@@ -6,6 +6,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+lerna-debug.log*
 
 # ======================
 # Environment
@@ -13,6 +14,7 @@ pnpm-debug.log*
 .env
 .env.*
 !.env.example
+*.local
 
 # ======================
 # Build outputs
@@ -20,6 +22,7 @@ pnpm-debug.log*
 dist/
 build/
 out/
+dist-ssr/
 
 # ======================
 # TypeScript
@@ -48,12 +51,24 @@ logs/
 # Coverage
 # ======================
 coverage/
+.nyc_output/
 
 # ======================
-# IDE
+# IDE / Editors
 # ======================
-.vscode/
+.vscode/*
+!.vscode/extensions.json
+
 .idea/
+
+# Visual Studio
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Swap files
+*.sw?
 
 # ======================
 # OS
@@ -69,25 +84,32 @@ Thumbs.db
 *.cache
 
 # ======================
-# Testing
-# ======================
-.nyc_output/
-
-# ======================
-# Uploads (if storing locally)
+# Uploads
 # ======================
 uploads/
 public/uploads/
 
 # ======================
-# Secrets / Keys
+# Secrets / Certificates
 # ======================
 *.pem
 *.key
 *.crt
 
 # ======================
-# Mongo local files
+# MongoDB local
 # ======================
 data/
 mongodb-data/
+
+# ======================
+# Test artifacts
+# ======================
+test-results/
+*.snap
+
+# ======================
+# PIDs
+# ======================
+*.pid
+*.pid.lock

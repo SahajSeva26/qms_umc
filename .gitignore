@@ -1,0 +1,93 @@
+# ======================
+# Node
+# ======================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ======================
+# Environment
+# ======================
+.env
+.env.*
+!.env.example
+
+# ======================
+# Build outputs
+# ======================
+dist/
+build/
+out/
+
+# ======================
+# TypeScript
+# ======================
+*.tsbuildinfo
+
+# ======================
+# Frontend (Vite/React)
+# ======================
+frontend/node_modules/
+frontend/dist/
+
+# ======================
+# Backend
+# ======================
+backend/node_modules/
+backend/dist/
+
+# ======================
+# Logs
+# ======================
+logs/
+*.log
+
+# ======================
+# Coverage
+# ======================
+coverage/
+
+# ======================
+# IDE
+# ======================
+.vscode/
+.idea/
+
+# ======================
+# OS
+# ======================
+.DS_Store
+Thumbs.db
+
+# ======================
+# Temporary files
+# ======================
+*.tmp
+*.temp
+*.cache
+
+# ======================
+# Testing
+# ======================
+.nyc_output/
+
+# ======================
+# Uploads (if storing locally)
+# ======================
+uploads/
+public/uploads/
+
+# ======================
+# Secrets / Keys
+# ======================
+*.pem
+*.key
+*.crt
+
+# ======================
+# Mongo local files
+# ======================
+data/
+mongodb-data/

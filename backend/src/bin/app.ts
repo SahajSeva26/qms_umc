@@ -1,0 +1,26 @@
+
+import express from "express";
+import cors from 'cors';
+import cookieParser from "cookie-parser";
+import { ResponseHandler} from "../shared/utils/responseHandler";
+
+
+
+// top level middleware
+const app = express();
+app.use(express.json());
+app.use(cookieParser());
+
+app.use(
+    cors({
+        origin: 'http://localhost:5173', // frontend URL
+        credentials: true, 
+    }),
+);
+
+app.get("/health-check", (req, res) => {
+  return ResponseHandler.appResponse(res, 200, true, "Server is running", null);
+});
+
+
+export {app};

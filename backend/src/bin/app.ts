@@ -3,6 +3,7 @@ import express from "express";
 import cors from 'cors';
 import cookieParser from "cookie-parser";
 import { ResponseHandler} from "../shared/utils/responseHandler";
+import { swaggerServe, swaggerSetup } from "../shared/config/swagger/swagger";
 
 
 
@@ -17,6 +18,7 @@ app.use(
         credentials: true, 
     }),
 );
+app.use("/api-docs", swaggerServe, swaggerSetup);
 
 app.get("/health-check", (req, res) => {
   return ResponseHandler.appResponse(res, 200, true, "Server is running", null);

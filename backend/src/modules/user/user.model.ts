@@ -1,4 +1,5 @@
 import mongoose, { InferSchemaType } from 'mongoose';
+import { USER_STATUS } from './user.constants';
 
 const defaultUserImage = 'https://as2.ftcdn.net/jpg/00/64/67/27/1000_F_64672736_U5kpdGs9keUll8CRQ3p3YaEv2M6qkVY5.webp';
 
@@ -53,8 +54,8 @@ const userSchema = new mongoose.Schema(
 
         status: {
             type: String,
-            enum: ['active', 'inactive', 'suspended', 'deleted'],
-            default: 'active',
+            enum: Object.keys(USER_STATUS),
+            default: USER_STATUS.ACTIVE,
         },
 
         gender: {

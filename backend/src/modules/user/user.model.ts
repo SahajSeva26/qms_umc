@@ -1,5 +1,5 @@
 import mongoose, { InferSchemaType } from 'mongoose';
-import { USER_STATUS } from './user.constants';
+import { USER_GENDERS, USER_STATUS } from './user.constants';
 
 const defaultUserImage = 'https://as2.ftcdn.net/jpg/00/64/67/27/1000_F_64672736_U5kpdGs9keUll8CRQ3p3YaEv2M6qkVY5.webp';
 
@@ -60,7 +60,7 @@ const userSchema = new mongoose.Schema(
 
         gender: {
             type: String,
-            enum: ['male', 'female', 'other'],
+            enum: Object.keys(USER_GENDERS),
         },
 
         isEmailVerified: {

@@ -10,7 +10,7 @@ import { IRegisterUserPayload } from '../auth/auth.validators';
 import { RequestContext } from '../../shared/utils/contextBuilder';
 
 type UserDocument = HydratedDocument<IUser> | null;
-const populate = [{}];
+const populate: any[] = [];
 // ========================================================================================
 // CORE FUNCTIONS
 // ========================================================================================
@@ -76,15 +76,19 @@ const search = async (filters: ISearchUserQuery, ctx: RequestContext, options?: 
     if (filters.gender) {
         where.gender = filters.gender;
     }
-    if (filters.joinedFrom) {
-        where.timestamp = { $gte: filters.joinedFrom };
-    }
-    if (filters.joinedTo) {
-        where.timestamp = { $lte: filters.joinedTo };
+    if (filters.joinedFrom || filters.joinedTo) {
+        where.timestamp = {};
+        if (filters.joinedFrom) where.timestamp.$gte = filters.joinedFrom;
+        if (filters.joinedTo) where.timestamp.$lte = filters.joinedTo;
     }
 
     const countPromise = UserModel.countDocuments(where);
-    const dataPromise = UserModel.find(where).sort(sort);
+
+    const dataPromise = UserModel.find(where)
+        .populate(populate)
+        .limit(options?.pagination?.limit)
+        .skip(options?.pagination?.skip)
+        .sort(sort);
 
     const [count, items] = await Promise.all([countPromise, dataPromise]);
 

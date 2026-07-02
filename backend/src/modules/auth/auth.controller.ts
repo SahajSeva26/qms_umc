@@ -52,8 +52,8 @@ const login = async (req: any, res: any) => {
         setRefreshCookie(res, refreshToken);
         return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'User logged in successfully', {
             data: AuthMapper.toResponse(user),
-            accessToken,
-            refreshToken,
+            // accessToken,
+            // refreshToken,
         });
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);

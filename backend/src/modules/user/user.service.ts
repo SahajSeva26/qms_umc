@@ -1,14 +1,15 @@
 import mongoose, { HydratedDocument } from 'mongoose';
 import { IUser, UserModel } from './user.model';
-import { IUpdateUserPayload } from './user.validators';
+import { ISearchUserQuery, IUpdateUserPayload } from './user.validators';
 import bcrypt from 'bcrypt';
 import { throwAppError } from '../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { USER_STATUS } from './user.constants';
 import { isValidEmail } from '../../shared/utils/strings';
-import { IRegisterPayload } from '../auth/auth.validators';
+import { IRegisterUserPayload } from '../auth/auth.validators';
+
 type UserDocument = HydratedDocument<IUser> | null;
-const populate = [];
+const populate = [{}];
 // ========================================================================================
 // CORE FUNCTIONS
 // ========================================================================================
@@ -30,7 +31,7 @@ const set = async (model: any, entity: HydratedDocument<IUser>) => {
     return entity;
 };
 
-const get = async (id:string, options?: any): Promise<UserDocument> => {
+const get = async (id: string, options?: any): Promise<UserDocument> => {
     let query = null;
 
     if (mongoose.isValidObjectId(id)) {
@@ -41,15 +42,58 @@ const get = async (id:string, options?: any): Promise<UserDocument> => {
         return throwAppError('Invalid user identifier', StatusCodes.BAD_REQUEST);
     }
 
-    if (options) {
-        query = query.populate(options);
+    if (query) {
+        if (options) {
+            query = query.populate(options);
+        }
     }
 
     return await query;
 };
 
-const create = async (model: IRegisterPayload): Promise<HydratedDocument<IUser>> => {
+const search = async (filters: ISearchUserQuery, options?: any) => {
+    let sort: any = {
+        timestamp: -1,
+    };
 
+    let where: mongoose.QueryFilter<IUser> = {
+        // add context default where build here
+    };
+
+    if (filters.name) {
+        where.$or = [
+            { firstName: { $regex: filters.name, $options: 'i' } },
+            { lastName: { $regex: filters.name, $options: 'i' } },
+        ];
+    }
+    if (filters.email) {
+        where.email = { $regex: filters.email, $options: 'i' };
+    }
+    if (filters.status) {
+        where.status = filters?.status?.toString();
+    }
+    if (filters.gender) {
+        where.gender = filters.gender;
+    }
+    if (filters.joinedFrom) {
+        where.timestamp = { $gte: filters.joinedFrom };
+    }
+    if (filters.joinedTo) {
+        where.timestamp = { $lte: filters.joinedTo };
+    }
+
+    const countPromise = UserModel.countDocuments(where);
+    const dataPromise = UserModel.find(where).sort(sort);
+
+    const [count, items] = await Promise.all([countPromise, dataPromise]);
+
+    return {
+        count,
+        items,
+    };
+};
+
+const create = async (model: IRegisterUserPayload): Promise<HydratedDocument<IUser>> => {
     let user: UserDocument = null;
 
     //1 check exitsing user
@@ -65,7 +109,7 @@ const create = async (model: IRegisterPayload): Promise<HydratedDocument<IUser>>
     //2: create user
     const entity = new UserModel({
         email: model.email,
-        status:USER_STATUS.INACTIVE,
+        status: USER_STATUS.INACTIVE,
         password: hashedPassword,
     });
 
@@ -76,27 +120,27 @@ const create = async (model: IRegisterPayload): Promise<HydratedDocument<IUser>>
     return user;
 };
 
-const update=async(id:string, model:IUpdateUserPayload)=>{
-
+const update = async (id: string, model: IUpdateUserPayload) => {
     //1: get user first
-    let user:UserDocument=null;
+    let user: UserDocument = null;
     user = await UserService.get(id);
     if (!user) {
         return throwAppError('User not found', StatusCodes.NOT_FOUND);
     }
-    
+
     //2: update user
     user = await set(model, user);
     user = await user.save();
 
     //3: return user
     return user;
-}
+};
 
 export const UserService = {
     get,
+    search,
     create,
-    update
+    update,
 };
 
 // ========================================================================================

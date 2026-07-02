@@ -7,4 +7,14 @@ export const UserMapper = {
             lastName: user.lastName,
         };
     },
+    toSearchResponse: (data: any) => {
+        const result = {
+            count: data?.count || 0,
+            items: [] as any[],
+        };
+        for (const u of data?.items) {
+            result.items.push(UserMapper.toResponse(u));
+        }
+        return result;
+    },
 };

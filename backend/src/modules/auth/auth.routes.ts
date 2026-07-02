@@ -2,7 +2,7 @@ import express from 'express';
 import { registry } from '../../shared/config/swagger/swagger.registry';
 
 import { AuthController } from './auth.controller';
-import { RegisterPayloadSchema } from './auth.validators';
+import { RegisterUserPayloadSchema } from './auth.validators';
 
 export const AuthRouter = express.Router(); 
 
@@ -18,7 +18,7 @@ registry.registerPath({
         body: {
             content: {
                 'application/json': {
-                    schema: RegisterPayloadSchema,
+                    schema: RegisterUserPayloadSchema,
                 },
             },
         },

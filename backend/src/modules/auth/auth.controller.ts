@@ -5,9 +5,11 @@ import { AuthService } from './auth.service';
 import { AuthMapper } from './auth.mapper';
 import { LoginUserPayloadSchema, RegisterUserPayloadSchema } from './auth.validators';
 import { clearAuthCookies, setAccessCookie, setRefreshCookie } from '../../shared/utils/cookies';
+import { RequestContext } from '../../shared/utils/contextBuilder';
 
 const register = async (req: any, res: any) => {
     try {
+        const ctx: RequestContext = req.context;
         const { data, success, error } = RegisterUserPayloadSchema.safeParse(req.body);
         if (!success) {
             const validationErrors = formatZodError(error);
@@ -17,7 +19,7 @@ const register = async (req: any, res: any) => {
             });
         }
 
-        const user = await AuthService.register(data);
+        const user = await AuthService.register(data, ctx);
 
         return ResponseHandler.appResponse(
             res,
@@ -33,6 +35,7 @@ const register = async (req: any, res: any) => {
 
 const login = async (req: any, res: any) => {
     try {
+        const ctx: RequestContext = req.context;
         const { data, success, error } = LoginUserPayloadSchema.safeParse(req.body);
         if (!success) {
             const validationErrors = formatZodError(error);
@@ -42,7 +45,7 @@ const login = async (req: any, res: any) => {
             });
         }
 
-        const { user, accessToken, refreshToken } = await AuthService.login(data);
+        const { user, accessToken, refreshToken } = await AuthService.login(data, ctx);
 
         //set cookies
         setAccessCookie(res, accessToken);

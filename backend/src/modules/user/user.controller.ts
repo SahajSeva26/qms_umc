@@ -5,15 +5,17 @@ import { StatusCodes } from 'http-status-codes';
 import { UserService } from './user.service';
 import { UserMapper } from './user.mapper';
 import { RequestHandler } from '../../shared/utils/requestHandler';
+import { RequestContext } from '../../shared/utils/contextBuilder';
 
 const get = async (req: any, res: any) => {
     try {
+        const ctx: RequestContext = req.context;
         const { id } = req?.params;
         if (!id) {
             return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'User ID is required', null);
         }
 
-        const user = await UserService.get(id);
+        const user = await UserService.get(id, ctx);
 
         return ResponseHandler.appResponse(
             res,
@@ -22,23 +24,18 @@ const get = async (req: any, res: any) => {
             'User fetched successfully',
             UserMapper.toResponse(user),
         );
-    } catch (error) {
-        return ResponseHandler.appResponse(
-            res,
-            StatusCodes.INTERNAL_SERVER_ERROR,
-            false,
-            'Internal server error',
-            null,
-        );
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }
 };
 
 const search = async (req: any, res: any) => {
     try {
+        const ctx: RequestContext = req.context;
         const query = RequestHandler.parseQuery(req);
         const pagination = RequestHandler.getPagination(req);
 
-        const result = await UserService.search(query, pagination);
+        const result = await UserService.search(query, ctx, { pagination });
 
         return ResponseHandler.appResponse(
             res,
@@ -54,6 +51,7 @@ const search = async (req: any, res: any) => {
 
 const update = async (req: any, res: any) => {
     try {
+        const ctx: RequestContext = req.context;
         const { id } = req?.params;
         if (!id) {
             return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'User ID is required', null);
@@ -68,7 +66,7 @@ const update = async (req: any, res: any) => {
             });
         }
 
-        const user = await UserService.update(id, data);
+        const user = await UserService.update(id, data, ctx);
 
         return ResponseHandler.appResponse(
             res,

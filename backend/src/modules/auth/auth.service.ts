@@ -6,15 +6,16 @@ import bcrypt from 'bcrypt';
 import { throwAppError } from '../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { TokenHandler } from '../../shared/helpers/tokenHelper';
+import { RequestContext } from '../../shared/utils/contextBuilder';
 
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 10 * 60 * 1000; // 10 minutes
 
-const register = async (data: IRegisterUserPayload): Promise<HydratedDocument<IUser>> => {
-    const user = await UserService.create(data);
+const register = async (data: IRegisterUserPayload, ctx: RequestContext): Promise<HydratedDocument<IUser>> => {
+    const user = await UserService.create(data, ctx);
     return user;
 };
-const login = async (data: ILoginUserPayload) => {
+const login = async (data: ILoginUserPayload, ctx: RequestContext) => {
     // 1: get user
     const user = await UserService.getUserWithPassword(data.email);
     if (!user) {

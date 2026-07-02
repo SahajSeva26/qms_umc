@@ -7,6 +7,7 @@ import { StatusCodes } from 'http-status-codes';
 import { USER_STATUS } from './user.constants';
 import { isValidEmail } from '../../shared/utils/strings';
 import { IRegisterUserPayload } from '../auth/auth.validators';
+import { RequestContext } from '../../shared/utils/contextBuilder';
 
 type UserDocument = HydratedDocument<IUser> | null;
 const populate = [{}];
@@ -14,7 +15,7 @@ const populate = [{}];
 // CORE FUNCTIONS
 // ========================================================================================
 
-const set = async (model: any, entity: HydratedDocument<IUser>) => {
+const set = async (model: any, entity: HydratedDocument<IUser>, ctx: RequestContext) => {
     if (model.firstName) {
         entity.firstName = model.firstName;
     }
@@ -31,7 +32,7 @@ const set = async (model: any, entity: HydratedDocument<IUser>) => {
     return entity;
 };
 
-const get = async (id: string, options?: any): Promise<UserDocument> => {
+const get = async (id: string, ctx: RequestContext, options?: any): Promise<UserDocument> => {
     let query = null;
 
     if (mongoose.isValidObjectId(id)) {
@@ -51,7 +52,7 @@ const get = async (id: string, options?: any): Promise<UserDocument> => {
     return await query;
 };
 
-const search = async (filters: ISearchUserQuery, options?: any) => {
+const search = async (filters: ISearchUserQuery, ctx: RequestContext, options?: any) => {
     let sort: any = {
         timestamp: -1,
     };
@@ -93,11 +94,11 @@ const search = async (filters: ISearchUserQuery, options?: any) => {
     };
 };
 
-const create = async (model: IRegisterUserPayload): Promise<HydratedDocument<IUser>> => {
+const create = async (model: IRegisterUserPayload, ctx: RequestContext): Promise<HydratedDocument<IUser>> => {
     let user: UserDocument = null;
 
     //1 check exitsing user
-    user = await UserService.get(model.email);
+    user = await UserService.get(model.email, ctx);
     if (user) {
         return throwAppError('User already exists', StatusCodes.CONFLICT);
     }
@@ -114,22 +115,22 @@ const create = async (model: IRegisterUserPayload): Promise<HydratedDocument<IUs
     });
 
     //set remaining fields
-    user = await set(model, entity);
+    user = await set(model, entity, ctx);
 
     user = await user.save();
     return user;
 };
 
-const update = async (id: string, model: IUpdateUserPayload) => {
+const update = async (id: string, model: IUpdateUserPayload, ctx: RequestContext) => {
     //1: get user first
     let user: UserDocument = null;
-    user = await UserService.get(id);
+    user = await UserService.get(id, ctx);
     if (!user) {
         return throwAppError('User not found', StatusCodes.NOT_FOUND);
     }
 
     //2: update user
-    user = await set(model, user);
+    user = await set(model, user, ctx);
     user = await user.save();
 
     //3: return user

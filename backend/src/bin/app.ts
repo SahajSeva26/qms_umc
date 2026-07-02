@@ -20,15 +20,13 @@ app.use(
 );
 app.use('/api-docs', swaggerServe, swaggerSetup);
 
-
 app.use(buildContext);
 // application routes
 app.use('/api/v1/auth', AuthRouter);
-app.use('/api/v1/user', UserRouter);
+app.use('/api/v1/users', UserRouter);
 
 app.get('/health-check', (req, res) => {
     return ResponseHandler.appResponse(res, 200, true, 'Server is running', null);
 });
 
 export { app };
-

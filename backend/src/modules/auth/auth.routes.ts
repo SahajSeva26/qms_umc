@@ -54,6 +54,7 @@ registry.registerPath({
 });
 
 registry.registerPath({
+    //logout
     method: 'post',
     path: '/auth/logout',
     tags: ['AUTH'],

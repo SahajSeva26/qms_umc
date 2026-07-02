@@ -1,15 +1,17 @@
 import express from 'express';
 import { UserController } from './user.controller';
 import { registry } from '../../shared/config/swagger/swagger.registry';
-import { z } from 'zod';
+
 import { SearchUserQuerySchema, UpdateUserPayloadSchema } from './user.validators';
+import { AuthMiddleware } from '../../shared/middlewares/authmiddleware';
 
 export const UserRouter = express.Router();
 
+UserRouter.use(AuthMiddleware);
 // get user
 registry.registerPath({
     method: 'get',
-    path: '/user/{id}',
+    path: '/users/{id}',
     tags: ['USER'],
     summary: 'Get user',
     parameters: [
@@ -29,10 +31,10 @@ registry.registerPath({
 //search user
 registry.registerPath({
     method: 'get',
-    path: '/user',
+    path: '/users',
     tags: ['USER'],
     summary: 'Search users',
-  request: {
+    request: {
         query: SearchUserQuerySchema,
     },
     responses: {
@@ -44,7 +46,7 @@ registry.registerPath({
 // Update user
 registry.registerPath({
     method: 'put',
-    path: '/user/{id}',
+    path: '/users/{id}',
     tags: ['USER'],
     summary: 'Update user',
     parameters: [
@@ -69,8 +71,6 @@ registry.registerPath({
         400: { description: 'User update failed' },
     },
 });
-
-
 
 UserRouter.get('/:id', UserController.get);
 UserRouter.put('/:id', UserController.update);

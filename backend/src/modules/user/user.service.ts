@@ -136,11 +136,16 @@ const update = async (id: string, model: IUpdateUserPayload) => {
     return user;
 };
 
+// dedicated method for auth flows only
+const getUserWithPassword = async (email: string) => {
+    return await UserModel.findOne({ email }).select('+password');
+};
 export const UserService = {
     get,
     search,
     create,
     update,
+    getUserWithPassword,
 };
 
 // ========================================================================================

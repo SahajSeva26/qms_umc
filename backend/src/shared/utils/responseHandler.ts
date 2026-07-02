@@ -20,7 +20,7 @@ import { object } from 'zod';
 //     });
 // };
 
-const appResponse = (res: any, status: number, success: boolean, message: string, data?: any) => {
+const appResponse = (res: any, status: number = 500, success: boolean, message: string, data?: any) => {
     return res.status(status).json({
         success,
         message: message || (success ? 'Request successful' : 'Request failed'),

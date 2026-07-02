@@ -10,7 +10,7 @@ let ENV = {
         Environment: process.env.APP_ENV || 'development',
     },
     DB: {
-        URI: process.env.DB_URI || '',
+        URI: process.env.DB_URI || 'http://localhost:27017/qms',
     },
     JWT: {
         Secret: process.env.JWT_SECRET || 'secret',

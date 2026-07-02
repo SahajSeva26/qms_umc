@@ -4,6 +4,7 @@ import cors from 'cors';
 import cookieParser from "cookie-parser";
 import { ResponseHandler} from "../shared/utils/responseHandler";
 import { swaggerServe, swaggerSetup } from "../shared/config/swagger/swagger";
+import { AuthRouter } from "../modules/auth/auth.routes";
 
 
 
@@ -19,6 +20,9 @@ app.use(
     }),
 );
 app.use("/api-docs", swaggerServe, swaggerSetup);
+
+// application routes
+app.use("/api/v1/auth",AuthRouter);
 
 app.get("/health-check", (req, res) => {
   return ResponseHandler.appResponse(res, 200, true, "Server is running", null);

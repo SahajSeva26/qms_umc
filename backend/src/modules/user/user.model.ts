@@ -54,13 +54,13 @@ const userSchema = new mongoose.Schema(
 
         status: {
             type: String,
-            enum: Object.keys(USER_STATUS),
+            enum: [USER_STATUS.ACTIVE, USER_STATUS.INACTIVE, USER_STATUS.SUSPENDED, USER_STATUS.DELETED],
             default: USER_STATUS.ACTIVE,
         },
 
         gender: {
             type: String,
-            enum: Object.keys(USER_GENDERS),
+            enum: [USER_GENDERS.MALE, USER_GENDERS.FEMALE],
         },
 
         isEmailVerified: {

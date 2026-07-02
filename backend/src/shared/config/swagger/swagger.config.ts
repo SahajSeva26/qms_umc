@@ -3,7 +3,7 @@ import { registry } from './swagger.registry';
 
 // ===========IMPORT ALL MODULES HERE============
 // ==============================================
-
+import  "../../../modules/auth/auth.routes";
 // =============================================
 // =============================================
 
@@ -14,5 +14,5 @@ export const swaggerSpec = new OpenApiGeneratorV3(registry.definitions).generate
         version: '1.0.0',
         description: 'API documentation for QMS backend',
     },
-    servers: [{ url: 'http://localhost:3000', description: 'Development server' }],
+    servers: [{ url: 'http://localhost:3000/api/v1', description: 'Development server' }],
 });

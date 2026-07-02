@@ -9,6 +9,6 @@ export const RegisterPayloadSchema = z.object({
     email: z.email().openapi({ example: 'john@example.com' }),
     password: z.string().min(1).openapi({ example: 'Test@123' }),
     phone: z.string().min(1).optional().openapi({ example: '1234567890' }),
-    gender: z.enum(Object.keys(USER_GENDERS)).optional().openapi({ example: 'male' }),
+    gender: z.enum([USER_GENDERS.MALE, USER_GENDERS.FEMALE,USER_GENDERS.OTHER]).optional().openapi({ example: 'male' }),
 });
 export type IRegisterPayload = z.infer<typeof RegisterPayloadSchema>;

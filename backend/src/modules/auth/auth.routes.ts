@@ -4,11 +4,12 @@ import { registry } from '../../shared/config/swagger/swagger.registry';
 import { AuthController } from './auth.controller';
 import { LoginUserPayloadSchema, RegisterUserPayloadSchema } from './auth.validators';
 
-export const AuthRouter = express.Router(); 
+export const AuthRouter = express.Router();
 
-// 
+//
 // ========== SWAGGER ============================
-registry.registerPath({ //register
+registry.registerPath({
+    //register
     method: 'post',
     path: '/auth/register',
     tags: ['AUTH'],
@@ -29,7 +30,8 @@ registry.registerPath({ //register
         400: { description: 'User registration failed' },
     },
 });
-registry.registerPath({ //login
+registry.registerPath({
+    //login
     method: 'post',
     path: '/auth/login',
     tags: ['AUTH'],
@@ -39,7 +41,7 @@ registry.registerPath({ //login
         body: {
             content: {
                 'application/json': {
-                    schema: LoginUserPayloadSchema  ,
+                    schema: LoginUserPayloadSchema,
                 },
             },
         },
@@ -51,8 +53,20 @@ registry.registerPath({ //login
     },
 });
 
+registry.registerPath({
+    method: 'post',
+    path: '/auth/logout',
+    tags: ['AUTH'],
+    summary: 'Logout a user',
+
+    responses: {
+        200: { description: 'User logged out successfully' },
+        400: { description: 'User logout failed' },
+    },
+});
 // ===================================================
 // ==========EXPORT ROUTES============================
 // ===================================================
 AuthRouter.post('/register', AuthController.register);
 AuthRouter.post('/login', AuthController.login);
+AuthRouter.post('/logout', AuthController.logout);

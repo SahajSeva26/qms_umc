@@ -4,6 +4,7 @@ import { ResponseHandler } from '../../shared/utils/responseHandler';
 import { AuthService } from './auth.service';
 import { AuthMapper } from './auth.mapper';
 import { LoginUserPayloadSchema, RegisterUserPayloadSchema } from './auth.validators';
+import { clearAuthCookies, setAccessCookie, setRefreshCookie } from '../../shared/utils/cookies';
 
 const register = async (req: any, res: any) => {
     try {
@@ -43,6 +44,9 @@ const login = async (req: any, res: any) => {
 
         const { user, accessToken, refreshToken } = await AuthService.login(data);
 
+        //set cookies
+        setAccessCookie(res, accessToken);
+        setRefreshCookie(res, refreshToken);
         return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'User logged in successfully', {
             data: AuthMapper.toResponse(user),
             accessToken,
@@ -53,7 +57,17 @@ const login = async (req: any, res: any) => {
     }
 };
 
+const logout = async (req: any, res: any) => {
+    try {
+        clearAuthCookies(res);
+        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'User logged out successfully', null);
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
 export const AuthController = {
     register,
     login,
+    logout,
 };

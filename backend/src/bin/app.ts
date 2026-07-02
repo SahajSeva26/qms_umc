@@ -5,6 +5,7 @@ import { ResponseHandler } from '../shared/utils/responseHandler';
 import { swaggerServe, swaggerSetup } from '../shared/config/swagger/swagger';
 import { AuthRouter } from '../modules/auth/auth.routes';
 import { UserRouter } from '../modules/user/user.routes';
+import { buildContext } from '../shared/utils/contextBuilder';
 
 // top level middleware
 const app = express();
@@ -19,6 +20,8 @@ app.use(
 );
 app.use('/api-docs', swaggerServe, swaggerSetup);
 
+
+app.use(buildContext);
 // application routes
 app.use('/api/v1/auth', AuthRouter);
 app.use('/api/v1/user', UserRouter);
@@ -28,3 +31,4 @@ app.get('/health-check', (req, res) => {
 });
 
 export { app };
+

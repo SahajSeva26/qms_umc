@@ -41,15 +41,13 @@ const login = async (req: any, res: any) => {
             });
         }
 
-        const user = await AuthService.login(data);
+        const { user, accessToken, refreshToken } = await AuthService.login(data);
 
-        return ResponseHandler.appResponse(
-            res,
-            StatusCodes.OK,
-            true,
-            'User logged in successfully',
-            AuthMapper.toResponse(user),
-        );
+        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'User logged in successfully', {
+            data: AuthMapper.toResponse(user),
+            accessToken,
+            refreshToken,
+        });
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }

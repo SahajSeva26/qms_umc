@@ -5,6 +5,7 @@ import { IUser } from '../user/user.model';
 import bcrypt from 'bcrypt';
 import { throwAppError } from '../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
+import { TokenHandler } from '../../shared/helpers/tokenHelper';
 
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 10 * 60 * 1000; // 10 minutes
@@ -54,7 +55,15 @@ const login = async (data: ILoginUserPayload) => {
     user.lockUntil = null;
     await user.save();
 
-    return user;
+    // 5: generate tokens
+    const accessToken = TokenHandler.generateAccessToken(user);
+    const refreshToken = TokenHandler.generateRefreshToken(user);
+
+    return {
+        user,
+        accessToken,
+        refreshToken,
+    };
 };
 
 export const AuthService = {

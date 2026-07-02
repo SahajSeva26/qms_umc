@@ -1,7 +1,8 @@
 import express from 'express';
 import { registry } from '../../shared/config/swagger/swagger.registry';
-import { RegisterPayloadSchema } from '../user/user.validators';
+
 import { AuthController } from './auth.controller';
+import { RegisterPayloadSchema } from './auth.validators';
 
 export const AuthRouter = express.Router(); 
 

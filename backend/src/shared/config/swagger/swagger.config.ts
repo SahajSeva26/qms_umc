@@ -4,6 +4,7 @@ import { registry } from './swagger.registry';
 // ===========IMPORT ALL MODULES HERE============
 // ==============================================
 import  "../../../modules/auth/auth.routes";
+import "../../../modules/user/user.routes";
 // =============================================
 // =============================================
 

@@ -1,12 +1,10 @@
-
-import express from "express";
+import express from 'express';
 import cors from 'cors';
-import cookieParser from "cookie-parser";
-import { ResponseHandler} from "../shared/utils/responseHandler";
-import { swaggerServe, swaggerSetup } from "../shared/config/swagger/swagger";
-import { AuthRouter } from "../modules/auth/auth.routes";
-
-
+import cookieParser from 'cookie-parser';
+import { ResponseHandler } from '../shared/utils/responseHandler';
+import { swaggerServe, swaggerSetup } from '../shared/config/swagger/swagger';
+import { AuthRouter } from '../modules/auth/auth.routes';
+import { UserRouter } from '../modules/user/user.routes';
 
 // top level middleware
 const app = express();
@@ -16,17 +14,17 @@ app.use(cookieParser());
 app.use(
     cors({
         origin: 'http://localhost:5173', // frontend URL
-        credentials: true, 
+        credentials: true,
     }),
 );
-app.use("/api-docs", swaggerServe, swaggerSetup);
+app.use('/api-docs', swaggerServe, swaggerSetup);
 
 // application routes
-app.use("/api/v1/auth",AuthRouter);
+app.use('/api/v1/auth', AuthRouter);
+app.use('/api/v1/user', UserRouter);
 
-app.get("/health-check", (req, res) => {
-  return ResponseHandler.appResponse(res, 200, true, "Server is running", null);
+app.get('/health-check', (req, res) => {
+    return ResponseHandler.appResponse(res, 200, true, 'Server is running', null);
 });
 
-
-export {app};
+export { app };

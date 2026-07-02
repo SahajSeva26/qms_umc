@@ -1,12 +1,11 @@
 import { StatusCodes } from "http-status-codes";
 import { formatZodError } from "../../shared/utils/error";
 import { ResponseHandler } from "../../shared/utils/responseHandler";
-import { UserService } from "../user/user.service";
-import { RegisterPayloadSchema } from "../user/user.validators";
-import { Request, Response, RequestHandler } from "express";
-import { userMapper } from "../user/user.mapper";
-
- const register = async (req: Request, res: Response) => {
+import { AuthService } from "./auth.service";
+import { AuthMapper } from "./auth.mapper";
+import { RegisterPayloadSchema } from "./auth.validators";
+    
+ const register = async (req: any, res: any) => {
     try {
         const { data, success, error } = RegisterPayloadSchema.safeParse(req.body);
         if (!success) {
@@ -17,9 +16,9 @@ import { userMapper } from "../user/user.mapper";
             });
         }
 
-        const user = await UserService.create(data);
+        const user = await AuthService.register(data);
 
-        return ResponseHandler.appResponse(res, StatusCodes.CREATED, true, 'User registered successfully', userMapper.toResponse(user));
+        return ResponseHandler.appResponse(res, StatusCodes.CREATED, true, 'User registered successfully', AuthMapper.toResponse(user));
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }

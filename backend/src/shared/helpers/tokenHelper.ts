@@ -6,7 +6,7 @@ import { StatusCodes } from 'http-status-codes';
 export const TokenHandler = {
     generateAccessToken: (payload: any) => {
         const tokenPayload = {
-            _id: payload?.id,
+            _id: payload?._id,
             email: payload?.email,
         };
 
@@ -25,7 +25,7 @@ export const TokenHandler = {
 
     generateRefreshToken: (payload: any) => {
         const tokenPayload = {
-            _id: payload?.id,
+            _id: payload?._id,
             email: payload?.email,
         };
 

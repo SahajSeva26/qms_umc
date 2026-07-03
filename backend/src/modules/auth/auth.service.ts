@@ -73,12 +73,12 @@ const login = async (data: ILoginUserPayload, ctx: RequestContext) => {
 
 const refreshToken = async (refreshToken: string, ctx: RequestContext) => {
     //1: generate new access token & refresh token
-    const payload = TokenHandler.decodePayload(refreshToken);
+    const payload: any = TokenHandler.decodePayload(refreshToken);
     const newAccessToken = TokenHandler.generateAccessToken(payload);
     const newRefreshToken = TokenHandler.generateRefreshToken(payload);
 
     //2: save new refresh token in database
-    const userId: string = ctx.user?._id || '';
+    const userId: string = payload?._id?.toString() || '';
     const user = await UserService.get(userId, ctx);
     if (!user) {
         return throwAppError('User not found', StatusCodes.NOT_FOUND);

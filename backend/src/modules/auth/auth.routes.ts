@@ -3,6 +3,7 @@ import { registry } from '../../shared/config/swagger/swagger.registry';
 
 import { AuthController } from './auth.controller';
 import { LoginUserPayloadSchema, RegisterUserPayloadSchema } from './auth.validators';
+import { AuthMiddleware } from '../../shared/middlewares/authmiddleware';
 
 export const AuthRouter = express.Router();
 
@@ -65,9 +66,22 @@ registry.registerPath({
         400: { description: 'User logout failed' },
     },
 });
+
+registry.registerPath({
+    //refresh token
+    method: 'post',
+    path: '/auth/refresh-token',
+    tags: ['AUTH'],
+    summary: 'Refresh access token',
+    responses: {
+        200: { description: 'Token refreshed successfully' },
+        400: { description: 'Token refresh failed' },
+    },
+});
 // ===================================================
 // ==========EXPORT ROUTES============================
 // ===================================================
 AuthRouter.post('/register', AuthController.register);
 AuthRouter.post('/login', AuthController.login);
-AuthRouter.post('/logout', AuthController.logout);
+AuthRouter.post('/logout', AuthMiddleware, AuthController.logout);
+AuthRouter.post('/refresh-token', AuthController.refreshToken);

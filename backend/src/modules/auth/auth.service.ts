@@ -6,7 +6,8 @@ import bcrypt from 'bcrypt';
 import { throwAppError } from '../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { TokenHandler } from '../../shared/helpers/tokenHelper';
-import { RequestContext } from '../../shared/utils/contextBuilder';
+import { ContextUser, RequestContext } from '../../shared/utils/contextBuilder';
+import { CookieHandler } from '../../shared/utils/cookies';
 
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 10 * 60 * 1000; // 10 minutes
@@ -54,11 +55,14 @@ const login = async (data: ILoginUserPayload, ctx: RequestContext) => {
     // 4: reset if everything is right
     user.loginAttempts = 0;
     user.lockUntil = null;
-    await user.save();
 
     // 5: generate tokens
     const accessToken = TokenHandler.generateAccessToken(user);
     const refreshToken = TokenHandler.generateRefreshToken(user);
+
+    // 6: save refresh token in database
+    user.refreshToken = refreshToken;
+    await user.save();
 
     return {
         user,
@@ -67,7 +71,30 @@ const login = async (data: ILoginUserPayload, ctx: RequestContext) => {
     };
 };
 
+const refreshToken = async (refreshToken: string, ctx: RequestContext) => {
+    //1: generate new access token & refresh token
+    const payload = TokenHandler.decodePayload(refreshToken);
+    const newAccessToken = TokenHandler.generateAccessToken(payload);
+    const newRefreshToken = TokenHandler.generateRefreshToken(payload);
+
+    //2: save new refresh token in database
+    const userId: string = ctx.user?._id || '';
+    const user = await UserService.get(userId, ctx);
+    if (!user) {
+        return throwAppError('User not found', StatusCodes.NOT_FOUND);
+    }
+
+    user.refreshToken = newRefreshToken;
+    await user.save();
+
+    return {
+        newAccessToken,
+        newRefreshToken,
+    };
+};
+
 export const AuthService = {
     register,
     login,
+    refreshToken,
 };

@@ -28,6 +28,9 @@ const set = async (model: any, entity: HydratedDocument<IUser>, ctx: RequestCont
     if (model.phone) {
         entity.phone = model.phone;
     }
+    if (model.status) {
+        entity.status = model.status;
+    }
 
     return entity;
 };

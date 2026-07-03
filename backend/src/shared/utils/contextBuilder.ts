@@ -2,7 +2,7 @@ import { throwAppError } from './error';
 import logger from './logger';
 import { generateUUID } from './strings';
 
-type ContextUser = {
+export type ContextUser = {
     _id: string;
     email: string;
 };

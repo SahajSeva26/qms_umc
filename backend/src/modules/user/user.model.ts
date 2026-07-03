@@ -59,17 +59,12 @@ const userSchema = new mongoose.Schema(
 
         gender: {
             type: String,
-            enum: [USER_GENDERS.MALE, USER_GENDERS.FEMALE,USER_GENDERS.OTHER],
+            enum: [USER_GENDERS.MALE, USER_GENDERS.FEMALE, USER_GENDERS.OTHER],
         },
 
-        isEmailVerified: {
-            type: Boolean,
-            default: false,
-        },
-
-        isPhoneVerified: {
-            type: Boolean,
-            default: false,
+        refreshToken: {
+            type: String,
+            default: null,
         },
 
         loginAttempts: {

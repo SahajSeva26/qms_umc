@@ -1,5 +1,7 @@
 import jwt from 'jsonwebtoken';
 import ENV from '../config/app.config';
+import { throwAppError } from '../utils/error';
+import { StatusCodes } from 'http-status-codes';
 
 export const TokenHandler = {
     generateAccessToken: (payload: any) => {
@@ -41,10 +43,20 @@ export const TokenHandler = {
     },
 
     verifyAccessToken: (token: string) => {
+
         return jwt.verify(token, ENV.JWT.AccessTokenSecret);
     },
 
     verifyRefreshToken: (token: string) => {
+        if (!token) {
+            throwAppError('Refresh token not found', StatusCodes.UNAUTHORIZED);
+        }
         return jwt.verify(token, ENV.JWT.RefreshTokenSecret);
     },
+
+    decodePayload: (token: string) => {
+        return jwt.decode(token);
+    },
+
+
 };

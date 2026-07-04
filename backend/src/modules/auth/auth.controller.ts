@@ -62,12 +62,15 @@ const login = async (req: any, res: any) => {
 const logout = async (req: any, res: any) => {
     try {
         const ctx: RequestContext = req.context;
-        CookieHandler.clear(res, AUTH_TOKENS.ACCESS_TOKEN);
-        CookieHandler.clear(res, AUTH_TOKENS.REFRESH_TOKEN);
+
+        // 1: clear backend session
         const userId = ctx.user?._id;
         if (userId) {
             await AuthService.logout(userId, ctx);
         }
+        // 2: clear browser  coookies second
+        CookieHandler.clear(res, AUTH_TOKENS.ACCESS_TOKEN);
+        CookieHandler.clear(res, AUTH_TOKENS.REFRESH_TOKEN);
         return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'User logged out successfully', null);
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);

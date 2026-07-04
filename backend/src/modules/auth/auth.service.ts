@@ -71,17 +71,18 @@ const login = async (data: ILoginUserPayload, ctx: RequestContext) => {
     };
 };
 
-const logout=async(userId: string, ctx: RequestContext) => {
+const logout = async (userId: string, ctx: RequestContext) => {
+    //1: get user
     const user = await UserService.get(userId, ctx);
     if (!user) {
         return throwAppError('User not found', StatusCodes.NOT_FOUND);
     }
+
+    //2: clear refresh token
     user.refreshToken = null;
     await user.save();
-    return {
-        message: 'Logged out successfully',
-    };
-}
+    return true;
+};
 const refreshToken = async (refreshToken: string, ctx: RequestContext) => {
     //1: generate new access token & refresh token
     const payload: any = TokenHandler.decodePayload(refreshToken);
@@ -111,8 +112,6 @@ const refreshToken = async (refreshToken: string, ctx: RequestContext) => {
         newRefreshToken,
     };
 };
-
-
 
 export const AuthService = {
     register,

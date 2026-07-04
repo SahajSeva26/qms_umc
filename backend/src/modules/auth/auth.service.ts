@@ -71,19 +71,38 @@ const login = async (data: ILoginUserPayload, ctx: RequestContext) => {
     };
 };
 
+const logout=async(userId: string, ctx: RequestContext) => {
+    const user = await UserService.get(userId, ctx);
+    if (!user) {
+        return throwAppError('User not found', StatusCodes.NOT_FOUND);
+    }
+    user.refreshToken = null;
+    await user.save();
+    return {
+        message: 'Logged out successfully',
+    };
+}
 const refreshToken = async (refreshToken: string, ctx: RequestContext) => {
     //1: generate new access token & refresh token
     const payload: any = TokenHandler.decodePayload(refreshToken);
-    const newAccessToken = TokenHandler.generateAccessToken(payload);
-    const newRefreshToken = TokenHandler.generateRefreshToken(payload);
 
-    //2: save new refresh token in database
+    //2: get user from database
     const userId: string = payload?._id?.toString() || '';
     const user = await UserService.get(userId, ctx);
     if (!user) {
         return throwAppError('User not found', StatusCodes.NOT_FOUND);
     }
 
+    // 3: check if refresh token matches
+    if (user.refreshToken?.toString() !== refreshToken.toString()) {
+        return throwAppError('Invalid refresh token', StatusCodes.UNAUTHORIZED);
+    }
+
+    //4: generate tokens
+    const newAccessToken = TokenHandler.generateAccessToken(payload);
+    const newRefreshToken = TokenHandler.generateRefreshToken(payload);
+
+    // 5: save new refresh token
     user.refreshToken = newRefreshToken;
     await user.save();
 
@@ -93,8 +112,11 @@ const refreshToken = async (refreshToken: string, ctx: RequestContext) => {
     };
 };
 
+
+
 export const AuthService = {
     register,
     login,
+    logout,
     refreshToken,
 };

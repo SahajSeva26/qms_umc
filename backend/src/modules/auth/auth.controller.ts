@@ -61,8 +61,13 @@ const login = async (req: any, res: any) => {
 
 const logout = async (req: any, res: any) => {
     try {
+        const ctx: RequestContext = req.context;
         CookieHandler.clear(res, AUTH_TOKENS.ACCESS_TOKEN);
         CookieHandler.clear(res, AUTH_TOKENS.REFRESH_TOKEN);
+        const userId = ctx.user?._id;
+        if (userId) {
+            await AuthService.logout(userId, ctx);
+        }
         return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'User logged out successfully', null);
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
@@ -88,7 +93,6 @@ const refreshToken = async (req: any, res: any) => {
         CookieHandler.setRefreshToken(res, newRefreshToken);
 
         return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Token refreshed successfully', null);
-
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }

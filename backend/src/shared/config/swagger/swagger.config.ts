@@ -6,6 +6,7 @@ import { registry } from './swagger.registry';
 import  "../../../modules/auth/auth.routes";
 import "../../../modules/user/user.routes";
 import "../../../modules/access-management/tenant/tenant.routes";
+import "../../../modules/access-management/permission-group/permissionGroup.routes";
 // =============================================
 // =============================================
 

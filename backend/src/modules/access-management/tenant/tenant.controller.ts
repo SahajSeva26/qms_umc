@@ -17,6 +17,10 @@ const get = async (req: any, res: any) => {
 
         const tenant = await TenantService.get(id, ctx);
 
+        if (!tenant) {
+            return ResponseHandler.appResponse(res, StatusCodes.NOT_FOUND, false, 'Tenant not found', null);
+        }
+
         return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Tenant fetched successfully', TenantMapper.toResponse(tenant));
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);

@@ -1,0 +1,144 @@
+import mongoose, { HydratedDocument } from 'mongoose';
+import { IPermissionGroup, PermissionGroupModel } from './permissionGroup.model';
+import { ICreatePermissionGroupPayload, ISearchPermissionGroupQuery, IUpdatePermissionGroupPayload } from './permissionGroup.validators';
+import { PERMISSION_GROUP_STATUSES } from './permissionGroups.constants';
+import { throwAppError } from '../../../shared/utils/error';
+import { StatusCodes } from 'http-status-codes';
+import { RequestContext } from '../../../shared/utils/contextBuilder';
+import { toObjectId, isValidObjectID } from '../../../shared/utils/strings';
+import { PERMISSIONS_ARRAY } from '../../../shared/env/permissions';
+import { TenantService } from '../tenant/tenant.service';
+
+type PermissionGroupDocument = HydratedDocument<IPermissionGroup> | null;
+const populate: any[] = [];
+
+// ========================================================================================
+// CORE FUNCTIONS
+// ========================================================================================
+
+const set = async (model: any, entity: HydratedDocument<IPermissionGroup>, ctx: RequestContext) => {
+    if (model.code) {
+        entity.code = model.code;
+    }
+    if (model.name) {
+        entity.name = model.name;
+    }
+    if (model.description) {
+        entity.description = model.description;
+    }
+    if (model.status) {
+        entity.status = model.status;
+    }
+    if (model.permissions && model.permissions.length > 0) {
+        // 1: check if all permissions are valid
+        ctx.logger.info('PERMISSIONS_ARRAY', PERMISSIONS_ARRAY);
+        const inValidPermissions = model.permissions.filter((permission: any) => !PERMISSIONS_ARRAY.includes(permission.code));
+        if (inValidPermissions.length > 0) {
+            throwAppError(`Invalid permissions: ${inValidPermissions.map((p: any) => p.code).join(', ')}`, StatusCodes.BAD_REQUEST);
+        }
+
+        entity.permissions = model.permissions;
+    }
+    if (model.tenant) {
+        // TODO: validate tenant exists
+        const tenant = await TenantService.get(model.tenant, ctx);
+        if (!tenant) {
+            throwAppError('Tenant not found', StatusCodes.NOT_FOUND);
+        }
+        entity.tenant = toObjectId(model.tenant);
+    }
+
+    return entity;
+};
+
+const get = async (id: string, ctx: RequestContext, options?: any): Promise<PermissionGroupDocument> => {
+    let query = null;
+
+    if (isValidObjectID(id)) {
+        query = PermissionGroupModel.findOne({ _id: id });
+    } else {
+        query = PermissionGroupModel.findOne({ code: id });
+    }
+
+    if (query && options) {
+        query = query.populate(options);
+    }
+
+    return await query;
+};
+
+const search = async (filters: ISearchPermissionGroupQuery, ctx: RequestContext, options?: any) => {
+    const sort: any = { createdAt: -1 };
+
+    const where: mongoose.QueryFilter<IPermissionGroup> = {};
+
+    if (filters.name) {
+        where.name = { $regex: filters.name, $options: 'i' };
+    }
+    if (filters.code) {
+        where.code = { $regex: filters.code, $options: 'i' };
+    }
+    if (filters.status) {
+        where.status = filters.status;
+    }
+    if (filters.tenant) {
+        where.tenant = toObjectId(filters.tenant);
+    }
+
+    const countPromise = PermissionGroupModel.countDocuments(where);
+
+    const dataPromise = PermissionGroupModel.find(where)
+        .populate(populate)
+        .limit(options?.pagination?.limit)
+        .skip(options?.pagination?.skip)
+        .sort(sort);
+
+    const [count, items] = await Promise.all([countPromise, dataPromise]);
+
+    return { count, items };
+};
+
+const create = async (model: ICreatePermissionGroupPayload, ctx: RequestContext): Promise<HydratedDocument<IPermissionGroup>> => {
+    let permissionGroup: PermissionGroupDocument = null;
+
+    //1: check existing permission group
+    permissionGroup = await PermissionGroupService.get(model.code, ctx);
+    if (permissionGroup) {
+        return throwAppError('Permission group with this code already exists', StatusCodes.CONFLICT);
+    }
+
+    //2: create permission group
+    const entity = new PermissionGroupModel();
+
+    //3: set fields
+    permissionGroup = await set(model, entity, ctx);
+    permissionGroup = await permissionGroup.save();
+
+    return permissionGroup;
+};
+
+const update = async (id: string, model: IUpdatePermissionGroupPayload, ctx: RequestContext) => {
+    //1: get permission group first
+    let permissionGroup: PermissionGroupDocument = null;
+    permissionGroup = await PermissionGroupService.get(id, ctx);
+    if (!permissionGroup) {
+        return throwAppError('Permission group not found', StatusCodes.NOT_FOUND);
+    }
+
+    //2: update
+    permissionGroup = await set(model, permissionGroup, ctx);
+    permissionGroup = await permissionGroup.save();
+
+    return permissionGroup;
+};
+
+// ========================================================================================
+// EXPORTS
+// ========================================================================================
+
+export const PermissionGroupService = {
+    get,
+    search,
+    create,
+    update,
+};

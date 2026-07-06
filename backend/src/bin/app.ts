@@ -6,6 +6,7 @@ import { swaggerServe, swaggerSetup } from '../shared/config/swagger/swagger';
 import { AuthRouter } from '../modules/auth/auth.routes';
 import { UserRouter } from '../modules/user/user.routes';
 import { TenantRouter } from '../modules/access-management/tenant/tenant.routes';
+import { PermissionGroupRouter } from '../modules/access-management/permission-group/permissionGroup.routes';
 import { buildContext } from '../shared/utils/contextBuilder';
 
 // top level middleware
@@ -26,6 +27,7 @@ app.use(buildContext);
 app.use('/api/v1/auth', AuthRouter);
 app.use('/api/v1/users', UserRouter);
 app.use('/api/v1/tenants', TenantRouter);
+app.use('/api/v1/permission-groups', PermissionGroupRouter);
 
 app.get('/health-check', (req, res) => {
     return ResponseHandler.appResponse(res, 200, true, 'Server is running', null);

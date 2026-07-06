@@ -3,7 +3,7 @@ import { User, KeyRound, Building2, Fingerprint, Eye, EyeOff } from 'lucide-reac
 import * as LucideIcons from 'lucide-react'
 import type React from 'react'
 import type { RoleConfig } from './RolePicker'
-import ThemeToggle from './ThemeToggle'
+import ThemeToggle from '@/components/ui/ThemeToggle'
 
 interface CredentialsFormProps {
   selectedRole: RoleConfig

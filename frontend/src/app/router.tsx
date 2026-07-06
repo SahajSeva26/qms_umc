@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import RootLayout from '@/components/layouts/RootLayout'
+import AppLayout from '@/components/layouts/AppLayout'
 import { authRoutes } from '@/features/auth/auth.routes'
 import { dashboardRoutes } from '@/features/dashboard/dashboard.routes'
 import { crmRoutes } from '@/features/crm/crm.routes'
@@ -20,19 +21,28 @@ const appRouter = createBrowserRouter([
     element: <RootLayout />,
     children: [
       { index: true, element: <Navigate to="/auth/login" replace /> },
+
+      // Unauthenticated routes — no shell
       ...authRoutes,
-      ...dashboardRoutes,
-      ...crmRoutes,
-      ...campsRoutes,
-      ...dietRoutes,
-      ...foRoutes,
-      ...pharmaRoutes,
-      ...projectsRoutes,
-      ...omRoutes,
-      ...doctorsRoutes,
-      ...billingRoutes,
-      ...analyticsRoutes,
-      ...adminRoutes,
+
+      // Authenticated routes — wrapped in AppLayout (sidebar + topbar)
+      {
+        element: <AppLayout />,
+        children: [
+          ...dashboardRoutes,
+          ...crmRoutes,
+          ...campsRoutes,
+          ...dietRoutes,
+          ...foRoutes,
+          ...pharmaRoutes,
+          ...projectsRoutes,
+          ...omRoutes,
+          ...doctorsRoutes,
+          ...billingRoutes,
+          ...analyticsRoutes,
+          ...adminRoutes,
+        ],
+      },
     ],
   },
 ])

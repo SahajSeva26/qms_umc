@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import RolePicker from '../components/RolePicker'
 import CredentialsForm from '../components/CredentialsForm'
 import OtpStep from '../components/OtpStep'
-import ThemeToggle from '../components/ThemeToggle'
+import ThemeToggle from '@/components/ui/ThemeToggle'
 import { useLogin } from '../hooks/useLogin'
 import { QMS_INTERNAL_ROLES, PHARMA_EXTERNAL_ROLES } from '../components/RolePicker'
 

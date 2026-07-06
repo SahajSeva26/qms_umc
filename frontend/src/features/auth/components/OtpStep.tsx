@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from 'react'
-import ThemeToggle from './ThemeToggle'
+import ThemeToggle from '@/components/ui/ThemeToggle'
 
 interface OtpStepProps {
   email: string

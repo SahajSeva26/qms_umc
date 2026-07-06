@@ -10,7 +10,7 @@ export const useLogin = () => {
     mutationFn: (payload: LoginPayload) => authService.login(payload),
     onSuccess: (data) => {
       if (data?.data?.data) {
-        setAuth(data.data.data, '')
+        setAuth(data.data.data)
       }
     },
   })

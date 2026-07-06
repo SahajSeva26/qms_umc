@@ -88,6 +88,66 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* ── Login left panel ── */
+.auth-panel {
+  background:
+    radial-gradient(800px 500px at 20% 10%, rgba(91,140,255,.55), transparent 60%),
+    radial-gradient(700px 500px at 80% 90%, rgba(20,184,166,.45), transparent 55%),
+    linear-gradient(135deg, #0f205c 0%, #1a369c 50%, #0d3b66 100%);
+  color: #e8ebff;
+}
+
+.auth-panel-dots {
+  background-image:
+    radial-gradient(2px 2px at 20px 30px, rgba(255,255,255,.18), transparent),
+    radial-gradient(2px 2px at 80px 200px, rgba(255,255,255,.15), transparent),
+    radial-gradient(2px 2px at 200px 100px, rgba(255,255,255,.18), transparent),
+    radial-gradient(2px 2px at 350px 380px, rgba(255,255,255,.10), transparent),
+    radial-gradient(2px 2px at 480px 80px, rgba(255,255,255,.20), transparent);
+  background-size: 600px 500px;
+}
+
+.auth-logo {
+  background: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%);
+}
+
+.auth-headline-accent {
+  background: linear-gradient(90deg, #9ec3ff, #7be0d4);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.auth-stat-card {
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(4px);
+}
+
+.auth-right-panel {
+  background-color: #ECEEF6;
+}
+
+.auth-card {
+  background-color: #FAFBFF;
+  border: 1px solid rgba(36,81,240,0.10);
+  box-shadow: 0 24px 60px -20px rgba(36,81,240,.30), 0 8px 24px rgba(11,16,32,.08);
+}
+
+/* ── Auth dark mode — triggered by .dark on <html> via Tailwind dark: variants ── */
+.dark .auth-right-panel {
+  background:
+    radial-gradient(1200px 800px at 10% -10%, #1a2057 0%, transparent 60%),
+    radial-gradient(900px 600px at 110% 10%, #0d3b66 0%, transparent 55%),
+    linear-gradient(180deg, #070b1c 0%, #0a0f24 100%);
+}
+
+.dark .auth-card {
+  background: rgba(20,26,55,0.55);
+  border: 1px solid rgba(148,168,255,0.12);
+  backdrop-filter: blur(20px) saturate(140%);
+  box-shadow: 0 30px 70px -20px rgba(0,0,0,.7), 0 10px 30px rgba(0,0,0,.5);
+}
+
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);

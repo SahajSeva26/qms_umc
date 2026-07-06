@@ -22,7 +22,9 @@ const RoleCard = ({ role, selected, onSelect }: RoleCardProps) => {
       className={cn(
         'w-full text-left p-2.5 pt-4 rounded-xl border transition-all duration-150 cursor-pointer group overflow-hidden relative',
         'hover:-translate-y-px',
-        selected ? 'shadow-sm' : 'border-gray-200 bg-white hover:border-opacity-50'
+        selected
+          ? 'shadow-sm'
+          : 'border-gray-200 dark:border-[rgba(148,168,255,0.15)] bg-white dark:bg-[rgba(22,29,62,0.7)] hover:border-opacity-50'
       )}
       style={
         selected
@@ -66,10 +68,10 @@ const RoleCard = ({ role, selected, onSelect }: RoleCardProps) => {
 
         {/* Text */}
         <div className="min-w-0">
-          <div className="text-[13px] font-bold text-gray-900 leading-tight">
+          <div className="text-[13px] font-bold text-gray-900 dark:text-[#e8ebff] leading-tight">
             {role.label}
           </div>
-          <div className="text-[11px] text-gray-500 mt-0.5 leading-snug">
+          <div className="text-[11px] text-gray-500 dark:text-[#7b85b8] mt-0.5 leading-snug">
             {role.description}
           </div>
         </div>

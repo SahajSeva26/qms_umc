@@ -2,7 +2,7 @@ import { useAuthStore } from '@/features/auth/store'
 import type { UserRole } from '@/types/auth.types'
 
 export const useAuth = () => {
-  const { user, accessToken } = useAuthStore()
+  const { user } = useAuthStore()
 
   const isAuthenticated = !!user
 
@@ -27,5 +27,5 @@ export const useAuth = () => {
     return pharmaRoles.includes(user.role)
   }
 
-  return { user, accessToken, isAuthenticated, hasRole, isQmsInternal, isPharma }
+  return { user, isAuthenticated, hasRole, isQmsInternal, isPharma }
 }

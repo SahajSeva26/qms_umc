@@ -40,9 +40,9 @@ interface RolePickerProps {
 
 const SectionDivider = ({ label }: { label: string }) => (
   <div className="flex items-center gap-2 my-4">
-    <div className="flex-1 h-px bg-gray-200" />
-    <span className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase">{label}</span>
-    <div className="flex-1 h-px bg-gray-200" />
+    <div className="flex-1 h-px bg-gray-200 dark:bg-[rgba(148,168,255,0.15)]" />
+    <span className="text-[10px] font-semibold tracking-widest text-gray-400 dark:text-[#7b85b8] uppercase">{label}</span>
+    <div className="flex-1 h-px bg-gray-200 dark:bg-[rgba(148,168,255,0.15)]" />
   </div>
 )
 

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import RolePicker from '../components/RolePicker'
 import CredentialsForm from '../components/CredentialsForm'
 import OtpStep from '../components/OtpStep'
+import ThemeToggle from '../components/ThemeToggle'
 import { useLogin } from '../hooks/useLogin'
 import { QMS_INTERNAL_ROLES, PHARMA_EXTERNAL_ROLES } from '../components/RolePicker'
 
@@ -19,7 +20,7 @@ const ROLE_HOME: Record<string, string> = {
   om_diet: '/om',
   fo: '/fo',
   dedicated_fo: '/fo',
-  logistics: '/dashboard',
+  logistics: '/admin',
   accounts: '/billing',
   dietitian: '/diet',
   analytics_viewer: '/analytics',
@@ -50,7 +51,6 @@ const LoginPage = () => {
   const handleCredentialsSubmit = (emailValue: string, _password: string) => {
     setEmail(emailValue)
     // TODO: call POST /auth/login once backend OTP flow is ready
-    // For now skip straight to OTP step
     setStep('otp')
   }
 
@@ -58,7 +58,6 @@ const LoginPage = () => {
     if (otp.length < 6) return
     setOtpError(undefined)
     // TODO: wire to POST /auth/verify-otp
-    // For now navigate to role home
     const home = ROLE_HOME[selectedRoleId ?? ''] ?? '/dashboard'
     navigate(home)
   }
@@ -66,38 +65,12 @@ const LoginPage = () => {
   return (
     <div className="flex h-screen w-full overflow-hidden">
       {/* ── Left panel ── */}
-      <div
-        className="hidden lg:flex lg:w-[52%] flex-col p-12 relative overflow-hidden"
-        style={{
-          background: `
-            radial-gradient(800px 500px at 20% 10%, rgba(91,140,255,.55), transparent 60%),
-            radial-gradient(700px 500px at 80% 90%, rgba(20,184,166,.45), transparent 55%),
-            linear-gradient(135deg, #0f205c 0%, #1a369c 50%, #0d3b66 100%)
-          `,
-          color: '#e8ebff',
-        }}
-      >
-        {/* Floating star dots */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            backgroundImage: `
-              radial-gradient(2px 2px at 20px 30px, rgba(255,255,255,.18), transparent),
-              radial-gradient(2px 2px at 80px 200px, rgba(255,255,255,.15), transparent),
-              radial-gradient(2px 2px at 200px 100px, rgba(255,255,255,.18), transparent),
-              radial-gradient(2px 2px at 350px 380px, rgba(255,255,255,.10), transparent),
-              radial-gradient(2px 2px at 480px 80px, rgba(255,255,255,.20), transparent)
-            `,
-            backgroundSize: '600px 500px',
-          }}
-        />
+      <div className="auth-panel hidden lg:flex lg:w-[52%] flex-col p-12 relative overflow-hidden">
+        <div className="auth-panel-dots absolute inset-0 pointer-events-none" />
 
         {/* Logo */}
         <div className="relative flex items-center gap-2.5">
-          <div
-            className="w-10 h-10 rounded-2xl flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%)' }}
-          >
+          <div className="auth-logo w-10 h-10 rounded-2xl flex items-center justify-center">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"/>
               <circle cx="12" cy="10" r="3"/>
@@ -110,7 +83,7 @@ const LoginPage = () => {
         <div className="relative flex-1 flex flex-col justify-center">
           <h1 className="font-bold text-white mb-4" style={{ fontSize: 'clamp(28px, 3.6vw, 48px)', lineHeight: 1.05 }}>
             The healthcare operations{' '}
-            <span style={{ background: 'linear-gradient(90deg,#9ec3ff,#7be0d4)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>command center</span>
+            <span className="auth-headline-accent">command center</span>
             {' '}for pharma India.
           </h1>
           <p className="mb-8 max-w-sm" style={{ fontSize: '16px', color: '#c2cef5', lineHeight: 1.6 }}>
@@ -125,11 +98,7 @@ const LoginPage = () => {
               { value: '2.1M', label: 'Patients reached' },
               { value: '28', label: 'Pharma clients' },
             ].map((stat) => (
-              <div
-                key={stat.label}
-                className="rounded-xl px-4 py-3"
-                style={{ background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(4px)' }}
-              >
+              <div key={stat.label} className="auth-stat-card rounded-xl px-4 py-3">
                 <div className="text-white font-bold leading-tight" style={{ fontSize: '22px' }}>{stat.value}</div>
                 <div className="mt-0.5" style={{ fontSize: '12px', color: '#aebbe5' }}>{stat.label}</div>
               </div>
@@ -169,44 +138,45 @@ const LoginPage = () => {
       </div>
 
       {/* ── Right panel ── */}
-      <div className="flex-1 bg-[#ECEEF6] flex items-start justify-center overflow-y-auto px-12">
+      <div className="auth-right-panel flex-1 flex items-start justify-center overflow-y-auto px-12">
         <div className="flex flex-col items-center justify-center min-h-full w-full py-10">
-        <div className="w-full max-w-105 rounded-2xl p-8" style={{ backgroundColor: '#FAFBFF', boxShadow: '0 8px 40px rgba(0,0,0,0.10)' }}>
+          <div className="auth-card w-full max-w-105 rounded-2xl p-8">
 
-          {step === 'role' && (
-            <>
-              <h2 className="text-2xl font-bold text-gray-900 tracking-tight mb-1.5">Choose your panel</h2>
-              <p className="text-sm text-gray-500 mb-5">
-                Each role lands on a different workspace with its own permissions.
-              </p>
-              <RolePicker selectedRole={selectedRoleId} onSelect={handleRoleSelect} />
-              <div className="mt-6 pt-4 border-t border-gray-100 flex justify-center">
-                <span className="text-xs text-gray-400">© QMS Health Platforms</span>
-              </div>
-            </>
-          )}
+            {step === 'role' && (
+              <>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-[#e8ebff] tracking-tight mb-1.5">Choose your panel</h2>
+                <p className="text-sm text-gray-500 dark:text-[#aab2dc] mb-5">
+                  Each role lands on a different workspace with its own permissions.
+                </p>
+                <RolePicker selectedRole={selectedRoleId} onSelect={handleRoleSelect} />
+                <div className="mt-6 pt-4 border-t border-gray-100 dark:border-[rgba(148,168,255,0.12)] flex items-center justify-between">
+                  <span className="text-xs text-gray-400 dark:text-[#7b85b8]">© QMS Health Platforms</span>
+                  <ThemeToggle />
+                </div>
+              </>
+            )}
 
-          {step === 'credentials' && selectedRole && (
-            <CredentialsForm
-              selectedRole={selectedRole}
-              onSubmit={handleCredentialsSubmit}
-              onBack={() => setStep('role')}
-              isLoading={isPending}
-              error={loginError?.message}
-            />
-          )}
+            {step === 'credentials' && selectedRole && (
+              <CredentialsForm
+                selectedRole={selectedRole}
+                onSubmit={handleCredentialsSubmit}
+                onBack={() => setStep('role')}
+                isLoading={isPending}
+                error={loginError?.message}
+              />
+            )}
 
-          {step === 'otp' && (
-            <OtpStep
-              email={email}
-              onVerify={handleOtpVerify}
-              onBack={() => setStep('credentials')}
-              isLoading={false}
-              error={otpError}
-            />
-          )}
+            {step === 'otp' && (
+              <OtpStep
+                email={email}
+                onVerify={handleOtpVerify}
+                onBack={() => setStep('credentials')}
+                isLoading={false}
+                error={otpError}
+              />
+            )}
 
-        </div>
+          </div>
         </div>
       </div>
     </div>

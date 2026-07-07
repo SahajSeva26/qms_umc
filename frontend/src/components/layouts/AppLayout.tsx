@@ -41,9 +41,9 @@ const AppLayout = () => {
   if (!isAuthenticated) return <Navigate to="/auth/login" replace />
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-[#0a0f24] overflow-hidden">
+    <div className="app-bg flex h-screen overflow-hidden">
       {/* Desktop sidebar */}
-      <div className="hidden lg:block shrink-0">
+      <div className="hidden lg:flex shrink-0">
         <Sidebar collapsed={collapsed} onToggle={handleToggle} />
       </div>
 

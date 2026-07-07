@@ -166,12 +166,12 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
   return (
     <aside
       className={cn(
-        'flex flex-col h-screen sticky top-0 border-r border-gray-200 dark:border-[rgba(148,168,255,0.1)] bg-white dark:bg-[#070b1c] transition-all duration-200 overflow-hidden',
+        'flex flex-col h-screen sticky top-0 border-r border-[rgba(36,81,240,0.10)] dark:border-[rgba(148,168,255,0.1)] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(20,26,55,0.55)] backdrop-blur-xl transition-all duration-200',
         collapsed ? 'w-16' : 'w-56'
       )}
     >
       {/* Brand */}
-      <div className={cn('flex items-center gap-2 px-3 py-3.5 border-b border-gray-100 dark:border-[rgba(148,168,255,0.08)]', collapsed && 'justify-center')}>
+      <div className={cn('flex items-center gap-2 px-3 py-3.5 border-b border-[rgba(36,81,240,0.08)] dark:border-[rgba(148,168,255,0.08)]', collapsed && 'justify-center')}>
         <div className="w-8 h-8 rounded-[10px] flex items-center justify-center shrink-0 text-white font-extrabold text-sm shadow-md"
           style={{ background: 'linear-gradient(135deg,#2451f0,#14b8a6)' }}>
           Q
@@ -225,7 +225,7 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
 
       {/* AI Copilot card — hidden when collapsed */}
       {!collapsed && (
-        <div className="p-3 border-t border-gray-100 dark:border-[rgba(148,168,255,0.08)]">
+        <div className="p-3 border-t border-[rgba(36,81,240,0.08)] dark:border-[rgba(148,168,255,0.08)]">
           <div className="rounded-xl border border-gray-200 dark:border-[rgba(148,168,255,0.12)] bg-gray-50 dark:bg-[rgba(22,29,62,0.6)] p-3">
             <div className="flex items-center gap-1.5 mb-1.5">
               <LucideIcons.Sparkles size={14} className="text-violet-500" />

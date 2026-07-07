@@ -5,7 +5,9 @@ import CredentialsForm from '../components/CredentialsForm'
 import OtpStep from '../components/OtpStep'
 import ThemeToggle from '@/components/ui/ThemeToggle'
 import { useLogin } from '../hooks/useLogin'
+import { useAuthStore } from '../store'
 import { QMS_INTERNAL_ROLES, PHARMA_EXTERNAL_ROLES } from '../components/RolePicker'
+import type { UserRole } from '@/types/auth.types'
 
 type Step = 'role' | 'credentials' | 'otp'
 
@@ -35,6 +37,7 @@ const ALL_ROLES = [...QMS_INTERNAL_ROLES, ...PHARMA_EXTERNAL_ROLES]
 const LoginPage = () => {
   const navigate = useNavigate()
   const { isPending, error: loginError } = useLogin()
+  const { setAuth } = useAuthStore()
 
   const [step, setStep] = useState<Step>('role')
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null)
@@ -57,7 +60,14 @@ const LoginPage = () => {
   const handleOtpVerify = (otp: string) => {
     if (otp.length < 6) return
     setOtpError(undefined)
-    // TODO: wire to POST /auth/verify-otp
+    // TODO: replace with real POST /auth/verify-otp response
+    setAuth({
+      _id: 'mock',
+      email,
+      firstName: 'Ajinkya',
+      lastName: 'Naik',
+      role: (selectedRoleId ?? 'super_admin') as UserRole,
+    })
     const home = ROLE_HOME[selectedRoleId ?? ''] ?? '/dashboard'
     navigate(home)
   }

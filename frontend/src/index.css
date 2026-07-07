@@ -88,6 +88,17 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* ── App shell background ── */
+.app-bg {
+  background: linear-gradient(135deg, #eef3ff 0%, #f6f8ff 35%, #ecfeff 100%);
+}
+.dark .app-bg {
+  background:
+    radial-gradient(1200px 800px at 10% -10%, #1a2057 0%, transparent 60%),
+    radial-gradient(900px 600px at 110% 10%, #0d3b66 0%, transparent 55%),
+    linear-gradient(180deg, #070b1c 0%, #0a0f24 100%);
+}
+
 /* ── Login left panel ── */
 .auth-panel {
   background:

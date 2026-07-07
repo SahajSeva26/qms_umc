@@ -76,7 +76,7 @@ const Topbar = ({ onMobileMenuToggle }: TopbarProps) => {
   }
 
   return (
-    <header className="sticky top-0 z-40 flex items-center gap-3.5 px-6 py-3.5 bg-white dark:bg-[#070b1c] border-b border-gray-200 dark:border-[rgba(148,168,255,0.1)] backdrop-blur-xl">
+    <header className="sticky top-0 z-40 flex items-center gap-3.5 px-6 py-3.5 bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(20,26,55,0.55)] border-b border-[rgba(36,81,240,0.10)] dark:border-[rgba(148,168,255,0.1)] backdrop-blur-xl">
       {/* Mobile menu button */}
       <button
         onClick={onMobileMenuToggle}

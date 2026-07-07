@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { PERMISSION_GROUP_STATUSES } from './permissionGroups.constants';
+import { PERMISSION_GROUP_STATUSES } from './permissionGroup.constants';
 
 const permissionGroupSchema = new mongoose.Schema(
     {

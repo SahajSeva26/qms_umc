@@ -7,6 +7,10 @@ let ENV = {
         Port: process.env.APP_PORT || 3000,
         Host: process.env.APP_HOST || 'localhost',
         Environment: process.env.APP_ENV || 'development',
+
+        SystemUserEmail: process.env.SYSTEM_USER_EMAIL || 'admin@gmail.com',
+        SystemUserPassword: process.env.SYSTEM_USER_PASSWORD || 'uk04ac2006',
+        SystemUserPhone: process.env.SYSTEM_USER_PHONE || '7456920792',
     },
     DB: {
         URI: process.env.DB_URI || 'http://localhost:27017/qms',

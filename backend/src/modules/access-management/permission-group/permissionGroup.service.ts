@@ -1,7 +1,7 @@
 import mongoose, { HydratedDocument } from 'mongoose';
 import { IPermissionGroup, PermissionGroupModel } from './permissionGroup.model';
 import { ICreatePermissionGroupPayload, ISearchPermissionGroupQuery, IUpdatePermissionGroupPayload } from './permissionGroup.validators';
-import { PERMISSION_GROUP_STATUSES } from './permissionGroups.constants';
+import { PERMISSION_GROUP_STATUSES } from './permissionGroup.constants';
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
@@ -31,7 +31,7 @@ const set = async (model: any, entity: HydratedDocument<IPermissionGroup>, ctx: 
     }
     if (model.permissions && model.permissions.length > 0) {
         // 1: check if all permissions are valid
-        ctx.logger.info('PERMISSIONS_ARRAY', PERMISSIONS_ARRAY);
+        // ctx.logger.info('PERMISSIONS_ARRAY', PERMISSIONS_ARRAY);
         const inValidPermissions = model.permissions.filter((permission: any) => !PERMISSIONS_ARRAY.includes(permission.code));
         if (inValidPermissions.length > 0) {
             throwAppError(`Invalid permissions: ${inValidPermissions.map((p: any) => p.code).join(', ')}`, StatusCodes.BAD_REQUEST);

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { PERMISSION_GROUP_STATUSES } from './permissionGroups.constants';
+import { PERMISSION_GROUP_STATUSES } from './permissionGroup.constants';
 
 const PermissionSchema = z.object({
     code: z.string().min(1).openapi({ example: 'user:create' }),
@@ -22,10 +22,7 @@ export type ICreatePermissionGroupPayload = z.infer<typeof CreatePermissionGroup
 export const UpdatePermissionGroupPayloadSchema = z.object({
     name: z.string().min(1).optional().openapi({ example: 'Admin Group' }),
     description: z.string().min(1).optional().openapi({ example: 'Full access permission group' }),
-    status: z
-        .enum([PERMISSION_GROUP_STATUSES.ACTIVE, PERMISSION_GROUP_STATUSES.INACTIVE])
-        .optional()
-        .openapi({ example: 'active' }),
+    status: z.enum([PERMISSION_GROUP_STATUSES.ACTIVE, PERMISSION_GROUP_STATUSES.INACTIVE]).optional().openapi({ example: 'active' }),
     permissions: z.array(PermissionSchema).optional().openapi({ example: [] }),
 });
 
@@ -35,10 +32,7 @@ export type IUpdatePermissionGroupPayload = z.infer<typeof UpdatePermissionGroup
 export const SearchPermissionGroupQuerySchema = z.object({
     name: z.string().optional().openapi({ example: 'Admin Group' }),
     code: z.string().lowercase().optional().openapi({ example: 'admin-group' }),
-    status: z
-        .enum([PERMISSION_GROUP_STATUSES.ACTIVE, PERMISSION_GROUP_STATUSES.INACTIVE])
-        .optional()
-        .openapi({ example: 'active' }),
+    status: z.enum([PERMISSION_GROUP_STATUSES.ACTIVE, PERMISSION_GROUP_STATUSES.INACTIVE]).optional().openapi({ example: 'active' }),
     tenant: z.string().optional().openapi({ example: '64f1a2b3c4d5e6f7a8b9c0d1' }),
 });
 

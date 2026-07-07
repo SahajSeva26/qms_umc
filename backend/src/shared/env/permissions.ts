@@ -1,8 +1,16 @@
 import { USER_PERMISSIONS } from '../../modules/user/user.constants';
 import { TENANT_PERMISSIONS } from '../../modules/access-management/tenant/tenant.constants';
-import { PERMISSION_GROUP_PERMISSIONS } from '../../modules/access-management/permission-group/permissionGroups.constants';
+import { PERMISSION_GROUP_PERMISSIONS } from '../../modules/access-management/permission-group/permissionGroup.constants';
 
+const SYSTEM_PERMISSIONS = {
+    MANAGE: {
+        code: 'system:manage',
+        name: 'Manage System',
+        description: 'Manage system',
+    },
+};
 export const PERMISSIONS = {
+    SYSTEM: SYSTEM_PERMISSIONS,
     USER: USER_PERMISSIONS,
     TENANT: TENANT_PERMISSIONS,
     PERMISSION_GROUP: PERMISSION_GROUP_PERMISSIONS,

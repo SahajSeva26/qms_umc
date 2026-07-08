@@ -29,11 +29,12 @@ export const AuthMiddleware = async (req: any, res: any, next: any) => {
         req.context.setRole(userRole);
         req.context.setTenant(userRole.tenant);
 
-        // extract permissions
-        const permissions = userRole.permissions || [];
-        permissions.push(...(userRole.type?.permissions || []));
-        const set = new Set(permissions);
-        req.context.setPermissions(Array.from(set));
+        // extract permissions (build a new array — do not mutate the role document)
+        const permissions = [
+            ...(userRole.permissions || []),
+            ...(userRole.type?.permissions || []),
+        ];
+        req.context.setPermissions([...new Set(permissions)]);
 
         next();
     } catch (error: any) {

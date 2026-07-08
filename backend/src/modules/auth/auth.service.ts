@@ -6,8 +6,7 @@ import bcrypt from 'bcrypt';
 import { throwAppError } from '../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { TokenHandler } from '../../shared/helpers/tokenHelper';
-import { ContextUser, RequestContext } from '../../shared/utils/contextBuilder';
-import { CookieHandler } from '../../shared/utils/cookies';
+import { RequestContext } from '../../shared/utils/contextBuilder';
 import { RoleService } from '../access-management/role/role.service';
 import { ITokenPayload } from '../../shared/helpers/tokenHelper';
 
@@ -61,7 +60,10 @@ const login = async (data: ILoginUserPayload, ctx: RequestContext) => {
     // 5: find user role
     let userRole: any = await RoleService.search({ user: user.id }, ctx);
     if (userRole.items.length == 0) {
-        return throwAppError('User role not found, login again', StatusCodes.NOT_FOUND);
+        return throwAppError(
+            'No role assigned to this account. Please contact your administrator.',
+            StatusCodes.FORBIDDEN,
+        );
     }
     userRole = userRole.items[0];
 
@@ -118,7 +120,10 @@ const refreshToken = async (refreshToken: string, ctx: RequestContext) => {
     // 4: get user role
     let userRole: any = await RoleService.search({ user: user.id }, ctx);
     if (userRole.items.length == 0) {
-        return throwAppError('User role not found, login again', StatusCodes.NOT_FOUND);
+        return throwAppError(
+            'No role assigned to this account. Please contact your administrator.',
+            StatusCodes.FORBIDDEN,
+        );
     }
     userRole = userRole.items[0];
 

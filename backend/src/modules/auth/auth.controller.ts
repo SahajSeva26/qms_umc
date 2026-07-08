@@ -7,7 +7,6 @@ import { LoginUserPayloadSchema, RegisterUserPayloadSchema } from './auth.valida
 import { CookieHandler } from '../../shared/utils/cookies';
 import { RequestContext } from '../../shared/utils/contextBuilder';
 import { AUTH_TOKENS } from './auth.constants';
-import { TokenHandler } from '../../shared/helpers/tokenHelper';
 const register = async (req: any, res: any) => {
     try {
         const ctx: RequestContext = req.context;
@@ -84,18 +83,17 @@ const logout = async (req: any, res: any) => {
 const refreshToken = async (req: any, res: any) => {
     try {
         const ctx: RequestContext = req.context;
-        // 1: get refresh token and access token from cookies
+        // 1: get refresh token from cookies
         const refreshToken = CookieHandler.get(req, AUTH_TOKENS.REFRESH_TOKEN);
-        // const accessToken = CookieHandler.get(req, AUTH_TOKENS.ACCESS_TOKEN);
 
-        // 2: return invliad or expired refresh token
-        if (!refreshToken || !TokenHandler.verifyRefreshToken(refreshToken)) {
+        // 2: presence check (signature + DB match are verified in the service)
+        if (!refreshToken) {
             return ResponseHandler.appResponse(res, StatusCodes.UNAUTHORIZED, false, 'Refresh token not found', null);
         }
 
         const { newAccessToken, newRefreshToken } = await AuthService.refreshToken(refreshToken, ctx);
 
-        // 4: set cookies
+        // 3: set cookies
         CookieHandler.setAccessToken(res, newAccessToken);
         CookieHandler.setRefreshToken(res, newRefreshToken);
 

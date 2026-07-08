@@ -29,7 +29,7 @@ registry.registerPath({
     },
 
     responses: {
-        200: { description: 'User registered successfully' },
+        201: { description: 'User registered successfully' },
         400: { description: 'User registration failed' },
     },
 });

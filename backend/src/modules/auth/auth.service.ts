@@ -28,7 +28,10 @@ const login = async (data: ILoginUserPayload, ctx: RequestContext) => {
     //2: check account locked
     if (user.lockUntil && user.lockUntil > new Date()) {
         const remainingTime = user.lockUntil.getTime() - Date.now();
-        return throwAppError(`Account is locked,try again in ${Math.ceil(remainingTime / 60000)} minutes.`, StatusCodes.FORBIDDEN);
+        return throwAppError(
+            `Account is locked,try again in ${Math.ceil(remainingTime / 60000)} minutes.`,
+            StatusCodes.FORBIDDEN,
+        );
     }
 
     //3: validate password
@@ -45,7 +48,10 @@ const login = async (data: ILoginUserPayload, ctx: RequestContext) => {
         }
 
         await user.save();
-        return throwAppError(`Invalid credentials, attempt remaining: ${5 - user.loginAttempts}`, StatusCodes.UNAUTHORIZED);
+        return throwAppError(
+            `Invalid credentials, attempt remaining: ${5 - user.loginAttempts}`,
+            StatusCodes.UNAUTHORIZED,
+        );
     }
 
     // 4: reset if everything is right
@@ -55,7 +61,7 @@ const login = async (data: ILoginUserPayload, ctx: RequestContext) => {
     // 5: find user role
     let userRole: any = await RoleService.search({ user: user.id }, ctx);
     if (userRole.items.length == 0) {
-        return throwAppError('User role not found', StatusCodes.NOT_FOUND);
+        return throwAppError('User role not found, login again', StatusCodes.NOT_FOUND);
     }
     userRole = userRole.items[0];
 
@@ -94,26 +100,41 @@ const logout = async (userId: string, ctx: RequestContext) => {
     return true;
 };
 const refreshToken = async (refreshToken: string, ctx: RequestContext) => {
-    //1: generate new access token & refresh token
-    const payload: any = TokenHandler.decodePayload(refreshToken);
-
-    //2: get user from database
-    const userId: string = payload?._id?.toString() || '';
-    const user = await UserService.get(userId, ctx);
-    if (!user) {
-        return throwAppError('User not found', StatusCodes.NOT_FOUND);
+    //1:decode token
+    const decoded: ITokenPayload = TokenHandler.decodePayload(refreshToken);
+    if (!decoded) {
+        return throwAppError('Invalid refresh token', StatusCodes.UNAUTHORIZED);
     }
 
-    // 3: check if refresh token matches
+    //2: get user from user service
+    const userId: string = decoded._id.toString();
+    const user = await UserService.get(userId, ctx);
+    if (!user) {
+        return throwAppError('User not found, login again', StatusCodes.NOT_FOUND);
+    }
+    // 3: get user role
+    let userRole: any = await RoleService.search({ user: user.id }, ctx);
+    if (userRole.items.length == 0) {
+        return throwAppError('User role not found, login again', StatusCodes.NOT_FOUND);
+    }
+    userRole = userRole.items[0];
+
+    // 4: check if refresh token matches
     if (user.refreshToken?.toString() !== refreshToken.toString()) {
         return throwAppError('Invalid refresh token', StatusCodes.UNAUTHORIZED);
     }
 
-    //4: generate tokens
-    const newAccessToken = TokenHandler.generateAccessToken(payload);
-    const newRefreshToken = TokenHandler.generateRefreshToken(payload);
+    //5: generate tokens with new payload
+    const freshPayload: ITokenPayload = {
+        _id: user.id.toString(),
+        email: user.email,
+        role: userRole.id.toString(),
+        tenant: userRole.tenant.id.toString(),
+    };
+    const newAccessToken = TokenHandler.generateAccessToken(freshPayload);
+    const newRefreshToken = TokenHandler.generateRefreshToken(freshPayload);
 
-    // 5: save new refresh token
+    // 6: save new refresh token
     user.refreshToken = newRefreshToken;
     await user.save();
 

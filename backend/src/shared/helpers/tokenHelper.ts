@@ -10,12 +10,11 @@ export interface ITokenPayload {
     role: string;
     tenant: string;
 }
+
 export const TokenHandler = {
     generateAccessToken: (payload: ITokenPayload) => {
-
         const token: any = jwt.sign(
             {
-                // ...tokenPayload,
                 ...payload,
             },
             ENV.JWT.AccessTokenSecret,
@@ -28,8 +27,6 @@ export const TokenHandler = {
     },
 
     generateRefreshToken: (payload: any) => {
-
-
         const token: any = jwt.sign(
             {
                 ...payload,
@@ -54,7 +51,7 @@ export const TokenHandler = {
         return jwt.verify(token, ENV.JWT.RefreshTokenSecret);
     },
 
-    decodePayload: (token: string) => {
-        return jwt.decode(token);
+    decodePayload: (token: string): ITokenPayload => {
+        return jwt.decode(token) as ITokenPayload;
     },
 };

@@ -41,14 +41,25 @@ export const TokenHandler = {
     },
 
     verifyAccessToken: (token: string) => {
-        return jwt.verify(token, ENV.JWT.AccessTokenSecret);
+        if (!token) {
+            throwAppError('Access token not found', StatusCodes.UNAUTHORIZED);
+        }
+        try {
+            return jwt.verify(token, ENV.JWT.AccessTokenSecret);
+        } catch (error) {
+            throwAppError('Invalid or expired access token', StatusCodes.UNAUTHORIZED);
+        }
     },
 
     verifyRefreshToken: (token: string) => {
         if (!token) {
             throwAppError('Refresh token not found', StatusCodes.UNAUTHORIZED);
         }
-        return jwt.verify(token, ENV.JWT.RefreshTokenSecret);
+        try {
+            return jwt.verify(token, ENV.JWT.RefreshTokenSecret);
+        } catch (error) {
+            throwAppError('Invalid or expired refresh token', StatusCodes.UNAUTHORIZED);
+        }
     },
 
     decodePayload: (token: string): ITokenPayload => {

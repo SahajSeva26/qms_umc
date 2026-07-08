@@ -57,7 +57,7 @@ const get = async (id: string, ctx: RequestContext, options?: any): Promise<User
 
 const search = async (filters: ISearchUserQuery, ctx: RequestContext, options?: any) => {
     let sort: any = {
-        timestamp: -1,
+        createdAt: -1,
     };
 
     let where: mongoose.QueryFilter<IUser> = {
@@ -74,15 +74,15 @@ const search = async (filters: ISearchUserQuery, ctx: RequestContext, options?: 
         where.email = { $regex: filters.email, $options: 'i' };
     }
     if (filters.status) {
-        where.status = filters?.status?.toString();
+        where.status = filters.status;
     }
     if (filters.gender) {
         where.gender = filters.gender;
     }
     if (filters.joinedFrom || filters.joinedTo) {
-        where.timestamp = {};
-        if (filters.joinedFrom) where.timestamp.$gte = filters.joinedFrom;
-        if (filters.joinedTo) where.timestamp.$lte = filters.joinedTo;
+        where.createdAt = {};
+        if (filters.joinedFrom) where.createdAt.$gte = filters.joinedFrom;
+        if (filters.joinedTo) where.createdAt.$lte = filters.joinedTo;
     }
 
     const countPromise = UserModel.countDocuments(where);

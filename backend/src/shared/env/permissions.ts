@@ -4,7 +4,7 @@ import { PERMISSION_GROUP_PERMISSIONS } from '../../modules/access-management/pe
 import { ROLE_TYPE_PERMISSIONS } from '../../modules/access-management/role-type/roleType.constants';
 import { ROLE_PERMISSIONS } from '../../modules/access-management/role/role.constants';
 
-const SYSTEM_PERMISSIONS = {
+export const SYSTEM_PERMISSIONS = {
     MANAGE: {
         code: 'system:manage',
         name: 'Manage System',

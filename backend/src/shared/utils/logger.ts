@@ -2,25 +2,15 @@
 import chalk from 'chalk';
 import ENV from '../config/app.config.js';
 
-let lastLogTime = Date.now();
-
 const getTimestamp = () => {
     const now = new Date();
     return now.toISOString(); // readable + sortable
 };
 
-const getTimeDiff = () => {
-    const now = Date.now();
-    const diff = now - lastLogTime;
-    lastLogTime = now;
-    return `+${diff}ms`;
-};
-
 const formatMessage = (level: string, message: string, meta: any) => {
     const time = getTimestamp();
-    const diff = getTimeDiff();
 
-    let base = `[${time}] [${level.toUpperCase()}] (${diff}) ${message}`;
+    let base = `[${time}] [${level.toUpperCase()}] ${message}`;
 
     if (meta) {
         if (typeof meta === 'object') {

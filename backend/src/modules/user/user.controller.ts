@@ -1,5 +1,5 @@
 import { ResponseHandler } from '../../shared/utils/responseHandler';
-import { formatZodError } from '../../shared/utils/error';
+import { formatZodError, throwAppError } from '../../shared/utils/error';
 import { UpdateUserPayloadSchema } from './user.validators';
 import { StatusCodes } from 'http-status-codes';
 import { UserService } from './user.service';
@@ -16,13 +16,16 @@ const get = async (req: any, res: any) => {
         }
 
         const user = await UserService.get(id, ctx);
+        if (!user) {
+            return throwAppError('User not found', StatusCodes.NOT_FOUND);
+        }
 
         return ResponseHandler.appResponse(
             res,
             StatusCodes.OK,
             true,
             'User fetched successfully',
-            UserMapper.toResponse(user),
+            UserMapper.toResponse(user, ctx),
         );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
@@ -42,7 +45,7 @@ const search = async (req: any, res: any) => {
             StatusCodes.OK,
             true,
             'Users fetched successfully',
-            UserMapper.toSearchResponse(result),
+            UserMapper.toSearchResponse(result, ctx),
         );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
@@ -54,16 +57,14 @@ const update = async (req: any, res: any) => {
         const ctx: RequestContext = req.context;
         const { id } = req?.params;
         if (!id) {
-            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'User ID is required', null);
+            return throwAppError('User ID is required', StatusCodes.BAD_REQUEST);
         }
 
         const { data, success, error } = UpdateUserPayloadSchema.safeParse(req.body);
         if (!success) {
             const validationErrors = formatZodError(error);
 
-            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
-                fields: validationErrors,
-            });
+            return throwAppError('Validation Error', StatusCodes.BAD_REQUEST, { fields: validationErrors });
         }
 
         const user = await UserService.update(id, data, ctx);
@@ -73,7 +74,7 @@ const update = async (req: any, res: any) => {
             StatusCodes.OK,
             true,
             'User updated successfully',
-            UserMapper.toResponse(user),
+            UserMapper.toResponse(user, ctx),
         );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);

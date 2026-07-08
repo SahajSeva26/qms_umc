@@ -1,6 +1,6 @@
 import { ResponseHandler } from '../../../shared/utils/responseHandler';
 import { formatZodError } from '../../../shared/utils/error';
-import { CreateRolePayloadSchema, UpdateRolePayloadSchema } from './role.validators';
+import { CreateRolePayloadSchema, SearchRoleQuerySchema, UpdateRolePayloadSchema } from './role.validators';
 import { StatusCodes } from 'http-status-codes';
 import { RoleService } from './role.service';
 import { RoleMapper } from './role.mapper';
@@ -21,7 +21,13 @@ const get = async (req: any, res: any) => {
             return ResponseHandler.appResponse(res, StatusCodes.NOT_FOUND, false, 'Role not found', null);
         }
 
-        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Role fetched successfully', RoleMapper.toResponse(role));
+        return ResponseHandler.appResponse(
+            res,
+            StatusCodes.OK,
+            true,
+            'Role fetched successfully',
+            RoleMapper.toResponse(role),
+        );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }
@@ -30,12 +36,25 @@ const get = async (req: any, res: any) => {
 const search = async (req: any, res: any) => {
     try {
         const ctx: RequestContext = req.context;
-        const query = RequestHandler.parseQuery(req);
-        const pagination = RequestHandler.getPagination(req);
 
-        const result = await RoleService.search(query, ctx, { pagination });
+        const { data: filters, success, error } = SearchRoleQuerySchema.safeParse(req.query);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                errors: validationErrors,
+            });
+        }
+        const pagination = RequestHandler.getPagination(filters);
 
-        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Roles fetched successfully', RoleMapper.toSearchResponse(result));
+        const result = await RoleService.search(filters, ctx, { pagination });
+
+        return ResponseHandler.appResponse(
+            res,
+            StatusCodes.OK,
+            true,
+            'Roles fetched successfully',
+            RoleMapper.toSearchResponse(result),
+        );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }
@@ -55,7 +74,13 @@ const create = async (req: any, res: any) => {
 
         const role = await RoleService.create(data, ctx);
 
-        return ResponseHandler.appResponse(res, StatusCodes.CREATED, true, 'Role created successfully', RoleMapper.toResponse(role));
+        return ResponseHandler.appResponse(
+            res,
+            StatusCodes.CREATED,
+            true,
+            'Role created successfully',
+            RoleMapper.toResponse(role),
+        );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }
@@ -79,7 +104,13 @@ const update = async (req: any, res: any) => {
 
         const role = await RoleService.update(id, data, ctx);
 
-        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Role updated successfully', RoleMapper.toResponse(role));
+        return ResponseHandler.appResponse(
+            res,
+            StatusCodes.OK,
+            true,
+            'Role updated successfully',
+            RoleMapper.toResponse(role),
+        );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }

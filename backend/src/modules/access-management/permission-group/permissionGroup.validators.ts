@@ -34,6 +34,8 @@ export const SearchPermissionGroupQuerySchema = z.object({
     code: z.string().lowercase().optional().openapi({ example: 'admin-group' }),
     status: z.enum([PERMISSION_GROUP_STATUSES.ACTIVE, PERMISSION_GROUP_STATUSES.INACTIVE]).optional().openapi({ example: 'active' }),
     tenant: z.string().optional().openapi({ example: '64f1a2b3c4d5e6f7a8b9c0d1' }),
+    page: z.string().optional().openapi({ example: '1' }),
+    limit: z.string().optional().openapi({ example: '10' }),
 });
 
 export type ISearchPermissionGroupQuery = z.infer<typeof SearchPermissionGroupQuerySchema>;

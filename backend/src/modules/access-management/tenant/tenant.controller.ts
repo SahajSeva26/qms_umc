@@ -6,6 +6,7 @@ import { TenantService } from './tenant.service';
 import { TenantMapper } from './tenant.mapper';
 import { RequestHandler } from '../../../shared/utils/requestHandler';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
+import { SearchTenantQuerySchema } from './tenant.validators';
 
 const get = async (req: any, res: any) => {
     try {
@@ -21,7 +22,13 @@ const get = async (req: any, res: any) => {
             return ResponseHandler.appResponse(res, StatusCodes.NOT_FOUND, false, 'Tenant not found', null);
         }
 
-        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Tenant fetched successfully', TenantMapper.toResponse(tenant));
+        return ResponseHandler.appResponse(
+            res,
+            StatusCodes.OK,
+            true,
+            'Tenant fetched successfully',
+            TenantMapper.toResponse(tenant),
+        );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }
@@ -30,12 +37,24 @@ const get = async (req: any, res: any) => {
 const search = async (req: any, res: any) => {
     try {
         const ctx: RequestContext = req.context;
-        const query = RequestHandler.parseQuery(req);
-        const pagination = RequestHandler.getPagination(req);
+        const { data: filters, success, error } = SearchTenantQuerySchema.safeParse(req.query);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                errors: validationErrors,
+            });
+        }
+        const pagination = RequestHandler.getPagination(filters);
 
-        const result = await TenantService.search(query, ctx, { pagination });
+        const result = await TenantService.search(filters, ctx, { pagination });
 
-        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Tenants fetched successfully', TenantMapper.toSearchResponse(result));
+        return ResponseHandler.appResponse(
+            res,
+            StatusCodes.OK,
+            true,
+            'Tenants fetched successfully',
+            TenantMapper.toSearchResponse(result),
+        );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }
@@ -55,7 +74,13 @@ const create = async (req: any, res: any) => {
 
         const tenant = await TenantService.create(data, ctx);
 
-        return ResponseHandler.appResponse(res, StatusCodes.CREATED, true, 'Tenant created successfully', TenantMapper.toResponse(tenant));
+        return ResponseHandler.appResponse(
+            res,
+            StatusCodes.CREATED,
+            true,
+            'Tenant created successfully',
+            TenantMapper.toResponse(tenant),
+        );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }
@@ -79,7 +104,13 @@ const update = async (req: any, res: any) => {
 
         const tenant = await TenantService.update(id, data, ctx);
 
-        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Tenant updated successfully', TenantMapper.toResponse(tenant));
+        return ResponseHandler.appResponse(
+            res,
+            StatusCodes.OK,
+            true,
+            'Tenant updated successfully',
+            TenantMapper.toResponse(tenant),
+        );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }

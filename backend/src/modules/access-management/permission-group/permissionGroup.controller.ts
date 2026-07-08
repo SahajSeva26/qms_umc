@@ -6,6 +6,7 @@ import { PermissionGroupService } from './permissionGroup.service';
 import { PermissionGroupMapper } from './permissionGroup.mapper';
 import { RequestHandler } from '../../../shared/utils/requestHandler';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
+import { SearchPermissionGroupQuerySchema } from './permissionGroup.validators';
 
 const get = async (req: any, res: any) => {
     try {
@@ -35,10 +36,17 @@ const get = async (req: any, res: any) => {
 const search = async (req: any, res: any) => {
     try {
         const ctx: RequestContext = req.context;
-        const query = RequestHandler.parseQuery(req);
-        const pagination = RequestHandler.getPagination(req);
 
-        const result = await PermissionGroupService.search(query, ctx, { pagination });
+        const { data: filters, success, error } = SearchPermissionGroupQuerySchema.safeParse(req.query);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                errors: validationErrors,
+            });
+        }
+        const pagination = RequestHandler.getPagination(filters);
+
+        const result = await PermissionGroupService.search(filters, ctx, { pagination });
 
         return ResponseHandler.appResponse(
             res,

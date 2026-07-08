@@ -47,8 +47,8 @@ const get = async (id: string, ctx: RequestContext, options?: any): Promise<User
     }
 
     if (query) {
-        if (options) {
-            query = query.populate(options);
+        if (options?.populate) {
+            query = query.populate(populate);
         }
     }
 

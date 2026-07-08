@@ -33,6 +33,8 @@ export const SearchRoleQuerySchema = z.object({
     tenant: z.string().optional().openapi({ example: '64f1a2b3c4d5e6f7a8b9c0d3' }),
     type: z.string().optional().openapi({ example: '64f1a2b3c4d5e6f7a8b9c0d1' }),
     user: z.string().optional().openapi({ example: '64f1a2b3c4d5e6f7a8b9c0d2' }),
+    page: z.string().optional().openapi({ example: '1' }),
+    limit: z.string().optional().openapi({ example: '10' }),
 });
 
 export type ISearchRoleQuery = z.infer<typeof SearchRoleQuerySchema>;

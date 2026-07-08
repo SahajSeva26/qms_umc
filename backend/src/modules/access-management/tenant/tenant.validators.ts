@@ -30,6 +30,8 @@ export const SearchTenantQuerySchema = z.object({
         .enum([TENANT_STATUS.ACTIVE, TENANT_STATUS.INACTIVE])
         .optional()
         .openapi({ example: 'active' }),
+    page: z.string().optional().openapi({ example: '1' }),
+    limit: z.string().optional().openapi({ example: '10' }),
 });
 
 export type ISearchTenantQuery = z.infer<typeof SearchTenantQuerySchema>;

@@ -11,6 +11,12 @@
       "options": {
         "printWidth": 80
       }
+    },
+     {
+      "files": "*.validators.ts",
+      "options": {
+        "printWidth": 80
+      }
     }
   ]
 }

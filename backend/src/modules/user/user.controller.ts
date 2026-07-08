@@ -1,6 +1,6 @@
 import { ResponseHandler } from '../../shared/utils/responseHandler';
 import { formatZodError, throwAppError } from '../../shared/utils/error';
-import { UpdateUserPayloadSchema } from './user.validators';
+import { SearchUserQuerySchema, UpdateUserPayloadSchema } from './user.validators';
 import { StatusCodes } from 'http-status-codes';
 import { UserService } from './user.service';
 import { UserMapper } from './user.mapper';
@@ -10,11 +10,14 @@ import { RequestContext } from '../../shared/utils/contextBuilder';
 const get = async (req: any, res: any) => {
     try {
         const ctx: RequestContext = req.context;
+        
+        //1: get user id
         const { id } = req?.params;
         if (!id) {
             return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'User ID is required', null);
         }
 
+        //2: get user
         const user = await UserService.get(id, ctx);
         if (!user) {
             return throwAppError('User not found', StatusCodes.NOT_FOUND);
@@ -35,10 +38,21 @@ const get = async (req: any, res: any) => {
 const search = async (req: any, res: any) => {
     try {
         const ctx: RequestContext = req.context;
-        const query = RequestHandler.parseQuery(req);
-        const pagination = RequestHandler.getPagination(req);
 
-        const result = await UserService.search(query, ctx, { pagination });
+        //1: validate filters
+        const { data: filters, success, error } = SearchUserQuerySchema.safeParse(req.query);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                fields: validationErrors,
+            });
+        }
+
+        //2: get pagination
+        const pagination = RequestHandler.getPagination(filters);
+
+        //3: search users
+        const result = await UserService.search(filters, ctx, { pagination });
 
         return ResponseHandler.appResponse(
             res,
@@ -55,16 +69,20 @@ const search = async (req: any, res: any) => {
 const update = async (req: any, res: any) => {
     try {
         const ctx: RequestContext = req.context;
+
+        //1: get user id
         const { id } = req?.params;
         if (!id) {
             return throwAppError('User ID is required', StatusCodes.BAD_REQUEST);
         }
 
+        //2: validate payload
         const { data, success, error } = UpdateUserPayloadSchema.safeParse(req.body);
         if (!success) {
             const validationErrors = formatZodError(error);
-
-            return throwAppError('Validation Error', StatusCodes.BAD_REQUEST, { fields: validationErrors });
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                fields: validationErrors,
+            });
         }
 
         const user = await UserService.update(id, data, ctx);

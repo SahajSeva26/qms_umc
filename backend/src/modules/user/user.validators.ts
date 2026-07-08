@@ -1,4 +1,4 @@
-import { email, z } from 'zod';
+import { z } from 'zod';
 
 import { USER_GENDERS, USER_STATUS } from './user.constants';
 
@@ -6,7 +6,15 @@ import { USER_GENDERS, USER_STATUS } from './user.constants';
 export const UpdateUserPayloadSchema = z.object({
     firstName: z.string().min(1).openapi({ example: 'john' }),
     lastName: z.string().optional().openapi({ example: 'doe' }),
-    status: z.boolean().optional().openapi({ example: true }),
+    status: z
+        .enum([
+            USER_STATUS.ACTIVE,
+            USER_STATUS.INACTIVE,
+            USER_STATUS.SUSPENDED,
+            USER_STATUS.DELETED,
+        ])
+        .optional()
+        .openapi({ example: 'active' }),
     gender: z
         .enum([USER_GENDERS.MALE, USER_GENDERS.FEMALE, USER_GENDERS.OTHER])
         .optional()
@@ -18,26 +26,30 @@ export type IUpdateUserPayload = z.infer<typeof UpdateUserPayloadSchema>;
 //2: search ====================================>
 export const SearchUserQuerySchema = z.object({
     name: z.string().optional().openapi({ example: 'john' }),
-    email: email().optional().openapi({ example: 'john.doe@example.com' }),
+    email: z.email().optional().openapi({ example: 'john.doe@example.com' }),
     status: z
-        .enum([...Object.values(USER_STATUS)])
+        .enum([
+            USER_STATUS.ACTIVE,
+            USER_STATUS.INACTIVE,
+            USER_STATUS.SUSPENDED,
+            USER_STATUS.DELETED,
+        ])
         .optional()
         .openapi({ example: 'active' }),
     gender: z
         .enum([USER_GENDERS.MALE, USER_GENDERS.FEMALE, USER_GENDERS.OTHER])
         .optional()
         .openapi({ example: 'male' }),
-    joinedFrom: z.iso.datetime().optional().openapi({ example: '2022-01-01T00:00:00.000Z' }),
-    joinedTo: z.iso.datetime().optional().openapi({ example: '2022-12-31T23:59:59.999Z' }),
-    page: z
-        .string()
-        .optional(),
-        // .transform((val) => (val ? Number(val) : 1)),
-
-    limit: z
-        .string()
+    joinedFrom: z.iso
+        .datetime()
         .optional()
-        // .transform((val) => (val ? Number(val) : 10)),
+        .openapi({ example: '2022-01-01T00:00:00.000Z' }),
+    joinedTo: z.iso
+        .datetime()
+        .optional()
+        .openapi({ example: '2022-12-31T23:59:59.999Z' }),
+    page: z.string().optional(),
+    limit: z.string().optional(),
 });
 
 export type ISearchUserQuery = z.infer<typeof SearchUserQuerySchema>;

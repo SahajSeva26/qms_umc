@@ -22,4 +22,4 @@ export const USER_PERMISSIONS = {
     SEARCH: { code: 'user:search', name: 'Search User', description: 'Search users' } as const,
     UPDATE: { code: 'user:update', name: 'Update User', description: 'Update a user' } as const,
     MANAGE: { code: 'user:manage', name: 'Manage User', description: 'Manage users' } as const,
-} as const;
+};

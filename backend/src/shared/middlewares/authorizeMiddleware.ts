@@ -26,7 +26,7 @@ export const AuthorizeMiddleware = (requiredPermission: any[] = [], type: permis
                     if (!ctx.hasAnyPermissions(requiredPermission)) {
                         return throwAppError('Forbidden', StatusCodes.FORBIDDEN);
                     }
-                    next(); 
+                    next();
                     break;
                 }
             }
@@ -34,12 +34,4 @@ export const AuthorizeMiddleware = (requiredPermission: any[] = [], type: permis
             return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
         }
     };
-};
-
-export const hasAnyPermission = (userPermissions: string[], requiredPermission: string[]): boolean => {
-    return requiredPermission.some((permission) => userPermissions.includes(permission));
-};
-
-export const hasAllPermission = (userPermissions: string[], requiredPermission: string[]): boolean => {
-    return requiredPermission.every((permission) => userPermissions.includes(permission));
 };

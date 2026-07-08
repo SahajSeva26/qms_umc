@@ -1,3 +1,4 @@
+import { PERMISSIONS } from '../env/permissions';
 import { throwAppError } from './error';
 import logger from './logger';
 import { generateUUID } from './strings';
@@ -34,7 +35,9 @@ export const buildContext = (req: any, res: any, next: any) => {
     res.on('finish', () => {
         const durationMs = (Number(process.hrtime.bigint() - startTime) / 1e6).toFixed(2);
         const requestID = req.context?.requestID ?? '?';
-        logger.info(`[HTTP] ${req.method} ${req.originalUrl} | status:${res.statusCode} | duration:${durationMs}ms | req:#${requestID}`);
+        logger.info(
+            `[HTTP] ${req.method} ${req.originalUrl} | status:${res.statusCode} | duration:${durationMs}ms | req:#${requestID}`,
+        );
     });
 
     const context: RequestContext = {
@@ -69,8 +72,13 @@ export const buildContext = (req: any, res: any, next: any) => {
             // req.context.logger.info('permissions attached to context', { count: permissions.length });
             req.context.permissions = permissions;
         },
-        // either this OR that
+
+        // either of any provided permissions
         hasAnyPermissions(required: string[]) {
+            // if user has system-manage permission, return true
+            if (req.context.permissions.includes(PERMISSIONS.SYSTEM.MANAGE.code)) {
+                return true;
+            }
             for (const item of required) {
                 if (req.context.permissions.includes(item)) {
                     return true;
@@ -78,8 +86,13 @@ export const buildContext = (req: any, res: any, next: any) => {
             }
             return false;
         },
-        // must have this AND that
+
+        // must have all provided permissions
         hasAllPermissions(required: string[]) {
+            // if user has system-manage permission, return true
+            if (req.context.permissions.includes(PERMISSIONS.SYSTEM.MANAGE.code)) {
+                return true;
+            }
             for (const item of required) {
                 if (!req.context.permissions.includes(item)) {
                     return false;
@@ -87,6 +100,7 @@ export const buildContext = (req: any, res: any, next: any) => {
             }
             return true;
         },
+
         // guard
         requirePermissions(perms: string[]) {
             if (!this.hasAllPermissions(perms)) {
@@ -95,10 +109,12 @@ export const buildContext = (req: any, res: any, next: any) => {
             }
             return true;
         },
+
         where() {
             return {};
         },
     };
+
     req.context = context;
     next();
 };

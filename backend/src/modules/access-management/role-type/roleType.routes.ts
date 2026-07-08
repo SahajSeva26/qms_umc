@@ -1,8 +1,14 @@
 import express from 'express';
 import { RoleTypeController } from './roleType.controller';
 import { registry } from '../../../shared/config/swagger/swagger.registry';
-import { CreateRoleTypePayloadSchema, SearchRoleTypeQuerySchema, UpdateRoleTypePayloadSchema } from './roleType.validators';
+import {
+    CreateRoleTypePayloadSchema,
+    SearchRoleTypeQuerySchema,
+    UpdateRoleTypePayloadSchema,
+} from './roleType.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
+import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { PERMISSIONS } from '../../../shared/env/permissions';
 
 export const RoleTypeRouter = express.Router();
 
@@ -95,7 +101,23 @@ registry.registerPath({
     },
 });
 
-RoleTypeRouter.get('/:id', RoleTypeController.get);
-RoleTypeRouter.put('/:id', RoleTypeController.update);
-RoleTypeRouter.get('/', RoleTypeController.search);
-RoleTypeRouter.post('/', RoleTypeController.create);
+RoleTypeRouter.get(
+    '/:id',
+    AuthorizeMiddleware([PERMISSIONS.ROLE_TYPE.GET.code]),
+    RoleTypeController.get,
+);
+RoleTypeRouter.put(
+    '/:id',
+    AuthorizeMiddleware([PERMISSIONS.ROLE_TYPE.UPDATE.code]),
+    RoleTypeController.update,
+);
+RoleTypeRouter.get(
+    '/',
+    AuthorizeMiddleware(['ROLE_TYPE.SEARCH']),
+    RoleTypeController.search,
+);
+RoleTypeRouter.post(
+    '/',
+    AuthorizeMiddleware(['ROLE_TYPE.CREATE']),
+    RoleTypeController.create,
+);

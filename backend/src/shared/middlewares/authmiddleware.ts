@@ -3,8 +3,6 @@ import { StatusCodes } from 'http-status-codes';
 import { ResponseHandler } from '../utils/responseHandler';
 import { TokenHandler } from '../helpers/tokenHelper';
 import { RoleService } from '../../modules/access-management/role/role.service';
-import { ContextUser } from '../utils/contextBuilder';
-import { populate } from 'dotenv';
 import { throwAppError } from '../utils/error';
 
 export const AuthMiddleware = async (req: any, res: any, next: any) => {

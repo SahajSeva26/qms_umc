@@ -30,9 +30,15 @@ const set = async (model: any, entity: HydratedDocument<IRoleType>, ctx: Request
     }
     if (model.permissions && model.permissions.length > 0) {
         //check if valid permissions
-        const inValidPermissions = model.permissions.filter((permission: any) => !PERMISSIONS_ARRAY.includes(permission.code));
+        // FIXME: this is a high priority bug, need to fix it
+        const inValidPermissions = model.permissions.filter(
+            (permission: any) => !PERMISSIONS_ARRAY.includes(permission.code),
+        );
         if (inValidPermissions.length > 0) {
-            throwAppError(`Invalid permissions: ${inValidPermissions.map((p: any) => p.code).join(', ')}`, StatusCodes.BAD_REQUEST);
+            throwAppError(
+                `Invalid permissions: ${inValidPermissions.map((p: any) => p.code).join(', ')}`,
+                StatusCodes.BAD_REQUEST,
+            );
         }
 
         //check if permissions are allowed by permission group
@@ -87,7 +93,11 @@ const search = async (filters: ISearchRoleTypeQuery, ctx: RequestContext, option
 
     const countPromise = RoleTypeModel.countDocuments(where);
 
-    const dataPromise = RoleTypeModel.find(where).populate(populate).limit(options?.pagination?.limit).skip(options?.pagination?.skip).sort(sort);
+    const dataPromise = RoleTypeModel.find(where)
+        .populate(populate)
+        .limit(options?.pagination?.limit)
+        .skip(options?.pagination?.skip)
+        .sort(sort);
 
     const [count, items] = await Promise.all([countPromise, dataPromise]);
 

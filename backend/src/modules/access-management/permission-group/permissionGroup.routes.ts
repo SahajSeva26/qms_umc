@@ -1,8 +1,14 @@
 import express from 'express';
 import { PermissionGroupController } from './permissionGroup.controller';
 import { registry } from '../../../shared/config/swagger/swagger.registry';
-import { CreatePermissionGroupPayloadSchema, SearchPermissionGroupQuerySchema, UpdatePermissionGroupPayloadSchema } from './permissionGroup.validators';
+import {
+    CreatePermissionGroupPayloadSchema,
+    SearchPermissionGroupQuerySchema,
+    UpdatePermissionGroupPayloadSchema,
+} from './permissionGroup.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
+import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { PERMISSIONS } from '../../../shared/env/permissions';
 
 export const PermissionGroupRouter = express.Router();
 
@@ -96,7 +102,26 @@ registry.registerPath({
     },
 });
 
-PermissionGroupRouter.get('/:id', PermissionGroupController.get);
-PermissionGroupRouter.put('/:id', PermissionGroupController.update);
-PermissionGroupRouter.get('/', PermissionGroupController.search);
-PermissionGroupRouter.post('/', PermissionGroupController.create);
+// ==========================================================================
+// EXPORTED PERMISSION GROUP ROUTES
+// ==========================================================================
+PermissionGroupRouter.get(
+    '/:id',
+    AuthorizeMiddleware([PERMISSIONS.PERMISSION_GROUP.GET.code]),
+    PermissionGroupController.get,
+);
+PermissionGroupRouter.get(
+    '/',
+    AuthorizeMiddleware([PERMISSIONS.PERMISSION_GROUP.SEARCH.code]),
+    PermissionGroupController.search,
+);
+PermissionGroupRouter.post(
+    '/',
+    AuthorizeMiddleware([PERMISSIONS.PERMISSION_GROUP.CREATE.code]),
+    PermissionGroupController.create,
+);
+PermissionGroupRouter.put(
+    '/:id',
+    AuthorizeMiddleware([PERMISSIONS.PERMISSION_GROUP.UPDATE.code]),
+    PermissionGroupController.update,
+);

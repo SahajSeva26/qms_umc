@@ -2,7 +2,10 @@ import express from 'express';
 import { registry } from '../../shared/config/swagger/swagger.registry';
 
 import { AuthController } from './auth.controller';
-import { LoginUserPayloadSchema, RegisterUserPayloadSchema } from './auth.validators';
+import {
+    LoginUserPayloadSchema,
+    RegisterUserPayloadSchema,
+} from './auth.validators';
 import { AuthMiddleware } from '../../shared/middlewares/authmiddleware';
 
 export const AuthRouter = express.Router();

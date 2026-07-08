@@ -1,8 +1,14 @@
 import express from 'express';
 import { TenantController } from './tenant.controller';
 import { registry } from '../../../shared/config/swagger/swagger.registry';
-import { CreateTenantPayloadSchema, SearchTenantQuerySchema, UpdateTenantPayloadSchema } from './tenant.validators';
+import {
+    CreateTenantPayloadSchema,
+    SearchTenantQuerySchema,
+    UpdateTenantPayloadSchema,
+} from './tenant.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
+import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { PERMISSIONS } from '../../../shared/env/permissions';
 
 export const TenantRouter = express.Router();
 
@@ -95,7 +101,23 @@ registry.registerPath({
     },
 });
 
-TenantRouter.get('/:id', TenantController.get);
-TenantRouter.put('/:id', TenantController.update);
-TenantRouter.get('/', TenantController.search);
-TenantRouter.post('/', TenantController.create);
+TenantRouter.get(
+    '/:id',
+    AuthorizeMiddleware([PERMISSIONS.TENANT.GET.code]),
+    TenantController.get,
+);
+TenantRouter.put(
+    '/:id',
+    AuthorizeMiddleware([PERMISSIONS.TENANT.UPDATE.code]),
+    TenantController.update,
+);
+TenantRouter.get(
+    '/',
+    AuthorizeMiddleware([PERMISSIONS.TENANT.SEARCH.code]),
+    TenantController.search,
+);
+TenantRouter.post(
+    '/',
+    AuthorizeMiddleware([PERMISSIONS.TENANT.CREATE.code]),
+    TenantController.create,
+);

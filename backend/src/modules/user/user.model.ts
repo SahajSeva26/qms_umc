@@ -15,7 +15,6 @@ const userSchema = new mongoose.Schema(
 
         lastName: {
             type: String,
-            required: true,
             maxlength: 50,
             trim: true,
             lowercase: true,
@@ -31,13 +30,12 @@ const userSchema = new mongoose.Schema(
 
         phone: {
             type: String,
-            required: true,
         },
 
         password: {
             type: String,
             required: true,
-            minlength: 8,
+            minlength: 6,
         },
 
         avatar: {

@@ -51,9 +51,13 @@ const login = async (req: any, res: any) => {
         //set cookies
         CookieHandler.setAccessToken(res, accessToken);
         CookieHandler.setRefreshToken(res, refreshToken);
-        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'User logged in successfully', {
-            data: AuthMapper.toResponse(user),
-        });
+        return ResponseHandler.appResponse(
+            res,
+            StatusCodes.OK,
+            true,
+            'User logged in successfully',
+            AuthMapper.toResponse(user),
+        );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }

@@ -49,7 +49,7 @@ const login = async (data: ILoginUserPayload, ctx: RequestContext) => {
 
         await user.save();
         return throwAppError(
-            `Invalid credentials, attempt remaining: ${5 - user.loginAttempts}`,
+            `Invalid credentials, attempt remaining: ${MAX_LOGIN_ATTEMPTS - user.loginAttempts}`,
             StatusCodes.UNAUTHORIZED,
         );
     }
@@ -100,11 +100,8 @@ const logout = async (userId: string, ctx: RequestContext) => {
     return true;
 };
 const refreshToken = async (refreshToken: string, ctx: RequestContext) => {
-    //1:decode token
-    const decoded: ITokenPayload = TokenHandler.decodePayload(refreshToken);
-    if (!decoded) {
-        return throwAppError('Invalid refresh token', StatusCodes.UNAUTHORIZED);
-    }
+    //1: verify token (throws AppError 401 on invalid/expired)
+    const decoded: any = TokenHandler.verifyRefreshToken(refreshToken);
 
     //2: get user from user service
     const userId: string = decoded._id.toString();
@@ -112,17 +109,18 @@ const refreshToken = async (refreshToken: string, ctx: RequestContext) => {
     if (!user) {
         return throwAppError('User not found, login again', StatusCodes.NOT_FOUND);
     }
-    // 3: get user role
+
+    // 3: check if refresh token matches the one on record (before any further DB work)
+    if (user.refreshToken?.toString() !== refreshToken.toString()) {
+        return throwAppError('Invalid refresh token', StatusCodes.UNAUTHORIZED);
+    }
+
+    // 4: get user role
     let userRole: any = await RoleService.search({ user: user.id }, ctx);
     if (userRole.items.length == 0) {
         return throwAppError('User role not found, login again', StatusCodes.NOT_FOUND);
     }
     userRole = userRole.items[0];
-
-    // 4: check if refresh token matches
-    if (user.refreshToken?.toString() !== refreshToken.toString()) {
-        return throwAppError('Invalid refresh token', StatusCodes.UNAUTHORIZED);
-    }
 
     //5: generate tokens with new payload
     const freshPayload: ITokenPayload = {

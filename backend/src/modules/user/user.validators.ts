@@ -4,7 +4,7 @@ import { USER_GENDERS, USER_STATUS } from './user.constants';
 
 //1: update ====================================>
 export const UpdateUserPayloadSchema = z.object({
-    firstName: z.string().min(1).openapi({ example: 'john' }),
+    firstName: z.string().optional().openapi({ example: 'john' }),
     lastName: z.string().optional().openapi({ example: 'doe' }),
     status: z
         .enum([
@@ -26,7 +26,7 @@ export type IUpdateUserPayload = z.infer<typeof UpdateUserPayloadSchema>;
 //2: search ====================================>
 export const SearchUserQuerySchema = z.object({
     name: z.string().optional().openapi({ example: 'john' }),
-    email: z.email().optional().openapi({ example: 'john.doe@example.com' }),
+    email: z.string().optional().openapi({ example: 'john.doe@example.com' }),
     status: z
         .enum([
             USER_STATUS.ACTIVE,

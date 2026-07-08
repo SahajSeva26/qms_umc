@@ -8,7 +8,6 @@ import { USER_PERMISSIONS, USER_STATUS } from './user.constants';
 import { isValidEmail } from '../../shared/utils/strings';
 import { IRegisterUserPayload } from '../auth/auth.validators';
 import { RequestContext } from '../../shared/utils/contextBuilder';
-import { SYSTEM_PERMISSIONS } from '../../shared/env/permissions';
 
 type UserDocument = HydratedDocument<IUser> | null;
 const populate: any[] = [];
@@ -29,7 +28,7 @@ const set = async (model: any, entity: HydratedDocument<IUser>, ctx: RequestCont
     if (model.phone) {
         entity.phone = model.phone;
     }
-    if (model.status) {
+    if (model.status && ctx.hasAllPermissions([USER_PERMISSIONS.MANAGE.code])) {
         entity.status = model.status;
     }
 

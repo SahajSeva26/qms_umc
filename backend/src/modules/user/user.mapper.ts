@@ -30,7 +30,7 @@ export const UserMapper = {
             count: data?.count || 0,
             items: [] as any[],
         };
-        for (const u of data?.items) {
+        for (const u of data?.items || []) {
             result.items.push(UserMapper.toResponse(u, ctx));
         }
         return result;

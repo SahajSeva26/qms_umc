@@ -10,7 +10,12 @@ import { TenantService } from '../tenant/tenant.service';
 import { PERMISSIONS_ARRAY } from '../../../shared/env/permissions';
 
 type RoleTypeDocument = HydratedDocument<IRoleType> | null;
-const populate: any[] = [];
+const populate: any[] = [
+    {
+        path: 'tenant',
+        select: 'name code',
+    },
+];
 
 // ========================================================================================
 // CORE FUNCTIONS
@@ -55,7 +60,7 @@ const get = async (id: string, ctx: RequestContext, options?: any): Promise<Role
     }
 
     if (query && options) {
-        query = query.populate(options);
+        query = query.populate(populate);
     }
 
     return await query;

@@ -32,8 +32,8 @@ Never skip a layer. Never merge them.
 ## Request Flow
 
 ```
-Route → AuthMiddleware (if protected) → Controller → Service → DB
-                                                    ↘ Other Services
+Route → AuthMiddleware (if protected) → AuthorizeMiddleware (if guarded) → Controller → Service → DB
+                                                                                       ↘ Other Services
 ```
 
 - **Routes**: define HTTP method + path, register Swagger, apply middleware
@@ -105,12 +105,14 @@ Cookies are: `httpOnly: true`, `secure: true` in production, `sameSite: strict`.
 Never call `jwt.*` directly. Use:
 
 ```typescript
-TokenHandler.generateAccessToken(payload)   // { _id, email }
+TokenHandler.generateAccessToken(payload)   // { _id, email, role, tenant }
 TokenHandler.generateRefreshToken(payload)
 TokenHandler.verifyAccessToken(token)       // throws on invalid
 TokenHandler.verifyRefreshToken(token)      // throws on invalid/missing
 TokenHandler.decodePayload(token)           // decode without verify
 ```
+
+`ITokenPayload` shape: `{ _id: string; email: string; role: string; tenant: string }`
 
 ### `logger` (`src/shared/utils/logger.ts`)
 Never use `console.log`. Use logger everywhere.
@@ -128,12 +130,17 @@ Every request gets a context injected by the `buildContext` middleware. In contr
 
 ```typescript
 const ctx: RequestContext = req.context
-// ctx.user         → { _id, email } | null (set by AuthMiddleware)
-// ctx.permissions  → string[]
+// ctx.user         → { _id, email, role, tenant } | null (set by AuthMiddleware)
+// ctx.role         → populated role document | null (set by AuthMiddleware)
+// ctx.tenant       → tenant id / document | null (set by AuthMiddleware)
+// ctx.permissions  → string[] (merged from role.permissions + role.type.permissions)
 // ctx.requestID    → UUID per request
 // ctx.ipAddress    → client IP
 // ctx.logger       → scoped logger
 // ctx.setUser(userData)
+// ctx.setRole(role)
+// ctx.setTenant(tenant)
+// ctx.setPermissions(permissions)
 // ctx.requirePermissions(['perm'])  → throws 403 if missing
 // ctx.hasAnyPermissions(['a', 'b']) → boolean
 // ctx.hasAllPermissions(['a', 'b']) → boolean
@@ -275,8 +282,32 @@ Swagger must be registered in the routes file because `swagger.config.ts` import
 - **Refresh token**: 7 days, stored in `refreshToken` httpOnly cookie + `user.refreshToken` in DB
 - **Token rotation**: every refresh generates new access + refresh token pair; old refresh token in DB is replaced
 - **Account lockout**: 5 failed logins → 10-minute lockout (`loginAttempts`, `lockUntil` on User model)
-- **AuthMiddleware**: verifies access token, sets `ctx.user` via `ctx.setUser()`. Apply to all protected routes.
+- **AuthMiddleware** (`src/shared/middlewares/authmiddleware.ts`): verifies access token, looks up the role from DB (with type + tenant populate), sets `ctx.user`, `ctx.role`, `ctx.tenant`, and merges `role.permissions + role.type.permissions` into `ctx.permissions`. Apply to all protected routes.
+- **AuthorizeMiddleware** (`src/shared/middlewares/authorizeMiddleware.ts`): permission guard, applied after `AuthMiddleware`. Takes a permission list and a mode (`'AND'` | `'OR'`). Use `'AND'` (default) to require all, `'OR'` to require any.
 - **Logout order**: clear DB session first, then clear browser cookies
+
+```typescript
+// Usage in routes:
+FooRouter.post('/create', AuthMiddleware, AuthorizeMiddleware(['foo:create'], 'AND'), FooController.create)
+FooRouter.get('/',        AuthMiddleware, AuthorizeMiddleware(['foo:read', 'foo:manage'], 'OR'), FooController.search)
+```
+
+### System User Seeding (`src/shared/env/seedSystemUser.ts`)
+
+Called on app startup. Idempotent — skips any step where the record already exists.
+
+Order: system tenant → permission group → role type → user → role.
+
+Env vars required: `SYSTEM_USER_EMAIL`, `SYSTEM_USER_PASSWORD`, `SYSTEM_USER_PHONE`
+
+### Permissions Registry (`src/shared/env/permissions.ts`)
+
+All module permissions are aggregated here. Each module exports its own `*_PERMISSIONS` constant and it must be added to the `PERMISSIONS` object.
+
+```typescript
+import { PERMISSIONS, PERMISSIONS_ARRAY } from '../../shared/env/permissions'
+// PERMISSIONS_ARRAY → flat string[] of all permission codes — used for validation in role.service
+```
 
 ---
 
@@ -317,14 +348,20 @@ user.constants.ts
 
 ## What's Done
 
-| Module | Endpoints |
+| Module / Feature | Endpoints / Notes |
 |---|---|
 | auth | POST /register, POST /login, POST /logout, POST /refresh-token |
 | user | GET /:id, GET / (search), PUT /:id |
+| tenant | CRUD |
+| permission-group | CRUD |
+| role-type | GET /:id, GET / (search), POST /, PUT /:id |
+| role | GET /:id, GET / (search), POST /, PUT /:id |
+| AuthorizeMiddleware | permission-based route guard (`AND` / `OR` modes) |
+| System user seeding | auto-seeds tenant, permission group, role type, role, user on startup |
+| Permissions registry | aggregated `PERMISSIONS` + `PERMISSIONS_ARRAY` for validation |
 
 ## What's Next (planned)
 
-- Role / permission module
 - Document module (core QMS functionality)
 - Email verification flow
 - File upload (avatar)

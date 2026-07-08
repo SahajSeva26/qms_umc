@@ -86,7 +86,7 @@ const seedSystemUser = async () => {
 
         const message =
             seededItems.length > 0
-                ? `System tenant, role type, permissions, and user created successfully. Seeded items: ${seededItems.join(', ')}`
+                ? `System tenant, role type, permissions, and user created successfully. Seeded items: [${seededItems.join(', ').toUpperCase()}]`
                 : 'System tenant, role type, permissions, and user already exist';
 
         logger.success(message);

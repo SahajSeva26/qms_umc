@@ -6,7 +6,6 @@ import { LoginUserPayloadSchema, RegisterUserPayloadSchema } from './auth.valida
 import { AuthMiddleware } from '../../shared/middlewares/authmiddleware';
 
 export const AuthRouter = express.Router();
-
 //
 // ========== SWAGGER ============================
 registry.registerPath({

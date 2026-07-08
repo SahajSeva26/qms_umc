@@ -2,17 +2,21 @@ import jwt from 'jsonwebtoken';
 import ENV from '../config/app.config';
 import { throwAppError } from '../utils/error';
 import { StatusCodes } from 'http-status-codes';
+import { ContextUser } from '../utils/contextBuilder';
 
+export interface ITokenPayload {
+    _id: string;
+    email: string;
+    role: string;
+    tenant: string;
+}
 export const TokenHandler = {
-    generateAccessToken: (payload: any) => {
-        const tokenPayload = {
-            _id: payload?._id,
-            email: payload?.email,
-        };
+    generateAccessToken: (payload: ITokenPayload) => {
 
         const token: any = jwt.sign(
             {
-                ...tokenPayload,
+                // ...tokenPayload,
+                ...payload,
             },
             ENV.JWT.AccessTokenSecret,
             {
@@ -24,14 +28,11 @@ export const TokenHandler = {
     },
 
     generateRefreshToken: (payload: any) => {
-        const tokenPayload = {
-            _id: payload?._id,
-            email: payload?.email,
-        };
+
 
         const token: any = jwt.sign(
             {
-                ...tokenPayload,
+                ...payload,
             },
             ENV.JWT.RefreshTokenSecret,
             {
@@ -43,7 +44,6 @@ export const TokenHandler = {
     },
 
     verifyAccessToken: (token: string) => {
-
         return jwt.verify(token, ENV.JWT.AccessTokenSecret);
     },
 
@@ -57,6 +57,4 @@ export const TokenHandler = {
     decodePayload: (token: string) => {
         return jwt.decode(token);
     },
-
-
 };

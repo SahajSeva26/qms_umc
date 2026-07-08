@@ -42,14 +42,22 @@ npm run build     # tsc + vite build
 
 ## Active Branch
 
-`feature/user-module`
+`feature/access-management`
 
-## Current Status (as of 2026-07-06)
+## Current Status (as of 2026-07-08)
 
 ### Backend — in progress
 - Auth module: register, login, logout, refresh-token — DONE
 - User module: get, search, update — DONE
 - Token rotation, account lockout, httpOnly cookie auth — DONE
+- Tenant CRUD — DONE
+- Permission group CRUD — DONE
+- Role type CRUD — DONE
+- Role CRUD — DONE
+- AuthorizeMiddleware (permission-based route guard) — DONE
+- System user seeding on startup — DONE
+- Token payload includes role + tenant — DONE
+- AuthMiddleware loads role from DB and sets role/tenant/permissions on context — DONE
 - Swagger fully wired
 
 ### Frontend — early scaffold
@@ -68,4 +76,7 @@ JWT_ACCESS_SECRET=
 JWT_ACCESS_EXPIRY_SEC=900
 JWT_REFRESH_SECRET=
 JWT_REFRESH_EXPIRY_SEC=604800
+SYSTEM_USER_EMAIL=
+SYSTEM_USER_PASSWORD=
+SYSTEM_USER_PHONE=
 ```

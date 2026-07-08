@@ -9,7 +9,7 @@ let ENV = {
         Environment: process.env.APP_ENV || 'development',
 
         SystemUserEmail: process.env.SYSTEM_USER_EMAIL || 'admin@gmail.com',
-        SystemUserPassword: process.env.SYSTEM_USER_PASSWORD || 'uk04ac2006',
+        SystemUserPassword: process.env.SYSTEM_USER_PASSWORD || 'Test@123',
         SystemUserPhone: process.env.SYSTEM_USER_PHONE || '7456920792',
     },
     DB: {

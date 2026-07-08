@@ -14,7 +14,7 @@ export const PERMISSIONS = {
     USER: USER_PERMISSIONS,
     TENANT: TENANT_PERMISSIONS,
     PERMISSION_GROUP: PERMISSION_GROUP_PERMISSIONS,
-};
+} as const;
 
 // export const PERMISSIONS_ARRAY = [...Object.values(PERMISSIONS).values()].map((p: any) => p.code);
 

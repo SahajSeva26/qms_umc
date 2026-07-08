@@ -16,3 +16,11 @@ export const isValidObjectID = (id: string): boolean => {
 export const toObjectId = (id: string): mongoose.Types.ObjectId => {
     return new mongoose.Types.ObjectId(id);
 };
+
+export const hasAllItem = (data: string[], required: string[]): boolean => {
+    return required.every((item) => data.includes(item));
+};
+
+export const hasAnyItem = (data: string[], required: string[]): boolean => {
+    return required.some((item) => data.includes(item));
+};

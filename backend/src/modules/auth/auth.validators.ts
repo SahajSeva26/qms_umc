@@ -17,7 +17,7 @@ export type IRegisterUserPayload = z.infer<typeof RegisterUserPayloadSchema>;
 
 //2: login ====================================>
 export const LoginUserPayloadSchema = z.object({
-    email: z.email().openapi({ example: 'shailu@example.com' }),
+    email: z.email().openapi({ example: 'admin@gmail.com' }),
     password: z.string().min(1).openapi({ example: 'Test@123' }),
 });
 export type ILoginUserPayload = z.infer<typeof LoginUserPayloadSchema>;

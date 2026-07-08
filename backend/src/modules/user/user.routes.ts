@@ -4,6 +4,8 @@ import { registry } from '../../shared/config/swagger/swagger.registry';
 
 import { SearchUserQuerySchema, UpdateUserPayloadSchema } from './user.validators';
 import { AuthMiddleware } from '../../shared/middlewares/authmiddleware';
+import { PERMISSIONS } from '../../shared/env/permissions';
+import { AuthorizeMiddleware } from '../../shared/middlewares/authorizeMiddleware';
 
 export const UserRouter = express.Router();
 
@@ -72,6 +74,14 @@ registry.registerPath({
     },
 });
 
-UserRouter.get('/:id', UserController.get);
-UserRouter.put('/:id', UserController.update);
+UserRouter.get(
+    '/:id',
+    AuthorizeMiddleware([PERMISSIONS.USER.GET, PERMISSIONS.SYSTEM.MANAGE], 'OR'),
+    UserController.get,
+);
+UserRouter.put(
+    '/:id',
+    AuthorizeMiddleware([PERMISSIONS.USER.UPDATE, PERMISSIONS.SYSTEM.MANAGE], 'OR'),
+    UserController.update,
+);
 UserRouter.get('/', UserController.search);

@@ -8,6 +8,8 @@ import { StatusCodes } from 'http-status-codes';
 import { TokenHandler } from '../../shared/helpers/tokenHelper';
 import { ContextUser, RequestContext } from '../../shared/utils/contextBuilder';
 import { CookieHandler } from '../../shared/utils/cookies';
+import { RoleService } from '../access-management/role/role.service';
+import { ITokenPayload } from '../../shared/helpers/tokenHelper';
 
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 10 * 60 * 1000; // 10 minutes
@@ -26,10 +28,7 @@ const login = async (data: ILoginUserPayload, ctx: RequestContext) => {
     //2: check account locked
     if (user.lockUntil && user.lockUntil > new Date()) {
         const remainingTime = user.lockUntil.getTime() - Date.now();
-        return throwAppError(
-            `Account is locked,try again in ${Math.ceil(remainingTime / 60000)} minutes.`,
-            StatusCodes.FORBIDDEN,
-        );
+        return throwAppError(`Account is locked,try again in ${Math.ceil(remainingTime / 60000)} minutes.`, StatusCodes.FORBIDDEN);
     }
 
     //3: validate password
@@ -46,19 +45,30 @@ const login = async (data: ILoginUserPayload, ctx: RequestContext) => {
         }
 
         await user.save();
-        return throwAppError(
-            `Invalid credentials, attempt remaining: ${5 - user.loginAttempts}`,
-            StatusCodes.UNAUTHORIZED,
-        );
+        return throwAppError(`Invalid credentials, attempt remaining: ${5 - user.loginAttempts}`, StatusCodes.UNAUTHORIZED);
     }
 
     // 4: reset if everything is right
     user.loginAttempts = 0;
     user.lockUntil = null;
 
+    // 5: find user role
+    let userRole: any = await RoleService.search({ user: user.id }, ctx);
+    if (userRole.items.length == 0) {
+        return throwAppError('User role not found', StatusCodes.NOT_FOUND);
+    }
+    userRole = userRole.items[0];
+
+    const payload: ITokenPayload = {
+        _id: user.id.toString(),
+        email: user.email,
+        role: userRole.id.toString(),
+        tenant: userRole.tenant.id.toString(),
+    };
+
     // 5: generate tokens
-    const accessToken = TokenHandler.generateAccessToken(user);
-    const refreshToken = TokenHandler.generateRefreshToken(user);
+    const accessToken = TokenHandler.generateAccessToken(payload);
+    const refreshToken = TokenHandler.generateRefreshToken(payload);
 
     // 6: save refresh token in database
     user.refreshToken = refreshToken;

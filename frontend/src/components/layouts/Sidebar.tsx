@@ -1,7 +1,14 @@
 import { useState, useEffect } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import * as LucideIcons from 'lucide-react'
-import type React from 'react'
+import type { IconType } from 'react-icons'
+import {
+  FiGrid, FiTrendingUp, FiNavigation, FiActivity, FiBarChart2,
+  FiCalendar, FiUsers, FiBriefcase, FiFolderPlus, FiSliders,
+  FiClipboard, FiSun, FiVideo, FiHeart, FiDollarSign, FiUserCheck,
+  FiSettings, FiMapPin, FiAlertTriangle, FiCpu, FiGlobe, FiUser,
+  FiPackage, FiBox, FiFileText, FiShield, FiZap, FiMessageSquare,
+  FiChevronsLeft, FiChevronsRight, FiChevronDown, FiCircle,
+} from 'react-icons/fi'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import {
@@ -16,6 +23,38 @@ interface SidebarProps {
   onToggle: () => void
 }
 
+// Static map: navConfig icon string → Feather component
+const ICON_MAP: Record<string, IconType> = {
+  Grid:          FiGrid,
+  TrendingUp:    FiTrendingUp,
+  Navigation:    FiNavigation,
+  Activity:      FiActivity,
+  BarChart2:     FiBarChart2,
+  Calendar:      FiCalendar,
+  Users:         FiUsers,
+  Briefcase:     FiBriefcase,
+  FolderPlus:    FiFolderPlus,
+  Sliders:       FiSliders,
+  Clipboard:     FiClipboard,
+  Sun:           FiSun,
+  Video:         FiVideo,
+  Heart:         FiHeart,
+  DollarSign:    FiDollarSign,
+  UserCheck:     FiUserCheck,
+  Settings:      FiSettings,
+  MapPin:        FiMapPin,
+  AlertTriangle: FiAlertTriangle,
+  Cpu:           FiCpu,
+  Globe:         FiGlobe,
+  User:          FiUser,
+  Package:       FiPackage,
+  Box:           FiBox,
+  FileText:      FiFileText,
+  Shield:        FiShield,
+  Zap:           FiZap,
+  MessageSquare: FiMessageSquare,
+}
+
 const SECTIONS_KEY = 'qms.sb.sections'
 
 function readCollapsedSections(): Set<string> {
@@ -27,13 +66,9 @@ function saveCollapsedSections(set: Set<string>) {
   try { localStorage.setItem(SECTIONS_KEY, JSON.stringify([...set])) } catch {}
 }
 
-const toPascalCase = (str: string) =>
-  str.split('-').map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join('')
-
 const NavIcon = ({ name, size = 16 }: { name: string; size?: number }) => {
-  const iconName = toPascalCase(name) as keyof typeof LucideIcons
-  const Icon = (LucideIcons[iconName] as React.ElementType) ?? LucideIcons.Circle
-  return <Icon size={size} strokeWidth={1.8} />
+  const Icon = ICON_MAP[name] ?? FiCircle
+  return <Icon size={size} />
 }
 
 const NavItemRow = ({ item, collapsed }: { item: NavItem; collapsed: boolean }) => {
@@ -43,28 +78,28 @@ const NavItemRow = ({ item, collapsed }: { item: NavItem; collapsed: boolean }) 
   return (
     <NavLink
       to={item.path}
-      data-label={item.label}
       className={cn(
-        'flex items-center gap-2.5 px-2.5 py-[7px] rounded-lg text-[13px] font-medium transition-all duration-150 relative group',
+        'flex items-center gap-2.5 px-2.5 py-1.75 rounded-lg text-[13px] font-medium transition-all duration-150 relative group',
         collapsed ? 'justify-center px-2' : '',
         isActive
-          ? 'text-gray-900 dark:text-white'
-          : 'text-gray-500 dark:text-[#7b85b8] hover:bg-gray-100 dark:hover:bg-[rgba(148,168,255,0.07)] hover:text-gray-800 dark:hover:text-[#aab2dc]'
+          ? ''
+          : 'hover:bg-(--qms-surface-hover)'
       )}
       style={
         isActive
           ? {
+              color: 'var(--qms-text)',
               background: 'linear-gradient(135deg, rgba(36,81,240,.12), rgba(20,184,166,.08))',
-              boxShadow: 'inset 0 0 0 1px rgba(36,81,240,0.18)',
+              boxShadow: 'inset 0 0 0 1px var(--qms-border-strong)',
             }
-          : undefined
+          : { color: 'var(--qms-text-muted)' }
       }
     >
       {/* Active left accent bar */}
       {isActive && (
         <span
-          className="absolute -left-2.5 top-1.5 bottom-1.5 w-[3px] rounded-full"
-          style={{ background: 'linear-gradient(180deg,#2451f0,#14b8a6)' }}
+          className="absolute -left-2.5 top-1.5 bottom-1.5 w-0.75 rounded-full"
+          style={{ background: 'linear-gradient(180deg, var(--qms-brand), var(--qms-teal))' }}
         />
       )}
 
@@ -76,7 +111,7 @@ const NavItemRow = ({ item, collapsed }: { item: NavItem; collapsed: boolean }) 
         <>
           <span className="flex-1 truncate">{item.label}</span>
           {item.live && (
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[rgba(16,185,129,0.13)] text-emerald-600 dark:text-emerald-400">
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-success-soft text-success">
               LIVE
             </span>
           )}
@@ -85,7 +120,10 @@ const NavItemRow = ({ item, collapsed }: { item: NavItem; collapsed: boolean }) 
 
       {/* Collapsed tooltip */}
       {collapsed && (
-        <span className="pointer-events-none absolute left-full ml-2.5 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-gray-900 dark:bg-[rgba(15,23,42,0.95)] text-white text-xs font-semibold px-2.5 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg">
+        <span
+          className="pointer-events-none absolute left-full ml-2.5 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-lg text-white text-xs font-semibold px-2.5 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg"
+          style={{ background: 'var(--popover)', color: 'var(--qms-text)' }}
+        >
           {item.label}
         </span>
       )}
@@ -112,10 +150,11 @@ const SectionBlock = ({
         <button
           type="button"
           onClick={() => onToggleSection(section.section)}
-          className="w-full flex items-center justify-between px-2.5 pt-2.5 pb-1 text-[10px] font-bold tracking-widest uppercase text-gray-400 dark:text-[#7b85b8] hover:text-gray-600 dark:hover:text-[#aab2dc] transition-colors"
+          className="w-full flex items-center justify-between px-2.5 pt-2.5 pb-1 text-[10px] font-bold tracking-widest uppercase transition-colors"
+          style={{ color: 'var(--qms-text-muted)' }}
         >
           <span>{section.section}</span>
-          <LucideIcons.ChevronDown
+          <FiChevronDown
             size={12}
             className={cn('transition-transform duration-150', isSectionCollapsed && '-rotate-90')}
           />
@@ -127,7 +166,7 @@ const SectionBlock = ({
           {section.subs.map((sub, si) => (
             <div key={si}>
               {!collapsed && sub.title && (
-                <div className="px-2.5 pt-2 pb-0.5 text-[9px] font-bold tracking-widest uppercase text-gray-400 dark:text-[#7b85b8] opacity-70">
+                <div className="px-2.5 pt-2 pb-0.5 text-[9px] font-bold tracking-widest uppercase opacity-70" style={{ color: 'var(--qms-text-muted)' }}>
                   {sub.title}
                 </div>
               )}
@@ -156,7 +195,6 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
     })
   }
 
-  // Keep sections state in sync if role changes
   useEffect(() => {
     setCollapsedSections(readCollapsedSections())
   }, [user?.role])
@@ -166,44 +204,55 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
   return (
     <aside
       className={cn(
-        'flex flex-col h-screen sticky top-0 border-r border-[rgba(36,81,240,0.10)] dark:border-[rgba(148,168,255,0.1)] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(20,26,55,0.55)] backdrop-blur-xl transition-all duration-200',
+        'flex flex-col h-screen sticky top-0 border-r backdrop-blur-xl transition-all duration-200',
         collapsed ? 'w-16' : 'w-56'
       )}
+      style={{
+        background: 'var(--qms-surface)',
+        borderColor: 'var(--qms-border)',
+      }}
     >
       {/* Brand */}
-      <div className={cn('flex items-center gap-2 px-3 py-3.5 border-b border-[rgba(36,81,240,0.08)] dark:border-[rgba(148,168,255,0.08)]', collapsed && 'justify-center')}>
-        <div className="w-8 h-8 rounded-[10px] flex items-center justify-center shrink-0 text-white font-extrabold text-sm shadow-md"
-          style={{ background: 'linear-gradient(135deg,#2451f0,#14b8a6)' }}>
+      <div
+        className={cn('flex items-center gap-2 px-3 py-3.5 border-b', collapsed && 'justify-center')}
+        style={{ borderColor: 'var(--qms-border)' }}
+      >
+        <div
+          className="w-8 h-8 rounded-[10px] flex items-center justify-center shrink-0 text-white font-extrabold text-sm shadow-md"
+          style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
+        >
           Q
         </div>
         {!collapsed && (
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-extrabold text-gray-900 dark:text-white tracking-tight leading-none">QMS</div>
-            <div className="text-[10px] text-gray-400 dark:text-[#7b85b8] leading-tight mt-0.5">Healthcare Ops OS</div>
+            <div className="text-sm font-extrabold tracking-tight leading-none" style={{ color: 'var(--qms-text)' }}>QMS</div>
+            <div className="text-[10px] leading-tight mt-0.5" style={{ color: 'var(--qms-text-muted)' }}>Healthcare Ops OS</div>
           </div>
         )}
         {!collapsed && (
           <button
             onClick={onToggle}
-            className="w-7 h-7 rounded-lg border border-gray-200 dark:border-[rgba(148,168,255,0.15)] flex items-center justify-center text-gray-400 dark:text-[#7b85b8] hover:bg-gray-100 dark:hover:bg-[rgba(148,168,255,0.07)] hover:text-gray-600 dark:hover:text-[#aab2dc] transition-all shrink-0"
+            className="w-7 h-7 rounded-lg border flex items-center justify-center transition-all shrink-0 hover:bg-(--qms-surface-hover)"
+            style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }}
             aria-label="Collapse sidebar"
           >
-            <LucideIcons.PanelLeftClose size={14} />
+            <FiChevronsLeft size={14} />
           </button>
         )}
         {collapsed && (
           <button
             onClick={onToggle}
-            className="absolute top-3.5 right-1 w-7 h-7 rounded-lg border border-gray-200 dark:border-[rgba(148,168,255,0.15)] flex items-center justify-center text-gray-400 dark:text-[#7b85b8] hover:bg-gray-100 dark:hover:bg-[rgba(148,168,255,0.07)] transition-all"
+            className="absolute top-3.5 right-1 w-7 h-7 rounded-lg border flex items-center justify-center transition-all hover:bg-(--qms-surface-hover)"
+            style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }}
             aria-label="Expand sidebar"
           >
-            <LucideIcons.PanelLeftOpen size={14} />
+            <FiChevronsRight size={14} />
           </button>
         )}
       </div>
 
       {/* Nav */}
-      <div className="flex-1 overflow-y-auto px-2 py-2 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-[rgba(148,168,255,0.15)]">
+      <div className="flex-1 overflow-y-auto hide-scrollbar px-2 py-2">
         {nav === 'ALL' ? (
           FULL_NAV_SECTIONS.map((section) => (
             <SectionBlock
@@ -223,20 +272,25 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
         )}
       </div>
 
-      {/* AI Copilot card — hidden when collapsed */}
+      {/* AI Copilot card */}
       {!collapsed && (
-        <div className="p-3 border-t border-[rgba(36,81,240,0.08)] dark:border-[rgba(148,168,255,0.08)]">
-          <div className="rounded-xl border border-gray-200 dark:border-[rgba(148,168,255,0.12)] bg-gray-50 dark:bg-[rgba(22,29,62,0.6)] p-3">
+        <div className="p-3 border-t" style={{ borderColor: 'var(--qms-border)' }}>
+          <div
+            className="rounded-xl border p-3"
+            style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-strong)' }}
+          >
             <div className="flex items-center gap-1.5 mb-1.5">
-              <LucideIcons.Sparkles size={14} className="text-violet-500" />
-              <span className="text-xs font-bold text-gray-800 dark:text-[#e8ebff]">AI Copilot</span>
+              <FiZap size={14} className="text-violet-500" />
+              <span className="text-xs font-bold" style={{ color: 'var(--qms-text)' }}>AI Copilot</span>
             </div>
-            <p className="text-[11px] text-gray-500 dark:text-[#7b85b8] leading-relaxed mb-2.5">
+            <p className="text-[11px] leading-relaxed mb-2.5" style={{ color: 'var(--qms-text-muted)' }}>
               Ask anything across camps, leads, FOs and inventory.
             </p>
-            <button className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-bold text-white transition-all hover:-translate-y-px hover:shadow-md"
-              style={{ background: 'linear-gradient(135deg,#2451f0,#0ea5e9)' }}>
-              <LucideIcons.MessageSquare size={12} />
+            <button
+              className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-bold text-white transition-all hover:-translate-y-px hover:shadow-md"
+              style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
+            >
+              <FiMessageSquare size={12} />
               Ask Copilot
             </button>
           </div>

@@ -1,29 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { User, KeyRound, Eye, EyeOff } from 'lucide-react'
+import { FiUser, FiLock, FiEye, FiEyeOff } from 'react-icons/fi'
 import { useLogin } from '../hooks/useLogin'
 import ThemeToggle from '@/components/ui/ThemeToggle'
-
-const ROLE_HOME: Record<string, string> = {
-  super_admin:      '/dashboard',
-  admin:            '/dashboard',
-  sales_lead:       '/crm',
-  sales_rep:        '/crm',
-  camp_coord:       '/camps',
-  diet_camp_coord:  '/diet',
-  om_screening:     '/om',
-  om_diet:          '/om',
-  fo:               '/fo',
-  dedicated_fo:     '/fo',
-  logistics:        '/admin',
-  accounts:         '/billing',
-  dietitian:        '/diet',
-  analytics_viewer: '/analytics',
-  pharma_ho:        '/pharma/ho',
-  pharma_rsm:       '/pharma/rsm',
-  pharma_asm:       '/pharma/asm',
-  pharma_mr:        '/pharma/mr',
-}
+import { ROLE_HOME, DASHBOARD_ROUTES } from '@/components/layouts/navConfig'
 
 const LoginPage = () => {
   const navigate = useNavigate()
@@ -42,7 +22,7 @@ const LoginPage = () => {
         onSuccess: (data) => {
           // TODO: once backend adds role to response, replace with data.data.data.role
           const role = data?.data?.data?.role ?? 'super_admin'
-          navigate(ROLE_HOME[role] ?? '/dashboard', { replace: true })
+          navigate(ROLE_HOME[role] ?? DASHBOARD_ROUTES.DASHBOARD, { replace: true })
         },
       }
     )
@@ -114,26 +94,31 @@ const LoginPage = () => {
           {/* Header */}
           <div className="mb-7">
             <div className="w-10 h-10 rounded-2xl flex items-center justify-center mb-4 text-white font-extrabold"
-              style={{ background: 'linear-gradient(135deg,#2451f0,#14b8a6)' }}>
+              style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}>
               Q
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-[#e8ebff] tracking-tight">Welcome back</h2>
-            <p className="text-sm text-gray-500 dark:text-[#aab2dc] mt-1">Sign in to your QMS workspace.</p>
+            <h2 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--qms-text)' }}>Welcome back</h2>
+            <p className="text-sm mt-1" style={{ color: 'var(--qms-text-muted)' }}>Sign in to your QMS workspace.</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-[10px] font-semibold tracking-widest text-gray-400 dark:text-[#aab2dc] uppercase mb-2">
+              <label className="block text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
                 Email
               </label>
               <div className="relative">
-                <User size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#7b85b8]" />
+                <FiUser size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--qms-text-muted)' }} />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@qms.health"
-                  className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 dark:border-[rgba(148,168,255,0.22)] rounded-xl outline-none focus:border-blue-400 dark:focus:border-[rgba(148,168,255,0.5)] focus:ring-2 focus:ring-blue-100 dark:focus:ring-[rgba(90,139,255,0.35)] transition-all placeholder:text-gray-400 dark:placeholder:text-[#7b85b8] bg-white dark:bg-[rgba(22,29,62,0.85)] text-gray-900 dark:text-[#e8ebff]"
+                  style={{
+                    borderColor: 'var(--qms-border-input)',
+                    backgroundColor: 'var(--qms-surface-input)',
+                    color: 'var(--qms-text)',
+                  }}
+                  className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl border outline-none focus:border-(--qms-border-strong) focus:ring-2 focus:ring-(--qms-ring) transition-all placeholder:text-qms-text-muted"
                   required
                   autoFocus
                 />
@@ -141,41 +126,47 @@ const LoginPage = () => {
             </div>
 
             <div>
-              <label className="block text-[10px] font-semibold tracking-widest text-gray-400 dark:text-[#aab2dc] uppercase mb-2">
+              <label className="block text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
                 Password
               </label>
               <div className="relative">
-                <KeyRound size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#7b85b8]" />
+                <FiLock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--qms-text-muted)' }} />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-9 pr-10 py-2.5 text-sm border border-gray-200 dark:border-[rgba(148,168,255,0.22)] rounded-xl outline-none focus:border-blue-400 dark:focus:border-[rgba(148,168,255,0.5)] focus:ring-2 focus:ring-blue-100 dark:focus:ring-[rgba(90,139,255,0.35)] transition-all placeholder:text-gray-400 dark:placeholder:text-[#7b85b8] bg-white dark:bg-[rgba(22,29,62,0.85)] text-gray-900 dark:text-[#e8ebff]"
+                  style={{
+                    borderColor: 'var(--qms-border-input)',
+                    backgroundColor: 'var(--qms-surface-input)',
+                    color: 'var(--qms-text)',
+                  }}
+                  className="w-full pl-9 pr-10 py-2.5 text-sm rounded-xl border outline-none focus:border-(--qms-border-strong) focus:ring-2 focus:ring-(--qms-ring) transition-all placeholder:text-qms-text-muted"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#7b85b8] hover:text-gray-600 dark:hover:text-[#aab2dc] transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
+                  style={{ color: 'var(--qms-text-muted)' }}
                 >
-                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  {showPassword ? <FiEyeOff size={15} /> : <FiEye size={15} />}
                 </button>
               </div>
             </div>
 
             <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 text-xs text-gray-500 dark:text-[#aab2dc] cursor-pointer select-none">
+              <label className="flex items-center gap-2 text-xs cursor-pointer select-none" style={{ color: 'var(--qms-text-soft)' }}>
                 <input type="checkbox" defaultChecked className="rounded" />
                 Remember me
               </label>
-              <a href="#" className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors">
+              <a href="#" className="text-xs font-semibold transition-colors" style={{ color: 'var(--qms-brand)' }}>
                 Forgot password?
               </a>
             </div>
 
             {error && (
-              <div className="text-xs text-red-600 bg-red-50 dark:bg-[rgba(244,63,94,0.08)] border border-red-200 dark:border-[rgba(244,63,94,0.2)] rounded-xl px-3 py-2">
+              <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
                 {error.message ?? 'Invalid email or password.'}
               </div>
             )}
@@ -184,14 +175,14 @@ const LoginPage = () => {
               type="submit"
               disabled={isPending || !email || !password}
               className="w-full py-3 px-4 text-white text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow-md hover:-translate-y-px active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
-              style={{ background: 'linear-gradient(135deg, #3b6dff 0%, #0ea5e9 100%)' }}
+              style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
             >
               {isPending ? 'Signing in…' : 'Sign in →'}
             </button>
           </form>
 
-          <div className="mt-6 pt-4 border-t border-gray-100 dark:border-[rgba(148,168,255,0.12)] flex items-center justify-between">
-            <span className="text-xs text-gray-400 dark:text-[#7b85b8]">© QMS Health Platforms</span>
+          <div className="mt-6 pt-4 flex items-center justify-between" style={{ borderTop: '1px solid var(--qms-border)' }}>
+            <span className="text-xs" style={{ color: 'var(--qms-text-muted)' }}>© QMS Health Platforms</span>
             <ThemeToggle />
           </div>
 

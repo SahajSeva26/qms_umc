@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Outlet, Navigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import { AUTH_ROUTES } from '@/features/auth/auth.routes'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 
@@ -38,7 +39,7 @@ const AppLayout = () => {
     })
   }
 
-  if (!isAuthenticated) return <Navigate to="/auth/login" replace />
+  if (!isAuthenticated) return <Navigate to={AUTH_ROUTES.LOGIN} replace />
 
   return (
     <div className="app-bg flex h-screen overflow-hidden">

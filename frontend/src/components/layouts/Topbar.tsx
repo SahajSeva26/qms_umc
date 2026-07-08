@@ -1,108 +1,80 @@
 import { useState, useEffect } from 'react'
-import { Search, Bell, HelpCircle, ChevronDown, LogOut, User, Menu } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { FiSearch, FiBell, FiHelpCircle, FiChevronDown, FiLogOut, FiUser, FiMenu } from 'react-icons/fi'
 import { useAuth } from '@/hooks/useAuth'
-import { useAuthStore } from '@/features/auth/store'
+import { ROLE_LABEL, ROLE_COLOR } from '@/lib/roles'
+import { getGreeting, formatClockDisplay } from '@/utils/formatters'
 import ThemeToggle from '@/components/ui/ThemeToggle'
 
 interface TopbarProps {
   onMobileMenuToggle: () => void
 }
 
-function greeting(): string {
-  const hr = new Date().getHours()
-  if (hr >= 5 && hr < 12) return 'Good morning'
-  if (hr >= 12 && hr < 17) return 'Good afternoon'
-  return 'Good evening'
-}
-
-function formatClock(): string {
-  const now = new Date()
-  return (
-    now.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true }) +
-    ' · ' +
-    now.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })
-  )
-}
-
 function getInitials(firstName?: string, lastName?: string): string {
   return [(firstName?.[0] ?? ''), (lastName?.[0] ?? '')].join('').toUpperCase() || 'U'
 }
 
-const ROLE_LABEL: Record<string, string> = {
-  super_admin: 'Super Admin', admin: 'Admin',
-  sales_lead: 'Sales Head', sales_rep: 'Key Account Manager',
-  camp_coord: 'Camp Coordinator', diet_camp_coord: 'Diet Coord',
-  om_screening: 'OM · Screening', om_diet: 'OM · Diet',
-  fo: 'Field Officer', dedicated_fo: 'Dedicated FO',
-  logistics: 'Logistics', accounts: 'Accounts',
-  dietitian: 'Dietitian', analytics_viewer: 'Analytics Viewer',
-  pharma_ho: 'Pharma HO', pharma_rsm: 'Pharma RSM',
-  pharma_asm: 'Pharma ASM', pharma_mr: 'Pharma MR',
-}
-
-const ROLE_COLOR: Record<string, string> = {
-  super_admin: '#f43f5e', admin: '#8b5cf6',
-  sales_lead: '#3b6dff', sales_rep: '#0ea5e9',
-  camp_coord: '#10b981', diet_camp_coord: '#10b981',
-  om_screening: '#3b6dff', om_diet: '#10b981',
-  fo: '#14b8a6', dedicated_fo: '#0ea5e9',
-  logistics: '#f59e0b', accounts: '#a855f7',
-  dietitian: '#10b981', analytics_viewer: '#0ea5e9',
-  pharma_ho: '#7c5cff', pharma_rsm: '#0ea5e9',
-  pharma_asm: '#8b5cf6', pharma_mr: '#ec4899',
-}
-
 const Topbar = ({ onMobileMenuToggle }: TopbarProps) => {
-  const { user } = useAuth()
-  const { clearAuth } = useAuthStore()
-  const navigate = useNavigate()
-  const [clock, setClock] = useState(formatClock)
+  const { user, signOut } = useAuth()
+  const [clock, setClock] = useState(formatClockDisplay)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
 
   useEffect(() => {
-    const interval = setInterval(() => setClock(formatClock()), 60_000)
+    const interval = setInterval(() => setClock(formatClockDisplay()), 60_000)
     return () => clearInterval(interval)
   }, [])
 
-  const initials = getInitials(user?.firstName, user?.lastName)
+  const initials  = getInitials(user?.firstName, user?.lastName)
   const firstName = user?.firstName ?? 'there'
   const roleLabel = user ? (ROLE_LABEL[user.role] ?? user.role) : ''
-  const roleColor = user ? (ROLE_COLOR[user.role] ?? '#3b6dff') : '#3b6dff'
-
-  const handleSignOut = () => {
-    clearAuth()
-    navigate('/auth/login', { replace: true })
-  }
+  const roleColor = user ? (ROLE_COLOR[user.role] ?? 'var(--qms-brand)') : 'var(--qms-brand)'
 
   return (
-    <header className="sticky top-0 z-40 flex items-center gap-3.5 px-6 py-3.5 bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(20,26,55,0.55)] border-b border-[rgba(36,81,240,0.10)] dark:border-[rgba(148,168,255,0.1)] backdrop-blur-xl">
+    <header
+      className="sticky top-0 z-40 flex items-center gap-3.5 px-6 py-3.5 backdrop-blur-xl"
+      style={{
+        background: 'var(--qms-surface)',
+        borderBottom: '1px solid var(--qms-border)',
+      }}
+    >
       {/* Mobile menu button */}
       <button
         onClick={onMobileMenuToggle}
-        className="lg:hidden w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 dark:text-[#aab2dc] hover:bg-gray-100 dark:hover:bg-[rgba(148,168,255,0.07)] transition-all"
+        className="lg:hidden w-8 h-8 flex items-center justify-center rounded-lg transition-all"
+        style={{ color: 'var(--qms-text-soft)' }}
         aria-label="Open menu"
       >
-        <Menu size={18} />
+        <FiMenu size={18} />
       </button>
 
       {/* Greeting + clock */}
       <div className="hidden sm:flex flex-col leading-tight mr-1">
-        <span className="text-[13px] font-bold text-gray-900 dark:text-white">
-          {greeting()}, {firstName} 👋
+        <span className="text-[13px] font-bold" style={{ color: 'var(--qms-text)' }}>
+          {getGreeting()}, {firstName} 👋
         </span>
-        <span className="text-[11px] text-gray-400 dark:text-[#7b85b8]">{clock}</span>
+        <span className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>{clock}</span>
       </div>
 
       {/* Search */}
-      <div className="relative flex-1 max-w-[520px]">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#7b85b8]" />
+      <div className="relative flex-1 max-w-130">
+        <FiSearch size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--qms-text-muted)' }} />
         <input
           type="text"
           placeholder="Search camps, doctors, leads, devices, projects..."
-          className="w-full pl-9 pr-12 py-2 text-[13px] rounded-xl border border-gray-200 dark:border-[rgba(148,168,255,0.15)] bg-gray-50 dark:bg-[rgba(22,29,62,0.6)] text-gray-900 dark:text-[#e8ebff] placeholder:text-gray-400 dark:placeholder:text-[#7b85b8] outline-none focus:border-blue-400 dark:focus:border-[rgba(148,168,255,0.4)] focus:ring-2 focus:ring-blue-100 dark:focus:ring-[rgba(90,139,255,0.2)] transition-all"
+          style={{
+            borderColor: 'var(--qms-border-input)',
+            backgroundColor: 'var(--qms-surface-strong)',
+            color: 'var(--qms-text)',
+          }}
+          className="w-full pl-9 pr-12 py-2 text-[13px] rounded-xl border outline-none focus:border-(--qms-border-strong) focus:ring-2 focus:ring-(--qms-ring) transition-all placeholder:text-qms-text-muted"
         />
-        <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] px-1.5 py-0.5 rounded-md border border-gray-200 dark:border-[rgba(148,168,255,0.15)] bg-white dark:bg-[rgba(22,29,62,0.8)] text-gray-400 dark:text-[#7b85b8] font-mono">
+        <kbd
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] px-1.5 py-0.5 rounded-md border font-mono"
+          style={{
+            borderColor: 'var(--qms-border)',
+            backgroundColor: 'var(--qms-surface-card)',
+            color: 'var(--qms-text-muted)',
+          }}
+        >
           ⌘K
         </kbd>
       </div>
@@ -112,21 +84,33 @@ const Topbar = ({ onMobileMenuToggle }: TopbarProps) => {
         <ThemeToggle />
 
         {/* Notifications */}
-        <button className="relative w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 dark:text-[#aab2dc] hover:bg-gray-100 dark:hover:bg-[rgba(148,168,255,0.07)] transition-all" aria-label="Notifications">
-          <Bell size={16} />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white dark:ring-[#070b1c]" />
+        <button
+          className="relative w-8 h-8 flex items-center justify-center rounded-lg transition-all"
+          style={{ color: 'var(--qms-text-soft)' }}
+          aria-label="Notifications"
+        >
+          <FiBell size={16} />
+          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full ring-2 ring-qms-surface" style={{ backgroundColor: 'var(--qms-role-super-admin)' }} />
         </button>
 
         {/* Help */}
-        <button className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 dark:text-[#aab2dc] hover:bg-gray-100 dark:hover:bg-[rgba(148,168,255,0.07)] transition-all" aria-label="Help">
-          <HelpCircle size={16} />
+        <button
+          className="w-8 h-8 flex items-center justify-center rounded-lg transition-all"
+          style={{ color: 'var(--qms-text-soft)' }}
+          aria-label="Help"
+        >
+          <FiHelpCircle size={16} />
         </button>
 
         {/* User chip */}
         <div className="relative">
           <button
             onClick={() => setUserMenuOpen((v) => !v)}
-            className="flex items-center gap-2 pl-1.5 pr-2.5 py-1.5 rounded-full border border-gray-200 dark:border-[rgba(148,168,255,0.15)] bg-gray-50 dark:bg-[rgba(22,29,62,0.6)] hover:border-gray-300 dark:hover:border-[rgba(148,168,255,0.3)] transition-all"
+            className="flex items-center gap-2 pl-1.5 pr-2.5 py-1.5 rounded-full border transition-all"
+            style={{
+              borderColor: 'var(--qms-border)',
+              backgroundColor: 'var(--qms-surface-strong)',
+            }}
           >
             <div
               className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
@@ -135,35 +119,45 @@ const Topbar = ({ onMobileMenuToggle }: TopbarProps) => {
               {initials}
             </div>
             <div className="hidden sm:block text-left">
-              <div className="text-[13px] font-semibold text-gray-900 dark:text-[#e8ebff] leading-none">
+              <div className="text-[13px] font-semibold leading-none" style={{ color: 'var(--qms-text)' }}>
                 {user ? `${user.firstName} ${user.lastName}` : '—'}
               </div>
-              <div className="text-[11px] text-gray-400 dark:text-[#7b85b8] leading-none mt-0.5">{roleLabel}</div>
+              <div className="text-[11px] leading-none mt-0.5" style={{ color: 'var(--qms-text-muted)' }}>{roleLabel}</div>
             </div>
-            <ChevronDown size={13} className="text-gray-400 dark:text-[#7b85b8]" />
+            <FiChevronDown size={13} style={{ color: 'var(--qms-text-muted)' }} />
           </button>
 
           {/* Dropdown */}
           {userMenuOpen && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)} />
-              <div className="absolute right-0 top-full mt-2 w-52 z-50 rounded-xl border border-gray-200 dark:border-[rgba(148,168,255,0.15)] bg-white dark:bg-[rgba(14,20,45,0.98)] shadow-xl dark:shadow-[0_20px_60px_rgba(0,0,0,0.6)] backdrop-blur-xl overflow-hidden">
-                <div className="px-4 py-3 border-b border-gray-100 dark:border-[rgba(148,168,255,0.08)]">
-                  <div className="text-[13px] font-bold text-gray-900 dark:text-[#e8ebff]">
+              <div
+                className="absolute right-0 top-full mt-2 w-52 z-50 rounded-xl border shadow-xl backdrop-blur-xl overflow-hidden"
+                style={{
+                  borderColor: 'var(--qms-border)',
+                  backgroundColor: 'var(--popover)',
+                }}
+              >
+                <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--qms-border)' }}>
+                  <div className="text-[13px] font-bold" style={{ color: 'var(--qms-text)' }}>
                     {user ? `${user.firstName} ${user.lastName}` : '—'}
                   </div>
-                  <div className="text-[11px] text-gray-400 dark:text-[#7b85b8] mt-0.5">{user?.email}</div>
+                  <div className="text-[11px] mt-0.5" style={{ color: 'var(--qms-text-muted)' }}>{user?.email}</div>
                 </div>
                 <div className="py-1">
-                  <button className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-gray-700 dark:text-[#aab2dc] hover:bg-gray-50 dark:hover:bg-[rgba(148,168,255,0.07)] transition-all">
-                    <User size={14} className="text-gray-400 dark:text-[#7b85b8]" />
+                  <button
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] transition-all hover:bg-(--qms-surface-hover)"
+                    style={{ color: 'var(--qms-text-soft)' }}
+                  >
+                    <FiUser size={14} style={{ color: 'var(--qms-text-muted)' }} />
                     My Profile
                   </button>
                   <button
-                    onClick={handleSignOut}
-                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-rose-600 hover:bg-rose-50 dark:hover:bg-[rgba(244,63,94,0.08)] transition-all"
+                    onClick={signOut}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] transition-all hover:bg-danger-soft"
+                    style={{ color: 'var(--danger)' }}
                   >
-                    <LogOut size={14} />
+                    <FiLogOut size={14} />
                     Sign out
                   </button>
                 </div>

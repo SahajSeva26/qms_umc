@@ -1,4 +1,4 @@
-import { Sun, Moon } from 'lucide-react'
+import { FiSun, FiMoon } from 'react-icons/fi'
 import { useThemeStore } from '@/store/themeStore'
 
 const ThemeToggle = () => {
@@ -6,10 +6,10 @@ const ThemeToggle = () => {
   return (
     <button
       onClick={toggle}
-      className="w-7 h-7 rounded-full border border-gray-200 dark:border-[rgba(148,168,255,0.22)] flex items-center justify-center text-gray-400 dark:text-[#aab2dc] hover:border-gray-300 dark:hover:border-[rgba(148,168,255,0.4)] hover:text-gray-600 dark:hover:text-[#e8ebff] transition-all"
+      className="w-7 h-7 rounded-full border border-[var(--qms-border)] flex items-center justify-center text-[var(--qms-text-muted)] hover:border-[var(--qms-border-strong)] hover:text-[var(--qms-text)] transition-all"
       aria-label="Toggle theme"
     >
-      {isDark ? <Sun size={13} /> : <Moon size={13} />}
+      {isDark ? <FiSun size={13} /> : <FiMoon size={13} />}
     </button>
   )
 }

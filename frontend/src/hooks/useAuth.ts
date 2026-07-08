@@ -1,8 +1,12 @@
+import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/features/auth/store'
+import { AUTH_ROUTES } from '@/features/auth/auth.routes'
+import { INTERNAL_ROLES, PHARMA_ROLES } from '@/lib/roles'
 import type { UserRole } from '@/types/auth.types'
 
 export const useAuth = () => {
-  const { user } = useAuthStore()
+  const { user, clearAuth } = useAuthStore()
+  const navigate = useNavigate()
 
   const isAuthenticated = !!user
 
@@ -11,21 +15,13 @@ export const useAuth = () => {
     return roles.includes(user.role)
   }
 
-  const isQmsInternal = () => {
-    if (!user) return false
-    const internalRoles: UserRole[] = [
-      'super_admin', 'admin', 'sales_lead', 'sales_rep',
-      'camp_coord', 'diet_camp_coord', 'om_screening', 'om_diet',
-      'fo', 'dedicated_fo', 'logistics', 'accounts', 'dietitian', 'analytics_viewer',
-    ]
-    return internalRoles.includes(user.role)
+  const isQmsInternal = () => !!user && (INTERNAL_ROLES as readonly string[]).includes(user.role)
+  const isPharma      = () => !!user && (PHARMA_ROLES  as readonly string[]).includes(user.role)
+
+  const signOut = () => {
+    clearAuth()
+    navigate(AUTH_ROUTES.LOGIN, { replace: true })
   }
 
-  const isPharma = () => {
-    if (!user) return false
-    const pharmaRoles: UserRole[] = ['pharma_ho', 'pharma_rsm', 'pharma_asm', 'pharma_mr']
-    return pharmaRoles.includes(user.role)
-  }
-
-  return { user, isAuthenticated, hasRole, isQmsInternal, isPharma }
+  return { user, isAuthenticated, hasRole, isQmsInternal, isPharma, signOut }
 }

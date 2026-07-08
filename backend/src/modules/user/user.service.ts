@@ -4,10 +4,11 @@ import { ISearchUserQuery, IUpdateUserPayload } from './user.validators';
 import bcrypt from 'bcrypt';
 import { throwAppError } from '../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
-import { USER_STATUS } from './user.constants';
+import { USER_PERMISSIONS, USER_STATUS } from './user.constants';
 import { isValidEmail } from '../../shared/utils/strings';
 import { IRegisterUserPayload } from '../auth/auth.validators';
 import { RequestContext } from '../../shared/utils/contextBuilder';
+import { SYSTEM_PERMISSIONS } from '../../shared/env/permissions';
 
 type UserDocument = HydratedDocument<IUser> | null;
 const populate: any[] = [];
@@ -62,6 +63,7 @@ const search = async (filters: ISearchUserQuery, ctx: RequestContext, options?: 
 
     let where: mongoose.QueryFilter<IUser> = {
         // add context default where build here
+        status: USER_STATUS.ACTIVE,
     };
 
     if (filters.name) {
@@ -70,15 +72,19 @@ const search = async (filters: ISearchUserQuery, ctx: RequestContext, options?: 
             { lastName: { $regex: filters.name, $options: 'i' } },
         ];
     }
+
     if (filters.email) {
         where.email = { $regex: filters.email, $options: 'i' };
     }
+
     if (filters.status) {
         where.status = filters.status;
     }
+
     if (filters.gender) {
         where.gender = filters.gender;
     }
+
     if (filters.joinedFrom || filters.joinedTo) {
         where.createdAt = {};
         if (filters.joinedFrom) where.createdAt.$gte = filters.joinedFrom;

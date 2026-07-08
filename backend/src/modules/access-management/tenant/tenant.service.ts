@@ -6,6 +6,7 @@ import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
 import { toObjectId, isValidObjectID } from '../../../shared/utils/strings';
+import { RoleService } from '../role/role.service';
 
 type TenantDocument = HydratedDocument<ITenant> | null;
 const populate: any[] = [];
@@ -20,10 +21,15 @@ const set = async (model: any, entity: HydratedDocument<ITenant>, ctx: RequestCo
     if (model.name) {
         entity.name = model.name;
     }
-    if (model.owner) {
-        // TODO: validate owner exists
-        entity.owner = toObjectId(model.owner);
-    }
+    // if (model.owner) {
+    //     // FIXME: validate role exists for that tenant whichh should also belong to tenant
+    //     const role = await RoleService.get(model.owner, ctx);
+    //     if (!role) {
+    //         throwAppError('ROLE_NOT_FOUND', StatusCodes.NOT_FOUND);
+    //     } else {
+    //         entity.owner = role._id;
+    //     }
+    // }
     if (model.status) {
         entity.status = model.status;
     }
@@ -41,8 +47,8 @@ const get = async (id: string, ctx: RequestContext, options?: any): Promise<Tena
     }
 
     if (query) {
-        if (options) {
-            query = query.populate(options);
+        if (options?.populate) {
+            query = query.populate(populate);
         }
     }
 
@@ -94,10 +100,7 @@ const create = async (model: ICreateTenantPayload, ctx: RequestContext): Promise
     }
 
     //2: create tenant
-    const entity = new TenantModel({
-        // code: model.code,
-        // status: TENANT_STATUS.ACTIVE,
-    });
+    const entity = new TenantModel({});
 
     //3: set remaining fields
     tenant = await set(model, entity, ctx);

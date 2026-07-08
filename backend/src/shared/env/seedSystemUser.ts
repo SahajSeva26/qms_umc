@@ -7,6 +7,7 @@ import ENV from '../config/app.config';
 import bcrypt from 'bcrypt';
 import { RoleModel } from '../../modules/access-management/role/role.model';
 import logger from '../utils/logger';
+import { TENANT_TYPE } from '../../modules/access-management/tenant/tenant.constants';
 
 const seedSystemUser = async () => {
     try {
@@ -19,6 +20,7 @@ const seedSystemUser = async () => {
             tenant = await TenantModel.create({
                 code: 'system',
                 name: 'System',
+                type:TENANT_TYPE.PLATFORM,
                 description: 'System tenant',
             });
             seededItems.push('tenant');

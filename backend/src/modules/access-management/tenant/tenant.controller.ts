@@ -27,7 +27,7 @@ const get = async (req: any, res: any) => {
             StatusCodes.OK,
             true,
             'Tenant fetched successfully',
-            TenantMapper.toResponse(tenant),
+            TenantMapper.toResponse(tenant,ctx),
         );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
@@ -53,7 +53,7 @@ const search = async (req: any, res: any) => {
             StatusCodes.OK,
             true,
             'Tenants fetched successfully',
-            TenantMapper.toSearchResponse(result),
+            TenantMapper.toSearchResponse(result,ctx),
         );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
@@ -79,7 +79,7 @@ const create = async (req: any, res: any) => {
             StatusCodes.CREATED,
             true,
             'Tenant created successfully',
-            TenantMapper.toResponse(tenant),
+            TenantMapper.toResponse(tenant,ctx),
         );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
@@ -109,7 +109,7 @@ const update = async (req: any, res: any) => {
             StatusCodes.OK,
             true,
             'Tenant updated successfully',
-            TenantMapper.toResponse(tenant),
+            TenantMapper.toResponse(tenant,ctx),
         );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);

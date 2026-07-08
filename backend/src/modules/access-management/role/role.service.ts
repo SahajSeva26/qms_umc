@@ -20,7 +20,6 @@ const populate: any[] = [
         path: 'tenant',
         select: 'name code',
     },
-
 ];
 
 // ========================================================================================
@@ -50,7 +49,19 @@ const set = async (model: any, entity: HydratedDocument<IRoleDocument>, ctx: Req
         entity.type = toObjectId(model.type);
     }
     if (model.tenant) {
-        entity.tenant = toObjectId(model.tenant);
+        //get tenant
+        const tenant = await TenantService.get(model.tenant, ctx);
+        if (!tenant) {
+            throwAppError('Tenant not found', StatusCodes.NOT_FOUND);
+        } else {
+            entity.tenant = tenant._id;
+
+            if (!tenant.owner) {
+                //set first role as owner
+                tenant.owner = entity._id;
+                await tenant.save();
+            }
+        }
     }
     if (model.user) {
         entity.user = toObjectId(model.user);
@@ -84,7 +95,7 @@ const search = async (filters: ISearchRoleQuery, ctx: RequestContext, options?: 
         where.name = { $regex: filters.name, $options: 'i' };
     }
     if (filters.code) {
-        where.code = { $regex: filters.code, $options: 'i' };
+        where.code = filters.code;
     }
     if (filters.status) {
         where.status = filters.status;
@@ -100,7 +111,11 @@ const search = async (filters: ISearchRoleQuery, ctx: RequestContext, options?: 
     }
 
     const countPromise = RoleModel.countDocuments(where);
-    const dataPromise = RoleModel.find(where).populate(populate).limit(options?.pagination?.limit).skip(options?.pagination?.skip).sort(sort);
+    const dataPromise = RoleModel.find(where)
+        .populate(populate)
+        .limit(options?.pagination?.limit)
+        .skip(options?.pagination?.skip)
+        .sort(sort);
 
     const [count, items] = await Promise.all([countPromise, dataPromise]);
 

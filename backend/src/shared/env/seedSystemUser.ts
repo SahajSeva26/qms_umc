@@ -81,6 +81,9 @@ const seedSystemUser = async () => {
             });
             role.permissions.push(PERMISSIONS.SYSTEM.MANAGE.code);
             await role.save();
+            //update owner of tenant
+            tenant.owner = role._id;
+            await tenant.save();
             seededItems.push('role');
         }
 

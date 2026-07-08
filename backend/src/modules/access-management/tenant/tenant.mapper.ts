@@ -15,7 +15,7 @@ export const TenantMapper = {
             count: data?.count || 0,
             items: [] as any[],
         };
-        for (const t of data?.items) {
+        for (const t of data?.items||[]) {
             result.items.push(TenantMapper.toResponse(t));
         }
         return result;

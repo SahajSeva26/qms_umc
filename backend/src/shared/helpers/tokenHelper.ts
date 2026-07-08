@@ -63,6 +63,9 @@ export const TokenHandler = {
     },
 
     decodePayload: (token: string): ITokenPayload => {
+        if (!token) {
+            throwAppError('Token not found', StatusCodes.UNAUTHORIZED);
+        }
         return jwt.decode(token) as ITokenPayload;
     },
 };

@@ -101,23 +101,39 @@ registry.registerPath({
     },
 });
 
+
+// ==========================================================================
+// ================= EXPORTED ROUTES ========================================
+// ==========================================================================
 TenantRouter.get(
     '/:id',
-    AuthorizeMiddleware([PERMISSIONS.TENANT.GET.code]),
+    AuthorizeMiddleware([
+        PERMISSIONS.TENANT.GET.code,
+        PERMISSIONS.TENANT.MANAGE.code,
+    ]),
     TenantController.get,
 );
 TenantRouter.put(
     '/:id',
-    AuthorizeMiddleware([PERMISSIONS.TENANT.UPDATE.code]),
+    AuthorizeMiddleware([
+        PERMISSIONS.TENANT.UPDATE.code,
+        PERMISSIONS.TENANT.MANAGE.code,
+    ]),
     TenantController.update,
 );
 TenantRouter.get(
     '/',
-    AuthorizeMiddleware([PERMISSIONS.TENANT.SEARCH.code]),
+    AuthorizeMiddleware([
+        PERMISSIONS.TENANT.SEARCH.code,
+        PERMISSIONS.TENANT.MANAGE.code,
+    ]),
     TenantController.search,
 );
 TenantRouter.post(
     '/',
-    AuthorizeMiddleware([PERMISSIONS.TENANT.CREATE.code]),
+    AuthorizeMiddleware([
+        PERMISSIONS.TENANT.CREATE.code,
+        PERMISSIONS.TENANT.MANAGE.code,
+    ]),
     TenantController.create,
 );

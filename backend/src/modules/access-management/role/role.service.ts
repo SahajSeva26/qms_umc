@@ -9,6 +9,7 @@ import { TenantService } from '../tenant/tenant.service';
 import { RoleTypeService } from '../role-type/roleType.service';
 import { UserService } from '../../user/user.service';
 import { PERMISSIONS_ARRAY } from '../../../shared/env/permissions';
+import { IServiceOptions } from '../../../shared/types/service.types';
 
 type RoleDoc = HydratedDocument<IRoleDocument> | null;
 const populate: any[] = [
@@ -70,7 +71,7 @@ const set = async (model: any, entity: HydratedDocument<IRoleDocument>, ctx: Req
     return entity;
 };
 
-const get = async (id: string, ctx: RequestContext, options?: any): Promise<RoleDoc> => {
+const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): Promise<RoleDoc> => {
     let query = null;
 
     if (isValidObjectID(id)) {
@@ -86,7 +87,7 @@ const get = async (id: string, ctx: RequestContext, options?: any): Promise<Role
     return await query;
 };
 
-const search = async (filters: ISearchRoleQuery, ctx: RequestContext, options?: any) => {
+const search = async (filters: ISearchRoleQuery, ctx: RequestContext, options?: IServiceOptions) => {
     const sort: any = { createdAt: -1 };
 
     const where: mongoose.QueryFilter<IRoleDocument> = {};
@@ -122,7 +123,11 @@ const search = async (filters: ISearchRoleQuery, ctx: RequestContext, options?: 
     return { count, items };
 };
 
-const create = async (model: ICreateRolePayload, ctx: RequestContext): Promise<HydratedDocument<IRoleDocument>> => {
+const create = async (
+    model: ICreateRolePayload,
+    ctx: RequestContext,
+    options?: IServiceOptions,
+): Promise<HydratedDocument<IRoleDocument>> => {
     let role: RoleDoc = null;
 
     //1: validate tenant exists
@@ -162,10 +167,10 @@ const create = async (model: ICreateRolePayload, ctx: RequestContext): Promise<H
     return role;
 };
 
-const update = async (id: string, model: IUpdateRolePayload, ctx: RequestContext) => {
+const update = async (id: string, model: IUpdateRolePayload, ctx: RequestContext, options?: IServiceOptions) => {
     //1: get role first
     let role: RoleDoc = null;
-    role = await RoleService.get(id, ctx);
+    role = await RoleService.get(id, ctx, options);
     if (!role) {
         return throwAppError('Role not found', StatusCodes.NOT_FOUND);
     }

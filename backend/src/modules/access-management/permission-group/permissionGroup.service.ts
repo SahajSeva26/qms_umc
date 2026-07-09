@@ -8,6 +8,7 @@ import { RequestContext } from '../../../shared/utils/contextBuilder';
 import { toObjectId, isValidObjectID } from '../../../shared/utils/strings';
 import { PERMISSIONS_ARRAY } from '../../../shared/env/permissions';
 import { TenantService } from '../tenant/tenant.service';
+import { IServiceOptions } from '../../../shared/types/service.types';
 
 type PermissionGroupDocument = HydratedDocument<IPermissionGroup> | null;
 const populate: any[] = [];
@@ -51,7 +52,7 @@ const set = async (model: any, entity: HydratedDocument<IPermissionGroup>, ctx: 
     return entity;
 };
 
-const get = async (id: string, ctx: RequestContext, options?: any): Promise<PermissionGroupDocument> => {
+const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): Promise<PermissionGroupDocument> => {
     let query = null;
 
     if (isValidObjectID(id)) {
@@ -60,14 +61,14 @@ const get = async (id: string, ctx: RequestContext, options?: any): Promise<Perm
         query = PermissionGroupModel.findOne({ code: id });
     }
 
-    if (query && options) {
-        query = query.populate(options);
+    if (options?.populate) {
+        query = query.populate(populate);
     }
 
     return await query;
 };
 
-const search = async (filters: ISearchPermissionGroupQuery, ctx: RequestContext, options?: any) => {
+const search = async (filters: ISearchPermissionGroupQuery, ctx: RequestContext, options?: IServiceOptions) => {
     const sort: any = { createdAt: -1 };
 
     const where: mongoose.QueryFilter<IPermissionGroup> = {};
@@ -98,11 +99,15 @@ const search = async (filters: ISearchPermissionGroupQuery, ctx: RequestContext,
     return { count, items };
 };
 
-const create = async (model: ICreatePermissionGroupPayload, ctx: RequestContext): Promise<HydratedDocument<IPermissionGroup>> => {
+const create = async (
+    model: ICreatePermissionGroupPayload,
+    ctx: RequestContext,
+    options?: IServiceOptions,
+): Promise<HydratedDocument<IPermissionGroup>> => {
     let permissionGroup: PermissionGroupDocument = null;
 
     //1: check existing permission group
-    permissionGroup = await PermissionGroupService.get(model.code, ctx);
+    permissionGroup = await PermissionGroupService.get(model.code, ctx, options);
     if (permissionGroup) {
         return throwAppError('Permission group with this code already exists', StatusCodes.CONFLICT);
     }
@@ -117,10 +122,10 @@ const create = async (model: ICreatePermissionGroupPayload, ctx: RequestContext)
     return permissionGroup;
 };
 
-const update = async (id: string, model: IUpdatePermissionGroupPayload, ctx: RequestContext) => {
+const update = async (id: string, model: IUpdatePermissionGroupPayload, ctx: RequestContext, options?: IServiceOptions) => {
     //1: get permission group first
     let permissionGroup: PermissionGroupDocument = null;
-    permissionGroup = await PermissionGroupService.get(id, ctx);
+    permissionGroup = await PermissionGroupService.get(id, ctx, options);
     if (!permissionGroup) {
         return throwAppError('Permission group not found', StatusCodes.NOT_FOUND);
     }

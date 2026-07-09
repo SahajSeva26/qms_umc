@@ -9,15 +9,16 @@ import { TokenHandler } from '../../shared/helpers/tokenHelper';
 import { RequestContext } from '../../shared/utils/contextBuilder';
 import { RoleService } from '../access-management/role/role.service';
 import { ITokenPayload } from '../../shared/helpers/tokenHelper';
+import { IServiceOptions } from '../../shared/types/service.types';
 
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 10 * 60 * 1000; // 10 minutes
 
-const register = async (data: IRegisterUserPayload, ctx: RequestContext): Promise<HydratedDocument<IUser>> => {
-    const user = await UserService.create(data, ctx);
+const register = async (data: IRegisterUserPayload, ctx: RequestContext, options?: IServiceOptions): Promise<HydratedDocument<IUser>> => {
+    const user = await UserService.create(data, ctx, options);
     return user;
 };
-const login = async (data: ILoginUserPayload, ctx: RequestContext) => {
+const login = async (data: ILoginUserPayload, ctx: RequestContext, options?: IServiceOptions) => {
     // 1: get user
     const user = await UserService.getUserWithPassword(data.email);
     if (!user) {
@@ -89,9 +90,9 @@ const login = async (data: ILoginUserPayload, ctx: RequestContext) => {
     };
 };
 
-const logout = async (userId: string, ctx: RequestContext) => {
+const logout = async (userId: string, ctx: RequestContext, options?: IServiceOptions) => {
     //1: get user
-    const user = await UserService.get(userId, ctx);
+    const user = await UserService.get(userId, ctx, options);
     if (!user) {
         return throwAppError('User not found', StatusCodes.NOT_FOUND);
     }

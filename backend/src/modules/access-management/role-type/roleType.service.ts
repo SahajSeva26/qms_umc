@@ -8,6 +8,7 @@ import { RequestContext } from '../../../shared/utils/contextBuilder';
 import { toObjectId, isValidObjectID } from '../../../shared/utils/strings';
 import { TenantService } from '../tenant/tenant.service';
 import { PERMISSIONS_ARRAY } from '../../../shared/env/permissions';
+import { IServiceOptions } from '../../../shared/types/service.types';
 
 type RoleTypeDocument = HydratedDocument<IRoleType> | null;
 const populate: any[] = [
@@ -31,14 +32,9 @@ const set = async (model: any, entity: HydratedDocument<IRoleType>, ctx: Request
     if (model.permissions && model.permissions.length > 0) {
         //check if valid permissions
         // FIXME: this is a high priority bug, need to fix it
-        const inValidPermissions = model.permissions.filter(
-            (permission: any) => !PERMISSIONS_ARRAY.includes(permission.code),
-        );
+        const inValidPermissions = model.permissions.filter((permission: any) => !PERMISSIONS_ARRAY.includes(permission.code));
         if (inValidPermissions.length > 0) {
-            throwAppError(
-                `Invalid permissions: ${inValidPermissions.map((p: any) => p.code).join(', ')}`,
-                StatusCodes.BAD_REQUEST,
-            );
+            throwAppError(`Invalid permissions: ${inValidPermissions.map((p: any) => p.code).join(', ')}`, StatusCodes.BAD_REQUEST);
         }
 
         //check if permissions are allowed by permission group
@@ -56,7 +52,7 @@ const set = async (model: any, entity: HydratedDocument<IRoleType>, ctx: Request
     return entity;
 };
 
-const get = async (id: string, ctx: RequestContext, options?: any): Promise<RoleTypeDocument> => {
+const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): Promise<RoleTypeDocument> => {
     let query = null;
 
     if (isValidObjectID(id)) {
@@ -65,14 +61,14 @@ const get = async (id: string, ctx: RequestContext, options?: any): Promise<Role
         query = RoleTypeModel.findOne({ code: id });
     }
 
-    if (query && options) {
+    if (options?.populate) {
         query = query.populate(populate);
     }
 
     return await query;
 };
 
-const search = async (filters: ISearchRoleTypeQuery, ctx: RequestContext, options?: any) => {
+const search = async (filters: ISearchRoleTypeQuery, ctx: RequestContext, options?: IServiceOptions) => {
     const sort: any = { createdAt: -1 };
 
     const where: mongoose.QueryFilter<IRoleType> = {};
@@ -104,7 +100,11 @@ const search = async (filters: ISearchRoleTypeQuery, ctx: RequestContext, option
     return { count, items };
 };
 
-const create = async (model: ICreateRoleTypePayload, ctx: RequestContext): Promise<HydratedDocument<IRoleType>> => {
+const create = async (
+    model: ICreateRoleTypePayload,
+    ctx: RequestContext,
+    options?: IServiceOptions,
+): Promise<HydratedDocument<IRoleType>> => {
     let roleType: RoleTypeDocument = null;
 
     //1: validate tenant exists
@@ -131,7 +131,7 @@ const create = async (model: ICreateRoleTypePayload, ctx: RequestContext): Promi
     return roleType;
 };
 
-const update = async (id: string, model: IUpdateRoleTypePayload, ctx: RequestContext) => {
+const update = async (id: string, model: IUpdateRoleTypePayload, ctx: RequestContext, options?: IServiceOptions) => {
     //1: get role type first
     let roleType: RoleTypeDocument = null;
     roleType = await RoleTypeService.get(id, ctx);

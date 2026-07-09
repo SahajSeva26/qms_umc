@@ -8,6 +8,7 @@ import { USER_PERMISSIONS, USER_STATUS } from './user.constants';
 import { isValidEmail } from '../../shared/utils/strings';
 import { IRegisterUserPayload } from '../auth/auth.validators';
 import { RequestContext } from '../../shared/utils/contextBuilder';
+import { IServiceOptions } from '../../shared/types/service.types';
 
 type UserDocument = HydratedDocument<IUser> | null;
 const populate: any[] = [];
@@ -15,7 +16,7 @@ const populate: any[] = [];
 // CORE FUNCTIONS
 // ========================================================================================
 
-const set = async (model: any, entity: HydratedDocument<IUser>, ctx: RequestContext) => {
+const set = async (model: any, entity: HydratedDocument<IUser>, ctx: RequestContext, options?: IServiceOptions) => {
     if (model.firstName) {
         entity.firstName = model.firstName;
     }
@@ -35,7 +36,7 @@ const set = async (model: any, entity: HydratedDocument<IUser>, ctx: RequestCont
     return entity;
 };
 
-const get = async (id: string, ctx: RequestContext, options?: any): Promise<UserDocument> => {
+const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): Promise<UserDocument> => {
     let query = null;
 
     if (mongoose.isValidObjectId(id)) {
@@ -55,7 +56,7 @@ const get = async (id: string, ctx: RequestContext, options?: any): Promise<User
     return await query;
 };
 
-const search = async (filters: ISearchUserQuery, ctx: RequestContext, options?: any) => {
+const search = async (filters: ISearchUserQuery, ctx: RequestContext, options?: IServiceOptions) => {
     let sort: any = {
         createdAt: -1,
     };
@@ -66,10 +67,7 @@ const search = async (filters: ISearchUserQuery, ctx: RequestContext, options?: 
     };
 
     if (filters.name) {
-        where.$or = [
-            { firstName: { $regex: filters.name, $options: 'i' } },
-            { lastName: { $regex: filters.name, $options: 'i' } },
-        ];
+        where.$or = [{ firstName: { $regex: filters.name, $options: 'i' } }, { lastName: { $regex: filters.name, $options: 'i' } }];
     }
 
     if (filters.email) {
@@ -106,7 +104,7 @@ const search = async (filters: ISearchUserQuery, ctx: RequestContext, options?: 
     };
 };
 
-const create = async (model: IRegisterUserPayload, ctx: RequestContext): Promise<HydratedDocument<IUser>> => {
+const create = async (model: IRegisterUserPayload, ctx: RequestContext, options?: IServiceOptions): Promise<HydratedDocument<IUser>> => {
     let user: UserDocument = null;
 
     //1 check exitsing user
@@ -133,7 +131,7 @@ const create = async (model: IRegisterUserPayload, ctx: RequestContext): Promise
     return user;
 };
 
-const update = async (id: string, model: IUpdateUserPayload, ctx: RequestContext) => {
+const update = async (id: string, model: IUpdateUserPayload, ctx: RequestContext, options?: IServiceOptions) => {
     //1: get user first
     let user: UserDocument = null;
     user = await UserService.get(id, ctx);

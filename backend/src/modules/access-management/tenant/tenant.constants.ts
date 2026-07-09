@@ -16,5 +16,8 @@ export const TENANT_PERMISSIONS = {
     GET: { code: 'tenant:get', name: 'Get Tenant', description: 'Get a tenant' } as const,
     SEARCH: { code: 'tenant:search', name: 'Search Tenant', description: 'Search tenants' } as const,
     UPDATE: { code: 'tenant:update', name: 'Update Tenant', description: 'Update a tenant' } as const,
+    //owner of tenant
+    ADMIN: { code: 'tenant:admin', name: 'Admin Tenant', description: 'Admin tenant' } as const,
+
     MANAGE: { code: 'tenant:manage', name: 'Manage Tenant', description: 'Manage tenants' } as const,
 };

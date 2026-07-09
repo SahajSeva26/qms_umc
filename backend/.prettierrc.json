@@ -17,6 +17,13 @@
       "options": {
         "printWidth": 80
       }
+    },
+    {
+      "files": "*.service.ts",
+      "options": {
+        "printWidth": 140
+      }
     }
+
   ]
 }

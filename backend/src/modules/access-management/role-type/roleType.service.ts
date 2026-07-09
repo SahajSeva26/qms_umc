@@ -30,11 +30,10 @@ const set = async (model: any, entity: HydratedDocument<IRoleType>, ctx: Request
         entity.name = model.name;
     }
     if (model.permissions && model.permissions.length > 0) {
-        //check if valid permissions
-        // FIXME: this is a high priority bug, need to fix it
-        const inValidPermissions = model.permissions.filter((permission: any) => !PERMISSIONS_ARRAY.includes(permission.code));
+        const inValidPermissions = model.permissions.filter((permission: any) => !PERMISSIONS_ARRAY.includes(permission));
         if (inValidPermissions.length > 0) {
-            throwAppError(`Invalid permissions: ${inValidPermissions.map((p: any) => p.code).join(', ')}`, StatusCodes.BAD_REQUEST);
+
+            throwAppError(`Invalid permissions: ${inValidPermissions.join(', ')}`, StatusCodes.BAD_REQUEST);
         }
 
         //check if permissions are allowed by permission group
@@ -131,7 +130,7 @@ const create = async (
     return roleType;
 };
 
-const update = async (id: string, model: IUpdateRoleTypePayload, ctx: RequestContext, options?: IServiceOptions) => {
+const update = async (id: string, model: IUpdateRoleTypePayload, ctx: RequestContext) => {
     //1: get role type first
     let roleType: RoleTypeDocument = null;
     roleType = await RoleTypeService.get(id, ctx);

@@ -31,10 +31,10 @@ const set = async (model: any, entity: HydratedDocument<IPermissionGroup>, ctx: 
         entity.status = model.status;
     }
     if (model.permissions && model.permissions.length > 0) {
-        // 1: check if all permissions are valid
-        // ctx.logger.info('PERMISSIONS_ARRAY', PERMISSIONS_ARRAY);
+
         const inValidPermissions = model.permissions.filter((permission: any) => !PERMISSIONS_ARRAY.includes(permission.code));
         if (inValidPermissions.length > 0) {
+             
             throwAppError(`Invalid permissions: ${inValidPermissions.map((p: any) => p.code).join(', ')}`, StatusCodes.BAD_REQUEST);
         }
 
@@ -99,15 +99,11 @@ const search = async (filters: ISearchPermissionGroupQuery, ctx: RequestContext,
     return { count, items };
 };
 
-const create = async (
-    model: ICreatePermissionGroupPayload,
-    ctx: RequestContext,
-    options?: IServiceOptions,
-): Promise<HydratedDocument<IPermissionGroup>> => {
+const create = async (model: ICreatePermissionGroupPayload, ctx: RequestContext): Promise<HydratedDocument<IPermissionGroup>> => {
     let permissionGroup: PermissionGroupDocument = null;
 
     //1: check existing permission group
-    permissionGroup = await PermissionGroupService.get(model.code, ctx, options);
+    permissionGroup = await PermissionGroupService.get(model.code, ctx);
     if (permissionGroup) {
         return throwAppError('Permission group with this code already exists', StatusCodes.CONFLICT);
     }
@@ -122,10 +118,10 @@ const create = async (
     return permissionGroup;
 };
 
-const update = async (id: string, model: IUpdatePermissionGroupPayload, ctx: RequestContext, options?: IServiceOptions) => {
+const update = async (id: string, model: IUpdatePermissionGroupPayload, ctx: RequestContext) => {
     //1: get permission group first
     let permissionGroup: PermissionGroupDocument = null;
-    permissionGroup = await PermissionGroupService.get(id, ctx, options);
+    permissionGroup = await PermissionGroupService.get(id, ctx);
     if (!permissionGroup) {
         return throwAppError('Permission group not found', StatusCodes.NOT_FOUND);
     }

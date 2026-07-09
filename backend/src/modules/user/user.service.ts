@@ -16,7 +16,7 @@ const populate: any[] = [];
 // CORE FUNCTIONS
 // ========================================================================================
 
-const set = async (model: any, entity: HydratedDocument<IUser>, ctx: RequestContext, options?: IServiceOptions) => {
+const set = async (model: any, entity: HydratedDocument<IUser>, ctx: RequestContext) => {
     if (model.firstName) {
         entity.firstName = model.firstName;
     }
@@ -104,7 +104,7 @@ const search = async (filters: ISearchUserQuery, ctx: RequestContext, options?: 
     };
 };
 
-const create = async (model: IRegisterUserPayload, ctx: RequestContext, options?: IServiceOptions): Promise<HydratedDocument<IUser>> => {
+const create = async (model: IRegisterUserPayload, ctx: RequestContext): Promise<HydratedDocument<IUser>> => {
     let user: UserDocument = null;
 
     //1 check exitsing user
@@ -131,7 +131,7 @@ const create = async (model: IRegisterUserPayload, ctx: RequestContext, options?
     return user;
 };
 
-const update = async (id: string, model: IUpdateUserPayload, ctx: RequestContext, options?: IServiceOptions) => {
+const update = async (id: string, model: IUpdateUserPayload, ctx: RequestContext) => {
     //1: get user first
     let user: UserDocument = null;
     user = await UserService.get(id, ctx);

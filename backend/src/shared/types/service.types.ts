@@ -11,7 +11,8 @@ export interface IServiceOptions {
     populate?: boolean;
     pagination?: any;
 
-    //transaction
-    isTransaction?: boolean;
-    session?: ClientSession;
+    // //transactionexplain with me easy steps
+    
+    // isTransaction?: boolean;
+    // session?: ClientSession;
 }

@@ -42,13 +42,13 @@ const logger = {
 
     debug: (msg: string, meta?: any) => {
         if (ENV.App.Environment !== 'production') {
-            console.log(chalk.gray(formatMessage('debug', msg, meta)));
+            console.log(chalk.magenta(formatMessage('debug', msg, meta)));
         }
     },
 
     silly: (msg: string, meta?: any) => {
         if (ENV.App.Environment !== 'production') {
-            console.log(chalk.magenta(formatMessage('silly', msg, meta)));
+            console.log(chalk.white(formatMessage('silly', msg, meta)));
         }
     },
 };

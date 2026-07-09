@@ -14,11 +14,11 @@ import { IServiceOptions } from '../../shared/types/service.types';
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 10 * 60 * 1000; // 10 minutes
 
-const register = async (data: IRegisterUserPayload, ctx: RequestContext, options?: IServiceOptions): Promise<HydratedDocument<IUser>> => {
-    const user = await UserService.create(data, ctx, options);
+const register = async (data: IRegisterUserPayload, ctx: RequestContext): Promise<HydratedDocument<IUser>> => {
+    const user = await UserService.create(data, ctx);
     return user;
 };
-const login = async (data: ILoginUserPayload, ctx: RequestContext, options?: IServiceOptions) => {
+const login = async (data: ILoginUserPayload, ctx: RequestContext) => {
     // 1: get user
     const user = await UserService.getUserWithPassword(data.email);
     if (!user) {
@@ -90,9 +90,9 @@ const login = async (data: ILoginUserPayload, ctx: RequestContext, options?: ISe
     };
 };
 
-const logout = async (userId: string, ctx: RequestContext, options?: IServiceOptions) => {
+const logout = async (userId: string, ctx: RequestContext) => {
     //1: get user
-    const user = await UserService.get(userId, ctx, options);
+    const user = await UserService.get(userId, ctx);
     if (!user) {
         return throwAppError('User not found', StatusCodes.NOT_FOUND);
     }

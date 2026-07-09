@@ -37,7 +37,7 @@ const seedSystemUser = async () => {
             });
 
             //4: insert permissions
-            permissionGroup.permissions.push(PERMISSIONS.SYSTEM.MANAGE);
+            permissionGroup.permissions.push(PERMISSIONS.SYSTEM.MANAGE,PERMISSIONS.TENANT.ADMIN);
             await permissionGroup.save();
         }
 

@@ -113,11 +113,11 @@ RoleTypeRouter.put(
 );
 RoleTypeRouter.get(
     '/',
-    AuthorizeMiddleware(['ROLE_TYPE.SEARCH']),
+    AuthorizeMiddleware([PERMISSIONS.ROLE_TYPE.SEARCH.code]),
     RoleTypeController.search,
 );
 RoleTypeRouter.post(
     '/',
-    AuthorizeMiddleware(['ROLE_TYPE.CREATE']),
+    AuthorizeMiddleware([PERMISSIONS.ROLE_TYPE.CREATE.code]),
     RoleTypeController.create,
 );

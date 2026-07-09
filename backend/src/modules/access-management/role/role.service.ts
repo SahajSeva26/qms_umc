@@ -126,7 +126,6 @@ const search = async (filters: ISearchRoleQuery, ctx: RequestContext, options?: 
 const create = async (
     model: ICreateRolePayload,
     ctx: RequestContext,
-    options?: IServiceOptions,
 ): Promise<HydratedDocument<IRoleDocument>> => {
     let role: RoleDoc = null;
 
@@ -167,10 +166,10 @@ const create = async (
     return role;
 };
 
-const update = async (id: string, model: IUpdateRolePayload, ctx: RequestContext, options?: IServiceOptions) => {
+const update = async (id: string, model: IUpdateRolePayload, ctx: RequestContext) => {
     //1: get role first
     let role: RoleDoc = null;
-    role = await RoleService.get(id, ctx, options);
+    role = await RoleService.get(id, ctx);
     if (!role) {
         return throwAppError('Role not found', StatusCodes.NOT_FOUND);
     }

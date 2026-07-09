@@ -8,7 +8,7 @@ import {
 } from './permissionGroup.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
 import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
-import { PERMISSIONS } from '../../../shared/env/permissions';
+import { PERMISSION_GROUP_PERMISSIONS } from './permissionGroup.constants';
 
 export const PermissionGroupRouter = express.Router();
 
@@ -107,21 +107,21 @@ registry.registerPath({
 // ==========================================================================
 PermissionGroupRouter.get(
     '/:id',
-    AuthorizeMiddleware([PERMISSIONS.PERMISSION_GROUP.GET.code]),
+    AuthorizeMiddleware([PERMISSION_GROUP_PERMISSIONS.GET.code]),
     PermissionGroupController.get,
 );
 PermissionGroupRouter.get(
     '/',
-    AuthorizeMiddleware([PERMISSIONS.PERMISSION_GROUP.SEARCH.code]),
+    AuthorizeMiddleware([PERMISSION_GROUP_PERMISSIONS.SEARCH.code]),
     PermissionGroupController.search,
 );
 PermissionGroupRouter.post(
     '/',
-    AuthorizeMiddleware([PERMISSIONS.PERMISSION_GROUP.CREATE.code]),
+    AuthorizeMiddleware([PERMISSION_GROUP_PERMISSIONS.CREATE.code]),
     PermissionGroupController.create,
 );
 PermissionGroupRouter.put(
     '/:id',
-    AuthorizeMiddleware([PERMISSIONS.PERMISSION_GROUP.UPDATE.code]),
+    AuthorizeMiddleware([PERMISSION_GROUP_PERMISSIONS.UPDATE.code]),
     PermissionGroupController.update,
 );

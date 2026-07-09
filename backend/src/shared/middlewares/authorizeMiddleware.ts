@@ -16,7 +16,7 @@ export const AuthorizeMiddleware = (requiredPermission: any[] = [], type: permis
             switch (type) {
                 case 'AND': {
                     if (!ctx.hasAllPermissions(requiredPermission)) {
-                        return throwAppError('Forbidden', StatusCodes.FORBIDDEN);
+                        return throwAppError('Forbidden: Insufficient permissions', StatusCodes.FORBIDDEN);
                     }
                     next();
                     break;
@@ -24,7 +24,7 @@ export const AuthorizeMiddleware = (requiredPermission: any[] = [], type: permis
 
                 case 'OR': {
                     if (!ctx.hasAnyPermissions(requiredPermission)) {
-                        return throwAppError('Forbidden', StatusCodes.FORBIDDEN);
+                        return throwAppError('Forbidden: Insufficient permissions', StatusCodes.FORBIDDEN);
                     }
                     next();
                     break;

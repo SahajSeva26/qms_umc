@@ -136,7 +136,7 @@ const createTenant = async (model: ICreateTenantPayload, ctx: RequestContext) =>
         return await withTransaction(async () => {
             //1: create tenant
             let tenant: any = await create(model, ctx);
-            ctx.setTenant(tenant);
+            // ctx.setTenant(tenant);
             log.debug('Tenant created', { tenantId: tenant._id });
 
             //2: create permission group
@@ -148,6 +148,7 @@ const createTenant = async (model: ICreateTenantPayload, ctx: RequestContext) =>
                     tenant: tenant._id.toString(),
                     permissions: [
                         //all default bare minimum permisions boundary for a tenant
+                        // TENANT_PERMISSIONS.ADMIN,
                         USER_PERMISSIONS.GET,
                         USER_PERMISSIONS.SEARCH,
                         USER_PERMISSIONS.UPDATE,
@@ -196,10 +197,8 @@ const createTenant = async (model: ICreateTenantPayload, ctx: RequestContext) =>
             return tenant;
         });
     } catch (error: any) {
-        // any step failed → whole transaction rolled back. Re-surface a known
-        // AppError as-is; wrap anything else as a generic "not created" failure.
-        log.error('Tenant creation transaction failed', error);
-        return throwAppError('Tenant not created', StatusCodes.INTERNAL_SERVER_ERROR);
+        log.error('Tenant creation transaction failed:', error?.message);
+        return throwAppError(error?.message || 'Failed to create tenant', error?.statusCode || StatusCodes.BAD_REQUEST);
     }
 };
 

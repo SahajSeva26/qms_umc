@@ -9,6 +9,15 @@ import { RoleModel } from '../../modules/access-management/role/role.model';
 import logger from '../utils/logger';
 import { TENANT_TYPE } from '../../modules/access-management/tenant/tenant.constants';
 
+const systemUserPermissions:any = [
+    PERMISSIONS.SYSTEM.MANAGE,
+    ...Object.values(PERMISSIONS.USER),
+    ...Object.values(PERMISSIONS.TENANT),
+    ...Object.values(PERMISSIONS.PERMISSION_GROUP),
+    ...Object.values(PERMISSIONS.ROLE_TYPE),
+    ...Object.values(PERMISSIONS.ROLE),
+];
+
 const seedSystemUser = async () => {
     try {
         //  1: Check if system tenant already exists
@@ -20,7 +29,7 @@ const seedSystemUser = async () => {
             tenant = await TenantModel.create({
                 code: 'system',
                 name: 'System',
-                type:TENANT_TYPE.PLATFORM,
+                type: TENANT_TYPE.PLATFORM,
                 description: 'System tenant',
             });
             seededItems.push('tenant');
@@ -37,7 +46,7 @@ const seedSystemUser = async () => {
             });
 
             //4: insert permissions
-            permissionGroup.permissions.push(PERMISSIONS.SYSTEM.MANAGE,PERMISSIONS.TENANT.ADMIN);
+            permissionGroup.permissions = systemUserPermissions;
             await permissionGroup.save();
         }
 

@@ -25,13 +25,15 @@ const login = async (data: ILoginUserPayload, ctx: RequestContext) => {
         return throwAppError('User not found', StatusCodes.NOT_FOUND);
     }
 
+    //1.5: check if user is active
+    if (user.status !== 'active') {
+        return throwAppError('Account not active contact admin', StatusCodes.FORBIDDEN);
+    }
+
     //2: check account locked
     if (user.lockUntil && user.lockUntil > new Date()) {
         const remainingTime = user.lockUntil.getTime() - Date.now();
-        return throwAppError(
-            `Account is locked,try again in ${Math.ceil(remainingTime / 60000)} minutes.`,
-            StatusCodes.FORBIDDEN,
-        );
+        return throwAppError(`Account is locked,try again in ${Math.ceil(remainingTime / 60000)} minutes.`, StatusCodes.FORBIDDEN);
     }
 
     //3: validate password
@@ -61,10 +63,7 @@ const login = async (data: ILoginUserPayload, ctx: RequestContext) => {
     // 5: find user role
     let userRole: any = await RoleService.search({ user: user.id }, ctx);
     if (userRole.items.length == 0) {
-        return throwAppError(
-            'No role assigned to this account. Please contact your administrator.',
-            StatusCodes.FORBIDDEN,
-        );
+        return throwAppError('No role assigned to this account. Please contact your administrator.', StatusCodes.FORBIDDEN);
     }
     userRole = userRole.items[0];
 
@@ -121,10 +120,7 @@ const refreshToken = async (refreshToken: string, ctx: RequestContext) => {
     // 4: get user role
     let userRole: any = await RoleService.search({ user: user.id }, ctx);
     if (userRole.items.length == 0) {
-        return throwAppError(
-            'No role assigned to this account. Please contact your administrator.',
-            StatusCodes.FORBIDDEN,
-        );
+        return throwAppError('No role assigned to this account. Please contact your administrator.', StatusCodes.FORBIDDEN);
     }
     userRole = userRole.items[0];
 

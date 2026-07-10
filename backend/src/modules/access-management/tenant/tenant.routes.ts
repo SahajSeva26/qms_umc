@@ -119,7 +119,7 @@ registry.registerPath({
 // ================= EXPORTED ROUTES ========================================
 // ==========================================================================
 
-TenantRouter.get('/me', AuthMiddleware, TenantController.getMe);
+TenantRouter.get('/me', AuthMiddleware, TenantController.getTenantMe);
 
 TenantRouter.get(
     '/:id',

@@ -27,10 +27,10 @@ const seedSystemUser = async () => {
         //  2: If not, create system tenant
         if (!tenant) {
             tenant = await TenantModel.create({
-                code: 'system',
-                name: 'System',
+                code: 'qms',
+                name: 'Qms internal',
                 type: TENANT_TYPE.PLATFORM,
-                description: 'System tenant',
+                description: 'Qms internal tenant for system operations',
             });
             seededItems.push('tenant');
         }

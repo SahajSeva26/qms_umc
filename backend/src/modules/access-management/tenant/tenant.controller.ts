@@ -115,7 +115,7 @@ const update = async (req: any, res: any) => {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }
 };
-const getMe =async(req:any,res:any)=>{
+const getTenantMe =async(req:any,res:any)=>{
     try {
         const ctx: RequestContext = req.context;
         const tenant = await TenantService.get(ctx.tenant, ctx);
@@ -135,5 +135,5 @@ export const TenantController = {
     search,
     create,
     update,
-    getMe
+    getTenantMe
 };

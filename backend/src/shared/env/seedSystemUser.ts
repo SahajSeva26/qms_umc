@@ -23,7 +23,7 @@ const seedSystemUser = async () => {
         //  1: Check if system tenant already exists
         const seededItems: string[] = [];
 
-        let tenant = await TenantModel.findOne({ code: 'system' });
+        let tenant = await TenantModel.findOne({ code: 'qms' });
         //  2: If not, create system tenant
         if (!tenant) {
             tenant = await TenantModel.create({

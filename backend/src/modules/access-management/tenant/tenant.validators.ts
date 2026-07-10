@@ -12,9 +12,9 @@ export const CreateTenantPayloadSchema = z.object({
         .refine((val) => !isValidObjectID(val), {
             message: 'Code must not be an ObjectId',
         })
-        .openapi({ example: 'acme' }),
-    name: z.string().min(1).openapi({ example: 'Acme Corp' }),
-    description: z.string().optional().openapi({ example: 'Acme Corporation' }),
+        .openapi({ example: 'cipla' }),
+    name: z.string().min(1).openapi({ example: 'Cipla pvt ltd' }),
+    description: z.string().optional().openapi({ example: 'Cipla private limited' }),
     owner: RegisterUserPayloadSchema,
 });
 export type ICreateTenantPayload = z.infer<typeof CreateTenantPayloadSchema>;

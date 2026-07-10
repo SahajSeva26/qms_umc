@@ -26,7 +26,7 @@ const get = async (req: any, res: any) => {
             StatusCodes.OK,
             true,
             'Permission group fetched successfully',
-            PermissionGroupMapper.toResponse(permissionGroup),
+            PermissionGroupMapper.toResponse(permissionGroup,ctx),
         );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
@@ -53,7 +53,7 @@ const search = async (req: any, res: any) => {
             StatusCodes.OK,
             true,
             'Permission groups fetched successfully',
-            PermissionGroupMapper.toSearchResponse(result),
+            PermissionGroupMapper.toSearchResponse(result, ctx),
         );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
@@ -79,7 +79,7 @@ const create = async (req: any, res: any) => {
             StatusCodes.CREATED,
             true,
             'Permission group created successfully',
-            PermissionGroupMapper.toResponse(permissionGroup),
+            PermissionGroupMapper.toResponse(permissionGroup,ctx),
         );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
@@ -109,7 +109,7 @@ const update = async (req: any, res: any) => {
             StatusCodes.OK,
             true,
             'Permission group updated successfully',
-            PermissionGroupMapper.toResponse(permissionGroup),
+            PermissionGroupMapper.toResponse(permissionGroup,ctx),
         );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);

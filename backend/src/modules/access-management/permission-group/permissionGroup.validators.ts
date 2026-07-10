@@ -23,7 +23,7 @@ export const UpdatePermissionGroupPayloadSchema = z.object({
     name: z.string().min(1).optional().openapi({ example: 'Admin Group' }),
     description: z.string().min(1).optional().openapi({ example: 'Full access permission group' }),
     status: z.enum([PERMISSION_GROUP_STATUSES.ACTIVE, PERMISSION_GROUP_STATUSES.INACTIVE]).optional().openapi({ example: 'active' }),
-    // permissions: z.array(PermissionSchema).optional().openapi({ example: [] }),
+    permissions: z.array(PermissionSchema).optional().openapi({ example: [] }),
 });
 
 export type IUpdatePermissionGroupPayload = z.infer<typeof UpdatePermissionGroupPayloadSchema>;

@@ -18,9 +18,6 @@ const populate: any[] = [];
 // ========================================================================================
 
 const set = async (model: any, entity: HydratedDocument<IPermissionGroup>, ctx: RequestContext) => {
-    if (model.code) {
-        entity.code = model.code;
-    }
     if (model.name) {
         entity.name = model.name;
     }
@@ -33,15 +30,9 @@ const set = async (model: any, entity: HydratedDocument<IPermissionGroup>, ctx: 
     if (model.permissions && model.permissions.length > 0) {
         if (await handlePermissionUpdate(model, ctx)) {
             entity.permissions = model.permissions;
+            //TODO: add audit log
+            //TODO: also make a simple transaction, which will ROLE-TYPE and ROLE with new permissions
         }
-    }
-    if (model.tenant) {
-        // validate tenant exists
-        const tenant = await TenantService.get(model.tenant, ctx);
-        if (!tenant) {
-            throwAppError('Tenant not found', StatusCodes.NOT_FOUND);
-        }
-        entity.tenant = toObjectId(model.tenant);
     }
 
     return entity;
@@ -103,10 +94,19 @@ const create = async (model: ICreatePermissionGroupPayload, ctx: RequestContext)
         return throwAppError('Permission group with this code already exists', StatusCodes.CONFLICT);
     }
 
-    //2: create permission group
-    const entity = new PermissionGroupModel();
+    //2: validate tenant exists
+    const tenant = await TenantService.get(model.tenant, ctx);
+    if (!tenant) {
+        throwAppError('Tenant not found', StatusCodes.NOT_FOUND);
+    }
 
-    //3: set fields
+    //3: create permission group
+    const entity = new PermissionGroupModel({
+        code: model.code,
+        tenant: toObjectId(model.tenant),
+    });
+
+    //4: set rest fields
     permissionGroup = await set(model, entity, ctx);
     permissionGroup = await permissionGroup.save();
 
@@ -140,17 +140,15 @@ export const PermissionGroupService = {
 };
 const handlePermissionUpdate = async (model: any, ctx: RequestContext) => {
     const log = ctx.logger;
-    // chec if permisisons are valid by system
+    // check if permisisons are valid by system
     let inValidPermissions = model.permissions.filter((permission: any) => !PERMISSIONS_ARRAY.includes(permission.code));
     if (inValidPermissions.length > 0) {
         throwAppError(`Invalid permissions: ${inValidPermissions.map((p: any) => p.code).join(', ')}`, StatusCodes.BAD_REQUEST);
     }
 
-    //check if permissions are allowed by permission group of the one who is acting(admin)
-    log.debug('Searching for permission group', { tenant: ctx.tenant.id });
+    //check if permissions are allowed by permission group of the one who is updating(admin)
     let permissionGroup: any = await PermissionGroupService.search({ tenant: ctx.tenant._id }, ctx);
     if (permissionGroup.count == 0) {
-        log.error('Permission group not found');
         throwAppError('Permission group not found', StatusCodes.NOT_FOUND);
     }
     permissionGroup = permissionGroup.items[0];

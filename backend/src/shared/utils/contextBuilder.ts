@@ -1,3 +1,4 @@
+import { TENANT_TYPE } from '../../modules/access-management/tenant/tenant.constants';
 import { PERMISSIONS } from '../env/permissions';
 import { throwAppError } from './error';
 import logger from './logger';
@@ -26,7 +27,7 @@ export type RequestContext = {
     hasAnyPermissions: (required: string[]) => boolean;
     hasAllPermissions: (required: string[]) => boolean;
     requirePermissions: (permissions: string[]) => boolean;
-    where: () => Object;
+    where: () => object;
 };
 
 export const buildContext = (req: any, res: any, next: any) => {
@@ -111,7 +112,26 @@ export const buildContext = (req: any, res: any, next: any) => {
         },
 
         where() {
-            return {};
+            let scope: any = {};
+            switch (this.tenant.type) {
+                case TENANT_TYPE.PLATFORM: {
+                    // No tenant filter for system
+                    break;
+                }
+                
+                case TENANT_TYPE.CUSTOMER: {
+                    // Filter by customer tenant
+                    scope.tenant = this.tenant._id || this.tenant.id;
+                    break;
+                }
+
+                default: {
+                    throwAppError('Invalid tenant type', 500);
+                    break;
+                }
+            }
+
+            return scope;
         },
     };
 
@@ -126,3 +146,5 @@ declare global {
         }
     }
 }
+
+const buildWhere = (context: RequestContext) => {};

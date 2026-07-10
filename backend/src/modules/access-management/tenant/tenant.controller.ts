@@ -1,5 +1,5 @@
 import { ResponseHandler } from '../../../shared/utils/responseHandler';
-import { formatZodError } from '../../../shared/utils/error';
+import { formatZodError, throwAppError } from '../../../shared/utils/error';
 import { CreateTenantPayloadSchema, UpdateTenantPayloadSchema } from './tenant.validators';
 import { StatusCodes } from 'http-status-codes';
 import { TenantService } from './tenant.service';
@@ -91,7 +91,7 @@ const update = async (req: any, res: any) => {
         const ctx: RequestContext = req.context;
         const { id } = req?.params;
         if (!id) {
-            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Tenant ID is required', null);
+            return throwAppError('Tenant ID is required',StatusCodes.BAD_REQUEST);
         }
 
         const { data, success, error } = UpdateTenantPayloadSchema.safeParse(req.body);
@@ -115,10 +115,25 @@ const update = async (req: any, res: any) => {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }
 };
-
+const getMe =async(req:any,res:any)=>{
+    try {
+        const ctx: RequestContext = req.context;
+        const tenant = await TenantService.get(ctx.tenant, ctx);
+        return ResponseHandler.appResponse(
+            res,
+            StatusCodes.OK,
+            true,
+            'Tenant fetched successfully',
+            TenantMapper.toResponse(tenant,ctx),
+        );
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+}
 export const TenantController = {
     get,
     search,
     create,
     update,
+    getMe
 };

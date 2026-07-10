@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { TENANT_STATUS } from './tenant.constants';
+import { TENANT_STATUS, TENANT_TYPE } from './tenant.constants';
 import { isValidObjectID } from '../../../shared/utils/strings';
 import { RegisterUserPayloadSchema } from '../../auth/auth.validators';
 
@@ -16,7 +16,7 @@ export const CreateTenantPayloadSchema = z.object({
     name: z.string().min(1).openapi({ example: 'Acme Corp' }),
     description: z.string().optional().openapi({ example: 'Acme Corporation' }),
     owner: RegisterUserPayloadSchema,
-}); 
+});
 export type ICreateTenantPayload = z.infer<typeof CreateTenantPayloadSchema>;
 
 //2: update ====================================>
@@ -27,6 +27,10 @@ export const UpdateTenantPayloadSchema = z.object({
         .enum([TENANT_STATUS.ACTIVE, TENANT_STATUS.INACTIVE])
         .optional()
         .openapi({ example: 'active' }),
+    type: z
+        .enum([TENANT_TYPE.PLATFORM, TENANT_TYPE.CUSTOMER])
+        .optional()
+        .openapi({ example: 'platform' }),
 });
 export type IUpdateTenantPayload = z.infer<typeof UpdateTenantPayloadSchema>;
 

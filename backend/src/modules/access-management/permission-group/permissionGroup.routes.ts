@@ -50,27 +50,27 @@ registry.registerPath({
     },
 });
 
-// create permission group
-registry.registerPath({
-    method: 'post',
-    path: '/permission-groups',
-    tags: ['PERMISSION GROUP'],
-    summary: 'Create permission group',
-    request: {
-        body: {
-            content: {
-                'application/json': {
-                    schema: CreatePermissionGroupPayloadSchema,
-                },
-            },
-        },
-    },
-    responses: {
-        201: { description: 'Permission group created successfully' },
-        400: { description: 'Validation failed' },
-        409: { description: 'Permission group already exists' },
-    },
-});
+// // create permission group
+// registry.registerPath({
+//     method: 'post',
+//     path: '/permission-groups',
+//     tags: ['PERMISSION GROUP'],
+//     summary: 'Create permission group',
+//     request: {
+//         body: {
+//             content: {
+//                 'application/json': {
+//                     schema: CreatePermissionGroupPayloadSchema,
+//                 },
+//             },
+//         },
+//     },
+//     responses: {
+//         201: { description: 'Permission group created successfully' },
+//         400: { description: 'Validation failed' },
+//         409: { description: 'Permission group already exists' },
+//     },
+// });
 
 // update permission group
 registry.registerPath({
@@ -115,11 +115,11 @@ PermissionGroupRouter.get(
     AuthorizeMiddleware([PERMISSION_GROUP_PERMISSIONS.SEARCH.code]),
     PermissionGroupController.search,
 );
-PermissionGroupRouter.post(
-    '/',
-    AuthorizeMiddleware([PERMISSION_GROUP_PERMISSIONS.CREATE.code]),
-    PermissionGroupController.create,
-);
+// PermissionGroupRouter.post(
+//     '/',
+//     AuthorizeMiddleware([PERMISSION_GROUP_PERMISSIONS.CREATE.code]),
+//     PermissionGroupController.create,
+// );
 PermissionGroupRouter.put(
     '/:id',
     AuthorizeMiddleware([PERMISSION_GROUP_PERMISSIONS.UPDATE.code]),

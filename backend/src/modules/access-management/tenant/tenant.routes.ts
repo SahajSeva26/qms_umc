@@ -8,7 +8,10 @@ import {
 } from './tenant.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
 import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
-import { PERMISSIONS } from '../../../shared/env/permissions';
+import {
+    PERMISSIONS,
+    SYSTEM_PERMISSIONS,
+} from '../../../shared/env/permissions';
 
 export const TenantRouter = express.Router();
 
@@ -101,9 +104,23 @@ registry.registerPath({
     },
 });
 
+registry.registerPath({
+    method: 'get',
+    path: '/tenants/me',
+    tags: ['TENANT'],
+    summary: 'Get current tenant',
+    responses: {
+        200: { description: 'Tenant fetched successfully' },
+        400: { description: 'Tenant fetch failed' },
+    },
+});
+
 // ==========================================================================
 // ================= EXPORTED ROUTES ========================================
 // ==========================================================================
+
+TenantRouter.get('/me', AuthMiddleware, TenantController.getMe);
+
 TenantRouter.get(
     '/:id',
     AuthorizeMiddleware([
@@ -123,8 +140,9 @@ TenantRouter.get(
 TenantRouter.post(
     '/',
     AuthorizeMiddleware([
-        PERMISSIONS.TENANT.CREATE.code,
-        PERMISSIONS.TENANT.MANAGE.code,
+        // PERMISSIONS.TENANT.CREATE.code,
+        // PERMISSIONS.TENANT.MANAGE.code,
+        SYSTEM_PERMISSIONS.MANAGE.code,
     ]),
     TenantController.create,
 );

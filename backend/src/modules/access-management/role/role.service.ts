@@ -8,8 +8,9 @@ import { toObjectId, isValidObjectID } from '../../../shared/utils/strings';
 import { TenantService } from '../tenant/tenant.service';
 import { RoleTypeService } from '../role-type/roleType.service';
 import { UserService } from '../../user/user.service';
-import { PERMISSIONS_ARRAY } from '../../../shared/env/permissions';
+import { PERMISSIONS_ARRAY, SYSTEM_PERMISSIONS } from '../../../shared/env/permissions';
 import { IServiceOptions } from '../../../shared/types/service.types';
+import { PermissionGroupService } from '../permission-group/permissionGroup.service';
 
 type RoleDoc = HydratedDocument<IRoleDocument> | null;
 const populate: any[] = [
@@ -19,7 +20,7 @@ const populate: any[] = [
     },
     {
         path: 'tenant',
-        select: 'name code',
+        select: 'name code type status',
     },
 ];
 
@@ -199,3 +200,37 @@ export const RoleService = {
 // ========================================================================================
 // EXPORTS
 // ========================================================================================
+const handlePermissionUpdate = async (model: any, ctx: RequestContext) => {
+    const log = ctx.logger;
+    //1: check if permisisons are valid by system
+    let inValidPermissions = model.permissions?.filter((permission: any) => !PERMISSIONS_ARRAY.includes(permission));
+    if (inValidPermissions?.length > 0) {
+        log.error(`Invalid system permissions update: ${inValidPermissions.join(', ')}`);
+        throwAppError(`Invalid permissions: ${inValidPermissions.join(', ')}`, StatusCodes.BAD_REQUEST);
+    }
+
+    // 2: early return if system.manage is true
+    if (ctx.hasAnyPermissions([SYSTEM_PERMISSIONS.MANAGE.code])) {
+        log.info('Creator has system manage permission, skipping permission group validation');
+        return true;
+    }
+
+    // 3:check if permissions are allowed by permission group
+    let permissionGroup: any = await PermissionGroupService.search({ tenant: model.tenant }, ctx);
+    if (permissionGroup.count == 0) {
+        log.error('Permission group not found');
+        throwAppError('Permission group not found', StatusCodes.NOT_FOUND);
+    }
+    permissionGroup = permissionGroup.items[0];
+    //flat permissions of  permision group
+
+    const allowedGroupPermissions = permissionGroup.permissions.map((permission: any) => permission.code);
+    const inValidGroupPermissions = model.permissions.filter((permission: any) => !allowedGroupPermissions.includes(permission));
+    if (inValidGroupPermissions.length > 0) {
+        log.error(`Invalid group permissions update: ${inValidGroupPermissions.join(', ')}`);
+        throwAppError(`Invalid permissions: ${inValidGroupPermissions.join(', ')}`, StatusCodes.BAD_REQUEST);
+    }
+
+    log.info('Permissions validated successfully');
+    return true;
+};

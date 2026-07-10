@@ -5,15 +5,15 @@ import { TENANT_PERMISSIONS, TENANT_STATUS } from './tenant.constants';
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
-import { toObjectId, isValidObjectID } from '../../../shared/utils/strings';
+import { isValidObjectID } from '../../../shared/utils/strings';
 import { RoleService } from '../role/role.service';
 import { UserService } from '../../user/user.service';
-import { PermissionGroupModel } from '../permission-group/permissionGroup.model';
 import { PermissionGroupService } from '../permission-group/permissionGroup.service';
 import { USER_PERMISSIONS } from '../../user/user.constants';
 import { RoleTypeService } from '../role-type/roleType.service';
-import { IService, IServiceOptions } from '../../../shared/types/service.types';
+import { IServiceOptions } from '../../../shared/types/service.types';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
+import { SYSTEM_PERMISSIONS } from '../../../shared/env/permissions';
 
 type TenantDocument = HydratedDocument<ITenant> | null;
 const populate: any[] = [];
@@ -34,16 +34,26 @@ const set = async (model: any, entity: HydratedDocument<ITenant>, ctx: RequestCo
         entity.status = model.status;
     }
 
+    if (model.type && ctx.hasAnyPermissions([SYSTEM_PERMISSIONS.MANAGE.code])) {
+        //only system user shoudld be able to do that
+        entity.type = model.type;
+    }
+
     return entity;
 };
 
 const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): Promise<TenantDocument> => {
+    //1: add default scoping
+    let where: mongoose.QueryFilter<ITenant> ={ };
+
     let query = null;
 
     if (isValidObjectID(id)) {
-        query = TenantModel.findOne({ _id: id });
+        where._id = id;
+        query = TenantModel.findOne({ ...where });
     } else {
-        query = TenantModel.findOne({ code: id });
+        where.code = id;
+        query = TenantModel.findOne({ ...where });
     }
 
     if (query) {
@@ -60,22 +70,23 @@ const search = async (filters: ISearchTenantQuery, ctx: RequestContext, options?
         createdAt: -1,
     };
 
-    let where: mongoose.QueryFilter<ITenant> = {
-        // add context default where build here
-    };
+    //1: add default scoping
+    let where: mongoose.QueryFilter<ITenant> = ctx.where();
+    where.status = TENANT_STATUS.ACTIVE;
 
+    //2: add search filters
     if (filters.name) {
         where.name = { $regex: filters.name, $options: 'i' };
     }
     if (filters.code) {
         where.code = { $regex: filters.code, $options: 'i' };
     }
-    if (filters.status) {
+    if (filters.status && ctx.hasAnyPermissions([TENANT_PERMISSIONS.MANAGE.code])) {
         where.status = filters.status;
     }
 
+    // 3: execute queries
     const countPromise = TenantModel.countDocuments(where);
-
     const dataPromise = TenantModel.find(where)
         .populate(populate)
         .limit(options?.pagination?.limit)
@@ -136,7 +147,6 @@ const createTenant = async (model: ICreateTenantPayload, ctx: RequestContext) =>
         return await withTransaction(async () => {
             //1: create tenant
             let tenant: any = await create(model, ctx);
-            // ctx.setTenant(tenant);
             log.debug('Tenant created', { tenantId: tenant._id });
 
             //2: create permission group

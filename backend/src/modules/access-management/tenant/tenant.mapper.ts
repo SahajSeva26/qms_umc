@@ -13,6 +13,7 @@ export const TenantMapper = {
             result.owner = tenant.owner;
             result.createdAt = tenant.createdAt;
             result.updatedAt = tenant.updatedAt;
+            result.type = tenant.type;
         }
         return result;
     },

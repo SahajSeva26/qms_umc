@@ -27,7 +27,7 @@ const get = async (req: any, res: any) => {
             StatusCodes.OK,
             true,
             'Role type fetched successfully',
-            RoleTypeMapper.toResponse(roleType),
+            RoleTypeMapper.toResponse(roleType, ctx),
         );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
@@ -55,7 +55,7 @@ const search = async (req: any, res: any) => {
             StatusCodes.OK,
             true,
             'Role types fetched successfully',
-            RoleTypeMapper.toSearchResponse(result),
+            RoleTypeMapper.toSearchResponse(result, ctx),
         );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
@@ -81,7 +81,7 @@ const create = async (req: any, res: any) => {
             StatusCodes.CREATED,
             true,
             'Role type created successfully',
-            RoleTypeMapper.toResponse(roleType),
+            RoleTypeMapper.toResponse(roleType, ctx),
         );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
@@ -111,7 +111,7 @@ const update = async (req: any, res: any) => {
             StatusCodes.OK,
             true,
             'Role type updated successfully',
-            RoleTypeMapper.toResponse(roleType),
+            RoleTypeMapper.toResponse(roleType, ctx),
         );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);

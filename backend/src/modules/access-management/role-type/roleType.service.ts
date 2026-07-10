@@ -1,7 +1,7 @@
 import mongoose, { HydratedDocument } from 'mongoose';
 import { IRoleType, RoleTypeModel } from './roleType.model';
 import { ICreateRoleTypePayload, ISearchRoleTypeQuery, IUpdateRoleTypePayload } from './roleType.validators';
-import { ROLE_TYPE_STATUSES } from './roleType.constants';
+import { ROLE_TYPE_PERMISSIONS, ROLE_TYPE_STATUSES } from './roleType.constants';
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
@@ -24,34 +24,38 @@ const populate: any[] = [
 // ========================================================================================
 
 const set = async (model: any, entity: HydratedDocument<IRoleType>, ctx: RequestContext) => {
-    if (model.code) {
-        entity.code = model.code;
-    }
     if (model.name) {
         entity.name = model.name;
+    }
+    if (model.description) {
+        entity.description = model.description;
+    }
+
+    if (model.status && ctx.hasAnyPermissions([ROLE_TYPE_PERMISSIONS.MANAGE.code])) {
+        entity.status = model.status;
     }
     if (model.permissions && model.permissions.length > 0) {
         if (await handlePermissionUpdate(model, ctx)) {
             entity.permissions = model.permissions;
         }
     }
-    if (model.status) {
-        entity.status = model.status;
-    }
-    if (model.category !== undefined) {
-        entity.category = model.category;
-    }
+    // if (model.category !== undefined) {
+    //     entity.category = model.category;
+    // }
 
     return entity;
 };
 
 const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): Promise<RoleTypeDocument> => {
     let query = null;
+    let where: mongoose.QueryFilter<IRoleType> = { ...ctx.where() };
 
     if (isValidObjectID(id)) {
-        query = RoleTypeModel.findOne({ _id: id });
+        where._id = id;
+        query = RoleTypeModel.findOne(where);
     } else {
-        query = RoleTypeModel.findOne({ code: id });
+        where.code = id;
+        query = RoleTypeModel.findOne(where);
     }
 
     if (options?.populate) {
@@ -64,7 +68,7 @@ const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): 
 const search = async (filters: ISearchRoleTypeQuery, ctx: RequestContext, options?: IServiceOptions) => {
     const sort: any = { createdAt: -1 };
 
-    const where: mongoose.QueryFilter<IRoleType> = {};
+    const where: mongoose.QueryFilter<IRoleType> = { ...ctx.where() };
 
     if (filters.name) {
         where.name = { $regex: filters.name, $options: 'i' };
@@ -75,8 +79,7 @@ const search = async (filters: ISearchRoleTypeQuery, ctx: RequestContext, option
     if (filters.status) {
         where.status = filters.status;
     }
-    if (filters.tenant) {
-        //TODO: also chekc if he has elevated permissions to access cross tenant(admin)
+    if (filters.tenant && ctx.hasAnyPermissions([ROLE_TYPE_PERMISSIONS.MANAGE.code])) {
         where.tenant = toObjectId(filters.tenant);
     }
 
@@ -114,6 +117,7 @@ const create = async (
 
     //3: create role type
     const entity = new RoleTypeModel({
+        code: model.code,
         tenant: toObjectId(model.tenant),
     });
 

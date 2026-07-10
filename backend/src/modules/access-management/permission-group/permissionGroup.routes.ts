@@ -83,6 +83,9 @@ registry.registerPath({
 // ==========================================================================
 // EXPORTED PERMISSION GROUP ROUTES
 // ==========================================================================
+
+//TODO: add getPermission group me route
+
 PermissionGroupRouter.get(
     '/:id',
     AuthorizeMiddleware([PERMISSION_GROUP_PERMISSIONS.GET.code]),
@@ -103,3 +106,4 @@ PermissionGroupRouter.put(
     AuthorizeMiddleware([PERMISSION_GROUP_PERMISSIONS.UPDATE.code]),
     PermissionGroupController.update,
 );
+

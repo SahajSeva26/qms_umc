@@ -8,7 +8,7 @@ export const CreateRoleTypePayloadSchema = z.object({
     description: z.string().optional().openapi({ example: 'Administrator role type' }),
     tenant: z.string().min(1).openapi({ example: '64f1a2b3c4d5e6f7a8b9c0d1' }),
     permissions: z.array(z.string().min(1)).optional().default([]).openapi({ example: ['user:create', 'user:read'] }),
-    category: z.string().optional().openapi({ example: 'system' }),
+    // category: z.string().optional().openapi({ example: 'system' }),
 });
 
 export type ICreateRoleTypePayload = z.infer<typeof CreateRoleTypePayloadSchema>;
@@ -21,7 +21,7 @@ export const UpdateRoleTypePayloadSchema = z.object({
         .enum([ROLE_TYPE_STATUSES.ACTIVE, ROLE_TYPE_STATUSES.INACTIVE])
         .optional()
         .openapi({ example: 'active' }),
-    category: z.string().optional().openapi({ example: 'system' }),
+    // category: z.string().optional().openapi({ example: 'system' }),
 });
 
 export type IUpdateRoleTypePayload = z.infer<typeof UpdateRoleTypePayloadSchema>;

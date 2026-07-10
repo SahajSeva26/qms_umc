@@ -26,7 +26,7 @@ const roleTypeSchema = new mongoose.Schema({
         enum: [ROLE_TYPE_STATUSES.ACTIVE, ROLE_TYPE_STATUSES.INACTIVE],
         default: ROLE_TYPE_STATUSES.ACTIVE,
     },
-    category: String,
+    // category: String,
     tenant: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Tenant',

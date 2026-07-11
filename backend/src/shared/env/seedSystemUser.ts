@@ -22,7 +22,18 @@ const systemUserPermissions: any = [
 
 const seedSystemUser = async () => {
     try {
-        const seededItems: string[] = [];
+        // Ensure collections + indexes exist BEFORE the transaction, so the first
+        // write doesn't trigger implicit collection creation inside it — which throws
+        // a TransientTransactionError on a single-node replica set and makes the driver
+        // replay the whole callback (the cause of the doubled seed run).
+        await Promise.all([
+            TenantModel.init(),
+            PermissionGroupModel.init(),
+            RoleTypeModel.init(),
+            UserModel.init(),
+            RoleModel.init(),
+        ]);
+
         await withTransaction(async () => {
             //  1: Check if system tenant already exists ====================================================>
             let tenant = await TenantModel.findOne({ code: ENV.App.SystemTenantCode });
@@ -34,7 +45,8 @@ const seedSystemUser = async () => {
                     type: TENANT_TYPE.PLATFORM,
                     description: ENV.App.SystemTenantDescription,
                 });
-                seededItems.push('tenant');
+
+                logger.debug('System tenant created', { tenantId: tenant.id });
             }
 
             //3: create permission group if not exits ========================================================>
@@ -44,12 +56,13 @@ const seedSystemUser = async () => {
                     tenant: tenant.id,
                     code: ENV.App.SystemTenantCode,
                     name: ENV.App.SystemTenantName,
-                    description: ENV.App.SystemTenantName + ' permission group',
+                    description: ENV.App.SystemTenantName + 'permission group',
                 });
 
                 //4: insert permissions
                 permissionGroup.permissions = systemUserPermissions;
                 await permissionGroup.save();
+                logger.debug('Tenant permission group created', { permissionGroupId: permissionGroup.id });
             }
 
             // 4: Create defualt system ROLE TYPES ===============================================================>
@@ -66,6 +79,7 @@ const seedSystemUser = async () => {
                 // role type level permissions
                 systemRoleType.permissions.push(PERMISSIONS.SYSTEM.MANAGE.code);
                 await systemRoleType.save();
+                logger.debug('System role type created', { roleTypeId: systemRoleType.id });
             }
 
             // 4.2 Create system tenant admin role
@@ -82,8 +96,9 @@ const seedSystemUser = async () => {
                 });
 
                 // role type level permissions
-                tenantAdminRoleType.permissions.push(PERMISSIONS.TENANT.MANAGE.code);
+                tenantAdminRoleType.permissions.push(PERMISSIONS.TENANT.MANAGE.code, PERMISSIONS.TENANT.ADMIN.code);
                 await tenantAdminRoleType.save();
+                logger.debug('Admin role type created', { roleTypeId: tenantAdminRoleType.id });
             }
 
             //5: Create corresponding users for Role-Type ==========================================================>
@@ -99,7 +114,7 @@ const seedSystemUser = async () => {
                     lastName: 'User',
                     phone: ENV.App.SystemUserPhone,
                 });
-                seededItems.push('System user');
+                logger.debug('System user created', { userId: systemUser.id });
             }
             // 5.2 Create admin user
             let adminUser = await UserModel.findOne({ email: ENV.App.AdminUserEmail });
@@ -113,7 +128,7 @@ const seedSystemUser = async () => {
                     lastName: 'User',
                     phone: ENV.App.AdminUserPhone,
                 });
-                seededItems.push('user');
+                logger.debug('Admin user created', { userId: adminUser.id });
             }
 
             // 6: Create & Assign role to System users ====================================================>
@@ -130,7 +145,7 @@ const seedSystemUser = async () => {
                 });
 
                 await systemRole.save();
-                seededItems.push('role');
+                logger.debug('System role created', { roleId: systemRole.id });
             }
 
             // 6.2 Create admin role of system role type
@@ -146,19 +161,16 @@ const seedSystemUser = async () => {
                 });
 
                 await adminRole.save();
-                seededItems.push('role');
+                logger.debug('Admin role created', { roleId: adminRole.id });
             }
 
             //update owner of tenant
             tenant.owner = adminRole._id;
             await tenant.save();
+            logger.info('Tenant owner updated', { tenantId: tenant.id });
         });
-        const message =
-            seededItems.length > 0
-                ? `System tenant, role type, permissions, and user created successfully. Seeded items: [${seededItems.join(', ').toUpperCase()}]`
-                : 'System tenant, role type, permissions, and user already exist';
 
-        logger.success(message);
+        logger.success('System user seeding completed successfully....');
     } catch (error) {
         logger.error('Error seeding system user:', error);
         return throwAppError('Error seeding system users', 500);

@@ -121,7 +121,7 @@ const update = async (id: string, model: IUpdatePermissionGroupPayload, ctx: Req
         return throwAppError('Permission group not found', StatusCodes.NOT_FOUND);
     }
 
-    //2: update
+    //2: update incoming fields
     permissionGroup = await set(model, permissionGroup, ctx);
     permissionGroup = await permissionGroup.save();
 

@@ -5,7 +5,6 @@ const roleSchema = new mongoose.Schema({
     code: {
         type: String,
         required: [true, 'code is required'],
-        unique: true,
     },
     name: {
         type: String,
@@ -42,6 +41,6 @@ const roleSchema = new mongoose.Schema({
         required: [true, 'tenant is required'],
     },
 });
-
+roleSchema.index({ tenant: 1, code: 1 }, { unique: true });
 export const RoleModel = mongoose.model('Role', roleSchema);
 export type RoleDocument = mongoose.InferSchemaType<typeof roleSchema>;

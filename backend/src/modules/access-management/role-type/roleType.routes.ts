@@ -102,23 +102,39 @@ registry.registerPath({
     },
 });
 
+// =======================================================================
+// ======================== EXPORT GET ROLE TYPE =========================
+// =======================================================================
 RoleTypeRouter.get(
     '/:id',
-    AuthorizeMiddleware([PERMISSIONS.ROLE_TYPE.GET.code,TENANT_PERMISSIONS.ADMIN.code],"OR"),
+    AuthorizeMiddleware(
+        [PERMISSIONS.ROLE_TYPE.GET.code, TENANT_PERMISSIONS.ADMIN.code],
+        'OR',
+    ),
     RoleTypeController.get,
 );
 RoleTypeRouter.put(
     '/:id',
-    AuthorizeMiddleware([PERMISSIONS.ROLE_TYPE.UPDATE.code]),
+    AuthorizeMiddleware(
+        [PERMISSIONS.ROLE_TYPE.UPDATE.code, TENANT_PERMISSIONS.ADMIN.code],
+        'OR',
+    ),
     RoleTypeController.update,
 );
+
 RoleTypeRouter.get(
     '/',
-    AuthorizeMiddleware([PERMISSIONS.ROLE_TYPE.SEARCH.code,TENANT_PERMISSIONS.ADMIN.code],"OR"),
+    AuthorizeMiddleware(
+        [PERMISSIONS.ROLE_TYPE.SEARCH.code, TENANT_PERMISSIONS.ADMIN.code],
+        'OR',
+    ),
     RoleTypeController.search,
 );
 RoleTypeRouter.post(
     '/',
-    AuthorizeMiddleware([PERMISSIONS.ROLE_TYPE.CREATE.code]),
+    AuthorizeMiddleware(
+        [PERMISSIONS.ROLE_TYPE.CREATE.code, TENANT_PERMISSIONS.ADMIN.code],
+        'OR',
+    ),
     RoleTypeController.create,
 );

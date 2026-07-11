@@ -35,13 +35,10 @@ const set = async (model: any, entity: HydratedDocument<IRoleType>, ctx: Request
         entity.status = model.status;
     }
     if (model.permissions && model.permissions.length > 0) {
-        if (await handlePermissionUpdate(model, ctx)) {
+        if (await handlePermissionUpdate(model, entity, ctx)) {
             entity.permissions = model.permissions;
         }
     }
-    // if (model.category !== undefined) {
-    //     entity.category = model.category;
-    // }
 
     return entity;
 };
@@ -118,7 +115,7 @@ const create = async (
     //3: create role type
     const entity = new RoleTypeModel({
         code: model.code,
-        tenant: toObjectId(model.tenant),
+        tenant: tenant._id,
     });
 
     //4: set remaining fields
@@ -155,7 +152,7 @@ export const RoleTypeService = {
 // EXPORTS
 // ========================================================================================
 
-const handlePermissionUpdate = async (model: any, ctx: RequestContext) => {
+const handlePermissionUpdate = async (model: any, entity: RoleTypeDocument, ctx: RequestContext) => {
     const log = ctx.logger;
     //1: check if permisisons are valid by system
     let inValidPermissions = model.permissions?.filter((permission: any) => !PERMISSIONS_ARRAY.includes(permission));
@@ -164,14 +161,10 @@ const handlePermissionUpdate = async (model: any, ctx: RequestContext) => {
         throwAppError(`Invalid permissions: ${inValidPermissions.join(', ')}`, StatusCodes.BAD_REQUEST);
     }
 
-    // 2: early return if system.manage is true
-    if (ctx.hasAnyPermissions([SYSTEM_PERMISSIONS.MANAGE.code])) {
-        log.info('Creator has system manage permission, skipping permission group validation');
-        return true;
-    }
-
     // 3:check if permissions are allowed by permission group
-    let permissionGroup: any = await PermissionGroupService.search({ tenant: model.tenant }, ctx);
+    //TODO: also we can get by code,
+    //FIXME: need to handle this case
+    let permissionGroup: any = await PermissionGroupService.search({ tenant: entity?.tenant?.toString() || "" }, ctx);
     if (permissionGroup.count == 0) {
         log.error('Permission group not found');
         throwAppError('Permission group not found', StatusCodes.NOT_FOUND);

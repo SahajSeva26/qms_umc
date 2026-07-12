@@ -9,7 +9,7 @@
     {
       "files": "*.routes.ts",
       "options": {
-        "printWidth": 80
+        "printWidth": 100
       }
     },
      {

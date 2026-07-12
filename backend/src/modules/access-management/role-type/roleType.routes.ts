@@ -107,34 +107,22 @@ registry.registerPath({
 // =======================================================================
 RoleTypeRouter.get(
     '/:id',
-    AuthorizeMiddleware(
-        [PERMISSIONS.ROLE_TYPE.GET.code, TENANT_PERMISSIONS.ADMIN.code],
-        'OR',
-    ),
+    AuthorizeMiddleware([TENANT_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.ADMIN.code]),
     RoleTypeController.get,
 );
 RoleTypeRouter.put(
     '/:id',
-    AuthorizeMiddleware(
-        [PERMISSIONS.ROLE_TYPE.UPDATE.code, TENANT_PERMISSIONS.ADMIN.code],
-        'OR',
-    ),
+    AuthorizeMiddleware([TENANT_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.ADMIN.code]),
     RoleTypeController.update,
 );
 
 RoleTypeRouter.get(
     '/',
-    AuthorizeMiddleware(
-        [PERMISSIONS.ROLE_TYPE.SEARCH.code, TENANT_PERMISSIONS.ADMIN.code],
-        'OR',
-    ),
+    AuthorizeMiddleware([TENANT_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.ADMIN.code]),
     RoleTypeController.search,
 );
 RoleTypeRouter.post(
     '/',
-    AuthorizeMiddleware(
-        [PERMISSIONS.ROLE_TYPE.CREATE.code, TENANT_PERMISSIONS.ADMIN.code],
-        'OR',
-    ),
+    AuthorizeMiddleware([TENANT_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.ADMIN.code]),
     RoleTypeController.create,
 );

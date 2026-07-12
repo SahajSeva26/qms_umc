@@ -8,7 +8,7 @@ import { RequestContext } from '../utils/contextBuilder';
 
 type permissionRequired = 'AND' | 'OR';
 
-export const AuthorizeMiddleware = (requiredPermission: string[] = [], type: permissionRequired = 'AND') => {
+export const AuthorizeMiddleware = (requiredPermission: string[] = [], type: permissionRequired = 'OR') => {
     return (req: any, res: any, next: any) => {
         try {
             const ctx: RequestContext = req.context;

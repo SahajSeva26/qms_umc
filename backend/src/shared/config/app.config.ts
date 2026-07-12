@@ -9,12 +9,12 @@ let ENV = {
         Environment: process.env.APP_ENV || 'development',
 
         // System User
-        SystemUserEmail: process.env.APP_SYSTEM_USER_EMAIL || 'admin@gmail.com',
+        SystemUserEmail: process.env.APP_SYSTEM_USER_EMAIL || 'system@gmail.com',
         SystemUserPassword: process.env.APP_SYSTEM_USER_PASSWORD || 'Test@123',
         SystemUserPhone: process.env.APP_SYSTEM_USER_PHONE || '7456920792',
 
         // Admin User
-        AdminUserEmail: process.env.APP_ADMIN_USER_EMAIL || 'tenant@gmail.com',
+        AdminUserEmail: process.env.APP_ADMIN_USER_EMAIL || 'admin@gmail.com',
         AdminUserPassword: process.env.APP_ADMIN_USER_PASSWORD || 'Test@123',
         AdminUserPhone: process.env.APP_ADMIN_USER_PHONE || '7456920792',
 

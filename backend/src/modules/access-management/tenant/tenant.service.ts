@@ -14,6 +14,7 @@ import { RoleTypeService } from '../role-type/roleType.service';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
 import { SYSTEM_PERMISSIONS } from '../../../shared/env/permissions';
+import { IUser } from '../../user/user.model';
 
 type TenantDocument = HydratedDocument<ITenant> | null;
 const populate: any[] = [];
@@ -44,7 +45,7 @@ const set = async (model: any, entity: HydratedDocument<ITenant>, ctx: RequestCo
 
 const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): Promise<TenantDocument> => {
     //1: add default scoping
-    let where: mongoose.QueryFilter<ITenant> ={ };
+    let where: mongoose.QueryFilter<ITenant> = {};
 
     let query = null;
 

@@ -57,13 +57,13 @@ const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): 
 const search = async (filters: ISearchPermissionGroupQuery, ctx: RequestContext, options?: IServiceOptions) => {
     const sort: any = { createdAt: -1 };
 
-    const where: mongoose.QueryFilter<IPermissionGroup> = {};
+    const where: mongoose.QueryFilter<IPermissionGroup> = ctx.where();
 
     if (filters.name) {
         where.name = { $regex: filters.name, $options: 'i' };
     }
     if (filters.code) {
-        where.code = { $regex: filters.code, $options: 'i' };
+        where.code = filters.code;
     }
     if (filters.status) {
         where.status = filters.status;

@@ -1,5 +1,6 @@
 import { SYSTEM_PERMISSIONS } from '../../../shared/env/permissions';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
+import { TENANT_PERMISSIONS } from '../tenant/tenant.constants';
 
 export const PermissionGroupMapper = {
     toResponse: (entity: any, ctx: RequestContext) => {
@@ -12,7 +13,7 @@ export const PermissionGroupMapper = {
             createdAt: entity.createdAt,
             updatedAt: entity.updatedAt,
         };
-        if (ctx.hasAnyPermissions([SYSTEM_PERMISSIONS.MANAGE.code])) {
+        if (ctx.hasAnyPermissions([SYSTEM_PERMISSIONS.MANAGE.code,TENANT_PERMISSIONS.ADMIN.code])) {
             // Add permissions if user has view permission
             result.status = entity.status;
             result.permissions = entity.permissions ?? [];

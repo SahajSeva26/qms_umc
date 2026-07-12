@@ -7,9 +7,10 @@ import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
 import { toObjectId, isValidObjectID } from '../../../shared/utils/strings';
 import { TenantService } from '../tenant/tenant.service';
-import { PERMISSIONS_ARRAY, SYSTEM_PERMISSIONS } from '../../../shared/env/permissions';
+import { PERMISSIONS_ARRAY } from '../../../shared/env/permissions';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { PermissionGroupService } from '../permission-group/permissionGroup.service';
+import { TENANT_PERMISSIONS } from '../tenant/tenant.constants';
 
 type RoleTypeDocument = HydratedDocument<IRoleType> | null;
 const populate: any[] = [
@@ -31,12 +32,25 @@ const set = async (model: any, entity: HydratedDocument<IRoleType>, ctx: Request
         entity.description = model.description;
     }
 
-    if (model.status && ctx.hasAnyPermissions([ROLE_TYPE_PERMISSIONS.MANAGE.code])) {
+    if (model.status) {
+        if (!ctx.hasAnyPermissions([TENANT_PERMISSIONS.ADMIN.code, TENANT_PERMISSIONS.MANAGE.code])) {
+            throwAppError('Forbidden: you are not allowed to update status', StatusCodes.FORBIDDEN);
+        }
         entity.status = model.status;
     }
-    if (model.permissions && model.permissions.length > 0) {
-        if (await handlePermissionUpdate(model, entity, ctx)) {
-            entity.permissions = model.permissions;
+
+    if (model.permissions != undefined) {
+        if (!ctx.hasAnyPermissions([TENANT_PERMISSIONS.ADMIN.code, TENANT_PERMISSIONS.MANAGE.code])) {
+            throwAppError('Forbidden: you are not allowed to update permissions', StatusCodes.FORBIDDEN);
+        }
+        //allowing empty [] array for update
+        if (model.permissions.length > 0) {
+            if (await handlePermissionUpdate(model, entity, ctx)) {
+                entity.permissions = model.permissions;
+            }
+        }
+        if (model.permissions.length === 0) {
+            entity.permissions = [];
         }
     }
 
@@ -70,13 +84,15 @@ const search = async (filters: ISearchRoleTypeQuery, ctx: RequestContext, option
     if (filters.name) {
         where.name = { $regex: filters.name, $options: 'i' };
     }
+
     if (filters.code) {
-        where.code = { $regex: filters.code, $options: 'i' };
+        where.code = filters.code;
     }
-    if (filters.status) {
+
+    if (filters.status && ctx.hasAnyPermissions([TENANT_PERMISSIONS.ADMIN.code, TENANT_PERMISSIONS.MANAGE.code])) {
         where.status = filters.status;
     }
-    if (filters.tenant && ctx.hasAnyPermissions([ROLE_TYPE_PERMISSIONS.MANAGE.code])) {
+    if (filters.tenant && ctx.hasAnyPermissions([TENANT_PERMISSIONS.MANAGE.code])) {
         where.tenant = toObjectId(filters.tenant);
     }
 
@@ -106,19 +122,24 @@ const create = async (
         return throwAppError('Tenant not found', StatusCodes.NOT_FOUND);
     }
 
-    //2: check for duplicate code
-    const result = await RoleTypeService.get(model.code, ctx);
-    if (result) {
+    //2: check the scoping creation
+    if (!ctx.hasAnyPermissions([TENANT_PERMISSIONS.MANAGE.code]) && tenant.owner?.toString() != ctx.role?._id.toString()) {
+        //only system user or tenant owner should be able to do that
+        return throwAppError('Forbidden: You do not have permission to create a role type for this tenant', StatusCodes.FORBIDDEN);
+    }
+    //3: check for duplicate code
+    const result = await RoleTypeService.search({ code: model.code, tenant: model.tenant }, ctx);
+    if (result.count > 0) {
         return throwAppError('Role type with this code already exists, for this tenant', StatusCodes.CONFLICT);
     }
 
-    //3: create role type
+    //4: create role type
     const entity = new RoleTypeModel({
         code: model.code,
         tenant: tenant._id,
     });
 
-    //4: set remaining fields
+    //5: set remaining fields
     roleType = await set(model, entity, ctx);
     roleType = await roleType.save();
 
@@ -162,16 +183,14 @@ const handlePermissionUpdate = async (model: any, entity: RoleTypeDocument, ctx:
     }
 
     // 3:check if permissions are allowed by permission group
-    //TODO: also we can get by code,
-    //FIXME: need to handle this case
-    let permissionGroup: any = await PermissionGroupService.search({ tenant: entity?.tenant?.toString() || "" }, ctx);
+    let permissionGroup: any = await PermissionGroupService.search({ tenant: ctx.tenant._id }, ctx);
     if (permissionGroup.count == 0) {
         log.error('Permission group not found');
         throwAppError('Permission group not found', StatusCodes.NOT_FOUND);
     }
     permissionGroup = permissionGroup.items[0];
-    //flat permissions of  permision group
 
+    // 4: flat permissions of  permision group
     const allowedGroupPermissions = permissionGroup.permissions.map((permission: any) => permission.code);
     const inValidGroupPermissions = model.permissions.filter((permission: any) => !allowedGroupPermissions.includes(permission));
     if (inValidGroupPermissions.length > 0) {

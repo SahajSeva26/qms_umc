@@ -9,6 +9,7 @@ import {
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
 import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
 import { PERMISSION_GROUP_PERMISSIONS } from './permissionGroup.constants';
+import { TENANT_PERMISSIONS } from '../tenant/tenant.constants';
 
 export const PermissionGroupRouter = express.Router();
 
@@ -93,7 +94,7 @@ PermissionGroupRouter.get(
 );
 PermissionGroupRouter.get(
     '/',
-    AuthorizeMiddleware([PERMISSION_GROUP_PERMISSIONS.SEARCH.code]),
+    AuthorizeMiddleware([PERMISSION_GROUP_PERMISSIONS.SEARCH.code,TENANT_PERMISSIONS.ADMIN.code]),
     PermissionGroupController.search,
 );
 // PermissionGroupRouter.post(

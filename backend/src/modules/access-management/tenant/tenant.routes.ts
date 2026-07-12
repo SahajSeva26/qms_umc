@@ -141,7 +141,7 @@ TenantRouter.post(
     '/',
     AuthorizeMiddleware([
         // PERMISSIONS.TENANT.CREATE.code,
-        // PERMISSIONS.TENANT.MANAGE.code,
+        PERMISSIONS.TENANT.MANAGE.code,
         SYSTEM_PERMISSIONS.MANAGE.code,
     ]),
     TenantController.create,

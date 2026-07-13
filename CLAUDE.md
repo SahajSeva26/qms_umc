@@ -16,9 +16,38 @@ Quality Management System. Full-stack monorepo: Express/TypeScript backend + Rea
 
 ```
 D:\Qms\
-  backend/     → Express API
-  frontend/    → React SPA
+  backend/
+    src/
+      bin/                          → app.ts (Express app) + server.ts (bootstrap)
+      modules/
+        auth/                       → controller, routes, service, validators, mapper, constants
+        user/                       → controller, routes, service, validators, mapper, model, constants
+        access-management/
+          tenant/                   → controller, routes, service, validators, mapper, model, constants
+          permission-group/         → controller, routes, service, validators, mapper, model, constants
+          role-type/                → controller, routes, service, validators, mapper, model, constants
+          role/                     → controller, routes, service, validators, mapper, model, constants
+      shared/
+        config/                     → app.config.ts, connectDB.ts, swagger/
+        middlewares/                → authmiddleware.ts, authorizeMiddleware.ts
+        helpers/                    → tokenHelper.ts, transactionHelper.ts
+        utils/                      → error, logger, cookies, responseHandler, requestHandler, strings, contextBuilder
+        types/                      → permission.types.ts, service.types.ts
+        env/                        → index.ts, permissions.ts, seedSystemUser.ts
+  frontend/
+    src/
+      app/                          → App.tsx, AppProvider.tsx, router.tsx
+      components/                   → layouts/RootLayout.tsx, ui/button.tsx
+      features/
+        auth/                       → auth.routes.tsx, components/, hooks/, pages/, store.ts
+      lib/                          → api/ (api.ts, queryClient.ts), utils.ts
+      types/                        → sampleType.ts
+      main.tsx
 ```
+
+Module convention (backend): each feature folder follows the same file layout —
+`*.controller.ts`, `*.routes.ts`, `*.service.ts`, `*.validators.ts`, `*.mapper.ts`,
+`*.model.ts` (Mongoose), `*.constants.ts`.
 
 ## Dev Commands
 
@@ -44,7 +73,7 @@ npm run build     # tsc + vite build
 
 `feature/access-management`
 
-## Current Status (as of 2026-07-08)
+## Current Status (as of 2026-07-13)
 
 ### Backend — in progress
 - Auth module: register, login, logout, refresh-token — DONE
@@ -62,7 +91,8 @@ npm run build     # tsc + vite build
 
 ### Frontend — early scaffold
 - Routing skeleton done (React Router v7, createBrowserRouter)
-- Auth feature folder created, files empty
+- Auth feature folders created (components/, hooks/, pages/, store.ts) — files still empty
+- `lib/api/` scaffold present (api.ts, queryClient.ts) — files still empty
 - No API integration yet
 
 ## Environment Variables (backend/.env)

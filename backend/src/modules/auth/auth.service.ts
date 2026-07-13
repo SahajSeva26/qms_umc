@@ -10,6 +10,7 @@ import { RequestContext } from '../../shared/utils/contextBuilder';
 import { RoleService } from '../access-management/role/role.service';
 import { ITokenPayload } from '../../shared/helpers/tokenHelper';
 import { IServiceOptions } from '../../shared/types/service.types';
+import { RoleModel } from '../access-management/role/role.model';
 
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 10 * 60 * 1000; // 10 minutes
@@ -61,11 +62,10 @@ const login = async (data: ILoginUserPayload, ctx: RequestContext) => {
     user.lockUntil = null;
 
     // 5: find user role
-    let userRole: any = await RoleService.search({ user: user.id }, ctx);
-    if (userRole.items.length == 0) {
+    let userRole: any = await RoleModel.findOne({ user: user.id });
+    if (!userRole) {
         return throwAppError('No role assigned to this account. Please contact your administrator.', StatusCodes.FORBIDDEN);
     }
-    userRole = userRole.items[0];
 
     const payload: ITokenPayload = {
         _id: user.id.toString(),
@@ -118,11 +118,10 @@ const refreshToken = async (refreshToken: string, ctx: RequestContext) => {
     }
 
     // 4: get user role
-    let userRole: any = await RoleService.search({ user: user.id }, ctx);
-    if (userRole.items.length == 0) {
+    let userRole: any = await RoleModel.findOne({user:user._id}).populate('tenant');
+    if (!userRole) {
         return throwAppError('No role assigned to this account. Please contact your administrator.', StatusCodes.FORBIDDEN);
     }
-    userRole = userRole.items[0];
 
     //5: generate tokens with new payload
     const freshPayload: ITokenPayload = {

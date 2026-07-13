@@ -9,7 +9,7 @@ let ENV = {
         Environment: process.env.APP_ENV || 'development',
     },
     DB: {
-        URI: process.env.DB_URI || 'http://localhost:27017/qms',
+        URI: process.env.DB_URI || 'mongodb://localhost:27017/qms',
     },
     JWT: {
         AccessTokenSecret: process.env.JWT_ACCESS_SECRET || 'secret',

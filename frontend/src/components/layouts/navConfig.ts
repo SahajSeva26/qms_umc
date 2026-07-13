@@ -187,6 +187,9 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { id: 'admin',        label: 'Admin',                       icon: 'Shield',        path: ADMIN_ROUTES.ADMIN,
     rolesAllowed: [] },
 
+  { id: 'users',        label: 'Users',                       icon: 'Users',         path: ADMIN_ROUTES.ADMIN_USERS,
+    rolesAllowed: [] },
+
   { id: 'settings',     label: 'Settings',                    icon: 'Settings',      path: ADMIN_ROUTES.ADMIN_SETTINGS,
     rolesAllowed: [] },
 ]
@@ -239,7 +242,7 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
   {
     section: 'System',
     subs: [
-      { title: '', items: ['admin', 'settings'].map((id) => NAV_BY_ID[id]) },
+      { title: '', items: ['admin', 'users', 'settings'].map((id) => NAV_BY_ID[id]) },
     ],
   },
 ]

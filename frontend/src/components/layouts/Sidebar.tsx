@@ -110,11 +110,6 @@ const NavItemRow = ({ item, collapsed }: { item: NavItem; collapsed: boolean }) 
       {!collapsed && (
         <>
           <span className="flex-1 truncate">{item.label}</span>
-          {item.live && (
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-success-soft text-success">
-              LIVE
-            </span>
-          )}
         </>
       )}
 

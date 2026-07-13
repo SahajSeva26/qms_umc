@@ -10,7 +10,8 @@ export const useLogin = () => {
     mutationFn: (payload: LoginPayload) => authService.login(payload),
     onSuccess: (data) => {
       if (data?.data?.data) {
-        setAuth(data.data.data)
+        // TODO: backend doesn't return role yet — remove this fallback once it does
+        setAuth({ ...data.data.data, role: data.data.data.role ?? 'super_admin' })
       }
     },
   })

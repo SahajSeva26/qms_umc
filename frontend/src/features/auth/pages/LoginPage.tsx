@@ -20,7 +20,7 @@ const LoginPage = () => {
       { email, password },
       {
         onSuccess: (data) => {
-          // TODO: once backend adds role to response, replace with data.data.data.role
+          // TODO: once backend adds role to response, remove this fallback entirely
           const role = data?.data?.data?.role ?? 'super_admin'
           navigate(ROLE_HOME[role] ?? DASHBOARD_ROUTES.DASHBOARD, { replace: true })
         },

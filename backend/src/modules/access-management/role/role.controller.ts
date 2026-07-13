@@ -15,7 +15,7 @@ const get = async (req: any, res: any) => {
             return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Role ID is required', null);
         }
 
-        const role = await RoleService.get(id, ctx);
+        const role = await RoleService.get(id, ctx, { populate: true });
 
         if (!role) {
             return ResponseHandler.appResponse(res, StatusCodes.NOT_FOUND, false, 'Role not found', null);

@@ -195,7 +195,7 @@ const createTenant = async (model: ICreateTenantPayload, ctx: RequestContext) =>
                     tenant: tenant._id.toString(),
                     type: roleType.id,
                     user: user.id,
-                    permissions: [TENANT_PERMISSIONS.ADMIN.code],
+                    permissions: [],
                 },
                 ctx,
             );

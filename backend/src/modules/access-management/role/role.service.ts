@@ -11,6 +11,7 @@ import { UserService } from '../../user/user.service';
 import { PERMISSIONS_ARRAY, SYSTEM_PERMISSIONS } from '../../../shared/env/permissions';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { PermissionGroupService } from '../permission-group/permissionGroup.service';
+import { TENANT_PERMISSIONS } from '../tenant/tenant.constants';
 
 type RoleDoc = HydratedDocument<IRoleDocument> | null;
 const populate: any[] = [
@@ -37,34 +38,36 @@ const set = async (model: any, entity: HydratedDocument<IRoleDocument>, ctx: Req
     if (model.description) {
         entity.description = model.description;
     }
-    if (model.permissions && model.permissions.length > 0) {
-        const inValidPermissions = model.permissions.filter((p: string) => !PERMISSIONS_ARRAY.includes(p));
-        if (inValidPermissions.length > 0) {
-            throwAppError(`Invalid permissions: ${inValidPermissions.join(', ')}`, StatusCodes.BAD_REQUEST);
-        }
-        entity.permissions = model.permissions;
-    }
+
     if (model.status) {
         entity.status = model.status;
     }
     if (model.type) {
-        entity.type = toObjectId(model.type);
-    }
-    if (model.tenant) {
-        //get tenant
-        const tenant = await TenantService.get(model.tenant, ctx);
-        if (!tenant) {
-            throwAppError('Tenant not found', StatusCodes.NOT_FOUND);
-        } else {
-            entity.tenant = tenant._id;
+        // get role type
+        const roleType: any = await RoleTypeService.get(model.type, ctx);
+        if (!roleType) {
+            throwAppError('Role type not found', StatusCodes.NOT_FOUND);
+        }
 
-            if (!tenant.owner) {
-                //set first role as owner
-                tenant.owner = entity._id;
-                await tenant.save();
+        // if this is the admin role type, it may back at most one role — reject a second admin
+        if (roleType.permissions.includes(TENANT_PERMISSIONS.ADMIN.code)) {
+            const existingRole = await RoleModel.findOne({
+                type: toObjectId(roleType._id),
+                _id: { $ne: entity._id }, // exclude self so onboarding create / admin self-edit pass
+            });
+            if (existingRole) {
+                throwAppError('An admin role already exists for this tenant', StatusCodes.CONFLICT);
             }
         }
+
+        entity.type = toObjectId(model.type);
     }
+
+    if (model.permissions && model.permissions.length > 0) {
+        await handlePermissionUpdate(model, ctx);
+        entity.permissions = model.permissions;
+    }
+
     if (model.user) {
         entity.user = toObjectId(model.user);
     }
@@ -73,25 +76,28 @@ const set = async (model: any, entity: HydratedDocument<IRoleDocument>, ctx: Req
 };
 
 const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): Promise<RoleDoc> => {
-    let query = null;
+    const where: mongoose.QueryFilter<IRoleDocument> = ctx.where();
+    let entity = null;
 
     if (isValidObjectID(id)) {
-        query = RoleModel.findOne({ _id: id });
+        where._id = id;
+        entity = RoleModel.findOne(where);
     } else {
-        query = RoleModel.findOne({ code: id });
+        where.code = id;
+        entity = RoleModel.findOne(where);
     }
 
-    if (query && options) {
-        query = query.populate(populate);
+    if (entity && options) {
+        entity = entity.populate(populate);
     }
 
-    return await query;
+    return await entity;
 };
 
 const search = async (filters: ISearchRoleQuery, ctx: RequestContext, options?: IServiceOptions) => {
     const sort: any = { createdAt: -1 };
 
-    const where: mongoose.QueryFilter<IRoleDocument> = {};
+    const where: mongoose.QueryFilter<IRoleDocument> = ctx.where();
 
     if (filters.name) {
         where.name = { $regex: filters.name, $options: 'i' };
@@ -124,33 +130,29 @@ const search = async (filters: ISearchRoleQuery, ctx: RequestContext, options?: 
     return { count, items };
 };
 
-const create = async (
-    model: ICreateRolePayload,
-    ctx: RequestContext,
-): Promise<HydratedDocument<IRoleDocument>> => {
+const create = async (model: ICreateRolePayload, ctx: RequestContext): Promise<HydratedDocument<IRoleDocument>> => {
     let role: RoleDoc = null;
 
     //1: validate tenant exists
-    const tenant = await TenantService.get(model.tenant, ctx);
+    const tenantPromise = TenantService.get(model.tenant, ctx);
+
+    //2: validate user exists
+    const userPromise = UserService.get(model.user, ctx);
+
+    //3: check for duplicate code
+    const existingRolePromise = RoleService.get(model.code, ctx);
+
+    const [tenant, user, existingRole] = await Promise.all([tenantPromise, userPromise, existingRolePromise]);
+
     if (!tenant) {
         return throwAppError('Tenant not found', StatusCodes.NOT_FOUND);
     }
 
-    //2: validate role type exists
-    const roleType = await RoleTypeService.get(model.type, ctx);
-    if (!roleType) {
-        return throwAppError('Role type not found', StatusCodes.NOT_FOUND);
-    }
-
-    //3: validate user exists
-    const user = await UserService.get(model.user, ctx);
     if (!user) {
         return throwAppError('User not found', StatusCodes.NOT_FOUND);
     }
 
-    //4: check for duplicate code
-    const existing = await RoleService.get(model.code, ctx);
-    if (existing) {
+    if (existingRole) {
         return throwAppError('Role with this code already exists', StatusCodes.CONFLICT);
     }
 
@@ -175,15 +177,7 @@ const update = async (id: string, model: IUpdateRolePayload, ctx: RequestContext
         return throwAppError('Role not found', StatusCodes.NOT_FOUND);
     }
 
-    //2: validate role type exists if being updated
-    if (model.type) {
-        const roleType = await RoleTypeService.get(model.type, ctx);
-        if (!roleType) {
-            return throwAppError('Role type not found', StatusCodes.NOT_FOUND);
-        }
-    }
-
-    //3: update role
+    //2: update role (set() validates the role type + enforces the single-admin guard)
     role = await set(model, role, ctx);
     role = await role.save();
 
@@ -200,23 +194,39 @@ export const RoleService = {
 // ========================================================================================
 // EXPORTS
 // ========================================================================================
+// a role may NEVER directly hold these elevated permissions — they belong on a role type only
+const ROLE_FORBIDDEN_PERMISSIONS = [
+    TENANT_PERMISSIONS.ADMIN.code,
+    TENANT_PERMISSIONS.MANAGE.code,
+    SYSTEM_PERMISSIONS.MANAGE.code,
+];
+
 const handlePermissionUpdate = async (model: any, ctx: RequestContext) => {
     const log = ctx.logger;
-    //1: check if permisisons are valid by system
-    let inValidPermissions = model.permissions?.filter((permission: any) => !PERMISSIONS_ARRAY.includes(permission));
-    if (inValidPermissions?.length > 0) {
+    if (!model.permissions?.length) return true;
+
+    //1: check if permissions are valid system permission codes
+    const inValidPermissions = model.permissions.filter((permission: any) => !PERMISSIONS_ARRAY.includes(permission));
+    if (inValidPermissions.length > 0) {
         log.error(`Invalid system permissions update: ${inValidPermissions.join(', ')}`);
         throwAppError(`Invalid permissions: ${inValidPermissions.join(', ')}`, StatusCodes.BAD_REQUEST);
     }
 
-    // 2: early return if system.manage is true
+    //2: denylist — a role can never directly hold elevated permissions (no bypass, applies even to system)
+    const forbiddenPermissions = model.permissions.filter((permission: any) => ROLE_FORBIDDEN_PERMISSIONS.includes(permission));
+    if (forbiddenPermissions.length > 0) {
+        log.error(`Attempt to grant elevated permissions to a role: ${forbiddenPermissions.join(', ')}`);
+        throwAppError(`A role cannot directly hold elevated permissions: ${forbiddenPermissions.join(', ')}`, StatusCodes.FORBIDDEN);
+    }
+
+    //3: early return if system.manage is true — system bypasses the permission group ceiling
     if (ctx.hasAnyPermissions([SYSTEM_PERMISSIONS.MANAGE.code])) {
         log.info('Creator has system manage permission, skipping permission group validation');
         return true;
     }
 
-    // 3:check if permissions are allowed by permission group
-    let permissionGroup: any = await PermissionGroupService.search({ tenant: model.tenant }, ctx);
+    //4: check if permissions are allowed by the actor's tenant permission group
+    let permissionGroup: any = await PermissionGroupService.search({ tenant: ctx.tenant._id }, ctx);
     if (permissionGroup.count == 0) {
         log.error('Permission group not found');
         throwAppError('Permission group not found', StatusCodes.NOT_FOUND);

@@ -4,6 +4,8 @@ import { ResponseHandler } from '../utils/responseHandler';
 import { TokenHandler } from '../helpers/tokenHelper';
 import { RoleService } from '../../modules/access-management/role/role.service';
 import { throwAppError } from '../utils/error';
+import { RoleModel } from '../../modules/access-management/role/role.model';
+import { decode, JwtPayload } from 'jsonwebtoken';
 
 export const AuthMiddleware = async (req: any, res: any, next: any) => {
     try {
@@ -19,7 +21,8 @@ export const AuthMiddleware = async (req: any, res: any, next: any) => {
         }
 
         // get role
-        const userRole: any = await RoleService.get(user.role, req.context, { populate: true });
+        // const userRole: any = await RoleService.get(user.role, req.context, { populate: true });
+        const userRole: any = await RoleModel.findById(user.role).populate(['tenant', 'type']);
         if (!userRole) {
             throw throwAppError('Role not found', StatusCodes.UNAUTHORIZED);
         }
@@ -41,3 +44,8 @@ export const AuthMiddleware = async (req: any, res: any, next: any) => {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }
 };
+
+const getContextCredentials=async(decode:any)=>{
+
+    // get and set all, roles, tenant, and rolType here
+}

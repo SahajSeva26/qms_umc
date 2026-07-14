@@ -8,11 +8,11 @@ const parseQuery = (req: any) => {
     return query;
 };
 
-const getPagination = (req: any) => {
+const getPagination = (filters: any) => {
     return {
-        page: Number.parseInt(req.query.page || '1'),
-        limit: Number.parseInt(req.query.limit || '10'),
-        skip: (Number.parseInt(req.query.page || '1') - 1) * Number.parseInt(req.query.limit || '10'),
+        page: Number.parseInt(filters.page || '1'),
+        limit: Number.parseInt(filters.limit || '10'),
+        skip: (Number.parseInt(filters.page || '1') - 1) * Number.parseInt(filters.limit || '10'),
     };
 };
 

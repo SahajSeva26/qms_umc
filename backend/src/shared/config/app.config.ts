@@ -7,6 +7,21 @@ let ENV = {
         Port: process.env.APP_PORT || 3000,
         Host: process.env.APP_HOST || 'localhost',
         Environment: process.env.APP_ENV || 'development',
+
+        // System User
+        SystemUserEmail: process.env.APP_SYSTEM_USER_EMAIL || 'system@gmail.com',
+        SystemUserPassword: process.env.APP_SYSTEM_USER_PASSWORD || 'Test@123',
+        SystemUserPhone: process.env.APP_SYSTEM_USER_PHONE || '7456920792',
+
+        // Admin User
+        AdminUserEmail: process.env.APP_ADMIN_USER_EMAIL || 'admin@gmail.com',
+        AdminUserPassword: process.env.APP_ADMIN_USER_PASSWORD || 'Test@123',
+        AdminUserPhone: process.env.APP_ADMIN_USER_PHONE || '7456920792',
+
+        // Tenant dada
+        SystemTenantCode: process.env.APP_SYSTEM_TENANT_CODE || 'qms',
+        SystemTenantName: process.env.APP_SYSTEM_TENANT_NAME || 'QMS',
+        SystemTenantDescription: process.env.APP_SYSTEM_TENANT_DESCRIPTION || 'QMS internal tenant for system operations',
     },
     DB: {
         URI: process.env.DB_URI || 'http://localhost:27017/qms',

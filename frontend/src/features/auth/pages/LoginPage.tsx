@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FiUser, FiLock, FiEye, FiEyeOff } from 'react-icons/fi'
+import { FiUser, FiLock, FiEye, FiEyeOff, FiMapPin, FiShield, FiGrid } from 'react-icons/fi'
 import { useLogin } from '../hooks/useLogin'
 import ThemeToggle from '@/components/ui/ThemeToggle'
 import { ROLE_HOME, DASHBOARD_ROUTES } from '@/components/layouts/navConfig'
@@ -37,10 +37,7 @@ const LoginPage = () => {
         {/* Logo */}
         <div className="relative flex items-center gap-2.5">
           <div className="auth-logo w-10 h-10 rounded-2xl flex items-center justify-center">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"/>
-              <circle cx="12" cy="10" r="3"/>
-            </svg>
+            <FiMapPin size={20} color="white" strokeWidth={2.2} />
           </div>
           <span className="text-white font-bold text-lg tracking-tight">QMS</span>
         </div>
@@ -72,14 +69,12 @@ const LoginPage = () => {
 
           <div className="flex items-center gap-5">
             {[
-              { icon: 'shield', label: 'DPDP-ready' },
-              { icon: 'lock',   label: 'SOC 2 in progress' },
-              { icon: 'grid',   label: 'ABDM compatible' },
-            ].map(({ icon, label }) => (
+              { icon: FiShield, label: 'DPDP-ready' },
+              { icon: FiLock,   label: 'SOC 2 in progress' },
+              { icon: FiGrid,   label: 'ABDM compatible' },
+            ].map(({ icon: Icon, label }) => (
               <div key={label} className="flex items-center gap-1.5 text-blue-300 text-xs">
-                {icon === 'shield' && <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>}
-                {icon === 'lock'   && <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>}
-                {icon === 'grid'   && <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>}
+                <Icon size={13} />
                 {label}
               </div>
             ))}

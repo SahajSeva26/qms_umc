@@ -7,7 +7,6 @@ import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
 import { isValidObjectID } from '../../../shared/utils/strings';
 import { RoleService } from '../role/role.service';
-import { UserService } from '../../user/user.service';
 import { PermissionGroupService } from '../permission-group/permissionGroup.service';
 import { USER_PERMISSIONS } from '../../user/user.constants';
 import { RoleTypeService } from '../role-type/roleType.service';
@@ -182,11 +181,7 @@ const createTenant = async (model: ICreateTenantPayload, ctx: RequestContext) =>
             );
             log.debug('Role type created', { roleTypeId: roleType._id });
 
-            //4: create user
-            const user = await UserService.create(model.owner, ctx);
-            log.debug('User created', { userId: user._id });
-
-            //5: create role
+            //4: create role (RoleService.create creates + links the owner user)
             const role = await RoleService.create(
                 {
                     code: `${tenant.code}.admin`,
@@ -194,7 +189,7 @@ const createTenant = async (model: ICreateTenantPayload, ctx: RequestContext) =>
                     description: `${tenant.name}'s admin role`,
                     tenant: tenant._id.toString(),
                     type: roleType.id,
-                    user: user.id,
+                    user: model.owner,
                     permissions: [],
                 },
                 ctx,

@@ -10,28 +10,28 @@ import { TENANT_PERMISSIONS } from '../access-management/tenant/tenant.constants
 export const AuthRouter = express.Router();
 //
 // ========== SWAGGER ============================
-registry.registerPath({
-    //register
-    method: 'post',
-    path: '/auth/register',
-    tags: ['AUTH'],
-    summary: 'Register a new user',
+// registry.registerPath({
+//     //register
+//     method: 'post',
+//     path: '/auth/register',
+//     tags: ['AUTH'],
+//     summary: 'Register a new user',
 
-    request: {
-        body: {
-            content: {
-                'application/json': {
-                    schema: RegisterUserPayloadSchema,
-                },
-            },
-        },
-    },
+//     request: {
+//         body: {
+//             content: {
+//                 'application/json': {
+//                     schema: RegisterUserPayloadSchema,
+//                 },
+//             },
+//         },
+//     },
 
-    responses: {
-        201: { description: 'User registered successfully' },
-        400: { description: 'User registration failed' },
-    },
-});
+//     responses: {
+//         201: { description: 'User registered successfully' },
+//         400: { description: 'User registration failed' },
+//     },
+// });
 registry.registerPath({
     //login
     method: 'post',
@@ -82,12 +82,12 @@ registry.registerPath({
 // ===================================================
 // ==========EXPORT ROUTES============================
 // ===================================================
-AuthRouter.post(
-    '/register',
-    AuthMiddleware,
-    AuthorizeMiddleware([TENANT_PERMISSIONS.MANAGE.code]),
-    AuthController.register,
-);
+// AuthRouter.post(
+//     '/register',
+//     AuthMiddleware,
+//     AuthorizeMiddleware([TENANT_PERMISSIONS.MANAGE.code]),
+//     AuthController.register,
+// );
 AuthRouter.post('/login', AuthController.login);
 AuthRouter.post('/logout', AuthMiddleware, AuthController.logout);
 AuthRouter.post('/refresh-token', AuthController.refreshToken);

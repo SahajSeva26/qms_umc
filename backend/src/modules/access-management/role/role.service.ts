@@ -12,6 +12,7 @@ import { PERMISSIONS_ARRAY, SYSTEM_PERMISSIONS } from '../../../shared/env/permi
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { PermissionGroupService } from '../permission-group/permissionGroup.service';
 import { TENANT_PERMISSIONS } from '../tenant/tenant.constants';
+import { withTransaction } from '../../../shared/helpers/transactionHelper';
 
 type RoleDoc = HydratedDocument<IRoleDocument> | null;
 const populate: any[] = [
@@ -22,6 +23,10 @@ const populate: any[] = [
     {
         path: 'tenant',
         select: 'name code type status',
+    },
+    {
+        path: 'user',
+        select: 'firstName lastName email phone gender status',
     },
 ];
 
@@ -69,7 +74,15 @@ const set = async (model: any, entity: HydratedDocument<IRoleDocument>, ctx: Req
     }
 
     if (model.user) {
-        entity.user = toObjectId(model.user);
+        if (entity.user) {
+            //its an update call
+            const userID = entity.user.toString();
+            await UserService.update(userID, model.user, ctx);
+        } else {
+            //its create call
+            const user = await UserService.create(model.user, ctx);
+            entity.user = user._id;
+        }
     }
 
     return entity;
@@ -136,35 +149,29 @@ const create = async (model: ICreateRolePayload, ctx: RequestContext): Promise<H
     //1: validate tenant exists
     const tenantPromise = TenantService.get(model.tenant, ctx);
 
-    //2: validate user exists
-    const userPromise = UserService.get(model.user, ctx);
-
     //3: check for duplicate code
     const existingRolePromise = RoleService.get(model.code, ctx);
 
-    const [tenant, user, existingRole] = await Promise.all([tenantPromise, userPromise, existingRolePromise]);
+    let [tenant, existingRole] = await Promise.all([tenantPromise, existingRolePromise]);
 
     if (!tenant) {
         return throwAppError('Tenant not found', StatusCodes.NOT_FOUND);
-    }
-
-    if (!user) {
-        return throwAppError('User not found', StatusCodes.NOT_FOUND);
     }
 
     if (existingRole) {
         return throwAppError('Role with this code already exists', StatusCodes.CONFLICT);
     }
 
-    //5: create role
-    const entity = new RoleModel({
-        tenant: toObjectId(model.tenant),
-        user: toObjectId(model.user),
-    });
+    //5: create user + role together — rolls back if either fails
+    role = await withTransaction(async () => {
+        const entity = new RoleModel({
+            tenant: toObjectId(model.tenant),
+        });
 
-    //6: set remaining fields
-    role = await set(model, entity, ctx);
-    role = await role.save();
+        //6: set remaining fields (creates + links the user)
+        const r = await set(model, entity, ctx);
+        return await r.save();
+    });
 
     return role;
 };
@@ -177,9 +184,12 @@ const update = async (id: string, model: IUpdateRolePayload, ctx: RequestContext
         return throwAppError('Role not found', StatusCodes.NOT_FOUND);
     }
 
-    //2: update role (set() validates the role type + enforces the single-admin guard)
-    role = await set(model, role, ctx);
-    role = await role.save();
+    //2: update user + role together — rolls back if either fails
+    role = await withTransaction(async () => {
+        //set() validates the role type, enforces the single-admin guard, and updates the linked user
+        const r = await set(model, role!, ctx);
+        return await r.save();
+    });
 
     return role;
 };
@@ -195,11 +205,7 @@ export const RoleService = {
 // EXPORTS
 // ========================================================================================
 // a role may NEVER directly hold these elevated permissions — they belong on a role type only
-const ROLE_FORBIDDEN_PERMISSIONS = [
-    TENANT_PERMISSIONS.ADMIN.code,
-    TENANT_PERMISSIONS.MANAGE.code,
-    SYSTEM_PERMISSIONS.MANAGE.code,
-];
+const ROLE_FORBIDDEN_PERMISSIONS = [TENANT_PERMISSIONS.ADMIN.code, TENANT_PERMISSIONS.MANAGE.code, SYSTEM_PERMISSIONS.MANAGE.code];
 
 const handlePermissionUpdate = async (model: any, ctx: RequestContext) => {
     const log = ctx.logger;

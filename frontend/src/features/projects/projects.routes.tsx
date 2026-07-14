@@ -1,5 +1,6 @@
 import type { RouteObject } from 'react-router-dom'
 import ProjectsPage from './pages/ProjectsPage'
+import ProjectGanttPage from './pages/ProjectGanttPage'
 
 export const PROJECTS_ROUTES = {
   PROJECTS:       '/projects',
@@ -8,5 +9,5 @@ export const PROJECTS_ROUTES = {
 
 export const projectsRoutes: RouteObject[] = [
   { path: PROJECTS_ROUTES.PROJECTS,       element: <ProjectsPage /> },
-  { path: PROJECTS_ROUTES.PROJECTS_GANTT, element: <ProjectsPage /> },
+  { path: PROJECTS_ROUTES.PROJECTS_GANTT, element: <ProjectGanttPage /> },
 ]

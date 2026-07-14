@@ -56,8 +56,7 @@ coverage/
 # ======================
 # IDE / Editors
 # ======================
-.vscode/*
-.vscode
+
 !.vscode/extensions.json
 
 .idea/

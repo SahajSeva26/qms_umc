@@ -2,11 +2,10 @@ import express from 'express';
 import { registry } from '../../shared/config/swagger/swagger.registry';
 
 import { AuthController } from './auth.controller';
-import {
-    LoginUserPayloadSchema,
-    RegisterUserPayloadSchema,
-} from './auth.validators';
+import { LoginUserPayloadSchema, RegisterUserPayloadSchema } from './auth.validators';
 import { AuthMiddleware } from '../../shared/middlewares/authmiddleware';
+import { AuthorizeMiddleware } from '../../shared/middlewares/authorizeMiddleware';
+import { TENANT_PERMISSIONS } from '../access-management/tenant/tenant.constants';
 
 export const AuthRouter = express.Router();
 //
@@ -83,7 +82,12 @@ registry.registerPath({
 // ===================================================
 // ==========EXPORT ROUTES============================
 // ===================================================
-AuthRouter.post('/register', AuthController.register);
+AuthRouter.post(
+    '/register',
+    AuthMiddleware,
+    AuthorizeMiddleware([TENANT_PERMISSIONS.MANAGE.code]),
+    AuthController.register,
+);
 AuthRouter.post('/login', AuthController.login);
 AuthRouter.post('/logout', AuthMiddleware, AuthController.logout);
 AuthRouter.post('/refresh-token', AuthController.refreshToken);

@@ -3,6 +3,25 @@ export const ROLE_TYPE_STATUSES = {
     INACTIVE: 'inactive',
 } as const;
 
+export const ALLOWED_ROLETYPE_CODES = {
+    PLATFORM: {
+        SYSTEM: 'system',
+        HR: 'hr',
+        ADMIN: 'admin',
+        SALES: 'sales',
+        SALES_HEAD: 'sales-head',
+    },
+    CUSTOMER: {
+        PHARMA_HO: 'pharma-ho',
+        PHARMA_MS: 'pharma-ms',
+        PHARMS_ASM: 'pharms-asm',
+        PHARMA_RSM: 'pharma-rsm',
+    },
+} as const;
+export const ALLOWED_ROLETYPE_CODES_ARRAY = Object.values(ALLOWED_ROLETYPE_CODES).flatMap((group) =>
+    Object.values(group),
+) as [string, ...string[]];
+
 // ========================================================
 // ROLE TYPE PERMISSIONS
 // ========================================================

@@ -1,10 +1,13 @@
 import { z } from 'zod';
-import { ROLE_TYPE_STATUSES } from './roleType.constants';
+import {
+    ALLOWED_ROLETYPE_CODES_ARRAY,
+    ROLE_TYPE_STATUSES,
+} from './roleType.constants';
 import mongoose from 'mongoose';
 
 //1: create ====================================>
 export const CreateRoleTypePayloadSchema = z.object({
-    code: z.string().min(1).lowercase().openapi({ example: 'hr' }),
+    code: z.enum(ALLOWED_ROLETYPE_CODES_ARRAY).openapi({ example: 'hr' }),
     name: z.string().min(1).openapi({ example: 'hr' }),
     description: z.string().optional().openapi({ example: 'HR role type' }),
     tenant: z
@@ -36,7 +39,6 @@ export const UpdateRoleTypePayloadSchema = z.object({
         .enum([ROLE_TYPE_STATUSES.ACTIVE, ROLE_TYPE_STATUSES.INACTIVE])
         .optional()
         .openapi({ example: 'active' }),
-
 });
 
 export type IUpdateRoleTypePayload = z.infer<

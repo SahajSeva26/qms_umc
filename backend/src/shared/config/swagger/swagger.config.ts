@@ -3,12 +3,13 @@ import { registry } from './swagger.registry';
 
 // ===========IMPORT ALL MODULES HERE============
 // ==============================================
-import  "../../../modules/auth/auth.routes";
-import "../../../modules/user/user.routes";
-import "../../../modules/access-management/tenant/tenant.routes";
-import "../../../modules/access-management/permission-group/permissionGroup.routes";
-import "../../../modules/access-management/role-type/roleType.routes";
-import "../../../modules/access-management/role/role.routes";
+import '../../../modules/auth/auth.routes';
+import '../../../modules/user/user.routes';
+import '../../../modules/access-management/tenant/tenant.routes';
+import '../../../modules/access-management/permission-group/permissionGroup.routes';
+import '../../../modules/access-management/role-type/roleType.routes';
+import '../../../modules/access-management/role/role.routes';
+import '../../../modules/crm/division/division.routes';
 // =============================================
 // =============================================
 

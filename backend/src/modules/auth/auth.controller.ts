@@ -103,9 +103,28 @@ const refreshToken = async (req: any, res: any) => {
     }
 };
 
+const me = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+
+        const data = await AuthService.session(ctx);
+
+        return ResponseHandler.appResponse(
+            res,
+            StatusCodes.OK,
+            true,
+            'Current session fetched successfully',
+            AuthMapper.toSession(data),
+        );
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
 export const AuthController = {
     register,
     login,
     logout,
     refreshToken,
+    me,
 };

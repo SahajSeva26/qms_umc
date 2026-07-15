@@ -79,6 +79,18 @@ registry.registerPath({
         400: { description: 'Token refresh failed' },
     },
 });
+
+registry.registerPath({
+    //current session
+    method: 'get',
+    path: '/auth/me',
+    tags: ['AUTH'],
+    summary: 'Get current session (profile, role, role type, tenant, permissions)',
+    responses: {
+        200: { description: 'Current session fetched successfully' },
+        401: { description: 'Unauthorized' },
+    },
+});
 // ===================================================
 // ==========EXPORT ROUTES============================
 // ===================================================
@@ -91,3 +103,4 @@ registry.registerPath({
 AuthRouter.post('/login', AuthController.login);
 AuthRouter.post('/logout', AuthMiddleware, AuthController.logout);
 AuthRouter.post('/refresh-token', AuthController.refreshToken);
+AuthRouter.get('/me', AuthMiddleware, AuthController.me);

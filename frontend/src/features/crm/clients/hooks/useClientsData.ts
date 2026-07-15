@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ClientMr, PurchaseOrder } from '@/types/client.types'
 import * as clientsService from '@/features/crm/clients/clients.service'
 import type { BookCampInput, ClientsData } from '@/features/crm/clients/clients.service'
+import { useCampsData } from '@/hooks/useCampsData'
 
 const EMPTY: ClientsData = {
   clients: [],
@@ -10,11 +11,11 @@ const EMPTY: ClientsData = {
   projects: [],
   invoices: [],
   doctors: [],
-  camps: [],
 }
 
 export const useClientsData = () => {
   const queryClient = useQueryClient()
+  const { camps, addCamp } = useCampsData()
 
   const { data = EMPTY, isLoading, error } = useQuery({ queryKey: ['clients-data'], queryFn: clientsService.getData })
 
@@ -40,19 +41,23 @@ export const useClientsData = () => {
     onSuccess: invalidate,
   })
 
-  const bookCampMutation = useMutation({
-    mutationFn: (input: BookCampInput) => clientsService.bookCamp(input),
-    onSuccess: invalidate,
-  })
+  const bookCamp = async (input: BookCampInput) => {
+    const camp = clientsService.buildBookedCamp(input)
+    await addCamp(camp)
+    clientsService.recordCampBookingOnMr(input.mrId)
+    invalidate()
+    return camp
+  }
 
   return {
     ...data,
+    camps,
     isLoading,
     error,
     addPo: (projectId: string, po: PurchaseOrder) => addPoMutation.mutateAsync({ projectId, po }),
     updatePo: (projectId: string, po: PurchaseOrder) => updatePoMutation.mutateAsync({ projectId, po }),
     addMr: (mr: ClientMr) => addMrMutation.mutateAsync(mr),
     addDoctor: (input: { name: string; specialty: string; city: string }) => addDoctorMutation.mutateAsync(input),
-    bookCamp: (input: BookCampInput) => bookCampMutation.mutateAsync(input),
+    bookCamp,
   }
 }

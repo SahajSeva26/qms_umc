@@ -8,7 +8,6 @@ import type {
   Division,
   PurchaseOrder,
 } from '@/types/client.types'
-import { getCamps } from '@/features/camps/camps.service'
 import {
   CLIENTS as SEED_CLIENTS,
   DIVISIONS as SEED_DIVISIONS,
@@ -18,7 +17,6 @@ import {
 } from '@/features/crm/clients/clients.mock'
 
 const PROJECTS_KEY = 'qms.master.projects'
-const CAMPS_KEY = 'qms.master.camps'
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value))
@@ -42,18 +40,6 @@ function persistProjects(next: ClientProject[]) {
   }
 }
 
-// Camps live in the Camps module's store ('qms.master.camps'). Reading through
-// the Camps feature's own service (rather than its internal mock module) keeps
-// this a cross-feature service call instead of a boundary violation, while
-// still landing booked camps alongside the seeded ones on the same key.
-function persistCamps(next: Camp[]) {
-  try {
-    localStorage.setItem(CAMPS_KEY, JSON.stringify(next))
-  } catch {
-    // demo persistence only — safe to ignore quota/serialization errors
-  }
-}
-
 // Module-level in-memory stores seeded from the mock. Projects additionally
 // persist to localStorage so PO changes survive reloads.
 const clients: Client[] = clone(SEED_CLIENTS)
@@ -70,7 +56,6 @@ export interface ClientsData {
   projects: ClientProject[]
   invoices: ClientInvoice[]
   doctors: ClientDoctor[]
-  camps: Camp[]
 }
 
 // TODO: replace with real API calls once backend endpoints exist
@@ -82,7 +67,6 @@ export async function getData(): Promise<ClientsData> {
     projects: [...projects],
     invoices: [...invoices],
     doctors: [...doctors],
-    camps: await getCamps(),
   }
 }
 
@@ -128,10 +112,11 @@ export interface BookCampInput {
 }
 
 // TODO: replace with real API calls once backend endpoints exist
-// Writes a REQUESTED camp into the Camps module's 'qms.master.camps' store so
-// it shows up on the camps board immediately.
-export async function bookCamp(input: BookCampInput): Promise<Camp> {
-  const camp: Camp = {
+// Builds a REQUESTED camp from a client-side booking flow. Persisting it to
+// the Camps module's own store is the caller's job (via the shared
+// useCampsData hook's addCamp) — this service only knows Client-side fields.
+export function buildBookedCamp(input: BookCampInput): Camp {
+  return {
     id: `C-${Math.floor(1000 + Math.random() * 9000)}`,
     date: input.date,
     slot: input.slot,
@@ -154,10 +139,10 @@ export async function bookCamp(input: BookCampInput): Promise<Camp> {
     mrId: input.mrId,
     mrName: input.mrName,
   }
-  const camps = await getCamps()
-  camps.push(camp)
-  persistCamps(camps)
-  const mr = mrs.find((m) => m.id === input.mrId)
+}
+
+// TODO: replace with real API calls once backend endpoints exist
+export function recordCampBookingOnMr(mrId: string): void {
+  const mr = mrs.find((m) => m.id === mrId)
   if (mr) mr.campsBooked += 1
-  return camp
 }

@@ -5,7 +5,7 @@ import * as meetingsService from '@/features/crm/appointments/appointments.servi
 export const useMeetings = () => {
   const queryClient = useQueryClient()
 
-  const { data: meetings = [] } = useQuery({ queryKey: ['meetings'], queryFn: meetingsService.getMeetings })
+  const { data: meetings = [], isLoading, error } = useQuery({ queryKey: ['meetings'], queryFn: meetingsService.getMeetings })
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['meetings'] })
 
@@ -61,5 +61,5 @@ export const useMeetings = () => {
   const releaseBlock = (id: string, reason: string, releasedBy: string) =>
     releaseBlockMutation.mutate({ id, reason, releasedBy })
 
-  return { meetings, createMeeting, submitMom, reschedule, markDone, cancel, setOutcome, releaseBlock }
+  return { meetings, isLoading, error, createMeeting, submitMom, reschedule, markDone, cancel, setOutcome, releaseBlock }
 }

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { FiMapPin, FiCalendar, FiGrid } from 'react-icons/fi'
 import { useAuth } from '@/hooks/useAuth'
-import { useCamps } from '@/features/camps/hooks/useCamps'
+import { useCampsData } from '@/hooks/useCampsData'
 import { CLIENTS } from '@/types/client.types'
 import {
   buildCampReport,
@@ -66,7 +66,7 @@ const StackedBar = ({ parts, max, height }: StackedBarProps) => (
 
 const CampReportSection = () => {
   const { user } = useAuth()
-  const { camps } = useCamps()
+  const { camps } = useCampsData()
   const [type, setType] = useState<CampReportType>('ALL')
   const [view, setView] = useState<CampReportView>('month')
 

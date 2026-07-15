@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useDashboardFilters } from '@/features/dashboard/hooks/useDashboardFilters'
-import { useSalesData } from '@/features/crm/sales/hooks/useSalesData'
-import { useClientsData } from '@/features/crm/clients/hooks/useClientsData'
-import { QUARTER } from '@/features/crm/sales/sales.mock'
-import { buildSalesHeadKpis, DEFAULT_SALES_FILTER, type SalesFilterState } from '@/features/crm/sales/sales.kpis'
-import SalesFilterBar from '@/features/crm/sales/components/SalesFilterBar'
-import SalesKpiGrid from '@/features/crm/sales/components/SalesKpiGrid'
+import { useSalesDataShared } from '@/hooks/useSalesDataShared'
+import { useClientsDataShared } from '@/hooks/useClientsDataShared'
+import { QUARTER } from '@/types/salesdash.types'
+import { buildSalesHeadKpis, DEFAULT_SALES_FILTER, type SalesFilterState } from '@/components/widgets/sales-kpi/sales.kpis'
+import SalesFilterBar from '@/components/widgets/sales-kpi/SalesFilterBar'
+import SalesKpiGrid from '@/components/widgets/sales-kpi/SalesKpiGrid'
 import FilterBar from '@/features/dashboard/components/FilterBar'
 import TopKpiStrip from '@/features/dashboard/components/TopKpiStrip'
 import CampReportSection from '@/features/dashboard/components/CampReportSection'
@@ -33,8 +33,8 @@ const DashboardPage = () => {
   // bar + KPI strip directly into this page, super_admin-only (dashboard.js:
   // "isSuper = sess.roleId === 'super_admin'" — any other role, incl. plain
   // admin, never sees these blocks here at all).
-  const { reps, targets } = useSalesData()
-  const { clients, projects, invoices } = useClientsData()
+  const { reps, targets } = useSalesDataShared()
+  const { clients, projects, invoices } = useClientsDataShared()
   const salesKpiTiles = useMemo(
     () => (isSuperAdmin ? buildSalesHeadKpis({ reps, targets, clients, projects, invoices, filter: salesFilter, quarter: QUARTER }) : []),
     [isSuperAdmin, reps, targets, clients, projects, invoices, salesFilter]

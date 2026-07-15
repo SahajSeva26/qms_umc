@@ -1,7 +1,6 @@
-import { useQuery } from '@tanstack/react-query'
 import type { Lead } from '@/types/lead.types'
 import { STAGES, LOST_STAGE } from '@/features/crm/crm.mock'
-import { getMeetings } from '@/features/crm/appointments/appointments.service'
+import { useMeetings } from '@/features/crm/appointments/hooks/useMeetings'
 import { MEETING_STATUS_META, MEETING_TYPE_META } from '@/types/meeting.types'
 import { formatDate } from '@/utils/formatters'
 import { formatTimeRange } from '@/features/crm/appointments/appointments.utils'
@@ -17,10 +16,10 @@ function stageName(id: string): string {
 const FollowupsTab = ({ lead }: FollowupsTabProps) => {
   const history = [...(lead.stageHistory ?? [])].reverse()
 
-  // Meetings live in the Appointments module's store — read through its own
-  // service (not its internals) and cross-reference by linkedLeadId, mirroring
-  // the prototype's renderFollowups() (crm.js) which does the same join.
-  const { data: allMeetings = [], isLoading, error } = useQuery({ queryKey: ['meetings'], queryFn: getMeetings })
+  // Meetings live in the Appointments module — read through its own hook
+  // (not its internals) and cross-reference by linkedLeadId, mirroring the
+  // prototype's renderFollowups() (crm.js) which does the same join.
+  const { meetings: allMeetings, isLoading, error } = useMeetings()
   const linkedMeetings = [...allMeetings]
     .filter((m) => m.linkedLeadId === lead.id)
     .sort((a, b) => b.startAt.localeCompare(a.startAt))

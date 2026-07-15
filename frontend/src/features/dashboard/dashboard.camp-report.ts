@@ -1,6 +1,6 @@
 import type { Camp, CampType } from '@/types/camp.types'
 import type { UserRole } from '@/types/auth.types'
-import { ASSIGNMENTS } from '@/features/crm/sales/sales.mock'
+import { ASSIGNMENTS } from '@/types/salesdash.types'
 
 // Mirrors the prototype's camp-report.js exactly: a role-scoped Camp Report
 // (Diet & Screening) segment on the Dashboard. super_admin/admin/sales_lead

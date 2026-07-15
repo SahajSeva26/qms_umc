@@ -3,8 +3,10 @@ import type { Client, ClientInvoice, ClientProject, ClientProjectType } from '@/
 import { formatINR, formatPercent } from '@/utils/formatters'
 
 // Mirrors the prototype's sales.js salesHeadCards() exactly — the executive
-// KPI panel shown to Sales Head/Admin on the Sales Dashboard (pages/sales.html),
-// a different screen from the main Command Center Dashboard's own KPIs.
+// KPI panel dual-mounted by the prototype's own design on both the Sales
+// Dashboard (pages/sales.html) and the main Dashboard (super_admin only,
+// dashboard.html). Lives here (not features/crm/sales/) since it's a
+// genuinely shared widget, not CRM-private logic.
 // TODO: several figures the prototype calls "Illustrative" (Gross Margin %,
 // Client Retention %) are placeholder constants there too — not invented here.
 

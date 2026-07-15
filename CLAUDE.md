@@ -339,6 +339,106 @@ Full detail (files, sub-components, known bugs) is in `PROGRESS.md` — this tab
 
 Read this section first in a fresh session — it's the "what's actually going on" summary.
 
+### Backend merged in; real RBAC exists now; role-vs-permission decision LOCKED — read before building any new screen
+
+A teammate's backend work (branch `main`, 52 commits) was merged into `feature/login`. The backend
+now has real, working: auth (login/logout/refresh-token, JWT access+refresh via httpOnly cookies,
+bcrypt, account lockout), a `user` module, and a full `access-management` RBAC module family
+(`tenant`/`role-type`/`role`/`permission-group`). **None of it is wired to the frontend yet** — this
+is the current, deliberate state, not a bug:
+
+- The backend's authorization model is **permission-code-based**, not role-name-based: each user's
+  effective permissions = their `RoleType.permissions` ∪ their own `Role.permissions` override,
+  merged server-side into `req.context.permissions` on every request. Backend routes are gated with
+  `AuthorizeMiddleware([PERMISSIONS.TENANT.MANAGE.code], 'AND'|'OR')` — permission codes, never role
+  strings.
+- There are currently **29 permission codes total**, all CRUD-shaped (`create/get/search/update/
+  manage`), covering only the 6 backend resources that exist so far: `system`, `user`, `tenant`,
+  `permission-group`, `role-type`, `role`. **Nothing the frontend actually renders today** (camps,
+  projects, sales, dashboard, analytics, etc.) has a backend permission code yet.
+- **The permission array is never sent to the client.** It's computed and used purely server-side
+  for route-guarding; `AuthMapper.toResponse`/`UserMapper.toResponse` both omit it, no `/me`-style
+  endpoint exists. This is a deeper, separate version of the already-known "role missing from login
+  response" bug below — fixing that bug alone (adding `role`) still wouldn't be enough; the
+  permission array itself needs its own wiring.
+- The backend's 9 `RoleType` codes (`system`/`hr`/`admin`/`sales`/`sales-head` platform,
+  `pharma-ho`/`pharma-ms`/`pharms-asm`/`pharma-rsm` customer — note `pharms-asm`/`pharma-ms` look
+  like typos, not yet confirmed with the teammate) share **zero exact string matches** with our
+  frontend's 18-value `UserRole` enum (`super_admin`/`sales_lead`/`camp_coord`/etc.) — different
+  vocabulary, different shape (flat string vs. permission-code array), different coverage.
+
+**Locked decision (2026-07-15, made directly by the user): the frontend will fully adopt the
+backend's real permission-based model once wired — gate nav/routes/UI on "what permissions does
+this user have," not on an invented role name.** This is the target architecture, not optional.
+However, the actual wiring (backend exposing the permission array in an API response + adding
+permission codes for the modules that don't have them yet) is **explicitly deferred** — do not start
+that migration unprompted. **For any new screen built before that wiring happens: keep using the
+current flat-role scaffolding** (`AuthUser.role` + `rolesAllowed` arrays in `navConfig.ts`) exactly
+as existing screens do, for consistency — but treat the 18-value `UserRole` enum as a temporary
+stand-in being replaced, not a vocabulary worth deepening or "getting right" long-term. Don't invent
+new role values beyond what's already there if you can avoid it.
+
+A full adversarially-verified audit of the whole merged codebase was also run this session — 102
+findings (13 critical, 27 high), covering real backend security issues (hardcoded JWT-secret
+fallback, default admin credentials seeded on every boot if env vars unset, zero rate limiting,
+two cross-tenant privilege-escalation paths in the new RBAC code) plus frontend architecture/
+integration findings. Full detail in PROGRESS.md's 2026-07-15 entries; the interactive report itself
+was delivered as a Claude artifact, not saved as a repo file — ask the user if they still have the
+link if you need to reference specific findings again.
+
+### Cross-feature import rule — now fully enforced, resolved via the rule's own stated test (2026-07-15)
+
+User asked directly whether the existing built screens actually follow the project's own rules
+(shadcn/Tailwind/TanStack Query/Zustand/cross-feature-imports/useState+Zod). A background audit
+found the tech-stack rules were solid, but **cross-feature imports failed** — 8 real violations
+(2 previously known + 6 new, including the pre-existing Analytics module reaching into 4 other
+features' hooks at once). Resolved the ambiguity in the rule's wording ("features communicate only
+through shared `types/`, `hooks/`, or `lib/`" — does a feature's OWN `hooks/` folder count as
+"shared"?) using the rule's own stated rationale in §3: **"if a feature is removed, delete its
+folder and one line from router.tsx — nothing else breaks."** Any hardcoded `@/features/[other]/...`
+import path violates that guarantee regardless of what kind of file sits at the end of it — so the
+strict reading was adopted, and Analytics's pre-existing violations were fixed too, not left as a
+precedent.
+
+**The fix pattern, now established — follow this for any new cross-feature data need:**
+1. Plain mock/seed *data* another feature needs → promote it into the relevant shared `types/*.types.ts`
+   file (same pattern as `CLIENTS`/`DIVISIONS`/`STAGES`/`QUARTER`/`ASSIGNMENTS`), with the original
+   feature file keeping a backward-compatible re-export.
+2. A feature's own *read-only data hook* another feature needs → create a shared, read-only wrapper
+   hook in the top-level `frontend/src/hooks/` folder (e.g. `useCampsData`, `useSalesDataShared`,
+   `useClientsDataShared`, `useLeadsData`, `useDashboardDataShared`) that calls that feature's own
+   service function directly. This mirrors `useAuth.ts`'s existing, already-sanctioned role as the
+   shared surface over `features/auth/`'s internals. The feature's OWN hook (`useCamps`,
+   `useSalesData`, etc.) keeps its mutations — the shared wrapper is read-only, only for data other
+   features need to display, never to mutate.
+3. A genuine cross-feature *write action* (e.g. CRM booking a camp, which is fundamentally a
+   Camps-owned mutation triggered from outside) → the shared hook gets the mutation too (see
+   `useCampsData`'s `addCamp`), and the triggering feature's own hook orchestrates: build the
+   domain object via its own service, persist via the shared hook's mutation, do its own
+   feature-local side effects (e.g. incrementing an MR's camp-booked count) after.
+4. A component/widget that's genuinely used by 2+ features by DESIGN (not just convenience) → it
+   isn't really owned by either feature. Move it out entirely to `components/widgets/[name]/` (see
+   the Sales KPI panel — `sales.kpis.ts`/`SalesKpiGrid.tsx`/`SalesFilterBar.tsx`, moved out of
+   `features/crm/sales/` since the prototype dual-mounts the same executive KPI panel on both the
+   Sales Dashboard and the main Dashboard by design).
+
+`useProjects.ts`'s `useAuthStore` import remains the one confirmed, sanctioned exception — `authStore`
+is explicitly listed in §3's repository structure as a shared file alongside `axiosClient`/
+`queryClient`, not feature-private.
+
+Also found and fixed while doing this: shadcn's `--primary`/`--sidebar-primary`/`--chart-1` tokens
+(light AND dark theme, 6 values total) still held the wrong `--brand-600`/lighter-tint shades that
+were fixed on `--qms-brand` in an earlier session but never propagated to the shadcn token layer —
+corrected to `#3b6dff` in both themes after confirming against the prototype's own dark-theme CSS
+that it has no separate brand-color override. Do NOT "fix" `--qms-border*`/`--border`/`--input`
+(the `rgba(36,81,240,...)` tokens) if you see them again — those are a genuinely different, correct
+shade the prototype itself uses for borders specifically; only `--primary`-family tokens were wrong.
+
+**Separately found while trying to verify this live:** the backend currently fails to boot locally
+(`seedSystemUser`'s transaction requires a MongoDB replica set; the local `mongod` is a standalone
+instance) — see PROGRESS.md Known Issues. Not caused by this session's changes; a pre-existing
+backend/infra gap that blocks live end-to-end testing until fixed.
+
 ### Design-token / prototype-fidelity fixes (2026-07-15)
 A user-reported "the wizard contrast looks wrong" turned into a multi-part fidelity audit. Fixed,
 in order of what was found:

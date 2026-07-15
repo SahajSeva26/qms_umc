@@ -4,7 +4,7 @@ import type { ProjectStatus } from '@/types/project.types'
 import { CLIENTS } from '@/types/client.types'
 import { useAuth } from '@/hooks/useAuth'
 import { useProjects } from '@/features/projects/hooks/useProjects'
-import { useCamps } from '@/features/camps/hooks/useCamps'
+import { useCampsData } from '@/hooks/useCampsData'
 import { roleScopedProjects, projectSearchMatches, genProjectId } from '@/features/projects/projects.utils'
 import ProjectTable from '@/features/projects/components/ProjectTable'
 import ProjectDetailDrawer from '@/features/projects/components/ProjectDetailDrawer'
@@ -34,7 +34,7 @@ const HEADER_CHIPS = [
 const ProjectsPage = () => {
   const { user } = useAuth()
   const { projects, createProject, updateProject, changeStatus, closeProject, reopenProject, renewProject, addVoidCamp, removeVoidCamp } = useProjects()
-  const { camps } = useCamps()
+  const { camps } = useCampsData()
 
   const [tab, setTab] = useState<Tab>('ALL')
   const [search, setSearch] = useState('')

@@ -1,12 +1,15 @@
 import type {
   ActivityItem,
   ApprovalRequest,
-  RepAssignment,
   RepTarget,
   SalesRep,
 } from '@/types/salesdash.types'
+import { QUARTER, ASSIGNMENTS } from '@/types/salesdash.types'
 
-export const QUARTER = 'Q2 FY26'
+// Re-exported for existing in-feature imports — the canonical QUARTER/
+// ASSIGNMENTS now live in types/salesdash.types.ts so other features can
+// read them without reaching into this file.
+export { QUARTER, ASSIGNMENTS }
 
 export const REPS: SalesRep[] = [
   {
@@ -111,14 +114,6 @@ export const TARGETS: RepTarget[] = [
     setOn: '2026-04-02',
     status: 'ON_TRACK',
   },
-]
-
-export const ASSIGNMENTS: RepAssignment[] = [
-  { repId: 'p-riya', clientId: 'cli-sun', divisionIds: ['div-sun-cardio', 'div-sun-diabeto'] },
-  { repId: 'p-riya', clientId: 'cli-cipla', divisionIds: ['div-cipla-endo'] },
-  { repId: 'p-sneha', clientId: 'cli-cipla', divisionIds: ['div-cipla-resp'] },
-  { repId: 'p-arjun', clientId: 'cli-abbott', divisionIds: [] },
-  { repId: 'p-arjun', clientId: 'cli-drreddys', divisionIds: [] },
 ]
 
 export const CLIENT_NAMES: Record<string, string> = {

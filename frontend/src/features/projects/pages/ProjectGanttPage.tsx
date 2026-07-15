@@ -4,7 +4,7 @@ import type { ProjectStatus } from '@/types/project.types'
 import { CLIENTS } from '@/types/client.types'
 import { useAuth } from '@/hooks/useAuth'
 import { useProjects } from '@/features/projects/hooks/useProjects'
-import { useCamps } from '@/features/camps/hooks/useCamps'
+import { useCampsData } from '@/hooks/useCampsData'
 import { roleScopedProjects, computeProjectKpis, projectSearchMatches } from '@/features/projects/projects.utils'
 import { GANTT_VIEWS, addDays, formatRangeLabel, type GanttViewId } from '@/features/projects/gantt.utils'
 import GanttKpiStrip from '@/features/projects/components/GanttKpiStrip'
@@ -19,7 +19,7 @@ type StatusFilter = 'ALL' | ProjectStatus
 const ProjectGanttPage = () => {
   const { user } = useAuth()
   const { projects, createProject } = useProjects()
-  const { camps } = useCamps()
+  const { camps } = useCampsData()
 
   const [view, setView] = useState<GanttViewId>('month')
   const [groupByClient, setGroupByClient] = useState(true)

@@ -5,8 +5,8 @@ import {
 import { GiWallet, GiCrown, GiCampingTent, GiShinyApple, GiRoundBottomFlask } from 'react-icons/gi'
 import { PiGaugeBold, PiReceiptBold, PiStackBold } from 'react-icons/pi'
 import type { IconType } from 'react-icons'
-import type { SalesKpiTile, KpiTone } from '@/features/crm/sales/sales.kpis'
-import { groupByCategory } from '@/features/crm/sales/sales.kpis'
+import type { SalesKpiTile, KpiTone } from '@/components/widgets/sales-kpi/sales.kpis'
+import { groupByCategory } from '@/components/widgets/sales-kpi/sales.kpis'
 
 // Mirrors the prototype's .kpi/.kpi.tone tiles (styles.css lines 449-489) —
 // the colored corner glow-blob is a blurred ::after circle at 18% opacity.

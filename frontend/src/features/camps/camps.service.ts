@@ -53,3 +53,12 @@ export async function assignFo(id: string, foId: string): Promise<Camp[]> {
   persistCamps(next)
   return next
 }
+
+// TODO: replace with real API calls once backend endpoints exist
+// Appends a camp booked from outside this feature (e.g. CRM/Clients'
+// bookCamp flow) onto the same store, so it shows up on the camps board.
+export async function addCamp(camp: Camp): Promise<Camp[]> {
+  const next = [...loadCamps(), camp]
+  persistCamps(next)
+  return next
+}

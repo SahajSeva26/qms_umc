@@ -4,6 +4,12 @@ export type ApprovalType = 'CLIENT' | 'DIVISION' | 'MARKETING' | 'BRAND'
 export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'WITHDRAWN'
 export type CadenceBand = 'FAST' | 'WEEKLY' | 'BIWEEKLY' | 'SLOW' | 'NONE'
 
+// The current sales quarter — lives here (not sales.mock.ts) so any feature
+// can read it through the shared types layer instead of reaching into CRM
+// Sales' internal mock file. Mirrors the CLIENTS/DIVISIONS pattern in
+// types/client.types.ts.
+export const QUARTER = 'Q2 FY26'
+
 export interface SalesRep {
   id: string
   name: string
@@ -36,6 +42,18 @@ export interface RepAssignment {
   clientId: string
   divisionIds: string[]
 }
+
+// Which reps are assigned to which clients/divisions — used for KAM
+// role-scoping on both the Sales Dashboard and the main Dashboard's Camp
+// Report section. Lives here so Dashboard doesn't have to reach into
+// features/crm/sales/sales.mock.ts directly.
+export const ASSIGNMENTS: RepAssignment[] = [
+  { repId: 'p-riya', clientId: 'cli-sun', divisionIds: ['div-sun-cardio', 'div-sun-diabeto'] },
+  { repId: 'p-riya', clientId: 'cli-cipla', divisionIds: ['div-cipla-endo'] },
+  { repId: 'p-sneha', clientId: 'cli-cipla', divisionIds: ['div-cipla-resp'] },
+  { repId: 'p-arjun', clientId: 'cli-abbott', divisionIds: [] },
+  { repId: 'p-arjun', clientId: 'cli-drreddys', divisionIds: [] },
+]
 
 export interface ApprovalRequest {
   id: string

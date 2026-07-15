@@ -2,17 +2,20 @@ import jwt from 'jsonwebtoken';
 import ENV from '../config/app.config';
 import { throwAppError } from '../utils/error';
 import { StatusCodes } from 'http-status-codes';
+import { ContextUser } from '../utils/contextBuilder';
+
+export interface ITokenPayload {
+    _id: string;
+    email: string;
+    role: string;
+    tenant: string;
+}
 
 export const TokenHandler = {
-    generateAccessToken: (payload: any) => {
-        const tokenPayload = {
-            _id: payload?._id,
-            email: payload?.email,
-        };
-
+    generateAccessToken: (payload: ITokenPayload) => {
         const token: any = jwt.sign(
             {
-                ...tokenPayload,
+                ...payload,
             },
             ENV.JWT.AccessTokenSecret,
             {
@@ -24,14 +27,9 @@ export const TokenHandler = {
     },
 
     generateRefreshToken: (payload: any) => {
-        const tokenPayload = {
-            _id: payload?._id,
-            email: payload?.email,
-        };
-
         const token: any = jwt.sign(
             {
-                ...tokenPayload,
+                ...payload,
             },
             ENV.JWT.RefreshTokenSecret,
             {
@@ -43,20 +41,31 @@ export const TokenHandler = {
     },
 
     verifyAccessToken: (token: string) => {
-
-        return jwt.verify(token, ENV.JWT.AccessTokenSecret);
+        if (!token) {
+            throwAppError('Access token not found', StatusCodes.UNAUTHORIZED);
+        }
+        try {
+            return jwt.verify(token, ENV.JWT.AccessTokenSecret);
+        } catch (error) {
+            throwAppError('Invalid or expired access token', StatusCodes.UNAUTHORIZED);
+        }
     },
 
     verifyRefreshToken: (token: string) => {
         if (!token) {
             throwAppError('Refresh token not found', StatusCodes.UNAUTHORIZED);
         }
-        return jwt.verify(token, ENV.JWT.RefreshTokenSecret);
+        try {
+            return jwt.verify(token, ENV.JWT.RefreshTokenSecret);
+        } catch (error) {
+            throwAppError('Invalid or expired refresh token', StatusCodes.UNAUTHORIZED);
+        }
     },
 
-    decodePayload: (token: string) => {
-        return jwt.decode(token);
+    decodePayload: (token: string): ITokenPayload => {
+        if (!token) {
+            throwAppError('Token not found', StatusCodes.UNAUTHORIZED);
+        }
+        return jwt.decode(token) as ITokenPayload;
     },
-
-
 };

@@ -4,10 +4,11 @@ import { ISearchUserQuery, IUpdateUserPayload } from './user.validators';
 import bcrypt from 'bcrypt';
 import { throwAppError } from '../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
-import { USER_STATUS } from './user.constants';
+import { USER_PERMISSIONS, USER_STATUS } from './user.constants';
 import { isValidEmail } from '../../shared/utils/strings';
 import { IRegisterUserPayload } from '../auth/auth.validators';
 import { RequestContext } from '../../shared/utils/contextBuilder';
+import { IServiceOptions } from '../../shared/types/service.types';
 
 type UserDocument = HydratedDocument<IUser> | null;
 const populate: any[] = [];
@@ -28,14 +29,14 @@ const set = async (model: any, entity: HydratedDocument<IUser>, ctx: RequestCont
     if (model.phone) {
         entity.phone = model.phone;
     }
-    if (model.status) {
+    if (model.status && ctx.hasAllPermissions([USER_PERMISSIONS.MANAGE.code])) {
         entity.status = model.status;
     }
 
     return entity;
 };
 
-const get = async (id: string, ctx: RequestContext, options?: any): Promise<UserDocument> => {
+const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): Promise<UserDocument> => {
     let query = null;
 
     if (mongoose.isValidObjectId(id)) {
@@ -47,42 +48,44 @@ const get = async (id: string, ctx: RequestContext, options?: any): Promise<User
     }
 
     if (query) {
-        if (options) {
-            query = query.populate(options);
+        if (options?.populate) {
+            query = query.populate(populate);
         }
     }
 
     return await query;
 };
 
-const search = async (filters: ISearchUserQuery, ctx: RequestContext, options?: any) => {
+const search = async (filters: ISearchUserQuery, ctx: RequestContext, options?: IServiceOptions) => {
     let sort: any = {
-        timestamp: -1,
+        createdAt: -1,
     };
 
     let where: mongoose.QueryFilter<IUser> = {
         // add context default where build here
+        status: USER_STATUS.ACTIVE,
     };
 
     if (filters.name) {
-        where.$or = [
-            { firstName: { $regex: filters.name, $options: 'i' } },
-            { lastName: { $regex: filters.name, $options: 'i' } },
-        ];
+        where.$or = [{ firstName: { $regex: filters.name, $options: 'i' } }, { lastName: { $regex: filters.name, $options: 'i' } }];
     }
+
     if (filters.email) {
         where.email = { $regex: filters.email, $options: 'i' };
     }
+
     if (filters.status) {
-        where.status = filters?.status?.toString();
+        where.status = filters.status;
     }
+
     if (filters.gender) {
         where.gender = filters.gender;
     }
+
     if (filters.joinedFrom || filters.joinedTo) {
-        where.timestamp = {};
-        if (filters.joinedFrom) where.timestamp.$gte = filters.joinedFrom;
-        if (filters.joinedTo) where.timestamp.$lte = filters.joinedTo;
+        where.createdAt = {};
+        if (filters.joinedFrom) where.createdAt.$gte = filters.joinedFrom;
+        if (filters.joinedTo) where.createdAt.$lte = filters.joinedTo;
     }
 
     const countPromise = UserModel.countDocuments(where);

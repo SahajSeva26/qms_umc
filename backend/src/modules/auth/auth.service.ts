@@ -6,8 +6,11 @@ import bcrypt from 'bcrypt';
 import { throwAppError } from '../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { TokenHandler } from '../../shared/helpers/tokenHelper';
-import { ContextUser, RequestContext } from '../../shared/utils/contextBuilder';
-import { CookieHandler } from '../../shared/utils/cookies';
+import { RequestContext } from '../../shared/utils/contextBuilder';
+import { RoleService } from '../access-management/role/role.service';
+import { ITokenPayload } from '../../shared/helpers/tokenHelper';
+import { IServiceOptions } from '../../shared/types/service.types';
+import { RoleModel } from '../access-management/role/role.model';
 
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 10 * 60 * 1000; // 10 minutes
@@ -23,13 +26,15 @@ const login = async (data: ILoginUserPayload, ctx: RequestContext) => {
         return throwAppError('User not found', StatusCodes.NOT_FOUND);
     }
 
+    //1.5: check if user is active
+    if (user.status !== 'active') {
+        return throwAppError('Account not active contact admin', StatusCodes.FORBIDDEN);
+    }
+
     //2: check account locked
     if (user.lockUntil && user.lockUntil > new Date()) {
         const remainingTime = user.lockUntil.getTime() - Date.now();
-        return throwAppError(
-            `Account is locked,try again in ${Math.ceil(remainingTime / 60000)} minutes.`,
-            StatusCodes.FORBIDDEN,
-        );
+        return throwAppError(`Account is locked,try again in ${Math.ceil(remainingTime / 60000)} minutes.`, StatusCodes.FORBIDDEN);
     }
 
     //3: validate password
@@ -47,7 +52,7 @@ const login = async (data: ILoginUserPayload, ctx: RequestContext) => {
 
         await user.save();
         return throwAppError(
-            `Invalid credentials, attempt remaining: ${5 - user.loginAttempts}`,
+            `Invalid credentials, attempt remaining: ${MAX_LOGIN_ATTEMPTS - user.loginAttempts}`,
             StatusCodes.UNAUTHORIZED,
         );
     }
@@ -56,9 +61,22 @@ const login = async (data: ILoginUserPayload, ctx: RequestContext) => {
     user.loginAttempts = 0;
     user.lockUntil = null;
 
+    // 5: find user role
+    let userRole: any = await RoleModel.findOne({ user: user.id });
+    if (!userRole) {
+        return throwAppError('No role assigned to this account. Please contact your administrator.', StatusCodes.FORBIDDEN);
+    }
+
+    const payload: ITokenPayload = {
+        _id: user.id.toString(),
+        email: user.email,
+        role: userRole.id.toString(),
+        tenant: userRole.tenant.id.toString(),
+    };
+
     // 5: generate tokens
-    const accessToken = TokenHandler.generateAccessToken(user);
-    const refreshToken = TokenHandler.generateRefreshToken(user);
+    const accessToken = TokenHandler.generateAccessToken(payload);
+    const refreshToken = TokenHandler.generateRefreshToken(payload);
 
     // 6: save refresh token in database
     user.refreshToken = refreshToken;
@@ -84,26 +102,38 @@ const logout = async (userId: string, ctx: RequestContext) => {
     return true;
 };
 const refreshToken = async (refreshToken: string, ctx: RequestContext) => {
-    //1: generate new access token & refresh token
-    const payload: any = TokenHandler.decodePayload(refreshToken);
+    //1: verify token (throws AppError 401 on invalid/expired)
+    const decoded: any = TokenHandler.verifyRefreshToken(refreshToken);
 
-    //2: get user from database
-    const userId: string = payload?._id?.toString() || '';
+    //2: get user from user service
+    const userId: string = decoded._id.toString();
     const user = await UserService.get(userId, ctx);
     if (!user) {
-        return throwAppError('User not found', StatusCodes.NOT_FOUND);
+        return throwAppError('User not found, login again', StatusCodes.NOT_FOUND);
     }
 
-    // 3: check if refresh token matches
+    // 3: check if refresh token matches the one on record (before any further DB work)
     if (user.refreshToken?.toString() !== refreshToken.toString()) {
         return throwAppError('Invalid refresh token', StatusCodes.UNAUTHORIZED);
     }
 
-    //4: generate tokens
-    const newAccessToken = TokenHandler.generateAccessToken(payload);
-    const newRefreshToken = TokenHandler.generateRefreshToken(payload);
+    // 4: get user role
+    let userRole: any = await RoleModel.findOne({user:user._id}).populate('tenant');
+    if (!userRole) {
+        return throwAppError('No role assigned to this account. Please contact your administrator.', StatusCodes.FORBIDDEN);
+    }
 
-    // 5: save new refresh token
+    //5: generate tokens with new payload
+    const freshPayload: ITokenPayload = {
+        _id: user.id.toString(),
+        email: user.email,
+        role: userRole.id.toString(),
+        tenant: userRole.tenant.id.toString(),
+    };
+    const newAccessToken = TokenHandler.generateAccessToken(freshPayload);
+    const newRefreshToken = TokenHandler.generateRefreshToken(freshPayload);
+
+    // 6: save new refresh token
     user.refreshToken = newRefreshToken;
     await user.save();
 

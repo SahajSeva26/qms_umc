@@ -3,5 +3,27 @@
     "singleQuote": true,
     "trailingComma": "all",
     "printWidth": 120,
-    "tabWidth": 4
+    "tabWidth": 4,
+
+    "overrides": [
+    {
+      "files": "*.routes.ts",
+      "options": {
+        "printWidth": 100
+      }
+    },
+     {
+      "files": "*.validators.ts",
+      "options": {
+        "printWidth": 80
+      }
+    },
+    {
+      "files": "*.service.ts",
+      "options": {
+        "printWidth": 140
+      }
+    }
+
+  ]
 }

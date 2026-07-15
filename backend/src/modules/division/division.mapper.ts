@@ -1,6 +1,6 @@
-import { RequestContext } from '../../../shared/utils/contextBuilder';
+import { RequestContext } from '../../shared/utils/contextBuilder';
 import { DIVISION_PERMISSIONS } from './division.constants';
-import { TENANT_PERMISSIONS } from '../../access-management/tenant/tenant.constants';
+import { TENANT_PERMISSIONS } from '../access-management/tenant/tenant.constants';
 
 export const DivisionMapper = {
     toResponse: (division: any, ctx: RequestContext) => {

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { DIVISION_STATUS, DIVISION_THERAPY } from './division.constants';
-import { isValidObjectID } from '../../../shared/utils/strings';
+import { isValidObjectID } from '../../shared/utils/strings';
 
 //1: create ====================================>
 export const CreateDivisionPayloadSchema = z.object({

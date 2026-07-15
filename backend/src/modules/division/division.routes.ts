@@ -1,15 +1,15 @@
 import express from 'express';
 import { DivisionController } from './division.controller';
-import { registry } from '../../../shared/config/swagger/swagger.registry';
+import { registry } from '../../shared/config/swagger/swagger.registry';
 import {
     CreateDivisionPayloadSchema,
     SearchDivisionQuerySchema,
     UpdateDivisionPayloadSchema,
 } from './division.validators';
-import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
-import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { AuthMiddleware } from '../../shared/middlewares/authmiddleware';
+import { AuthorizeMiddleware } from '../../shared/middlewares/authorizeMiddleware';
 import { DIVISION_PERMISSIONS } from './division.constants';
-import { TENANT_PERMISSIONS } from '../../access-management/tenant/tenant.constants';
+import { TENANT_PERMISSIONS } from '../access-management/tenant/tenant.constants';
 
 export const DivisionRouter = express.Router();
 

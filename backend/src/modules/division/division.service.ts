@@ -2,12 +2,12 @@ import mongoose, { HydratedDocument } from 'mongoose';
 import { IDivision, DivisionModel } from './division.model';
 import { ICreateDivisionPayload, ISearchDivisionQuery, IUpdateDivisionPayload } from './division.validators';
 import { DIVISION_PERMISSIONS, DIVISION_STATUS } from './division.constants';
-import { throwAppError } from '../../../shared/utils/error';
+import { throwAppError } from '../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
-import { RequestContext } from '../../../shared/utils/contextBuilder';
-import { isValidObjectID } from '../../../shared/utils/strings';
-import { IServiceOptions } from '../../../shared/types/service.types';
-import { TENANT_PERMISSIONS, TENANT_TYPE } from '../../access-management/tenant/tenant.constants';
+import { RequestContext } from '../../shared/utils/contextBuilder';
+import { isValidObjectID } from '../../shared/utils/strings';
+import { IServiceOptions } from '../../shared/types/service.types';
+import { TENANT_PERMISSIONS, TENANT_TYPE } from '../access-management/tenant/tenant.constants';
 
 type DivisionDocument = HydratedDocument<IDivision> | null;
 const populate: any[] = [

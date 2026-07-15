@@ -3,7 +3,8 @@ import { TENANT_PERMISSIONS } from '../../modules/access-management/tenant/tenan
 import { PERMISSION_GROUP_PERMISSIONS } from '../../modules/access-management/permission-group/permissionGroup.constants';
 import { ROLE_TYPE_PERMISSIONS } from '../../modules/access-management/role-type/roleType.constants';
 import { ROLE_PERMISSIONS } from '../../modules/access-management/role/role.constants';
-import { DIVISION_PERMISSIONS } from '../../modules/crm/division/division.constants';
+import { DIVISION_PERMISSIONS } from '../../modules/division/division.constants';
+import { LEAD_PERMISSIONS } from '../../modules/crm/lead/lead.constants';
 
 export const SYSTEM_PERMISSIONS = {
     MANAGE: {
@@ -20,6 +21,7 @@ export const PERMISSIONS = {
     ROLE_TYPE: ROLE_TYPE_PERMISSIONS,
     ROLE: ROLE_PERMISSIONS,
     DIVISION: DIVISION_PERMISSIONS,
+    LEAD: LEAD_PERMISSIONS,
 };
 
 export const PERMISSIONS_ARRAY = Object.values(PERMISSIONS)

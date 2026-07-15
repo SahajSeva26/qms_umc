@@ -82,12 +82,20 @@ export const LEAD_PROJECT_TYPES = {
 //   },
 // ];
 
-export const LEAD_TRANSITION_MAP = {
-    NEW: [LEAD_STATUSES.QUALIFIED],
-    QUALIFIED: [LEAD_STATUSES.PROPOSAL, LEAD_STATUSES.LOST],
-    PROPOSAL: [LEAD_STATUSES.PILOT, LEAD_STATUSES.NEGOTIATION, LEAD_STATUSES.LOST],
-    PILOT: [LEAD_STATUSES.NEGOTIATION, LEAD_STATUSES.WON, LEAD_STATUSES.LOST],
-    NEGOTIATION: [LEAD_STATUSES.WON, LEAD_STATUSES.LOST],
-    WON: [],
-    LOST: [],
+// keyed by the stored status VALUE (lowercase) so moveStage can do LEAD_TRANSITION_MAP[lead.status] directly
+export const LEAD_TRANSITION_MAP: Record<string, string[]> = {
+    [LEAD_STATUSES.NEW]: [LEAD_STATUSES.QUALIFIED],
+    [LEAD_STATUSES.QUALIFIED]: [LEAD_STATUSES.PROPOSAL, LEAD_STATUSES.LOST],
+    [LEAD_STATUSES.PROPOSAL]: [LEAD_STATUSES.PILOT, LEAD_STATUSES.NEGOTIATION, LEAD_STATUSES.LOST],
+    [LEAD_STATUSES.PILOT]: [LEAD_STATUSES.NEGOTIATION, LEAD_STATUSES.WON, LEAD_STATUSES.LOST],
+    [LEAD_STATUSES.NEGOTIATION]: [LEAD_STATUSES.WON, LEAD_STATUSES.LOST],
+    [LEAD_STATUSES.WON]: [],
+    [LEAD_STATUSES.LOST]: [],
+};
+
+// ============================================================
+// ================= LEAD PERMISSIONS CONSTANTS ===============
+// ============================================================
+export const LEAD_PERMISSIONS = {
+    MANAGE: { code: 'lead:manage', name: 'Manage Lead', description: 'Manage leads' } as const,
 };

@@ -1,5 +1,5 @@
-import { ResponseHandler } from '../../../shared/utils/responseHandler';
-import { formatZodError } from '../../../shared/utils/error';
+import { ResponseHandler } from '../../shared/utils/responseHandler';
+import { formatZodError } from '../../shared/utils/error';
 import {
     CreateDivisionPayloadSchema,
     UpdateDivisionPayloadSchema,
@@ -8,8 +8,8 @@ import {
 import { StatusCodes } from 'http-status-codes';
 import { DivisionService } from './division.service';
 import { DivisionMapper } from './division.mapper';
-import { RequestHandler } from '../../../shared/utils/requestHandler';
-import { RequestContext } from '../../../shared/utils/contextBuilder';
+import { RequestHandler } from '../../shared/utils/requestHandler';
+import { RequestContext } from '../../shared/utils/contextBuilder';
 
 const get = async (req: any, res: any) => {
     try {

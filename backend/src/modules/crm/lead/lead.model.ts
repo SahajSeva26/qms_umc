@@ -38,7 +38,7 @@ const leadSchema = new mongoose.Schema(
             required: true,
             index: true,
         },
-        company: {},
+        // company: {},
         division: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Division',

@@ -66,7 +66,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { id: 'dashboard',    label: 'Dashboard',                   icon: 'Grid',          path: DASHBOARD_ROUTES.DASHBOARD,
     rolesAllowed: ['logistics', 'analytics_viewer'] },
 
-  { id: 'sales',        label: 'Sales Dashboard',             icon: 'Grid',          path: CRM_ROUTES.SALES,
+  { id: 'sales',        label: 'Dashboard',                   icon: 'Grid',          path: CRM_ROUTES.SALES,
     rolesAllowed: ['sales_lead', 'sales_rep'] },
 
   { id: 'analytics',    label: 'Sales Analytics',             icon: 'TrendingUp',    path: ANALYTICS_ROUTES.ANALYTICS_SALES,

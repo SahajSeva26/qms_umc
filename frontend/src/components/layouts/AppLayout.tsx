@@ -42,7 +42,7 @@ const AppLayout = () => {
   if (!isAuthenticated) return <Navigate to={AUTH_ROUTES.LOGIN} replace />
 
   return (
-    <div className="app-bg flex h-screen overflow-hidden">
+    <div className="app-bg flex h-dvh overflow-hidden">
       {/* Desktop sidebar */}
       <div className="hidden lg:flex shrink-0">
         <Sidebar collapsed={collapsed} onToggle={handleToggle} />

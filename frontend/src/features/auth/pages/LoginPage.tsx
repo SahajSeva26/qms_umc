@@ -29,7 +29,7 @@ const LoginPage = () => {
   }
 
   return (
-    <div className="flex h-screen w-full overflow-hidden">
+    <div className="flex h-dvh w-full overflow-hidden">
       {/* ── Left panel ── */}
       <div className="auth-panel hidden lg:flex lg:w-[52%] flex-col p-12 relative overflow-hidden">
         <div className="auth-panel-dots absolute inset-0 pointer-events-none" />

@@ -199,7 +199,7 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
   return (
     <aside
       className={cn(
-        'flex flex-col h-screen sticky top-0 border-r backdrop-blur-xl transition-all duration-200',
+        'flex flex-col h-dvh sticky top-0 border-r backdrop-blur-xl transition-all duration-200',
         collapsed ? 'w-16' : 'w-56'
       )}
       style={{

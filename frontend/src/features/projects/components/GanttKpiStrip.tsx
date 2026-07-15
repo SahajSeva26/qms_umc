@@ -1,14 +1,16 @@
 import { FiFolder, FiPlayCircle, FiPauseCircle, FiRefreshCw, FiAlertTriangle, FiClock, FiLayers } from 'react-icons/fi'
 import type { ProjectKpis } from '@/types/project.types'
+import KpiTile, { type KpiTone } from '@/components/ui/KpiTile'
 
+// Tones match the prototype's gantt.js `cards` array exactly (line 283-289).
 const TILES = [
-  { key: 'total' as const, label: 'Projects', icon: FiFolder, color: 'var(--qms-brand)' },
-  { key: 'live' as const, label: 'Live', icon: FiPlayCircle, color: '#10b981' },
-  { key: 'hold' as const, label: 'On Hold', icon: FiPauseCircle, color: '#f59e0b' },
-  { key: 'renewingIn30d' as const, label: 'Renewing 30d', icon: FiRefreshCw, color: '#7c3aed' },
-  { key: 'atRisk' as const, label: 'At Risk', icon: FiAlertTriangle, color: '#f43f5e' },
-  { key: 'overdue' as const, label: 'Overdue', icon: FiClock, color: '#f43f5e' },
-  { key: 'totalCamps' as const, label: 'Total Camps', icon: FiLayers, color: 'var(--qms-teal)' },
+  { key: 'total' as const, label: 'Projects', icon: FiFolder, tone: 'brand' as KpiTone },
+  { key: 'live' as const, label: 'Live', icon: FiPlayCircle, tone: 'teal' as KpiTone },
+  { key: 'hold' as const, label: 'On Hold', icon: FiPauseCircle, tone: 'amber' as KpiTone },
+  { key: 'renewingIn30d' as const, label: 'Renewing 30d', icon: FiRefreshCw, tone: 'violet' as KpiTone },
+  { key: 'atRisk' as const, label: 'At Risk', icon: FiAlertTriangle, tone: 'rose' as KpiTone },
+  { key: 'overdue' as const, label: 'Overdue', icon: FiClock, tone: 'rose' as KpiTone },
+  { key: 'totalCamps' as const, label: 'Total Camps', icon: FiLayers, tone: 'brand' as KpiTone },
 ]
 
 function subLabel(key: keyof ProjectKpis, kpis: ProjectKpis): string {
@@ -35,16 +37,16 @@ interface GanttKpiStripProps {
 }
 
 const GanttKpiStrip = ({ kpis }: GanttKpiStripProps) => (
-  <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
+  <div className="grid gap-2.5 mb-4 grid-cols-4 max-[1300px]:grid-cols-3 max-[980px]:grid-cols-2 max-[560px]:grid-cols-1">
     {TILES.map((tile) => (
-      <div key={tile.key} className="rounded-2xl border p-3.5" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}>
-        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-          <tile.icon size={12} style={{ color: tile.color }} />
-          {tile.label}
-        </div>
-        <div className="text-2xl font-bold" style={{ color: 'var(--qms-text)' }}>{kpis[tile.key]}</div>
-        <div className="text-[11px] mt-0.5" style={{ color: 'var(--qms-text-muted)' }}>{subLabel(tile.key, kpis)}</div>
-      </div>
+      <KpiTile
+        key={tile.key}
+        label={tile.label}
+        value={String(kpis[tile.key])}
+        sub={subLabel(tile.key, kpis)}
+        tone={tile.tone}
+        icon={tile.icon}
+      />
     ))}
   </div>
 )

@@ -3,6 +3,10 @@ import { useAuth } from '@/hooks/useAuth'
 import { useSalesData } from '@/features/crm/sales/hooks/useSalesData'
 import { useLeads } from '@/features/crm/hooks/useLeads'
 import { useClientsData } from '@/features/crm/clients/hooks/useClientsData'
+import { QUARTER } from '@/features/crm/sales/sales.mock'
+import { buildSalesHeadKpis, buildKamKpis, DEFAULT_SALES_FILTER, type SalesFilterState } from '@/features/crm/sales/sales.kpis'
+import SalesFilterBar from '@/features/crm/sales/components/SalesFilterBar'
+import SalesKpiGrid from '@/features/crm/sales/components/SalesKpiGrid'
 import TodayTab from '@/features/crm/sales/components/TodayTab'
 import TeamTab from '@/features/crm/sales/components/TeamTab'
 import TargetsTab from '@/features/crm/sales/components/TargetsTab'
@@ -39,6 +43,7 @@ const SalesDashboardPage = () => {
   const [tab, setTab] = useState<TabId>('TODAY')
   const [targetDialog, setTargetDialog] = useState<{ repId: string | null } | null>(null)
   const [openRepId, setOpenRepId] = useState<string | null>(null)
+  const [salesFilter, setSalesFilter] = useState<SalesFilterState>(DEFAULT_SALES_FILTER)
 
   const isApprover = APPROVER_ROLES.includes(user?.role ?? '')
 
@@ -49,6 +54,14 @@ const SalesDashboardPage = () => {
 
   const pendingApprovals = approvals.filter((a) => a.status === 'PENDING').length
   const openRep = reps.find((r) => r.id === openRepId) ?? null
+
+  const kpiTiles = useMemo(
+    () =>
+      isApprover
+        ? buildSalesHeadKpis({ reps, targets, clients, projects, invoices, filter: salesFilter, quarter: QUARTER })
+        : buildKamKpis({ reps, targets, clients, projects, invoices, filter: salesFilter, quarter: QUARTER }),
+    [isApprover, reps, targets, clients, projects, invoices, salesFilter]
+  )
 
   const TABS: { id: TabId; label: string; badge?: number }[] = [
     { id: 'TODAY', label: 'Today' },
@@ -73,6 +86,12 @@ const SalesDashboardPage = () => {
           </span>
         </div>
       </div>
+
+      {isApprover && (
+        <SalesFilterBar filter={salesFilter} onChange={setSalesFilter} reps={reps} clients={clients} projects={projects} />
+      )}
+
+      <SalesKpiGrid tiles={kpiTiles} />
 
       <div className="flex flex-wrap gap-1.5 mb-4">
         {TABS.map((t) => (

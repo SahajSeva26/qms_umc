@@ -6,9 +6,8 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import DatePicker from '@/components/ui/DatePicker'
-
-const labelClasses = 'block text-[10px] font-semibold tracking-widest uppercase mb-2'
-const labelStyle = { color: 'var(--qms-text-muted)' }
+import { ReviewCard, ReviewGrid, ReviewField } from '@/components/ui/ReviewCard'
+import { labelClasses, labelStyle, fieldClasses } from '@/features/crm/components/wizard/wizard.styles'
 
 interface WizardStep4Props {
   form: WizardFormState
@@ -20,14 +19,14 @@ const WizardStep4 = ({ form, setField }: WizardStep4Props) => {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2.5">
         <div>
           <Label className={labelClasses} style={labelStyle}>Estimated value (₹)</Label>
           <Input
             type="number"
             value={form.estimatedValue || ''}
             onChange={(e) => setField('estimatedValue', Number(e.target.value))}
-            className="text-[13px]"
+            className={fieldClasses}
           />
         </div>
         <div>
@@ -35,13 +34,15 @@ const WizardStep4 = ({ form, setField }: WizardStep4Props) => {
           <DatePicker
             value={form.nextFollowUpDate}
             onChange={(iso) => setField('nextFollowUpDate', iso)}
-            className="w-full text-[13px]"
+            className={`w-full ${fieldClasses}`}
           />
         </div>
       </div>
 
       <div>
-        <Label className={labelClasses} style={labelStyle}>Confidence — {form.confidencePct}%</Label>
+        <Label className={labelClasses} style={labelStyle}>
+          Confidence — <span style={{ color: 'var(--qms-brand)', fontWeight: 800 }}>{form.confidencePct}%</span>
+        </Label>
         <input
           type="range"
           min={0}
@@ -54,42 +55,38 @@ const WizardStep4 = ({ form, setField }: WizardStep4Props) => {
       </div>
 
       <div>
-        <Label className={labelClasses} style={labelStyle}>Owner</Label>
+        <Label className={labelClasses} style={labelStyle}>Owner (sales rep)</Label>
         <Select value={form.owner} onValueChange={(v) => setField('owner', v as string)}>
-          <SelectTrigger className="w-full text-[13px]"><SelectValue placeholder="Select owner..." /></SelectTrigger>
+          <SelectTrigger className={`w-full ${fieldClasses}`}><SelectValue placeholder="Select owner..." /></SelectTrigger>
           <SelectContent>
             {OWNERS.map((o) => <SelectItem key={o.name} value={o.name}>{o.name}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
 
-      <div
-        className="rounded-xl p-3 text-[12px]"
-        style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text-soft)' }}
-      >
-        Lead opens in stage <span className="font-bold">Lead Generation</span>. Transition forward by drag-drop in the
-        Kanban, or mark Lost from the drawer.
-      </div>
+      <p className="text-[12px] mt-2" style={{ color: 'var(--qms-text-muted)' }}>
+        Lead opens in stage <b>Lead Generation</b>. Transition forward by drag-drop in the kanban, or mark Lost from the drawer.
+      </p>
 
-      <div
-        className="rounded-xl border p-3"
-        style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}
-      >
-        <div className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-          Review
-        </div>
-        <div className="grid grid-cols-2 gap-2 text-[12px]">
-          <div><span style={{ color: 'var(--qms-text-muted)' }}>Pharma:</span> {form.pharmaCompanyName || '—'}</div>
-          <div><span style={{ color: 'var(--qms-text-muted)' }}>Division:</span> {form.divisionName || '—'}</div>
-          <div><span style={{ color: 'var(--qms-text-muted)' }}>Focus therapy:</span> {form.focusTherapies.join(', ') || '—'}</div>
-          <div><span style={{ color: 'var(--qms-text-muted)' }}>Brands:</span> {form.brandNames.join(', ') || '—'}</div>
-          <div><span style={{ color: 'var(--qms-text-muted)' }}>MRs:</span> {form.mrCount || '—'}</div>
-          <div><span style={{ color: 'var(--qms-text-muted)' }}>Project type:</span> {form.projectType || '—'}</div>
-          <div><span style={{ color: 'var(--qms-text-muted)' }}>QMS offer:</span> {form.qmsOffers.join(', ') || '—'}</div>
-          <div><span style={{ color: 'var(--qms-text-muted)' }}>AI score:</span> <span className="font-bold">{score}</span></div>
-          <div><span style={{ color: 'var(--qms-text-muted)' }}>Value:</span> {formatINR(form.estimatedValue)}</div>
-        </div>
-      </div>
+      <ReviewCard>
+        <ReviewGrid>
+          <ReviewField label="Pharma" value={form.pharmaCompanyName || '—'} />
+          <ReviewField label="Division" value={form.divisionName || '—'} />
+          <ReviewField label="Focus therapy" value={form.focusTherapies.join(', ') || '—'} />
+          <ReviewField label="Brands" value={form.brandNames.join(', ') || '—'} />
+          <ReviewField label="MRs" value={form.mrCount ? String(form.mrCount) : '—'} />
+          <ReviewField label="Project type" value={form.projectType || '—'} />
+          <ReviewField label="QMS offer" value={form.qmsOffers.join(', ') || '—'} />
+          <ReviewField label="AI score" value={String(score)} />
+          <ReviewField label="Value" value={formatINR(form.estimatedValue)} />
+        </ReviewGrid>
+        {form.problemStatement && (
+          <div className="mt-3">
+            <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--qms-text-soft)' }}>Problem statement</div>
+            <div className="text-[13px] mt-1 leading-snug" style={{ color: 'var(--qms-text)' }}>{form.problemStatement}</div>
+          </div>
+        )}
+      </ReviewCard>
     </div>
   )
 }

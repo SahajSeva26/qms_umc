@@ -4,15 +4,13 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import ChipPicker from '@/features/crm/components/wizard/ChipPicker'
+import { labelClasses, labelStyle, fieldClasses } from '@/features/crm/components/wizard/wizard.styles'
 
 const ACCOUNTS = ['Sun Pharma', 'Cipla', "Dr Reddy's", 'Abbott India', 'Lupin', 'Zydus', 'Glenmark', 'Fortis Healthcare']
 const SPECIALTIES = [
   'Cardiologist', 'Endocrinologist', 'Pulmonologist', 'Neurologist', 'Orthopedic', 'Gynecologist',
   'Gastroenterologist', 'Dermatologist', 'Nephrologist', 'Oncologist', 'GP', 'CP', 'Other',
 ]
-
-const labelClasses = 'block text-[10px] font-semibold tracking-widest uppercase mb-2'
-const labelStyle = { color: 'var(--qms-text-muted)' }
 
 interface WizardStep1Props {
   form: WizardFormState
@@ -24,7 +22,7 @@ const WizardStep1 = ({ form, setField }: WizardStep1Props) => (
     <div>
       <Label className={labelClasses} style={labelStyle}>Pharma company *</Label>
       <Select value={form.pharmaCompanyName} onValueChange={(v) => setField('pharmaCompanyName', v as string)}>
-        <SelectTrigger className="w-full text-[13px]"><SelectValue placeholder="Select company..." /></SelectTrigger>
+        <SelectTrigger className={`w-full ${fieldClasses}`}><SelectValue placeholder="Select company..." /></SelectTrigger>
         <SelectContent>
           {ACCOUNTS.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
         </SelectContent>
@@ -33,28 +31,28 @@ const WizardStep1 = ({ form, setField }: WizardStep1Props) => (
 
     <div>
       <Label className={labelClasses} style={labelStyle}>Division</Label>
-      <Input type="text" value={form.divisionName} onChange={(e) => setField('divisionName', e.target.value)} className="text-[13px]" placeholder="e.g. Cardio Care" />
+      <Input type="text" value={form.divisionName} onChange={(e) => setField('divisionName', e.target.value)} className={fieldClasses} placeholder="e.g. Cardio Care" />
     </div>
 
-    <div className="grid grid-cols-2 gap-3">
+    <div className="grid grid-cols-2 gap-2.5">
       <div>
         <Label className={labelClasses} style={labelStyle}>Contact person *</Label>
-        <Input type="text" value={form.contact} onChange={(e) => setField('contact', e.target.value)} className="text-[13px]" placeholder="Dr. Name" />
+        <Input type="text" value={form.contact} onChange={(e) => setField('contact', e.target.value)} className={fieldClasses} placeholder="Dr. Name" />
       </div>
       <div>
         <Label className={labelClasses} style={labelStyle}>Role</Label>
-        <Input type="text" value={form.contactRole} onChange={(e) => setField('contactRole', e.target.value)} className="text-[13px]" placeholder="Brand Mgr" />
+        <Input type="text" value={form.contactRole} onChange={(e) => setField('contactRole', e.target.value)} className={fieldClasses} placeholder="Brand Mgr" />
       </div>
     </div>
 
-    <div className="grid grid-cols-2 gap-3">
+    <div className="grid grid-cols-2 gap-2.5">
       <div>
         <Label className={labelClasses} style={labelStyle}>Email</Label>
-        <Input type="email" value={form.email} onChange={(e) => setField('email', e.target.value)} className="text-[13px]" />
+        <Input type="email" value={form.email} onChange={(e) => setField('email', e.target.value)} className={fieldClasses} />
       </div>
       <div>
         <Label className={labelClasses} style={labelStyle}>Phone</Label>
-        <Input type="tel" value={form.phone} onChange={(e) => setField('phone', e.target.value)} className="text-[13px]" />
+        <Input type="tel" value={form.phone} onChange={(e) => setField('phone', e.target.value)} className={fieldClasses} />
       </div>
     </div>
 
@@ -71,7 +69,7 @@ const WizardStep1 = ({ form, setField }: WizardStep1Props) => (
           type="text"
           value={form.focusDoctorOther}
           onChange={(e) => setField('focusDoctorOther', e.target.value)}
-          className="text-[13px] mt-2"
+          className={`${fieldClasses} mt-2`}
           placeholder="Specify other specialty *"
         />
       )}

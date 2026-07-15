@@ -2,9 +2,7 @@ import type { WizardFormState } from '@/features/projects/wizard.types'
 import { formatINR } from '@/utils/formatters'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-
-const labelClasses = 'block text-[10px] font-semibold tracking-widest uppercase mb-2'
-const labelStyle = { color: 'var(--qms-text-muted)' }
+import { labelClasses, labelStyle, fieldClasses } from '@/features/projects/components/wizard/wizard.styles'
 
 interface WizardStep3Props {
   form: WizardFormState
@@ -18,7 +16,7 @@ const WizardStep3 = ({ form, setField }: WizardStep3Props) => {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2.5">
         <div>
           <Label className={labelClasses} style={labelStyle}>Camp cost (₹ per camp)</Label>
           <Input
@@ -29,7 +27,7 @@ const WizardStep3 = ({ form, setField }: WizardStep3Props) => {
               setField('campCost', campCost)
               if (!form.valueBeforeGstTouched) setField('valueBeforeGst', campCost * form.totalCamps)
             }}
-            className="text-[13px]"
+            className={fieldClasses}
           />
         </div>
         <div>
@@ -42,7 +40,7 @@ const WizardStep3 = ({ form, setField }: WizardStep3Props) => {
               setField('totalCamps', totalCamps)
               if (!form.valueBeforeGstTouched) setField('valueBeforeGst', form.campCost * totalCamps)
             }}
-            className="text-[13px]"
+            className={fieldClasses}
           />
         </div>
       </div>
@@ -56,35 +54,46 @@ const WizardStep3 = ({ form, setField }: WizardStep3Props) => {
             setField('valueBeforeGst', Number(e.target.value))
             setField('valueBeforeGstTouched', true)
           }}
-          className="text-[13px]"
+          className={fieldClasses}
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2.5">
         <div>
           <Label className={labelClasses} style={labelStyle}>GST %</Label>
-          <Input type="number" min={0} max={100} step={0.5} value={form.gstPct} onChange={(e) => setField('gstPct', Number(e.target.value))} className="text-[13px]" />
+          <Input type="number" min={0} max={100} step={0.5} value={form.gstPct} onChange={(e) => setField('gstPct', Number(e.target.value))} className={fieldClasses} />
         </div>
         <div>
           <Label className={labelClasses} style={labelStyle}>Additional patient cost (₹ per patient)</Label>
-          <Input type="number" value={form.additionalPatientCost || ''} onChange={(e) => setField('additionalPatientCost', Number(e.target.value))} className="text-[13px]" />
+          <Input type="number" value={form.additionalPatientCost || ''} onChange={(e) => setField('additionalPatientCost', Number(e.target.value))} className={fieldClasses} />
         </div>
       </div>
 
-      <div className="rounded-xl border p-3 space-y-1.5 text-[13px]" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-strong)' }}>
-        <div className="flex justify-between" style={{ color: 'var(--qms-text-muted)' }}>
+      {/* Matches the prototype's .gst-calc exactly: 2-col grid, diagonal
+          brand→teal gradient tint, dashed-top-border total row. */}
+      <div
+        className="grid grid-cols-2 gap-2 p-3 rounded-xl border text-[12px] mt-1.5"
+        style={{
+          borderColor: 'var(--qms-border)',
+          background: 'linear-gradient(135deg, color-mix(in srgb, var(--qms-brand) 5%, transparent), color-mix(in srgb, var(--qms-teal) 5%, transparent))',
+        }}
+      >
+        <div className="flex justify-between" style={{ color: 'var(--qms-text-soft)' }}>
           <span>Camp cost × Total camps</span>
           <span>{formatINR(computedValueBeforeGst)}</span>
         </div>
-        <div className="flex justify-between" style={{ color: 'var(--qms-text-muted)' }}>
-          <span>Value before GST</span>
+        <div className="flex justify-between" style={{ color: 'var(--qms-text-soft)' }}>
+          <span>Value before GST (editable)</span>
           <span>{formatINR(form.valueBeforeGst)}</span>
         </div>
-        <div className="flex justify-between" style={{ color: 'var(--qms-text-muted)' }}>
+        <div className="flex justify-between" style={{ color: 'var(--qms-text-soft)' }}>
           <span>GST @ {form.gstPct}%</span>
           <span>{formatINR(gstAmount)}</span>
         </div>
-        <div className="flex justify-between font-bold pt-1.5" style={{ color: 'var(--qms-text)', borderTop: '1px solid var(--qms-border)' }}>
+        <div
+          className="flex justify-between font-extrabold text-[13px] pt-1.5"
+          style={{ color: 'var(--qms-brand)', borderTop: '1px dashed var(--qms-border)' }}
+        >
           <span>Total value (incl. GST)</span>
           <span>{formatINR(totalValue)}</span>
         </div>

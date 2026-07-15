@@ -4,11 +4,11 @@ import type { WizardFormState } from '@/features/projects/wizard.types'
 import type { UploadedDoc } from '@/types/project.types'
 import { EXECUTION_MODES } from '@/types/project.types'
 import { CLIENTS } from '@/types/client.types'
+import { PickCard, PickGrid } from '@/components/ui/PickCard'
+import SectionHeader from '@/components/ui/SectionHeader'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-
-const labelClasses = 'block text-[10px] font-semibold tracking-widest uppercase mb-2'
-const labelStyle = { color: 'var(--qms-text-muted)' }
+import { labelClasses, labelStyle, fieldClasses } from '@/features/projects/components/wizard/wizard.styles'
 
 const MODE_ICONS = { PO: FiFile, AGREEMENT: FiFileText, MAIL: FiMail }
 
@@ -57,30 +57,26 @@ const WizardStep2 = ({ form, setField }: WizardStep2Props) => {
     <div className="space-y-4">
       <div>
         <Label className={labelClasses} style={labelStyle}>Execution mode *</Label>
-        <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
-          {EXECUTION_MODES.map((m) => {
-            const Icon = MODE_ICONS[m.id]
-            const active = form.executionMode === m.id
-            return (
-              <button
-                key={m.id}
-                onClick={() => setField('executionMode', m.id)}
-                className="flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-all text-left"
-                style={active ? { background: `${m.color}18`, borderColor: m.color, color: m.color } : { background: 'var(--qms-surface-strong)', borderColor: 'var(--qms-border)', color: 'var(--qms-text-soft)' }}
-              >
-                <Icon size={15} />
-                <span className="text-[12px] font-semibold">{m.label}</span>
-              </button>
-            )
-          })}
-        </div>
+        <PickGrid>
+          {EXECUTION_MODES.map((m) => (
+            <PickCard
+              key={m.id}
+              active={form.executionMode === m.id}
+              color={m.color}
+              label={m.label}
+              icon={MODE_ICONS[m.id]}
+              onClick={() => setField('executionMode', m.id)}
+            />
+          ))}
+        </PickGrid>
       </div>
 
       {form.executionMode === 'PO' && (
         <div className="space-y-3">
+          <SectionHeader icon={FiFile}>PO Based details</SectionHeader>
           <div>
             <Label className={labelClasses} style={labelStyle}>PO number *</Label>
-            <Input type="text" value={form.poNo} onChange={(e) => setField('poNo', e.target.value)} className="text-[13px]" />
+            <Input type="text" value={form.poNo} onChange={(e) => setField('poNo', e.target.value)} className={fieldClasses} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -92,12 +88,12 @@ const WizardStep2 = ({ form, setField }: WizardStep2Props) => {
                   setField('poDate', e.target.value)
                   if (!form.poExpiry) setField('poExpiry', addMonthsIso(e.target.value, 12))
                 }}
-                className="text-[13px]"
+                className={fieldClasses}
               />
             </div>
             <div>
               <Label className={labelClasses} style={labelStyle}>PO expiry</Label>
-              <Input type="date" value={form.poExpiry} onChange={(e) => setField('poExpiry', e.target.value)} className="text-[13px]" placeholder="blank → +12 months" />
+              <Input type="date" value={form.poExpiry} onChange={(e) => setField('poExpiry', e.target.value)} className={fieldClasses} placeholder="blank → +12 months" />
             </div>
           </div>
         </div>
@@ -105,9 +101,10 @@ const WizardStep2 = ({ form, setField }: WizardStep2Props) => {
 
       {form.executionMode === 'AGREEMENT' && (
         <div className="space-y-3">
+          <SectionHeader icon={FiFileText}>Agreement Based details</SectionHeader>
           <div>
             <Label className={labelClasses} style={labelStyle}>Agreement number</Label>
-            <Input type="text" value={form.agreementNo} onChange={(e) => setField('agreementNo', e.target.value)} className="text-[13px]" placeholder={suggestedAgreementNo || 'auto-generated on save'} />
+            <Input type="text" value={form.agreementNo} onChange={(e) => setField('agreementNo', e.target.value)} className={fieldClasses} placeholder={suggestedAgreementNo || 'auto-generated on save'} />
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div>
@@ -120,7 +117,7 @@ const WizardStep2 = ({ form, setField }: WizardStep2Props) => {
                   if (form.agreementExpiry) setField('agreementDurationMonths', monthsBetween(e.target.value, form.agreementExpiry))
                   else if (form.agreementDurationMonths) setField('agreementExpiry', addMonthsIso(e.target.value, form.agreementDurationMonths))
                 }}
-                className="text-[13px]"
+                className={fieldClasses}
               />
             </div>
             <div>
@@ -132,7 +129,7 @@ const WizardStep2 = ({ form, setField }: WizardStep2Props) => {
                   setField('agreementExpiry', e.target.value)
                   if (form.agreementStart) setField('agreementDurationMonths', monthsBetween(form.agreementStart, e.target.value))
                 }}
-                className="text-[13px]"
+                className={fieldClasses}
               />
             </div>
             <div>
@@ -145,7 +142,7 @@ const WizardStep2 = ({ form, setField }: WizardStep2Props) => {
                   setField('agreementDurationMonths', months)
                   if (form.agreementStart) setField('agreementExpiry', addMonthsIso(form.agreementStart, months))
                 }}
-                className="text-[13px]"
+                className={fieldClasses}
               />
             </div>
           </div>
@@ -168,9 +165,10 @@ const WizardStep2 = ({ form, setField }: WizardStep2Props) => {
 
       {form.executionMode === 'MAIL' && (
         <div className="space-y-3">
+          <SectionHeader icon={FiMail}>Mail Confirmation details</SectionHeader>
           <div>
             <Label className={labelClasses} style={labelStyle}>Email reference / subject *</Label>
-            <Input type="text" value={form.mailRef} onChange={(e) => setField('mailRef', e.target.value)} className="text-[13px]" />
+            <Input type="text" value={form.mailRef} onChange={(e) => setField('mailRef', e.target.value)} className={fieldClasses} />
           </div>
           <div>
             <Label className={labelClasses} style={labelStyle}>Attachment</Label>

@@ -33,10 +33,10 @@ interface ProjectTableProps {
 }
 
 const ProjectTable = ({ projects, camps, onOpenDetail, onEdit, onChangeStatus, onRenew, onAddVoidCamp, onClose, onReopen }: ProjectTableProps) => (
-  <div className="overflow-x-auto rounded-xl border" style={{ borderColor: 'var(--qms-border)' }}>
+  <div className="overflow-x-auto rounded-xl border backdrop-blur-xl" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface)' }}>
     <table className="w-full text-[13px]">
       <thead>
-        <tr style={{ borderBottom: '1px solid var(--qms-border)' }}>
+        <tr style={{ borderBottom: '1px solid var(--qms-border)', background: 'var(--qms-surface-strong)' }}>
           {COLUMNS.map((h) => (
             <th key={h} className="text-left font-bold text-[11px] uppercase tracking-wider px-3 py-2 whitespace-nowrap" style={{ color: 'var(--qms-text-muted)' }}>
               {h}

@@ -159,7 +159,10 @@
   --chart-5: #10b981;
 
   /* ── QMS brand ── */
-  --qms-brand:           #2451f0;
+  /* Matches the prototype's --brand-500 exactly (styles.css) — the actual
+     accent color used for active states/buttons/highlights throughout, not
+     the darker --brand-600 this token used to hold. */
+  --qms-brand:           #3b6dff;
   --qms-teal:            #14b8a6;
 
   /* ── QMS surface (light) ── */

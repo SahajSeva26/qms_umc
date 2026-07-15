@@ -42,11 +42,11 @@ export const PROJECT_TYPES: ProjectTypeMeta[] = [
 
 export type MixedSubType = 'Screening' | 'Diet' | 'DedicatedFO' | 'Lab'
 
-export const MIXED_SUBTYPES: { id: MixedSubType; label: string }[] = [
-  { id: 'Screening', label: 'Screening Camp' },
-  { id: 'Diet', label: 'Diet' },
-  { id: 'DedicatedFO', label: 'Dedicated FO' },
-  { id: 'Lab', label: 'Lab' },
+export const MIXED_SUBTYPES: { id: MixedSubType; label: string; color: string }[] = [
+  { id: 'Screening', label: 'Screening Camp', color: '#3b6dff' },
+  { id: 'Diet', label: 'Diet', color: '#14b8a6' },
+  { id: 'DedicatedFO', label: 'Dedicated FO', color: '#0ea5e9' },
+  { id: 'Lab', label: 'Lab', color: '#a855f7' },
 ]
 
 export type ExecutionMode = 'PO' | 'AGREEMENT' | 'MAIL'
@@ -81,6 +81,12 @@ export const CAMP_TIME_SLOTS: { id: string; label: string }[] = [
 ]
 
 export type GoLiveScope = 'STATE' | 'CITY' | 'PAN_INDIA'
+
+export const GO_LIVE_SCOPES: { id: GoLiveScope; label: string; icon: string }[] = [
+  { id: 'STATE', label: 'Specific states', icon: 'map' },
+  { id: 'CITY', label: 'Specific cities', icon: 'map-pin' },
+  { id: 'PAN_INDIA', label: 'PAN-India', icon: 'globe-2' },
+]
 
 export const STATES_INDIA = [
   'AN', 'AP', 'AR', 'AS', 'BR', 'CG', 'CH', 'DL', 'DN', 'GA', 'GJ', 'HP', 'HR', 'JH', 'JK',

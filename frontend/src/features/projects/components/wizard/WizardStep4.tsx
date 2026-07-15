@@ -1,19 +1,15 @@
+import { FiClock, FiXCircle, FiMap, FiMapPin, FiGlobe, FiUsers } from 'react-icons/fi'
 import type { WizardFormState } from '@/features/projects/wizard.types'
-import type { GoLiveScope } from '@/types/project.types'
-import { CAMP_TIME_SLOTS, STATES_INDIA, BOOKING_ROLES } from '@/types/project.types'
-import ChipPicker from '@/components/ui/ChipPicker'
+import { CAMP_TIME_SLOTS, STATES_INDIA, BOOKING_ROLES, GO_LIVE_SCOPES } from '@/types/project.types'
+import { PickCard, PickGrid } from '@/components/ui/PickCard'
+import SectionHeader from '@/components/ui/SectionHeader'
+import { ChipRow, ChipToggle } from '@/components/ui/ChipToggle'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { labelClasses, labelStyle, fieldClasses } from '@/features/projects/components/wizard/wizard.styles'
 
-const labelClasses = 'block text-[10px] font-semibold tracking-widest uppercase mb-2'
-const labelStyle = { color: 'var(--qms-text-muted)' }
-
-const SCOPE_OPTIONS: { id: GoLiveScope; label: string }[] = [
-  { id: 'STATE', label: 'Specific states' },
-  { id: 'CITY', label: 'Specific cities' },
-  { id: 'PAN_INDIA', label: 'PAN-India' },
-]
+const SCOPE_ICONS = { STATE: FiMap, CITY: FiMapPin, PAN_INDIA: FiGlobe }
 
 interface WizardStep4Props {
   form: WizardFormState
@@ -25,110 +21,99 @@ const WizardStep4 = ({ form, setField }: WizardStep4Props) => {
     setField('campTimeSlots', form.campTimeSlots.includes(id) ? form.campTimeSlots.filter((s) => s !== id) : [...form.campTimeSlots, id])
   }
 
+  const toggleState = (state: string) => {
+    setField('goLiveDetails', form.goLiveDetails.includes(state) ? form.goLiveDetails.filter((s) => s !== state) : [...form.goLiveDetails, state])
+  }
+
   const toggleBookingRole = (id: WizardFormState['bookingHierarchy'][number]) => {
     setField('bookingHierarchy', form.bookingHierarchy.includes(id) ? form.bookingHierarchy.filter((r) => r !== id) : [...form.bookingHierarchy, id])
   }
 
   return (
-    <div className="space-y-4">
-      <div>
-        <Label className={labelClasses} style={labelStyle}>Camp time slots *</Label>
-        <div className="flex flex-wrap gap-1.5">
-          {CAMP_TIME_SLOTS.map((slot) => (
-            <button
-              key={slot.id}
-              onClick={() => toggleSlot(slot.id)}
-              className="text-[12px] font-semibold px-3 py-1.5 rounded-lg border transition-all"
-              style={
-                form.campTimeSlots.includes(slot.id)
-                  ? { background: 'var(--qms-teal)', borderColor: 'var(--qms-teal)', color: '#fff' }
-                  : { background: 'var(--qms-surface-strong)', borderColor: 'var(--qms-border)', color: 'var(--qms-text-soft)' }
-              }
-            >
-              {slot.label}
-            </button>
-          ))}
+    <div className="space-y-1">
+      <SectionHeader icon={FiClock} spaced={false}>Camp time slots (multi-select)</SectionHeader>
+      <ChipRow>
+        {CAMP_TIME_SLOTS.map((slot) => (
+          <ChipToggle key={slot.id} active={form.campTimeSlots.includes(slot.id)} onClick={() => toggleSlot(slot.id)}>
+            {slot.label}
+          </ChipToggle>
+        ))}
+      </ChipRow>
+
+      <SectionHeader icon={FiXCircle}>Cancellation policy</SectionHeader>
+      <div className="grid grid-cols-3 gap-2.5">
+        <div>
+          <Label className={labelClasses} style={labelStyle}>Free-cancel hours prior</Label>
+          <Input type="number" value={form.cancellationPolicy.freeHoursPrior} onChange={(e) => setField('cancellationPolicy', { ...form.cancellationPolicy, freeHoursPrior: Number(e.target.value) })} className={fieldClasses} />
+        </div>
+        <div>
+          <Label className={labelClasses} style={labelStyle}>% cancellations allowed</Label>
+          <Input type="number" value={form.cancellationPolicy.pctAllowed} onChange={(e) => setField('cancellationPolicy', { ...form.cancellationPolicy, pctAllowed: Number(e.target.value) })} className={fieldClasses} />
+        </div>
+        <div>
+          <Label className={labelClasses} style={labelStyle}>% deducted on chargeable cancel</Label>
+          <Input type="number" value={form.cancellationPolicy.pctDeducted} onChange={(e) => setField('cancellationPolicy', { ...form.cancellationPolicy, pctDeducted: Number(e.target.value) })} className={fieldClasses} />
         </div>
       </div>
 
-      <div>
-        <Label className={labelClasses} style={labelStyle}>Cancellation policy</Label>
-        <div className="grid grid-cols-3 gap-3">
-          <div>
-            <Label className="block text-[10px] mb-1" style={labelStyle}>Free-cancel hours prior</Label>
-            <Input type="number" value={form.cancellationPolicy.freeHoursPrior} onChange={(e) => setField('cancellationPolicy', { ...form.cancellationPolicy, freeHoursPrior: Number(e.target.value) })} className="text-[13px]" />
-          </div>
-          <div>
-            <Label className="block text-[10px] mb-1" style={labelStyle}>% cancellations allowed</Label>
-            <Input type="number" value={form.cancellationPolicy.pctAllowed} onChange={(e) => setField('cancellationPolicy', { ...form.cancellationPolicy, pctAllowed: Number(e.target.value) })} className="text-[13px]" />
-          </div>
-          <div>
-            <Label className="block text-[10px] mb-1" style={labelStyle}>% deducted on chargeable cancel</Label>
-            <Input type="number" value={form.cancellationPolicy.pctDeducted} onChange={(e) => setField('cancellationPolicy', { ...form.cancellationPolicy, pctDeducted: Number(e.target.value) })} className="text-[13px]" />
-          </div>
-        </div>
-      </div>
+      <SectionHeader icon={FiGlobe}>Go-live scope</SectionHeader>
+      <PickGrid>
+        {GO_LIVE_SCOPES.map((s) => (
+          <PickCard
+            key={s.id}
+            active={form.goLiveScope === s.id}
+            label={s.label}
+            icon={SCOPE_ICONS[s.id]}
+            onClick={() => { setField('goLiveScope', s.id); setField('goLiveDetails', []) }}
+          />
+        ))}
+      </PickGrid>
 
-      <div>
-        <Label className={labelClasses} style={labelStyle}>Go-live scope *</Label>
-        <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))' }}>
-          {SCOPE_OPTIONS.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => { setField('goLiveScope', s.id); setField('goLiveDetails', []) }}
-              className="px-3 py-2 rounded-xl border transition-all text-[12px] font-semibold"
-              style={
-                form.goLiveScope === s.id
-                  ? { background: 'var(--qms-brand)', borderColor: 'var(--qms-brand)', color: '#fff' }
-                  : { background: 'var(--qms-surface-strong)', borderColor: 'var(--qms-border)', color: 'var(--qms-text-soft)' }
-              }
-            >
-              {s.label}
-            </button>
-          ))}
+      {form.goLiveScope === 'STATE' && (
+        <div className="mt-2">
+          <SectionHeader icon={FiMap} spaced={false}>States</SectionHeader>
+          <ChipRow>
+            {STATES_INDIA.map((state) => (
+              <ChipToggle key={state} active={form.goLiveDetails.includes(state)} onClick={() => toggleState(state)}>
+                {state}
+              </ChipToggle>
+            ))}
+          </ChipRow>
         </div>
-
-        {form.goLiveScope === 'STATE' && (
-          <div className="mt-3">
-            <ChipPicker options={STATES_INDIA} selected={form.goLiveDetails} onChange={(v) => setField('goLiveDetails', v)} placeholder="Add a state..." />
-          </div>
-        )}
-        {form.goLiveScope === 'CITY' && (
+      )}
+      {form.goLiveScope === 'CITY' && (
+        <div className="mt-2">
+          <SectionHeader icon={FiMapPin} spaced={false}>Cities (one per line)</SectionHeader>
           <Textarea
-            className="mt-3 text-[13px]"
+            className={fieldClasses}
             rows={3}
             placeholder="One city per line"
             value={form.goLiveDetails.join('\n')}
             onChange={(e) => setField('goLiveDetails', e.target.value.split('\n').map((c) => c.trim()).filter(Boolean))}
           />
-        )}
-        {form.goLiveScope === 'PAN_INDIA' && (
-          <p className="mt-3 text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>
-            Serviceability checks bypassed for unserviceable markets.
-          </p>
-        )}
-      </div>
-
-      <div>
-        <Label className={labelClasses} style={labelStyle}>Who can book the camp (combination) *</Label>
-        <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
-          {BOOKING_ROLES.map((role) => (
-            <button
-              key={role.id}
-              onClick={() => toggleBookingRole(role.id)}
-              className="px-3 py-2 rounded-xl border transition-all text-left"
-              style={
-                form.bookingHierarchy.includes(role.id)
-                  ? { background: 'var(--qms-brand)', borderColor: 'var(--qms-brand)', color: '#fff' }
-                  : { background: 'var(--qms-surface-strong)', borderColor: 'var(--qms-border)', color: 'var(--qms-text-soft)' }
-              }
-            >
-              <div className="text-[12px] font-bold">{role.label}</div>
-              <div className="text-[11px] opacity-90">{role.desc}</div>
-            </button>
-          ))}
         </div>
-      </div>
+      )}
+      {form.goLiveScope === 'PAN_INDIA' && (
+        <p className="mt-2 text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>
+          Serviceability checks bypassed for unserviceable markets.
+        </p>
+      )}
+
+      <SectionHeader icon={FiUsers}>Who can book the camp (combination)</SectionHeader>
+      <PickGrid>
+        {BOOKING_ROLES.map((role) => (
+          <PickCard
+            key={role.id}
+            active={form.bookingHierarchy.includes(role.id)}
+            label={role.label}
+            desc={role.desc}
+            initials={role.label}
+            tileColor="rgba(59,109,255,.15)"
+            tileTextColor="var(--qms-brand)"
+            onClick={() => toggleBookingRole(role.id)}
+          />
+        ))}
+      </PickGrid>
     </div>
   )
 }

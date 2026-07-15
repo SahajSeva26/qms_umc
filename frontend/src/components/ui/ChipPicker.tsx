@@ -39,8 +39,8 @@ const ChipPicker = ({ options, selected, onChange, placeholder }: ChipPickerProp
           {selected.map((s) => (
             <span
               key={s}
-              className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-full"
-              style={{ background: 'var(--qms-brand)', color: '#fff' }}
+              className="inline-flex items-center gap-1 text-[12px] font-semibold px-3 py-1 rounded-full"
+              style={{ background: 'var(--qms-brand)', color: '#fff', boxShadow: '0 1px 4px rgba(59,109,255,.25)' }}
             >
               {s}
               <button onClick={() => onChange(selected.filter((x) => x !== s))} aria-label={`Remove ${s}`}>

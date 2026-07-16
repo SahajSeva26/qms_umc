@@ -5,7 +5,7 @@ import type { IPermission } from '@/types/accessManagement.types'
 import { usePermissionGroup } from '@/features/access-management/permission-group/hooks/usePermissionGroup'
 import { useUpdatePermissionGroup } from '@/features/access-management/permission-group/hooks/useUpdatePermissionGroup'
 import { PERMISSION_GROUP_ROUTES } from '@/features/access-management/permission-group/permission-group.routes'
-import { PERMISSION_CATALOG } from '@/features/access-management/permission-group/constants/permissionCatalog'
+import { PERMISSION_CATALOG, PERMISSION_CATALOG_FLAT, PERMISSION_RESOURCE_LABELS } from '@/features/access-management/permission-group/constants/permissionCatalog'
 import PermissionGroupStatusPill from '@/features/access-management/permission-group/components/PermissionGroupStatusPill'
 import { Button } from '@/components/ui/button'
 import { updatePermissionGroupSchema } from '@/features/access-management/permission-group/schemas/permissionGroup.schemas'
@@ -51,9 +51,7 @@ const PermissionGroupDetailPage = () => {
   }
 
   const handleSave = () => {
-    const permissions = PERMISSION_CATALOG.flatMap((group) =>
-      group.permissions.filter((permission) => selectedCodes.has(permission.code)),
-    )
+    const permissions = PERMISSION_CATALOG_FLAT.filter((permission) => selectedCodes.has(permission.code))
 
     const result = updatePermissionGroupSchema.safeParse({ permissions })
     if (!result.success) {
@@ -123,7 +121,7 @@ const PermissionGroupDetailPage = () => {
                 Permissions
               </h2>
               <span className="text-[11px] font-semibold" style={{ color: 'var(--qms-text-muted)' }}>
-                {selectedCodes.size} of {PERMISSION_CATALOG.flatMap((g) => g.permissions).length} selected
+                {selectedCodes.size} of {PERMISSION_CATALOG_FLAT.length} selected
               </span>
             </div>
             <p className="text-[12px] mb-4" style={{ color: 'var(--qms-text-muted)' }}>
@@ -131,16 +129,16 @@ const PermissionGroupDetailPage = () => {
             </p>
 
             <div className="space-y-5">
-              {PERMISSION_CATALOG.map((resourceGroup) => (
-                <div key={resourceGroup.resource}>
+              {(Object.entries(PERMISSION_CATALOG) as [keyof typeof PERMISSION_CATALOG, typeof PERMISSION_CATALOG[keyof typeof PERMISSION_CATALOG]][]).map(([resourceKey, resourceActions]) => (
+                <div key={resourceKey}>
                   <div
                     className="text-[10px] font-semibold tracking-widest uppercase mb-2"
                     style={{ color: 'var(--qms-text-muted)' }}
                   >
-                    {resourceGroup.label}
+                    {PERMISSION_RESOURCE_LABELS[resourceKey]}
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {resourceGroup.permissions.map((permission) => {
+                    {Object.values(resourceActions).map((permission) => {
                       const checked = selectedCodes.has(permission.code)
                       return (
                         <label

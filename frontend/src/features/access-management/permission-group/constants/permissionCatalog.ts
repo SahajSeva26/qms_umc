@@ -15,80 +15,72 @@ import type { IPermission } from '@/types/accessManagement.types'
 // cart" UI: every known permission code is always rendered, grouped by
 // resource, with the ones already on the group checked. 27 codes total
 // across 6 resources — kept in exact sync with the backend source above.
+//
+// Shape deliberately mirrors the backend's own PERMISSIONS object exactly —
+// an object keyed by resource, each resource an object keyed by action name
+// (e.g. PERMISSIONS.TENANT.CREATE) — rather than the array-of-groups shape
+// this file used before. The backend never represents this as an array;
+// SYSTEM having only one action (MANAGE) is just a one-key object there, not
+// a special case, so there's no array-of-one to flatten here either.
 
-export interface PermissionCatalogGroup {
-  /** Resource key, e.g. 'system', 'user', 'tenant'. */
-  resource: string
-  /** Display label for the resource group header. */
+export interface PermissionResourceLabel {
+  /** Display label for the resource group header, e.g. 'Permission Group'. */
   label: string
-  permissions: IPermission[]
 }
 
-export const PERMISSION_CATALOG: PermissionCatalogGroup[] = [
-  {
-    resource: 'system',
-    label: 'System',
-    permissions: [
-      { code: 'system:manage', name: 'Manage System', description: 'Manage system' },
-    ],
+export const PERMISSION_CATALOG = {
+  SYSTEM: {
+    MANAGE: { code: 'system:manage', name: 'Manage System', description: 'Manage system' },
   },
-  {
-    resource: 'user',
-    label: 'User',
-    permissions: [
-      { code: 'user:create', name: 'Create User', description: 'Create a new user' },
-      { code: 'user:get', name: 'Get User', description: 'Get a user' },
-      { code: 'user:search', name: 'Search User', description: 'Search users' },
-      { code: 'user:update', name: 'Update User', description: 'Update a user' },
-      { code: 'user:manage', name: 'Manage User', description: 'Manage users' },
-    ],
+  USER: {
+    CREATE: { code: 'user:create', name: 'Create User', description: 'Create a new user' },
+    GET: { code: 'user:get', name: 'Get User', description: 'Get a user' },
+    SEARCH: { code: 'user:search', name: 'Search User', description: 'Search users' },
+    UPDATE: { code: 'user:update', name: 'Update User', description: 'Update a user' },
+    MANAGE: { code: 'user:manage', name: 'Manage User', description: 'Manage users' },
   },
-  {
-    resource: 'tenant',
-    label: 'Tenant',
-    permissions: [
-      { code: 'tenant:create', name: 'Create Tenant', description: 'Create a new tenant' },
-      { code: 'tenant:get', name: 'Get Tenant', description: 'Get a tenant' },
-      { code: 'tenant:search', name: 'Search Tenant', description: 'Search tenants' },
-      { code: 'tenant:update', name: 'Update Tenant', description: 'Update a tenant' },
-      { code: 'tenant:admin', name: 'Admin Tenant', description: 'Admin tenant' },
-      { code: 'tenant:manage', name: 'Manage Tenant', description: 'Manage tenants' },
-    ],
+  TENANT: {
+    CREATE: { code: 'tenant:create', name: 'Create Tenant', description: 'Create a new tenant' },
+    GET: { code: 'tenant:get', name: 'Get Tenant', description: 'Get a tenant' },
+    SEARCH: { code: 'tenant:search', name: 'Search Tenant', description: 'Search tenants' },
+    UPDATE: { code: 'tenant:update', name: 'Update Tenant', description: 'Update a tenant' },
+    ADMIN: { code: 'tenant:admin', name: 'Admin Tenant', description: 'Admin tenant' },
+    MANAGE: { code: 'tenant:manage', name: 'Manage Tenant', description: 'Manage tenants' },
   },
-  {
-    resource: 'permission-group',
-    label: 'Permission Group',
-    permissions: [
-      { code: 'permission-group:create', name: 'Create Permission Group', description: 'Create Permission Group' },
-      { code: 'permission-group:get', name: 'Get Permission Group', description: 'Get Permission Group' },
-      { code: 'permission-group:search', name: 'Search Permission Group', description: 'Search Permission Group' },
-      { code: 'permission-group:update', name: 'Update Permission Group', description: 'Update Permission Group' },
-      { code: 'permission-group:manage', name: 'Manage Permission Group', description: 'Manage Permission Group' },
-    ],
+  PERMISSION_GROUP: {
+    CREATE: { code: 'permission-group:create', name: 'Create Permission Group', description: 'Create Permission Group' },
+    GET: { code: 'permission-group:get', name: 'Get Permission Group', description: 'Get Permission Group' },
+    SEARCH: { code: 'permission-group:search', name: 'Search Permission Group', description: 'Search Permission Group' },
+    UPDATE: { code: 'permission-group:update', name: 'Update Permission Group', description: 'Update Permission Group' },
+    MANAGE: { code: 'permission-group:manage', name: 'Manage Permission Group', description: 'Manage Permission Group' },
   },
-  {
-    resource: 'role-type',
-    label: 'Role Type',
-    permissions: [
-      { code: 'role-type:get', name: 'Get Role Type', description: 'Get Role Type' },
-      { code: 'role-type:search', name: 'Search Role Type', description: 'Search Role Type' },
-      { code: 'role-type:create', name: 'Create Role Type', description: 'Create Role Type' },
-      { code: 'role-type:update', name: 'Update Role Type', description: 'Update Role Type' },
-      { code: 'role-type:manage', name: 'Manage Role Type', description: 'Manage Role Type' },
-    ],
+  ROLE_TYPE: {
+    GET: { code: 'role-type:get', name: 'Get Role Type', description: 'Get Role Type' },
+    SEARCH: { code: 'role-type:search', name: 'Search Role Type', description: 'Search Role Type' },
+    CREATE: { code: 'role-type:create', name: 'Create Role Type', description: 'Create Role Type' },
+    UPDATE: { code: 'role-type:update', name: 'Update Role Type', description: 'Update Role Type' },
+    MANAGE: { code: 'role-type:manage', name: 'Manage Role Type', description: 'Manage Role Type' },
   },
-  {
-    resource: 'role',
-    label: 'Role',
-    permissions: [
-      { code: 'role:get', name: 'Get Role', description: 'Get Role' },
-      { code: 'role:search', name: 'Search Role', description: 'Search Role' },
-      { code: 'role:create', name: 'Create Role', description: 'Create Role' },
-      { code: 'role:update', name: 'Update Role', description: 'Update Role' },
-      { code: 'role:manage', name: 'Manage Role', description: 'Manage Role' },
-    ],
+  ROLE: {
+    GET: { code: 'role:get', name: 'Get Role', description: 'Get Role' },
+    SEARCH: { code: 'role:search', name: 'Search Role', description: 'Search Role' },
+    CREATE: { code: 'role:create', name: 'Create Role', description: 'Create Role' },
+    UPDATE: { code: 'role:update', name: 'Update Role', description: 'Update Role' },
+    MANAGE: { code: 'role:manage', name: 'Manage Role', description: 'Manage Role' },
   },
-]
+} as const
 
-/** Flat list of every catalog permission, in the same order as the groups above. */
-export const PERMISSION_CATALOG_FLAT: IPermission[] = PERMISSION_CATALOG.flatMap((group) => group.permissions)
+/** Display labels for each resource group header — keys must match PERMISSION_CATALOG exactly. */
+export const PERMISSION_RESOURCE_LABELS: Record<keyof typeof PERMISSION_CATALOG, string> = {
+  SYSTEM: 'System',
+  USER: 'User',
+  TENANT: 'Tenant',
+  PERMISSION_GROUP: 'Permission Group',
+  ROLE_TYPE: 'Role Type',
+  ROLE: 'Role',
+}
+
+/** Flat list of every catalog permission, in the same order as PERMISSION_CATALOG's keys. */
+export const PERMISSION_CATALOG_FLAT: IPermission[] = Object.values(PERMISSION_CATALOG).flatMap((resource) =>
+  Object.values(resource),
+)

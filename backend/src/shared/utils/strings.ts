@@ -24,3 +24,7 @@ export const hasAllItem = (data: string[], required: string[]): boolean => {
 export const hasAnyItem = (data: string[], required: string[]): boolean => {
     return required.some((item) => data.includes(item));
 };
+
+export const canTransition = (from: string, to: string, transitionMap: Record<string, string[]>) => {
+    return transitionMap[from]?.includes(to);
+};

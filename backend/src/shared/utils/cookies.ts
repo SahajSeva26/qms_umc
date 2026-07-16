@@ -2,10 +2,15 @@ import { Response, Request } from 'express';
 import ENV from '../config/app.config';
 import { AUTH_TOKENS } from '../../modules/auth/auth.constants';
 
+const isProduction = ENV.App.Environment === 'production';
+
+// In production the frontend is typically on a DIFFERENT domain than the API, so the
+// auth cookie must be cross-site: sameSite:'none' REQUIRES secure:true (HTTPS), which
+// Railway provides. In dev (localhost) we stay on 'lax' over plain HTTP.
 const BASE_COOKIE_OPTS = {
     httpOnly: true,
-    secure: ENV.App.Environment === 'production',
-    sameSite: 'strict' as const,
+    secure: isProduction,
+    sameSite: (isProduction ? 'none' : 'lax') as 'none' | 'lax',
 };
 
 export const CookieHandler = {
@@ -19,7 +24,10 @@ export const CookieHandler = {
         });
     },
     clear: (res: Response, key: string) => {
-        res.clearCookie(key);
+        // clearCookie only removes the cookie if the attributes match how it was set —
+        // a bare clearCookie(key) fails to clear a sameSite:'none'; secure cookie, so
+        // pass the same base options (logout would otherwise silently do nothing in prod)
+        res.clearCookie(key, BASE_COOKIE_OPTS);
     },
 
     // ===========IMP==========================

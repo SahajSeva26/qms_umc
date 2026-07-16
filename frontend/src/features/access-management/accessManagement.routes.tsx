@@ -32,12 +32,22 @@ export const ACCESS_MANAGEMENT_ROUTES = {
   ROLE_DETAIL:          '/admin/roles/:id',
 }
 
+// Named permission-code sets for each list screen's <AccessPermissionGate>,
+// pulled out of the JSX below rather than inlined per route — matches each
+// backend route's own real AuthorizeMiddleware([...], 'OR') guard exactly
+// (see the research this module was built against: tenant/permission-group/
+// role-type/role routes.ts, all default OR semantics).
+const TENANTS_VIEW_PERMISSIONS = ['tenant:get', 'tenant:search', 'tenant:manage']
+const PERMISSION_GROUPS_VIEW_PERMISSIONS = ['permission-group:get', 'permission-group:search', 'permission-group:manage']
+const ROLE_TYPES_VIEW_PERMISSIONS = ['role-type:get', 'role-type:search', 'role-type:manage']
+const ROLES_VIEW_PERMISSIONS = ['role:get', 'role:search', 'role:manage']
+
 export const accessManagementRoutes: RouteObject[] = [
   // Tenants
   {
     path: ACCESS_MANAGEMENT_ROUTES.TENANTS,
     element: (
-      <AccessPermissionGate anyOf={['tenant:get', 'tenant:search', 'tenant:manage']}>
+      <AccessPermissionGate anyOf={TENANTS_VIEW_PERMISSIONS}>
         <TenantsListPage />
       </AccessPermissionGate>
     ),
@@ -48,7 +58,7 @@ export const accessManagementRoutes: RouteObject[] = [
   {
     path: ACCESS_MANAGEMENT_ROUTES.PERMISSION_GROUPS,
     element: (
-      <AccessPermissionGate anyOf={['permission-group:get', 'permission-group:search', 'permission-group:manage']}>
+      <AccessPermissionGate anyOf={PERMISSION_GROUPS_VIEW_PERMISSIONS}>
         <PermissionGroupsListPage />
       </AccessPermissionGate>
     ),
@@ -59,7 +69,7 @@ export const accessManagementRoutes: RouteObject[] = [
   {
     path: ACCESS_MANAGEMENT_ROUTES.ROLE_TYPES,
     element: (
-      <AccessPermissionGate anyOf={['role-type:get', 'role-type:search', 'role-type:manage']}>
+      <AccessPermissionGate anyOf={ROLE_TYPES_VIEW_PERMISSIONS}>
         <RoleTypesListPage />
       </AccessPermissionGate>
     ),
@@ -71,7 +81,7 @@ export const accessManagementRoutes: RouteObject[] = [
   {
     path: ACCESS_MANAGEMENT_ROUTES.ROLES,
     element: (
-      <AccessPermissionGate anyOf={['role:get', 'role:search', 'role:manage']}>
+      <AccessPermissionGate anyOf={ROLES_VIEW_PERMISSIONS}>
         <RolesListPage />
       </AccessPermissionGate>
     ),

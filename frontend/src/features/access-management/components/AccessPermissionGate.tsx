@@ -13,15 +13,19 @@ import { usePermission } from '@/hooks/usePermission'
 // denied message, since the real gate is server-side anyway.
 
 interface AccessPermissionGateProps {
-  /** Any one of these codes (or `system:manage`, handled inside usePermission) is enough to pass. */
-  anyOf: string[]
+  /** Any one of these codes (or `system:manage`, handled inside usePermission) is enough to pass. Ignored if `allOf` is also given. */
+  anyOf?: string[]
+  /** ALL of these codes are required (or `system:manage`, handled inside usePermission). Takes precedence over `anyOf` if both are given. */
+  allOf?: string[]
   children: ReactNode
 }
 
-const AccessPermissionGate = ({ anyOf, children }: AccessPermissionGateProps) => {
-  const { hasAnyPermission, isLoading } = usePermission()
+const AccessPermissionGate = ({ anyOf, allOf, children }: AccessPermissionGateProps) => {
+  const { hasAnyPermission, hasAllPermissions, isLoading } = usePermission()
 
-  if (!isLoading && !hasAnyPermission(anyOf)) {
+  const isAllowed = allOf ? hasAllPermissions(allOf) : hasAnyPermission(anyOf ?? [])
+
+  if (!isLoading && !isAllowed) {
     return (
       <div className="max-w-5xl">
         <div

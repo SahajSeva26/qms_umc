@@ -1,26 +1,25 @@
 import { useNavigate } from 'react-router-dom'
-import type { User } from '@/types/user.types'
-import UserAvatar from '@/components/ui/UserAvatar'
-import RoleBadge from '@/features/admin/components/RoleBadge'
-import StatusPill from '@/features/admin/components/StatusPill'
+import type { Tenant } from '@/types/accessManagement.types'
+import { TENANT_ROUTES } from '@/features/access-management/tenant/tenant.routes'
+import TenantTypeBadge from '@/features/access-management/tenant/components/TenantTypeBadge'
+import TenantStatusPill from '@/features/access-management/tenant/components/TenantStatusPill'
 
-// Literal path (not imported from admin.routes.tsx) — that file imports
-// UsersPage, which imports this component, so importing back from it here
-// would be a circular module dependency (same pattern as CampDrawer.tsx).
-const ADMIN_USER_DETAIL_PATH = '/admin/users/:id'
+// Hand-built table matching `@/features/admin/components/UsersTable.tsx`
+// exactly: var(--qms-*) custom properties, no shadcn Table, row-click
+// navigates to the detail route, inline empty state.
 
-interface UsersTableProps {
-  users: User[]
+interface TenantsTableProps {
+  tenants: Tenant[]
 }
 
-function formatJoined(createdAt?: string): string {
+function formatCreated(createdAt?: string): string {
   if (!createdAt) return '—'
   const date = new Date(createdAt)
   if (Number.isNaN(date.getTime())) return '—'
   return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-const UsersTable = ({ users }: UsersTableProps) => {
+const TenantsTable = ({ tenants }: TenantsTableProps) => {
   const navigate = useNavigate()
 
   return (
@@ -33,48 +32,48 @@ const UsersTable = ({ users }: UsersTableProps) => {
           <thead>
             <tr style={{ borderBottom: '1px solid var(--qms-border)' }}>
               <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                User
+                Code
               </th>
               <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                Role
+                Name
+              </th>
+              <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
+                Type
               </th>
               <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
                 Status
               </th>
               <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                Joined
+                Created
               </th>
             </tr>
           </thead>
           <tbody>
-            {users.map((user) => (
+            {tenants.map((tenant) => (
               <tr
-                key={user._id}
-                onClick={() => navigate(ADMIN_USER_DETAIL_PATH.replace(':id', user._id))}
+                key={tenant.id}
+                onClick={() => navigate(TENANT_ROUTES.TENANT_DETAIL.replace(':id', tenant.id))}
                 className="cursor-pointer transition-colors hover:bg-(--qms-surface-hover)"
                 style={{ borderBottom: '1px solid var(--qms-border)' }}
               >
                 <td className="px-4 py-2.5">
-                  <div className="flex items-center gap-2.5">
-                    <UserAvatar firstName={user.firstName} lastName={user.lastName} tone={user.avatarTone} size="sm" />
-                    <div className="min-w-0">
-                      <div className="font-semibold truncate" style={{ color: 'var(--qms-text)' }}>
-                        {user.firstName} {user.lastName}
-                      </div>
-                      <div className="text-[11px] truncate" style={{ color: 'var(--qms-text-muted)' }}>
-                        {user.email}
-                      </div>
-                    </div>
+                  <span className="font-semibold" style={{ color: 'var(--qms-text)' }}>
+                    {tenant.code}
+                  </span>
+                </td>
+                <td className="px-4 py-2.5">
+                  <div className="font-semibold truncate" style={{ color: 'var(--qms-text)' }}>
+                    {tenant.name}
                   </div>
                 </td>
                 <td className="px-4 py-2.5">
-                  <RoleBadge role={user.role} />
+                  <TenantTypeBadge type={tenant.type} />
                 </td>
                 <td className="px-4 py-2.5">
-                  <StatusPill status={user.status} />
+                  <TenantStatusPill status={tenant.status} />
                 </td>
                 <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                  {formatJoined(user.createdAt)}
+                  {formatCreated(tenant.createdAt)}
                 </td>
               </tr>
             ))}
@@ -82,13 +81,13 @@ const UsersTable = ({ users }: UsersTableProps) => {
         </table>
       </div>
 
-      {users.length === 0 && (
+      {tenants.length === 0 && (
         <div className="px-4 py-10 text-center text-[13px]" style={{ color: 'var(--qms-text-muted)' }}>
-          No users found.
+          No tenants found.
         </div>
       )}
     </div>
   )
 }
 
-export default UsersTable
+export default TenantsTable

@@ -3,7 +3,6 @@ import { FiArrowLeft, FiPrinter } from 'react-icons/fi'
 import { useAuth } from '@/hooks/useAuth'
 import { useCamps } from '@/features/camps/hooks/useCamps'
 import { perspectiveForRole } from '@/features/camps/camps.perspective'
-import { CAMPS_ROUTES } from '@/features/camps/camps.routes'
 import DossierHeader from '@/features/camps/components/DossierHeader'
 import {
   CampDetailsSection,
@@ -28,6 +27,11 @@ import {
   DietitianCoordSection,
 } from '@/features/camps/components/dossier/FinanceSections'
 
+// Literal path (not imported from camps.routes.tsx) — that file imports this
+// component, so importing back from it here would be a circular module
+// dependency (same pattern as AnalyticsPage.tsx / CampDrawer.tsx).
+const CAMPS_LIST_PATH = '/camps'
+
 const CampDetailPage = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -41,7 +45,7 @@ const CampDetailPage = () => {
     return (
       <div className="max-w-2xl">
         <button
-          onClick={() => navigate(CAMPS_ROUTES.CAMPS)}
+          onClick={() => navigate(CAMPS_LIST_PATH)}
           className="flex items-center gap-1.5 text-[13px] font-semibold mb-5 transition-colors hover:opacity-80"
           style={{ color: 'var(--qms-text-soft)' }}
         >
@@ -58,7 +62,7 @@ const CampDetailPage = () => {
     <div className="max-w-4xl">
       <div className="flex items-center justify-between mb-4">
         <button
-          onClick={() => navigate(CAMPS_ROUTES.CAMPS)}
+          onClick={() => navigate(CAMPS_LIST_PATH)}
           className="flex items-center gap-1.5 text-[13px] font-semibold transition-colors hover:opacity-80"
           style={{ color: 'var(--qms-text-soft)' }}
         >

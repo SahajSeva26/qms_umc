@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { pbacService } from '@/features/pbac/pbac.service'
-import type { SessionPermissions } from '@/types/pbac.types'
+import { accessManagementService } from '@/features/access-management/accessManagement.service'
+import type { SessionPermissions } from '@/types/accessManagement.types'
 
 // NEW, independent hook. Does NOT replace `useAuth`/`useAuthStore` and does
 // NOT modify `useLogin.ts` or the auth store — this is the only place that
@@ -15,7 +15,7 @@ export const SESSION_PERMISSIONS_QUERY_KEY = ['session-permissions'] as const
 export const usePermission = () => {
   const query = useQuery({
     queryKey: SESSION_PERMISSIONS_QUERY_KEY,
-    queryFn: () => pbacService.getMe(),
+    queryFn: () => accessManagementService.getMe(),
     staleTime: 5 * 60 * 1000, // 5 minutes — permissions rarely change mid-session
   })
 

@@ -3,7 +3,6 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { FiArrowLeft } from 'react-icons/fi'
 import { useUser } from '@/features/admin/hooks/useUser'
 import { useUpdateUser } from '@/features/admin/hooks/useUpdateUser'
-import { ADMIN_ROUTES } from '@/features/admin/admin.routes'
 import UserAvatar from '@/components/ui/UserAvatar'
 import RoleBadge from '@/features/admin/components/RoleBadge'
 import StatusPill from '@/features/admin/components/StatusPill'
@@ -11,6 +10,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { updateUserSchema } from '@/features/admin/schemas/user.schemas'
+
+// Literal path (not imported from admin.routes.tsx) — that file imports this
+// component, so importing back from it here would be a circular module
+// dependency (same pattern as CampDetailPage.tsx / CampDrawer.tsx).
+const ADMIN_USERS_PATH = '/admin/users'
 
 const UserDetailPage = () => {
   const { id } = useParams<{ id: string }>()
@@ -43,7 +47,7 @@ const UserDetailPage = () => {
   return (
     <div className="max-w-2xl">
       <button
-        onClick={() => navigate(ADMIN_ROUTES.ADMIN_USERS)}
+        onClick={() => navigate(ADMIN_USERS_PATH)}
         className="flex items-center gap-1.5 text-[13px] font-semibold mb-5 transition-colors hover:opacity-80"
         style={{ color: 'var(--qms-text-soft)' }}
       >

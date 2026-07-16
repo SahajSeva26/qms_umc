@@ -13,7 +13,7 @@ import { OM_ROUTES }        from '@/features/om/om.routes'
 import { DOCTORS_ROUTES }   from '@/features/doctors/doctors.routes'
 import { BILLING_ROUTES }   from '@/features/billing/billing.routes'
 import { ADMIN_ROUTES }     from '@/features/admin/admin.routes'
-import { PBAC_ROUTES }      from '@/features/pbac/pbac.routes'
+import { ACCESS_MANAGEMENT_ROUTES }      from '@/features/access-management/accessManagement.routes'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -195,22 +195,22 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { id: 'settings',     label: 'Settings',                    icon: 'Settings',      path: ADMIN_ROUTES.ADMIN_SETTINGS,
     rolesAllowed: [] },
 
-  // PBAC entities — no real backend permission maps onto the existing
+  // Access Management entities — no real backend permission maps onto the existing
   // 18-role UserRole enum yet, so rolesAllowed is set explicitly to
   // ['super_admin', 'admin'] rather than left at [] (which would mean
   // "invisible to everyone except the super_admin/admin ALL-bypass" — same
   // runtime effect via getNavForRole's early-return for those two roles,
   // but explicit here for future readers).
-  { id: 'tenants',          label: 'Tenants',                 icon: 'Globe',         path: PBAC_ROUTES.TENANTS,
+  { id: 'tenants',          label: 'Tenants',                 icon: 'Globe',         path: ACCESS_MANAGEMENT_ROUTES.TENANTS,
     rolesAllowed: ['super_admin', 'admin'] },
 
-  { id: 'permissiongroups', label: 'Permission Groups',       icon: 'Shield',        path: PBAC_ROUTES.PERMISSION_GROUPS,
+  { id: 'permissiongroups', label: 'Permission Groups',       icon: 'Shield',        path: ACCESS_MANAGEMENT_ROUTES.PERMISSION_GROUPS,
     rolesAllowed: ['super_admin', 'admin'] },
 
-  { id: 'roletypes',        label: 'Role Types',              icon: 'Sliders',       path: PBAC_ROUTES.ROLE_TYPES,
+  { id: 'roletypes',        label: 'Role Types',              icon: 'Sliders',       path: ACCESS_MANAGEMENT_ROUTES.ROLE_TYPES,
     rolesAllowed: ['super_admin', 'admin'] },
 
-  { id: 'roles',            label: 'Roles',                   icon: 'UserCheck',     path: PBAC_ROUTES.ROLES,
+  { id: 'roles',            label: 'Roles',                   icon: 'UserCheck',     path: ACCESS_MANAGEMENT_ROUTES.ROLES,
     rolesAllowed: ['super_admin', 'admin'] },
 ]
 

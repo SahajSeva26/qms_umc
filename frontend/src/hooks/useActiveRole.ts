@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import { pbacService } from '@/features/pbac/pbac.service'
+import { accessManagementService } from '@/features/access-management/accessManagement.service'
 import { SESSION_PERMISSIONS_QUERY_KEY } from '@/hooks/usePermission'
-import type { SessionRole } from '@/types/pbac.types'
+import type { SessionRole } from '@/types/accessManagement.types'
 
 // Enforces the product rule "strictly one active Role per user" as a
 // FRONTEND-ENFORCED invariant. Confirmed against the real backend: there is
@@ -64,7 +64,7 @@ function resolveActiveRole(source: ActiveRoleSource | null | undefined): {
 export const useActiveRole = (): UseActiveRoleResult => {
   const query = useQuery({
     queryKey: SESSION_PERMISSIONS_QUERY_KEY,
-    queryFn: () => pbacService.getMe(),
+    queryFn: () => accessManagementService.getMe(),
     staleTime: 5 * 60 * 1000,
   })
 

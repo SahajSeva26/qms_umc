@@ -23,7 +23,8 @@ const login = async (data: ILoginUserPayload, ctx: RequestContext) => {
     // 1: get user
     const user = await UserService.getUserWithPassword(data.email);
     if (!user) {
-        return throwAppError('User not found', StatusCodes.NOT_FOUND);
+        // generic 401 (same as wrong password) so an unknown email can't be distinguished — prevents user enumeration
+        return throwAppError('Invalid credentials', StatusCodes.UNAUTHORIZED);
     }
 
     //1.5: check if user is active

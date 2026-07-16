@@ -2,11 +2,14 @@
   "name": "backend",
   "version": "1.0.0",
   "description": "QMS backend",
-  "main": "index.js",
+  "main": "dist/bin/server.js",
   "scripts": {
     "dev": "tsx watch src/bin/server.ts",
     "build": "tsc",
     "start": "node dist/bin/server.js"
+  },
+  "engines": {
+    "node": "22.x"
   },
   "author": "",
   "license": "ISC",

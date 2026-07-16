@@ -4,9 +4,16 @@ configDotenv();
 let ENV = {
     App: {
         // INIT_ADMIN_TOKEN: process.env.INIT_ADMIN_TOKEN || "",
-        Port: process.env.APP_PORT || 3000,
+        Port: process.env.PORT || process.env.APP_PORT || 3000,
         Host: process.env.APP_HOST || 'localhost',
         Environment: process.env.APP_ENV || 'development',
+
+        // Allowed frontend origins for CORS — comma-separated list, e.g.
+        // "https://app.example.com,https://admin.example.com"
+        CorsOrigins: (process.env.APP_CORS_ORIGINS || 'http://localhost:5173')
+            .split(',')
+            .map((origin) => origin.trim())
+            .filter(Boolean),
 
         // System User
         SystemUserEmail: process.env.APP_SYSTEM_USER_EMAIL || 'system@gmail.com',

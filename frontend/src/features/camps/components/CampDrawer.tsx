@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FiPhone, FiMail, FiMapPin, FiExternalLink, FiSmartphone } from 'react-icons/fi'
 import type { Camp, CampStatus } from '@/types/camp.types'
-import { CAMPS_ROUTES } from '@/features/camps/camps.routes'
 import { getDoctor, isChargeableCancellation } from '@/features/camps/camps.utils'
 import { clientName, divisionName, foName } from '@/features/camps/camps.refs'
 import { Button } from '@/components/ui/button'
@@ -11,6 +10,11 @@ import SideDrawer from '@/components/ui/SideDrawer'
 import CampStatusPill from '@/features/camps/components/CampStatusPill'
 import { SLOTS } from '@/features/camps/camps.mock'
 import { formatDate } from '@/utils/formatters'
+
+// Literal path (not imported from camps.routes.tsx) — that file imports
+// CampsPage, which imports this component, so importing back from it here
+// would be a circular module dependency (same pattern as AnalyticsPage.tsx).
+const CAMP_DETAIL_PATH = '/camps/:id'
 
 interface CampDrawerProps {
   camp: Camp | null
@@ -46,7 +50,7 @@ const CampDrawer = ({ camp, onClose, onSetStatus, onAssignFo, onToggleTele }: Ca
         <Button
           variant="outline"
           size="sm"
-          onClick={() => navigate(CAMPS_ROUTES.CAMP_DETAIL.replace(':id', camp.id))}
+          onClick={() => navigate(CAMP_DETAIL_PATH.replace(':id', camp.id))}
           className="text-[12px] font-semibold"
         >
           <FiExternalLink size={12} /> Full dossier

@@ -15,6 +15,7 @@ import { doctorsRoutes } from '@/features/doctors/doctors.routes'
 import { billingRoutes } from '@/features/billing/billing.routes'
 import { analyticsRoutes } from '@/features/analytics/analytics.routes'
 import { adminRoutes } from '@/features/admin/admin.routes'
+import { pbacRoutes } from '@/features/pbac/pbac.routes'
 
 const appRouter = createBrowserRouter([
   {
@@ -43,6 +44,7 @@ const appRouter = createBrowserRouter([
           ...billingRoutes,
           ...analyticsRoutes,
           ...adminRoutes,
+          ...pbacRoutes,
         ],
       },
     ],

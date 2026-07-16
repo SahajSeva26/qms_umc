@@ -1,6 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
-import { accessManagementService } from '@/features/access-management/accessManagement.service'
-import { SESSION_PERMISSIONS_QUERY_KEY } from '@/hooks/usePermission'
+import { useSession } from '@/hooks/useSession'
 import type { SessionRole } from '@/types/accessManagement.types'
 
 // Enforces the product rule "strictly one active Role per user" as a
@@ -11,9 +9,9 @@ import type { SessionRole } from '@/types/accessManagement.types'
 // returns a single `role` object, not an array, so this hook's "multiple
 // roles" branch is defensive-only and should not occur in practice.
 //
-// Reuses the same TanStack Query cache entry as `usePermission` (same query
-// key + queryFn) so calling both hooks in the same tree does not trigger a
-// duplicate network request.
+// Reads off the central `useSession()` hook rather than running its own
+// query, so calling this alongside `usePermission()`/`useSession()` in the
+// same tree never triggers a duplicate network request.
 
 /**
  * Defensive typing for a session payload that (contrary to the current,
@@ -62,19 +60,15 @@ function resolveActiveRole(source: ActiveRoleSource | null | undefined): {
 }
 
 export const useActiveRole = (): UseActiveRoleResult => {
-  const query = useQuery({
-    queryKey: SESSION_PERMISSIONS_QUERY_KEY,
-    queryFn: () => accessManagementService.getMe(),
-    staleTime: 5 * 60 * 1000,
-  })
+  const { session, isLoading, isError } = useSession()
 
-  const rawRole = query.data?.data?.role as ActiveRoleSource | undefined
+  const rawRole = session?.role as ActiveRoleSource | undefined
   const { role, hasMultipleRolesError } = resolveActiveRole(rawRole)
 
   return {
     role,
     hasMultipleRolesError,
-    isLoading: query.isLoading,
-    isError: query.isError,
+    isLoading,
+    isError,
   }
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Outlet, Navigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import { useSession } from '@/hooks/useSession'
 import { AUTH_ROUTES } from '@/features/auth/auth.routes'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
@@ -16,7 +17,26 @@ function getInitialCollapsed(): boolean {
 }
 
 const AppLayout = () => {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated: isStoreAuthenticated } = useAuth()
+  // On a hard page reload, useAuthStore.user starts null (no persist
+  // middleware) even though the httpOnly session cookie may still be
+  // valid. SessionBootstrap (app/SessionBootstrap.tsx) restores the store
+  // from the real session via a useEffect — but that effect only runs
+  // AFTER the render that resolved the session data commits, and this
+  // component's OWN render (reading the store) can happen in that same
+  // window, before the effect has fired. Waiting on isLoading/isFetching
+  // alone doesn't close that window either, since by the time
+  // SessionBootstrap's effect actually runs, the query itself has already
+  // finished (isFetching already false) — so this component must check
+  // useSession()'s OWN isAuthenticated/session directly (derived straight
+  // from query data at render time, no effect-timing dependency) rather
+  // than solely trusting the store, which can lag behind by exactly one
+  // effect-flush. The store is still the source of truth everywhere else
+  // (useAuth's other consumers, hasRole, etc.) — this is only a
+  // same-render fallback so a valid session is never treated as logged-out
+  // for the single render before the store catches up.
+  const { isAuthenticated: isSessionAuthenticated, isFetching: isSessionFetching } = useSession()
+  const isAuthenticated = isStoreAuthenticated || isSessionAuthenticated
   const [collapsed, setCollapsed] = useState(getInitialCollapsed)
   const [mobileOpen, setMobileOpen] = useState(false)
 
@@ -38,6 +58,12 @@ const AppLayout = () => {
       return next
     })
   }
+
+  // Don't decide "not authenticated, redirect" until we've had a chance to
+  // restore a valid session from the cookie — only relevant on the very
+  // first render after a hard reload (isAuthenticated is already true on
+  // every subsequent client-side navigation, so this never blocks normal use).
+  if (!isAuthenticated && isSessionFetching) return null
 
   if (!isAuthenticated) return <Navigate to={AUTH_ROUTES.LOGIN} replace />
 

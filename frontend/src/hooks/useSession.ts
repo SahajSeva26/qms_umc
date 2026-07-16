@@ -33,6 +33,16 @@ export const useSession = () => {
     queryKey: SESSION_QUERY_KEY,
     queryFn: () => accessManagementService.getMe(),
     staleTime: 5 * 60 * 1000, // 5 minutes — permissions rarely change mid-session
+    // Never retry a 401 — it means "no valid session" (e.g. on first load
+    // before any login, or after both tokens expire), which a retry can't
+    // fix. Without this override, the queryClient's default retry:1 doubles
+    // how long isLoading stays true on every unauthenticated load, and
+    // SessionBootstrap blocks the entire router (including the login page
+    // itself) until isLoading resolves.
+    retry: (failureCount, error: any) => {
+      if (error?.response?.status === 401) return false
+      return failureCount < 1
+    },
   })
 
   const session: SessionResponse | null = query.data?.data ?? null
@@ -69,8 +79,16 @@ export const useSession = () => {
   const clearSession = () => queryClient.setQueryData(SESSION_QUERY_KEY, undefined)
 
   return {
-    // raw query state, for loading/error handling by callers
+    // raw query state, for loading/error handling by callers.
+    // isLoading is ONLY true for this query's very FIRST fetch attempt ever
+    // — it does NOT go true again for a later background refetch (e.g. a
+    // second useSession() observer mounting and triggering its own
+    // refetchOnMount). Consumers that need "has the session ever been
+    // resolved at all, regardless of which fetch attempt did it" (like
+    // AppLayout's hard-reload race) should use isSettled instead.
     isLoading: query.isLoading,
+    isFetching: query.isFetching,
+    isSettled: query.isFetched,
     isError: query.isError,
     error: query.error,
 

@@ -10,6 +10,7 @@ import { AuthMiddleware } from '../../shared/middlewares/authmiddleware';
 import { AuthorizeMiddleware } from '../../shared/middlewares/authorizeMiddleware';
 import { DIVISION_PERMISSIONS } from './division.constants';
 import { TENANT_PERMISSIONS } from '../access-management/tenant/tenant.constants';
+import { LEAD_PERMISSIONS } from '../crm/lead/lead.constants';
 
 export const DivisionRouter = express.Router();
 
@@ -117,7 +118,11 @@ DivisionRouter.put(
 
 DivisionRouter.get(
     '/',
-    AuthorizeMiddleware([DIVISION_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.ADMIN.code]),
+    AuthorizeMiddleware([
+        DIVISION_PERMISSIONS.MANAGE.code,
+        TENANT_PERMISSIONS.ADMIN.code,
+        LEAD_PERMISSIONS.MANAGE.code,
+    ]),
     DivisionController.search,
 );
 DivisionRouter.post(

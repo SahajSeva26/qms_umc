@@ -33,6 +33,7 @@ let ENV = {
         RefreshTokenSecret: process.env.JWT_REFRESH_SECRET || 'refresh-secret',
         RefreshExpirySec: Number(process.env.JWT_REFRESH_EXPIRY_SEC) || 60 * 60 * 24 * 7, // 7 days fallback
     },
+    
 };
 
 export default ENV;

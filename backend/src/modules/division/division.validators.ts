@@ -41,12 +41,19 @@ export type IUpdateDivisionPayload = z.infer<
 
 //3: search ====================================>
 export const SearchDivisionQuerySchema = z.object({
+    tenantId: z
+        .string()
+        .refine((val) => isValidObjectID(val), {
+            message: 'tenantId must be a valid ObjectId',
+        })
+        .optional()
+        .openapi({ example: '64f0c2a1b3d4e5f6a7b8c9d0' }),
     code: z.string().lowercase().optional().openapi({ example: 'sun-cardio' }),
     name: z.string().optional().openapi({ example: 'Cardio Care' }),
     therapy: z
         .enum(Object.values(DIVISION_THERAPY))
         .optional()
-        .openapi({ example: 'Cardiology' }),
+        .openapi({ example: 'cardiology' }),
     status: z
         .enum([DIVISION_STATUS.ACTIVE, DIVISION_STATUS.INACTIVE])
         .optional()

@@ -13,6 +13,7 @@ const OfferSchema = z.object({
 
 //1: create ====================================>
 export const CreateLeadPayloadSchema = z.object({
+    tenant: objectId('Tenant').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
     division: objectId('Division').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8b' }),
     contactPerson: objectId('Contact person').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8c' }),
     salesPerson: objectId('Sales person').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8d' }),
@@ -52,6 +53,10 @@ export const UpdateLeadPayloadSchema = z.object({
 export type IUpdateLeadPayload = z.infer<typeof UpdateLeadPayloadSchema>;
 
 //3: move stage ====================================>
+// generic state-machine guard — reusable for any entity that keeps a `{ [from]: to[] }` transition map
+export const canTransition = (map: Record<string, string[]>, from: string, to: string): boolean =>
+    (map[from] || []).includes(to);
+
 export const MoveStagePayloadSchema = z.object({
     to: z.enum(Object.values(LEAD_STATUSES)).openapi({ example: 'qualified' }),
     reason: z.string().min(1).openapi({ example: 'Client confirmed budget and timeline' }),

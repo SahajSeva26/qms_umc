@@ -1,11 +1,6 @@
 import mongoose, { HydratedDocument } from 'mongoose';
 import { ILead, LeadModel } from './lead.model';
-import {
-    ICreateLeadPayload,
-    IMoveStagePayload,
-    ISearchLeadQuery,
-    IUpdateLeadPayload,
-} from './lead.validators';
+import { ICreateLeadPayload, IMoveStagePayload, ISearchLeadQuery, IUpdateLeadPayload, canTransition } from './lead.validators';
 import { LEAD_TRANSITION_MAP } from './lead.constants';
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
@@ -13,6 +8,8 @@ import { RequestContext } from '../../../shared/utils/contextBuilder';
 import { isValidObjectID } from '../../../shared/utils/strings';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { DivisionService } from '../../division/division.service';
+import { RoleService } from '../../access-management/role/role.service';
+import { TENANT_TYPE } from '../../access-management/tenant/tenant.constants';
 
 type LeadDocument = HydratedDocument<ILead> | null;
 
@@ -98,19 +95,46 @@ const search = async (filters: ISearchLeadQuery, ctx: RequestContext, options?: 
 };
 
 const create = async (model: ICreateLeadPayload, ctx: RequestContext): Promise<HydratedDocument<ILead>> => {
-    //1: division must exist within the actor's scope; the lead inherits its tenant
-    const division = await DivisionService.get(model.division, ctx);
+    //1: resolve all referenced entities up front (scoped to the actor; tenant populated for the role checks)
+    const [division, contactPerson, salesPerson] = await Promise.all([
+        DivisionService.get(model.division, ctx),
+        RoleService.get(model.contactPerson, ctx, { populate: true }),
+        RoleService.get(model.salesPerson, ctx, { populate: true }),
+    ]);
+
+    //2: division must exist; the lead inherits its tenant
     if (!division) {
         return throwAppError('Division not found', StatusCodes.NOT_FOUND);
     }
 
-    //2: build entity — tenant is derived from the division (the pharma company)
+    //3: guard — the chosen division must belong to the selected tenant (catches mismatched selection)
+    if (division.tenant.toString() !== model.tenant) {
+        return throwAppError('Division does not belong to the selected company', StatusCodes.BAD_REQUEST);
+    }
+
+    //4: contact person must exist and belong to the customer whose lead we're creating (the lead's tenant)
+    if (!contactPerson) {
+        return throwAppError('Contact person not found', StatusCodes.NOT_FOUND);
+    }
+    if ((contactPerson.tenant as any)?._id?.toString() !== division.tenant.toString()) {
+        return throwAppError('Contact person must belong to the selected company', StatusCodes.BAD_REQUEST);
+    }
+
+    //5: sales person must exist and be QMS internal staff (a role under the platform tenant)
+    if (!salesPerson) {
+        return throwAppError('Sales person not found', StatusCodes.NOT_FOUND);
+    }
+    if ((salesPerson.tenant as any)?.type !== TENANT_TYPE.PLATFORM) {
+        return throwAppError('Sales person must be QMS internal staff', StatusCodes.BAD_REQUEST);
+    }
+
+    //6: build entity — tenant is still derived from the division (the pharma company, source of truth)
     const entity = new LeadModel({
         tenant: division.tenant,
         division: division._id,
     });
 
-    //3: set remaining fields
+    //7: set remaining fields
     let lead = await set(model, entity, ctx);
     lead = await lead.save();
 
@@ -148,8 +172,7 @@ const moveStage = async (id: string, model: IMoveStagePayload, ctx: RequestConte
     }
 
     //3: guard — transition must be allowed
-    const allowed = LEAD_TRANSITION_MAP[from] || [];
-    if (!allowed.includes(to)) {
+    if (!canTransition(LEAD_TRANSITION_MAP, from, to)) {
         return throwAppError(`Invalid stage transition from '${from}' to '${to}'`, StatusCodes.BAD_REQUEST);
     }
 

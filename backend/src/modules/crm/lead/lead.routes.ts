@@ -16,8 +16,6 @@ export const LeadRouter = express.Router();
 
 LeadRouter.use(AuthMiddleware);
 
-const GUARD = [LEAD_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.ADMIN.code];
-
 // get lead
 registry.registerPath({
     method: 'get',
@@ -116,6 +114,8 @@ registry.registerPath({
 // =======================================================================
 // ========================== EXPORT LEAD ROUTES =========================
 // =======================================================================
+const GUARD = [LEAD_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code];
+
 LeadRouter.get('/:id', AuthorizeMiddleware(GUARD), LeadController.get);
 LeadRouter.put('/:id', AuthorizeMiddleware(GUARD), LeadController.update);
 LeadRouter.patch('/:id/stage', AuthorizeMiddleware(GUARD), LeadController.moveStage);

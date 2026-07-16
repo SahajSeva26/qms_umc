@@ -100,7 +100,7 @@ const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): 
         entity = RoleModel.findOne(where);
     }
 
-    if (entity && options) {
+    if (entity && options?.populate) {
         entity = entity.populate(populate);
     }
 

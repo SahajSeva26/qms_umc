@@ -8,6 +8,7 @@ import { RequestContext } from '../../shared/utils/contextBuilder';
 import { isValidObjectID } from '../../shared/utils/strings';
 import { IServiceOptions } from '../../shared/types/service.types';
 import { TENANT_PERMISSIONS, TENANT_TYPE } from '../access-management/tenant/tenant.constants';
+import { LEAD_PERMISSIONS } from '../crm/lead/lead.constants';
 
 type DivisionDocument = HydratedDocument<IDivision> | null;
 const populate: any[] = [
@@ -68,6 +69,9 @@ const search = async (filters: ISearchDivisionQuery, ctx: RequestContext, option
     where.status = DIVISION_STATUS.ACTIVE;
 
     //2: add search filters
+    if (filters.tenantId && ctx.hasAnyPermissions([LEAD_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.ADMIN.code])) {
+        where.tenant = filters.tenantId;
+    }
     if (filters.name) {
         where.name = { $regex: filters.name, $options: 'i' };
     }

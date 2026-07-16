@@ -147,6 +147,8 @@ const update = async (id: string, model: IUpdateUserPayload, ctx: RequestContext
     return user;
 };
 
+
+
 // dedicated method for auth flows only
 const getUserWithPassword = async (email: string) => {
     return await UserModel.findOne({ email }).select('+password');

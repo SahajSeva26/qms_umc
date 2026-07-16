@@ -144,9 +144,31 @@ const refreshToken = async (refreshToken: string, ctx: RequestContext) => {
     };
 };
 
+// returns the current session: profile + access (role, role type, tenant, merged permissions).
+// role/tenant/permissions are already loaded onto ctx by AuthMiddleware — we only fetch the profile.
+const session = async (ctx: RequestContext) => {
+    const userId = ctx.user?._id;
+    if (!userId) {
+        return throwAppError('Unauthorized', StatusCodes.UNAUTHORIZED);
+    }
+
+    const user = await UserService.get(userId, ctx);
+    if (!user) {
+        return throwAppError('User not found', StatusCodes.NOT_FOUND);
+    }
+
+    return {
+        user,
+        role: ctx.role,
+        tenant: ctx.tenant,
+        permissions: ctx.permissions,
+    };
+};
+
 export const AuthService = {
     register,
     login,
     logout,
     refreshToken,
+    session,
 };

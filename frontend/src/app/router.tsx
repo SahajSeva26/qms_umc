@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import RootLayout from '@/components/layouts/RootLayout'
 import AppLayout from '@/components/layouts/AppLayout'
+import UnauthorizedPage from '@/components/layouts/UnauthorizedPage'
 import { authRoutes, AUTH_ROUTES } from '@/features/auth/auth.routes'
 import { dashboardRoutes } from '@/features/dashboard/dashboard.routes'
 import { crmRoutes } from '@/features/crm/crm.routes'
@@ -31,6 +32,7 @@ const appRouter = createBrowserRouter([
       {
         element: <AppLayout />,
         children: [
+          { path: '/unauthorized', element: <UnauthorizedPage /> },
           ...dashboardRoutes,
           ...crmRoutes,
           ...campsRoutes,

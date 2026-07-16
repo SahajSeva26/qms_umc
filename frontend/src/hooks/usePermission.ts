@@ -3,7 +3,7 @@ import type { SessionPermissions } from '@/types/accessManagement.types'
 
 // Thin wrapper over the central `useSession()` hook — kept as its own export
 // (rather than migrating call sites to useSession directly) so existing
-// consumers (AccessPermissionGate.tsx, TenantDetailPage.tsx) don't need to
+// consumers (RequirePermission.tsx, TenantDetailPage.tsx) don't need to
 // change. New code should prefer `useSession()` directly.
 export { SESSION_QUERY_KEY as SESSION_PERMISSIONS_QUERY_KEY }
 

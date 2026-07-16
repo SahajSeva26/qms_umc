@@ -1,5 +1,5 @@
 import type { RouteObject } from 'react-router-dom'
-import AccessPermissionGate from '@/features/access-management/components/AccessPermissionGate'
+import RequirePermission from '@/components/layouts/RequirePermission'
 import TenantsListPage from '@/features/access-management/tenant/pages/TenantsListPage'
 import TenantDetailPage from '@/features/access-management/tenant/pages/TenantDetailPage'
 import PermissionGroupsListPage from '@/features/access-management/permission-group/pages/PermissionGroupsListPage'
@@ -32,11 +32,14 @@ export const ACCESS_MANAGEMENT_ROUTES = {
   ROLE_DETAIL:          '/admin/roles/:id',
 }
 
-// Named permission-code sets for each list screen's <AccessPermissionGate>,
-// pulled out of the JSX below rather than inlined per route — matches each
-// backend route's own real AuthorizeMiddleware([...], 'OR') guard exactly
-// (see the research this module was built against: tenant/permission-group/
-// role-type/role routes.ts, all default OR semantics).
+// Named permission-code sets for each entity's <RequirePermission> route
+// guard, pulled out of the JSX below rather than inlined per route —
+// matches each backend route's own real AuthorizeMiddleware([...], 'OR')
+// guard exactly (see the research this module was built against:
+// tenant/permission-group/role-type/role routes.ts, all default OR
+// semantics). Applied to BOTH the list route and its detail/new routes —
+// previously only the list routes were gated at all; a user could
+// navigate straight to e.g. /admin/tenants/:id with zero permission check.
 const TENANTS_VIEW_PERMISSIONS = ['tenant:get', 'tenant:search', 'tenant:manage']
 const PERMISSION_GROUPS_VIEW_PERMISSIONS = ['permission-group:get', 'permission-group:search', 'permission-group:manage']
 const ROLE_TYPES_VIEW_PERMISSIONS = ['role-type:get', 'role-type:search', 'role-type:manage']
@@ -47,45 +50,87 @@ export const accessManagementRoutes: RouteObject[] = [
   {
     path: ACCESS_MANAGEMENT_ROUTES.TENANTS,
     element: (
-      <AccessPermissionGate anyOf={TENANTS_VIEW_PERMISSIONS}>
+      <RequirePermission anyOf={TENANTS_VIEW_PERMISSIONS}>
         <TenantsListPage />
-      </AccessPermissionGate>
+      </RequirePermission>
     ),
   },
-  { path: ACCESS_MANAGEMENT_ROUTES.TENANT_DETAIL, element: <TenantDetailPage /> },
+  {
+    path: ACCESS_MANAGEMENT_ROUTES.TENANT_DETAIL,
+    element: (
+      <RequirePermission anyOf={TENANTS_VIEW_PERMISSIONS}>
+        <TenantDetailPage />
+      </RequirePermission>
+    ),
+  },
 
   // Permission Groups
   {
     path: ACCESS_MANAGEMENT_ROUTES.PERMISSION_GROUPS,
     element: (
-      <AccessPermissionGate anyOf={PERMISSION_GROUPS_VIEW_PERMISSIONS}>
+      <RequirePermission anyOf={PERMISSION_GROUPS_VIEW_PERMISSIONS}>
         <PermissionGroupsListPage />
-      </AccessPermissionGate>
+      </RequirePermission>
     ),
   },
-  { path: ACCESS_MANAGEMENT_ROUTES.PERMISSION_GROUP_DETAIL, element: <PermissionGroupDetailPage /> },
+  {
+    path: ACCESS_MANAGEMENT_ROUTES.PERMISSION_GROUP_DETAIL,
+    element: (
+      <RequirePermission anyOf={PERMISSION_GROUPS_VIEW_PERMISSIONS}>
+        <PermissionGroupDetailPage />
+      </RequirePermission>
+    ),
+  },
 
   // Role Types
   {
     path: ACCESS_MANAGEMENT_ROUTES.ROLE_TYPES,
     element: (
-      <AccessPermissionGate anyOf={ROLE_TYPES_VIEW_PERMISSIONS}>
+      <RequirePermission anyOf={ROLE_TYPES_VIEW_PERMISSIONS}>
         <RoleTypesListPage />
-      </AccessPermissionGate>
+      </RequirePermission>
     ),
   },
-  { path: ACCESS_MANAGEMENT_ROUTES.ROLE_TYPE_NEW,    element: <RoleTypeDetailPage /> },
-  { path: ACCESS_MANAGEMENT_ROUTES.ROLE_TYPE_DETAIL, element: <RoleTypeDetailPage /> },
+  {
+    path: ACCESS_MANAGEMENT_ROUTES.ROLE_TYPE_NEW,
+    element: (
+      <RequirePermission anyOf={ROLE_TYPES_VIEW_PERMISSIONS}>
+        <RoleTypeDetailPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: ACCESS_MANAGEMENT_ROUTES.ROLE_TYPE_DETAIL,
+    element: (
+      <RequirePermission anyOf={ROLE_TYPES_VIEW_PERMISSIONS}>
+        <RoleTypeDetailPage />
+      </RequirePermission>
+    ),
+  },
 
   // Roles
   {
     path: ACCESS_MANAGEMENT_ROUTES.ROLES,
     element: (
-      <AccessPermissionGate anyOf={ROLES_VIEW_PERMISSIONS}>
+      <RequirePermission anyOf={ROLES_VIEW_PERMISSIONS}>
         <RolesListPage />
-      </AccessPermissionGate>
+      </RequirePermission>
     ),
   },
-  { path: ACCESS_MANAGEMENT_ROUTES.ROLE_NEW,    element: <RoleDetailPage /> },
-  { path: ACCESS_MANAGEMENT_ROUTES.ROLE_DETAIL, element: <RoleDetailPage /> },
+  {
+    path: ACCESS_MANAGEMENT_ROUTES.ROLE_NEW,
+    element: (
+      <RequirePermission anyOf={ROLES_VIEW_PERMISSIONS}>
+        <RoleDetailPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: ACCESS_MANAGEMENT_ROUTES.ROLE_DETAIL,
+    element: (
+      <RequirePermission anyOf={ROLES_VIEW_PERMISSIONS}>
+        <RoleDetailPage />
+      </RequirePermission>
+    ),
+  },
 ]

@@ -11,6 +11,7 @@ export function matchesFilters(camp: Camp, filters: CampsFilterState): boolean {
   if (filters.status !== 'ALL' && camp.status !== filters.status) return false
   if (filters.type !== 'ALL' && camp.type !== filters.type) return false
   if (filters.client !== 'ALL' && camp.clientId !== filters.client) return false
+  if (filters.division !== 'ALL' && (camp.divisionId ?? '') !== filters.division) return false
   if (filters.doctor !== 'ALL' && camp.doctorId !== filters.doctor) return false
   if (filters.fo !== 'ALL') {
     if (filters.fo === '__none__') {

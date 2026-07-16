@@ -7,6 +7,7 @@ import { crmRoutes } from '@/features/crm/crm.routes'
 import { campsRoutes } from '@/features/camps/camps.routes'
 import { dietRoutes } from '@/features/diet/diet.routes'
 import { foRoutes } from '@/features/fo/fo.routes'
+import { dedicatedOpsRoutes } from '@/features/dedicatedops/dedicatedops.routes'
 import { pharmaRoutes } from '@/features/pharma/pharma.routes'
 import { projectsRoutes } from '@/features/projects/projects.routes'
 import { omRoutes } from '@/features/om/om.routes'
@@ -34,6 +35,7 @@ const appRouter = createBrowserRouter([
           ...campsRoutes,
           ...dietRoutes,
           ...foRoutes,
+          ...dedicatedOpsRoutes,
           ...pharmaRoutes,
           ...projectsRoutes,
           ...omRoutes,

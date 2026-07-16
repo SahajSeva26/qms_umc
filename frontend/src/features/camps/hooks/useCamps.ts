@@ -20,10 +20,17 @@ export const useCamps = () => {
     onSuccess: invalidate,
   })
 
+  const toggleTeleMutation = useMutation({
+    mutationFn: (id: string) => campsService.toggleTele(id),
+    onSuccess: invalidate,
+  })
+
   const setStatus = (id: string, status: CampStatus, cancelReason?: string) =>
     setStatusMutation.mutate({ id, status, cancelReason })
 
   const assignFo = (id: string, foId: string) => assignFoMutation.mutate({ id, foId })
 
-  return { camps, isLoading, error, setStatus, assignFo }
+  const toggleTele = (id: string) => toggleTeleMutation.mutate(id)
+
+  return { camps, isLoading, error, setStatus, assignFo, toggleTele }
 }

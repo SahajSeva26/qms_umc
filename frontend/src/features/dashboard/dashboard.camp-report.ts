@@ -1,6 +1,5 @@
 import type { Camp, CampType } from '@/types/camp.types'
 import type { UserRole } from '@/types/auth.types'
-import { ASSIGNMENTS } from '@/types/salesdash.types'
 
 // Mirrors the prototype's camp-report.js exactly: a role-scoped Camp Report
 // (Diet & Screening) segment on the Dashboard. super_admin/admin/sales_lead
@@ -21,11 +20,12 @@ export type CampReportView = 'month' | 'day'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-export function scopedClientIds(role: UserRole | undefined, repId?: string): Set<string> | null {
-  if (role !== 'sales_rep' || !repId) return null
-  const ids = ASSIGNMENTS.filter((a) => a.repId === repId).map((a) => a.clientId)
-  return ids.length ? new Set(ids) : null
-}
+// Promoted to types/salesdash.types.ts (alongside ASSIGNMENTS, which it
+// reads) so other features can use it through the shared types layer
+// instead of reaching into features/dashboard/ internals — same pattern as
+// the CLIENTS/DIVISIONS/STAGES promotions. Re-exported here for backward
+// compatibility with existing imports in this feature.
+export { scopedClientIds } from '@/types/salesdash.types'
 
 function typeMatch(type: CampType, filter: CampReportType): boolean {
   return filter === 'ALL' || type === filter

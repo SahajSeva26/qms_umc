@@ -3,7 +3,7 @@ import type { LoginPayload, AuthUser } from '@/types/auth.types'
 import type { ApiResponse } from '@/types/common.types'
 
 const login = async (payload: LoginPayload) => {
-  const res = await api.post<ApiResponse<{ data: AuthUser }>>('/auth/login', payload)
+  const res = await api.post<ApiResponse<AuthUser>>('/auth/login', payload)
   return res.data
 }
 

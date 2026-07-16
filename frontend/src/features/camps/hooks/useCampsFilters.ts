@@ -6,6 +6,7 @@ export interface CampsFilterState {
   status: string
   type: string
   client: string
+  division: string
   doctor: string
   fo: string
   search: string
@@ -17,6 +18,7 @@ const DEFAULT_FILTERS: CampsFilterState = {
   status: 'ALL',
   type: 'ALL',
   client: 'ALL',
+  division: 'ALL',
   doctor: 'ALL',
   fo: 'ALL',
   search: '',

@@ -6,6 +6,7 @@ import { ANALYTICS_ROUTES } from '@/features/analytics/analytics.routes'
 import { CAMPS_ROUTES }     from '@/features/camps/camps.routes'
 import { DIET_ROUTES }      from '@/features/diet/diet.routes'
 import { FO_ROUTES }        from '@/features/fo/fo.routes'
+import { DEDICATEDOPS_ROUTES } from '@/features/dedicatedops/dedicatedops.routes'
 import { PHARMA_ROUTES }    from '@/features/pharma/pharma.routes'
 import { PROJECTS_ROUTES }  from '@/features/projects/projects.routes'
 import { OM_ROUTES }        from '@/features/om/om.routes'
@@ -111,7 +112,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { id: 'diet',         label: 'Diet Camps',                  icon: 'Heart',         path: DIET_ROUTES.DIET,
     rolesAllowed: ['camp_coord', 'diet_camp_coord', 'om_diet', 'sales_lead', 'sales_rep', 'fo', 'dietitian', 'logistics', 'pharma_ho', 'pharma_mr', 'pharma_asm', 'pharma_rsm'] },
 
-  { id: 'dedicatedops', label: 'Dedicated Ops',               icon: 'Briefcase',     path: FO_ROUTES.FO_DEDICATED,
+  { id: 'dedicatedops', label: 'Dedicated Ops',               icon: 'Briefcase',     path: DEDICATEDOPS_ROUTES.DEDICATEDOPS,
     rolesAllowed: ['om_screening'] },
 
   // Operations — Dietitians

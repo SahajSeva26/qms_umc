@@ -1,4 +1,4 @@
-import type { Camp, CampStatusMeta, CampTypeMeta, SlotMeta, Doctor } from '@/types/camp.types'
+import type { Camp, CampStatusMeta, CampTypeMeta, Doctor } from '@/types/camp.types'
 
 // TODO: entirely mock — no backend endpoints exist for camps yet.
 // Values copied from the vanilla-JS prototype's camps-data.js so they match
@@ -22,12 +22,9 @@ export const CAMP_STATUSES: CampStatusMeta[] = [
   { id: 'CANCELLED_CHARGED', name: 'Cancelled (charged)', color: '#f43f5e' },
 ]
 
-export const SLOTS: SlotMeta[] = [
-  { id: '9-1', label: '9 AM – 1 PM' },
-  { id: '10-2', label: '10 AM – 2 PM' },
-  { id: '11-3', label: '11 AM – 3 PM' },
-  { id: '6-10', label: '6 PM – 10 PM' },
-]
+// Promoted to types/camp.types.ts — Diet Camps reads this through the
+// shared types layer instead of reaching into this feature's internals.
+export { SLOTS } from '@/types/camp.types'
 
 function dPlus(days: number): string {
   return new Date(Date.now() + days * 86400000).toISOString().slice(0, 10)

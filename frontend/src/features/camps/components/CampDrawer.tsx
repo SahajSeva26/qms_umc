@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FiPhone, FiMail, FiMapPin, FiExternalLink } from 'react-icons/fi'
+import { FiPhone, FiMail, FiMapPin, FiExternalLink, FiSmartphone } from 'react-icons/fi'
 import type { Camp, CampStatus } from '@/types/camp.types'
 import { CAMPS_ROUTES } from '@/features/camps/camps.routes'
 import { getDoctor, isChargeableCancellation } from '@/features/camps/camps.utils'
@@ -17,9 +17,10 @@ interface CampDrawerProps {
   onClose: () => void
   onSetStatus: (id: string, status: CampStatus, reason?: string) => void
   onAssignFo: (id: string) => void
+  onToggleTele?: (id: string) => void
 }
 
-const CampDrawer = ({ camp, onClose, onSetStatus, onAssignFo }: CampDrawerProps) => {
+const CampDrawer = ({ camp, onClose, onSetStatus, onAssignFo, onToggleTele }: CampDrawerProps) => {
   const navigate = useNavigate()
   const [cancelling, setCancelling] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
@@ -52,9 +53,25 @@ const CampDrawer = ({ camp, onClose, onSetStatus, onAssignFo }: CampDrawerProps)
         </Button>
       </div>
 
-      <div className="text-[13px] mb-4" style={{ color: 'var(--qms-text-muted)' }}>
+      <div className="text-[13px] mb-2" style={{ color: 'var(--qms-text-muted)' }}>
         {clientName(camp.clientId)} · {divisionName(camp.divisionId)} · {camp.city}, {camp.state} · {formatDate(camp.date)} · {slot?.label}
       </div>
+
+      {camp.teleConsult && (
+        <div className="flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-full w-fit mb-3" style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-brand)' }}>
+          <FiSmartphone size={11} /> Teleconsultation · {camp.teleChannel === 'IVR' ? 'IVR' : 'Video'}
+        </div>
+      )}
+
+      {onToggleTele && !isFinal && (
+        <button
+          onClick={() => onToggleTele(camp.id)}
+          className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-dashed mb-4 w-fit"
+          style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }}
+        >
+          {camp.teleConsult ? 'Unmark teleconsultation' : 'Mark as teleconsultation'}
+        </button>
+      )}
 
       <div className="grid grid-cols-4 gap-2 mb-5 rounded-xl p-3" style={{ background: 'var(--qms-surface-strong)' }}>
         {[

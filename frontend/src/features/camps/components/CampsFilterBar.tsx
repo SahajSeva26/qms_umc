@@ -4,7 +4,7 @@ import DatePicker from '@/components/ui/DatePicker'
 import { Input } from '@/components/ui/input'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { CAMP_STATUSES, CAMP_TYPES, DOCTORS } from '@/features/camps/camps.mock'
-import { CLIENT_NAMES, FO_NAMES } from '@/features/camps/camps.refs'
+import { CLIENT_NAMES, DIVISION_NAMES, FO_NAMES } from '@/features/camps/camps.refs'
 import type { CampsFilterState } from '@/features/camps/hooks/useCampsFilters'
 
 interface CampsFilterBarProps {
@@ -42,6 +42,14 @@ const CampsFilterBar = ({ filters, setFilter, reset }: CampsFilterBarProps) => (
       <SelectContent>
         <SelectItem value="ALL">All companies</SelectItem>
         {Object.entries(CLIENT_NAMES).map(([id, name]) => <SelectItem key={id} value={id}>{name}</SelectItem>)}
+      </SelectContent>
+    </Select>
+
+    <Select value={filters.division} onValueChange={(v) => setFilter('division', v as string)}>
+      <SelectTrigger className="text-[12px]"><SelectValue placeholder="All divisions" /></SelectTrigger>
+      <SelectContent>
+        <SelectItem value="ALL">All divisions</SelectItem>
+        {Object.entries(DIVISION_NAMES).map(([id, name]) => <SelectItem key={id} value={id}>{name}</SelectItem>)}
       </SelectContent>
     </Select>
 

@@ -40,7 +40,16 @@ let ENV = {
         RefreshTokenSecret: process.env.JWT_REFRESH_SECRET || 'refresh-secret',
         RefreshExpirySec: Number(process.env.JWT_REFRESH_EXPIRY_SEC) || 60 * 60 * 24 * 7, // 7 days fallback
     },
-    
+
+    RateLimit: {
+        // Global limiter — applied to the whole API
+        WindowMs: Number(process.env.RATE_LIMIT_WINDOW_MS) || 60 * 1000, // 1 min
+        Max: Number(process.env.RATE_LIMIT_MAX) || 100, // requests per window per IP
+
+        // Strict limiter — applied to auth endpoints (brute-force targets)
+        AuthWindowMs: Number(process.env.AUTH_RATE_LIMIT_WINDOW_MS) || 60 * 1000, // 1 min
+        AuthMax: Number(process.env.AUTH_RATE_LIMIT_MAX) || 10, // requests per window per IP
+    },
 };
 
 export default ENV;

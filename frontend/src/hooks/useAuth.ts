@@ -1,14 +1,14 @@
 import { useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/features/auth/store'
 import { AUTH_ROUTES } from '@/features/auth/auth.routes'
 import { INTERNAL_ROLES, PHARMA_ROLES } from '@/lib/roles'
-import { useSession } from '@/hooks/useSession'
 import { authService } from '@/features/auth/auth.service'
 import type { UserRole } from '@/types/auth.types'
 
 export const useAuth = () => {
   const { user, clearAuth } = useAuthStore()
-  const { clearSession } = useSession()
+  const queryClient = useQueryClient()
   const navigate = useNavigate()
 
   const isAuthenticated = !!user
@@ -36,10 +36,17 @@ export const useAuth = () => {
     // unconditional regardless of how this call resolves.
     authService.logout().catch(() => {})
     clearAuth()
-    // Clear the cached session (useSession/usePermission/useActiveRole)
-    // immediately, so a subsequent login by a different user never briefly
-    // shows the previous user's stale permissions before the query refetches.
-    clearSession()
+    // Clear EVERY cached query (session, tenants, roles, role types,
+    // permission groups, etc.), not just the session key — this also
+    // covers what a narrower clearSession() call would have done. Without
+    // this, on a shared machine, User A logs out, User B logs in within
+    // the 5-minute staleTime, and any list/detail view B opens could
+    // render A's still-cached data until that specific query naturally
+    // refetches. Defense-in-depth data hygiene, not a real security
+    // boundary (the backend's own per-request authorization is what
+    // actually protects this data) — but no reason to leave stale
+    // cross-user data sitting in memory when a full clear is one line.
+    queryClient.clear()
     navigate(AUTH_ROUTES.LOGIN, { replace: true })
   }
 

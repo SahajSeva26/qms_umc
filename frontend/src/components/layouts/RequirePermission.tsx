@@ -27,12 +27,18 @@ interface RequirePermissionProps {
 }
 
 const RequirePermission = ({ anyOf, allOf, children }: RequirePermissionProps) => {
-  const { hasAnyPermission, hasAllPermissions, isLoading } = usePermission()
+  const { hasAnyPermission, hasAllPermissions, isSettled } = usePermission()
 
-  // While the session is still loading, render nothing yet rather than
-  // redirecting prematurely — a real user with permission should never be
-  // bounced to /unauthorized just because the session query hasn't resolved.
-  if (isLoading) return null
+  // Wait until the session query has resolved at least once before deciding
+  // to redirect — a real user with permission should never be bounced to
+  // /unauthorized just because the session hasn't loaded yet. Uses isSettled
+  // (true once the query has completed ANY fetch, initial or a later
+  // refetch), not isLoading (only true for the very first-ever fetch) —
+  // isLoading would incorrectly read false during a later refetch (e.g.
+  // right after refetchSession() invalidates the query on login), letting
+  // this guard proceed on stale/empty permission data before the refetch
+  // actually completes.
+  if (!isSettled) return null
 
   const isAllowed = allOf ? hasAllPermissions(allOf) : hasAnyPermission(anyOf ?? [])
 

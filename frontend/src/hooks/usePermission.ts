@@ -10,6 +10,8 @@ export { SESSION_QUERY_KEY as SESSION_PERMISSIONS_QUERY_KEY }
 export const usePermission = () => {
   const {
     isLoading,
+    isFetching,
+    isSettled,
     isError,
     error,
     session,
@@ -33,8 +35,14 @@ export const usePermission = () => {
     : null
 
   return {
-    // raw query state, for loading/error handling by callers
+    // raw query state, for loading/error handling by callers.
+    // isLoading is only true for the query's very FIRST fetch ever, not
+    // subsequent refetches — callers deciding "has the session ever
+    // resolved" (e.g. a route guard) should use isSettled instead; see
+    // useSession.ts's own doc comment on this exact distinction.
     isLoading,
+    isFetching,
+    isSettled,
     isError,
     error,
     refetch: refetchSession,

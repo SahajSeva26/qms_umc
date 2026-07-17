@@ -81,6 +81,13 @@ const RoleTypeDetailPage = () => {
   const [status, setStatus] = useState<RoleTypeStatus | ''>('')
   const [selectedCodes, setSelectedCodes] = useState<Set<string>>(new Set())
   const [formError, setFormError] = useState<string | null>(null)
+  // Permissions dropped from selectedCodes because the tenant's PermissionGroup
+  // ceiling has shrunk since this RoleType was last saved (see the pruning
+  // effect below) — surfaced as a visible notice rather than silently
+  // vanishing from the checked list, since an admin could otherwise revoke a
+  // permission from a role type without ever intending to, just by opening
+  // and re-saving the page.
+  const [prunedCodes, setPrunedCodes] = useState<string[]>([])
 
   useEffect(() => {
     if (roleType && !isCreateMode) {
@@ -95,11 +102,19 @@ const RoleTypeDetailPage = () => {
 
   // Whenever the ceiling (tenant's PermissionGroup) changes, drop any
   // selected code that has fallen outside it — the ceiling is authoritative
-  // and the backend would reject an out-of-ceiling code anyway.
+  // and the backend would reject an out-of-ceiling code on save anyway. But
+  // don't do this silently: record which codes were actually dropped so a
+  // visible notice can tell the admin exactly what's about to be revoked,
+  // rather than a permission quietly disappearing from the checked list
+  // with no trace before they click Save.
   useEffect(() => {
     if (!permissionGroup) return
     const allowed = new Set(ceilingPermissions.map((p) => p.code))
-    setSelectedCodes((prev) => new Set([...prev].filter((c) => allowed.has(c))))
+    setSelectedCodes((prev) => {
+      const dropped = [...prev].filter((c) => !allowed.has(c))
+      if (dropped.length > 0) setPrunedCodes((existing) => [...new Set([...existing, ...dropped])])
+      return new Set([...prev].filter((c) => allowed.has(c)))
+    })
   }, [permissionGroup, ceilingPermissions])
 
   const toggleCode = (code: string) => {
@@ -354,6 +369,16 @@ const RoleTypeDetailPage = () => {
               Only permissions granted to this tenant's own permission group can be assigned to a role type —
               that group is the ceiling for every role type under it.
             </p>
+
+            {prunedCodes.length > 0 && (
+              <div className="text-[12px] rounded-xl px-3 py-2 mb-4 bg-warning-soft border border-warning text-warning">
+                <span className="font-semibold">Heads up:</span> this tenant's permission group no longer grants{' '}
+                {prunedCodes.length === 1 ? 'this permission' : 'these permissions'}, so{' '}
+                {prunedCodes.length === 1 ? "it's" : "they're"} no longer selected below:{' '}
+                <span className="font-mono">{prunedCodes.join(', ')}</span>. Saving now will remove{' '}
+                {prunedCodes.length === 1 ? 'it' : 'them'} from this role type.
+              </div>
+            )}
 
             {!tenant && (
               <div className="text-[13px] py-6 text-center rounded-lg border" style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }}>

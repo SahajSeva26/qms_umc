@@ -21,5 +21,7 @@ export const swaggerSpec = new OpenApiGeneratorV3(registry.definitions).generate
         version: '1.0.0',
         description: 'API documentation for QMS backend',
     },
-    servers: [{ url: 'http://localhost:3000/api/v1', description: 'Development server' }],
+    // Relative URL: Swagger UI sends "Try it out" requests to whatever origin the docs are served
+    // from, so it works on localhost, a LAN IP, or a deployed domain without ever going cross-origin.
+    servers: [{ url: '/api/v1', description: 'Current host' }],
 });

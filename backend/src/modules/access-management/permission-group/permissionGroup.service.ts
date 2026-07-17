@@ -6,9 +6,10 @@ import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
 import { toObjectId, isValidObjectID } from '../../../shared/utils/strings';
-import { PERMISSIONS_ARRAY } from '../../../shared/env/permissions';
+import { PERMISSIONS_ARRAY, SYSTEM_PERMISSIONS } from '../../../shared/env/permissions';
 import { TenantService } from '../tenant/tenant.service';
 import { IServiceOptions } from '../../../shared/types/service.types';
+import ENV from '../../../shared/config/app.config';
 
 type PermissionGroupDocument = HydratedDocument<IPermissionGroup> | null;
 const populate: any[] = [];
@@ -121,6 +122,12 @@ const update = async (id: string, model: IUpdatePermissionGroupPayload, ctx: Req
         return throwAppError('Permission group not found', StatusCodes.NOT_FOUND);
     }
 
+    //1.1: the system permission group is immutable — it can never be modified through the API,
+    //no matter who the actor is (including the system user). It is owned by the seed only.
+    if (permissionGroup.code === ENV.App.SystemTenantCode) {
+        return throwAppError('The system permission group cannot be modified', StatusCodes.FORBIDDEN);
+    }
+
     //2: update incoming fields
     permissionGroup = await set(model, permissionGroup, ctx);
     permissionGroup = await permissionGroup.save();
@@ -140,6 +147,12 @@ export const PermissionGroupService = {
 };
 const handlePermissionUpdate = async (model: any, ctx: RequestContext) => {
     const log = ctx.logger;
+    // system:manage is a seed-only skeleton key — it can never be granted to any permission
+    // group through the API, no matter who the actor is (including the system user).
+    if (model.permissions.some((permission: any) => permission.code === SYSTEM_PERMISSIONS.MANAGE.code)) {
+        throwAppError(`${SYSTEM_PERMISSIONS.MANAGE.code} cannot be assigned to a permission group`, StatusCodes.FORBIDDEN);
+    }
+
     // check if permisisons are valid by system
     let inValidPermissions = model.permissions.filter((permission: any) => !PERMISSIONS_ARRAY.includes(permission.code));
     if (inValidPermissions.length > 0) {

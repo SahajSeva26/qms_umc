@@ -48,9 +48,12 @@ const set = async (model: any, entity: HydratedDocument<IRoleDocument>, ctx: Req
         entity.status = model.status;
     }
     if (model.type) {
-        // get role type
+        // the incoming role type must exist AND belong to the role's own tenant — a mismatch
+        // returns a vague 404 on purpose, so a tenant admin cannot discover role types elsewhere.
+        // Comparing against entity.tenant (not ctx) also constrains a system user to the role's tenant.
+        // (admin / tenant:manage access is already enforced by the create + update route guards)
         const roleType: any = await RoleTypeService.get(model.type, ctx);
-        if (!roleType) {
+        if (!roleType || roleType.tenant.toString() !== entity.tenant.toString()) {
             throwAppError('Role type not found', StatusCodes.NOT_FOUND);
         }
 
@@ -100,7 +103,7 @@ const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): 
         entity = RoleModel.findOne(where);
     }
 
-    if (entity && options) {
+    if (entity && options?.populate) {
         entity = entity.populate(populate);
     }
 

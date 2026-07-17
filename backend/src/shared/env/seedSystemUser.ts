@@ -60,11 +60,21 @@ const seedSystemUser = async () => {
                     name: ENV.App.SystemTenantName,
                     description: ENV.App.SystemTenantName + 'permission group',
                 });
-
-                //4: insert permissions
-                permissionGroup.permissions = systemUserPermissions;
-                await permissionGroup.save();
                 logger.debug('Tenant permission group created', { permissionGroupId: permissionGroup.id });
+            }
+
+            //3.1: reconcile permissions — the system permission group is frozen against the API, so the
+            // seed is the ONLY place it can grow. Idempotently add any permission missing by code and
+            // leave existing entries untouched, so a new module's permission lands here on next startup.
+            const existingCodes = new Set(permissionGroup.permissions.map((permission: any) => permission.code));
+            const missingPermissions = systemUserPermissions.filter((permission: any) => !existingCodes.has(permission.code));
+            if (missingPermissions.length > 0) {
+                permissionGroup.permissions.push(...missingPermissions);
+                await permissionGroup.save();
+                logger.debug('System permission group permissions reconciled', {
+                    permissionGroupId: permissionGroup.id,
+                    added: missingPermissions.map((permission: any) => permission.code),
+                });
             }
 
             // 4: Create defualt system ROLE TYPES ===============================================================>

@@ -56,7 +56,8 @@ coverage/
 # ======================
 # IDE / Editors
 # ======================
-
+.vscode/*
+!.vscode/launch.json
 !.vscode/extensions.json
 
 .idea/
@@ -113,3 +114,10 @@ test-results/
 # ======================
 *.pid
 *.pid.lock
+
+# ======================
+# Session / local only
+# ======================
+CLAUDE.md
+PROGRESS.md
+TESTS.md

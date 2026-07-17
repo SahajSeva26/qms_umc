@@ -9,8 +9,13 @@ let ENV = {
         Environment: process.env.APP_ENV || 'development',
 
         // Allowed frontend origins for CORS — comma-separated list, e.g.
-        // "https://app.example.com,https://admin.example.com"
-        CorsOrigins: (process.env.APP_CORS_ORIGINS || 'http://localhost:5173')
+        // "https://app.example.com,https://admin.example.com".
+        // APP_CORS_ORIGINS wins in every environment; the per-env string is only a fallback when it's unset/empty.
+        CorsOrigins: (process.env.APP_CORS_ORIGINS ||
+            (process.env.APP_ENV === 'development'
+                ? 'http://localhost:5174,http://localhost:3000'
+                : 'http://localhost:5173')
+        )
             .split(',')
             .map((origin) => origin.trim())
             .filter(Boolean),
@@ -28,10 +33,11 @@ let ENV = {
         // Tenant dada
         SystemTenantCode: process.env.APP_SYSTEM_TENANT_CODE || 'qms',
         SystemTenantName: process.env.APP_SYSTEM_TENANT_NAME || 'QMS',
-        SystemTenantDescription: process.env.APP_SYSTEM_TENANT_DESCRIPTION || 'QMS internal tenant for system operations',
+        SystemTenantDescription:
+            process.env.APP_SYSTEM_TENANT_DESCRIPTION || 'QMS internal tenant for system operations',
     },
     DB: {
-        URI: process.env.DB_URI || 'http://localhost:27017/qms',
+        URI: process.env.DB_URI || 'mongodb://localhost:27017/qms',
     },
     JWT: {
         AccessTokenSecret: process.env.JWT_ACCESS_SECRET || 'secret',

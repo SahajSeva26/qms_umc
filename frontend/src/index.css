@@ -2,129 +2,374 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 @custom-variant dark (&:is(.dark *));
 
-:root{
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-  background-color: black;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0)
-}
-
+/* ── Tailwind v4 theme mappings ── */
 @theme inline {
-  --font-heading: var(--font-sans);
-  --font-sans: 'Geist Variable', sans-serif;
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
+  --font-heading: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-sans:    'Inter', system-ui, -apple-system, sans-serif;
+
+  /* Sidebar */
+  --color-sidebar-ring:               var(--sidebar-ring);
+  --color-sidebar-border:             var(--sidebar-border);
+  --color-sidebar-accent-foreground:  var(--sidebar-accent-foreground);
+  --color-sidebar-accent:             var(--sidebar-accent);
   --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
+  --color-sidebar-primary:            var(--sidebar-primary);
+  --color-sidebar-foreground:         var(--sidebar-foreground);
+  --color-sidebar:                    var(--sidebar);
+
+  /* Charts */
   --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* Core */
+  --color-ring:        var(--ring);
+  --color-input:       var(--input);
+  --color-border:      var(--border);
   --color-destructive: var(--destructive);
+
   --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
+  --color-accent:            var(--accent);
+
   --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
+  --color-muted:            var(--muted);
+
   --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
+  --color-secondary:            var(--secondary);
+
   --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
+  --color-primary:            var(--primary);
+
   --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
+  --color-popover:            var(--popover);
+
   --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
+  --color-card:            var(--card);
+
   --color-foreground: var(--foreground);
   --color-background: var(--background);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
+
+  /* Status */
+  --color-success:          var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-soft:     var(--success-soft);
+  --color-warning:          var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-soft:     var(--warning-soft);
+  --color-danger:           var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-danger-soft:      var(--danger-soft);
+  --color-neutral:          var(--neutral);
+  --color-neutral-foreground: var(--neutral-foreground);
+  --color-neutral-soft:     var(--neutral-soft);
+
+  /* QMS surface */
+  --color-qms-surface:       var(--qms-surface);
+  --color-qms-border:        var(--qms-border);
+  --color-qms-text:          var(--qms-text);
+  --color-qms-text-soft:     var(--qms-text-soft);
+  --color-qms-text-muted:    var(--qms-text-muted);
+
+  /* Radius */
+  --radius-sm:  calc(var(--radius) * 0.6);
+  --radius-md:  calc(var(--radius) * 0.8);
+  --radius-lg:  var(--radius);
+  --radius-xl:  calc(var(--radius) * 1.4);
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+/* ============================================================
+   QMS Design Tokens — shadcn variable convention
+   Single source of truth. All raw values live here only.
+   Components consume via var(--token-name).
+   ============================================================ */
+
+/* ─── Light Theme ─── */
+:root {
+  /* ── shadcn base ── */
+  --background:          #f5f7ff;
+  --foreground:          #0b1020;
+
+  --card:                #fafbff;
+  --card-foreground:     #0b1020;
+
+  --popover:             #ffffff;
+  --popover-foreground:  #0b1020;
+
+  /* Matches --qms-brand (--brand-500 in the prototype), not the darker
+     --brand-600 this token used to hold — same bug as --qms-brand had. */
+  --primary:             #3b6dff;
+  --primary-foreground:  #ffffff;
+
+  --secondary:           #eef3ff;
+  --secondary-foreground:#0b1020;
+
+  --muted:               #f0f3ff;
+  --muted-foreground:    #6e77a8;
+
+  --accent:              #14b8a6;
+  --accent-foreground:   #ffffff;
+
+  --destructive:         #e11d48;
+  --danger:              #be123c;
+
+  --border:              rgba(36, 81, 240, 0.10);
+  --input:               rgba(36, 81, 240, 0.12);
+  --ring:                rgba(59, 109, 255, 0.25);
+
+  --radius:              0.625rem;
+
+  /* ── shadcn sidebar ── */
+  --sidebar:                    rgba(255, 255, 255, 0.72);
+  --sidebar-foreground:         #0b1020;
+  --sidebar-primary:            #3b6dff;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent:             rgba(36, 81, 240, 0.06);
+  --sidebar-accent-foreground:  #0b1020;
+  --sidebar-border:             rgba(36, 81, 240, 0.10);
+  --sidebar-ring:               rgba(59, 109, 255, 0.25);
+
+  /* ── status ── */
+  --success:             #166534;
+  --success-foreground:  #f0fdf4;
+  --success-soft:        #dcfce7;
+
+  --warning:             #92400e;
+  --warning-foreground:  #fffbeb;
+  --warning-soft:        #fef3c7;
+
+  --danger-foreground:   #fef2f2;
+  --danger-soft:         #ffe4e6;
+
+  --neutral:             #475089;
+  --neutral-foreground:  #f5f7ff;
+  --neutral-soft:        #eef3ff;
+
+  /* ── charts ── */
+  --chart-1: #3b6dff;
+  --chart-2: #14b8a6;
+  --chart-3: #7c5cff;
+  --chart-4: #f59e0b;
+  --chart-5: #10b981;
+
+  /* ── QMS brand ── */
+  /* Matches the prototype's --brand-500 exactly (styles.css) — the actual
+     accent color used for active states/buttons/highlights throughout, not
+     the darker --brand-600 this token used to hold. */
+  --qms-brand:           #3b6dff;
+  --qms-teal:            #14b8a6;
+
+  /* ── QMS surface (light) ── */
+  --qms-surface:         rgba(255, 255, 255, 0.72);
+  --qms-surface-strong:  rgba(255, 255, 255, 0.92);
+  --qms-surface-card:    #fafbff;
+  --qms-surface-input:   #ffffff;
+  --qms-surface-hover:   rgba(0, 0, 0, 0.04);
+
+  /* ── QMS border (light) ── */
+  --qms-border:          rgba(36, 81, 240, 0.10);
+  --qms-border-strong:   rgba(36, 81, 240, 0.18);
+  --qms-border-card:     rgba(36, 81, 240, 0.10);
+  --qms-border-input:    rgba(36, 81, 240, 0.15);
+
+  /* ── QMS text (light) ── */
+  --qms-text:            #0b1020;
+  --qms-text-soft:       #475089;
+  --qms-text-muted:      #6e77a8;
+
+  /* ── QMS page background (light) ── */
+  --qms-page-bg:         linear-gradient(135deg, #eef3ff 0%, #f6f8ff 35%, #ecfeff 100%);
+
+  /* ── QMS auth (light) ── */
+  --qms-auth-right-bg:   #eceef6;
+  --qms-auth-card-bg:    #fafbff;
+  --qms-auth-card-shadow:0 24px 60px -20px rgba(36, 81, 240, 0.30), 0 8px 24px rgba(11, 16, 32, 0.08);
+
+  /* ── QMS role colors ── */
+  --qms-role-super-admin: #f43f5e;
+  --qms-role-admin:       #8b5cf6;
+  --qms-role-sales-lead:  #3b6dff;
+  --qms-role-sales-rep:   #0ea5e9;
+  --qms-role-camp:        #10b981;
+  --qms-role-fo:          #14b8a6;
+  --qms-role-logistics:   #f59e0b;
+  --qms-role-accounts:    #a855f7;
+  --qms-role-pharma-ho:   #7c5cff;
+  --qms-role-pharma-mr:   #ec4899;
+  --qms-role-pharma-asm:  #8b5cf6;
+  --qms-role-pharma-rsm:  #0ea5e9;
 }
 
+/* ─── Dark Theme ─── */
+.dark {
+  /* ── shadcn base ── */
+  --background:          #070b1c;
+  --foreground:          #e8ebff;
+
+  --card:                rgba(20, 26, 55, 0.55);
+  --card-foreground:     #e8ebff;
+
+  --popover:             rgba(14, 20, 45, 0.98);
+  --popover-foreground:  #e8ebff;
+
+  /* Same --qms-brand value as light mode — the prototype's dark theme has
+     no separate brand-color override, only a lighter #5a8bff ring/glow tint. */
+  --primary:             #3b6dff;
+  --primary-foreground:  #ffffff;
+
+  --secondary:           rgba(148, 168, 255, 0.08);
+  --secondary-foreground:#e8ebff;
+
+  --muted:               rgba(148, 168, 255, 0.06);
+  --muted-foreground:    #7b85b8;
+
+  --accent:              #14b8a6;
+  --accent-foreground:   #070b1c;
+
+  --destructive:         #fb7185;
+  --danger:              #f43f5e;
+
+  --border:              rgba(148, 168, 255, 0.12);
+  --input:               rgba(148, 168, 255, 0.15);
+  --ring:                rgba(90, 139, 255, 0.35);
+
+  --radius:              0.625rem;
+
+  /* ── shadcn sidebar ── */
+  --sidebar:                    rgba(20, 26, 55, 0.55);
+  --sidebar-foreground:         #e8ebff;
+  --sidebar-primary:            #3b6dff;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent:             rgba(148, 168, 255, 0.07);
+  --sidebar-accent-foreground:  #aab2dc;
+  --sidebar-border:             rgba(148, 168, 255, 0.12);
+  --sidebar-ring:               rgba(90, 139, 255, 0.35);
+
+  /* ── status (dark) ── */
+  --success:             #22c55e;
+  --success-foreground:  #052e16;
+  --success-soft:        #052e16;
+
+  --warning:             #f59e0b;
+  --warning-foreground:  #1c1000;
+  --warning-soft:        #1c1000;
+
+  --danger-foreground:   #2d0707;
+  --danger-soft:         #2d0707;
+
+  --neutral:             #aab2dc;
+  --neutral-foreground:  #070b1c;
+  --neutral-soft:        rgba(148, 168, 255, 0.08);
+
+  /* ── charts (dark) ── */
+  --chart-1: #3b6dff;
+  --chart-2: #2dd4bf;
+  --chart-3: #a78bfa;
+  --chart-4: #fbbf24;
+  --chart-5: #34d399;
+
+  /* ── QMS surface (dark) ── */
+  --qms-surface:         rgba(20, 26, 55, 0.55);
+  --qms-surface-strong:  rgba(22, 29, 62, 0.85);
+  --qms-surface-card:    rgba(20, 26, 55, 0.55);
+  --qms-surface-input:   rgba(22, 29, 62, 0.85);
+  --qms-surface-hover:   rgba(148, 168, 255, 0.07);
+
+  /* ── QMS border (dark) ── */
+  --qms-border:          rgba(148, 168, 255, 0.12);
+  --qms-border-strong:   rgba(148, 168, 255, 0.22);
+  --qms-border-card:     rgba(148, 168, 255, 0.12);
+  --qms-border-input:    rgba(148, 168, 255, 0.22);
+
+  /* ── QMS text (dark) ── */
+  --qms-text:            #e8ebff;
+  --qms-text-soft:       #aab2dc;
+  --qms-text-muted:      #7b85b8;
+
+  /* ── QMS page background (dark) ── */
+  --qms-page-bg:
+    radial-gradient(1200px 800px at 10% -10%, #1a2057 0%, transparent 60%),
+    radial-gradient(900px 600px at 110% 10%, #0d3b66 0%, transparent 55%),
+    linear-gradient(180deg, #070b1c 0%, #0a0f24 100%);
+
+  /* ── QMS auth (dark) ── */
+  --qms-auth-right-bg:
+    radial-gradient(1200px 800px at 10% -10%, #1a2057 0%, transparent 60%),
+    radial-gradient(900px 600px at 110% 10%, #0d3b66 0%, transparent 55%),
+    linear-gradient(180deg, #070b1c 0%, #0a0f24 100%);
+  --qms-auth-card-bg:    rgba(20, 26, 55, 0.55);
+  --qms-auth-card-shadow:0 30px 70px -20px rgba(0,0,0,0.7), 0 10px 30px rgba(0,0,0,0.5);
+}
+
+/* ── App shell background ── */
+.app-bg { background: var(--qms-page-bg); }
+
+/* ── Auth layout ── */
+.auth-panel {
+  background:
+    radial-gradient(800px 500px at 20% 10%, rgba(91,140,255,.55), transparent 60%),
+    radial-gradient(700px 500px at 80% 90%, rgba(20,184,166,.45), transparent 55%),
+    linear-gradient(135deg, #0f205c 0%, #1a369c 50%, #0d3b66 100%);
+}
+
+.auth-panel-dots {
+  background-image:
+    radial-gradient(2px 2px at 20px 30px,  rgba(255,255,255,.18), transparent),
+    radial-gradient(2px 2px at 80px 200px, rgba(255,255,255,.15), transparent),
+    radial-gradient(2px 2px at 200px 100px,rgba(255,255,255,.18), transparent),
+    radial-gradient(2px 2px at 350px 380px,rgba(255,255,255,.10), transparent),
+    radial-gradient(2px 2px at 480px 80px, rgba(255,255,255,.20), transparent);
+  background-size: 600px 500px;
+}
+
+.auth-logo        { background: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%); }
+
+.auth-headline-accent {
+  background: linear-gradient(90deg, #9ec3ff, #7be0d4);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.auth-stat-card {
+  background:      rgba(255,255,255,0.08);
+  backdrop-filter: blur(4px);
+}
+
+.auth-right-panel  { background: var(--qms-auth-right-bg); }
+
+.auth-card {
+  background: var(--qms-auth-card-bg);
+  border:     1px solid var(--qms-border-card);
+  box-shadow: var(--qms-auth-card-shadow);
+}
+
+.dark .auth-card {
+  backdrop-filter: blur(20px) saturate(140%);
+}
+
+/* ── Scrollbar ── */
+:root::-webkit-scrollbar { display: none; }
+
+.hide-scrollbar               { scrollbar-width: none; }
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+
+/* ── Base ── */
 @layer base {
-  * {
-    @apply border-border outline-ring/50;}
-  body {
-    @apply bg-background text-foreground;}
-  html {
-    @apply font-sans;}}
+  * { @apply border-border outline-ring/50; }
+
+  body { @apply bg-background text-foreground; }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) { cursor: pointer; }
+
+  html { @apply font-sans; }
+}

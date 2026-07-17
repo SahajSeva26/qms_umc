@@ -1,15 +1,56 @@
-
-
-import { createBrowserRouter } from "react-router-dom";
-import RootLayout from "../components/layouts/RootLayout";
+import { createBrowserRouter, Navigate } from 'react-router-dom'
+import RootLayout from '@/components/layouts/RootLayout'
+import AppLayout from '@/components/layouts/AppLayout'
+import UnauthorizedPage from '@/components/layouts/UnauthorizedPage'
+import { authRoutes, AUTH_ROUTES } from '@/features/auth/auth.routes'
+import { dashboardRoutes } from '@/features/dashboard/dashboard.routes'
+import { crmRoutes } from '@/features/crm/crm.routes'
+import { campsRoutes } from '@/features/camps/camps.routes'
+import { dietRoutes } from '@/features/diet/diet.routes'
+import { foRoutes } from '@/features/fo/fo.routes'
+import { dedicatedOpsRoutes } from '@/features/dedicatedops/dedicatedops.routes'
+import { pharmaRoutes } from '@/features/pharma/pharma.routes'
+import { projectsRoutes } from '@/features/projects/projects.routes'
+import { omRoutes } from '@/features/om/om.routes'
+import { doctorsRoutes } from '@/features/doctors/doctors.routes'
+import { billingRoutes } from '@/features/billing/billing.routes'
+import { analyticsRoutes } from '@/features/analytics/analytics.routes'
+import { adminRoutes } from '@/features/admin/admin.routes'
+import { accessManagementRoutes } from '@/features/access-management/accessManagement.routes'
 
 const appRouter = createBrowserRouter([
-    {
-        path: "/",
-        element: <RootLayout />,
-        // add all children here
-        children:[]
-    }
+  {
+    path: '/',
+    element: <RootLayout />,
+    children: [
+      { index: true, element: <Navigate to={AUTH_ROUTES.LOGIN} replace /> },
+
+      // Unauthenticated routes — no shell
+      ...authRoutes,
+
+      // Authenticated routes — wrapped in AppLayout (sidebar + topbar)
+      {
+        element: <AppLayout />,
+        children: [
+          { path: '/unauthorized', element: <UnauthorizedPage /> },
+          ...dashboardRoutes,
+          ...crmRoutes,
+          ...campsRoutes,
+          ...dietRoutes,
+          ...foRoutes,
+          ...dedicatedOpsRoutes,
+          ...pharmaRoutes,
+          ...projectsRoutes,
+          ...omRoutes,
+          ...doctorsRoutes,
+          ...billingRoutes,
+          ...analyticsRoutes,
+          ...adminRoutes,
+          ...accessManagementRoutes,
+        ],
+      },
+    ],
+  },
 ])
 
 export default appRouter

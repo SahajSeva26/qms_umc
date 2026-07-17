@@ -25,8 +25,31 @@ const populate: any[] = [
 // ========================================================================================
 
 const set = async (model: any, entity: HydratedDocument<ILead>, ctx: RequestContext) => {
-    if (model.contactPerson) entity.contactPerson = model.contactPerson;
-    if (model.salesPerson) entity.salesPerson = model.salesPerson;
+    // contactPerson must exist and belong to the lead's own tenant (the pharma company).
+    // entity.tenant is set before set() runs — derived from division on create, loaded doc on update.
+    if (model.contactPerson) {
+        const contactPerson = await RoleService.get(model.contactPerson, ctx, { populate: true });
+        if (!contactPerson) {
+            return throwAppError('Contact person not found', StatusCodes.NOT_FOUND);
+        }
+        if ((contactPerson.tenant as any)?._id?.toString() !== entity.tenant?.toString()) {
+            return throwAppError('Contact person must belong to the selected company', StatusCodes.BAD_REQUEST);
+        }
+        entity.contactPerson = model.contactPerson;
+    }
+
+    // salesPerson must exist and be QMS internal (platform) staff.
+    if (model.salesPerson) {
+        const salesPerson = await RoleService.get(model.salesPerson, ctx, { populate: true });
+        if (!salesPerson) {
+            return throwAppError('Sales person not found', StatusCodes.NOT_FOUND);
+        }
+        if ((salesPerson.tenant as any)?.type !== TENANT_TYPE.PLATFORM) {
+            return throwAppError('Sales person must be QMS internal staff', StatusCodes.BAD_REQUEST);
+        }
+        entity.salesPerson = model.salesPerson;
+    }
+
     if (model.title) entity.title = model.title;
     if (model.problemStatement) entity.problemStatement = model.problemStatement;
     if (model.numberOfMRS !== undefined) entity.numberOfMRS = model.numberOfMRS;
@@ -95,46 +118,25 @@ const search = async (filters: ISearchLeadQuery, ctx: RequestContext, options?: 
 };
 
 const create = async (model: ICreateLeadPayload, ctx: RequestContext): Promise<HydratedDocument<ILead>> => {
-    //1: resolve all referenced entities up front (scoped to the actor; tenant populated for the role checks)
-    const [division, contactPerson, salesPerson] = await Promise.all([
-        DivisionService.get(model.division, ctx),
-        RoleService.get(model.contactPerson, ctx, { populate: true }),
-        RoleService.get(model.salesPerson, ctx, { populate: true }),
-    ]);
-
-    //2: division must exist; the lead inherits its tenant
+    //1: division must exist (scoped to the actor); the lead inherits its tenant
+    const division = await DivisionService.get(model.division, ctx);
     if (!division) {
         return throwAppError('Division not found', StatusCodes.NOT_FOUND);
     }
 
-    //3: guard — the chosen division must belong to the selected tenant (catches mismatched selection)
+    //2: guard — the chosen division must belong to the selected tenant (catches mismatched selection)
     if (division.tenant.toString() !== model.tenant) {
         return throwAppError('Division does not belong to the selected company', StatusCodes.BAD_REQUEST);
     }
 
-    //4: contact person must exist and belong to the customer whose lead we're creating (the lead's tenant)
-    if (!contactPerson) {
-        return throwAppError('Contact person not found', StatusCodes.NOT_FOUND);
-    }
-    if ((contactPerson.tenant as any)?._id?.toString() !== division.tenant.toString()) {
-        return throwAppError('Contact person must belong to the selected company', StatusCodes.BAD_REQUEST);
-    }
-
-    //5: sales person must exist and be QMS internal staff (a role under the platform tenant)
-    if (!salesPerson) {
-        return throwAppError('Sales person not found', StatusCodes.NOT_FOUND);
-    }
-    if ((salesPerson.tenant as any)?.type !== TENANT_TYPE.PLATFORM) {
-        return throwAppError('Sales person must be QMS internal staff', StatusCodes.BAD_REQUEST);
-    }
-
-    //6: build entity — tenant is still derived from the division (the pharma company, source of truth)
+    //3: build entity — tenant is derived from the division (the pharma company, source of truth).
+    // tenant must be set before set() so it can validate the contactPerson against it.
     const entity = new LeadModel({
         tenant: division.tenant,
         division: division._id,
     });
 
-    //7: set remaining fields
+    //4: set validates + applies contactPerson/salesPerson and the remaining fields
     let lead = await set(model, entity, ctx);
     lead = await lead.save();
 

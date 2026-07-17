@@ -4,7 +4,7 @@ import { AUTH_ROUTES } from '@/features/auth/auth.routes'
 
 const api = axios.create({
   baseURL: ENV.Api.BaseUrl+"/api/v1",
-  withCredentials: true, // cookies are httpOnly — sent automatically
+  withCredentials: true,// auto set cookies
 })
 
 // Silent access-token refresh: on a non-login 401, try POST /auth/refresh-token

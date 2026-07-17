@@ -7,7 +7,7 @@ import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
 import { toObjectId, isValidObjectID } from '../../../shared/utils/strings';
 import { TenantService } from '../tenant/tenant.service';
-import { PERMISSIONS_ARRAY } from '../../../shared/env/permissions';
+import { PERMISSIONS_ARRAY, SYSTEM_PERMISSIONS } from '../../../shared/env/permissions';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { PermissionGroupService } from '../permission-group/permissionGroup.service';
 import { TENANT_PERMISSIONS } from '../tenant/tenant.constants';
@@ -42,6 +42,15 @@ const set = async (model: any, entity: HydratedDocument<IRoleType>, ctx: Request
     if (model.permissions != undefined) {
         if (!ctx.hasAnyPermissions([TENANT_PERMISSIONS.ADMIN.code, TENANT_PERMISSIONS.MANAGE.code])) {
             throwAppError('Forbidden: you are not allowed to update permissions', StatusCodes.FORBIDDEN);
+        }
+        // system:manage is a seed-only skeleton key. It can never be granted through the API...
+        if (model.permissions.includes(SYSTEM_PERMISSIONS.MANAGE.code)) {
+            throwAppError(`${SYSTEM_PERMISSIONS.MANAGE.code} cannot be assigned to a role type`, StatusCodes.FORBIDDEN);
+        }
+        // ...and it can never be stripped from a role type that already carries it (e.g. the
+        // seeded system role type), including via an empty-array wipe. Freezes it in place.
+        if (entity.permissions.includes(SYSTEM_PERMISSIONS.MANAGE.code)) {
+            throwAppError('The permissions of a system-managed role type cannot be modified', StatusCodes.FORBIDDEN);
         }
         //allowing empty [] array for update
         if (model.permissions.length > 0) {

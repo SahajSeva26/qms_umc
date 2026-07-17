@@ -7,10 +7,15 @@ import RoleTypeStatusPill from '@/features/access-management/role-type/component
 // `@/features/access-management/permission-group/components/PermissionGroupsTable.tsx`
 // exactly: var(--qms-*) custom properties, no shadcn Table, row-click
 // navigates to the detail route, inline empty state. Columns per the task:
-// code, name, permission count, status.
+// code, name, tenant, permission count, status.
 
 interface RoleTypesTableProps {
   roleTypes: RoleTypeEntity[]
+}
+
+function tenantLabel(tenant: RoleTypeEntity['tenant']): string {
+  if (typeof tenant === 'string') return '—'
+  return tenant?.name ?? '—'
 }
 
 const RoleTypesTable = ({ roleTypes }: RoleTypesTableProps) => {
@@ -30,6 +35,9 @@ const RoleTypesTable = ({ roleTypes }: RoleTypesTableProps) => {
               </th>
               <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
                 Name
+              </th>
+              <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
+                Tenant
               </th>
               <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
                 Permissions
@@ -61,6 +69,9 @@ const RoleTypesTable = ({ roleTypes }: RoleTypesTableProps) => {
                       {roleType.description}
                     </div>
                   )}
+                </td>
+                <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
+                  {tenantLabel(roleType.tenant)}
                 </td>
                 <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>
                   {roleType.permissions ? roleType.permissions.length : '—'}

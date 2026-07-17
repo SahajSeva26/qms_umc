@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { createRoleSchema, updateRoleSchema } from '@/features/access-management/role/schemas/role.schemas'
+import { useScrollIntoViewOnChange } from '@/hooks/useScrollIntoViewOnChange'
 import type { RolePopulatedRoleType, RolePopulatedUser, RoleStatus } from '@/types/accessManagement.types'
 
 // Combined create-flow + edit page for Role — the "ID card" entity binding
@@ -72,8 +73,14 @@ const RoleDetailPage = () => {
   const [tenant, setTenant] = useState(searchParams.get('tenant') ?? '')
   useEffect(() => {
     if (role && !isCreateMode) {
-      const tenantValue = role.tenant as unknown
-      setTenant(typeof tenantValue === 'string' ? tenantValue : ((tenantValue as { id?: string })?.id ?? ''))
+      // role.tenant is a raw ObjectId string on create/update responses but a
+      // populated {_id, name, code} object on GET-by-id/search — see
+      // RolePopulatedTenant's comment in accessManagement.types.ts. Reading
+      // `.id` here (rather than `._id`) always fell through to '', which
+      // permanently disabled the Role Type picker below since it requires a
+      // resolved tenant id.
+      const tenantValue = role.tenant
+      setTenant(typeof tenantValue === 'string' ? tenantValue : (tenantValue?._id ?? ''))
     }
   }, [role, isCreateMode])
 
@@ -96,6 +103,7 @@ const RoleDetailPage = () => {
   const [roleType, setRoleType] = useState(searchParams.get('roleType') ?? '')
   const [selectedCodes, setSelectedCodes] = useState<Set<string>>(new Set())
   const [formError, setFormError] = useState<string | null>(null)
+  const errorRef = useScrollIntoViewOnChange<HTMLDivElement>(formError)
 
   // Embedded user-registration fields (create) / limited user-edit fields (update).
   const [userFirstName, setUserFirstName] = useState('')
@@ -115,8 +123,10 @@ const RoleDetailPage = () => {
       // comment in accessManagement.types.ts) — no .code projection needed.
       setSelectedCodes(new Set(role.permissions ?? []))
 
-      const typeValue = role.type as unknown
-      setRoleType(typeof typeValue === 'string' ? typeValue : ((typeValue as { id?: string })?.id ?? ''))
+      // role.type has the same populated-vs-string duality as role.tenant
+      // above — see RolePopulatedRoleType's comment.
+      const typeValue = role.type
+      setRoleType(typeof typeValue === 'string' ? typeValue : (typeValue?._id ?? ''))
 
       const userValue = role.user as RolePopulatedUser | string
       if (typeof userValue !== 'string') {
@@ -674,7 +684,11 @@ const RoleDetailPage = () => {
               </div>
             )}
 
-            {formError && <div className="text-xs text-danger mt-4">{formError}</div>}
+            {formError && (
+              <div ref={errorRef} className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger mt-4">
+                {formError}
+              </div>
+            )}
 
             <Button onClick={handleSave} disabled={mutation.isPending} className="mt-4">
               {mutation.isPending ? 'Saving…' : isCreateMode ? 'Create role' : 'Save changes'}

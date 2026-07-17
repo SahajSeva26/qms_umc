@@ -20,6 +20,7 @@ export const UserMapper = {
             result.loginAttempts = user?.loginAttempts;
             result.lockUntil = user?.lockUntil;
             result.meta = user?.meta;
+            result.createdAt = user?.createdAt;
         }
 
         return result;

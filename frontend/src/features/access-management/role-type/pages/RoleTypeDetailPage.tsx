@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { createRoleTypeSchema, updateRoleTypeSchema } from '@/features/access-management/role-type/schemas/roleType.schemas'
+import { useScrollIntoViewOnChange } from '@/hooks/useScrollIntoViewOnChange'
 import type { RoleTypeCode, RoleTypeStatus } from '@/types/accessManagement.types'
 
 // Combined create-flow + edit page:
@@ -59,11 +60,10 @@ const RoleTypeDetailPage = () => {
   const [tenant, setTenant] = useState(searchParams.get('tenant') ?? '')
   useEffect(() => {
     if (roleType && !isCreateMode) {
-      // RoleTypeEntity['tenant'] is a raw ObjectId string per the mapper
-      // (populate only selects name/code on GET, so `tenant` may come back as
-      // an object OR a string depending on the request path — normalize both).
-      const tenantValue = roleType.tenant as unknown
-      setTenant(typeof tenantValue === 'string' ? tenantValue : ((tenantValue as { id?: string })?.id ?? ''))
+      // roleType.tenant is a raw ObjectId string on GET-by-id but a populated
+      // {_id, name, code} object on GET (search) — see RoleTypePopulatedTenant.
+      const tenantValue = roleType.tenant
+      setTenant(typeof tenantValue === 'string' ? tenantValue : (tenantValue?._id ?? ''))
     }
   }, [roleType, isCreateMode])
 
@@ -81,6 +81,7 @@ const RoleTypeDetailPage = () => {
   const [status, setStatus] = useState<RoleTypeStatus | ''>('')
   const [selectedCodes, setSelectedCodes] = useState<Set<string>>(new Set())
   const [formError, setFormError] = useState<string | null>(null)
+  const errorRef = useScrollIntoViewOnChange<HTMLDivElement>(formError)
   // Permissions dropped from selectedCodes because the tenant's PermissionGroup
   // ceiling has shrunk since this RoleType was last saved (see the pruning
   // effect below) — surfaced as a visible notice rather than silently
@@ -448,7 +449,11 @@ const RoleTypeDetailPage = () => {
               </div>
             )}
 
-            {formError && <div className="text-xs text-danger mt-4">{formError}</div>}
+            {formError && (
+              <div ref={errorRef} className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger mt-4">
+                {formError}
+              </div>
+            )}
 
             <Button onClick={handleSave} disabled={mutation.isPending} className="mt-4">
               {mutation.isPending ? 'Saving…' : isCreateMode ? 'Create role type' : 'Save changes'}

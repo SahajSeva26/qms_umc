@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { updateUserSchema } from '@/features/admin/schemas/user.schemas'
+import { useScrollIntoViewOnChange } from '@/hooks/useScrollIntoViewOnChange'
 
 // Literal path (not imported from admin.routes.tsx) — that file imports this
 // component, so importing back from it here would be a circular module
@@ -26,6 +27,7 @@ const UserDetailPage = () => {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
+  const errorRef = useScrollIntoViewOnChange<HTMLDivElement>(formError)
 
   useEffect(() => {
     if (user) {
@@ -141,7 +143,7 @@ const UserDetailPage = () => {
               )}
 
               {formError && (
-                <div className="text-xs text-danger">
+                <div ref={errorRef} className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
                   {formError}
                 </div>
               )}

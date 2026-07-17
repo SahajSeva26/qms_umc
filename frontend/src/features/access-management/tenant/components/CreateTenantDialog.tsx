@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useCreateTenant } from '@/features/access-management/tenant/hooks/useCreateTenant'
 import { createTenantSchema } from '@/features/access-management/tenant/schemas/tenant.schemas'
 import { TENANT_ROUTES } from '@/features/access-management/tenant/tenant.routes'
+import { useScrollIntoViewOnChange } from '@/hooks/useScrollIntoViewOnChange'
 
 // Single-step create form rendered in a Dialog modal — this is a much
 // smaller payload than the CRM "New Lead" flow (`NewLeadWizard.tsx`), so a
@@ -39,6 +40,7 @@ const CreateTenantDialog = () => {
   const [formError, setFormError] = useState<string | null>(null)
   const navigate = useNavigate()
   const createTenant = useCreateTenant()
+  const errorRef = useScrollIntoViewOnChange<HTMLDivElement>(formError)
 
   const setField = <K extends keyof typeof EMPTY_FORM>(key: K, value: (typeof EMPTY_FORM)[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -211,7 +213,11 @@ const CreateTenantDialog = () => {
             </div>
           </div>
 
-          {formError && <div className="text-xs text-danger">{formError}</div>}
+          {formError && (
+            <div ref={errorRef} className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
+              {formError}
+            </div>
+          )}
 
           {createTenant.isError && (
             <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">

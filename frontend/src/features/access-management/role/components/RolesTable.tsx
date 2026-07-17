@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import type { RoleEntity, RolePopulatedRoleType, RolePopulatedUser } from '@/types/accessManagement.types'
+import type { RoleEntity, RolePopulatedRoleType, RolePopulatedTenant, RolePopulatedUser } from '@/types/accessManagement.types'
 import { ROLE_ROUTES } from '@/features/access-management/role/role.routes'
 import RoleStatusPill from '@/features/access-management/role/components/RoleStatusPill'
 
@@ -25,6 +25,11 @@ function roleTypeLabel(type: RoleEntity['type']): string {
   if (typeof type === 'string') return '—'
   const t = type as RolePopulatedRoleType
   return t?.name ?? '—'
+}
+
+function tenantLabel(tenant: RoleEntity['tenant']): string {
+  if (typeof tenant === 'string') return '—'
+  return (tenant as RolePopulatedTenant)?.name ?? '—'
 }
 
 function userName(user: RoleEntity['user']): string {
@@ -56,6 +61,9 @@ const RolesTable = ({ roles }: RolesTableProps) => {
               </th>
               <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
                 Name
+              </th>
+              <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
+                Tenant
               </th>
               <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
                 Role Type
@@ -90,6 +98,9 @@ const RolesTable = ({ roles }: RolesTableProps) => {
                       {role.description}
                     </div>
                   )}
+                </td>
+                <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
+                  {tenantLabel(role.tenant)}
                 </td>
                 <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>
                   {roleTypeLabel(role.type)}

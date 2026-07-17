@@ -1,7 +1,7 @@
 import mongoose, { HydratedDocument } from 'mongoose';
 import { ILead, LeadModel } from './lead.model';
 import { ICreateLeadPayload, IMoveStagePayload, ISearchLeadQuery, IUpdateLeadPayload, canTransition } from './lead.validators';
-import { LEAD_TRANSITION_MAP } from './lead.constants';
+import { LEAD_PERMISSIONS, LEAD_TRANSITION_MAP } from './lead.constants';
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
@@ -72,6 +72,12 @@ const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): 
     }
 
     const where: mongoose.QueryFilter<ILead> = { ...ctx.where(), _id: id };
+
+    // reps (lead:search, not lead:manage) can only see their own leads
+    if (ctx.hasAnyPermissions([LEAD_PERMISSIONS.SEARCH.code]) && !ctx.hasAnyPermissions([LEAD_PERMISSIONS.MANAGE.code])) {
+        where.salesPerson = ctx.role?._id;
+    }
+
     let query = LeadModel.findOne(where);
 
     if (options?.populate) {
@@ -86,6 +92,11 @@ const search = async (filters: ISearchLeadQuery, ctx: RequestContext, options?: 
 
     //1: add default scoping
     const where: mongoose.QueryFilter<ILead> = { ...ctx.where() };
+
+    // reps (lead:search, not lead:manage) can only see their own leads
+    if (ctx.hasAnyPermissions([LEAD_PERMISSIONS.SEARCH.code]) && !ctx.hasAnyPermissions([LEAD_PERMISSIONS.MANAGE.code])) {
+        where.salesPerson = ctx.role?._id;
+    }
 
     //2: add search filters
     if (filters.title) {
@@ -118,6 +129,7 @@ const search = async (filters: ISearchLeadQuery, ctx: RequestContext, options?: 
 };
 
 const create = async (model: ICreateLeadPayload, ctx: RequestContext): Promise<HydratedDocument<ILead>> => {
+    
     //1: division must exist (scoped to the actor); the lead inherits its tenant
     const division = await DivisionService.get(model.division, ctx);
     if (!division) {

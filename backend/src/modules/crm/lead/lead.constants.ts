@@ -97,5 +97,38 @@ export const LEAD_TRANSITION_MAP: Record<string, string[]> = {
 // ================= LEAD PERMISSIONS CONSTANTS ===============
 // ============================================================
 export const LEAD_PERMISSIONS = {
-    MANAGE: { code: 'lead:manage', name: 'Manage Lead', description: 'Manage leads' } as const,
+    MANAGE: {
+        code: 'lead:manage',
+        category: 'lead',
+        name: 'Manage Lead',
+        description: 'Manage leads (full visibility)',
+    } as const,
+
+    SEARCH: {
+        code: 'lead:search',
+        category: 'lead',
+        name: 'Search Lead',
+        description: 'View/search own leads only',
+    } as const,
+
+    CREATE: {
+        code: 'lead:create',
+        category: 'lead',
+        name: 'Create Lead',
+        description: 'Create leads',
+    } as const,
+
+    UPDATE: {
+        code: 'lead:update',
+        category: 'lead',
+        name: 'Update Lead',
+        description: 'Update leads',
+    } as const,
+
+    GET: {
+        code: 'lead:get',
+        category: 'lead',
+        name: 'Get Lead',
+        description: 'Get leads',
+    } as const,
 };

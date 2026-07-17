@@ -18,6 +18,8 @@ const systemUserPermissions: any = [
     ...Object.values(PERMISSIONS.PERMISSION_GROUP),
     ...Object.values(PERMISSIONS.ROLE_TYPE),
     ...Object.values(PERMISSIONS.ROLE),
+    ...Object.values(PERMISSIONS.DIVISION),
+    ...Object.values(PERMISSIONS.LEAD),
 ];
 
 const seedSystemUser = async () => {

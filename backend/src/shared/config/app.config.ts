@@ -4,9 +4,16 @@ configDotenv();
 let ENV = {
     App: {
         // INIT_ADMIN_TOKEN: process.env.INIT_ADMIN_TOKEN || "",
-        Port: process.env.APP_PORT || 3000,
+        Port: process.env.PORT || process.env.APP_PORT || 3000,
         Host: process.env.APP_HOST || 'localhost',
         Environment: process.env.APP_ENV || 'development',
+
+        // Allowed frontend origins for CORS — comma-separated list, e.g.
+        // "https://app.example.com,https://admin.example.com"
+        CorsOrigins: (process.env.APP_CORS_ORIGINS || 'http://localhost:5173')
+            .split(',')
+            .map((origin) => origin.trim())
+            .filter(Boolean),
 
         // System User
         SystemUserEmail: process.env.APP_SYSTEM_USER_EMAIL || 'system@gmail.com',
@@ -32,6 +39,16 @@ let ENV = {
 
         RefreshTokenSecret: process.env.JWT_REFRESH_SECRET || 'refresh-secret',
         RefreshExpirySec: Number(process.env.JWT_REFRESH_EXPIRY_SEC) || 60 * 60 * 24 * 7, // 7 days fallback
+    },
+
+    RateLimit: {
+        // Global limiter — applied to the whole API
+        WindowMs: Number(process.env.RATE_LIMIT_WINDOW_MS) || 60 * 1000, // 1 min
+        Max: Number(process.env.RATE_LIMIT_MAX) || 100, // requests per window per IP
+
+        // Strict limiter — applied to auth endpoints (brute-force targets)
+        AuthWindowMs: Number(process.env.AUTH_RATE_LIMIT_WINDOW_MS) || 60 * 1000, // 1 min
+        AuthMax: Number(process.env.AUTH_RATE_LIMIT_MAX) || 10, // requests per window per IP
     },
 };
 

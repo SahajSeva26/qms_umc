@@ -3,7 +3,7 @@ import ENV from '@/config/env'
 import { AUTH_ROUTES } from '@/features/auth/auth.routes'
 
 const api = axios.create({
-  baseURL: ENV.Api.BaseUrl,
+  baseURL: ENV.Api.BaseUrl+"/api/v1",
   withCredentials: true, // cookies are httpOnly — sent automatically
 })
 

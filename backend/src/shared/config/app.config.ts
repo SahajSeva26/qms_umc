@@ -31,7 +31,7 @@ let ENV = {
         SystemTenantDescription: process.env.APP_SYSTEM_TENANT_DESCRIPTION || 'QMS internal tenant for system operations',
     },
     DB: {
-        URI: process.env.DB_URI || 'http://localhost:27017/qms',
+        URI: process.env.DB_URI || 'mongodb://localhost:27017/qms',
     },
     JWT: {
         AccessTokenSecret: process.env.JWT_ACCESS_SECRET || 'secret',

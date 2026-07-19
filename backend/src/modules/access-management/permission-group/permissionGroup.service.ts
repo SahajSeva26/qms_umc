@@ -5,7 +5,7 @@ import { PERMISSION_GROUP_STATUSES } from './permissionGroup.constants';
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
-import { toObjectId, isValidObjectID } from '../../../shared/utils/strings';
+import { toObjectId, isValidObjectID, escapeRegex } from '../../../shared/utils/strings';
 import { PERMISSIONS_ARRAY, SYSTEM_PERMISSIONS } from '../../../shared/env/permissions';
 import { TenantService } from '../tenant/tenant.service';
 import { IServiceOptions } from '../../../shared/types/service.types';
@@ -69,7 +69,7 @@ const search = async (filters: ISearchPermissionGroupQuery, ctx: RequestContext,
     const where: mongoose.QueryFilter<IPermissionGroup> = ctx.where();
 
     if (filters.name) {
-        where.name = { $regex: filters.name, $options: 'i' };
+        where.name = { $regex: escapeRegex(filters.name), $options: 'i' };
     }
     if (filters.code) {
         where.code = filters.code;

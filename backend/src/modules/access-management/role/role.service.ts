@@ -4,7 +4,7 @@ import { ICreateRolePayload, ISearchRoleQuery, IUpdateRolePayload } from './role
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
-import { toObjectId, isValidObjectID } from '../../../shared/utils/strings';
+import { toObjectId, isValidObjectID, escapeRegex } from '../../../shared/utils/strings';
 import { TenantService } from '../tenant/tenant.service';
 import { RoleTypeService } from '../role-type/roleType.service';
 import { UserService } from '../../user/user.service';
@@ -116,7 +116,7 @@ const search = async (filters: ISearchRoleQuery, ctx: RequestContext, options?: 
     const where: mongoose.QueryFilter<IRoleDocument> = ctx.where();
 
     if (filters.name) {
-        where.name = { $regex: filters.name, $options: 'i' };
+        where.name = { $regex: escapeRegex(filters.name), $options: 'i' };
     }
     if (filters.code) {
         where.code = filters.code;

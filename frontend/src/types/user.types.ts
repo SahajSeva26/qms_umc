@@ -20,9 +20,13 @@ export interface User {
 }
 
 export interface UpdateUserPayload {
-  firstName: string
+  // Matches backend UpdateUserPayloadSchema (user.validators.ts): all three
+  // fields are optional there too.
+  firstName?: string
   lastName?: string
-  status?: boolean
+  // Was `boolean` — backend expects the same 4-value status string enum as
+  // UserStatus, not a boolean.
+  status?: UserStatus
 }
 
 export interface SearchUserQuery {

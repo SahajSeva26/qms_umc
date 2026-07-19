@@ -40,12 +40,20 @@ const set = async (model: any, entity: HydratedDocument<IPermissionGroup>, ctx: 
 };
 
 const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): Promise<PermissionGroupDocument> => {
+    // Scoping is opt-in (not applied unconditionally) because create() also
+    // calls get() to check code-uniqueness, and PermissionGroup.code has a
+    // GLOBAL unique index (permissionGroup.model.ts) — that check must stay
+    // tenant-unscoped, or two different tenants could each create a group
+    // with the same code and collide. Real by-id/by-code lookups (update(),
+    // and the controller's own get) opt in explicitly.
+    const scope = options?.scopeToTenant ? ctx.where() : {};
+
     let query = null;
 
     if (isValidObjectID(id)) {
-        query = PermissionGroupModel.findOne({ _id: id });
+        query = PermissionGroupModel.findOne({ ...scope, _id: id });
     } else {
-        query = PermissionGroupModel.findOne({ code: id });
+        query = PermissionGroupModel.findOne({ ...scope, code: id });
     }
 
     if (options?.populate) {
@@ -117,7 +125,7 @@ const create = async (model: ICreatePermissionGroupPayload, ctx: RequestContext)
 const update = async (id: string, model: IUpdatePermissionGroupPayload, ctx: RequestContext) => {
     //1: get permission group first
     let permissionGroup: PermissionGroupDocument = null;
-    permissionGroup = await PermissionGroupService.get(id, ctx);
+    permissionGroup = await PermissionGroupService.get(id, ctx, { scopeToTenant: true });
     if (!permissionGroup) {
         return throwAppError('Permission group not found', StatusCodes.NOT_FOUND);
     }

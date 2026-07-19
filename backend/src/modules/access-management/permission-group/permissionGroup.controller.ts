@@ -16,7 +16,7 @@ const get = async (req: any, res: any) => {
             return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Permission group ID is required', null);
         }
 
-        const permissionGroup = await PermissionGroupService.get(id, ctx);
+        const permissionGroup = await PermissionGroupService.get(id, ctx, { scopeToTenant: true });
         if (!permissionGroup) {
             return ResponseHandler.appResponse(res, StatusCodes.NOT_FOUND, false, 'Permission group not found', null);
         }

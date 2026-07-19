@@ -20,6 +20,10 @@ export const CAMP_STATUSES: CampStatusMeta[] = [
   { id: 'CLOSED', name: 'Closed', color: '#14b8a6' },
   { id: 'CANCELLED', name: 'Cancelled', color: '#f59e0b' },
   { id: 'CANCELLED_CHARGED', name: 'Cancelled (charged)', color: '#f43f5e' },
+  // Run Camp wizard closure outcomes (fo-camp-run.js computeFinalStatus)
+  { id: 'COMPLETE', name: 'Complete', color: '#059669' },
+  { id: 'COMPLETE_WITHOUT_REPORT', name: 'Complete · report pending', color: '#d97706' },
+  { id: 'INCOMPLETE', name: 'Incomplete', color: '#dc2626' },
 ]
 
 // Promoted to types/camp.types.ts — Diet Camps reads this through the

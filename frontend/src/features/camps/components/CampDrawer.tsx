@@ -1,15 +1,19 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FiPhone, FiMail, FiMapPin, FiExternalLink, FiSmartphone } from 'react-icons/fi'
+import { FiPhone, FiMail, FiMapPin, FiExternalLink, FiSmartphone, FiBell, FiUsers, FiCheckCircle } from 'react-icons/fi'
 import type { Camp, CampStatus } from '@/types/camp.types'
-import { getDoctor, isChargeableCancellation } from '@/features/camps/camps.utils'
+import { getDoctor } from '@/features/camps/camps.utils'
 import { clientName, divisionName, foName } from '@/features/camps/camps.refs'
 import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
 import SideDrawer from '@/components/ui/SideDrawer'
 import CampStatusPill from '@/features/camps/components/CampStatusPill'
 import { SLOTS } from '@/features/camps/camps.mock'
 import { formatDate } from '@/utils/formatters'
+import { useProjectsDataShared } from '@/hooks/useProjectsDataShared'
+import CancelCampModal from '@/features/camps/components/CancelCampModal'
+import CloseOutCampModal from '@/features/camps/components/CloseOutCampModal'
+import CampRemindersModal from '@/features/camps/components/CampRemindersModal'
+import ResourceAssignModal from '@/features/camps/components/ResourceAssignModal'
 
 // Literal path (not imported from camps.routes.tsx) — that file imports
 // CampsPage, which imports this component, so importing back from it here
@@ -26,22 +30,21 @@ interface CampDrawerProps {
 
 const CampDrawer = ({ camp, onClose, onSetStatus, onAssignFo, onToggleTele }: CampDrawerProps) => {
   const navigate = useNavigate()
-  const [cancelling, setCancelling] = useState(false)
-  const [cancelReason, setCancelReason] = useState('')
+  const { projects } = useProjectsDataShared()
+  const [cancelOpen, setCancelOpen] = useState(false)
+  const [closeOutOpen, setCloseOutOpen] = useState(false)
+  const [remindersOpen, setRemindersOpen] = useState(false)
+  const [resourceAssignOpen, setResourceAssignOpen] = useState(false)
 
   if (!camp) return <SideDrawer open={false} title="" onClose={onClose}>{null}</SideDrawer>
 
   const doctor = getDoctor(camp.doctorId)
   const slot = SLOTS.find((s) => s.id === camp.slot)
   const isFinal = camp.status === 'CANCELLED' || camp.status === 'CANCELLED_CHARGED' || camp.status === 'CLOSED'
-
-  const handleCancelConfirm = () => {
-    if (!cancelReason.trim()) return
-    const chargeable = isChargeableCancellation(camp)
-    onSetStatus(camp.id, chargeable ? 'CANCELLED_CHARGED' : 'CANCELLED', cancelReason)
-    setCancelling(false)
-    setCancelReason('')
-  }
+  // Cross-feature project lookup for CancelCampModal's cancellation-policy
+  // calc — falls back to undefined (its own default policy) if the camp
+  // isn't linked to a project.
+  const linkedProject = projects.find((p) => p.id === camp.projectId)
 
   return (
     <SideDrawer open={!!camp} title={`${camp.id} · ${camp.type}`} onClose={onClose}>
@@ -105,17 +108,38 @@ const CampDrawer = ({ camp, onClose, onSetStatus, onAssignFo, onToggleTele }: Ca
 
       <h3 className="text-[12px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--qms-text-muted)' }}>Field Officer</h3>
       {camp.foId ? (
-        <p className="text-[13px] mb-5 font-semibold" style={{ color: 'var(--qms-text)' }}>{foName(camp.foId)}</p>
+        <p className="text-[13px] mb-3 font-semibold" style={{ color: 'var(--qms-text)' }}>{foName(camp.foId)}</p>
       ) : (
         <Button
           size="sm"
           onClick={() => onAssignFo(camp.id)}
-          className="text-[12px] font-semibold text-white mb-5"
+          className="text-[12px] font-semibold text-white mb-3"
           style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
         >
           Assign FO
         </Button>
       )}
+
+      <div className="flex flex-wrap gap-2 mb-5">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setResourceAssignOpen(true)}
+          className="text-[12px] font-semibold"
+        >
+          <FiUsers size={12} /> Assign resources
+        </Button>
+        {!isFinal && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setRemindersOpen(true)}
+            className="text-[12px] font-semibold"
+          >
+            <FiBell size={12} /> Configure reminders
+          </Button>
+        )}
+      </div>
 
       {camp.devicesAllocated.length > 0 && (
         <>
@@ -133,7 +157,7 @@ const CampDrawer = ({ camp, onClose, onSetStatus, onAssignFo, onToggleTele }: Ca
         </>
       )}
 
-      {!isFinal && !cancelling && (
+      {!isFinal && (
         <div className="flex flex-wrap gap-2">
           {camp.status === 'REQUESTED' && (
             <Button
@@ -157,16 +181,16 @@ const CampDrawer = ({ camp, onClose, onSetStatus, onAssignFo, onToggleTele }: Ca
           {camp.status === 'LIVE' && (
             <Button
               size="sm"
-              onClick={() => onSetStatus(camp.id, 'CLOSED')}
+              onClick={() => setCloseOutOpen(true)}
               className="text-[12px] font-bold text-white"
               style={{ background: 'var(--qms-teal)' }}
             >
-              Close
+              <FiCheckCircle size={12} /> Close
             </Button>
           )}
           <Button
             size="sm"
-            onClick={() => setCancelling(true)}
+            onClick={() => setCancelOpen(true)}
             className="text-[12px] font-bold bg-danger-soft text-danger hover:bg-danger-soft/80"
           >
             Cancel
@@ -174,35 +198,27 @@ const CampDrawer = ({ camp, onClose, onSetStatus, onAssignFo, onToggleTele }: Ca
         </div>
       )}
 
-      {cancelling && (
-        <div className="space-y-2">
-          <Textarea
-            value={cancelReason}
-            onChange={(e) => setCancelReason(e.target.value)}
-            placeholder="Reason for cancellation (required)..."
-            rows={3}
-            className="text-[13px]"
-          />
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              onClick={handleCancelConfirm}
-              disabled={!cancelReason.trim()}
-              className="text-[12px] font-bold bg-danger-soft text-danger hover:bg-danger-soft/80"
-            >
-              Confirm cancellation
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setCancelling(false)}
-              className="text-[12px] font-semibold"
-            >
-              Back
-            </Button>
-          </div>
-        </div>
-      )}
+      <CancelCampModal
+        open={cancelOpen}
+        onClose={() => setCancelOpen(false)}
+        camp={camp}
+        project={linkedProject}
+      />
+      <CloseOutCampModal
+        open={closeOutOpen}
+        onClose={() => setCloseOutOpen(false)}
+        camp={camp}
+      />
+      <CampRemindersModal
+        open={remindersOpen}
+        onClose={() => setRemindersOpen(false)}
+        camp={camp}
+      />
+      <ResourceAssignModal
+        open={resourceAssignOpen}
+        onClose={() => setResourceAssignOpen(false)}
+        camp={camp}
+      />
     </SideDrawer>
   )
 }

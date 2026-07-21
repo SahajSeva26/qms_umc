@@ -5,9 +5,10 @@
 
 import type {
   FoClaim, ClaimStatus, LeaveRequest, TrainingRecord, TrainingStatus, Incident, IncidentStatus,
-  ConsumableLot, FoNotification,
+  ConsumableLot, FoNotification, MachineFlag,
 } from '@/features/fo/fo.types'
-import { TRAINING_CATALOG } from '@/features/fo/fo.types'
+import { TRAINING_CATALOG, INCIDENT_CATEGORIES } from '@/features/fo/fo.types'
+import type { DeviceCatalogItem } from '@/types/device.types'
 
 const KEYS = {
   CLAIMS: 'qms.fo.claims',
@@ -16,6 +17,7 @@ const KEYS = {
   INCIDENTS: 'qms.fo.incidents',
   CONSUMABLES: 'qms.fo.consumables',
   NOTIF: 'qms.fo.notif',
+  MACHINE_FLAGS: 'qms.incidents.machineFlags',
 }
 
 // Field Officer ids matching camps.mock.ts's CAMPS array (p-ravi, p-anita,
@@ -215,6 +217,14 @@ export async function getIncidents(foId?: string): Promise<Incident[]> {
   return foId ? incidents.filter((i) => i.foId === foId) : incidents
 }
 
+function slaMinutesFor(category: Incident['category']): number {
+  return INCIDENT_CATEGORIES.find((c) => c.value === category)?.slaMinutes ?? 240
+}
+
+function historyEntry(action: string, by: string, note?: string): { at: string; action: string; by: string; note?: string } {
+  return { at: new Date().toISOString(), action, by, ...(note ? { note } : {}) }
+}
+
 // TODO: replace with real API calls once backend endpoints exist
 export async function raiseIncident(incident: Omit<Incident, 'id' | 'status' | 'createdAt'>): Promise<Incident[]> {
   const next: Incident = {
@@ -222,9 +232,14 @@ export async function raiseIncident(incident: Omit<Incident, 'id' | 'status' | '
     id: `INC-${Date.now()}`,
     status: 'OPEN',
     createdAt: new Date().toISOString(),
+    slaMinutes: incident.slaMinutes ?? slaMinutesFor(incident.category),
+    history: [historyEntry('RAISED', incident.raisedByName)],
   }
   const all = [next, ...loadIncidents()]
   persist(KEYS.INCIDENTS, all)
+  if (next.deviceId && (next.category === 'machine_failure')) {
+    await flagMachineFaulty(next.deviceId, next.id, next.notes)
+  }
   return all
 }
 
@@ -233,6 +248,145 @@ export async function setIncidentStatus(id: string, status: IncidentStatus): Pro
   const next = loadIncidents().map((i) => (i.id === id ? { ...i, status } : i))
   persist(KEYS.INCIDENTS, next)
   return next
+}
+
+// TODO: replace with real API calls once backend endpoints exist
+export async function assignIncident(id: string, assignedToId: string, assignedToName: string, by: string): Promise<Incident[]> {
+  const next = loadIncidents().map((i) =>
+    i.id === id
+      ? { ...i, status: 'ASSIGNED' as const, assignedToId, assignedToName, assignedAt: new Date().toISOString(), history: [...(i.history ?? []), historyEntry('ASSIGNED', by, `to ${assignedToName}`)] }
+      : i
+  )
+  persist(KEYS.INCIDENTS, next)
+  return next
+}
+
+// TODO: replace with real API calls once backend endpoints exist
+export async function startIncident(id: string, by: string): Promise<Incident[]> {
+  const next = loadIncidents().map((i) =>
+    i.id === id
+      ? { ...i, status: 'IN_PROGRESS' as const, startedAt: new Date().toISOString(), history: [...(i.history ?? []), historyEntry('STARTED', by)] }
+      : i
+  )
+  persist(KEYS.INCIDENTS, next)
+  return next
+}
+
+// TODO: replace with real API calls once backend endpoints exist
+export async function resolveIncident(id: string, by: string, notes: string, replacementDeviceId?: string, replacementNotes?: string): Promise<Incident[]> {
+  const all = loadIncidents()
+  const target = all.find((i) => i.id === id)
+  const next = all.map((i) =>
+    i.id === id
+      ? {
+          ...i, status: 'RESOLVED' as const, resolvedAt: new Date().toISOString(), resolvedNotes: notes,
+          replacementDeviceId, replacementNotes,
+          history: [...(i.history ?? []), historyEntry('RESOLVED', by, notes)],
+        }
+      : i
+  )
+  persist(KEYS.INCIDENTS, next)
+  if (target?.deviceId && replacementDeviceId) {
+    await clearMachineFlag(target.deviceId, by)
+  }
+  return next
+}
+
+// TODO: replace with real API calls once backend endpoints exist
+export async function closeIncident(id: string, by: string, notes?: string): Promise<Incident[]> {
+  const next = loadIncidents().map((i) =>
+    i.id === id
+      ? { ...i, status: 'CLOSED' as const, closedAt: new Date().toISOString(), closedNotes: notes, history: [...(i.history ?? []), historyEntry('CLOSED', by, notes)] }
+      : i
+  )
+  persist(KEYS.INCIDENTS, next)
+  return next
+}
+
+// TODO: replace with real API calls once backend endpoints exist
+export async function cancelIncident(id: string, by: string, reason: string): Promise<Incident[]> {
+  const next = loadIncidents().map((i) =>
+    i.id === id
+      ? { ...i, status: 'CANCELLED' as const, cancelledAt: new Date().toISOString(), cancelledReason: reason, history: [...(i.history ?? []), historyEntry('CANCELLED', by, reason)] }
+      : i
+  )
+  persist(KEYS.INCIDENTS, next)
+  return next
+}
+
+// computeSlaState() — minutes elapsed since createdAt vs. the ticket's SLA
+// window; only meaningful while still open (RESOLVED/CLOSED/CANCELLED tickets
+// freeze at their resolution time instead of ticking forever).
+export function computeSlaState(incident: Incident): { minutesElapsed: number; minutesRemaining: number; breached: boolean } {
+  const sla = incident.slaMinutes ?? slaMinutesFor(incident.category)
+  const endRef = incident.resolvedAt ?? incident.closedAt ?? incident.cancelledAt ?? new Date().toISOString()
+  const minutesElapsed = Math.max(0, Math.round((new Date(endRef).getTime() - new Date(incident.createdAt).getTime()) / 60_000))
+  return { minutesElapsed, minutesRemaining: sla - minutesElapsed, breached: minutesElapsed > sla }
+}
+
+// ── Machine fault-flagging — externalized source of truth (fo.types.ts's
+// MachineFlag), keyed by deviceId, NOT DeviceCatalogItem.faulty. ──────────
+
+function loadMachineFlags(): MachineFlag[] {
+  return load(KEYS.MACHINE_FLAGS, [])
+}
+
+// TODO: replace with real API calls once backend endpoints exist
+export async function getMachineFlags(): Promise<MachineFlag[]> {
+  return loadMachineFlags()
+}
+
+export function isMachineFaulty(deviceId: string, flags: MachineFlag[]): boolean {
+  const flag = flags.find((f) => f.deviceId === deviceId)
+  return !!flag && flag.faulty && !flag.clearedAt
+}
+
+// TODO: replace with real API calls once backend endpoints exist
+export async function flagMachineFaulty(deviceId: string, incidentId: string, notes?: string): Promise<MachineFlag[]> {
+  const all = loadMachineFlags()
+  const existing = all.find((f) => f.deviceId === deviceId && !f.clearedAt)
+  const next = existing
+    ? all.map((f) => (f === existing ? { ...f, flaggedAt: new Date().toISOString(), flaggedByIncidentId: incidentId, notes } : f))
+    : [...all, { deviceId, faulty: true, flaggedAt: new Date().toISOString(), flaggedByIncidentId: incidentId, notes }]
+  persist(KEYS.MACHINE_FLAGS, next)
+  return next
+}
+
+// TODO: replace with real API calls once backend endpoints exist
+export async function clearMachineFlag(deviceId: string, clearedBy: string): Promise<MachineFlag[]> {
+  const next = loadMachineFlags().map((f) =>
+    f.deviceId === deviceId && !f.clearedAt ? { ...f, clearedAt: new Date().toISOString(), clearedBy } : f
+  )
+  persist(KEYS.MACHINE_FLAGS, next)
+  return next
+}
+
+// suggestReplacement() — same-category spare device with units available,
+// preferring one already assigned to no one / a backup unit, closest to the
+// faulty device's vendor city if known (falls back to any available match).
+export function suggestReplacement(faultyDeviceId: string, devices: DeviceCatalogItem[]): DeviceCatalogItem | null {
+  const faulty = devices.find((d) => d.id === faultyDeviceId)
+  if (!faulty) return null
+  const candidates = devices.filter((d) =>
+    d.id !== faultyDeviceId &&
+    (d.category === faulty.category || (faulty.type && d.type === faulty.type)) &&
+    d.unitsAvailable > 0 &&
+    d.status !== 'FAULTY'
+  )
+  if (!candidates.length) return null
+  const sameCity = faulty.vendorCity ? candidates.find((d) => d.vendorCity === faulty.vendorCity) : undefined
+  return sameCity ?? candidates[0]
+}
+
+// notifyChannels() — a pure display-string helper (no actual dispatch; mirrors
+// the prototype's UI-only "notified via SMS/WhatsApp/Email" banner text)
+// describing which channels a ticket's escalation would notionally reach.
+export function notifyChannels(incident: Incident): string[] {
+  const channels = ['In-app']
+  if (incident.severity === 'CRITICAL' || incident.category === 'sos') channels.push('SMS', 'Phone call')
+  else if (incident.severity === 'HIGH') channels.push('SMS')
+  channels.push('Email')
+  return channels
 }
 
 function loadAllConsumables(): ConsumableLot[] {

@@ -82,9 +82,15 @@ export interface TrainingRecord {
   score: number
 }
 
-export type IncidentCategory = 'sos' | 'machine_failure' | 'consumable_shortage' | 'patient_escalation' | 'gps_fraud' | 'other'
+// 'inventory_mismatch' added for Incidents · SOS (OM-facing) — the
+// consumable/device stock-discrepancy category that screen's Raise Ticket
+// flow supports alongside the FO-side RaiseSosModal's original 6.
+export type IncidentCategory = 'sos' | 'machine_failure' | 'consumable_shortage' | 'patient_escalation' | 'gps_fraud' | 'inventory_mismatch' | 'other'
 export type IncidentSeverity = 'CRITICAL' | 'HIGH' | 'MED' | 'MEDIUM' | 'LOW'
-export type IncidentStatus = 'OPEN' | 'ASSIGNED' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED'
+// CANCELLED added as a side-exit from the OPEN/ASSIGNED states (a ticket
+// raised in error or made moot) — distinct from CLOSED, which only follows
+// RESOLVED in the normal lifecycle.
+export type IncidentStatus = 'OPEN' | 'ASSIGNED' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED' | 'CANCELLED'
 
 export interface Incident {
   id: string
@@ -100,6 +106,71 @@ export interface Incident {
   severity: IncidentSeverity
   status: IncidentStatus
   createdAt: string
+
+  // OM-facing Incidents · SOS extensions (additive — FO-side IncidentsModule
+  // never sets these; they're populated by the OM Kanban/ticket actions).
+  assignedToId?: string
+  assignedToName?: string
+  assignedAt?: string
+  startedAt?: string
+  resolvedAt?: string
+  resolvedNotes?: string
+  closedAt?: string
+  closedNotes?: string
+  cancelledAt?: string
+  cancelledReason?: string
+  slaMinutes?: number
+  slaBreached?: boolean
+  city?: string
+  replacementDeviceId?: string
+  replacementNotes?: string
+  escalatedAt?: string
+  history?: { at: string; action: string; by: string; note?: string }[]
+}
+
+// Per-category SLA response-time table (minutes) — exact transcription of
+// incidents-data.js's CATEGORIES (lines 26-34). CRITICAL/sos tickets get the
+// tightest window (10 min); 'other' gets 24h (1440 min).
+export const INCIDENT_CATEGORIES: { value: IncidentCategory; label: string; defaultSeverity: IncidentSeverity; slaMinutes: number }[] = [
+  { value: 'sos', label: 'SOS — emergency', defaultSeverity: 'CRITICAL', slaMinutes: 10 },
+  { value: 'machine_failure', label: 'Machine failure', defaultSeverity: 'HIGH', slaMinutes: 60 },
+  { value: 'consumable_shortage', label: 'Consumable shortage', defaultSeverity: 'HIGH', slaMinutes: 60 },
+  { value: 'inventory_mismatch', label: 'Inventory mismatch', defaultSeverity: 'MEDIUM', slaMinutes: 240 },
+  { value: 'patient_escalation', label: 'Patient escalation', defaultSeverity: 'HIGH', slaMinutes: 30 },
+  { value: 'gps_fraud', label: 'GPS spoofing / fraud flag', defaultSeverity: 'HIGH', slaMinutes: 120 },
+  { value: 'other', label: 'Other', defaultSeverity: 'LOW', slaMinutes: 1440 },
+]
+
+// Exact transcription of incidents-data.js's SEVERITY_COLORS (lines 35-37).
+export const SEVERITY_COLORS: Record<IncidentSeverity, { bg: string; color: string }> = {
+  CRITICAL: { bg: 'color-mix(in srgb, #b91c1c 14%, transparent)', color: '#b91c1c' },
+  HIGH: { bg: 'color-mix(in srgb, #f43f5e 14%, transparent)', color: '#f43f5e' },
+  MEDIUM: { bg: 'color-mix(in srgb, #f59e0b 14%, transparent)', color: '#f59e0b' },
+  MED: { bg: 'color-mix(in srgb, #f59e0b 14%, transparent)', color: '#f59e0b' },
+  LOW: { bg: 'color-mix(in srgb, #64748b 14%, transparent)', color: '#64748b' },
+}
+
+// Exact transcription of incidents-data.js's STATUS_COLORS (lines 38-40).
+export const STATUS_COLORS: Record<IncidentStatus, { bg: string; color: string }> = {
+  OPEN: { bg: 'color-mix(in srgb, #94a3b8 14%, transparent)', color: '#94a3b8' },
+  ASSIGNED: { bg: 'color-mix(in srgb, #0ea5e9 14%, transparent)', color: '#0ea5e9' },
+  IN_PROGRESS: { bg: 'color-mix(in srgb, #7c5cff 14%, transparent)', color: '#7c5cff' },
+  RESOLVED: { bg: 'color-mix(in srgb, #10b981 14%, transparent)', color: '#10b981' },
+  CLOSED: { bg: 'color-mix(in srgb, #14b8a6 14%, transparent)', color: '#14b8a6' },
+  CANCELLED: { bg: 'color-mix(in srgb, #f59e0b 14%, transparent)', color: '#f59e0b' },
+}
+
+// Machine fault-flagging — externalized from DeviceCatalogItem.faulty (a
+// display-only fallback), the real source of truth per the Incidents
+// research spec, keyed by deviceId. Mirrors incidents-data.js's approach.
+export interface MachineFlag {
+  deviceId: string
+  faulty: boolean
+  flaggedAt: string
+  flaggedByIncidentId?: string
+  clearedAt?: string
+  clearedBy?: string
+  notes?: string
 }
 
 export interface ConsumableLot {

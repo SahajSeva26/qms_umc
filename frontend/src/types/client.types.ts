@@ -170,7 +170,7 @@ export interface PurchaseOrder {
   status: PoStatus
 }
 
-export type ClientProjectType = 'Screening' | 'Diet' | 'Lab'
+export type ClientProjectType = 'Screening' | 'Diet' | 'Lab' | 'Mixed'
 export type ClientProjectStatus = 'LIVE' | 'PILOT' | 'PAUSED'
 
 export interface ClientProject {
@@ -186,6 +186,18 @@ export interface ClientProject {
   campsDone: number
   status: ClientProjectStatus
   pos: PurchaseOrder[]
+  /** Additional camp types a Mixed project covers, e.g. ['Diet'] on a
+   * Screening-primary project that also runs diet camps — mirrors
+   * diet-approvals.js's isDietProject() Mixed-subtype check. Only meaningful
+   * when type === 'Mixed'. */
+  mixedSubTypes?: ClientProjectType[]
+  /** Diet Camp Coordinator assigned to this project — mirrors om-data.js's
+   * project.coordinatorId, read by resolveCoordinatorId()/isCoordCamp(). */
+  coordinatorId?: string
+  /** Per-camp PO-budgeted cost, when a project sets this directly rather
+   * than deriving it from poValueInr/campsTarget (diet-rates-modal.js's
+   * poCampCost() priority chain checks this field first). */
+  campCost?: number
 }
 
 export type InvoiceStatus = 'SENT' | 'PAID' | 'OVERDUE'

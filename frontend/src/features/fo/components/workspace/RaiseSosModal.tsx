@@ -4,6 +4,7 @@ import type { Person } from '@/types/people.types'
 import type { Camp } from '@/types/camp.types'
 import type { DeviceCatalogItem } from '@/types/device.types'
 import type { IncidentCategory, IncidentSeverity } from '@/features/fo/fo.types'
+import { INCIDENT_CATEGORIES } from '@/features/fo/fo.types'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
@@ -21,19 +22,16 @@ interface RaiseSosModalProps {
   onSubmit: (incident: { category: IncidentCategory; campId?: string; deviceId?: string; title: string; notes: string; severity: IncidentSeverity }) => void
 }
 
-const CATEGORY_OPTIONS: { value: IncidentCategory; label: string }[] = [
-  { value: 'sos', label: 'SOS / Emergency' },
-  { value: 'machine_failure', label: 'Machine failure' },
-  { value: 'consumable_shortage', label: 'Consumable shortage' },
-  { value: 'patient_escalation', label: 'Patient escalation' },
-  { value: 'gps_fraud', label: 'GPS / fraud flag' },
-  { value: 'other', label: 'Other' },
-]
+// Category list — derived from the same real, prototype-transcribed
+// INCIDENT_CATEGORIES table the OM-side raise flow uses (incidents.js's
+// openRaiseSos() lists every INC.CATEGORIES entry, not a hand-picked
+// subset) — this used to hardcode only 6 of the 7 real categories
+// (missing 'inventory_mismatch') with its own duplicated, drifted
+// severity mapping; now single-sourced so it can't drift again.
+const CATEGORY_OPTIONS: { value: IncidentCategory; label: string }[] = INCIDENT_CATEGORIES.map((c) => ({ value: c.value, label: c.label }))
 
 function severityFor(category: IncidentCategory): IncidentSeverity {
-  if (category === 'sos') return 'CRITICAL'
-  if (category === 'machine_failure') return 'HIGH'
-  return 'MED'
+  return INCIDENT_CATEGORIES.find((c) => c.value === category)?.defaultSeverity ?? 'LOW'
 }
 
 const RaiseSosModal = ({ open, me, camps, devices, defaultCategory, defaultDeviceId, onClose, onSubmit }: RaiseSosModalProps) => {

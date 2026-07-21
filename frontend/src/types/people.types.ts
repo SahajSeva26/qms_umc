@@ -36,6 +36,12 @@ export interface Person {
   vendor?: string
   relievedOn?: string
 
+  /** Home-location coordinates for the HQ Mapping & Serviceability geo
+   * engine — auto-resolved from `hq` via the city gazetteer when blank
+   * (hq-serviceability.js's activeFos()). */
+  lat?: number
+  lng?: number
+
   // FO-specific operational metrics (om-data.js real-FO enrichment)
   salaryInr?: number
   campsPerDay?: number

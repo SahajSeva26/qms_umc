@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as service from '@/features/fo/fo.service'
 import type {
   FoClaim, ClaimStatus, LeaveRequest, TrainingRecord, TrainingStatus, Incident, IncidentStatus,
-  ConsumableLot, FoNotification,
+  ConsumableLot, FoNotification, MachineFlag,
 } from '@/features/fo/fo.types'
 import type { Camp } from '@/types/camp.types'
 import { formatINR } from '@/utils/formatters'
@@ -233,12 +233,72 @@ export const useFoIncidents = (foId?: string) => {
     onSuccess: invalidate,
   })
 
+  const assignMutation = useMutation({
+    mutationFn: ({ id, assignedToId, assignedToName, by }: { id: string; assignedToId: string; assignedToName: string; by: string }) =>
+      service.assignIncident(id, assignedToId, assignedToName, by),
+    onSuccess: invalidate,
+  })
+
+  const startMutation = useMutation({
+    mutationFn: ({ id, by }: { id: string; by: string }) => service.startIncident(id, by),
+    onSuccess: invalidate,
+  })
+
+  const resolveMutation = useMutation({
+    mutationFn: ({ id, by, notes, replacementDeviceId, replacementNotes }: { id: string; by: string; notes: string; replacementDeviceId?: string; replacementNotes?: string }) =>
+      service.resolveIncident(id, by, notes, replacementDeviceId, replacementNotes),
+    onSuccess: invalidate,
+  })
+
+  const closeMutation = useMutation({
+    mutationFn: ({ id, by, notes }: { id: string; by: string; notes?: string }) => service.closeIncident(id, by, notes),
+    onSuccess: invalidate,
+  })
+
+  const cancelMutation = useMutation({
+    mutationFn: ({ id, by, reason }: { id: string; by: string; reason: string }) => service.cancelIncident(id, by, reason),
+    onSuccess: invalidate,
+  })
+
   return {
     incidents,
     isLoading,
     error,
     raiseIncident: (incident: Omit<Incident, 'id' | 'status' | 'createdAt'>) => raiseMutation.mutateAsync(incident),
     setIncidentStatus: (id: string, status: IncidentStatus) => setStatusMutation.mutateAsync({ id, status }),
+    assignIncident: (id: string, assignedToId: string, assignedToName: string, by: string) => assignMutation.mutateAsync({ id, assignedToId, assignedToName, by }),
+    startIncident: (id: string, by: string) => startMutation.mutateAsync({ id, by }),
+    resolveIncident: (id: string, by: string, notes: string, replacementDeviceId?: string, replacementNotes?: string) =>
+      resolveMutation.mutateAsync({ id, by, notes, replacementDeviceId, replacementNotes }),
+    closeIncident: (id: string, by: string, notes?: string) => closeMutation.mutateAsync({ id, by, notes }),
+    cancelIncident: (id: string, by: string, reason: string) => cancelMutation.mutateAsync({ id, by, reason }),
+  }
+}
+
+export const useMachineFlags = () => {
+  const queryClient = useQueryClient()
+  const { data: flags = [], isLoading, error } = useQuery({ queryKey: ['fo', 'machineFlags'], queryFn: service.getMachineFlags })
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['fo', 'machineFlags'] })
+
+  const flagMutation = useMutation({
+    mutationFn: ({ deviceId, incidentId, notes }: { deviceId: string; incidentId: string; notes?: string }) =>
+      service.flagMachineFaulty(deviceId, incidentId, notes),
+    onSuccess: invalidate,
+  })
+
+  const clearMutation = useMutation({
+    mutationFn: ({ deviceId, clearedBy }: { deviceId: string; clearedBy: string }) => service.clearMachineFlag(deviceId, clearedBy),
+    onSuccess: invalidate,
+  })
+
+  return {
+    flags,
+    isLoading,
+    error,
+    isMachineFaulty: (deviceId: string) => service.isMachineFaulty(deviceId, flags as MachineFlag[]),
+    flagMachineFaulty: (deviceId: string, incidentId: string, notes?: string) => flagMutation.mutateAsync({ deviceId, incidentId, notes }),
+    clearMachineFlag: (deviceId: string, clearedBy: string) => clearMutation.mutateAsync({ deviceId, clearedBy }),
   }
 }
 

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import {
   FiAlertTriangle, FiTool, FiPackage, FiUserX, FiMapPin, FiHelpCircle,
-  FiFolder, FiCheckCircle, FiXCircle,
+  FiFolder, FiCheckCircle, FiXCircle, FiClipboard,
 } from 'react-icons/fi'
 import type { Person } from '@/types/people.types'
 import type { Camp } from '@/types/camp.types'
@@ -32,6 +32,7 @@ const CATEGORY_ICON: Record<IncidentCategory, typeof FiAlertTriangle> = {
   consumable_shortage: FiPackage,
   patient_escalation: FiUserX,
   gps_fraud: FiMapPin,
+  inventory_mismatch: FiClipboard,
   other: FiHelpCircle,
 }
 

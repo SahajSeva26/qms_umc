@@ -147,6 +147,10 @@ export interface Camp {
   photoUrl?: string
   patientCount?: number
   submissionCompleted?: boolean
+  /** Dietitian post-camp submission payload (photos uploaded via the
+   * submission-link flow) — a fallback photo source alongside the top-level
+   * `photos` field, mirrors om-data.js's isReportComplete() checking both. */
+  submissionData?: { photos?: string[] }
   coordinatorId?: string
   coordId?: string
   resources?: CampResources
@@ -162,7 +166,27 @@ export interface Camp {
    * only this field exists so ReopenRequestsTab's approve action has
    * somewhere real to write. */
   tokenActivatedAt?: string
+  /** Dietitian post-camp data-submission link token — mirrors om-data.js's
+   * submissionToken/submissionUrl pair used by the Diet Coord Workspace's
+   * reopen-request flow and Dietitian Payment's "View camps" submission link. */
+  submissionToken?: string
+  submissionUrl?: string
+  reopenRequests?: import('@/features/diet/dietitians.types').CampReopenRequest[]
   dietitianProposal?: CampDietitianProposal
+  /** Coord-set rates for this camp's dietitian assignment — mirrors
+   * om-data.js's camp.dietitianRates, read by dietitianExpense()'s priority
+   * chain ahead of the dietitian's rate history / master defaults. */
+  dietitianRates?: { remuneration?: number; ta?: number; printing?: number; targetCost?: number }
+  /** Estimated one-way travel distance (km) for the assigned dietitian —
+   * feeds dietitianExpense()'s TA fallback (₹9/km) when no explicit rate is set. */
+  foDistanceKm?: number
+  /** Flat TA override, independent of dietitianRates.ta (om-data.js's
+   * camp.taAmount fallback, checked before rate-history/travel-estimate). */
+  taAmount?: number
+  /** Tests/screenings this camp conducts — drives campRequiresBca()'s
+   * BCA-camp detection (matches /\bBCA\b|body\s*comp|composition|fat\s*analys/i). */
+  tests?: string[]
+  testsConducted?: string[]
   checkInAt?: string
   checkOutAt?: string
   completedAt?: string

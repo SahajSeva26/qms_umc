@@ -58,8 +58,16 @@ const set = async (model: any, entity: HydratedDocument<IProject>, ctx: RequestC
         await assertPlatformStaff(model.projectCoordinator, 'Project coordinator', ctx);
         entity.projectCoordinator = model.projectCoordinator;
     }
+    // marketingContact is the CUSTOMER-side contact — must belong to the project's own tenant
+    // (the pharma company). entity.tenant is set before set() runs (derived from the lead).
     if (model.marketingContact) {
-        await assertPlatformStaff(model.marketingContact, 'Marketing contact', ctx);
+        const marketingContact = await RoleService.get(model.marketingContact, ctx, { populate: true });
+        if (!marketingContact) {
+            return throwAppError('Marketing contact not found', StatusCodes.NOT_FOUND);
+        }
+        if ((marketingContact.tenant as any)?._id?.toString() !== entity.tenant?.toString()) {
+            return throwAppError('Marketing contact must belong to the selected company', StatusCodes.BAD_REQUEST);
+        }
         entity.marketingContact = model.marketingContact;
     }
 

@@ -115,10 +115,27 @@ registry.registerPath({
 // ========================== EXPORT LEAD ROUTES =========================
 // =======================================================================
 const GUARD = [LEAD_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code];
+const READ_GUARD = [LEAD_PERMISSIONS.SEARCH.code, ...GUARD]; // reps (lead:search) may read; service scopes them to their own
 
-LeadRouter.get('/:id', AuthorizeMiddleware(GUARD), LeadController.get);
-LeadRouter.put('/:id', AuthorizeMiddleware(GUARD), LeadController.update);
-LeadRouter.patch('/:id/stage', AuthorizeMiddleware(GUARD), LeadController.moveStage);
+LeadRouter.get(
+    '/:id',
+    AuthorizeMiddleware([
+        LEAD_PERMISSIONS.MANAGE.code,
+        LEAD_PERMISSIONS.SEARCH.code,
+        TENANT_PERMISSIONS.MANAGE.code,
+    ]),
+    LeadController.get,
+);
+LeadRouter.put(
+    '/:id',
+    AuthorizeMiddleware([LEAD_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
+    LeadController.update,
+);
+LeadRouter.patch(
+    '/:id/stage',
+    AuthorizeMiddleware([LEAD_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
+    LeadController.moveStage,
+);
 
-LeadRouter.get('/', AuthorizeMiddleware(GUARD), LeadController.search);
+LeadRouter.get('/', AuthorizeMiddleware(READ_GUARD), LeadController.search);
 LeadRouter.post('/', AuthorizeMiddleware(GUARD), LeadController.create);

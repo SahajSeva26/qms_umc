@@ -10,7 +10,7 @@ import { RoleTypeService } from '../role-type/roleType.service';
 import { UserService } from '../../user/user.service';
 import { PERMISSIONS_ARRAY, SYSTEM_PERMISSIONS } from '../../../shared/env/permissions';
 import { IServiceOptions } from '../../../shared/types/service.types';
-import { PermissionGroupService } from '../permission-group/permissionGroup.service';
+import { PermissionGroupModel } from '../permission-group/permissionGroup.model';
 import { TENANT_PERMISSIONS } from '../tenant/tenant.constants';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
 
@@ -234,14 +234,17 @@ const handlePermissionUpdate = async (model: any, ctx: RequestContext) => {
         return true;
     }
 
-    //4: check if permissions are allowed by the actor's tenant permission group
-    let permissionGroup: any = await PermissionGroupService.search({ tenant: ctx.tenant._id }, ctx);
-    if (permissionGroup.count == 0) {
+    //4: check if permissions are allowed by the actor's tenant permission group.
+    // Use a single findOne, NOT PermissionGroupService.search: this runs inside RoleService's
+    // create/update transaction, and search() fires count+find as a Promise.all — two parallel
+    // ops on the one transactional session, which MongoDB rejects ("cannot start a new
+    // transaction at the active transaction number"). sort keeps the most-recent-PG semantics
+    // that search()+items[0] had.
+    const permissionGroup: any = await PermissionGroupModel.findOne({ tenant: ctx.tenant._id }).sort({ createdAt: -1 });
+    if (!permissionGroup) {
         log.error('Permission group not found');
         throwAppError('Permission group not found', StatusCodes.NOT_FOUND);
     }
-    permissionGroup = permissionGroup.items[0];
-    //flat permissions of  permision group
 
     const allowedGroupPermissions = permissionGroup.permissions.map((permission: any) => permission.code);
     const inValidGroupPermissions = model.permissions.filter((permission: any) => !allowedGroupPermissions.includes(permission));

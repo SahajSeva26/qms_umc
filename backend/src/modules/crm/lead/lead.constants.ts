@@ -1,5 +1,7 @@
 // Lead Constants
 
+import { ALLOWED_ROLETYPE_CODES } from '../../access-management/role-type/roleType.constants';
+
 export const LEAD_STATUSES = {
     NEW: 'new',
     QUALIFIED: 'qualified',
@@ -97,5 +99,53 @@ export const LEAD_TRANSITION_MAP: Record<string, string[]> = {
 // ================= LEAD PERMISSIONS CONSTANTS ===============
 // ============================================================
 export const LEAD_PERMISSIONS = {
-    MANAGE: { code: 'lead:manage', name: 'Manage Lead', description: 'Manage leads' } as const,
+    MANAGE: {
+        code: 'lead:manage',
+        name: 'Manage Lead',
+        description: 'Manage leads (full visibility)',
+    } as const,
+
+    SEARCH: {
+        code: 'lead:search',
+        name: 'Search Lead',
+        description: 'View/search own leads only',
+    } as const,
+
+    CREATE: {
+        code: 'lead:create',
+        name: 'Create Lead',
+        description: 'Create leads',
+    } as const,
+
+    UPDATE: {
+        code: 'lead:update',
+        name: 'Update Lead',
+        description: 'Update leads',
+    } as const,
+
+    GET: {
+        code: 'lead:get',
+        name: 'Get Lead',
+        description: 'Get leads',
+    } as const,
 };
+
+export const LEAD_BUSINESS_ROLE_TYPES = [
+    {
+        code: ALLOWED_ROLETYPE_CODES.PLATFORM.SALES,
+        name: 'Sales',
+        description: 'Sales representative — owns and works their own leads',
+        permissions: [
+            LEAD_PERMISSIONS.SEARCH.code,
+            LEAD_PERMISSIONS.CREATE.code,
+            LEAD_PERMISSIONS.UPDATE.code,
+            LEAD_PERMISSIONS.GET.code,
+        ],
+    },
+    {
+        code: ALLOWED_ROLETYPE_CODES.PLATFORM.SALES_HEAD,
+        name: 'Sales Head',
+        description: 'Sales head — full lead visibility, assigns leads to sales reps',
+        permissions: [LEAD_PERMISSIONS.MANAGE.code],
+    },
+];

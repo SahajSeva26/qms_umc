@@ -10,6 +10,8 @@ import logger from '../utils/logger';
 import { TENANT_TYPE } from '../../modules/access-management/tenant/tenant.constants';
 import { withTransaction } from '../helpers/transactionHelper';
 import { throwAppError } from '../utils/error';
+import { LEAD_BUSINESS_ROLE_TYPES } from '../../modules/crm/lead/lead.constants';
+import { provisionDefaultRoleTypes } from './roleTypeProvisioner';
 
 const systemUserPermissions: any = [
     PERMISSIONS.SYSTEM.MANAGE,
@@ -67,7 +69,9 @@ const seedSystemUser = async () => {
             // seed is the ONLY place it can grow. Idempotently add any permission missing by code and
             // leave existing entries untouched, so a new module's permission lands here on next startup.
             const existingCodes = new Set(permissionGroup.permissions.map((permission: any) => permission.code));
-            const missingPermissions = systemUserPermissions.filter((permission: any) => !existingCodes.has(permission.code));
+            const missingPermissions = systemUserPermissions.filter(
+                (permission: any) => !existingCodes.has(permission.code),
+            );
             if (missingPermissions.length > 0) {
                 permissionGroup.permissions.push(...missingPermissions);
                 await permissionGroup.save();
@@ -86,6 +90,7 @@ const seedSystemUser = async () => {
                     code: 'system',
                     name: 'System',
                     description: 'System role type for system',
+                    isSystem: true,
                 });
 
                 // role type level permissions
@@ -105,6 +110,7 @@ const seedSystemUser = async () => {
                     code: `${ENV.App.SystemTenantCode}.admin`,
                     name: 'System Tenant Admin',
                     description: 'System tenant admin role type',
+                    isSystem: true,
                 });
 
                 // role type level permissions
@@ -112,6 +118,9 @@ const seedSystemUser = async () => {
                 await tenantAdminRoleType.save();
                 logger.debug('Admin role type created', { roleTypeId: tenantAdminRoleType.id });
             }
+
+            // 4.3 Provision the platform's fixed business role types (sales, sales-head) with their lead permissions
+            await provisionDefaultRoleTypes(tenant, LEAD_BUSINESS_ROLE_TYPES);
 
             //5: Create corresponding users for Role-Type ==========================================================>
             // 5.1 Create system user

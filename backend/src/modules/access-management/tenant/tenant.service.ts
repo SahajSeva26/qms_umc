@@ -1,19 +1,20 @@
 import mongoose, { HydratedDocument } from 'mongoose';
 import { ITenant, TenantModel } from './tenant.model';
 import { ICreateTenantPayload, ISearchTenantQuery, IUpdateTenantPayload } from './tenant.validators';
-import { TENANT_PERMISSIONS, TENANT_STATUS } from './tenant.constants';
+import { TENANT_PERMISSIONS, TENANT_STATUS, TENANT_TYPE } from './tenant.constants';
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
 import { isValidObjectID } from '../../../shared/utils/strings';
 import { RoleService } from '../role/role.service';
 import { PermissionGroupService } from '../permission-group/permissionGroup.service';
-import { USER_PERMISSIONS } from '../../user/user.constants';
-import { RoleTypeService } from '../role-type/roleType.service';
+import { USER_PERMISSIONS, USER_STATUS } from '../../user/user.constants';
+import { DEFAULT_PHARMA_ROLE_TYPES } from '../role-type/roleType.constants';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
+import { provisionDefaultRoleTypes } from '../../../shared/env/roleTypeProvisioner';
 import { SYSTEM_PERMISSIONS } from '../../../shared/env/permissions';
-import { IUser } from '../../user/user.model';
+import { IUser, UserModel } from '../../user/user.model';
 
 type TenantDocument = HydratedDocument<ITenant> | null;
 const populate: any[] = [];
@@ -168,18 +169,31 @@ const createTenant = async (model: ICreateTenantPayload, ctx: RequestContext) =>
             );
             log.debug('Permission group created', { permissionGroupId: permissionGroup._id });
 
-            //3: create role type
-            const roleType = await RoleTypeService.create(
+            //3: create the tenant admin role type as a fixed default via the direct provisioner
+            // (isSystem: true). The service path can't set isSystem — that would leave this as an
+            // editable, isSystem:false role type, inconsistent with the system tenant's admin role
+            // type and outside the future reset-to-default scope. Provisioned like the pharma
+            // defaults so all platform-curated role types are uniform.
+            const [roleType] = await provisionDefaultRoleTypes(tenant, [
                 {
                     code: `${tenant.code}.admin`,
                     name: `${tenant.name}'s admin role type`,
                     description: `${tenant.name}'s admin role type`,
-                    tenant: tenant._id.toString(),
                     permissions: [TENANT_PERMISSIONS.ADMIN.code],
                 },
-                ctx,
-            );
-            log.debug('Role type created', { roleTypeId: roleType._id });
+            ]);
+            if (!roleType) {
+                return throwAppError('Failed to provision admin role type', StatusCodes.INTERNAL_SERVER_ERROR);
+            }
+            log.debug('Admin role type provisioned', { roleTypeId: roleType._id });
+
+            //3.1: provision the fixed default (pharma) role types for CUSTOMER tenants. Created
+            // directly with isSystem:true so their codes are reserved; the pharma admin then only
+            // creates roles derived from them, never the role types themselves.
+            if (tenant.type === TENANT_TYPE.CUSTOMER) {
+                await provisionDefaultRoleTypes(tenant, DEFAULT_PHARMA_ROLE_TYPES);
+                log.debug('Default pharma role types provisioned', { tenantId: tenant._id });
+            }
 
             //4: create role (RoleService.create creates + links the owner user)
             const role = await RoleService.create(
@@ -195,6 +209,16 @@ const createTenant = async (model: ICreateTenantPayload, ctx: RequestContext) =>
                 ctx,
             );
             log.debug('Role created', { roleId: role._id });
+
+            //5: activate the owner user. UserService.create (via RoleService.create) forces every
+            // new user INACTIVE — the deliberate admin-driven register default. But the owner minted
+            // during onboarding must be able to log in immediately, mirroring the seeded platform
+            // admin (created active). Done directly on the model, in the same transaction, so it
+            // bypasses the user:manage status gate for this trusted bootstrap step only. The owner is
+            // always a brand-new account (RoleService.create 409s if the email already exists), so
+            // there's no risk of flipping a pre-existing user active.
+            await UserModel.updateOne({ _id: role.user }, { status: USER_STATUS.ACTIVE });
+            log.debug('Owner user activated', { userId: role.user });
 
             //6: update tenant owner
             tenant.owner = role._id;

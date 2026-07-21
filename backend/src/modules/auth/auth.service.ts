@@ -11,6 +11,7 @@ import { RoleService } from '../access-management/role/role.service';
 import { ITokenPayload } from '../../shared/helpers/tokenHelper';
 import { IServiceOptions } from '../../shared/types/service.types';
 import { RoleModel } from '../access-management/role/role.model';
+import { PermissionGroupModel } from '../access-management/permission-group/permissionGroup.model';
 
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 10 * 60 * 1000; // 10 minutes
@@ -62,10 +63,28 @@ const login = async (data: ILoginUserPayload, ctx: RequestContext) => {
     user.loginAttempts = 0;
     user.lockUntil = null;
 
-    // 5: find user role
-    let userRole: any = await RoleModel.findOne({ user: user.id });
+    // 5: find user role (populate tenant + type so we can gate on the active chain)
+    let userRole: any = await RoleModel.findOne({ user: user.id }).populate(['tenant', 'type']);
     if (!userRole) {
         return throwAppError('No role assigned to this account. Please contact your administrator.', StatusCodes.FORBIDDEN);
+    }
+
+    // 5.1: gate on the full active chain — a token is only useful if tenant, role type and role
+    // are all active. AuthMiddleware enforces this on every request; do it here too so login
+    // fails cleanly with a specific reason instead of returning a token that 401s on first use.
+    if (!userRole.tenant || userRole.tenant.status !== 'active') {
+        return throwAppError('Tenant is not active', StatusCodes.FORBIDDEN);
+    }
+    if (!userRole.type || userRole.type.status !== 'active') {
+        return throwAppError('Role type is not active', StatusCodes.FORBIDDEN);
+    }
+    if (userRole.status !== 'active') {
+        return throwAppError('Role is not active', StatusCodes.FORBIDDEN);
+    }
+    // the tenant's permission group is its permission boundary — an inactive PG freezes the tenant
+    const permissionGroup = await PermissionGroupModel.findOne({ tenant: userRole.tenant._id });
+    if (!permissionGroup || permissionGroup.status !== 'active') {
+        return throwAppError('Permission group is not active', StatusCodes.FORBIDDEN);
     }
 
     const payload: ITokenPayload = {

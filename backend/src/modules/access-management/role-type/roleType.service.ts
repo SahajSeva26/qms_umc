@@ -136,7 +136,16 @@ const create = async (
         //only system user or tenant owner should be able to do that
         return throwAppError('Forbidden: You do not have permission to create a role type for this tenant', StatusCodes.FORBIDDEN);
     }
-    //3: check for duplicate code
+    //3: reserved-code guard — a system/default role type's code cannot be reused by a custom one.
+    // Checked UNSCOPED (not via ctx.where()) because system role types live on the platform tenant
+    // (and pharma defaults on each customer tenant), which the actor's scope would not see. This
+    // replaces the old allow-list enum as the protector of reserved codes now that codes are free-form.
+    const reserved = await RoleTypeModel.findOne({ code: model.code, isSystem: true });
+    if (reserved) {
+        return throwAppError('This role type code is reserved and cannot be used', StatusCodes.CONFLICT);
+    }
+
+    //4: check for duplicate code within the tenant
     const result = await RoleTypeService.search({ code: model.code, tenant: model.tenant }, ctx);
     if (result.count > 0) {
         return throwAppError('Role type with this code already exists, for this tenant', StatusCodes.CONFLICT);

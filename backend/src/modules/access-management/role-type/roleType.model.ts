@@ -26,6 +26,13 @@ const roleTypeSchema = new mongoose.Schema(
             enum: [ROLE_TYPE_STATUSES.ACTIVE, ROLE_TYPE_STATUSES.INACTIVE],
             default: ROLE_TYPE_STATUSES.ACTIVE,
         },
+        // seed-owned infrastructure role types (system, admin, sales, sales-head) are marked
+        // isSystem. Set ONLY by the seed — never accepted by the create/update validators — so its
+        // code is reserved: the API cannot create another role type using a system role type's code.
+        isSystem: {
+            type: Boolean,
+            default: false,
+        },
         // category: String,
         tenant: {
             type: mongoose.Schema.Types.ObjectId,

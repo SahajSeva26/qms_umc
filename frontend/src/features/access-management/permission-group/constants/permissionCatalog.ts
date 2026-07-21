@@ -11,12 +11,13 @@ import type { IPermission } from '@/types/accessManagement.types'
 //   - modules/access-management/role/role.constants.ts                 (ROLE_PERMISSIONS)
 //   - modules/division/division.constants.ts                          (DIVISION_PERMISSIONS)
 //   - modules/crm/lead/lead.constants.ts                               (LEAD_PERMISSIONS)
+//   - modules/qa-feedback/qaFeedback.constants.ts                      (QA_FEEDBACK_PERMISSIONS)
 //
 // There is no dedicated "list all permissions" endpoint on the backend, so
 // this catalog is hardcoded here to power the permission-group "shopping
 // cart" UI: every known permission code is always rendered, grouped by
-// resource, with the ones already on the group checked. 33 codes total
-// across 8 resources — kept in exact sync with the backend source above.
+// resource, with the ones already on the group checked. 35 codes total
+// across 9 resources — kept in exact sync with the backend source above.
 // CONFIRMED DRIFT INCIDENT (2026-07-17): this file sat at 27/6 for a while
 // after `division`/`lead` were merged into the backend (PR #3/#4) — nobody
 // updated this hardcoded list, so a real Permission Group in the DB that had
@@ -97,6 +98,10 @@ export const PERMISSION_CATALOG = {
     UPDATE: { code: 'lead:update', name: 'Update Lead', description: 'Update leads' },
     MANAGE: { code: 'lead:manage', name: 'Manage Lead', description: 'Manage leads (full visibility)' },
   },
+  QA_FEEDBACK: {
+    CREATE: { code: 'qa-feedback:create', name: 'Create QA Feedback', description: 'Report a QA feedback comment' },
+    MANAGE: { code: 'qa-feedback:manage', name: 'Manage QA Feedback', description: 'Review and resolve QA feedback' },
+  },
 } as const
 
 /** Display labels for each resource group header — keys must match PERMISSION_CATALOG exactly. */
@@ -109,6 +114,7 @@ export const PERMISSION_RESOURCE_LABELS: Record<keyof typeof PERMISSION_CATALOG,
   ROLE: 'Role',
   DIVISION: 'Division',
   LEAD: 'Lead',
+  QA_FEEDBACK: 'QA Feedback',
 }
 
 /** Flat list of every catalog permission, in the same order as PERMISSION_CATALOG's keys. */

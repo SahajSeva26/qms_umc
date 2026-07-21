@@ -18,6 +18,7 @@ import { analyticsRoutes } from '@/features/analytics/analytics.routes'
 import { adminRoutes } from '@/features/admin/admin.routes'
 import { accessManagementRoutes } from '@/features/access-management/accessManagement.routes'
 import { companyDataRoutes } from '@/features/company-data/company-data.routes'
+import { qaFeedbackRoutes } from '@/features/qa-feedback/qa-feedback.routes'
 
 const appRouter = createBrowserRouter([
   {
@@ -49,6 +50,7 @@ const appRouter = createBrowserRouter([
           ...adminRoutes,
           ...accessManagementRoutes,
           ...companyDataRoutes,
+          ...qaFeedbackRoutes,
         ],
       },
     ],

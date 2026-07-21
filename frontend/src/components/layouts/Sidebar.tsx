@@ -79,6 +79,7 @@ const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
   permissiongroups: ['permission-group:get', 'permission-group:search', 'permission-group:manage'],
   roletypes: ['role-type:get', 'role-type:search', 'role-type:manage'],
   roles: ['role:get', 'role:search', 'role:manage'],
+  qafeedback: ['qa-feedback:manage'],
 }
 
 interface SidebarProps {

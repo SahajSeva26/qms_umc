@@ -15,18 +15,25 @@ import type { IPermission } from '@/types/accessManagement.types'
 // There is no dedicated "list all permissions" endpoint on the backend, so
 // this catalog is hardcoded here to power the permission-group "shopping
 // cart" UI: every known permission code is always rendered, grouped by
-// resource, with the ones already on the group checked. 29 codes total
+// resource, with the ones already on the group checked. 33 codes total
 // across 8 resources — kept in exact sync with the backend source above.
 // CONFIRMED DRIFT INCIDENT (2026-07-17): this file sat at 27/6 for a while
 // after `division`/`lead` were merged into the backend (PR #3/#4) — nobody
 // updated this hardcoded list, so a real Permission Group in the DB that had
 // been granted the 2 new codes rendered as "29 of 27 selected" (an
-// impossible-looking count) until this file was updated to match. This is
-// exactly the drift risk documented as a known, deferred gap when this
-// catalog was first built — it has now actually happened once. If a
-// `GET /permissions` endpoint is ever added, prefer fetching this list live
+// impossible-looking count) until this file was updated to match.
+// CONFIRMED DRIFT INCIDENT #2 (2026-07-21): happened again — a `main` merge
+// (the "feature/lead-management" PR) split `lead:manage` into 5 codes
+// (search/create/update/get + manage), but this file wasn't updated
+// alongside it, so a real tenant's Permission Group holding e.g. `lead:search`
+// rendered it as invisible/unselectable here (the code existed on the group
+// document but had no matching catalog entry to check a box against) —
+// caught live while testing a Permission Group's edit screen post-merge. If
+// a `GET /permissions` endpoint is ever added, prefer fetching this list live
 // instead of hand-maintaining it — see PROGRESS.md's "No backend endpoint to
-// list the full permission catalog" Known Issue.
+// list the full permission catalog" Known Issue. Until then: any change to
+// a module's own `*_PERMISSIONS` constant on the backend MUST be mirrored
+// here in the same commit/PR.
 //
 // Shape deliberately mirrors the backend's own PERMISSIONS object exactly —
 // an object keyed by resource, each resource an object keyed by action name
@@ -84,7 +91,11 @@ export const PERMISSION_CATALOG = {
     MANAGE: { code: 'division:manage', name: 'Manage Division', description: 'Manage divisions' },
   },
   LEAD: {
-    MANAGE: { code: 'lead:manage', name: 'Manage Lead', description: 'Manage leads' },
+    CREATE: { code: 'lead:create', name: 'Create Lead', description: 'Create leads' },
+    GET: { code: 'lead:get', name: 'Get Lead', description: 'Get leads' },
+    SEARCH: { code: 'lead:search', name: 'Search Lead', description: 'View/search own leads only' },
+    UPDATE: { code: 'lead:update', name: 'Update Lead', description: 'Update leads' },
+    MANAGE: { code: 'lead:manage', name: 'Manage Lead', description: 'Manage leads (full visibility)' },
   },
 } as const
 

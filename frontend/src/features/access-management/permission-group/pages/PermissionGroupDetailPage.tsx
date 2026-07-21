@@ -16,7 +16,9 @@ import { useScrollIntoViewOnChange } from '@/hooks/useScrollIntoViewOnChange'
 // link, header summary card, editable card below, save button wired to a
 // useUpdate* mutation with isPending/isError/isSuccess feedback) — but the
 // editable section here is the permission-group "shopping cart": every
-// permission in the full PERMISSION_CATALOG (27 codes / 6 resources) is
+// permission in the full PERMISSION_CATALOG (see that file's own header
+// comment for the current code/resource count — it drifts as backend
+// modules add permissions, so don't hardcode a number here too) is
 // always rendered as a checkbox, grouped by resource, with the group's
 // currently-granted permissions pre-checked. Toggling a box adds/removes
 // that permission from local state; Save sends the full resulting list to

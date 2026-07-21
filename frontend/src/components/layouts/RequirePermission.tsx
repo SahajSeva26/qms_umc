@@ -12,11 +12,12 @@ import { usePermission } from '@/hooks/usePermission'
 // dedicated "why can't I see this" destination instead of a broken/empty
 // screen.
 //
-// General-purpose primitive: any route can wrap its element in this. Only
-// wired onto the 4 access-management routes today (2026-07-16), since
-// those are the only routes with real backend permission codes to check —
-// see PROGRESS.md's "General-purpose route protection" note for how to
-// extend this to other features once/if they get real permission codes.
+// General-purpose primitive: any route can wrap its element in this. Wired
+// onto the 4 access-management routes plus Company Data/Divisions and CRM
+// (crm.routes.tsx) so far, since those are the routes with real backend
+// permission codes to check — see PROGRESS.md's "General-purpose route
+// protection" note for how to extend this to other features once/if they
+// get real permission codes.
 
 interface RequirePermissionProps {
   /** Any one of these codes (or `system:manage`) is enough to pass. Ignored if `allOf` is also given. */

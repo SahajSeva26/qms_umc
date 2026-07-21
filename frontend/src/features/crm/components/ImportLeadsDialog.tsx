@@ -166,6 +166,13 @@ const ImportLeadsDialog = ({ onClose, onImported }: ImportLeadsDialogProps) => {
   const handleConfirmImport = async () => {
     setPhase('importing')
     const next = [...rowStates]
+    // Calls crmService.createLead directly rather than useLeads().createLead
+    // — that hook's mutation only supports single-shot Promise.all-style
+    // usage (one toast, one invalidate, no way to report per-row success/
+    // failure independently), which doesn't fit this loop's need to keep
+    // going after one row's create fails and to update each row's state as
+    // its own request resolves. onImported() below does the one shared
+    // invalidate this dialog needs, once, after the whole loop finishes.
     for (let i = 0; i < next.length; i++) {
       const state = next[i]
       if (state.status !== 'ready') continue

@@ -11,9 +11,10 @@ interface StageDrawerProps {
   onClose: () => void
   onOpenLead: (id: string) => void
   onNewLead: () => void
+  canManage: boolean
 }
 
-const StageDrawer = ({ status, leads, onClose, onOpenLead, onNewLead }: StageDrawerProps) => {
+const StageDrawer = ({ status, leads, onClose, onOpenLead, onNewLead, canManage }: StageDrawerProps) => {
   if (!status) return <SideDrawer open={false} title="" onClose={onClose}>{null}</SideDrawer>
 
   const color = LEAD_STATUS_COLOR[status]
@@ -82,7 +83,7 @@ const StageDrawer = ({ status, leads, onClose, onOpenLead, onNewLead }: StageDra
         )}
       </div>
 
-      <Button className="w-full" onClick={onNewLead}>+ New lead</Button>
+      {canManage && <Button className="w-full" onClick={onNewLead}>+ New lead</Button>}
     </SideDrawer>
   )
 }

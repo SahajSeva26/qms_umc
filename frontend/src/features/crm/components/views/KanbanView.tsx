@@ -11,9 +11,10 @@ interface KanbanViewProps {
   leads: LeadEntity[]
   onOpen: (id: string) => void
   onMoveStage: (id: string, to: LeadStatus, reason: string) => void
+  canManage: boolean
 }
 
-const KanbanView = ({ leads, onOpen, onMoveStage }: KanbanViewProps) => {
+const KanbanView = ({ leads, onOpen, onMoveStage, canManage }: KanbanViewProps) => {
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOverStatus, setDragOverStatus] = useState<LeadStatus | null>(null)
   const [pendingMove, setPendingMove] = useState<{ lead: LeadEntity; to: LeadStatus } | null>(null)
@@ -22,6 +23,7 @@ const KanbanView = ({ leads, onOpen, onMoveStage }: KanbanViewProps) => {
   const legalTargets = draggingLead ? LEAD_TRANSITION_MAP[draggingLead.status] : []
 
   const requestMove = (leadId: string, to: LeadStatus) => {
+    if (!canManage) return
     const lead = leads.find((l) => l.id === leadId)
     if (!lead || lead.status === to) return
     if (!LEAD_TRANSITION_MAP[lead.status].includes(to)) return
@@ -80,8 +82,8 @@ const KanbanView = ({ leads, onOpen, onMoveStage }: KanbanViewProps) => {
                     key={lead.id}
                     lead={lead}
                     onOpen={onOpen}
-                    onAdvance={(id, to) => requestMove(id, to)}
-                    draggable
+                    onAdvance={canManage ? (id, to) => requestMove(id, to) : undefined}
+                    draggable={canManage}
                     onDragStart={(_, id) => setDraggingId(id)}
                     onDragEnd={() => {
                       setDraggingId(null)

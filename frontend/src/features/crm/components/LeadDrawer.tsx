@@ -21,9 +21,10 @@ interface LeadDrawerProps {
   onClose: () => void
   onMoveStage: (id: string, to: LeadStatus, reason: string) => void
   onUpdateLead: (id: string, payload: UpdateLeadPayload) => Promise<unknown>
+  canManage: boolean
 }
 
-const LeadDrawer = ({ lead, onClose, onMoveStage, onUpdateLead }: LeadDrawerProps) => {
+const LeadDrawer = ({ lead, onClose, onMoveStage, onUpdateLead, canManage }: LeadDrawerProps) => {
   const [tab, setTab] = useState<Tab>('Overview')
   const [markingLost, setMarkingLost] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -48,21 +49,23 @@ const LeadDrawer = ({ lead, onClose, onMoveStage, onUpdateLead }: LeadDrawerProp
   // Lost/reopen is a status transition like any other — no separate backend
   // endpoint exists. There is no reopen path at all: won/lost are both
   // terminal in LEAD_TRANSITION_MAP, so no button is shown for either.
-  const canMarkLost = LEAD_TRANSITION_MAP[lead.status].includes('lost')
+  const canMarkLost = canManage && LEAD_TRANSITION_MAP[lead.status].includes('lost')
 
   return (
     <SideDrawer open={!!lead} title={lead.title} onClose={onClose}>
       <div className="mb-4">
         <div className="flex items-start justify-between gap-2">
           <div className="text-[15px] font-bold truncate" style={{ color: 'var(--qms-text)' }}>{lead.title}</div>
-          <button
-            onClick={() => setEditing(true)}
-            aria-label="Edit lead"
-            className="shrink-0 rounded-lg border p-1.5 transition-colors hover:bg-(--qms-surface-hover)"
-            style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-soft)' }}
-          >
-            <FiEdit2 size={13} />
-          </button>
+          {canManage && (
+            <button
+              onClick={() => setEditing(true)}
+              aria-label="Edit lead"
+              className="shrink-0 rounded-lg border p-1.5 transition-colors hover:bg-(--qms-surface-hover)"
+              style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-soft)' }}
+            >
+              <FiEdit2 size={13} />
+            </button>
+          )}
         </div>
         <div className="text-[12px] truncate mb-2" style={{ color: 'var(--qms-text-muted)' }}>
           {roleLabel(lead.contactPerson)}

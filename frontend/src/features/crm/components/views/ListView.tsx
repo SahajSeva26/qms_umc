@@ -15,9 +15,10 @@ interface ListViewProps {
   leads: LeadEntity[]
   onOpen: (id: string) => void
   onMoveStage: (id: string, to: LeadStatus, reason: string) => void
+  canManage: boolean
 }
 
-const ListView = ({ leads, onOpen, onMoveStage }: ListViewProps) => {
+const ListView = ({ leads, onOpen, onMoveStage, canManage }: ListViewProps) => {
   const [advance, setAdvance] = useState<{ lead: LeadEntity; to: LeadStatus } | null>(null)
 
   const handleExport = () => downloadLeadsCsv(leads, `crm-leads-${new Date().toISOString().slice(0, 10)}.csv`)
@@ -71,7 +72,7 @@ const ListView = ({ leads, onOpen, onMoveStage }: ListViewProps) => {
                 <td className="px-3 py-2 whitespace-nowrap">
                   {lead.status === 'won' && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-success-soft text-success">WON</span>}
                   {lead.status === 'lost' && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-danger-soft text-danger">LOST</span>}
-                  {!isFinal && nextStatuses.length > 0 && (
+                  {canManage && !isFinal && nextStatuses.length > 0 && (
                     <div className="flex flex-wrap gap-1 justify-end">
                       {nextStatuses.map((to) => (
                         <button

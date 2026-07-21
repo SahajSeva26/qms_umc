@@ -74,7 +74,7 @@ const PERMISSION_NAV_SECTIONS: PermissionNavSection[] = [
 //   crm.routes.tsx: CRM_VIEW_PERMISSIONS
 //   accessManagement.routes.tsx: TENANTS_/PERMISSION_GROUPS_/ROLE_TYPES_/ROLES_VIEW_PERMISSIONS
 const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
-  crm: ['lead:manage', 'tenant:manage'],
+  crm: ['lead:search', 'lead:manage', 'tenant:manage'],
   tenants: ['tenant:get', 'tenant:search', 'tenant:manage'],
   permissiongroups: ['permission-group:get', 'permission-group:search', 'permission-group:manage'],
   roletypes: ['role-type:get', 'role-type:search', 'role-type:manage'],

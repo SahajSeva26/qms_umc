@@ -8,7 +8,10 @@ import UserAvatar from '@/components/ui/UserAvatar'
 interface LeadCardProps {
   lead: LeadEntity
   onOpen: (id: string) => void
-  onAdvance: (id: string, to: LeadStatus) => void
+  // Omitted (not just a no-op) when the caller lacks lead:manage/tenant:manage
+  // — hides the "Move to X" buttons entirely rather than showing controls
+  // that would only 403 on click.
+  onAdvance?: (id: string, to: LeadStatus) => void
   draggable?: boolean
   onDragStart?: (e: React.DragEvent, id: string) => void
   onDragEnd?: (e: React.DragEvent) => void
@@ -52,7 +55,7 @@ const LeadCard = ({ lead, onOpen, onAdvance, draggable, onDragStart, onDragEnd }
       {lead.status === 'lost' && (
         <div className="text-center text-[11px] font-bold py-1.5 rounded-lg bg-danger-soft text-danger">✕ LOST</div>
       )}
-      {!isFinal && nextStatuses.length > 0 && (
+      {onAdvance && !isFinal && nextStatuses.length > 0 && (
         <div className="flex flex-col gap-1">
           {nextStatuses.map((to) => (
             <button

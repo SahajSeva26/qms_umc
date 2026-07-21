@@ -191,7 +191,8 @@ const PermissionGroupDetailPage = () => {
 
             {updatePermissionGroup.isError && (
               <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger mt-4">
-                Failed to save changes.
+                {(updatePermissionGroup.error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+                  'Failed to save changes.'}
               </div>
             )}
             {updatePermissionGroup.isSuccess && (

@@ -88,6 +88,39 @@ const set = async (model: any, entity: HydratedDocument<IRoleDocument>, ctx: Req
         }
     }
 
+    // Reassignment: hand this SAME role document to a different existing
+    // user (e.g. the tenant-admin role moving from one person to another).
+    // Distinct from `model.user` above, which only ever edits the fields of
+    // whoever is CURRENTLY linked — this swaps who's linked. The role type
+    // itself is never touched; only `entity.user` changes, so any
+    // permissions/config living on the role type carry over automatically
+    // to the new holder.
+    if (model.userId) {
+        // UserService.get() is deliberately called WITHOUT scopeToTenant here
+        // (unlike model.user's UserService.update path) — scopeToTenant only
+        // matches users who ALREADY hold a Role in this tenant, which would
+        // make it impossible to reassign to someone genuinely new to the
+        // company. Instead, guard the real risk directly: a user who already
+        // holds a Role in a DIFFERENT tenant must not be silently pulled in —
+        // there is no invite/consent flow in this system, so cross-tenant
+        // reassignment would otherwise let this tenant's admin unilaterally
+        // bind a stranger from another company's tenant to this role.
+        const newUser = await UserService.get(model.userId, ctx);
+        if (!newUser) {
+            return throwAppError('User not found', StatusCodes.NOT_FOUND);
+        }
+
+        const existingRoleElsewhere = await RoleModel.findOne({
+            user: newUser._id,
+            tenant: { $ne: entity.tenant },
+        }).lean();
+        if (existingRoleElsewhere) {
+            throwAppError('This user already belongs to a different tenant and cannot be reassigned here', StatusCodes.CONFLICT);
+        }
+
+        entity.user = toObjectId(model.userId);
+    }
+
     return entity;
 };
 

@@ -221,7 +221,8 @@ const CreateTenantDialog = () => {
 
           {createTenant.isError && (
             <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
-              Failed to create tenant. Please try again.
+              {(createTenant.error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+                'Failed to create tenant. Please try again.'}
             </div>
           )}
         </div>

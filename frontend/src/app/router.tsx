@@ -17,6 +17,7 @@ import { billingRoutes } from '@/features/billing/billing.routes'
 import { analyticsRoutes } from '@/features/analytics/analytics.routes'
 import { adminRoutes } from '@/features/admin/admin.routes'
 import { accessManagementRoutes } from '@/features/access-management/accessManagement.routes'
+import { companyDataRoutes } from '@/features/company-data/company-data.routes'
 
 const appRouter = createBrowserRouter([
   {
@@ -47,6 +48,7 @@ const appRouter = createBrowserRouter([
           ...analyticsRoutes,
           ...adminRoutes,
           ...accessManagementRoutes,
+          ...companyDataRoutes,
         ],
       },
     ],

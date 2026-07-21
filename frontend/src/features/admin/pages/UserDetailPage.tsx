@@ -3,14 +3,24 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { FiArrowLeft } from 'react-icons/fi'
 import { useUser } from '@/features/admin/hooks/useUser'
 import { useUpdateUser } from '@/features/admin/hooks/useUpdateUser'
+import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import UserAvatar from '@/components/ui/UserAvatar'
-import RoleBadge from '@/features/admin/components/RoleBadge'
+import RealRoleBadge from '@/features/admin/components/RealRoleBadge'
 import StatusPill from '@/features/admin/components/StatusPill'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { updateUserSchema } from '@/features/admin/schemas/user.schemas'
 import { useScrollIntoViewOnChange } from '@/hooks/useScrollIntoViewOnChange'
+import type { UserStatus } from '@/types/user.types'
+
+const STATUS_OPTIONS: { value: UserStatus; label: string }[] = [
+  { value: 'active', label: 'Active' },
+  { value: 'inactive', label: 'Inactive' },
+  { value: 'suspended', label: 'Suspended' },
+  { value: 'deleted', label: 'Deleted' },
+]
 
 // Literal path (not imported from admin.routes.tsx) — that file imports this
 // component, so importing back from it here would be a circular module
@@ -23,9 +33,19 @@ const UserDetailPage = () => {
   const { data, isLoading, error } = useUser(id)
   const user = data?.data ?? null
 
+  // Real bound-Role lookup by user id (this user's OWN Role, not the
+  // hash-derived fake `user.role`/`RoleBadge` this page used before — see
+  // admin.mock.ts's withMockFields: `role` is computed from a hash of the
+  // user's _id and has zero relationship to their real backend RoleType).
+  // A user may hold zero or more than one Role in principle; showing every
+  // one found (usually exactly one) rather than assuming a single result.
+  const { data: rolesData, isLoading: isLoadingRoles } = useRoles(id ? { user: id, limit: '10' } : { limit: '0' })
+  const roles = rolesData?.data?.items ?? []
+
   const updateUser = useUpdateUser(id ?? '')
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
+  const [status, setStatus] = useState<UserStatus | ''>('')
   const [formError, setFormError] = useState<string | null>(null)
   const errorRef = useScrollIntoViewOnChange<HTMLDivElement>(formError)
 
@@ -33,11 +53,12 @@ const UserDetailPage = () => {
     if (user) {
       setFirstName(user.firstName)
       setLastName(user.lastName)
+      setStatus(user.status)
     }
   }, [user])
 
   const handleSave = () => {
-    const result = updateUserSchema.safeParse({ firstName, lastName })
+    const result = updateUserSchema.safeParse({ firstName, lastName, status: status || undefined })
     if (!result.success) {
       setFormError(result.error.issues[0].message)
       return
@@ -83,8 +104,11 @@ const UserDetailPage = () => {
               <div className="text-[13px] truncate mb-2" style={{ color: 'var(--qms-text-muted)' }}>
                 {user.email}
               </div>
-              <div className="flex items-center gap-2">
-                <RoleBadge role={user.role} />
+              <div className="flex items-center gap-2 flex-wrap">
+                <RealRoleBadge
+                  roleTypeName={roles[0] ? (typeof roles[0].type === 'string' ? roles[0].code : roles[0].type.name) : null}
+                  isLoading={isLoadingRoles}
+                />
                 <StatusPill status={user.status} />
               </div>
             </div>
@@ -131,9 +155,51 @@ const UserDetailPage = () => {
                 />
               </div>
 
+              <div>
+                <Label
+                  htmlFor="status"
+                  className="text-[10px] font-semibold tracking-widest uppercase mb-2"
+                  style={{ color: 'var(--qms-text-muted)' }}
+                >
+                  Status
+                </Label>
+                {/* Keyed on whether the user's real status has loaded yet —
+                    forces exactly ONE remount, from "not yet loaded" to
+                    "loaded", so this Select's first REAL render already has
+                    the actual value. base-ui locks a Select into controlled/
+                    uncontrolled mode based on whether `value` is `undefined`
+                    on mount (React's classic controlled-component rule) and
+                    won't honor a later change from undefined to a real
+                    value — without this key, the useEffect-driven
+                    `setStatus` below arrives one render too late and the
+                    trigger is stuck showing the placeholder forever. Keying
+                    on the status VALUE itself (rather than just "loaded or
+                    not") would also remount on every user selection, causing
+                    a visible flicker while they're actively using it — this
+                    key only flips once. */}
+                <Select key={status ? 'loaded' : 'loading'} value={status || undefined} onValueChange={(v) => setStatus(v as UserStatus)}>
+                  <SelectTrigger id="status" className="w-full">
+                    {/* Render-prop child, not a plain placeholder — base-ui's
+                        SelectValue only auto-resolves a selected value's label
+                        from an `items` prop passed to Select.Root, which this
+                        app's Select wrapper never supplies, so a bare
+                        placeholder shows correctly only until something is
+                        selected, then falls back to the raw value. Same fix
+                        applied to the CRM wizard's pickers earlier. */}
+                    <SelectValue placeholder="Select status">
+                      {(v: string) => STATUS_OPTIONS.find((s) => s.value === v)?.label ?? 'Select status'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPTIONS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+
               {updateUser.isError && (
                 <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
-                  Failed to save changes.
+                  {(updateUser.error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+                    'Failed to save changes.'}
                 </div>
               )}
               {updateUser.isSuccess && (

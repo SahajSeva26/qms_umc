@@ -23,11 +23,21 @@ interface RequirePermissionProps {
   anyOf?: string[]
   /** ALL of these codes are required (or `system:manage`). Takes precedence over `anyOf` if both are given. */
   allOf?: string[]
+  /**
+   * When true, `system:manage` does NOT bypass this gate — only an explicit
+   * `anyOf`/`allOf` code passes. Use for features that are deliberately
+   * tenant-scoped-only (e.g. Company Data/Divisions: a customer tenant's own
+   * business, not something QMS's platform-level super-admin should reach)
+   * where the normal "system:manage sees everything" rule would be wrong.
+   * Defaults to false (normal bypass semantics) everywhere else, matching
+   * the backend's own AuthorizeMiddleware default.
+   */
+  excludeSystemManage?: boolean
   children: ReactNode
 }
 
-const RequirePermission = ({ anyOf, allOf, children }: RequirePermissionProps) => {
-  const { hasAnyPermission, hasAllPermissions, isSettled } = usePermission()
+const RequirePermission = ({ anyOf, allOf, excludeSystemManage, children }: RequirePermissionProps) => {
+  const { hasAnyPermission, hasAllPermissions, permissions, isSettled } = usePermission()
 
   // Wait until the session query has resolved at least once before deciding
   // to redirect — a real user with permission should never be bounced to
@@ -40,7 +50,17 @@ const RequirePermission = ({ anyOf, allOf, children }: RequirePermissionProps) =
   // actually completes.
   if (!isSettled) return null
 
-  const isAllowed = allOf ? hasAllPermissions(allOf) : hasAnyPermission(anyOf ?? [])
+  // Raw permissions.includes(...) — deliberately bypassing hasAnyPermission/
+  // hasAllPermissions' own system:manage shortcut, which is exactly what
+  // excludeSystemManage exists to opt out of. Same raw-check pattern already
+  // used for Sidebar.tsx's PERMISSION_NAV_SECTIONS, for the same reason.
+  const isAllowed = excludeSystemManage
+    ? allOf
+      ? allOf.every((code) => permissions.includes(code))
+      : (anyOf ?? []).some((code) => permissions.includes(code))
+    : allOf
+      ? hasAllPermissions(allOf)
+      : hasAnyPermission(anyOf ?? [])
 
   if (!isAllowed) {
     return <Navigate to="/unauthorized" replace />

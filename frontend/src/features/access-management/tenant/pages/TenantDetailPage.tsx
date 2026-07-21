@@ -160,7 +160,9 @@ const TenantDetailPage = () => {
                   </Label>
                   <Select value={status || undefined} onValueChange={(v) => setStatus(v as TenantStatus)}>
                     <SelectTrigger id="status" className="w-full">
-                      <SelectValue placeholder="Select status" />
+                      <SelectValue placeholder="Select status">
+                        {(v) => (v === 'active' ? 'Active' : v === 'inactive' ? 'Inactive' : 'Select status')}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="active">Active</SelectItem>
@@ -181,7 +183,9 @@ const TenantDetailPage = () => {
                   </Label>
                   <Select value={type || undefined} onValueChange={(v) => setType(v as TenantType)}>
                     <SelectTrigger id="type" className="w-full">
-                      <SelectValue placeholder="Select type" />
+                      <SelectValue placeholder="Select type">
+                        {(v) => (v === 'platform' ? 'Platform' : v === 'customer' ? 'Customer' : 'Select type')}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="platform">Platform</SelectItem>
@@ -199,7 +203,8 @@ const TenantDetailPage = () => {
 
               {updateTenant.isError && (
                 <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
-                  Failed to save changes.
+                  {(updateTenant.error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+                    'Failed to save changes.'}
                 </div>
               )}
               {updateTenant.isSuccess && (

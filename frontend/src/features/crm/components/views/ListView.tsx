@@ -1,22 +1,25 @@
+import { useState } from 'react'
 import { FiDownload } from 'react-icons/fi'
-import type { Lead } from '@/types/lead.types'
-import { STAGE_ORDER, STAGES } from '@/features/crm/crm.mock'
+import type { LeadEntity, LeadStatus } from '@/types/crm.types'
+import { LEAD_STATUS_LABEL, LEAD_TRANSITION_MAP } from '@/types/crm.types'
 import { downloadLeadsCsv } from '@/features/crm/crm.export'
-import { formatINR } from '@/utils/formatters'
+import { formatINR, formatDate } from '@/utils/formatters'
+import { roleLabel, divisionLabel } from '@/features/crm/crm.utils'
 import { Button } from '@/components/ui/button'
 import StagePill from '@/features/crm/components/StagePill'
-import ScoreChip from '@/features/crm/components/ScoreChip'
-import UserAvatar from '@/components/ui/UserAvatar'
+import LeadAdvanceModal from '@/features/crm/components/LeadAdvanceModal'
 
-const COLUMNS = ['Lead', 'Subject', 'Account / Contact', 'Therapy / Division', 'Owner', 'Geography', 'Stage', 'Value', 'Score', 'Age', '']
+const COLUMNS = ['Title', 'Contact / Division', 'Sales rep', 'Status', 'Value', 'Created', '']
 
 interface ListViewProps {
-  leads: Lead[]
+  leads: LeadEntity[]
   onOpen: (id: string) => void
-  onAdvance: (id: string) => void
+  onMoveStage: (id: string, to: LeadStatus, reason: string) => void
 }
 
-const ListView = ({ leads, onOpen, onAdvance }: ListViewProps) => {
+const ListView = ({ leads, onOpen, onMoveStage }: ListViewProps) => {
+  const [advance, setAdvance] = useState<{ lead: LeadEntity; to: LeadStatus } | null>(null)
+
   const handleExport = () => downloadLeadsCsv(leads, `crm-leads-${new Date().toISOString().slice(0, 10)}.csv`)
 
   return (
@@ -46,9 +49,8 @@ const ListView = ({ leads, onOpen, onAdvance }: ListViewProps) => {
         </thead>
         <tbody>
           {leads.map((lead) => {
-            const nextIndex = STAGE_ORDER.indexOf(lead.stage) + 1
-            const nextStage = nextIndex < STAGE_ORDER.length ? STAGES.find((s) => s.id === STAGE_ORDER[nextIndex]) : null
-            const isFinal = lead.stage === 'won' || lead.stage === 'lost'
+            const nextStatuses = LEAD_TRANSITION_MAP[lead.status]
+            const isFinal = lead.status === 'won' || lead.status === 'lost'
 
             return (
               <tr
@@ -57,41 +59,34 @@ const ListView = ({ leads, onOpen, onAdvance }: ListViewProps) => {
                 className="cursor-pointer transition-colors hover:bg-(--qms-surface-hover)"
                 style={{ borderBottom: '1px solid var(--qms-border)' }}
               >
-                <td className="px-3 py-2 font-bold whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>{lead.id}</td>
-                <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--qms-text-muted)' }}>{lead.subject ?? '—'}</td>
+                <td className="px-3 py-2 font-bold whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>{lead.title}</td>
                 <td className="px-3 py-2 whitespace-nowrap">
-                  <div className="font-semibold" style={{ color: 'var(--qms-text)' }}>{lead.account}</div>
-                  <div className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>{lead.contact}</div>
+                  <div className="font-semibold" style={{ color: 'var(--qms-text)' }}>{roleLabel(lead.contactPerson)}</div>
+                  <div className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>{divisionLabel(lead.division)}</div>
                 </td>
+                <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>{roleLabel(lead.salesPerson)}</td>
+                <td className="px-3 py-2 whitespace-nowrap"><StagePill status={lead.status} /></td>
+                <td className="px-3 py-2 whitespace-nowrap font-bold text-right" style={{ color: 'var(--qms-text)' }}>{formatINR(lead.estimatedValue)}</td>
+                <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--qms-text-muted)' }}>{formatDate(lead.createdAt)}</td>
                 <td className="px-3 py-2 whitespace-nowrap">
-                  <div style={{ color: 'var(--qms-text)' }}>{lead.therapy}</div>
-                  <div className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>{lead.division}</div>
-                </td>
-                <td className="px-3 py-2 whitespace-nowrap">
-                  <div className="flex items-center gap-1.5">
-                    <UserAvatar firstName={lead.owner.split(' ')[0]} lastName={lead.owner.split(' ')[1]} tone={lead.ownerTone} size="sm" />
-                    <span style={{ color: 'var(--qms-text)' }}>{lead.owner.split(' ')[0]}</span>
-                  </div>
-                </td>
-                <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--qms-text-muted)' }}>{lead.geography}</td>
-                <td className="px-3 py-2 whitespace-nowrap"><StagePill stage={lead.stage} /></td>
-                <td className="px-3 py-2 whitespace-nowrap font-bold text-right" style={{ color: 'var(--qms-text)' }}>{formatINR(lead.value)}</td>
-                <td className="px-3 py-2 whitespace-nowrap"><ScoreChip score={lead.score} size="sm" /></td>
-                <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--qms-text-muted)' }}>{lead.age}d</td>
-                <td className="px-3 py-2 whitespace-nowrap">
-                  {lead.stage === 'won' && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-success-soft text-success">WON</span>}
-                  {lead.stage === 'lost' && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-danger-soft text-danger">LOSS</span>}
-                  {!isFinal && nextStage && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onAdvance(lead.id)
-                      }}
-                      className="text-[11px] font-semibold px-2 py-1 rounded-lg border transition-all hover:bg-(--qms-surface-hover)"
-                      style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-soft)' }}
-                    >
-                      Move →
-                    </button>
+                  {lead.status === 'won' && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-success-soft text-success">WON</span>}
+                  {lead.status === 'lost' && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-danger-soft text-danger">LOST</span>}
+                  {!isFinal && nextStatuses.length > 0 && (
+                    <div className="flex flex-wrap gap-1 justify-end">
+                      {nextStatuses.map((to) => (
+                        <button
+                          key={to}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setAdvance({ lead, to })
+                          }}
+                          className="text-[11px] font-semibold px-2 py-1 rounded-lg border transition-all hover:bg-(--qms-surface-hover)"
+                          style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-soft)' }}
+                        >
+                          {LEAD_STATUS_LABEL[to]} →
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </td>
               </tr>
@@ -105,6 +100,16 @@ const ListView = ({ leads, onOpen, onAdvance }: ListViewProps) => {
         </div>
       )}
     </div>
+
+    {advance && (
+      <LeadAdvanceModal
+        leadId={advance.lead.id}
+        currentStatus={advance.lead.status}
+        toStatus={advance.to}
+        onMoveStage={onMoveStage}
+        onClose={() => setAdvance(null)}
+      />
+    )}
   </div>
   )
 }

@@ -1,11 +1,18 @@
-import type { Lead } from '@/types/lead.types'
 import type { ClientProject } from '@/types/client.types'
 import type { SalesMeeting, SalesTask, TaskKind } from '@/types/salesdash.types'
 
 // TODO: entirely mock/frontend-only — no backend endpoints exist for tasks yet.
-// Auto-derived from meetings/leads/projects, mirroring the prototype's
+// Auto-derived from meetings/projects, mirroring the prototype's
 // ensureAutoTasks(): tasks are keyed by sourceRef so re-deriving them on every
 // render never creates duplicates. Only CUSTOM (user-added) tasks lack one.
+//
+// The old "lead stuck 14+ days" auto-task read Lead.owner/stage/age — fields
+// that don't exist on the real LeadEntity (see types/crm.types.ts) and have
+// no honest equivalent here: LeadEntity.salesPerson is a real Role, but
+// SalesRep (this module's owner/rep roster) is still a separate mock system
+// with no id linking it to that Role or its bound User. Rather than fake a
+// name-string join that doesn't really resolve, this auto-task is dropped
+// until Sales' rep roster itself is migrated to real Roles.
 
 const TASKS_KEY = 'qms.sales.tasks'
 
@@ -38,15 +45,14 @@ function owns(name: string | undefined, ownerKey: string): boolean {
 
 interface AutoTaskSources {
   meetings: SalesMeeting[]
-  leads: Lead[]
   projects: ClientProject[]
   /** project.id -> owning rep's first-name key, since ClientProject has no ownerId in our model */
   projectOwnerKey: (project: ClientProject) => string | undefined
 }
 
 // Derives stable auto-tasks for one rep (by first-name key) from real data:
-// today's PLANNED meetings, overdue MOMs, leads stuck 14+ days, and projects
-// with camps executed but no PO attached yet. Idempotent via sourceRef.
+// today's PLANNED meetings, overdue MOMs, and projects with camps executed
+// but no PO attached yet. Idempotent via sourceRef.
 function ensureAutoTasks(ownerKey: string, sources: AutoTaskSources): SalesTask[] {
   const all = loadTasks()
   const existingRefs = new Set(all.map((t) => t.sourceRef).filter(Boolean))
@@ -81,20 +87,6 @@ function ensureAutoTasks(ownerKey: string, sources: AutoTaskSources): SalesTask[
         ownerKey,
       })
     }
-  }
-
-  for (const l of sources.leads) {
-    if (!owns(l.owner, ownerKey)) continue
-    if (l.stage === 'won' || l.stage === 'lost') continue
-    if ((l.age || 0) < 14) continue
-    add({
-      title: `Follow up · ${l.account || '—'}`,
-      detail: `${l.id} · stage ${l.stage} · ${l.age || 0}d stuck`,
-      kind: 'LEAD',
-      sourceRef: `lead:${l.id}`,
-      dueOn: todayIso,
-      ownerKey,
-    })
   }
 
   for (const p of sources.projects) {

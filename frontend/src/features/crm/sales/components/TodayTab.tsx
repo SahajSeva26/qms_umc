@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 import { FiCalendar, FiCheckSquare, FiClock, FiFileText, FiFolder, FiPlus, FiX } from 'react-icons/fi'
 import type { IconType } from 'react-icons'
-import type { Lead } from '@/types/lead.types'
 import type { Client, ClientInvoice, ClientProject } from '@/types/client.types'
 import type { RepAssignment } from '@/types/salesdash.types'
 import type { SalesMeeting, SalesRep, SalesTask, TaskKind } from '@/types/salesdash.types'
@@ -18,7 +17,6 @@ interface TodayTabProps {
   meRep: SalesRep | null
   reps: SalesRep[]
   meetings: SalesMeeting[]
-  leads: Lead[]
   assignments: RepAssignment[]
   clients: Client[]
   projects: ClientProject[]
@@ -41,7 +39,7 @@ const TASK_FILTERS: { id: 'PENDING' | 'SNOOZED' | 'DONE'; label: string }[] = [
 
 const PROJECT_TYPES: ClientProject['type'][] = ['Screening', 'Diet', 'Lab']
 
-const TodayTab = ({ isApprover, meRep, reps, meetings, leads, assignments, clients, projects, invoices }: TodayTabProps) => {
+const TodayTab = ({ isApprover, meRep, reps, meetings, assignments, clients, projects, invoices }: TodayTabProps) => {
   const [taskFilter, setTaskFilter] = useState<'PENDING' | 'SNOOZED' | 'DONE'>('PENDING')
   const [addTaskOpen, setAddTaskOpen] = useState(false)
   const [snoozingTaskId, setSnoozingTaskId] = useState<string | null>(null)
@@ -71,7 +69,6 @@ const TodayTab = ({ isApprover, meRep, reps, meetings, leads, assignments, clien
   const { tasks, isLoading, error, markDone, snooze, addTask } = useSalesTasks({
     ownerKeys,
     meetings,
-    leads,
     projects,
     projectOwnerKey,
   })

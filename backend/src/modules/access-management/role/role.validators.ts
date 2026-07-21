@@ -28,27 +28,50 @@ export const CreateRolePayloadSchema = z.object({
 export type ICreateRolePayload = z.infer<typeof CreateRolePayloadSchema>;
 
 //2: update ====================================>
-export const UpdateRolePayloadSchema = z.object({
-    name: z.string().min(1).optional().openapi({ example: 'Site Manager' }),
-    description: z
-        .string()
-        .optional()
-        .openapi({ example: 'Manages site operations' }),
-    permissions: z
-        .array(z.string().min(1))
-        .optional()
-        .openapi({ example: ['document:read'] }),
-    status: z
-        .enum([ROLE_STATUSES.ACTIVE, ROLE_STATUSES.INACTIVE])
-        .optional()
-        .openapi({ example: 'active' }),
-    type: z
-        .string()
-        .min(1)
-        .optional()
-        .openapi({ example: '64f1a2b3c4d5e6f7a8b9c0d1' }),
-    user: UpdateUserPayloadSchema.optional(),
-});
+export const UpdateRolePayloadSchema = z
+    .object({
+        name: z.string().min(1).optional().openapi({ example: 'Site Manager' }),
+        description: z
+            .string()
+            .optional()
+            .openapi({ example: 'Manages site operations' }),
+        permissions: z
+            .array(z.string().min(1))
+            .optional()
+            .openapi({ example: ['document:read'] }),
+        status: z
+            .enum([ROLE_STATUSES.ACTIVE, ROLE_STATUSES.INACTIVE])
+            .optional()
+            .openapi({ example: 'active' }),
+        type: z
+            .string()
+            .min(1)
+            .optional()
+            .openapi({ example: '64f1a2b3c4d5e6f7a8b9c0d1' }),
+        // Edits the CURRENTLY-linked user's own fields (name/phone/etc) — never
+        // changes who holds this role. Mutually exclusive with `userId` below
+        // (enforced by the superRefine, not just this comment).
+        user: UpdateUserPayloadSchema.optional(),
+        // Reassigns this role to a DIFFERENT existing user (e.g. handing the
+        // tenant-admin role to someone else) — an id, not a fields-to-edit
+        // payload. See role.service.ts's set() for the single-admin-role
+        // implications (the role type stays put; only `user` changes).
+        userId: z.string().min(1).optional().openapi({ example: '64f1a2b3c4d5e6f7a8b9c0d2' }),
+    })
+    .superRefine((data, ctx) => {
+        // Without this, sending both in one request would silently run BOTH
+        // branches in role.service.ts's set() (edit the old holder's fields,
+        // then immediately displace them) with no error — genuinely
+        // ambiguous, order-dependent behavior for what should be two
+        // distinct actions.
+        if (data.user && data.userId) {
+            ctx.addIssue({
+                code: 'custom',
+                message: 'Provide either `user` (edit the current holder) or `userId` (reassign to someone else), not both.',
+                path: ['userId'],
+            });
+        }
+    });
 
 export type IUpdateRolePayload = z.infer<typeof UpdateRolePayloadSchema>;
 

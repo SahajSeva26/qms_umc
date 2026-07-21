@@ -25,7 +25,12 @@ export const PROJECTS: ClientProject[] = [
   {
     id: 'PRJ-438', name: 'Cipla · Endo Plus · South India', clientId: 'cli-cipla', divisionId: 'div-cipla-endo',
     type: 'Diet', poNo: 'PO/CIP/2026/0233', poValueInr: 3210000, poDate: '2026-02-03',
-    campsTarget: 90, campsDone: 62, status: 'LIVE', pos: [],
+    campsTarget: 90, campsDone: 62, status: 'LIVE', pos: [], coordinatorId: 'p-tushar', campCost: 4200,
+  },
+  {
+    id: 'PRJ-448', name: 'Abbott · Weight Management · West', clientId: 'cli-abbott', divisionId: 'div-abt-diab',
+    type: 'Diet', poNo: 'PO/ABT/2026/0455', poValueInr: 2100000, poDate: '2026-04-08',
+    campsTarget: 50, campsDone: 9, status: 'LIVE', pos: [], coordinatorId: 'p-tushar', campCost: 3800,
   },
   {
     id: 'PRJ-440', name: "Dr Reddy's · OncoCare · National", clientId: 'cli-drr', divisionId: 'div-drr-onco',
@@ -45,7 +50,7 @@ export const PROJECTS: ClientProject[] = [
   {
     id: 'PRJ-432', name: 'Cipla · Respiratory Care · Pan India', clientId: 'cli-cipla', divisionId: 'div-cipla-resp',
     type: 'Diet', poNo: 'PO/CIP/2026/0198', poValueInr: 3000000, poDate: '2026-01-28',
-    campsTarget: 36, campsDone: 14, status: 'LIVE', pos: [],
+    campsTarget: 36, campsDone: 14, status: 'LIVE', pos: [], coordinatorId: 'p-tushar', campCost: 4000,
   },
   {
     id: 'PRJ-429', name: 'Lupin · Cardio Excellence · North', clientId: 'cli-lupin', divisionId: null,

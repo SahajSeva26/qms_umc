@@ -4,6 +4,7 @@ import { ResponseHandler } from '../utils/responseHandler';
 import { TokenHandler } from '../helpers/tokenHelper';
 import { throwAppError } from '../utils/error';
 import { RoleModel } from '../../modules/access-management/role/role.model';
+import { PermissionGroupModel } from '../../modules/access-management/permission-group/permissionGroup.model';
 import { PERMISSIONS_ARRAY } from '../env/permissions';
 
 export const AuthMiddleware = async (req: any, res: any, next: any) => {
@@ -37,6 +38,14 @@ export const AuthMiddleware = async (req: any, res: any, next: any) => {
         }
         if (userRole.status != 'active') {
             throwAppError('Role is not active', StatusCodes.UNAUTHORIZED);
+        }
+
+        // The tenant's permission group is its permission boundary — if it's inactive the tenant
+        // is effectively frozen, so block access. Looked up by tenant (one PG per tenant); the PG
+        // isn't referenced from the role, hence the extra query.
+        const permissionGroup: any = await PermissionGroupModel.findOne({ tenant: userRole.tenant._id });
+        if (!permissionGroup || permissionGroup.status != 'active') {
+            throwAppError('Permission group is not active', StatusCodes.UNAUTHORIZED);
         }
 
         // Set context data

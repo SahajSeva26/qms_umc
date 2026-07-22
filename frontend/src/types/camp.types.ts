@@ -6,7 +6,12 @@ export type CampType = 'Screening' | 'Diet' | 'Lab'
 // Raw statuses that actually exist on camp records. Colors are the REAL values
 // from camps-data.js's CAMP_STATUSES table — these differ from the (stale)
 // color mapping in CLAUDE.md §8, which does not match the prototype's code.
-export type CampStatus = 'REQUESTED' | 'CONFIRMED' | 'SCHEDULED' | 'LIVE' | 'CLOSED' | 'CANCELLED' | 'CANCELLED_CHARGED'
+// COMPLETE/COMPLETE_WITHOUT_REPORT/INCOMPLETE are the Run Camp wizard's own
+// closure outcomes (fo-camp-run.js's computeFinalStatus) — distinct from the
+// simpler CLOSED status Camp Management's own close-out flow sets directly.
+export type CampStatus =
+  | 'REQUESTED' | 'CONFIRMED' | 'SCHEDULED' | 'LIVE' | 'CLOSED' | 'CANCELLED' | 'CANCELLED_CHARGED'
+  | 'COMPLETE' | 'COMPLETE_WITHOUT_REPORT' | 'INCOMPLETE'
 
 // Derived UI bucket — NOT the same as `status`. Drives the 9 list tabs/KPIs.
 export type CampStage = 'REQUESTED' | 'UPCOMING' | 'LIVE' | 'COMPLETED' | 'COMPLETED_PENDING' | 'CANCELLED' | 'CANCELLED_CHARGED'
@@ -88,7 +93,10 @@ export interface CampDietitianProposal {
 // simpler cancel flow still uses — see PROGRESS.md Known Issues).
 export interface CampCancellation {
   when: string
-  reason: 'DIETITIAN_UNAVAILABLE' | 'WEATHER' | 'LOW_TURNOUT' | 'CLIENT_REQUEST' | 'RESCHEDULED' | 'OTHER'
+  // DOCTOR_UNAVAILABLE is Camp Management's variant (camps-manager.js's
+  // cancelCamp reason select); DIETITIAN_UNAVAILABLE is Diet Camps' own
+  // (diet-camps.js's dcCancelCamp) — kept as siblings, neither renamed.
+  reason: 'DIETITIAN_UNAVAILABLE' | 'DOCTOR_UNAVAILABLE' | 'WEATHER' | 'LOW_TURNOUT' | 'CLIENT_REQUEST' | 'RESCHEDULED' | 'OTHER'
   notes: string
   hoursBefore: number
   chargeAmount: number
@@ -139,6 +147,10 @@ export interface Camp {
   photoUrl?: string
   patientCount?: number
   submissionCompleted?: boolean
+  /** Dietitian post-camp submission payload (photos uploaded via the
+   * submission-link flow) — a fallback photo source alongside the top-level
+   * `photos` field, mirrors om-data.js's isReportComplete() checking both. */
+  submissionData?: { photos?: string[] }
   coordinatorId?: string
   coordId?: string
   resources?: CampResources
@@ -154,7 +166,27 @@ export interface Camp {
    * only this field exists so ReopenRequestsTab's approve action has
    * somewhere real to write. */
   tokenActivatedAt?: string
+  /** Dietitian post-camp data-submission link token — mirrors om-data.js's
+   * submissionToken/submissionUrl pair used by the Diet Coord Workspace's
+   * reopen-request flow and Dietitian Payment's "View camps" submission link. */
+  submissionToken?: string
+  submissionUrl?: string
+  reopenRequests?: import('@/features/diet/dietitians.types').CampReopenRequest[]
   dietitianProposal?: CampDietitianProposal
+  /** Coord-set rates for this camp's dietitian assignment — mirrors
+   * om-data.js's camp.dietitianRates, read by dietitianExpense()'s priority
+   * chain ahead of the dietitian's rate history / master defaults. */
+  dietitianRates?: { remuneration?: number; ta?: number; printing?: number; targetCost?: number }
+  /** Estimated one-way travel distance (km) for the assigned dietitian —
+   * feeds dietitianExpense()'s TA fallback (₹9/km) when no explicit rate is set. */
+  foDistanceKm?: number
+  /** Flat TA override, independent of dietitianRates.ta (om-data.js's
+   * camp.taAmount fallback, checked before rate-history/travel-estimate). */
+  taAmount?: number
+  /** Tests/screenings this camp conducts — drives campRequiresBca()'s
+   * BCA-camp detection (matches /\bBCA\b|body\s*comp|composition|fat\s*analys/i). */
+  tests?: string[]
+  testsConducted?: string[]
   checkInAt?: string
   checkOutAt?: string
   completedAt?: string
@@ -172,6 +204,63 @@ export interface Camp {
   extraEfforts?: string[]
   foRemarks?: string[]
   closeOut?: CampCloseOut
+
+  // Run Camp wizard fields (fo-camp-run.js) — kept as separate fields rather
+  // than reusing the similarly-named ones above, since those are already
+  // consumed with different shapes by Camp Management's own dossier/close-out
+  // flow (mrAvailable is a boolean there; the wizard's is a free-text select
+  // string like 'Available — full day'). Same pattern as the
+  // DIETITIAN_UNAVAILABLE/DOCTOR_UNAVAILABLE sibling-not-rename precedent.
+  closedAt?: string
+  statusReason?: string
+  checkInDelayMins?: number
+  checkInDelayReason?: string
+  checkInGeo?: { lat: number; lng: number; accuracy?: number } | null
+  selfieDataUrl?: string
+  setupPhotos?: Record<string, string>
+  additionalPhotos?: Record<string, string>
+  closurePhoto?: string
+  wastage?: { consumableId: string; qty: number; reason: string }[]
+  extraConsumables?: { consumableId: string; qty: number; reason: string }[]
+  consumableDeductions?: { consumableId: string; qty: number }[]
+  selectedLots?: string[]
+  screeningResults?: RunCampScreeningResult[]
+  runSummary?: RunCampSummary
+  foReportUploadedAt?: string
+  criticalFindings?: number
+  runFoRemarks?: string
+  runMrAvailable?: string
+  runMrAvailabilityHrs?: string
+  runDoctorAvailabilityHrs?: string
+  runMrFeedbackRating?: number
+  runMrFeedback?: string
+  runIncidentReport?: string
+}
+
+export interface RunCampScreeningResult {
+  patientCode: string
+  name: string
+  age: number
+  gender: string
+  results: Record<string, { value: string | number; level?: string; message?: string }>
+  criticalFinding: boolean
+  referredToDoctor: boolean
+  at: string
+}
+
+export interface RunCampSummary {
+  totalPatients: number
+  genderBreakdown: { M: number; F: number; O: number }
+  criticalFindings: number
+  doctorReferrals: number
+  testCounts: Record<string, number>
+  consumableTotals: Record<string, number>
+  wastageEntries: number
+  extraConsumableEntries: number
+  additionalPhotoCount: number
+  delayMins?: number
+  delayReason?: string
+  generatedAt: string
 }
 
 export interface CampStatusMeta {

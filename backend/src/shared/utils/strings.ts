@@ -6,6 +6,17 @@ export const isValidEmail = (email: string): boolean => {
     return emailRegex.test(email);
 };
 
+// Escapes regex metacharacters so a search string used as `{ $regex: ... }`
+// is matched LITERALLY, not compiled as a pattern. Every *.service.ts search()
+// built a $regex straight from unescaped user input (filters.name/.email/etc)
+// — besides letting a caller craft an unintended pattern, an adversarial
+// pattern with nested repetition (e.g. `(a+)+$`) can trigger catastrophic
+// backtracking and hang the query (ReDoS) for any authenticated caller with
+// search access, not just an admin.
+export const escapeRegex = (value: string): string => {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+};
+
 export const generateUUID = (): string => {
     return uuidv4().toString();
 };

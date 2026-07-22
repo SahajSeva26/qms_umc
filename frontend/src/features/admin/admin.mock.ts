@@ -1,15 +1,15 @@
 import type { UserRole } from '@/types/auth.types'
-import type { User, UserStatus } from '@/types/user.types'
+import type { User } from '@/types/user.types'
 import { INTERNAL_ROLES, PHARMA_ROLES } from '@/lib/roles'
 
-// TODO: remove this file once the backend returns role/status/avatarTone/createdAt.
-// The mapper (backend/src/modules/user/user.mapper.ts) currently strips everything
-// except id/email/firstName/lastName, and the User model has no role field at all.
+// TODO: remove this file once the backend returns role/avatarTone/createdAt.
+// The User model has no role field at all (a user's real access comes from
+// its bound Role/RoleType — see features/access-management), and no
+// avatarTone. status is now real (see user.types.ts), no longer mocked here.
 // Everything here is deterministically derived from _id so it's stable across
 // re-renders/refetches instead of jumping around randomly.
 
 const ALL_ROLES: UserRole[] = [...INTERNAL_ROLES, ...PHARMA_ROLES]
-const STATUSES: UserStatus[] = ['active', 'active', 'active', 'invited', 'suspended'] // weighted toward active
 const TONES = ['brand', 'teal', 'violet', 'amber', 'emerald', 'rose']
 
 function hashString(value: string): number {
@@ -23,12 +23,11 @@ function hashString(value: string): number {
 
 export function withMockFields<T extends { _id: string }>(
   user: T
-): T & Pick<User, 'role' | 'status' | 'avatarTone'> {
+): T & Pick<User, 'role' | 'avatarTone'> {
   const hash = hashString(user._id)
   return {
     ...user,
     role: ALL_ROLES[hash % ALL_ROLES.length],
-    status: STATUSES[hash % STATUSES.length],
     avatarTone: TONES[hash % TONES.length],
   }
 }

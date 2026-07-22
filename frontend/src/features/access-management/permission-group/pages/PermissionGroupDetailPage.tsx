@@ -8,13 +8,17 @@ import { PERMISSION_GROUP_ROUTES } from '@/features/access-management/permission
 import { PERMISSION_CATALOG, PERMISSION_CATALOG_FLAT, PERMISSION_RESOURCE_LABELS } from '@/features/access-management/permission-group/constants/permissionCatalog'
 import PermissionGroupStatusPill from '@/features/access-management/permission-group/components/PermissionGroupStatusPill'
 import { Button } from '@/components/ui/button'
+import { Accordion, AccordionItem, AccordionTrigger, AccordionPanel } from '@/components/ui/accordion'
 import { updatePermissionGroupSchema } from '@/features/access-management/permission-group/schemas/permissionGroup.schemas'
+import { useScrollIntoViewOnChange } from '@/hooks/useScrollIntoViewOnChange'
 
 // Mirrors `@/features/admin/pages/UserDetailPage.tsx`'s overall shape (back
 // link, header summary card, editable card below, save button wired to a
 // useUpdate* mutation with isPending/isError/isSuccess feedback) — but the
 // editable section here is the permission-group "shopping cart": every
-// permission in the full PERMISSION_CATALOG (27 codes / 6 resources) is
+// permission in the full PERMISSION_CATALOG (see that file's own header
+// comment for the current code/resource count — it drifts as backend
+// modules add permissions, so don't hardcode a number here too) is
 // always rendered as a checkbox, grouped by resource, with the group's
 // currently-granted permissions pre-checked. Toggling a box adds/removes
 // that permission from local state; Save sends the full resulting list to
@@ -31,6 +35,7 @@ const PermissionGroupDetailPage = () => {
 
   const [selectedCodes, setSelectedCodes] = useState<Set<string>>(new Set())
   const [formError, setFormError] = useState<string | null>(null)
+  const errorRef = useScrollIntoViewOnChange<HTMLDivElement>(formError)
 
   useEffect(() => {
     if (group) {
@@ -128,52 +133,68 @@ const PermissionGroupDetailPage = () => {
               Every permission in the system is listed below, grouped by resource. Check the ones this group should grant.
             </p>
 
-            <div className="space-y-5">
-              {(Object.entries(PERMISSION_CATALOG) as [keyof typeof PERMISSION_CATALOG, typeof PERMISSION_CATALOG[keyof typeof PERMISSION_CATALOG]][]).map(([resourceKey, resourceActions]) => (
-                <div key={resourceKey}>
-                  <div
-                    className="text-[10px] font-semibold tracking-widest uppercase mb-2"
-                    style={{ color: 'var(--qms-text-muted)' }}
-                  >
-                    {PERMISSION_RESOURCE_LABELS[resourceKey]}
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {Object.values(resourceActions).map((permission) => {
-                      const checked = selectedCodes.has(permission.code)
-                      return (
-                        <label
-                          key={permission.code}
-                          className="flex items-start gap-2.5 rounded-lg border px-3 py-2 cursor-pointer transition-colors hover:bg-(--qms-surface-hover)"
+            <Accordion multiple defaultValue={Object.keys(PERMISSION_CATALOG)}>
+              {(Object.entries(PERMISSION_CATALOG) as [keyof typeof PERMISSION_CATALOG, typeof PERMISSION_CATALOG[keyof typeof PERMISSION_CATALOG]][]).map(([resourceKey, resourceActions]) => {
+                const resourcePermissions = Object.values(resourceActions)
+                const resourceSelectedCount = resourcePermissions.filter((permission) => selectedCodes.has(permission.code)).length
+
+                return (
+                  <AccordionItem key={resourceKey} value={resourceKey}>
+                    <AccordionTrigger style={{ color: 'var(--qms-text-muted)' }}>
+                      <span className="flex items-center gap-2">
+                        {PERMISSION_RESOURCE_LABELS[resourceKey]}
+                        <span
+                          className="normal-case tracking-normal font-medium text-[10px] px-1.5 py-0.5 rounded-full"
                           style={{
-                            borderColor: checked ? 'var(--qms-brand)' : 'var(--qms-border)',
-                            background: checked ? 'color-mix(in oklch, var(--qms-brand), transparent 92%)' : 'transparent',
+                            background: resourceSelectedCount > 0 ? 'color-mix(in oklch, var(--qms-brand), transparent 88%)' : 'var(--qms-surface-hover)',
+                            color: resourceSelectedCount > 0 ? 'var(--qms-brand)' : 'var(--qms-text-muted)',
                           }}
                         >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => toggleCode(permission)}
-                            className="mt-0.5 accent-(--qms-brand)"
-                          />
-                          <span className="min-w-0">
-                            <span className="block text-[13px] font-semibold truncate" style={{ color: 'var(--qms-text)' }}>
-                              {permission.name}
-                            </span>
-                            <span className="block text-[11px] font-mono truncate" style={{ color: 'var(--qms-text-muted)' }}>
-                              {permission.code}
-                            </span>
-                          </span>
-                        </label>
-                      )
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
+                          {resourceSelectedCount}/{resourcePermissions.length}
+                        </span>
+                      </span>
+                    </AccordionTrigger>
+                    <AccordionPanel>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {resourcePermissions.map((permission) => {
+                          const checked = selectedCodes.has(permission.code)
+                          return (
+                            <label
+                              key={permission.code}
+                              className="flex items-start gap-2.5 rounded-lg border px-3 py-2 cursor-pointer transition-colors hover:bg-(--qms-surface-hover)"
+                              style={{
+                                borderColor: checked ? 'var(--qms-brand)' : 'var(--qms-border)',
+                                background: checked ? 'color-mix(in oklch, var(--qms-brand), transparent 92%)' : 'transparent',
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => toggleCode(permission)}
+                                className="mt-0.5 accent-(--qms-brand)"
+                              />
+                              <span className="min-w-0">
+                                <span className="block text-[13px] font-semibold truncate" style={{ color: 'var(--qms-text)' }}>
+                                  {permission.name}
+                                </span>
+                                <span className="block text-[11px] font-mono truncate" style={{ color: 'var(--qms-text-muted)' }}>
+                                  {permission.code}
+                                </span>
+                              </span>
+                            </label>
+                          )
+                        })}
+                      </div>
+                    </AccordionPanel>
+                  </AccordionItem>
+                )
+              })}
+            </Accordion>
 
             {updatePermissionGroup.isError && (
               <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger mt-4">
-                Failed to save changes.
+                {(updatePermissionGroup.error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+                  'Failed to save changes.'}
               </div>
             )}
             {updatePermissionGroup.isSuccess && (
@@ -183,7 +204,7 @@ const PermissionGroupDetailPage = () => {
             )}
 
             {formError && (
-              <div className="text-xs text-danger mt-4">
+              <div ref={errorRef} className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger mt-4">
                 {formError}
               </div>
             )}

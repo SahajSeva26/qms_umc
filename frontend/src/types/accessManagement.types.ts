@@ -152,6 +152,18 @@ export type RoleTypeCode =
   | 'pharms-asm'
   | 'pharma-rsm'
 
+// Populated shape for `tenant` as returned by GET /role-types (search) —
+// roleType.service.ts's search() unconditionally populates `tenant` with
+// `select: 'name code'`, so this nested relation carries Mongoose's raw
+// `_id`, not a mapped `id` (same pattern as RolePopulatedTenant). GET
+// /role-types/:id (single) does NOT populate — `tenant` comes back as a bare
+// ObjectId string on that path instead, hence the union below.
+export interface RoleTypePopulatedTenant {
+  _id?: string
+  name: string
+  code: string
+}
+
 export interface RoleTypeEntity {
   id: string
   code: string
@@ -162,7 +174,9 @@ export interface RoleTypeEntity {
   // bare array of permission-code strings, NOT expanded {code,name,description}
   // objects (that expansion only happens for PermissionGroup.permissions).
   permissions: string[]
-  tenant: string
+  // Populated {RoleTypePopulatedTenant} on GET (search); raw ObjectId string
+  // on GET-by-id/create/update responses — see RoleTypePopulatedTenant's comment.
+  tenant: RoleTypePopulatedTenant | string
   createdAt: string
   updatedAt: string
   // TODO: gated on caller having `tenant:admin`/`tenant:manage` in the mapper;
@@ -203,7 +217,10 @@ export type RoleStatus = 'active' | 'inactive'
 
 /** Populated shape for `type`/`user`/`tenant` as returned by GET-by-id/search (not create/update, which return raw ObjectIds). */
 export interface RolePopulatedRoleType {
-  id?: string
+  // RoleMapper.toResponse only maps `id` on the top-level Role — nested
+  // populated relations (type/user/tenant) pass through Mongoose's raw
+  // .populate() output untouched, so this is `_id`, not `id`.
+  _id?: string
   name: string
   code: string
   // Bare permission-code strings — see the same note on RoleTypeEntity.permissions.
@@ -220,7 +237,9 @@ export interface RolePopulatedUser {
 }
 
 export interface RolePopulatedTenant {
-  id?: string
+  // See RolePopulatedRoleType's comment — nested populated relations use
+  // Mongoose's raw `_id`, not the mapped `id`.
+  _id?: string
   name: string
   code: string
   type?: TenantType

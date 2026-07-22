@@ -5,7 +5,7 @@ import { TENANT_PERMISSIONS, TENANT_STATUS, TENANT_TYPE } from './tenant.constan
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
-import { isValidObjectID } from '../../../shared/utils/strings';
+import { escapeRegex, isValidObjectID } from '../../../shared/utils/strings';
 import { RoleService } from '../role/role.service';
 import { PermissionGroupService } from '../permission-group/permissionGroup.service';
 import { USER_PERMISSIONS, USER_STATUS } from '../../user/user.constants';
@@ -77,10 +77,10 @@ const search = async (filters: ISearchTenantQuery, ctx: RequestContext, options?
 
     //2: add search filters
     if (filters.name) {
-        where.name = { $regex: filters.name, $options: 'i' };
+        where.name = { $regex: escapeRegex(filters.name), $options: 'i' };
     }
     if (filters.code) {
-        where.code = { $regex: filters.code, $options: 'i' };
+        where.code = { $regex: escapeRegex(filters.code), $options: 'i' };
     }
     if (filters.status && ctx.hasAnyPermissions([TENANT_PERMISSIONS.MANAGE.code])) {
         where.status = filters.status;

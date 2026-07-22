@@ -1,121 +1,179 @@
 # Shallow-build audit — Diet Camps / Dedicated Ops / Camp Management / Teleconsultation Camps
-_Saved 2026-07-16. Context: after fixing the same problem across all 11 Ops Manager tabs (see PROGRESS.md Session Log), 4 parallel research agents were dispatched to audit whether these 4 already-built screens have the same "read prototype but condensed/summarized instead of porting exactly" defect. 3 of the 4 agents hit a session API limit mid-run and terminated early — their partial findings (captured in their last progress message before termination) are included below. Only the Dedicated Ops agent completed its full run. **Nothing below has been acted on yet — no rebuild work has started on these 4 screens.** This file exists so the research isn't lost; resume by re-running the incomplete agents (their prompts are preserved below) or continuing manually from the partial findings._
+_Saved 2026-07-16, updated 2026-07-16 (all 4 audits now complete). Context: after fixing the same problem across all 11 Ops Manager tabs (see PROGRESS.md Session Log), all 4 of these screens were audited against their prototype source. All 4 were confirmed to have real gaps._
+
+**⚠️ UPDATE 2026-07-18 — UI-only shells for every finding below have now been built and live-verified.** See PROGRESS.md's 2026-07-18 Session Log entry for the full list of 11 new components. Every gap in the "Tier 1"/"Tier 2" consolidated priority view at the bottom of this file now has a corresponding shell — the wizard, bulk-upload, cancellation engine, close-out modal, reminders modal, resource-assignment modal, the 2 missing Diet Camps modals, the dietitian enrollment+detail views, the media-upload flow, and the Dedicated Ops project drawer all exist and render correctly with every field from the prototype. **What is NOT done**: none of these shells persist anything — every save/submit is a stub toast. The "Tier 3" dead-button/wrong-formula items (e.g. Diet's Tele-Dietitian book-modal having 7 of 8 fields hardcoded, KPI tiles not being clickable, the Reminders tab's Declined path) were NOT addressed in the 2026-07-18 pass — that pass built new UI for entirely-missing pieces, it did not go back and fix smaller pre-existing interaction bugs on already-existing UI. If resuming this work, the next step is wiring the 11 new shells to real `*.service.ts` persistence, THEN sweeping the remaining Tier 3 items.
+
+**Scope note (confirmed with user):** only these 4 screens (built during the "Operations" sidebar-section session) are in scope for this rebuild pass — not a whole-app audit.
 
 ---
 
-## 1. Dedicated Ops — AUDIT COMPLETE (agent finished normally)
+## 1. Dedicated Ops — AUDIT COMPLETE
 
-**Verdict: NOT built as shallow as Ops Manager was.** Reasonably faithful port (service layer even cites prototype line numbers in comments), but not gap-free. Much shallower gap profile than Ops Manager (no missing tabs, no missing business-logic files) but several real issues.
+**Verdict: NOT built as shallow as Ops Manager was.** Reasonably faithful port (service layer even cites prototype line numbers in comments), but not gap-free.
 
-**Scope clarification confirmed by agent:** `dedicated-ops.js` (489 lines) + `dedicated-data.js` (526 lines) power `pages/dedicated-ops.html` — the 4-tab Ops-Manager-facing console (Projects / Live FOs / Compliance / SOP Configuration). This is what `features/dedicatedops/` implements. `dedicated-fo.js` (662 lines) + `dedicated-fo.html` is a **separate, distinct screen** — the FO's own mobile daily workspace (check-in/photo/screenings/check-out) — out of scope for "Dedicated Ops", **no React equivalent exists yet**, worth flagging separately if expected to exist elsewhere.
+**Scope clarification:** `dedicated-ops.js` (489 lines) + `dedicated-data.js` (526 lines) power `pages/dedicated-ops.html` — the 4-tab Ops-Manager-facing console (Projects / Live FOs / Compliance / SOP Configuration). This is what `features/dedicatedops/` implements. `dedicated-fo.js` (662 lines) + `dedicated-fo.html` is a **separate, distinct screen** — the FO's own mobile daily workspace — out of scope, no React equivalent exists yet, flag separately if ever needed.
 
-**Line-count sanity check:** prototype ~1015 lines (dedicated-ops.js + dedicated-data.js) vs React ~1107 lines total (service+types+hook+mock+page+modals+components) — comparable, but a chunk of the prototype total is FO-portal-only DPDP/consent/photo-upload machinery (~158 lines) that's legitimately out of scope here. Excluding that, real comparable logic is ~857 vs 464 — "mostly-faithful but somewhat compressed," not a systemic gutting.
+**Line-count:** prototype ~1015 lines vs React ~1107 lines total — comparable overall, though real comparable logic (excluding legitimately-out-of-scope FO-portal DPDP/consent code) is ~857 vs 464 — "mostly-faithful but somewhat compressed."
 
 ### Concrete gaps (most → least severe)
 
-1. **Project drawer/detail view — entirely missing** (missing entire section). Prototype `window.doOpenProject` (dedicated-ops.js:145-209): clicking a project row opens a slide-in drawer with project header, "Manpower requirement" have/need panel, "Assigned FOs" roster (avatar, doctor/clinic, live check-in/out pill, inline unassign), "SOP summary" panel, "Edit SOP" deep-link button. React: table rows aren't clickable at all, no drawer component exists anywhere in the feature folder. Per-FO unassign only exists on the Live FOs tab, not reachable from Projects.
-
-2. **"Nudge" button is dead** (functional bug). Prototype `window.doNudgeFo` (dedicated-ops.js:374-377) fires a real toast. React `DedicatedOpsPage.tsx:261` — `<Button>Nudge</Button>` has no `onClick` at all.
-
-3. **Live FOs tab KPI row — entirely missing** (missing entire section). Prototype `tabLive` (dedicated-ops.js:310-316) renders 4 tiles: Active FOs (checked in), Closed today, No check-in, Today's screenings. React's `tab === 'live'` block renders only the table, no KPI grid.
-
-4. **Projects-tab KPIs: 2 of 4 are wrong/substituted metrics, all sub-captions dropped** (missing fields). Prototype (dedicated-ops.js:84-87): "Dedicated projects", "Assigned FOs", **"Screenings to date"**, **"Active today"** — each with a `sub` caption. React (`DedicatedOpsPage.tsx:119-122`): "Dedicated projects", "FOs deployed", then **"Fully compliant"** and **"Overdue"** (these are Compliance-tab metrics, wrongly duplicated here) — actual screenings-to-date/active-today numbers never shown on Projects tab at all. `KpiTile`'s `sub` prop exists and is supported but never passed anywhere on this page.
-
-5. **Projects table "Status" column shows a duplicate metric, not real project status** (wrong field). Prototype (line 74): shows `p.status` lifecycle pill (LIVE/PAUSED/other). React (`DedicatedOpsPage.tsx:154`): re-shows the fill-rate pill (already shown via progress bar 2 columns over) — real `Project.status` ('ACTIVE'|'COMPLETED') never rendered here at all.
-
-6. **Fill-rate formula wrong when `required === 0`** (logic edge-case bug). Prototype (lines 66-67): `pct = required ? round(100*fos/required) : (fos.length ? 100 : 0)`, i.e. 0-required-but-staffed projects show 100%/filled. React (`DedicatedOpsPage.tsx:139`): always 0% when required is 0, regardless of actual staff — incorrectly shows "Understaffed" at 0%.
-
-7. **"Convert project to Dedicated" — no eligible-projects guard, helper copy dropped** (minor UX). Prototype (lines 103-109) toasts and refuses to open modal if zero eligible projects; also shows helper text under the form about default-SOP behavior (line 121). React opens the modal unconditionally with an empty Select; helper text missing.
-
-8. **Assign-FO modal "currently on X" hint condition narrower than prototype** (cosmetic). Prototype (lines 218-222) shows the hint for any existing assignment including the same project; React (`AssignFoModal.tsx:59-64`) suppresses it if already on the same project.
-
-9. **SOP tab is a genuinely faithful field-for-field port** (not a gap) — all ~12 fields verified present and matching. React additionally adds a "Manpower required" panel not in the prototype's SOP tab (reasonable compensating addition for gap #1, but shows required-only, no live fill count).
-
-10. **CSV export column sets match** (not a gap) — verified prototype's and React's attendance/screening export columns are equivalent; only difference is React's export has no post-export confirmation toast (cosmetic).
-
-**Agent's recommendation:** prioritize #1 (drawer) since it's the only entirely-missing user-facing surface, then #2 (dead button) and #3 (missing KPI row) as the most visible "shallow port" symptoms; rest are quick/low-risk.
+1. **Project drawer/detail view — entirely missing.** Prototype `window.doOpenProject` (dedicated-ops.js:145-209): clicking a project row opens a slide-in drawer with project header, "Manpower requirement" have/need panel, "Assigned FOs" roster (avatar, doctor/clinic, live check-in/out pill, inline unassign), "SOP summary" panel, "Edit SOP" deep-link button. React: table rows aren't clickable at all, no drawer component exists. Per-FO unassign only exists on the Live FOs tab, not reachable from Projects.
+2. **"Nudge" button is dead.** Prototype `window.doNudgeFo` (dedicated-ops.js:374-377) fires a real toast. React `DedicatedOpsPage.tsx:261` — `<Button>Nudge</Button>` has no `onClick` at all.
+3. **Live FOs tab KPI row — entirely missing.** Prototype `tabLive` (dedicated-ops.js:310-316) renders 4 tiles: Active FOs (checked in), Closed today, No check-in, Today's screenings. React's `tab === 'live'` block renders only the table.
+4. **Projects-tab KPIs: 2 of 4 are wrong/substituted metrics, all sub-captions dropped.** Prototype (dedicated-ops.js:84-87): "Dedicated projects", "Assigned FOs", "Screenings to date", "Active today" (each with a `sub` caption). React (`DedicatedOpsPage.tsx:119-122`): "Dedicated projects", "FOs deployed", then "Fully compliant" and "Overdue" — those last two are Compliance-tab metrics, wrongly duplicated here; real screenings-to-date/active-today never shown. `KpiTile`'s `sub` prop exists but is never passed.
+5. **Projects table "Status" column shows a duplicate metric, not real project status.** Prototype (line 74): shows `p.status` lifecycle pill (LIVE/PAUSED/other). React (`DedicatedOpsPage.tsx:154`): re-shows the fill-rate pill (already shown via progress bar 2 columns over) — real `Project.status` never rendered.
+6. **Fill-rate formula wrong when `required === 0`.** Prototype (lines 66-67): 0-required-but-staffed projects show 100%/filled. React (`DedicatedOpsPage.tsx:139`): always 0% when required is 0 — incorrectly "Understaffed".
+7. **"Convert project to Dedicated" — no eligible-projects guard, helper copy dropped.** Prototype (lines 103-109, 121) toasts + refuses to open modal if zero eligible; shows default-SOP helper text. React opens modal unconditionally, no helper text.
+8. **Assign-FO modal "currently on X" hint condition narrower than prototype** (cosmetic). Prototype (lines 218-222) shows hint for any existing assignment; React (`AssignFoModal.tsx:59-64`) suppresses if already on the same project.
+9. **SOP tab is a genuinely faithful field-for-field port** (not a gap) — all ~12 fields verified matching. React additionally adds a "Manpower required" panel not in the prototype's SOP tab (reasonable compensating addition for gap #1, but required-only, no live fill count).
+10. **CSV export column sets match** (not a gap) — only difference is no post-export confirmation toast (cosmetic).
 
 ---
 
-## 2. Diet Camps — AUDIT INCOMPLETE (agent hit session limit mid-run)
+## 2. Diet Camps — AUDIT COMPLETE
 
-Partial finding captured before termination:
+**Verdict: shallow-built, same defect class as Ops Manager and Camp Management.** Better than Camp Management in one respect (KPI tile set, camp card grid, cancellation-charge math, close-out formula, and 2 modals really were ported with matching formulas), but **3 entire prototype subsystems were dropped wholesale** (invite-dietitians modal, assign/rate-sheet modal, media upload), the flagship full-page camp-detail view was reduced to a stub drawer missing most sections, and the Dietitians tab is fully dead/read-only.
 
-> Confirmed: `DietitiansTab` has **zero interactivity** — no click handlers, no drawer, no filter/search UI, no "Enrol dietitian" button. It's a pure read-only grid of cards.
->
-> [Agent's stated next steps, not yet done]: verify the AI banner ("Diet copilot") and "Auto-assign" button, check page-level chips/header parity, verify KPI tiles are clickable (prototype KPIs jump to filtered status pill on click).
+**Line-count:** prototype = 2,896 lines (`diet-camps.js` 2,255 + `diet-invite-modal.js` 213 + `diet-rates-modal.js` 428, all loaded by `diet-camps.html` and wired into diet-camps.js's assign/invite flows). React = 1,541 lines across 18 files — 53%. Two entire prototype files (641 lines, 100% of the invite + rate-sheet modals) have **zero** React counterpart.
 
-**Scope for this screen:** prototype source is `assets/js/diet-camps.js` (2255 lines — the largest of the 4 by far). Our build is `features/diet/` (~1114 lines across pages/components/tabs/hooks/service — confirmed pre-audit). That's roughly 2x under-building by raw line count alone, consistent with the Ops Manager pattern, though line count alone isn't conclusive (see Dedicated Ops caveat above about legitimately-out-of-scope code).
+### Global chrome (outside the 6 tabs)
+| Gap | Prototype | Ours | Severity |
+|---|---|---|---|
+| AI banner "Diet copilot" | `diet-camps.html:37-44` + `renderAi()` (diet-camps.js:567-585) — computes unassigned-request count, camps within 48h awaiting confirmation, dietitians not interviewed/missing resumes | Not present in `DietPage.tsx` | Missing section |
+| "Auto-assign" button | `diet-camps.html:43` | Not present | Cosmetic (dead in prototype too) |
+| KPI tiles clickable → filter jump | `diet-camps.js:541-565` `dcOpenStatus()` | `KpiTile.tsx` has no `onClick` prop at all | Dead tile |
+| Import/Export buttons | `diet-camps.html:31-32` | Not present | Cosmetic (dead in prototype too) |
 
-**Status: needs a fresh full audit run** — only the Dietitians tab's interactivity gap was confirmed before the agent died. The other tabs (Diet Camps list, Tele Dietitian, Devices, Reminders, Media — per PROGRESS.md's "6 tabs" note) were not yet compared function-by-function against `diet-camps.js`.
+### Tab 1 — Diet Camps
+- **Camp detail is a full in-place page in the prototype, not a drawer.** `pageCampDetail()` (diet-camps.js:1301-1629): hero, missing-primary-role banner, stage timeline, Camp Particulars, Client & Project section, Team (dietitian+FO+labtech+manpower+doctor for Mixed projects), Patient Count w/ turnout %, Devices (camp-allocated + dietitian-carried), full reminder/confirmation log grid inline, Cancellation section, **Close-out report section**, Media gallery with upload, full action bar. Ours: `DietCampDetail.tsx` (155-line `SideDrawer`) only has status pill, one-line client/div/city/date, cancellation banner, dietitian-only team, bare patient count, plain device-ID list, notes, Mark Live/Close/Cancel. **Missing majority of section content.**
+- **"Invite dietitians" flow — entirely missing** (whole `diet-invite-modal.js`, 213 lines, zero port): ranked shortlist w/ last remuneration/rating/same-doctor-history/BCA status/doctor-preferred pin, multi-select, WhatsApp-invite simulation, accept/decline recording.
+- **"Assign/Edit team" rate-sheet flow — entirely missing** (whole `diet-rates-modal.js`, 428 lines, zero port): two-step ranked picker → rate sheet (Remuneration/TA/Printing/Target cost pre-filled from history, edit-triggers-mandatory-reason, live PO-cost variance banner, rate-history trend table, BCA gate, OM-approval gate). Our `AssignTeamModal.tsx` (77 lines) only implements the **prototype's own degraded fallback path** (explicitly commented in the prototype as "used only if the shared modal script failed to load") — not its primary flow.
+- **"Online assessments & diet plans" — dead button.** Prototype `dcOpenAssessments`/`dcNewAssessment` (diet-camps.js:716-805): per-patient BMI/diet-plan capture form. Ours: types/service plumbing exists (`OnlineAssessment`, `addAssessment`) but no component renders it; the card's button opens the wrong (plain) drawer; `assessmentCount` is hardcoded to `0`.
+- Patient-count modal missing "Entered by"/"Note" fields — hardcoded instead of user-entered.
+- `dietViewOnly()` toast-messaging on blocked actions — cosmetic gap only (buttons are hidden instead, functionally similar end-state).
 
-**To resume:** re-run this exact research prompt (agent type: Explore, read-only):
+### Tab 2 — Dietitians (confirms + expands the original partial finding)
+- No state filter dropdown, no search box.
+- **"Enrol dietitian" button — entirely missing** (`dcAddDietitian()` full enrollment form: code/name/email/phone/qualification/resume/interviewed/status/remuneration/TA/DA/printing/address/gmap/state/city/machines-assigned).
+- **Card click → dietitian detail drawer — entirely missing** (`dcOpenDietitian()`: avatar, contact block, Commercials-per-camp block with **total per-camp cost**, machines-assigned chips, **camp history table** last 12 camps w/ click-through). Confirmed: cards have zero `onClick`.
+- Per-camp cost tile shows raw `remuneration` only, not the correct summed formula (`remuneration+ta+da+printing`).
+- Missing devices-count stat tile on card.
+- No edit-existing-dietitian path (since no create path exists either).
 
-> We are rebuilding a QMS healthcare-ops React app (at s:\qms_umc\frontend\src) by porting a vanilla-JS prototype (at s:\QMS-Camp-Portal-feature-qms-sales-ops-suite). We just discovered our earlier "Ops Manager" rebuild was systemically shallow — we read the prototype source but condensed/summarized it instead of porting every literal panel, KPI tile, formula, and button action, so large chunks of real functionality were silently dropped. We fixed all 11 Ops Manager tabs by re-reading the prototype in FULL (not skimmed) and porting every element exactly. Now we need to know if the same shallowness problem exists in the "Diet Camps" screen, which we built earlier in this project.
->
-> Your job: do a thorough comparison and report concrete gaps. Do NOT write any code — this is a research/audit task only.
->
-> 1. Read the FULL prototype source for the Diet Camps screen. Primary file: s:\QMS-Camp-Portal-feature-qms-sales-ops-suite\assets\js\diet-camps.js (2255 lines — read it in full via multiple Read calls with offset/limit, not just a sample). Also check s:\QMS-Camp-Portal-feature-qms-sales-ops-suite\pages\ for the corresponding HTML page (look for a diet-camps.html or similar) to see what other JS files it loads and what the page structure/layout looks like.
-> 2. Read our current React implementation in full: everything under s:\qms_umc\frontend\src\features\diet\ (pages, components/tabs, hooks, diet.service.ts, diet.types.ts if it exists).
-> 3. Compare systematically: for every function, panel, KPI tile, table column, modal, button action, filter, and business-logic formula in the prototype's diet-camps.js, check whether our React build has a faithful equivalent. Look specifically for: missing KPI tiles/summary panels; missing table columns or missing rows/sections entirely; missing modals or missing fields within existing modals; dead buttons (no onClick) vs. the prototype's real action; approximated/simplified business-logic formulas (status calculations, date logic, filtering/sorting logic); missing CSV/export functionality; any entirely-missing tabs/sub-sections.
-> 4. Report: summary verdict (shallow vs reasonably complete); specific concrete gap list (prototype line ref + our build file:line ref or "entirely missing" + severity); rough line-count comparison.
+### Tab 3 — Tele Dietitian
+- No status-pill filter strip, no search box, no 4-tile KPI row (Today/Scheduled/Completed/No-shows).
+- No "Start" (join room) action — separate from Complete in the prototype.
+- **Book modal has only a patient-name field** — phone/condition/dietitian-choice/date/time/mode/client are all hardcoded defaults, vs. the prototype's 8-field form.
+- Complete modal (notes + diet plan) is faithfully ported — OK.
 
----
+### Tab 4 — Devices
+- **Dietitian × device matrix table — entirely missing** (`tabDevices()` diet-camps.js:1116-1147: row per dietitian, device chips, "Manage" button → edit form, name click → drawer) — roughly half the tab's content, including the only per-dietitian device-management entry point.
+- KPI tiles + usage bars are faithfully ported — OK.
 
-## 3. Camp Management — AUDIT INCOMPLETE (agent hit session limit mid-run)
+### Tab 5 — Reminders
+- Camp header not clickable (prototype opens full camp detail).
+- Missing explanatory copy line.
+- Recipient display shows only role key, not resolved assignee name (or manpower count).
+- Only 2 of 3 actions exist (Send, Confirm) — **no Declined path reachable via UI at all**, though the type supports it.
 
-Partial finding captured before termination:
+### Tab 6 — Media
+- **No upload capability anywhere** — `dcAddMedia()` modal (type/uploaded-by/URL/caption) has zero React equivalent; this is the prototype's *only* way to add media, entirely absent.
+- Media items not clickable to open full-size.
+- **Actual photo/video is never rendered** — generic icon placeholder shown instead of the real `item.url` image/video.
+- Missing "camps without media" warning callout section.
+- Scope logic narrower: prototype computes the eligible universe (LIVE+COMPLETED camps) then splits with/without media; ours only ever shows camps that already have media, so the "missing media" callout can't even be computed.
 
-> Confirmed a critical gap: **no camp wizard (booking modal), no bulk upload, no project filter, no cancellation policy/charge calculation logic, no close-out modal, no reminders modal, no resource assignment modal, no AI banner, no Import/Export buttons.**
->
-> [Agent's stated next steps, not yet done]: check the remaining dossier sections and utils files.
+### Formula/business-logic fidelity (for balance — what's genuinely correct)
+- `dietStage()` — exact port.
+- Cancellation-charge engine (24h threshold, 50%×₹5,000) — exact port.
+- Close-out formula (55/45 gender split, 40/30/20/10 risk bands) — exact port.
+- `bmiOf`/`bmiBand` — ported but orphaned (nothing calls it, since assessments UI doesn't exist).
+- Invite-ranking algorithm, rate-sheet PO-variance/rate-history/BCA-gate/approval-gate logic — **not ported at all**, exclusively lived in the two entirely-missing modal files.
 
-This is a large, high-severity partial finding — effectively says most of the interactive/write-side functionality of Camp Management may be missing entirely (as opposed to Dedicated Ops's "mostly there, some panels missing" profile). This lines up with PROGRESS.md's own existing Known Issues note: *"Real gaps found (close-out modal, cancellation policy engine) — see Known Issues"* — meaning some of this was already known before this audit round, but the agent's partial finding suggests the list of missing pieces is longer than previously documented (bulk upload, project filter, reminders modal, resource assignment modal, AI banner, Import/Export buttons are new items not previously called out).
-
-**Status: needs a fresh full audit run, and likely the largest rebuild of the 4 screens.** The camp detail/dossier drill-down view (`camp-detail.js`, 894 lines) was flagged in the original prompt as needing full comparison but the agent's progress note only mentions "remaining dossier sections" as not-yet-checked — meaning dossier-view completeness is still unknown.
-
-**To resume:** re-run this exact research prompt (agent type: Explore, read-only):
-
-> We are rebuilding a QMS healthcare-ops React app (at s:\qms_umc\frontend\src) by porting a vanilla-JS prototype (at s:\QMS-Camp-Portal-feature-qms-sales-ops-suite). We just discovered our earlier "Ops Manager" rebuild was systemically shallow — we read the prototype source but condensed/summarized it instead of porting every literal panel, KPI tile, formula, and button action, so large chunks of real functionality were silently dropped. We fixed all 11 Ops Manager tabs by re-reading the prototype in FULL (not skimmed) and porting every element exactly. Now we need to know if the same shallowness problem exists in the "Camp Management" screen, which we built earlier in this project.
->
-> Your job: do a thorough comparison and report concrete gaps. Do NOT write any code — this is a research/audit task only.
->
-> 1. Read the FULL prototype source for the Camp Management screen. Primary files likely include: s:\QMS-Camp-Portal-feature-qms-sales-ops-suite\assets\js\camps.js, camps-manager.js, camps-data.js, and camp-detail.js (894 lines) — check file sizes first, then read ALL of them in full via multiple Read calls with offset/limit. Also check s:\QMS-Camp-Portal-feature-qms-sales-ops-suite\pages\ for the corresponding HTML page to see what other JS files it loads and what the page structure/tabs/layout looks like.
-> 2. Read our current React implementation in full: everything under s:\qms_umc\frontend\src\features\camps\ (pages, components, hooks, service files, camps.service.ts, camps.refs.ts, camps.mock.ts).
-> 3. Compare systematically, specifically confirming or expanding on this partial prior finding: "no camp wizard (booking modal), no bulk upload, no project filter, no cancellation policy/charge calculation logic, no close-out modal, no reminders modal, no resource assignment modal, no AI banner, no Import/Export buttons" — verify each claim with exact file:line evidence, and check the camp detail/dossier drill-down view specifically (camp-detail.js's full 894 lines vs whatever our build shows when drilling into a single camp) since that was not fully checked last time.
-> 4. Report: summary verdict; specific concrete gap list (prototype line ref + our build file:line ref or "entirely missing" + severity); rough line-count comparison.
-
----
-
-## 4. Teleconsultation Camps — AUDIT INCOMPLETE (agent hit session limit mid-run)
-
-Partial finding captured before termination:
-
-> Confirmed: **no "New Camp" wizard exists in this React feature at all** — the "New Camp" button in `CampsPage.tsx` (line 97-102) has no `onClick` handler (dead button).
->
-> [Agent's stated next steps, not yet done]: confirm that and check `BookCampDialog.tsx` in CRM (a different booking flow) to see if it has tele fields, plus double check the `division` filter (project filter is missing from React filter bar vs prototype which has client/division/**project**/doctor/fo).
-
-**Important overlap note:** per PROGRESS.md, Teleconsultation Camps is documented as *"a locked-tab wrapper over Camp Management (`/camps/tele`), not a separate feature"* — meaning this screen and Camp Management (audit #3 above) likely share the exact same underlying `CampsPage.tsx`/dead "New Camp" button bug. **Fixing Camp Management's missing camp wizard will very likely fix this same gap for Teleconsultation Camps simultaneously** — these two audits should probably be reconciled/merged before any rebuild work starts, rather than treated as two independent fixes.
-
-**Status: needs a fresh full audit run**, but likely largely redundant with #3 above given the shared-component architecture — worth explicitly re-confirming the overlap before spending agent time on a fully separate audit.
-
-**To resume:** re-run this exact research prompt (agent type: Explore, read-only) — but consider first just re-reading #3's findings once complete, since it may already cover this:
-
-> We are rebuilding a QMS healthcare-ops React app (at s:\qms_umc\frontend\src) by porting a vanilla-JS prototype (at s:\QMS-Camp-Portal-feature-qms-sales-ops-suite). We just discovered our earlier "Ops Manager" rebuild was systemically shallow — we read the prototype source but condensed/summarized it instead of porting every literal panel, KPI tile, formula, and button action, so large chunks of real functionality were silently dropped. We fixed all 11 Ops Manager tabs by re-reading the prototype in FULL (not skimmed) and porting every element exactly. Now we need to know if the same shallowness problem exists in the "Teleconsultation Camps" screen, which we built earlier in this project.
->
-> Note: per project docs, Teleconsultation Camps is a locked-tab wrapper over the SAME Camp Management feature (`/camps/tele`), not a separate feature — it likely shares `CampsPage.tsx` and other components with Camp Management. Check whether the Camp Management audit already covers this screen's gaps before doing a fully separate pass.
->
-> 1. First read s:\QMS-Camp-Portal-feature-qms-sales-ops-suite\pages\tele-camps.html in full to see exactly which JS files it loads (note: shared generic modules — camps.js/camps-manager.js/camps-data.js/booking-window.js — rather than a dedicated tele-specific file; figure out how "Teleconsultation" camps are filtered/handled within those shared files, e.g. by camp `type` field).
-> 2. Search assets/js/camps.js, camps-manager.js, camps-data.js, booking-window.js for "Tele"/"tele"/"teleconsultation" (case-insensitive), read the surrounding functions in full for context.
-> 3. Read our current React implementation: features/camps/ (or wherever "tele" is handled — search component names first if unsure of exact path).
-> 4. Compare systematically: missing KPI tiles/panels; missing table columns/filters/sections; missing modals or fields (booking-window logic for tele slots, video-link fields, doctor assignment); dead buttons vs. real prototype actions (already confirmed one: "New Camp" button in CampsPage.tsx:97-102 has no onClick); approximated business logic; missing CSV/export; missing tabs/sub-sections. Also verify the partial finding about a missing "project" filter (prototype filter bar reportedly has client/division/project/doctor/fo, ours reportedly missing "project").
-> 5. Report: summary verdict; specific concrete gap list; rough line-count comparison if meaningful.
+### CSV/export
+Prototype's Export button is dead in the prototype itself (no `onclick`) — not a regression, don't prioritize.
 
 ---
 
-## Suggested next steps when resuming this work
+## 3. Camp Management — AUDIT COMPLETE
 
-1. Re-run the 3 incomplete audits (Diet Camps, Camp Management, Teleconsultation Camps) using the preserved prompts above — ideally after checking whether the session limit has reset, and possibly running them sequentially rather than 4-way parallel this time to reduce concurrent token pressure if that contributed to hitting the limit.
-2. Given the overlap flagged in #4, consider merging the Camp Management and Teleconsultation Camps audits into one pass, or running Teleconsultation second and having it explicitly build on Camp Management's findings rather than re-deriving them.
-3. Once all 4 audits are complete, apply the same methodology used for Ops Manager: read full prototype source (not summaries), rebuild every missing panel/tile/modal/formula exactly, verify via `tsc -b`, `npm run build`, and live Playwright screenshots against `npm run preview -- --port 4173` for every affected role/mode combination — not just a single happy-path render.
-4. **Playwright/auth-mock note carried over from the Ops Manager work:** when writing verification scripts, mock the auth route at its real absolute URL (`http://localhost:3000/api/v1/auth/login`, from `ENV.Api.BaseUrl` in `frontend/src/config/env.ts`) — NOT a relative glob like `**/auth/login`, which will incorrectly also match the SPA's own `/auth/login` page route during `page.goto()` navigation and serve raw JSON instead of the app shell. Also mock response shape must be `{ success: true, data: <AuthUser flat fields incl. role> }` — NOT nested under `data.user` — since `useLogin.ts` calls `setAuth(data.data)` directlyand `AuthUser`'s fields are flat. If `role` isn't correctly threaded through, the login silently falls back to `role: 'super_admin'` (see `useLogin.ts:14`), which will make every screen render in an unintended admin/all-access mode without a visible error — always double check the sidebar user badge shows the intended role, not "Super Admin", before trusting any live-verification screenshot.
+**Verdict: shallow-built, same pattern as Ops Manager.** The camp-detail/dossier view (`camp-detail.js`, 894 lines) is a genuine bright spot — ported with unusual fidelity, all 18 sections present, correct pharma/internal redaction. But the main list screen (camps.js 1235 + camps-manager.js 1110 = 2345 lines of real behavior) was reduced to a shell with cosmetic buttons and no backing logic.
+
+**Line-count:** prototype core logic (camps.js+camps-manager.js+camps-data.js+booking-window.js, excluding the well-ported camp-detail.js) = 2,586 lines. Our entire `features/camps/` = 1,828 lines, of which the dossier alone is ~750 — meaning the list/wizard/lifecycle side is only ~1,000 lines against 2,586 equivalent prototype lines, under 40%.
+
+### Confirmed gaps
+1. **No camp wizard / booking modal at all.** Prototype `window.openCampWizard` (camps.js:726-757), full 4-step wizard `renderWizard` (camps.js:916-1153): Doctor step (+ inline "add new doctor"), Project & Type step (client/division/project/MR/ASM-auto/RSM-auto/camp-type chips/teleconsult toggle), Slot & FO step (date w/ booking-window hint, slot, city/state, FO), Devices & Confirm step (device chips, review, notes, consent path). Ours: zero occurrences of `openCampWizard`/wizard anywhere; `CampsPage.tsx:96-103`'s "New Camp" button has **no `onClick` at all** — dead button. **Largest single gap** — an entire ~240-line 4-step wizard.
+2. **No bulk upload (historical camps import).** Prototype `window.openBulkUploadCamps` (camps.js:840-914), `downloadBulkTemplate()` (XLSX template gen), `processBulkRows()` (maps rows→CLOSED camps, resolves client/division/project/doctor/MR by name). Ours: zero occurrences — even though `Camp` type already carries `thirdParty`/`executedBy`/`source:'BULK_HISTORICAL'` fields nothing ever writes them.
+3. **No project filter.** Prototype `renderFilterBar()` (camps.js:265-305) has 9 controls incl. `cf-prj` project dropdown (camps.js:292-293) cascading off client. Ours: `CampsFilterBar.tsx` has 7 controls, no project dropdown; `matchesFilters()` has no `projectId` predicate at all.
+4. **No cancellation policy/charge-calculation engine.** Prototype `computeCancellationCharge()` (camps-manager.js:282-297): reads `project.cancellationPolicy` (freeHoursPrior/pctAllowed/pctDeducted), computes hoursUntilCamp, unitCost (project.perCampCost or ₹5000 default), chargeAmount, newStatus — wired into a full policy-preview modal (camps-manager.js:344-444) with free-window math and a computed ₹ figure before confirming. Ours: `isChargeableCancellation()` (camps.utils.ts:30-33) is a **hardcoded `hoursUntil < 24` boolean** — no policy lookup, no per-project override, no unit cost, no ₹ amount shown anywhere. Cancel reason is also a free-text `Textarea`, not the prototype's 6-code enum (`DOCTOR_UNAVAILABLE`/`WEATHER`/`LOW_TURNOUT_EXPECTED`/`CLIENT_REQUEST`/`RESCHEDULED`/`OTHER`) — the typed union already exists in `camp.types.ts` unused. **Missing entire business-logic engine**, not cosmetic.
+5. **No close-out modal.** Prototype `window.closeCampLifecycle` override (camps-manager.js:449-628): patient bifurcation (done/male/female w/ sanity-check), 4-band risk bifurcation w/ running-total check, Rx count, 3 star ratings, 4-tile photo-URL grid, 3 thank-you-communication checkboxes, closing notes — plus a separate read-only close-out report viewer w/ PDF/share (`window.showCloseOutReport`, camps-manager.js:1032-1098). Ours: `CampDrawer.tsx:157-165` "Close" just calls `onSetStatus(camp.id,'CLOSED')` directly — no modal, no data entry at all; `closeOut` object is never written anywhere in the app (only displayable if hardcoded in seed data).
+6. **No reminders modal.** Prototype `window.openCampReminders` (camps-manager.js:751-871): configurable per-timing (T48/T24/T2) × per-channel (WhatsApp/Email/AI Voice) matrix, custom messages, 4 target-audience checkboxes, persisted to `camp.reminders`. Ours: `RemindersSection` is **read-only and synthetic**, deriving fake text from `camp.status` with an explicit `// TODO: mock` comment — no config UI anywhere.
+7. **No resource assignment modal.** Prototype `window.openResourceAssign` (camps-manager.js:633-746): FO/Dietitian/LabTech single-select + Manpower multi-select, filtered by people-master role, primary-role-required banner (`PRIMARY_ROLE_BY_TYPE`), confirm-to-override. Ours: only `assignFo()` exists, via a raw `window.prompt()` text box — no dropdown, no role filtering, no dietitian/labtech/manpower assignment at all.
+8. **No AI banner** (cosmetic — prototype's own is a static string with no logic either).
+9. **No Import/Export buttons** (cosmetic — dead in the prototype too, low-severity parity item).
+10. **Smart Actions panel entirely missing from the drawer** — prototype's drawer override (camps-manager.js:912-1027) injects a whole overlay card: missing-primary-role warning, live cancellation-policy chip, booking-hierarchy list, 4 action tiles (Assign resources / Configure reminders / Close w/ summary / Cancel w/ policy). Ours has none of this overlay layer at all, only the bare original actions.
+11. **Booking-window rules (booking-window.js, 170 lines) entirely unported** — lead-time/window-days/monthly-cutoff/privileged-role-bypass engine gating the wizard's date step; since there's no wizard, this whole admin-configurable engine has no equivalent.
+12. **Cancel flow's reason taxonomy regression** — free-text instead of the 6-code enum (also listed under #4, called out separately since it's a distinct defect: the typed union in `camp.types.ts` is dead code).
+13. **"Send WA" buttons are decorative no-ops in both codebases** — `CampCard.tsx:113-118` has no `onClick` at all (prototype's own WA buttons are toast-only stubs too) — low severity, but confirms dead-button pattern extends beyond Create actions.
+14. Camp-report.js dashboard widget (234 lines) confirmed **out of scope** — belongs to the Dashboard page, not Camp Management.
+
+### What was ported faithfully (for balance)
+- `camp-detail.js` dossier (894 lines) → `CampDetailPage.tsx` + dossier components: all 18 sections present, correct pharma/internal perspective suppression, correct PII redaction. Ported at the depth Ops Manager should have been done at from the start.
+- `campStage()` — exact line-for-line port including the REQUESTED-vs-UPCOMING-by-foId nuance and the 3-condition COMPLETED-vs-COMPLETED_PENDING check.
+- `matchesFilters()` correctly ports 7 of 9 filter predicates (missing only project, per gap #3, plus role-based scoping nuance).
+- KPI strip (`CampsKpiStrip.tsx`) correctly ports all 7 status-bucket tiles with click-to-filter (unlike Diet Camps' KPI tiles, which are NOT clickable — a real divergence between the two audits worth noting).
+
+---
+
+## 4. Teleconsultation Camps — AUDIT COMPLETE
+
+**Verdict: the overlap-with-Camp-Management theory is CONFIRMED.** `/camps/tele` is genuinely the same `CampsPage.tsx` rendered with `lockTab="TELE"`, mirroring the prototype's `tele-camps.html` (which loads the identical script set as `camps.html` and just calls `window.setCampsTab('tele')` instead of defaulting to `'requested'`). **Fixing Camp Management's wizard/bulk-upload/project-filter/cancellation-engine/close-out/reminders/resources/Smart-Actions gaps (all of #1-#11 above) will fix those same gaps on `/camps/tele` automatically** — no separate work needed for any of them.
+
+### Gaps inherited verbatim from Camp Management (do not re-fix separately — fixing Camp Management fixes these here too)
+No wizard (dead "New camp" button), no bulk-upload, no project filter, no cancellation-charge engine, no close-out modal, no reminders modal, no resource-assignment modal, no Smart Actions drawer overlay.
+
+### Genuinely Tele-specific findings (real additional work, separate from Camp Management)
+1. **There is no dedicated Tele booking/slot logic to port at all — confirmed as a prototype limitation, not a build gap.** "Teleconsultation" in the prototype is not a 4th camp type, just an orthogonal `teleConsult: boolean` + `teleChannel: 'VIDEO'|'IVR'` flag, settable in the wizard's Step-1 panel or toggled after-the-fact via `window.toggleCampTele` (camps.js:1174-1181). `booking-window.js` has zero tele-aware branching. `camps-manager.js` has zero tele/video/ivr matches. No video-link/meeting-URL field exists anywhere in prototype or React (confirmed via grep both sides) — this is a genuine absence in the prototype's own design, not something to build.
+2. **What Tele-specific surface DOES exist is faithfully ported** where the underlying UI exists: card badge (`CampCard.tsx:59-63`), drawer badge+toggle (`CampDrawer.tsx:64-78`), tab filter (`CampsPage.tsx:70`, exact match w/ code comment citing the prototype line), `toggleTele` mutation mirrors `toggleCampTele` including VIDEO-default-on-first-toggle. `camps.mock.ts` even seeds one example Tele camp (`C-9450`) — an improvement over the prototype, which has zero example Tele camps in its own seed data.
+3. **Genuinely Tele-specific gap — the KPI strip (and type-breakdown chip row) is unconditionally suppressed on the locked-tab view, independent of the wizard gap.** Prototype: `tele-camps.html` still renders the KPI grid + calls `renderKpis()` unconditionally (camps.js:1220), plus `renderTele()` passes `showTypeBreakdown:true` producing a Screening/Diet/Lab count-chip row (camps.js:481-490,507) — so the Tele screen shows the same 7-stage KPI strip as Camp Management, not Tele-filtered (a prototype quirk, not something to "improve" beyond parity), plus the breakdown chips. React: `CampsPage.tsx:106` explicitly does `{!lockTab && (<CampsKpiStrip .../>)}` — **the ENTIRE KPI strip is suppressed whenever `lockTab` is set**, so `/camps/tele` shows no KPI tiles at all, and there's no type-breakdown chip row anywhere in the codebase for any tab. Since Tele is a single-tab screen with no other content to fall back on, this is a proportionally larger information loss here than on the main Camp Management tabs.
+4. **Minor: wizard header/subtitle should branch by route once built.** Prototype's `tele-camps.html:76-77` relabels the wizard modal to "Book new camp" / "Tick 'Teleconsultation camp' · pick Video / IVR" — a copy-only nuance to fold into the eventual wizard implementation, not a separate feature.
+5. **Project filter — identically absent, same fix as Camp Management, not a separate item.**
+6. **No video-link/meeting-URL field anywhere — confirmed absent in BOTH prototype and React**, so this is NOT a gap — the prototype never modeled real meeting-link integration for Tele, only a categorization flag + channel label.
+
+### Summary
+Only ONE genuinely Tele-specific fix is needed beyond the Camp Management backlog: **restore the KPI strip (ideally + type-breakdown chips) on the locked-tab view** — currently unconditionally suppressed by `{!lockTab && ...}` in `CampsPage.tsx:106`. Everything else Tele-related is either already correctly ported, or purely blocked by (and will be fixed by) the shared Camp Management wizard/modal work.
+
+---
+
+## Consolidated priority view across all 4 screens
+
+**Tier 1 — entirely-missing core workflows (biggest user-visible gaps, "Create doesn't work" class):**
+- Camp Management: camp-creation wizard (also fixes the dead "New Camp" button on Teleconsultation Camps for free)
+- Diet Camps: invite-dietitians modal, assign/rate-sheet modal (currently only the prototype's own degraded fallback exists), media-upload modal, dietitian-enrollment form + dietitian-detail drawer
+- Dedicated Ops: project detail/drawer view
+
+**Tier 2 — entirely-missing supporting modals/engines:**
+- Camp Management: bulk-upload, close-out modal (+ report viewer), reminders-config modal, resource-assignment modal (FO assignment is currently a raw `window.prompt()`), cancellation-charge engine (currently a hardcoded 24h boolean, no ₹ calc), Smart Actions drawer overlay, booking-window rules engine
+- Diet Camps: camp-detail view needs most of its sections rebuilt (timeline, particulars, client/project block, reminder grid, close-out report, media gallery, team incl. FO/labtech/manpower/doctor), online-assessments UI (types/service already exist, just unwired), dietitian × device matrix (Devices tab)
+
+**Tier 3 — dead buttons / missing interactions on otherwise-present UI:**
+- Camp Management: project filter, dead "Send WA" buttons
+- Diet Camps: KPI tiles not clickable, dietitian card per-camp-cost formula wrong, Tele Dietitian book-modal has 7 of 8 fields hardcoded, Reminders tab's Declined path unreachable, Media tab items not clickable/not actually rendering real photo/video
+- Dedicated Ops: dead "Nudge" button, wrong Projects-tab KPIs (2 of 4 substituted + all sub-captions dropped), wrong Status column, fill-rate formula edge case, Convert-modal missing eligibility guard
+- Teleconsultation Camps: KPI strip suppressed (unique to this screen, separate fix from Camp Management)
+
+**Tier 4 — cosmetic / already-dead-in-the-prototype-too (do not prioritize):**
+- AI banners, Import/Export buttons on Camp Management and Diet Camps headers (all confirmed dead in the prototype itself, not a regression)
+
+## Recommended rebuild order (by leverage)
+1. **Camp Management's camp-creation wizard** — highest leverage single item, since it also fixes Teleconsultation Camps' dead "New Camp" button for free.
+2. **Camp Management's remaining Tier 1/2 items** (bulk-upload, cancellation engine, close-out modal, reminders modal, resource-assignment modal, Smart Actions overlay, project filter) — same feature folder, natural to batch.
+3. **Teleconsultation Camps' one unique gap** (KPI strip suppression) — small, isolated fix once Camp Management work is settled.
+4. **Diet Camps** — largest remaining scope (3 entire missing modal files + a mostly-stub camp-detail view + a fully-dead Dietitians tab). Likely needs its own dedicated multi-step pass similar to how Ops Manager was done tab-by-tab.
+5. **Dedicated Ops** — smallest remaining scope (1 missing drawer + a handful of dead buttons/formula bugs), can be done last or in parallel once the others are underway.
+
+## Verification methodology (carried over from Ops Manager, apply identically here)
+- Read full prototype source per file (not summaries) before writing each component.
+- Rebuild one screen/modal at a time; after each, run `tsc -b --noEmit`, `npm run build`, then a live Playwright check against `npm run preview -- --port 4173`.
+- **Auth-mock gotcha**: mock the login route at its real absolute URL (`http://localhost:3000/api/v1/auth/login`, from `ENV.Api.BaseUrl` in `frontend/src/config/env.ts`) — NOT a relative glob like `**/auth/login`, which also matches the SPA's own `/auth/login` page route during `page.goto()` and silently serves raw JSON instead of the app shell. Response shape must be flat (`{success:true, data: <AuthUser fields incl. role>}`), NOT nested under `data.user`. If `role` isn't threaded through correctly, login silently falls back to `role:'super_admin'` (`useLogin.ts:14`) — always verify the sidebar user badge shows the intended role before trusting a screenshot.
+- Navigate via `page.locator('a[href="..."]').first().click()`, not `page.goto()`, since the Zustand auth store isn't persisted and a full reload wipes it.

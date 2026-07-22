@@ -5,7 +5,7 @@ import { LEAD_PERMISSIONS, LEAD_TRANSITION_MAP } from './lead.constants';
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
-import { isValidObjectID } from '../../../shared/utils/strings';
+import { isValidObjectID, escapeRegex } from '../../../shared/utils/strings';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { DivisionService } from '../../division/division.service';
 import { RoleService } from '../../access-management/role/role.service';
@@ -100,7 +100,7 @@ const search = async (filters: ISearchLeadQuery, ctx: RequestContext, options?: 
 
     //2: add search filters
     if (filters.title) {
-        where.title = { $regex: filters.title, $options: 'i' };
+        where.title = { $regex: escapeRegex(filters.title), $options: 'i' };
     }
     if (filters.status) {
         where.status = filters.status;

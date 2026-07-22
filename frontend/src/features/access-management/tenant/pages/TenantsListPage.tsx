@@ -1,18 +1,42 @@
 import { useState } from 'react'
-import { FiSearch } from 'react-icons/fi'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
+import { useTenantsFilters } from '@/features/access-management/tenant/hooks/useTenantsFilters'
 import TenantsTable from '@/features/access-management/tenant/components/TenantsTable'
+import TenantsFilterBar from '@/features/access-management/tenant/components/TenantsFilterBar'
 import CreateTenantDialog from '@/features/access-management/tenant/components/CreateTenantDialog'
-import { Input } from '@/components/ui/input'
+import PaginationControls from '@/components/ui/PaginationControls'
+import type { TenantStatus } from '@/types/accessManagement.types'
 
-// Matches `@/features/admin/pages/UsersPage.tsx` exactly: search input feeds
-// the react-query hook, loading/error/empty states rendered inline, no
-// shadcn Table. Adds a "New Tenant" trigger button next to the search bar.
+const PAGE_SIZE = 10
+
+// Matches `@/features/access-management/role-type/pages/RoleTypesListPage.tsx`'s
+// filter+pagination shape exactly: a filters hook + filter bar (Status +
+// Search) feeding real server-side pagination via SearchTenantQuery's own
+// status/page/limit fields (already supported server-side, just never wired
+// up on this page before).
 const TenantsListPage = () => {
-  const [search, setSearch] = useState('')
+  const { filters, setFilter, reset } = useTenantsFilters()
+  const [page, setPage] = useState(1)
 
-  const { data, isLoading, error } = useTenants({ name: search || undefined })
+  const { data, isLoading, error } = useTenants({
+    name: filters.search || undefined,
+    status: filters.status === 'ALL' ? undefined : (filters.status as TenantStatus),
+    page: String(page),
+    limit: String(PAGE_SIZE),
+  })
   const tenants = data?.data?.items ?? []
+  const totalCount = data?.data?.count ?? 0
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
+
+  const handleFilterChange = <K extends keyof typeof filters>(key: K, value: (typeof filters)[K]) => {
+    setFilter(key, value)
+    setPage(1)
+  }
+
+  const handleReset = () => {
+    reset()
+    setPage(1)
+  }
 
   return (
     <div className="max-w-5xl">
@@ -22,26 +46,13 @@ const TenantsListPage = () => {
             Tenants
           </h1>
           <p className="text-[13px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>
-            {data?.data ? `${data.data.count} total` : 'Manage tenants on the platform.'}
+            {!isLoading && !error ? `${totalCount} total` : 'Manage tenants on the platform.'}
           </p>
         </div>
         <CreateTenantDialog />
       </div>
 
-      <div className="relative max-w-sm mb-4">
-        <FiSearch
-          size={15}
-          className="absolute left-3 top-1/2 -translate-y-1/2"
-          style={{ color: 'var(--qms-text-muted)' }}
-        />
-        <Input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by name..."
-          className="pl-9 text-[13px] md:text-[13px]"
-        />
-      </div>
+      <TenantsFilterBar filters={filters} setFilter={handleFilterChange} reset={handleReset} />
 
       {isLoading && (
         <div className="text-[13px] py-10 text-center" style={{ color: 'var(--qms-text-muted)' }}>
@@ -55,7 +66,12 @@ const TenantsListPage = () => {
         </div>
       )}
 
-      {!isLoading && !error && <TenantsTable tenants={tenants} />}
+      {!isLoading && !error && (
+        <>
+          <TenantsTable tenants={tenants} />
+          <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} />
+        </>
+      )}
     </div>
   )
 }

@@ -5,7 +5,7 @@ import { DIVISION_PERMISSIONS, DIVISION_STATUS } from './division.constants';
 import { throwAppError } from '../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../shared/utils/contextBuilder';
-import { isValidObjectID } from '../../shared/utils/strings';
+import { isValidObjectID, escapeRegex } from '../../shared/utils/strings';
 import { IServiceOptions } from '../../shared/types/service.types';
 import { TENANT_PERMISSIONS, TENANT_TYPE } from '../access-management/tenant/tenant.constants';
 import { LEAD_PERMISSIONS } from '../crm/lead/lead.constants';
@@ -73,10 +73,10 @@ const search = async (filters: ISearchDivisionQuery, ctx: RequestContext, option
         where.tenant = filters.tenantId;
     }
     if (filters.name) {
-        where.name = { $regex: filters.name, $options: 'i' };
+        where.name = { $regex: escapeRegex(filters.name), $options: 'i' };
     }
     if (filters.code) {
-        where.code = { $regex: filters.code, $options: 'i' };
+        where.code = { $regex: escapeRegex(filters.code), $options: 'i' };
     }
     if (filters.therapy) {
         where.therapy = filters.therapy;

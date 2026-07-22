@@ -13,7 +13,7 @@ let ENV = {
         // APP_CORS_ORIGINS wins in every environment; the per-env string is only a fallback when it's unset/empty.
         CorsOrigins: (process.env.APP_CORS_ORIGINS ||
             (process.env.APP_ENV === 'development'
-                ? 'http://localhost:5174,http://localhost:3000'
+                ? 'http://localhost:5173,http://localhost:3000'
                 : 'http://localhost:5173')
         )
             .split(',')

@@ -14,6 +14,7 @@ import { LeadRouter } from '../modules/crm/lead/lead.routes';
 import { ProjectRouter } from '../modules/crm/project/project.routes';
 import { QaFeedbackRouter } from '../modules/qa-feedback/qaFeedback.routes';
 import { DoctorRouter } from '../modules/doctor/doctor.routes';
+import { GeoProfileRouter } from '../modules/operations/geoProfile/geoProfile.routes';
 import { buildContext } from '../shared/utils/contextBuilder';
 import ENV from '../shared/config/app.config';
 import logger from '../shared/utils/logger';
@@ -63,6 +64,7 @@ app.use('/api/v1/leads', LeadRouter);
 app.use('/api/v1/projects', ProjectRouter);
 app.use('/api/v1/qa-feedback', QaFeedbackRouter);
 app.use('/api/v1/doctors', DoctorRouter);
+app.use('/api/v1/geo-profiles', GeoProfileRouter);
 
 // Captured once at boot — lets /health-check report how long the current deploy has been up.
 const startedAt = new Date().toISOString();

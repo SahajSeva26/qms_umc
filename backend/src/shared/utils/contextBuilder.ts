@@ -118,7 +118,7 @@ export const buildContext = (req: any, res: any, next: any) => {
                     // No tenant filter for system
                     break;
                 }
-                
+
                 case TENANT_TYPE.CUSTOMER: {
                     // Filter by customer tenant
                     scope.tenant = this.tenant._id || this.tenant.id;

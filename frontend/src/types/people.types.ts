@@ -36,12 +36,6 @@ export interface Person {
   vendor?: string
   relievedOn?: string
 
-  /** Home-location coordinates for the HQ Mapping & Serviceability geo
-   * engine — auto-resolved from `hq` via the city gazetteer when blank
-   * (hq-serviceability.js's activeFos()). */
-  lat?: number
-  lng?: number
-
   // FO-specific operational metrics (om-data.js real-FO enrichment)
   salaryInr?: number
   campsPerDay?: number
@@ -58,21 +52,4 @@ export interface Person {
   panMasked?: string
   aadharMasked?: string
   permanentAddress?: string
-  temporaryAddress?: string
-  altPhone?: string
-  personalEmail?: string
-  address?: string
-  pincode?: string
-  gmapLink?: string
-
-  // FO Management / Workspace fields (fo-manager.js, fo-portal.js)
-  daRule?: string
-  taRule?: string
-  daApplicable?: boolean
-  taApplicable?: boolean
-  deviceAssignApplicable?: boolean
-  reportsTo?: string
-  tone?: 'rose' | 'amber' | 'teal' | 'brand'
-  userId?: string
-  profileInitials?: string
 }

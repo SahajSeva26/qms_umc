@@ -5,33 +5,13 @@ import bcrypt from 'bcrypt';
 import { throwAppError } from '../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { USER_PERMISSIONS, USER_STATUS } from './user.constants';
-import { escapeRegex, isValidEmail } from '../../shared/utils/strings';
+import { isValidEmail } from '../../shared/utils/strings';
 import { IRegisterUserPayload } from '../auth/auth.validators';
 import { RequestContext } from '../../shared/utils/contextBuilder';
 import { IServiceOptions } from '../../shared/types/service.types';
-import { RoleModel } from '../access-management/role/role.model';
-import { TENANT_TYPE } from '../access-management/tenant/tenant.constants';
 
 type UserDocument = HydratedDocument<IUser> | null;
 const populate: any[] = [];
-
-// User has no `tenant` field of its own — a user's tenant membership is
-// indirect, via the Role bound to them (Role.user -> User, Role.tenant ->
-// Tenant). ctx.where() (contextBuilder.ts) can't be reused as-is here the
-// way every other module does, since it builds a direct `{ tenant: ... }`
-// field filter — that would silently match nothing on the User collection.
-// For a CUSTOMER-tenant caller, resolve the set of user IDs that actually
-// have a Role in ctx.tenant and constrain the query to that set; a
-// PLATFORM-tenant caller (e.g. system:manage) sees every user, matching
-// ctx.where()'s own "no filter for platform" behavior.
-const scopeToTenant = async (ctx: RequestContext): Promise<mongoose.QueryFilter<IUser>> => {
-    if (ctx.tenant?.type !== TENANT_TYPE.CUSTOMER) {
-        return {};
-    }
-    const tenantId = ctx.tenant._id || ctx.tenant.id;
-    const roles = await RoleModel.find({ tenant: tenantId }).select('user').lean();
-    return { _id: { $in: roles.map((role: any) => role.user) } };
-};
 // ========================================================================================
 // CORE FUNCTIONS
 // ========================================================================================
@@ -57,18 +37,12 @@ const set = async (model: any, entity: HydratedDocument<IUser>, ctx: RequestCont
 };
 
 const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): Promise<UserDocument> => {
-    // Combined via $and, not a plain object spread — scope's own `_id: {$in:
-    // [...]}` key would otherwise collide with (and be silently overwritten
-    // by) the `_id: id` key added below them, discarding the tenant scoping
-    // entirely while still returning success.
-    const scope = options?.scopeToTenant ? await scopeToTenant(ctx) : {};
-
     let query = null;
 
     if (mongoose.isValidObjectId(id)) {
-        query = UserModel.findOne({ $and: [scope, { _id: id }] });
+        query = UserModel.findOne({ _id: id });
     } else if (isValidEmail(id)) {
-        query = UserModel.findOne({ $and: [scope, { email: id }] });
+        query = UserModel.findOne({ email: id });
     } else {
         return throwAppError('Invalid user identifier', StatusCodes.BAD_REQUEST);
     }
@@ -87,20 +61,17 @@ const search = async (filters: ISearchUserQuery, ctx: RequestContext, options?: 
         createdAt: -1,
     };
 
-    const scope = options?.scopeToTenant ? await scopeToTenant(ctx) : {};
-
     let where: mongoose.QueryFilter<IUser> = {
-        ...scope,
+        // add context default where build here
         status: USER_STATUS.ACTIVE,
     };
 
     if (filters.name) {
-        const namePattern = escapeRegex(filters.name);
-        where.$or = [{ firstName: { $regex: namePattern, $options: 'i' } }, { lastName: { $regex: namePattern, $options: 'i' } }];
+        where.$or = [{ firstName: { $regex: filters.name, $options: 'i' } }, { lastName: { $regex: filters.name, $options: 'i' } }];
     }
 
     if (filters.email) {
-        where.email = { $regex: escapeRegex(filters.email), $options: 'i' };
+        where.email = { $regex: filters.email, $options: 'i' };
     }
 
     if (filters.status) {
@@ -163,7 +134,7 @@ const create = async (model: IRegisterUserPayload, ctx: RequestContext): Promise
 const update = async (id: string, model: IUpdateUserPayload, ctx: RequestContext) => {
     //1: get user first
     let user: UserDocument = null;
-    user = await UserService.get(id, ctx, { scopeToTenant: true });
+    user = await UserService.get(id, ctx);
     if (!user) {
         return throwAppError('User not found', StatusCodes.NOT_FOUND);
     }

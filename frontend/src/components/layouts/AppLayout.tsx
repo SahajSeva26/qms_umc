@@ -5,7 +5,6 @@ import { useSession } from '@/hooks/useSession'
 import { AUTH_ROUTES } from '@/features/auth/auth.routes'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
-import FeedbackWidget from '@/features/qa-feedback/components/FeedbackWidget'
 
 const SB_INTENT_KEY = 'qms.sb.intent'
 const SB_SMALL_MQ = '(max-width: 1280px)'
@@ -95,8 +94,6 @@ const AppLayout = () => {
           <Outlet />
         </main>
       </div>
-
-      <FeedbackWidget />
     </div>
   )
 }

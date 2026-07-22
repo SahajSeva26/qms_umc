@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { FiArrowLeft } from 'react-icons/fi'
-import type { ZodIssue } from 'zod'
 import { useRoleType } from '@/features/access-management/role-type/hooks/useRoleType'
 import { useUpdateRoleType } from '@/features/access-management/role-type/hooks/useUpdateRoleType'
 import { useCreateRoleType } from '@/features/access-management/role-type/hooks/useCreateRoleType'
@@ -15,41 +14,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Accordion, AccordionItem, AccordionTrigger, AccordionPanel } from '@/components/ui/accordion'
-import { PERMISSION_CATALOG, PERMISSION_RESOURCE_LABELS } from '@/features/access-management/permission-group/constants/permissionCatalog'
 import { createRoleTypeSchema, updateRoleTypeSchema } from '@/features/access-management/role-type/schemas/roleType.schemas'
-import { useScrollIntoViewOnChange } from '@/hooks/useScrollIntoViewOnChange'
 import type { RoleTypeCode, RoleTypeStatus } from '@/types/accessManagement.types'
-
-// Maps every catalog permission code back to its PERMISSION_CATALOG resource
-// key (e.g. 'role-type:create' -> 'ROLE_TYPE') so this page's ceiling-scoped
-// `ceilingPermissions` (a flat IPermission[] from the tenant's own
-// PermissionGroup — NOT the full catalog) can be grouped into the same
-// resource sections PermissionGroupDetailPage.tsx uses, without duplicating
-// its full-catalog iteration (which would wrongly show every resource/action
-// regardless of whether the tenant's ceiling actually grants anything in it).
-const CODE_TO_RESOURCE_KEY: Record<string, keyof typeof PERMISSION_CATALOG> = Object.fromEntries(
-  (Object.entries(PERMISSION_CATALOG) as [keyof typeof PERMISSION_CATALOG, Record<string, { code: string }>][]).flatMap(
-    ([resourceKey, actions]) => Object.values(actions).map((permission) => [permission.code, resourceKey]),
-  ),
-)
-
-// Same rationale as RoleDetailPage.tsx's identical helper: Zod 4's built-in
-// type-mismatch message never names the field, and the custom `.min()`/enum
-// messages in roleType.schemas.ts are skipped whenever the value passed in
-// is genuinely `undefined` rather than an empty string.
-const ROLE_TYPE_FIELD_LABELS: Record<string, string> = {
-  code: 'Code',
-  name: 'Name',
-  tenant: 'Tenant',
-}
-
-const formatZodIssue = (issue: ZodIssue): string => {
-  const path = issue.path.join('.')
-  const label = ROLE_TYPE_FIELD_LABELS[path]
-  if (!label || issue.message.toLowerCase().includes(label.toLowerCase())) return issue.message
-  return `${label}: ${issue.message}`
-}
 
 // Combined create-flow + edit page:
 //   - no `:id` param (route is ROLE_TYPE_NEW)  -> create form
@@ -93,10 +59,11 @@ const RoleTypeDetailPage = () => {
   const [tenant, setTenant] = useState(searchParams.get('tenant') ?? '')
   useEffect(() => {
     if (roleType && !isCreateMode) {
-      // roleType.tenant is a raw ObjectId string on GET-by-id but a populated
-      // {_id, name, code} object on GET (search) — see RoleTypePopulatedTenant.
-      const tenantValue = roleType.tenant
-      setTenant(typeof tenantValue === 'string' ? tenantValue : (tenantValue?._id ?? ''))
+      // RoleTypeEntity['tenant'] is a raw ObjectId string per the mapper
+      // (populate only selects name/code on GET, so `tenant` may come back as
+      // an object OR a string depending on the request path — normalize both).
+      const tenantValue = roleType.tenant as unknown
+      setTenant(typeof tenantValue === 'string' ? tenantValue : ((tenantValue as { id?: string })?.id ?? ''))
     }
   }, [roleType, isCreateMode])
 
@@ -104,29 +71,6 @@ const RoleTypeDetailPage = () => {
 
   const { permissionGroup, isLoading: isLoadingCeiling } = useTenantPermissionGroup(tenant || undefined)
   const ceilingPermissions = useMemo(() => permissionGroup?.permissions ?? [], [permissionGroup])
-
-  // Groups the ceiling-scoped permission list by resource, in PERMISSION_CATALOG's
-  // own key order — mirrors PermissionGroupDetailPage.tsx's Accordion grouping,
-  // but over `ceilingPermissions` (the tenant's own granted subset) instead of
-  // the full catalog, and only emits resources that actually have at least one
-  // ceiling permission (an empty accordion section for a resource the tenant's
-  // PermissionGroup grants nothing in would just be dead weight to expand).
-  const groupedCeilingPermissions = useMemo(() => {
-    const byResource = new Map<keyof typeof PERMISSION_CATALOG, typeof ceilingPermissions>()
-    for (const permission of ceilingPermissions) {
-      const resourceKey = CODE_TO_RESOURCE_KEY[permission.code]
-      if (!resourceKey) continue
-      const existing = byResource.get(resourceKey)
-      if (existing) {
-        existing.push(permission)
-      } else {
-        byResource.set(resourceKey, [permission])
-      }
-    }
-    return (Object.keys(PERMISSION_CATALOG) as (keyof typeof PERMISSION_CATALOG)[])
-      .filter((resourceKey) => byResource.has(resourceKey))
-      .map((resourceKey) => ({ resourceKey, permissions: byResource.get(resourceKey)! }))
-  }, [ceilingPermissions])
 
   const updateRoleType = useUpdateRoleType(id ?? '')
   const createRoleType = useCreateRoleType()
@@ -137,7 +81,6 @@ const RoleTypeDetailPage = () => {
   const [status, setStatus] = useState<RoleTypeStatus | ''>('')
   const [selectedCodes, setSelectedCodes] = useState<Set<string>>(new Set())
   const [formError, setFormError] = useState<string | null>(null)
-  const errorRef = useScrollIntoViewOnChange<HTMLDivElement>(formError)
   // Permissions dropped from selectedCodes because the tenant's PermissionGroup
   // ceiling has shrunk since this RoleType was last saved (see the pruning
   // effect below) — surfaced as a visible notice rather than silently
@@ -193,14 +136,14 @@ const RoleTypeDetailPage = () => {
 
     if (isCreateMode) {
       const result = createRoleTypeSchema.safeParse({
-        code,
+        code: code || undefined,
         name,
         description: description || undefined,
         tenant,
         permissions,
       })
       if (!result.success) {
-        setFormError(formatZodIssue(result.error.issues[0]))
+        setFormError(result.error.issues[0].message)
         return
       }
       setFormError(null)
@@ -221,7 +164,7 @@ const RoleTypeDetailPage = () => {
       permissions,
     })
     if (!result.success) {
-      setFormError(formatZodIssue(result.error.issues[0]))
+      setFormError(result.error.issues[0].message)
       return
     }
     setFormError(null)
@@ -274,12 +217,7 @@ const RoleTypeDetailPage = () => {
                   </Label>
                   <Select value={tenant || undefined} onValueChange={(v) => setTenant(v ?? '')}>
                     <SelectTrigger id="tenant" className="w-full">
-                      <SelectValue placeholder="Select tenant">
-                        {(v) => {
-                          const t = tenants.find((t) => t.id === v)
-                          return t ? `${t.name} (${t.code})` : 'Select tenant'
-                        }}
-                      </SelectValue>
+                      <SelectValue placeholder="Select tenant" />
                     </SelectTrigger>
                     <SelectContent>
                       {tenants.map((t) => (
@@ -331,7 +269,7 @@ const RoleTypeDetailPage = () => {
                   </Label>
                   <Select value={code || undefined} onValueChange={(v) => setCode(v as RoleTypeCode)}>
                     <SelectTrigger id="code" className="w-full">
-                      <SelectValue placeholder="Select code">{(v) => (v ? String(v) : 'Select code')}</SelectValue>
+                      <SelectValue placeholder="Select code" />
                     </SelectTrigger>
                     <SelectContent>
                       {ROLE_TYPE_CODE_GROUPS.map((group) => (
@@ -403,9 +341,7 @@ const RoleTypeDetailPage = () => {
                   </Label>
                   <Select value={status || undefined} onValueChange={(v) => setStatus(v as RoleTypeStatus)}>
                     <SelectTrigger id="status" className="w-full">
-                      <SelectValue placeholder="Select status">
-                        {(v) => (v === 'active' ? 'Active' : v === 'inactive' ? 'Inactive' : 'Select status')}
-                      </SelectValue>
+                      <SelectValue placeholder="Select status" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="active">Active</SelectItem>
@@ -462,74 +398,48 @@ const RoleTypeDetailPage = () => {
               </div>
             )}
 
-            {tenant && !isLoadingCeiling && permissionGroup && groupedCeilingPermissions.length > 0 && (
-              <Accordion multiple defaultValue={groupedCeilingPermissions.map((g) => g.resourceKey)}>
-                {groupedCeilingPermissions.map(({ resourceKey, permissions: resourcePermissions }) => {
-                  const resourceSelectedCount = resourcePermissions.filter((p) => selectedCodes.has(p.code)).length
+            {tenant && !isLoadingCeiling && permissionGroup && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {ceilingPermissions.map((permission) => {
+                  const checked = selectedCodes.has(permission.code)
                   return (
-                    <AccordionItem key={resourceKey} value={resourceKey}>
-                      <AccordionTrigger style={{ color: 'var(--qms-text-muted)' }}>
-                        <span className="flex items-center gap-2">
-                          {PERMISSION_RESOURCE_LABELS[resourceKey]}
-                          <span
-                            className="normal-case tracking-normal font-medium text-[10px] px-1.5 py-0.5 rounded-full"
-                            style={{
-                              background: resourceSelectedCount > 0 ? 'color-mix(in oklch, var(--qms-brand), transparent 88%)' : 'var(--qms-surface-hover)',
-                              color: resourceSelectedCount > 0 ? 'var(--qms-brand)' : 'var(--qms-text-muted)',
-                            }}
-                          >
-                            {resourceSelectedCount}/{resourcePermissions.length}
-                          </span>
+                    <label
+                      key={permission.code}
+                      className="flex items-start gap-2.5 rounded-lg border px-3 py-2 cursor-pointer transition-colors hover:bg-(--qms-surface-hover)"
+                      style={{
+                        borderColor: checked ? 'var(--qms-brand)' : 'var(--qms-border)',
+                        background: checked ? 'color-mix(in oklch, var(--qms-brand), transparent 92%)' : 'transparent',
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleCode(permission.code)}
+                        className="mt-0.5 accent-(--qms-brand)"
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-[13px] font-semibold truncate" style={{ color: 'var(--qms-text)' }}>
+                          {permission.name}
                         </span>
-                      </AccordionTrigger>
-                      <AccordionPanel>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {resourcePermissions.map((permission) => {
-                            const checked = selectedCodes.has(permission.code)
-                            return (
-                              <label
-                                key={permission.code}
-                                className="flex items-start gap-2.5 rounded-lg border px-3 py-2 cursor-pointer transition-colors hover:bg-(--qms-surface-hover)"
-                                style={{
-                                  borderColor: checked ? 'var(--qms-brand)' : 'var(--qms-border)',
-                                  background: checked ? 'color-mix(in oklch, var(--qms-brand), transparent 92%)' : 'transparent',
-                                }}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  onChange={() => toggleCode(permission.code)}
-                                  className="mt-0.5 accent-(--qms-brand)"
-                                />
-                                <span className="min-w-0">
-                                  <span className="block text-[13px] font-semibold truncate" style={{ color: 'var(--qms-text)' }}>
-                                    {permission.name}
-                                  </span>
-                                  <span className="block text-[11px] font-mono truncate" style={{ color: 'var(--qms-text-muted)' }}>
-                                    {permission.code}
-                                  </span>
-                                </span>
-                              </label>
-                            )
-                          })}
-                        </div>
-                      </AccordionPanel>
-                    </AccordionItem>
+                        <span className="block text-[11px] font-mono truncate" style={{ color: 'var(--qms-text-muted)' }}>
+                          {permission.code}
+                        </span>
+                      </span>
+                    </label>
                   )
                 })}
-              </Accordion>
-            )}
 
-            {tenant && !isLoadingCeiling && permissionGroup && groupedCeilingPermissions.length === 0 && (
-              <div className="text-[13px] py-6 text-center rounded-lg border" style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }}>
-                This tenant's permission group grants no permissions yet.
+                {ceilingPermissions.length === 0 && (
+                  <div className="text-[13px] py-6 text-center col-span-full" style={{ color: 'var(--qms-text-muted)' }}>
+                    This tenant's permission group grants no permissions yet.
+                  </div>
+                )}
               </div>
             )}
 
             {mutation.isError && (
               <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger mt-4">
-                {(mutation.error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-                  'Failed to save changes.'}
+                Failed to save changes.
               </div>
             )}
             {mutation.isSuccess && !isCreateMode && (
@@ -538,11 +448,7 @@ const RoleTypeDetailPage = () => {
               </div>
             )}
 
-            {formError && (
-              <div ref={errorRef} className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger mt-4">
-                {formError}
-              </div>
-            )}
+            {formError && <div className="text-xs text-danger mt-4">{formError}</div>}
 
             <Button onClick={handleSave} disabled={mutation.isPending} className="mt-4">
               {mutation.isPending ? 'Saving…' : isCreateMode ? 'Create role type' : 'Save changes'}

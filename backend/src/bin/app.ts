@@ -11,7 +11,6 @@ import { RoleTypeRouter } from '../modules/access-management/role-type/roleType.
 import { RoleRouter } from '../modules/access-management/role/role.routes';
 import { DivisionRouter } from '../modules/division/division.routes';
 import { LeadRouter } from '../modules/crm/lead/lead.routes';
-import { QaFeedbackRouter } from '../modules/qa-feedback/qaFeedback.routes';
 import { buildContext } from '../shared/utils/contextBuilder';
 import ENV from '../shared/config/app.config';
 import logger from '../shared/utils/logger';
@@ -56,7 +55,6 @@ app.use('/api/v1/role-types', RoleTypeRouter);
 app.use('/api/v1/roles', RoleRouter);
 app.use('/api/v1/divisions', DivisionRouter);
 app.use('/api/v1/leads', LeadRouter);
-app.use('/api/v1/qa-feedback', QaFeedbackRouter);
 
 app.get('/health-check', (req, res) => {
     return ResponseHandler.appResponse(res, 200, true, 'Server is running', null);

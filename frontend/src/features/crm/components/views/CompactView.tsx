@@ -1,33 +1,33 @@
-import type { LeadEntity, LeadStatus } from '@/types/crm.types'
-import { LEAD_STATUS_LABEL, LEAD_STATUS_COLOR } from '@/types/crm.types'
+import type { Lead } from '@/types/lead.types'
+import { STAGES } from '@/features/crm/crm.mock'
 import { formatINR } from '@/utils/formatters'
 
-const COLUMNS = Object.keys(LEAD_STATUS_LABEL) as LeadStatus[]
-
 interface CompactViewProps {
-  leads: LeadEntity[]
-  onSelectStatus: (status: LeadStatus) => void
+  leads: Lead[]
+  onSelectStage: (stageId: string) => void
 }
 
-const CompactView = ({ leads, onSelectStatus }: CompactViewProps) => (
+const CompactView = ({ leads, onSelectStage }: CompactViewProps) => (
   <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
-    {COLUMNS.map((status) => {
-      const statusLeads = leads.filter((l) => l.status === status)
-      const total = statusLeads.reduce((sum, l) => sum + l.estimatedValue, 0)
+    {STAGES.map((stage) => {
+      const stageLeads = leads.filter((l) => l.stage === stage.id)
+      const total = stageLeads.reduce((sum, l) => sum + l.value, 0)
+      const avgScore = stageLeads.length > 0 ? Math.round(stageLeads.reduce((s, l) => s + l.score, 0) / stageLeads.length) : 0
 
       return (
         <button
-          key={status}
-          onClick={() => onSelectStatus(status)}
+          key={stage.id}
+          onClick={() => onSelectStage(stage.id)}
           className="text-left rounded-2xl border p-4 transition-all hover:-translate-y-0.5"
           style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}
         >
           <div className="flex items-center gap-2 mb-3">
-            <span className="w-2.5 h-2.5 rounded-full" style={{ background: LEAD_STATUS_COLOR[status] }} />
-            <span className="text-[13px] font-bold" style={{ color: 'var(--qms-text)' }}>{LEAD_STATUS_LABEL[status]}</span>
+            <span className="w-2.5 h-2.5 rounded-full" style={{ background: stage.color }} />
+            <span className="text-[13px] font-bold" style={{ color: 'var(--qms-text)' }}>{stage.name}</span>
           </div>
-          <div className="text-2xl font-extrabold mb-1" style={{ color: 'var(--qms-text)' }}>{statusLeads.length}</div>
-          <div className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>{formatINR(total)}</div>
+          <div className="text-2xl font-extrabold mb-1" style={{ color: 'var(--qms-text)' }}>{stageLeads.length}</div>
+          <div className="text-[12px] mb-2" style={{ color: 'var(--qms-text-muted)' }}>{formatINR(total)}</div>
+          <div className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>Avg score {avgScore}</div>
         </button>
       )
     })}

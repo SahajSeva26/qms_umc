@@ -1,91 +1,72 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { crmService } from '@/features/crm/crm.service'
-import { LEAD_STATUS_LABEL } from '@/types/crm.types'
-import type { CreateLeadPayload, LeadStatus, SearchLeadQuery, UpdateLeadPayload } from '@/types/crm.types'
+import type { Lead, LeadStage } from '@/types/lead.types'
+import * as crmService from '@/features/crm/crm.service'
+import { STAGES, LOST_STAGE } from '@/features/crm/crm.mock'
 import { toast } from '@/components/ui/sonner'
 
-// Single source of truth for leads state via one ['leads', query] TanStack
-// Query cache — all mutations invalidate it so every view refetches.
-//
-// Real backend has NO separate markLost/reopen endpoints (unlike the old
-// mock service) — `lost` is just another status reached through the same
-// PATCH /leads/:id/stage moveStage path, and there is no reopen path at all
-// once a lead is `won`/`lost` (both are terminal in LEAD_TRANSITION_MAP).
-//
-// Every consumer (Kanban board, KPI strip, client-side status/text filter,
-// KAM ownership-scoping) needs the full working set in memory at once —
-// none of them paginate. The backend defaults to page=1/limit=10 whenever
-// `limit` is omitted (RequestHandler.getPagination), so callers that don't
-// pass an explicit limit here would silently only ever see the first 10
-// leads company-wide. Default to a high limit unless the caller opts into
-// real server-side pagination by passing its own.
-const DEFAULT_LEADS_LIMIT = '1000'
+const stageName = (stage: LeadStage) => (stage === 'lost' ? LOST_STAGE : STAGES.find((s) => s.id === stage))?.name ?? stage
 
-export const useLeads = (query: SearchLeadQuery = {}) => {
+// Single source of truth for leads state — the prototype had a two-array-drift
+// bug (QMS_CRM.leads vs crm.js's sliced copy) where wizard-created leads
+// didn't reliably show up in the views that just created them. TanStack Query
+// gives us one ['leads'] cache instead, so mutations invalidate everywhere.
+export const useLeads = () => {
   const queryClient = useQueryClient()
-  const effectiveQuery: SearchLeadQuery = { limit: DEFAULT_LEADS_LIMIT, ...query }
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['leads', effectiveQuery],
-    queryFn: () => crmService.searchLeads(effectiveQuery),
+  const { data: leads = [], isLoading, error } = useQuery({
+    queryKey: ['leads'],
+    queryFn: crmService.getLeads,
   })
-
-  const leads = data?.data?.items ?? []
-  const count = data?.data?.count ?? 0
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['leads'] })
 
   const moveStageMutation = useMutation({
-    mutationFn: ({ id, to, reason }: { id: string; to: LeadStatus; reason: string }) =>
-      crmService.moveLeadStage(id, { to, reason }),
-    onSuccess: (_, { to }) => {
+    mutationFn: ({ id, toStage, reason }: { id: string; toStage: LeadStage; reason: string }) =>
+      crmService.moveStage(id, toStage, reason),
+    onSuccess: (_, { toStage }) => {
       invalidate()
-      toast.success(`Moved to ${LEAD_STATUS_LABEL[to]}`)
+      toast.success(`Moved to ${stageName(toStage)}`)
     },
-    onError: (err: any) =>
-      toast.error(err?.response?.data?.message || 'Could not move the lead — try again.'),
+    onError: () => toast.error('Could not move the lead — try again.'),
   })
 
-  const updateLeadMutation = useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: UpdateLeadPayload }) => crmService.updateLead(id, payload),
+  const markLostMutation = useMutation({
+    mutationFn: ({ id, category, reason }: { id: string; category: string; reason: string }) =>
+      crmService.markLost(id, category, reason),
     onSuccess: () => {
       invalidate()
-      toast.success('Lead updated')
+      toast.success('Lead marked as lost')
     },
-    onError: (err: any) => toast.error(err?.response?.data?.message || 'Could not update the lead — try again.'),
+    onError: () => toast.error('Could not mark the lead as lost — try again.'),
+  })
+
+  const reopenMutation = useMutation({
+    mutationFn: (id: string) => crmService.reopen(id),
+    onSuccess: () => {
+      invalidate()
+      toast.success('Lead reopened to Negotiation')
+    },
+    onError: () => toast.error('Could not reopen the lead — try again.'),
   })
 
   const createLeadMutation = useMutation({
-    mutationFn: (payload: CreateLeadPayload) => crmService.createLead(payload),
+    mutationFn: (lead: Lead) => crmService.createLead(lead),
     onSuccess: () => {
       invalidate()
       toast.success('New lead created')
     },
-    onError: (err: any) => toast.error(err?.response?.data?.message || 'Could not create the lead — try again.'),
+    onError: () => toast.error('Could not create the lead — try again.'),
   })
 
-  const moveStage = (id: string, to: LeadStatus, reason: string) => moveStageMutation.mutate({ id, to, reason })
+  const moveStage = (id: string, toStage: LeadStage, reason: string) =>
+    moveStageMutation.mutate({ id, toStage, reason })
 
-  // mutateAsync (not mutate) so callers — e.g. EditLeadModal — can await the
-  // save and only close on real success, same convention as createLead below.
-  const updateLead = (id: string, payload: UpdateLeadPayload) => updateLeadMutation.mutateAsync({ id, payload })
+  const markLost = (id: string, category: string, reason: string) =>
+    markLostMutation.mutate({ id, category, reason })
 
-  // mutateAsync (not mutate) so callers — e.g. NewLeadWizard — can await
-  // creation and only close/reset on real success, matching the mutateAsync
-  // convention used by every other feature's data hook in this app (see
-  // useCampsData/useFo/useDoctors/useDedicatedOps/etc).
-  const createLead = (payload: CreateLeadPayload) => createLeadMutation.mutateAsync(payload)
+  const reopen = (id: string) => reopenMutation.mutate(id)
 
-  return {
-    leads,
-    count,
-    isLoading,
-    error,
-    moveStage,
-    updateLead,
-    createLead,
-    isMovingStage: moveStageMutation.isPending,
-    isUpdating: updateLeadMutation.isPending,
-    isCreating: createLeadMutation.isPending,
-  }
+  const createLead = (lead: Lead) => createLeadMutation.mutate(lead)
+
+  return { leads, isLoading, error, moveStage, markLost, reopen, createLead }
 }

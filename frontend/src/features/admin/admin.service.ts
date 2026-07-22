@@ -3,9 +3,9 @@ import type { ApiResponse, PaginatedResponse } from '@/types/common.types'
 import type { SearchUserQuery, UpdateUserPayload, User } from '@/types/user.types'
 import { withMockFields } from '@/features/admin/admin.mock'
 
-// Backend returns real status (for callers with system:manage) but has no
-// role/avatarTone fields — see admin.mock.ts for why those are patched in here.
-type UserApiShape = Omit<User, '_id' | 'role' | 'avatarTone'> & { id: string }
+// Backend only returns { id, email, firstName, lastName } per user today —
+// see admin.mock.ts for why role/status/avatarTone are patched in here.
+type UserApiShape = Omit<User, '_id' | 'role' | 'status' | 'avatarTone'> & { id: string }
 
 const searchUsers = async (query: SearchUserQuery) => {
   const res = await api.get<PaginatedResponse<UserApiShape>>('/users', { params: query })

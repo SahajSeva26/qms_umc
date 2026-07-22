@@ -1,47 +1,17 @@
 import { useState } from 'react'
+import { FiSearch } from 'react-icons/fi'
 import { usePermissionGroups } from '@/features/access-management/permission-group/hooks/usePermissionGroups'
-import { usePermissionGroupsFilters } from '@/features/access-management/permission-group/hooks/usePermissionGroupsFilters'
-import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import PermissionGroupsTable from '@/features/access-management/permission-group/components/PermissionGroupsTable'
-import PermissionGroupsFilterBar from '@/features/access-management/permission-group/components/PermissionGroupsFilterBar'
-import PaginationControls from '@/components/ui/PaginationControls'
-import type { PermissionGroupStatus } from '@/types/accessManagement.types'
+import { Input } from '@/components/ui/input'
 
-const PAGE_SIZE = 10
+// Mirrors `@/features/admin/pages/UsersPage.tsx` exactly: local search state
+// fed straight into the search query, loading/error/empty states, table below.
 
-// Matches `@/features/access-management/role-type/pages/RoleTypesListPage.tsx`'s
-// filter+pagination shape exactly: a filters hook + filter bar (Status +
-// Tenant + Search) feeding real server-side pagination via
-// SearchPermissionGroupQuery's own status/tenant/page/limit fields (already
-// supported server-side, just never wired up on this page before).
 const PermissionGroupsListPage = () => {
-  const { filters, setFilter, reset } = usePermissionGroupsFilters()
-  const [page, setPage] = useState(1)
+  const [search, setSearch] = useState('')
 
-  const { data, isLoading, error } = usePermissionGroups({
-    name: filters.search || undefined,
-    status: filters.status === 'ALL' ? undefined : (filters.status as PermissionGroupStatus),
-    tenant: filters.tenant === 'ALL' ? undefined : filters.tenant,
-    page: String(page),
-    limit: String(PAGE_SIZE),
-  })
+  const { data, isLoading, error } = usePermissionGroups({ name: search || undefined })
   const groups = data?.data?.items ?? []
-  const totalCount = data?.data?.count ?? 0
-  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
-
-  const { data: tenantsData } = useTenants({})
-  const tenantOptions = (tenantsData?.data?.items ?? []).map((t) => ({ id: t.id, label: t.name }))
-  const tenantLabelById = new Map(tenantOptions.map((t) => [t.id, t.label]))
-
-  const handleFilterChange = <K extends keyof typeof filters>(key: K, value: (typeof filters)[K]) => {
-    setFilter(key, value)
-    setPage(1)
-  }
-
-  const handleReset = () => {
-    reset()
-    setPage(1)
-  }
 
   return (
     <div className="max-w-5xl">
@@ -50,11 +20,24 @@ const PermissionGroupsListPage = () => {
           Permission Groups
         </h1>
         <p className="text-[13px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>
-          {!isLoading && !error ? `${totalCount} total` : 'Manage permission groups and the permissions they grant.'}
+          {data?.data ? `${data.data.count} total` : 'Manage permission groups and the permissions they grant.'}
         </p>
       </div>
 
-      <PermissionGroupsFilterBar filters={filters} setFilter={handleFilterChange} reset={handleReset} tenantOptions={tenantOptions} />
+      <div className="relative max-w-sm mb-4">
+        <FiSearch
+          size={15}
+          className="absolute left-3 top-1/2 -translate-y-1/2"
+          style={{ color: 'var(--qms-text-muted)' }}
+        />
+        <Input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by name..."
+          className="pl-9 text-[13px] md:text-[13px]"
+        />
+      </div>
 
       {isLoading && (
         <div className="text-[13px] py-10 text-center" style={{ color: 'var(--qms-text-muted)' }}>
@@ -68,12 +51,7 @@ const PermissionGroupsListPage = () => {
         </div>
       )}
 
-      {!isLoading && !error && (
-        <>
-          <PermissionGroupsTable groups={groups} tenantLabelById={tenantLabelById} />
-          <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} />
-        </>
-      )}
+      {!isLoading && !error && <PermissionGroupsTable groups={groups} />}
     </div>
   )
 }

@@ -14,9 +14,6 @@ const STATUS_COLORS: Record<CampStatus, string> = {
   SCHEDULED: '#3b6dff',
   CANCELLED: '#f59e0b',
   CANCELLED_CHARGED: '#f43f5e',
-  COMPLETE: '#059669',
-  COMPLETE_WITHOUT_REPORT: '#d97706',
-  INCOMPLETE: '#dc2626',
 }
 
 const TYPE_COLORS = { Screening: '#3b6dff', Diet: '#10b981', Lab: '#8b5cf6' }

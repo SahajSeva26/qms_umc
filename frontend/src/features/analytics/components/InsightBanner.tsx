@@ -1,12 +1,12 @@
 import { FiZap } from 'react-icons/fi'
 import type { Camp } from '@/types/camp.types'
 import type { ClientInvoice } from '@/types/client.types'
-import type { LeadEntity } from '@/types/crm.types'
+import type { Lead } from '@/types/lead.types'
 import { computeInsights } from '@/features/analytics/analytics.utils'
 
 interface InsightBannerProps {
   camps: Camp[]
-  leads: LeadEntity[]
+  leads: Lead[]
   invoices: ClientInvoice[]
 }
 

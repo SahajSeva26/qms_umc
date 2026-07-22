@@ -180,7 +180,6 @@ export const PROJECT_TYPE_COLORS: Record<ClientProject['type'], string> = {
   Screening: '#3b6dff',
   Diet: '#10b981',
   Lab: '#8b5cf6',
-  Mixed: '#f59e0b',
 }
 
 export const CONFIRMATION_TYPE_COLORS: Record<PoConfirmationType, string> = {

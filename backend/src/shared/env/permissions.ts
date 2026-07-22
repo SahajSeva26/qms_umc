@@ -5,6 +5,7 @@ import { ROLE_TYPE_PERMISSIONS } from '../../modules/access-management/role-type
 import { ROLE_PERMISSIONS } from '../../modules/access-management/role/role.constants';
 import { DIVISION_PERMISSIONS } from '../../modules/division/division.constants';
 import { LEAD_PERMISSIONS } from '../../modules/crm/lead/lead.constants';
+import { PROJECT_PERMISSIONS } from '../../modules/crm/project/project.constants';
 
 export const SYSTEM_PERMISSIONS = {
     MANAGE: {
@@ -22,6 +23,7 @@ export const PERMISSIONS = {
     ROLE: ROLE_PERMISSIONS,
     DIVISION: DIVISION_PERMISSIONS,
     LEAD: LEAD_PERMISSIONS,
+    PROJECT: PROJECT_PERMISSIONS,
 };
 
 export const PERMISSIONS_ARRAY = Object.values(PERMISSIONS)

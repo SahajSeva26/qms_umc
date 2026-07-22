@@ -1,29 +1,31 @@
-import type { LeadEntity, KpiTile } from '@/types/crm.types'
+import type { Lead, KpiTile } from '@/types/lead.types'
 import RecordsDrawer from '@/features/crm/components/RecordsDrawer'
 
-function describeKpi(tile: KpiTile, leads: LeadEntity[]): LeadEntity[] {
+function describeKpi(tile: KpiTile, leads: Lead[]): Lead[] {
   switch (tile.id) {
     case 'pipe':
     case 'open':
     case 'aov':
-      return leads.filter((l) => l.status !== 'won' && l.status !== 'lost')
+      return leads.filter((l) => l.stage !== 'won' && l.stage !== 'lost')
     case 'won':
-      return leads.filter((l) => l.status === 'won')
+      return leads.filter((l) => l.stage === 'won')
     case 'wr':
-      return leads.filter((l) => l.status === 'won' || l.status === 'lost')
+      return leads.filter((l) => l.stage === 'won' || l.stage === 'lost')
+    case 'aiscore':
+      return [...leads].sort((a, b) => b.score - a.score)
     default:
       return leads
   }
 }
 
-interface KpiDrillDrawerProps {
+interface KpiSideDrawerProps {
   tile: KpiTile
-  leads: LeadEntity[]
+  leads: Lead[]
   onClose: () => void
 }
 
-const KpiDrillDrawer = ({ tile, leads, onClose }: KpiDrillDrawerProps) => (
+const KpiSideDrawer = ({ tile, leads, onClose }: KpiSideDrawerProps) => (
   <RecordsDrawer title={tile.label} exportSlug={`kpi-${tile.id}`} leads={describeKpi(tile, leads)} onClose={onClose} />
 )
 
-export default KpiDrillDrawer
+export default KpiSideDrawer

@@ -11,7 +11,6 @@ import DoPill from '@/features/dedicatedops/components/DoPill'
 import DoBar from '@/features/dedicatedops/components/DoBar'
 import ConvertProjectModal from '@/features/dedicatedops/components/ConvertProjectModal'
 import AssignFoModal from '@/features/dedicatedops/components/AssignFoModal'
-import ProjectDetailDrawer from '@/features/dedicatedops/components/ProjectDetailDrawer'
 import type { SopConfig, ManpowerRoleKey } from '@/features/dedicatedops/dedicatedops.types'
 import { ROLE_LABELS } from '@/features/dedicatedops/dedicatedops.types'
 
@@ -31,7 +30,6 @@ function todayIso() {
 const DedicatedOpsPage = () => {
   const { projects } = useProjectsDataShared()
   const { people: fos } = usePeopleData('Field Officer')
-  const { people: allPeople } = usePeopleData()
   const { doctors } = useCampsData()
   const {
     projectConfigs, assignments, attendance, screenings,
@@ -42,7 +40,6 @@ const DedicatedOpsPage = () => {
   const [convertOpen, setConvertOpen] = useState(false)
   const [assignProjectId, setAssignProjectId] = useState<string | null>(null)
   const [sopProjectId, setSopProjectId] = useState<string | null>(null)
-  const [openProjectId, setOpenProjectId] = useState<string | null>(null)
 
   const dedicatedProjects = useMemo(
     () => projects.filter((p) => service.isDedicated(p, projectConfigs)),
@@ -142,12 +139,7 @@ const DedicatedOpsPage = () => {
                   const fillPct = required ? Math.round((onProject.length / required) * 100) : 0
                   const screeningsCount = screenings.filter((s) => s.projectId === p.id).length
                   return (
-                    <tr
-                      key={p.id}
-                      onClick={() => setOpenProjectId(p.id)}
-                      className="border-t cursor-pointer"
-                      style={{ borderColor: 'var(--qms-border)' }}
-                    >
+                    <tr key={p.id} className="border-t" style={{ borderColor: 'var(--qms-border)' }}>
                       <td className="px-3 py-2.5">
                         <div className="font-semibold" style={{ color: 'var(--qms-text)' }}>{p.id}</div>
                         <div className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>{p.name}</div>
@@ -160,7 +152,7 @@ const DedicatedOpsPage = () => {
                       <td className="px-3 py-2.5" style={{ color: 'var(--qms-text-soft)' }}>{cfg?.territory.city || '—'}{cfg?.territory.state ? `, ${cfg.territory.state}` : ''}</td>
                       <td className="px-3 py-2.5 text-center tabular-nums" style={{ color: 'var(--qms-text)' }}>{screeningsCount}</td>
                       <td className="px-3 py-2.5"><DoPill tone={fillPct >= 100 ? 'ok' : 'warn'}>{fillPct >= 100 ? 'Fully staffed' : 'Understaffed'}</DoPill></td>
-                      <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+                      <td className="px-3 py-2.5">
                         <div className="flex items-center gap-1.5">
                           <Button size="sm" variant="outline" onClick={() => setAssignProjectId(p.id)}>Assign FO</Button>
                           <Button size="sm" variant="ghost" onClick={() => handleExport(p.id)}><FiDownload size={12} /></Button>
@@ -413,25 +405,6 @@ const DedicatedOpsPage = () => {
           }}
         />
       )}
-
-      <ProjectDetailDrawer
-        open={!!openProjectId}
-        onClose={() => setOpenProjectId(null)}
-        projectId={openProjectId}
-        project={dedicatedProjects.find((p) => p.id === openProjectId)}
-        projectConfig={openProjectId ? projectConfigs[openProjectId] : undefined}
-        assignments={assignments}
-        attendance={attendance}
-        people={allPeople}
-        doctors={doctors}
-        onAssignFo={(projectId) => setAssignProjectId(projectId)}
-        onUnassignFo={unassignFo}
-        onGoToSop={() => {
-          if (openProjectId) setSopProjectId(openProjectId)
-          setOpenProjectId(null)
-          setTab('sop')
-        }}
-      />
     </div>
   )
 }

@@ -13,7 +13,6 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { updateTenantSchema } from '@/features/access-management/tenant/schemas/tenant.schemas'
-import { useScrollIntoViewOnChange } from '@/hooks/useScrollIntoViewOnChange'
 import type { TenantStatus, TenantType } from '@/types/accessManagement.types'
 
 // Matches `@/features/admin/pages/UserDetailPage.tsx` exactly: back link,
@@ -43,7 +42,6 @@ const TenantDetailPage = () => {
   const [status, setStatus] = useState<TenantStatus | ''>('')
   const [type, setType] = useState<TenantType | ''>('')
   const [formError, setFormError] = useState<string | null>(null)
-  const errorRef = useScrollIntoViewOnChange<HTMLDivElement>(formError)
 
   useEffect(() => {
     if (tenant) {
@@ -160,9 +158,7 @@ const TenantDetailPage = () => {
                   </Label>
                   <Select value={status || undefined} onValueChange={(v) => setStatus(v as TenantStatus)}>
                     <SelectTrigger id="status" className="w-full">
-                      <SelectValue placeholder="Select status">
-                        {(v) => (v === 'active' ? 'Active' : v === 'inactive' ? 'Inactive' : 'Select status')}
-                      </SelectValue>
+                      <SelectValue placeholder="Select status" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="active">Active</SelectItem>
@@ -183,9 +179,7 @@ const TenantDetailPage = () => {
                   </Label>
                   <Select value={type || undefined} onValueChange={(v) => setType(v as TenantType)}>
                     <SelectTrigger id="type" className="w-full">
-                      <SelectValue placeholder="Select type">
-                        {(v) => (v === 'platform' ? 'Platform' : v === 'customer' ? 'Customer' : 'Select type')}
-                      </SelectValue>
+                      <SelectValue placeholder="Select type" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="platform">Platform</SelectItem>
@@ -203,19 +197,14 @@ const TenantDetailPage = () => {
 
               {updateTenant.isError && (
                 <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
-                  {(updateTenant.error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-                    'Failed to save changes.'}
+                  Failed to save changes.
                 </div>
               )}
               {updateTenant.isSuccess && (
                 <div className="text-xs rounded-xl px-3 py-2 bg-success-soft text-success">Saved.</div>
               )}
 
-              {formError && (
-                <div ref={errorRef} className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
-                  {formError}
-                </div>
-              )}
+              {formError && <div className="text-xs text-danger">{formError}</div>}
 
               <Button onClick={handleSave} disabled={updateTenant.isPending}>
                 {updateTenant.isPending ? 'Saving…' : 'Save changes'}

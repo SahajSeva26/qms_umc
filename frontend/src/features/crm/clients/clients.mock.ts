@@ -1,5 +1,6 @@
 import type {
   ClientInvoice,
+  ClientMr,
   ClientProject,
 } from '@/types/client.types'
 
@@ -7,11 +8,82 @@ import type {
 // IDs and project numbers line up with camps.mock.ts / dashboard.mock.ts so the
 // modules read as one dataset.
 
-// Re-exported for existing in-feature imports — the canonical CLIENTS/DIVISIONS/MRS
-// data now lives in types/client.types.ts so other features (e.g. projects,
-// doctors) can read it through the shared types layer instead of reaching into
-// this feature's internal mock file.
-export { CLIENTS, DIVISIONS, MRS } from '@/types/client.types'
+// Re-exported for existing in-feature imports — the canonical CLIENTS/DIVISIONS
+// data now lives in types/client.types.ts so other features (e.g. projects)
+// can read it through the shared types layer instead of reaching into this
+// feature's internal mock file.
+export { CLIENTS, DIVISIONS } from '@/types/client.types'
+
+const noService = { screening: { cities: [] }, diet: { cities: [] }, lab: { cities: [] } }
+
+export const MRS: ClientMr[] = [
+  {
+    id: 'mr-sun-cardio-1', clientId: 'cli-sun', divisionId: 'div-sun-cardio', name: 'Suresh Patil', empCode: 'SUN-0412',
+    designation: 'Sr MR', hq: 'Mumbai', region: 'West', manager: 'Anil Joshi', phone: '+91 98220 10011', email: 'suresh.patil@sunpharma.com',
+    serviceability: { screening: { cities: ['Mumbai', 'Thane', 'Pune'] }, diet: { cities: ['Mumbai', 'Thane'] }, lab: { cities: ['Mumbai'] } },
+    campsBooked: 14, doctorsMapped: 46,
+  },
+  {
+    id: 'mr-sun-cardio-2', clientId: 'cli-sun', divisionId: 'div-sun-cardio', name: 'Kiran Deshmukh', empCode: 'SUN-0587',
+    designation: 'MR', hq: 'Pune', region: 'West', manager: 'Anil Joshi', phone: '+91 98220 10022', email: 'kiran.deshmukh@sunpharma.com',
+    serviceability: { screening: { cities: ['Pune'] }, diet: { cities: ['Pune'] }, lab: { cities: [] } },
+    campsBooked: 8, doctorsMapped: 22,
+  },
+  {
+    id: 'mr-sun-diabeto-1', clientId: 'cli-sun', divisionId: 'div-sun-diabeto', name: 'Meena Kulkarni', empCode: 'SUN-0731',
+    designation: 'MR', hq: 'Nashik', region: 'West', manager: 'Prakash Rane', phone: '+91 98220 10033', email: 'meena.kulkarni@sunpharma.com',
+    serviceability: noService, // non-serviceable — no mapped cities yet
+    campsBooked: 0, doctorsMapped: 12,
+  },
+  {
+    id: 'mr-cipla-resp-1', clientId: 'cli-cipla', divisionId: 'div-cipla-resp', name: 'Arjun Reddy', empCode: 'CIP-1104',
+    designation: 'Sr MR', hq: 'Chennai', region: 'South', manager: 'Suresh Menon', phone: '+91 97910 20011', email: 'arjun.reddy@cipla.com',
+    serviceability: { screening: { cities: ['Chennai', 'Coimbatore'] }, diet: { cities: ['Chennai'] }, lab: { cities: ['Chennai'] } },
+    campsBooked: 11, doctorsMapped: 34,
+  },
+  {
+    id: 'mr-cipla-resp-2', clientId: 'cli-cipla', divisionId: 'div-cipla-resp', name: 'Farhan Shaikh', empCode: 'CIP-1382',
+    designation: 'MR', hq: 'Madurai', region: 'South', manager: 'Suresh Menon', phone: '+91 97910 20022', email: 'farhan.shaikh@cipla.com',
+    serviceability: noService, // non-serviceable — no mapped cities yet
+    campsBooked: 2, doctorsMapped: 9,
+  },
+  {
+    id: 'mr-cipla-endo-1', clientId: 'cli-cipla', divisionId: 'div-cipla-endo', name: 'Divya Hegde', empCode: 'CIP-1245',
+    designation: 'Sr MR', hq: 'Bengaluru', region: 'South', manager: 'Ramesh Gowda', phone: '+91 98450 20033', email: 'divya.hegde@cipla.com',
+    serviceability: { screening: { cities: ['Bengaluru', 'Mysuru'] }, diet: { cities: ['Bengaluru', 'Mysuru'] }, lab: { cities: ['Bengaluru'] } },
+    campsBooked: 16, doctorsMapped: 51,
+  },
+  {
+    id: 'mr-drr-onco-1', clientId: 'cli-drr', divisionId: 'div-drr-onco', name: 'Srinivas Rao', empCode: 'DRR-0218',
+    designation: 'Sr MR', hq: 'Hyderabad', region: 'South', manager: 'Venkat Iyer', phone: '+91 99490 30011', email: 'srinivas.rao@drreddys.com',
+    serviceability: { screening: { cities: ['Hyderabad', 'Vijayawada'] }, diet: { cities: [] }, lab: { cities: ['Hyderabad'] } },
+    campsBooked: 9, doctorsMapped: 28,
+  },
+  {
+    id: 'mr-drr-onco-2', clientId: 'cli-drr', divisionId: 'div-drr-onco', name: 'Kavya Nair', empCode: 'DRR-0356',
+    designation: 'MR', hq: 'Visakhapatnam', region: 'South', manager: 'Venkat Iyer', phone: '+91 99490 30022', email: 'kavya.nair@drreddys.com',
+    serviceability: { screening: { cities: ['Visakhapatnam'] }, diet: { cities: [] }, lab: { cities: [] } },
+    campsBooked: 4, doctorsMapped: 15,
+  },
+  {
+    id: 'mr-abt-diab-1', clientId: 'cli-abbott', divisionId: 'div-abt-diab', name: 'Rohit Malhotra', empCode: 'ABT-2041',
+    designation: 'MR', hq: 'Mumbai', region: 'West', manager: 'Sanjay Kapoor', phone: '+91 98200 40011', email: 'rohit.malhotra@abbott.com',
+    serviceability: { screening: { cities: ['Mumbai', 'Thane'] }, diet: { cities: ['Mumbai'] }, lab: { cities: ['Mumbai', 'Navi Mumbai'] } },
+    campsBooked: 12, doctorsMapped: 39,
+  },
+  {
+    id: 'mr-abt-diab-2', clientId: 'cli-abbott', divisionId: 'div-abt-diab', name: 'Neha Sharma', empCode: 'ABT-2288',
+    designation: 'MR', hq: 'Indore', region: 'North', manager: 'Sanjay Kapoor', phone: '+91 98930 40022', email: 'neha.sharma@abbott.com',
+    serviceability: noService, // non-serviceable — no mapped cities yet
+    campsBooked: 1, doctorsMapped: 7,
+  },
+  {
+    id: 'mr-glen-derm-1', clientId: 'cli-glenmark', divisionId: 'div-glen-derm', name: 'Vishal Jain', empCode: 'GLN-0904',
+    designation: 'Sr MR', hq: 'Mumbai', region: 'West', manager: 'Deepak Mehta', phone: '+91 98200 50011', email: 'vishal.jain@glenmark.com',
+    serviceability: { screening: { cities: ['Mumbai'] }, diet: { cities: ['Mumbai'] }, lab: { cities: ['Mumbai', 'Pune'] } },
+    campsBooked: 10, doctorsMapped: 31,
+  },
+]
 
 export const PROJECTS: ClientProject[] = [
   {
@@ -25,12 +97,7 @@ export const PROJECTS: ClientProject[] = [
   {
     id: 'PRJ-438', name: 'Cipla · Endo Plus · South India', clientId: 'cli-cipla', divisionId: 'div-cipla-endo',
     type: 'Diet', poNo: 'PO/CIP/2026/0233', poValueInr: 3210000, poDate: '2026-02-03',
-    campsTarget: 90, campsDone: 62, status: 'LIVE', pos: [], coordinatorId: 'p-tushar', campCost: 4200,
-  },
-  {
-    id: 'PRJ-448', name: 'Abbott · Weight Management · West', clientId: 'cli-abbott', divisionId: 'div-abt-diab',
-    type: 'Diet', poNo: 'PO/ABT/2026/0455', poValueInr: 2100000, poDate: '2026-04-08',
-    campsTarget: 50, campsDone: 9, status: 'LIVE', pos: [], coordinatorId: 'p-tushar', campCost: 3800,
+    campsTarget: 90, campsDone: 62, status: 'LIVE', pos: [],
   },
   {
     id: 'PRJ-440', name: "Dr Reddy's · OncoCare · National", clientId: 'cli-drr', divisionId: 'div-drr-onco',
@@ -50,7 +117,7 @@ export const PROJECTS: ClientProject[] = [
   {
     id: 'PRJ-432', name: 'Cipla · Respiratory Care · Pan India', clientId: 'cli-cipla', divisionId: 'div-cipla-resp',
     type: 'Diet', poNo: 'PO/CIP/2026/0198', poValueInr: 3000000, poDate: '2026-01-28',
-    campsTarget: 36, campsDone: 14, status: 'LIVE', pos: [], coordinatorId: 'p-tushar', campCost: 4000,
+    campsTarget: 36, campsDone: 14, status: 'LIVE', pos: [],
   },
   {
     id: 'PRJ-429', name: 'Lupin · Cardio Excellence · North', clientId: 'cli-lupin', divisionId: null,

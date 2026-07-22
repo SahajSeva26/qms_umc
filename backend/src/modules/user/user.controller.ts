@@ -18,7 +18,7 @@ const get = async (req: any, res: any) => {
         }
 
         //2: get user
-        const user = await UserService.get(id, ctx, { scopeToTenant: true });
+        const user = await UserService.get(id, ctx);
         if (!user) {
             return throwAppError('User not found', StatusCodes.NOT_FOUND);
         }
@@ -52,7 +52,7 @@ const search = async (req: any, res: any) => {
         const pagination = RequestHandler.getPagination(filters);
 
         //3: search users
-        const result = await UserService.search(filters, ctx, { pagination, scopeToTenant: true });
+        const result = await UserService.search(filters, ctx, { pagination });
 
         return ResponseHandler.appResponse(
             res,

@@ -2,16 +2,14 @@ import type { UserStatus } from '@/types/user.types'
 
 const STATUS_CLASSES: Record<UserStatus, string> = {
   active:    'bg-success-soft text-success',
-  inactive:  'bg-warning-soft text-warning',
+  invited:   'bg-warning-soft text-warning',
   suspended: 'bg-danger-soft text-danger',
-  deleted:   'bg-danger-soft text-danger',
 }
 
 const STATUS_LABEL: Record<UserStatus, string> = {
   active: 'Active',
-  inactive: 'Inactive',
+  invited: 'Invited',
   suspended: 'Suspended',
-  deleted: 'Deleted',
 }
 
 interface StatusPillProps {

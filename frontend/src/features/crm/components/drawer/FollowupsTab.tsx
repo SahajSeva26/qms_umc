@@ -1,16 +1,20 @@
-import type { LeadEntity } from '@/types/crm.types'
-import { LEAD_STATUS_LABEL } from '@/types/crm.types'
+import type { Lead } from '@/types/lead.types'
+import { STAGES, LOST_STAGE } from '@/features/crm/crm.mock'
 import { useMeetings } from '@/features/crm/appointments/hooks/useMeetings'
 import { MEETING_STATUS_META, MEETING_TYPE_META } from '@/types/meeting.types'
 import { formatDate } from '@/utils/formatters'
 import { formatTimeRange } from '@/features/crm/appointments/appointments.utils'
 
 interface FollowupsTabProps {
-  lead: LeadEntity
+  lead: Lead
+}
+
+function stageName(id: string): string {
+  return id === 'lost' ? LOST_STAGE.name : STAGES.find((s) => s.id === id)?.name ?? id
 }
 
 const FollowupsTab = ({ lead }: FollowupsTabProps) => {
-  const history = [...lead.stageHistory].reverse()
+  const history = [...(lead.stageHistory ?? [])].reverse()
 
   // Meetings live in the Appointments module — read through its own hook
   // (not its internals) and cross-reference by linkedLeadId, mirroring the
@@ -32,7 +36,8 @@ const FollowupsTab = ({ lead }: FollowupsTabProps) => {
           Next follow-up
         </div>
         <div className="flex items-center justify-between text-[13px]" style={{ color: 'var(--qms-text)' }}>
-          <span>{lead.followUpDate ? formatDate(lead.followUpDate) : 'Not scheduled'}</span>
+          <span>{lead.nextAction}</span>
+          <span className="font-bold">{lead.nextDue}</span>
         </div>
       </div>
 
@@ -102,11 +107,11 @@ const FollowupsTab = ({ lead }: FollowupsTabProps) => {
           {history.map((entry, i) => (
             <div key={i} className="text-[12px] rounded-lg p-2.5" style={{ background: 'var(--qms-surface-strong)' }}>
               <div className="font-semibold mb-0.5" style={{ color: 'var(--qms-text)' }}>
-                {LEAD_STATUS_LABEL[entry.from]} → {LEAD_STATUS_LABEL[entry.to]}
+                {stageName(entry.from)} → {stageName(entry.to)}
               </div>
               <div style={{ color: 'var(--qms-text-muted)' }}>{entry.reason}</div>
               <div className="text-[10px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>
-                {new Date(entry.createdAt).toLocaleString('en-IN')}
+                {new Date(entry.at).toLocaleString('en-IN')}
               </div>
             </div>
           ))}

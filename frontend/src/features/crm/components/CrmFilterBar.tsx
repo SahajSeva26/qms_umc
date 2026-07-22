@@ -2,11 +2,8 @@ import { FiSearch } from 'react-icons/fi'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { LEAD_STATUS_LABEL } from '@/types/crm.types'
-import type { LeadStatus } from '@/types/crm.types'
+import { STAGES, LOST_STAGE, THERAPIES, OWNERS } from '@/features/crm/crm.mock'
 import type { CrmFilterState } from '@/features/crm/hooks/useCrmFilters'
-
-const STATUSES = Object.keys(LEAD_STATUS_LABEL) as LeadStatus[]
 
 interface CrmFilterBarProps {
   filters: CrmFilterState
@@ -21,12 +18,32 @@ const CrmFilterBar = ({ filters, setFilter, reset }: CrmFilterBarProps) => (
     className="flex flex-wrap items-center gap-2 p-2.5 mb-3 rounded-xl border"
     style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}
   >
-    <Select value={filters.status || 'ALL'} onValueChange={(v) => setFilter('status', (v as string) === 'ALL' ? '' : (v as LeadStatus))}>
-      <SelectTrigger className="text-[12px]"><SelectValue placeholder="All statuses" /></SelectTrigger>
+    <Select value={filters.stage || 'ALL'} onValueChange={(v) => setFilter('stage', (v as string) === 'ALL' ? '' : (v as string))}>
+      <SelectTrigger className="text-[12px]"><SelectValue placeholder="All stages" /></SelectTrigger>
       <SelectContent>
-        <SelectItem value="ALL">All statuses</SelectItem>
-        {STATUSES.map((s) => (
-          <SelectItem key={s} value={s}>{LEAD_STATUS_LABEL[s]}</SelectItem>
+        <SelectItem value="ALL">All stages</SelectItem>
+        {[...STAGES, LOST_STAGE].map((s) => (
+          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+
+    <Select value={filters.therapy || 'ALL'} onValueChange={(v) => setFilter('therapy', (v as string) === 'ALL' ? '' : (v as string))}>
+      <SelectTrigger className="text-[12px]"><SelectValue placeholder="All therapies" /></SelectTrigger>
+      <SelectContent>
+        <SelectItem value="ALL">All therapies</SelectItem>
+        {THERAPIES.map((t) => (
+          <SelectItem key={t} value={t}>{t}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+
+    <Select value={filters.owner || 'ALL'} onValueChange={(v) => setFilter('owner', (v as string) === 'ALL' ? '' : (v as string))}>
+      <SelectTrigger className="text-[12px]"><SelectValue placeholder="All owners" /></SelectTrigger>
+      <SelectContent>
+        <SelectItem value="ALL">All owners</SelectItem>
+        {OWNERS.map((o) => (
+          <SelectItem key={o.name} value={o.name}>{o.name}</SelectItem>
         ))}
       </SelectContent>
     </Select>
@@ -37,7 +54,7 @@ const CrmFilterBar = ({ filters, setFilter, reset }: CrmFilterBarProps) => (
         type="text"
         value={filters.q}
         onChange={(e) => setFilter('q', e.target.value)}
-        placeholder="Search title, contact, division..."
+        placeholder="Search account, contact, ID..."
         className="pl-7 text-[12px]"
       />
     </div>

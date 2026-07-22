@@ -1,75 +1,71 @@
 import { useState } from 'react'
-import type { LeadEntity, LeadStatus } from '@/types/crm.types'
-import { LEAD_STATUS_LABEL, LEAD_STATUS_COLOR, LEAD_TRANSITION_MAP } from '@/types/crm.types'
+import type { Lead, LeadStage } from '@/types/lead.types'
+import { STAGES } from '@/features/crm/crm.mock'
 import { formatINR } from '@/utils/formatters'
 import LeadCard from '@/features/crm/components/LeadCard'
 import StageMoveModal from '@/features/crm/components/StageMoveModal'
-
-const COLUMNS = Object.keys(LEAD_STATUS_LABEL) as LeadStatus[]
+import { STAGE_ORDER } from '@/features/crm/crm.mock'
 
 interface KanbanViewProps {
-  leads: LeadEntity[]
+  leads: Lead[]
   onOpen: (id: string) => void
-  onMoveStage: (id: string, to: LeadStatus, reason: string) => void
-  canManage: boolean
+  onMoveStage: (id: string, toStage: LeadStage, reason: string) => void
+  onMarkLost: (id: string) => void
 }
 
-const KanbanView = ({ leads, onOpen, onMoveStage, canManage }: KanbanViewProps) => {
+const KanbanView = ({ leads, onOpen, onMoveStage, onMarkLost }: KanbanViewProps) => {
   const [draggingId, setDraggingId] = useState<string | null>(null)
-  const [dragOverStatus, setDragOverStatus] = useState<LeadStatus | null>(null)
-  const [pendingMove, setPendingMove] = useState<{ lead: LeadEntity; to: LeadStatus } | null>(null)
+  const [dragOverStage, setDragOverStage] = useState<LeadStage | null>(null)
+  const [pendingMove, setPendingMove] = useState<{ lead: Lead; toStage: LeadStage } | null>(null)
 
-  const draggingLead = draggingId ? leads.find((l) => l.id === draggingId) ?? null : null
-  const legalTargets = draggingLead ? LEAD_TRANSITION_MAP[draggingLead.status] : []
-
-  const requestMove = (leadId: string, to: LeadStatus) => {
-    if (!canManage) return
+  const requestMove = (leadId: string, toStage: LeadStage) => {
     const lead = leads.find((l) => l.id === leadId)
-    if (!lead || lead.status === to) return
-    if (!LEAD_TRANSITION_MAP[lead.status].includes(to)) return
-    setPendingMove({ lead, to })
+    if (!lead || lead.stage === toStage) return
+    setPendingMove({ lead, toStage })
+  }
+
+  const handleAdvance = (id: string) => {
+    const lead = leads.find((l) => l.id === id)
+    if (!lead) return
+    const nextIndex = STAGE_ORDER.indexOf(lead.stage) + 1
+    if (nextIndex < STAGE_ORDER.length) requestMove(id, STAGE_ORDER[nextIndex])
   }
 
   return (
     <div className="overflow-x-auto pb-2">
-      <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${COLUMNS.length}, minmax(240px, 1fr))` }}>
-        {COLUMNS.map((status) => {
-          const columnLeads = leads.filter((l) => l.status === status)
-          const total = columnLeads.reduce((sum, l) => sum + l.estimatedValue, 0)
-          const isDragOver = dragOverStatus === status
-          const isLegalTarget = !draggingLead || draggingLead.status === status || legalTargets.includes(status)
+      <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${STAGES.length}, minmax(260px, 1fr))` }}>
+        {STAGES.map((stage) => {
+          const stageLeads = leads.filter((l) => l.stage === stage.id)
+          const total = stageLeads.reduce((sum, l) => sum + l.value, 0)
+          const isDragOver = dragOverStage === stage.id
 
           return (
             <div
-              key={status}
+              key={stage.id}
               onDragOver={(e) => {
-                if (!isLegalTarget) return
                 e.preventDefault()
-                setDragOverStatus(status)
+                setDragOverStage(stage.id)
               }}
-              onDragLeave={() => setDragOverStatus(null)}
+              onDragLeave={() => setDragOverStage(null)}
               onDrop={(e) => {
                 e.preventDefault()
-                setDragOverStatus(null)
-                if (draggingId && isLegalTarget) requestMove(draggingId, status)
+                setDragOverStage(null)
+                if (draggingId) requestMove(draggingId, stage.id)
               }}
               className="rounded-2xl border p-2.5 transition-all"
               style={{
                 background: isDragOver ? 'var(--qms-surface-strong)' : 'var(--qms-surface)',
                 borderColor: isDragOver ? 'var(--qms-brand)' : 'var(--qms-border)',
-                opacity: isLegalTarget ? 1 : 0.45,
-                cursor: draggingLead && !isLegalTarget ? 'not-allowed' : undefined,
               }}
             >
               <div className="flex items-center gap-2 mb-1 px-1">
-                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: LEAD_STATUS_COLOR[status] }} />
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: stage.color }} />
                 <div className="min-w-0 flex-1">
-                  <div className="text-[13px] font-bold truncate" style={{ color: 'var(--qms-text)' }}>
-                    {LEAD_STATUS_LABEL[status]}
-                  </div>
+                  <div className="text-[13px] font-bold truncate" style={{ color: 'var(--qms-text)' }}>{stage.name}</div>
+                  <div className="text-[10px] truncate" style={{ color: 'var(--qms-text-muted)' }}>{stage.desc}</div>
                 </div>
                 <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text-muted)' }}>
-                  {columnLeads.length}
+                  {stageLeads.length}
                 </span>
               </div>
               <div className="text-[11px] font-semibold px-1 mb-2" style={{ color: 'var(--qms-text-muted)' }}>
@@ -77,21 +73,18 @@ const KanbanView = ({ leads, onOpen, onMoveStage, canManage }: KanbanViewProps) 
               </div>
 
               <div className="min-h-[80px]">
-                {columnLeads.map((lead) => (
+                {stageLeads.map((lead) => (
                   <LeadCard
                     key={lead.id}
                     lead={lead}
                     onOpen={onOpen}
-                    onAdvance={canManage ? (id, to) => requestMove(id, to) : undefined}
-                    draggable={canManage}
+                    onAdvance={handleAdvance}
+                    draggable
                     onDragStart={(_, id) => setDraggingId(id)}
-                    onDragEnd={() => {
-                      setDraggingId(null)
-                      setDragOverStatus(null)
-                    }}
+                    onDragEnd={() => setDraggingId(null)}
                   />
                 ))}
-                {columnLeads.length === 0 && (
+                {stageLeads.length === 0 && (
                   <div
                     className="text-center text-[11px] py-6 rounded-xl border border-dashed"
                     style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }}
@@ -107,14 +100,18 @@ const KanbanView = ({ leads, onOpen, onMoveStage, canManage }: KanbanViewProps) 
 
       {pendingMove && (
         <StageMoveModal
-          fromStatus={pendingMove.lead.status}
-          toStatus={pendingMove.to}
+          fromStage={pendingMove.lead.stage}
+          toStage={pendingMove.toStage}
           requireReason
           onConfirm={(reason) => {
-            onMoveStage(pendingMove.lead.id, pendingMove.to, reason)
+            onMoveStage(pendingMove.lead.id, pendingMove.toStage, reason)
             setPendingMove(null)
           }}
           onCancel={() => setPendingMove(null)}
+          onMarkLost={() => {
+            onMarkLost(pendingMove.lead.id)
+            setPendingMove(null)
+          }}
         />
       )}
     </div>

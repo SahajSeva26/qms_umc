@@ -14,7 +14,6 @@ import { DOCTORS_ROUTES }   from '@/features/doctors/doctors.routes'
 import { BILLING_ROUTES }   from '@/features/billing/billing.routes'
 import { ADMIN_ROUTES }     from '@/features/admin/admin.routes'
 import { ACCESS_MANAGEMENT_ROUTES }      from '@/features/access-management/accessManagement.routes'
-import { QA_FEEDBACK_ROUTES } from '@/features/qa-feedback/qa-feedback.routes'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -213,9 +212,6 @@ const ALL_NAV_ITEMS: NavItem[] = [
 
   { id: 'roles',            label: 'Roles',                   icon: 'UserCheck',     path: ACCESS_MANAGEMENT_ROUTES.ROLES,
     rolesAllowed: ['super_admin', 'admin'] },
-
-  { id: 'qafeedback',       label: 'QA Feedback',             icon: 'MessageSquare', path: QA_FEEDBACK_ROUTES.QA_FEEDBACK_REVIEW,
-    rolesAllowed: ['super_admin', 'admin'] },
 ]
 
 const NAV_BY_ID = Object.fromEntries(ALL_NAV_ITEMS.map((n) => [n.id, n]))
@@ -266,7 +262,7 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
   {
     section: 'System',
     subs: [
-      { title: '', items: ['admin', 'users', 'settings', 'tenants', 'permissiongroups', 'roletypes', 'roles', 'qafeedback'].map((id) => NAV_BY_ID[id]) },
+      { title: '', items: ['admin', 'users', 'settings', 'tenants', 'permissiongroups', 'roletypes', 'roles'].map((id) => NAV_BY_ID[id]) },
     ],
   },
 ]

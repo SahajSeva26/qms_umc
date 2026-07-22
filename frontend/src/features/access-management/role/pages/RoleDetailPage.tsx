@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { FiArrowLeft } from 'react-icons/fi'
-import type { ZodIssue } from 'zod'
 import { useRole } from '@/features/access-management/role/hooks/useRole'
 import { useUpdateRole } from '@/features/access-management/role/hooks/useUpdateRole'
 import { useCreateRole } from '@/features/access-management/role/hooks/useCreateRole'
@@ -17,7 +16,6 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { createRoleSchema, updateRoleSchema } from '@/features/access-management/role/schemas/role.schemas'
-import { useScrollIntoViewOnChange } from '@/hooks/useScrollIntoViewOnChange'
 import type { RolePopulatedRoleType, RolePopulatedUser, RoleStatus } from '@/types/accessManagement.types'
 
 // Combined create-flow + edit page for Role — the "ID card" entity binding
@@ -56,31 +54,6 @@ import type { RolePopulatedRoleType, RolePopulatedUser, RoleStatus } from '@/typ
 //    `permissions` array, minus the 3 forbidden codes — never a free-for-all
 //    across the whole PermissionGroup.
 
-// Zod 4's built-in type-mismatch message ("Invalid input: expected string,
-// received undefined") never names the field — only the custom `.min()`
-// messages in role.schemas.ts do, and those are skipped whenever the value
-// passed in is actually `undefined` rather than an empty string (which is
-// exactly what `code || undefined`-style coercion produced for an empty
-// required field). Falling back to the field's own label via its path keeps
-// the message actionable even when a future schema change reintroduces a
-// bare type-mismatch error.
-const ROLE_FIELD_LABELS: Record<string, string> = {
-  code: 'Code',
-  name: 'Name',
-  type: 'Role type',
-  tenant: 'Tenant',
-  'user.firstName': "User's first name",
-  'user.email': 'User email',
-  'user.password': 'Password',
-}
-
-const formatZodIssue = (issue: ZodIssue): string => {
-  const path = issue.path.join('.')
-  const label = ROLE_FIELD_LABELS[path]
-  if (!label || issue.message.toLowerCase().includes(label.toLowerCase())) return issue.message
-  return `${label}: ${issue.message}`
-}
-
 const RoleDetailPage = () => {
   const { id } = useParams<{ id: string }>()
   const isCreateMode = !id
@@ -99,14 +72,8 @@ const RoleDetailPage = () => {
   const [tenant, setTenant] = useState(searchParams.get('tenant') ?? '')
   useEffect(() => {
     if (role && !isCreateMode) {
-      // role.tenant is a raw ObjectId string on create/update responses but a
-      // populated {_id, name, code} object on GET-by-id/search — see
-      // RolePopulatedTenant's comment in accessManagement.types.ts. Reading
-      // `.id` here (rather than `._id`) always fell through to '', which
-      // permanently disabled the Role Type picker below since it requires a
-      // resolved tenant id.
-      const tenantValue = role.tenant
-      setTenant(typeof tenantValue === 'string' ? tenantValue : (tenantValue?._id ?? ''))
+      const tenantValue = role.tenant as unknown
+      setTenant(typeof tenantValue === 'string' ? tenantValue : ((tenantValue as { id?: string })?.id ?? ''))
     }
   }, [role, isCreateMode])
 
@@ -129,7 +96,6 @@ const RoleDetailPage = () => {
   const [roleType, setRoleType] = useState(searchParams.get('roleType') ?? '')
   const [selectedCodes, setSelectedCodes] = useState<Set<string>>(new Set())
   const [formError, setFormError] = useState<string | null>(null)
-  const errorRef = useScrollIntoViewOnChange<HTMLDivElement>(formError)
 
   // Embedded user-registration fields (create) / limited user-edit fields (update).
   const [userFirstName, setUserFirstName] = useState('')
@@ -149,10 +115,8 @@ const RoleDetailPage = () => {
       // comment in accessManagement.types.ts) — no .code projection needed.
       setSelectedCodes(new Set(role.permissions ?? []))
 
-      // role.type has the same populated-vs-string duality as role.tenant
-      // above — see RolePopulatedRoleType's comment.
-      const typeValue = role.type
-      setRoleType(typeof typeValue === 'string' ? typeValue : (typeValue?._id ?? ''))
+      const typeValue = role.type as unknown
+      setRoleType(typeof typeValue === 'string' ? typeValue : ((typeValue as { id?: string })?.id ?? ''))
 
       const userValue = role.user as RolePopulatedUser | string
       if (typeof userValue !== 'string') {
@@ -211,7 +175,7 @@ const RoleDetailPage = () => {
 
     if (isCreateMode) {
       const result = createRoleSchema.safeParse({
-        code,
+        code: code || undefined,
         name,
         description: description || undefined,
         type: roleType,
@@ -227,7 +191,7 @@ const RoleDetailPage = () => {
         },
       })
       if (!result.success) {
-        setFormError(formatZodIssue(result.error.issues[0]))
+        setFormError(result.error.issues[0].message)
         return
       }
       setFormError(null)
@@ -255,7 +219,7 @@ const RoleDetailPage = () => {
       },
     })
     if (!result.success) {
-      setFormError(formatZodIssue(result.error.issues[0]))
+      setFormError(result.error.issues[0].message)
       return
     }
     setFormError(null)
@@ -315,12 +279,7 @@ const RoleDetailPage = () => {
                     }}
                   >
                     <SelectTrigger id="tenant" className="w-full">
-                      <SelectValue placeholder="Select tenant">
-                        {(v) => {
-                          const t = tenants.find((t) => t.id === v)
-                          return t ? `${t.name} (${t.code})` : 'Select tenant'
-                        }}
-                      </SelectValue>
+                      <SelectValue placeholder="Select tenant" />
                     </SelectTrigger>
                     <SelectContent>
                       {tenants.map((t) => (
@@ -422,12 +381,7 @@ const RoleDetailPage = () => {
                 </Label>
                 <Select value={roleType || undefined} onValueChange={(v) => setRoleType(v ?? '')} disabled={!tenant}>
                   <SelectTrigger id="roleType" className="w-full">
-                    <SelectValue placeholder={tenant ? 'Select role type' : 'Select a tenant first'}>
-                      {(v) => {
-                        const rt = roleTypes.find((rt) => rt.id === v)
-                        return rt ? `${rt.name} (${rt.code})` : tenant ? 'Select role type' : 'Select a tenant first'
-                      }}
-                    </SelectValue>
+                    <SelectValue placeholder={tenant ? 'Select role type' : 'Select a tenant first'} />
                   </SelectTrigger>
                   <SelectContent>
                     {roleTypes.map((rt) => (
@@ -453,9 +407,7 @@ const RoleDetailPage = () => {
                   </Label>
                   <Select value={status || undefined} onValueChange={(v) => setStatus(v as RoleStatus)}>
                     <SelectTrigger id="status" className="w-full">
-                      <SelectValue placeholder="Select status">
-                        {(v) => (v === 'active' ? 'Active' : v === 'inactive' ? 'Inactive' : 'Select status')}
-                      </SelectValue>
+                      <SelectValue placeholder="Select status" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="active">Active</SelectItem>
@@ -583,9 +535,7 @@ const RoleDetailPage = () => {
                   </Label>
                   <Select value={userGender || undefined} onValueChange={(v) => setUserGender(v as typeof userGender)}>
                     <SelectTrigger id="userGender" className="w-full">
-                      <SelectValue placeholder="Optional">
-                        {(v) => (v === 'male' ? 'Male' : v === 'female' ? 'Female' : v === 'other' ? 'Other' : 'Optional')}
-                      </SelectValue>
+                      <SelectValue placeholder="Optional" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="male">Male</SelectItem>
@@ -607,12 +557,7 @@ const RoleDetailPage = () => {
                   </Label>
                   <Select value={userStatus || undefined} onValueChange={(v) => setUserStatus(v as typeof userStatus)}>
                     <SelectTrigger id="userStatus" className="w-full">
-                      <SelectValue placeholder="Select user status">
-                        {(v) => {
-                          const labels: Record<string, string> = { active: 'Active', inactive: 'Inactive', suspended: 'Suspended', deleted: 'Deleted' }
-                          return labels[v as string] ?? 'Select user status'
-                        }}
-                      </SelectValue>
+                      <SelectValue placeholder="Select user status" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="active">Active</SelectItem>
@@ -720,8 +665,7 @@ const RoleDetailPage = () => {
 
             {mutation.isError && (
               <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger mt-4">
-                {(mutation.error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-                  'Failed to save changes.'}
+                Failed to save changes.
               </div>
             )}
             {mutation.isSuccess && !isCreateMode && (
@@ -730,11 +674,7 @@ const RoleDetailPage = () => {
               </div>
             )}
 
-            {formError && (
-              <div ref={errorRef} className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger mt-4">
-                {formError}
-              </div>
-            )}
+            {formError && <div className="text-xs text-danger mt-4">{formError}</div>}
 
             <Button onClick={handleSave} disabled={mutation.isPending} className="mt-4">
               {mutation.isPending ? 'Saving…' : isCreateMode ? 'Create role' : 'Save changes'}

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useSalesData } from '@/features/crm/sales/hooks/useSalesData'
+import { useLeads } from '@/features/crm/hooks/useLeads'
 import { useClientsData } from '@/features/crm/clients/hooks/useClientsData'
 import { QUARTER } from '@/types/salesdash.types'
 import { buildSalesHeadKpis, buildKamKpis, DEFAULT_SALES_FILTER, type SalesFilterState } from '@/components/widgets/sales-kpi/sales.kpis'
@@ -36,6 +37,7 @@ const SalesDashboardPage = () => {
     withdrawRequest,
     submitRequest,
   } = useSalesData()
+  const { leads } = useLeads()
   const { clients, projects, invoices } = useClientsData()
 
   const [tab, setTab] = useState<TabId>('TODAY')
@@ -45,17 +47,9 @@ const SalesDashboardPage = () => {
 
   const isApprover = APPROVER_ROLES.includes(user?.role ?? '')
 
-  // Matched by email, not first name: SalesRep (sales.mock.ts) has no
-  // userId linking it to the real User/Auth model — "the people master is a
-  // separate upcoming module" per sales.service.ts's own comment — so this
-  // can't be a real foreign-key join yet. Email is still a materially safer
-  // stand-in than first name: the backend enforces a global unique index on
-  // User.email (see UserService), so two reps can never collide on it the
-  // way two "Priya"s would on a first-name match.
   const meRep = useMemo(() => {
-    if (!user?.email) return null
-    const email = user.email.toLowerCase()
-    return reps.find((r) => r.email.toLowerCase() === email) ?? null
+    if (!user?.firstName) return null
+    return reps.find((r) => r.name.split(' ')[0].toLowerCase() === user.firstName!.toLowerCase()) ?? null
   }, [reps, user])
 
   const pendingApprovals = approvals.filter((a) => a.status === 'PENDING').length
@@ -130,6 +124,7 @@ const SalesDashboardPage = () => {
           meRep={meRep}
           reps={reps}
           meetings={meetings}
+          leads={leads}
           assignments={assignments}
           clients={clients}
           projects={projects}

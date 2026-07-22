@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { Lead } from '@/types/lead.types'
 import type { ClientProject } from '@/types/client.types'
 import type { SalesMeeting } from '@/types/salesdash.types'
 import * as tasksService from '@/features/crm/sales/sales.tasks.service'
@@ -6,16 +7,17 @@ import * as tasksService from '@/features/crm/sales/sales.tasks.service'
 interface UseSalesTasksInput {
   ownerKeys: string[]
   meetings: SalesMeeting[]
+  leads: Lead[]
   projects: ClientProject[]
   projectOwnerKey: (project: ClientProject) => string | undefined
 }
 
-export const useSalesTasks = ({ ownerKeys, meetings, projects, projectOwnerKey }: UseSalesTasksInput) => {
+export const useSalesTasks = ({ ownerKeys, meetings, leads, projects, projectOwnerKey }: UseSalesTasksInput) => {
   const queryClient = useQueryClient()
 
   const { data: tasks = [], isLoading, error } = useQuery({
     queryKey: ['sales-tasks', ownerKeys],
-    queryFn: () => tasksService.getTasksForOwners(ownerKeys, { meetings, projects, projectOwnerKey }),
+    queryFn: () => tasksService.getTasksForOwners(ownerKeys, { meetings, leads, projects, projectOwnerKey }),
   })
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['sales-tasks'] })

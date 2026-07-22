@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { PASSWORD_MIN_LENGTH } from '@/features/access-management/accessManagement.constants'
 
 // Validation schemas for the tenant create/update forms. Follows the exact
 // pattern of `@/features/admin/schemas/user.schemas.ts` — zod objects run
@@ -39,7 +38,7 @@ export const createTenantSchema = z.object({
     firstName: z.string().trim().min(1, "Owner's first name is required"),
     lastName: z.string().trim().optional(),
     email: z.string().trim().min(1, 'Owner email is required').email('Enter a valid email'),
-    password: z.string().min(PASSWORD_MIN_LENGTH, `Password must be at least ${PASSWORD_MIN_LENGTH} characters`),
+    password: z.string().min(8, 'Password must be at least 8 characters'),
     phone: z.string().trim().optional(),
     gender: z.enum(['male', 'female', 'other']).optional(),
   }),

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FiPlus, FiUpload } from 'react-icons/fi'
+import { FiPlus } from 'react-icons/fi'
 import type { CampStage } from '@/types/camp.types'
 import { useCamps } from '@/features/camps/hooks/useCamps'
 import { useCampsFilters } from '@/features/camps/hooks/useCampsFilters'
@@ -11,8 +11,6 @@ import CampsFilterBar from '@/features/camps/components/CampsFilterBar'
 import CampCard from '@/features/camps/components/CampCard'
 import CampTable from '@/features/camps/components/CampTable'
 import CampDrawer from '@/features/camps/components/CampDrawer'
-import CampWizard from '@/features/camps/components/CampWizard'
-import BulkUploadCampsModal from '@/features/camps/components/BulkUploadCampsModal'
 import { useAuth } from '@/hooks/useAuth'
 
 type TabId = CampStage | 'TELE' | 'ALL'
@@ -46,8 +44,6 @@ const CampsPage = ({ lockTab, title, subtitle }: CampsPageProps = {}) => {
   const { filters, setFilter, reset } = useCampsFilters()
   const [activeTab, setActiveTab] = useState<TabId>(lockTab ?? 'LIVE')
   const [openCampId, setOpenCampId] = useState<string | null>(null)
-  const [wizardOpen, setWizardOpen] = useState(false)
-  const [bulkUploadOpen, setBulkUploadOpen] = useState(false)
 
   // lockTab is only used as the initial useState value above, so navigating
   // client-side between routes sharing this component (e.g. /camps ->
@@ -98,33 +94,22 @@ const CampsPage = ({ lockTab, title, subtitle }: CampsPageProps = {}) => {
           </p>
         </div>
         {!isFo && (
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => setBulkUploadOpen(true)}
-              className="flex items-center gap-1.5 text-[13px] font-bold px-3.5 py-2 rounded-xl border"
-              style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text)' }}
-            >
-              <FiUpload size={14} /> Bulk upload
-            </button>
-            <button
-              onClick={() => setWizardOpen(true)}
-              className="flex items-center gap-1.5 text-[13px] font-bold px-3.5 py-2 rounded-xl text-white shrink-0"
-              style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
-            >
-              <FiPlus size={14} /> New Camp
-            </button>
-          </div>
+          <button
+            className="flex items-center gap-1.5 text-[13px] font-bold px-3.5 py-2 rounded-xl text-white shrink-0"
+            style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
+          >
+            <FiPlus size={14} /> New Camp
+          </button>
         )}
       </div>
 
-      {/* Per confirmed audit finding: the prototype's tele-camps.html shows
-          the KPI strip even on the locked Tele view, so it must always
-          render regardless of lockTab. */}
-      <CampsKpiStrip
-        camps={scopedCamps}
-        activeTab={activeTab}
-        onSelectTab={(stage) => setActiveTab(stage)}
-      />
+      {!lockTab && (
+        <CampsKpiStrip
+          camps={scopedCamps}
+          activeTab={activeTab}
+          onSelectTab={(stage) => setActiveTab(stage)}
+        />
+      )}
 
       {lockTab ? (
         <div className="flex flex-wrap gap-1 mb-3 border-b" style={{ borderColor: 'var(--qms-border)' }}>
@@ -187,9 +172,6 @@ const CampsPage = ({ lockTab, title, subtitle }: CampsPageProps = {}) => {
         onAssignFo={handleAssignFo}
         onToggleTele={toggleTele}
       />
-
-      <CampWizard open={wizardOpen} onClose={() => setWizardOpen(false)} />
-      <BulkUploadCampsModal open={bulkUploadOpen} onClose={() => setBulkUploadOpen(false)} />
     </div>
   )
 }

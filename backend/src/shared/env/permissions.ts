@@ -6,6 +6,7 @@ import { ROLE_PERMISSIONS } from '../../modules/access-management/role/role.cons
 import { DIVISION_PERMISSIONS } from '../../modules/division/division.constants';
 import { LEAD_PERMISSIONS } from '../../modules/crm/lead/lead.constants';
 import { PROJECT_PERMISSIONS } from '../../modules/crm/project/project.constants';
+import { QA_FEEDBACK_PERMISSIONS } from '../../modules/qa-feedback/qaFeedback.constants';
 
 export const SYSTEM_PERMISSIONS = {
     MANAGE: {
@@ -24,6 +25,7 @@ export const PERMISSIONS = {
     DIVISION: DIVISION_PERMISSIONS,
     LEAD: LEAD_PERMISSIONS,
     PROJECT: PROJECT_PERMISSIONS,
+    QA_FEEDBACK: QA_FEEDBACK_PERMISSIONS,
 };
 
 export const PERMISSIONS_ARRAY = Object.values(PERMISSIONS)

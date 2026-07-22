@@ -60,8 +60,19 @@ app.use('/api/v1/leads', LeadRouter);
 app.use('/api/v1/projects', ProjectRouter);
 app.use('/api/v1/qa-feedback', QaFeedbackRouter);
 
+// Captured once at boot — lets /health-check report how long the current deploy has been up.
+const startedAt = new Date().toISOString();
+
 app.get('/health-check', (req, res) => {
-    return ResponseHandler.appResponse(res, 200, true, 'Server is running', null);
+    return ResponseHandler.appResponse(res, 200, true, 'Server is running', {
+        environment: ENV.App.Environment,
+        version: ENV.Deployment.Version,
+        commit: ENV.Deployment.Commit,
+        commitMessage: ENV.Deployment.CommitMessage,
+        branch: ENV.Deployment.Branch,
+        startedAt,
+        uptimeSec: Math.floor(process.uptime()),
+    });
 });
 
 export { app };

@@ -36,6 +36,15 @@ let ENV = {
         SystemTenantDescription:
             process.env.APP_SYSTEM_TENANT_DESCRIPTION || 'QMS internal tenant for system operations',
     },
+    // Build / deploy metadata — Railway injects the RAILWAY_GIT_* vars automatically
+    // on every deploy, so /health-check can report exactly which commit is live.
+    // Falls back to a manual GIT_COMMIT_SHA or 'unknown' when run outside Railway.
+    Deployment: {
+        Version: process.env.npm_package_version || 'unknown',
+        Commit: process.env.RAILWAY_GIT_COMMIT_SHA || process.env.GIT_COMMIT_SHA || 'unknown',
+        CommitMessage: process.env.RAILWAY_GIT_COMMIT_MESSAGE || '',
+        Branch: process.env.RAILWAY_GIT_BRANCH || '',
+    },
     DB: {
         URI: process.env.DB_URI || 'mongodb://localhost:27017/qms',
     },

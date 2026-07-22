@@ -1,6 +1,6 @@
 import type { IconType } from 'react-icons'
-import { FiTrendingUp, FiBriefcase, FiCheckCircle, FiTarget, FiDollarSign, FiActivity, FiZap, FiAward, FiArrowUp, FiArrowDown } from 'react-icons/fi'
-import type { KpiTile } from '@/types/lead.types'
+import { FiTrendingUp, FiBriefcase, FiCheckCircle, FiTarget, FiDollarSign, FiActivity } from 'react-icons/fi'
+import type { KpiTile } from '@/types/crm.types'
 import { formatINR, formatPercent } from '@/utils/formatters'
 
 const ICON_MAP: Record<string, IconType> = {
@@ -9,15 +9,11 @@ const ICON_MAP: Record<string, IconType> = {
   CheckCircle: FiCheckCircle,
   Target: FiTarget,
   DollarSign: FiDollarSign,
-  Gauge: FiActivity,
-  Zap: FiZap,
-  Award: FiAward,
 }
 
 function formatValue(tile: KpiTile): string {
   if (tile.fmt === 'inr') return formatINR(Number(tile.value))
   if (tile.fmt === 'pct') return formatPercent(Number(tile.value), 1)
-  if (tile.fmt === 'raw') return tile.id === 'vel' ? `${tile.value} days` : String(tile.value)
   return Number(tile.value).toLocaleString('en-IN')
 }
 
@@ -26,11 +22,13 @@ interface CrmKpiStripProps {
   onDrill: (tile: KpiTile) => void
 }
 
+// No delta/trend badge — there's no previous-period comparison available
+// from the real backend (the old mock strip's +/-% deltas were fabricated
+// numbers with no data source), so tiles show the live value only.
 const CrmKpiStrip = ({ tiles, onDrill }: CrmKpiStripProps) => (
   <div className="grid gap-2.5 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
     {tiles.map((tile) => {
       const Icon = ICON_MAP[tile.icon] ?? FiActivity
-      const isUp = tile.delta >= 0
       return (
         <button
           key={tile.id}
@@ -44,21 +42,9 @@ const CrmKpiStrip = ({ tiles, onDrill }: CrmKpiStripProps) => (
             </span>
             <Icon size={13} style={{ color: 'var(--qms-text-muted)' }} />
           </div>
-          <div className="text-[20px] font-extrabold tracking-tight mb-1" style={{ color: 'var(--qms-text)' }}>
+          <div className="text-[20px] font-extrabold tracking-tight" style={{ color: 'var(--qms-text)' }}>
             {formatValue(tile)}
           </div>
-          {tile.sub ? (
-            <span className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>{tile.sub}</span>
-          ) : (
-            <span
-              className={`inline-flex items-center gap-1 text-[11px] font-bold px-1.5 py-0.5 rounded-full ${
-                isUp ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger'
-              }`}
-            >
-              {isUp ? <FiArrowUp size={9} /> : <FiArrowDown size={9} />}
-              {formatPercent(Math.abs(tile.delta), 1)}
-            </span>
-          )}
         </button>
       )
     })}

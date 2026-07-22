@@ -1,13 +1,12 @@
 import { useState } from 'react'
+import type { LeadStatus } from '@/types/crm.types'
 
 export interface CrmFilterState {
-  stage: string
-  therapy: string
-  owner: string
+  status: LeadStatus | ''
   q: string
 }
 
-const DEFAULT_FILTERS: CrmFilterState = { stage: '', therapy: '', owner: '', q: '' }
+const DEFAULT_FILTERS: CrmFilterState = { status: '', q: '' }
 
 export const useCrmFilters = () => {
   const [filters, setFilters] = useState<CrmFilterState>(DEFAULT_FILTERS)

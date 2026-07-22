@@ -9,9 +9,15 @@ import PermissionGroupStatusPill from '@/features/access-management/permission-g
 
 interface PermissionGroupsTableProps {
   groups: PermissionGroupEntity[]
+  // group.tenant is a raw ObjectId string (never populated server-side —
+  // PermissionGroupEntity's own type comment), so the caller resolves it to
+  // a display name via this map (built from the same tenant list it already
+  // fetches for the page's Tenant filter dropdown) — falls back to the raw
+  // id if a tenant isn't found (e.g. deleted/inaccessible).
+  tenantLabelById?: Map<string, string>
 }
 
-const PermissionGroupsTable = ({ groups }: PermissionGroupsTableProps) => {
+const PermissionGroupsTable = ({ groups, tenantLabelById }: PermissionGroupsTableProps) => {
   const navigate = useNavigate()
 
   return (
@@ -64,7 +70,7 @@ const PermissionGroupsTable = ({ groups }: PermissionGroupsTableProps) => {
                   )}
                 </td>
                 <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                  {group.tenant}
+                  {tenantLabelById?.get(group.tenant) ?? group.tenant}
                 </td>
                 <td className="px-4 py-2.5">
                   <PermissionGroupStatusPill status={group.status} />

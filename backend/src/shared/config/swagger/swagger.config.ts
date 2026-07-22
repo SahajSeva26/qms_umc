@@ -15,6 +15,7 @@ import '../../../modules/crm/project/project.routes';
 import '../../../modules/qa-feedback/qaFeedback.routes';
 import '../../../modules/doctor/doctor.routes';
 import '../../../modules/operations/geoProfile/geoProfile.routes';
+import '../../../modules/operations/camp/camp.routes';
 // =============================================
 // =============================================
 

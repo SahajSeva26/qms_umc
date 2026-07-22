@@ -8,6 +8,7 @@ import { toObjectId, isValidObjectID } from '../../../shared/utils/strings';
 import { TenantService } from '../tenant/tenant.service';
 import { RoleTypeService } from '../role-type/roleType.service';
 import { UserService } from '../../user/user.service';
+import { DivisionService } from '../../division/division.service';
 import { PERMISSIONS_ARRAY, SYSTEM_PERMISSIONS } from '../../../shared/env/permissions';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { PermissionGroupModel } from '../permission-group/permissionGroup.model';
@@ -71,6 +72,17 @@ const set = async (model: any, entity: HydratedDocument<IRoleDocument>, ctx: Req
         entity.type = toObjectId(model.type);
     }
 
+    if (model.division) {
+        // the division must exist AND belong to the role's own tenant (coherence) — a mismatch
+        // returns a vague 404 on purpose, mirroring the role-type guard above. Comparing against
+        // entity.tenant (not ctx) also stops a system user from linking a division from elsewhere.
+        const division: any = await DivisionService.get(model.division, ctx);
+        if (!division || division.tenant.toString() !== entity.tenant.toString()) {
+            throwAppError('Division not found', StatusCodes.NOT_FOUND);
+        }
+        entity.division = toObjectId(model.division);
+    }
+
     if (model.permissions && model.permissions.length > 0) {
         await handlePermissionUpdate(model, ctx);
         entity.permissions = model.permissions;
@@ -132,6 +144,9 @@ const search = async (filters: ISearchRoleQuery, ctx: RequestContext, options?: 
     }
     if (filters.user) {
         where.user = toObjectId(filters.user);
+    }
+    if (filters.division) {
+        where.division = toObjectId(filters.division);
     }
 
     const countPromise = RoleModel.countDocuments(where);

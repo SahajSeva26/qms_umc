@@ -9,6 +9,7 @@ import { PROJECT_PERMISSIONS } from '../../modules/crm/project/project.constants
 import { QA_FEEDBACK_PERMISSIONS } from '../../modules/qa-feedback/qaFeedback.constants';
 import { DOCTOR_PERMISSIONS } from '../../modules/doctor/doctor.constants';
 import { GEO_PROFILE_PERMISSIONS } from '../../modules/operations/geoProfile/geoProfile.constants';
+import { CAMP_PERMISSIONS } from '../../modules/operations/camp/camp.constants';
 
 export const SYSTEM_PERMISSIONS = {
     MANAGE: {
@@ -30,6 +31,7 @@ export const PERMISSIONS = {
     QA_FEEDBACK: QA_FEEDBACK_PERMISSIONS,
     DOCTOR: DOCTOR_PERMISSIONS,
     GEO_PROFILE: GEO_PROFILE_PERMISSIONS,
+    CAMP: CAMP_PERMISSIONS,
 };
 
 export const PERMISSIONS_ARRAY = Object.values(PERMISSIONS)

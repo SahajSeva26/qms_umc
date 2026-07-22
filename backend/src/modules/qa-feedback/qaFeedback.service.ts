@@ -4,7 +4,7 @@ import { ICreateQaFeedbackPayload, ISearchQaFeedbackQuery, IUpdateQaFeedbackPayl
 import { throwAppError } from '../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../shared/utils/contextBuilder';
-import { isValidObjectID, escapeRegex } from '../../shared/utils/strings';
+import { isValidObjectID } from '../../shared/utils/strings';
 import { IServiceOptions } from '../../shared/types/service.types';
 
 type QaFeedbackDocument = HydratedDocument<IQaFeedback> | null;
@@ -40,7 +40,7 @@ const search = async (filters: ISearchQaFeedbackQuery, options?: IServiceOptions
         where.status = filters.status;
     }
     if (filters.pageRoute) {
-        where.pageRoute = { $regex: escapeRegex(filters.pageRoute), $options: 'i' };
+        where.pageRoute = { $regex: filters.pageRoute, $options: 'i' };
     }
     if (filters.reportedBy) {
         where.reportedBy = filters.reportedBy;

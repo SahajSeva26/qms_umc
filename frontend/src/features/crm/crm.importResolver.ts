@@ -6,10 +6,10 @@ import { crmService } from '@/features/crm/crm.service'
 // IDs) back into the real ObjectIds CreateLeadPayload requires. Uses each
 // resource's own search endpoint's server-side `name` filter (confirmed
 // case-insensitive partial/regex match — tenant.service.ts/role.service.ts/
-// division.service.ts all do `{ $regex: escapeRegex(name), $options: 'i' }`)
-// rather than fetching every record and filtering client-side — no backend
-// changes needed, this is exactly what those endpoints were already built
-// to do for the wizard's own pickers.
+// division.service.ts all do `{ $regex: name, $options: 'i' }`) rather than
+// fetching every record and filtering client-side — no backend changes
+// needed, this is exactly what those endpoints were already built to do
+// for the wizard's own pickers.
 //
 // A name match must be EXACT (case-insensitive) and UNIQUE to resolve
 // automatically — a partial/ambiguous match is surfaced as an error rather

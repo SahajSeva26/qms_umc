@@ -5,7 +5,7 @@ import { ROLE_TYPE_PERMISSIONS, ROLE_TYPE_STATUSES } from './roleType.constants'
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
-import { toObjectId, isValidObjectID, escapeRegex } from '../../../shared/utils/strings';
+import { toObjectId, isValidObjectID } from '../../../shared/utils/strings';
 import { TenantService } from '../tenant/tenant.service';
 import { PERMISSIONS_ARRAY, SYSTEM_PERMISSIONS } from '../../../shared/env/permissions';
 import { IServiceOptions } from '../../../shared/types/service.types';
@@ -91,7 +91,7 @@ const search = async (filters: ISearchRoleTypeQuery, ctx: RequestContext, option
     const where: mongoose.QueryFilter<IRoleType> = { ...ctx.where() };
 
     if (filters.name) {
-        where.name = { $regex: escapeRegex(filters.name), $options: 'i' };
+        where.name = { $regex: filters.name, $options: 'i' };
     }
 
     if (filters.code) {

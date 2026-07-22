@@ -5,7 +5,7 @@ import bcrypt from 'bcrypt';
 import { throwAppError } from '../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { USER_PERMISSIONS, USER_STATUS } from './user.constants';
-import { escapeRegex, isValidEmail } from '../../shared/utils/strings';
+import { isValidEmail } from '../../shared/utils/strings';
 import { IRegisterUserPayload } from '../auth/auth.validators';
 import { RequestContext } from '../../shared/utils/contextBuilder';
 import { IServiceOptions } from '../../shared/types/service.types';
@@ -95,12 +95,11 @@ const search = async (filters: ISearchUserQuery, ctx: RequestContext, options?: 
     };
 
     if (filters.name) {
-        const namePattern = escapeRegex(filters.name);
-        where.$or = [{ firstName: { $regex: namePattern, $options: 'i' } }, { lastName: { $regex: namePattern, $options: 'i' } }];
+        where.$or = [{ firstName: { $regex: filters.name, $options: 'i' } }, { lastName: { $regex: filters.name, $options: 'i' } }];
     }
 
     if (filters.email) {
-        where.email = { $regex: escapeRegex(filters.email), $options: 'i' };
+        where.email = { $regex: filters.email, $options: 'i' };
     }
 
     if (filters.status) {

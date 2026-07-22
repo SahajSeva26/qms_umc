@@ -1,6 +1,6 @@
 import type { Camp } from '@/types/camp.types'
 import type { ClientInvoice, ClientProject } from '@/types/client.types'
-import type { Lead } from '@/types/lead.types'
+import type { LeadEntity } from '@/types/crm.types'
 import type { FieldOfficer } from '@/types/analytics.types'
 import { pct } from '@/features/analytics/analytics.utils'
 
@@ -18,12 +18,12 @@ export interface AnalyticsKpiTile {
 export function computeAnalyticsKpis(
   camps: Camp[],
   projects: ClientProject[],
-  leads: Lead[],
+  leads: LeadEntity[],
   invoices: ClientInvoice[],
   fieldOfficers: FieldOfficer[],
   formatINR: (v: number) => string
 ): AnalyticsKpiTile[] {
-  const won = leads.filter((l) => l.stage === 'won')
+  const won = leads.filter((l) => l.status === 'won')
   const liveProjects = projects.filter((p) => p.status === 'LIVE')
   const closed = camps.filter((c) => c.status === 'CLOSED')
   const patients = closed.reduce((sum, c) => sum + (c.patientsDone || 0), 0)

@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import type { User } from '@/types/user.types'
 import UserAvatar from '@/components/ui/UserAvatar'
-import RoleBadge from '@/features/admin/components/RoleBadge'
+import RealRoleBadge from '@/features/admin/components/RealRoleBadge'
 import StatusPill from '@/features/admin/components/StatusPill'
 
 // Literal path (not imported from admin.routes.tsx) — that file imports
@@ -11,6 +11,9 @@ const ADMIN_USER_DETAIL_PATH = '/admin/users/:id'
 
 interface UsersTableProps {
   users: User[]
+  /** Real bound RoleType name per user, keyed by email — see UsersPage.tsx. */
+  roleTypeByEmail: Map<string, string>
+  isLoadingRoles: boolean
 }
 
 function formatJoined(createdAt?: string): string {
@@ -20,7 +23,7 @@ function formatJoined(createdAt?: string): string {
   return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-const UsersTable = ({ users }: UsersTableProps) => {
+const UsersTable = ({ users, roleTypeByEmail, isLoadingRoles }: UsersTableProps) => {
   const navigate = useNavigate()
 
   return (
@@ -68,7 +71,7 @@ const UsersTable = ({ users }: UsersTableProps) => {
                   </div>
                 </td>
                 <td className="px-4 py-2.5">
-                  <RoleBadge role={user.role} />
+                  <RealRoleBadge roleTypeName={roleTypeByEmail.get(user.email) ?? null} isLoading={isLoadingRoles} />
                 </td>
                 <td className="px-4 py-2.5">
                   <StatusPill status={user.status} />

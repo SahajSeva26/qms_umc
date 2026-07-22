@@ -1,39 +1,32 @@
-import type { LeadStage } from '@/types/lead.types'
-import { STAGE_ORDER } from '@/features/crm/crm.mock'
+import type { LeadStatus } from '@/types/crm.types'
 import StageMoveModal from '@/features/crm/components/StageMoveModal'
-import { useLeads } from '@/features/crm/hooks/useLeads'
+import type { useLeads } from '@/features/crm/hooks/useLeads'
 
 interface LeadAdvanceModalProps {
   leadId: string
-  currentStage: LeadStage
+  currentStatus: LeadStatus
+  toStatus: LeadStatus
   onMoveStage: ReturnType<typeof useLeads>['moveStage']
-  onMarkLost: ReturnType<typeof useLeads>['markLost']
   onClose: () => void
 }
 
-// Wraps StageMoveModal for the "Move to {next} →" button path (optional reason,
-// forward-only), as distinct from the Kanban drag-drop path (mandatory reason).
-const LeadAdvanceModal = ({ leadId, currentStage, onMoveStage, onMarkLost, onClose }: LeadAdvanceModalProps) => {
-  const nextIndex = STAGE_ORDER.indexOf(currentStage) + 1
-  const toStage = nextIndex < STAGE_ORDER.length ? STAGE_ORDER[nextIndex] : null
-  if (!toStage) return null
-
-  return (
-    <StageMoveModal
-      fromStage={currentStage}
-      toStage={toStage}
-      requireReason={false}
-      onConfirm={(reason) => {
-        onMoveStage(leadId, toStage, reason || 'Advanced via quick action')
-        onClose()
-      }}
-      onCancel={onClose}
-      onMarkLost={() => {
-        onMarkLost(leadId, 'Other', 'Marked lost from quick action')
-        onClose()
-      }}
-    />
-  )
-}
+// Wraps StageMoveModal for the "Move to {next} →" quick-action path (optional
+// reason), as distinct from the Kanban drag-drop path (mandatory reason).
+// `toStatus` is picked by the caller — when a status has more than one legal
+// next value (e.g. proposal -> pilot/negotiation/lost), the caller renders one
+// quick-action per legal target rather than guessing a single path, so this
+// modal only ever confirms the one the user already chose.
+const LeadAdvanceModal = ({ leadId, currentStatus, toStatus, onMoveStage, onClose }: LeadAdvanceModalProps) => (
+  <StageMoveModal
+    fromStatus={currentStatus}
+    toStatus={toStatus}
+    requireReason={false}
+    onConfirm={(reason) => {
+      onMoveStage(leadId, toStatus, reason || 'Advanced via quick action')
+      onClose()
+    }}
+    onCancel={onClose}
+  />
+)
 
 export default LeadAdvanceModal

@@ -2,6 +2,8 @@ import type { RouteObject } from 'react-router-dom'
 import AdminPage from './pages/AdminPage'
 import UsersPage from './pages/UsersPage'
 import UserDetailPage from './pages/UserDetailPage'
+import HqPage from '@/features/hq/pages/HqPage'
+import RemindersPage from '@/features/reminders/pages/RemindersPage'
 
 export const ADMIN_ROUTES = {
   ADMIN:              '/admin',
@@ -17,8 +19,8 @@ export const ADMIN_ROUTES = {
 
 export const adminRoutes: RouteObject[] = [
   { path: ADMIN_ROUTES.ADMIN,           element: <AdminPage /> },
-  { path: ADMIN_ROUTES.ADMIN_HQ,        element: <AdminPage /> },
-  { path: ADMIN_ROUTES.ADMIN_REMINDERS, element: <AdminPage /> },
+  { path: ADMIN_ROUTES.ADMIN_HQ,        element: <HqPage /> },
+  { path: ADMIN_ROUTES.ADMIN_REMINDERS, element: <RemindersPage /> },
   { path: ADMIN_ROUTES.ADMIN_INVENTORY, element: <AdminPage /> },
   { path: ADMIN_ROUTES.ADMIN_ASSETS,    element: <AdminPage /> },
   { path: ADMIN_ROUTES.ADMIN_KPI,       element: <AdminPage /> },

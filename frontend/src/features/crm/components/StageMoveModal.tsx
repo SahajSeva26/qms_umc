@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import type { LeadStage } from '@/types/lead.types'
-import { STAGES, LOST_STAGE } from '@/features/crm/crm.mock'
+import type { LeadStatus } from '@/types/crm.types'
+import { LEAD_STATUS_LABEL } from '@/types/crm.types'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -8,19 +8,14 @@ import { Textarea } from '@/components/ui/textarea'
 import { stageMoveReasonSchema } from '@/features/crm/schemas/lead.schemas'
 
 interface StageMoveModalProps {
-  fromStage: LeadStage
-  toStage: LeadStage
+  fromStatus: LeadStatus
+  toStatus: LeadStatus
   requireReason: boolean
   onConfirm: (reason: string) => void
   onCancel: () => void
-  onMarkLost?: () => void
 }
 
-function stageName(stage: LeadStage): string {
-  return stage === 'lost' ? LOST_STAGE.name : STAGES.find((s) => s.id === stage)?.name ?? stage
-}
-
-const StageMoveModal = ({ fromStage, toStage, requireReason, onConfirm, onCancel, onMarkLost }: StageMoveModalProps) => {
+const StageMoveModal = ({ fromStatus, toStatus, requireReason, onConfirm, onCancel }: StageMoveModalProps) => {
   const [reason, setReason] = useState('')
   const [error, setError] = useState<string | null>(null)
 
@@ -39,16 +34,18 @@ const StageMoveModal = ({ fromStage, toStage, requireReason, onConfirm, onCancel
     <Dialog open onOpenChange={(o) => { if (!o) onCancel() }}>
       <DialogContent className="sm:max-w-sm" showCloseButton={false}>
         <DialogHeader>
-          <DialogTitle className="text-sm font-bold" style={{ color: 'var(--qms-text)' }}>Move lead</DialogTitle>
+          <DialogTitle className="text-sm font-bold" style={{ color: 'var(--qms-text)' }}>
+            {toStatus === 'lost' ? 'Mark lead as lost' : 'Move lead'}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="flex items-center gap-2 text-[12px]">
           <span className="px-2 py-0.5 rounded-full font-semibold" style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text-muted)' }}>
-            {stageName(fromStage)}
+            {LEAD_STATUS_LABEL[fromStatus]}
           </span>
           <span style={{ color: 'var(--qms-text-muted)' }}>→</span>
           <span className="px-2 py-0.5 rounded-full font-semibold" style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text)' }}>
-            {stageName(toStage)}
+            {LEAD_STATUS_LABEL[toStatus]}
           </span>
         </div>
 
@@ -71,10 +68,9 @@ const StageMoveModal = ({ fromStage, toStage, requireReason, onConfirm, onCancel
 
         <DialogFooter>
           <Button variant="secondary" onClick={onCancel}>Cancel</Button>
-          {onMarkLost && (
-            <Button variant="destructive" onClick={onMarkLost}>Mark as Loss</Button>
-          )}
-          <Button onClick={handleConfirm}>Confirm move</Button>
+          <Button variant={toStatus === 'lost' ? 'destructive' : 'default'} onClick={handleConfirm}>
+            {toStatus === 'lost' ? 'Confirm lost' : 'Confirm move'}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

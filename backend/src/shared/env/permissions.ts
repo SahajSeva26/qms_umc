@@ -7,6 +7,7 @@ import { DIVISION_PERMISSIONS } from '../../modules/division/division.constants'
 import { LEAD_PERMISSIONS } from '../../modules/crm/lead/lead.constants';
 import { PROJECT_PERMISSIONS } from '../../modules/crm/project/project.constants';
 import { QA_FEEDBACK_PERMISSIONS } from '../../modules/qa-feedback/qaFeedback.constants';
+import { DOCTOR_PERMISSIONS } from '../../modules/doctor/doctor.constants';
 
 export const SYSTEM_PERMISSIONS = {
     MANAGE: {
@@ -26,6 +27,7 @@ export const PERMISSIONS = {
     LEAD: LEAD_PERMISSIONS,
     PROJECT: PROJECT_PERMISSIONS,
     QA_FEEDBACK: QA_FEEDBACK_PERMISSIONS,
+    DOCTOR: DOCTOR_PERMISSIONS,
 };
 
 export const PERMISSIONS_ARRAY = Object.values(PERMISSIONS)

@@ -13,6 +13,7 @@ import { DivisionRouter } from '../modules/division/division.routes';
 import { LeadRouter } from '../modules/crm/lead/lead.routes';
 import { ProjectRouter } from '../modules/crm/project/project.routes';
 import { QaFeedbackRouter } from '../modules/qa-feedback/qaFeedback.routes';
+import { DoctorRouter } from '../modules/doctor/doctor.routes';
 import { buildContext } from '../shared/utils/contextBuilder';
 import ENV from '../shared/config/app.config';
 import logger from '../shared/utils/logger';
@@ -33,9 +34,11 @@ app.use(cookieParser());
 app.use(
     cors({
         origin(origin, callback) {
+            logger.info(`allowed origins: ${ENV.App.CorsOrigins}`);
             if (!origin || ENV.App.CorsOrigins.includes(origin)) {
                 return callback(null, true);
             }
+
             logger.error(`Blocked by CORS: ${origin}`);
             return callback(new Error('Not allowed by CORS'));
         },
@@ -59,6 +62,7 @@ app.use('/api/v1/divisions', DivisionRouter);
 app.use('/api/v1/leads', LeadRouter);
 app.use('/api/v1/projects', ProjectRouter);
 app.use('/api/v1/qa-feedback', QaFeedbackRouter);
+app.use('/api/v1/doctors', DoctorRouter);
 
 // Captured once at boot — lets /health-check report how long the current deploy has been up.
 const startedAt = new Date().toISOString();

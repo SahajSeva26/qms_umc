@@ -8,8 +8,17 @@ export const ALLOWED_ROLETYPE_CODES = {
         SYSTEM: 'system',
         HR: 'hr',
         ADMIN: 'admin',
-        SALES: 'sales',
+
+        SALES_REP: 'sales-rep',
         SALES_HEAD: 'sales-head',
+
+        CAMP_COORDINATOR_SCREENING: 'camp-coordinator-screening',
+        CAMP_COORDINATOR_DIET: 'camp-coordinator-diet',
+
+        OPERATION_MANAGER_SCREENING: 'operation-manager-screening',
+        OPERATION_MANAGER_DIET: 'operation-manager-diet',
+
+        FIELD_OFFICER: 'field-officer',
     },
     CUSTOMER: {
         PHARMA_HO: 'pharma-ho',

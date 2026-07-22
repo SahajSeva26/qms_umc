@@ -2,9 +2,11 @@ import { useState } from 'react'
 import type { Camp } from '@/types/camp.types'
 import type { Dietitian, DietStage } from '@/features/diet/diet.types'
 import type { useDietCamps } from '@/features/diet/hooks/useDietCamps'
+import { usePeopleData } from '@/hooks/usePeopleData'
 import DietCampCard from '@/features/diet/components/DietCampCard'
 import DietCampDetail from '@/features/diet/components/DietCampDetail'
-import AssignTeamModal from '@/features/diet/components/AssignTeamModal'
+import InviteDietitiansModal from '@/features/diet/components/InviteDietitiansModal'
+import DietitianRateSheetModal from '@/features/diet/components/DietitianRateSheetModal'
 
 interface CampsTabProps {
   camps: Camp[]
@@ -26,11 +28,12 @@ const STATUS_PILLS: { id: DietStage | 'ALL'; label: string }[] = [
 ]
 
 const CampsTab = ({ camps, dietitians, viewOnly, statusFilter, onSelectStatus, diet }: CampsTabProps) => {
+  const { people: dietitianPeople } = usePeopleData('Dietitian')
   const [openCampId, setOpenCampId] = useState<string | null>(null)
-  const [assignCampId, setAssignCampId] = useState<string | null>(null)
+  const [inviteCampId, setInviteCampId] = useState<string | null>(null)
+  const [rateSheetCampId, setRateSheetCampId] = useState<string | null>(null)
 
   const openCamp = camps.find((c) => c.id === openCampId) ?? null
-  const assignCamp = camps.find((c) => c.id === assignCampId) ?? null
 
   return (
     <div>
@@ -59,8 +62,8 @@ const CampsTab = ({ camps, dietitians, viewOnly, statusFilter, onSelectStatus, d
             dietitians={dietitians}
             viewOnly={viewOnly}
             onOpen={setOpenCampId}
-            onInvite={setAssignCampId}
-            onAssign={setAssignCampId}
+            onInvite={setInviteCampId}
+            onAssign={setRateSheetCampId}
             onOpenAssessments={setOpenCampId}
           />
         ))}
@@ -77,16 +80,28 @@ const CampsTab = ({ camps, dietitians, viewOnly, statusFilter, onSelectStatus, d
         viewOnly={viewOnly}
         diet={diet}
         onClose={() => setOpenCampId(null)}
-        onAssignTeam={() => { setAssignCampId(openCampId); setOpenCampId(null) }}
+        onAssignTeam={() => { setRateSheetCampId(openCampId); setOpenCampId(null) }}
       />
 
-      {assignCamp && (
-        <AssignTeamModal
-          open={!!assignCamp}
-          camp={assignCamp}
-          dietitians={dietitians}
-          onClose={() => setAssignCampId(null)}
-          onConfirm={(dietitianId, foId) => { diet.assignTeam(assignCamp.id, dietitianId, foId); setAssignCampId(null) }}
+      {inviteCampId && (
+        <InviteDietitiansModal
+          open={!!inviteCampId}
+          onClose={() => setInviteCampId(null)}
+          campId={inviteCampId}
+          dietitians={dietitianPeople}
+          onProceedToRateSheet={() => {
+            setRateSheetCampId(inviteCampId)
+            setInviteCampId(null)
+          }}
+        />
+      )}
+
+      {rateSheetCampId && (
+        <DietitianRateSheetModal
+          open={!!rateSheetCampId}
+          onClose={() => setRateSheetCampId(null)}
+          campId={rateSheetCampId}
+          dietitians={dietitianPeople}
         />
       )}
     </div>

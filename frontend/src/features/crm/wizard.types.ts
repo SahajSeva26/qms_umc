@@ -1,68 +1,68 @@
+import type { LeadOffer, LeadProjectType } from '@/types/crm.types'
+
+// Wizard form state shaped to build a real CreateLeadPayload (crm.types.ts)
+// directly — no client-only fields carried through to submit. Picker ids
+// (tenantId/divisionId/contactPersonId/salesPersonId) resolve to
+// CreateLeadPayload's tenant/division/contactPerson/salesPerson respectively;
+// the "*Label" companions exist only for review-step display since the
+// picked entities aren't otherwise held in state.
 export interface WizardFormState {
   // Step 1 — Pharma
-  pharmaCompanyName: string
-  divisionName: string
-  contact: string
-  contactRole: string
-  email: string
-  phone: string
-  focusTherapies: string[]
-  focusDoctors: string[]
-  focusDoctorOther: string
-  brandNames: string[]
+  tenantId: string
+  tenantLabel: string
+  divisionId: string
+  divisionLabel: string
+  contactPersonId: string
+  contactPersonLabel: string
+  focusTherapy: string[]
+  focusTherapyDoctor: string[]
 
   // Step 2 — Opportunity
-  subject: string
+  title: string
   problemStatement: string
-  mrCount: number
-  currentActivities: string[]
-  currentActivityOther: string
-  currentActivityNotes: string
+  numberOfMRS: number
+  currentlyDoing: string[]
 
   // Step 3 — QMS offer
-  projectType: string
-  qmsOffers: string[]
-  qmsOfferDetails: Record<string, { sub: string; reason: string }>
+  projectType: LeadProjectType | ''
+  offers: LeadOffer[]
 
   // Step 4 — Commercial
   estimatedValue: number
-  nextFollowUpDate: string
-  confidencePct: number
-  owner: string
+  followUpDate: string
+  confidence: number
+  salesPersonId: string
+  salesPersonLabel: string
 }
 
 export const DEFAULT_WIZARD_FORM: WizardFormState = {
-  pharmaCompanyName: '',
-  divisionName: '',
-  contact: '',
-  contactRole: '',
-  email: '',
-  phone: '',
-  focusTherapies: [],
-  focusDoctors: [],
-  focusDoctorOther: '',
-  brandNames: [],
-  subject: '',
+  tenantId: '',
+  tenantLabel: '',
+  divisionId: '',
+  divisionLabel: '',
+  contactPersonId: '',
+  contactPersonLabel: '',
+  focusTherapy: [],
+  focusTherapyDoctor: [],
+  title: '',
   problemStatement: '',
-  mrCount: 0,
-  currentActivities: [],
-  currentActivityOther: '',
-  currentActivityNotes: '',
+  numberOfMRS: 0,
+  currentlyDoing: [],
   projectType: '',
-  qmsOffers: [],
-  qmsOfferDetails: {},
+  offers: [],
   estimatedValue: 0,
-  nextFollowUpDate: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10),
-  confidencePct: 50,
-  owner: '',
+  followUpDate: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10),
+  confidence: 50,
+  salesPersonId: '',
+  salesPersonLabel: '',
 }
 
 export function computeWizardScore(form: WizardFormState): number {
-  let score = form.confidencePct
+  let score = form.confidence
   if (form.estimatedValue > 5_000_000) score += 6
   if (form.estimatedValue > 1_000_000) score += 3
   if (form.problemStatement.length > 80) score += 4
-  if (form.focusDoctors.length > 0) score += 2
-  if (form.divisionName) score += 2
+  if (form.focusTherapyDoctor.length > 0) score += 2
+  if (form.divisionId) score += 2
   return Math.max(5, Math.min(99, Math.round(score)))
 }

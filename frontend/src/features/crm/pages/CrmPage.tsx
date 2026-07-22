@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { FiDownload, FiPlus, FiUpload } from 'react-icons/fi'
-import type { KpiTile, StageMeta } from '@/types/lead.types'
-import { STAGES } from '@/features/crm/crm.mock'
+import type { KpiTile, LeadStatus } from '@/types/crm.types'
 import { useAuth } from '@/hooks/useAuth'
+import { usePermission } from '@/hooks/usePermission'
 import { useLeads } from '@/features/crm/hooks/useLeads'
 import { useCrmFilters } from '@/features/crm/hooks/useCrmFilters'
 import { matchesFilters, scopedByOwner } from '@/features/crm/crm.filter'
@@ -17,8 +18,8 @@ import ListView from '@/features/crm/components/views/ListView'
 import CalendarView from '@/features/crm/components/views/CalendarView'
 import LeadDrawer from '@/features/crm/components/LeadDrawer'
 import NewLeadWizard from '@/features/crm/components/NewLeadWizard'
+import ImportLeadsDialog from '@/features/crm/components/ImportLeadsDialog'
 import BottomInsightsRow from '@/features/crm/components/BottomInsightsRow'
-import LeadAdvanceModal from '@/features/crm/components/LeadAdvanceModal'
 import KpiDrillDrawer from '@/features/crm/components/KpiDrillDrawer'
 import StageDrawer from '@/features/crm/components/StageDrawer'
 
@@ -34,24 +35,31 @@ const VIEW_LABELS: { id: ViewMode; label: string }[] = [
 const CrmPage = () => {
   const { user } = useAuth()
   const isKam = user?.role === 'sales_rep'
-  const { leads, isLoading, error, moveStage, markLost, reopen, createLead } = useLeads()
+  const { leads, isLoading, error, moveStage, updateLead } = useLeads()
+  const queryClient = useQueryClient()
+  const { hasAnyPermission } = usePermission()
+  // A lead:search-only caller (the real "Sales" rep business role — see
+  // lead.constants.ts's LEAD_BUSINESS_ROLE_TYPES) can view their own leads
+  // (server-side row-scoped) but the backend's create/update/move-stage
+  // routes still require lead:manage/tenant:manage (lead.routes.ts's GUARD,
+  // deliberately narrower than READ_GUARD — confirmed via the teammate's own
+  // commit history, not an oversight). Hide the controls that would only
+  // 403 for such a caller rather than showing them and letting them fail.
+  const canManageLeads = hasAnyPermission(['lead:manage', 'tenant:manage'])
   const { filters, setFilter, reset } = useCrmFilters()
 
   const [view, setView] = useState<ViewMode>(isKam ? 'compact' : 'list')
   const [openLeadId, setOpenLeadId] = useState<string | null>(null)
-  const [pendingAdvance, setPendingAdvance] = useState<string | null>(null)
   const [wizardOpen, setWizardOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   const [kpiDrill, setKpiDrill] = useState<KpiTile | null>(null)
-  const [stageDrill, setStageDrill] = useState<StageMeta | null>(null)
+  const [statusDrill, setStatusDrill] = useState<LeadStatus | null>(null)
 
-  const scoped = useMemo(() => scopedByOwner(leads, user?.firstName, isKam), [leads, user, isKam])
+  const scoped = useMemo(() => scopedByOwner(leads, user?._id, isKam), [leads, user, isKam])
   const filtered = useMemo(() => scoped.filter((l) => matchesFilters(l, filters)), [scoped, filters])
   const kpis = useMemo(() => computeKpis(scoped, isKam), [scoped, isKam])
 
   const openLead = leads.find((l) => l.id === openLeadId) ?? null
-  const advanceLead = leads.find((l) => l.id === pendingAdvance) ?? null
-
-  const handleAdvanceRequest = (id: string) => setPendingAdvance(id)
 
   return (
     <div className="max-w-7xl">
@@ -77,21 +85,24 @@ const CrmPage = () => {
               </Button>
             ))}
           </div>
-          <Button
-            onClick={() => setWizardOpen(true)}
-            className="text-white shrink-0"
-            style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
-          >
-            <FiPlus size={14} /> New Lead
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled
-            title="Bulk import isn't wired up in the source prototype either — no handler to port."
-          >
-            <FiUpload size={13} /> Import
-          </Button>
+          {canManageLeads && (
+            <Button
+              onClick={() => setWizardOpen(true)}
+              className="text-white shrink-0"
+              style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
+            >
+              <FiPlus size={14} /> New Lead
+            </Button>
+          )}
+          {canManageLeads && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setImportOpen(true)}
+            >
+              <FiUpload size={13} /> Import
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -121,50 +132,32 @@ const CrmPage = () => {
 
           <div className="mb-4">
             {view === 'compact' && (
-              <CompactView
-                leads={filtered}
-                onSelectStage={(stageId) => setStageDrill(STAGES.find((s) => s.id === stageId) ?? null)}
-              />
+              <CompactView leads={filtered} onSelectStatus={setStatusDrill} />
             )}
             {view === 'kanban' && (
-              <KanbanView
-                leads={filtered}
-                onOpen={setOpenLeadId}
-                onMoveStage={moveStage}
-                onMarkLost={(id) => {
-                  setOpenLeadId(id)
-                }}
-              />
+              <KanbanView leads={filtered} onOpen={setOpenLeadId} onMoveStage={moveStage} canManage={canManageLeads} />
             )}
-            {view === 'list' && <ListView leads={filtered} onOpen={setOpenLeadId} onAdvance={handleAdvanceRequest} />}
-            {view === 'calendar' && <CalendarView />}
+            {view === 'list' && <ListView leads={filtered} onOpen={setOpenLeadId} onMoveStage={moveStage} canManage={canManageLeads} />}
+            {view === 'calendar' && <CalendarView leads={filtered} onOpen={setOpenLeadId} />}
           </div>
 
           <BottomInsightsRow leads={scoped} />
         </>
       )}
 
-      <LeadDrawer lead={openLead} onClose={() => setOpenLeadId(null)} onMarkLost={markLost} onReopen={reopen} />
+      <LeadDrawer lead={openLead} onClose={() => setOpenLeadId(null)} onMoveStage={moveStage} onUpdateLead={updateLead} canManage={canManageLeads} />
 
       {wizardOpen && (
         <NewLeadWizard
-          existingLeads={leads}
           onClose={() => setWizardOpen(false)}
-          onCreate={(lead) => {
-            createLead(lead)
-            setWizardOpen(false)
-            setOpenLeadId(lead.id)
-          }}
+          onCreated={() => setWizardOpen(false)}
         />
       )}
 
-      {advanceLead && (
-        <LeadAdvanceModal
-          leadId={advanceLead.id}
-          currentStage={advanceLead.stage}
-          onMoveStage={moveStage}
-          onMarkLost={markLost}
-          onClose={() => setPendingAdvance(null)}
+      {importOpen && (
+        <ImportLeadsDialog
+          onClose={() => setImportOpen(false)}
+          onImported={() => queryClient.invalidateQueries({ queryKey: ['leads'] })}
         />
       )}
 
@@ -173,17 +166,18 @@ const CrmPage = () => {
       )}
 
       <StageDrawer
-        stage={stageDrill}
+        status={statusDrill}
         leads={scoped}
-        onClose={() => setStageDrill(null)}
+        onClose={() => setStatusDrill(null)}
         onOpenLead={(id) => {
-          setStageDrill(null)
+          setStatusDrill(null)
           setOpenLeadId(id)
         }}
         onNewLead={() => {
-          setStageDrill(null)
+          setStatusDrill(null)
           setWizardOpen(true)
         }}
+        canManage={canManageLeads}
       />
     </div>
   )

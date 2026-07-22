@@ -1,8 +1,8 @@
 import { Fragment, useState } from 'react'
 import { FiBriefcase, FiArrowLeft, FiArrowRight, FiSave, FiX } from 'react-icons/fi'
-import type { Lead } from '@/types/lead.types'
+import type { CreateLeadPayload } from '@/types/crm.types'
 import { DEFAULT_WIZARD_FORM, computeWizardScore, type WizardFormState } from '@/features/crm/wizard.types'
-import { OWNERS } from '@/features/crm/crm.mock'
+import { useLeads } from '@/features/crm/hooks/useLeads'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import {
@@ -37,21 +37,13 @@ function validateStep(step: number, form: WizardFormState): string | null {
   return result.error.issues[0]?.message ?? 'Please complete the required fields.'
 }
 
-function genLeadId(existing: Lead[]): string {
-  const maxId = existing.reduce((max, l) => {
-    const num = parseInt(l.id.replace('L-', ''), 10)
-    return Number.isNaN(num) ? max : Math.max(max, num)
-  }, 2400)
-  return `L-${maxId + 1}`
-}
-
 interface NewLeadWizardProps {
-  existingLeads: Lead[]
   onClose: () => void
-  onCreate: (lead: Lead) => void
+  onCreated: () => void
 }
 
-const NewLeadWizard = ({ existingLeads, onClose, onCreate }: NewLeadWizardProps) => {
+const NewLeadWizard = ({ onClose, onCreated }: NewLeadWizardProps) => {
+  const { createLead, isCreating } = useLeads()
   const [step, setStep] = useState(0)
   const [form, setForm] = useState<WizardFormState>(DEFAULT_WIZARD_FORM)
   const [error, setError] = useState<string | null>(null)
@@ -70,73 +62,45 @@ const NewLeadWizard = ({ existingLeads, onClose, onCreate }: NewLeadWizardProps)
     if (step < 3) setStep(step + 1)
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const err = validateStep(3, form)
     if (err) {
       setError(err)
       return
     }
 
-    const owner = OWNERS.find((o) => o.name === form.owner) ?? OWNERS[0]
-    const score = computeWizardScore(form)
-    const id = genLeadId(existingLeads)
-
-    const lead: Lead = {
-      id,
-      account: form.pharmaCompanyName,
-      contact: form.contact,
-      contactRole: form.contactRole,
-      email: form.email,
-      phone: form.phone,
-      division: form.divisionName,
-      therapy: form.focusTherapies[0] ?? '',
-      brand: form.brandNames[0] ?? '',
-      targetDoctors: form.focusDoctors.length * 20,
-      existingActivity: form.currentActivities[0] ?? '',
-      currentVendor: '— None —',
-      problem: form.problemStatement,
-      geography: '—',
-      city: '—',
-      state: '—',
-      competitor: '— None —',
-      value: form.estimatedValue,
-      stage: 'new',
-      score,
-      owner: owner.name,
-      ownerInitials: owner.initials,
-      ownerTone: owner.tone,
-      ownerRole: owner.role,
-      age: 0,
-      nextAction: 'Follow up',
-      nextDue: form.nextFollowUpDate,
-      source: 'Manual entry',
-      created: new Date().toISOString().slice(0, 10),
-      updated: new Date().toISOString().slice(0, 10),
-      tags: [form.focusTherapies[0], form.projectType, form.divisionName].filter(Boolean) as string[],
-      subject: form.subject,
+    const payload: CreateLeadPayload = {
+      tenant: form.tenantId,
+      division: form.divisionId,
+      contactPerson: form.contactPersonId,
+      salesPerson: form.salesPersonId,
+      title: form.title,
       problemStatement: form.problemStatement,
-      pharmaCompanyName: form.pharmaCompanyName,
-      divisionName: form.divisionName,
-      focusTherapies: form.focusTherapies,
-      focusDoctors: form.focusDoctors,
-      focusDoctorOther: form.focusDoctorOther,
-      brandNames: form.brandNames,
-      mrCount: form.mrCount,
-      currentActivities: form.currentActivities,
-      currentActivityOther: form.currentActivityOther,
-      currentActivityNotes: form.currentActivityNotes,
-      projectType: form.projectType,
-      qmsOffers: form.qmsOffers,
-      qmsOfferDetails: form.qmsOfferDetails,
+      numberOfMRS: form.numberOfMRS,
+      projectType: form.projectType || undefined,
+      focusTherapy: form.focusTherapy,
+      focusTherapyDoctor: form.focusTherapyDoctor,
+      currentlyDoing: form.currentlyDoing,
+      offers: form.offers,
       estimatedValue: form.estimatedValue,
-      confidencePct: form.confidencePct,
-      nextFollowUpDate: form.nextFollowUpDate,
+      confidence: form.confidence,
+      followUpDate: form.followUpDate,
     }
 
-    onCreate(lead)
+    // Await so the modal only closes on real success — useLeads' own
+    // onError toast still fires on failure, and the modal stays open with
+    // its filled-in form intact so the user can retry rather than losing
+    // their input to a silently-closed dialog.
+    try {
+      await createLead(payload)
+      onCreated()
+    } catch {
+      // no-op: useLeads' createLeadMutation.onError already toasted
+    }
   }
 
   const currentStep = STEPS[step]
+  const score = computeWizardScore(form)
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
@@ -209,7 +173,7 @@ const NewLeadWizard = ({ existingLeads, onClose, onCreate }: NewLeadWizardProps)
 
         <div className="flex items-center justify-between gap-3 px-5 pb-5 pt-3" style={{ borderTop: '1px solid var(--qms-border)' }}>
           <div className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>
-            L-new · {form.pharmaCompanyName || '(no name)'}
+            New lead · {form.tenantLabel || '(no company)'} · score {score}
           </div>
           <div className="flex flex-col items-end gap-1.5">
             {error && <p className="text-[12px] text-danger">{error}</p>}
@@ -222,8 +186,8 @@ const NewLeadWizard = ({ existingLeads, onClose, onCreate }: NewLeadWizardProps)
                   Next <FiArrowRight size={14} />
                 </Button>
               ) : (
-                <Button onClick={handleSave} className="font-bold text-white" style={{ background: 'linear-gradient(135deg, var(--qms-brand), #3b6dff 60%, var(--qms-teal))' }}>
-                  <FiSave size={14} /> Create lead
+                <Button onClick={handleSave} disabled={isCreating} className="font-bold text-white" style={{ background: 'linear-gradient(135deg, var(--qms-brand), #3b6dff 60%, var(--qms-teal))' }}>
+                  <FiSave size={14} /> {isCreating ? 'Creating…' : 'Create lead'}
                 </Button>
               )}
             </div>

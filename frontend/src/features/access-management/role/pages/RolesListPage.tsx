@@ -1,40 +1,53 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FiPlus, FiSearch } from 'react-icons/fi'
+import { FiPlus } from 'react-icons/fi'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
+import { useRolesFilters } from '@/features/access-management/role/hooks/useRolesFilters'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import RolesTable from '@/features/access-management/role/components/RolesTable'
+import RolesFilterBar from '@/features/access-management/role/components/RolesFilterBar'
+import PaginationControls from '@/components/ui/PaginationControls'
 import { ROLE_ROUTES } from '@/features/access-management/role/role.routes'
-import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import type { RoleStatus } from '@/types/accessManagement.types'
 
-// Mirrors `@/features/access-management/role-type/pages/RoleTypesListPage.tsx` exactly:
-// local search state feeds the search query, loading/error/empty states
-// rendered inline, hand-built table below. Roles are tenant-scoped
-// (SearchRoleQuery.tenant) just like RoleTypes, so this page adds the same
-// tenant picker: an optional `tenantId` prop for a caller that already knows
-// which tenant it wants, otherwise a self-rendered <Select> populated from
-// `useTenants`. The roles query itself is only run once a tenant is selected.
+const PAGE_SIZE = 10
 
-interface RolesListPageProps {
-  /** Optional pre-selected tenant id. When omitted, the page renders its own tenant picker. */
-  tenantId?: string
-}
-
-const RolesListPage = ({ tenantId }: RolesListPageProps) => {
+// Shows every role across every tenant by default (no forced tenant picker
+// before the table renders — GET /roles has no hardcoded status default,
+// and search() applies ctx.where() scoping on its own, so an unfiltered call
+// already returns everything the caller is allowed to see). Status/Tenant/
+// Search narrow the results from there, with real server-side pagination
+// since all three filters are genuinely applied in the backend's
+// where-clause (mirrors RoleTypesListPage.tsx exactly).
+const RolesListPage = () => {
   const navigate = useNavigate()
-  const [search, setSearch] = useState('')
-  const [selectedTenant, setSelectedTenant] = useState(tenantId ?? '')
-
-  const { data: tenantsData } = useTenants({})
-  const tenants = tenantsData?.data?.items ?? []
+  const { filters, setFilter, reset } = useRolesFilters()
+  const [page, setPage] = useState(1)
 
   const { data, isLoading, error } = useRoles({
-    tenant: selectedTenant || undefined,
-    name: search || undefined,
+    name: filters.search || undefined,
+    status: filters.status === 'ALL' ? undefined : (filters.status as RoleStatus),
+    tenant: filters.tenant === 'ALL' ? undefined : filters.tenant,
+    page: String(page),
+    limit: String(PAGE_SIZE),
   })
   const roles = data?.data?.items ?? []
+  const totalCount = data?.data?.count ?? 0
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
+
+  const { data: tenantsData } = useTenants({})
+  const tenantOptions = (tenantsData?.data?.items ?? []).map((t) => ({ id: t.id, label: t.name }))
+
+  const handleFilterChange = <K extends keyof typeof filters>(key: K, value: (typeof filters)[K]) => {
+    setFilter(key, value)
+    setPage(1)
+  }
+
+  const handleReset = () => {
+    reset()
+    setPage(1)
+  }
 
   return (
     <div className="max-w-5xl">
@@ -44,9 +57,7 @@ const RolesListPage = ({ tenantId }: RolesListPageProps) => {
             Roles
           </h1>
           <p className="text-[13px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>
-            {selectedTenant && data?.data
-              ? `${data.data.count} total`
-              : 'Select a tenant to manage its roles.'}
+            {!isLoading && !error ? `${totalCount} total` : 'Manage roles across tenants.'}
           </p>
         </div>
         <Button
@@ -58,55 +69,26 @@ const RolesListPage = ({ tenantId }: RolesListPageProps) => {
         </Button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        <Select value={selectedTenant || undefined} onValueChange={(v) => setSelectedTenant(v ?? '')}>
-          <SelectTrigger className="w-full sm:w-64">
-            <SelectValue placeholder="Select tenant" />
-          </SelectTrigger>
-          <SelectContent>
-            {tenants.map((tenant) => (
-              <SelectItem key={tenant.id} value={tenant.id}>
-                {tenant.name} ({tenant.code})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <RolesFilterBar filters={filters} setFilter={handleFilterChange} reset={handleReset} tenantOptions={tenantOptions} />
 
-        <div className="relative max-w-sm flex-1 min-w-50">
-          <FiSearch
-            size={15}
-            className="absolute left-3 top-1/2 -translate-y-1/2"
-            style={{ color: 'var(--qms-text-muted)' }}
-          />
-          <Input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name..."
-            className="pl-9 text-[13px] md:text-[13px]"
-          />
-        </div>
-      </div>
-
-      {!selectedTenant && (
-        <div className="text-[13px] py-10 text-center rounded-xl border" style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }}>
-          Choose a tenant above to view its roles.
-        </div>
-      )}
-
-      {selectedTenant && isLoading && (
+      {isLoading && (
         <div className="text-[13px] py-10 text-center" style={{ color: 'var(--qms-text-muted)' }}>
           Loading roles…
         </div>
       )}
 
-      {selectedTenant && error && !isLoading && (
+      {error && !isLoading && (
         <div className="text-[13px] rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
           Failed to load roles. Please try again.
         </div>
       )}
 
-      {selectedTenant && !isLoading && !error && <RolesTable roles={roles} />}
+      {!isLoading && !error && (
+        <>
+          <RolesTable roles={roles} />
+          <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} />
+        </>
+      )}
     </div>
   )
 }

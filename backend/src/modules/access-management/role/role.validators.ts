@@ -22,6 +22,8 @@ export const CreateRolePayloadSchema = z.object({
         .openapi({ example: ['document:read'] }),
     type: z.string().min(1).openapi({ example: '64f1a2b3c4d5e6f7a8b9c0d1' }),
     tenant: z.string().min(1).openapi({ example: '64f1a2b3c4d5e6f7a8b9c0d3' }),
+    // optional — only customer field-force roles (MR/HO/ASM/RSM) carry a division
+    division: z.string().min(1).optional().openapi({ example: '64f1a2b3c4d5e6f7a8b9c0d4' }),
     user: RegisterUserPayloadSchema,
 });
 
@@ -47,6 +49,7 @@ export const UpdateRolePayloadSchema = z.object({
         .min(1)
         .optional()
         .openapi({ example: '64f1a2b3c4d5e6f7a8b9c0d1' }),
+    division: z.string().min(1).optional().openapi({ example: '64f1a2b3c4d5e6f7a8b9c0d4' }),
     user: UpdateUserPayloadSchema.optional(),
 });
 
@@ -76,6 +79,10 @@ export const SearchRoleQuerySchema = z.object({
         .string()
         .optional()
         .openapi({ example: '64f1a2b3c4d5e6f7a8b9c0d2' }),
+    division: z
+        .string()
+        .optional()
+        .openapi({ example: '64f1a2b3c4d5e6f7a8b9c0d4' }),
     page: z.string().optional().openapi({ example: '1' }),
     limit: z.string().optional().openapi({ example: '10' }),
 });

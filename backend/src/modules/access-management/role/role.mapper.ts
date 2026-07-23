@@ -10,6 +10,7 @@ export const RoleMapper = {
             type: role.type,
             user: role.user,
             tenant: role.tenant,
+            division: role.division,
             createdAt: role.createdAt,
             updatedAt: role.updatedAt,
         };

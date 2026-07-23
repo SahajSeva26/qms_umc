@@ -10,6 +10,7 @@ export const RoleTypeMapper = {
             name: roleType.name,
             description: roleType.description,
             permissions: roleType.permissions,
+            isSystem: roleType.isSystem,
             tenant: roleType.tenant,
             createdAt: roleType.createdAt,
             updatedAt: roleType.updatedAt,

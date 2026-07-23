@@ -40,6 +40,14 @@ const roleSchema = new mongoose.Schema({
         ref: 'Tenant',
         required: [true, 'tenant is required'],
     },
+    // Optional org-placement, one level finer than tenant. Only customer field-force roles
+    // (MR/HO/ASM/RSM) belong to a division. Left null for QMS/platform staff, tenant-admins,
+    // and FO/Dietitian — which correctly means "not division-restricted" for scoping
+    // (ctx.divisions stays empty => the actor sees across all divisions of their tenant).
+    division: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Division',
+    },
 });
 roleSchema.index({ tenant: 1, code: 1 }, { unique: true });
 export const RoleModel = mongoose.model('Role', roleSchema);

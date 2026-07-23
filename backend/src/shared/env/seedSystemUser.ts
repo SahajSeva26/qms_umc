@@ -11,6 +11,7 @@ import { TENANT_TYPE } from '../../modules/access-management/tenant/tenant.const
 import { withTransaction } from '../helpers/transactionHelper';
 import { throwAppError } from '../utils/error';
 import { LEAD_BUSINESS_ROLE_TYPES } from '../../modules/crm/lead/lead.constants';
+import { CAMP_BUSINESS_ROLE_TYPES } from '../../modules/operations/camp/camp.constants';
 import { provisionDefaultRoleTypes } from './roleTypeProvisioner';
 
 const systemUserPermissions: any = [
@@ -23,9 +24,14 @@ const systemUserPermissions: any = [
     ...Object.values(PERMISSIONS.DIVISION),
     ...Object.values(PERMISSIONS.LEAD),
     ...Object.values(PERMISSIONS.PROJECT),
+    ...Object.values(PERMISSIONS.QA_FEEDBACK),
+    ...Object.values(PERMISSIONS.DOCTOR),
+    ...Object.values(PERMISSIONS.GEO_PROFILE),
+    ...Object.values(PERMISSIONS.CAMP),
 ];
 
 const seedSystemUser = async () => {
+    const startTime = Date.now();
     try {
         // Ensure collections + indexes exist BEFORE the transaction, so the first
         // write doesn't trigger implicit collection creation inside it — which throws
@@ -123,6 +129,9 @@ const seedSystemUser = async () => {
             // 4.3 Provision the platform's fixed business role types (sales, sales-head) with their lead permissions
             await provisionDefaultRoleTypes(tenant, LEAD_BUSINESS_ROLE_TYPES);
 
+            // 4.4 Provision the platform's camp/operations role types (coordinators, ops managers, fo)
+            await provisionDefaultRoleTypes(tenant, CAMP_BUSINESS_ROLE_TYPES);
+
             //5: Create corresponding users for Role-Type ==========================================================>
             // 5.1 Create system user
             let systemUser = await UserModel.findOne({ email: ENV.App.SystemUserEmail });
@@ -193,10 +202,19 @@ const seedSystemUser = async () => {
         });
 
         logger.success('System user seeding completed successfully....');
+        const endTime = Date.now();
+        logger.info(`System user seeding took ${endTime - startTime}ms`);
     } catch (error) {
         logger.error('Error seeding system user:', error);
+        const endTime = Date.now();
+        logger.error(`System user seeding took ${endTime - startTime}ms`);
         return throwAppError('Error seeding system users', 500);
     }
 };
 
 export default seedSystemUser;
+
+// export const seedSystemBusinessRoles = async (tenant: any) => {
+//     await provisionDefaultRoleTypes(tenant, [
+//         ...LEAD_BUSINESS_ROLE_TYPES]);
+// };

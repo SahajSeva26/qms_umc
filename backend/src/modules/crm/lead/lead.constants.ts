@@ -132,8 +132,8 @@ export const LEAD_PERMISSIONS = {
 
 export const LEAD_BUSINESS_ROLE_TYPES = [
     {
-        code: ALLOWED_ROLETYPE_CODES.PLATFORM.SALES,
-        name: 'Sales',
+        code: ALLOWED_ROLETYPE_CODES.PLATFORM.SALES_REP,
+        name: 'Sales Representative',
         description: 'Sales representative — owns and works their own leads',
         permissions: [
             LEAD_PERMISSIONS.SEARCH.code,

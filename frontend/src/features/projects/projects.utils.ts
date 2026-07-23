@@ -1,95 +1,135 @@
-import type { Camp } from '@/types/camp.types'
-import type { UserRole } from '@/types/auth.types'
-import type { Project, ProjectKpis, ProjectType } from '@/types/project.types'
+import type { ProjectEntity, ProjectType } from '@/types/project.types'
 
-// Mirrors the prototype's projects-manager.js roleScopedProjects() — screening
-// coordinators/OMs only see Screening+Mixed projects, diet coordinators/OMs
-// only see Diet+Mixed; everyone else (sales, admin, etc.) sees every type.
-const ROLE_TYPE_SCOPE: Partial<Record<UserRole, ProjectType[]>> = {
-  camp_coord: ['Screening', 'Mixed'],
-  om_screening: ['Screening', 'Mixed'],
-  diet_camp_coord: ['Diet', 'Mixed'],
-  om_diet: ['Diet', 'Mixed'],
+// Real backend ProjectType values that correspond to the app's older
+// "Screening"/"Diet" mode split (used by OM/Invoicing/PO-management/Masters
+// tabs) — `mixed` shows under both, matching the old mock's intent (a mixed
+// project touches both modes) more faithfully than the old single-value
+// equality check (`project.type === 'Screening'`) ever did, since `type` is
+// now a real array field.
+export const SCREENING_MODE_TYPES: ProjectType[] = ['screening_camp', 'mixed']
+export const DIET_MODE_TYPES: ProjectType[] = ['diet', 'teleconsultation_diet', 'mixed']
+
+export function isScreeningProject(project: ProjectEntity): boolean {
+  return project.type.some((t) => SCREENING_MODE_TYPES.includes(t))
 }
 
-export function roleScopedProjects(projects: Project[], role: UserRole | undefined): Project[] {
-  const allowed = role ? ROLE_TYPE_SCOPE[role] : undefined
-  if (!allowed) return projects
-  return projects.filter((p) => allowed.includes(p.type))
+// Single source of truth for per-type accent colors — previously duplicated
+// verbatim in WizardStep1.tsx, EditProjectModal.tsx, and ProjectTypePill.tsx
+// (a real drift risk, and the direct cause of a bug found in live testing:
+// EditProjectModal's PickCard usage passed no color, so every type card's
+// tile rendered the same default blue regardless of selection state).
+export const PROJECT_TYPE_COLOR: Record<ProjectType, string> = {
+  screening_camp: '#3b6dff',
+  diet: '#14b8a6',
+  teleconsultation_diet: '#7c3aed',
+  lab_test: '#a855f7',
+  mixed: '#f59e0b',
 }
 
-const CLOSED_CAMP_STATUS = /CLOSED|COMPLETED|DONE/i
-
-// Prefers the project's own aggregate `campsDone` figure over the live camps
-// array: unlike the prototype (whose camps store holds a full execution
-// history matching each project's totals), our camps.mock.ts only seeds a
-// handful of illustrative sample rows per project. Counting just those would
-// under-report progress, so the richer of the two signals wins.
-export function executedCamps(project: Project, camps: Camp[]): number {
-  const matched = camps.filter((c) => c.projectId === project.id && CLOSED_CAMP_STATUS.test(c.status)).length
-  return Math.max(matched, project.campsDone)
+// GST math, shared by WizardStep3 (live calculator), WizardStep6 (review
+// card), and the New Project Wizard's own save flow — centralized here since
+// the old mock duplicated this same formula in 3 separate places.
+// valueAfterGST/gstAmount are display-only computed values; the backend
+// model has no slot to store either (only valueBeforeGST + gst are real
+// fields), so neither is ever sent in a create/update payload.
+//
+// `gst` has no schema default on the backend (unlike campCost/totalCamps/
+// valueBeforeGST, which all default to 0) — a project created without a gst
+// value genuinely has gst: undefined server-side. Confirmed live: a project
+// created via direct API call with no gst rendered "₹NaN" everywhere its
+// value was shown, before this fallback was added.
+export function computeGstBreakdown(valueBeforeGST: number, gst: number | undefined) {
+  const gstAmount = Math.round((valueBeforeGST || 0) * ((gst || 0) / 100))
+  const valueAfterGST = (valueBeforeGST || 0) + gstAmount
+  return { gstAmount, valueAfterGST }
 }
 
-export function totalPoCamps(project: Project): number {
-  const sum = project.pos.reduce((total, po) => total + po.campCount, 0)
-  return sum > 0 ? sum : project.totalCamps
+export function projectTenantName(project: ProjectEntity): string {
+  return typeof project.tenant === 'string' ? project.tenant : project.tenant.name
 }
 
-export function campsProgressPct(project: Project, camps: Camp[]): number {
-  const total = totalPoCamps(project)
-  if (!total) return 0
-  return Math.min(100, Math.round((executedCamps(project, camps) / total) * 100))
+export function projectDivisionName(project: ProjectEntity): string {
+  return typeof project.division === 'string' ? project.division : project.division.name
 }
 
-// Renewal-consumed % — deliberately EXCLUDES void camps from the numerator.
-// The prototype's own UI copy promises "void camps are excluded from
-// PO-renewal % calculation," but its actual code included them anyway
-// (a real contradiction found during research). This port honors the copy.
-export function renewalConsumedPct(project: Project): number {
-  const total = project.totalCamps
-  if (!total) return 0
-  return Math.round((project.campsDone / total) * 100)
+export function projectSalesRepName(project: ProjectEntity): string {
+  return typeof project.salesRep === 'string' ? project.salesRep : project.salesRep.name
 }
 
-export function projectSearchMatches(project: Project, clientName: string, query: string): boolean {
+export function projectSearchMatches(project: ProjectEntity, query: string): boolean {
   if (!query) return true
-  const haystack = `${project.id} ${project.name} ${clientName} ${project.poNo} ${project.therapy}`.toLowerCase()
+  const haystack = `${project.name} ${projectTenantName(project)} ${project.therapy}`.toLowerCase()
   return haystack.includes(query.toLowerCase())
 }
 
-export function computeProjectKpis(projects: Project[], camps: Camp[]): ProjectKpis {
-  const now = Date.now()
-  const live = projects.filter((p) => p.status === 'LIVE')
-  const hold = projects.filter((p) => p.status === 'HOLD')
-  const closed = projects.filter((p) => p.status === 'CLOSED')
-  const overdue = live.filter((p) => p.endDate && new Date(p.endDate).getTime() < now)
-  const atRisk = live.filter((p) => p.healthScore && p.healthScore < 75)
-  const renewingIn30d = live.filter((p) => {
-    if (!p.endDate) return false
-    const delta = new Date(p.endDate).getTime() - now
-    return delta > 0 && delta < 30 * 86_400_000
-  })
+// KPI strip. overdue/atRisk/renewingIn30d are now derived from
+// projectNearestExpiry (real executionMode.poExpiry/.agreementEndDate data),
+// not the old mock's flat startDate/endDate — a project with no date range
+// (mail-confirmation mode, or `mode` unset) counts toward none of the three.
+export function computeProjectKpis(projects: ProjectEntity[]) {
+  const live = projects.filter((p) => p.status === 'live')
+  const hold = projects.filter((p) => p.status === 'hold')
+  const closed = projects.filter((p) => p.status === 'closed')
+  const totalCamps = projects.reduce((sum, p) => sum + (p.totalCamps || 0), 0)
 
-  const projectIds = new Set(projects.map((p) => p.id))
-  const scopedCamps = camps.filter((c) => c.projectId && projectIds.has(c.projectId))
+  const now = Date.now()
+  let overdue = 0
+  let renewingIn30d = 0
+  for (const p of projects) {
+    const expiry = projectNearestExpiry(p)
+    if (!expiry) continue
+    const daysLeft = Math.ceil((new Date(expiry).getTime() - now) / 86_400_000)
+    if (daysLeft <= 0) overdue += 1
+    else if (daysLeft <= 30) renewingIn30d += 1
+  }
 
   return {
     total: projects.length,
     live: live.length,
     hold: hold.length,
     closed: closed.length,
-    renewingIn30d: renewingIn30d.length,
-    atRisk: atRisk.length,
-    overdue: overdue.length,
-    totalCamps: scopedCamps.length,
-    closedCamps: scopedCamps.filter((c) => CLOSED_CAMP_STATUS.test(c.status)).length,
+    totalCamps,
+    overdue,
+    renewingIn30d,
   }
 }
 
-export function genProjectId(existing: Project[]): string {
-  const maxId = existing.reduce((max, p) => {
-    const num = parseInt(p.id.replace('PRJ-', ''), 10)
-    return Number.isNaN(num) ? max : Math.max(max, num)
-  }, 450)
-  return `PRJ-${maxId + 1}`
+// Nearest-expiry date — the one real date-ish signal on the model
+// (executionMode.poExpiry / .agreementEndDate).
+export function projectNearestExpiry(project: ProjectEntity): string | null {
+  if (!project.mode) return null
+  return project.mode.poExpiry ?? project.mode.agreementEndDate ?? null
+}
+
+// Derived start/end date for the Gantt timeline — the old mock's
+// startDate/endDate were never independently tracked fields, they were
+// always identical to the PO date range in every mock fixture. The real
+// model has no flat date-range field, but PO- and agreement-mode projects
+// do carry the same start/end pair nested under `mode`. Mail-confirmation
+// mode projects (and any project with `mode` unset) have no date range at
+// all and are excluded from the timeline entirely.
+export function projectDateRange(project: ProjectEntity): { start: string; end: string } | null {
+  if (!project.mode) return null
+  const start = project.mode.poDate ?? project.mode.agreementStartDate ?? null
+  const end = project.mode.poExpiry ?? project.mode.agreementEndDate ?? null
+  if (!start || !end) return null
+  return { start, end }
+}
+
+// Derived health score — NOT a restoration of the old mock field (that was
+// always a hand-picked number with no formula behind it, confirmed by
+// inspecting every fixture; there was nothing to reverse-engineer). This is
+// a new heuristic built from the one real signal the backend actually
+// tracks for renewal risk: days left until poExpiry/agreementEndDate.
+// 100 = 90+ days of runway, scaling down to 0 at/after expiry. Projects with
+// no date range (mail-confirmation mode, or `mode` unset) have no renewal
+// risk to score and return null rather than a fabricated number.
+const HEALTH_SCORE_FULL_RUNWAY_DAYS = 90
+
+export function projectHealthScore(project: ProjectEntity): number | null {
+  const range = projectDateRange(project)
+  if (!range) return null
+  const daysLeft = Math.ceil((new Date(range.end).getTime() - Date.now()) / 86_400_000)
+  if (daysLeft <= 0) return 0
+  return Math.min(100, Math.round((daysLeft / HEALTH_SCORE_FULL_RUNWAY_DAYS) * 100))
 }

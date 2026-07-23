@@ -1,5 +1,6 @@
 import type { Camp } from '@/types/camp.types'
-import type { Project } from '@/types/project.types'
+import type { ProjectEntity } from '@/types/project.types'
+import { computeGstBreakdown, projectTenantName } from '@/features/projects/projects.utils'
 import { campStatus } from '@/features/om/om.service'
 import type {
   VerificationRecord, VerificationStatusId, PoStats, Invoice, LeakageCategory, LeakageRow, LeakageCategoryKey,
@@ -96,14 +97,17 @@ export async function decideReinstate(campId: string, decision: 'APPROVED' | 'RE
 }
 
 // campRate() — Project doesn't have campsTarget/poValueInr in our model;
-// map to our actual fields (valueAfterGst / totalCamps).
-export function campRate(project: Project): number {
-  return project.totalCamps ? Math.round(project.valueAfterGst / project.totalCamps) : 0
+// map to our actual fields. valueAfterGST is computed on the fly
+// (valueBeforeGST + gst), not a stored field.
+export function campRate(project: ProjectEntity): number {
+  if (!project.totalCamps) return 0
+  const { valueAfterGST } = computeGstBreakdown(project.valueBeforeGST, project.gst)
+  return Math.round(valueAfterGST / project.totalCamps)
 }
 
 // poStats() — mirrors poStats() exactly (erp-screening.js:117-139), mapped
 // onto our Project's real field names.
-export function poStats(project: Project, camps: Camp[], verification: Record<string, VerificationRecord>): PoStats {
+export function poStats(project: ProjectEntity, camps: Camp[], verification: Record<string, VerificationRecord>): PoStats {
   const projCamps = screeningCamps(camps).filter((c) => c.projectId === project.id)
   const completed = projCamps.filter((c) => campStatus(c) === 'COMPLETED')
   const accepted = completed.filter((c) => verificationFor(verification, c.id).status === 'ACCEPTED')
@@ -117,23 +121,26 @@ export function poStats(project: Project, camps: Camp[], verification: Record<st
   const consumed = accepted.length + cancelledCharged.length
   const remaining = Math.max(0, poQty - consumed)
   const rate = campRate(project)
+  const { valueAfterGST } = computeGstBreakdown(project.valueBeforeGST, project.gst)
 
   return {
     poQty, consumed, remaining,
     completed: completed.length, accepted: accepted.length, rejected: rejected.length,
     blocked: blocked.length, pendingVer: pendingVer.length,
     cancelledCharged: cancelledCharged.length, cancelledNon: cancelledNon.length,
-    poValue: project.valueAfterGst || 0, rate,
+    poValue: valueAfterGST, rate,
     consumedValue: consumed * rate, remainingValue: remaining * rate,
   }
 }
 
-export function poAlerts(project: Project, stats: PoStats): { level: 'red' | 'amber'; message: string }[] {
+export function poAlerts(project: ProjectEntity, stats: PoStats): { level: 'red' | 'amber'; message: string }[] {
   const alerts: { level: 'red' | 'amber'; message: string }[] = []
   if (stats.poQty && stats.remaining <= 0) alerts.push({ level: 'red', message: 'PO exhausted' })
   else if (stats.poQty && stats.remaining <= Math.ceil(stats.poQty * 0.1)) alerts.push({ level: 'amber', message: `PO near exhaustion — ${stats.remaining} camps left` })
-  if (project.poExpiry) {
-    const days = Math.round((new Date(project.poExpiry).getTime() - Date.now()) / 86400000)
+  // poExpiry only exists when execution mode is 'po' — real model nests it
+  // under mode, not a flat top-level field.
+  if (project.mode?.mode === 'po' && project.mode.poExpiry) {
+    const days = Math.round((new Date(project.mode.poExpiry).getTime() - Date.now()) / 86400000)
     if (days >= 0 && days <= 30) alerts.push({ level: 'amber', message: `PO expiring in ${days} day${days === 1 ? '' : 's'}` })
   }
   return alerts
@@ -149,17 +156,20 @@ export async function getInvoices(): Promise<Invoice[]> {
   return load(KEYS.INVOICES, [] as Invoice[])
 }
 
-export function billableCampsForProject(project: Project, camps: Camp[], verification: Record<string, VerificationRecord>, billed: Set<string>): Camp[] {
+export function billableCampsForProject(project: ProjectEntity, camps: Camp[], verification: Record<string, VerificationRecord>, billed: Set<string>): Camp[] {
   return screeningCamps(camps).filter((c) =>
     c.projectId === project.id && campStatus(c) === 'COMPLETED' && isBillable(verification, c.id) && !billed.has(c.id)
   )
 }
 
-export async function generateInvoice(project: Project, billableIds: string[], by: string): Promise<Invoice[]> {
+export async function generateInvoice(project: ProjectEntity, billableIds: string[], by: string): Promise<Invoice[]> {
   const rate = campRate(project)
   const invoices = load(KEYS.INVOICES, [] as Invoice[])
   const invoice: Invoice = {
-    id: `INV-${Date.now().toString().slice(-6)}`, projectId: project.id, clientId: project.clientId, poNo: project.poNo,
+    id: `INV-${Date.now().toString().slice(-6)}`,
+    projectId: project.id,
+    clientId: projectTenantName(project),
+    poNo: project.mode?.mode === 'po' ? project.mode.poNumber ?? '' : '',
     generatedBy: by, generatedOn: new Date().toISOString(), rate, addlRate: 0,
     lines: billableIds.map((campId) => ({ campId, kind: 'CAMP', desc: `Camp ${campId}`, qty: 1, rate, amount: rate })),
     campIds: billableIds, voidCampIds: [], focCampIds: [],
@@ -187,7 +197,7 @@ const CATEGORY_META: Record<LeakageCategoryKey, { label: string; recoverable: bo
   DISPUTE: { label: 'Client dispute', recoverable: false },
 }
 
-export function leakage(camps: Camp[], projects: Project[], verification: Record<string, VerificationRecord>, billed: Set<string>): { categories: LeakageCategory[]; rows: LeakageRow[]; total: number; recoverable: number; unrecoverable: number } {
+export function leakage(camps: Camp[], projects: ProjectEntity[], verification: Record<string, VerificationRecord>, billed: Set<string>): { categories: LeakageCategory[]; rows: LeakageRow[]; total: number; recoverable: number; unrecoverable: number } {
   const categories: Record<LeakageCategoryKey, LeakageCategory> = Object.fromEntries(
     (Object.keys(CATEGORY_META) as LeakageCategoryKey[]).map((k) => [k, { key: k, ...CATEGORY_META[k], amount: 0, count: 0 }])
   ) as Record<LeakageCategoryKey, LeakageCategory>

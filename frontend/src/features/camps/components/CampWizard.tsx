@@ -96,7 +96,16 @@ const CampWizard = ({ open, onClose }: CampWizardProps) => {
   }
 
   const divisionsOf = DIVISIONS.filter((d) => d.clientId === clientId)
-  const projectsOf = projects.filter((p) => p.clientId === clientId)
+  // Real Project.tenant is a populated Tenant/ObjectId, an entirely different
+  // ID space from this wizard's own mock CLIENTS master (clientId) — there is
+  // no real bridge between the two yet (Camp Management has no backend at
+  // all). Matching by tenant NAME against the mock client's name is the
+  // closest honest heuristic available, not a real foreign-key join.
+  const selectedClientName = CLIENTS.find((c) => c.id === clientId)?.name ?? ''
+  const projectsOf = projects.filter((p) => {
+    const tenantName = typeof p.tenant === 'string' ? p.tenant : p.tenant.name
+    return tenantName === selectedClientName
+  })
 
   const handleClientChange = (v: string | null) => {
     setClientId(v ?? '')

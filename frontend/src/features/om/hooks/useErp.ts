@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { Project } from '@/types/project.types'
+import type { ProjectEntity } from '@/types/project.types'
 import type { VerificationStatusId } from '@/features/om/erp.types'
 import * as erpService from '@/features/om/erp.service'
 
@@ -27,7 +27,7 @@ export const useErp = () => {
     onSuccess: invalidateVerification,
   })
   const generateInvoiceMutation = useMutation({
-    mutationFn: ({ project, billableIds, by }: { project: Project; billableIds: string[]; by: string }) => erpService.generateInvoice(project, billableIds, by),
+    mutationFn: ({ project, billableIds, by }: { project: ProjectEntity; billableIds: string[]; by: string }) => erpService.generateInvoice(project, billableIds, by),
     onSuccess: invalidateBilling,
   })
 
@@ -41,6 +41,6 @@ export const useErp = () => {
       decideMutation.mutateAsync({ campId, status, reason, rootCause, correctiveAction, responsible, by }),
     requestReinstate: (campId: string, by: string) => requestReinstateMutation.mutateAsync({ campId, by }),
     decideReinstate: (campId: string, decision: 'APPROVED' | 'REJECTED', by: string) => decideReinstateMutation.mutateAsync({ campId, decision, by }),
-    generateInvoice: (project: Project, billableIds: string[], by: string) => generateInvoiceMutation.mutateAsync({ project, billableIds, by }),
+    generateInvoice: (project: ProjectEntity, billableIds: string[], by: string) => generateInvoiceMutation.mutateAsync({ project, billableIds, by }),
   } as const
 }

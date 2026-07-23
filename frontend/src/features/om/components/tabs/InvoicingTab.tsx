@@ -3,8 +3,8 @@ import { useAuth } from '@/hooks/useAuth'
 import { useProjectsDataShared } from '@/hooks/useProjectsDataShared'
 import { useErp } from '@/features/om/hooks/useErp'
 import { billableCampsForProject } from '@/features/om/erp.service'
+import { computeGstBreakdown, isScreeningProject, projectTenantName } from '@/features/projects/projects.utils'
 import { Button } from '@/components/ui/button'
-import { clientName } from '@/types/campref.types'
 import { formatINR } from '@/utils/formatters'
 
 interface InvoicingTabProps {
@@ -18,7 +18,7 @@ const InvoicingTab = ({ camps }: InvoicingTabProps) => {
   const { projects } = useProjectsDataShared()
   const erp = useErp()
 
-  const screeningProjects = projects.filter((p) => p.type === 'Screening')
+  const screeningProjects = projects.filter(isScreeningProject)
   const byName = user ? `${user.firstName} ${user.lastName}` : 'Ops Manager'
 
   return (
@@ -35,12 +35,13 @@ const InvoicingTab = ({ camps }: InvoicingTabProps) => {
           <tbody>
             {screeningProjects.map((p) => {
               const billable = billableCampsForProject(p, camps, erp.verification, erp.billedCampIds)
-              const rate = p.totalCamps ? Math.round(p.valueAfterGst / p.totalCamps) : 0
+              const { valueAfterGST } = computeGstBreakdown(p.valueBeforeGST, p.gst)
+              const rate = p.totalCamps ? Math.round(valueAfterGST / p.totalCamps) : 0
               return (
                 <tr key={p.id} className="border-t" style={{ borderColor: 'var(--qms-border)' }}>
                   <td className="px-3 py-2.5">
                     <div className="font-semibold" style={{ color: 'var(--qms-text)' }}>{p.name}</div>
-                    <div className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>{clientName(p.clientId)}</div>
+                    <div className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>{projectTenantName(p)}</div>
                   </td>
                   <td className="px-3 py-2.5 text-center tabular-nums" style={{ color: 'var(--qms-text)' }}>{billable.length}</td>
                   <td className="px-3 py-2.5 font-bold tabular-nums" style={{ color: 'var(--qms-text)' }}>{formatINR(billable.length * rate)}</td>
@@ -69,7 +70,7 @@ const InvoicingTab = ({ camps }: InvoicingTabProps) => {
             {erp.invoices.slice().reverse().slice(0, 12).map((inv) => (
               <tr key={inv.id} className="border-t" style={{ borderColor: 'var(--qms-border)' }}>
                 <td className="px-3 py-2.5 font-semibold" style={{ color: 'var(--qms-text)' }}>{inv.id}</td>
-                <td className="px-3 py-2.5" style={{ color: 'var(--qms-text-soft)' }}>{clientName(inv.clientId)} · {inv.projectId}</td>
+                <td className="px-3 py-2.5" style={{ color: 'var(--qms-text-soft)' }}>{inv.clientId} · {inv.projectId}</td>
                 <td className="px-3 py-2.5 text-center tabular-nums" style={{ color: 'var(--qms-text)' }}>{inv.campCount}</td>
                 <td className="px-3 py-2.5 font-bold tabular-nums" style={{ color: 'var(--qms-text)' }}>{formatINR(inv.total)}</td>
                 <td className="px-3 py-2.5">

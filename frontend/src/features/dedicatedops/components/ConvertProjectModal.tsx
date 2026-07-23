@@ -3,12 +3,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
-import type { Project } from '@/types/project.types'
+import type { ProjectEntity } from '@/types/project.types'
 
 interface ConvertProjectModalProps {
   open: boolean
   onClose: () => void
-  eligibleProjects: Project[]
+  eligibleProjects: ProjectEntity[]
   onConfirm: (projectId: string, manpower: { fo: number; coordinator: number; technician: number }, territory: { state: string; city: string; zone: string }) => void
 }
 

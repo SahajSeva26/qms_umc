@@ -2,9 +2,9 @@ import { useNavigate } from 'react-router-dom'
 import { FiFolderPlus, FiActivity, FiCpu } from 'react-icons/fi'
 import { useProjectsDataShared } from '@/hooks/useProjectsDataShared'
 import { usePeopleData } from '@/hooks/usePeopleData'
+import { isScreeningProject, projectTenantName } from '@/features/projects/projects.utils'
 import KpiTile from '@/components/ui/KpiTile'
 import { Button } from '@/components/ui/button'
-import { clientName } from '@/types/campref.types'
 
 // Mirrors renderMasters — a quick-action launcher + counts over the shared
 // masters (erp-screening.js:436-540), not a full CRUD screen. Coordinator
@@ -14,7 +14,7 @@ const MastersTab = () => {
   const navigate = useNavigate()
   const { projects } = useProjectsDataShared()
   const { devices } = usePeopleData()
-  const screeningProjects = projects.filter((p) => p.type === 'Screening')
+  const screeningProjects = projects.filter(isScreeningProject)
 
   return (
     <div>
@@ -34,14 +34,17 @@ const MastersTab = () => {
             </tr>
           </thead>
           <tbody>
-            {screeningProjects.map((p) => (
-              <tr key={p.id} className="border-t" style={{ borderColor: 'var(--qms-border)' }}>
-                <td className="px-3 py-2.5 font-semibold" style={{ color: 'var(--qms-text)' }}>{p.name}</td>
-                <td className="px-3 py-2.5" style={{ color: 'var(--qms-text-soft)' }}>{clientName(p.clientId)}</td>
-                <td className="px-3 py-2.5 text-center tabular-nums" style={{ color: 'var(--qms-text)' }}>{p.totalCamps}</td>
-                <td className="px-3 py-2.5" style={{ color: 'var(--qms-text-soft)' }}>{p.coordinatorId || '—'}</td>
-              </tr>
-            ))}
+            {screeningProjects.map((p) => {
+              const coordinatorName = typeof p.projectCoordinator === 'string' ? p.projectCoordinator : p.projectCoordinator.name
+              return (
+                <tr key={p.id} className="border-t" style={{ borderColor: 'var(--qms-border)' }}>
+                  <td className="px-3 py-2.5 font-semibold" style={{ color: 'var(--qms-text)' }}>{p.name}</td>
+                  <td className="px-3 py-2.5" style={{ color: 'var(--qms-text-soft)' }}>{projectTenantName(p)}</td>
+                  <td className="px-3 py-2.5 text-center tabular-nums" style={{ color: 'var(--qms-text)' }}>{p.totalCamps}</td>
+                  <td className="px-3 py-2.5" style={{ color: 'var(--qms-text-soft)' }}>{coordinatorName || '—'}</td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
         <div className="p-3 border-t" style={{ borderColor: 'var(--qms-border)' }}>

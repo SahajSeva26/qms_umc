@@ -1,5 +1,5 @@
-import { PROJECT_STATUSES } from '@/types/project.types'
 import type { ProjectStatus } from '@/types/project.types'
+import { PROJECT_STATUS_COLOR, PROJECT_STATUS_LABEL } from '@/types/project.types'
 
 interface ProjectStatusPillProps {
   status: ProjectStatus
@@ -7,8 +7,7 @@ interface ProjectStatusPillProps {
 }
 
 const ProjectStatusPill = ({ status, onClick }: ProjectStatusPillProps) => {
-  const meta = PROJECT_STATUSES.find((s) => s.id === status)
-  const color = meta?.color ?? '#94a3b8'
+  const color = PROJECT_STATUS_COLOR[status] ?? '#94a3b8'
 
   return (
     <span
@@ -17,7 +16,7 @@ const ProjectStatusPill = ({ status, onClick }: ProjectStatusPillProps) => {
       style={{ background: `${color}22`, color, cursor: onClick ? 'pointer' : undefined }}
     >
       <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
-      {meta?.label ?? status}
+      {PROJECT_STATUS_LABEL[status] ?? status}
     </span>
   )
 }

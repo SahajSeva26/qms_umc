@@ -88,6 +88,7 @@ export const CAMP_BUSINESS_ROLE_TYPES = [
             CAMP_PERMISSIONS.GET.code,
             CAMP_PERMISSIONS.CREATE.code,
             CAMP_PERMISSIONS.UPDATE.code,
+            
         ],
     },
     {

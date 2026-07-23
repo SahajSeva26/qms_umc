@@ -13,6 +13,7 @@ import { pharmaRoutes } from '@/features/pharma/pharma.routes'
 import { projectsRoutes } from '@/features/projects/projects.routes'
 import { omRoutes } from '@/features/om/om.routes'
 import { doctorsRoutes } from '@/features/doctors/doctors.routes'
+import { geoProfileRoutes } from '@/features/geo-profile/geoProfile.routes'
 import { billingRoutes } from '@/features/billing/billing.routes'
 import { analyticsRoutes } from '@/features/analytics/analytics.routes'
 import { adminRoutes } from '@/features/admin/admin.routes'
@@ -45,6 +46,7 @@ const appRouter = createBrowserRouter([
           ...projectsRoutes,
           ...omRoutes,
           ...doctorsRoutes,
+          ...geoProfileRoutes,
           ...billingRoutes,
           ...analyticsRoutes,
           ...adminRoutes,

@@ -1,54 +1,92 @@
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import { FiSearch } from 'react-icons/fi'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import type { EngagementBand } from '@/features/doctors/doctors.types'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import type { DoctorsFilterState } from '@/features/doctors/hooks/useDoctorsFilters'
+import type { DoctorSpecialization, DoctorStatus } from '@/types/doctor.types'
 
-const BANDS: (EngagementBand | 'ALL')[] = ['ALL', 'CHAMPION', 'ACTIVE', 'DORMANT', 'INACTIVE', 'NEW']
+// Real backend enum — DOCTOR_SPECIALIZATION only has these two values
+// (doctor.constants.ts). Do not add more; the mock-era 13-item specialty
+// list this feature used to show has no backend counterpart.
+const SPECIALIZATION_OPTIONS: { value: DoctorSpecialization; label: string }[] = [
+  { value: 'cp', label: 'CP' },
+  { value: 'gp', label: 'GP' },
+]
+const SPECIALIZATION_LABEL_BY_VALUE = new Map(SPECIALIZATION_OPTIONS.map((s) => [s.value, s.label]))
 
-export interface DoctorFilters {
-  specialty: string
-  city: string
-  band: EngagementBand | 'ALL'
-  search: string
-}
+const STATUS_OPTIONS: { value: DoctorStatus; label: string }[] = [
+  { value: 'active', label: 'Active' },
+  { value: 'inactive', label: 'Inactive' },
+]
+const STATUS_LABEL_BY_VALUE = new Map(STATUS_OPTIONS.map((s) => [s.value, s.label]))
 
 interface DoctorFilterBarProps {
-  filters: DoctorFilters
-  onChange: (patch: Partial<DoctorFilters>) => void
-  specialties: string[]
-  cities: string[]
+  filters: DoctorsFilterState
+  setFilter: <K extends keyof DoctorsFilterState>(key: K, value: DoctorsFilterState[K]) => void
+  reset: () => void
 }
 
-const DoctorFilterBar = ({ filters, onChange, specialties, cities }: DoctorFilterBarProps) => (
-  <div className="flex flex-wrap items-center gap-2 mb-3">
-    <Select value={filters.specialty} onValueChange={(v) => onChange({ specialty: v as string })}>
-      <SelectTrigger className="w-44 text-[12.5px]"><SelectValue placeholder="Specialty" /></SelectTrigger>
+// Same convention as RolesFilterBar.tsx. `status` is only actually honored
+// server-side for callers with `doctor:manage` (doctor.service.ts's search()
+// hard-scopes everyone else to status=active regardless of this control) —
+// still rendered unconditionally, matching Tenants' own "no per-field
+// permission gating" precedent (picking "Inactive" as a non-privileged
+// caller just silently returns the same active-only results).
+const DoctorFilterBar = ({ filters, setFilter, reset }: DoctorFilterBarProps) => (
+  <div
+    className="flex flex-wrap items-center gap-2 p-2.5 mb-3 rounded-xl border"
+    style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}
+  >
+    <Select value={filters.specialization} onValueChange={(v) => setFilter('specialization', (v ?? 'ALL') as DoctorsFilterState['specialization'])}>
+      <SelectTrigger className="text-[12px]">
+        <SelectValue>{(v: string) => (v === 'ALL' ? 'Specialization' : (SPECIALIZATION_LABEL_BY_VALUE.get(v as DoctorSpecialization) ?? 'Specialization'))}</SelectValue>
+      </SelectTrigger>
       <SelectContent>
-        <SelectItem value="ALL">All specialties</SelectItem>
-        {specialties.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+        <SelectItem value="ALL">All</SelectItem>
+        {SPECIALIZATION_OPTIONS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
       </SelectContent>
     </Select>
 
-    <Select value={filters.city} onValueChange={(v) => onChange({ city: v as string })}>
-      <SelectTrigger className="w-40 text-[12.5px]"><SelectValue placeholder="City" /></SelectTrigger>
+    <Select value={filters.status} onValueChange={(v) => setFilter('status', (v ?? 'ALL') as DoctorsFilterState['status'])}>
+      <SelectTrigger className="text-[12px]">
+        <SelectValue>{(v: string) => (v === 'ALL' ? 'Status' : (STATUS_LABEL_BY_VALUE.get(v as DoctorStatus) ?? 'Status'))}</SelectValue>
+      </SelectTrigger>
       <SelectContent>
-        <SelectItem value="ALL">All cities</SelectItem>
-        {cities.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-      </SelectContent>
-    </Select>
-
-    <Select value={filters.band} onValueChange={(v) => onChange({ band: v as EngagementBand | 'ALL' })}>
-      <SelectTrigger className="w-36 text-[12.5px]"><SelectValue placeholder="Band" /></SelectTrigger>
-      <SelectContent>
-        {BANDS.map((b) => <SelectItem key={b} value={b}>{b === 'ALL' ? 'All bands' : b}</SelectItem>)}
+        <SelectItem value="ALL">All</SelectItem>
+        {STATUS_OPTIONS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
       </SelectContent>
     </Select>
 
     <Input
-      value={filters.search}
-      onChange={(e) => onChange({ search: e.target.value })}
-      placeholder="Search name · code · email · phone · city"
-      className="text-[12.5px] w-72"
+      type="text"
+      value={filters.city}
+      onChange={(e) => setFilter('city', e.target.value)}
+      placeholder="City..."
+      className="w-32 text-[12px]"
     />
+
+    <Input
+      type="text"
+      value={filters.state}
+      onChange={(e) => setFilter('state', e.target.value)}
+      placeholder="State..."
+      className="w-32 text-[12px]"
+    />
+
+    <div className="relative">
+      <FiSearch size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--qms-text-muted)' }} />
+      <Input
+        type="text"
+        value={filters.search}
+        onChange={(e) => setFilter('search', e.target.value)}
+        placeholder="Search by name..."
+        className="w-56 pl-7 text-[12px]"
+      />
+    </div>
+
+    <Button variant="outline" size="sm" onClick={reset}>
+      Reset
+    </Button>
   </div>
 )
 

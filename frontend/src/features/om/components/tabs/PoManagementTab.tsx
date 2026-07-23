@@ -3,7 +3,7 @@ import type { Camp } from '@/types/camp.types'
 import { useProjectsDataShared } from '@/hooks/useProjectsDataShared'
 import { useErp } from '@/features/om/hooks/useErp'
 import { poStats, poAlerts } from '@/features/om/erp.service'
-import { clientName } from '@/types/campref.types'
+import { isScreeningProject, projectTenantName } from '@/features/projects/projects.utils'
 import { formatINR } from '@/utils/formatters'
 import DoBar from '@/features/dedicatedops/components/DoBar'
 
@@ -17,7 +17,7 @@ const PoManagementTab = ({ camps }: PoManagementTabProps) => {
   const { projects } = useProjectsDataShared()
   const erp = useErp()
 
-  const screeningProjects = projects.filter((p) => p.type === 'Screening')
+  const screeningProjects = projects.filter(isScreeningProject)
 
   return (
     <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}>
@@ -31,7 +31,9 @@ const PoManagementTab = ({ camps }: PoManagementTabProps) => {
           <div key={p.id} className="rounded-xl border p-4" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
             <div className="mb-2">
               <div className="text-[13px] font-bold" style={{ color: 'var(--qms-text)' }}>{p.name}</div>
-              <div className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>{clientName(p.clientId)} · PO {p.poNo || '—'}</div>
+              <div className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>
+                {projectTenantName(p)} · PO {p.mode?.mode === 'po' ? p.mode.poNumber || '—' : '—'}
+              </div>
             </div>
 
             {alerts.map((a, i) => (

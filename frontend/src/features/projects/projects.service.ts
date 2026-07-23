@@ -1,129 +1,72 @@
-import type { Project, ProjectStatus, VoidCamp } from '@/types/project.types'
-import { PROJECTS as SEED_PROJECTS } from '@/features/projects/projects.mock'
+import api from '@/lib/api/api'
+import type { ApiResponse, PaginatedResponse } from '@/types/common.types'
+import type { LeadEntity, SearchLeadQuery } from '@/types/crm.types'
+import type {
+  CreateProjectPayload,
+  MoveProjectStagePayload,
+  ProjectEntity,
+  SearchProjectQuery,
+  UpdateProjectPayload,
+} from '@/types/project.types'
 
-// TODO: replace with real API calls once backend endpoints exist.
-// Module-level store stands in for the server: each mutation updates it and
-// resolves with the fresh array, mirroring what a REST endpoint would return.
+// Follows the exact pattern of accessManagementService: same shared `api`
+// axios instance, same ApiResponse/PaginatedResponse envelope typing, a plain
+// object export, no class/default export.
 //
-// Deliberately a SEPARATE localStorage key from Client Management's
-// 'qms.master.projects' (features/crm/clients/clients.service.ts) — that
-// module already persists a lighter ClientProject[] shape there for its PO
-// feature. Reusing the same key would let two incompatible shapes clobber
-// each other. Both are seeded from the same client/division master data so
-// they still read as one system.
-const PROJECTS_KEY = 'qms.master.projects.full'
+// Default limit: 100 — GET /projects silently defaults to limit=10 server-side
+// (RequestHandler.getPagination) when the caller omits it, same quirk already
+// found and fixed for Lead's own search call.
+const DEFAULT_LIMIT = '100'
 
-function loadProjects(): Project[] {
-  try {
-    const raw = localStorage.getItem(PROJECTS_KEY)
-    if (raw) return JSON.parse(raw)
-  } catch {
-    // fall through to seed
-  }
-  return JSON.parse(JSON.stringify(SEED_PROJECTS))
-}
-
-function persist(next: Project[]) {
-  try {
-    localStorage.setItem(PROJECTS_KEY, JSON.stringify(next))
-  } catch {
-    // demo persistence only — safe to ignore quota/serialization errors
-  }
-}
-
-let projectsStore: Project[] = loadProjects()
-
-const now = () => new Date().toISOString()
-
-export const getProjects = async (): Promise<Project[]> => projectsStore
-
-export const createProject = async (project: Project): Promise<Project[]> => {
-  projectsStore = [project, ...projectsStore]
-  persist(projectsStore)
-  return projectsStore
-}
-
-export const updateProject = async (project: Project): Promise<Project[]> => {
-  projectsStore = projectsStore.map((p) => (p.id === project.id ? { ...project, updatedAt: now() } : p))
-  persist(projectsStore)
-  return projectsStore
-}
-
-export const changeStatus = async (id: string, status: ProjectStatus, reason: string, by: string): Promise<Project[]> => {
-  projectsStore = projectsStore.map((p) => {
-    if (p.id !== id) return p
-    const entry = { from: p.status, to: status, reason, at: now(), by }
-    return {
-      ...p,
-      status,
-      closeReason: status === 'CLOSED' && !p.closeReason ? reason : p.closeReason,
-      statusHistory: [...p.statusHistory, entry],
-      updatedAt: now(),
-    }
+const searchProjects = async (query: SearchProjectQuery) => {
+  const res = await api.get<PaginatedResponse<ProjectEntity>>('/projects', {
+    params: { limit: DEFAULT_LIMIT, ...query },
   })
-  persist(projectsStore)
-  return projectsStore
+  return res.data
 }
 
-export const closeProject = async (id: string, reason: string): Promise<Project[]> => {
-  projectsStore = projectsStore.map((p) =>
-    p.id === id ? { ...p, status: 'CLOSED' as const, closeReason: reason, updatedAt: now() } : p
-  )
-  persist(projectsStore)
-  return projectsStore
+const getProject = async (id: string) => {
+  const res = await api.get<ApiResponse<ProjectEntity>>(`/projects/${id}`)
+  return res.data
 }
 
-export const reopenProject = async (id: string): Promise<Project[]> => {
-  projectsStore = projectsStore.map((p) =>
-    p.id === id ? { ...p, status: 'HOLD' as const, closeReason: '', updatedAt: now() } : p
-  )
-  persist(projectsStore)
-  return projectsStore
+const createProject = async (payload: CreateProjectPayload) => {
+  // NOTE: response is NOT populated — project.service.ts's create() never
+  // re-fetches with {populate:true} before returning. Callers needing
+  // populated relations should invalidate + refetch via useProject(id).
+  const res = await api.post<ApiResponse<ProjectEntity>>('/projects', payload)
+  return res.data
 }
 
-export const renewProject = async (
-  sourceId: string,
-  input: { id: string; name: string; poDate: string; poExpiry: string; poNo: string }
-): Promise<Project[]> => {
-  const source = projectsStore.find((p) => p.id === sourceId)
-  if (!source) return projectsStore
-
-  const cloned: Project = {
-    ...JSON.parse(JSON.stringify(source)),
-    id: input.id,
-    name: input.name,
-    poNo: input.poNo,
-    poDate: input.poDate,
-    poExpiry: input.poExpiry,
-    pos:
-      source.executionMode === 'PO'
-        ? [{ id: `po-${input.id}`, poNo: input.poNo, poDate: input.poDate, poExpiry: input.poExpiry, campCount: source.totalCamps, value: source.valueAfterGst, status: 'ACTIVE' as const }]
-        : [],
-    campsDone: 0,
-    voidCamps: [],
-    status: 'LIVE' as const,
-    statusHistory: [],
-    createdAt: now(),
-    updatedAt: now(),
-  }
-
-  projectsStore = [cloned, ...projectsStore]
-  persist(projectsStore)
-  return projectsStore
+const updateProject = async (id: string, payload: UpdateProjectPayload) => {
+  // Same caveat as createProject — response echo is unpopulated.
+  const res = await api.put<ApiResponse<ProjectEntity>>(`/projects/${id}`, payload)
+  return res.data
 }
 
-export const addVoidCamp = async (projectId: string, voidCamp: VoidCamp): Promise<Project[]> => {
-  projectsStore = projectsStore.map((p) =>
-    p.id === projectId ? { ...p, voidCamps: [...p.voidCamps, voidCamp], updatedAt: now() } : p
-  )
-  persist(projectsStore)
-  return projectsStore
+const moveProjectStage = async (id: string, payload: MoveProjectStagePayload) => {
+  const res = await api.patch<ApiResponse<ProjectEntity>>(`/projects/${id}/stage`, payload)
+  return res.data
 }
 
-export const removeVoidCamp = async (projectId: string, voidCampId: string): Promise<Project[]> => {
-  projectsStore = projectsStore.map((p) =>
-    p.id === projectId ? { ...p, voidCamps: p.voidCamps.filter((v) => v.id !== voidCampId), updatedAt: now() } : p
-  )
-  persist(projectsStore)
-  return projectsStore
+// Scoped, self-contained call for the New Project wizard's Step 0 (pick a
+// lead) — deliberately NOT routed through crmService, which is still the
+// stale pre-migration mock file on this branch (crm.service.ts has no real
+// searchLeads export yet). Calling GET /leads directly here keeps this
+// feature's blast radius limited to Project; fixing crm.service.ts is a
+// separate, pre-existing task.
+const searchWonLeads = async (query: SearchLeadQuery = {}) => {
+  const res = await api.get<PaginatedResponse<LeadEntity>>('/leads', {
+    params: { limit: DEFAULT_LIMIT, ...query, status: 'won' },
+  })
+  return res.data
+}
+
+export const projectsService = {
+  searchProjects,
+  getProject,
+  createProject,
+  updateProject,
+  moveProjectStage,
+  searchWonLeads,
 }

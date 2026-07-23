@@ -1,4 +1,5 @@
 import type { WizardFormState } from '@/features/projects/wizard.types'
+import { computeGstBreakdown } from '@/features/projects/projects.utils'
 import { formatINR } from '@/utils/formatters'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,9 +11,8 @@ interface WizardStep3Props {
 }
 
 const WizardStep3 = ({ form, setField }: WizardStep3Props) => {
-  const computedValueBeforeGst = form.campCost * form.totalCamps
-  const gstAmount = Math.round(form.valueBeforeGst * (form.gstPct / 100))
-  const totalValue = form.valueBeforeGst + gstAmount
+  const computedValueBeforeGST = form.campCost * form.totalCamps
+  const { gstAmount, valueAfterGST } = computeGstBreakdown(form.valueBeforeGST, form.gst)
 
   return (
     <div className="space-y-4">
@@ -25,7 +25,7 @@ const WizardStep3 = ({ form, setField }: WizardStep3Props) => {
             onChange={(e) => {
               const campCost = Number(e.target.value)
               setField('campCost', campCost)
-              if (!form.valueBeforeGstTouched) setField('valueBeforeGst', campCost * form.totalCamps)
+              if (!form.valueBeforeGSTTouched) setField('valueBeforeGST', campCost * form.totalCamps)
             }}
             className={fieldClasses}
           />
@@ -38,7 +38,7 @@ const WizardStep3 = ({ form, setField }: WizardStep3Props) => {
             onChange={(e) => {
               const totalCamps = Number(e.target.value)
               setField('totalCamps', totalCamps)
-              if (!form.valueBeforeGstTouched) setField('valueBeforeGst', form.campCost * totalCamps)
+              if (!form.valueBeforeGSTTouched) setField('valueBeforeGST', form.campCost * totalCamps)
             }}
             className={fieldClasses}
           />
@@ -49,10 +49,10 @@ const WizardStep3 = ({ form, setField }: WizardStep3Props) => {
         <Label className={labelClasses} style={labelStyle}>Value before GST (₹) *</Label>
         <Input
           type="number"
-          value={form.valueBeforeGst || ''}
+          value={form.valueBeforeGST || ''}
           onChange={(e) => {
-            setField('valueBeforeGst', Number(e.target.value))
-            setField('valueBeforeGstTouched', true)
+            setField('valueBeforeGST', Number(e.target.value))
+            setField('valueBeforeGSTTouched', true)
           }}
           className={fieldClasses}
         />
@@ -61,16 +61,14 @@ const WizardStep3 = ({ form, setField }: WizardStep3Props) => {
       <div className="grid grid-cols-2 gap-2.5">
         <div>
           <Label className={labelClasses} style={labelStyle}>GST %</Label>
-          <Input type="number" min={0} max={100} step={0.5} value={form.gstPct} onChange={(e) => setField('gstPct', Number(e.target.value))} className={fieldClasses} />
+          <Input type="number" min={0} max={100} step={0.5} value={form.gst} onChange={(e) => setField('gst', Number(e.target.value))} className={fieldClasses} />
         </div>
         <div>
-          <Label className={labelClasses} style={labelStyle}>Additional patient cost (₹ per patient)</Label>
-          <Input type="number" value={form.additionalPatientCost || ''} onChange={(e) => setField('additionalPatientCost', Number(e.target.value))} className={fieldClasses} />
+          <Label className={labelClasses} style={labelStyle}>Additional cost (₹ per patient)</Label>
+          <Input type="number" value={form.additionalCost || ''} onChange={(e) => setField('additionalCost', Number(e.target.value))} className={fieldClasses} />
         </div>
       </div>
 
-      {/* Matches the prototype's .gst-calc exactly: 2-col grid, diagonal
-          brand→teal gradient tint, dashed-top-border total row. */}
       <div
         className="grid grid-cols-2 gap-2 p-3 rounded-xl border text-[12px] mt-1.5"
         style={{
@@ -80,14 +78,14 @@ const WizardStep3 = ({ form, setField }: WizardStep3Props) => {
       >
         <div className="flex justify-between" style={{ color: 'var(--qms-text-soft)' }}>
           <span>Camp cost × Total camps</span>
-          <span>{formatINR(computedValueBeforeGst)}</span>
+          <span>{formatINR(computedValueBeforeGST)}</span>
         </div>
         <div className="flex justify-between" style={{ color: 'var(--qms-text-soft)' }}>
           <span>Value before GST (editable)</span>
-          <span>{formatINR(form.valueBeforeGst)}</span>
+          <span>{formatINR(form.valueBeforeGST)}</span>
         </div>
         <div className="flex justify-between" style={{ color: 'var(--qms-text-soft)' }}>
-          <span>GST @ {form.gstPct}%</span>
+          <span>GST @ {form.gst}%</span>
           <span>{formatINR(gstAmount)}</span>
         </div>
         <div
@@ -95,7 +93,7 @@ const WizardStep3 = ({ form, setField }: WizardStep3Props) => {
           style={{ color: 'var(--qms-brand)', borderTop: '1px dashed var(--qms-border)' }}
         >
           <span>Total value (incl. GST)</span>
-          <span>{formatINR(totalValue)}</span>
+          <span>{formatINR(valueAfterGST)}</span>
         </div>
       </div>
     </div>

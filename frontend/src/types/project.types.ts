@@ -1,249 +1,398 @@
-// Project Management + Project Gantt domain types.
-// Mirrors the vanilla-JS prototype's projects-manager.js / gantt.js shapes.
-// TODO: entirely mock/frontend-only — no backend endpoints exist for projects yet.
+// Real backend-integrated types for the Project module, replacing the old
+// mock-only model entirely. Matches backend/src/modules/crm/project/* exactly
+// (model/constants/validators/mapper) — see the comment on each interface for
+// the specific service/mapper behavior its shape depends on.
 //
-// NOTE: this is a deliberately separate, richer entity from ClientProject
-// (types/client.types.ts), which Client Management already persists to
-// 'qms.master.projects'. This module persists to its own key
-// ('qms.master.projects.full') to avoid corrupting Client Management's
-// already-shipped PO feature with an incompatible shape. Both are seeded from
-// the same CLIENTS/DIVISIONS master data so they read as one system.
+// A Project is created FROM a won Lead (backend enforces exactly one Project
+// per Lead — project.service.ts's create() 409s if one already exists for the
+// given lead). tenant/division are derived server-side from the source Lead
+// and are never sent by the client on create.
+//
+// Backend quirk, deliberately not "fixed" client-side beyond a soft UX filter:
+// project.routes.ts's Swagger summary says "create project (from a WON
+// lead)", but project.service.ts's create() never actually checks
+// lead.status === 'won' — only that the lead exists and no project already
+// exists for it. The lead picker restricts to status=won as a UX-only
+// convention; it is not a hard backend rule.
 
-export type ProjectStatus = 'LIVE' | 'HOLD' | 'CLOSED'
+import type { DivisionTherapy } from './crm.types'
 
-export interface ProjectStatusMeta {
-  id: ProjectStatus
-  label: string
-  color: string
+// ---------------------------------------------------------------------------
+// Enums / constants
+// ---------------------------------------------------------------------------
+
+// Same enum values as Division's own therapy field (project.constants.ts's
+// PROJECT_THERAPY_TYPES matches division.constants.ts's DIVISION_THERAPY
+// exactly, minus ophthalmology/dermatology/oncology/pediatrics — Project's
+// enum is a strict subset of Division's).
+export type ProjectTherapy =
+  | 'cardiology'
+  | 'diabetes'
+  | 'pulmonology'
+  | 'endocrine'
+  | 'orthopedics'
+  | 'gynaecology'
+  | 'neurology'
+  | 'hepatology'
+  | 'nephrology'
+
+export const PROJECT_THERAPY_LABEL: Record<ProjectTherapy, string> = {
+  cardiology: 'Cardiology',
+  diabetes: 'Diabetes',
+  pulmonology: 'Pulmonology',
+  endocrine: 'Endocrine',
+  orthopedics: 'Orthopedics',
+  gynaecology: 'Gynaecology',
+  neurology: 'Neurology',
+  hepatology: 'Hepatology',
+  nephrology: 'Nephrology',
 }
 
-export const PROJECT_STATUSES: ProjectStatusMeta[] = [
-  { id: 'LIVE', label: 'Live', color: '#10b981' },
-  { id: 'HOLD', label: 'Hold', color: '#f59e0b' },
-  { id: 'CLOSED', label: 'Closed', color: '#94a3b8' },
-]
+// project.constants.ts's PROJECT_TYPES — an ARRAY-valued field on the real
+// model (project.model.ts's `type: [{...enum}]`), unlike the old mock's
+// single-select ProjectType. A project can be more than one type at once.
+export type ProjectType = 'screening_camp' | 'diet' | 'teleconsultation_diet' | 'lab_test' | 'mixed'
 
-export type ProjectType = 'Screening' | 'Diet' | 'TeleDiet' | 'Lab' | 'Mixed'
-
-export interface ProjectTypeMeta {
-  id: ProjectType
-  label: string
-  icon: string
-  color: string
+export const PROJECT_TYPE_LABEL: Record<ProjectType, string> = {
+  screening_camp: 'Screening Camp',
+  diet: 'Diet',
+  teleconsultation_diet: 'Teleconsultation Diet',
+  lab_test: 'Lab Test',
+  mixed: 'Mixed',
 }
 
-export const PROJECT_TYPES: ProjectTypeMeta[] = [
-  { id: 'Screening', label: 'Screening', icon: 'stethoscope', color: '#3b6dff' },
-  { id: 'Diet', label: 'Diet', icon: 'apple', color: '#14b8a6' },
-  { id: 'TeleDiet', label: 'Teleconsultation Diet', icon: 'video', color: '#7c3aed' },
-  { id: 'Lab', label: 'Lab', icon: 'flask-conical', color: '#a855f7' },
-  { id: 'Mixed', label: 'Mixed', icon: 'shuffle', color: '#f59e0b' },
-]
+// project.constants.ts's PROJECT_TEST_TYPES — a closed backend enum (not an
+// Admin-master-driven dynamic list like the old mock's TESTS).
+export type ProjectTest = 'fbs' | 'ppbs' | 'rbs' | 'bp' | 'spo2' | 'ecg' | 'lipid' | 'hba1c' | 'spiro' | 'bca'
 
-export type MixedSubType = 'Screening' | 'Diet' | 'DedicatedFO' | 'Lab'
-
-export const MIXED_SUBTYPES: { id: MixedSubType; label: string; color: string }[] = [
-  { id: 'Screening', label: 'Screening Camp', color: '#3b6dff' },
-  { id: 'Diet', label: 'Diet', color: '#14b8a6' },
-  { id: 'DedicatedFO', label: 'Dedicated FO', color: '#0ea5e9' },
-  { id: 'Lab', label: 'Lab', color: '#a855f7' },
-]
-
-export type ExecutionMode = 'PO' | 'AGREEMENT' | 'MAIL'
-
-export interface ExecutionModeMeta {
-  id: ExecutionMode
-  label: string
-  icon: string
-  color: string
+export const PROJECT_TEST_LABEL: Record<ProjectTest, string> = {
+  fbs: 'FBS',
+  ppbs: 'PPBS',
+  rbs: 'RBS',
+  bp: 'BP',
+  spo2: 'SPO2',
+  ecg: 'ECG',
+  lipid: 'Lipid',
+  hba1c: 'HbA1c',
+  spiro: 'Spiro',
+  bca: 'BCA',
 }
 
-export const EXECUTION_MODES: ExecutionModeMeta[] = [
-  { id: 'PO', label: 'PO Based', icon: 'file-badge', color: '#3b6dff' },
-  { id: 'AGREEMENT', label: 'Agreement Based', icon: 'file-text', color: '#14b8a6' },
-  { id: 'MAIL', label: 'Mail Confirmation', icon: 'mail', color: '#a855f7' },
-]
+export type ExecutionModeType = 'po' | 'agreement' | 'mail_confirmation'
 
-// Therapy list is a hardcoded dropdown in the prototype, not master-data driven.
-export const THERAPIES = [
-  'Cardiology', 'Diabetes', 'Pulmonology', 'Endocrine', 'Orthopedics', 'Gynaecology',
-  'Neurology', 'Hepatology', 'Nephrology', 'Ophthalmology', 'Dermatology', 'Oncology',
-  'Pediatrics', 'Wellness',
-]
-
-export const CAMP_TIME_SLOTS: { id: string; label: string }[] = [
-  { id: '8-9', label: '8 am–9 am' },
-  { id: '9-13', label: '9 am–1 pm' },
-  { id: '10-14', label: '10 am–2 pm' },
-  { id: '11-15', label: '11 am–3 pm' },
-  { id: '16-17', label: '4 pm–5 pm' },
-  { id: '18-22', label: '6 pm–10 pm' },
-]
-
-export type GoLiveScope = 'STATE' | 'CITY' | 'PAN_INDIA'
-
-export const GO_LIVE_SCOPES: { id: GoLiveScope; label: string; icon: string }[] = [
-  { id: 'STATE', label: 'Specific states', icon: 'map' },
-  { id: 'CITY', label: 'Specific cities', icon: 'map-pin' },
-  { id: 'PAN_INDIA', label: 'PAN-India', icon: 'globe-2' },
-]
-
-export const STATES_INDIA = [
-  'AN', 'AP', 'AR', 'AS', 'BR', 'CG', 'CH', 'DL', 'DN', 'GA', 'GJ', 'HP', 'HR', 'JH', 'JK',
-  'KA', 'KL', 'LA', 'LD', 'MH', 'ML', 'MN', 'MP', 'MZ', 'NL', 'OD', 'PB', 'PY', 'RJ', 'SK',
-  'TG', 'TN', 'TR', 'UP', 'UK', 'WB',
-]
-
-export type BookingRole = 'MR' | 'ASM' | 'RM' | 'HO'
-
-export const BOOKING_ROLES: { id: BookingRole; label: string; desc: string }[] = [
-  { id: 'MR', label: 'MR', desc: 'Books own assigned doctors only' },
-  { id: 'ASM', label: 'ASM', desc: 'Own MRs + serviceability flags · books on their behalf' },
-  { id: 'RM', label: 'RM', desc: 'Own ASMs + their MRs + serviceability' },
-  { id: 'HO', label: 'HO', desc: 'Books on behalf of anyone in the company' },
-]
-
-export type ReportCadence = 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'SEMIANNUAL' | 'ANNUAL'
-
-export const REPORT_CADENCES: { id: ReportCadence; label: string }[] = [
-  { id: 'WEEKLY', label: 'Weekly' },
-  { id: 'BIWEEKLY', label: '15 days' },
-  { id: 'MONTHLY', label: 'Monthly' },
-  { id: 'QUARTERLY', label: 'Quarterly' },
-  { id: 'SEMIANNUAL', label: 'Six-monthly' },
-  { id: 'ANNUAL', label: 'Yearly' },
-]
-
-// Full pointer pool for the "Report format" ordered picker — sequence matters,
-// so this is the available pool, not the default selection (see DEFAULT_WIZARD_FORM).
-export const REPORT_POINTERS = [
-  'Camps executed', 'Patients screened', 'Doctor count', 'Conversion %', 'Cancellation count',
-  'Cancellation cost', 'NPS score', 'AR aging', 'Revenue MTD', 'Margin %', 'Risk bifurcation',
-  'Therapy mix', 'Geography mix', 'Top performing FOs',
-]
-
-export interface CancellationPolicy {
-  freeHoursPrior: number
-  pctAllowed: number
-  pctDeducted: number
+export const EXECUTION_MODE_LABEL: Record<ExecutionModeType, string> = {
+  po: 'PO Based',
+  agreement: 'Agreement Based',
+  mail_confirmation: 'Mail Confirmation',
 }
 
-export interface ProjectPo {
-  id: string
-  poNo: string
-  poDate: string
-  poExpiry: string
-  campCount: number
-  value: number
-  status: 'ACTIVE' | 'COMPLETED'
+// project.constants.ts's PROJECT_STATUS — 4 values (the old mock had only
+// LIVE/HOLD/CLOSED, no `new`). Every project starts at `new` server-side
+// (model default) and only moves via PATCH /projects/:id/stage.
+export type ProjectStatus = 'new' | 'live' | 'hold' | 'closed'
+
+export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
+  new: 'New',
+  live: 'Live',
+  hold: 'Hold',
+  closed: 'Closed',
 }
 
-export interface DietChartLink {
-  id: string
+// Not defined server-side — one consistent swatch per status for pills.
+export const PROJECT_STATUS_COLOR: Record<ProjectStatus, string> = {
+  new: '#3b6dff',
+  live: '#10b981',
+  hold: '#f59e0b',
+  closed: '#94a3b8',
+}
+
+// Mirrors project.constants.ts's PROJECT_TRANSITION_MAP exactly — the only
+// legal `to` values from a given current `status`. `closed` is terminal.
+export const PROJECT_STAGE_TRANSITION_MAP: Record<ProjectStatus, ProjectStatus[]> = {
+  new: ['live', 'hold', 'closed'],
+  live: ['hold', 'closed'],
+  hold: ['live', 'closed'],
+  closed: [],
+}
+
+export type PaymentTerms = 'net_30' | 'net_60' | 'net_90'
+
+export const PAYMENT_TERMS_LABEL: Record<PaymentTerms, string> = {
+  net_30: 'Net 30',
+  net_60: 'Net 60',
+  net_90: 'Net 90',
+}
+
+// project.constants.ts's CLIENT_REPORT_CANDANCE_TYPES — field name preserves
+// the backend's own spelling (clientReportCandance) verbatim, not "fixed."
+export type ClientReportCadence = 'weekly' | 'half_monthly' | 'monthly' | 'quarterly' | 'halfyearly' | 'yearly'
+
+export const CLIENT_REPORT_CADENCE_LABEL: Record<ClientReportCadence, string> = {
+  weekly: 'Weekly',
+  half_monthly: 'Half-monthly',
+  monthly: 'Monthly',
+  quarterly: 'Quarterly',
+  halfyearly: 'Half-yearly',
+  yearly: 'Yearly',
+}
+
+// project.constants.ts's CLIENT_REPORT_POINTERS — currently a single value.
+// Kept as a Record-driven map (not a hardcoded reorder widget) so a future
+// backend addition doesn't require a UI rebuild.
+export type AvailablePointer = 'camp_executed'
+
+export const AVAILABLE_POINTER_LABEL: Record<AvailablePointer, string> = {
+  camp_executed: 'Camps executed',
+}
+
+// project.constants.ts's PROJECT_GO_LIVE_SCOPE.
+export type GoLiveScopeCode = 'states' | 'cities' | 'pan'
+
+export const GO_LIVE_SCOPE_LABEL: Record<GoLiveScopeCode, string> = {
+  states: 'Specific states',
+  cities: 'Specific cities',
+  pan: 'PAN-India',
+}
+
+// project.model.ts's whoCanBookCamp enum is ALLOWED_ROLETYPE_CODES.CUSTOMER —
+// reuse the exact customer-side RoleTypeCode subset already defined in
+// role-type/constants/roleTypeCodes.ts rather than redeclaring a parallel
+// literal union (avoids drift if the backend enum ever changes).
+export type WhoCanBookCampCode = 'pharma-ho' | 'pharma-ms' | 'pharms-asm' | 'pharma-rsm'
+
+// ---------------------------------------------------------------------------
+// Nested value objects (plain shapes, not entities — no `id`)
+// ---------------------------------------------------------------------------
+
+// One flat object mirroring project.model.ts's executionModeSchema exactly.
+// All fields besides `mode` are optional and only meaningful for their own
+// mode (po / agreement / mail_confirmation) — the backend itself models this
+// as one sub-document, not a TS discriminated union.
+export interface ExecutionMode {
+  mode: ExecutionModeType
+  // po
+  poNumber?: string
+  poDate?: string
+  poExpiry?: string
+  // agreement
+  agreementNumber?: string
+  agreementStartDate?: string
+  agreementEndDate?: string
+  duration?: number
+  // No real file-upload endpoint confirmed for agreementDocument/emailDocument
+  // yet — both are plain string URL fields matching the backend's schema
+  // (`type: String`), not a base64 blob. See CreateProjectPayload's comment.
+  agreementDocument?: string
+  // mail_confirmation
+  emailReference?: string
+  emailDocument?: string
+}
+
+// Free-text HH:MM start/end pairs (project.model.ts's campTimeSlots) —
+// replaces the old mock's fixed slot-ID picker entirely.
+export interface CampTimeSlot {
+  start: string
+  end: string
+}
+
+export interface GoLiveScope {
+  code: GoLiveScopeCode
+  values: string[]
+}
+
+export interface DietChartEntry {
   name: string
   url: string
-  uploadedAt: string
 }
 
-export interface VoidCamp {
-  id: string
-  date: string
-  doctorName: string
-  city: string
-  mailUrl: string
-  approvedBy: string
-  notes: string
-  approvedAt: string
-}
-
-export interface ProjectStatusChange {
+export interface ProjectStageHistoryEntry {
   from: ProjectStatus
   to: ProjectStatus
   reason: string
-  at: string
-  by: string
+  // Raw Role ObjectId string — project.service.ts's populate array has no
+  // entry for stageHistory.createdBy (same as Lead's own stageHistory).
+  createdBy: string
+  createdAt: string
 }
 
-export interface UploadedDoc {
+// ---------------------------------------------------------------------------
+// Populated relation shapes
+// ---------------------------------------------------------------------------
+
+export interface ProjectPopulatedTenant {
+  _id?: string
   name: string
-  type: string
-  size: number
-  dataUrl: string
+  code: string
 }
 
-export interface Project {
+export interface ProjectPopulatedDivision {
+  _id?: string
+  name: string
+  code: string
+  therapy: DivisionTherapy
+}
+
+// project.service.ts's populate array selects only 'title status' for lead —
+// a deliberately slim shape, not the full LeadEntity.
+export interface ProjectPopulatedLead {
+  _id?: string
+  title: string
+  status: string
+}
+
+// Reused for salesRep/projectCoordinator/marketingContact — all three
+// populate as the full Role document (project.service.ts's populate array has
+// no `select` for these, same over-fetch pattern as Lead's contactPerson/
+// salesPerson). Only the fields actually consumed here are typed.
+export interface ProjectPopulatedRole {
+  _id?: string
+  code: string
+  name: string
+}
+
+// ---------------------------------------------------------------------------
+// Project
+// ---------------------------------------------------------------------------
+
+// GET /projects/:id and GET /projects (search) BOTH always populate
+// (project.controller.ts's get() always passes {populate:true}; search()'s
+// service function calls .populate() unconditionally) — so, like Lead, there
+// is effectively no raw-string case on any read path today. The `| string`
+// union only matters for typing a create/update/moveStage response's echo,
+// since none of those three re-fetch with populate before responding
+// (project.service.ts's update()/moveStage() call get(id, ctx) with no
+// {populate:true} option — confirmed the same behavior exists on Lead's own
+// update(), so this is a repo-wide convention, not a Project-specific gap).
+export interface ProjectEntity {
   id: string
   name: string
-  clientId: string
-  /** null when the project has no division — matches Camp.divisionId's sentinel */
-  divisionId: string | null
-  type: ProjectType
-  mixedSubTypes: MixedSubType[]
-  therapy: string
-  testsConducted: string[]
-
-  bookingLeadDays: number
-  status: ProjectStatus
-  executionMode: ExecutionMode
-
-  poNo: string
-  poDate: string
-  poExpiry: string
-  agreementNo: string
-  agreementStart: string
-  agreementExpiry: string
-  agreementDurationMonths: number
-  agreementDoc: UploadedDoc | null
-  mailRef: string
-  mailAttachmentDoc: UploadedDoc | null
-
+  tenant: ProjectPopulatedTenant | string
+  division: ProjectPopulatedDivision | string
+  therapy: ProjectTherapy
+  type: ProjectType[]
+  tests: ProjectTest[]
+  lead: ProjectPopulatedLead | string
+  mode: ExecutionMode | null
   campCost: number
   totalCamps: number
-  campsDone: number
-  valueBeforeGst: number
-  gstPct: number
-  gstAmount: number
-  valueAfterGst: number
-  additionalPatientCost: number
-
-  campTimeSlots: string[]
-  cancellationPolicy: CancellationPolicy
-  goLiveScope: GoLiveScope
-  goLiveDetails: string[]
-  bookingHierarchy: BookingRole[]
-
-  salesPersonId: string
-  coordinatorId: string
-  marketingContactId: string
-  paymentTerms: string
-  renewalReminderPct: number
-  reportCadence: ReportCadence
-  reportFormat: string[]
+  gst: number
+  valueBeforeGST: number
+  additionalCost: number
+  campTimeSlots: CampTimeSlot[]
+  freeCancelHours: number
+  cancellationAllowed: number
+  campCostDeductionOnChargableCancel: number
+  goLiveScope: GoLiveScope | null
+  whoCanBookCamp: WhoCanBookCampCode[]
+  salesRep: ProjectPopulatedRole | string
+  projectCoordinator: ProjectPopulatedRole | string
+  marketingContact: ProjectPopulatedRole | string
+  paymentTerms: PaymentTerms
+  status: ProjectStatus
+  stageHistory: ProjectStageHistoryEntry[]
+  daysToBookBefore: number
+  effectiveEarliestSlot?: string
+  dietChart: DietChartEntry[]
+  poRenewalReminder: number
+  clientReportCandance?: ClientReportCadence
+  availablePointers: AvailablePointer[]
   tats: string
   sops: string
-  dietCharts: DietChartLink[]
-
-  voidCamps: VoidCamp[]
-  closeReason: string
-
-  healthScore: number
-  startDate: string
-  endDate: string
   createdAt: string
   updatedAt: string
-
-  statusHistory: ProjectStatusChange[]
-  pos: ProjectPo[]
 }
 
-export interface ProjectKpis {
-  total: number
-  live: number
-  hold: number
-  closed: number
-  renewingIn30d: number
-  atRisk: number
-  overdue: number
-  totalCamps: number
-  closedCamps: number
+export interface SearchProjectQuery {
+  name?: string
+  status?: ProjectStatus
+  therapy?: ProjectTherapy
+  division?: string
+  lead?: string
+  salesRep?: string
+  page?: string
+  limit?: string
+}
+
+// Matches CreateProjectPayloadSchema exactly — tenant/division/status are NOT
+// accepted (derived server-side from `lead`).
+export interface CreateProjectPayload {
+  lead: string
+  name: string
+  therapy: ProjectTherapy
+  type: ProjectType[]
+  tests?: ProjectTest[]
+  mode?: ExecutionMode
+  campCost?: number
+  totalCamps?: number
+  gst?: number
+  valueBeforeGST?: number
+  additionalCost?: number
+  campTimeSlots?: CampTimeSlot[]
+  freeCancelHours?: number
+  cancellationAllowed?: number
+  campCostDeductionOnChargableCancel?: number
+  goLiveScope?: GoLiveScope
+  whoCanBookCamp?: WhoCanBookCampCode[]
+  salesRep: string
+  projectCoordinator: string
+  marketingContact: string
+  paymentTerms: PaymentTerms
+  daysToBookBefore?: number
+  effectiveEarliestSlot?: string
+  dietChart?: DietChartEntry[]
+  poRenewalReminder?: number
+  clientReportCandance?: ClientReportCadence
+  availablePointers?: AvailablePointer[]
+  tats?: string
+  sops?: string
+}
+
+// Same as create minus `lead` — lead/tenant/division/status are all immutable
+// post-create (status only ever moves through moveStage, per
+// project.service.ts's update()'s own comment: "lead/tenant/division/status
+// are not touched here").
+export interface UpdateProjectPayload {
+  name?: string
+  therapy?: ProjectTherapy
+  type?: ProjectType[]
+  tests?: ProjectTest[]
+  mode?: ExecutionMode
+  campCost?: number
+  totalCamps?: number
+  gst?: number
+  valueBeforeGST?: number
+  additionalCost?: number
+  campTimeSlots?: CampTimeSlot[]
+  freeCancelHours?: number
+  cancellationAllowed?: number
+  campCostDeductionOnChargableCancel?: number
+  goLiveScope?: GoLiveScope
+  whoCanBookCamp?: WhoCanBookCampCode[]
+  salesRep?: string
+  projectCoordinator?: string
+  marketingContact?: string
+  paymentTerms?: PaymentTerms
+  daysToBookBefore?: number
+  effectiveEarliestSlot?: string
+  dietChart?: DietChartEntry[]
+  poRenewalReminder?: number
+  clientReportCandance?: ClientReportCadence
+  availablePointers?: AvailablePointer[]
+  tats?: string
+  sops?: string
+}
+
+export interface MoveProjectStagePayload {
+  to: ProjectStatus
+  reason: string
+}
+
+// UI-only KPI shape for the Projects list header strip — no backend KPI
+// endpoint exists; computed client-side from the real ProjectEntity[] already
+// in cache, same convention as crm.types.ts's KpiTile.
+export interface ProjectKpiTile {
+  id: string
+  label: string
+  value: number | string
+  tone: string
 }

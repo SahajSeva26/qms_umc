@@ -5,7 +5,8 @@
 // TODO: entirely mock/frontend-only — no backend endpoints exist yet.
 
 import type { Camp } from '@/types/camp.types'
-import type { Project } from '@/types/project.types'
+import type { ProjectEntity } from '@/types/project.types'
+import { projectTenantName } from '@/features/projects/projects.utils'
 import {
   type FoProjectConfig, type FoTestDef, type ConsumableMapEntry, type InterpretationResult,
   DEFAULT_PATIENT_FIELDS, DEFAULT_SETUP_PHOTOS, DEFAULT_ADDITIONAL_PHOTOS, DEFAULT_DELAY_REASONS,
@@ -89,12 +90,12 @@ export async function deleteProjectConfig(projectId: string): Promise<void> {
   persist(KEYS.PROJECT_CONFIG, map)
 }
 
-export function blankProjectConfig(project: Project): FoProjectConfig {
+export function blankProjectConfig(project: ProjectEntity): FoProjectConfig {
   return {
     projectId: project.id,
     projectName: project.name,
     therapyArea: project.therapy,
-    clientId: project.clientId,
+    clientId: projectTenantName(project),
     patientFields: DEFAULT_PATIENT_FIELDS.slice(),
     tests: [],
     consent: { type: 'signature', mandatory: true, otpEnabled: true, uploadEnabled: true },
@@ -182,12 +183,15 @@ export function interpret(test: FoTestDef | undefined, rawValue: string | number
 // resolveForCamp() — the effective config for a camp: explicit project config
 // if one exists, else a keyword-derived default. Exact port of
 // fo-config-master.js:204-236.
-export async function resolveForCamp(camp: Camp | undefined, project: Project | undefined): Promise<FoProjectConfig & { source: 'project' | 'default' }> {
+export async function resolveForCamp(camp: Camp | undefined, project: ProjectEntity | undefined): Promise<FoProjectConfig & { source: 'project' | 'default' }> {
   if (camp?.projectId) {
     const proj = await getProjectConfig(camp.projectId)
     if (proj) return { ...proj, source: 'project' }
   }
-  const type = camp?.type ?? project?.type ?? 'General'
+  // project.type is a real backend array field now (a project can be more
+  // than one type) — take the first entry as the keyword-match input,
+  // matching this function's own "one representative type" contract.
+  const type = camp?.type ?? project?.type?.[0] ?? 'General'
   return {
     projectId: camp?.projectId ?? '',
     patientFields: DEFAULT_PATIENT_FIELDS.slice(),

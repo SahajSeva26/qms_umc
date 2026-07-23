@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as foConfigService from '@/features/fo/foConfig.service'
 import type { FoProjectConfig, FoTestDef, ConsumableMapEntry } from '@/features/fo/foConfig.types'
-import type { Project } from '@/types/project.types'
+import type { ProjectEntity } from '@/types/project.types'
 
 // React Query wrapper around foConfig.service.ts (the FO Config Master
 // engine). All CRUD/interpretation logic lives in the service — this hook
@@ -60,7 +60,7 @@ export const useFoConfig = () => {
 
     // Effective config for a project — explicit saved config if one exists,
     // else a blank default seeded from the project's own name/therapy/client.
-    getProjectConfigOrBlank: async (project: Project): Promise<FoProjectConfig> => {
+    getProjectConfigOrBlank: async (project: ProjectEntity): Promise<FoProjectConfig> => {
       const existing = await foConfigService.getProjectConfig(project.id)
       return existing ?? foConfigService.blankProjectConfig(project)
     },

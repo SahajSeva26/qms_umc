@@ -1,8 +1,9 @@
 import SideDrawer from '@/components/ui/SideDrawer'
 import { Button } from '@/components/ui/button'
 import { FiUserPlus, FiUserX, FiSliders, FiCheck, FiX } from 'react-icons/fi'
-import type { Project, ProjectStatus } from '@/types/project.types'
-import { CLIENTS } from '@/types/client.types'
+import type { ProjectEntity, ProjectStatus } from '@/types/project.types'
+import { PROJECT_STATUS_LABEL, PROJECT_THERAPY_LABEL } from '@/types/project.types'
+import { projectTenantName } from '@/features/projects/projects.utils'
 import type { Person } from '@/types/people.types'
 import type { Doctor } from '@/types/camp.types'
 import type { Assignment, Attendance, DedicatedProjectConfig, ManpowerRoleKey } from '@/features/dedicatedops/dedicatedops.types'
@@ -15,7 +16,7 @@ interface ProjectDetailDrawerProps {
   onClose: () => void
   projectId: string | null
   onGoToSop?: () => void
-  project?: Project
+  project?: ProjectEntity
   projectConfig?: DedicatedProjectConfig
   assignments: Record<string, Assignment>
   attendance: Attendance[]
@@ -43,14 +44,13 @@ function fmtTime(iso: string): string {
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10)
 }
-function clientName(clientId: string): string {
-  return CLIENTS.find((c) => c.id === clientId)?.name ?? clientId
-}
 
-// Project.status is the real lifecycle status (LIVE/HOLD/CLOSED), not the
-// fill-rate pill — matches the prototype's status pill on the drawer header
-// (dedicated-ops.js:175) which is a separate pill from the fill-rate bar.
-const STATUS_TONE: Record<ProjectStatus, DoPillTone> = { LIVE: 'ok', HOLD: 'warn', CLOSED: 'info' }
+// Project.status is the real lifecycle status (new/live/hold/closed), not
+// the fill-rate pill — matches the prototype's status pill on the drawer
+// header (dedicated-ops.js:175) which is a separate pill from the fill-rate
+// bar. Real backend model has 4 values (new/live/hold/closed), not the old
+// mock's 3 (LIVE/HOLD/CLOSED).
+const STATUS_TONE: Record<ProjectStatus, DoPillTone> = { new: 'info', live: 'ok', hold: 'warn', closed: 'info' }
 
 const ProjectDetailDrawer = ({
   open, onClose, projectId, onGoToSop,
@@ -79,13 +79,13 @@ const ProjectDetailDrawer = ({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <DoPill tone="dedi">DEDICATED</DoPill>
-            <DoPill tone={STATUS_TONE[project.status] ?? 'info'}>{project.status || '—'}</DoPill>
+            <DoPill tone={STATUS_TONE[project.status] ?? 'info'}>{PROJECT_STATUS_LABEL[project.status] || '—'}</DoPill>
           </div>
           <div className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>{project.id}</div>
         </div>
         <div className="mt-1.5 font-bold text-[14px]" style={{ color: 'var(--qms-text)' }}>{project.name || project.id}</div>
         <div className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>
-          {clientName(project.clientId)}{project.therapy ? ` · ${project.therapy}` : ''}
+          {projectTenantName(project)}{project.therapy ? ` · ${PROJECT_THERAPY_LABEL[project.therapy]}` : ''}
         </div>
         <div className="text-[12px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>
           Territory: {territory?.city || '—'}{territory?.state ? `, ${territory.state}` : ''}{territory?.zone ? ` · ${territory.zone} zone` : ''}

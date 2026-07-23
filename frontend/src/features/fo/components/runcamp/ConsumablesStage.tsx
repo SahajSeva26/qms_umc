@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { FiCheckCircle, FiXCircle, FiPackage } from 'react-icons/fi'
 import type { Camp } from '@/types/camp.types'
-import type { Project } from '@/types/project.types'
+import type { ProjectEntity } from '@/types/project.types'
 import type { ConsumableLot } from '@/features/fo/fo.types'
 import { resolveForCamp, consumablesForTest } from '@/features/fo/foConfig.service'
 
 interface ConsumablesStageProps {
   camp: Camp
-  project: Project | undefined
+  project: ProjectEntity | undefined
   consumables: ConsumableLot[]
   onResolveLots: (lotIds: string[]) => void
 }

@@ -7,13 +7,13 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { toast } from '@/components/ui/sonner'
 import { SLOTS } from '@/features/camps/camps.mock'
 import type { Camp, CampCancellation } from '@/types/camp.types'
-import type { Project } from '@/types/project.types'
+import type { ProjectEntity } from '@/types/project.types'
 
 interface CancelCampModalProps {
   open: boolean
   onClose: () => void
   camp: Camp
-  project?: Project
+  project?: ProjectEntity
 }
 
 const REASON_OPTIONS: { value: CampCancellation['reason']; label: string }[] = [
@@ -41,8 +41,13 @@ function hoursUntilCamp(camp: Camp): number {
 }
 
 // Mirrors camps-manager.js's computeCancellationCharge() (line 282-297).
-function computeCancellationCharge(camp: Camp, project?: Project) {
-  const policy = project?.cancellationPolicy || DEFAULT_POLICY
+// Real backend Project has no nested cancellationPolicy object — 3 flat
+// fields instead (freeCancelHours/cancellationAllowed/
+// campCostDeductionOnChargableCancel).
+function computeCancellationCharge(camp: Camp, project?: ProjectEntity) {
+  const policy = project
+    ? { freeHoursPrior: project.freeCancelHours, pctAllowed: project.cancellationAllowed, pctDeducted: project.campCostDeductionOnChargableCancel }
+    : DEFAULT_POLICY
   const hrs = hoursUntilCamp(camp)
   const unitCost = project?.campCost || 5000
   const isFree = hrs >= policy.freeHoursPrior

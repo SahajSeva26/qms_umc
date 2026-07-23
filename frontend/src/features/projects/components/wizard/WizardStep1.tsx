@@ -1,9 +1,8 @@
-import { FiActivity, FiHeart, FiVideo, FiDroplet, FiShuffle, FiBriefcase, FiTag, FiLayers } from 'react-icons/fi'
+import { FiActivity, FiHeart, FiVideo, FiDroplet, FiShuffle, FiTag, FiInfo } from 'react-icons/fi'
 import type { WizardFormState } from '@/features/projects/wizard.types'
-import type { MixedSubType, ProjectType } from '@/types/project.types'
-import { CLIENTS, DIVISIONS } from '@/types/client.types'
-import { PROJECT_TYPES, MIXED_SUBTYPES, THERAPIES } from '@/types/project.types'
-import { TESTS } from '@/features/projects/projects.tests'
+import type { ProjectTest, ProjectTherapy, ProjectType } from '@/types/project.types'
+import { PROJECT_TEST_LABEL, PROJECT_THERAPY_LABEL, PROJECT_TYPE_LABEL } from '@/types/project.types'
+import { PROJECT_TYPE_COLOR } from '@/features/projects/projects.utils'
 import { PickCard, PickGrid } from '@/components/ui/PickCard'
 import SectionHeader from '@/components/ui/SectionHeader'
 import { ChipRow, ChipToggle } from '@/components/ui/ChipToggle'
@@ -13,148 +12,89 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { labelClasses, labelStyle, fieldClasses } from '@/features/projects/components/wizard/wizard.styles'
 
 const TYPE_ICONS: Record<ProjectType, typeof FiActivity> = {
-  Screening: FiActivity,
-  Diet: FiHeart,
-  TeleDiet: FiVideo,
-  Lab: FiDroplet,
-  Mixed: FiShuffle,
+  screening_camp: FiActivity,
+  diet: FiHeart,
+  teleconsultation_diet: FiVideo,
+  lab_test: FiDroplet,
+  mixed: FiShuffle,
 }
 
-const MIXED_ICONS: Record<MixedSubType, typeof FiActivity> = {
-  Screening: FiActivity,
-  Diet: FiHeart,
-  DedicatedFO: FiBriefcase,
-  Lab: FiDroplet,
-}
+const THERAPY_OPTIONS = Object.keys(PROJECT_THERAPY_LABEL) as ProjectTherapy[]
+const TYPE_OPTIONS = Object.keys(PROJECT_TYPE_LABEL) as ProjectType[]
+const TEST_OPTIONS = Object.keys(PROJECT_TEST_LABEL) as ProjectTest[]
 
 interface WizardStep1Props {
   form: WizardFormState
   setField: <K extends keyof WizardFormState>(key: K, value: WizardFormState[K]) => void
 }
 
+// Client/division no longer picked here — they're derived server-side from
+// the Step 0-selected lead's own tenant/division (never sent in the create
+// payload). `type` is now a real multi-select array (backend model field),
+// not a single-select — this also removes the old "Mixed" special case
+// entirely: a project can just be `type: ['diet', 'lab_test']` directly.
 const WizardStep1 = ({ form, setField }: WizardStep1Props) => {
-  const divisionOptions = DIVISIONS.filter((d) => !form.clientId || d.clientId === form.clientId)
-
-  const toggleMixedSubType = (id: MixedSubType) => {
-    setField(
-      'mixedSubTypes',
-      form.mixedSubTypes.includes(id) ? form.mixedSubTypes.filter((s) => s !== id) : [...form.mixedSubTypes, id]
-    )
+  const toggleType = (id: ProjectType) => {
+    setField('type', form.type.includes(id) ? form.type.filter((t) => t !== id) : [...form.type, id])
   }
 
-  const toggleTest = (testId: string) => {
-    setField(
-      'testsConducted',
-      form.testsConducted.includes(testId) ? form.testsConducted.filter((t) => t !== testId) : [...form.testsConducted, testId]
-    )
+  const toggleTest = (id: ProjectTest) => {
+    setField('tests', form.tests.includes(id) ? form.tests.filter((t) => t !== id) : [...form.tests, id])
   }
 
   return (
     <div className="space-y-4">
+      {form.leadId && (
+        <div className="flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg" style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text-muted)' }}>
+          <FiInfo size={12} />
+          Creating for <span style={{ color: 'var(--qms-text)' }}>{form.leadTenantName || '—'}</span>
+          {form.leadDivisionName && <> · <span style={{ color: 'var(--qms-text)' }}>{form.leadDivisionName}</span></>}
+          {' '}(from lead "{form.leadTitle}")
+        </div>
+      )}
+
       <div>
         <Label className={labelClasses} style={labelStyle}>Project name *</Label>
         <Input type="text" value={form.name} onChange={(e) => setField('name', e.target.value)} className={fieldClasses} placeholder="e.g. Sun Cardio · Mumbai Screening · FY26" />
       </div>
 
-      <div className="grid grid-cols-2 gap-2.5">
-        <div>
-          <Label className={labelClasses} style={labelStyle}>Pharma client *</Label>
-          <Select value={form.clientId} onValueChange={(v) => { setField('clientId', v as string); setField('divisionId', '') }}>
-            <SelectTrigger className={`w-full ${fieldClasses}`}><SelectValue placeholder="— select pharma —" /></SelectTrigger>
-            <SelectContent>
-              {CLIENTS.map((c) => (
-                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label className={labelClasses} style={labelStyle}>Division</Label>
-          <Select value={form.divisionId} onValueChange={(v) => setField('divisionId', v as string)}>
-            <SelectTrigger className={`w-full ${fieldClasses}`}><SelectValue placeholder="— select division —" /></SelectTrigger>
-            <SelectContent>
-              {divisionOptions.map((d) => (
-                <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
       <div>
-        <Label className={labelClasses} style={labelStyle}>Therapy</Label>
-        <Select value={form.therapy} onValueChange={(v) => setField('therapy', v as string)}>
+        <Label className={labelClasses} style={labelStyle}>Therapy *</Label>
+        <Select value={form.therapy} onValueChange={(v) => setField('therapy', v as ProjectTherapy)}>
           <SelectTrigger className={`w-full ${fieldClasses}`}><SelectValue placeholder="— therapy —" /></SelectTrigger>
           <SelectContent>
-            {THERAPIES.map((t) => (
-              <SelectItem key={t} value={t}>{t}</SelectItem>
+            {THERAPY_OPTIONS.map((t) => (
+              <SelectItem key={t} value={t}>{PROJECT_THERAPY_LABEL[t]}</SelectItem>
             ))}
           </SelectContent>
         </Select>
       </div>
 
       <div>
-        <SectionHeader icon={FiTag} spaced={false}>Type of project *</SectionHeader>
+        <SectionHeader icon={FiTag} spaced={false}>Type of project (multi-select) *</SectionHeader>
         <PickGrid>
-          {PROJECT_TYPES.map((pt) => (
+          {TYPE_OPTIONS.map((pt) => (
             <PickCard
-              key={pt.id}
-              active={form.type === pt.id}
-              color={pt.color}
-              label={pt.label}
-              icon={TYPE_ICONS[pt.id]}
-              onClick={() => { setField('type', pt.id); if (pt.id !== 'Mixed') setField('mixedSubTypes', []) }}
+              key={pt}
+              active={form.type.includes(pt)}
+              color={PROJECT_TYPE_COLOR[pt]}
+              label={PROJECT_TYPE_LABEL[pt]}
+              icon={TYPE_ICONS[pt]}
+              onClick={() => toggleType(pt)}
             />
           ))}
         </PickGrid>
       </div>
 
-      {form.type === 'Mixed' && (
-        <div>
-          <SectionHeader icon={FiLayers}>Mixed project · pick the sub-types in scope *</SectionHeader>
-          <div className="grid grid-cols-2 gap-2">
-            {MIXED_SUBTYPES.map((st) => {
-              const checked = form.mixedSubTypes.includes(st.id)
-              const Icon = MIXED_ICONS[st.id]
-              return (
-                <label
-                  key={st.id}
-                  className="flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] border cursor-pointer transition-colors"
-                  style={{
-                    borderColor: checked ? st.color : 'var(--qms-border)',
-                    background: checked ? `color-mix(in srgb, ${st.color} 8%, transparent)` : 'var(--qms-surface)',
-                  }}
-                >
-                  <input type="checkbox" checked={checked} onChange={() => toggleMixedSubType(st.id)} className="sr-only" />
-                  <span
-                    className="inline-flex items-center justify-center w-7 h-7 rounded-lg shrink-0 text-white"
-                    style={{ background: st.color }}
-                  >
-                    <Icon size={14} />
-                  </span>
-                  <span className="text-[12.5px] font-extrabold" style={{ color: 'var(--qms-text)' }}>{st.label}</span>
-                </label>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
       <div>
         <SectionHeader icon={FiDroplet}>Tests to be conducted</SectionHeader>
-        {TESTS.length > 0 ? (
-          <ChipRow>
-            {TESTS.map((t) => (
-              <ChipToggle key={t.id} active={form.testsConducted.includes(t.id)} onClick={() => toggleTest(t.id)}>
-                {t.code}
-              </ChipToggle>
-            ))}
-          </ChipRow>
-        ) : (
-          <p className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>
-            No tests in master · add in Admin → Master → Tests first.
-          </p>
-        )}
+        <ChipRow>
+          {TEST_OPTIONS.map((t) => (
+            <ChipToggle key={t} active={form.tests.includes(t)} onClick={() => toggleTest(t)}>
+              {PROJECT_TEST_LABEL[t]}
+            </ChipToggle>
+          ))}
+        </ChipRow>
       </div>
     </div>
   )

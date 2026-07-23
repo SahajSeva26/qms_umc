@@ -4,7 +4,7 @@ import type {
 } from '@/features/dedicatedops/dedicatedops.types'
 import { DEFAULT_MANPOWER, DEFAULT_SOP } from '@/features/dedicatedops/dedicatedops.types'
 import { SEED_PROJECT_CONFIG, SEED_ASSIGNMENTS, SEED_ATTENDANCE, SEED_SCREENINGS } from '@/features/dedicatedops/dedicatedops.mock'
-import type { Project } from '@/types/project.types'
+import type { ProjectEntity } from '@/types/project.types'
 
 // TODO: replace with real API calls once backend endpoints exist.
 // Storage keys mirror the prototype's dedicated-data.js exactly
@@ -48,12 +48,15 @@ function loadScreenings(): Screening[] {
   return load(KEYS.SCR, SEED_SCREENINGS)
 }
 
-// isDedicated() — dual-path check exactly as the prototype: the overlay
-// config OR the base project's own `type` field (case-insensitive) says so.
-export function isDedicated(project: Project, configs: Record<string, DedicatedProjectConfig>): boolean {
+// isDedicated() — the overlay config's own `type` flag is the real signal.
+// The old mock's second check (base project's own `type` field literally
+// saying "dedicated") never had a real backend equivalent — the real
+// ProjectType enum (screening_camp/diet/teleconsultation_diet/lab_test/
+// mixed) has no "dedicated" value at all, so that branch is dropped rather
+// than kept as permanently-dead code.
+export function isDedicated(project: ProjectEntity, configs: Record<string, DedicatedProjectConfig>): boolean {
   const cfg = configs[project.id]
-  if (cfg?.type === 'Dedicated') return true
-  return String(project.type ?? '').toLowerCase() === 'dedicated'
+  return cfg?.type === 'Dedicated'
 }
 
 export interface DedicatedOpsData {

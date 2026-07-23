@@ -1,7 +1,9 @@
 import { FiNavigation, FiUserCheck, FiCreditCard, FiBriefcase, FiFileText, FiDollarSign, FiClipboard as FiAudit, FiArrowRight, FiFilePlus, FiAward, FiFolder, FiHome } from 'react-icons/fi'
 import type { Camp } from '@/types/camp.types'
 import type { Person } from '@/types/people.types'
-import type { Project } from '@/types/project.types'
+import type { ProjectEntity } from '@/types/project.types'
+import { PROJECT_STATUS_LABEL } from '@/types/project.types'
+import { computeGstBreakdown, projectTenantName } from '@/features/projects/projects.utils'
 import type { ExpenseStatus } from '@/features/om/om.types'
 import {
   campStatus, campsOfType, isCampUnassigned, expensesOfType, dietitianExpensesOfType,
@@ -9,7 +11,6 @@ import {
 } from '@/features/om/om.service'
 import KpiTile from '@/components/ui/KpiTile'
 import DoBar from '@/features/dedicatedops/components/DoBar'
-import { clientName } from '@/types/campref.types'
 import { formatINR } from '@/utils/formatters'
 
 interface OverviewTabProps {
@@ -17,9 +18,18 @@ interface OverviewTabProps {
   mode: 'Screening' | 'Diet'
   fos: Person[]
   dietitians: Person[]
-  projects: Project[]
+  projects: ProjectEntity[]
   expenseOverlay: Record<string, ExpenseStatus>
   onGoTab: (tab: string) => void
+}
+
+// Real backend ProjectType values that correspond to this tab's Screening/Diet
+// mode split — 'mixed' projects show under both, matching the old mock's
+// intent (a mixed project touches both modes) more faithfully than the old
+// single-value equality check ever did.
+const MODE_TYPES: Record<'Screening' | 'Diet', string[]> = {
+  Screening: ['screening_camp', 'mixed'],
+  Diet: ['diet', 'teleconsultation_diet', 'mixed'],
 }
 
 const ACCENT: Record<'Screening' | 'Diet', string> = { Screening: '#3b6dff', Diet: '#10b981' }
@@ -91,8 +101,9 @@ const OverviewTab = ({ camps, mode, fos, dietitians, projects, expenseOverlay, o
   const reportMissing = audit.filter((a) => a.reportMissing).length
   const countMissing = audit.filter((a) => a.countMissing).length
 
-  // Projects of this type
-  const modeProjects = projects.filter((p) => p.type === mode)
+  // Projects of this type — `type` is a real backend array field now (a
+  // project can be more than one type), not the old mock's single-value enum.
+  const modeProjects = projects.filter((p) => p.type.some((t) => MODE_TYPES[mode].includes(t)))
 
   // Billing/revenue — no billing-engine module exists yet in our app (Phase 2
   // per CLAUDE.md); left as honest zeros rather than fabricated, matching the
@@ -247,42 +258,42 @@ const OverviewTab = ({ camps, mode, fos, dietitians, projects, expenseOverlay, o
         </div>
       </div>
 
-      {/* Projects · PO position */}
+      {/* Projects — rebuilt against only real Project fields. The old
+          PO-progress-bar and Health columns depended on campsDone/healthScore,
+          neither of which exist on the real backend model — dropped rather
+          than faked; Total camps (a flat count, no progress fraction) and
+          Total value (computed from valueBeforeGST+gst, no stored
+          valueAfterGst) replace them. */}
       <div className="rounded-xl border p-3.5 mb-3" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
         <div className="flex items-center gap-2 text-[13px] font-bold mb-2.5" style={{ color: 'var(--qms-text)' }}>
-          <FiFolder size={15} style={{ color: accent }} /> {mode} projects · PO position
+          <FiFolder size={15} style={{ color: accent }} /> {mode} projects
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-[12px]">
             <thead>
               <tr>
-                {['Project', 'Status', 'PO progress', 'PO value', 'Health'].map((h) => (
+                {['Project', 'Status', 'Total camps', 'Total value'].map((h) => (
                   <th key={h} className="text-left font-semibold px-2 py-1.5" style={{ color: 'var(--qms-text-muted)' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {modeProjects.slice(0, 8).map((p) => {
-                const pct = p.totalCamps ? Math.round((100 * p.campsDone) / p.totalCamps) : 0
-                const hc = p.healthScore >= 80 ? '#10b981' : p.healthScore >= 60 ? '#f59e0b' : '#f43f5e'
+                const { valueAfterGST } = computeGstBreakdown(p.valueBeforeGST, p.gst)
                 return (
                   <tr key={p.id} className="border-t" style={{ borderColor: 'var(--qms-border)' }}>
                     <td className="px-2 py-1.5">
                       <div className="font-semibold" style={{ color: 'var(--qms-text)' }}>{p.name}</div>
-                      <div className="text-[10px]" style={{ color: 'var(--qms-text-muted)' }}>{clientName(p.clientId)}</div>
+                      <div className="text-[10px]" style={{ color: 'var(--qms-text-muted)' }}>{projectTenantName(p)}</div>
                     </td>
-                    <td className="px-2 py-1.5" style={{ color: STATUS_COLOR[p.status] ?? 'var(--qms-text-soft)' }}>{p.status}</td>
-                    <td className="px-2 py-1.5 min-w-30">
-                      <div className="text-[10px] mb-1" style={{ color: 'var(--qms-text-muted)' }}>{p.campsDone}/{p.totalCamps} camps</div>
-                      <DoBar pct={Math.min(100, pct)} color={accent} />
-                    </td>
-                    <td className="px-2 py-1.5 text-right font-bold" style={{ color: 'var(--qms-text)' }}>{formatINR(p.valueAfterGst)}</td>
-                    <td className="px-2 py-1.5 text-center font-extrabold" style={{ color: hc }}>{p.healthScore || '—'}</td>
+                    <td className="px-2 py-1.5" style={{ color: STATUS_COLOR[p.status] ?? 'var(--qms-text-soft)' }}>{PROJECT_STATUS_LABEL[p.status] ?? p.status}</td>
+                    <td className="px-2 py-1.5" style={{ color: 'var(--qms-text)' }}>{p.totalCamps}</td>
+                    <td className="px-2 py-1.5 text-right font-bold" style={{ color: 'var(--qms-text)' }}>{formatINR(valueAfterGST)}</td>
                   </tr>
                 )
               })}
               {modeProjects.length === 0 && (
-                <tr><td colSpan={5} className="text-center py-3.5 text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>No {mode} projects.</td></tr>
+                <tr><td colSpan={4} className="text-center py-3.5 text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>No {mode} projects.</td></tr>
               )}
             </tbody>
           </table>

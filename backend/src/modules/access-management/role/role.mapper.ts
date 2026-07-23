@@ -11,6 +11,7 @@ export const RoleMapper = {
             user: role.user,
             tenant: role.tenant,
             division: role.division,
+            supervisor: role.supervisor,
             createdAt: role.createdAt,
             updatedAt: role.updatedAt,
         };

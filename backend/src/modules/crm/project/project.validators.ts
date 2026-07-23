@@ -75,7 +75,7 @@ export const CreateProjectPayloadSchema = z.object({
     whoCanBookCamp: z
         .array(z.enum(Object.values(ALLOWED_ROLETYPE_CODES.CUSTOMER)))
         .optional()
-        .openapi({ example: ['pharma-ms'] }),
+        .openapi({ example: ['pharma-mr'] }),
 
     // team (QMS internal staff)
     salesRep: objectId('Sales rep').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8b' }),

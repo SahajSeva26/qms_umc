@@ -29,6 +29,10 @@ const populate: any[] = [
         path: 'user',
         select: 'firstName lastName email phone gender status',
     },
+    {
+        path: 'supervisor',
+        select: 'code name type tenant division',
+    },
 ];
 
 // ========================================================================================
@@ -81,6 +85,24 @@ const set = async (model: any, entity: HydratedDocument<IRoleDocument>, ctx: Req
             throwAppError('Division not found', StatusCodes.NOT_FOUND);
         }
         entity.division = toObjectId(model.division);
+    }
+
+    if (model.supervisor) {
+        // a role cannot report to itself
+        if (model.supervisor === entity._id.toString()) {
+            throwAppError('A role cannot be its own supervisor', StatusCodes.BAD_REQUEST);
+        }
+        // the manager (supervisor) must exist, be visible to the actor, and belong to the role's
+        // own tenant — a role can only report to someone inside the same company. Fetch populated so
+        // the tenant is a document we can compare by _id.
+        const supervisor: any = await RoleService.get(model.supervisor, ctx, { populate: true });
+        if (!supervisor) {
+            throwAppError('Supervisor not found', StatusCodes.NOT_FOUND);
+        }
+        if (supervisor.tenant?._id?.toString() !== entity.tenant.toString()) {
+            throwAppError('Supervisor must belong to the same tenant', StatusCodes.BAD_REQUEST);
+        }
+        entity.supervisor = toObjectId(model.supervisor);
     }
 
     if (model.permissions && model.permissions.length > 0) {
@@ -147,6 +169,9 @@ const search = async (filters: ISearchRoleQuery, ctx: RequestContext, options?: 
     }
     if (filters.division) {
         where.division = toObjectId(filters.division);
+    }
+    if (filters.supervisor) {
+        where.supervisor = toObjectId(filters.supervisor);
     }
 
     const countPromise = RoleModel.countDocuments(where);

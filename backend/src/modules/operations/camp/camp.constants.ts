@@ -1,6 +1,7 @@
 // Camp Constants
 
 import { ALLOWED_ROLETYPE_CODES } from '../../access-management/role-type/roleType.constants';
+import { DOCTOR_PERMISSIONS } from '../../doctor/doctor.constants';
 
 export const CAMP_TYPES = {
     SCREENING: 'screening',
@@ -78,47 +79,3 @@ export const CAMP_PERMISSIONS = {
 // CAMP BUSINESS ROLE TYPES
 //============================================================
 
-export const CAMP_BUSINESS_ROLE_TYPES = [
-    {
-        code: ALLOWED_ROLETYPE_CODES.PLATFORM.CAMP_COORDINATOR_SCREENING,
-        name: 'Camp Coordinator (Screening)',
-        description: 'Screening camp coordinator — manages camps',
-        permissions: [
-            CAMP_PERMISSIONS.SEARCH.code,
-            CAMP_PERMISSIONS.GET.code,
-            CAMP_PERMISSIONS.CREATE.code,
-            CAMP_PERMISSIONS.UPDATE.code,
-            
-        ],
-    },
-    {
-        code: ALLOWED_ROLETYPE_CODES.PLATFORM.CAMP_COORDINATOR_DIET,
-        name: 'Camp Coordinator (Diet)',
-        description: 'Diet camp coordinator — manages camps',
-        permissions: [
-            CAMP_PERMISSIONS.SEARCH.code,
-            CAMP_PERMISSIONS.GET.code,
-            CAMP_PERMISSIONS.CREATE.code,
-            CAMP_PERMISSIONS.UPDATE.code,
-        ],
-    },
-    {
-        code: ALLOWED_ROLETYPE_CODES.PLATFORM.OPERATION_MANAGER_SCREENING,
-        name: 'Ops Manager Screening',
-        description: 'Ops manager screening — view camps',
-        permissions: [CAMP_PERMISSIONS.MANAGE.code],
-    },
-    {
-        code: ALLOWED_ROLETYPE_CODES.PLATFORM.OPERATION_MANAGER_DIET,
-        name: 'Ops Manager Diet',
-        description: 'Ops manager diet — view camps',
-        permissions: [CAMP_PERMISSIONS.MANAGE.code],
-    },
-
-    {
-        code: ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER,
-        name: 'Field Officer',
-        description: 'Field officer — view camps',
-        permissions: [CAMP_PERMISSIONS.SEARCH.code, CAMP_PERMISSIONS.GET.code],
-    },
-];

@@ -48,6 +48,15 @@ const roleSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Division',
     },
+    // Optional reporting link — the role this role reports to (its manager). Drives the
+    // field-force org tree (e.g. MR -> ASM -> RSM): many roles may point at the same supervisor,
+    // which is how "one RSM has many ASMs, one ASM has many MRs" falls out. Left empty for anyone
+    // at the top of a chain and for internal/platform roles that have no hierarchy. The supervisor
+    // must belong to the same tenant; cycles are rejected in the service.
+    supervisor: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Role',
+    },
 });
 roleSchema.index({ tenant: 1, code: 1 }, { unique: true });
 export const RoleModel = mongoose.model('Role', roleSchema);

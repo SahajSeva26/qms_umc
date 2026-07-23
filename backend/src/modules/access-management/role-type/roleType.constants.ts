@@ -22,9 +22,9 @@ export const ALLOWED_ROLETYPE_CODES = {
     },
     CUSTOMER: {
         PHARMA_HO: 'pharma-ho',
-        PHARMA_MS: 'pharma-ms',
-        PHARMS_ASM: 'pharms-asm',
+        PHARMA_ASM: 'pharma-asm',
         PHARMA_RSM: 'pharma-rsm',
+        PHARMA_MR: 'pharma-mr',
     },
 } as const;
 
@@ -54,13 +54,7 @@ export const DEFAULT_PHARMA_ROLE_TYPES = [
         permissions: [] as string[],
     },
     {
-        code: ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MS,
-        name: 'Pharma MS',
-        description: 'Pharma MS',
-        permissions: [] as string[],
-    },
-    {
-        code: ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMS_ASM,
+        code: ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_ASM,
         name: 'Pharma ASM',
         description: 'Pharma area sales manager',
         permissions: [] as string[],
@@ -69,6 +63,12 @@ export const DEFAULT_PHARMA_ROLE_TYPES = [
         code: ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_RSM,
         name: 'Pharma RSM',
         description: 'Pharma regional sales manager',
+        permissions: [] as string[],
+    },
+    {
+        code: ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR,
+        name: 'Pharma MR',
+        description: 'Pharma MR',
         permissions: [] as string[],
     },
 ];

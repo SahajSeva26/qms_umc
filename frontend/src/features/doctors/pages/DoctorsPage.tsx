@@ -1,122 +1,102 @@
 import { useMemo, useState } from 'react'
-import { FiUsers, FiVideo, FiTrendingUp, FiLayers, FiMap, FiMoon, FiSend, FiUpload, FiDownload, FiPlus, FiZap, FiAward, FiCheckCircle, FiClock, FiStar } from 'react-icons/fi'
+import { FiUsers, FiLayers, FiMap, FiMoon, FiPlus, FiCheckCircle } from 'react-icons/fi'
 import KpiTile from '@/components/ui/KpiTile'
-import { toast } from '@/components/ui/sonner'
+import PaginationControls from '@/components/ui/PaginationControls'
 import { useDoctors } from '@/features/doctors/hooks/useDoctors'
-import type { Doctor } from '@/features/doctors/doctors.types'
-import type { DoctorFilters } from '@/features/doctors/components/DoctorFilterBar'
+import { useDoctorsFilters } from '@/features/doctors/hooks/useDoctorsFilters'
+import type { DoctorEntity, DoctorSpecialization } from '@/types/doctor.types'
 import RosterTab from '@/features/doctors/components/tabs/RosterTab'
-import EngagementTab from '@/features/doctors/components/tabs/EngagementTab'
 import SpecialtiesTab from '@/features/doctors/components/tabs/SpecialtiesTab'
 import GeographyTab from '@/features/doctors/components/tabs/GeographyTab'
 import InactiveTab from '@/features/doctors/components/tabs/InactiveTab'
-import BroadcastsTab from '@/features/doctors/components/tabs/BroadcastsTab'
-import TeleConsultTab from '@/features/doctors/components/tabs/TeleConsultTab'
 import DoctorDrawer from '@/features/doctors/components/DoctorDrawer'
 import EditDoctorModal from '@/features/doctors/components/EditDoctorModal'
 
-type TabId = 'roster' | 'tele' | 'engagement' | 'specialties' | 'geography' | 'inactive' | 'broadcasts'
+type TabId = 'roster' | 'specialties' | 'geography' | 'inactive'
 
 const TABS: { id: TabId; label: string; icon: typeof FiUsers }[] = [
   { id: 'roster', label: 'Roster', icon: FiUsers },
-  { id: 'tele', label: 'Tele Consultation', icon: FiVideo },
-  { id: 'engagement', label: 'Engagement', icon: FiTrendingUp },
   { id: 'specialties', label: 'Specialties', icon: FiLayers },
   { id: 'geography', label: 'Geography', icon: FiMap },
   { id: 'inactive', label: 'Inactive', icon: FiMoon },
-  { id: 'broadcasts', label: 'Broadcasts', icon: FiSend },
 ]
 
-const HEADER_CHIPS = [
-  { icon: null, label: 'Doctor master · live', live: true },
-  { icon: FiZap, label: 'Engagement scored' },
-  { icon: FiMap, label: 'Geo-mapped' },
-  { icon: FiSend, label: 'Broadcast-ready' },
-]
+const PAGE_SIZE = 20
 
-const emptyFilters: DoctorFilters = { specialty: 'ALL', city: 'ALL', band: 'ALL', search: '' }
+// Real backend-integrated Doctor Management. Tele Consultation/Engagement/
+// Broadcasts tabs from the mock-era build are dropped entirely — they were
+// derived from Camp data (camp gaps, ratings, patient counts), which the
+// real Doctor model has no relationship to at all (doctor.service.ts's own
+// comment: "Doctor is a global/system record ... it holds no references").
+// Large enough to cover realistic doctor-master sizes in one page for the
+// aggregate tabs (Specialties/Geography/Inactive) — these need the FULL
+// dataset to group/count correctly, not just the Roster tab's current page.
+const AGGREGATE_LIMIT = 1000
 
 const DoctorsPage = () => {
-  const {
-    doctors, camps, broadcasts, addDoctor, editDoctor, addBroadcast,
-    engagementFor, engagementBand, engagementScore, doctorPrediction, genUIN,
-  } = useDoctors()
-
+  const { filters, setFilter, reset } = useDoctorsFilters()
   const [tab, setTab] = useState<TabId>('roster')
-  const [filters, setFilters] = useState<DoctorFilters>(emptyFilters)
-  const [broadcastIds, setBroadcastIds] = useState<Set<string>>(new Set())
+  const [page, setPage] = useState(1)
   const [openDoctorId, setOpenDoctorId] = useState<string | null>(null)
-  const [editModal, setEditModal] = useState<{ open: boolean; doctor: Doctor | null }>({ open: false, doctor: null })
+  const [editModal, setEditModal] = useState<{ open: boolean; doctor: DoctorEntity | null }>({ open: false, doctor: null })
 
-  const handleFilterChange = (patch: Partial<DoctorFilters>) => setFilters((prev) => ({ ...prev, ...patch }))
+  const { data, isLoading, error } = useDoctors({
+    name: filters.search || undefined,
+    specialization: filters.specialization === 'ALL' ? undefined : filters.specialization,
+    status: filters.status === 'ALL' ? undefined : filters.status,
+    city: filters.city || undefined,
+    state: filters.state || undefined,
+    page: String(page),
+    limit: String(PAGE_SIZE),
+  })
+  const doctors = data?.data?.items ?? []
+  const totalCount = data?.data?.count ?? 0
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
 
-  const toggleBroadcast = (id: string) => {
-    setBroadcastIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) {
-        next.delete(id)
-        toast.info('Removed from broadcast')
-      } else {
-        next.add(id)
-        toast.info('Added to broadcast')
-      }
-      return next
-    })
+  // Specialties/Geography aggregate across every ACTIVE doctor, independent
+  // of the Roster tab's own filters/pagination — search() defaults to
+  // status=active for everyone (doctor.service.ts), which is exactly the
+  // "normal" doctor-master view these two tabs are meant to summarize.
+  const { data: activeData } = useDoctors({ limit: String(AGGREGATE_LIMIT) })
+  const activeDoctors = activeData?.data?.items ?? []
+
+  // Inactive doctors are invisible to the default (status-omitted) query —
+  // search() only honors an explicit status filter for callers with
+  // doctor:manage, and even then only if asked for it — so this tab needs
+  // its own dedicated query rather than filtering the roster/active list
+  // client-side (which can never contain an inactive doctor to filter for).
+  const { data: inactiveData } = useDoctors({ status: 'inactive', limit: String(AGGREGATE_LIMIT) })
+  const inactiveDoctors = inactiveData?.data?.items ?? []
+
+  const handleFilterChange = <K extends keyof typeof filters>(key: K, value: (typeof filters)[K]) => {
+    setFilter(key, value)
+    setPage(1)
   }
 
-  const cities = useMemo(() => [...new Set(doctors.map((d) => d.city).filter(Boolean))], [doctors])
-  const specialties = useMemo(() => [...new Set(doctors.map((d) => d.specialty).filter(Boolean))], [doctors])
+  const handleReset = () => {
+    reset()
+    setPage(1)
+  }
 
   const kpis = useMemo(() => {
-    let champions = 0, active = 0, dormant = 0, inactive = 0, fresh = 0
-    let patientsTotal = 0
-    let ratingSum = 0, ratedCount = 0
-    doctors.forEach((d) => {
-      const stats = engagementFor(d.id)
-      const band = engagementBand(stats)
-      if (band === 'CHAMPION') champions++
-      else if (band === 'ACTIVE') active++
-      else if (band === 'DORMANT') dormant++
-      else if (band === 'INACTIVE') inactive++
-      else fresh++
-      patientsTotal += stats.patients
-      if (stats.avgRating > 0) { ratingSum += stats.avgRating; ratedCount++ }
-    })
-    const avgRating = ratedCount ? Math.round((ratingSum / ratedCount) * 10) / 10 : null
-    return { champions, active, dormant, inactive, fresh, patientsTotal, avgRating, ratedCount }
-  }, [doctors, camps, engagementFor, engagementBand])
+    const cities = new Set(activeDoctors.map((d) => d.city).filter(Boolean)).size
+    const specializations = new Set(activeDoctors.map((d) => d.specialization)).size
+    return { cities, specializations, active: activeDoctors.length, inactive: inactiveDoctors.length }
+  }, [activeDoctors, inactiveDoctors])
 
-  const aiText = useMemo(() => {
-    const parts: string[] = []
-    if (kpis.dormant > 0) parts.push(`${kpis.dormant} doctor(s) dormant — broadcast a re-engagement camp invite`)
-    if (kpis.inactive > 0) parts.push(`${kpis.inactive} inactive (> 180d)`)
-    if (kpis.champions > 0) parts.push(`${kpis.champions} champion(s) — high LTV doctors`)
-    return parts.length > 0 ? parts.join(' · ') : 'Network healthy. All doctors recently engaged.'
-  }, [kpis])
+  const allKnownDoctors = [...doctors, ...activeDoctors, ...inactiveDoctors]
+  const openDoctor = allKnownDoctors.find((d) => d.id === openDoctorId) ?? null
 
-  const openDoctor = doctors.find((d) => d.id === openDoctorId) ?? null
-  const openDoctorCamps = openDoctor ? camps.filter((c) => c.doctorId === openDoctor.id) : []
-  const openDoctorStats = openDoctor ? engagementFor(openDoctor.id) : null
-  const openDoctorBand = openDoctorStats ? engagementBand(openDoctorStats) : null
-  const openDoctorScore = openDoctorStats ? engagementScore(openDoctorStats) : 0
-  const openDoctorPrediction = openDoctorStats && openDoctorBand ? doctorPrediction(openDoctorStats, openDoctorBand, openDoctorScore) : null
-
-  const handleGoToRosterWithSpecialty = (specialty: string) => {
-    setFilters((prev) => ({ ...prev, specialty }))
+  const handleGoToRosterWithSpecialization = (specialization: DoctorSpecialization) => {
+    setFilter('specialization', specialization)
+    setPage(1)
     setTab('roster')
   }
 
   const handleGoToRosterWithCity = (city: string) => {
-    setFilters((prev) => ({ ...prev, city }))
+    setFilter('city', city)
+    setPage(1)
     setTab('roster')
-  }
-
-  const handleSaveDoctor = async (rec: Doctor) => {
-    if (editModal.doctor) {
-      await editDoctor(editModal.doctor.id, rec)
-    } else {
-      await addDoctor(rec)
-    }
   }
 
   return (
@@ -125,67 +105,20 @@ const DoctorsPage = () => {
         <div>
           <div className="text-[12px] mb-1" style={{ color: 'var(--qms-text-muted)' }}>Operations · Field Network · Doctor Management</div>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--qms-text)' }}>Doctor Management</h1>
-          <div className="flex flex-wrap gap-1.5 mt-2">
-            {HEADER_CHIPS.map((chip) => (
-              <span
-                key={chip.label}
-                className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full"
-                style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text-muted)' }}
-              >
-                {chip.live ? <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--success)' }} /> : chip.icon && <chip.icon size={11} />}
-                {chip.label}
-              </span>
-            ))}
-          </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={() => toast.info('Import would open here')}
-            className="flex items-center gap-1.5 text-[13px] font-semibold px-3 py-2 rounded-xl border transition-colors"
-            style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-soft)' }}
-          >
-            <FiUpload size={13} /> Import
-          </button>
-          <button
-            onClick={() => toast.info('Export would download here')}
-            className="flex items-center gap-1.5 text-[13px] font-semibold px-3 py-2 rounded-xl border transition-colors"
-            style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-soft)' }}
-          >
-            <FiDownload size={13} /> Export
-          </button>
-          <button
-            onClick={() => setEditModal({ open: true, doctor: null })}
-            className="flex items-center gap-1.5 text-[13px] font-bold px-3.5 py-2 rounded-xl text-white shrink-0"
-            style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
-          >
-            <FiPlus size={14} /> Add doctor
-          </button>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between gap-3 rounded-2xl px-4 py-3 mb-4" style={{ background: 'linear-gradient(135deg, color-mix(in oklab, var(--qms-brand) 12%, transparent), color-mix(in oklab, var(--qms-teal) 12%, transparent))' }}>
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}>
-            <FiZap size={15} color="#fff" />
-          </div>
-          <div className="text-[13px]" style={{ color: 'var(--qms-text)' }}>
-            <span className="font-bold">AI:</span> {aiText}
-          </div>
-        </div>
-        <button onClick={() => toast.info('Review would open here')} className="flex items-center gap-1.5 text-[12px] font-semibold px-3 py-1.5 rounded-lg border shrink-0" style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-soft)' }}>
-          Review
+        <button
+          onClick={() => setEditModal({ open: true, doctor: null })}
+          className="flex items-center gap-1.5 text-[13px] font-bold px-3.5 py-2 rounded-xl text-white shrink-0"
+          style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
+        >
+          <FiPlus size={14} /> Add doctor
         </button>
       </div>
 
       <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(168px, 1fr))' }}>
-        <KpiTile label="Total doctors" value={String(doctors.length)} sub={`${cities.length} cities · ${specialties.length} specialties`} tone="brand" icon={FiUsers} />
-        <KpiTile label="Champions" value={String(kpis.champions)} sub="≥ 6 camps · ★ 4.3+" tone="violet" icon={FiAward} />
-        <KpiTile label="Active" value={String(kpis.active)} sub="Last camp < 60d" tone="emerald" icon={FiCheckCircle} />
-        <KpiTile label="Dormant" value={String(kpis.dormant)} sub="60-180d gap" tone="amber" icon={FiClock} />
-        <KpiTile label="Inactive" value={String(kpis.inactive)} sub="> 180d gap" tone="rose" icon={FiMoon} />
-        <KpiTile label="New/unused" value={String(kpis.fresh)} sub="No camp history yet" tone="teal" icon={FiStar} />
-        <KpiTile label="Patients seen" value={kpis.patientsTotal.toLocaleString('en-IN')} sub="Across all doctors" tone="brand" icon={FiUsers} />
-        <KpiTile label="Avg ★" value={kpis.avgRating !== null ? `${kpis.avgRating} ★` : '—'} sub={`${kpis.ratedCount} rated`} tone="amber" icon={FiStar} />
+        <KpiTile label="Total doctors" value={String(kpis.active + kpis.inactive)} sub={`${kpis.cities} cities · ${kpis.specializations} specializations`} tone="brand" icon={FiUsers} />
+        <KpiTile label="Active" value={String(kpis.active)} tone="emerald" icon={FiCheckCircle} />
+        <KpiTile label="Inactive" value={String(kpis.inactive)} tone="rose" icon={FiMoon} />
       </div>
 
       <div className="flex flex-wrap gap-1 mb-4 border-b overflow-x-auto" style={{ borderColor: 'var(--qms-border)' }}>
@@ -207,82 +140,57 @@ const DoctorsPage = () => {
         })}
       </div>
 
-      {tab === 'roster' && (
-        <RosterTab
-          doctors={doctors}
-          filters={filters}
-          onFilterChange={handleFilterChange}
-          engagementFor={engagementFor}
-          engagementBand={engagementBand}
-          onOpenDoctor={setOpenDoctorId}
-          broadcastIds={broadcastIds}
-          onToggleBroadcast={toggleBroadcast}
-        />
+      {isLoading && (
+        <div className="text-[13px] py-10 text-center" style={{ color: 'var(--qms-text-muted)' }}>
+          Loading doctors…
+        </div>
       )}
 
-      {tab === 'tele' && <TeleConsultTab doctors={doctors} />}
-
-      {tab === 'engagement' && (
-        <EngagementTab
-          doctors={doctors}
-          filters={filters}
-          onFilterChange={handleFilterChange}
-          engagementFor={engagementFor}
-          engagementBand={engagementBand}
-          engagementScore={engagementScore}
-          onOpenDoctor={setOpenDoctorId}
-        />
+      {error && !isLoading && (
+        <div className="text-[13px] rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
+          Failed to load doctors. Please try again.
+        </div>
       )}
 
-      {tab === 'specialties' && (
-        <SpecialtiesTab doctors={doctors} engagementFor={engagementFor} onSelectSpecialty={handleGoToRosterWithSpecialty} />
+      {!isLoading && !error && (
+        <>
+          {tab === 'roster' && (
+            <>
+              <RosterTab
+                doctors={doctors}
+                filters={filters}
+                setFilter={handleFilterChange}
+                reset={handleReset}
+                onOpenDoctor={setOpenDoctorId}
+              />
+              <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} />
+            </>
+          )}
+
+          {tab === 'specialties' && (
+            <SpecialtiesTab doctors={activeDoctors} onSelectSpecialization={handleGoToRosterWithSpecialization} />
+          )}
+
+          {tab === 'geography' && (
+            <GeographyTab doctors={activeDoctors} onSelectCity={handleGoToRosterWithCity} />
+          )}
+
+          {tab === 'inactive' && (
+            <InactiveTab doctors={inactiveDoctors} onOpenDoctor={setOpenDoctorId} />
+          )}
+        </>
       )}
 
-      {tab === 'geography' && (
-        <GeographyTab doctors={doctors} engagementFor={engagementFor} onSelectCity={handleGoToRosterWithCity} />
-      )}
-
-      {tab === 'inactive' && (
-        <InactiveTab
-          doctors={doctors}
-          engagementFor={engagementFor}
-          engagementBand={engagementBand}
-          broadcastIds={broadcastIds}
-          onToggleBroadcast={toggleBroadcast}
-          onOpenDoctor={setOpenDoctorId}
-        />
-      )}
-
-      {tab === 'broadcasts' && (
-        <BroadcastsTab
-          doctors={doctors}
-          broadcastIds={broadcastIds}
-          onClearBroadcast={() => setBroadcastIds(new Set())}
-          broadcasts={broadcasts}
-          onSend={addBroadcast}
-        />
-      )}
-
-      {openDoctor && openDoctorStats && openDoctorBand && openDoctorPrediction && (
-        <DoctorDrawer
-          doctor={openDoctor}
-          camps={openDoctorCamps}
-          stats={openDoctorStats}
-          band={openDoctorBand}
-          score={openDoctorScore}
-          prediction={openDoctorPrediction}
-          genUIN={genUIN}
-          onClose={() => setOpenDoctorId(null)}
-          onEdit={() => setEditModal({ open: true, doctor: openDoctor })}
-          onAddToBroadcast={() => toggleBroadcast(openDoctor.id)}
-        />
-      )}
+      <DoctorDrawer
+        doctor={openDoctor}
+        onClose={() => setOpenDoctorId(null)}
+        onEdit={() => { setEditModal({ open: true, doctor: openDoctor }); setOpenDoctorId(null) }}
+      />
 
       <EditDoctorModal
         open={editModal.open}
         doctor={editModal.doctor}
         onClose={() => setEditModal({ open: false, doctor: null })}
-        onSave={handleSaveDoctor}
       />
     </div>
   )

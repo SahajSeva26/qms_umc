@@ -11,6 +11,7 @@ import { PHARMA_ROUTES }    from '@/features/pharma/pharma.routes'
 import { PROJECTS_ROUTES }  from '@/features/projects/projects.routes'
 import { OM_ROUTES }        from '@/features/om/om.routes'
 import { DOCTORS_ROUTES }   from '@/features/doctors/doctors.routes'
+import { GEO_PROFILE_ROUTES } from '@/features/geo-profile/geoProfile.routes'
 import { BILLING_ROUTES }   from '@/features/billing/billing.routes'
 import { ADMIN_ROUTES }     from '@/features/admin/admin.routes'
 import { ACCESS_MANAGEMENT_ROUTES }      from '@/features/access-management/accessManagement.routes'
@@ -140,6 +141,13 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { id: 'doctors',      label: 'Doctor Management',           icon: 'Activity',      path: DOCTORS_ROUTES.DOCTORS,
     rolesAllowed: ['camp_coord', 'diet_camp_coord', 'pharma_ho', 'pharma_mr', 'pharma_asm', 'pharma_rsm'] },
 
+  // Real-permission-backed (geo-profile:manage), like the Access Management
+  // entities below — no real backend permission maps onto the existing
+  // 18-role UserRole enum yet, so this is visible to super_admin/admin only
+  // (same convention as tenants/permissiongroups/roletypes/roles).
+  { id: 'geoprofiles',  label: 'Field Staff Coverage',        icon: 'MapPin',        path: GEO_PROFILE_ROUTES.GEO_PROFILES,
+    rolesAllowed: ['super_admin', 'admin'] },
+
   // Operations — Coverage & Alerts
   { id: 'hqmapping',    label: 'HQ Mapping & Serviceability', icon: 'MapPin',        path: ADMIN_ROUTES.ADMIN_HQ,
     rolesAllowed: ['sales_lead', 'sales_rep', 'camp_coord', 'diet_camp_coord', 'om_screening', 'om_diet', 'fo', 'dedicated_fo', 'logistics', 'accounts', 'analytics_viewer'] },
@@ -241,7 +249,7 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
     subs: [
       { title: 'Camps',             items: ['omportal', 'camps', 'telecamps', 'diet', 'dedicatedops'].map((id) => NAV_BY_ID[id]) },
       { title: 'Dietitians',        items: ['dietapprovals', 'dietpayment', 'dietprofile'].map((id) => NAV_BY_ID[id]) },
-      { title: 'Field Network',     items: ['fo', 'fo_workspace', 'foconfig', 'doctors'].map((id) => NAV_BY_ID[id]) },
+      { title: 'Field Network',     items: ['fo', 'fo_workspace', 'foconfig', 'doctors', 'geoprofiles'].map((id) => NAV_BY_ID[id]) },
       { title: 'Coverage & Alerts', items: ['hqmapping', 'incidents', 'remindauto'].map((id) => NAV_BY_ID[id]) },
     ],
   },

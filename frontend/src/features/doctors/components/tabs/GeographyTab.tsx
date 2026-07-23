@@ -1,21 +1,17 @@
 import { useMemo } from 'react'
 import { FiMap } from 'react-icons/fi'
-import type { Doctor, EngagementStats } from '@/features/doctors/doctors.types'
+import type { DoctorEntity } from '@/types/doctor.types'
 import DoBar from '@/features/dedicatedops/components/DoBar'
 
 interface GeographyTabProps {
-  doctors: Doctor[]
-  engagementFor: (doctorId: string) => EngagementStats
+  doctors: DoctorEntity[]
   onSelectCity: (city: string) => void
 }
 
-const GeographyTab = ({ doctors, engagementFor, onSelectCity }: GeographyTabProps) => {
+const GeographyTab = ({ doctors, onSelectCity }: GeographyTabProps) => {
   const byState = useMemo(() => {
     const map = new Map<string, number>()
     doctors.forEach((d) => {
-      // Excludes doctors with no state on record entirely (rather than
-      // aggregating them into a spurious bucket) — matches the prototype's
-      // `if (d.state)` guard.
       if (!d.state) return
       map.set(d.state, (map.get(d.state) ?? 0) + 1)
     })
@@ -23,22 +19,18 @@ const GeographyTab = ({ doctors, engagementFor, onSelectCity }: GeographyTabProp
   }, [doctors])
 
   const byCity = useMemo(() => {
-    const map = new Map<string, { city: string; state: string; count: number; camps: number }>()
+    const map = new Map<string, { city: string; state: string; count: number }>()
     doctors.forEach((d) => {
-      // Excludes doctors with no city on record entirely — matches the
-      // prototype's `if (d.city)` guard.
       if (!d.city) return
       const existing = map.get(d.city)
-      const camps = engagementFor(d.id).closedCount
       if (existing) {
         existing.count += 1
-        existing.camps += camps
       } else {
-        map.set(d.city, { city: d.city, state: d.state || '—', count: 1, camps })
+        map.set(d.city, { city: d.city, state: d.state || '—', count: 1 })
       }
     })
     return [...map.values()].sort((a, b) => b.count - a.count)
-  }, [doctors, engagementFor])
+  }, [doctors])
 
   const maxState = Math.max(1, ...byState.map((s) => s.count))
 
@@ -68,7 +60,7 @@ const GeographyTab = ({ doctors, engagementFor, onSelectCity }: GeographyTabProp
           <table className="w-full text-[12px]">
             <thead>
               <tr>
-                {['City', 'State', 'Doctors', 'Camps'].map((h) => (
+                {['City', 'State', 'Doctors'].map((h) => (
                   <th key={h} className="text-left font-semibold px-2 py-1.5 text-[10px] uppercase tracking-wide" style={{ color: 'var(--qms-text-muted)' }}>{h}</th>
                 ))}
               </tr>
@@ -84,11 +76,10 @@ const GeographyTab = ({ doctors, engagementFor, onSelectCity }: GeographyTabProp
                   <td className="px-2 py-1.5 font-semibold" style={{ color: 'var(--qms-text)' }}>{c.city}</td>
                   <td className="px-2 py-1.5" style={{ color: 'var(--qms-text-soft)' }}>{c.state}</td>
                   <td className="px-2 py-1.5" style={{ color: 'var(--qms-text-soft)' }}>{c.count}</td>
-                  <td className="px-2 py-1.5" style={{ color: 'var(--qms-text-soft)' }}>{c.camps}</td>
                 </tr>
               ))}
               {byCity.length === 0 && (
-                <tr><td colSpan={4} className="text-center py-4 text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>No doctors on record.</td></tr>
+                <tr><td colSpan={3} className="text-center py-4 text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>No doctors on record.</td></tr>
               )}
             </tbody>
           </table>

@@ -13,7 +13,7 @@ import { RequestContext } from '../../../shared/utils/contextBuilder';
 import { isValidObjectID } from '../../../shared/utils/strings';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { RoleService } from '../../access-management/role/role.service';
-import { GEO_PROFILE_PERMISSIONS, GEO_PROFILE_STATUS } from './geoProfile.constants';
+import { GEO_ALLOCATION_MAX_DISTANCE, GEO_PROFILE_PERMISSIONS, GEO_PROFILE_STATUS } from './geoProfile.constants';
 
 type GeoProfileDocument = HydratedDocument<IGeoProfile> | null;
 
@@ -143,6 +143,8 @@ const findNearest = async (filters: INearestGeoProfileQuery, ctx: RequestContext
                 near: { type: 'Point', coordinates: [filters.lng, filters.lat] },
                 distanceField: 'distance', // meters
                 spherical: true,
+                // hard outer cap — a mis-set coverageRadius can never pull in a far-away worker
+                maxDistance: GEO_ALLOCATION_MAX_DISTANCE,
                 query,
             },
         },

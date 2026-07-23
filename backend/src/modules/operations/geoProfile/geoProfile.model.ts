@@ -31,10 +31,11 @@ const geoProfileSchema = new mongoose.Schema(
             type: [Number],
             index: '2dsphere',
         },
-        // coverage radius in METERS (matches $geoNear distance units); 1000 = 1km
+        // coverage radius in METERS (matches $geoNear distance units); 35000 = 35km default reach.
+        // Per-profile so each field worker's real travel envelope can be tuned individually.
         coverageRadius: {
             type: Number,
-            default: 1000,
+            default: 35000,
         },
         meta: {
             type: mongoose.Schema.Types.Mixed,

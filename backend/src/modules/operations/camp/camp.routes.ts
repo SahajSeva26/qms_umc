@@ -112,6 +112,20 @@ registry.registerPath({
     },
 });
 
+// allocate field officer (nearest-FO auto-assign)
+registry.registerPath({
+    method: 'post',
+    path: '/camps/{id}/allocate',
+    tags: ['CAMP'],
+    summary: "Auto-allocate the nearest available field officer to the camp (based on the camp's coordinates)",
+    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+    responses: {
+        200: { description: 'Field officer allocated successfully' },
+        404: { description: 'Camp not found' },
+        422: { description: 'Camp has no coordinates, or no field officer covers this location' },
+    },
+});
+
 // =======================================================================
 // ========================= EXPORT CAMP ROUTES ==========================
 // =======================================================================
@@ -133,6 +147,8 @@ CampRouter.patch(
     AuthorizeMiddleware([CAMP_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
     CampController.moveStage,
 );
+
+CampRouter.post('/:id/allocate', AuthorizeMiddleware(GUARD), CampController.allocateFo);
 
 CampRouter.get('/', AuthorizeMiddleware(READ_GUARD), CampController.search);
 CampRouter.post('/', AuthorizeMiddleware(GUARD), CampController.create);

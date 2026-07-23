@@ -16,6 +16,10 @@ export const GEO_PROFILE_STATUS = {
     INACTIVE: 'inactive',
 } as const;
 
+// Hard outer cap (meters) for the allocation search. Even a mis-configured coverageRadius cannot
+// pull in a field worker from beyond this distance — a safety net over the per-profile radius. 100 km.
+export const GEO_ALLOCATION_MAX_DISTANCE = 100000;
+
 // ================= GEO PROFILE PERMISSIONS CONSTANTS ===============
 
 export const GEO_PROFILE_PERMISSIONS = {

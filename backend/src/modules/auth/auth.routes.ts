@@ -2,7 +2,12 @@ import express from 'express';
 import { registry } from '../../shared/config/swagger/swagger.registry';
 
 import { AuthController } from './auth.controller';
-import { LoginUserPayloadSchema, RegisterUserPayloadSchema } from './auth.validators';
+import {
+    ForgotPasswordPayloadSchema,
+    LoginUserPayloadSchema,
+    RegisterUserPayloadSchema,
+    ResetPasswordPayloadSchema,
+} from './auth.validators';
 import { AuthMiddleware } from '../../shared/middlewares/authmiddleware';
 import { AuthorizeMiddleware } from '../../shared/middlewares/authorizeMiddleware';
 import { TENANT_PERMISSIONS } from '../access-management/tenant/tenant.constants';
@@ -91,6 +96,48 @@ registry.registerPath({
         401: { description: 'Unauthorized' },
     },
 });
+
+registry.registerPath({
+    //reset own password (self-service)
+    method: 'post',
+    path: '/auth/reset-password',
+    tags: ['AUTH'],
+    summary: 'Reset own password (verifies the current password)',
+    request: {
+        body: {
+            content: {
+                'application/json': {
+                    schema: ResetPasswordPayloadSchema,
+                },
+            },
+        },
+    },
+    responses: {
+        200: { description: 'Password reset successfully' },
+        400: { description: 'Password reset failed' },
+    },
+});
+
+registry.registerPath({
+    //admin reset of a user's password (tenant:admin)
+    method: 'post',
+    path: '/auth/forgot-password',
+    tags: ['AUTH'],
+    summary: 'Admin reset of a user password within the tenant (tenant:admin)',
+    request: {
+        body: {
+            content: {
+                'application/json': {
+                    schema: ForgotPasswordPayloadSchema,
+                },
+            },
+        },
+    },
+    responses: {
+        200: { description: 'Password reset successfully' },
+        400: { description: 'Password reset failed' },
+    },
+});
 // ===================================================
 // ==========EXPORT ROUTES============================
 // ===================================================
@@ -104,3 +151,14 @@ AuthRouter.post('/login', AuthController.login);
 AuthRouter.post('/logout', AuthMiddleware, AuthController.logout);
 AuthRouter.post('/refresh-token', AuthController.refreshToken);
 AuthRouter.get('/me', AuthMiddleware, AuthController.me);
+
+// self-service: any authenticated user changes their own password
+AuthRouter.post('/reset-password', AuthMiddleware, AuthController.resetPassword);
+
+// admin-initiated: tenant:admin resets a user's password within their tenant
+AuthRouter.post(
+    '/forgot-password',
+    AuthMiddleware,
+    AuthorizeMiddleware([TENANT_PERMISSIONS.ADMIN.code]),
+    AuthController.forgotPassword,
+);

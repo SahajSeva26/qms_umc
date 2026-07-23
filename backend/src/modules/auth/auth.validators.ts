@@ -21,3 +21,17 @@ export const LoginUserPayloadSchema = z.object({
     password: z.string().min(1).openapi({ example: 'Test@123' }),
 });
 export type ILoginUserPayload = z.infer<typeof LoginUserPayloadSchema>;
+
+//3: reset password (self-service — user changes own password) ====================================>
+export const ResetPasswordPayloadSchema = z.object({
+    currentPassword: z.string().min(1).openapi({ example: 'Test@123' }),
+    newPassword: z.string().min(6).openapi({ example: 'NewTest@123' }),
+});
+export type IResetPasswordPayload = z.infer<typeof ResetPasswordPayloadSchema>;
+
+//4: forgot password (admin-initiated — tenant:admin resets a user) ====================================>
+export const ForgotPasswordPayloadSchema = z.object({
+    email: z.email().openapi({ example: 'john@example.com' }),
+    newPassword: z.string().min(6).openapi({ example: 'NewTest@123' }),
+});
+export type IForgotPasswordPayload = z.infer<typeof ForgotPasswordPayloadSchema>;

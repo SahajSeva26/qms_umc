@@ -80,10 +80,12 @@ const stageHistorySchema = new mongoose.Schema(
             enum: Object.values(PROJECT_STATUS),
             required: [true, 'To status is required'],
         },
-        createdBy: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'Role',
-            required: [true, 'Created by is required'],
+        // frozen snapshot of the actor at the moment of the transition — immutable audit trail.
+        // roleId/userId stay linkable; name/email never change even if the user/role later does.
+        actor: {
+            roleId: { type: mongoose.Schema.Types.ObjectId, ref: 'Role' },
+            name: { type: String },
+            email: { type: String },
         },
         reason: {
             type: String,

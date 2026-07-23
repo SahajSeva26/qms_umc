@@ -62,6 +62,7 @@ const set = async (model: any, entity: HydratedDocument<IRoleDocument>, ctx: Req
             throwAppError('Role type not found', StatusCodes.NOT_FOUND);
         }
 
+        
         // if this is the admin role type, it may back at most one role — reject a second admin
         if (roleType.permissions.includes(TENANT_PERMISSIONS.ADMIN.code)) {
             const existingRole = await RoleModel.findOne({

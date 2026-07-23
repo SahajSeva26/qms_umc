@@ -7,6 +7,8 @@ import { ContextUser } from '../utils/contextBuilder';
 export interface ITokenPayload {
     _id: string;
     email: string;
+    firstName?: string | undefined;
+    lastName?: string | undefined;
     role: string;
     tenant: string;
 }

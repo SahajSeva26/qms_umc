@@ -35,10 +35,10 @@ const set = async (model: any, entity: HydratedDocument<ITenant>, ctx: RequestCo
         entity.status = model.status;
     }
 
-    if (model.type && ctx.hasAnyPermissions([SYSTEM_PERMISSIONS.MANAGE.code])) {
-        //only system user shoudld be able to do that
-        entity.type = model.type;
-    }
+    // if (model.type && ctx.hasAnyPermissions([SYSTEM_PERMISSIONS.MANAGE.code])) {
+    //     //only system user shoudld be able to do that
+    //     entity.type = model.type;
+    // }
 
     return entity;
 };

@@ -90,6 +90,8 @@ const login = async (data: ILoginUserPayload, ctx: RequestContext) => {
     const payload: ITokenPayload = {
         _id: user.id.toString(),
         email: user.email,
+        firstName: user.firstName ?? undefined,
+        lastName: user.lastName ?? undefined,
         role: userRole.id.toString(),
         tenant: userRole.tenant.id.toString(),
     };
@@ -147,6 +149,8 @@ const refreshToken = async (refreshToken: string, ctx: RequestContext) => {
     const freshPayload: ITokenPayload = {
         _id: user.id.toString(),
         email: user.email,
+        firstName: user.firstName ?? undefined,
+        lastName: user.lastName ?? undefined,
         role: userRole.id.toString(),
         tenant: userRole.tenant.id.toString(),
     };

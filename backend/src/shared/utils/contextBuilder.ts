@@ -7,6 +7,8 @@ import { generateUUID } from './strings';
 export type ContextUser = {
     _id: string;
     email: string;
+    firstName?: string | undefined;
+    lastName?: string | undefined;
     role: string;
     tenant: string;
 };
@@ -55,6 +57,8 @@ export const buildContext = (req: any, res: any, next: any) => {
             const user: ContextUser = {
                 _id: userData._id,
                 email: userData.email,
+                firstName: userData.firstName,
+                lastName: userData.lastName,
                 role: userData.role,
                 tenant: userData.tenant,
             };

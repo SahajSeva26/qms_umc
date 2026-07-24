@@ -5,6 +5,7 @@ import { ROLE_TYPE_PERMISSIONS } from '../../modules/access-management/role-type
 import { ROLE_PERMISSIONS } from '../../modules/access-management/role/role.constants';
 import { DIVISION_PERMISSIONS } from '../../modules/division/division.constants';
 import { LEAD_PERMISSIONS } from '../../modules/crm/lead/lead.constants';
+import { CONTACT_PERMISSIONS } from '../../modules/crm/contact/contact.constants';
 import { PROJECT_PERMISSIONS } from '../../modules/crm/project/project.constants';
 import { QA_FEEDBACK_PERMISSIONS } from '../../modules/qa-feedback/qaFeedback.constants';
 import { DOCTOR_PERMISSIONS } from '../../modules/doctor/doctor.constants';
@@ -27,6 +28,7 @@ export const PERMISSIONS = {
     ROLE: ROLE_PERMISSIONS,
     DIVISION: DIVISION_PERMISSIONS,
     LEAD: LEAD_PERMISSIONS,
+    CONTACT: CONTACT_PERMISSIONS,
     PROJECT: PROJECT_PERMISSIONS,
     QA_FEEDBACK: QA_FEEDBACK_PERMISSIONS,
     DOCTOR: DOCTOR_PERMISSIONS,

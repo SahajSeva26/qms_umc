@@ -11,6 +11,7 @@ import { RoleTypeRouter } from '../modules/access-management/role-type/roleType.
 import { RoleRouter } from '../modules/access-management/role/role.routes';
 import { DivisionRouter } from '../modules/division/division.routes';
 import { LeadRouter } from '../modules/crm/lead/lead.routes';
+import { ContactRouter } from '../modules/crm/contact/contact.routes';
 import { ProjectRouter } from '../modules/crm/project/project.routes';
 import { QaFeedbackRouter } from '../modules/qa-feedback/qaFeedback.routes';
 import { DoctorRouter } from '../modules/doctor/doctor.routes';
@@ -69,6 +70,7 @@ app.use('/api/v1/role-types', RoleTypeRouter);
 app.use('/api/v1/roles', RoleRouter);
 app.use('/api/v1/divisions', DivisionRouter);
 app.use('/api/v1/leads', LeadRouter);
+app.use('/api/v1/contacts', ContactRouter);
 app.use('/api/v1/projects', ProjectRouter);
 app.use('/api/v1/qa-feedback', QaFeedbackRouter);
 app.use('/api/v1/doctors', DoctorRouter);

@@ -11,6 +11,7 @@ import { QA_FEEDBACK_PERMISSIONS } from '../../modules/qa-feedback/qaFeedback.co
 import { DOCTOR_PERMISSIONS } from '../../modules/doctor/doctor.constants';
 import { GEO_PROFILE_PERMISSIONS } from '../../modules/operations/geoProfile/geoProfile.constants';
 import { CAMP_PERMISSIONS } from '../../modules/operations/camp/camp.constants';
+import { COUNTER_PERMISSIONS } from '../../modules/counter/counter.constants';
 
 export const SYSTEM_PERMISSIONS = {
     MANAGE: {
@@ -34,6 +35,7 @@ export const PERMISSIONS = {
     DOCTOR: DOCTOR_PERMISSIONS,
     GEO_PROFILE: GEO_PROFILE_PERMISSIONS,
     CAMP: CAMP_PERMISSIONS,
+    COUNTER: COUNTER_PERMISSIONS,
 };
 
 export const PERMISSIONS_ARRAY = Object.values(PERMISSIONS)

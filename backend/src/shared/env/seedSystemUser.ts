@@ -56,7 +56,7 @@ const seedSystemUser = async () => {
                     description: ENV.App.SystemTenantDescription,
                 });
 
-                logger.debug('System tenant created', { tenantId: tenant.id });
+                logger.debug({ tenantId: tenant.id }, 'System tenant created');
             }
 
             //3: create permission group if not exits ========================================================>
@@ -68,7 +68,7 @@ const seedSystemUser = async () => {
                     name: ENV.App.SystemTenantName,
                     description: ENV.App.SystemTenantName + 'permission group',
                 });
-                logger.debug('Tenant permission group created', { permissionGroupId: permissionGroup.id });
+                logger.debug({ permissionGroupId: permissionGroup.id }, 'Tenant permission group created');
             }
 
             //3.1: reconcile permissions — the system permission group is frozen against the API, so the
@@ -81,10 +81,13 @@ const seedSystemUser = async () => {
             if (missingPermissions.length > 0) {
                 permissionGroup.permissions.push(...missingPermissions);
                 await permissionGroup.save();
-                logger.debug('System permission group permissions reconciled', {
-                    permissionGroupId: permissionGroup.id,
-                    added: missingPermissions.map((permission: any) => permission.code),
-                });
+                logger.debug(
+                    {
+                        permissionGroupId: permissionGroup.id,
+                        added: missingPermissions.map((permission: any) => permission.code),
+                    },
+                    'System permission group permissions reconciled',
+                );
             }
 
             // 4: Create defualt system ROLE TYPES ===============================================================>
@@ -102,7 +105,7 @@ const seedSystemUser = async () => {
                 // role type level permissions
                 systemRoleType.permissions.push(PERMISSIONS.SYSTEM.MANAGE.code);
                 await systemRoleType.save();
-                logger.debug('System role type created', { roleTypeId: systemRoleType.id });
+                logger.debug({ roleTypeId: systemRoleType.id }, 'System role type created');
             }
 
             // 4.2 Create system tenant admin role
@@ -122,7 +125,7 @@ const seedSystemUser = async () => {
                 // role type level permissions
                 tenantAdminRoleType.permissions.push(PERMISSIONS.TENANT.MANAGE.code, PERMISSIONS.TENANT.ADMIN.code);
                 await tenantAdminRoleType.save();
-                logger.debug('Admin role type created', { roleTypeId: tenantAdminRoleType.id });
+                logger.debug({ roleTypeId: tenantAdminRoleType.id }, 'Admin role type created');
             }
 
             // 4.3 Provision the platform's fixed business role types (sales, sales-head) with their lead permissions
@@ -144,7 +147,7 @@ const seedSystemUser = async () => {
                     lastName: 'User',
                     phone: ENV.App.SystemUserPhone,
                 });
-                logger.debug('System user created', { userId: systemUser.id });
+                logger.debug({ userId: systemUser.id }, 'System user created');
             }
             // 5.2 Create admin user
             let adminUser = await UserModel.findOne({ email: ENV.App.AdminUserEmail });
@@ -158,7 +161,7 @@ const seedSystemUser = async () => {
                     lastName: 'User',
                     phone: ENV.App.AdminUserPhone,
                 });
-                logger.debug('Admin user created', { userId: adminUser.id });
+                logger.debug({ userId: adminUser.id }, 'Admin user created');
             }
 
             // 6: Create & Assign role to System users ====================================================>
@@ -175,7 +178,7 @@ const seedSystemUser = async () => {
                 });
 
                 await systemRole.save();
-                logger.debug('System role created', { roleId: systemRole.id });
+                logger.debug({ roleId: systemRole.id }, 'System role created');
             }
 
             // 6.2 Create admin role of system role type
@@ -191,20 +194,20 @@ const seedSystemUser = async () => {
                 });
 
                 await adminRole.save();
-                logger.debug('Admin role created', { roleId: adminRole.id });
+                logger.debug({ roleId: adminRole.id }, 'Admin role created');
             }
 
             //update owner of tenant
             tenant.owner = adminRole._id;
             await tenant.save();
-            logger.info('Tenant owner updated', { tenantId: tenant.id });
+            logger.info({ tenantId: tenant.id }, 'Tenant owner updated');
         });
 
-        logger.success('System user seeding completed successfully....');
+        logger.info('System user seeding completed successfully....');
         const endTime = Date.now();
         logger.info(`System user seeding took ${endTime - startTime}ms`);
     } catch (error) {
-        logger.error('Error seeding system user:', error);
+        logger.error({ err: error }, 'Error seeding system user');
         const endTime = Date.now();
         logger.error(`System user seeding took ${endTime - startTime}ms`);
         return throwAppError('Error seeding system users', 500);

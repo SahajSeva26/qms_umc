@@ -30,11 +30,14 @@ export const provisionDefaultRoleTypes = async (tenant: any, definitions: IDefau
             if (!inSync) {
                 existing.set('permissions', desired);
                 await existing.save();
-                logger.debug('Default role type permissions synced', {
-                    roleTypeId: existing.id,
-                    code: existing.code,
-                    permissions: desired,
-                });
+                logger.debug(
+                    {
+                        roleTypeId: existing.id,
+                        code: existing.code,
+                        permissions: desired,
+                    },
+                    'Default role type permissions synced',
+                );
             }
             roleTypes.push(existing);
             continue;
@@ -53,11 +56,14 @@ export const provisionDefaultRoleTypes = async (tenant: any, definitions: IDefau
             await roleType.save();
         }
 
-        logger.debug('Default role type provisioned', {
-            roleTypeId: roleType.id,
-            code: roleType.code,
-            tenant: tenant._id,
-        });
+        logger.debug(
+            {
+                roleTypeId: roleType.id,
+                code: roleType.code,
+                tenant: tenant._id,
+            },
+            'Default role type provisioned',
+        );
 
         roleTypes.push(roleType);
     }

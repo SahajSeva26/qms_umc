@@ -115,15 +115,22 @@ TokenHandler.decodePayload(token)           // decode without verify
 `ITokenPayload` shape: `{ _id: string; email: string; role: string; tenant: string }`
 
 ### `logger` (`src/shared/utils/logger.ts`)
-Never use `console.log`. Use logger everywhere.
+Never use `console.log`. Use logger everywhere. Backed by **pino** (`src/shared/logger/`);
+`src/shared/utils/logger.ts` is a shim re-exporting it (both `import logger` and `import { logger }` work).
+
+Pino's signature is **metadata object first, message second** — the reverse of the old logger. Passing `(msg, obj)` silently drops the object.
 
 ```typescript
-import logger from '../../shared/utils/logger'
-logger.info('message', { meta })
-logger.error('message', error)
-logger.success('message')
-logger.debug('message')   // only logs outside production
+import { logger } from '../../shared/utils/logger'
+logger.info({ userId }, 'message')     // metadata object FIRST
+logger.error({ err }, 'message')       // use the `err` key → expands stack via serializer
+logger.info('message')                 // plain string is fine when there's no metadata
+logger.debug({ meta }, 'message')      // only logs outside production
 ```
+
+Levels: `silly, debug, info, warn, error, fatal` (no `success` — use `info`).
+Prefer `ctx.logger` inside request handlers — it's the request-scoped child logger and auto-includes the request id.
+HTTP request logging is automatic via the `pino-http` middleware (`src/shared/logger/httpLogger.ts`); don't log requests by hand.
 
 ### `RequestContext` (`src/shared/utils/contextBuilder.ts`)
 Every request gets a context injected by the `buildContext` middleware. In controllers and services, always receive and thread it as `ctx: RequestContext`.

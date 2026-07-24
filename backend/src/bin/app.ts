@@ -17,6 +17,7 @@ import { DoctorRouter } from '../modules/doctor/doctor.routes';
 import { GeoProfileRouter } from '../modules/operations/geoProfile/geoProfile.routes';
 import { CampRouter } from '../modules/operations/camp/camp.routes';
 import { buildContext } from '../shared/utils/contextBuilder';
+import { httpLogger } from '../shared/logger/httpLogger';
 import ENV from '../shared/config/app.config';
 import logger from '../shared/utils/logger';
 import { globalRateLimiter, authRateLimiter } from '../shared/middlewares/rateLimiter';
@@ -51,6 +52,9 @@ app.use('/api-docs', swaggerServe, swaggerSetup);
 // Global rate limit — covers the whole API (health-check + swagger sit outside /api/v1)
 app.use('/api/v1', globalRateLimiter);
 
+// pino-http: one completion log line per request + a request-scoped child logger
+// at req.log. Must run before buildContext so req.id is available as ctx.requestID.
+app.use(httpLogger);
 app.use(buildContext);
 // application routes — auth gets the stricter limiter on top of the global one
 app.use('/api/v1/auth', authRateLimiter, AuthRouter);

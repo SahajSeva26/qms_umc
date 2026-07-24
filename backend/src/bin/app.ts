@@ -29,6 +29,10 @@ const app = express();
 // (rate limiting keys on IP; without this every request looks like the proxy's IP).
 app.set('trust proxy', 1);
 
+// Disable ETags so authenticated JSON GETs always return a fresh 200 with body,
+// instead of Express downgrading to 304 on the client's If-None-Match.
+app.set('etag', false);
+
 app.use(express.json());
 app.use(cookieParser());
 

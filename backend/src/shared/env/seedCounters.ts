@@ -28,7 +28,7 @@ const COUNTERS = [
     },
     {
         entity: CAMP_COUNTER_ENTITY,
-        prefix: 'camp',
+        prefix: 'cmp',
         separator: '-',
         padding: 6,
         description: 'Sequential code for camps (camp-000001)',

@@ -5,6 +5,7 @@ export const CampMapper = {
     toResponse: (camp: any, ctx: RequestContext) => {
         const result: any = {
             id: camp._id?.toString(),
+            code: camp.code,
 
             // links (derived from project)
             tenant: camp.tenant,

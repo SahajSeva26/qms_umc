@@ -34,6 +34,12 @@ const stageHistorySchema = new mongoose.Schema(
 
 const campSchema = new mongoose.Schema(
     {
+        code: {
+            type: String,
+            required: true,
+            trim: true,
+            unique: true,
+        },
         doctor: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Doctor',

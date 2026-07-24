@@ -6,8 +6,10 @@ import {
     ISearchProjectQuery,
     IUpdateProjectPayload,
 } from './project.validators';
-import { PROJECT_PERMISSIONS, PROJECT_TRANSITION_MAP } from './project.constants';
+import { PROJECT_COUNTER_ENTITY, PROJECT_PERMISSIONS, PROJECT_TRANSITION_MAP } from './project.constants';
 import { canTransition } from '../lead/lead.validators';
+import { withTransaction } from '../../../shared/helpers/transactionHelper';
+import { CounterService } from '../../counter/counter.service';
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
@@ -196,17 +198,22 @@ const create = async (model: ICreateProjectPayload, ctx: RequestContext): Promis
         return throwAppError('A project already exists for this lead', StatusCodes.CONFLICT);
     }
 
-    //3: build entity — tenant + division are derived from the lead (source of truth),
-    // never trusted from the payload.
-    const entity = new Project({
-        lead: lead._id,
-        tenant: lead.tenant,
-        division: lead.division,
-    });
+    const project = await withTransaction(async () => {
+        const code: string = await CounterService.next(PROJECT_COUNTER_ENTITY, ctx);
+        //3: build entity — tenant + division are derived from the lead (source of truth),
+        // never trusted from the payload.
+        const entity = new Project({
+            lead: lead._id,
+            tenant: lead.tenant,
+            division: lead.division,
+            code,
+        });
 
-    //4: set validates + applies team and the remaining fields
-    let project = await set(model, entity, ctx);
-    project = await project.save();
+        //4: set validates + applies team and the remaining fields
+        let project = await set(model, entity, ctx);
+        project = await project.save();
+        return project;
+    });
 
     return project;
 };

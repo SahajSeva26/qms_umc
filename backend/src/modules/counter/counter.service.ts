@@ -1,7 +1,7 @@
 // Counter Service
 import { HydratedDocument } from 'mongoose';
 import { CounterModel, ICounter } from './counter.model';
-import { ICreateCounterPayload, ISearchCounterQuery, IUpdateCounterPayload } from './counter.validators';
+import { ISearchCounterQuery, IUpdateCounterPayload } from './counter.validators';
 import { COUNTER_PERMISSIONS, COUNTER_STATUSES } from './counter.constants';
 import { throwAppError } from '../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
@@ -67,30 +67,42 @@ const search = async (filters: ISearchCounterQuery, ctx: RequestContext, options
 
     //3: execute count + data together
     const countPromise = CounterModel.countDocuments(where);
-    const dataPromise = CounterModel.find(where)
-        .limit(options?.pagination?.limit)
-        .skip(options?.pagination?.skip)
-        .sort(sort);
+    const dataPromise = CounterModel.find(where).limit(options?.pagination?.limit).skip(options?.pagination?.skip).sort(sort);
 
     const [count, items] = await Promise.all([countPromise, dataPromise]);
 
     return { count, items };
 };
 
-const create = async (model: ICreateCounterPayload, ctx: RequestContext): Promise<HydratedDocument<ICounter>> => {
-    //1: guard — entity must be free (reuse get on the natural key)
-    const existing = await CounterService.get(model.entity, ctx);
-    if (existing) {
-        return throwAppError('A counter for this entity already exists', StatusCodes.CONFLICT);
+// Render a counter document into its formatted code string, honoring the stored
+// format template tokens: {{prefix}} {{suffix}} {{separator}} {{number}}. prefix/suffix
+// are stored lowercase but codes read as uppercase (LEAD-000001), so they're upper-cased here.
+const formatCode = (counter: HydratedDocument<ICounter>): string => {
+    const number = String(counter.currentValue).padStart(counter.padding, '0');
+    return counter.format
+        .replace(/{{\s*prefix\s*}}/g, counter.prefix || '')
+        .replace(/{{\s*suffix\s*}}/g, counter.suffix || '')
+        .replace(/{{\s*separator\s*}}/g, counter.separator || '')
+        .replace(/{{\s*number\s*}}/g, number)
+        .trim();
+};
+
+// Atomically reserve the next value for `entity` and return its formatted code.
+// A single-document $inc is atomic on its own, so concurrent callers each get a distinct
+// value with no race. When called inside a transaction it auto-joins the session
+// (transactionAsyncLocalStorage) — so if the caller's transaction aborts, the increment
+// rolls back and the code is never burned (no gaps in the sequence).
+const next = async (entity: string, ctx: RequestContext): Promise<string> => {
+    const counter = await CounterModel.findOneAndUpdate(
+        { entity: entity.toLowerCase(), status: COUNTER_STATUSES.ACTIVE },
+        { $inc: { currentValue: 1 } },
+        { new: true },
+    );
+    if (!counter) {
+        return throwAppError(`No active counter found for "${entity}"`, StatusCodes.INTERNAL_SERVER_ERROR);
     }
-
-    //2: build entity — entity (immutable natural key) is seeded here; everything else,
-    //   including the optional starting currentValue, flows through set()
-    const counter = new CounterModel({ entity: model.entity });
-    let saved = await set(model, counter, ctx);
-    saved = await saved.save();
-
-    return saved;
+    return formatCode(counter);
+    // return counter.currentValue;
 };
 
 const update = async (id: string, model: IUpdateCounterPayload, ctx: RequestContext) => {
@@ -110,6 +122,6 @@ const update = async (id: string, model: IUpdateCounterPayload, ctx: RequestCont
 export const CounterService = {
     get,
     search,
-    create,
+    next,
     update,
 };

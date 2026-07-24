@@ -1,7 +1,7 @@
 // Counter Controller
 import { ResponseHandler } from '../../shared/utils/responseHandler';
 import { formatZodError } from '../../shared/utils/error';
-import { CreateCounterPayloadSchema, SearchCounterQuerySchema, UpdateCounterPayloadSchema } from './counter.validators';
+import { SearchCounterQuerySchema, UpdateCounterPayloadSchema } from './counter.validators';
 import { StatusCodes } from 'http-status-codes';
 import { CounterService } from './counter.service';
 import { CounterMapper } from './counter.mapper';
@@ -62,32 +62,6 @@ const search = async (req: any, res: any) => {
     }
 };
 
-const create = async (req: any, res: any) => {
-    try {
-        const ctx: RequestContext = req.context;
-
-        const { data, success, error } = CreateCounterPayloadSchema.safeParse(req.body);
-        if (!success) {
-            const validationErrors = formatZodError(error);
-            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
-                fields: validationErrors,
-            });
-        }
-
-        const counter = await CounterService.create(data, ctx);
-
-        return ResponseHandler.appResponse(
-            res,
-            StatusCodes.CREATED,
-            true,
-            'Counter created successfully',
-            CounterMapper.toResponse(counter, ctx),
-        );
-    } catch (error: any) {
-        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
-    }
-};
-
 const update = async (req: any, res: any) => {
     try {
         const ctx: RequestContext = req.context;
@@ -121,6 +95,5 @@ const update = async (req: any, res: any) => {
 export const CounterController = {
     get,
     search,
-    create,
     update,
 };

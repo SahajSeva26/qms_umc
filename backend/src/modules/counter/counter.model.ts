@@ -1,11 +1,12 @@
 // Counter Model
 import mongoose from 'mongoose';
-import { COUNTER_RESET_POLICIES, COUNTER_STATUSES } from './counter.constants';
+import { COUNTER_ENTITY_TYPES, COUNTER_RESET_POLICIES, COUNTER_STATUSES } from './counter.constants';
 
 const counterSchema = new mongoose.Schema(
     {
         entity: {
             type: String,
+            enum: Object.values(COUNTER_ENTITY_TYPES),
             required: [true, 'Entity is required'],
             unique: true,
             lowercase: true,

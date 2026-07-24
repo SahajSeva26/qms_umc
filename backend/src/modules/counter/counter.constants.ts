@@ -1,4 +1,10 @@
 // Counter Constants
+export const COUNTER_ENTITY_TYPES = {
+    LEAD: 'lead',
+    PROJECT: 'project',
+    INVOICE: 'invoice',
+    CAMP: 'camp',
+};
 export const COUNTER_RESET_POLICIES = {
     NEVER: 'never',
     DAILY: 'daily',
@@ -6,7 +12,7 @@ export const COUNTER_RESET_POLICIES = {
     YEARLY: 'yearly',
 } as const;
 
-export const COUNTER_STATUSES= {
+export const COUNTER_STATUSES = {
     ACTIVE: 'active',
     INACTIVE: 'inactive',
 } as const;

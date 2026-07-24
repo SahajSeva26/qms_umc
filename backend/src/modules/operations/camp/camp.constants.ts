@@ -1,7 +1,5 @@
 // Camp Constants
-
-import { ALLOWED_ROLETYPE_CODES } from '../../access-management/role-type/roleType.constants';
-import { DOCTOR_PERMISSIONS } from '../../doctor/doctor.constants';
+export const CAMP_COUNTER_ENTITY = 'camp';
 
 export const CAMP_TYPES = {
     SCREENING: 'screening',
@@ -78,4 +76,3 @@ export const CAMP_PERMISSIONS = {
 //============================================================
 // CAMP BUSINESS ROLE TYPES
 //============================================================
-

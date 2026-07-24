@@ -47,6 +47,12 @@ const leadSchema = new mongoose.Schema(
             required: true,
             index: true,
         },
+        code: {
+            type: String,
+            required: true,
+            trim: true,
+            unique: true,
+        },
         contactPerson: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Role',
@@ -69,10 +75,12 @@ const leadSchema = new mongoose.Schema(
         title: {
             type: String,
             required: [true, 'Title is required'],
+            trim: true,
         },
         problemStatement: {
             type: String,
             required: [true, 'Problem statement is required'],
+            trim: true,
         },
         numberOfMRS: {
             type: Number,
@@ -86,7 +94,9 @@ const leadSchema = new mongoose.Schema(
 
         notes: {
             type: String,
+            trim: true,
         },
+
         projectType: {
             type: String,
             enum: Object.values(LEAD_PROJECT_TYPES),

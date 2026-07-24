@@ -1,5 +1,5 @@
 // Project Constants
-
+export const PROJECT_COUNTER_ENTITY = 'project';
 export const PROJECT_THERAPY_TYPES = {
     CARDIOLOGY: 'cardiology',
     DIABETES: 'diabetes',

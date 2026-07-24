@@ -3,7 +3,6 @@ import express from 'express';
 import { CounterController } from './counter.controller';
 import { registry } from '../../shared/config/swagger/swagger.registry';
 import {
-    CreateCounterPayloadSchema,
     SearchCounterQuerySchema,
     UpdateCounterPayloadSchema,
 } from './counter.validators';
@@ -42,28 +41,6 @@ registry.registerPath({
     },
 });
 
-// create counter
-registry.registerPath({
-    method: 'post',
-    path: '/counters',
-    tags: ['COUNTER'],
-    summary: 'Create counter (global system record)',
-    request: {
-        body: {
-            content: {
-                'application/json': {
-                    schema: CreateCounterPayloadSchema,
-                },
-            },
-        },
-    },
-    responses: {
-        201: { description: 'Counter created successfully' },
-        400: { description: 'Validation error' },
-        409: { description: 'A counter for this entity already exists' },
-    },
-});
-
 // update counter
 registry.registerPath({
     method: 'put',
@@ -95,11 +72,6 @@ registry.registerPath({
 CounterRouter.get('/:id', CounterController.get);
 CounterRouter.get('/', CounterController.search);
 
-CounterRouter.post(
-    '/',
-    AuthorizeMiddleware([COUNTER_PERMISSIONS.MANAGE.code]),
-    CounterController.create,
-);
 CounterRouter.put(
     '/:id',
     AuthorizeMiddleware([COUNTER_PERMISSIONS.MANAGE.code]),

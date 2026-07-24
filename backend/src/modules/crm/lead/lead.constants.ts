@@ -130,22 +130,3 @@ export const LEAD_PERMISSIONS = {
     } as const,
 };
 
-export const LEAD_BUSINESS_ROLE_TYPES = [
-    {
-        code: ALLOWED_ROLETYPE_CODES.PLATFORM.SALES_REP,
-        name: 'Sales Representative',
-        description: 'Sales representative — owns and works their own leads',
-        permissions: [
-            LEAD_PERMISSIONS.SEARCH.code,
-            LEAD_PERMISSIONS.CREATE.code,
-            LEAD_PERMISSIONS.UPDATE.code,
-            LEAD_PERMISSIONS.GET.code,
-        ],
-    },
-    {
-        code: ALLOWED_ROLETYPE_CODES.PLATFORM.SALES_HEAD,
-        name: 'Sales Head',
-        description: 'Sales head — full lead visibility, assigns leads to sales reps',
-        permissions: [LEAD_PERMISSIONS.MANAGE.code],
-    },
-];

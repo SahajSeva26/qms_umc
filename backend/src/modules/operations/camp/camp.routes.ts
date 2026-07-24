@@ -117,7 +117,8 @@ registry.registerPath({
     method: 'post',
     path: '/camps/{id}/allocate',
     tags: ['CAMP'],
-    summary: "Auto-allocate the nearest available field officer to the camp (based on the camp's coordinates)",
+    summary:
+        "Auto-allocate the nearest available field officer to the camp (based on the camp's coordinates)",
     parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
     responses: {
         200: { description: 'Field officer allocated successfully' },
@@ -134,12 +135,20 @@ const READ_GUARD = [CAMP_PERMISSIONS.SEARCH.code, ...GUARD]; // assigned field-f
 
 CampRouter.get(
     '/:id',
-    AuthorizeMiddleware([CAMP_PERMISSIONS.MANAGE.code, CAMP_PERMISSIONS.SEARCH.code, TENANT_PERMISSIONS.MANAGE.code]),
+    AuthorizeMiddleware([
+        CAMP_PERMISSIONS.MANAGE.code,
+        CAMP_PERMISSIONS.GET.code,
+        TENANT_PERMISSIONS.MANAGE.code,
+    ]),
     CampController.get,
 );
 CampRouter.put(
     '/:id',
-    AuthorizeMiddleware([CAMP_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
+    AuthorizeMiddleware([
+        CAMP_PERMISSIONS.UPDATE.code,
+        CAMP_PERMISSIONS.MANAGE.code,
+        TENANT_PERMISSIONS.MANAGE.code,
+    ]),
     CampController.update,
 );
 CampRouter.patch(
@@ -148,7 +157,32 @@ CampRouter.patch(
     CampController.moveStage,
 );
 
-CampRouter.post('/:id/allocate', AuthorizeMiddleware(GUARD), CampController.allocateFo);
+CampRouter.post(
+    '/:id/allocate',
+    AuthorizeMiddleware([
+        CAMP_PERMISSIONS.UPDATE.code,
+        CAMP_PERMISSIONS.MANAGE.code,
+        TENANT_PERMISSIONS.MANAGE.code,
+    ]),
+    CampController.allocateFo,
+);
 
-CampRouter.get('/', AuthorizeMiddleware(READ_GUARD), CampController.search);
-CampRouter.post('/', AuthorizeMiddleware(GUARD), CampController.create);
+CampRouter.get(
+    '/',
+    AuthorizeMiddleware([
+        CAMP_PERMISSIONS.SEARCH.code,
+        CAMP_PERMISSIONS.MANAGE.code,
+        TENANT_PERMISSIONS.MANAGE.code,
+    ]),
+    CampController.search,
+);
+
+CampRouter.post(
+    '/',
+    AuthorizeMiddleware([
+        CAMP_PERMISSIONS.CREATE.code,
+        CAMP_PERMISSIONS.MANAGE.code,
+        TENANT_PERMISSIONS.MANAGE.code,
+    ]),
+    CampController.create,
+);

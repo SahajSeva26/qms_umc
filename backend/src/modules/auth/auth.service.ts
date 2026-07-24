@@ -1,6 +1,11 @@
 import { HydratedDocument } from 'mongoose';
 import { UserService } from '../user/user.service';
-import { ILoginUserPayload, IRegisterUserPayload } from './auth.validators';
+import {
+    IForgotPasswordPayload,
+    ILoginUserPayload,
+    IRegisterUserPayload,
+    IResetPasswordPayload,
+} from './auth.validators';
 import { IUser } from '../user/user.model';
 import bcrypt from 'bcrypt';
 import { throwAppError } from '../../shared/utils/error';
@@ -90,6 +95,8 @@ const login = async (data: ILoginUserPayload, ctx: RequestContext) => {
     const payload: ITokenPayload = {
         _id: user.id.toString(),
         email: user.email,
+        firstName: user.firstName ?? undefined,
+        lastName: user.lastName ?? undefined,
         role: userRole.id.toString(),
         tenant: userRole.tenant.id.toString(),
     };
@@ -147,6 +154,8 @@ const refreshToken = async (refreshToken: string, ctx: RequestContext) => {
     const freshPayload: ITokenPayload = {
         _id: user.id.toString(),
         email: user.email,
+        firstName: user.firstName ?? undefined,
+        lastName: user.lastName ?? undefined,
         role: userRole.id.toString(),
         tenant: userRole.tenant.id.toString(),
     };
@@ -184,10 +193,71 @@ const session = async (ctx: RequestContext) => {
     };
 };
 
+// self-service: the logged-in user changes their own password. Must prove
+// knowledge of the current password before it can be replaced.
+const resetPassword = async (data: IResetPasswordPayload, ctx: RequestContext) => {
+    // identity comes from the token — route is AuthMiddleware-protected, so ctx.user is always set
+    const userId = ctx.user!._id;
+
+    const user = await UserService.getUserWithPassword(userId);
+    if (!user) {
+        return throwAppError('User not found', StatusCodes.NOT_FOUND);
+    }
+
+    // 1: verify the current password
+    const isValid = await bcrypt.compare(data.currentPassword, user.password);
+    if (!isValid) {
+        return throwAppError('Current password is incorrect', StatusCodes.BAD_REQUEST);
+    }
+
+    // 2: don't allow reusing the same password
+    const isSame = await bcrypt.compare(data.newPassword, user.password);
+    if (isSame) {
+        return throwAppError('New password must be different from the current password', StatusCodes.BAD_REQUEST);
+    }
+
+    // 3: hash + save the new password
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(data.newPassword, salt);
+    await user.save();
+
+    return true;
+};
+
+// admin-initiated (tenant:admin): reset another user's password. No current
+// password is required, but the admin may only reset a user that belongs to
+// their own tenant. ctx.where() yields {} for platform/system (god-mode) and
+// { tenant } for a customer admin, so the role resolves only when the target
+// user is inside the actor's tenant — otherwise we return a vague 404.
+const forgotPassword = async (data: IForgotPasswordPayload, ctx: RequestContext) => {
+    const user = await UserService.getUserWithPassword(data.email);
+    if (!user) {
+        return throwAppError('User not found', StatusCodes.NOT_FOUND);
+    }
+
+    // RoleService.search applies ctx.where() internally, so this only matches a role
+    // for the target user inside the actor's tenant (platform/system god-mode → any tenant).
+    const { count } = await RoleService.search({ user: user._id.toString() }, ctx);
+    if (!count) {
+        return throwAppError('User not found', StatusCodes.NOT_FOUND);
+    }
+
+    // hash + save the new password
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(data.newPassword, salt);
+    // force the target to re-authenticate everywhere with the new password
+    user.refreshToken = null;
+    await user.save();
+
+    return true;
+};
+
 export const AuthService = {
     register,
     login,
     logout,
     refreshToken,
     session,
+    resetPassword,
+    forgotPassword,
 };

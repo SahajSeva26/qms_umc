@@ -20,10 +20,10 @@ async function main() {
 
         // 3: only now accept traffic
         app.listen(ENV.App.Port, () => {
-            logger.info('Server is running on port:', ENV.App.Port);
+            logger.info({ port: ENV.App.Port }, 'Server is running');
         });
     } catch (err) {
-        logger.error('Failed to start server:', err);
+        logger.error({ err }, 'Failed to start server');
         process.exit(1);
     }
 }

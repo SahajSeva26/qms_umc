@@ -21,6 +21,24 @@ export const provisionDefaultRoleTypes = async (tenant: any, definitions: IDefau
     for (const definition of definitions) {
         const existing = await RoleTypeModel.findOne({ code: definition.code, tenant: tenant._id });
         if (existing) {
+            // Seeded role-type permissions are owned entirely by the seed (not editable via API),
+            // so the definition is the source of truth. Full-sync on every run: apply BOTH additions
+            // and removals so the live role type exactly matches the definition. No-op when in sync.
+            const desired = definition.permissions ?? [];
+            const current = existing.permissions ?? [];
+            const inSync = desired.length === current.length && desired.every((code) => current.includes(code));
+            if (!inSync) {
+                existing.set('permissions', desired);
+                await existing.save();
+                logger.debug(
+                    {
+                        roleTypeId: existing.id,
+                        code: existing.code,
+                        permissions: desired,
+                    },
+                    'Default role type permissions synced',
+                );
+            }
             roleTypes.push(existing);
             continue;
         }
@@ -38,11 +56,14 @@ export const provisionDefaultRoleTypes = async (tenant: any, definitions: IDefau
             await roleType.save();
         }
 
-        logger.debug('Default role type provisioned', {
-            roleTypeId: roleType.id,
-            code: roleType.code,
-            tenant: tenant._id,
-        });
+        logger.debug(
+            {
+                roleTypeId: roleType.id,
+                code: roleType.code,
+                tenant: tenant._id,
+            },
+            'Default role type provisioned',
+        );
 
         roleTypes.push(roleType);
     }

@@ -49,7 +49,7 @@ export const ProjectMapper = {
                 from: entry.from,
                 to: entry.to,
                 reason: entry.reason,
-                createdBy: entry.createdBy,
+                actor: entry.actor,
                 createdAt: entry.createdAt,
             })),
             daysToBookBefore: project.daysToBookBefore,

@@ -3,7 +3,12 @@ import { formatZodError } from '../../shared/utils/error';
 import { ResponseHandler } from '../../shared/utils/responseHandler';
 import { AuthService } from './auth.service';
 import { AuthMapper } from './auth.mapper';
-import { LoginUserPayloadSchema, RegisterUserPayloadSchema } from './auth.validators';
+import {
+    ForgotPasswordPayloadSchema,
+    LoginUserPayloadSchema,
+    RegisterUserPayloadSchema,
+    ResetPasswordPayloadSchema,
+} from './auth.validators';
 import { CookieHandler } from '../../shared/utils/cookies';
 import { RequestContext } from '../../shared/utils/contextBuilder';
 import { AUTH_TOKENS } from './auth.constants';
@@ -121,10 +126,54 @@ const me = async (req: any, res: any) => {
     }
 };
 
+// self-service: logged-in user changes their own password
+const resetPassword = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+        const { data, success, error } = ResetPasswordPayloadSchema.safeParse(req.body);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                fields: validationErrors,
+            });
+        }
+
+        await AuthService.resetPassword(data, ctx);
+
+        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Password reset successfully', null);
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
+// admin-initiated: tenant:admin resets another user's password
+const forgotPassword = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+        const { data, success, error } = ForgotPasswordPayloadSchema.safeParse(req.body);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                fields: validationErrors,
+            });
+        }
+
+        await AuthService.forgotPassword(data, ctx);
+
+        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Password reset successfully', null);
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
 export const AuthController = {
     register,
     login,
     logout,
     refreshToken,
     me,
+    resetPassword,
+    forgotPassword,
 };

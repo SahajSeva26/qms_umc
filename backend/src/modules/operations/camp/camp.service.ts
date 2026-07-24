@@ -325,11 +325,17 @@ const moveStage = async (id: string, model: IMoveStagePayload, ctx: RequestConte
     }
 
     //4: append to the append-only journal + flip the cached status (one atomic save)
+    // snapshot the actor's identity from the token so history stays true even if the user/role later changes
+    const actorName = `${ctx.user?.firstName || ''} ${ctx.user?.lastName || ''}`.trim();
     camp.stageHistory.push({
         from,
         to,
         reason: model.reason,
-        createdBy: ctx.role?._id || ctx.role?.id,
+        actor: {
+            roleId: ctx.role?._id || ctx.role?.id,
+            name: actorName || undefined,
+            email: ctx.user?.email,
+        },
     } as any);
     camp.status = to;
     camp = await camp.save();

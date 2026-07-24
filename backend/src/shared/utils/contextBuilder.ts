@@ -1,12 +1,16 @@
 import { TENANT_TYPE } from '../../modules/access-management/tenant/tenant.constants';
 import { PERMISSIONS } from '../env/permissions';
+import { logger } from '../logger';
+
 import { throwAppError } from './error';
-import logger from './logger';
+// import logger from './logger';
 import { generateUUID } from './strings';
 
 export type ContextUser = {
     _id: string;
     email: string;
+    firstName?: string | undefined;
+    lastName?: string | undefined;
     role: string;
     tenant: string;
 };
@@ -31,30 +35,24 @@ export type RequestContext = {
 };
 
 export const buildContext = (req: any, res: any, next: any) => {
-    const startTime = process.hrtime.bigint();
-
-    res.on('finish', () => {
-        const durationMs = (Number(process.hrtime.bigint() - startTime) / 1e6).toFixed(2);
-        const requestID = req.context?.requestID ?? '?';
-        logger.info(
-            `[HTTP] ${req.method} ${req.originalUrl} | status:${res.statusCode} | duration:${durationMs}ms | req:#${requestID}`,
-        );
-    });
-
+    // Per-request HTTP logging is handled by the pino-http middleware (httpLogger),
+    // which runs before this and sets req.id + a request-scoped child logger at req.log.
     const context: RequestContext = {
-        requestID: generateUUID(),
+        requestID: req.id ? String(req.id) : generateUUID(),
         ipAddress: req.socket.remoteAddress || 'unknown',
         user: req.user || null,
         role: req.role || null,
         tenant: req.tenant || null,
         permissions: req.permissions || [],
-        logger: logger,
+        logger: req.log || logger,
 
         // runtime funcitons
         setUser: (userData: any) => {
             const user: ContextUser = {
                 _id: userData._id,
                 email: userData.email,
+                firstName: userData.firstName,
+                lastName: userData.lastName,
                 role: userData.role,
                 tenant: userData.tenant,
             };

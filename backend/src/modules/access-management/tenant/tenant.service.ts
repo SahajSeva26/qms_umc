@@ -35,10 +35,10 @@ const set = async (model: any, entity: HydratedDocument<ITenant>, ctx: RequestCo
         entity.status = model.status;
     }
 
-    if (model.type && ctx.hasAnyPermissions([SYSTEM_PERMISSIONS.MANAGE.code])) {
-        //only system user shoudld be able to do that
-        entity.type = model.type;
-    }
+    // if (model.type && ctx.hasAnyPermissions([SYSTEM_PERMISSIONS.MANAGE.code])) {
+    //     //only system user shoudld be able to do that
+    //     entity.type = model.type;
+    // }
 
     return entity;
 };
@@ -148,7 +148,7 @@ const createTenant = async (model: ICreateTenantPayload, ctx: RequestContext) =>
         return await withTransaction(async () => {
             //1: create tenant
             let tenant: any = await create(model, ctx);
-            log.debug('Tenant created', { tenantId: tenant._id });
+            log.debug({ tenantId: tenant._id }, 'Tenant created');
 
             //2: create permission group
             const permissionGroup = await PermissionGroupService.create(
@@ -167,7 +167,7 @@ const createTenant = async (model: ICreateTenantPayload, ctx: RequestContext) =>
                 },
                 ctx,
             );
-            log.debug('Permission group created', { permissionGroupId: permissionGroup._id });
+            log.debug({ permissionGroupId: permissionGroup._id }, 'Permission group created');
 
             //3: create the tenant admin role type as a fixed default via the direct provisioner
             // (isSystem: true). The service path can't set isSystem — that would leave this as an
@@ -185,14 +185,14 @@ const createTenant = async (model: ICreateTenantPayload, ctx: RequestContext) =>
             if (!roleType) {
                 return throwAppError('Failed to provision admin role type', StatusCodes.INTERNAL_SERVER_ERROR);
             }
-            log.debug('Admin role type provisioned', { roleTypeId: roleType._id });
+            log.debug({ roleTypeId: roleType._id }, 'Admin role type provisioned');
 
             //3.1: provision the fixed default (pharma) role types for CUSTOMER tenants. Created
             // directly with isSystem:true so their codes are reserved; the pharma admin then only
             // creates roles derived from them, never the role types themselves.
             if (tenant.type === TENANT_TYPE.CUSTOMER) {
                 await provisionDefaultRoleTypes(tenant, DEFAULT_PHARMA_ROLE_TYPES);
-                log.debug('Default pharma role types provisioned', { tenantId: tenant._id });
+                log.debug({ tenantId: tenant._id }, 'Default pharma role types provisioned');
             }
 
             //4: create role (RoleService.create creates + links the owner user)
@@ -208,7 +208,7 @@ const createTenant = async (model: ICreateTenantPayload, ctx: RequestContext) =>
                 },
                 ctx,
             );
-            log.debug('Role created', { roleId: role._id });
+            log.debug({ roleId: role._id }, 'Role created');
 
             //5: activate the owner user. UserService.create (via RoleService.create) forces every
             // new user INACTIVE — the deliberate admin-driven register default. But the owner minted
@@ -218,12 +218,12 @@ const createTenant = async (model: ICreateTenantPayload, ctx: RequestContext) =>
             // always a brand-new account (RoleService.create 409s if the email already exists), so
             // there's no risk of flipping a pre-existing user active.
             await UserModel.updateOne({ _id: role.user }, { status: USER_STATUS.ACTIVE });
-            log.debug('Owner user activated', { userId: role.user });
+            log.debug({ userId: role.user }, 'Owner user activated');
 
             //6: update tenant owner
             tenant.owner = role._id;
             tenant = await tenant.save();
-            log.debug('Tenant owner updated', { tenantId: tenant._id });
+            log.debug({ tenantId: tenant._id }, 'Tenant owner updated');
             return tenant;
         });
     } catch (error: any) {

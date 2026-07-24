@@ -149,9 +149,10 @@ const update = async (id: string, model: IUpdateUserPayload, ctx: RequestContext
 
 
 
-// dedicated method for auth flows only
-const getUserWithPassword = async (email: string) => {
-    return await UserModel.findOne({ email }).select('+password');
+// dedicated method for auth flows only — accepts a user id or email
+const getUserWithPassword = async (identifier: string) => {
+    const where = mongoose.isValidObjectId(identifier) ? { _id: identifier } : { email: identifier };
+    return await UserModel.findOne(where).select('+password');
 };
 export const UserService = {
     get,

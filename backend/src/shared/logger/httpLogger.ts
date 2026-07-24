@@ -32,4 +32,15 @@ export const httpLogger = pinoHttp({
     // router mount, which truncates nested routes). Data domains are separated by " | ".
     customSuccessMessage: (req: any, res) => `${req.method} ${req.originalUrl ?? req.url} | ${res.statusCode}`,
     customErrorMessage: (req: any, res) => `${req.method} ${req.originalUrl ?? req.url} | ${res.statusCode}`,
+
+    // Attach the parsed request body (only when present, so GETs stay clean).
+    // Prints in the trailing data blob. Sensitive fields are stripped by redact.ts
+    // (payload.* and payload.*.* wildcards).
+    customProps: (req: any) => {
+        const body = req.body;
+        if (body && typeof body === 'object' && Object.keys(body).length > 0) {
+            return { payload: body };
+        }
+        return {};
+    },
 });

@@ -34,45 +34,9 @@ interface DoctorFilterBarProps {
 // caller just silently returns the same active-only results).
 const DoctorFilterBar = ({ filters, setFilter, reset }: DoctorFilterBarProps) => (
   <div
-    className="flex flex-wrap items-center gap-2 p-2.5 mb-3 rounded-xl border"
+    className="flex flex-wrap items-center justify-between gap-2 p-2.5 mb-3 rounded-xl border"
     style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}
   >
-    <Select value={filters.specialization} onValueChange={(v) => setFilter('specialization', (v ?? 'ALL') as DoctorsFilterState['specialization'])}>
-      <SelectTrigger className="text-[12px]">
-        <SelectValue>{(v: string) => (v === 'ALL' ? 'Specialization' : (SPECIALIZATION_LABEL_BY_VALUE.get(v as DoctorSpecialization) ?? 'Specialization'))}</SelectValue>
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="ALL">All</SelectItem>
-        {SPECIALIZATION_OPTIONS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
-      </SelectContent>
-    </Select>
-
-    <Select value={filters.status} onValueChange={(v) => setFilter('status', (v ?? 'ALL') as DoctorsFilterState['status'])}>
-      <SelectTrigger className="text-[12px]">
-        <SelectValue>{(v: string) => (v === 'ALL' ? 'Status' : (STATUS_LABEL_BY_VALUE.get(v as DoctorStatus) ?? 'Status'))}</SelectValue>
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="ALL">All</SelectItem>
-        {STATUS_OPTIONS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
-      </SelectContent>
-    </Select>
-
-    <Input
-      type="text"
-      value={filters.city}
-      onChange={(e) => setFilter('city', e.target.value)}
-      placeholder="City..."
-      className="w-32 text-[12px]"
-    />
-
-    <Input
-      type="text"
-      value={filters.state}
-      onChange={(e) => setFilter('state', e.target.value)}
-      placeholder="State..."
-      className="w-32 text-[12px]"
-    />
-
     <div className="relative">
       <FiSearch size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--qms-text-muted)' }} />
       <Input
@@ -84,9 +48,47 @@ const DoctorFilterBar = ({ filters, setFilter, reset }: DoctorFilterBarProps) =>
       />
     </div>
 
-    <Button variant="outline" size="sm" onClick={reset}>
-      Reset
-    </Button>
+    <div className="flex flex-wrap items-center gap-2">
+      <Select value={filters.specialization} onValueChange={(v) => setFilter('specialization', (v ?? 'ALL') as DoctorsFilterState['specialization'])}>
+        <SelectTrigger className="text-[12px]">
+          <SelectValue>{(v: string) => (v === 'ALL' ? 'Specialization' : (SPECIALIZATION_LABEL_BY_VALUE.get(v as DoctorSpecialization) ?? 'Specialization'))}</SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="ALL">All</SelectItem>
+          {SPECIALIZATION_OPTIONS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+        </SelectContent>
+      </Select>
+
+      <Select value={filters.status} onValueChange={(v) => setFilter('status', (v ?? 'ALL') as DoctorsFilterState['status'])}>
+        <SelectTrigger className="text-[12px]">
+          <SelectValue>{(v: string) => (v === 'ALL' ? 'Status' : (STATUS_LABEL_BY_VALUE.get(v as DoctorStatus) ?? 'Status'))}</SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="ALL">All</SelectItem>
+          {STATUS_OPTIONS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+        </SelectContent>
+      </Select>
+
+      <Input
+        type="text"
+        value={filters.city}
+        onChange={(e) => setFilter('city', e.target.value)}
+        placeholder="City..."
+        className="w-32 text-[12px]"
+      />
+
+      <Input
+        type="text"
+        value={filters.state}
+        onChange={(e) => setFilter('state', e.target.value)}
+        placeholder="State..."
+        className="w-32 text-[12px]"
+      />
+
+      <Button variant="outline" size="sm" onClick={reset}>
+        Reset
+      </Button>
+    </div>
   </div>
 )
 

@@ -2,6 +2,7 @@ import { CounterModel, ICounter } from '../../modules/counter/counter.model';
 import { LEAD_COUNTER_ENTITY } from '../../modules/crm/lead/lead.constants';
 import { PROJECT_COUNTER_ENTITY } from '../../modules/crm/project/project.constants';
 import { CAMP_COUNTER_ENTITY } from '../../modules/operations/camp/camp.constants';
+import { APPOINTMENT_COUNTER_ENTITY } from '../../modules/crm/appointment/appointment.constants';
 import logger from '../utils/logger';
 import { throwAppError } from '../utils/error';
 
@@ -32,6 +33,13 @@ const COUNTERS = [
         separator: '-',
         padding: 6,
         description: 'Sequential code for camps (camp-000001)',
+    },
+    {
+        entity: APPOINTMENT_COUNTER_ENTITY,
+        prefix: 'met',
+        separator: '-',
+        padding: 6,
+        description: 'Sequential code for appointments (met-000001)',
     },
 ];
 

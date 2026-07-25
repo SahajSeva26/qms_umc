@@ -4,6 +4,7 @@ export const COUNTER_ENTITY_TYPES = {
     PROJECT: 'project',
     INVOICE: 'invoice',
     CAMP: 'camp',
+    APPOINTMENT: 'appointment',
 };
 export const COUNTER_RESET_POLICIES = {
     NEVER: 'never',

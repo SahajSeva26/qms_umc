@@ -1,7 +1,12 @@
 // Appointment Model
 
 import mongoose from 'mongoose';
-import { APPOINTMENT_MODES, APPOINTMENT_STATUSES, APPOINTMENT_TYPES } from './appointment.constants';
+import {
+    APPOINTMENT_INVITE_STATUSES,
+    APPOINTMENT_MODES,
+    APPOINTMENT_STATUSES,
+    APPOINTMENT_TYPES,
+} from './appointment.constants';
 
 const stageHistorySchema = new mongoose.Schema(
     {
@@ -32,8 +37,34 @@ const stageHistorySchema = new mongoose.Schema(
     },
 );
 
+const internalMemberInvitesSchema = new mongoose.Schema(
+    {
+        role: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Role',
+            required: [true, 'Role is required'],
+        },
+        status: {
+            type: String,
+            enum: Object.values(APPOINTMENT_INVITE_STATUSES),
+            default: APPOINTMENT_INVITE_STATUSES.PENDING,
+        },
+        note: {
+            type: String,
+            default: '',
+        },
+    },
+    {
+        timestamps: true,
+    },
+);
+
 const appointmentSchema = new mongoose.Schema(
     {
+        code: {
+            type: String,
+            required: [true, 'Meeting code is required'],
+        },
         tenant: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Tenant',
@@ -44,13 +75,7 @@ const appointmentSchema = new mongoose.Schema(
             ref: 'Division',
             required: [true, 'Division is required'],
         },
-        department: {
-            type: String,
-        },
-        meetingNo: {
-            type: String,
-            required: [true, 'Meeting number is required'],
-        },
+
         type: {
             type: String,
             enum: Object.values(APPOINTMENT_TYPES),
@@ -67,21 +92,16 @@ const appointmentSchema = new mongoose.Schema(
         contactPerson: {
             //from pharma/client
             type: mongoose.Schema.Types.ObjectId,
-            ref: 'Role',
+            ref: 'Contact',
             required: [true, 'Contact person is required'],
         },
 
-        internalMembers: [
-            {
-                type: mongoose.Schema.Types.ObjectId,
-                ref: 'Role',
-            },
-        ],
+        internalMembers: [internalMemberInvitesSchema],
         lead: {
             //only for follow-up appointments
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Lead',
-            required: [true, 'Lead is required'],
+            // required: [true, 'Lead is required'],
         },
         // invoice: {
         // // for invoices
@@ -103,21 +123,25 @@ const appointmentSchema = new mongoose.Schema(
             type: String,
             default: '',
         },
-        startTime: {
-            type: Date,
-            required: [true, 'Start time is required'],
+        duration: {
+            startTime: {
+                type: Date,
+                required: [true, 'Start time is required'],
+            },
+            endTime: {
+                type: Date,
+                // required: [true, 'End time is required'],
+            },
         },
-        endTime: {
-            type: Date,
-            required: [true, 'End time is required'],
-        },
-        agendaPublic: {
-            type: String,
-            default: '',
-        },
-        agendaPrivate: {
-            type: String,
-            default: '',
+        agenda: {
+            public: {
+                type: String,
+                default: '',
+            },
+            private: {
+                type: String,
+                default: '',
+            },
         },
         status: {
             type: String,
@@ -125,11 +149,14 @@ const appointmentSchema = new mongoose.Schema(
             default: APPOINTMENT_STATUSES.PLANNED,
         },
         mom: {
-            detaills: {
+            details: {
                 type: String,
                 default: '',
             },
             submittedAt: {
+                type: Date,
+            },
+            submissionDeadline: {
                 type: Date,
             },
         },
@@ -141,7 +168,7 @@ const appointmentSchema = new mongoose.Schema(
         //     type: Boolean,
         //     default: false,
         // },
-        stageHistory: stageHistorySchema,
+        stageHistory: [stageHistorySchema],
     },
     {
         timestamps: true,

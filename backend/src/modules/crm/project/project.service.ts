@@ -1,11 +1,6 @@
 import mongoose, { HydratedDocument } from 'mongoose';
 import { IProject, Project } from './project.model';
-import {
-    ICreateProjectPayload,
-    IMoveStagePayload,
-    ISearchProjectQuery,
-    IUpdateProjectPayload,
-} from './project.validators';
+import { ICreateProjectPayload, IMoveStagePayload, ISearchProjectQuery, IUpdateProjectPayload } from './project.validators';
 import { PROJECT_COUNTER_ENTITY, PROJECT_PERMISSIONS, PROJECT_TRANSITION_MAP } from './project.constants';
 import { canTransition } from '../lead/lead.validators';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
@@ -115,17 +110,16 @@ const set = async (model: any, entity: HydratedDocument<IProject>, ctx: RequestC
 };
 
 const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): Promise<ProjectDocument> => {
-    if (!isValidObjectID(id)) {
-        return null;
+    const where: mongoose.QueryFilter<IProject> = ctx.where();
+
+    if (isValidObjectID(id)) {
+        where._id = id;
+    } else {
+        where.code=id
     }
 
-    const where: mongoose.QueryFilter<IProject> = { ...ctx.where(), _id: id };
-
     // reps (project:search, not project:manage) can only see their own projects
-    if (
-        ctx.hasAnyPermissions([PROJECT_PERMISSIONS.SEARCH.code]) &&
-        !ctx.hasAnyPermissions([PROJECT_PERMISSIONS.MANAGE.code])
-    ) {
+    if (ctx.hasAnyPermissions([PROJECT_PERMISSIONS.SEARCH.code]) && !ctx.hasAnyPermissions([PROJECT_PERMISSIONS.MANAGE.code])) {
         where.salesRep = ctx.role?._id;
     }
 
@@ -145,10 +139,7 @@ const search = async (filters: ISearchProjectQuery, ctx: RequestContext, options
     const where: mongoose.QueryFilter<IProject> = { ...ctx.where() };
 
     // reps (project:search, not project:manage) can only see their own projects
-    if (
-        ctx.hasAnyPermissions([PROJECT_PERMISSIONS.SEARCH.code]) &&
-        !ctx.hasAnyPermissions([PROJECT_PERMISSIONS.MANAGE.code])
-    ) {
+    if (ctx.hasAnyPermissions([PROJECT_PERMISSIONS.SEARCH.code]) && !ctx.hasAnyPermissions([PROJECT_PERMISSIONS.MANAGE.code])) {
         where.salesRep = ctx.role?._id;
     }
 
@@ -174,11 +165,7 @@ const search = async (filters: ISearchProjectQuery, ctx: RequestContext, options
 
     //3: execute queries
     const countPromise = Project.countDocuments(where);
-    const dataPromise = Project.find(where)
-        .populate(populate)
-        .limit(options?.pagination?.limit)
-        .skip(options?.pagination?.skip)
-        .sort(sort);
+    const dataPromise = Project.find(where).populate(populate).limit(options?.pagination?.limit).skip(options?.pagination?.skip).sort(sort);
 
     const [count, items] = await Promise.all([countPromise, dataPromise]);
 

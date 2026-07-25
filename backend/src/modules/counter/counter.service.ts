@@ -76,7 +76,7 @@ const search = async (filters: ISearchCounterQuery, ctx: RequestContext, options
 
 // Render a counter document into its formatted code string, honoring the stored
 // format template tokens: {{prefix}} {{suffix}} {{separator}} {{number}}. prefix/suffix
-// are stored lowercase but codes read as uppercase (LEAD-000001), so they're upper-cased here.
+// are stored (and emitted) lowercase, e.g. lead-000001 — the frontend upper-cases for display.
 const formatCode = (counter: HydratedDocument<ICounter>): string => {
     const number = String(counter.currentValue).padStart(counter.padding, '0');
     return counter.format

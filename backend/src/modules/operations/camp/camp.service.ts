@@ -169,17 +169,21 @@ const set = async (model: any, entity: HydratedDocument<ICamp>, ctx: RequestCont
 };
 
 const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): Promise<CampDocument> => {
-    if (!isValidObjectID(id)) {
-        return null;
-    }
+    const where: mongoose.QueryFilter<ICamp> = ctx.where();
 
-    const where: mongoose.QueryFilter<ICamp> = { ...ctx.where(), _id: id };
+    if (isValidObjectID(id)) {
+        where._id = id;
+    } else {
+        where.code = id;
+    }
     applyOwnScope(where, ctx);
 
     let query = CampModel.findOne(where);
 
-    if (options?.populate) {
-        query = query.populate(populate);
+    if (query) {
+        if (options?.populate) {
+            query = query.populate(populate);
+        }
     }
 
     return await query;

@@ -69,11 +69,12 @@ const set = async (model: any, entity: HydratedDocument<ILead>, ctx: RequestCont
 };
 
 const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): Promise<LeadDocument> => {
-    if (!isValidObjectID(id)) {
-        return null;
+    const where: mongoose.QueryFilter<ILead> = ctx.where();
+    if (isValidObjectID(id)) {
+        where._id = id;
+    } else {
+        where.code = id;
     }
-
-    const where: mongoose.QueryFilter<ILead> = { ...ctx.where(), _id: id };
 
     // reps (lead:search, not lead:manage) can only see their own leads
     if (ctx.hasAnyPermissions([LEAD_PERMISSIONS.SEARCH.code]) && !ctx.hasAnyPermissions([LEAD_PERMISSIONS.MANAGE.code])) {

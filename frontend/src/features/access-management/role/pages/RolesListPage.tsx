@@ -57,7 +57,7 @@ const RolesListPage = () => {
             Roles
           </h1>
           <p className="text-[13px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>
-            {!isLoading && !error ? `${totalCount} total` : 'Manage roles across tenants.'}
+            {!isLoading && !error ? `${totalCount} total` : 'Manage roles across companies.'}
           </p>
         </div>
         <Button

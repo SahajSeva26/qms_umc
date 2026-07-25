@@ -87,7 +87,7 @@ const WizardStep4 = ({ form, setField }: WizardStep4Props) => {
           <p className="text-[11px] mt-1 text-danger">Couldn't load sales reps — try again.</p>
         )}
         {!tenantsErrored && !rolesErrored && !rolesLoading && !platformTenant && (
-          <p className="text-[11px] mt-1 text-danger">No QMS internal (platform) tenant found — a sales rep must belong to one.</p>
+          <p className="text-[11px] mt-1 text-danger">No QMS internal (platform) company found — a sales rep must belong to one.</p>
         )}
       </div>
 

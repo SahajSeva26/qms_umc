@@ -37,7 +37,7 @@ const RoleTypesTable = ({ roleTypes }: RoleTypesTableProps) => {
                 Name
               </th>
               <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                Tenant
+                Company
               </th>
               <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
                 Permissions

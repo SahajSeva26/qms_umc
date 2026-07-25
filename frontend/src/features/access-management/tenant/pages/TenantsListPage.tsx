@@ -50,10 +50,10 @@ const TenantsListPage = () => {
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--qms-text)' }}>
-            Tenants
+            Companies
           </h1>
           <p className="text-[13px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>
-            {!isLoading && !error ? `${totalCount} total` : 'Manage tenants on the platform.'}
+            {!isLoading && !error ? `${totalCount} total` : 'Manage companies on the platform.'}
           </p>
         </div>
         {canManageTenant && <CreateTenantDialog />}
@@ -63,13 +63,13 @@ const TenantsListPage = () => {
 
       {isLoading && (
         <div className="text-[13px] py-10 text-center" style={{ color: 'var(--qms-text-muted)' }}>
-          Loading tenants…
+          Loading companies…
         </div>
       )}
 
       {error && !isLoading && (
         <div className="text-[13px] rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
-          Failed to load tenants. Please try again.
+          Failed to load companies. Please try again.
         </div>
       )}
 

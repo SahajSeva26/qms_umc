@@ -57,8 +57,8 @@ export async function resolveRowNames(row: {
     errors.push({
       field: 'Company',
       message: count > 1
-        ? `"${row.company}" matches more than one tenant — use the exact name.`
-        : `No tenant found matching "${row.company}".`,
+        ? `"${row.company}" matches more than one company — use the exact name.`
+        : `No company found matching "${row.company}".`,
     })
   }
 
@@ -75,7 +75,7 @@ export async function resolveRowNames(row: {
         field: 'Division',
         message: count > 1
           ? `"${row.division}" matches more than one division under "${row.company}".`
-          : `No division found matching "${row.division}" under tenant "${row.company}".`,
+          : `No division found matching "${row.division}" under company "${row.company}".`,
       })
     }
   }
@@ -93,7 +93,7 @@ export async function resolveRowNames(row: {
         field: 'Contact',
         message: count > 1
           ? `"${row.contact}" matches more than one active role under "${row.company}".`
-          : `No active role found matching "${row.contact}" under tenant "${row.company}".`,
+          : `No active role found matching "${row.contact}" under company "${row.company}".`,
       })
     }
   }
@@ -105,7 +105,7 @@ export async function resolveRowNames(row: {
   const platformTenant = (platformTenantRes.data?.items ?? []).find((t) => t.type === 'platform')
   let salesRep: { id: string; name: string } | null = null
   if (!platformTenant) {
-    errors.push({ field: 'Sales rep', message: 'No platform (QMS internal) tenant found — a sales rep must belong to one.' })
+    errors.push({ field: 'Sales rep', message: 'No platform (QMS internal) company found — a sales rep must belong to one.' })
   } else {
     const salesRepRes = await accessManagementService.searchRoles({ tenant: platformTenant.id, name: row.salesRep, status: 'active', limit: '1000' })
     salesRep = exactMatch(salesRepRes.data?.items ?? [], (r) => r.name, row.salesRep)

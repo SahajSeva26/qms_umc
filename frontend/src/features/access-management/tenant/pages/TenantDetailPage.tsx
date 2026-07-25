@@ -80,18 +80,18 @@ const TenantDetailPage = () => {
         style={{ color: 'var(--qms-text-soft)' }}
       >
         <FiArrowLeft size={14} />
-        Back to tenants
+        Back to companies
       </button>
 
       {isLoading && (
         <div className="text-[13px] py-10 text-center" style={{ color: 'var(--qms-text-muted)' }}>
-          Loading tenant…
+          Loading company…
         </div>
       )}
 
       {error && !isLoading && (
         <div className="text-[13px] rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
-          Failed to load tenant. Please try again.
+          Failed to load company. Please try again.
         </div>
       )}
 
@@ -118,7 +118,7 @@ const TenantDetailPage = () => {
             style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}
           >
             <h2 className="text-sm font-bold mb-4" style={{ color: 'var(--qms-text)' }}>
-              Edit tenant
+              Edit company
             </h2>
 
             <div className="space-y-4">
@@ -197,7 +197,7 @@ const TenantDetailPage = () => {
 
               {!canManageTenant && !canManageSystem && (
                 <p className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>
-                  Status and type are only editable by users with tenant or system management permissions.
+                  Status and type are only editable by users with company or system management permissions.
                 </p>
               )}
 

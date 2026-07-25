@@ -28,12 +28,12 @@ export const createTenantSchema = z.object({
   code: z
     .string()
     .trim()
-    .min(3, 'Tenant code must be at least 3 characters')
+    .min(3, 'Company code must be at least 3 characters')
     .toLowerCase()
     .refine((val) => !MONGO_OBJECT_ID_REGEX.test(val), {
-      message: 'Tenant code must not look like an ObjectId',
+      message: 'Company code must not look like an ObjectId',
     }),
-  name: z.string().trim().min(1, 'Tenant name is required'),
+  name: z.string().trim().min(1, 'Company name is required'),
   description: z.string().trim().optional(),
   owner: z.object({
     firstName: z.string().trim().min(1, "Owner's first name is required"),

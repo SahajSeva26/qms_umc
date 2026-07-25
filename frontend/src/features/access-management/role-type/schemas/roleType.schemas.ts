@@ -13,7 +13,7 @@ export const createRoleTypeSchema = z.object({
   code: z.enum(ROLE_TYPE_CODES as [string, ...string[]], { message: 'Select a valid role type code' }),
   name: z.string().trim().min(1, 'Name is required'),
   description: z.string().trim().optional(),
-  tenant: z.string().trim().min(1, 'Tenant is required'),
+  tenant: z.string().trim().min(1, 'Company is required'),
   // The "shopping cart" list of bare permission codes (per
   // CreateRoleTypePayload.permissions: string[]), ceiling-checked client-side
   // (and re-checked server-side) against the tenant's own PermissionGroup.

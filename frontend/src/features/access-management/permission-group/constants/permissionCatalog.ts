@@ -69,12 +69,15 @@ export const PERMISSION_CATALOG = {
     MANAGE: { code: 'user:manage', name: 'Manage User', description: 'Manage users' },
   },
   TENANT: {
-    CREATE: { code: 'tenant:create', name: 'Create Tenant', description: 'Create a new tenant' },
-    GET: { code: 'tenant:get', name: 'Get Tenant', description: 'Get a tenant' },
-    SEARCH: { code: 'tenant:search', name: 'Search Tenant', description: 'Search tenants' },
-    UPDATE: { code: 'tenant:update', name: 'Update Tenant', description: 'Update a tenant' },
-    ADMIN: { code: 'tenant:admin', name: 'Admin Tenant', description: 'Admin tenant' },
-    MANAGE: { code: 'tenant:manage', name: 'Manage Tenant', description: 'Manage tenants' },
+    // Display-only rename (Tenant -> Company) for user-facing labels, per
+    // explicit user instruction — the `code` values below (`tenant:*`) are
+    // real backend permission codes and MUST NOT change.
+    CREATE: { code: 'tenant:create', name: 'Create Company', description: 'Create a new company' },
+    GET: { code: 'tenant:get', name: 'Get Company', description: 'Get a company' },
+    SEARCH: { code: 'tenant:search', name: 'Search Company', description: 'Search companies' },
+    UPDATE: { code: 'tenant:update', name: 'Update Company', description: 'Update a company' },
+    ADMIN: { code: 'tenant:admin', name: 'Admin Company', description: 'Admin company' },
+    MANAGE: { code: 'tenant:manage', name: 'Manage Company', description: 'Manage companies' },
   },
   PERMISSION_GROUP: {
     CREATE: { code: 'permission-group:create', name: 'Create Permission Group', description: 'Create Permission Group' },
@@ -127,7 +130,7 @@ export const PERMISSION_CATALOG = {
 export const PERMISSION_RESOURCE_LABELS: Record<keyof typeof PERMISSION_CATALOG, string> = {
   SYSTEM: 'System',
   USER: 'User',
-  TENANT: 'Tenant',
+  TENANT: 'Company',
   PERMISSION_GROUP: 'Permission Group',
   ROLE_TYPE: 'Role Type',
   ROLE: 'Role',

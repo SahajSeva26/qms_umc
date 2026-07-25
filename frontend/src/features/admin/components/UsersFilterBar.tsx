@@ -51,7 +51,7 @@ const UsersFilterBar = ({ filters, setFilter, reset, tenantOptions }: UsersFilte
 
       <Select value={filters.tenant} onValueChange={(v) => setFilter('tenant', v ?? 'ALL')}>
         <SelectTrigger className="text-[12px]">
-          <SelectValue>{(v: string) => (v === 'ALL' ? 'Tenant' : (tenantLabelById.get(v) ?? 'Tenant'))}</SelectValue>
+          <SelectValue>{(v: string) => (v === 'ALL' ? 'Company' : (tenantLabelById.get(v) ?? 'Company'))}</SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="ALL">All</SelectItem>

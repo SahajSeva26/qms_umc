@@ -92,21 +92,21 @@ const CreateTenantDialog = () => {
         className="text-white shrink-0"
         style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
       >
-        <FiPlus size={14} /> New Tenant
+        <FiPlus size={14} /> New Company
       </Button>
 
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Create tenant</DialogTitle>
+          <DialogTitle>Create company</DialogTitle>
           <DialogDescription>
-            Sets up the tenant and registers its initial admin user in one step.
+            Sets up the company and registers its initial admin user in one step.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
           <div>
             <h3 className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-              Tenant details
+              Company details
             </h3>
             <div className="space-y-3">
               <div>
@@ -222,7 +222,7 @@ const CreateTenantDialog = () => {
           {createTenant.isError && (
             <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
               {(createTenant.error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-                'Failed to create tenant. Please try again.'}
+                'Failed to create company. Please try again.'}
             </div>
           )}
         </div>
@@ -232,7 +232,7 @@ const CreateTenantDialog = () => {
             Cancel
           </Button>
           <Button onClick={handleSubmit} disabled={createTenant.isPending}>
-            {createTenant.isPending ? 'Creating…' : 'Create tenant'}
+            {createTenant.isPending ? 'Creating…' : 'Create company'}
           </Button>
         </DialogFooter>
       </DialogContent>

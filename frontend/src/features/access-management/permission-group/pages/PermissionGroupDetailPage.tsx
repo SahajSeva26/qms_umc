@@ -4,6 +4,7 @@ import { FiArrowLeft } from 'react-icons/fi'
 import type { IPermission } from '@/types/accessManagement.types'
 import { usePermissionGroup } from '@/features/access-management/permission-group/hooks/usePermissionGroup'
 import { useUpdatePermissionGroup } from '@/features/access-management/permission-group/hooks/useUpdatePermissionGroup'
+import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { PERMISSION_GROUP_ROUTES } from '@/features/access-management/permission-group/permission-group.routes'
 import { PERMISSION_CATALOG, PERMISSION_CATALOG_FLAT, PERMISSION_RESOURCE_LABELS } from '@/features/access-management/permission-group/constants/permissionCatalog'
 import PermissionGroupStatusPill from '@/features/access-management/permission-group/components/PermissionGroupStatusPill'
@@ -32,6 +33,16 @@ const PermissionGroupDetailPage = () => {
   const group = data?.data ?? null
 
   const updatePermissionGroup = useUpdatePermissionGroup(id ?? '')
+
+  // group.tenant is a raw ObjectId string (never populated server-side —
+  // same PermissionGroupEntity.tenant: string shape PermissionGroupsTable.tsx
+  // already documents), so it needs the same tenantLabelById resolution
+  // PermissionGroupsListPage.tsx already builds for that list page's own
+  // Company column — this detail page was missing the equivalent lookup
+  // entirely and rendered the bare id instead of a name. Found via a
+  // 2026-07-25 live UI check.
+  const { data: tenantsData } = useTenants({})
+  const tenantLabelById = new Map((tenantsData?.data?.items ?? []).map((t) => [t.id, t.name]))
 
   const [selectedCodes, setSelectedCodes] = useState<Set<string>>(new Set())
   const [formError, setFormError] = useState<string | null>(null)
@@ -113,7 +124,7 @@ const PermissionGroupDetailPage = () => {
               </p>
             )}
             <div className="text-[11px] mt-3" style={{ color: 'var(--qms-text-muted)' }}>
-              Tenant: {group.tenant}
+              Company: {tenantLabelById.get(group.tenant) ?? group.tenant}
             </div>
           </div>
 

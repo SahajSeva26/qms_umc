@@ -177,7 +177,7 @@ const CampDetailPageReal = () => {
     const deviceList = devices.split(',').map((d) => d.trim()).filter(Boolean)
 
     if (isCreateMode) {
-      if (!tenant) { setFormError('Tenant is required'); return }
+      if (!tenant) { setFormError('Company is required'); return }
       if (!division) { setFormError('Division is required'); return }
       if (!doctor) { setFormError('Doctor is required'); return }
       if (!date) { setFormError('Date is required'); return }
@@ -413,9 +413,9 @@ const CampDetailPageReal = () => {
               {isCreateMode && (
                 <>
                   <div>
-                    <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Tenant</Label>
+                    <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Company</Label>
                     <Select value={tenant || undefined} onValueChange={(v) => { setTenant(v ?? ''); setDivision('') }}>
-                      <SelectTrigger className="w-full"><SelectValue placeholder="Select tenant" /></SelectTrigger>
+                      <SelectTrigger className="w-full"><SelectValue placeholder="Select company" /></SelectTrigger>
                       <SelectContent>
                         {tenants.map((t) => <SelectItem key={t.id} value={t.id}>{t.name} ({t.code})</SelectItem>)}
                       </SelectContent>
@@ -424,7 +424,7 @@ const CampDetailPageReal = () => {
                   <div>
                     <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Division</Label>
                     <Select value={division || undefined} onValueChange={(v) => setDivision(v ?? '')} disabled={!tenant}>
-                      <SelectTrigger className="w-full"><SelectValue placeholder={tenant ? 'Select division' : 'Select a tenant first'} /></SelectTrigger>
+                      <SelectTrigger className="w-full"><SelectValue placeholder={tenant ? 'Select division' : 'Select a company first'} /></SelectTrigger>
                       <SelectContent>
                         {divisions.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
                       </SelectContent>

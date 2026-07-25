@@ -202,7 +202,7 @@ const ImportLeadsDialog = ({ onClose, onImported }: ImportLeadsDialogProps) => {
           <DialogTitle>Import leads from CSV</DialogTitle>
           <DialogDescription>
             Upload a CSV with columns: Title, Company, Division, Contact, Sales rep, Problem statement, Number of MRs
-            (optional: Estimated value, Confidence). Names must exactly match existing tenants/divisions/roles.
+            (optional: Estimated value, Confidence). Names must exactly match existing companies/divisions/roles.
           </DialogDescription>
         </DialogHeader>
 

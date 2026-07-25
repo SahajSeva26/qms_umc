@@ -104,6 +104,12 @@ const projectSchema = new mongoose.Schema(
             type: String,
             required: [true, 'Project name is required'],
         },
+        code: {
+            type: String,
+            required: true,
+            trim: true,
+            unique: true,
+        },
         tenant: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Tenant',

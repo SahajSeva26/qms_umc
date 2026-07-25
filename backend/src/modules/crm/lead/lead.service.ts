@@ -1,7 +1,7 @@
 import mongoose, { HydratedDocument } from 'mongoose';
 import { ILead, LeadModel } from './lead.model';
 import { ICreateLeadPayload, IMoveStagePayload, ISearchLeadQuery, IUpdateLeadPayload, canTransition } from './lead.validators';
-import { LEAD_PERMISSIONS, LEAD_TRANSITION_MAP } from './lead.constants';
+import { LEAD_COUNTER_ENTITY, LEAD_PERMISSIONS, LEAD_TRANSITION_MAP } from './lead.constants';
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
@@ -10,6 +10,8 @@ import { IServiceOptions } from '../../../shared/types/service.types';
 import { DivisionService } from '../../division/division.service';
 import { RoleService } from '../../access-management/role/role.service';
 import { TENANT_TYPE } from '../../access-management/tenant/tenant.constants';
+import { withTransaction } from '../../../shared/helpers/transactionHelper';
+import { CounterService } from '../../counter/counter.service';
 
 type LeadDocument = HydratedDocument<ILead> | null;
 
@@ -67,11 +69,12 @@ const set = async (model: any, entity: HydratedDocument<ILead>, ctx: RequestCont
 };
 
 const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): Promise<LeadDocument> => {
-    if (!isValidObjectID(id)) {
-        return null;
+    const where: mongoose.QueryFilter<ILead> = ctx.where();
+    if (isValidObjectID(id)) {
+        where._id = id;
+    } else {
+        where.code = id;
     }
-
-    const where: mongoose.QueryFilter<ILead> = { ...ctx.where(), _id: id };
 
     // reps (lead:search, not lead:manage) can only see their own leads
     if (ctx.hasAnyPermissions([LEAD_PERMISSIONS.SEARCH.code]) && !ctx.hasAnyPermissions([LEAD_PERMISSIONS.MANAGE.code])) {
@@ -129,7 +132,6 @@ const search = async (filters: ISearchLeadQuery, ctx: RequestContext, options?: 
 };
 
 const create = async (model: ICreateLeadPayload, ctx: RequestContext): Promise<HydratedDocument<ILead>> => {
-    
     //1: division must exist (scoped to the actor); the lead inherits its tenant
     const division = await DivisionService.get(model.division, ctx);
     if (!division) {
@@ -141,16 +143,21 @@ const create = async (model: ICreateLeadPayload, ctx: RequestContext): Promise<H
         return throwAppError('Division does not belong to the selected company', StatusCodes.BAD_REQUEST);
     }
 
-    //3: build entity — tenant is derived from the division (the pharma company, source of truth).
-    // tenant must be set before set() so it can validate the contactPerson against it.
-    const entity = new LeadModel({
-        tenant: division.tenant,
-        division: division._id,
-    });
+    const lead = await withTransaction(async () => {
+        const code: string = await CounterService.next(LEAD_COUNTER_ENTITY, ctx);
+        //3: build entity — tenant is derived from the division (the pharma company, source of truth).
+        // tenant must be set before set() so it can validate the contactPerson against it.
+        let entity = new LeadModel({
+            tenant: division.tenant,
+            division: division._id,
+            code,
+        });
 
-    //4: set validates + applies contactPerson/salesPerson and the remaining fields
-    let lead = await set(model, entity, ctx);
-    lead = await lead.save();
+        //4: set validates + applies contactPerson/salesPerson and the remaining fields
+        entity = await set(model, entity, ctx);
+        entity = await entity.save();
+        return entity;
+    });
 
     return lead;
 };

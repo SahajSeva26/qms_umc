@@ -2,7 +2,9 @@
 import mongoose, { HydratedDocument } from 'mongoose';
 import { CampModel, ICamp } from './camp.model';
 import { ICreateCampPayload, IMoveStagePayload, ISearchCampQuery, IUpdateCampPayload } from './camp.validators';
-import { CAMP_PERMISSIONS, CAMP_STATUSES, CAMP_TRANSITION_MAP } from './camp.constants';
+import { CAMP_COUNTER_ENTITY, CAMP_PERMISSIONS, CAMP_STATUSES, CAMP_TRANSITION_MAP } from './camp.constants';
+import { withTransaction } from '../../../shared/helpers/transactionHelper';
+import { CounterService } from '../../counter/counter.service';
 import { GeoProfileService } from '../geoProfile/geoProfile.service';
 import { GEO_PROFILE_TYPES } from '../geoProfile/geoProfile.constants';
 import { canTransition } from '../../crm/lead/lead.validators';
@@ -167,17 +169,21 @@ const set = async (model: any, entity: HydratedDocument<ICamp>, ctx: RequestCont
 };
 
 const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): Promise<CampDocument> => {
-    if (!isValidObjectID(id)) {
-        return null;
-    }
+    const where: mongoose.QueryFilter<ICamp> = ctx.where();
 
-    const where: mongoose.QueryFilter<ICamp> = { ...ctx.where(), _id: id };
+    if (isValidObjectID(id)) {
+        where._id = id;
+    } else {
+        where.code = id;
+    }
     applyOwnScope(where, ctx);
 
     let query = CampModel.findOne(where);
 
-    if (options?.populate) {
-        query = query.populate(populate);
+    if (query) {
+        if (options?.populate) {
+            query = query.populate(populate);
+        }
     }
 
     return await query;
@@ -263,9 +269,15 @@ const create = async (model: ICreateCampPayload, ctx: RequestContext): Promise<H
         camp = await set({ fo: foRole.toString() }, camp, ctx);
     }
 
-    camp = await camp.save();
+    //6: reserve the sequential camp code and persist. Wrapped in a transaction so a failed save
+    // rolls the counter back (no burned code). The $geoNear FO lookup above stays OUTSIDE the
+    // transaction — $geoNear is not permitted inside a MongoDB transaction.
+    const saved = await withTransaction(async () => {
+        camp.code = await CounterService.next(CAMP_COUNTER_ENTITY, ctx);
+        return await camp.save();
+    });
 
-    return camp;
+    return saved;
 };
 
 const update = async (id: string, model: IUpdateCampPayload, ctx: RequestContext) => {

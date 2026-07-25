@@ -11,11 +11,14 @@ import '../../../modules/access-management/role-type/roleType.routes';
 import '../../../modules/access-management/role/role.routes';
 import '../../../modules/division/division.routes';
 import '../../../modules/crm/lead/lead.routes';
+import '../../../modules/crm/contact/contact.routes';
+import '../../../modules/crm/appointment/appointment.routes';
 import '../../../modules/crm/project/project.routes';
 import '../../../modules/qa-feedback/qaFeedback.routes';
 import '../../../modules/doctor/doctor.routes';
 import '../../../modules/operations/geoProfile/geoProfile.routes';
 import '../../../modules/operations/camp/camp.routes';
+import '../../../modules/counter/counter.routes';
 // =============================================
 // =============================================
 

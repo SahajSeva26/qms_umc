@@ -1,5 +1,6 @@
 import { ALLOWED_ROLETYPE_CODES } from '../../modules/access-management/role-type/roleType.constants';
 import { LEAD_PERMISSIONS } from '../../modules/crm/lead/lead.constants';
+import { APPOINTMENT_PERMISSIONS } from '../../modules/crm/appointment/appointment.constants';
 import { DOCTOR_PERMISSIONS } from '../../modules/doctor/doctor.constants';
 import { CAMP_PERMISSIONS } from '../../modules/operations/camp/camp.constants';
 
@@ -14,13 +15,19 @@ export const CRM_BUSINESS_ROLE_TYPES = [
             LEAD_PERMISSIONS.CREATE.code,
             LEAD_PERMISSIONS.UPDATE.code,
             LEAD_PERMISSIONS.GET.code,
+            // appointments they own/attend — CRUD (search+get is what the service scopes own-visibility off)
+            APPOINTMENT_PERMISSIONS.SEARCH.code,
+            APPOINTMENT_PERMISSIONS.CREATE.code,
+            APPOINTMENT_PERMISSIONS.UPDATE.code,
+            APPOINTMENT_PERMISSIONS.GET.code,
+            APPOINTMENT_PERMISSIONS.RSVP.code,
         ],
     },
     {
         code: ALLOWED_ROLETYPE_CODES.PLATFORM.SALES_HEAD,
         name: 'Sales Head',
         description: 'Sales head — full lead visibility, assigns leads to sales reps',
-        permissions: [LEAD_PERMISSIONS.MANAGE.code],
+        permissions: [LEAD_PERMISSIONS.MANAGE.code, APPOINTMENT_PERMISSIONS.MANAGE.code],
     },
 ];
 
@@ -35,6 +42,9 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
             CAMP_PERMISSIONS.GET.code,
             CAMP_PERMISSIONS.UPDATE.code,
             DOCTOR_PERMISSIONS.MANAGE.code,
+            APPOINTMENT_PERMISSIONS.SEARCH.code,
+            APPOINTMENT_PERMISSIONS.GET.code,
+            APPOINTMENT_PERMISSIONS.RSVP.code,
         ],
     },
     {
@@ -46,25 +56,44 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
             CAMP_PERMISSIONS.GET.code,
             CAMP_PERMISSIONS.UPDATE.code,
             DOCTOR_PERMISSIONS.MANAGE.code,
+            APPOINTMENT_PERMISSIONS.SEARCH.code,
+            APPOINTMENT_PERMISSIONS.GET.code,
+            APPOINTMENT_PERMISSIONS.RSVP.code,
         ],
     },
     {
         code: ALLOWED_ROLETYPE_CODES.PLATFORM.OPERATION_MANAGER_SCREENING,
         name: 'Ops Manager Screening',
         description: 'Ops manager screening (manages screening camps)',
-        permissions: [CAMP_PERMISSIONS.MANAGE.code],
+        permissions: [
+            CAMP_PERMISSIONS.MANAGE.code,
+            APPOINTMENT_PERMISSIONS.SEARCH.code,
+            APPOINTMENT_PERMISSIONS.GET.code,
+            APPOINTMENT_PERMISSIONS.RSVP.code,
+        ],
     },
     {
         code: ALLOWED_ROLETYPE_CODES.PLATFORM.OPERATION_MANAGER_DIET,
         name: 'Ops Manager Diet',
         description: 'Ops manager diet (manages diet camps)',
-        permissions: [CAMP_PERMISSIONS.MANAGE.code],
+        permissions: [
+            CAMP_PERMISSIONS.MANAGE.code,
+            APPOINTMENT_PERMISSIONS.SEARCH.code,
+            APPOINTMENT_PERMISSIONS.GET.code,
+            APPOINTMENT_PERMISSIONS.RSVP.code,
+        ],
     },
 
     {
         code: ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER,
         name: 'Field Officer',
         description: 'Field officer',
-        permissions: [CAMP_PERMISSIONS.SEARCH.code, CAMP_PERMISSIONS.GET.code],
+        permissions: [
+            CAMP_PERMISSIONS.SEARCH.code,
+            CAMP_PERMISSIONS.GET.code,
+            APPOINTMENT_PERMISSIONS.SEARCH.code,
+            APPOINTMENT_PERMISSIONS.GET.code,
+            APPOINTMENT_PERMISSIONS.RSVP.code,
+        ],
     },
 ];

@@ -12,6 +12,9 @@ export const LEAD_STATUSES = {
     LOST: 'lost',
 } as const;
 
+// entity key for the sequential lead-code counter (seeded at startup, incremented on create)
+export const LEAD_COUNTER_ENTITY = 'lead';
+
 export const LEAD_PROJECT_TYPES = {
     SCREENING: 'screening',
     DIET: 'diet',
@@ -20,7 +23,7 @@ export const LEAD_PROJECT_TYPES = {
     MIXED: 'mixed',
 } as const;
 
-//optional
+
 // export const qmsOfferings = [
 //   {
 //     code: "screening_camps",

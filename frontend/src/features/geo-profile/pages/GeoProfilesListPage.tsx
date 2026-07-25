@@ -6,7 +6,6 @@ import { useGeoProfilesFilters } from '@/features/geo-profile/hooks/useGeoProfil
 import GeoProfilesTable from '@/features/geo-profile/components/GeoProfilesTable'
 import GeoProfilesFilterBar from '@/features/geo-profile/components/GeoProfilesFilterBar'
 import PaginationControls from '@/components/ui/PaginationControls'
-import { GEO_PROFILE_ROUTES } from '@/features/geo-profile/geoProfile.routes'
 import { Button } from '@/components/ui/button'
 import type { GeoProfileStatus, GeoProfileType } from '@/types/geoProfile.types'
 
@@ -56,11 +55,11 @@ const GeoProfilesListPage = () => {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Button variant="outline" onClick={() => navigate(GEO_PROFILE_ROUTES.GEO_PROFILE_NEAREST)}>
+          <Button variant="outline" onClick={() => navigate('/geo-profiles/nearest-lookup')}>
             <FiNavigation size={14} /> Nearest lookup
           </Button>
           <Button
-            onClick={() => navigate(GEO_PROFILE_ROUTES.GEO_PROFILE_NEW)}
+            onClick={() => navigate('/geo-profiles/new')}
             className="text-white"
             style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
           >

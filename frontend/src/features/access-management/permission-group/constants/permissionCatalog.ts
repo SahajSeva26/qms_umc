@@ -16,8 +16,10 @@ import type { IPermission } from '@/types/accessManagement.types'
 // There is no dedicated "list all permissions" endpoint on the backend, so
 // this catalog is hardcoded here to power the permission-group "shopping
 // cart" UI: every known permission code is always rendered, grouped by
-// resource, with the ones already on the group checked. 35 codes total
-// across 9 resources — kept in exact sync with the backend source above.
+// resource, with the ones already on the group checked. 41 codes total
+// across 11 resources — kept in exact sync with the backend source above
+// (now also camp.constants.ts's CAMP_PERMISSIONS and doctor.constants.ts's
+// DOCTOR_PERMISSIONS, see drift incident #3 below).
 // CONFIRMED DRIFT INCIDENT (2026-07-17): this file sat at 27/6 for a while
 // after `division`/`lead` were merged into the backend (PR #3/#4) — nobody
 // updated this hardcoded list, so a real Permission Group in the DB that had
@@ -29,12 +31,19 @@ import type { IPermission } from '@/types/accessManagement.types'
 // alongside it, so a real tenant's Permission Group holding e.g. `lead:search`
 // rendered it as invisible/unselectable here (the code existed on the group
 // document but had no matching catalog entry to check a box against) —
-// caught live while testing a Permission Group's edit screen post-merge. If
-// a `GET /permissions` endpoint is ever added, prefer fetching this list live
-// instead of hand-maintaining it — see PROGRESS.md's "No backend endpoint to
-// list the full permission catalog" Known Issue. Until then: any change to
-// a module's own `*_PERMISSIONS` constant on the backend MUST be mirrored
-// here in the same commit/PR.
+// caught live while testing a Permission Group's edit screen post-merge.
+// CONFIRMED DRIFT INCIDENT #3 (2026-07-24): happened again — the real Camp
+// and Doctor backend modules (`camp.constants.ts`'s 5 codes, `doctor.constants.ts`'s
+// 1 code) were never added here, so any RoleType/PermissionGroup actually
+// holding e.g. `camp:update`/`doctor:manage` (like the real seeded "Camp
+// Coordinator" RoleType) showed a nonzero "N of 47 selected" header with
+// every checkbox unchecked and no way to see or edit which permissions those
+// were — found via a live test sweep, fixed by adding the CAMP/DOCTOR groups
+// below. If a `GET /permissions` endpoint is ever added, prefer fetching this
+// list live instead of hand-maintaining it — see PROGRESS.md's "No backend
+// endpoint to list the full permission catalog" Known Issue. Until then: any
+// change to a module's own `*_PERMISSIONS` constant on the backend MUST be
+// mirrored here in the same commit/PR — this has now drifted 3 times.
 //
 // Shape deliberately mirrors the backend's own PERMISSIONS object exactly —
 // an object keyed by resource, each resource an object keyed by action name
@@ -102,6 +111,16 @@ export const PERMISSION_CATALOG = {
     CREATE: { code: 'qa-feedback:create', name: 'Create QA Feedback', description: 'Report a QA feedback comment' },
     MANAGE: { code: 'qa-feedback:manage', name: 'Manage QA Feedback', description: 'Review and resolve QA feedback' },
   },
+  CAMP: {
+    GET: { code: 'camp:get', name: 'Get Camp', description: 'Get camps' },
+    SEARCH: { code: 'camp:search', name: 'Search Camp', description: 'View/search only camps the actor is assigned to (fo/mr/asm/rsm)' },
+    CREATE: { code: 'camp:create', name: 'Create Camp', description: 'Create camps' },
+    UPDATE: { code: 'camp:update', name: 'Update Camp', description: 'Update camps' },
+    MANAGE: { code: 'camp:manage', name: 'Manage Camp', description: 'Manage camps (full visibility across the tenant)' },
+  },
+  DOCTOR: {
+    MANAGE: { code: 'doctor:manage', name: 'Manage Doctor', description: 'Manage doctors (full visibility, incl. inactive)' },
+  },
 } as const
 
 /** Display labels for each resource group header — keys must match PERMISSION_CATALOG exactly. */
@@ -115,6 +134,8 @@ export const PERMISSION_RESOURCE_LABELS: Record<keyof typeof PERMISSION_CATALOG,
   DIVISION: 'Division',
   LEAD: 'Lead',
   QA_FEEDBACK: 'QA Feedback',
+  CAMP: 'Camp',
+  DOCTOR: 'Doctor',
 }
 
 /** Flat list of every catalog permission, in the same order as PERMISSION_CATALOG's keys. */

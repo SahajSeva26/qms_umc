@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FiArrowLeft } from 'react-icons/fi'
 import { useNearestGeoProfiles } from '@/features/geo-profile/hooks/useNearestGeoProfiles'
-import { GEO_PROFILE_ROUTES } from '@/features/geo-profile/geoProfile.routes'
 import GeoProfileStatusPill from '@/features/geo-profile/components/GeoProfileStatusPill'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -45,7 +44,7 @@ const NearestGeoProfilesPage = () => {
   return (
     <div className="max-w-3xl">
       <button
-        onClick={() => navigate(GEO_PROFILE_ROUTES.GEO_PROFILES)}
+        onClick={() => navigate('/geo-profiles')}
         className="flex items-center gap-1.5 text-[13px] font-semibold mb-5 transition-colors hover:opacity-80"
         style={{ color: 'var(--qms-text-soft)' }}
       >

@@ -5,6 +5,7 @@ import TenantsTable from '@/features/access-management/tenant/components/Tenants
 import TenantsFilterBar from '@/features/access-management/tenant/components/TenantsFilterBar'
 import CreateTenantDialog from '@/features/access-management/tenant/components/CreateTenantDialog'
 import PaginationControls from '@/components/ui/PaginationControls'
+import { usePermission } from '@/hooks/usePermission'
 import type { TenantStatus } from '@/types/accessManagement.types'
 
 const PAGE_SIZE = 10
@@ -15,6 +16,14 @@ const PAGE_SIZE = 10
 const TenantsListPage = () => {
   const { filters, setFilter, reset } = useTenantsFilters()
   const [page, setPage] = useState(1)
+  // Backend's real POST /tenants guard only accepts tenant:manage/system:manage,
+  // but this page itself is reachable by tenant:get/tenant:search alone — the
+  // "New Tenant" button rendered unconditionally for any of those 3, so a
+  // read-only tenant viewer could open the dialog and fill it out only to
+  // 403 on submit. Mirrors TenantDetailPage.tsx's own canManageTenant gate.
+  // Found via a 2026-07-24 test sweep.
+  const { hasPermission } = usePermission()
+  const canManageTenant = hasPermission('tenant:manage')
 
   const { data, isLoading, error } = useTenants({
     name: filters.search || undefined,
@@ -47,7 +56,7 @@ const TenantsListPage = () => {
             {!isLoading && !error ? `${totalCount} total` : 'Manage tenants on the platform.'}
           </p>
         </div>
-        <CreateTenantDialog />
+        {canManageTenant && <CreateTenantDialog />}
       </div>
 
       <TenantsFilterBar filters={filters} setFilter={handleFilterChange} reset={handleReset} />

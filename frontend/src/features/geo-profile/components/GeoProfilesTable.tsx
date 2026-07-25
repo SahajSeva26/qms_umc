@@ -1,6 +1,5 @@
 import { useNavigate } from 'react-router-dom'
 import type { GeoProfileEntity } from '@/types/geoProfile.types'
-import { GEO_PROFILE_ROUTES } from '@/features/geo-profile/geoProfile.routes'
 import GeoProfileStatusPill from '@/features/geo-profile/components/GeoProfileStatusPill'
 
 // Mirrors `@/features/access-management/role/components/RolesTable.tsx` exactly.
@@ -46,7 +45,7 @@ const GeoProfilesTable = ({ geoProfiles }: GeoProfilesTableProps) => {
             {geoProfiles.map((profile) => (
               <tr
                 key={profile.id}
-                onClick={() => navigate(GEO_PROFILE_ROUTES.GEO_PROFILE_DETAIL.replace(':id', profile.id))}
+                onClick={() => navigate(`/geo-profiles/${profile.id}`)}
                 className="cursor-pointer transition-colors hover:bg-(--qms-surface-hover)"
                 style={{ borderBottom: '1px solid var(--qms-border)' }}
               >

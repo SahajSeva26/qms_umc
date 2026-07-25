@@ -171,15 +171,11 @@ AppointmentRouter.patch(
     AppointmentController.moveStage,
 );
 
-// an invited member responds for themselves — read-level access is enough to reach the appointment;
-// the service enforces that the actor is actually on the invite list.
+// an invited member responds for themselves — gated by the dedicated appointment:rsvp permission
+// (manage is the domain superset). The service still enforces that the actor is actually on the invite list.
 AppointmentRouter.patch(
     '/:id/rsvp',
-    AuthorizeMiddleware([
-        APPOINTMENT_PERMISSIONS.MANAGE.code,
-        APPOINTMENT_PERMISSIONS.SEARCH.code,
-        TENANT_PERMISSIONS.MANAGE.code,
-    ]),
+    AuthorizeMiddleware([APPOINTMENT_PERMISSIONS.RSVP.code, APPOINTMENT_PERMISSIONS.MANAGE.code]),
     AppointmentController.respond,
 );
 

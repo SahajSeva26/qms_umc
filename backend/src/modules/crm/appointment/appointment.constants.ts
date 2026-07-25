@@ -68,6 +68,12 @@ export const APPOINTMENT_PERMISSIONS = {
         description: 'View/search own appointments only',
     } as const,
 
+    RSVP: {
+        code: 'appointment:rsvp',
+        name: 'RSVP Appointment',
+        description: 'Respond (accept/decline) to appointment invites you are a member of',
+    } as const,
+
     CREATE: {
         code: 'appointment:create',
         name: 'Create Appointment',

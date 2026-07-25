@@ -451,7 +451,16 @@ const RoleDetailPage = () => {
                   >
                     Status
                   </Label>
-                  <Select value={status || undefined} onValueChange={(v) => setStatus(v as RoleStatus)}>
+                  {/* key={status || 'empty'} forces a fresh mount once the real
+                      value loads from the async fetch — base-ui's Select
+                      decides controlled-vs-uncontrolled on its very first
+                      render and never revisits it, so without this the
+                      trigger permanently shows "Select status" even after
+                      the real value arrives (same bug as
+                      TenantDetailPage.tsx/GeoProfileDetailPage.tsx/
+                      CampDetailPageReal.tsx). Data-only display bug — the
+                      underlying value was always correct. */}
+                  <Select key={status || 'empty'} value={status || undefined} onValueChange={(v) => setStatus(v as RoleStatus)}>
                     <SelectTrigger id="status" className="w-full">
                       <SelectValue placeholder="Select status">
                         {(v) => (v === 'active' ? 'Active' : v === 'inactive' ? 'Inactive' : 'Select status')}

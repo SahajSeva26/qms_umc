@@ -158,7 +158,18 @@ const TenantDetailPage = () => {
                   >
                     Status
                   </Label>
-                  <Select value={status || undefined} onValueChange={(v) => setStatus(v as TenantStatus)}>
+                  {/* key={status || 'empty'} forces a fresh mount once the real
+                      value loads. base-ui's Select decides controlled-vs-
+                      uncontrolled from whether `value` is defined on its VERY
+                      FIRST render and never revisits that decision — `status`
+                      starts as '' before the async tenant fetch resolves, so
+                      without this the trigger permanently shows "Select
+                      status" even after the real value arrives (same bug
+                      fixed on GeoProfileDetailPage.tsx's Type/Status selects
+                      and CampDetailPageReal.tsx's role/doctor selects).
+                      Data-only bug: the underlying value was always correct,
+                      as the header card's TenantStatusPill above proves. */}
+                  <Select key={status || 'empty'} value={status || undefined} onValueChange={(v) => setStatus(v as TenantStatus)}>
                     <SelectTrigger id="status" className="w-full">
                       <SelectValue placeholder="Select status">
                         {(v) => (v === 'active' ? 'Active' : v === 'inactive' ? 'Inactive' : 'Select status')}
@@ -181,7 +192,10 @@ const TenantDetailPage = () => {
                   >
                     Type
                   </Label>
-                  <Select value={type || undefined} onValueChange={(v) => setType(v as TenantType)}>
+                  {/* Same base-ui controlled/uncontrolled lock-in as the
+                      Status select above — key={type || 'empty'} forces a
+                      fresh mount once the real value loads. */}
+                  <Select key={type || 'empty'} value={type || undefined} onValueChange={(v) => setType(v as TenantType)}>
                     <SelectTrigger id="type" className="w-full">
                       <SelectValue placeholder="Select type">
                         {(v) => (v === 'platform' ? 'Platform' : v === 'customer' ? 'Customer' : 'Select type')}

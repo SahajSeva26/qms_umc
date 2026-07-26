@@ -36,7 +36,11 @@ const AppLayout = () => {
   // (useAuth's other consumers, hasRole, etc.) — this is only a
   // same-render fallback so a valid session is never treated as logged-out
   // for the single render before the store catches up.
-  const { isAuthenticated: isSessionAuthenticated, isFetching: isSessionFetching } = useSession()
+  const {
+    isAuthenticated: isSessionAuthenticated,
+    isFetching: isSessionFetching,
+    isConfirmedUnauthenticated,
+  } = useSession()
   const isAuthenticated = isStoreAuthenticated || isSessionAuthenticated
   const [collapsed, setCollapsed] = useState(getInitialCollapsed)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -65,6 +69,18 @@ const AppLayout = () => {
   // first render after a hard reload (isAuthenticated is already true on
   // every subsequent client-side navigation, so this never blocks normal use).
   if (!isAuthenticated && isSessionFetching) return null
+
+  // GET /auth/me shares the same rate limiter as /auth/login and
+  // /auth/refresh-token (rateLimiter.ts, mounted on all of /api/v1/auth/*),
+  // so a burst of requests can make it come back 429 even for a perfectly
+  // valid, still-logged-in session — found live: this hard-redirected a
+  // genuinely authenticated user to /login purely because of rate-limiter
+  // traffic, not because their session was actually invalid. Only redirect
+  // when the backend has ACTUALLY confirmed the caller is unauthenticated
+  // (a real 401); any other failure just renders nothing for this pass and
+  // lets react-query's own retry (useSession.ts's retry policy) resolve it,
+  // rather than forcing a login screen on a session that may still be fine.
+  if (!isAuthenticated && !isConfirmedUnauthenticated) return null
 
   if (!isAuthenticated) return <Navigate to={AUTH_ROUTES.LOGIN} replace />
 

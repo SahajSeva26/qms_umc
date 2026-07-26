@@ -50,6 +50,20 @@ export const useSession = () => {
 
   const isAuthenticated = !!session
 
+  // Distinguishes "the backend confirmed this caller is genuinely logged
+  // out" (a real 401 on GET /auth/me) from "the query failed for some
+  // other, non-authoritative reason" (429 rate-limited, network blip, 5xx).
+  // GET /auth/me sits behind the same shared authRateLimiter as /auth/login
+  // and /auth/refresh-token (rateLimiter.ts, mounted on the whole
+  // /api/v1/auth/* prefix) — a burst of requests can trip it and return 429
+  // even for a perfectly valid, still-logged-in session. Consumers that
+  // decide whether to hard-redirect to login or tear down the persisted
+  // auth store (AppLayout.tsx, SessionBootstrap.tsx) MUST key off this,
+  // not off isError/!session alone — those go true for a 429 too, and were
+  // found live to force real, valid sessions out to the login screen the
+  // moment this endpoint got rate-limited.
+  const isConfirmedUnauthenticated = query.isError && (query.error as { response?: { status?: number } })?.response?.status === 401
+
   // Mirrors backend `authorizeMiddleware.ts` hasAnyPermissions/hasAllPermissions
   // exactly: a caller holding `system:manage` bypasses every check unconditionally.
   const isSystemManage = permissions.includes(SYSTEM_MANAGE_CODE)
@@ -99,6 +113,7 @@ export const useSession = () => {
     session,
     permissions,
     isAuthenticated,
+    isConfirmedUnauthenticated,
 
     // permission checks — the actual decisions worth centralizing
     hasPermission,

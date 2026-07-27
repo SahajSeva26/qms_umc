@@ -36,10 +36,10 @@ const COUNTERS = [
     },
     {
         entity: APPOINTMENT_COUNTER_ENTITY,
-        prefix: 'met',
+        prefix: 'mtg',
         separator: '-',
         padding: 6,
-        description: 'Sequential code for appointments (met-000001)',
+        description: 'Sequential code for appointments (mtg-000001)',
     },
 ];
 

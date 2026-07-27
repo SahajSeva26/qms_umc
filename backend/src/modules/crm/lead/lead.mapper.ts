@@ -4,6 +4,7 @@ export const LeadMapper = {
     toResponse: (lead: any, ctx: RequestContext) => {
         const result: any = {
             id: lead._id?.toString(),
+            code: lead.code,
             tenant: lead.tenant,
             division: lead.division,
             contactPerson: lead.contactPerson,

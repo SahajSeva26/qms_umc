@@ -11,11 +11,14 @@ import { RoleTypeRouter } from '../modules/access-management/role-type/roleType.
 import { RoleRouter } from '../modules/access-management/role/role.routes';
 import { DivisionRouter } from '../modules/division/division.routes';
 import { LeadRouter } from '../modules/crm/lead/lead.routes';
+import { ContactRouter } from '../modules/crm/contact/contact.routes';
+import { AppointmentRouter } from '../modules/crm/appointment/appointment.routes';
 import { ProjectRouter } from '../modules/crm/project/project.routes';
 import { QaFeedbackRouter } from '../modules/qa-feedback/qaFeedback.routes';
 import { DoctorRouter } from '../modules/doctor/doctor.routes';
 import { GeoProfileRouter } from '../modules/operations/geoProfile/geoProfile.routes';
 import { CampRouter } from '../modules/operations/camp/camp.routes';
+import { CounterRouter } from '../modules/counter/counter.routes';
 import { buildContext } from '../shared/utils/contextBuilder';
 import { httpLogger } from '../shared/logger/httpLogger';
 import ENV from '../shared/config/app.config';
@@ -69,11 +72,14 @@ app.use('/api/v1/role-types', RoleTypeRouter);
 app.use('/api/v1/roles', RoleRouter);
 app.use('/api/v1/divisions', DivisionRouter);
 app.use('/api/v1/leads', LeadRouter);
+app.use('/api/v1/contacts', ContactRouter);
+app.use('/api/v1/appointments', AppointmentRouter);
 app.use('/api/v1/projects', ProjectRouter);
 app.use('/api/v1/qa-feedback', QaFeedbackRouter);
 app.use('/api/v1/doctors', DoctorRouter);
 app.use('/api/v1/geo-profiles', GeoProfileRouter);
 app.use('/api/v1/camps', CampRouter);
+app.use('/api/v1/counters', CounterRouter);
 
 // Captured once at boot — lets /health-check report how long the current deploy has been up.
 const startedAt = new Date().toISOString();

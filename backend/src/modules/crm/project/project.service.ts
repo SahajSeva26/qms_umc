@@ -1,13 +1,10 @@
 import mongoose, { HydratedDocument } from 'mongoose';
 import { IProject, Project } from './project.model';
-import {
-    ICreateProjectPayload,
-    IMoveStagePayload,
-    ISearchProjectQuery,
-    IUpdateProjectPayload,
-} from './project.validators';
-import { PROJECT_PERMISSIONS, PROJECT_TRANSITION_MAP } from './project.constants';
+import { ICreateProjectPayload, IMoveStagePayload, ISearchProjectQuery, IUpdateProjectPayload } from './project.validators';
+import { PROJECT_COUNTER_ENTITY, PROJECT_PERMISSIONS, PROJECT_TRANSITION_MAP } from './project.constants';
 import { canTransition } from '../lead/lead.validators';
+import { withTransaction } from '../../../shared/helpers/transactionHelper';
+import { CounterService } from '../../counter/counter.service';
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
@@ -113,17 +110,16 @@ const set = async (model: any, entity: HydratedDocument<IProject>, ctx: RequestC
 };
 
 const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): Promise<ProjectDocument> => {
-    if (!isValidObjectID(id)) {
-        return null;
+    const where: mongoose.QueryFilter<IProject> = ctx.where();
+
+    if (isValidObjectID(id)) {
+        where._id = id;
+    } else {
+        where.code=id
     }
 
-    const where: mongoose.QueryFilter<IProject> = { ...ctx.where(), _id: id };
-
     // reps (project:search, not project:manage) can only see their own projects
-    if (
-        ctx.hasAnyPermissions([PROJECT_PERMISSIONS.SEARCH.code]) &&
-        !ctx.hasAnyPermissions([PROJECT_PERMISSIONS.MANAGE.code])
-    ) {
+    if (ctx.hasAnyPermissions([PROJECT_PERMISSIONS.SEARCH.code]) && !ctx.hasAnyPermissions([PROJECT_PERMISSIONS.MANAGE.code])) {
         where.salesRep = ctx.role?._id;
     }
 
@@ -143,10 +139,7 @@ const search = async (filters: ISearchProjectQuery, ctx: RequestContext, options
     const where: mongoose.QueryFilter<IProject> = { ...ctx.where() };
 
     // reps (project:search, not project:manage) can only see their own projects
-    if (
-        ctx.hasAnyPermissions([PROJECT_PERMISSIONS.SEARCH.code]) &&
-        !ctx.hasAnyPermissions([PROJECT_PERMISSIONS.MANAGE.code])
-    ) {
+    if (ctx.hasAnyPermissions([PROJECT_PERMISSIONS.SEARCH.code]) && !ctx.hasAnyPermissions([PROJECT_PERMISSIONS.MANAGE.code])) {
         where.salesRep = ctx.role?._id;
     }
 
@@ -172,11 +165,7 @@ const search = async (filters: ISearchProjectQuery, ctx: RequestContext, options
 
     //3: execute queries
     const countPromise = Project.countDocuments(where);
-    const dataPromise = Project.find(where)
-        .populate(populate)
-        .limit(options?.pagination?.limit)
-        .skip(options?.pagination?.skip)
-        .sort(sort);
+    const dataPromise = Project.find(where).populate(populate).limit(options?.pagination?.limit).skip(options?.pagination?.skip).sort(sort);
 
     const [count, items] = await Promise.all([countPromise, dataPromise]);
 
@@ -196,17 +185,22 @@ const create = async (model: ICreateProjectPayload, ctx: RequestContext): Promis
         return throwAppError('A project already exists for this lead', StatusCodes.CONFLICT);
     }
 
-    //3: build entity — tenant + division are derived from the lead (source of truth),
-    // never trusted from the payload.
-    const entity = new Project({
-        lead: lead._id,
-        tenant: lead.tenant,
-        division: lead.division,
-    });
+    const project = await withTransaction(async () => {
+        const code: string = await CounterService.next(PROJECT_COUNTER_ENTITY, ctx);
+        //3: build entity — tenant + division are derived from the lead (source of truth),
+        // never trusted from the payload.
+        const entity = new Project({
+            lead: lead._id,
+            tenant: lead.tenant,
+            division: lead.division,
+            code,
+        });
 
-    //4: set validates + applies team and the remaining fields
-    let project = await set(model, entity, ctx);
-    project = await project.save();
+        //4: set validates + applies team and the remaining fields
+        let project = await set(model, entity, ctx);
+        project = await project.save();
+        return project;
+    });
 
     return project;
 };

@@ -4,6 +4,7 @@ export const ProjectMapper = {
     toResponse: (project: any, ctx: RequestContext) => {
         const result: any = {
             id: project._id?.toString(),
+            code: project.code,
 
             // basics
             tenant: project.tenant,

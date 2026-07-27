@@ -1,4 +1,5 @@
 import { accessManagementService } from '@/features/access-management/accessManagement.service'
+import { PLATFORM_TENANT_CODE } from '@/features/access-management/accessManagement.constants'
 import { crmService } from '@/features/crm/crm.service'
 
 // Resolves the human-readable names a CSV row provides (matching Export's own
@@ -102,7 +103,12 @@ export async function resolveRowNames(row: {
   // WizardStep4.tsx's own salesPerson scoping rule), never the pharma
   // client's own tenant, resolved independently of Company/Division.
   const platformTenantRes = await accessManagementService.searchTenants({ limit: '1000' })
-  const platformTenant = (platformTenantRes.data?.items ?? []).find((t) => t.type === 'platform')
+  // tenant.type is only present on the wire for a system:manage caller
+  // (TenantMapper.toResponse) — code is always present regardless of
+  // permission, so match on it as a fallback. Without this, CSV import
+  // silently imported 0 rows for any non-system:manage caller, since every
+  // row failed on Sales rep resolution alone. Found via a 2026-07-26 test pass.
+  const platformTenant = (platformTenantRes.data?.items ?? []).find((t) => t.type === 'platform' || t.code === PLATFORM_TENANT_CODE)
   let salesRep: { id: string; name: string } | null = null
   if (!platformTenant) {
     errors.push({ field: 'Sales rep', message: 'No platform (QMS internal) company found — a sales rep must belong to one.' })

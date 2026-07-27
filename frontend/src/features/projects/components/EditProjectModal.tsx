@@ -4,6 +4,7 @@ import type { PaymentTerms, ProjectEntity, ProjectTherapy, ProjectType } from '@
 import { PAYMENT_TERMS_LABEL, PROJECT_THERAPY_LABEL, PROJECT_TYPE_LABEL } from '@/types/project.types'
 import type { UpdateProjectPayload } from '@/types/project.types'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
+import { PLATFORM_TENANT_CODE } from '@/features/access-management/accessManagement.constants'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import { useUpdateProject } from '@/features/projects/hooks/useUpdateProject'
 import { editProjectSchema } from '@/features/projects/schemas/project.schemas'
@@ -80,7 +81,10 @@ const EditProjectModal = ({ project, onClose }: EditProjectModalProps) => {
   // exactly from EditLeadModal's own recipe.
   const projectTenantId = typeof project.tenant === 'string' ? project.tenant : project.tenant._id
   const { data: tenantData, isError: tenantsErrored } = useTenants({ status: 'active' })
-  const platformTenant = tenantData?.data?.items.find((t) => t.type === 'platform')
+  // tenant.type is only present on the wire for a system:manage caller
+  // (TenantMapper.toResponse) — code is always present regardless of
+  // permission, so match on it as a fallback. Found via a 2026-07-26 test pass.
+  const platformTenant = tenantData?.data?.items.find((t) => t.type === 'platform' || t.code === PLATFORM_TENANT_CODE)
   const { data: platformRoleData, isLoading: platformRolesLoading, isError: platformRolesErrored } =
     useRoles(platformTenant ? { tenant: platformTenant.id, status: 'active' } : { tenant: undefined })
   const platformRoles = platformTenant ? platformRoleData?.data?.items ?? [] : []

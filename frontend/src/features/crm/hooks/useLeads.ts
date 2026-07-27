@@ -21,13 +21,20 @@ import { toast } from '@/components/ui/sonner'
 // real server-side pagination by passing its own.
 const DEFAULT_LEADS_LIMIT = '1000'
 
-export const useLeads = (query: SearchLeadQuery = {}) => {
+// `fetchList` (default true) lets a caller that only needs the mutations
+// (moveStage/updateLead/createLead) skip the list query entirely.
+// NewLeadWizard.tsx, for example, only calls createLead — but calling this
+// hook at all used to unconditionally fetch all ~1000 leads company-wide
+// every time the wizard opened, for a value it never reads. Found live via
+// the Network tab: a `leads?limit=1000` fetch with no on-screen consumer.
+export const useLeads = (query: SearchLeadQuery = {}, fetchList: boolean = true) => {
   const queryClient = useQueryClient()
   const effectiveQuery: SearchLeadQuery = { limit: DEFAULT_LEADS_LIMIT, ...query }
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['leads', effectiveQuery],
     queryFn: () => crmService.searchLeads(effectiveQuery),
+    enabled: fetchList,
   })
 
   const leads = data?.data?.items ?? []

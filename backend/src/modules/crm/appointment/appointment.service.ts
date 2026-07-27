@@ -81,14 +81,17 @@ const set = async (model: any, entity: any, ctx: RequestContext): Promise<Hydrat
     // brand-new members start at pending. Members dropped from the list are removed.
     if (model.internalMembers) {
         const existing = new Map((entity.internalMembers || []).map((inv: any) => [inv.role.toString(), inv]));
-        const invites: any[] = [];
-        for (const role of model.internalMembers) {
-            const member = await RoleService.get(role, ctx);
-            if (!member) {
+        // dedupe incoming ids — the same role listed twice must not create two invite rows
+        const roleIds: string[] = Array.from(new Set<string>(model.internalMembers.map((role: any) => String(role))));
+        // validate every referenced role exists (scoped to the actor) in parallel
+        const members = await Promise.all(roleIds.map((roleId) => RoleService.get(roleId, ctx)));
+        const invites = roleIds.map((roleId, i) => {
+            if (!members[i]) {
                 return throwAppError('Internal member not found', StatusCodes.NOT_FOUND);
             }
-            invites.push(existing.get(role.toString()) || { role, status: APPOINTMENT_INVITE_STATUSES.PENDING });
-        }
+            // preserve an existing member's response; brand-new members start at pending
+            return existing.get(roleId) || { role: roleId, status: APPOINTMENT_INVITE_STATUSES.PENDING };
+        });
         entity.internalMembers = invites;
     }
 
@@ -360,6 +363,15 @@ const respond = async (id: string, model: IRespondPayload, ctx: RequestContext) 
     const invite = (appointment.internalMembers as any[]).find((inv) => inv.role?.toString() === roleId);
     if (!invite) {
         return throwAppError('You are not an invited member of this appointment', StatusCodes.FORBIDDEN);
+    }
+
+    //2b: RSVP only makes sense while the meeting is still planned — you cannot respond to one
+    // that is already done, cancelled, blocked, or released.
+    if (appointment.status !== APPOINTMENT_STATUSES.PLANNED) {
+        return throwAppError(
+            `You can only respond to a planned appointment (this one is '${appointment.status}')`,
+            StatusCodes.CONFLICT,
+        );
     }
 
     //3: record the response — the subdoc's updatedAt timestamps when they answered

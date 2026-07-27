@@ -150,6 +150,19 @@ const search = async (filters: ISearchRoleQuery, ctx: RequestContext, options?: 
 
     const where: mongoose.QueryFilter<IRoleDocument> = ctx.where();
 
+    // `user` is a free-text keyword → resolve against the linked user (name/email) via the user
+    // service, then match roles by their `user` field. The role query still runs under ctx.where(),
+    // so a foreign-tenant user id in the list matches no role — no cross-tenant leak. No match yields
+    // $in [] which correctly returns zero roles.
+    if (filters.user) {
+        const [byName, byEmail] = await Promise.all([
+            UserService.search({ name: filters.user }, ctx),
+            UserService.search({ email: filters.user }, ctx),
+        ]);
+        const userIds = [...byName.items, ...byEmail.items].map((user) => user._id);
+        where.user = { $in: userIds };
+    }
+
     if (filters.name) {
         where.name = { $regex: filters.name, $options: 'i' };
     }
@@ -164,9 +177,6 @@ const search = async (filters: ISearchRoleQuery, ctx: RequestContext, options?: 
     }
     if (filters.type) {
         where.type = toObjectId(filters.type);
-    }
-    if (filters.user) {
-        where.user = toObjectId(filters.user);
     }
     if (filters.division) {
         where.division = toObjectId(filters.division);

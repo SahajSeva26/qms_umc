@@ -101,7 +101,7 @@ const LeadDrawer = ({ lead, onClose, onMoveStage, onUpdateLead, canManage }: Lea
       {tab === 'Overview' && <OverviewTab lead={lead} />}
       {tab === 'Follow-ups' && <FollowupsTab lead={lead} />}
       {tab === 'AI Recommendations' && <AiRecommendationsTab />}
-      {tab === 'Activity' && <ActivityTab />}
+      {tab === 'Activity' && <ActivityTab lead={lead} />}
 
       {canMarkLost && (
         <div className="flex gap-2 mt-5 pt-4" style={{ borderTop: '1px dashed var(--qms-border)' }}>

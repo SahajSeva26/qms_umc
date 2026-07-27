@@ -15,12 +15,3 @@ export const ROI_ESTIMATE = {
   payback: '3.4 mo',
   confidence: '82%',
 }
-
-export const ACTIVITY_TIMELINE = [
-  { actor: 'Riya Mehta', action: 'Discovery call completed', at: '2 days ago' },
-  { actor: 'System', action: 'Automated follow-up email sent', at: '3 days ago' },
-  { actor: 'AI Engine', action: 'Recommendation generated', at: '4 days ago' },
-  { actor: 'Riya Mehta', action: 'Meeting scheduled with contact', at: '6 days ago' },
-  { actor: 'Riya Mehta', action: 'Note added: budget confirmed for Q2', at: '8 days ago' },
-  { actor: 'System', action: 'Lead created', at: '12 days ago' },
-]

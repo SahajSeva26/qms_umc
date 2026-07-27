@@ -48,6 +48,27 @@ const BILLING_OPTIONS: { value: BillingType; label: string }[] = [
 const CAMP_WRITE_PERMISSIONS = ['camp:update', 'camp:manage', 'tenant:manage']
 const CAMP_STAGE_PERMISSIONS = ['camp:manage', 'tenant:manage']
 
+// camp.controller.ts's Zod-validation-failure branch (create + update) responds
+// with { message: 'Validation Error', data: { fields: { <field>: '<reason>' } } }
+// instead of a specific top-level message — reading only response.data.message
+// (as every other error box in this file does) surfaces just the generic
+// "Validation Error" string and silently drops the actual per-field reason.
+// Since 'Project (optional)' (below) is a raw free-text Input rather than a
+// picker, and patientExpectation has a server-side >=0 floor, this is the one
+// save path where a typo'd/out-of-range value routinely triggers exactly that
+// shape. Fall back to the plain message for every other error (403, 409, network).
+function saveErrorMessage(err: unknown): string {
+  const response = (err as { response?: { data?: { message?: string; data?: { fields?: Record<string, string> } } } })
+    ?.response
+  const fields = response?.data?.data?.fields
+  if (fields && Object.keys(fields).length > 0) {
+    return Object.entries(fields)
+      .map(([field, reason]) => `${field}: ${reason}`)
+      .join('; ')
+  }
+  return response?.data?.message || 'Failed to save changes.'
+}
+
 // Combined create-flow + edit page, mirrors GeoProfileDetailPage.tsx's shape
 // (single-page form, not a multi-step wizard — the old mock CampWizard's
 // 4-step flow was built against fields with no real backend equivalent).
@@ -110,7 +131,7 @@ const CampDetailPageReal = () => {
   const doctorLabel = (id: string) => doctors.find((d) => d.id === id)?.name ?? id
   const roleLabel = (id: string) => assignableRoles.find((r) => r.id === id)?.name ?? id
 
-  const { doctorName, divisionName } = useCampRefNames()
+  const { doctorName, divisionName, projectName } = useCampRefNames()
 
   const createCamp = useCreateCamp()
   const updateCamp = useUpdateCamp(id ?? '')
@@ -239,7 +260,14 @@ const CampDetailPageReal = () => {
       state: state || undefined,
       coordinates: latitude && longitude ? [lng, lat] : undefined,
       devices: deviceList,
-      notes: notes || undefined,
+      // NOT `notes || undefined`: this is a partial-update PATCH-style payload
+      // against an EXISTING record, so an omitted key means "leave untouched"
+      // (camp.service.ts's set() only overwrites when the key is present).
+      // Using the falsy `||` here silently dropped `notes` from the request
+      // whenever the user cleared the textarea (empty string is falsy), so
+      // the stale note stayed in the DB even though the UI reported "Saved."
+      // Send the raw string always so an explicit '' actually clears it.
+      notes,
     })
   }
 
@@ -293,6 +321,11 @@ const CampDetailPageReal = () => {
                     <div className="text-[13px]" style={{ color: 'var(--qms-text-muted)' }}>
                       {camp.city}, {camp.state} · {new Date(camp.date).toLocaleDateString()}
                     </div>
+                    {camp.project && (
+                      <div className="text-[13px]" style={{ color: 'var(--qms-text-muted)' }}>
+                        Project: {projectName(camp.project)}
+                      </div>
+                    )}
                   </div>
                   <CampStatusPillReal status={camp.status} />
                 </div>
@@ -595,7 +628,7 @@ const CampDetailPageReal = () => {
 
             {mutation.isError && (
               <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger mt-4">
-                {(mutation.error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to save changes.'}
+                {saveErrorMessage(mutation.error)}
               </div>
             )}
             {mutation.isSuccess && !isCreateMode && (

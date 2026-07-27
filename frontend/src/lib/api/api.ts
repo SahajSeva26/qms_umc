@@ -48,8 +48,13 @@ api.interceptors.response.use(
       return Promise.reject(error)
     }
 
-    // The refresh call itself 401'd — the refresh token is also expired/invalid.
-    // No more silent options; the user genuinely needs to log in again.
+    // The refresh call itself 401'd — the refresh token is genuinely
+    // expired/invalid. No more silent options; the user needs to log in
+    // again. (Only a 401 ever reaches this branch — the top-level guard
+    // above already rejects anything that isn't a 401, so a 429 from this
+    // same endpoint never gets here; see the catch block below for where
+    // that case is actually handled, since it arrives as a REJECTED
+    // refreshPromise there, not as a direct response to this interceptor.)
     if (isRefreshRequest) {
       redirectToLogin()
       return Promise.reject(error)
@@ -68,7 +73,13 @@ api.interceptors.response.use(
       }
       await refreshPromise
     } catch (refreshError) {
-      redirectToLogin()
+      // Same distinction as above: only force a logout if the refresh
+      // request itself came back with a genuine 401. A 429/network/5xx
+      // failure here means "couldn't refresh right now," not "session is
+      // dead" — let the original request fail without nuking a valid session.
+      if (axios.isAxiosError(refreshError) && refreshError.response?.status === 401) {
+        redirectToLogin()
+      }
       return Promise.reject(refreshError)
     } finally {
       refreshPromise = null

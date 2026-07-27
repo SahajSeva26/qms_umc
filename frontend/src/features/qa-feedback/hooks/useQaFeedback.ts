@@ -7,13 +7,22 @@ import { toast } from '@/components/ui/sonner'
 // cache, mutations invalidate it so the review dashboard refetches.
 const DEFAULT_LIMIT = '100'
 
-export const useQaFeedback = (query: SearchQaFeedbackQuery = {}) => {
+// `fetchList` (default true) lets a caller that only wants createFeedback/
+// updateFeedback skip the list query entirely. FeedbackWidget.tsx (the
+// floating "To Do" button mounted globally in AppLayout.tsx, so it renders
+// on EVERY authenticated page) never reads items/count/isLoading/error —
+// it only submits new feedback — but calling this hook at all used to fire
+// a real GET /qa-feedback?limit=100 on every single page load regardless,
+// since useQuery has no built-in way to be "called but inert." Found live
+// via the Network tab: a fetch with no on-screen consumer, on every page.
+export const useQaFeedback = (query: SearchQaFeedbackQuery = {}, fetchList: boolean = true) => {
   const queryClient = useQueryClient()
   const effectiveQuery: SearchQaFeedbackQuery = { limit: DEFAULT_LIMIT, ...query }
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['qa-feedback', effectiveQuery],
     queryFn: () => qaFeedbackService.searchFeedback(effectiveQuery),
+    enabled: fetchList,
   })
 
   const items = data?.data?.items ?? []

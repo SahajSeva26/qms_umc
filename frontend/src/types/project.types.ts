@@ -157,8 +157,13 @@ export const GO_LIVE_SCOPE_LABEL: Record<GoLiveScopeCode, string> = {
 // project.model.ts's whoCanBookCamp enum is ALLOWED_ROLETYPE_CODES.CUSTOMER —
 // reuse the exact customer-side RoleTypeCode subset already defined in
 // role-type/constants/roleTypeCodes.ts rather than redeclaring a parallel
-// literal union (avoids drift if the backend enum ever changes).
-export type WhoCanBookCampCode = 'pharma-ho' | 'pharma-ms' | 'pharms-asm' | 'pharma-rsm'
+// literal union (avoids drift if the backend enum ever changes). Was typo'd
+// ('pharma-ms', 'pharms-asm' instead of 'pharma-mr', 'pharma-asm') — the real
+// backend's own Zod enum (project.validators.ts) validates against
+// ALLOWED_ROLETYPE_CODES.CUSTOMER's real values, so selecting either typo'd
+// option in the wizard would have submitted a value the backend rejects —
+// found and fixed via a 2026-07-24 test sweep of the sibling RoleType bug.
+export type WhoCanBookCampCode = 'pharma-ho' | 'pharma-asm' | 'pharma-rsm' | 'pharma-mr'
 
 // ---------------------------------------------------------------------------
 // Nested value objects (plain shapes, not entities — no `id`)

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { FiArrowLeft } from 'react-icons/fi'
 import { useCampReal } from '@/features/camps/hooks/useCampReal'
@@ -7,7 +7,7 @@ import { useUpdateCamp } from '@/features/camps/hooks/useUpdateCamp'
 import { useMoveCampStage } from '@/features/camps/hooks/useMoveCampStage'
 import { useAllocateFo } from '@/features/camps/hooks/useAllocateFo'
 import { useCampRefNames } from '@/features/camps/hooks/useCampRefNames'
-import { campRefId } from '@/features/camps/campsReal.utils'
+import { campRefId, campRefName } from '@/features/camps/campsReal.utils'
 import { usePermission } from '@/hooks/usePermission'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { useDivisions } from '@/features/crm/hooks/useDivisions'
@@ -33,12 +33,41 @@ const BILLING_OPTIONS: { value: BillingType; label: string }[] = [
   { value: 'void', label: 'Void' },
 ]
 
-// camp.routes.ts's real GUARD for update/moveStage/allocate is [camp:manage,
-// tenant:manage] — a camp:search-only actor (e.g. an FO) can legitimately
-// land on this page in edit mode (they can see their own assigned camps) but
-// the backend 403s any write, so the edit form / move-stage / allocate
-// controls are read-only for that case rather than shown as if usable.
-const CAMP_WRITE_PERMISSIONS = ['camp:manage', 'tenant:manage']
+// Real per-action route guards (camp.routes.ts):
+// - PUT /camps/:id (Save)        -> camp:update, camp:manage, tenant:manage
+// - POST /camps/:id/allocate     -> camp:update, camp:manage, tenant:manage
+// - PATCH /camps/:id/stage       -> camp:manage, tenant:manage ONLY (no camp:update)
+// A camp:search-only actor (e.g. an FO) can legitimately land on this page in
+// edit mode (they can see their own assigned camps) but the backend 403s any
+// write, so the whole edit form is read-only for that case. camp:update was
+// previously missing from CAMP_WRITE_PERMISSIONS entirely — found via a
+// 2026-07-24 test sweep: a real Camp Coordinator (camp:update, no
+// camp:manage) was wrongly shown "read-only" even though a direct PUT from
+// that same session succeeded with 200. Move-stage stays gated more strictly
+// since the backend itself never accepts camp:update for that action.
+const CAMP_WRITE_PERMISSIONS = ['camp:update', 'camp:manage', 'tenant:manage']
+const CAMP_STAGE_PERMISSIONS = ['camp:manage', 'tenant:manage']
+
+// camp.controller.ts's Zod-validation-failure branch (create + update) responds
+// with { message: 'Validation Error', data: { fields: { <field>: '<reason>' } } }
+// instead of a specific top-level message — reading only response.data.message
+// (as every other error box in this file does) surfaces just the generic
+// "Validation Error" string and silently drops the actual per-field reason.
+// Since 'Project (optional)' (below) is a raw free-text Input rather than a
+// picker, and patientExpectation has a server-side >=0 floor, this is the one
+// save path where a typo'd/out-of-range value routinely triggers exactly that
+// shape. Fall back to the plain message for every other error (403, 409, network).
+function saveErrorMessage(err: unknown): string {
+  const response = (err as { response?: { data?: { message?: string; data?: { fields?: Record<string, string> } } } })
+    ?.response
+  const fields = response?.data?.data?.fields
+  if (fields && Object.keys(fields).length > 0) {
+    return Object.entries(fields)
+      .map(([field, reason]) => `${field}: ${reason}`)
+      .join('; ')
+  }
+  return response?.data?.message || 'Failed to save changes.'
+}
 
 // Combined create-flow + edit page, mirrors GeoProfileDetailPage.tsx's shape
 // (single-page form, not a multi-step wizard — the old mock CampWizard's
@@ -57,6 +86,7 @@ const CampDetailPageReal = () => {
   const navigate = useNavigate()
   const { hasAnyPermission } = usePermission()
   const canWrite = hasAnyPermission(CAMP_WRITE_PERMISSIONS)
+  const canMoveStage = hasAnyPermission(CAMP_STAGE_PERMISSIONS)
 
   const { data, isLoading, error } = useCampReal(id)
   const camp = data?.data ?? null
@@ -71,10 +101,37 @@ const CampDetailPageReal = () => {
   const { data: doctorsData } = useDoctors({ limit: '1000' })
   const doctors = doctorsData?.data?.items ?? []
 
-  const { data: rolesData } = useRoles({})
+  // Active-only + a real limit (backend defaults to 10 with no query params —
+  // was silently truncating the fo/mr/asm/rsm pickers to whatever 10 roles
+  // happened to sort first, and offering inactive roles as if assignable).
+  // A camp's ALREADY-assigned role is merged back in below (via
+  // assignableRoles) even if it's since gone inactive or fallen outside this
+  // list, so an existing assignment always still resolves a real label
+  // instead of silently rendering the "unassigned" placeholder.
+  const { data: rolesData } = useRoles({ status: 'active', limit: '500' })
   const roles = rolesData?.data?.items ?? []
+  const assignableRoles: { id: string; name: string; code: string }[] = useMemo(() => {
+    const byId = new Map(roles.map((r) => [r.id, { id: r.id, name: r.name, code: r.code }]))
+    for (const value of [camp?.fo, camp?.mr, camp?.asm, camp?.rsm]) {
+      const refId = campRefId(value)
+      if (refId && !byId.has(refId)) {
+        const name = campRefName(value)
+        byId.set(refId, { id: refId, name: name ?? refId, code: name ? 'inactive' : 'unavailable' })
+      }
+    }
+    return Array.from(byId.values())
+  }, [roles, camp])
+  // SelectValue's default rendering just echoes the raw `value` prop back as
+  // text (a bare Mongo ObjectId) unless given a render-fn child that maps
+  // id->label — GeoProfileDetailPage.tsx's Role select already does this
+  // (`roleName`); these 5 Selects on this page were missing it entirely, so
+  // once the `key`-remount fix above finally let them display a value at
+  // all, they showed raw ids instead of names. Found live via a 2026-07-24
+  // verification pass.
+  const doctorLabel = (id: string) => doctors.find((d) => d.id === id)?.name ?? id
+  const roleLabel = (id: string) => assignableRoles.find((r) => r.id === id)?.name ?? id
 
-  const { doctorName, divisionName } = useCampRefNames()
+  const { doctorName, divisionName, projectName } = useCampRefNames()
 
   const createCamp = useCreateCamp()
   const updateCamp = useUpdateCamp(id ?? '')
@@ -141,7 +198,7 @@ const CampDetailPageReal = () => {
     const deviceList = devices.split(',').map((d) => d.trim()).filter(Boolean)
 
     if (isCreateMode) {
-      if (!tenant) { setFormError('Tenant is required'); return }
+      if (!tenant) { setFormError('Company is required'); return }
       if (!division) { setFormError('Division is required'); return }
       if (!doctor) { setFormError('Doctor is required'); return }
       if (!date) { setFormError('Date is required'); return }
@@ -203,7 +260,14 @@ const CampDetailPageReal = () => {
       state: state || undefined,
       coordinates: latitude && longitude ? [lng, lat] : undefined,
       devices: deviceList,
-      notes: notes || undefined,
+      // NOT `notes || undefined`: this is a partial-update PATCH-style payload
+      // against an EXISTING record, so an omitted key means "leave untouched"
+      // (camp.service.ts's set() only overwrites when the key is present).
+      // Using the falsy `||` here silently dropped `notes` from the request
+      // whenever the user cleared the textarea (empty string is falsy), so
+      // the stale note stayed in the DB even though the UI reported "Saved."
+      // Send the raw string always so an explicit '' actually clears it.
+      notes,
     })
   }
 
@@ -257,6 +321,11 @@ const CampDetailPageReal = () => {
                     <div className="text-[13px]" style={{ color: 'var(--qms-text-muted)' }}>
                       {camp.city}, {camp.state} · {new Date(camp.date).toLocaleDateString()}
                     </div>
+                    {camp.project && (
+                      <div className="text-[13px]" style={{ color: 'var(--qms-text-muted)' }}>
+                        Project: {projectName(camp.project)}
+                      </div>
+                    )}
                   </div>
                   <CampStatusPillReal status={camp.status} />
                 </div>
@@ -303,7 +372,7 @@ const CampDetailPageReal = () => {
                       {(moveStage.error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to move stage.'}
                     </div>
                   )}
-                  <Button onClick={handleMoveStage} disabled={moveStage.isPending || !canWrite} title={!canWrite ? 'You do not have permission to change this camp\'s stage' : undefined}>
+                  <Button onClick={handleMoveStage} disabled={moveStage.isPending || !canMoveStage} title={!canMoveStage ? 'You do not have permission to change this camp\'s stage' : undefined}>
                     {moveStage.isPending ? 'Moving…' : 'Move stage'}
                   </Button>
                 </div>
@@ -327,6 +396,44 @@ const CampDetailPageReal = () => {
             </div>
           )}
 
+          {/* Backend renamed stageHistory[].createdBy (a bare roleId string) to
+              stageHistory[].actor: {roleId, name, email} — a resolved snapshot
+              of who made each transition, captured at that moment. Found via a
+              2026-07-24 test sweep that the backend side was correct end-to-end
+              but this page never rendered stageHistory at all, so the data had
+              nowhere to show up. */}
+          {!isCreateMode && camp && camp.stageHistory.length > 0 && (
+            <div
+              className="rounded-xl border p-5 mb-5"
+              style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}
+            >
+              <h2 className="text-sm font-bold mb-4" style={{ color: 'var(--qms-text)' }}>Stage history</h2>
+              <div className="space-y-3">
+                {[...camp.stageHistory].reverse().map((entry, i) => (
+                  <div
+                    key={i}
+                    className="text-[13px] pb-3"
+                    style={i < camp.stageHistory.length - 1 ? { borderBottom: '1px solid var(--qms-border)' } : undefined}
+                  >
+                    <div style={{ color: 'var(--qms-text)' }}>
+                      <span className="font-semibold">{entry.from}</span> → <span className="font-semibold">{entry.to}</span>
+                    </div>
+                    <div className="text-[12px] mt-0.5" style={{ color: 'var(--qms-text-muted)' }}>
+                      {entry.actor?.name || entry.actor?.email || entry.actor?.roleId || 'Unknown actor'}
+                      {' · '}
+                      {new Date(entry.createdAt).toLocaleString()}
+                    </div>
+                    {entry.reason && (
+                      <div className="text-[12px] mt-1 italic" style={{ color: 'var(--qms-text-muted)' }}>
+                        “{entry.reason}”
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div
             className="rounded-xl border p-5 mb-5"
             style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}
@@ -339,9 +446,9 @@ const CampDetailPageReal = () => {
               {isCreateMode && (
                 <>
                   <div>
-                    <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Tenant</Label>
+                    <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Company</Label>
                     <Select value={tenant || undefined} onValueChange={(v) => { setTenant(v ?? ''); setDivision('') }}>
-                      <SelectTrigger className="w-full"><SelectValue placeholder="Select tenant" /></SelectTrigger>
+                      <SelectTrigger className="w-full"><SelectValue placeholder="Select company" /></SelectTrigger>
                       <SelectContent>
                         {tenants.map((t) => <SelectItem key={t.id} value={t.id}>{t.name} ({t.code})</SelectItem>)}
                       </SelectContent>
@@ -350,7 +457,7 @@ const CampDetailPageReal = () => {
                   <div>
                     <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Division</Label>
                     <Select value={division || undefined} onValueChange={(v) => setDivision(v ?? '')} disabled={!tenant}>
-                      <SelectTrigger className="w-full"><SelectValue placeholder={tenant ? 'Select division' : 'Select a tenant first'} /></SelectTrigger>
+                      <SelectTrigger className="w-full"><SelectValue placeholder={tenant ? 'Select division' : 'Select a company first'} /></SelectTrigger>
                       <SelectContent>
                         {divisions.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
                       </SelectContent>
@@ -365,8 +472,18 @@ const CampDetailPageReal = () => {
 
               <div>
                 <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Doctor</Label>
-                <Select value={doctor || undefined} onValueChange={(v) => setDoctor(v ?? '')}>
-                  <SelectTrigger className="w-full"><SelectValue placeholder="Select doctor" /></SelectTrigger>
+                {/* key={doctor || 'empty'} forces a fresh mount once the real value
+                    loads — same base-ui controlled/uncontrolled lock-in already
+                    fixed on GeoProfileDetailPage.tsx's Type/Status selects
+                    (useControlled.mjs decides controlled-vs-uncontrolled from
+                    whether `value` is defined on the VERY FIRST render and never
+                    revisits it; doctor/fo/mr/asm/rsm all start as '' before the
+                    async camp fetch resolves). Found on this page too via a
+                    2026-07-24 live-verification pass after the GeoProfile fix. */}
+                <Select key={doctor || 'empty'} value={doctor || undefined} onValueChange={(v) => setDoctor(v ?? '')}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select doctor">{(v) => doctorLabel(v as string)}</SelectValue>
+                  </SelectTrigger>
                   <SelectContent>
                     {doctors.map((d) => <SelectItem key={d.id} value={d.id}>{d.name} ({d.pharmaCode})</SelectItem>)}
                   </SelectContent>
@@ -446,19 +563,28 @@ const CampDetailPageReal = () => {
                   <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
                     Field Officer (optional — auto-assigned if blank)
                   </Label>
-                  <Select value={fo || undefined} onValueChange={(v) => setFo(v ?? '')} disabled={!isCreateMode && !!camp && camp.status !== 'requested'}>
-                    <SelectTrigger className="w-full"><SelectValue placeholder="Auto-assign nearest FO" /></SelectTrigger>
+                  {/* key={fo || 'empty'}: same base-ui controlled/uncontrolled
+                      lock-in fix as the Doctor select above, applied to all 4 of
+                      fo/mr/asm/rsm — found live via a 2026-07-24 verification pass:
+                      all 5 of this page's Selects showed a permanent placeholder
+                      instead of the loaded value, even for actively-assigned roles. */}
+                  <Select key={fo || 'empty'} value={fo || undefined} onValueChange={(v) => setFo(v ?? '')} disabled={!isCreateMode && !!camp && camp.status !== 'requested'}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Auto-assign nearest FO">{(v) => roleLabel(v as string)}</SelectValue>
+                    </SelectTrigger>
                     <SelectContent>
-                      {roles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
+                      {assignableRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
                   <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>MR (optional)</Label>
-                  <Select value={mr || undefined} onValueChange={(v) => setMr(v ?? '')}>
-                    <SelectTrigger className="w-full"><SelectValue placeholder="Select MR" /></SelectTrigger>
+                  <Select key={mr || 'empty'} value={mr || undefined} onValueChange={(v) => setMr(v ?? '')}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select MR">{(v) => roleLabel(v as string)}</SelectValue>
+                    </SelectTrigger>
                     <SelectContent>
-                      {roles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
+                      {assignableRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -467,19 +593,23 @@ const CampDetailPageReal = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>ASM (optional)</Label>
-                  <Select value={asm || undefined} onValueChange={(v) => setAsm(v ?? '')}>
-                    <SelectTrigger className="w-full"><SelectValue placeholder="Select ASM" /></SelectTrigger>
+                  <Select key={asm || 'empty'} value={asm || undefined} onValueChange={(v) => setAsm(v ?? '')}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select ASM">{(v) => roleLabel(v as string)}</SelectValue>
+                    </SelectTrigger>
                     <SelectContent>
-                      {roles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
+                      {assignableRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
                   <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>RSM (optional)</Label>
-                  <Select value={rsm || undefined} onValueChange={(v) => setRsm(v ?? '')}>
-                    <SelectTrigger className="w-full"><SelectValue placeholder="Select RSM" /></SelectTrigger>
+                  <Select key={rsm || 'empty'} value={rsm || undefined} onValueChange={(v) => setRsm(v ?? '')}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select RSM">{(v) => roleLabel(v as string)}</SelectValue>
+                    </SelectTrigger>
                     <SelectContent>
-                      {roles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
+                      {assignableRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -498,7 +628,7 @@ const CampDetailPageReal = () => {
 
             {mutation.isError && (
               <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger mt-4">
-                {(mutation.error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to save changes.'}
+                {saveErrorMessage(mutation.error)}
               </div>
             )}
             {mutation.isSuccess && !isCreateMode && (

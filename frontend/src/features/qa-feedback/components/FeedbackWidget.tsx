@@ -25,7 +25,10 @@ type Phase = 'idle' | 'picking' | 'commenting'
 
 const FeedbackWidget = () => {
   const location = useLocation()
-  const { createFeedback, isCreating } = useQaFeedback()
+  // fetchList=false — this widget only ever submits new feedback, it never
+  // displays the existing list, so there's no reason to fetch it (this
+  // component renders on every authenticated page via AppLayout.tsx).
+  const { createFeedback, isCreating } = useQaFeedback({}, false)
   const [phase, setPhase] = useState<Phase>('idle')
   const [pin, setPin] = useState<{ xPercent: number; yPercent: number; clientX: number; clientY: number } | null>(null)
   const [comment, setComment] = useState('')

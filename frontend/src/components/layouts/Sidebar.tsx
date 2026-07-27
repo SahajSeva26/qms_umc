@@ -135,9 +135,37 @@ const NavIcon = ({ name, size = 16 }: { name: string; size?: number }) => {
   return <Icon size={size} />
 }
 
+// Every real nav path, flattened once from the fixed FULL_NAV_SECTIONS tree —
+// used to find the single BEST (most specific) match for the current
+// location, rather than letting every ancestor path light up independently.
+// Several real routes are literal path-prefixes of others (e.g. Admin is
+// '/admin', but Users/Settings/Tenants/Permission Groups/Role Types/Roles/HQ
+// Mapping/AI Reminders/Inventory/Assets/Order & KPI Engine are all
+// '/admin/...') — visiting '/admin/tenants' used to highlight BOTH "Admin"
+// and "Companies" in the sidebar simultaneously, since the old isActive check
+// only asked "does this item's path prefix-match the URL," never "is there a
+// MORE SPECIFIC item that also matches." Found via a live screenshot showing
+// two simultaneous highlights, confirmed to recur throughout the whole
+// sidebar wherever a section's own landing route (e.g. '/admin', '/pharma')
+// is also the literal path-prefix of its own child items.
+const ALL_NAV_PATHS: string[] = FULL_NAV_SECTIONS.flatMap((section) =>
+  section.subs.flatMap((sub) => sub.items.map((item) => item.path)),
+)
+
+function findBestMatchingNavPath(pathname: string): string | null {
+  let best: string | null = null
+  for (const path of ALL_NAV_PATHS) {
+    const matches = pathname === path || pathname.startsWith(path + '/')
+    if (matches && (best === null || path.length > best.length)) {
+      best = path
+    }
+  }
+  return best
+}
+
 const NavItemRow = ({ item, collapsed }: { item: NavItem; collapsed: boolean }) => {
   const location = useLocation()
-  const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/')
+  const isActive = item.path === findBestMatchingNavPath(location.pathname)
 
   return (
     <NavLink

@@ -3,6 +3,7 @@ import type { WizardFormState } from '@/features/projects/wizard.types'
 import type { PaymentTerms } from '@/types/project.types'
 import { PAYMENT_TERMS_LABEL } from '@/types/project.types'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
+import { PLATFORM_TENANT_CODE } from '@/features/access-management/accessManagement.constants'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import SectionHeader from '@/components/ui/SectionHeader'
 import { Label } from '@/components/ui/label'
@@ -24,7 +25,10 @@ interface WizardStep5Props {
 // rule from the other two.
 const WizardStep5 = ({ form, setField }: WizardStep5Props) => {
   const { data: tenantData, isError: tenantsErrored } = useTenants({ status: 'active' })
-  const platformTenant = tenantData?.data?.items.find((t) => t.type === 'platform')
+  // tenant.type is only present on the wire for a system:manage caller
+  // (TenantMapper.toResponse) — code is always present regardless of
+  // permission, so match on it as a fallback. Found via a 2026-07-26 test pass.
+  const platformTenant = tenantData?.data?.items.find((t) => t.type === 'platform' || t.code === PLATFORM_TENANT_CODE)
 
   const { data: platformRoleData, isLoading: platformRolesLoading, isError: platformRolesErrored } =
     useRoles(platformTenant ? { tenant: platformTenant.id, status: 'active' } : { tenant: undefined })

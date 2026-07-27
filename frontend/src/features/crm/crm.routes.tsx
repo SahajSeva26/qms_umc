@@ -25,7 +25,12 @@ export const CRM_ROUTES = {
 // redirect. Per PROGRESS.md's "General-purpose route protection" note,
 // /crm is the first non-access-management route to get real backend
 // permission codes to check against, so it's the first to be wired up
-// beyond that one precedent.
+// beyond that one precedent. Applied to ALL FOUR routes below (index +
+// sales/appointments/clients), not just /crm itself — matches
+// accessManagement.routes.tsx's own convention (and its comment documenting
+// the identical bug class fixed on /admin/tenants/:id) of gating every
+// sibling/detail route in a feature the same as its list route, not just
+// the entry point.
 const CRM_VIEW_PERMISSIONS = ['lead:search', 'lead:manage', 'tenant:manage']
 
 export const crmRoutes: RouteObject[] = [
@@ -37,7 +42,28 @@ export const crmRoutes: RouteObject[] = [
       </RequirePermission>
     ),
   },
-  { path: CRM_ROUTES.SALES,        element: <SalesDashboardPage /> },
-  { path: CRM_ROUTES.APPOINTMENTS, element: <AppointmentsPage /> },
-  { path: CRM_ROUTES.CLIENTS,      element: <ClientsPage /> },
+  {
+    path: CRM_ROUTES.SALES,
+    element: (
+      <RequirePermission anyOf={CRM_VIEW_PERMISSIONS}>
+        <SalesDashboardPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: CRM_ROUTES.APPOINTMENTS,
+    element: (
+      <RequirePermission anyOf={CRM_VIEW_PERMISSIONS}>
+        <AppointmentsPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: CRM_ROUTES.CLIENTS,
+    element: (
+      <RequirePermission anyOf={CRM_VIEW_PERMISSIONS}>
+        <ClientsPage />
+      </RequirePermission>
+    ),
+  },
 ]

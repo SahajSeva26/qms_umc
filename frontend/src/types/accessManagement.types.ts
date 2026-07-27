@@ -140,17 +140,29 @@ export interface UpdatePermissionGroupPayload {
 
 export type RoleTypeStatus = 'active' | 'inactive'
 
-/** The fixed, backend-enforced set of allowed RoleType codes (ALLOWED_ROLETYPE_CODES_ARRAY). */
+// NOTE: the backend's CreateRoleTypePayloadSchema.code is NO LONGER a fixed
+// enum (roleType.validators.ts switched to a free-form kebab-case regex,
+// `/^[a-z][a-z0-9-]*$/` — reserved/default codes are blocked in the service
+// layer via an isSystem lookup, not by restricting the input set). This type
+// still lists the backend's known/default codes (ALLOWED_ROLETYPE_CODES in
+// roleType.constants.ts) since the create form's dropdown offers exactly
+// these — found stale (missing 5 real operations codes, 2 typo'd pharma
+// codes, 1 wrong sales code) via a 2026-07-24 test sweep and corrected here.
 export type RoleTypeCode =
   | 'system'
   | 'hr'
   | 'admin'
-  | 'sales'
+  | 'sales-rep'
   | 'sales-head'
+  | 'camp-coordinator-screening'
+  | 'camp-coordinator-diet'
+  | 'operation-manager-screening'
+  | 'operation-manager-diet'
+  | 'field-officer'
   | 'pharma-ho'
-  | 'pharma-ms'
-  | 'pharms-asm'
+  | 'pharma-asm'
   | 'pharma-rsm'
+  | 'pharma-mr'
 
 // Populated shape for `tenant` as returned by GET /role-types (search) —
 // roleType.service.ts's search() unconditionally populates `tenant` with

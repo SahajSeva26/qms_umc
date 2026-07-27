@@ -29,7 +29,7 @@ import WizardStep6 from '@/features/projects/components/wizard/WizardStep6'
 // (UpdateProjectPayload has no lead field), so an edit session starts at
 // step 1 with the project's existing lead-derived context shown read-only.
 const CREATE_STEPS = [
-  { label: 'Lead', heading: 'Pick the source lead', sub: 'A project is created from a won lead — tenant and division are derived from it automatically.' },
+  { label: 'Lead', heading: 'Pick the source lead', sub: 'A project is created from a won lead — company and division are derived from it automatically.' },
   { label: 'Basics', heading: 'Project basics', sub: 'Identity, therapy, project type(s), and tests conducted.' },
   { label: 'Execution', heading: 'Execution mode', sub: 'How will the project be commercially anchored?' },
   { label: 'Financials', heading: 'Financials', sub: 'Per-camp cost × total camps → pre-GST → GST → total. Edit values; GST recalculates live.' },

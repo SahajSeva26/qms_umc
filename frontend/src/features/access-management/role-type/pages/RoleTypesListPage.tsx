@@ -58,7 +58,7 @@ const RoleTypesListPage = () => {
             Role Types
           </h1>
           <p className="text-[13px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>
-            {!isLoading && !error ? `${totalCount} total` : 'Manage role types across tenants.'}
+            {!isLoading && !error ? `${totalCount} total` : 'Manage role types across companies.'}
           </p>
         </div>
         <Button

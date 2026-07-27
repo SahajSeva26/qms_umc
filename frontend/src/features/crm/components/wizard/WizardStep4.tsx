@@ -3,6 +3,7 @@ import { computeWizardScore } from '@/features/crm/wizard.types'
 import { LEAD_PROJECT_TYPE_LABEL } from '@/types/crm.types'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
+import { PLATFORM_TENANT_CODE } from '@/features/access-management/accessManagement.constants'
 import { formatINR } from '@/utils/formatters'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
@@ -20,7 +21,12 @@ const WizardStep4 = ({ form, setField }: WizardStep4Props) => {
   const score = computeWizardScore(form)
 
   const { data: tenantData, isError: tenantsErrored } = useTenants({ status: 'active' })
-  const platformTenant = tenantData?.data?.items.find((t) => t.type === 'platform')
+  // tenant.type is only present on the wire for a system:manage caller
+  // (TenantMapper.toResponse) — code is always present regardless of
+  // permission, so match on it as a fallback rather than leaving this
+  // permanently unresolved for every other real caller (tenant:manage
+  // admins included). Found via a 2026-07-26 test pass.
+  const platformTenant = tenantData?.data?.items.find((t) => t.type === 'platform' || t.code === PLATFORM_TENANT_CODE)
 
   const { data: roleData, isLoading: rolesLoading, isError: rolesErrored } = useRoles(platformTenant ? { tenant: platformTenant.id, status: 'active' } : { tenant: undefined })
   const salesRoles = platformTenant ? roleData?.data?.items ?? [] : []
@@ -87,7 +93,7 @@ const WizardStep4 = ({ form, setField }: WizardStep4Props) => {
           <p className="text-[11px] mt-1 text-danger">Couldn't load sales reps — try again.</p>
         )}
         {!tenantsErrored && !rolesErrored && !rolesLoading && !platformTenant && (
-          <p className="text-[11px] mt-1 text-danger">No QMS internal (platform) tenant found — a sales rep must belong to one.</p>
+          <p className="text-[11px] mt-1 text-danger">No QMS internal (platform) company found — a sales rep must belong to one.</p>
         )}
       </div>
 

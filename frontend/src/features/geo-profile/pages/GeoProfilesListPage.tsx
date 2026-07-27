@@ -1,12 +1,14 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useQueries } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { FiNavigation, FiPlus } from 'react-icons/fi'
 import { useGeoProfiles } from '@/features/geo-profile/hooks/useGeoProfiles'
 import { useGeoProfilesFilters } from '@/features/geo-profile/hooks/useGeoProfilesFilters'
+import { useRoles } from '@/features/access-management/role/hooks/useRoles'
+import { accessManagementService } from '@/features/access-management/accessManagement.service'
 import GeoProfilesTable from '@/features/geo-profile/components/GeoProfilesTable'
 import GeoProfilesFilterBar from '@/features/geo-profile/components/GeoProfilesFilterBar'
 import PaginationControls from '@/components/ui/PaginationControls'
-import { GEO_PROFILE_ROUTES } from '@/features/geo-profile/geoProfile.routes'
 import { Button } from '@/components/ui/button'
 import type { GeoProfileStatus, GeoProfileType } from '@/types/geoProfile.types'
 
@@ -32,6 +34,41 @@ const GeoProfilesListPage = () => {
   const totalCount = data?.data?.count ?? 0
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
 
+  // GeoProfileMapper.toResponse (backend) always flattens `role` to a bare
+  // ObjectId string, even though geoProfile.service.ts's search() populates
+  // it server-side — the populated name/code is discarded before the
+  // response ever leaves the backend, so this list has no way to get a
+  // resolved name except a separate lookup, same pattern already used by
+  // GeoProfileDetailPage.tsx's own roleName() helper. Without this, the
+  // Role column rendered a raw 24-char hex id for every row. Found via a
+  // 2026-07-26 ground-up test pass.
+  const { data: rolesData } = useRoles({ status: 'active', limit: '500' })
+  const activeRoles = rolesData?.data?.items ?? []
+
+  // A GeoProfile's role can be deactivated AFTER the profile was created —
+  // the active-only list above won't include it. SearchRoleQuery has no
+  // "give me these specific ids" filter, so resolve whichever ids on THIS
+  // page aren't already in the active list via individual GET /roles/:id
+  // calls instead (bounded to page size, max 10, so this stays cheap).
+  const activeRoleIds = new Set(activeRoles.map((r) => r.id))
+  const missingRoleIds = [...new Set(geoProfiles.map((p) => p.role))].filter((id) => !activeRoleIds.has(id))
+  const missingRoleQueries = useQueries({
+    queries: missingRoleIds.map((id) => ({
+      queryKey: ['role', id],
+      queryFn: () => accessManagementService.getRole(id),
+    })),
+  })
+
+  const roleLabelById = useMemo(() => {
+    const map = new Map(activeRoles.map((r) => [r.id, r.name]))
+    for (const q of missingRoleQueries) {
+      const role = q.data?.data
+      if (role) map.set(role.id, role.name)
+    }
+    return map
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeRoles, missingRoleQueries.map((q) => q.dataUpdatedAt).join(',')])
+
   const handleFilterChange = <K extends keyof typeof filters>(key: K, value: (typeof filters)[K]) => {
     setFilter(key, value)
     setPage(1)
@@ -56,11 +93,11 @@ const GeoProfilesListPage = () => {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Button variant="outline" onClick={() => navigate(GEO_PROFILE_ROUTES.GEO_PROFILE_NEAREST)}>
+          <Button variant="outline" onClick={() => navigate('/geo-profiles/nearest-lookup')}>
             <FiNavigation size={14} /> Nearest lookup
           </Button>
           <Button
-            onClick={() => navigate(GEO_PROFILE_ROUTES.GEO_PROFILE_NEW)}
+            onClick={() => navigate('/geo-profiles/new')}
             className="text-white"
             style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
           >
@@ -85,7 +122,7 @@ const GeoProfilesListPage = () => {
 
       {!isLoading && !error && (
         <>
-          <GeoProfilesTable geoProfiles={geoProfiles} />
+          <GeoProfilesTable geoProfiles={geoProfiles} roleLabelById={roleLabelById} />
           <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} />
         </>
       )}

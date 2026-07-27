@@ -36,11 +36,18 @@ export interface CampTimeSlot {
 /** [longitude, latitude] — GeoJSON order, matches camp.validators.ts's CoordinatesSchema tuple. */
 export type CampCoordinates = [number, number]
 
+/** Frozen snapshot of who made this transition, captured at the moment it happened — stays accurate even if that person's name/role later changes. */
+export interface CampStageActor {
+  roleId?: string
+  name?: string
+  email?: string
+}
+
 export interface CampStageHistoryEntry {
   from: CampStatus
   to: CampStatus
   reason: string
-  createdBy: string
+  actor: CampStageActor
   createdAt: string
 }
 

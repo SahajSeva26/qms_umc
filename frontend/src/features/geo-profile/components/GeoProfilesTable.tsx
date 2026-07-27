@@ -1,6 +1,5 @@
 import { useNavigate } from 'react-router-dom'
 import type { GeoProfileEntity } from '@/types/geoProfile.types'
-import { GEO_PROFILE_ROUTES } from '@/features/geo-profile/geoProfile.routes'
 import GeoProfileStatusPill from '@/features/geo-profile/components/GeoProfileStatusPill'
 
 // Mirrors `@/features/access-management/role/components/RolesTable.tsx` exactly.
@@ -11,9 +10,15 @@ const TYPE_LABEL: Record<GeoProfileEntity['type'], string> = {
 
 interface GeoProfilesTableProps {
   geoProfiles: GeoProfileEntity[]
+  // geoProfile.role is always a bare ObjectId string on the wire (the
+  // backend mapper discards the populated name — see
+  // GeoProfilesListPage.tsx's own comment) — this lookup resolves it to a
+  // display name, falling back to the raw id if the role isn't in the
+  // active-roles list (e.g. deactivated after this profile was created).
+  roleLabelById: Map<string, string>
 }
 
-const GeoProfilesTable = ({ geoProfiles }: GeoProfilesTableProps) => {
+const GeoProfilesTable = ({ geoProfiles, roleLabelById }: GeoProfilesTableProps) => {
   const navigate = useNavigate()
 
   return (
@@ -46,13 +51,13 @@ const GeoProfilesTable = ({ geoProfiles }: GeoProfilesTableProps) => {
             {geoProfiles.map((profile) => (
               <tr
                 key={profile.id}
-                onClick={() => navigate(GEO_PROFILE_ROUTES.GEO_PROFILE_DETAIL.replace(':id', profile.id))}
+                onClick={() => navigate(`/geo-profiles/${profile.id}`)}
                 className="cursor-pointer transition-colors hover:bg-(--qms-surface-hover)"
                 style={{ borderBottom: '1px solid var(--qms-border)' }}
               >
                 <td className="px-4 py-2.5">
-                  <span className="font-semibold font-mono truncate" style={{ color: 'var(--qms-text)' }}>
-                    {profile.role}
+                  <span className="font-semibold truncate" style={{ color: 'var(--qms-text)' }}>
+                    {roleLabelById.get(profile.role) ?? profile.role}
                   </span>
                 </td>
                 <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>

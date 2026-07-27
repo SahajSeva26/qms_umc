@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { FiArrowLeft } from 'react-icons/fi'
 import { useTenant } from '@/features/access-management/tenant/hooks/useTenant'
 import { useUpdateTenant } from '@/features/access-management/tenant/hooks/useUpdateTenant'
+import { useRole } from '@/features/access-management/role/hooks/useRole'
+import { ROLE_ROUTES } from '@/features/access-management/role/role.routes'
 import { usePermission } from '@/hooks/usePermission'
 import { TENANT_ROUTES } from '@/features/access-management/tenant/tenant.routes'
 import TenantTypeBadge from '@/features/access-management/tenant/components/TenantTypeBadge'
@@ -14,7 +16,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { updateTenantSchema } from '@/features/access-management/tenant/schemas/tenant.schemas'
 import { useScrollIntoViewOnChange } from '@/hooks/useScrollIntoViewOnChange'
-import type { TenantStatus, TenantType } from '@/types/accessManagement.types'
+import type { RolePopulatedUser, TenantStatus, TenantType } from '@/types/accessManagement.types'
 
 // Matches `@/features/admin/pages/UserDetailPage.tsx` exactly: back link,
 // inline loading/error states, a summary card, then an edit-form card.
@@ -33,9 +35,32 @@ const TenantDetailPage = () => {
   const { data, isLoading, error } = useTenant(id)
   const tenant = data?.data ?? null
 
-  const { hasPermission } = usePermission()
+  const { hasPermission, hasAnyPermission } = usePermission()
   const canManageTenant = hasPermission('tenant:manage')
   const canManageSystem = hasPermission('system:manage')
+  // Same three codes RolesListPage/RoleDetailPage gate their own routes with
+  // (ROLES_VIEW_PERMISSIONS in accessManagement.routes.tsx) — only link to
+  // /admin/roles/:id when the caller could actually load that page.
+  const canViewRole = hasAnyPermission(['role:get', 'role:search', 'role:manage'])
+
+  // tenant.owner is a bare ObjectId ref to Role (tenant.model.ts), only
+  // present at all for system:manage callers (TenantMapper.toResponse gate —
+  // hence Tenant.owner being typed optional). It is never populated
+  // server-side, so resolving it to a display name needs its own GET
+  // /roles/:id call, same pattern as PermissionGroupDetailPage.tsx's
+  // tenantLabelById lookup for group.tenant — except here there's exactly
+  // one id to resolve (not a list), so a single useRole() call suffices
+  // rather than the useQueries+Map fan-out used for N unresolved ids.
+  // Previously tenant.owner was fetched by the backend but never rendered,
+  // linked, or resolved anywhere on this page. Found via a 2026-07-27 audit.
+  const { data: ownerRoleData } = useRole(tenant?.owner)
+  const ownerRole = ownerRoleData?.data ?? null
+  const ownerUser = ownerRole && typeof ownerRole.user !== 'string' ? (ownerRole.user as RolePopulatedUser) : null
+  const ownerName = ownerUser?.firstName ? `${ownerUser.firstName} ${ownerUser.lastName ?? ''}`.trim() : null
+  // Only append "(email)" when the button/label is showing the NAME — if we
+  // fell back to the email as the label itself (no firstName resolved yet),
+  // appending it again would show "user@x.com (user@x.com)".
+  const ownerEmailSuffix = ownerName && ownerUser?.email ? ownerUser.email : null
 
   const updateTenant = useUpdateTenant(id ?? '')
   const [name, setName] = useState('')
@@ -80,18 +105,18 @@ const TenantDetailPage = () => {
         style={{ color: 'var(--qms-text-soft)' }}
       >
         <FiArrowLeft size={14} />
-        Back to tenants
+        Back to companies
       </button>
 
       {isLoading && (
         <div className="text-[13px] py-10 text-center" style={{ color: 'var(--qms-text-muted)' }}>
-          Loading tenant…
+          Loading company…
         </div>
       )}
 
       {error && !isLoading && (
         <div className="text-[13px] rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
-          Failed to load tenant. Please try again.
+          Failed to load company. Please try again.
         </div>
       )}
 
@@ -111,6 +136,27 @@ const TenantDetailPage = () => {
               <TenantTypeBadge type={tenant.type} />
               <TenantStatusPill status={tenant.status} />
             </div>
+            {tenant.owner && (
+              <div className="text-[11px] mt-3" style={{ color: 'var(--qms-text-muted)' }}>
+                Owner:{' '}
+                {canViewRole ? (
+                  <button
+                    onClick={() => navigate(ROLE_ROUTES.ROLE_DETAIL.replace(':id', tenant.owner as string))}
+                    className="font-semibold underline underline-offset-2 hover:opacity-80"
+                    style={{ color: 'var(--qms-text-soft)' }}
+                  >
+                    {ownerName ?? (ownerUser?.email ?? tenant.owner)}
+                  </button>
+                ) : (
+                  <span className="font-semibold" style={{ color: 'var(--qms-text-soft)' }}>
+                    {ownerName ?? tenant.owner}
+                  </span>
+                )}
+                {ownerEmailSuffix && (
+                  <span className="ml-1.5">({ownerEmailSuffix})</span>
+                )}
+              </div>
+            )}
           </div>
 
           <div
@@ -118,7 +164,7 @@ const TenantDetailPage = () => {
             style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}
           >
             <h2 className="text-sm font-bold mb-4" style={{ color: 'var(--qms-text)' }}>
-              Edit tenant
+              Edit company
             </h2>
 
             <div className="space-y-4">
@@ -158,7 +204,18 @@ const TenantDetailPage = () => {
                   >
                     Status
                   </Label>
-                  <Select value={status || undefined} onValueChange={(v) => setStatus(v as TenantStatus)}>
+                  {/* key={status || 'empty'} forces a fresh mount once the real
+                      value loads. base-ui's Select decides controlled-vs-
+                      uncontrolled from whether `value` is defined on its VERY
+                      FIRST render and never revisits that decision — `status`
+                      starts as '' before the async tenant fetch resolves, so
+                      without this the trigger permanently shows "Select
+                      status" even after the real value arrives (same bug
+                      fixed on GeoProfileDetailPage.tsx's Type/Status selects
+                      and CampDetailPageReal.tsx's role/doctor selects).
+                      Data-only bug: the underlying value was always correct,
+                      as the header card's TenantStatusPill above proves. */}
+                  <Select key={status || 'empty'} value={status || undefined} onValueChange={(v) => setStatus(v as TenantStatus)}>
                     <SelectTrigger id="status" className="w-full">
                       <SelectValue placeholder="Select status">
                         {(v) => (v === 'active' ? 'Active' : v === 'inactive' ? 'Inactive' : 'Select status')}
@@ -181,7 +238,10 @@ const TenantDetailPage = () => {
                   >
                     Type
                   </Label>
-                  <Select value={type || undefined} onValueChange={(v) => setType(v as TenantType)}>
+                  {/* Same base-ui controlled/uncontrolled lock-in as the
+                      Status select above — key={type || 'empty'} forces a
+                      fresh mount once the real value loads. */}
+                  <Select key={type || 'empty'} value={type || undefined} onValueChange={(v) => setType(v as TenantType)}>
                     <SelectTrigger id="type" className="w-full">
                       <SelectValue placeholder="Select type">
                         {(v) => (v === 'platform' ? 'Platform' : v === 'customer' ? 'Customer' : 'Select type')}
@@ -197,7 +257,7 @@ const TenantDetailPage = () => {
 
               {!canManageTenant && !canManageSystem && (
                 <p className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>
-                  Status and type are only editable by users with tenant or system management permissions.
+                  Status and type are only editable by users with company or system management permissions.
                 </p>
               )}
 

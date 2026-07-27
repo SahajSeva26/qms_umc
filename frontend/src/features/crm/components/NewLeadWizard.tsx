@@ -43,7 +43,10 @@ interface NewLeadWizardProps {
 }
 
 const NewLeadWizard = ({ onClose, onCreated }: NewLeadWizardProps) => {
-  const { createLead, isCreating } = useLeads()
+  // fetchList=false — this wizard only ever creates a new lead, it never
+  // displays the existing list, so there's no reason to fetch all ~1000
+  // leads company-wide every time it opens.
+  const { createLead, isCreating } = useLeads({}, false)
   const [step, setStep] = useState(0)
   const [form, setForm] = useState<WizardFormState>(DEFAULT_WIZARD_FORM)
   const [error, setError] = useState<string | null>(null)

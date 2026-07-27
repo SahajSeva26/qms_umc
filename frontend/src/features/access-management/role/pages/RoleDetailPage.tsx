@@ -68,7 +68,7 @@ const ROLE_FIELD_LABELS: Record<string, string> = {
   code: 'Code',
   name: 'Name',
   type: 'Role type',
-  tenant: 'Tenant',
+  tenant: 'Company',
   'user.firstName': "User's first name",
   'user.email': 'User email',
   'user.password': 'Password',
@@ -305,7 +305,7 @@ const RoleDetailPage = () => {
                     className="text-[10px] font-semibold tracking-widest uppercase mb-2"
                     style={{ color: 'var(--qms-text-muted)' }}
                   >
-                    Tenant
+                    Company
                   </Label>
                   <Select
                     value={tenant || undefined}
@@ -315,10 +315,10 @@ const RoleDetailPage = () => {
                     }}
                   >
                     <SelectTrigger id="tenant" className="w-full">
-                      <SelectValue placeholder="Select tenant">
+                      <SelectValue placeholder="Select company">
                         {(v) => {
                           const t = tenants.find((t) => t.id === v)
-                          return t ? `${t.name} (${t.code})` : 'Select tenant'
+                          return t ? `${t.name} (${t.code})` : 'Select company'
                         }}
                       </SelectValue>
                     </SelectTrigger>
@@ -331,7 +331,7 @@ const RoleDetailPage = () => {
                     </SelectContent>
                   </Select>
                   <p className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
-                    The role type and elevated permissions below are scoped to this tenant.
+                    The role type and elevated permissions below are scoped to this company.
                   </p>
                 </div>
               </>
@@ -422,10 +422,10 @@ const RoleDetailPage = () => {
                 </Label>
                 <Select value={roleType || undefined} onValueChange={(v) => setRoleType(v ?? '')} disabled={!tenant}>
                   <SelectTrigger id="roleType" className="w-full">
-                    <SelectValue placeholder={tenant ? 'Select role type' : 'Select a tenant first'}>
+                    <SelectValue placeholder={tenant ? 'Select role type' : 'Select a company first'}>
                       {(v) => {
                         const rt = roleTypes.find((rt) => rt.id === v)
-                        return rt ? `${rt.name} (${rt.code})` : tenant ? 'Select role type' : 'Select a tenant first'
+                        return rt ? `${rt.name} (${rt.code})` : tenant ? 'Select role type' : 'Select a company first'
                       }}
                     </SelectValue>
                   </SelectTrigger>
@@ -438,7 +438,7 @@ const RoleDetailPage = () => {
                   </SelectContent>
                 </Select>
                 <p className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
-                  Scoped to the same tenant this role belongs to.
+                  Scoped to the same company this role belongs to.
                 </p>
               </div>
 
@@ -451,7 +451,16 @@ const RoleDetailPage = () => {
                   >
                     Status
                   </Label>
-                  <Select value={status || undefined} onValueChange={(v) => setStatus(v as RoleStatus)}>
+                  {/* key={status || 'empty'} forces a fresh mount once the real
+                      value loads from the async fetch — base-ui's Select
+                      decides controlled-vs-uncontrolled on its very first
+                      render and never revisits it, so without this the
+                      trigger permanently shows "Select status" even after
+                      the real value arrives (same bug as
+                      TenantDetailPage.tsx/GeoProfileDetailPage.tsx/
+                      CampDetailPageReal.tsx). Data-only display bug — the
+                      underlying value was always correct. */}
+                  <Select key={status || 'empty'} value={status || undefined} onValueChange={(v) => setStatus(v as RoleStatus)}>
                     <SelectTrigger id="status" className="w-full">
                       <SelectValue placeholder="Select status">
                         {(v) => (v === 'active' ? 'Active' : v === 'inactive' ? 'Inactive' : 'Select status')}
@@ -641,16 +650,16 @@ const RoleDetailPage = () => {
             <p className="text-[12px] mb-4" style={{ color: 'var(--qms-text-muted)' }}>
               Optional, temporary grants layered on top of the bound role type's own permissions (e.g. a same-domain
               grant like <span className="font-mono">sales.manage</span> for this one person) — not a replacement for
-              them. Choices are limited to permissions the role type already has AND that this tenant's permission
+              them. Choices are limited to permissions the role type already has AND that this company's permission
               group allows.{' '}
               <span className="font-semibold">
-                Tenant-admin, tenant-manage, and system-manage can never be granted here.
+                Admin Company, Manage Company, and system-manage can never be granted here.
               </span>
             </p>
 
             {!tenant && (
               <div className="text-[13px] py-6 text-center rounded-lg border" style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }}>
-                Select a tenant above to load available elevated permissions.
+                Select a company above to load available elevated permissions.
               </div>
             )}
 
@@ -668,7 +677,7 @@ const RoleDetailPage = () => {
 
             {tenant && roleType && !isLoadingCeiling && !permissionGroup && (
               <div className="text-[13px] rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
-                This tenant has no permission group configured yet, so no elevated permissions can be assigned.
+                This company has no permission group configured yet, so no elevated permissions can be assigned.
               </div>
             )}
 
@@ -706,7 +715,7 @@ const RoleDetailPage = () => {
                 {candidatePermissions.length === 0 && (
                   <div className="text-[13px] py-6 text-center col-span-full" style={{ color: 'var(--qms-text-muted)' }}>
                     No permissions are available to elevate — either the role type has none, or none of them are
-                    within this tenant's permission group ceiling.
+                    within this company's permission group ceiling.
                   </div>
                 )}
               </div>
@@ -714,7 +723,7 @@ const RoleDetailPage = () => {
 
             {permissionGroupCeilingCodes.size === 0 && permissionGroup && (
               <p className="text-[11px] mt-3" style={{ color: 'var(--qms-text-muted)' }}>
-                This tenant's permission group currently grants no permissions.
+                This company's permission group currently grants no permissions.
               </p>
             )}
 

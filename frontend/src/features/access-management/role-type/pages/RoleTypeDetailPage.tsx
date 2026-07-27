@@ -41,7 +41,7 @@ const CODE_TO_RESOURCE_KEY: Record<string, keyof typeof PERMISSION_CATALOG> = Ob
 const ROLE_TYPE_FIELD_LABELS: Record<string, string> = {
   code: 'Code',
   name: 'Name',
-  tenant: 'Tenant',
+  tenant: 'Company',
 }
 
 const formatZodIssue = (issue: ZodIssue): string => {
@@ -270,14 +270,14 @@ const RoleTypeDetailPage = () => {
                     className="text-[10px] font-semibold tracking-widest uppercase mb-2"
                     style={{ color: 'var(--qms-text-muted)' }}
                   >
-                    Tenant
+                    Company
                   </Label>
                   <Select value={tenant || undefined} onValueChange={(v) => setTenant(v ?? '')}>
                     <SelectTrigger id="tenant" className="w-full">
-                      <SelectValue placeholder="Select tenant">
+                      <SelectValue placeholder="Select company">
                         {(v) => {
                           const t = tenants.find((t) => t.id === v)
-                          return t ? `${t.name} (${t.code})` : 'Select tenant'
+                          return t ? `${t.name} (${t.code})` : 'Select company'
                         }}
                       </SelectValue>
                     </SelectTrigger>
@@ -290,7 +290,7 @@ const RoleTypeDetailPage = () => {
                     </SelectContent>
                   </Select>
                   <p className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
-                    The available permissions below are limited to this tenant's own permission group.
+                    The available permissions below are limited to this company's own permission group.
                   </p>
                 </div>
               </>
@@ -360,7 +360,7 @@ const RoleTypeDetailPage = () => {
                     {roleType?.code}
                   </div>
                   <p className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
-                    This is the reserved, system-seeded tenant-admin role type code and cannot be changed.
+                    This is the reserved, system-seeded company-admin role type code and cannot be changed.
                   </p>
                 </div>
               )}
@@ -401,7 +401,17 @@ const RoleTypeDetailPage = () => {
                   >
                     Status
                   </Label>
-                  <Select value={status || undefined} onValueChange={(v) => setStatus(v as RoleTypeStatus)}>
+                  {/* key={status || 'empty'} forces a fresh mount once the real
+                      value loads from the async fetch — base-ui's Select
+                      decides controlled-vs-uncontrolled on its very first
+                      render and never revisits it, so without this the
+                      trigger permanently shows "Select status" even after
+                      the real value arrives (same bug as
+                      TenantDetailPage.tsx/RoleDetailPage.tsx/
+                      GeoProfileDetailPage.tsx/CampDetailPageReal.tsx).
+                      Data-only display bug — the underlying value was
+                      always correct. */}
+                  <Select key={status || 'empty'} value={status || undefined} onValueChange={(v) => setStatus(v as RoleTypeStatus)}>
                     <SelectTrigger id="status" className="w-full">
                       <SelectValue placeholder="Select status">
                         {(v) => (v === 'active' ? 'Active' : v === 'inactive' ? 'Inactive' : 'Select status')}
@@ -430,13 +440,13 @@ const RoleTypeDetailPage = () => {
               </span>
             </div>
             <p className="text-[12px] mb-4" style={{ color: 'var(--qms-text-muted)' }}>
-              Only permissions granted to this tenant's own permission group can be assigned to a role type —
+              Only permissions granted to this company's own permission group can be assigned to a role type —
               that group is the ceiling for every role type under it.
             </p>
 
             {prunedCodes.length > 0 && (
               <div className="text-[12px] rounded-xl px-3 py-2 mb-4 bg-warning-soft border border-warning text-warning">
-                <span className="font-semibold">Heads up:</span> this tenant's permission group no longer grants{' '}
+                <span className="font-semibold">Heads up:</span> this company's permission group no longer grants{' '}
                 {prunedCodes.length === 1 ? 'this permission' : 'these permissions'}, so{' '}
                 {prunedCodes.length === 1 ? "it's" : "they're"} no longer selected below:{' '}
                 <span className="font-mono">{prunedCodes.join(', ')}</span>. Saving now will remove{' '}
@@ -446,7 +456,7 @@ const RoleTypeDetailPage = () => {
 
             {!tenant && (
               <div className="text-[13px] py-6 text-center rounded-lg border" style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }}>
-                Select a tenant above to load its available permissions.
+                Select a company above to load its available permissions.
               </div>
             )}
 
@@ -458,7 +468,7 @@ const RoleTypeDetailPage = () => {
 
             {tenant && !isLoadingCeiling && !permissionGroup && (
               <div className="text-[13px] rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
-                This tenant has no permission group configured yet, so no permissions can be assigned.
+                This company has no permission group configured yet, so no permissions can be assigned.
               </div>
             )}
 
@@ -522,7 +532,7 @@ const RoleTypeDetailPage = () => {
 
             {tenant && !isLoadingCeiling && permissionGroup && groupedCeilingPermissions.length === 0 && (
               <div className="text-[13px] py-6 text-center rounded-lg border" style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }}>
-                This tenant's permission group grants no permissions yet.
+                This company's permission group grants no permissions yet.
               </div>
             )}
 

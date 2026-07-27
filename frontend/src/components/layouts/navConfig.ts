@@ -210,7 +210,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   // "invisible to everyone except the super_admin/admin ALL-bypass" — same
   // runtime effect via getNavForRole's early-return for those two roles,
   // but explicit here for future readers).
-  { id: 'tenants',          label: 'Tenants',                 icon: 'Globe',         path: ACCESS_MANAGEMENT_ROUTES.TENANTS,
+  { id: 'tenants',          label: 'Companies',               icon: 'Globe',         path: ACCESS_MANAGEMENT_ROUTES.TENANTS,
     rolesAllowed: ['super_admin', 'admin'] },
 
   { id: 'permissiongroups', label: 'Permission Groups',       icon: 'Shield',        path: ACCESS_MANAGEMENT_ROUTES.PERMISSION_GROUPS,

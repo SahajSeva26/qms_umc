@@ -32,7 +32,7 @@ import { useAuthStore } from '@/features/auth/store'
 // over with a fabricated mapping table here.
 
 const SessionBootstrap = ({ children }: { children: ReactNode }) => {
-  const { session, isLoading, isError } = useSession()
+  const { session, isLoading, isConfirmedUnauthenticated } = useSession()
   const { user, setAuth, clearAuth } = useAuthStore()
 
   useEffect(() => {
@@ -52,14 +52,20 @@ const SessionBootstrap = ({ children }: { children: ReactNode }) => {
       })
     }
 
-    if ((isError || !session) && user) {
-      // A previously-restored/logged-in user's session is no longer valid
-      // (e.g. both tokens expired) — clear the stale store rather than
-      // leave AppLayout thinking they're still authenticated.
+    // Only tear down a previously-restored/logged-in user's store entry once
+    // the backend has ACTUALLY confirmed they're unauthenticated (a real 401
+    // on GET /auth/me) — not merely because this fetch attempt failed for
+    // some other reason. GET /auth/me shares the same rate limiter as
+    // /auth/login and /auth/refresh-token (rateLimiter.ts), so a burst of
+    // requests can 429 it even for a perfectly valid, still-logged-in
+    // session; treating that identically to "both tokens expired" was a
+    // real bug found live — it silently logged out a valid user purely
+    // because of unrelated rate-limiter traffic.
+    if (isConfirmedUnauthenticated && user) {
       clearAuth()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, session, isError])
+  }, [isLoading, session, isConfirmedUnauthenticated])
 
   return <>{children}</>
 }

@@ -4,6 +4,7 @@ import KpiTile from '@/components/ui/KpiTile'
 import PaginationControls from '@/components/ui/PaginationControls'
 import { useDoctors } from '@/features/doctors/hooks/useDoctors'
 import { useDoctorsFilters } from '@/features/doctors/hooks/useDoctorsFilters'
+import { usePermission } from '@/hooks/usePermission'
 import type { DoctorEntity, DoctorSpecialization } from '@/types/doctor.types'
 import RosterTab from '@/features/doctors/components/tabs/RosterTab'
 import SpecialtiesTab from '@/features/doctors/components/tabs/SpecialtiesTab'
@@ -35,6 +36,8 @@ const AGGREGATE_LIMIT = 1000
 
 const DoctorsPage = () => {
   const { filters, setFilter, reset } = useDoctorsFilters()
+  const { hasPermission } = usePermission()
+  const canSeeInactive = hasPermission('doctor:manage')
   const [tab, setTab] = useState<TabId>('roster')
   const [page, setPage] = useState(1)
   const [openDoctorId, setOpenDoctorId] = useState<string | null>(null)
@@ -65,8 +68,19 @@ const DoctorsPage = () => {
   // doctor:manage, and even then only if asked for it — so this tab needs
   // its own dedicated query rather than filtering the roster/active list
   // client-side (which can never contain an inactive doctor to filter for).
-  const { data: inactiveData } = useDoctors({ status: 'inactive', limit: String(AGGREGATE_LIMIT) })
-  const inactiveDoctors = inactiveData?.data?.items ?? []
+  // For a caller WITHOUT doctor:manage, the backend silently substitutes
+  // status=active for this same query instead of honoring 'inactive' or
+  // rejecting it — so without the canSeeInactive gate, this query used to
+  // come back with the exact same active doctors the Roster tab already
+  // shows, double-counted into "Total doctors" and mislabeled under the
+  // "Inactive" tab/table as if they were genuinely inactive. Found via a
+  // 2026-07-24 test sweep. Skipping the query entirely for such a caller
+  // (rather than fetching and discarding) also avoids a wasted request.
+  const { data: inactiveData } = useDoctors(
+    canSeeInactive ? { status: 'inactive', limit: String(AGGREGATE_LIMIT) } : { limit: '0' },
+    { enabled: canSeeInactive },
+  )
+  const inactiveDoctors = canSeeInactive ? inactiveData?.data?.items ?? [] : []
 
   const handleFilterChange = <K extends keyof typeof filters>(key: K, value: (typeof filters)[K]) => {
     setFilter(key, value)
@@ -116,13 +130,22 @@ const DoctorsPage = () => {
       </div>
 
       <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(168px, 1fr))' }}>
-        <KpiTile label="Total doctors" value={String(kpis.active + kpis.inactive)} sub={`${kpis.cities} cities · ${kpis.specializations} specializations`} tone="brand" icon={FiUsers} />
+        {/* "Total doctors"/"Inactive" tiles and the whole Inactive tab are
+            hidden entirely for a caller without doctor:manage — the backend
+            silently substitutes status=active for that query rather than
+            honoring 'inactive', so without this gate these tiles double-
+            counted the same active doctors already shown under "Active" and
+            the Inactive tab showed them again mislabeled as inactive. Found
+            via a 2026-07-24 test sweep. */}
+        {canSeeInactive && (
+          <KpiTile label="Total doctors" value={String(kpis.active + kpis.inactive)} sub={`${kpis.cities} cities · ${kpis.specializations} specializations`} tone="brand" icon={FiUsers} />
+        )}
         <KpiTile label="Active" value={String(kpis.active)} tone="emerald" icon={FiCheckCircle} />
-        <KpiTile label="Inactive" value={String(kpis.inactive)} tone="rose" icon={FiMoon} />
+        {canSeeInactive && <KpiTile label="Inactive" value={String(kpis.inactive)} tone="rose" icon={FiMoon} />}
       </div>
 
       <div className="flex flex-wrap gap-1 mb-4 border-b overflow-x-auto" style={{ borderColor: 'var(--qms-border)' }}>
-        {TABS.map((t) => {
+        {TABS.filter((t) => t.id !== 'inactive' || canSeeInactive).map((t) => {
           const Icon = t.icon
           return (
             <button

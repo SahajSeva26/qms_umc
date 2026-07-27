@@ -5,7 +5,6 @@ import { useGeoProfile } from '@/features/geo-profile/hooks/useGeoProfile'
 import { useCreateGeoProfile } from '@/features/geo-profile/hooks/useCreateGeoProfile'
 import { useUpdateGeoProfile } from '@/features/geo-profile/hooks/useUpdateGeoProfile'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
-import { GEO_PROFILE_ROUTES } from '@/features/geo-profile/geoProfile.routes'
 import GeoProfileStatusPill from '@/features/geo-profile/components/GeoProfileStatusPill'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -41,7 +40,13 @@ const GeoProfileDetailPage = () => {
   const { data, isLoading, error } = useGeoProfile(id)
   const geoProfile = data?.data ?? null
 
-  const { data: rolesData } = useRoles({})
+  // No query params -> backend's RequestHandler.getPagination defaults limit
+  // to 10, so the Role picker silently truncated to whichever 10 roles
+  // sorted first, with no pagination/search/indication that more existed —
+  // found via a 2026-07-24 test sweep (26 real roles existed, only 10 ever
+  // selectable). Active-only + a real limit fixes both the truncation and
+  // offering already-inactive roles as if assignable.
+  const { data: rolesData } = useRoles({ status: 'active', limit: '500' })
   const roles = rolesData?.data?.items ?? []
 
   const createGeoProfile = useCreateGeoProfile()
@@ -90,7 +95,7 @@ const GeoProfileDetailPage = () => {
         {
           onSuccess: (res) => {
             if (res.data?.id) {
-              navigate(GEO_PROFILE_ROUTES.GEO_PROFILE_DETAIL.replace(':id', res.data.id))
+              navigate(`/geo-profiles/${res.data.id}`)
             }
           },
         },
@@ -116,7 +121,7 @@ const GeoProfileDetailPage = () => {
   return (
     <div className="max-w-2xl">
       <button
-        onClick={() => navigate(GEO_PROFILE_ROUTES.GEO_PROFILES)}
+        onClick={() => navigate('/geo-profiles')}
         className="flex items-center gap-1.5 text-[13px] font-semibold mb-5 transition-colors hover:opacity-80"
         style={{ color: 'var(--qms-text-soft)' }}
       >
@@ -209,7 +214,20 @@ const GeoProfileDetailPage = () => {
                 >
                   Type
                 </Label>
-                <Select value={type || undefined} onValueChange={(v) => setType(v as GeoProfileType)}>
+                {/* key={type || 'empty'} forces a fresh mount when `type` transitions
+                    from '' to a real value. base-ui's Select decides controlled-vs-
+                    uncontrolled from whether `value` is defined on its VERY FIRST
+                    render (useControlled.mjs: `isControlled = useRef(controlled !==
+                    undefined)`) and never revisits that decision for the lifetime of
+                    the mounted instance. `type` starts as '' (the async GeoProfile
+                    fetch hasn't resolved yet), so on the old unconditional single
+                    mount the Select locked in as uncontrolled on its first render and
+                    then ignored every later setType() call from the load-effect,
+                    permanently showing "Select type" even after real data arrived.
+                    Remounting via `key` gives the Select a fresh first render (and a
+                    fresh controlled decision) once the real value is known. Found via
+                    a 2026-07-24 test sweep. */}
+                <Select key={type || 'empty'} value={type || undefined} onValueChange={(v) => setType(v as GeoProfileType)}>
                   <SelectTrigger id="type" className="w-full">
                     <SelectValue placeholder="Select type">
                       {(v) => TYPE_OPTIONS.find((t) => t.value === v)?.label ?? 'Select type'}
@@ -287,7 +305,11 @@ const GeoProfileDetailPage = () => {
                   >
                     Status
                   </Label>
-                  <Select value={status || undefined} onValueChange={(v) => setStatus(v as GeoProfileStatus)}>
+                  {/* Same base-ui controlled/uncontrolled lock-in as the Type select
+                      above — `key={status || 'empty'}` forces a fresh mount (and a
+                      fresh first-render controlled/uncontrolled decision) once the
+                      real status value arrives from the loaded geoProfile. */}
+                  <Select key={status || 'empty'} value={status || undefined} onValueChange={(v) => setStatus(v as GeoProfileStatus)}>
                     <SelectTrigger id="status" className="w-full">
                       <SelectValue placeholder="Select status">
                         {(v) => (v === 'active' ? 'Active' : v === 'inactive' ? 'Inactive' : 'Select status')}

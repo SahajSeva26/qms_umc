@@ -32,7 +32,7 @@ export const createRoleSchema = z.object({
   name: z.string().trim().min(1, 'Name is required'),
   description: z.string().trim().optional(),
   type: z.string().trim().min(1, 'Role type is required'),
-  tenant: z.string().trim().min(1, 'Tenant is required'),
+  tenant: z.string().trim().min(1, 'Company is required'),
   permissions: z
     .array(z.string())
     .optional()

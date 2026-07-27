@@ -5,6 +5,7 @@ import { LEAD_PROJECT_TYPE_LABEL } from '@/types/crm.types'
 import type { UpdateLeadPayload } from '@/types/crm.types'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
+import { PLATFORM_TENANT_CODE } from '@/features/access-management/accessManagement.constants'
 import { editLeadSchema } from '@/features/crm/schemas/lead.schemas'
 import { THERAPIES, SPECIALTIES, CURRENT_ACTIVITIES, QMS_OFFERINGS } from '@/features/crm/crm.constants'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
@@ -84,7 +85,10 @@ const EditLeadModal = ({ lead, onSave, onClose }: EditLeadModalProps) => {
   const contactRoles = contactRoleData?.data?.items ?? []
 
   const { data: tenantData, isError: tenantsErrored } = useTenants({ status: 'active' })
-  const platformTenant = tenantData?.data?.items.find((t) => t.type === 'platform')
+  // tenant.type is only present on the wire for a system:manage caller
+  // (TenantMapper.toResponse) — code is always present regardless of
+  // permission, so match on it as a fallback. Found via a 2026-07-26 test pass.
+  const platformTenant = tenantData?.data?.items.find((t) => t.type === 'platform' || t.code === PLATFORM_TENANT_CODE)
   const { data: salesRoleData, isLoading: salesRolesLoading, isError: salesRolesErrored } =
     useRoles(platformTenant ? { tenant: platformTenant.id, status: 'active' } : { tenant: undefined })
   const salesRoles = platformTenant ? salesRoleData?.data?.items ?? [] : []

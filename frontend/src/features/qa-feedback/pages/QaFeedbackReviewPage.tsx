@@ -17,7 +17,13 @@ const reporterLabel = (reportedBy: QaFeedbackEntity['reportedBy']): string => {
 }
 
 const FeedbackCard = ({ report }: { report: QaFeedbackEntity }) => {
-  const { updateFeedback, isUpdating } = useQaFeedback()
+  // fetchList=false — this card only ever updates ITS OWN report (passed in
+  // as a prop from the already-fetched list below), it never reads
+  // items/count itself. Without this, every rendered card fired its own
+  // redundant GET /qa-feedback?limit=100 — e.g. 15 feedback items on screen
+  // meant 15 simultaneous, unused list fetches on top of the page's own
+  // real one at line ~108.
+  const { updateFeedback, isUpdating } = useQaFeedback({}, false)
   const [note, setNote] = useState(report.resolutionNote)
   const [noteOpen, setNoteOpen] = useState(false)
 

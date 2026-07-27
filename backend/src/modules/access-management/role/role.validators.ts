@@ -60,6 +60,9 @@ export type IUpdateRolePayload = z.infer<typeof UpdateRolePayloadSchema>;
 
 //3: search ====================================>
 export const SearchRoleQuerySchema = z.object({
+    // free-text keyword matched against the linked user's first name / email. Resolved via
+    // UserService.search, then roles are filtered by their `user` field (member-picker typeahead).
+    user: z.string().optional().openapi({ example: 'priya' }),
     name: z.string().optional().openapi({ example: 'Site Manager' }),
     code: z
         .string()
@@ -78,10 +81,6 @@ export const SearchRoleQuerySchema = z.object({
         .string()
         .optional()
         .openapi({ example: '64f1a2b3c4d5e6f7a8b9c0d1' }),
-    user: z
-        .string()
-        .optional()
-        .openapi({ example: '64f1a2b3c4d5e6f7a8b9c0d2' }),
     division: z
         .string()
         .optional()

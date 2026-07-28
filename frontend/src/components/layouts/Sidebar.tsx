@@ -80,6 +80,11 @@ const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
   roletypes: ['role-type:get', 'role-type:search', 'role-type:manage'],
   roles: ['role:get', 'role:search', 'role:manage'],
   qafeedback: ['qa-feedback:manage'],
+  // Matches appointment.routes.ts's READ_GUARD and contacts.routes.tsx's
+  // CONTACT_VIEW_PERMISSIONS exactly — added 2026-07-27 alongside the real
+  // Appointment/Contact module wiring.
+  appointments: ['appointment:search', 'appointment:manage', 'tenant:manage'],
+  contacts: ['contact:search', 'contact:manage', 'tenant:manage', 'tenant:admin'],
 }
 
 interface SidebarProps {

@@ -31,8 +31,10 @@ interface ProjectDetailDrawerProps {
 // pos[] array exists), Void-camps section (no concept on Project), and the
 // standalone Close-reason paragraph are all dropped; the Status-history
 // section is kept (renamed to read stageHistory with real field names —
-// createdBy/createdAt instead of by/at — structurally almost identical to
-// the old mock's statusHistory).
+// actor/createdAt instead of by/at — structurally almost identical to
+// the old mock's statusHistory). actor is a resolved {roleId, name, email}
+// snapshot (backend renamed this from a raw, never-populated `createdBy`
+// Role id — 2026-07-27 merge, same rename as Lead's own stageHistory).
 const ProjectDetailDrawer = ({ project, onClose }: ProjectDetailDrawerProps) => {
   const gst = project ? computeGstBreakdown(project.valueBeforeGST, project.gst) : null
 
@@ -77,7 +79,9 @@ const ProjectDetailDrawer = ({ project, onClose }: ProjectDetailDrawerProps) => 
               <div className="text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: 'var(--qms-text-muted)' }}>Status history</div>
               {[...project.stageHistory].reverse().map((h, i) => (
                 <div key={i} className="text-[12px] py-1" style={{ color: 'var(--qms-text-muted)' }}>
-                  {h.from} → {h.to} · {h.reason} · {formatDate(h.createdAt)}
+                  {h.from} → {h.to} · {h.reason}
+                  {(h.actor?.name || h.actor?.email) && <> · {h.actor.name || h.actor.email}</>}
+                  {' · '}{formatDate(h.createdAt)}
                 </div>
               ))}
             </div>

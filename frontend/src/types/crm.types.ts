@@ -166,13 +166,20 @@ export interface LeadOffer {
   reason?: string
 }
 
+export interface LeadStageHistoryActor {
+  roleId?: string
+  name?: string
+  email?: string
+}
+
 export interface LeadStageHistoryEntry {
   from: LeadStatus
   to: LeadStatus
   reason: string
-  // Raw Role ObjectId string — never populated (lead.service.ts's populate
-  // array has no entry for stageHistory.createdBy), same on get and search.
-  createdBy: string
+  // Immutable actor snapshot taken at the moment of the transition (backend
+  // renamed this from a raw, never-populated `createdBy` Role id to a
+  // resolved {roleId, name, email} object — 2026-07-27 merge).
+  actor: LeadStageHistoryActor
   createdAt: string
 }
 
@@ -210,6 +217,9 @@ export interface LeadPopulatedRole {
 
 export interface LeadEntity {
   id: string
+  // Sequential human-readable code minted via the Counter module at create
+  // time (e.g. "ld-000001") — added in the 2026-07-27 Appointment merge.
+  code: string
   // Both GET-by-id AND search always populate tenant/division/contactPerson/
   // salesPerson (LeadService.search unconditionally calls .populate(),
   // ignoring the options.populate flag that gates LeadService.get) — so

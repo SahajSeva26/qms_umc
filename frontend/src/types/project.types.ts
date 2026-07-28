@@ -210,13 +210,21 @@ export interface DietChartEntry {
   url: string
 }
 
+export interface ProjectStageHistoryActor {
+  roleId?: string
+  name?: string
+  email?: string
+}
+
 export interface ProjectStageHistoryEntry {
   from: ProjectStatus
   to: ProjectStatus
   reason: string
-  // Raw Role ObjectId string — project.service.ts's populate array has no
-  // entry for stageHistory.createdBy (same as Lead's own stageHistory).
-  createdBy: string
+  // Immutable actor snapshot taken at the moment of the transition (backend
+  // renamed this from a raw, never-populated `createdBy` Role id to a
+  // resolved {roleId, name, email} object — 2026-07-27 merge, same rename as
+  // Lead's own stageHistory).
+  actor: ProjectStageHistoryActor
   createdAt: string
 }
 
@@ -270,6 +278,9 @@ export interface ProjectPopulatedRole {
 // update(), so this is a repo-wide convention, not a Project-specific gap).
 export interface ProjectEntity {
   id: string
+  // Sequential human-readable code minted via the Counter module at create
+  // time (e.g. "prj-000001") — added in the 2026-07-27 Appointment merge.
+  code: string
   name: string
   tenant: ProjectPopulatedTenant | string
   division: ProjectPopulatedDivision | string

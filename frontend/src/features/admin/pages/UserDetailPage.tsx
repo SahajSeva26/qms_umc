@@ -33,13 +33,22 @@ const UserDetailPage = () => {
   const { data, isLoading, error } = useUser(id)
   const user = data?.data ?? null
 
-  // Real bound-Role lookup by user id (this user's OWN Role, not the
+  // Real bound-Role lookup by user (this user's OWN Role, not the
   // hash-derived fake `user.role`/`RoleBadge` this page used before — see
   // admin.mock.ts's withMockFields: `role` is computed from a hash of the
   // user's _id and has zero relationship to their real backend RoleType).
   // A user may hold zero or more than one Role in principle; showing every
   // one found (usually exactly one) rather than assuming a single result.
-  const { data: rolesData, isLoading: isLoadingRoles } = useRoles(id ? { user: id, limit: '10' } : { limit: '0' })
+  //
+  // `user` used to be an exact-match ObjectId filter; it's now a free-text
+  // name/email keyword resolved server-side against the linked user
+  // (role.service.ts's search(), 2026-07-27 — built for a member-picker
+  // typeahead). Passing this page's raw `id` param would now match nothing
+  // (a regex search for a 24-char hex string against real names/emails is
+  // effectively never a hit) — use the loaded user's own email instead,
+  // which is unique and gives an exact-enough match (regex substring, but a
+  // real email is specific enough not to collide with another user's).
+  const { data: rolesData, isLoading: isLoadingRoles } = useRoles(user?.email ? { user: user.email, limit: '10' } : { limit: '0' })
   const roles = rolesData?.data?.items ?? []
 
   const updateUser = useUpdateUser(id ?? '')

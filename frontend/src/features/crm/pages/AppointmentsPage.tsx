@@ -1,75 +1,68 @@
 import { useMemo, useState } from 'react'
-import { useAuth } from '@/hooks/useAuth'
-import { useMeetings } from '@/features/crm/appointments/hooks/useMeetings'
-import { OWNERS } from '@/features/crm/appointments/appointments.mock'
 import { addDays, dayKey, startOfWeek } from '@/features/crm/appointments/appointments.utils'
-import type { CalendarViewMode } from '@/features/crm/appointments/components/CalendarToolbar'
-import CalendarToolbar from '@/features/crm/appointments/components/CalendarToolbar'
-import WeekGrid from '@/features/crm/appointments/components/WeekGrid'
-import MonthGrid from '@/features/crm/appointments/components/MonthGrid'
-import MeetingList from '@/features/crm/appointments/components/MeetingList'
-import MeetingDrawer from '@/features/crm/appointments/components/MeetingDrawer'
-import NewMeetingDialog from '@/features/crm/appointments/components/NewMeetingDialog'
+import { useAppointmentsReal } from '@/features/crm/appointments/hooks/useAppointmentsReal'
+import { useAppointmentReal } from '@/features/crm/appointments/hooks/useAppointmentReal'
+import type { CalendarViewMode } from '@/features/crm/appointments/components/AppointmentCalendarToolbar'
+import AppointmentCalendarToolbar from '@/features/crm/appointments/components/AppointmentCalendarToolbar'
+import AppointmentWeekGrid from '@/features/crm/appointments/components/AppointmentWeekGrid'
+import AppointmentMonthGrid from '@/features/crm/appointments/components/AppointmentMonthGrid'
+import AppointmentList from '@/features/crm/appointments/components/AppointmentList'
+import AppointmentDrawer from '@/features/crm/appointments/components/AppointmentDrawer'
+import NewAppointmentDialog from '@/features/crm/appointments/components/NewAppointmentDialog'
 
-const APPROVER_ROLES = ['super_admin', 'admin', 'sales_lead']
-
-// TODO deferred: Leads tab / lead-360 (CRM module already covers leads),
-// weekly-plan panel, invitee accept/reject/propose flows, Gmail connect
-// toggle, per-reminder editor, additional client-side contacts store,
-// payment-invoice cascade in the new-meeting form.
+// Real backend-integrated Appointments calendar. Replaces the localStorage-
+// mock build (appointments.mock.ts/useMeetings.ts, kept in place but no
+// longer routed to). Per the 2026-07-27 decisions documented in
+// PROGRESS.md's Known Issues:
+// - No "peer overlay" toggle — the backend's own applyOwnScope already
+//   limits search() to appointments the caller owns or is invited to, so
+//   every appointment fetched here is one the viewer can legitimately see.
+// - No Outcome picker, no reschedule-history trail, no Leads-view/Weekly-
+//   planning-panel — all dropped, no backend field/entity to back them.
+// - "24-hr MOM auto-block" badge removed from the header chips — confirmed
+//   via source read that no such automatic transition exists anywhere in
+//   the real backend (see PROGRESS.md); mom.submissionDeadline is computed
+//   but nothing ever acts on it. Only a real, honest badge is kept.
 const AppointmentsPage = () => {
-  const { user } = useAuth()
-  const { meetings, createMeeting, submitMom, reschedule, markDone, cancel, setOutcome, releaseBlock } = useMeetings()
-
-  const meId = useMemo(() => {
-    const match = OWNERS.find((o) => o.name.split(' ')[0].toLowerCase() === user?.firstName?.toLowerCase())
-    return match?.id ?? OWNERS[0].id
-  }, [user])
-
   const [cursor, setCursor] = useState(new Date())
   const [view, setView] = useState<CalendarViewMode>('week')
-  const [activePeers, setActivePeers] = useState<Set<string>>(new Set())
-  const [openMeetingId, setOpenMeetingId] = useState<string | null>(null)
+  const [openAppointmentId, setOpenAppointmentId] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [dialogPrefill, setDialogPrefill] = useState<{ date: string; hour: number } | undefined>(undefined)
 
-  const canRelease = APPROVER_ROLES.includes(user?.role ?? '')
   const weekStart = startOfWeek(cursor)
   const weekEnd = addDays(weekStart, 6)
 
-  const peerOwners = OWNERS.filter((o) => o.id !== meId)
+  // Month view needs the whole visible 6-week grid, not just the cursor's
+  // own week — matches AppointmentMonthGrid's own 42-cell range.
+  const rangeStart = view === 'month' ? startOfWeek(new Date(cursor.getFullYear(), cursor.getMonth(), 1)) : weekStart
+  const rangeEnd = view === 'month' ? addDays(rangeStart, 41) : weekEnd
 
-  const visibleMeetings = useMemo(
-    () => meetings.filter((m) => m.ownerId === meId || activePeers.has(m.ownerId)),
-    [meetings, meId, activePeers]
-  )
+  const { data, isLoading, error } = useAppointmentsReal({
+    dateFrom: dayKey(rangeStart),
+    dateTo: dayKey(rangeEnd),
+    limit: '200',
+  })
+  const appointments = useMemo(() => data?.data?.items ?? [], [data])
 
-  const weekMeetings = useMemo(() => {
+  const weekAppointments = useMemo(() => {
     const startKey = dayKey(weekStart)
     const endKey = dayKey(weekEnd)
-    return visibleMeetings.filter((m) => {
-      const k = dayKey(new Date(m.startAt))
+    return appointments.filter((a) => {
+      const k = dayKey(new Date(a.duration.startTime))
       return k >= startKey && k <= endKey
     })
-  }, [visibleMeetings, weekStart, weekEnd])
+  }, [appointments, weekStart, weekEnd])
 
-  const openMeeting = meetings.find((m) => m.id === openMeetingId) ?? null
-
-  const togglePeer = (id: string) => {
-    setActivePeers((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
+  const { data: openAppointmentData } = useAppointmentReal(openAppointmentId ?? undefined)
+  const openAppointment = openAppointmentData?.data ?? null
 
   const handleSlotClick = (day: Date, hour: number) => {
     setDialogPrefill({ date: dayKey(day), hour })
     setDialogOpen(true)
   }
 
-  const handleNewMeeting = () => {
+  const handleNewAppointment = () => {
     setDialogPrefill(undefined)
     setDialogOpen(true)
   }
@@ -85,68 +78,59 @@ const AppointmentsPage = () => {
           <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-success-soft text-success">
             Calendar · live
           </span>
-          <span className="text-[10px] font-semibold px-2 py-1 rounded-full" style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text-muted)' }}>
-            24-hr MOM auto-block
-          </span>
-          <span className="text-[10px] font-semibold px-2 py-1 rounded-full" style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text-muted)' }}>
-            Peer overlay (agenda hidden)
-          </span>
         </div>
       </div>
 
-      <CalendarToolbar
+      <AppointmentCalendarToolbar
         weekStart={weekStart}
         view={view}
         onViewChange={setView}
         onPrev={() => setCursor((c) => addDays(c, -7))}
         onNext={() => setCursor((c) => addDays(c, 7))}
         onToday={() => setCursor(new Date())}
-        peerOwners={peerOwners}
-        activePeers={activePeers}
-        onTogglePeer={togglePeer}
-        onNewMeeting={handleNewMeeting}
+        onNewAppointment={handleNewAppointment}
       />
 
-      {view === 'week' && (
-        <WeekGrid weekStart={weekStart} meetings={weekMeetings} meId={meId} onOpen={setOpenMeetingId} onSlotClick={handleSlotClick} />
+      {isLoading && (
+        <div className="text-[13px] py-10 text-center" style={{ color: 'var(--qms-text-muted)' }}>
+          Loading appointments…
+        </div>
       )}
-      {view === 'month' && (
-        <MonthGrid
-          cursor={cursor}
-          meetings={visibleMeetings}
-          meId={meId}
-          onPickDate={(date) => {
-            setCursor(date)
-            setView('week')
-          }}
-        />
+
+      {error && !isLoading && (
+        <div className="text-[13px] rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
+          Failed to load appointments. Please try again.
+        </div>
       )}
-      {view === 'list' && <MeetingList meetings={weekMeetings} meId={meId} onOpen={setOpenMeetingId} />}
 
-      <MeetingDrawer
-        meeting={openMeeting}
-        canRelease={canRelease}
-        onClose={() => setOpenMeetingId(null)}
-        onSubmitMom={submitMom}
-        onReschedule={reschedule}
-        onMarkDone={markDone}
-        onCancel={(id) => {
-          cancel(id)
-          setOpenMeetingId(null)
-        }}
-        onSetOutcome={setOutcome}
-        onReleaseBlock={(id, reason) => releaseBlock(id, reason, user?.firstName ?? 'Unknown')}
-      />
+      {!isLoading && !error && (
+        <>
+          {view === 'week' && (
+            <AppointmentWeekGrid weekStart={weekStart} appointments={weekAppointments} onOpen={setOpenAppointmentId} onSlotClick={handleSlotClick} />
+          )}
+          {view === 'month' && (
+            <AppointmentMonthGrid
+              cursor={cursor}
+              appointments={appointments}
+              onPickDate={(date) => {
+                setCursor(date)
+                setView('week')
+              }}
+            />
+          )}
+          {view === 'list' && <AppointmentList appointments={weekAppointments} onOpen={setOpenAppointmentId} />}
+        </>
+      )}
 
-      <NewMeetingDialog
+      <AppointmentDrawer appointment={openAppointment} onClose={() => setOpenAppointmentId(null)} />
+
+      <NewAppointmentDialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
-        onCreate={(meeting) => {
-          createMeeting(meeting)
+        onCreated={(id) => {
           setDialogOpen(false)
-          setOpenMeetingId(meeting.id)
+          setOpenAppointmentId(id)
         }}
-        meId={meId}
         prefill={dialogPrefill}
       />
     </div>

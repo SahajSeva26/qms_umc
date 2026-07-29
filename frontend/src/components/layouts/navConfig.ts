@@ -2,6 +2,7 @@ import type { UserRole } from '@/types/auth.types'
 import { AUTH_ROUTES }      from '@/features/auth/auth.routes'
 import { DASHBOARD_ROUTES } from '@/features/dashboard/dashboard.routes'
 import { CRM_ROUTES }       from '@/features/crm/crm.routes'
+import { CONTACT_ROUTES }   from '@/features/contacts/contacts.routes'
 import { ANALYTICS_ROUTES } from '@/features/analytics/analytics.routes'
 import { CAMPS_ROUTES }     from '@/features/camps/camps.routes'
 import { DIET_ROUTES }      from '@/features/diet/diet.routes'
@@ -93,6 +94,9 @@ const ALL_NAV_ITEMS: NavItem[] = [
     rolesAllowed: ['sales_lead', 'sales_rep', 'camp_coord', 'diet_camp_coord'] },
 
   { id: 'clientmgmt',   label: 'Client Management',           icon: 'Briefcase',     path: CRM_ROUTES.CLIENTS,
+    rolesAllowed: ['sales_lead', 'sales_rep', 'camp_coord', 'diet_camp_coord'] },
+
+  { id: 'contacts',     label: 'Contacts',                    icon: 'Users',         path: CONTACT_ROUTES.CONTACTS,
     rolesAllowed: ['sales_lead', 'sales_rep', 'camp_coord', 'diet_camp_coord'] },
 
   // Sales & CRM — Delivery
@@ -240,7 +244,7 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
   {
     section: 'Sales & CRM',
     subs: [
-      { title: 'Pipeline', items: ['appointments', 'crm', 'clientmgmt'].map((id) => NAV_BY_ID[id]) },
+      { title: 'Pipeline', items: ['appointments', 'crm', 'clientmgmt', 'contacts'].map((id) => NAV_BY_ID[id]) },
       { title: 'Delivery', items: ['projects', 'gantt'].map((id) => NAV_BY_ID[id]) },
     ],
   },

@@ -33,6 +33,12 @@ export const CRM_ROUTES = {
 // the entry point.
 const CRM_VIEW_PERMISSIONS = ['lead:search', 'lead:manage', 'tenant:manage']
 
+// Matches appointment.routes.ts's real READ_GUARD exactly:
+// [appointment:search, appointment:manage, tenant:manage] (OR semantics).
+// Deliberately separate from CRM_VIEW_PERMISSIONS above — Appointment is its
+// own module with its own permission codes, not gated by Lead's.
+const APPOINTMENT_VIEW_PERMISSIONS = ['appointment:search', 'appointment:manage', 'tenant:manage']
+
 export const crmRoutes: RouteObject[] = [
   {
     path: CRM_ROUTES.CRM,
@@ -53,7 +59,7 @@ export const crmRoutes: RouteObject[] = [
   {
     path: CRM_ROUTES.APPOINTMENTS,
     element: (
-      <RequirePermission anyOf={CRM_VIEW_PERMISSIONS}>
+      <RequirePermission anyOf={APPOINTMENT_VIEW_PERMISSIONS}>
         <AppointmentsPage />
       </RequirePermission>
     ),

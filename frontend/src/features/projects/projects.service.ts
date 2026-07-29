@@ -13,10 +13,10 @@ import type {
 // axios instance, same ApiResponse/PaginatedResponse envelope typing, a plain
 // object export, no class/default export.
 //
-// Default limit: 100 — GET /projects silently defaults to limit=10 server-side
-// (RequestHandler.getPagination) when the caller omits it, same quirk already
-// found and fixed for Lead's own search call.
-const DEFAULT_LIMIT = '100'
+// Default limit: 10 — matches the server-side default in
+// RequestHandler.getPagination. Callers that need more must pass their own
+// `limit` explicitly; no search fetches more than 10 by default.
+const DEFAULT_LIMIT = '10'
 
 const searchProjects = async (query: SearchProjectQuery) => {
   const res = await api.get<PaginatedResponse<ProjectEntity>>('/projects', {

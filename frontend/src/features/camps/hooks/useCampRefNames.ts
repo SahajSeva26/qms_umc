@@ -13,16 +13,16 @@ type RefValue<T> = T | string | null | undefined
 // needed), and only falls back to a batch-fetched id->name table when the
 // value is a bare id string (create/update/moveStage/allocate responses).
 export const useCampRefNames = () => {
-  const { data: doctorsData } = useDoctors({ limit: '1000' })
+  const { data: doctorsData } = useDoctors({ limit: '10' })
   const doctors = doctorsData?.data?.items ?? []
 
-  const { data: divisionsData } = useDivisions({ limit: '1000' })
+  const { data: divisionsData } = useDivisions({ limit: '10' })
   const divisions = divisionsData?.data?.items ?? []
 
-  const { data: rolesData } = useRoles({ limit: '1000' })
+  const { data: rolesData } = useRoles({ limit: '10' })
   const roles = rolesData?.data?.items ?? []
 
-  const { data: projectsData } = useProjects({ limit: '1000' })
+  const { data: projectsData } = useProjects({ limit: '10' })
   const projects = projectsData?.data?.items ?? []
 
   const doctorName = (value: RefValue<CampPopulatedDoctor>) => {

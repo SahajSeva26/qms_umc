@@ -22,7 +22,7 @@ import type { BillingType, CampStatus, CampType } from '@/types/campReal.types'
 const CAMP_WRITE_PERMISSIONS = ['camp:manage', 'tenant:manage']
 
 const PAGE_SIZE = 20
-const AGGREGATE_LIMIT = 1000
+const AGGREGATE_LIMIT = 10
 const ALL_STATUSES: CampStatus[] = ['requested', 'confirmed', 'live', 'closed', 'cancelled', 'cancelled_charged']
 
 // Rebuilt from scratch against the real backend contract

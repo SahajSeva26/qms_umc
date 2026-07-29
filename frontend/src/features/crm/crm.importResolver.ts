@@ -51,7 +51,7 @@ export async function resolveRowNames(row: {
   const errors: ResolveError[] = []
 
   // 1: Tenant (Company) — searched unscoped, by name.
-  const tenantRes = await accessManagementService.searchTenants({ name: row.company, limit: '1000' })
+  const tenantRes = await accessManagementService.searchTenants({ name: row.company, limit: '10' })
   const tenant = exactMatch(tenantRes.data?.items ?? [], (t) => t.name, row.company)
   if (!tenant) {
     const count = (tenantRes.data?.items ?? []).length
@@ -68,7 +68,7 @@ export async function resolveRowNames(row: {
   // is scoped), so this step is skipped if Company didn't resolve.
   let division: { id: string; name: string } | null = null
   if (tenant) {
-    const divisionRes = await crmService.searchDivisions({ tenantId: tenant.id, name: row.division, limit: '1000' })
+    const divisionRes = await crmService.searchDivisions({ tenantId: tenant.id, name: row.division, limit: '10' })
     division = exactMatch(divisionRes.data?.items ?? [], (d) => d.name, row.division)
     if (!division) {
       const count = (divisionRes.data?.items ?? []).length
@@ -86,7 +86,7 @@ export async function resolveRowNames(row: {
   // must equal the lead's tenant, enforced server-side in lead.service.ts).
   let contact: { id: string; name: string } | null = null
   if (tenant) {
-    const contactRes = await accessManagementService.searchRoles({ tenant: tenant.id, name: row.contact, status: 'active', limit: '1000' })
+    const contactRes = await accessManagementService.searchRoles({ tenant: tenant.id, name: row.contact, status: 'active', limit: '10' })
     contact = exactMatch(contactRes.data?.items ?? [], (r) => r.name, row.contact)
     if (!contact) {
       const count = (contactRes.data?.items ?? []).length
@@ -102,7 +102,7 @@ export async function resolveRowNames(row: {
   // 4: Sales rep — a Role under the PLATFORM tenant specifically (mirrors
   // WizardStep4.tsx's own salesPerson scoping rule), never the pharma
   // client's own tenant, resolved independently of Company/Division.
-  const platformTenantRes = await accessManagementService.searchTenants({ limit: '1000' })
+  const platformTenantRes = await accessManagementService.searchTenants({ limit: '10' })
   // tenant.type is only present on the wire for a system:manage caller
   // (TenantMapper.toResponse) — code is always present regardless of
   // permission, so match on it as a fallback. Without this, CSV import
@@ -113,7 +113,7 @@ export async function resolveRowNames(row: {
   if (!platformTenant) {
     errors.push({ field: 'Sales rep', message: 'No platform (QMS internal) company found — a sales rep must belong to one.' })
   } else {
-    const salesRepRes = await accessManagementService.searchRoles({ tenant: platformTenant.id, name: row.salesRep, status: 'active', limit: '1000' })
+    const salesRepRes = await accessManagementService.searchRoles({ tenant: platformTenant.id, name: row.salesRep, status: 'active', limit: '10' })
     salesRep = exactMatch(salesRepRes.data?.items ?? [], (r) => r.name, row.salesRep)
     if (!salesRep) {
       const count = (salesRepRes.data?.items ?? []).length

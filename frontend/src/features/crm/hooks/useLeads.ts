@@ -12,14 +12,12 @@ import { toast } from '@/components/ui/sonner'
 // PATCH /leads/:id/stage moveStage path, and there is no reopen path at all
 // once a lead is `won`/`lost` (both are terminal in LEAD_TRANSITION_MAP).
 //
-// Every consumer (Kanban board, KPI strip, client-side status/text filter,
-// KAM ownership-scoping) needs the full working set in memory at once —
-// none of them paginate. The backend defaults to page=1/limit=10 whenever
-// `limit` is omitted (RequestHandler.getPagination), so callers that don't
-// pass an explicit limit here would silently only ever see the first 10
-// leads company-wide. Default to a high limit unless the caller opts into
-// real server-side pagination by passing its own.
-const DEFAULT_LEADS_LIMIT = '1000'
+// Default limit: 10 — matches the backend's own page=1/limit=10 default in
+// RequestHandler.getPagination. No search fetches more than 10 by default; a
+// caller that needs the full working set (Kanban board, KPI strip, client-side
+// status/text filter, KAM ownership-scoping) must opt into a higher limit by
+// passing its own explicit `limit`.
+const DEFAULT_LEADS_LIMIT = '10'
 
 // `fetchList` (default true) lets a caller that only needs the mutations
 // (moveStage/updateLead/createLead) skip the list query entirely.

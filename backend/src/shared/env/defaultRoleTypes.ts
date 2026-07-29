@@ -3,6 +3,7 @@ import { LEAD_PERMISSIONS } from '../../modules/crm/lead/lead.constants';
 import { APPOINTMENT_PERMISSIONS } from '../../modules/crm/appointment/appointment.constants';
 import { DOCTOR_PERMISSIONS } from '../../modules/doctor/doctor.constants';
 import { CAMP_PERMISSIONS } from '../../modules/operations/camp/camp.constants';
+import { TENANT_PERMISSIONS } from '../../modules/access-management/tenant/tenant.constants';
 
 // CRM ROLE TYPES
 export const CRM_BUSINESS_ROLE_TYPES = [
@@ -11,6 +12,9 @@ export const CRM_BUSINESS_ROLE_TYPES = [
         name: 'Sales Representative',
         description: 'Sales representative — owns and works their own leads',
         permissions: [
+            TENANT_PERMISSIONS.SEARCH.code,
+            TENANT_PERMISSIONS.GET.code,
+
             LEAD_PERMISSIONS.SEARCH.code,
             LEAD_PERMISSIONS.CREATE.code,
             LEAD_PERMISSIONS.UPDATE.code,
@@ -27,7 +31,12 @@ export const CRM_BUSINESS_ROLE_TYPES = [
         code: ALLOWED_ROLETYPE_CODES.PLATFORM.SALES_HEAD,
         name: 'Sales Head',
         description: 'Sales head — full lead visibility, assigns leads to sales reps',
-        permissions: [LEAD_PERMISSIONS.MANAGE.code, APPOINTMENT_PERMISSIONS.MANAGE.code],
+        permissions: [
+            LEAD_PERMISSIONS.MANAGE.code,
+            APPOINTMENT_PERMISSIONS.MANAGE.code,
+            TENANT_PERMISSIONS.SEARCH.code,
+            TENANT_PERMISSIONS.GET.code,
+        ],
     },
 ];
 
@@ -38,6 +47,9 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
         name: 'Camp Coordinator (Screening)',
         description: 'Screening camp coordinator',
         permissions: [
+            TENANT_PERMISSIONS.SEARCH.code,
+            TENANT_PERMISSIONS.GET.code,
+
             CAMP_PERMISSIONS.SEARCH.code,
             CAMP_PERMISSIONS.GET.code,
             CAMP_PERMISSIONS.UPDATE.code,
@@ -52,10 +64,15 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
         name: 'Camp Coordinator (Diet)',
         description: 'Diet camp coordinator',
         permissions: [
+            TENANT_PERMISSIONS.SEARCH.code,
+            TENANT_PERMISSIONS.GET.code,
+
             CAMP_PERMISSIONS.SEARCH.code,
             CAMP_PERMISSIONS.GET.code,
             CAMP_PERMISSIONS.UPDATE.code,
+
             DOCTOR_PERMISSIONS.MANAGE.code,
+
             APPOINTMENT_PERMISSIONS.SEARCH.code,
             APPOINTMENT_PERMISSIONS.GET.code,
             APPOINTMENT_PERMISSIONS.RSVP.code,
@@ -66,6 +83,9 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
         name: 'Ops Manager Screening',
         description: 'Ops manager screening (manages screening camps)',
         permissions: [
+            TENANT_PERMISSIONS.SEARCH.code,
+            TENANT_PERMISSIONS.GET.code,
+
             CAMP_PERMISSIONS.MANAGE.code,
             APPOINTMENT_PERMISSIONS.SEARCH.code,
             APPOINTMENT_PERMISSIONS.GET.code,
@@ -77,6 +97,9 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
         name: 'Ops Manager Diet',
         description: 'Ops manager diet (manages diet camps)',
         permissions: [
+            TENANT_PERMISSIONS.SEARCH.code,
+            TENANT_PERMISSIONS.GET.code,
+
             CAMP_PERMISSIONS.MANAGE.code,
             APPOINTMENT_PERMISSIONS.SEARCH.code,
             APPOINTMENT_PERMISSIONS.GET.code,
@@ -89,6 +112,7 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
         name: 'Field Officer',
         description: 'Field officer',
         permissions: [
+            
             CAMP_PERMISSIONS.SEARCH.code,
             CAMP_PERMISSIONS.GET.code,
             APPOINTMENT_PERMISSIONS.SEARCH.code,

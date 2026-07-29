@@ -26,7 +26,7 @@ const DivisionsListPage = () => {
     tenantId: session?.tenant.id,
     therapy: filters.therapy === 'ALL' ? undefined : filters.therapy,
     name: filters.search || undefined,
-    limit: '1000',
+    limit: '10',
   }
 
   // division.service.ts's search() hardcodes `where.status = ACTIVE` BEFORE

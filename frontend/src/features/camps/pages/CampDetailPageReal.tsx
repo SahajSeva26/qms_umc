@@ -98,7 +98,7 @@ const CampDetailPageReal = () => {
   const { data: divisionsData } = useDivisions({ tenantId: tenant || undefined, limit: '200' })
   const divisions = divisionsData?.data?.items ?? []
 
-  const { data: doctorsData } = useDoctors({ limit: '1000' })
+  const { data: doctorsData } = useDoctors({ limit: '10' })
   const doctors = doctorsData?.data?.items ?? []
 
   // Active-only + a real limit (backend defaults to 10 with no query params —

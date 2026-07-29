@@ -32,7 +32,7 @@ const PAGE_SIZE = 20
 // Large enough to cover realistic doctor-master sizes in one page for the
 // aggregate tabs (Specialties/Geography/Inactive) — these need the FULL
 // dataset to group/count correctly, not just the Roster tab's current page.
-const AGGREGATE_LIMIT = 1000
+const AGGREGATE_LIMIT = 10
 
 const DoctorsPage = () => {
   const { filters, setFilter, reset } = useDoctorsFilters()

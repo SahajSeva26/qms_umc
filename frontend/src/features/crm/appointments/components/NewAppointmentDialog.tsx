@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import { FiUserPlus } from 'react-icons/fi'
 import type { AppointmentType, AppointmentMode } from '@/types/appointment.types'
 import { APPOINTMENT_TYPE_LABEL } from '@/types/appointment.types'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { useDivisions } from '@/features/crm/hooks/useDivisions'
 import { useContacts } from '@/features/contacts/hooks/useContacts'
+import { useCreateContact } from '@/features/contacts/hooks/useCreateContact'
 import { useCreateAppointment } from '@/features/crm/appointments/hooks/useCreateAppointment'
 import { toast } from '@/components/ui/sonner'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -13,6 +15,12 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import InternalMembersPicker from '@/features/crm/appointments/components/InternalMembersPicker'
+
+// Sentinel value for the inline "+ Add new contact" option inside the
+// Contact person <Select> — a real contact id is never this string, so it's
+// safe to use as a Select item value (base-ui's Select requires a non-empty
+// string value, ruling out '').
+const ADD_NEW_CONTACT_VALUE = '__add_new_contact__'
 
 const APPOINTMENT_TYPES: AppointmentType[] = ['new', 'follow-up', 'payment', 'spot']
 
@@ -56,6 +64,25 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
   const [nextSteps, setNextSteps] = useState('')
   const [error, setError] = useState('')
 
+  // Inline "add new contact" — mirrors the prototype's New Meeting form,
+  // which lets the user create a contact for the chosen company without
+  // leaving the appointment modal (sales-calendar.js's inline
+  // "➕ Add new contact…" option + name/designation sub-form). Kept
+  // deliberately minimal (name + designation) — a fuller edit (email/phone/
+  // location/type) is always available afterward via the standalone
+  // Contacts page.
+  const [addingContact, setAddingContact] = useState(false)
+  const [newContactName, setNewContactName] = useState('')
+  const [newContactDesignation, setNewContactDesignation] = useState('')
+  const [newContactError, setNewContactError] = useState('')
+  // Names the just-created contact locally so the Select shows it
+  // immediately — useContacts()'s query invalidation is async, so relying
+  // solely on `contacts.find(...)` leaves the trigger showing the
+  // "Select contact..." placeholder for a beat (or longer, if the refetch
+  // is still in flight) right after a successful inline creation, even
+  // though contactPersonId is already correctly set underneath.
+  const [justCreatedContact, setJustCreatedContact] = useState<{ id: string; name: string } | null>(null)
+
   const { data: tenantData, isLoading: tenantsLoading, isError: tenantsErrored } = useTenants({ status: 'active' })
   const tenants = tenantData?.data?.items ?? []
 
@@ -68,6 +95,39 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
   const contacts = tenantId ? contactData?.data?.items ?? [] : []
 
   const createAppointment = useCreateAppointment()
+  const createContact = useCreateContact()
+
+  const handleContactSelect = (value: string | null) => {
+    if (value === ADD_NEW_CONTACT_VALUE) {
+      setNewContactError('')
+      setNewContactName('')
+      setNewContactDesignation('')
+      setAddingContact(true)
+      return
+    }
+    setContactPersonId(value ?? '')
+  }
+
+  const handleCreateContact = async () => {
+    if (!newContactName.trim()) return setNewContactError('Name is required')
+    try {
+      const created = await createContact.mutateAsync({
+        tenant: tenantId,
+        name: newContactName.trim(),
+        designation: newContactDesignation.trim() || undefined,
+      })
+      if (!created.data) {
+        setNewContactError('Contact created but the response was empty — try selecting it from the list.')
+        return
+      }
+      toast.success('Contact added')
+      setJustCreatedContact({ id: created.data.id, name: created.data.name })
+      setContactPersonId(created.data.id)
+      setAddingContact(false)
+    } catch (err: any) {
+      setNewContactError(err?.response?.data?.message || 'Could not add contact — try again.')
+    }
+  }
 
   const reset = () => {
     setType('new')
@@ -85,6 +145,11 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
     setAgendaPrivate('')
     setNextSteps('')
     setError('')
+    setAddingContact(false)
+    setNewContactName('')
+    setNewContactDesignation('')
+    setNewContactError('')
+    setJustCreatedContact(null)
   }
 
   const handleClose = () => {
@@ -96,6 +161,8 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
     setTenantId(id)
     setDivisionId('')
     setContactPersonId('')
+    setAddingContact(false)
+    setJustCreatedContact(null)
   }
 
   const handleSave = async () => {
@@ -212,19 +279,61 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
             </div>
             <div>
               <Label className={labelClasses} style={labelStyle}>Contact person *</Label>
-              <Select value={contactPersonId || undefined} onValueChange={(v) => setContactPersonId(v ?? '')} disabled={!tenantId}>
+              {/* key forces a remount once a real value exists — base-ui's
+                  Select decides controlled-vs-uncontrolled on its very first
+                  render and never revisits it (same fix already used by
+                  RoleTypeDetailPage.tsx's Status select); without this,
+                  setting contactPersonId programmatically (e.g. right after
+                  the inline "Add new contact" flow) leaves the trigger
+                  permanently showing "Select contact..." even though the
+                  value is genuinely set underneath. */}
+              <Select key={contactPersonId || 'empty'} value={contactPersonId || undefined} onValueChange={handleContactSelect} disabled={!tenantId}>
                 <SelectTrigger className="w-full text-[13px]">
                   <SelectValue placeholder={!tenantId ? 'Select a company first' : contactsLoading ? 'Loading...' : 'Select contact...'}>
-                    {(v: string) => contacts.find((c) => c.id === v)?.name ?? (contactsLoading ? 'Loading...' : 'Select contact...')}
+                    {(v: string) =>
+                      contacts.find((c) => c.id === v)?.name ??
+                      (justCreatedContact?.id === v ? justCreatedContact.name : null) ??
+                      (contactsLoading ? 'Loading...' : 'Select contact...')
+                    }
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {contacts.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  {tenantId && (
+                    <SelectItem value={ADD_NEW_CONTACT_VALUE}>
+                      <span className="flex items-center gap-1.5" style={{ color: 'var(--qms-brand)' }}>
+                        <FiUserPlus size={12} /> Add new contact…
+                      </span>
+                    </SelectItem>
+                  )}
                 </SelectContent>
               </Select>
               {contactsErrored && <p className="text-[11px] mt-1 text-danger">Couldn't load contacts.</p>}
-              {!contactsErrored && !contactsLoading && tenantId && contacts.length === 0 && (
-                <p className="text-[11px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>This company has no contacts yet.</p>
+              {!contactsErrored && !contactsLoading && tenantId && contacts.length === 0 && !addingContact && (
+                <p className="text-[11px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>This company has no contacts yet — add one below.</p>
+              )}
+              {addingContact && (
+                <div className="mt-2 p-2.5 rounded-lg border space-y-2" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-strong)' }}>
+                  <Input
+                    value={newContactName}
+                    onChange={(e) => setNewContactName(e.target.value)}
+                    placeholder="Contact name *"
+                    className="text-[13px]"
+                  />
+                  <Input
+                    value={newContactDesignation}
+                    onChange={(e) => setNewContactDesignation(e.target.value)}
+                    placeholder="Designation (optional)"
+                    className="text-[13px]"
+                  />
+                  {newContactError && <p className="text-[11px] font-semibold text-danger">{newContactError}</p>}
+                  <div className="flex gap-2">
+                    <Button size="sm" type="button" onClick={handleCreateContact} disabled={createContact.isPending}>
+                      {createContact.isPending ? 'Saving...' : 'Save contact'}
+                    </Button>
+                    <Button size="sm" type="button" variant="outline" onClick={() => setAddingContact(false)}>Cancel</Button>
+                  </div>
+                </div>
               )}
             </div>
           </div>

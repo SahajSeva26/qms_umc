@@ -1,7 +1,14 @@
 import type { AppointmentEntity } from '@/types/appointment.types'
 import { APPOINTMENT_STATUS_LABEL, APPOINTMENT_TYPE_LABEL } from '@/types/appointment.types'
 import { addDays, dayKey, DAY_START_HOUR, HOUR_PX, HOURS, isSameDay } from '@/features/crm/appointments/appointments.utils'
-import { appointmentChipColor, appointmentRefName, darken, isMomOverdue } from '@/features/crm/appointments/appointmentsReal.utils'
+import { appointmentChipColor, appointmentRefName, darken, isMomOverdue, layoutDayAppointments } from '@/features/crm/appointments/appointmentsReal.utils'
+
+// Beyond this many concurrent columns, individual chips become too narrow to
+// read — collapse the overflow into a single "+N more" chip in the last
+// visible column instead of rendering slivers. Chosen empirically: below
+// ~880px min day-column width, 5 equal columns are still tappable; more
+// than that reads as noise, and the day is better inspected via List view.
+const MAX_VISIBLE_COLUMNS = 4
 
 interface AppointmentWeekGridProps {
   weekStart: Date
@@ -98,15 +105,23 @@ const AppointmentWeekGrid = ({ weekStart, appointments, onOpen, onSlotClick }: A
                     </div>
                   )}
 
-                  {dayAppointments.map((a) => {
-                    const start = new Date(a.duration.startTime)
-                    const end = a.duration.endTime ? new Date(a.duration.endTime) : new Date(start.getTime() + 3_600_000)
+                  {layoutDayAppointments(dayAppointments).map(({ appointment: a, start, end, column, columnCount }) => {
                     const top = Math.max(0, (start.getHours() + start.getMinutes() / 60 - DAY_START_HOUR) * HOUR_PX) + 2
                     const durationHrs = Math.max(0, (end.getTime() - start.getTime()) / 3_600_000)
                     const height = Math.max(24, durationHrs * HOUR_PX - 4)
                     const color = appointmentChipColor(a)
                     const cancelled = a.status === 'cancelled'
                     const overdue = isMomOverdue(a)
+
+                    // Cap the columns actually rendered — anything beyond
+                    // MAX_VISIBLE_COLUMNS collapses into the last visible
+                    // column as a "+N" overflow chip rather than slivers.
+                    const visibleColumnCount = Math.min(columnCount, MAX_VISIBLE_COLUMNS)
+                    if (column >= MAX_VISIBLE_COLUMNS) return null
+                    const isOverflowSlot = column === MAX_VISIBLE_COLUMNS - 1 && columnCount > MAX_VISIBLE_COLUMNS
+                    const hiddenCount = columnCount - MAX_VISIBLE_COLUMNS + 1
+                    const widthPct = 100 / visibleColumnCount
+                    const leftPct = column * widthPct
 
                     return (
                       <button
@@ -115,9 +130,19 @@ const AppointmentWeekGrid = ({ weekStart, appointments, onOpen, onSlotClick }: A
                           e.stopPropagation()
                           onOpen(a.id)
                         }}
-                        className={`absolute inset-x-0.5 z-[5] rounded-md px-1.5 py-1 text-left text-white overflow-hidden ${cancelled ? 'line-through opacity-70' : ''}`}
-                        style={{ top, height, background: color, borderLeft: `3px solid ${darken(color)}` }}
+                        className={`absolute z-[5] rounded-md px-1.5 py-1 text-left text-white overflow-hidden ${cancelled ? 'line-through opacity-70' : ''}`}
+                        style={{
+                          top,
+                          height,
+                          left: `calc(${leftPct}% + 2px)`,
+                          width: `calc(${widthPct}% - 4px)`,
+                          background: color,
+                          borderLeft: `3px solid ${darken(color)}`,
+                        }}
                       >
+                        {isOverflowSlot && (
+                          <div className="text-[10px] font-bold mb-0.5">+{hiddenCount} more</div>
+                        )}
                         <div className="text-[10px] font-bold truncate">
                           {APPOINTMENT_TYPE_LABEL[a.type]} · {APPOINTMENT_STATUS_LABEL[a.status]}
                         </div>

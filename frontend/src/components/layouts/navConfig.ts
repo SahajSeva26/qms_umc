@@ -244,7 +244,7 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
   {
     section: 'Sales & CRM',
     subs: [
-      { title: 'Pipeline', items: ['appointments', 'crm', 'clientmgmt'].map((id) => NAV_BY_ID[id]) },
+      { title: 'Pipeline', items: ['appointments', 'crm', 'clientmgmt', 'contacts'].map((id) => NAV_BY_ID[id]) },
       { title: 'Delivery', items: ['projects', 'gantt'].map((id) => NAV_BY_ID[id]) },
     ],
   },

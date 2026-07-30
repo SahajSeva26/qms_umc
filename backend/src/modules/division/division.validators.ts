@@ -4,6 +4,10 @@ import { isValidObjectID } from '../../shared/utils/strings';
 
 //1: create ====================================>
 export const CreateDivisionPayloadSchema = z.object({
+    tenant: z
+        .string()
+        .min(1)
+        .openapi({ example: 'sun-pharma' }),
     code: z
         .string()
         .min(3)

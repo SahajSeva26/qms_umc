@@ -7,7 +7,8 @@ import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../shared/utils/contextBuilder';
 import { isValidObjectID } from '../../shared/utils/strings';
 import { IServiceOptions } from '../../shared/types/service.types';
-import { TENANT_PERMISSIONS, TENANT_TYPE } from '../access-management/tenant/tenant.constants';
+import { TENANT_PERMISSIONS } from '../access-management/tenant/tenant.constants';
+import { TenantService } from '../access-management/tenant/tenant.service';
 import { LEAD_PERMISSIONS } from '../crm/lead/lead.constants';
 
 type DivisionDocument = HydratedDocument<IDivision> | null;
@@ -44,14 +45,11 @@ const set = async (model: any, entity: HydratedDocument<IDivision>, ctx: Request
 
 const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): Promise<DivisionDocument> => {
     let query = null;
-    let where: mongoose.QueryFilter<IDivision> = { ...ctx.where() };
 
     if (isValidObjectID(id)) {
-        where._id = id;
-        query = DivisionModel.findOne(where);
+        query = DivisionModel.findById(id);
     } else {
-        where.code = id;
-        query = DivisionModel.findOne(where);
+        query = DivisionModel.findOne({ code: id });
     }
 
     if (options?.populate) {
@@ -69,7 +67,7 @@ const search = async (filters: ISearchDivisionQuery, ctx: RequestContext, option
     where.status = DIVISION_STATUS.ACTIVE;
 
     //2: add search filters
-    if (filters.tenantId && ctx.hasAnyPermissions([LEAD_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.ADMIN.code])) {
+    if (filters.tenantId && ctx.hasAnyPermissions([LEAD_PERMISSIONS.MANAGE.code, DIVISION_PERMISSIONS.MANAGE.code])) {
         where.tenant = filters.tenantId;
     }
     if (filters.name) {
@@ -101,21 +99,22 @@ const search = async (filters: ISearchDivisionQuery, ctx: RequestContext, option
 const create = async (model: ICreateDivisionPayload, ctx: RequestContext): Promise<HydratedDocument<IDivision>> => {
     let division: DivisionDocument = null;
 
-    //0: platform tenant cannot own/create divisions
-    if (ctx.tenant.type === TENANT_TYPE.PLATFORM) {
-        return throwAppError('Platform tenant cannot create divisions', StatusCodes.FORBIDDEN);
+    //1: resolve the tenant supplied in the payload (accepts code or ObjectId)
+    const tenant = await TenantService.get(model.tenant, ctx);
+    if (!tenant) {
+        return throwAppError('Tenant not found', StatusCodes.NOT_FOUND);
     }
 
-    //1: check for duplicate code (within the actor's scope)
+    //2: check for duplicate code
     division = await DivisionService.get(model.code, ctx);
     if (division) {
         return throwAppError('Division with this code already exists', StatusCodes.CONFLICT);
     }
 
-    //2: create division under the actor's tenant (customer)
+    //3: create division under the resolved tenant
     const entity = new DivisionModel({
         code: model.code, //immutable
-        tenant: ctx.tenant._id || ctx.tenant.id,
+        tenant: tenant._id,
     });
 
     //3: set remaining fields

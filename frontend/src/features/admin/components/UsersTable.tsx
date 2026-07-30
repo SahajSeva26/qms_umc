@@ -1,7 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import type { User } from '@/types/user.types'
 import UserAvatar from '@/components/ui/UserAvatar'
-import RealRoleBadge from '@/features/admin/components/RealRoleBadge'
 import StatusPill from '@/features/admin/components/StatusPill'
 
 // Literal path (not imported from admin.routes.tsx) — that file imports
@@ -11,9 +10,6 @@ const ADMIN_USER_DETAIL_PATH = '/admin/users/:id'
 
 interface UsersTableProps {
   users: User[]
-  /** Real bound RoleType name per user, keyed by email — see UsersPage.tsx. */
-  roleTypeByEmail: Map<string, string>
-  isLoadingRoles: boolean
 }
 
 function formatJoined(createdAt?: string): string {
@@ -23,7 +19,7 @@ function formatJoined(createdAt?: string): string {
   return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-const UsersTable = ({ users, roleTypeByEmail, isLoadingRoles }: UsersTableProps) => {
+const UsersTable = ({ users }: UsersTableProps) => {
   const navigate = useNavigate()
 
   return (
@@ -37,9 +33,6 @@ const UsersTable = ({ users, roleTypeByEmail, isLoadingRoles }: UsersTableProps)
             <tr style={{ borderBottom: '1px solid var(--qms-border)' }}>
               <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
                 User
-              </th>
-              <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                Role
               </th>
               <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
                 Status
@@ -69,9 +62,6 @@ const UsersTable = ({ users, roleTypeByEmail, isLoadingRoles }: UsersTableProps)
                       </div>
                     </div>
                   </div>
-                </td>
-                <td className="px-4 py-2.5">
-                  <RealRoleBadge roleTypeName={roleTypeByEmail.get(user.email) ?? null} isLoading={isLoadingRoles} />
                 </td>
                 <td className="px-4 py-2.5">
                   <StatusPill status={user.status} />

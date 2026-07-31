@@ -21,21 +21,21 @@ export const COMPANY_DATA_ROUTES = {
 // tenant-side user yet; a future permission-group-driven grant would still
 // pass this check via hasAnyPermission's OR semantics).
 //
-// excludeSystemManage: RequirePermission's normal system:manage bypass would
-// otherwise let a real QMS super-admin reach this route directly by URL even
-// though Sidebar.tsx deliberately hides its nav entry from them (same
-// excludeSystemManage reasoning as PERMISSION_NAV_SECTIONS there) — without
-// this, hiding the nav link is only cosmetic, not an actual access boundary,
-// for the one account type it's specifically meant to exclude. Found live:
-// system@gmail.com could reach /company-data/divisions by typing the URL
-// directly despite never seeing it in their own sidebar.
+// system:manage was previously excluded here (via excludeSystemManage) to
+// match Sidebar.tsx's PERMISSION_NAV_SECTIONS, which deliberately hid this
+// nav entry from QMS's own super-admin. That decision was explicitly
+// reversed 2026-07-31 — Rishi asked for system:manage accounts to have
+// access too — so the normal RequirePermission bypass is restored here
+// (excludeSystemManage removed) to match the sidebar link now being visible
+// to them; leaving one but not the other would make this a dead link again,
+// the exact bug this comment used to warn about in the opposite direction.
 const COMPANY_DATA_VIEW_PERMISSIONS = ['tenant:admin']
 
 export const companyDataRoutes: RouteObject[] = [
   {
     path: COMPANY_DATA_ROUTES.DIVISIONS,
     element: (
-      <RequirePermission anyOf={COMPANY_DATA_VIEW_PERMISSIONS} excludeSystemManage>
+      <RequirePermission anyOf={COMPANY_DATA_VIEW_PERMISSIONS}>
         <DivisionsListPage />
       </RequirePermission>
     ),

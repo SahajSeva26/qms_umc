@@ -31,11 +31,14 @@ import {
 // 'super_admin'/'admin' in the old vocabulary at all).
 //
 // Checked against the RAW permissions array, not useSession's hasAnyPermission
-// — that helper unconditionally bypasses for system:manage (QMS's own
-// super-admin), which is correct for actual authorization checks but wrong
-// here: Company Data is each customer tenant's OWN admin managing THEIR
-// company's data, not something QMS's platform-level super-admin needs
-// cluttering their sidebar with (one entry per tenant, none of them "theirs").
+// — that helper unconditionally bypasses for system:manage. This section
+// originally excluded that bypass on purpose (Company Data was framed as
+// each customer tenant's OWN admin managing THEIR company's data, not
+// something QMS's platform-level super-admin needed cluttering their
+// sidebar with). That decision was explicitly reversed 2026-07-31 — Rishi
+// asked for system:manage accounts to see Divisions too — so 'system:manage'
+// is now included directly in `anyOf` below, restoring the normal bypass for
+// this one section specifically.
 interface PermissionNavSection {
   section: NavSection
   anyOf: string[]
@@ -43,7 +46,7 @@ interface PermissionNavSection {
 
 const PERMISSION_NAV_SECTIONS: PermissionNavSection[] = [
   {
-    anyOf: ['tenant:admin'],
+    anyOf: ['tenant:admin', 'system:manage'],
     section: {
       section: 'Company Data',
       subs: [

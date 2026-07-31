@@ -79,8 +79,8 @@ const search = async (filters: ISearchDivisionQuery, ctx: RequestContext, option
     where.status = DIVISION_STATUS.ACTIVE;
 
     //2: add search filters
-    if (filters.tenantId && ctx.hasAnyPermissions([LEAD_PERMISSIONS.MANAGE.code, DIVISION_PERMISSIONS.MANAGE.code])) {
-        where.tenant = filters.tenantId;
+    if (filters.tenant && ctx.hasAnyPermissions([LEAD_PERMISSIONS.MANAGE.code, DIVISION_PERMISSIONS.MANAGE.code])) {
+        where.tenant = filters.tenant;
     }
     if (filters.owner) {
         where.owner = filters.owner;

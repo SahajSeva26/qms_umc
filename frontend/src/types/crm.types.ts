@@ -88,6 +88,13 @@ export interface SearchDivisionQuery {
 }
 
 export interface CreateDivisionPayload {
+  // Required as of the 2026-07-30 backend change ("division creation allowed,
+  // for platform as well") — division.service.ts's create() now resolves
+  // this via TenantService.get() unconditionally for EVERY caller (no
+  // force-pinning to the caller's own tenant the way Contact's create does),
+  // and the old "platform tenant cannot create divisions" block was removed
+  // entirely. Accepts a tenant code or ObjectId.
+  tenant: string
   // Backend validates `.lowercase()` as a CHECK, not a transform — an
   // uppercase code is rejected, not normalized. Lowercase client-side first.
   code: string

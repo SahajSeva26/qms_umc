@@ -4,6 +4,7 @@ import type { DivisionTherapy } from '@/types/crm.types'
 import { DIVISION_THERAPY_LABEL } from '@/types/crm.types'
 import { createDivisionSchema } from '@/features/company-data/divisions/schemas/division.schemas'
 import { useCreateDivision } from '@/features/company-data/divisions/hooks/useCreateDivision'
+import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,7 +22,14 @@ const THERAPY_OPTIONS = Object.keys(DIVISION_THERAPY_LABEL) as DivisionTherapy[]
 // there is no dedicated edit route; a status/therapy/brand-focus/mrCount
 // change happens inline from the table (future pass) via useUpdateDivision,
 // not through this component.
+//
+// Company picker added 2026-07-30: the backend's create endpoint now
+// requires an explicit `tenant` for EVERY caller (the old "platform tenant
+// cannot create divisions" block was removed, and there's no force-pinning
+// to the caller's own tenant the way Contact's create does) — so unlike
+// Contact's conditional picker, this one always shows.
 const CreateDivisionModal = ({ onClose }: CreateDivisionModalProps) => {
+  const [tenant, setTenant] = useState('')
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
   const [therapy, setTherapy] = useState<DivisionTherapy | ''>('')
@@ -30,9 +38,12 @@ const CreateDivisionModal = ({ onClose }: CreateDivisionModalProps) => {
   const [error, setError] = useState<string | null>(null)
 
   const createDivision = useCreateDivision()
+  const { data: tenantsData } = useTenants({})
+  const tenants = tenantsData?.data?.items ?? []
 
   const handleSave = async () => {
     const result = createDivisionSchema.safeParse({
+      tenant,
       code: code.toLowerCase(),
       name,
       therapy: therapy || undefined,
@@ -62,6 +73,22 @@ const CreateDivisionModal = ({ onClose }: CreateDivisionModalProps) => {
         </DialogHeader>
 
         <div className="space-y-3">
+          <div>
+            <Label className="block text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+              Company *
+            </Label>
+            <Select key={tenant || 'empty'} value={tenant} onValueChange={(v) => setTenant(v ?? '')}>
+              <SelectTrigger className="w-full text-[13px]">
+                <SelectValue placeholder="Select company...">
+                  {(v: string) => tenants.find((t) => t.id === v)?.name ?? 'Select company...'}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {tenants.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div>
             <Label className="block text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
               Code *

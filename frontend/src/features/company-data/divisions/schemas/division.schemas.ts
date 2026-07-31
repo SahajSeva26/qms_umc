@@ -11,6 +11,11 @@ import { z } from 'zod'
 const MONGO_OBJECT_ID_REGEX = /^[0-9a-fA-F]{24}$/
 
 export const createDivisionSchema = z.object({
+  // Required for every caller since the 2026-07-30 backend change — the
+  // platform-tenant block was removed and Division no longer force-pins to
+  // the caller's own tenant, so every create must explicitly say which
+  // company the division belongs to.
+  tenant: z.string().trim().min(1, 'Company is required.'),
   code: z
     .string()
     .trim()

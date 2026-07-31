@@ -117,11 +117,16 @@ test-results/
 *.pid.lock
 
 # ======================
-# Markdown docs — all local only, never version-controlled
+# Local reference docs — all local only, never version-controlled
+# (test scripts, analysis write-ups, design/progress docs — kept in one
+# folder so they never spill loose across the repo root)
 # ======================
-*.md
+/md-files/
 
 # ======================
-# Local reference doc exports (root-level only — do not ignore app HTML like frontend/index.html)
+# Per-package convention docs — local-only per earlier team decision
+# (previously tracked, deliberately untracked; kept on disk, never committed)
 # ======================
-/*.html
+backend/CLAUDE.md
+frontend/CLAUDE.md
+mobile/CLAUDE.md

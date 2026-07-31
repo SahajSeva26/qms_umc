@@ -12,14 +12,15 @@ export const COMPANY_DATA_ROUTES = {
   DIVISIONS: '/company-data/divisions',
 }
 
-// Gated on tenant:admin directly (no new division-specific permission code —
-// confirmed scope) — this is a customer tenant's OWN admin managing their
-// company's master data, not a QMS-internal-staff feature. Matches the
-// backend's own route guard on DivisionRouter's create/update/get routes
-// exactly (division:manage / tenant:admin — division:manage is deliberately
-// left out of this frontend gate since no RoleType actually grants it to a
-// tenant-side user yet; a future permission-group-driven grant would still
-// pass this check via hasAnyPermission's OR semantics).
+// Matches the backend's own real route guard on every DivisionRouter route
+// exactly: division:manage OR tenant:admin (division.routes.ts). Previously
+// this list only had 'tenant:admin' — division:manage was deliberately left
+// out under the assumption "no RoleType actually grants it to a tenant-side
+// user yet," but that assumption went stale: Sales Head has held
+// division:manage since defaultRoleTypes.ts's 2026-07-30 change, and could
+// reach every Division backend endpoint while being unable to even open
+// this page on the frontend. Fixed 2026-07-31 by adding division:manage
+// here to match reality.
 //
 // system:manage was previously excluded here (via excludeSystemManage) to
 // match Sidebar.tsx's PERMISSION_NAV_SECTIONS, which deliberately hid this
@@ -29,7 +30,7 @@ export const COMPANY_DATA_ROUTES = {
 // (excludeSystemManage removed) to match the sidebar link now being visible
 // to them; leaving one but not the other would make this a dead link again,
 // the exact bug this comment used to warn about in the opposite direction.
-const COMPANY_DATA_VIEW_PERMISSIONS = ['tenant:admin']
+const COMPANY_DATA_VIEW_PERMISSIONS = ['division:manage']
 
 export const companyDataRoutes: RouteObject[] = [
   {

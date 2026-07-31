@@ -46,7 +46,14 @@ interface PermissionNavSection {
 
 const PERMISSION_NAV_SECTIONS: PermissionNavSection[] = [
   {
-    anyOf: ['tenant:admin', 'system:manage'],
+    // division:manage added 2026-07-31 — the real backend permission that
+    // actually gates every Division route (division.routes.ts:
+    // DIVISION_PERMISSIONS.MANAGE.code / TENANT_PERMISSIONS.ADMIN.code) was
+    // never added here when it was introduced; this list had silently
+    // fallen out of sync with what the backend actually grants (Sales Head
+    // holds division:manage today, per defaultRoleTypes.ts, and couldn't
+    // reach this page at all despite being fully authorized server-side).
+    anyOf: ['tenant:admin', 'system:manage', 'division:manage'],
     section: {
       section: 'Company Data',
       subs: [

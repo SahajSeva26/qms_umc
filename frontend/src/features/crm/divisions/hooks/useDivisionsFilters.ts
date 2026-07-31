@@ -1,15 +1,25 @@
 import { useState } from 'react'
 import type { DivisionStatus, DivisionTherapy } from '@/types/crm.types'
 
+// Default status is 'active', not an 'ALL' sentinel — division.service.ts's
+// search() always force-sets `where.status = ACTIVE` before it even looks at
+// whether a status filter was sent, and only overrides that for a caller
+// holding `division:manage`/`tenant:manage` (see DivisionsListPage.tsx's own
+// permission-gated Status dropdown). There is no way to request "every
+// status in one call" the way this used to be faked client-side with two
+// parallel active+inactive queries — matches the fix already applied to
+// Users' own status filter for the identical reason.
 export interface DivisionsFilterState {
   search: string
-  status: DivisionStatus | 'ALL'
+  code: string
+  status: DivisionStatus
   therapy: DivisionTherapy | 'ALL'
 }
 
 const DEFAULT_FILTERS: DivisionsFilterState = {
   search: '',
-  status: 'ALL',
+  code: '',
+  status: 'active',
   therapy: 'ALL',
 }
 

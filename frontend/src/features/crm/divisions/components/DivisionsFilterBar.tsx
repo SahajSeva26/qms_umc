@@ -2,7 +2,7 @@ import { FiSearch } from 'react-icons/fi'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import type { DivisionsFilterState } from '@/features/company-data/divisions/hooks/useDivisionsFilters'
+import type { DivisionsFilterState } from '@/features/crm/divisions/hooks/useDivisionsFilters'
 import type { DivisionStatus, DivisionTherapy } from '@/types/crm.types'
 import { DIVISION_THERAPY_LABEL } from '@/types/crm.types'
 
@@ -17,39 +17,57 @@ interface DivisionsFilterBarProps {
   filters: DivisionsFilterState
   setFilter: <K extends keyof DivisionsFilterState>(key: K, value: DivisionsFilterState[K]) => void
   reset: () => void
+  // division.service.ts only honors a status override (or any non-active
+  // result at all) for a caller holding division:manage/tenant:manage —
+  // showing "Inactive" to anyone else would be an option that silently does
+  // nothing when picked, so it's hidden entirely rather than shown-but-dead.
+  canSeeInactive: boolean
 }
 
 // Same convention as RoleTypesFilterBar.tsx — no Tenant filter here, unlike
 // that one, since Divisions is scoped to the caller's own tenant only
 // (a tenant admin never sees another company's divisions; the backend's
 // own ctx.where() scoping enforces this regardless of what this UI sends).
-const DivisionsFilterBar = ({ filters, setFilter, reset }: DivisionsFilterBarProps) => {
+// Matches the real backend search fields exactly: name, code, therapy,
+// status — no more, no less (division.validators.ts's SearchDivisionQuerySchema).
+const DivisionsFilterBar = ({ filters, setFilter, reset, canSeeInactive }: DivisionsFilterBarProps) => {
   return (
     <div
       className="flex flex-wrap items-center justify-between gap-2 p-2.5 mb-3 rounded-xl border"
       style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}
     >
-      <div className="relative">
-        <FiSearch size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--qms-text-muted)' }} />
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative">
+          <FiSearch size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--qms-text-muted)' }} />
+          <Input
+            type="text"
+            value={filters.search}
+            onChange={(e) => setFilter('search', e.target.value)}
+            placeholder="Search by name..."
+            className="w-56 pl-7 text-[12px]"
+          />
+        </div>
+
         <Input
           type="text"
-          value={filters.search}
-          onChange={(e) => setFilter('search', e.target.value)}
-          placeholder="Search by name..."
-          className="w-56 pl-7 text-[12px]"
+          value={filters.code}
+          onChange={(e) => setFilter('code', e.target.value)}
+          placeholder="Search by code..."
+          className="w-40 text-[12px]"
         />
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Select value={filters.status} onValueChange={(v) => setFilter('status', (v ?? 'ALL') as DivisionsFilterState['status'])}>
-          <SelectTrigger className="text-[12px]">
-            <SelectValue>{(v: string) => (v === 'ALL' ? 'Status' : (STATUS_LABEL_BY_VALUE.get(v as DivisionStatus) ?? 'Status'))}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ALL">All</SelectItem>
-            {STATUS_OPTIONS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        {canSeeInactive ? (
+          <Select value={filters.status} onValueChange={(v) => setFilter('status', (v ?? 'active') as DivisionsFilterState['status'])}>
+            <SelectTrigger className="text-[12px]">
+              <SelectValue>{(v: string) => STATUS_LABEL_BY_VALUE.get(v as DivisionStatus) ?? 'Status'}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {STATUS_OPTIONS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        ) : null}
 
         <Select value={filters.therapy} onValueChange={(v) => setFilter('therapy', (v ?? 'ALL') as DivisionsFilterState['therapy'])}>
           <SelectTrigger className="text-[12px]">

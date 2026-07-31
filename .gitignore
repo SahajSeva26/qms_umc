@@ -119,3 +119,8 @@ test-results/
 # Markdown docs — all local only, never version-controlled
 # ======================
 *.md
+
+# ======================
+# Local reference doc exports (root-level only — do not ignore app HTML like frontend/index.html)
+# ======================
+/*.html

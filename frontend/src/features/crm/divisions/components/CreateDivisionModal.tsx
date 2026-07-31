@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { FiSave } from 'react-icons/fi'
 import type { DivisionTherapy } from '@/types/crm.types'
 import { DIVISION_THERAPY_LABEL } from '@/types/crm.types'
-import { createDivisionSchema } from '@/features/company-data/divisions/schemas/division.schemas'
-import { useCreateDivision } from '@/features/company-data/divisions/hooks/useCreateDivision'
+import { createDivisionSchema } from '@/features/crm/divisions/schemas/division.schemas'
+import { useCreateDivision } from '@/features/crm/divisions/hooks/useCreateDivision'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -17,17 +17,28 @@ interface CreateDivisionModalProps {
 }
 
 const THERAPY_OPTIONS = Object.keys(DIVISION_THERAPY_LABEL) as DivisionTherapy[]
+const GENDER_OPTIONS: { value: 'male' | 'female' | 'other'; label: string }[] = [
+  { value: 'male', label: 'Male' },
+  { value: 'female', label: 'Female' },
+  { value: 'other', label: 'Other' },
+]
 
 // Create-only, per the confirmed scope ("for creating we will have modal") —
-// there is no dedicated edit route; a status/therapy/brand-focus/mrCount
-// change happens inline from the table (future pass) via useUpdateDivision,
-// not through this component.
+// status/therapy/brand-focus/mrCount edits happen through EditDivisionModal
+// instead, opened from a table row click.
 //
 // Company picker added 2026-07-30: the backend's create endpoint now
 // requires an explicit `tenant` for EVERY caller (the old "platform tenant
 // cannot create divisions" block was removed, and there's no force-pinning
 // to the caller's own tenant the way Contact's create does) — so unlike
 // Contact's conditional picker, this one always shows.
+//
+// Division Head section added 2026-07-31 — every division has a head; the
+// backend mints a brand-new user + Role for this person in the same
+// transaction as the division itself (same "founding owner" pattern as
+// Tenant.owner/tenant:admin). No "use an existing person" path exists
+// server-side, so this section is always shown and always required, exactly
+// mirroring CreateTenantDialog's own owner-registration section.
 const CreateDivisionModal = ({ onClose }: CreateDivisionModalProps) => {
   const [tenant, setTenant] = useState('')
   const [code, setCode] = useState('')
@@ -35,6 +46,12 @@ const CreateDivisionModal = ({ onClose }: CreateDivisionModalProps) => {
   const [therapy, setTherapy] = useState<DivisionTherapy | ''>('')
   const [brandFocus, setBrandFocus] = useState('')
   const [mrCount, setMrCount] = useState(0)
+  const [headFirstName, setHeadFirstName] = useState('')
+  const [headLastName, setHeadLastName] = useState('')
+  const [headEmail, setHeadEmail] = useState('')
+  const [headPassword, setHeadPassword] = useState('')
+  const [headPhone, setHeadPhone] = useState('')
+  const [headGender, setHeadGender] = useState<'male' | 'female' | 'other' | ''>('')
   const [error, setError] = useState<string | null>(null)
 
   const createDivision = useCreateDivision()
@@ -49,6 +66,14 @@ const CreateDivisionModal = ({ onClose }: CreateDivisionModalProps) => {
       therapy: therapy || undefined,
       brandFocus: brandFocus || undefined,
       mrCount,
+      head: {
+        firstName: headFirstName,
+        lastName: headLastName || undefined,
+        email: headEmail,
+        password: headPassword,
+        phone: headPhone || undefined,
+        gender: headGender || undefined,
+      },
     })
     if (!result.success) {
       setError(result.error.issues[0]?.message ?? 'Please complete the required fields.')
@@ -153,6 +178,90 @@ const CreateDivisionModal = ({ onClose }: CreateDivisionModalProps) => {
                 onChange={(e) => setMrCount(Number(e.target.value))}
                 className="text-[13px]"
               />
+            </div>
+          </div>
+
+          <div className="pt-2 mt-1 border-t" style={{ borderColor: 'var(--qms-border)' }}>
+            <p className="text-[11px] font-bold uppercase tracking-wide mb-2.5" style={{ color: 'var(--qms-text)' }}>
+              Division Head
+            </p>
+
+            <div className="grid grid-cols-2 gap-2.5 mb-2.5">
+              <div>
+                <Label className="block text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+                  First name *
+                </Label>
+                <Input
+                  type="text"
+                  value={headFirstName}
+                  onChange={(e) => setHeadFirstName(e.target.value)}
+                  className="text-[13px]"
+                />
+              </div>
+              <div>
+                <Label className="block text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+                  Last name
+                </Label>
+                <Input
+                  type="text"
+                  value={headLastName}
+                  onChange={(e) => setHeadLastName(e.target.value)}
+                  className="text-[13px]"
+                />
+              </div>
+            </div>
+
+            <div className="mb-2.5">
+              <Label className="block text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+                Email *
+              </Label>
+              <Input
+                type="email"
+                value={headEmail}
+                onChange={(e) => setHeadEmail(e.target.value)}
+                className="text-[13px]"
+              />
+            </div>
+
+            <div className="mb-2.5">
+              <Label className="block text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+                Password *
+              </Label>
+              <Input
+                type="password"
+                value={headPassword}
+                onChange={(e) => setHeadPassword(e.target.value)}
+                className="text-[13px]"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5">
+              <div>
+                <Label className="block text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+                  Phone
+                </Label>
+                <Input
+                  type="text"
+                  value={headPhone}
+                  onChange={(e) => setHeadPhone(e.target.value)}
+                  className="text-[13px]"
+                />
+              </div>
+              <div>
+                <Label className="block text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+                  Gender
+                </Label>
+                <Select key={headGender || 'empty'} value={headGender} onValueChange={(v) => setHeadGender((v ?? '') as typeof headGender)}>
+                  <SelectTrigger className="w-full text-[13px]">
+                    <SelectValue placeholder="Select...">
+                      {(v: string) => GENDER_OPTIONS.find((g) => g.value === v)?.label ?? 'Select...'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {GENDER_OPTIONS.map((g) => <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 

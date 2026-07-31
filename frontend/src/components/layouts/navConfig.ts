@@ -3,6 +3,7 @@ import { AUTH_ROUTES }      from '@/features/auth/auth.routes'
 import { DASHBOARD_ROUTES } from '@/features/dashboard/dashboard.routes'
 import { CRM_ROUTES }       from '@/features/crm/crm.routes'
 import { CONTACT_ROUTES }   from '@/features/contacts/contacts.routes'
+import { DIVISION_ROUTES }  from '@/features/crm/divisions/divisions.routes'
 import { ANALYTICS_ROUTES } from '@/features/analytics/analytics.routes'
 import { CAMPS_ROUTES }     from '@/features/camps/camps.routes'
 import { DIET_ROUTES }      from '@/features/diet/diet.routes'
@@ -98,6 +99,14 @@ const ALL_NAV_ITEMS: NavItem[] = [
 
   { id: 'contacts',     label: 'Contacts',                    icon: 'Users',         path: CONTACT_ROUTES.CONTACTS,
     rolesAllowed: ['sales_lead', 'sales_rep', 'camp_coord', 'diet_camp_coord'] },
+
+  // Moved here 2026-07-31 from a standalone "Company Data" section — Division
+  // is a CRM-native concept (Lead/Project/Appointment/Role all key off it
+  // directly), not a separate top-level area. Real visibility is enforced by
+  // REAL_GATED_NAV_ITEMS in Sidebar.tsx (division:manage / tenant:manage,
+  // with the usual system:manage bypass) — see that map for the actual gate.
+  { id: 'divisions',    label: 'Divisions',                   icon: 'Globe',         path: DIVISION_ROUTES.DIVISIONS,
+    rolesAllowed: [] },
 
   // Sales & CRM — Delivery
   { id: 'projects',     label: 'Project Management',          icon: 'FolderPlus',    path: PROJECTS_ROUTES.PROJECTS,
@@ -244,7 +253,7 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
   {
     section: 'Sales & CRM',
     subs: [
-      { title: 'Pipeline', items: ['appointments', 'crm', 'clientmgmt', 'contacts'].map((id) => NAV_BY_ID[id]) },
+      { title: 'Pipeline', items: ['appointments', 'crm', 'clientmgmt', 'contacts', 'divisions'].map((id) => NAV_BY_ID[id]) },
       { title: 'Delivery', items: ['projects', 'gantt'].map((id) => NAV_BY_ID[id]) },
     ],
   },

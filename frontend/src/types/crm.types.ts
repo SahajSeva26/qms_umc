@@ -1,3 +1,5 @@
+import type { RegisterOwnerPayload } from '@/types/accessManagement.types'
+
 // Real backend-integrated types for the CRM/Lead pipeline (Division + Lead),
 // replacing the old mock-only model in `lead.types.ts`. Matches
 // backend/src/modules/{division,crm/lead}/* exactly — see the research notes
@@ -58,6 +60,32 @@ export interface DivisionPopulatedTenant {
   code: string
 }
 
+/**
+ * Populated shape for Division.owner (the division's head Role) as returned
+ * by GET when populated — division.service.ts's `get()` populate array
+ * nests `user` (select 'firstName lastName email phone gender status') and
+ * `type` (select 'name code') under the Role. division.mapper.ts only ever
+ * extracts `owner._id`/raw id today (RoleMapper is imported but never
+ * actually invoked there) — so a fully populated user/type object is only
+ * available when this app's OWN code chooses to populate+shape it that way;
+ * treat `user`/`type` as optional/best-effort, not guaranteed present.
+ */
+export interface DivisionPopulatedOwnerRole {
+  _id?: string
+  user?: {
+    firstName: string
+    lastName?: string
+    email: string
+    phone?: string
+    gender?: 'male' | 'female' | 'other'
+    status: string
+  }
+  type?: {
+    name: string
+    code: string
+  }
+}
+
 export interface DivisionEntity {
   id: string
   code: string
@@ -72,17 +100,26 @@ export interface DivisionEntity {
   // (DivisionMapper.toResponse gates this — the key is ABSENT, not null, for
   // a lead:manage-only caller using the division-search cross-grant).
   status?: DivisionStatus
+  // Same gate as `status` above. The division's head Role — bare id string
+  // when the doc wasn't populated (e.g. echoed back from create), or the
+  // shape above when it was (get/search).
+  owner?: DivisionPopulatedOwnerRole | string
 }
 
 export interface SearchDivisionQuery {
   // NOTE: this field is genuinely named `tenantId` on Division's search
   // schema, unlike every other search query in this app which uses `tenant`
-  // — only honored server-side if caller has `lead:manage` or `tenant:admin`.
+  // — only honored server-side if caller has `lead:manage` or
+  // `division:manage` (division.service.ts's real gate — NOT `tenant:admin`,
+  // that was a stale claim in this comment, corrected 2026-07-31).
   tenantId?: string
   code?: string
   name?: string
   therapy?: DivisionTherapy
   status?: DivisionStatus
+  // Filter by the division's head Role id — division.service.ts applies this
+  // unconditionally if present (no extra permission gate, unlike tenantId).
+  owner?: string
   page?: string
   limit?: string
 }
@@ -102,6 +139,13 @@ export interface CreateDivisionPayload {
   therapy: DivisionTherapy
   brandFocus?: string
   mrCount?: number
+  // Required — every division has a head. The backend mints a brand-new
+  // user + Role for this person in the same transaction as the division
+  // itself (division.service.ts's create(), same "founding owner" pattern
+  // as Tenant.owner/tenant:admin). No "use an existing person" path exists
+  // server-side — this always registers someone new. Reuses the same
+  // registration-payload shape already established for Tenant's own owner.
+  head: RegisterOwnerPayload
 }
 
 export interface UpdateDivisionPayload {

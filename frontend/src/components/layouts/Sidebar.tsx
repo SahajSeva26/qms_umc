@@ -12,61 +12,12 @@ import {
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { useSession } from '@/hooks/useSession'
-import { COMPANY_DATA_ROUTES } from '@/features/company-data/company-data.routes'
 import {
   getNavForRole,
   FULL_NAV_SECTIONS,
   type NavItem,
   type NavSection,
 } from './navConfig'
-
-// Real-permission-gated nav — additive, alongside (not replacing) the
-// existing UserRole/rolesAllowed system above. That system was a
-// placeholder built before the backend had a real permission model (see
-// PROGRESS.md's 2026-07-20 entry) and is being replaced incrementally,
-// section by section, as each domain gets real backend permission codes —
-// Company Data is the first. A user sees this section whenever their real
-// session holds ANY of the listed permission codes, independent of which
-// legacy UserRole they've been assigned (a tenant admin is very often NOT
-// 'super_admin'/'admin' in the old vocabulary at all).
-//
-// Checked against the RAW permissions array, not useSession's hasAnyPermission
-// — that helper unconditionally bypasses for system:manage. This section
-// originally excluded that bypass on purpose (Company Data was framed as
-// each customer tenant's OWN admin managing THEIR company's data, not
-// something QMS's platform-level super-admin needed cluttering their
-// sidebar with). That decision was explicitly reversed 2026-07-31 — Rishi
-// asked for system:manage accounts to see Divisions too — so 'system:manage'
-// is now included directly in `anyOf` below, restoring the normal bypass for
-// this one section specifically.
-interface PermissionNavSection {
-  section: NavSection
-  anyOf: string[]
-}
-
-const PERMISSION_NAV_SECTIONS: PermissionNavSection[] = [
-  {
-    // division:manage added 2026-07-31 — the real backend permission that
-    // actually gates every Division route (division.routes.ts:
-    // DIVISION_PERMISSIONS.MANAGE.code / TENANT_PERMISSIONS.ADMIN.code) was
-    // never added here when it was introduced; this list had silently
-    // fallen out of sync with what the backend actually grants (Sales Head
-    // holds division:manage today, per defaultRoleTypes.ts, and couldn't
-    // reach this page at all despite being fully authorized server-side).
-    anyOf: ['tenant:admin', 'system:manage', 'division:manage'],
-    section: {
-      section: 'Company Data',
-      subs: [
-        {
-          title: '',
-          items: [
-            { id: 'company-data-divisions', label: 'Divisions', icon: 'Globe', path: COMPANY_DATA_ROUTES.DIVISIONS, rolesAllowed: [] },
-          ],
-        },
-      ],
-    },
-  },
-]
 
 // Existing FULL_NAV_SECTIONS items (the legacy 'ALL' tree every account
 // currently renders, per the super_admin-fallback bug documented below)
@@ -95,6 +46,12 @@ const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
   // Appointment/Contact module wiring.
   appointments: ['appointment:search', 'appointment:manage', 'tenant:manage'],
   contacts: ['contact:search', 'contact:manage', 'tenant:manage', 'tenant:admin'],
+  // Matches divisions.routes.tsx's DIVISION_VIEW_PERMISSIONS exactly. Moved
+  // here 2026-07-31 from a standalone "Company Data" section/mechanism
+  // (PERMISSION_NAV_SECTIONS, now removed) when Divisions was folded into
+  // CRM — Division is a CRM-native concept (Lead/Project/Appointment all key
+  // off it directly), not a separate top-level area.
+  divisions: ['division:manage', 'tenant:manage'],
 }
 
 interface SidebarProps {
@@ -288,16 +245,7 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
   const { permissions, isSettled } = useSession()
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(readCollapsedSections)
 
-  // Only resolve once the real session has settled — otherwise every
-  // permission check would default to false on first paint and the section
-  // would flash in a beat after the rest of the sidebar, same isSettled
-  // discipline RequirePermission.tsx uses for its own redirect decision.
-  // Raw `permissions.includes(...)`, deliberately not hasAnyPermission — see
-  // PERMISSION_NAV_SECTIONS's own comment on why the system:manage bypass
-  // must NOT apply to this particular gate.
-  const permissionSections = isSettled
-    ? PERMISSION_NAV_SECTIONS.filter(({ anyOf }) => anyOf.some((code) => permissions.includes(code))).map(({ section }) => section)
-    : []
+  const isRealSystemManage = isSettled && permissions.includes('system:manage')
 
   const toggleSection = (section: string) => {
     setCollapsedSections((prev) => {
@@ -343,9 +291,8 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
   // items are meant to bypass for system:manage (matches their own route
   // guards, which use the default hasAnyPermission), so a plain `.some(...)`
   // over the raw array reproduces that bypass correctly without importing
-  // the helper's own semantics wholesale.
-  const isRealSystemManage = isSettled && permissions.includes('system:manage')
-
+  // the helper's own semantics wholesale. (isRealSystemManage itself is
+  // computed once, earlier in this component, and reused here.)
   const isNavItemVisible = (item: NavItem): boolean => {
     const requiredCodes = REAL_GATED_NAV_ITEMS[item.id]
     if (!requiredCodes) return true // no real gate defined for this item — leave it alone
@@ -432,18 +379,6 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
             ))}
           </div>
         )}
-
-        {/* Real-permission-gated sections — independent of the UserRole
-            system above, so they render regardless of which branch fired. */}
-        {permissionSections.map((section) => (
-          <SectionBlock
-            key={section.section}
-            section={section}
-            collapsed={collapsed}
-            collapsedSections={collapsedSections}
-            onToggleSection={toggleSection}
-          />
-        ))}
       </div>
 
       {/* AI Copilot card */}

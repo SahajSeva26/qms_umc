@@ -3,15 +3,23 @@ import { DIVISION_THERAPY_LABEL } from '@/types/crm.types'
 
 // Hand-built table matching RoleTypesTable.tsx / PermissionGroupsTable.tsx
 // exactly: var(--qms-*) custom properties, no shadcn Table, inline empty
-// state. No row-click navigation (unlike those tables) since Divisions has
-// no detail route — status/therapy edits happen inline via a future modal,
-// not a dedicated page, matching the "for creating we will have modal" scope.
+// state. Rows open EditDivisionModal on click (not a navigate-to-detail-page
+// the way RolesTable does) — Divisions has no detail route, matching the
+// "for creating we will have modal" scope; same visual hover treatment as
+// RolesTable's own row-click pattern.
+
+function ownerName(owner: DivisionEntity['owner']): string | null {
+  if (!owner || typeof owner === 'string') return null
+  if (!owner.user) return null
+  return [owner.user.firstName, owner.user.lastName].filter(Boolean).join(' ')
+}
 
 interface DivisionsTableProps {
   divisions: DivisionEntity[]
+  onRowClick: (division: DivisionEntity) => void
 }
 
-const DivisionsTable = ({ divisions }: DivisionsTableProps) => {
+const DivisionsTable = ({ divisions, onRowClick }: DivisionsTableProps) => {
   return (
     <div
       className="rounded-xl border overflow-hidden"
@@ -37,13 +45,21 @@ const DivisionsTable = ({ divisions }: DivisionsTableProps) => {
                 MR count
               </th>
               <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
+                Head
+              </th>
+              <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
                 Status
               </th>
             </tr>
           </thead>
           <tbody>
             {divisions.map((division) => (
-              <tr key={division.id} style={{ borderBottom: '1px solid var(--qms-border)' }}>
+              <tr
+                key={division.id}
+                onClick={() => onRowClick(division)}
+                className="cursor-pointer transition-colors hover:bg-(--qms-surface-hover)"
+                style={{ borderBottom: '1px solid var(--qms-border)' }}
+              >
                 <td className="px-4 py-2.5">
                   <span className="font-semibold font-mono" style={{ color: 'var(--qms-text)' }}>
                     {division.code}
@@ -60,6 +76,9 @@ const DivisionsTable = ({ divisions }: DivisionsTableProps) => {
                 </td>
                 <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>
                   {division.mrCount}
+                </td>
+                <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
+                  {ownerName(division.owner) ?? '—'}
                 </td>
                 <td className="px-4 py-2.5">
                   {division.status ? (

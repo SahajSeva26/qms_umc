@@ -35,6 +35,12 @@ const divisionSchema = new mongoose.Schema(
             enum: [DIVISION_STATUS.ACTIVE, DIVISION_STATUS.INACTIVE],
             default: DIVISION_STATUS.ACTIVE,
         },
+        // the division head — the Role created for the head user during division onboarding.
+        // Mirrors Tenant.owner. Set right after the division is created (so it starts unset).
+        owner: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Role',
+        },
     },
     {
         timestamps: true,

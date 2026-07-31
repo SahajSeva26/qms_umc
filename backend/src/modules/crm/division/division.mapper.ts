@@ -7,16 +7,19 @@ export const DivisionMapper = {
     toResponse: (division: any, ctx: RequestContext) => {
         let result: any = {
             id: division._id?.toString(),
-            code: division.code,
-            name: division.name,
-            therapy: division.therapy,
-            brandFocus: division.brandFocus,
-            mrCount: division.mrCount,
-            tenant: division.tenant,
+            code: division?.code,
+            name: division?.name,
+            therapy: division?.therapy,
+            brandFocus: division?.brandFocus,
+            mrCount: division?.mrCount,
+            tenant: division?.tenant,
+
+            owner: division?.owner,
 
             createdAt: division.createdAt,
             updatedAt: division.updatedAt,
         };
+        
         if (ctx.hasAnyPermissions([DIVISION_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.ADMIN.code])) {
             result.status = division.status;
             // the division head role — mapped when populated (get/search), bare id otherwise (create)

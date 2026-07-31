@@ -1,11 +1,6 @@
 import { HydratedDocument } from 'mongoose';
 import { UserService } from '../user/user.service';
-import {
-    IForgotPasswordPayload,
-    ILoginUserPayload,
-    IRegisterUserPayload,
-    IResetPasswordPayload,
-} from './auth.validators';
+import { IForgotPasswordPayload, ILoginUserPayload, IRegisterUserPayload, IResetPasswordPayload } from './auth.validators';
 import { IUser } from '../user/user.model';
 import bcrypt from 'bcrypt';
 import { throwAppError } from '../../shared/utils/error';
@@ -136,7 +131,7 @@ const refreshToken = async (refreshToken: string, ctx: RequestContext) => {
     const userId: string = decoded._id.toString();
     const user = await UserService.get(userId, ctx);
     if (!user) {
-        return throwAppError('User not found, login again', StatusCodes.NOT_FOUND);
+        return throwAppError('User not found, login again', StatusCodes.UNAUTHORIZED);
     }
 
     // 3: check if refresh token matches the one on record (before any further DB work)
@@ -145,7 +140,7 @@ const refreshToken = async (refreshToken: string, ctx: RequestContext) => {
     }
 
     // 4: get user role
-    let userRole: any = await RoleModel.findOne({user:user._id}).populate('tenant');
+    let userRole: any = await RoleModel.findOne({ user: user._id }).populate('tenant');
     if (!userRole) {
         return throwAppError('No role assigned to this account. Please contact your administrator.', StatusCodes.FORBIDDEN);
     }

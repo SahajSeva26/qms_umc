@@ -9,7 +9,7 @@ import '../../../modules/access-management/tenant/tenant.routes';
 import '../../../modules/access-management/permission-group/permissionGroup.routes';
 import '../../../modules/access-management/role-type/roleType.routes';
 import '../../../modules/access-management/role/role.routes';
-import '../../../modules/division/division.routes';
+import '../../../modules/crm/division/division.routes';
 import '../../../modules/crm/lead/lead.routes';
 import '../../../modules/crm/contact/contact.routes';
 import '../../../modules/crm/appointment/appointment.routes';

@@ -1,13 +1,11 @@
 import { z } from 'zod';
 import { DIVISION_STATUS, DIVISION_THERAPY } from './division.constants';
-import { isValidObjectID } from '../../shared/utils/strings';
+import { isValidObjectID } from '../../../shared/utils/strings';
+import { RegisterUserPayloadSchema } from '../../auth/auth.validators';
 
 //1: create ====================================>
 export const CreateDivisionPayloadSchema = z.object({
-    tenant: z
-        .string()
-        .min(1)
-        .openapi({ example: 'sun-pharma' }),
+    tenant: z.string().min(1).openapi({ example: 'sun-pharma' }),
     code: z
         .string()
         .min(3)
@@ -17,9 +15,14 @@ export const CreateDivisionPayloadSchema = z.object({
         })
         .openapi({ example: 'sun-cardio' }),
     name: z.string().min(1).openapi({ example: 'Cardio Care' }),
-    therapy: z.enum(Object.values(DIVISION_THERAPY)).openapi({ example: 'Cardiology' }),
+    therapy: z
+        .enum(Object.values(DIVISION_THERAPY))
+        .openapi({ example: 'Cardiology' }),
     brandFocus: z.string().optional().openapi({ example: 'Atorvastatin+' }),
     mrCount: z.number().int().nonnegative().optional().openapi({ example: 38 }),
+    // the division is created together with its head: a new user (registered inactive) linked to a
+    // pharma-division-head role scoped to this division. Required — every division has a head.
+    head: RegisterUserPayloadSchema,
 });
 export type ICreateDivisionPayload = z.infer<
     typeof CreateDivisionPayloadSchema
@@ -49,6 +52,14 @@ export const SearchDivisionQuerySchema = z.object({
         .string()
         .refine((val) => isValidObjectID(val), {
             message: 'tenantId must be a valid ObjectId',
+        })
+        .optional()
+        .openapi({ example: '64f0c2a1b3d4e5f6a7b8c9d0' }),
+    // filter by the division head (owner) role id
+    owner: z
+        .string()
+        .refine((val) => isValidObjectID(val), {
+            message: 'owner must be a valid ObjectId',
         })
         .optional()
         .openapi({ example: '64f0c2a1b3d4e5f6a7b8c9d0' }),

@@ -3,7 +3,7 @@ import { TENANT_PERMISSIONS } from '../../modules/access-management/tenant/tenan
 import { PERMISSION_GROUP_PERMISSIONS } from '../../modules/access-management/permission-group/permissionGroup.constants';
 import { ROLE_TYPE_PERMISSIONS } from '../../modules/access-management/role-type/roleType.constants';
 import { ROLE_PERMISSIONS } from '../../modules/access-management/role/role.constants';
-import { DIVISION_PERMISSIONS } from '../../modules/division/division.constants';
+import { DIVISION_PERMISSIONS } from '../../modules/crm/division/division.constants';
 import { LEAD_PERMISSIONS } from '../../modules/crm/lead/lead.constants';
 import { CONTACT_PERMISSIONS } from '../../modules/crm/contact/contact.constants';
 import { APPOINTMENT_PERMISSIONS } from '../../modules/crm/appointment/appointment.constants';

@@ -7,7 +7,7 @@ import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
 import { isValidObjectID } from '../../../shared/utils/strings';
 import { IServiceOptions } from '../../../shared/types/service.types';
-import { DivisionService } from '../../division/division.service';
+import { DivisionService } from '../division/division.service';
 import { RoleService } from '../../access-management/role/role.service';
 import { TENANT_TYPE } from '../../access-management/tenant/tenant.constants';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';

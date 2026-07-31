@@ -1,6 +1,7 @@
-import { RequestContext } from '../../shared/utils/contextBuilder';
+import { RequestContext } from '../../../shared/utils/contextBuilder';
 import { DIVISION_PERMISSIONS } from './division.constants';
-import { TENANT_PERMISSIONS } from '../access-management/tenant/tenant.constants';
+import { TENANT_PERMISSIONS } from '../../access-management/tenant/tenant.constants';
+import { RoleMapper } from '../../access-management/role/role.mapper';
 
 export const DivisionMapper = {
     toResponse: (division: any, ctx: RequestContext) => {
@@ -12,11 +13,14 @@ export const DivisionMapper = {
             brandFocus: division.brandFocus,
             mrCount: division.mrCount,
             tenant: division.tenant,
+
             createdAt: division.createdAt,
             updatedAt: division.updatedAt,
         };
         if (ctx.hasAnyPermissions([DIVISION_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.ADMIN.code])) {
             result.status = division.status;
+            // the division head role — mapped when populated (get/search), bare id otherwise (create)
+            result.owner = division.owner?._id ? division.owner._id : division.owner;
         }
         return result;
     },

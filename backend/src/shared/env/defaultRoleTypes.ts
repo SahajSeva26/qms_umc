@@ -4,7 +4,7 @@ import { APPOINTMENT_PERMISSIONS } from '../../modules/crm/appointment/appointme
 import { DOCTOR_PERMISSIONS } from '../../modules/doctor/doctor.constants';
 import { CAMP_PERMISSIONS } from '../../modules/operations/camp/camp.constants';
 import { TENANT_PERMISSIONS } from '../../modules/access-management/tenant/tenant.constants';
-import { DIVISION_PERMISSIONS } from '../../modules/division/division.constants';
+import { DIVISION_PERMISSIONS } from '../../modules/crm/division/division.constants';
 
 // CRM ROLE TYPES
 export const CRM_BUSINESS_ROLE_TYPES = [
@@ -115,7 +115,6 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
         name: 'Field Officer',
         description: 'Field officer',
         permissions: [
-            
             CAMP_PERMISSIONS.SEARCH.code,
             CAMP_PERMISSIONS.GET.code,
             APPOINTMENT_PERMISSIONS.SEARCH.code,

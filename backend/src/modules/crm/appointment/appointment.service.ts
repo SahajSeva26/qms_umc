@@ -26,7 +26,7 @@ import { endOfUTCDay } from '../../../shared/utils/dates';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
 import { CounterService } from '../../counter/counter.service';
-import { DivisionService } from '../../division/division.service';
+import { DivisionService } from '../division/division.service';
 import { ContactService } from '../contact/contact.service';
 import { LeadService } from '../lead/lead.service';
 import { RoleService } from '../../access-management/role/role.service';
@@ -50,10 +50,7 @@ const populate: any[] = [
 // a search-only actor (appointment:search, not appointment:manage) sees an appointment only if
 // they own it (salesPerson) or attend it (internalMembers).
 const applyOwnScope = (where: any, ctx: RequestContext) => {
-    if (
-        ctx.hasAnyPermissions([APPOINTMENT_PERMISSIONS.SEARCH.code]) &&
-        !ctx.hasAnyPermissions([APPOINTMENT_PERMISSIONS.MANAGE.code])
-    ) {
+    if (ctx.hasAnyPermissions([APPOINTMENT_PERMISSIONS.SEARCH.code]) && !ctx.hasAnyPermissions([APPOINTMENT_PERMISSIONS.MANAGE.code])) {
         where.$or = [{ salesPerson: ctx.role?._id }, { 'internalMembers.role': ctx.role?._id }];
     }
 };
@@ -150,10 +147,7 @@ const set = async (model: any, entity: any, ctx: RequestContext): Promise<Hydrat
     if (model.mom) {
         // MoM cannot be captured while the appointment is blocked — the meeting is on hold.
         if (entity.status === APPOINTMENT_STATUSES.BLOCKED) {
-            return throwAppError(
-                'Minutes of meeting cannot be added while the appointment is blocked',
-                StatusCodes.CONFLICT,
-            );
+            return throwAppError('Minutes of meeting cannot be added while the appointment is blocked', StatusCodes.CONFLICT);
         }
         entity.mom = entity.mom || ({} as any);
         if (model.mom.details !== undefined) {
@@ -368,10 +362,7 @@ const respond = async (id: string, model: IRespondPayload, ctx: RequestContext) 
     //2b: RSVP only makes sense while the meeting is still planned — you cannot respond to one
     // that is already done, cancelled, blocked, or released.
     if (appointment.status !== APPOINTMENT_STATUSES.PLANNED) {
-        return throwAppError(
-            `You can only respond to a planned appointment (this one is '${appointment.status}')`,
-            StatusCodes.CONFLICT,
-        );
+        return throwAppError(`You can only respond to a planned appointment (this one is '${appointment.status}')`, StatusCodes.CONFLICT);
     }
 
     //3: record the response — the subdoc's updatedAt timestamps when they answered

@@ -17,7 +17,7 @@ import { IServiceOptions } from '../../../shared/types/service.types';
 import { ProjectService } from '../../crm/project/project.service';
 import { DoctorService } from '../../doctor/doctor.service';
 import { RoleService } from '../../access-management/role/role.service';
-import { DivisionService } from '../../division/division.service';
+import { DivisionService } from '../../crm/division/division.service';
 
 type CampDocument = HydratedDocument<ICamp> | null;
 

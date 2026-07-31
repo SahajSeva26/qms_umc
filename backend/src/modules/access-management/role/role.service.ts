@@ -8,7 +8,7 @@ import { toObjectId, isValidObjectID } from '../../../shared/utils/strings';
 import { TenantService } from '../tenant/tenant.service';
 import { RoleTypeService } from '../role-type/roleType.service';
 import { UserService } from '../../user/user.service';
-import { DivisionService } from '../../division/division.service';
+import { DivisionService } from '../../crm/division/division.service';
 import { PERMISSIONS_ARRAY, SYSTEM_PERMISSIONS } from '../../../shared/env/permissions';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { PermissionGroupModel } from '../permission-group/permissionGroup.model';
@@ -62,7 +62,6 @@ const set = async (model: any, entity: HydratedDocument<IRoleDocument>, ctx: Req
             throwAppError('Role type not found', StatusCodes.NOT_FOUND);
         }
 
-        
         // if this is the admin role type, it may back at most one role — reject a second admin
         if (roleType.permissions.includes(TENANT_PERMISSIONS.ADMIN.code)) {
             const existingRole = await RoleModel.findOne({

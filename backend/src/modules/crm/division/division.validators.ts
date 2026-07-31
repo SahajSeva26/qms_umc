@@ -1,13 +1,10 @@
 import { z } from 'zod';
 import { DIVISION_STATUS, DIVISION_THERAPY } from './division.constants';
-import { isValidObjectID } from '../../shared/utils/strings';
+import { isValidObjectID } from '../../../shared/utils/strings';
 
 //1: create ====================================>
 export const CreateDivisionPayloadSchema = z.object({
-    tenant: z
-        .string()
-        .min(1)
-        .openapi({ example: 'sun-pharma' }),
+    tenant: z.string().min(1).openapi({ example: 'sun-pharma' }),
     code: z
         .string()
         .min(3)
@@ -17,7 +14,9 @@ export const CreateDivisionPayloadSchema = z.object({
         })
         .openapi({ example: 'sun-cardio' }),
     name: z.string().min(1).openapi({ example: 'Cardio Care' }),
-    therapy: z.enum(Object.values(DIVISION_THERAPY)).openapi({ example: 'Cardiology' }),
+    therapy: z
+        .enum(Object.values(DIVISION_THERAPY))
+        .openapi({ example: 'Cardiology' }),
     brandFocus: z.string().optional().openapi({ example: 'Atorvastatin+' }),
     mrCount: z.number().int().nonnegative().optional().openapi({ example: 38 }),
 });

@@ -9,7 +9,7 @@ import { TenantRouter } from '../modules/access-management/tenant/tenant.routes'
 import { PermissionGroupRouter } from '../modules/access-management/permission-group/permissionGroup.routes';
 import { RoleTypeRouter } from '../modules/access-management/role-type/roleType.routes';
 import { RoleRouter } from '../modules/access-management/role/role.routes';
-import { DivisionRouter } from '../modules/division/division.routes';
+import { DivisionRouter } from '../modules/crm/division/division.routes';
 import { LeadRouter } from '../modules/crm/lead/lead.routes';
 import { ContactRouter } from '../modules/crm/contact/contact.routes';
 import { AppointmentRouter } from '../modules/crm/appointment/appointment.routes';

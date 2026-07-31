@@ -9,6 +9,7 @@ import RoleTypesFilterBar from '@/features/access-management/role-type/component
 import PaginationControls from '@/components/ui/PaginationControls'
 import { ROLE_TYPE_ROUTES } from '@/features/access-management/role-type/role-type.routes'
 import { Button } from '@/components/ui/button'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import type { RoleTypeStatus } from '@/types/accessManagement.types'
 
 const PAGE_SIZE = 10
@@ -26,8 +27,12 @@ const RoleTypesListPage = () => {
   const { filters, setFilter, reset } = useRoleTypesFilters()
   const [page, setPage] = useState(1)
 
+  // Debounced so each keystroke doesn't fire its own request — only the
+  // value still present 300ms after typing stops flows into the query below.
+  const debouncedSearch = useDebouncedValue(filters.search, 300)
+
   const { data, isLoading, error } = useRoleTypes({
-    name: filters.search || undefined,
+    name: debouncedSearch || undefined,
     status: filters.status === 'ALL' ? undefined : (filters.status as RoleTypeStatus),
     tenant: filters.tenant === 'ALL' ? undefined : filters.tenant,
     page: String(page),

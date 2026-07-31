@@ -117,10 +117,16 @@ test-results/
 *.pid.lock
 
 # ======================
-# Session / local only
+# Local reference docs — all local only, never version-controlled
+# (test scripts, analysis write-ups, design/progress docs — kept in one
+# folder so they never spill loose across the repo root)
 # ======================
-CLAUDE.md
-PROGRESS.md
-TESTS.md
-CLAUDE.teammate-root-notes.md
-RESEARCH_*.md
+/md-files/
+
+# ======================
+# Per-package convention docs — local-only per earlier team decision
+# (previously tracked, deliberately untracked; kept on disk, never committed)
+# ======================
+backend/CLAUDE.md
+frontend/CLAUDE.md
+mobile/CLAUDE.md

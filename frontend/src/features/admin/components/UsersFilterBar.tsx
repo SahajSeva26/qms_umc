@@ -23,15 +23,16 @@ interface UsersFilterBarProps {
   setFilter: <K extends keyof UsersFilterState>(key: K, value: UsersFilterState[K]) => void
   reset: () => void
   tenantOptions: TenantOption[]
+  /** Fired the first time the Company dropdown is opened — lets the page lazy-load its options instead of fetching them on every mount. */
+  onCompanyDropdownOpen?: () => void
 }
 
-// The trigger shows the fixed dimension name ("Status", "Tenant") at the
-// default "ALL" value, but switches to the selected option's own label once
-// something specific is picked (e.g. "Active") — SelectValue's `children`
-// function receives the current raw value, so this looks it up against the
-// option list rather than always rendering the matched SelectItem's text
-// (which would show "Active" but never fall back to "Status" at the default).
-const UsersFilterBar = ({ filters, setFilter, reset, tenantOptions }: UsersFilterBarProps) => {
+// The Status trigger always shows the selected option's own label (default
+// is "active" — see useUsersFilters.ts — there is no "All" choice, since the
+// backend can't return every status in one call). Tenant keeps its "All"
+// sentinel since that filter is applied client-side over whatever page of
+// results already came back, not sent to the server.
+const UsersFilterBar = ({ filters, setFilter, reset, tenantOptions, onCompanyDropdownOpen }: UsersFilterBarProps) => {
   const tenantLabelById = new Map(tenantOptions.map((t) => [t.id, t.label]))
 
   return (
@@ -51,17 +52,20 @@ const UsersFilterBar = ({ filters, setFilter, reset, tenantOptions }: UsersFilte
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Select value={filters.status} onValueChange={(v) => setFilter('status', (v ?? 'ALL') as UsersFilterState['status'])}>
+        <Select value={filters.status} onValueChange={(v) => setFilter('status', (v ?? 'active') as UsersFilterState['status'])}>
           <SelectTrigger className="text-[12px]">
-            <SelectValue>{(v: string) => (v === 'ALL' ? 'Status' : (STATUS_LABEL_BY_VALUE.get(v as UserStatus) ?? 'Status'))}</SelectValue>
+            <SelectValue>{(v: string) => STATUS_LABEL_BY_VALUE.get(v as UserStatus) ?? 'Status'}</SelectValue>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="ALL">All</SelectItem>
             {STATUS_OPTIONS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
           </SelectContent>
         </Select>
 
-        <Select value={filters.tenant} onValueChange={(v) => setFilter('tenant', v ?? 'ALL')}>
+        <Select
+          value={filters.tenant}
+          onValueChange={(v) => setFilter('tenant', v ?? 'ALL')}
+          onOpenChange={(open) => open && onCompanyDropdownOpen?.()}
+        >
           <SelectTrigger className="text-[12px]">
             <SelectValue>{(v: string) => (v === 'ALL' ? 'Company' : (tenantLabelById.get(v) ?? 'Company'))}</SelectValue>
           </SelectTrigger>

@@ -6,6 +6,7 @@ import TenantsFilterBar from '@/features/access-management/tenant/components/Ten
 import CreateTenantDialog from '@/features/access-management/tenant/components/CreateTenantDialog'
 import PaginationControls from '@/components/ui/PaginationControls'
 import { usePermission } from '@/hooks/usePermission'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import type { TenantStatus } from '@/types/accessManagement.types'
 
 const PAGE_SIZE = 10
@@ -25,8 +26,11 @@ const TenantsListPage = () => {
   const { hasPermission } = usePermission()
   const canManageTenant = hasPermission('tenant:manage')
 
+  // Debounced
+  const debouncedSearch = useDebouncedValue(filters.search, 300)
+
   const { data, isLoading, error } = useTenants({
-    name: filters.search || undefined,
+    name: debouncedSearch || undefined,
     status: filters.status === 'ALL' ? undefined : (filters.status as TenantStatus),
     page: String(page),
     limit: String(PAGE_SIZE),

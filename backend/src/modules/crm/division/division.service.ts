@@ -10,12 +10,24 @@ import { IServiceOptions } from '../../../shared/types/service.types';
 import { TENANT_PERMISSIONS } from '../../access-management/tenant/tenant.constants';
 import { TenantService } from '../../access-management/tenant/tenant.service';
 import { LEAD_PERMISSIONS } from '../lead/lead.constants';
+import { RoleService } from '../../access-management/role/role.service';
+import { RoleTypeModel } from '../../access-management/role-type/roleType.model';
+import { ALLOWED_ROLETYPE_CODES } from '../../access-management/role-type/roleType.constants';
+import { withTransaction } from '../../../shared/helpers/transactionHelper';
 
 type DivisionDocument = HydratedDocument<IDivision> | null;
 const populate: any[] = [
     {
         path: 'tenant',
         select: 'name code',
+    },
+    {
+        // the division head role — populate its user + role type so reads surface who the head is
+        path: 'owner',
+        populate: [
+            { path: 'user', select: 'firstName lastName email phone gender status' },
+            { path: 'type', select: 'name code' },
+        ],
     },
 ];
 
@@ -70,6 +82,9 @@ const search = async (filters: ISearchDivisionQuery, ctx: RequestContext, option
     if (filters.tenantId && ctx.hasAnyPermissions([LEAD_PERMISSIONS.MANAGE.code, DIVISION_PERMISSIONS.MANAGE.code])) {
         where.tenant = filters.tenantId;
     }
+    if (filters.owner) {
+        where.owner = filters.owner;
+    }
     if (filters.name) {
         where.name = { $regex: filters.name, $options: 'i' };
     }
@@ -111,15 +126,52 @@ const create = async (model: ICreateDivisionPayload, ctx: RequestContext): Promi
         return throwAppError('Division with this code already exists', StatusCodes.CONFLICT);
     }
 
-    //3: create division under the resolved tenant
-    const entity = new DivisionModel({
-        code: model.code, //immutable
+    //3: the head role needs the pharma-division-head role type, provisioned per CUSTOMER tenant.
+    // resolve it up-front (scoped to THIS tenant, by _id so the role service can't mis-match it to
+    // another tenant's copy) and fail fast if the tenant was onboarded before it was provisioned.
+    const headRoleType = await RoleTypeModel.findOne({
+        code: ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_DIVISION_HEAD,
         tenant: tenant._id,
     });
+    if (!headRoleType) {
+        return throwAppError(
+            'The pharma-division-head role type is not provisioned for this tenant',
+            StatusCodes.CONFLICT,
+        );
+    }
 
-    //3: set remaining fields
-    division = await set(model, entity, ctx);
-    division = await division.save();
+    //4: create the division AND its head role in one transaction — roll back both if either fails
+    division = await withTransaction(async () => {
+        //4.1: create division under the resolved tenant
+        const entity = new DivisionModel({
+            code: model.code, //immutable
+            tenant: tenant._id,
+        });
+        let d = await set(model, entity, ctx);
+        d = await d.save();
+
+        //4.2: mint the division head — RoleService.create registers a new (inactive) user from
+        // model.head and links it to a pharma-division-head role scoped to this division.
+        const head = await RoleService.create(
+            {
+                code: `${d.code}-head`,
+                name: `${d.name} Division Head`,
+                description: `Head of ${d.name} division`,
+                tenant: tenant._id.toString(),
+                type: headRoleType.id,
+                division: d._id.toString(),
+                user: model.head,
+                permissions: [],
+            },
+            ctx,
+        );
+
+        //4.3: point the division at its head role (mirrors Tenant.owner)
+        d.owner = head._id;
+        d = await d.save();
+
+        return d;
+    });
 
     return division;
 };

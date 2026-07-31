@@ -21,7 +21,9 @@ export const ALLOWED_ROLETYPE_CODES = {
         FIELD_OFFICER: 'field-officer',
     },
     CUSTOMER: {
+        
         PHARMA_HO: 'pharma-ho',
+        PHARMA_DIVISION_HEAD: 'pharma-division-head',
         PHARMA_ASM: 'pharma-asm',
         PHARMA_RSM: 'pharma-rsm',
         PHARMA_MR: 'pharma-mr',
@@ -51,6 +53,12 @@ export const DEFAULT_PHARMA_ROLE_TYPES = [
         code: ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_HO,
         name: 'Pharma Head Office',
         description: 'Pharma head office',
+        permissions: [] as string[],
+    },
+    {
+        code: ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_DIVISION_HEAD,
+        name: 'Pharma Division Head',
+        description: 'Pharma division head',
         permissions: [] as string[],
     },
     {

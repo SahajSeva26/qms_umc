@@ -76,6 +76,12 @@ const DoctorsPage = () => {
   // "Inactive" tab/table as if they were genuinely inactive. Found via a
   // 2026-07-24 test sweep. Skipping the query entirely for such a caller
   // (rather than fetching and discarding) also avoids a wasted request.
+  // The `{ limit: '0' }` fallback below is never actually sent — `enabled:
+  // canSeeInactive` already prevents this query from firing at all when
+  // false, so the query object's shape in that branch is moot. Kept as a
+  // type-satisfying placeholder only (not a real Mongoose `.limit(0)`
+  // "no limit" footgun like the ones fixed elsewhere today, since it's
+  // never actually executed).
   const { data: inactiveData } = useDoctors(
     canSeeInactive ? { status: 'inactive', limit: String(AGGREGATE_LIMIT) } : { limit: '0' },
     { enabled: canSeeInactive },

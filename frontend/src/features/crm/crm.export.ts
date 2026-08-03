@@ -1,6 +1,6 @@
 import type { LeadEntity } from '@/types/crm.types'
 import { LEAD_STATUS_LABEL } from '@/types/crm.types'
-import { roleLabel, divisionLabel, tenantLabel } from '@/features/crm/crm.utils'
+import { roleLabel, contactPersonLabel, divisionLabel, tenantLabel } from '@/features/crm/crm.utils'
 import { toast } from '@/components/ui/sonner'
 
 // Matches the prototype's crmExportLeads()/QMS_EXPORT.openMaster() behavior:
@@ -12,7 +12,7 @@ const COLUMNS: { header: string; get: (lead: LeadEntity) => string | number }[] 
   { header: 'Title', get: (l) => l.title },
   { header: 'Company', get: (l) => tenantLabel(l.tenant) },
   { header: 'Division', get: (l) => divisionLabel(l.division) },
-  { header: 'Contact', get: (l) => roleLabel(l.contactPerson) },
+  { header: 'Contact', get: (l) => contactPersonLabel(l.contactPerson) },
   { header: 'Sales rep', get: (l) => roleLabel(l.salesPerson) },
   { header: 'Status', get: (l) => LEAD_STATUS_LABEL[l.status] },
   { header: 'Value (INR)', get: (l) => l.estimatedValue },

@@ -4,12 +4,12 @@ import type { LeadEntity, LeadStatus } from '@/types/crm.types'
 import { LEAD_STATUS_LABEL, LEAD_TRANSITION_MAP } from '@/types/crm.types'
 import { downloadLeadsCsv } from '@/features/crm/crm.export'
 import { formatINR, formatDate } from '@/utils/formatters'
-import { roleLabel, divisionLabel } from '@/features/crm/crm.utils'
+import { roleLabel, divisionLabel, tenantLabel } from '@/features/crm/crm.utils'
 import { Button } from '@/components/ui/button'
 import StagePill from '@/features/crm/components/StagePill'
 import LeadAdvanceModal from '@/features/crm/components/LeadAdvanceModal'
 
-const COLUMNS = ['Title', 'Contact / Division', 'Sales rep', 'Status', 'Value', 'Created', '']
+const COLUMNS = ['Title', 'Company', 'Division', 'Sales rep', 'Status', 'Value', 'Created', 'Actions']
 
 interface ListViewProps {
   leads: LeadEntity[]
@@ -42,7 +42,11 @@ const ListView = ({ leads, onOpen, onMoveStage, canManage }: ListViewProps) => {
         <thead>
           <tr style={{ borderBottom: '1px solid var(--qms-border)' }}>
             {COLUMNS.map((h) => (
-              <th key={h} className="text-left font-bold text-[11px] uppercase tracking-wider px-3 py-2 whitespace-nowrap" style={{ color: 'var(--qms-text-muted)' }}>
+              <th
+                key={h}
+                className={`font-bold text-[11px] uppercase tracking-wider px-3 py-2 whitespace-nowrap ${h === 'Value' ? 'text-right' : 'text-left'}`}
+                style={{ color: 'var(--qms-text-muted)' }}
+              >
                 {h}
               </th>
             ))}
@@ -61,17 +65,16 @@ const ListView = ({ leads, onOpen, onMoveStage, canManage }: ListViewProps) => {
                 style={{ borderBottom: '1px solid var(--qms-border)' }}
               >
                 <td className="px-3 py-2 font-bold whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>{lead.title}</td>
-                <td className="px-3 py-2 whitespace-nowrap">
-                  <div className="font-semibold" style={{ color: 'var(--qms-text)' }}>{roleLabel(lead.contactPerson)}</div>
-                  <div className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>{divisionLabel(lead.division)}</div>
-                </td>
+                <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>{tenantLabel(lead.tenant)}</td>
+                <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>{divisionLabel(lead.division)}</td>
                 <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>{roleLabel(lead.salesPerson)}</td>
                 <td className="px-3 py-2 whitespace-nowrap"><StagePill status={lead.status} /></td>
                 <td className="px-3 py-2 whitespace-nowrap font-bold text-right" style={{ color: 'var(--qms-text)' }}>{formatINR(lead.estimatedValue)}</td>
                 <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--qms-text-muted)' }}>{formatDate(lead.createdAt)}</td>
                 <td className="px-3 py-2 whitespace-nowrap">
-                  {lead.status === 'won' && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-success-soft text-success">WON</span>}
-                  {lead.status === 'lost' && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-danger-soft text-danger">LOST</span>}
+                  {isFinal && (
+                    <div className="flex justify-center" style={{ color: 'var(--qms-text-muted)' }}>-</div>
+                  )}
                   {canManage && !isFinal && nextStatuses.length > 0 && (
                     <div className="flex flex-wrap gap-1 justify-end">
                       {nextStatuses.map((to) => (

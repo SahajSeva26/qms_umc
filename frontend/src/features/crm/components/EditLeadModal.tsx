@@ -5,6 +5,7 @@ import { LEAD_PROJECT_TYPE_LABEL } from '@/types/crm.types'
 import type { UpdateLeadPayload } from '@/types/crm.types'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
+import { useContacts } from '@/features/contacts/hooks/useContacts'
 import { PLATFORM_TENANT_CODE } from '@/features/access-management/accessManagement.constants'
 import { editLeadSchema } from '@/features/crm/schemas/lead.schemas'
 import { THERAPIES, SPECIALTIES, CURRENT_ACTIVITIES, QMS_OFFERINGS } from '@/features/crm/crm.constants'
@@ -78,11 +79,18 @@ const EditLeadModal = ({ lead, onSave, onClose }: EditLeadModalProps) => {
 
   // Lead's own tenant is immutable here — contact person is scoped to it,
   // same rule the wizard enforces at create time (contactPerson.tenant must
-  // equal the lead's tenant, see lead.service.ts's create() guard).
+  // equal the lead's tenant, see lead.service.ts's create() guard). Sourced
+  // from Contacts, not Roles — Lead.contactPerson switched from a Role
+  // reference to a Contact reference 2026-08-03 (lead.model.ts's
+  // contactPerson.ref, lead.service.ts's set()).
+  // `enabled: !!tenantId` — NOT `{ limit: '0' }` (fixed 2026-08-03):
+  // Mongoose's `.find().limit(0)` means "no limit at all," not "return
+  // nothing" — a Lead always has a tenant in practice, so this branch rarely
+  // triggers, but it was still wrong in principle.
   const tenantId = typeof lead.tenant === 'string' ? lead.tenant : lead.tenant._id
-  const { data: contactRoleData, isLoading: contactRolesLoading, isError: contactRolesErrored } =
-    useRoles(tenantId ? { tenant: tenantId, status: 'active' } : { tenant: undefined })
-  const contactRoles = contactRoleData?.data?.items ?? []
+  const { data: contactPersonData, isLoading: contactPeopleLoading, isError: contactPeopleErrored } =
+    useContacts({ tenant: tenantId, status: 'active' }, { enabled: !!tenantId })
+  const contactPeople = contactPersonData?.data?.items ?? []
 
   const { data: tenantData, isError: tenantsErrored } = useTenants({ status: 'active' })
   // tenant.type is only present on the wire for a system:manage caller
@@ -197,18 +205,15 @@ const EditLeadModal = ({ lead, onSave, onClose }: EditLeadModalProps) => {
             <Label className={labelClasses} style={labelStyle}>Contact person *</Label>
             <Select value={form.contactPersonId} onValueChange={(v) => setField('contactPersonId', v as string)}>
               <SelectTrigger className={`w-full ${fieldClasses}`}>
-                <SelectValue placeholder={contactRolesLoading ? 'Loading...' : 'Select contact person...'}>
-                  {(v: string) => {
-                    const r = contactRoles.find((role) => role.id === v)
-                    return r ? `${r.name} (${r.code})` : contactRolesLoading ? 'Loading...' : 'Select contact person...'
-                  }}
+                <SelectValue placeholder={contactPeopleLoading ? 'Loading...' : 'Select contact person...'}>
+                  {(v: string) => contactPeople.find((c) => c.id === v)?.name ?? (contactPeopleLoading ? 'Loading...' : 'Select contact person...')}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {contactRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
+                {contactPeople.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
               </SelectContent>
             </Select>
-            {contactRolesErrored && (
+            {contactPeopleErrored && (
               <p className="text-[11px] mt-1 text-danger">Couldn't load contacts — try again.</p>
             )}
           </div>

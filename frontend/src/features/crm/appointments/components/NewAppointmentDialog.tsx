@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { FiUserPlus } from 'react-icons/fi'
 import type { AppointmentType, AppointmentMode } from '@/types/appointment.types'
-import { APPOINTMENT_TYPE_LABEL } from '@/types/appointment.types'
+import { APPOINTMENT_TYPE_LABEL, APPOINTMENT_MODE_LABEL } from '@/types/appointment.types'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { useDivisions } from '@/features/crm/hooks/useDivisions'
 import { useContacts } from '@/features/contacts/hooks/useContacts'
@@ -12,9 +12,11 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import DatePicker from '@/components/ui/DatePicker'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import InternalMembersPicker from '@/features/crm/appointments/components/InternalMembersPicker'
+import LeadIdPicker from '@/features/crm/appointments/components/LeadIdPicker'
 
 // Sentinel value for the inline "+ Add new contact" option inside the
 // Contact person <Select> — a real contact id is never this string, so it's
@@ -59,6 +61,7 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
   const [endTime, setEndTime] = useState(prefill ? `${String(prefill.hour + 1).padStart(2, '0')}:00` : '11:00')
   const [destinationLink, setDestinationLink] = useState('')
   const [leadId, setLeadId] = useState('')
+  const [leadLabel, setLeadLabel] = useState('')
   const [agendaPublic, setAgendaPublic] = useState('')
   const [agendaPrivate, setAgendaPrivate] = useState('')
   const [nextSteps, setNextSteps] = useState('')
@@ -87,11 +90,16 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
   const tenants = tenantData?.data?.items ?? []
 
   const { data: divisionData, isLoading: divisionsLoading, isError: divisionsErrored } =
-    useDivisions(tenantId ? { tenantId } : { tenantId: undefined })
+    useDivisions({ tenantId: tenantId || undefined }, !!tenantId)
   const divisions = tenantId ? divisionData?.data?.items ?? [] : []
 
+  // `enabled: !!tenantId` — NOT `{ limit: '0' }` (the prior approach, fixed
+  // 2026-08-03): Mongoose's `.find().limit(0)` means "no limit at all," not
+  // "return nothing" — `limit: '0'` was silently fetching every contact in
+  // the system, unscoped, before a company was even picked. Confirmed live:
+  // GET /contacts?limit=0 returned all 16+ real contacts, not zero.
   const { data: contactData, isLoading: contactsLoading, isError: contactsErrored } =
-    useContacts(tenantId ? { tenant: tenantId, status: 'active' } : { limit: '0' })
+    useContacts({ tenant: tenantId || undefined, status: 'active' }, { enabled: !!tenantId })
   const contacts = tenantId ? contactData?.data?.items ?? [] : []
 
   const createAppointment = useCreateAppointment()
@@ -141,6 +149,7 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
     setEndTime('11:00')
     setDestinationLink('')
     setLeadId('')
+    setLeadLabel('')
     setAgendaPublic('')
     setAgendaPrivate('')
     setNextSteps('')
@@ -239,8 +248,8 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
 
           {type === 'follow-up' && (
             <div>
-              <Label className={labelClasses} style={labelStyle}>Linked lead ID *</Label>
-              <Input value={leadId} onChange={(e) => setLeadId(e.target.value)} className="text-[13px]" placeholder="Lead ObjectId" />
+              <Label className={labelClasses} style={labelStyle}>Linked lead *</Label>
+              <LeadIdPicker value={leadId} label={leadLabel} onChange={(id, label) => { setLeadId(id); setLeadLabel(label) }} />
             </div>
           )}
 
@@ -338,33 +347,33 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
             </div>
           </div>
 
-          <div>
-            <Label className={labelClasses} style={labelStyle}>Mode</Label>
-            <div className="flex gap-1.5">
-              {(['online', 'offline', 'call'] as AppointmentMode[]).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setMode(m)}
-                  className="text-[12px] font-semibold px-3 py-1.5 rounded-lg border transition-all"
-                  style={
-                    mode === m
-                      ? { background: 'var(--qms-brand)', borderColor: 'var(--qms-brand)', color: '#fff' }
-                      : { background: 'var(--qms-surface-strong)', borderColor: 'var(--qms-border)', color: 'var(--qms-text-soft)' }
-                  }
-                >
-                  {m === 'online' ? 'Online' : m === 'offline' ? 'In person' : 'Call'}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {mode !== 'call' && (
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className={labelClasses} style={labelStyle}>Meeting/map link</Label>
-              <Input value={destinationLink} onChange={(e) => setDestinationLink(e.target.value)} className="text-[13px]" placeholder="https://meet.google.com/..." />
+              <Label className={labelClasses} style={labelStyle}>Mode</Label>
+              <Select value={mode} onValueChange={(v) => setMode(v as AppointmentMode)}>
+                <SelectTrigger className="w-full text-[13px]">
+                  <SelectValue>{(v: string) => APPOINTMENT_MODE_LABEL[v as AppointmentMode]}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {(['online', 'offline', 'call'] as AppointmentMode[]).map((m) => (
+                    <SelectItem key={m} value={m}>{APPOINTMENT_MODE_LABEL[m]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          )}
+
+            {mode !== 'call' && (
+              <div>
+                <Label className={labelClasses} style={labelStyle}>{mode === 'online' ? 'Meeting link' : 'Map link'}</Label>
+                <Input
+                  value={destinationLink}
+                  onChange={(e) => setDestinationLink(e.target.value)}
+                  className="text-[13px]"
+                  placeholder={mode === 'online' ? 'https://meet.google.com/...' : 'https://maps.google.com/...'}
+                />
+              </div>
+            )}
+          </div>
 
           <div>
             <Label className={labelClasses} style={labelStyle}>Additional persons — QMS side</Label>
@@ -374,7 +383,7 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
           <div className="grid grid-cols-3 gap-3">
             <div>
               <Label className={labelClasses} style={labelStyle}>Date *</Label>
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="text-[13px]" />
+              <DatePicker value={date} onChange={setDate} className="w-full text-[13px]" />
             </div>
             <div>
               <Label className={labelClasses} style={labelStyle}>Start *</Label>
@@ -383,6 +392,9 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
             <div>
               <Label className={labelClasses} style={labelStyle}>End</Label>
               <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="text-[13px]" />
+              {endTime && startTime && endTime <= startTime && (
+                <p className="text-[11px] mt-1 text-danger">End time must be after start time</p>
+              )}
             </div>
           </div>
 

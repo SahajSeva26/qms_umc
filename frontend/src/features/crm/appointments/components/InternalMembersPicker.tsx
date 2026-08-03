@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { FiUserPlus, FiX } from 'react-icons/fi'
 import { Input } from '@/components/ui/input'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
+import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
+import { PLATFORM_TENANT_CODE } from '@/features/access-management/accessManagement.constants'
 import type { RoleEntity } from '@/types/accessManagement.types'
 
 interface SelectedMember {
@@ -27,12 +29,28 @@ interface InternalMembersPickerProps {
 // open/close with plain state + a click-outside listener instead). Clicking
 // a result adds it as a removable chip below. Debounced locally (300ms)
 // since every keystroke would otherwise fire a fresh search request.
+//
+// "QMS side" means the platform tenant specifically — the search is scoped
+// to it via `tenant: platformTenant.id` (found 2026-08-03: without this, a
+// platform-tenant caller's search is entirely unscoped server-side —
+// role.service.ts's search() only restricts a CUSTOMER-tenant caller from
+// leaking across tenants; a platform caller sees every tenant's roles by
+// default — so this field was silently offering customer-side admins, e.g.
+// "cipla pvt ltd's admin role," as if they were QMS internal staff).
 const InternalMembersPicker = ({ selected, onChange }: InternalMembersPickerProps) => {
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [open, setOpen] = useState(false)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const containerRef = useRef<HTMLDivElement>(null)
+
+  const { data: tenantData } = useTenants({ status: 'active' })
+  // tenant.type is only present on the wire for a system:manage caller
+  // (TenantMapper.toResponse) — code is always present regardless of
+  // permission, so match on it as a fallback. Same pattern already used by
+  // WizardStep4.tsx/WizardStep5.tsx/EditProjectModal.tsx for this exact
+  // platform-tenant lookup.
+  const platformTenant = tenantData?.data?.items.find((t) => t.type === 'platform' || t.code === PLATFORM_TENANT_CODE)
 
   useEffect(() => {
     clearTimeout(timeoutRef.current)
@@ -51,8 +69,15 @@ const InternalMembersPicker = ({ selected, onChange }: InternalMembersPickerProp
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [open])
 
+  // `enabled: !!debouncedQuery.trim() && !!platformTenant` — NOT `{ limit:
+  // '0' }` (fixed 2026-08-03): Mongoose's `.find().limit(0)` means "no limit
+  // at all," not "return nothing" — this was silently fetching every role in
+  // the system, unscoped, whenever the search box was empty (its default
+  // state). `tenant: platformTenant.id` scopes the search to QMS internal
+  // staff only, matching this field's own "QMS side" label.
   const { data, isFetching } = useRoles(
-    debouncedQuery.trim() ? { user: debouncedQuery.trim(), status: 'active', limit: '10' } : { limit: '0' },
+    { user: debouncedQuery.trim(), tenant: platformTenant?.id, status: 'active', limit: '10' },
+    !!debouncedQuery.trim() && !!platformTenant,
   )
   const results = data?.data?.items ?? []
   const selectedIds = new Set(selected.map((m) => m.roleId))
@@ -117,11 +142,11 @@ const InternalMembersPicker = ({ selected, onChange }: InternalMembersPickerProp
             <span
               key={m.roleId}
               className="flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-full"
-              style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text)' }}
+              style={{ background: 'var(--qms-brand)', color: '#fff' }}
             >
               {m.label}
               <button type="button" onClick={() => removeMember(m.roleId)} aria-label={`Remove ${m.label}`}>
-                <FiX size={12} style={{ color: 'var(--qms-text-muted)' }} />
+                <FiX size={12} style={{ color: '#fff' }} />
               </button>
             </span>
           ))}

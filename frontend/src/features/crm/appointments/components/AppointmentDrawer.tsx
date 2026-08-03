@@ -50,6 +50,20 @@ const refName = (ref: unknown, fallback = '—'): string => {
   return obj.name ?? fallback
 }
 
+// Lead's own populated shape uses `title`, not `name` (appointment.
+// service.ts's populate array: `{ path: 'lead', select: 'code title status' }`)
+// — a real crash found 2026-08-04: the old call site cast the raw Lead
+// object itself as the fallback string (`refName(lead, lead as string)`),
+// which meant refName's `obj.name` miss returned the OBJECT as "the
+// fallback string," and that object got rendered directly into JSX
+// (React error #31, "object with keys {_id, code, status, title}").
+const leadRefName = (ref: unknown, fallback = '—'): string => {
+  if (!ref) return fallback
+  if (typeof ref === 'string') return ref
+  const obj = ref as { title?: string }
+  return obj.title ?? fallback
+}
+
 type PanelKind = 'moveStage' | 'reschedule' | null
 
 interface AppointmentDrawerProps {
@@ -191,7 +205,7 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
           },
           { label: 'Mode', value: APPOINTMENT_MODE_LABEL[appointment.mode] },
           { label: 'Link', value: appointment.destinationLink || undefined },
-          { label: 'Linked lead', value: appointment.lead ? refName(appointment.lead, appointment.lead as string) : undefined },
+          { label: 'Linked lead', value: appointment.lead ? leadRefName(appointment.lead) : undefined },
           { label: 'Parent appointment', value: appointment.parent ? refName(appointment.parent) : undefined },
         ]}
       />

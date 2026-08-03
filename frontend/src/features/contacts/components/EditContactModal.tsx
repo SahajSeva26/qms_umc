@@ -76,8 +76,32 @@ const EditContactModalForm = ({ contact, onClose }: EditContactModalFormProps) =
   // attempt. Only platform staff need this picker at all.
   const { sessionPermissions } = usePermission()
   const needsTenantPicker = !isEdit && sessionPermissions?.tenantType === 'platform'
-  const { data: tenantsData } = useTenants(needsTenantPicker ? {} : { limit: '0' })
+  // `enabled: needsTenantPicker` — NOT `{ limit: '0' }` (fixed 2026-08-03):
+  // Mongoose's `.find().limit(0)` means "no limit at all," not "return
+  // nothing" — this was silently fetching every tenant in the system,
+  // unscoped, whenever this picker wasn't even shown.
+  const { data: tenantsData } = useTenants({}, needsTenantPicker)
   const tenants = tenantsData?.data?.items ?? []
+
+  // Type on CREATE is never a manual choice — it's derived from the target
+  // company, hidden from this form entirely (2026-08-03). Two cases:
+  // 1. No picker (customer-tenant caller, force-pinned server-side): use the
+  //    caller's OWN tenant type from the session — always available, no
+  //    permission gate (it's "what tenant am I," not "tell me about another
+  //    tenant").
+  // 2. Picker shown (platform-tenant caller choosing someone else's
+  //    company): GET /tenants only includes `type` for a caller holding
+  //    system:manage (tenant.mapper.ts's toResponse gate) — most platform
+  //    staff creating a contact do NOT hold that permission, so the picked
+  //    tenant's `type` is usually invisible to this form. Best-effort: use
+  //    it if visible (system:manage caller), else default to 'customer' —
+  //    the overwhelmingly common case (adding a contact FOR a customer
+  //    company), matching the backend's own Contact.type schema default.
+  const deriveCreateType = (): ContactType => {
+    if (!needsTenantPicker) return (sessionPermissions?.tenantType as ContactType) ?? 'customer'
+    const selected = tenants.find((t) => t.id === tenant)
+    return (selected?.type as ContactType) ?? 'customer'
+  }
 
   const createContact = useCreateContact()
   const updateContact = useUpdateContact(contact?.id ?? '')
@@ -107,7 +131,7 @@ const EditContactModalForm = ({ contact, onClose }: EditContactModalFormProps) =
           toast.error('Select a company')
           return
         }
-        const result = createContactSchema.safeParse({ ...draft, tenant: tenant || undefined })
+        const result = createContactSchema.safeParse({ ...draft, tenant: tenant || undefined, type: deriveCreateType() })
         if (!result.success) {
           toast.error(result.error.issues[0].message)
           return
@@ -162,17 +186,19 @@ const EditContactModalForm = ({ contact, onClose }: EditContactModalFormProps) =
             <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Designation</label>
             <Input value={draft.designation} onChange={(e) => setDraft((p) => ({ ...p, designation: e.target.value }))} />
           </div>
-          <div>
-            <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Type</label>
-            <Select value={draft.type} onValueChange={(v) => setDraft((p) => ({ ...p, type: v as ContactType }))}>
-              <SelectTrigger className="w-full text-[13px]">
-                <SelectValue>{(v: string) => TYPE_OPTIONS.find((t) => t.value === v)?.label ?? v}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {TYPE_OPTIONS.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
+          {isEdit && (
+            <div>
+              <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Type</label>
+              <Select value={draft.type} onValueChange={(v) => setDraft((p) => ({ ...p, type: v as ContactType }))}>
+                <SelectTrigger className="w-full text-[13px]">
+                  <SelectValue>{(v: string) => TYPE_OPTIONS.find((t) => t.value === v)?.label ?? v}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {TYPE_OPTIONS.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div>
             <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Email</label>
             <Input value={draft.email} onChange={(e) => setDraft((p) => ({ ...p, email: e.target.value }))} />

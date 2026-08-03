@@ -15,7 +15,7 @@
 // exists for it. The lead picker restricts to status=won as a UX-only
 // convention; it is not a hard backend rule.
 
-import type { DivisionTherapy } from './crm.types'
+import type { DivisionTherapy, LeadPopulatedContact } from './crm.types'
 
 // ---------------------------------------------------------------------------
 // Enums / constants
@@ -253,10 +253,11 @@ export interface ProjectPopulatedLead {
   status: string
 }
 
-// Reused for salesRep/projectCoordinator/marketingContact — all three
-// populate as the full Role document (project.service.ts's populate array has
-// no `select` for these, same over-fetch pattern as Lead's contactPerson/
-// salesPerson). Only the fields actually consumed here are typed.
+// Reused for salesRep/projectCoordinator — both populate as the full Role
+// document (project.service.ts's populate array has no `select` for these,
+// same over-fetch pattern as Lead's salesPerson). Only the fields actually
+// consumed here are typed. marketingContact switched to a Contact reference
+// 2026-08-03 (see LeadPopulatedContact import) — no longer this type.
 export interface ProjectPopulatedRole {
   _id?: string
   code: string
@@ -302,7 +303,10 @@ export interface ProjectEntity {
   whoCanBookCamp: WhoCanBookCampCode[]
   salesRep: ProjectPopulatedRole | string
   projectCoordinator: ProjectPopulatedRole | string
-  marketingContact: ProjectPopulatedRole | string
+  // Contact reference, not Role — switched 2026-08-03 (project.model.ts's
+  // marketingContact.ref, project.service.ts's set() now calls
+  // ContactService.get() instead of RoleService.get()).
+  marketingContact: LeadPopulatedContact | string
   paymentTerms: PaymentTerms
   status: ProjectStatus
   stageHistory: ProjectStageHistoryEntry[]

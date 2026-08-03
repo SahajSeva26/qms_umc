@@ -27,7 +27,7 @@ const CrmFilterBar = ({ filters, setFilter, reset }: CrmFilterBarProps) => (
         type="text"
         value={filters.q}
         onChange={(e) => setFilter('q', e.target.value)}
-        placeholder="Search title, contact, division..."
+        placeholder="Search title..."
         className="pl-7 text-[12px]"
       />
     </div>

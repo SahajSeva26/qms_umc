@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { WizardFormState } from '@/features/crm/wizard.types'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { useDivisions } from '@/features/crm/hooks/useDivisions'
-import { useRoles } from '@/features/access-management/role/hooks/useRoles'
+import { useContacts } from '@/features/contacts/hooks/useContacts'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -21,11 +21,22 @@ const WizardStep1 = ({ form, setField }: WizardStep1Props) => {
   const { data: tenantData, isLoading: tenantsLoading, isError: tenantsErrored } = useTenants({ name: tenantSearch || undefined, status: 'active' })
   const tenants = tenantData?.data?.items ?? []
 
-  const { data: divisionData, isLoading: divisionsLoading, isError: divisionsErrored } = useDivisions(form.tenantId ? { tenantId: form.tenantId } : { tenantId: undefined })
+  // Both gated on `!!form.tenantId` — neither should fire an unscoped,
+  // every-tenant call before a company is actually picked (was firing on
+  // mount, before this fix: Divisions returned whichever companies' divisions
+  // happened to sort first, Roles returned whichever tenant's roles sorted
+  // first — both wrong-scoped and both wasted, since this step is unusable
+  // without a company selected anyway).
+  const { data: divisionData, isLoading: divisionsLoading, isError: divisionsErrored } = useDivisions({ tenantId: form.tenantId || undefined }, !!form.tenantId)
   const divisions = form.tenantId ? divisionData?.data?.items ?? [] : []
 
-  const { data: roleData, isLoading: rolesLoading, isError: contactRolesErrored } = useRoles(form.tenantId ? { tenant: form.tenantId, status: 'active' } : { tenant: undefined })
-  const contactRoles = form.tenantId ? roleData?.data?.items ?? [] : []
+  // Backend switched Lead.contactPerson from a Role reference to a Contact
+  // reference 2026-08-03 (lead.model.ts's contactPerson.ref, lead.service.ts's
+  // set() now calls ContactService.get() instead of RoleService.get()) — this
+  // picker follows that change; previously deliberately sourced from Roles
+  // per the old ref, now Contacts per the new one.
+  const { data: contactData, isLoading: contactsLoading, isError: contactsErrored } = useContacts({ tenant: form.tenantId || undefined, status: 'active' }, { enabled: !!form.tenantId })
+  const contactPeople = form.tenantId ? contactData?.data?.items ?? [] : []
 
   const selectTenant = (tenantId: string) => {
     const tenant = tenants.find((t) => t.id === tenantId)
@@ -43,10 +54,10 @@ const WizardStep1 = ({ form, setField }: WizardStep1Props) => {
     setField('divisionLabel', division?.name ?? '')
   }
 
-  const selectContactPerson = (roleId: string) => {
-    const role = contactRoles.find((r) => r.id === roleId)
-    setField('contactPersonId', roleId)
-    setField('contactPersonLabel', role?.name ?? '')
+  const selectContactPerson = (contactId: string) => {
+    const contactPerson = contactPeople.find((c) => c.id === contactId)
+    setField('contactPersonId', contactId)
+    setField('contactPersonLabel', contactPerson?.name ?? '')
   }
 
   return (
@@ -108,22 +119,19 @@ const WizardStep1 = ({ form, setField }: WizardStep1Props) => {
         <Label className={labelClasses} style={labelStyle}>Contact person *</Label>
         <Select value={form.contactPersonId} onValueChange={(v) => selectContactPerson(v as string)} disabled={!form.tenantId}>
           <SelectTrigger className={`w-full ${fieldClasses}`}>
-            <SelectValue placeholder={!form.tenantId ? 'Select a company first' : rolesLoading ? 'Loading...' : 'Select contact person...'}>
-              {(v: string) => {
-                const r = contactRoles.find((role) => role.id === v)
-                return r ? `${r.name} (${r.code})` : rolesLoading ? 'Loading...' : 'Select contact person...'
-              }}
+            <SelectValue placeholder={!form.tenantId ? 'Select a company first' : contactsLoading ? 'Loading...' : 'Select contact person...'}>
+              {(v: string) => contactPeople.find((c) => c.id === v)?.name ?? (contactsLoading ? 'Loading...' : 'Select contact person...')}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            {contactRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
+            {contactPeople.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
           </SelectContent>
         </Select>
-        {contactRolesErrored && (
+        {contactsErrored && (
           <p className="text-[11px] mt-1 text-danger">Couldn't load contacts — try again.</p>
         )}
-        {!contactRolesErrored && !rolesLoading && form.tenantId && contactRoles.length === 0 && (
-          <p className="text-[11px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>This company has no roles to pick as a contact yet.</p>
+        {!contactsErrored && !contactsLoading && form.tenantId && contactPeople.length === 0 && (
+          <p className="text-[11px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>This company has no contacts yet.</p>
         )}
       </div>
 

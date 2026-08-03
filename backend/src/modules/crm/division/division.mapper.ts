@@ -22,8 +22,13 @@ export const DivisionMapper = {
         
         if (ctx.hasAnyPermissions([DIVISION_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.ADMIN.code])) {
             result.status = division.status;
-            // the division head role — mapped when populated (get/search), bare id otherwise (create)
-            result.owner = division.owner?._id ? division.owner._id : division.owner;
+            // the division head role — mapped through RoleMapper when populated (get/search;
+            // a populated role carries `code`), bare id otherwise (create response)
+            if (division.owner?.code) {
+                result.owner = RoleMapper.toResponse(division.owner);
+            } else {
+                result.owner = division.owner?._id ?? division.owner;
+            }
         }
         return result;
     },

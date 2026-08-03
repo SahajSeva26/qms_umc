@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { FiUserPlus, FiX } from 'react-icons/fi'
 import { Input } from '@/components/ui/input'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import type { RoleEntity } from '@/types/accessManagement.types'
 
@@ -19,20 +18,38 @@ interface InternalMembersPickerProps {
 // search(), 2026-07-27 — resolves against the linked user's first/last name
 // or email server-side). No existing multi-select-with-search component in
 // this codebase to reuse, so this is a small, self-contained picker: an
-// Input opens a Popover of live-matched roles; clicking one adds it as a
-// removable chip below. Debounced locally (300ms) since every keystroke
-// would otherwise fire a fresh search request.
+// Input with a plain, manually-positioned results list underneath (NOT a
+// base-ui Popover — Popover.Trigger manages its own focus/open state around
+// a single click-to-toggle button, which fights a live text input that
+// needs to keep keyboard focus while the user types; that mismatch caused
+// the list to flash open and immediately close, blocking typing entirely —
+// fixed 2026-08-01 by dropping Popover for this field and controlling
+// open/close with plain state + a click-outside listener instead). Clicking
+// a result adds it as a removable chip below. Debounced locally (300ms)
+// since every keystroke would otherwise fire a fresh search request.
 const InternalMembersPicker = ({ selected, onChange }: InternalMembersPickerProps) => {
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [open, setOpen] = useState(false)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     clearTimeout(timeoutRef.current)
     timeoutRef.current = setTimeout(() => setDebouncedQuery(query), 300)
     return () => clearTimeout(timeoutRef.current)
   }, [query])
+
+  useEffect(() => {
+    if (!open) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [open])
 
   const { data, isFetching } = useRoles(
     debouncedQuery.trim() ? { user: debouncedQuery.trim(), status: 'active', limit: '10' } : { limit: '0' },
@@ -50,6 +67,7 @@ const InternalMembersPicker = ({ selected, onChange }: InternalMembersPickerProp
     onChange([...selected, { roleId: role.id, label: roleLabel(role) }])
     setQuery('')
     setDebouncedQuery('')
+    setOpen(false)
   }
 
   const removeMember = (roleId: string) => {
@@ -57,17 +75,18 @@ const InternalMembersPicker = ({ selected, onChange }: InternalMembersPickerProp
   }
 
   return (
-    <div>
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger className="w-full">
-          <Input
-            placeholder="Search by name or email..."
-            value={query}
-            onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
-            onFocus={() => setOpen(true)}
-          />
-        </PopoverTrigger>
-        <PopoverContent align="start" className="p-1.5 w-full max-w-md">
+    <div ref={containerRef} className="relative">
+      <Input
+        placeholder="Search by name or email..."
+        value={query}
+        onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
+        onFocus={() => setOpen(true)}
+      />
+
+      {open && (
+        <div
+          className="absolute left-0 right-0 top-full mt-1 z-50 p-1.5 rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10"
+        >
           {isFetching && (
             <div className="text-[12px] px-2 py-2" style={{ color: 'var(--qms-text-muted)' }}>Searching…</div>
           )}
@@ -89,8 +108,8 @@ const InternalMembersPicker = ({ selected, onChange }: InternalMembersPickerProp
               <span className="truncate">{roleLabel(role)}</span>
             </button>
           ))}
-        </PopoverContent>
-      </Popover>
+        </div>
+      )}
 
       {selected.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-2">

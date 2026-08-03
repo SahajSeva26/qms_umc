@@ -12,7 +12,7 @@ import { DivisionService } from '../../crm/division/division.service';
 import { PERMISSIONS_ARRAY, SYSTEM_PERMISSIONS } from '../../../shared/env/permissions';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { PermissionGroupModel } from '../permission-group/permissionGroup.model';
-import { TENANT_PERMISSIONS } from '../tenant/tenant.constants';
+import { TENANT_PERMISSIONS, TENANT_TYPE } from '../tenant/tenant.constants';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
 
 type RoleDoc = HydratedDocument<IRoleDocument> | null;
@@ -80,9 +80,14 @@ const set = async (model: any, entity: HydratedDocument<IRoleDocument>, ctx: Req
         // the division must exist AND belong to the role's own tenant (coherence) — a mismatch
         // returns a vague 404 on purpose, mirroring the role-type guard above. Comparing against
         // entity.tenant (not ctx) also stops a system user from linking a division from elsewhere.
-        const division: any = await DivisionService.get(model.division, ctx);
-        if (!division || division.tenant.toString() !== entity.tenant.toString()) {
+        // Fetch populated so division.tenant is the tenant doc (id + type), not just an id.
+        const division: any = await DivisionService.get(model.division, ctx, { populate: true });
+        if (!division || division.tenant._id.toString() !== entity.tenant.toString()) {
             throwAppError('Division not found', StatusCodes.NOT_FOUND);
+        }
+        // a division may only be assigned to a role on a customer-type tenant
+        if (division.tenant.type !== TENANT_TYPE.CUSTOMER) {
+            throwAppError('Division can only be assigned to a customer tenant', StatusCodes.BAD_REQUEST);
         }
         entity.division = toObjectId(model.division);
     }

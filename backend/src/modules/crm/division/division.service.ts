@@ -19,7 +19,7 @@ type DivisionDocument = HydratedDocument<IDivision> | null;
 const populate: any[] = [
     {
         path: 'tenant',
-        select: 'name code',
+        select: 'name code type',
     },
     {
         // the division head role — populate its user + role type so reads surface who the head is

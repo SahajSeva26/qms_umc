@@ -48,10 +48,10 @@ export type IUpdateDivisionPayload = z.infer<
 
 //3: search ====================================>
 export const SearchDivisionQuerySchema = z.object({
-    tenantId: z
+    tenant: z
         .string()
         .refine((val) => isValidObjectID(val), {
-            message: 'tenantId must be a valid ObjectId',
+            message: 'tenant must be a valid ObjectId',
         })
         .optional()
         .openapi({ example: '64f0c2a1b3d4e5f6a7b8c9d0' }),

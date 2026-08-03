@@ -5,6 +5,8 @@ import { DOCTOR_PERMISSIONS } from '../../modules/doctor/doctor.constants';
 import { CAMP_PERMISSIONS } from '../../modules/operations/camp/camp.constants';
 import { TENANT_PERMISSIONS } from '../../modules/access-management/tenant/tenant.constants';
 import { DIVISION_PERMISSIONS } from '../../modules/crm/division/division.constants';
+import { CONTACT_PERMISSIONS } from '../../modules/crm/contact/contact.constants';
+import { ROLE_PERMISSIONS } from '../../modules/access-management/role/role.constants';
 
 // CRM ROLE TYPES
 export const CRM_BUSINESS_ROLE_TYPES = [
@@ -16,6 +18,9 @@ export const CRM_BUSINESS_ROLE_TYPES = [
             TENANT_PERMISSIONS.SEARCH.code,
             TENANT_PERMISSIONS.GET.code,
 
+            ROLE_PERMISSIONS.SEARCH.code,
+            ROLE_PERMISSIONS.GET.code,
+
             LEAD_PERMISSIONS.SEARCH.code,
             LEAD_PERMISSIONS.CREATE.code,
             LEAD_PERMISSIONS.UPDATE.code,
@@ -26,6 +31,9 @@ export const CRM_BUSINESS_ROLE_TYPES = [
             APPOINTMENT_PERMISSIONS.UPDATE.code,
             APPOINTMENT_PERMISSIONS.GET.code,
             APPOINTMENT_PERMISSIONS.RSVP.code,
+
+            CONTACT_PERMISSIONS.SEARCH.code,
+            CONTACT_PERMISSIONS.GET.code,
         ],
     },
     {
@@ -38,7 +46,11 @@ export const CRM_BUSINESS_ROLE_TYPES = [
             TENANT_PERMISSIONS.SEARCH.code,
             TENANT_PERMISSIONS.GET.code,
 
+            ROLE_PERMISSIONS.SEARCH.code,
+            ROLE_PERMISSIONS.GET.code,
+
             DIVISION_PERMISSIONS.MANAGE.code,
+            CONTACT_PERMISSIONS.MANAGE.code,
         ],
     },
 ];

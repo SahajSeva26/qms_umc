@@ -12,6 +12,7 @@ import { isValidObjectID } from '../../../shared/utils/strings';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { LeadService } from '../lead/lead.service';
 import { RoleService } from '../../access-management/role/role.service';
+import { ContactService } from '../contact/contact.service';
 import { TENANT_TYPE } from '../../access-management/tenant/tenant.constants';
 
 type ProjectDocument = HydratedDocument<IProject> | null;
@@ -29,8 +30,8 @@ const populate: any[] = [
 // HELPERS
 // ========================================================================================
 
-// team members (salesRep/projectCoordinator/marketingContact) must exist and be QMS internal
-// (platform) staff — QMS owns project execution in the two-sided model.
+// QMS-internal team members (salesRep/projectCoordinator) must exist and be platform staff —
+// QMS owns project execution in the two-sided model. (marketingContact is customer-side, checked separately.)
 const assertPlatformStaff = async (roleId: string, label: string, ctx: RequestContext) => {
     const role = await RoleService.get(roleId, ctx, { populate: true });
     if (!role) {
@@ -55,10 +56,10 @@ const set = async (model: any, entity: HydratedDocument<IProject>, ctx: RequestC
         await assertPlatformStaff(model.projectCoordinator, 'Project coordinator', ctx);
         entity.projectCoordinator = model.projectCoordinator;
     }
-    // marketingContact is the CUSTOMER-side contact — must belong to the project's own tenant
-    // (the pharma company). entity.tenant is set before set() runs (derived from the lead).
+    // marketingContact is the CUSTOMER-side contact (a Contact record) — must belong to the
+    // project's own tenant (the pharma company). entity.tenant is set before set() runs (derived from the lead).
     if (model.marketingContact) {
-        const marketingContact = await RoleService.get(model.marketingContact, ctx, { populate: true });
+        const marketingContact = await ContactService.get(model.marketingContact, ctx, { populate: true });
         if (!marketingContact) {
             return throwAppError('Marketing contact not found', StatusCodes.NOT_FOUND);
         }

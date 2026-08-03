@@ -235,7 +235,7 @@ const projectSchema = new mongoose.Schema(
         },
         marketingContact: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: 'Role',
+            ref: 'Contact',
             required: [true, 'Marketing contact is required'],
         },
         paymentTerms: {

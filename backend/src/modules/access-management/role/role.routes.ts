@@ -10,6 +10,7 @@ import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
 import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
 import { PERMISSIONS } from '../../../shared/env/permissions';
 import { TENANT_PERMISSIONS } from '../tenant/tenant.constants';
+import { ROLE_PERMISSIONS } from './role.constants';
 
 export const RoleRouter = express.Router();
 
@@ -103,7 +104,11 @@ registry.registerPath({
 
 RoleRouter.get(
     '/:id',
-    AuthorizeMiddleware([TENANT_PERMISSIONS.ADMIN.code, TENANT_PERMISSIONS.MANAGE.code]),
+    AuthorizeMiddleware([
+        TENANT_PERMISSIONS.ADMIN.code,
+        TENANT_PERMISSIONS.MANAGE.code,
+        ROLE_PERMISSIONS.GET.code,
+    ]),
     RoleController.get,
 );
 RoleRouter.put(
@@ -113,7 +118,11 @@ RoleRouter.put(
 );
 RoleRouter.get(
     '/',
-    AuthorizeMiddleware([TENANT_PERMISSIONS.ADMIN.code, TENANT_PERMISSIONS.MANAGE.code]),
+    AuthorizeMiddleware([
+        TENANT_PERMISSIONS.ADMIN.code,
+        TENANT_PERMISSIONS.MANAGE.code,
+        ROLE_PERMISSIONS.SEARCH.code,
+    ]),
     RoleController.search,
 );
 RoleRouter.post(

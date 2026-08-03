@@ -9,6 +9,7 @@ import { isValidObjectID } from '../../../shared/utils/strings';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { DivisionService } from '../division/division.service';
 import { RoleService } from '../../access-management/role/role.service';
+import { ContactService } from '../contact/contact.service';
 import { TENANT_TYPE } from '../../access-management/tenant/tenant.constants';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
 import { CounterService } from '../../counter/counter.service';
@@ -30,7 +31,7 @@ const set = async (model: any, entity: HydratedDocument<ILead>, ctx: RequestCont
     // contactPerson must exist and belong to the lead's own tenant (the pharma company).
     // entity.tenant is set before set() runs — derived from division on create, loaded doc on update.
     if (model.contactPerson) {
-        const contactPerson = await RoleService.get(model.contactPerson, ctx, { populate: true });
+        const contactPerson = await ContactService.get(model.contactPerson, ctx, { populate: true });
         if (!contactPerson) {
             return throwAppError('Contact person not found', StatusCodes.NOT_FOUND);
         }

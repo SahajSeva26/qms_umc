@@ -55,7 +55,7 @@ const leadSchema = new mongoose.Schema(
         },
         contactPerson: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: 'Role',
+            ref: 'Contact',
             required: true,
         },
 

@@ -203,8 +203,11 @@ const create = async (model: ICreateRolePayload, ctx: RequestContext): Promise<H
     //1: validate tenant exists
     const tenantPromise = TenantService.get(model.tenant, ctx);
 
-    //3: check for duplicate code
-    const existingRolePromise = RoleService.get(model.code, ctx);
+    //3: check for duplicate code — scoped to the TARGET tenant, matching the DB unique index
+    // { tenant, code }. Not RoleService.get(code, ctx): that runs under ctx.where(), which is
+    // unscoped for a god-mode (system:manage) actor and would wrongly match a same-coded role in
+    // another tenant (e.g. the seeded system tenant's `admin`), 409-ing every new tenant's admin.
+    const existingRolePromise = RoleModel.findOne({ tenant: toObjectId(model.tenant), code: model.code });
 
     let [tenant, existingRole] = await Promise.all([tenantPromise, existingRolePromise]);
 

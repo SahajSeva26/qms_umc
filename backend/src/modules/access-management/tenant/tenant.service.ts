@@ -200,7 +200,11 @@ const createTenant = async (model: ICreateTenantPayload, ctx: RequestContext) =>
             //4: create role (RoleService.create creates + links the owner user)
             const role = await RoleService.create(
                 {
-                    code: `${tenant.code}.admin`,
+                    // flat `admin` code — roles are unique per (tenant, code), so no tenant prefix
+                    // is needed. Keeps parity with the seeded system tenant (seedSystemUser creates
+                    // its admin role as plain `admin` too) so supervisor resolution finds the admin
+                    // role by the same code in both the seeded and runtime-created tenants.
+                    code: ALLOWED_ROLETYPE_CODES.PLATFORM.ADMIN,
                     name: `${tenant.name}'s admin role`,
                     description: `${tenant.name}'s admin role`,
                     tenant: tenant._id.toString(),

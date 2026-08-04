@@ -1,6 +1,6 @@
 import type { LeadEntity } from '@/types/crm.types'
 import { LEAD_PROJECT_TYPE_LABEL } from '@/types/crm.types'
-import { roleLabel, roleCode, tenantLabel, divisionLabel } from '@/features/crm/crm.utils'
+import { roleLabel, contactPersonLabel, tenantLabel, divisionLabel } from '@/features/crm/crm.utils'
 import KeyValueGrid from '@/components/ui/KeyValueGrid'
 import UserAvatar from '@/components/ui/UserAvatar'
 import { formatDate } from '@/utils/formatters'
@@ -17,7 +17,7 @@ const OverviewTab = ({ lead }: OverviewTabProps) => (
         { label: 'Lead ID', value: lead.id },
         { label: 'Company', value: tenantLabel(lead.tenant) },
         { label: 'Division', value: divisionLabel(lead.division) },
-        { label: 'Contact person', value: `${roleLabel(lead.contactPerson)}${roleCode(lead.contactPerson) ? ` (${roleCode(lead.contactPerson)})` : ''}` },
+        { label: 'Contact person', value: contactPersonLabel(lead.contactPerson) },
         { label: 'Project type', value: LEAD_PROJECT_TYPE_LABEL[lead.projectType] },
         { label: 'Number of MRs', value: lead.numberOfMRS },
         { label: 'Focus therapy', value: lead.focusTherapy.join(', ') },

@@ -5,6 +5,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import PaginationControls from '@/components/ui/PaginationControls'
 import { useContacts } from '@/features/contacts/hooks/useContacts'
 import { usePermission } from '@/hooks/usePermission'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import EditContactModal from '@/features/contacts/components/EditContactModal'
 import type { ContactEntity, ContactStatus, ContactType } from '@/types/contact.types'
 
@@ -23,13 +24,14 @@ const ContactsPage = () => {
   const canManage = hasAnyPermission(['contact:manage', 'tenant:manage', 'tenant:admin'])
 
   const [search, setSearch] = useState('')
+  const debouncedSearch = useDebouncedValue(search, 300)
   const [type, setType] = useState<ContactType | 'ALL'>('ALL')
   const [status, setStatus] = useState<ContactStatus | 'ALL'>('ALL')
   const [page, setPage] = useState(1)
   const [editModal, setEditModal] = useState<{ open: boolean; contact: ContactEntity | null }>({ open: false, contact: null })
 
   const { data, isLoading, error } = useContacts({
-    name: search || undefined,
+    name: debouncedSearch || undefined,
     type: type === 'ALL' ? undefined : type,
     status: status === 'ALL' ? undefined : status,
     page: String(page),

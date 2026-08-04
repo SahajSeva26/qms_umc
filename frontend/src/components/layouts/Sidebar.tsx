@@ -52,6 +52,15 @@ const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
   // CRM — Division is a CRM-native concept (Lead/Project/Appointment all key
   // off it directly), not a separate top-level area.
   divisions: ['division:manage', 'tenant:manage'],
+  // Matches projects.routes.tsx's PROJECTS_VIEW_PERMISSIONS exactly — found
+  // 2026-08-04: this nav item had no gate at all, so a Sales Head account
+  // (no project:* permission) could see and click into it and land on a
+  // real 403 "Failed to load projects" screen.
+  projects: ['project:search', 'project:manage', 'tenant:manage'],
+  gantt: ['project:search', 'project:manage', 'tenant:manage'],
+  // Matches camps.routes.tsx's CAMP_READ_PERMISSIONS exactly — same gap as
+  // projects/gantt above, found + fixed 2026-08-04.
+  camps: ['camp:search', 'camp:manage', 'tenant:manage'],
 }
 
 interface SidebarProps {

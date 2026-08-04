@@ -8,6 +8,7 @@ import StatusChangeDialog from '@/features/projects/components/StatusChangeDialo
 import EditProjectModal from '@/features/projects/components/EditProjectModal'
 import NewProjectWizard from '@/features/projects/components/wizard/NewProjectWizard'
 import { Input } from '@/components/ui/input'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 
 type Tab = 'all' | ProjectStatus
 
@@ -32,6 +33,7 @@ const HEADER_CHIPS = [
 const ProjectsPage = () => {
   const [tab, setTab] = useState<Tab>('all')
   const [search, setSearch] = useState('')
+  const debouncedSearch = useDebouncedValue(search, 300)
   const [openDetailId, setOpenDetailId] = useState<string | null>(null)
   const [statusChangeId, setStatusChangeId] = useState<string | null>(null)
   const [editId, setEditId] = useState<string | null>(null)
@@ -40,9 +42,9 @@ const ProjectsPage = () => {
   const query = useMemo(
     () => ({
       ...(tab !== 'all' ? { status: tab } : {}),
-      ...(search ? { name: search } : {}),
+      ...(debouncedSearch ? { name: debouncedSearch } : {}),
     }),
-    [tab, search]
+    [tab, debouncedSearch]
   )
 
   const { data, isLoading, error } = useProjects(query)

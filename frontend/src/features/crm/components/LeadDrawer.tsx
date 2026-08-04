@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { FiEdit2 } from 'react-icons/fi'
 import type { LeadEntity, LeadStatus, UpdateLeadPayload } from '@/types/crm.types'
 import { LEAD_TRANSITION_MAP } from '@/types/crm.types'
-import { roleLabel, divisionLabel } from '@/features/crm/crm.utils'
+import { contactPersonLabel, divisionLabel } from '@/features/crm/crm.utils'
 import SideDrawer from '@/components/ui/SideDrawer'
 import StagePill from '@/features/crm/components/StagePill'
 import OverviewTab from '@/features/crm/components/drawer/OverviewTab'
@@ -68,7 +68,7 @@ const LeadDrawer = ({ lead, onClose, onMoveStage, onUpdateLead, canManage }: Lea
           )}
         </div>
         <div className="text-[12px] truncate mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-          {roleLabel(lead.contactPerson)}
+          {contactPersonLabel(lead.contactPerson)}
         </div>
         <div className="flex flex-wrap gap-1.5">
           <StagePill status={lead.status} />

@@ -3,6 +3,7 @@ import { computeWizardScore } from '@/features/crm/wizard.types'
 import { LEAD_PROJECT_TYPE_LABEL } from '@/types/crm.types'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
+import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRoleTypes'
 import { PLATFORM_TENANT_CODE } from '@/features/access-management/accessManagement.constants'
 import { formatINR } from '@/utils/formatters'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
@@ -28,8 +29,38 @@ const WizardStep4 = ({ form, setField }: WizardStep4Props) => {
   // admins included). Found via a 2026-07-26 test pass.
   const platformTenant = tenantData?.data?.items.find((t) => t.type === 'platform' || t.code === PLATFORM_TENANT_CODE)
 
-  const { data: roleData, isLoading: rolesLoading, isError: rolesErrored } = useRoles(platformTenant ? { tenant: platformTenant.id, status: 'active' } : { tenant: undefined })
-  const salesRoles = platformTenant ? roleData?.data?.items ?? [] : []
+  // "Sales rep" here means someone with the sales-rep OR sales-head RoleType
+  // — NOT "any platform-tenant Role" (the old query), which let Admin/System
+  // accounts show up as pickable "sales reps." lead.service.ts's own
+  // salesPerson check only verifies "belongs to the platform tenant," no
+  // job-type check at all — that's a backend-side gap, flagged separately;
+  // this fixes the UI so the form never OFFERS something nonsensical like
+  // "System role," even though the backend wouldn't reject it if sent
+  // directly. Roles' own `type` search filter only accepts one RoleType id
+  // at a time (role.service.ts's search()), so both role types are queried
+  // in parallel and merged, since Sales Head can also own leads directly
+  // (holds lead:manage, per defaultRoleTypes.ts) same as Sales Rep.
+  // No `tenant` filter needed on these two lookups — `code` is an exact
+  // match and 'sales-rep'/'sales-head' are platform-only conventions
+  // (confirmed live: exactly one of each exists system-wide); the actual
+  // tenant scoping that matters happens implicitly below, since a Role's
+  // `type` must belong to the same tenant as the Role itself.
+  const { data: salesRepTypeData, isLoading: roleTypesLoading, isError: roleTypesErrored } = useRoleTypes({ code: 'sales-rep', status: 'active' })
+  const { data: salesHeadTypeData } = useRoleTypes({ code: 'sales-head', status: 'active' })
+  const salesRepTypeId = salesRepTypeData?.data?.items[0]?.id
+  const salesHeadTypeId = salesHeadTypeData?.data?.items[0]?.id
+
+  const { data: salesRepRoleData, isLoading: salesRepRolesLoading, isError: salesRepRolesErrored } = useRoles(
+    { tenant: platformTenant?.id, type: salesRepTypeId, status: 'active' },
+    !!platformTenant && !!salesRepTypeId,
+  )
+  const { data: salesHeadRoleData, isLoading: salesHeadRolesLoading, isError: salesHeadRolesErrored } = useRoles(
+    { tenant: platformTenant?.id, type: salesHeadTypeId, status: 'active' },
+    !!platformTenant && !!salesHeadTypeId,
+  )
+  const salesRoles = [...(salesRepRoleData?.data?.items ?? []), ...(salesHeadRoleData?.data?.items ?? [])]
+  const rolesLoading = roleTypesLoading || salesRepRolesLoading || salesHeadRolesLoading
+  const rolesErrored = roleTypesErrored || salesRepRolesErrored || salesHeadRolesErrored
 
   const selectSalesPerson = (roleId: string) => {
     const role = salesRoles.find((r) => r.id === roleId)

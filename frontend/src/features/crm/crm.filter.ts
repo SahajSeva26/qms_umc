@@ -1,13 +1,16 @@
 import type { LeadEntity } from '@/types/crm.types'
 import type { CrmFilterState } from '@/features/crm/hooks/useCrmFilters'
-import { roleLabel, divisionLabel } from '@/features/crm/crm.utils'
 
+// Search matches Title only (2026-08-03) — previously also matched contact
+// person and division name, which no longer made sense once the list view's
+// own Contact column was dropped in favor of dedicated Company/Division
+// columns; search is now scoped to exactly the one free-text field the table
+// doesn't already expose a dedicated filter for.
 export function matchesFilters(lead: LeadEntity, filters: CrmFilterState): boolean {
   if (filters.status && lead.status !== filters.status) return false
   if (filters.q) {
     const q = filters.q.toLowerCase()
-    const haystack = `${lead.title} ${roleLabel(lead.contactPerson)} ${divisionLabel(lead.division)}`.toLowerCase()
-    if (!haystack.includes(q)) return false
+    if (!lead.title.toLowerCase().includes(q)) return false
   }
   return true
 }

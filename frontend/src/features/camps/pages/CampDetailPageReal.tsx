@@ -13,6 +13,7 @@ import { useTenants } from '@/features/access-management/tenant/hooks/useTenants
 import { useDivisions } from '@/features/crm/hooks/useDivisions'
 import { useDoctors } from '@/features/doctors/hooks/useDoctors'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
+import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRoleTypes'
 import CampStatusPillReal from '@/features/camps/components/CampStatusPillReal'
 import { CAMP_TRANSITION_MAP } from '@/types/campReal.types'
 import { Button } from '@/components/ui/button'
@@ -20,7 +21,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import type { BillingType, CampStatus, CampType } from '@/types/campReal.types'
+import type { BillingType, CampStatus, CampType, CampPopulatedRole } from '@/types/campReal.types'
 
 const TYPE_OPTIONS: { value: CampType; label: string }[] = [
   { value: 'screening', label: 'Screening' },
@@ -95,32 +96,99 @@ const CampDetailPageReal = () => {
   const tenants = tenantsData?.data?.items ?? []
 
   const [tenant, setTenant] = useState('')
-  const { data: divisionsData } = useDivisions({ tenantId: tenant || undefined, limit: '200' })
+  // `enabled: !!tenant` — same fix already applied to WizardStep1.tsx/
+  // NewAppointmentDialog.tsx for this exact bug shape: an omitted/empty
+  // tenantId means "no filter at all" server-side, so this was firing
+  // GET /divisions?limit=200 unscoped across every company in the system on
+  // every page load, before a Company was even picked. Found live
+  // (2026-08-04) via the Network tab on the New Camp screen.
+  const { data: divisionsData } = useDivisions({ tenantId: tenant || undefined, limit: '200' }, !!tenant)
   const divisions = divisionsData?.data?.items ?? []
 
   const { data: doctorsData } = useDoctors({ limit: '10' })
   const doctors = doctorsData?.data?.items ?? []
 
-  // Active-only + a real limit (backend defaults to 10 with no query params —
-  // was silently truncating the fo/mr/asm/rsm pickers to whatever 10 roles
-  // happened to sort first, and offering inactive roles as if assignable).
-  // A camp's ALREADY-assigned role is merged back in below (via
-  // assignableRoles) even if it's since gone inactive or fallen outside this
-  // list, so an existing assignment always still resolves a real label
-  // instead of silently rendering the "unassigned" placeholder.
-  const { data: rolesData } = useRoles({ status: 'active', limit: '500' })
-  const roles = rolesData?.data?.items ?? []
-  const assignableRoles: { id: string; name: string; code: string }[] = useMemo(() => {
-    const byId = new Map(roles.map((r) => [r.id, { id: r.id, name: r.name, code: r.code }]))
-    for (const value of [camp?.fo, camp?.mr, camp?.asm, camp?.rsm]) {
-      const refId = campRefId(value)
-      if (refId && !byId.has(refId)) {
-        const name = campRefName(value)
-        byId.set(refId, { id: refId, name: name ?? refId, code: name ? 'inactive' : 'unavailable' })
-      }
+  // Effective tenant to scope FO/MR/ASM/RSM candidates against: create mode's
+  // picked Company (`tenant` state above), or edit mode's already-loaded
+  // camp.tenant (tenant/division are immutable after create — see the file
+  // header comment — so this is the only source of it in edit mode).
+  const effectiveTenant = tenant || campRefId(camp?.tenant) || ''
+
+  // mr/asm/rsm are all optional fields on the backend (camp.validators.ts —
+  // confirmed live 2026-08-04) and, unlike FO, have no other UI on this page
+  // that depends on their candidate list being ready up front (no
+  // auto-allocate-style feature). So their RoleType+Role lookups are lazy:
+  // gated on the dropdown having been opened at least once, tracked here and
+  // flipped by each Select's own onOpenChange below. FO stays eager since
+  // it's the primary field (the "auto-allocate nearest FO" panel elsewhere
+  // on this page implicitly depends on FO context) and only needs foTypeId,
+  // not a tenant, to resolve.
+  const [mrOpened, setMrOpened] = useState(false)
+  const [asmOpened, setAsmOpened] = useState(false)
+  const [rsmOpened, setRsmOpened] = useState(false)
+
+  // FO/MR/ASM/RSM are 4 DIFFERENT job types, not "any active Role" — the
+  // previous `useRoles({status:'active', limit:'500'})` fetched every active
+  // Role system-wide (500-row cap, ~21KB response, confirmed live 2026-08-04)
+  // and let all 4 pickers offer literally anything active, including Admin/
+  // System/other-companies'-tenant-admin roles. Same bug class already fixed
+  // once on the Lead wizard's Sales Rep picker (WizardStep4.tsx) — resolve
+  // each field's real RoleType id first, then scope the Role fetch to it.
+  // field-officer is a PLATFORM-side RoleType (one global record); pharma-mr/
+  // -asm/-rsm are CUSTOMER-side, provisioned per-tenant at onboarding
+  // (roleType.constants.ts's DEFAULT_PHARMA_ROLE_TYPES) — so those 3 need
+  // `tenant: effectiveTenant` in the RoleType lookup itself, not just the
+  // Role lookup, or 'pharma-mr' would resolve to some OTHER company's MR
+  // RoleType id instead of this camp's own.
+  const { data: foTypeData } = useRoleTypes({ code: 'field-officer', status: 'active' })
+  const { data: mrTypeData } = useRoleTypes(
+    { code: 'pharma-mr', status: 'active', tenant: effectiveTenant || undefined },
+    mrOpened && !!effectiveTenant,
+  )
+  const { data: asmTypeData } = useRoleTypes(
+    { code: 'pharma-asm', status: 'active', tenant: effectiveTenant || undefined },
+    asmOpened && !!effectiveTenant,
+  )
+  const { data: rsmTypeData } = useRoleTypes(
+    { code: 'pharma-rsm', status: 'active', tenant: effectiveTenant || undefined },
+    rsmOpened && !!effectiveTenant,
+  )
+  const foTypeId = foTypeData?.data?.items[0]?.id
+  const mrTypeId = mrTypeData?.data?.items[0]?.id
+  const asmTypeId = asmTypeData?.data?.items[0]?.id
+  const rsmTypeId = rsmTypeData?.data?.items[0]?.id
+
+  const { data: foRoleData } = useRoles({ type: foTypeId, status: 'active', limit: '200' }, !!foTypeId)
+  const { data: mrRoleData } = useRoles({ tenant: effectiveTenant, type: mrTypeId, status: 'active', limit: '200' }, !!effectiveTenant && !!mrTypeId)
+  const { data: asmRoleData } = useRoles({ tenant: effectiveTenant, type: asmTypeId, status: 'active', limit: '200' }, !!effectiveTenant && !!asmTypeId)
+  const { data: rsmRoleData } = useRoles({ tenant: effectiveTenant, type: rsmTypeId, status: 'active', limit: '200' }, !!effectiveTenant && !!rsmTypeId)
+
+  // Each field gets its OWN candidate list scoped to its own RoleType — the
+  // FO dropdown should never offer an MR, and vice versa. A camp's ALREADY-
+  // assigned role is merged back into its own field's list even if it's
+  // since gone inactive or its tenant no longer resolves, so an existing
+  // assignment always still resolves a real label instead of silently
+  // rendering the "unassigned" placeholder.
+  const withAssigned = (
+    list: { id: string; name: string; code: string }[],
+    value: CampPopulatedRole | string | null | undefined,
+  ) => {
+    const byId = new Map(list.map((r) => [r.id, r]))
+    const refId = campRefId(value)
+    if (refId && !byId.has(refId)) {
+      const name = campRefName(value)
+      byId.set(refId, { id: refId, name: name ?? refId, code: name ? 'inactive' : 'unavailable' })
     }
     return Array.from(byId.values())
-  }, [roles, camp])
+  }
+  const foRoles = useMemo(() => withAssigned(foRoleData?.data?.items ?? [], camp?.fo), [foRoleData, camp])
+  const mrRoles = useMemo(() => withAssigned(mrRoleData?.data?.items ?? [], camp?.mr), [mrRoleData, camp])
+  const asmRoles = useMemo(() => withAssigned(asmRoleData?.data?.items ?? [], camp?.asm), [asmRoleData, camp])
+  const rsmRoles = useMemo(() => withAssigned(rsmRoleData?.data?.items ?? [], camp?.rsm), [rsmRoleData, camp])
+  const assignableRoles = useMemo(
+    () => [...foRoles, ...mrRoles, ...asmRoles, ...rsmRoles],
+    [foRoles, mrRoles, asmRoles, rsmRoles],
+  )
   // SelectValue's default rendering just echoes the raw `value` prop back as
   // text (a bare Mongo ObjectId) unless given a render-fn child that maps
   // id->label — GeoProfileDetailPage.tsx's Role select already does this
@@ -131,7 +199,18 @@ const CampDetailPageReal = () => {
   const doctorLabel = (id: string) => doctors.find((d) => d.id === id)?.name ?? id
   const roleLabel = (id: string) => assignableRoles.find((r) => r.id === id)?.name ?? id
 
-  const { doctorName, divisionName, projectName } = useCampRefNames()
+  // doctorName/divisionName/projectName are only ever called from the
+  // !isCreateMode summary card below (camp is always null in create mode,
+  // since useCampReal(id) itself never fires without a real id) — gating on
+  // !isCreateMode avoids firing 3 more requests that would otherwise
+  // duplicate this page's own doctors (line 101)/divisions (line 98)
+  // fetches, on a screen where none of the 3 fallback tables can render
+  // anything yet anyway.
+  const { doctorName, divisionName, projectName } = useCampRefNames({
+    doctors: !isCreateMode,
+    divisions: !isCreateMode,
+    projects: !isCreateMode,
+  })
 
   const createCamp = useCreateCamp()
   const updateCamp = useUpdateCamp(id ?? '')
@@ -573,18 +652,22 @@ const CampDetailPageReal = () => {
                       <SelectValue placeholder="Auto-assign nearest FO">{(v) => roleLabel(v as string)}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      {assignableRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
+                      {foRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
                   <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>MR (optional)</Label>
-                  <Select key={mr || 'empty'} value={mr || undefined} onValueChange={(v) => setMr(v ?? '')}>
+                  {/* onOpenChange lazy-loads the MR RoleType+Role fetch only
+                      once this dropdown is actually opened — see mrOpened
+                      above. `open` param only, we never reset it back to
+                      false on close (load once, keep it cached). */}
+                  <Select key={mr || 'empty'} value={mr || undefined} onValueChange={(v) => setMr(v ?? '')} onOpenChange={(open) => { if (open) setMrOpened(true) }}>
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select MR">{(v) => roleLabel(v as string)}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      {assignableRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
+                      {mrRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -593,23 +676,23 @@ const CampDetailPageReal = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>ASM (optional)</Label>
-                  <Select key={asm || 'empty'} value={asm || undefined} onValueChange={(v) => setAsm(v ?? '')}>
+                  <Select key={asm || 'empty'} value={asm || undefined} onValueChange={(v) => setAsm(v ?? '')} onOpenChange={(open) => { if (open) setAsmOpened(true) }}>
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select ASM">{(v) => roleLabel(v as string)}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      {assignableRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
+                      {asmRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
                   <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>RSM (optional)</Label>
-                  <Select key={rsm || 'empty'} value={rsm || undefined} onValueChange={(v) => setRsm(v ?? '')}>
+                  <Select key={rsm || 'empty'} value={rsm || undefined} onValueChange={(v) => setRsm(v ?? '')} onOpenChange={(open) => { if (open) setRsmOpened(true) }}>
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select RSM">{(v) => roleLabel(v as string)}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      {assignableRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
+                      {rsmRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>

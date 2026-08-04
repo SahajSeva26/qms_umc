@@ -35,7 +35,7 @@ const MastersTab = () => {
           </thead>
           <tbody>
             {screeningProjects.map((p) => {
-              const coordinatorName = typeof p.projectCoordinator === 'string' ? p.projectCoordinator : p.projectCoordinator.name
+              const coordinatorName = !p.projectCoordinator ? '' : typeof p.projectCoordinator === 'string' ? p.projectCoordinator : p.projectCoordinator.name
               return (
                 <tr key={p.id} className="border-t" style={{ borderColor: 'var(--qms-border)' }}>
                   <td className="px-3 py-2.5 font-semibold" style={{ color: 'var(--qms-text)' }}>{p.name}</td>

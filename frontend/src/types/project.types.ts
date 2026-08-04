@@ -283,12 +283,19 @@ export interface ProjectEntity {
   // time (e.g. "prj-000001") — added in the 2026-07-27 Appointment merge.
   code: string
   name: string
-  tenant: ProjectPopulatedTenant | string
-  division: ProjectPopulatedDivision | string
+  // All 6 reference fields below are `required: true` server-side, but that
+  // only enforces new saves — an older document or a populate() that
+  // resolved to null (deleted doc, stale/pre-migration reference) can still
+  // come back null over the wire. Confirmed live 2026-08-04 via a real crash
+  // ("Cannot read properties of null (reading 'name')") on a project whose
+  // marketingContact was null — every consumer of these 6 fields must
+  // null-check before unwrapping, never assume `X | string` is exhaustive.
+  tenant: ProjectPopulatedTenant | string | null
+  division: ProjectPopulatedDivision | string | null
   therapy: ProjectTherapy
   type: ProjectType[]
   tests: ProjectTest[]
-  lead: ProjectPopulatedLead | string
+  lead: ProjectPopulatedLead | string | null
   mode: ExecutionMode | null
   campCost: number
   totalCamps: number
@@ -301,12 +308,12 @@ export interface ProjectEntity {
   campCostDeductionOnChargableCancel: number
   goLiveScope: GoLiveScope | null
   whoCanBookCamp: WhoCanBookCampCode[]
-  salesRep: ProjectPopulatedRole | string
-  projectCoordinator: ProjectPopulatedRole | string
+  salesRep: ProjectPopulatedRole | string | null
+  projectCoordinator: ProjectPopulatedRole | string | null
   // Contact reference, not Role — switched 2026-08-03 (project.model.ts's
   // marketingContact.ref, project.service.ts's set() now calls
   // ContactService.get() instead of RoleService.get()).
-  marketingContact: LeadPopulatedContact | string
+  marketingContact: LeadPopulatedContact | string | null
   paymentTerms: PaymentTerms
   status: ProjectStatus
   stageHistory: ProjectStageHistoryEntry[]

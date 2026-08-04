@@ -23,3 +23,16 @@ export const PASSWORD_MIN_LENGTH = 6
 // / Edit Project modal all had a permanently-empty Sales Rep picker for any
 // non-system:manage account.
 export const PLATFORM_TENANT_CODE = 'qms'
+
+// Every `useTenants({status:'active'})` call trying to resolve the platform
+// tenant (via PLATFORM_TENANT_CODE above) must pass this as its `limit` —
+// the backend's default limit is 10 (requestHandler.ts's `filters.limit ||
+// '10'`), and confirmed live 2026-08-04: with 14+ active tenants seeded, the
+// `qms` tenant sorts past that window and the query silently returns 10
+// tenants that never include it — permanently empty Sales Rep/Coordinator/
+// "QMS side" pickers, indistinguishable from "no QMS staff exist" even
+// though real Roles are there. This is the SAME failure mode as the
+// `type`-field-visibility bug documented on PLATFORM_TENANT_CODE above, just
+// the pagination half of it — that earlier fix never added a limit, so this
+// was still silently broken for anyone once real tenant count passed 10.
+export const PLATFORM_TENANT_FETCH_LIMIT = '20'

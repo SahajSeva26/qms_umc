@@ -92,7 +92,14 @@ const CampDetailPageReal = () => {
   const { data, isLoading, error } = useCampReal(id)
   const camp = data?.data ?? null
 
-  const { data: tenantsData } = useTenants({})
+  // limit: '20' — this Company picker should list every tenant, not just
+  // the backend's default first-10 (requestHandler.ts). Same class of
+  // truncation bug found live 2026-08-04 on the Project wizard's platform-
+  // tenant resolution (see accessManagement.constants.ts's
+  // PLATFORM_TENANT_FETCH_LIMIT) — here it's "some real companies silently
+  // missing from the Company dropdown" rather than one specific tenant
+  // being unreachable, but the same root cause.
+  const { data: tenantsData } = useTenants({ limit: '20' })
   const tenants = tenantsData?.data?.items ?? []
 
   const [tenant, setTenant] = useState('')

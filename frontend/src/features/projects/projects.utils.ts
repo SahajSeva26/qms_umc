@@ -44,15 +44,27 @@ export function computeGstBreakdown(valueBeforeGST: number, gst: number | undefi
   return { gstAmount, valueAfterGST }
 }
 
+// Guard against null even though tenant/division/salesRep are all
+// `required: true` in project.model.ts — that only enforces new saves, not
+// older documents or a populate() that resolved to null (stale/pre-migration
+// reference, deleted doc, etc). Found live 2026-08-04: a real project
+// ("Independent audit repro project") crashed the whole detail-drawer page
+// with "Cannot read properties of null (reading 'name')" on this exact
+// unguarded idiom, applied to marketingContact — same class of bug, these 3
+// shared helpers are used across ProjectTable.tsx/ProjectGanttPage.tsx and
+// several OM/FO/dedicatedops screens, so fixing here protects all of them.
 export function projectTenantName(project: ProjectEntity): string {
+  if (!project.tenant) return '—'
   return typeof project.tenant === 'string' ? project.tenant : project.tenant.name
 }
 
 export function projectDivisionName(project: ProjectEntity): string {
+  if (!project.division) return '—'
   return typeof project.division === 'string' ? project.division : project.division.name
 }
 
 export function projectSalesRepName(project: ProjectEntity): string {
+  if (!project.salesRep) return '—'
   return typeof project.salesRep === 'string' ? project.salesRep : project.salesRep.name
 }
 

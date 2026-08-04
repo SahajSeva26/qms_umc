@@ -127,6 +127,6 @@ test-results/
 # Per-package convention docs — local-only per earlier team decision
 # (previously tracked, deliberately untracked; kept on disk, never committed)
 # ======================
-backend/CLAUDE.md
-frontend/CLAUDE.md
-mobile/CLAUDE.md
+# backend/CLAUDE.md
+# frontend/CLAUDE.md
+# mobile/CLAUDE.md

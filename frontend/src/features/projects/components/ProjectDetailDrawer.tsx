@@ -18,6 +18,13 @@ function roleName(role: ProjectEntity['salesRep']): string {
   return typeof role === 'string' ? role : role.name
 }
 
+// marketingContact is a Contact reference, not a Role — switched 2026-08-03
+// (project.model.ts's marketingContact.ref) — separate helper since Contact
+// and Role are different populated shapes, even though both expose `.name`.
+function contactName(contact: ProjectEntity['marketingContact']): string {
+  return typeof contact === 'string' ? contact : contact.name
+}
+
 function leadTitle(lead: ProjectEntity['lead']): string {
   return typeof lead === 'string' ? lead : lead.title
 }
@@ -70,7 +77,7 @@ const ProjectDetailDrawer = ({ project, onClose }: ProjectDetailDrawerProps) => 
             <div className="text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: 'var(--qms-text-muted)' }}>Team</div>
             <Row label="Sales rep" value={roleName(project.salesRep)} />
             <Row label="Coordinator" value={roleName(project.projectCoordinator)} />
-            <Row label="Pharma marketing" value={roleName(project.marketingContact)} />
+            <Row label="Pharma marketing" value={contactName(project.marketingContact)} />
             <Row label="Payment terms" value={PAYMENT_TERMS_LABEL[project.paymentTerms] ?? project.paymentTerms} />
           </div>
 

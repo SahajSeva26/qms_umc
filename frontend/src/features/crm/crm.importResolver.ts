@@ -1,6 +1,7 @@
 import { accessManagementService } from '@/features/access-management/accessManagement.service'
 import { PLATFORM_TENANT_CODE } from '@/features/access-management/accessManagement.constants'
 import { crmService } from '@/features/crm/crm.service'
+import { contactsService } from '@/features/contacts/contacts.service'
 
 // Resolves the human-readable names a CSV row provides (matching Export's own
 // column shape — Company/Division/Contact/Sales rep as display names, not
@@ -81,20 +82,22 @@ export async function resolveRowNames(row: {
     }
   }
 
-  // 3: Contact person — a Role under the SAME tenant as Company (mirrors
+  // 3: Contact person — a Contact under the SAME tenant as Company (mirrors
   // EditLeadModal.tsx's own contactPerson scoping rule: contactPerson.tenant
   // must equal the lead's tenant, enforced server-side in lead.service.ts).
+  // Contact, not Role — Lead.contactPerson switched from a Role reference
+  // to a Contact reference 2026-08-03 (lead.model.ts's contactPerson.ref).
   let contact: { id: string; name: string } | null = null
   if (tenant) {
-    const contactRes = await accessManagementService.searchRoles({ tenant: tenant.id, name: row.contact, status: 'active', limit: '10' })
-    contact = exactMatch(contactRes.data?.items ?? [], (r) => r.name, row.contact)
+    const contactRes = await contactsService.searchContacts({ tenant: tenant.id, name: row.contact, status: 'active', limit: '10' })
+    contact = exactMatch(contactRes.data?.items ?? [], (c) => c.name, row.contact)
     if (!contact) {
       const count = (contactRes.data?.items ?? []).length
       errors.push({
         field: 'Contact',
         message: count > 1
-          ? `"${row.contact}" matches more than one active role under "${row.company}".`
-          : `No active role found matching "${row.contact}" under company "${row.company}".`,
+          ? `"${row.contact}" matches more than one active contact under "${row.company}".`
+          : `No active contact found matching "${row.contact}" under company "${row.company}".`,
       })
     }
   }

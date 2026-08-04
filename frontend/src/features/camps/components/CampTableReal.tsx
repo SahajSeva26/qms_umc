@@ -14,6 +14,10 @@ const TYPE_LABEL: Record<CampEntity['type'], string> = {
 }
 
 const CampTableReal = ({ camps, onOpen }: CampTableRealProps) => {
+  // camps here always come from search() (CampsPageReal.tsx's useCampsReal),
+  // which unconditionally populates division/doctor/fo — campRefName() always
+  // resolves directly, the id->name fallback tables are never actually
+  // consulted on this table. No options passed = none of the 4 fetch.
   const { doctorName, divisionName, roleName } = useCampRefNames()
 
   return (

@@ -5,6 +5,7 @@ import PaginationControls from '@/components/ui/PaginationControls'
 import { useDoctors } from '@/features/doctors/hooks/useDoctors'
 import { useDoctorsFilters } from '@/features/doctors/hooks/useDoctorsFilters'
 import { usePermission } from '@/hooks/usePermission'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import type { DoctorEntity, DoctorSpecialization } from '@/types/doctor.types'
 import RosterTab from '@/features/doctors/components/tabs/RosterTab'
 import SpecialtiesTab from '@/features/doctors/components/tabs/SpecialtiesTab'
@@ -36,6 +37,7 @@ const AGGREGATE_LIMIT = 10
 
 const DoctorsPage = () => {
   const { filters, setFilter, reset } = useDoctorsFilters()
+  const debouncedSearch = useDebouncedValue(filters.search, 300)
   const { hasPermission } = usePermission()
   const canSeeInactive = hasPermission('doctor:manage')
   const [tab, setTab] = useState<TabId>('roster')
@@ -44,7 +46,7 @@ const DoctorsPage = () => {
   const [editModal, setEditModal] = useState<{ open: boolean; doctor: DoctorEntity | null }>({ open: false, doctor: null })
 
   const { data, isLoading, error } = useDoctors({
-    name: filters.search || undefined,
+    name: debouncedSearch || undefined,
     specialization: filters.specialization === 'ALL' ? undefined : filters.specialization,
     status: filters.status === 'ALL' ? undefined : filters.status,
     city: filters.city || undefined,
@@ -76,6 +78,12 @@ const DoctorsPage = () => {
   // "Inactive" tab/table as if they were genuinely inactive. Found via a
   // 2026-07-24 test sweep. Skipping the query entirely for such a caller
   // (rather than fetching and discarding) also avoids a wasted request.
+  // The `{ limit: '0' }` fallback below is never actually sent — `enabled:
+  // canSeeInactive` already prevents this query from firing at all when
+  // false, so the query object's shape in that branch is moot. Kept as a
+  // type-satisfying placeholder only (not a real Mongoose `.limit(0)`
+  // "no limit" footgun like the ones fixed elsewhere today, since it's
+  // never actually executed).
   const { data: inactiveData } = useDoctors(
     canSeeInactive ? { status: 'inactive', limit: String(AGGREGATE_LIMIT) } : { limit: '0' },
     { enabled: canSeeInactive },

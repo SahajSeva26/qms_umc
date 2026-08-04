@@ -48,7 +48,11 @@ const UserDetailPage = () => {
   // effectively never a hit) — use the loaded user's own email instead,
   // which is unique and gives an exact-enough match (regex substring, but a
   // real email is specific enough not to collide with another user's).
-  const { data: rolesData, isLoading: isLoadingRoles } = useRoles(user?.email ? { user: user.email, limit: '10' } : { limit: '0' })
+  // `enabled: !!user?.email` — NOT `{ limit: '0' }` (fixed 2026-08-03):
+  // Mongoose's `.find().limit(0)` means "no limit at all," not "return
+  // nothing" — this was silently fetching every role in the system,
+  // unscoped, before `user` had loaded.
+  const { data: rolesData, isLoading: isLoadingRoles } = useRoles({ user: user?.email, limit: '10' }, !!user?.email)
   const roles = rolesData?.data?.items ?? []
 
   const updateUser = useUpdateUser(id ?? '')

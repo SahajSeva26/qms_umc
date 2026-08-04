@@ -2,7 +2,7 @@ import { FiClock } from 'react-icons/fi'
 import type { LeadEntity, LeadStatus } from '@/types/crm.types'
 import { LEAD_STATUS_LABEL, LEAD_TRANSITION_MAP } from '@/types/crm.types'
 import { formatINR } from '@/utils/formatters'
-import { roleLabel, divisionLabel } from '@/features/crm/crm.utils'
+import { roleLabel, contactPersonLabel, divisionLabel } from '@/features/crm/crm.utils'
 import UserAvatar from '@/components/ui/UserAvatar'
 
 interface LeadCardProps {
@@ -36,7 +36,7 @@ const LeadCard = ({ lead, onOpen, onAdvance, draggable, onDragStart, onDragEnd }
     >
       <div className="text-[13px] font-bold mb-0.5 truncate" style={{ color: 'var(--qms-text)' }}>{lead.title}</div>
       <div className="text-[11px] mb-2 truncate" style={{ color: 'var(--qms-text-muted)' }}>
-        {roleLabel(lead.contactPerson)} · {divisionLabel(lead.division)}
+        {contactPersonLabel(lead.contactPerson)} · {divisionLabel(lead.division)}
       </div>
 
       <div className="flex items-center justify-between mb-2.5">

@@ -1,6 +1,6 @@
 import type { LeadEntity, LeadStatus } from '@/types/crm.types'
 import { LEAD_STATUS_LABEL, LEAD_STATUS_COLOR } from '@/types/crm.types'
-import { roleLabel, divisionLabel } from '@/features/crm/crm.utils'
+import { contactPersonLabel, divisionLabel } from '@/features/crm/crm.utils'
 import SideDrawer from '@/components/ui/SideDrawer'
 import { Button } from '@/components/ui/button'
 import { formatINR } from '@/utils/formatters'
@@ -69,7 +69,7 @@ const StageDrawer = ({ status, leads, onClose, onOpenLead, onNewLead, canManage 
               <div className="min-w-0">
                 <div className="text-[12px] font-bold truncate" style={{ color: 'var(--qms-text)' }}>{lead.title}</div>
                 <div className="text-[11px] truncate" style={{ color: 'var(--qms-text-muted)' }}>
-                  {roleLabel(lead.contactPerson)} · {divisionLabel(lead.division)}
+                  {contactPersonLabel(lead.contactPerson)} · {divisionLabel(lead.division)}
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">

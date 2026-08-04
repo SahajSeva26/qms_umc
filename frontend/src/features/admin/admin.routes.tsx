@@ -4,6 +4,7 @@ import UsersPage from './pages/UsersPage'
 import UserDetailPage from './pages/UserDetailPage'
 import HqPage from '@/features/hq/pages/HqPage'
 import RemindersPage from '@/features/reminders/pages/RemindersPage'
+import InventoryPage from '@/features/inventory/pages/InventoryPage'
 
 export const ADMIN_ROUTES = {
   ADMIN:              '/admin',
@@ -21,7 +22,7 @@ export const adminRoutes: RouteObject[] = [
   { path: ADMIN_ROUTES.ADMIN,           element: <AdminPage /> },
   { path: ADMIN_ROUTES.ADMIN_HQ,        element: <HqPage /> },
   { path: ADMIN_ROUTES.ADMIN_REMINDERS, element: <RemindersPage /> },
-  { path: ADMIN_ROUTES.ADMIN_INVENTORY, element: <AdminPage /> },
+  { path: ADMIN_ROUTES.ADMIN_INVENTORY, element: <InventoryPage /> },
   { path: ADMIN_ROUTES.ADMIN_ASSETS,    element: <AdminPage /> },
   { path: ADMIN_ROUTES.ADMIN_KPI,       element: <AdminPage /> },
   { path: ADMIN_ROUTES.ADMIN_SETTINGS,  element: <AdminPage /> },

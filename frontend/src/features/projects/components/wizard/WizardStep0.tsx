@@ -7,6 +7,7 @@ import SectionHeader from '@/components/ui/SectionHeader'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { labelClasses, labelStyle } from '@/features/projects/components/wizard/wizard.styles'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 
 interface WizardStep0Props {
   form: WizardFormState
@@ -23,13 +24,23 @@ interface WizardStep0Props {
 // simply never offers that path through the UI.
 const WizardStep0 = ({ form, setField }: WizardStep0Props) => {
   const [search, setSearch] = useState('')
+  // Same 300ms debounce already used everywhere else in this app (Contacts/
+  // Doctors/Camps/Projects list search, Divisions/Users/Tenants/Roles) — this
+  // typeahead was firing a network request on every keystroke.
+  const debouncedSearch = useDebouncedValue(search, 300)
+  const hasSearch = debouncedSearch.trim().length > 0
 
+  // No default/browse-all list — a real won-lead roster could be in the
+  // hundreds, so this is search-only: nothing fetches until the user actually
+  // types a title. `enabled: hasSearch` means an empty search box never hits
+  // the network at all, not even for the default-10 list.
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['project-wizard-won-leads', search],
-    queryFn: () => projectsService.searchWonLeads(search ? { title: search } : {}),
+    queryKey: ['project-wizard-won-leads', debouncedSearch],
+    queryFn: () => projectsService.searchWonLeads({ title: debouncedSearch }),
+    enabled: hasSearch,
   })
 
-  const leads = data?.data?.items ?? []
+  const leads = hasSearch ? data?.data?.items ?? [] : []
 
   const selectLead = (leadId: string, title: string, tenantId: string, tenantName: string, divisionName: string) => {
     setField('leadId', leadId)
@@ -57,15 +68,21 @@ const WizardStep0 = ({ form, setField }: WizardStep0Props) => {
 
       <SectionHeader icon={FiCheckCircle} spaced={false}>Pick the won lead to convert into a project *</SectionHeader>
 
-      {isLoading && (
+      {!hasSearch && (
+        <p className="text-[12px] py-4 text-center rounded-xl border" style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }}>
+          Start typing a lead title above to search. A project can only be created from a lead that
+          has reached the "Won" stage.
+        </p>
+      )}
+      {hasSearch && isLoading && (
         <p className="text-[12px] py-4 text-center" style={{ color: 'var(--qms-text-muted)' }}>Loading leads…</p>
       )}
-      {isError && (
+      {hasSearch && isError && (
         <p className="text-[12px] text-danger">Couldn't load leads — try again.</p>
       )}
-      {!isLoading && !isError && leads.length === 0 && (
+      {hasSearch && !isLoading && !isError && leads.length === 0 && (
         <p className="text-[12px] py-4 text-center rounded-xl border" style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }}>
-          No won leads found. A project can only be created from a lead that has reached the "Won" stage.
+          No won leads match "{debouncedSearch}".
         </p>
       )}
 

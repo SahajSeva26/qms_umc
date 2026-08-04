@@ -248,11 +248,11 @@ export interface LeadPopulatedDivision {
   therapy: DivisionTherapy
 }
 
-// contactPerson/salesPerson are populated as the ENTIRE Role document (no
-// `select` in lead.service.ts's populate array, unlike tenant/division) —
-// includes `permissions[]`, and its own `type`/`user`/`tenant` sub-refs stay
-// as raw ObjectId strings (Role's own nested populate is never invoked here).
-// This is a real backend over-fetch, not a frontend modeling choice — do not
+// salesPerson is populated as the ENTIRE Role document (no `select` in
+// lead.service.ts's populate array, unlike tenant/division) — includes
+// `permissions[]`, and its own `type`/`user`/`tenant` sub-refs stay as raw
+// ObjectId strings (Role's own nested populate is never invoked here). This
+// is a real backend over-fetch, not a frontend modeling choice — do not
 // widen it further; only read the fields actually needed (name/email/etc).
 export interface LeadPopulatedRole {
   _id?: string
@@ -264,6 +264,28 @@ export interface LeadPopulatedRole {
   type: string
   user: string
   tenant: string
+}
+
+// contactPerson switched from a Role reference to a Contact reference
+// 2026-08-03 (lead.model.ts's contactPerson.ref, lead.service.ts's set()) —
+// this is the raw, unmapped Mongoose Contact document as populated directly
+// by lead.service.ts's populate array (`{ path: 'contactPerson' }`, no
+// `select`), NOT ContactMapper's own response shape — lead.mapper.ts embeds
+// `lead.contactPerson` straight through with no re-mapping step, so this
+// mirrors contact.model.ts's real schema fields exactly, not contact.types.ts's
+// ContactEntity (which is ContactMapper's shape, used by Contact's own
+// endpoints only).
+export interface LeadPopulatedContact {
+  _id?: string
+  tenant: string
+  name: string
+  designation?: string
+  email?: string
+  phone?: string
+  location?: string
+  type: string
+  user?: string
+  status: string
 }
 
 export interface LeadEntity {
@@ -279,7 +301,7 @@ export interface LeadEntity {
   // response's echo might contain before a follow-up GET.
   tenant: LeadPopulatedTenant | string
   division: LeadPopulatedDivision | string
-  contactPerson: LeadPopulatedRole | string
+  contactPerson: LeadPopulatedContact | string
   salesPerson: LeadPopulatedRole | string
   focusTherapy: string[]
   focusTherapyDoctor: string[]

@@ -8,9 +8,14 @@ import type { SearchDivisionQuery } from '@/types/crm.types'
 // caller can populate a division picker without needing division-admin rights
 // — see division.routes.ts. `tenantId` (not `tenant`) is Division's real
 // search-query field name.
-export const useDivisions = (query: SearchDivisionQuery) => {
+// `enabled` defaults to true for existing unscoped callers (e.g. Divisions'
+// own list page) — pass false while a caller genuinely has nothing to filter
+// by yet (e.g. WizardStep1's Division picker before a company is chosen),
+// so this doesn't fire an unscoped, all-tenants call no one asked for.
+export const useDivisions = (query: SearchDivisionQuery, enabled = true) => {
   return useQuery({
     queryKey: ['divisions', query],
     queryFn: () => crmService.searchDivisions(query),
+    enabled,
   })
 }

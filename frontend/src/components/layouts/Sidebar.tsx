@@ -58,6 +58,9 @@ const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
   // real 403 "Failed to load projects" screen.
   projects: ['project:search', 'project:manage', 'tenant:manage'],
   gantt: ['project:search', 'project:manage', 'tenant:manage'],
+  // Matches camps.routes.tsx's CAMP_READ_PERMISSIONS exactly — same gap as
+  // projects/gantt above, found + fixed 2026-08-04.
+  camps: ['camp:search', 'camp:manage', 'tenant:manage'],
 }
 
 interface SidebarProps {

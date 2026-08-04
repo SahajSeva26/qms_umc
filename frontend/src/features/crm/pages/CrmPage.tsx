@@ -62,7 +62,7 @@ const CrmPage = () => {
   const openLead = leads.find((l) => l.id === openLeadId) ?? null
 
   return (
-    <div className="max-w-7xl">
+    <div className="w-full">
       <div className="flex items-start justify-between gap-3 mb-4">
         <div>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--qms-text)' }}>CRM & Sales</h1>

@@ -27,7 +27,7 @@ const AccessPermissionGate = ({ anyOf, allOf, children }: AccessPermissionGatePr
 
   if (!isLoading && !isAllowed) {
     return (
-      <div className="max-w-5xl">
+      <div className="w-full">
         <div
           className="text-[13px] rounded-xl px-4 py-3 bg-danger-soft border border-danger text-danger"
         >

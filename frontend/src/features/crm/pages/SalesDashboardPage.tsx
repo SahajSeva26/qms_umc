@@ -80,7 +80,7 @@ const SalesDashboardPage = () => {
   ]
 
   return (
-    <div className="max-w-7xl">
+    <div className="w-full">
       <div className="mb-4">
         <h1 className="text-2xl font-bold" style={{ color: 'var(--qms-text)' }}>Sales Dashboard</h1>
         <div className="flex flex-wrap gap-1.5 mt-2">

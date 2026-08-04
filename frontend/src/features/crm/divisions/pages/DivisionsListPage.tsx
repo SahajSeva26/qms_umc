@@ -60,7 +60,7 @@ const DivisionsListPage = () => {
   const totalCount = data?.data?.count ?? 0
 
   return (
-    <div className="max-w-5xl">
+    <div className="w-full">
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--qms-text)' }}>

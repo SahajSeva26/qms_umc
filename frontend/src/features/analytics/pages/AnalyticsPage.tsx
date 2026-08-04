@@ -64,7 +64,7 @@ const AnalyticsPage = () => {
   const tab = focusedTab ?? activeTab
 
   return (
-    <div className="max-w-7xl">
+    <div className="w-full">
       <div className="mb-4">
         <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--qms-text-muted)' }}>
           Insights · {TAB_TITLES[tab]}

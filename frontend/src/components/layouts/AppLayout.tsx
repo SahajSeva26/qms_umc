@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Outlet, Navigate } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { Outlet, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useSession } from '@/hooks/useSession'
 import { AUTH_ROUTES } from '@/features/auth/auth.routes'
@@ -44,6 +44,8 @@ const AppLayout = () => {
   const isAuthenticated = isStoreAuthenticated || isSessionAuthenticated
   const [collapsed, setCollapsed] = useState(getInitialCollapsed)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const location = useLocation()
+  const isFirstRoute = useRef(true)
 
   // Auto-collapse/expand when crossing 1280px breakpoint, unless user has a saved intent
   useEffect(() => {
@@ -55,6 +57,20 @@ const AppLayout = () => {
     mql.addEventListener('change', onChange)
     return () => mql.removeEventListener('change', onChange)
   }, [])
+
+  // Collapse the sidebar after navigating to a new page — skips the initial
+  // mount (that's what getInitialCollapsed's saved intent/breakpoint check is
+  // for) and fires only on an actual route change. Deliberately does NOT
+  // persist 'collapsed' to SB_INTENT_KEY here: this is a per-navigation
+  // reflex, not a change to the user's remembered expand/collapse preference
+  // — reopening the sidebar (handleToggle) still saves that as normal.
+  useEffect(() => {
+    if (isFirstRoute.current) {
+      isFirstRoute.current = false
+      return
+    }
+    setCollapsed(true)
+  }, [location.pathname])
 
   const handleToggle = () => {
     setCollapsed((prev) => {

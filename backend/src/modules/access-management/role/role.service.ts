@@ -14,6 +14,7 @@ import { IServiceOptions } from '../../../shared/types/service.types';
 import { PermissionGroupModel } from '../permission-group/permissionGroup.model';
 import { TENANT_PERMISSIONS, TENANT_TYPE } from '../tenant/tenant.constants';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
+import { isValidRoleSupervisor, ROLE_SUPERVISOR_TREE } from './role.constants';
 
 type RoleDoc = HydratedDocument<IRoleDocument> | null;
 const populate: any[] = [
@@ -39,6 +40,21 @@ const populate: any[] = [
 // CORE FUNCTIONS
 // ========================================================================================
 const set = async (model: any, entity: HydratedDocument<IRoleDocument>, ctx: RequestContext) => {
+    // lazy, cached role-type resolver — fetched at most ONCE per set(), and only if a consumer below
+    // (type validation, the single-admin guard, or the supervisor tree checks) actually needs it. A
+    // name-only update therefore triggers zero role-type lookups. Prefers the incoming type
+    // (create / type-change), else the role's existing type.
+    let cachedRoleType: any;
+    let roleTypeResolved = false;
+    const getRoleType = async () => {
+        if (!roleTypeResolved) {
+            const typeId = model.type || entity.type?.toString();
+            cachedRoleType = typeId ? await RoleTypeService.get(typeId, ctx) : null;
+            roleTypeResolved = true;
+        }
+        return cachedRoleType;
+    };
+
     if (model.code) {
         entity.code = model.code;
     }
@@ -54,10 +70,7 @@ const set = async (model: any, entity: HydratedDocument<IRoleDocument>, ctx: Req
     }
     if (model.type) {
         // the incoming role type must exist AND belong to the role's own tenant — a mismatch
-        // returns a vague 404 on purpose, so a tenant admin cannot discover role types elsewhere.
-        // Comparing against entity.tenant (not ctx) also constrains a system user to the role's tenant.
-        // (admin / tenant:manage access is already enforced by the create + update route guards)
-        const roleType: any = await RoleTypeService.get(model.type, ctx);
+        const roleType: any = await getRoleType();
         if (!roleType || roleType.tenant.toString() !== entity.tenant.toString()) {
             throwAppError('Role type not found', StatusCodes.NOT_FOUND);
         }
@@ -78,9 +91,6 @@ const set = async (model: any, entity: HydratedDocument<IRoleDocument>, ctx: Req
 
     if (model.division) {
         // the division must exist AND belong to the role's own tenant (coherence) — a mismatch
-        // returns a vague 404 on purpose, mirroring the role-type guard above. Comparing against
-        // entity.tenant (not ctx) also stops a system user from linking a division from elsewhere.
-        // Fetch populated so division.tenant is the tenant doc (id + type), not just an id.
         const division: any = await DivisionService.get(model.division, ctx, { populate: true });
         if (!division || division.tenant._id.toString() !== entity.tenant.toString()) {
             throwAppError('Division not found', StatusCodes.NOT_FOUND);
@@ -92,23 +102,9 @@ const set = async (model: any, entity: HydratedDocument<IRoleDocument>, ctx: Req
         entity.division = toObjectId(model.division);
     }
 
-    if (model.supervisor) {
-        // a role cannot report to itself
-        if (model.supervisor === entity._id.toString()) {
-            throwAppError('A role cannot be its own supervisor', StatusCodes.BAD_REQUEST);
-        }
-        // the manager (supervisor) must exist, be visible to the actor, and belong to the role's
-        // own tenant — a role can only report to someone inside the same company. Fetch populated so
-        // the tenant is a document we can compare by _id.
-        const supervisor: any = await RoleService.get(model.supervisor, ctx, { populate: true });
-        if (!supervisor) {
-            throwAppError('Supervisor not found', StatusCodes.NOT_FOUND);
-        }
-        if (supervisor.tenant?._id?.toString() !== entity.tenant.toString()) {
-            throwAppError('Supervisor must belong to the same tenant', StatusCodes.BAD_REQUEST);
-        }
-        entity.supervisor = toObjectId(model.supervisor);
-    }
+    // validate a passed supervisor against the tree (create + update); on CREATE also require one for
+    // any role the tree places under a parent. Reuses the cached role type resolved above.
+    await handleSupervisor(model, entity, ctx, getRoleType);
 
     if (model.permissions && model.permissions.length > 0) {
         await handlePermissionUpdate(model, ctx);
@@ -310,4 +306,53 @@ const handlePermissionUpdate = async (model: any, ctx: RequestContext) => {
 
     log.info('Permissions validated successfully');
     return true;
+};
+
+const handleSupervisor = async (
+    model: any,
+    entity: HydratedDocument<IRoleDocument>,
+    ctx: RequestContext,
+    getRoleType: () => Promise<any>,
+) => {
+    // no supervisor supplied
+    if (!model.supervisor) {
+        // required on CREATE only, and only for a role the tree places under a parent. Roots (no/empty
+        // ROLE_SUPERVISOR_TREE entry) are exempt, so seeded/onboarding roots create fine. Updates never
+        // force one (entity.isNew is false), keeping supervisor optional on update.
+        if (entity.isNew) {
+            const roleType: any = await getRoleType();
+            const allowed: string[] = ROLE_SUPERVISOR_TREE[roleType?.code] || [];
+            if (allowed.length > 0) {
+                throwAppError('A supervisor is required for this role', StatusCodes.BAD_REQUEST);
+            }
+        }
+        return;
+    }
+
+    // a role cannot report to itself
+    if (model.supervisor === entity._id.toString()) {
+        throwAppError('A role cannot be its own supervisor', StatusCodes.BAD_REQUEST);
+    }
+
+    // the manager (supervisor) must exist and be visible to the actor
+    const supervisor: any = await RoleService.get(model.supervisor, ctx, { populate: true });
+    if (!supervisor) {
+        throwAppError('Supervisor not found', StatusCodes.NOT_FOUND);
+    }
+
+    // and belong to the role's own tenant — a role only reports to someone inside the same company
+    if (supervisor.tenant?._id?.toString() !== entity.tenant.toString()) {
+        throwAppError('Supervisor must belong to the same tenant', StatusCodes.BAD_REQUEST);
+    }
+
+    // the supervisor's role type must be one the tree allows for this role. A role type with no/empty
+    // ROLE_SUPERVISOR_TREE entry is a root — isValidRoleSupervisor returns true there, so a passed
+    // supervisor is accepted; when the tree DOES list allowed parents, only those role types pass.
+    const roleType: any = await getRoleType();
+    if (!isValidRoleSupervisor(roleType?.code, supervisor.type?.code)) {
+        const allowed: string[] = ROLE_SUPERVISOR_TREE[roleType?.code] || [];
+        throwAppError(`This role can only report to: ${allowed.join(', ')}`, StatusCodes.BAD_REQUEST);
+    }
+
+    entity.supervisor = toObjectId(model.supervisor);
 };

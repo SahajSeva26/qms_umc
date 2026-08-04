@@ -6,7 +6,7 @@ export const ROLE_TYPE_STATUSES = {
 export const ALLOWED_ROLETYPE_CODES = {
     PLATFORM: {
         SYSTEM: 'system',
-        HR: 'hr',
+        // HR: 'hr',
         ADMIN: 'admin',
 
         SALES_REP: 'sales-rep',
@@ -21,11 +21,10 @@ export const ALLOWED_ROLETYPE_CODES = {
         FIELD_OFFICER: 'field-officer',
     },
     CUSTOMER: {
-        
-        PHARMA_HO: 'pharma-ho',
+        // PHARMA_HO: 'pharma-ho',
         PHARMA_DIVISION_HEAD: 'pharma-division-head',
-        PHARMA_ASM: 'pharma-asm',
         PHARMA_RSM: 'pharma-rsm',
+        PHARMA_ASM: 'pharma-asm',
         PHARMA_MR: 'pharma-mr',
     },
 } as const;
@@ -50,27 +49,21 @@ export const ROLE_TYPE_PERMISSIONS = {
 // pharma/camp permission module exists yet; fill these in when it lands.
 export const DEFAULT_PHARMA_ROLE_TYPES = [
     {
-        code: ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_HO,
-        name: 'Pharma Head Office',
-        description: 'Pharma head office',
-        permissions: [] as string[],
-    },
-    {
         code: ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_DIVISION_HEAD,
         name: 'Pharma Division Head',
         description: 'Pharma division head',
         permissions: [] as string[],
     },
     {
-        code: ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_ASM,
-        name: 'Pharma ASM',
-        description: 'Pharma area sales manager',
-        permissions: [] as string[],
-    },
-    {
         code: ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_RSM,
         name: 'Pharma RSM',
         description: 'Pharma regional sales manager',
+        permissions: [] as string[],
+    },
+    {
+        code: ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_ASM,
+        name: 'Pharma ASM',
+        description: 'Pharma area sales manager',
         permissions: [] as string[],
     },
     {

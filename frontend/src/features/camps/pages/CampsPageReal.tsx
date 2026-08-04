@@ -4,6 +4,7 @@ import { FiPlus } from 'react-icons/fi'
 import { useCampsReal } from '@/features/camps/hooks/useCampsReal'
 import { useCampsRealFilters } from '@/features/camps/hooks/useCampsRealFilters'
 import { usePermission } from '@/hooks/usePermission'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import CampsFilterBarReal from '@/features/camps/components/CampsFilterBarReal'
 import CampsKpiStripReal from '@/features/camps/components/CampsKpiStripReal'
 import CampTableReal from '@/features/camps/components/CampTableReal'
@@ -38,6 +39,8 @@ const CampsPageReal = () => {
   const canWrite = hasAnyPermission(CAMP_WRITE_PERMISSIONS)
   const { filters, setFilter, reset } = useCampsRealFilters()
   const [page, setPage] = useState(1)
+  const debouncedCity = useDebouncedValue(filters.city, 300)
+  const debouncedState = useDebouncedValue(filters.state, 300)
 
   const activeStatus = filters.status
 
@@ -45,8 +48,8 @@ const CampsPageReal = () => {
     status: activeStatus === 'ALL' ? undefined : activeStatus,
     type: filters.type === 'ALL' ? undefined : (filters.type as CampType),
     billingType: filters.billingType === 'ALL' ? undefined : (filters.billingType as BillingType),
-    city: filters.city || undefined,
-    state: filters.state || undefined,
+    city: debouncedCity || undefined,
+    state: debouncedState || undefined,
     dateFrom: filters.dateFrom || undefined,
     dateTo: filters.dateTo || undefined,
     page: String(page),

@@ -389,7 +389,7 @@ const DietitianPaymentPage = () => {
   const bankEditDietitianName = nameFor(bankEditId)
 
   return (
-    <div className="max-w-7xl">
+    <div className="w-full">
       {/* Header */}
       <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
         <div>

@@ -6,7 +6,7 @@ import type { UpdateLeadPayload } from '@/types/crm.types'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import { useContacts } from '@/features/contacts/hooks/useContacts'
-import { PLATFORM_TENANT_CODE } from '@/features/access-management/accessManagement.constants'
+import { PLATFORM_TENANT_CODE, PLATFORM_TENANT_FETCH_LIMIT } from '@/features/access-management/accessManagement.constants'
 import { editLeadSchema } from '@/features/crm/schemas/lead.schemas'
 import { THERAPIES, SPECIALTIES, CURRENT_ACTIVITIES, QMS_OFFERINGS } from '@/features/crm/crm.constants'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
@@ -92,7 +92,10 @@ const EditLeadModal = ({ lead, onSave, onClose }: EditLeadModalProps) => {
     useContacts({ tenant: tenantId, status: 'active' }, { enabled: !!tenantId })
   const contactPeople = contactPersonData?.data?.items ?? []
 
-  const { data: tenantData, isError: tenantsErrored } = useTenants({ status: 'active' })
+  // limit: PLATFORM_TENANT_FETCH_LIMIT — see accessManagement.constants.ts;
+  // the backend's default 10-result limit can silently exclude the `qms`
+  // platform tenant once total active tenant count passes 10.
+  const { data: tenantData, isError: tenantsErrored } = useTenants({ status: 'active', limit: PLATFORM_TENANT_FETCH_LIMIT })
   // tenant.type is only present on the wire for a system:manage caller
   // (TenantMapper.toResponse) — code is always present regardless of
   // permission, so match on it as a fallback. Found via a 2026-07-26 test pass.

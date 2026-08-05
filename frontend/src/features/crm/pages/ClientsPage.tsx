@@ -42,7 +42,7 @@ const ClientsPage = () => {
   if (division) crumbs.push({ label: division.name })
 
   return (
-    <div className="max-w-7xl">
+    <div className="w-full">
       <div className="mb-4 flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--qms-text)' }}>Client Management</h1>

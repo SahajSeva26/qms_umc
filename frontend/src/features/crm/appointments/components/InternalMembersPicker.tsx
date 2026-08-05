@@ -3,7 +3,7 @@ import { FiUserPlus, FiX } from 'react-icons/fi'
 import { Input } from '@/components/ui/input'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
-import { PLATFORM_TENANT_CODE } from '@/features/access-management/accessManagement.constants'
+import { PLATFORM_TENANT_CODE, PLATFORM_TENANT_FETCH_LIMIT } from '@/features/access-management/accessManagement.constants'
 import type { RoleEntity } from '@/types/accessManagement.types'
 
 interface SelectedMember {
@@ -44,7 +44,10 @@ const InternalMembersPicker = ({ selected, onChange }: InternalMembersPickerProp
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  const { data: tenantData } = useTenants({ status: 'active' })
+  // limit: PLATFORM_TENANT_FETCH_LIMIT — see accessManagement.constants.ts;
+  // the backend's default 10-result limit can silently exclude the `qms`
+  // platform tenant once total active tenant count passes 10.
+  const { data: tenantData } = useTenants({ status: 'active', limit: PLATFORM_TENANT_FETCH_LIMIT })
   // tenant.type is only present on the wire for a system:manage caller
   // (TenantMapper.toResponse) — code is always present regardless of
   // permission, so match on it as a fallback. Same pattern already used by

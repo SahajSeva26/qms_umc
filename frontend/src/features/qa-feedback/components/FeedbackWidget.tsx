@@ -1,12 +1,15 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
-import { FiCheckSquare, FiX, FiSend } from 'react-icons/fi'
+import { FiFlag, FiX, FiSend } from 'react-icons/fi'
 import { useQaFeedback } from '@/features/qa-feedback/hooks/useQaFeedback'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 
-// Global "To Do" trigger — mounted once in AppLayout.tsx (sibling to
+// Global "Flag Issue" trigger — mounted once in AppLayout.tsx (sibling to
 // Sidebar/Topbar/main), so it's available on every authenticated page.
+// Draggable (pointer events on the trigger button itself) so it can be
+// moved out of the way of whatever it's covering; position is in-memory
+// only and resets to the default bottom-right corner on reload.
 //
 // Flow: click the trigger -> the whole viewport becomes clickable (a
 // transparent full-screen overlay tracks the cursor) -> tester clicks the
@@ -32,6 +35,48 @@ const FeedbackWidget = () => {
   const [phase, setPhase] = useState<Phase>('idle')
   const [pin, setPin] = useState<{ xPercent: number; yPercent: number; clientX: number; clientY: number } | null>(null)
   const [comment, setComment] = useState('')
+
+  // Trigger position — undefined means "use the default bottom-right CSS
+  // spot" (bottom-5 right-5). Once the user drags it, we switch to fixed
+  // pixel coordinates. Deliberately in-memory only (no localStorage): per
+  // user, 2026-08-04, the button should reset to the default corner on
+  // reload/new session, not remember where it was dropped.
+  const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null)
+  const dragState = useRef<{ offsetX: number; offsetY: number } | null>(null)
+  // Survives past pointerup (unlike dragState, cleared there) so the click
+  // event that fires right after pointerup can still see it and bail —
+  // otherwise a drag-release would also register as a click and immediately
+  // reopen picking mode.
+  const justDragged = useRef(false)
+
+  const handleDragStart = (e: React.PointerEvent<HTMLButtonElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    dragState.current = { offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top }
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+
+  const handleDragMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!dragState.current) return
+    justDragged.current = true
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = Math.min(Math.max(e.clientX - dragState.current.offsetX, 0), window.innerWidth - rect.width)
+    const y = Math.min(Math.max(e.clientY - dragState.current.offsetY, 0), window.innerHeight - rect.height)
+    setDragPos({ x, y })
+  }
+
+  const handleDragEnd = () => {
+    dragState.current = null
+  }
+
+  const handleTriggerClick = () => {
+    // A drag that actually moved the button shouldn't also fire the click
+    // that opens picking mode — only a genuine tap/click should.
+    if (justDragged.current) {
+      justDragged.current = false
+      return
+    }
+    setPhase('picking')
+  }
 
   const reset = () => {
     setPhase('idle')
@@ -76,12 +121,20 @@ const FeedbackWidget = () => {
     <>
       {phase === 'idle' && (
         <button
-          onClick={() => setPhase('picking')}
-          className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-full px-4 py-3 text-[13px] font-bold text-white shadow-lg transition-transform hover:scale-105"
-          style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
+          onClick={handleTriggerClick}
+          onPointerDown={handleDragStart}
+          onPointerMove={handleDragMove}
+          onPointerUp={handleDragEnd}
+          className="fixed z-50 flex items-center gap-2 rounded-full px-4 py-3 text-[13px] font-bold text-white shadow-lg transition-transform hover:scale-105 touch-none cursor-grab active:cursor-grabbing"
+          style={{
+            background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))',
+            ...(dragPos
+              ? { left: dragPos.x, top: dragPos.y, right: 'auto', bottom: 'auto' }
+              : { bottom: '1.25rem', right: '1.25rem' }),
+          }}
         >
-          <FiCheckSquare size={16} />
-          To Do
+          <FiFlag size={16} />
+          Flag Issue
         </button>
       )}
 

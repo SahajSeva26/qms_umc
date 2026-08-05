@@ -86,7 +86,13 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
   // though contactPersonId is already correctly set underneath.
   const [justCreatedContact, setJustCreatedContact] = useState<{ id: string; name: string } | null>(null)
 
-  const { data: tenantData, isLoading: tenantsLoading, isError: tenantsErrored } = useTenants({ status: 'active' })
+  // limit: '20' — this Company picker should list every active tenant, not
+  // just the backend's default first-10 (requestHandler.ts). Same class of
+  // truncation bug as the platform-tenant-resolution fix elsewhere (see
+  // accessManagement.constants.ts's PLATFORM_TENANT_FETCH_LIMIT) — here it's
+  // "some real companies silently missing from the Company dropdown" rather
+  // than "one specific tenant unreachable," but the same root cause.
+  const { data: tenantData, isLoading: tenantsLoading, isError: tenantsErrored } = useTenants({ status: 'active', limit: '20' })
   const tenants = tenantData?.data?.items ?? []
 
   const { data: divisionData, isLoading: divisionsLoading, isError: divisionsErrored } =

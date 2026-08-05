@@ -18,7 +18,10 @@ interface WizardStep1Props {
 const WizardStep1 = ({ form, setField }: WizardStep1Props) => {
   const [tenantSearch, setTenantSearch] = useState('')
 
-  const { data: tenantData, isLoading: tenantsLoading, isError: tenantsErrored } = useTenants({ name: tenantSearch || undefined, status: 'active' })
+  // limit: '20' — before a search term narrows the real filter, this should
+  // still reflect a realistic slice of all active companies, not just the
+  // backend's default first-10 (requestHandler.ts).
+  const { data: tenantData, isLoading: tenantsLoading, isError: tenantsErrored } = useTenants({ name: tenantSearch || undefined, status: 'active', limit: '20' })
   const tenants = tenantData?.data?.items ?? []
 
   // Both gated on `!!form.tenantId` — neither should fire an unscoped,

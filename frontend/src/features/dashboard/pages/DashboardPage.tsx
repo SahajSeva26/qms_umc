@@ -43,7 +43,7 @@ const DashboardPage = () => {
   const onDrill = (title: string, content: string) => setDrill({ title, content })
 
   return (
-    <div className="max-w-7xl">
+    <div className="w-full">
       <div className="mb-4">
         <h1 className="text-2xl font-bold" style={{ color: 'var(--qms-text)' }}>
           {getGreeting()}, {user?.firstName ?? 'there'} 👋

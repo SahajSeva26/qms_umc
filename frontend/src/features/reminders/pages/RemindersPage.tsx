@@ -31,7 +31,7 @@ const RemindersPage = () => {
   const { threads, isLoading, manualTrigger, bulkTrigger, runTick, refresh } = useReminderThreads(camps, people)
 
   return (
-    <div className="max-w-7xl">
+    <div className="w-full">
       <div className="mb-3 flex items-start justify-between gap-3 flex-wrap">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--qms-text-muted)' }}>Operations · AI Automation</p>

@@ -122,7 +122,7 @@ const DoctorsPage = () => {
   }
 
   return (
-    <div className="max-w-7xl">
+    <div className="w-full">
       <div className="flex items-start justify-between gap-3 mb-4 flex-wrap">
         <div>
           <div className="text-[12px] mb-1" style={{ color: 'var(--qms-text-muted)' }}>Operations · Field Network · Doctor Management</div>

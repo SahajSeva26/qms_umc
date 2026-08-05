@@ -41,7 +41,7 @@ const DietApprovalsPage = () => {
   const scopedCamps = useMemo(() => dietCampsForScope(camps, adminLike, coordId), [camps, adminLike, coordId])
 
   return (
-    <div className="max-w-7xl">
+    <div className="w-full">
       <div className="mb-3">
         <p className="text-[11px] font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--qms-text-muted)' }}>Operations · Diet Camp Coordination</p>
         <h1 className="text-2xl font-bold" style={{ color: 'var(--qms-text)' }}>Diet Coordinator Workspace</h1>

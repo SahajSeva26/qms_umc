@@ -14,7 +14,16 @@ const Row = ({ label, value }: { label: string; value: ReactNode }) => (
   </div>
 )
 
+// All 3 helpers below guard against `null`/`undefined` even though
+// salesRep/projectCoordinator/marketingContact/lead are all `required: true`
+// in project.model.ts — that only enforces new saves, it doesn't retroactively
+// backfill older documents, and a populate() can also resolve to null if the
+// referenced doc was since deleted or the field held a stale/pre-migration
+// reference (e.g. marketingContact's Role→Contact switch, 2026-08-03). Found
+// live 2026-08-04: "Independent audit repro project" crashed the whole page
+// with "Cannot read properties of null (reading 'name')" on marketingContact.
 function roleName(role: ProjectEntity['salesRep']): string {
+  if (!role) return '—'
   return typeof role === 'string' ? role : role.name
 }
 
@@ -22,10 +31,12 @@ function roleName(role: ProjectEntity['salesRep']): string {
 // (project.model.ts's marketingContact.ref) — separate helper since Contact
 // and Role are different populated shapes, even though both expose `.name`.
 function contactName(contact: ProjectEntity['marketingContact']): string {
+  if (!contact) return '—'
   return typeof contact === 'string' ? contact : contact.name
 }
 
 function leadTitle(lead: ProjectEntity['lead']): string {
+  if (!lead) return '—'
   return typeof lead === 'string' ? lead : lead.title
 }
 

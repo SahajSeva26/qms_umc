@@ -50,6 +50,17 @@ export const wizardStep4Schema = z
     message: 'Select at least one state or city.',
     path: ['goLiveScopeValues'],
   })
+  // Found live 2026-08-04: this step had zero time-order validation — a slot
+  // could be submitted with its end at/before its start (e.g. 13:56 to
+  // 09:56). "HH:MM" strings compare correctly with plain `<=`, same as
+  // NewAppointmentDialog.tsx's start/end check.
+  .superRefine((v, ctx) => {
+    v.campTimeSlots.forEach((slot, i) => {
+      if (slot.start && slot.end && slot.end <= slot.start) {
+        ctx.addIssue({ code: 'custom', message: 'End time must be after start time.', path: ['campTimeSlots', i, 'end'] })
+      }
+    })
+  })
 
 export const wizardStep5Schema = z.object({
   salesRep: z.string().min(1, 'Select the project sales rep.'),

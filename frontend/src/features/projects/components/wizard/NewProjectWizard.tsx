@@ -50,15 +50,22 @@ function validateStep(schemas: typeof CREATE_STEP_SCHEMAS, step: number, form: W
   return result.error.issues[0]?.message ?? 'Please complete the required fields.'
 }
 
+// Guards against null even though lead/tenant/salesRep/projectCoordinator/
+// marketingContact are all `required: true` in project.model.ts — that only
+// enforces new saves, not older documents or a populate() that resolved to
+// null (stale/pre-migration reference, deleted doc, etc). Found live
+// 2026-08-04 via a real crash on ProjectDetailDrawer.tsx's identical unwrap
+// idiom — same fix applied here before this wizard hit the same crash when
+// editing an affected project.
 function projectToForm(p: ProjectEntity): WizardFormState {
-  const leadId = typeof p.lead === 'string' ? p.lead : p.lead._id ?? ''
-  const leadTitle = typeof p.lead === 'string' ? '' : p.lead.title
-  const tenantId = typeof p.tenant === 'string' ? p.tenant : p.tenant._id ?? ''
-  const tenantName = typeof p.tenant === 'string' ? '' : p.tenant.name
-  const divisionName = typeof p.division === 'string' ? '' : p.division.name
-  const salesRep = typeof p.salesRep === 'string' ? p.salesRep : p.salesRep._id ?? ''
-  const projectCoordinator = typeof p.projectCoordinator === 'string' ? p.projectCoordinator : p.projectCoordinator._id ?? ''
-  const marketingContact = typeof p.marketingContact === 'string' ? p.marketingContact : p.marketingContact._id ?? ''
+  const leadId = !p.lead ? '' : typeof p.lead === 'string' ? p.lead : p.lead._id ?? ''
+  const leadTitle = !p.lead || typeof p.lead === 'string' ? '' : p.lead.title
+  const tenantId = !p.tenant ? '' : typeof p.tenant === 'string' ? p.tenant : p.tenant._id ?? ''
+  const tenantName = !p.tenant || typeof p.tenant === 'string' ? '' : p.tenant.name
+  const divisionName = !p.division || typeof p.division === 'string' ? '' : p.division.name
+  const salesRep = !p.salesRep ? '' : typeof p.salesRep === 'string' ? p.salesRep : p.salesRep._id ?? ''
+  const projectCoordinator = !p.projectCoordinator ? '' : typeof p.projectCoordinator === 'string' ? p.projectCoordinator : p.projectCoordinator._id ?? ''
+  const marketingContact = !p.marketingContact ? '' : typeof p.marketingContact === 'string' ? p.marketingContact : p.marketingContact._id ?? ''
 
   return {
     leadId,

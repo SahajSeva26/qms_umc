@@ -4,8 +4,9 @@ import type { PaymentTerms, ProjectEntity, ProjectTherapy, ProjectType } from '@
 import { PAYMENT_TERMS_LABEL, PROJECT_THERAPY_LABEL, PROJECT_TYPE_LABEL } from '@/types/project.types'
 import type { UpdateProjectPayload } from '@/types/project.types'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
-import { PLATFORM_TENANT_CODE } from '@/features/access-management/accessManagement.constants'
+import { PLATFORM_TENANT_CODE, PLATFORM_TENANT_FETCH_LIMIT } from '@/features/access-management/accessManagement.constants'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
+import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRoleTypes'
 import { useContacts } from '@/features/contacts/hooks/useContacts'
 import { useUpdateProject } from '@/features/projects/hooks/useUpdateProject'
 import { editProjectSchema } from '@/features/projects/schemas/project.schemas'
@@ -37,13 +38,22 @@ interface EditFormState {
   paymentTerms: PaymentTerms
 }
 
+// Guards against null even though these 3 fields are `required: true` in
+// project.model.ts — that only enforces new saves, not older documents or a
+// populate() that resolved to null (stale/pre-migration reference, deleted
+// doc, etc). Found live 2026-08-04 via a real crash on ProjectDetailDrawer.tsx's
+// identical unwrap idiom for the same 3 fields — same fix applied here before
+// this modal hit the same crash on an affected project.
+const refId = (value: { _id?: string } | string | null | undefined): string =>
+  !value ? '' : typeof value === 'string' ? value : value._id ?? ''
+
 const toFormState = (project: ProjectEntity): EditFormState => ({
   name: project.name,
   therapy: project.therapy,
   type: project.type,
-  salesRepId: typeof project.salesRep === 'string' ? project.salesRep : project.salesRep._id ?? '',
-  projectCoordinatorId: typeof project.projectCoordinator === 'string' ? project.projectCoordinator : project.projectCoordinator._id ?? '',
-  marketingContactId: typeof project.marketingContact === 'string' ? project.marketingContact : project.marketingContact._id ?? '',
+  salesRepId: refId(project.salesRep),
+  projectCoordinatorId: refId(project.projectCoordinator),
+  marketingContactId: refId(project.marketingContact),
   paymentTerms: project.paymentTerms,
 })
 
@@ -83,19 +93,63 @@ const EditProjectModal = ({ project, onClose }: EditProjectModalProps) => {
   // marketingContact sourced from Contacts, not Roles — project.model.ts's
   // marketingContact.ref switched from Role to Contact 2026-08-03 (same
   // change already applied to Lead.contactPerson).
-  const projectTenantId = typeof project.tenant === 'string' ? project.tenant : project.tenant._id
-  const { data: tenantData, isError: tenantsErrored } = useTenants({ status: 'active' })
+  const projectTenantId = !project.tenant ? undefined : typeof project.tenant === 'string' ? project.tenant : project.tenant._id
+  // limit: PLATFORM_TENANT_FETCH_LIMIT — see accessManagement.constants.ts;
+  // the backend's default 10-result limit can silently exclude the `qms`
+  // platform tenant once total active tenant count passes 10.
+  const { data: tenantData, isError: tenantsErrored } = useTenants({ status: 'active', limit: PLATFORM_TENANT_FETCH_LIMIT })
   // tenant.type is only present on the wire for a system:manage caller
   // (TenantMapper.toResponse) — code is always present regardless of
   // permission, so match on it as a fallback. Found via a 2026-07-26 test pass.
   const platformTenant = tenantData?.data?.items.find((t) => t.type === 'platform' || t.code === PLATFORM_TENANT_CODE)
-  // `enabled: !!platformTenant` — NOT the old `{ tenant: undefined }`
-  // fallback (fixed 2026-08-03): an omitted `tenant` param means "no filter
-  // at all" server-side, silently fetching every Role in the system,
-  // unscoped, before the platform tenant had resolved.
-  const { data: platformRoleData, isLoading: platformRolesLoading, isError: platformRolesErrored } =
-    useRoles({ tenant: platformTenant?.id, status: 'active' }, !!platformTenant)
-  const platformRoles = platformTenant ? platformRoleData?.data?.items ?? [] : []
+  // Sales rep — narrowed to the sales-rep RoleType only, same recipe as
+  // WizardStep5.tsx/CRM's WizardStep4.tsx — confirmed live 2026-08-04 the
+  // old unfiltered-by-tenant-only query showed System/Admin/every QA test
+  // role as pickable "sales reps." Sales Head was queried alongside
+  // sales-rep initially but explicitly excluded per user, 2026-08-04:
+  // "remove sales head he is not needed here only sales rep should be
+  // allowed."
+  const { data: salesRepTypeData, isLoading: salesRepTypeLoading, isError: salesRepTypeErrored, isSuccess: salesRepTypeLoaded } = useRoleTypes({ code: 'sales-rep', status: 'active' })
+  const salesRepTypeId = salesRepTypeData?.data?.items[0]?.id
+  // Hard-stop: `sales-rep` is a required seeded RoleType — if the lookup
+  // succeeds but returns zero items, it's been deleted/renamed and the
+  // picker can never resolve a valid sales rep (per user, 2026-08-04: "if
+  // not exists throw error and stop creation").
+  const salesRepTypeMissing = salesRepTypeLoaded && !salesRepTypeId
+
+  const { data: salesRepRoleData, isLoading: salesRepRolesLoading, isError: salesRepRolesErrored } = useRoles(
+    { tenant: platformTenant?.id, type: salesRepTypeId, status: 'active' },
+    !!platformTenant && !!salesRepTypeId,
+  )
+  const salesRoles = salesRepRoleData?.data?.items ?? []
+  const salesRolesLoading = salesRepTypeLoading || salesRepRolesLoading
+  const salesRolesErrored = tenantsErrored || salesRepTypeErrored || salesRepRolesErrored
+
+  // Project coordinator — narrowed to the camp-coordinator-screening/
+  // camp-coordinator-diet RoleTypes, the prototype's own intended filter for
+  // this field (projects-manager.js's renderStep5:
+  // /camp coordinator|admin|operations/i) — confirmed 2026-08-04 after
+  // re-checking the prototype source; previously left unnarrowed because no
+  // permission-based signal existed, but this RoleType-based signal does.
+  // Same merge + hard-stop shape as Sales rep above.
+  const { data: coordScreeningTypeData, isLoading: coordScreeningTypeLoading, isError: coordScreeningTypeErrored, isSuccess: coordScreeningTypeLoaded } = useRoleTypes({ code: 'camp-coordinator-screening', status: 'active' })
+  const { data: coordDietTypeData } = useRoleTypes({ code: 'camp-coordinator-diet', status: 'active' })
+  const coordScreeningTypeId = coordScreeningTypeData?.data?.items[0]?.id
+  const coordDietTypeId = coordDietTypeData?.data?.items[0]?.id
+  // Hard-stop, same reasoning as salesRepTypeMissing above.
+  const coordTypeMissing = coordScreeningTypeLoaded && !coordScreeningTypeId
+
+  const { data: coordScreeningRoleData, isLoading: coordScreeningRolesLoading, isError: coordScreeningRolesErrored } = useRoles(
+    { tenant: platformTenant?.id, type: coordScreeningTypeId, status: 'active' },
+    !!platformTenant && !!coordScreeningTypeId,
+  )
+  const { data: coordDietRoleData, isLoading: coordDietRolesLoading, isError: coordDietRolesErrored } = useRoles(
+    { tenant: platformTenant?.id, type: coordDietTypeId, status: 'active' },
+    !!platformTenant && !!coordDietTypeId,
+  )
+  const platformRoles = [...(coordScreeningRoleData?.data?.items ?? []), ...(coordDietRoleData?.data?.items ?? [])]
+  const platformRolesLoading = coordScreeningTypeLoading || coordScreeningRolesLoading || coordDietRolesLoading
+  const platformRolesErrored = tenantsErrored || coordScreeningTypeErrored || coordScreeningRolesErrored || coordDietRolesErrored
 
   const { data: marketingContactData, isLoading: marketingContactsLoading, isError: marketingContactsErrored } =
     useContacts({ tenant: projectTenantId, status: 'active' }, { enabled: !!projectTenantId })
@@ -176,19 +230,22 @@ const EditProjectModal = ({ project, onClose }: EditProjectModalProps) => {
             <Label className={labelClasses} style={labelStyle}>Sales rep *</Label>
             <Select value={form.salesRepId} onValueChange={(v) => setField('salesRepId', v as string)}>
               <SelectTrigger className={`w-full ${fieldClasses}`}>
-                <SelectValue placeholder={platformRolesLoading ? 'Loading...' : 'Select sales rep...'}>
+                <SelectValue placeholder={salesRolesLoading ? 'Loading...' : 'Select sales rep...'}>
                   {(v: string) => {
-                    const r = platformRoles.find((role) => role.id === v)
-                    return r ? `${r.name} (${r.code})` : platformRolesLoading ? 'Loading...' : 'Select sales rep...'
+                    const r = salesRoles.find((role) => role.id === v)
+                    return r ? `${r.name} (${r.code})` : salesRolesLoading ? 'Loading...' : 'Select sales rep...'
                   }}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {platformRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
+                {salesRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
               </SelectContent>
             </Select>
-            {(tenantsErrored || platformRolesErrored) && (
+            {salesRolesErrored && (
               <p className="text-[11px] mt-1 text-danger">Couldn't load sales reps — try again.</p>
+            )}
+            {salesRepTypeMissing && (
+              <p className="text-[11px] mt-1 text-danger">The "Sales rep" role type is missing — contact an admin.</p>
             )}
           </div>
 
@@ -207,6 +264,12 @@ const EditProjectModal = ({ project, onClose }: EditProjectModalProps) => {
                 {platformRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
               </SelectContent>
             </Select>
+            {platformRolesErrored && (
+              <p className="text-[11px] mt-1 text-danger">Couldn't load coordinators — try again.</p>
+            )}
+            {coordTypeMissing && (
+              <p className="text-[11px] mt-1 text-danger">The "Camp coordinator" role type is missing — contact an admin.</p>
+            )}
           </div>
 
           <div>

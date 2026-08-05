@@ -45,14 +45,27 @@ const WizardStep4 = ({ form, setField }: WizardStep4Props) => {
     <div className="space-y-1">
       <SectionHeader icon={FiClock} spaced={false}>Camp time slots *</SectionHeader>
       <div className="space-y-2">
-        {form.campTimeSlots.map((slot, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <Input type="time" value={slot.start} onChange={(e) => updateSlot(i, 'start', e.target.value)} className={fieldClasses} />
-            <span className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>to</span>
-            <Input type="time" value={slot.end} onChange={(e) => updateSlot(i, 'end', e.target.value)} className={fieldClasses} />
-            <button onClick={() => removeSlot(i)} aria-label="Remove slot" style={{ color: 'var(--qms-text-muted)' }}><FiX size={16} /></button>
-          </div>
-        ))}
+        {form.campTimeSlots.map((slot, i) => {
+          // Plain string compare is valid for "HH:MM" same-day values — same
+          // live-warning pattern as NewAppointmentDialog.tsx's start/end
+          // check. Found live 2026-08-04: this step had zero time-order
+          // validation at all (schema only checks `.min(1)` slots exist), so
+          // a slot could be submitted with its end before its start.
+          const invalidOrder = !!slot.start && !!slot.end && slot.end <= slot.start
+          return (
+            <div key={i}>
+              <div className="flex items-center gap-2">
+                <Input type="time" value={slot.start} onChange={(e) => updateSlot(i, 'start', e.target.value)} className={fieldClasses} />
+                <span className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>to</span>
+                <Input type="time" value={slot.end} onChange={(e) => updateSlot(i, 'end', e.target.value)} className={fieldClasses} />
+                <button onClick={() => removeSlot(i)} aria-label="Remove slot" style={{ color: 'var(--qms-text-muted)' }}><FiX size={16} /></button>
+              </div>
+              {invalidOrder && (
+                <p className="text-[11px] mt-1 text-danger">End time must be after start time</p>
+              )}
+            </div>
+          )
+        })}
       </div>
       <button onClick={addSlot} className="flex items-center gap-1.5 text-[12px] font-semibold mt-1.5" style={{ color: 'var(--qms-brand)' }}>
         <FiPlus size={13} /> Add time slot

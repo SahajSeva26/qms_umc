@@ -76,7 +76,7 @@ const OmPage = () => {
   const activeTab = tabs.find((t) => t.id === tab) ?? tabs[0]
 
   return (
-    <div className="max-w-7xl">
+    <div className="w-full">
       <OmIdBar mode={mode} onModeChange={handleModeChange} canToggle={canToggleMode} userName={user ? `${user.firstName} ${user.lastName}` : 'Ops Manager'} />
 
       <div className="flex items-start justify-between gap-3 mb-3">

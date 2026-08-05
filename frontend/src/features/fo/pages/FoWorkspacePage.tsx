@@ -106,7 +106,7 @@ const FoWorkspacePage = () => {
   const handleRunCamp = (campId: string) => setRunCampCampId(campId)
 
   return (
-    <div className="max-w-7xl">
+    <div className="w-full">
       <div className="mb-4">
         <div className="text-[12px] mb-1" style={{ color: 'var(--qms-text-muted)' }}>My Workspace</div>
         <h1 className="text-2xl font-bold" style={{ color: 'var(--qms-text)' }}>Hi, {user?.firstName ?? me.name}</h1>

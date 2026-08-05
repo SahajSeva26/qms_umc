@@ -4,7 +4,7 @@ import { LEAD_PROJECT_TYPE_LABEL } from '@/types/crm.types'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRoleTypes'
-import { PLATFORM_TENANT_CODE } from '@/features/access-management/accessManagement.constants'
+import { PLATFORM_TENANT_CODE, PLATFORM_TENANT_FETCH_LIMIT } from '@/features/access-management/accessManagement.constants'
 import { formatINR } from '@/utils/formatters'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
@@ -21,7 +21,10 @@ interface WizardStep4Props {
 const WizardStep4 = ({ form, setField }: WizardStep4Props) => {
   const score = computeWizardScore(form)
 
-  const { data: tenantData, isError: tenantsErrored } = useTenants({ status: 'active' })
+  // limit: PLATFORM_TENANT_FETCH_LIMIT — see accessManagement.constants.ts;
+  // the backend's default 10-result limit can silently exclude the `qms`
+  // platform tenant once total active tenant count passes 10.
+  const { data: tenantData, isError: tenantsErrored } = useTenants({ status: 'active', limit: PLATFORM_TENANT_FETCH_LIMIT })
   // tenant.type is only present on the wire for a system:manage caller
   // (TenantMapper.toResponse) — code is always present regardless of
   // permission, so match on it as a fallback rather than leaving this

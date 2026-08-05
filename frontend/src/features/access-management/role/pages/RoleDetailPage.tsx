@@ -8,8 +8,11 @@ import { useCreateRole } from '@/features/access-management/role/hooks/useCreate
 import { useTenantPermissionGroup } from '@/features/access-management/role-type/hooks/useTenantPermissionGroup'
 import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRoleTypes'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
+import { useRoles } from '@/features/access-management/role/hooks/useRoles'
+import { useDivisions } from '@/features/crm/hooks/useDivisions'
 import { ROLE_ROUTES } from '@/features/access-management/role/role.routes'
 import { ROLE_FORBIDDEN_PERMISSIONS } from '@/features/access-management/role/constants/roleForbiddenPermissions'
+import { PHARMA_SUPERVISOR_PARENT_CODE } from '@/features/access-management/role/constants/pharmaSupervisorTree'
 import RoleStatusPill from '@/features/access-management/role/components/RoleStatusPill'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -69,6 +72,8 @@ const ROLE_FIELD_LABELS: Record<string, string> = {
   name: 'Name',
   type: 'Role type',
   tenant: 'Company',
+  division: 'Division',
+  supervisor: 'Supervisor',
   'user.firstName': "User's first name",
   'user.email': 'User email',
   'user.password': 'Password',
@@ -90,7 +95,10 @@ const RoleDetailPage = () => {
   const { data, isLoading, error } = useRole(id)
   const role = data?.data ?? null
 
-  const { data: tenantsData } = useTenants({})
+  // limit: '20' — the backend defaults to 10 results; with 16+ active
+  // tenants seeded, `qms` (created earliest, sorts last) fell past that
+  // window and never appeared in this picker at all. Confirmed live 2026-08-05.
+  const { data: tenantsData } = useTenants({ limit: '20' })
   const tenants = tenantsData?.data?.items ?? []
 
   // On create, the tenant is chosen via a picker (optionally pre-filled from
@@ -110,7 +118,7 @@ const RoleDetailPage = () => {
     }
   }, [role, isCreateMode])
 
-  const { data: roleTypesData } = useRoleTypes({ tenant: tenant || undefined })
+  const { data: roleTypesData } = useRoleTypes({ tenant: tenant || undefined }, !!tenant)
   const roleTypes = roleTypesData?.data?.items ?? []
 
   const { permissionGroup, isLoading: isLoadingCeiling } = useTenantPermissionGroup(tenant || undefined)
@@ -127,9 +135,53 @@ const RoleDetailPage = () => {
   const [description, setDescription] = useState('')
   const [status, setStatus] = useState<RoleStatus | ''>('')
   const [roleType, setRoleType] = useState(searchParams.get('roleType') ?? '')
+  const [division, setDivision] = useState('')
+  const [supervisor, setSupervisor] = useState('')
   const [selectedCodes, setSelectedCodes] = useState<Set<string>>(new Set())
   const [formError, setFormError] = useState<string | null>(null)
   const errorRef = useScrollIntoViewOnChange<HTMLDivElement>(formError)
+
+  // Pharma role hierarchy (create only — see role.service.ts's
+  // handleDivision/handleSupervisor, both gated on entity.isNew): a division
+  // is required for a non-root pharma role type, and a supervisor must be an
+  // existing Role of the immediate parent type within that same division.
+  const selectedRoleTypeCode = roleTypes.find((rt) => rt.id === roleType)?.code
+  const supervisorParentCode = selectedRoleTypeCode ? PHARMA_SUPERVISOR_PARENT_CODE[selectedRoleTypeCode] : undefined
+  const needsDivision = selectedRoleTypeCode !== undefined && selectedRoleTypeCode in PHARMA_SUPERVISOR_PARENT_CODE
+  const needsSupervisor = !!supervisorParentCode
+
+  // NOT `tenantId` — SearchDivisionQuery's own field is stale (see its
+  // comment); the real backend query param is `tenant`
+  // (division.validators.ts's SearchDivisionQuerySchema), confirmed live
+  // 2026-08-05. Sending `tenantId` compiles but is silently ignored
+  // server-side, returning EVERY tenant's divisions unscoped — asserting the
+  // param shape here rather than widening SearchDivisionQuery itself, since
+  // fixing every other caller is a separate, already-flagged follow-up.
+  const { data: divisionsData } = useDivisions(
+    { tenant: tenant || undefined } as unknown as { tenantId?: string },
+    isCreateMode && needsDivision && !!tenant,
+  )
+  const divisions = divisionsData?.data?.items ?? []
+
+  // Resolved from the roleTypes list already fetched above (line 118) —
+  // no second useRoleTypes call needed, the parent code's id is already in
+  // that response since it's the same tenant's full RoleType list.
+  const parentTypeId = roleTypes.find((rt) => rt.code === supervisorParentCode)?.id
+
+  // status: 'active' — the backend's own supervisor validation never checks
+  // the candidate's status (confirmed live 2026-08-05: an inactive Role is
+  // silently accepted as a supervisor), so this filter is the only thing
+  // keeping an inactive/deactivated person out of the picker.
+  const { data: supervisorCandidatesData, isLoading: isLoadingSupervisors } = useRoles(
+    { tenant: tenant || undefined, division: division || undefined, type: parentTypeId, status: 'active' },
+    isCreateMode && needsSupervisor && !!tenant && !!division && !!parentTypeId,
+  )
+  const supervisorCandidates = supervisorCandidatesData?.data?.items ?? []
+
+  useEffect(() => {
+    setDivision('')
+    setSupervisor('')
+  }, [roleType, tenant])
 
   // Embedded user-registration fields (create) / limited user-edit fields (update).
   const [userFirstName, setUserFirstName] = useState('')
@@ -210,12 +262,27 @@ const RoleDetailPage = () => {
     const permissions = [...selectedCodes]
 
     if (isCreateMode) {
+      if (needsDivision && !division) {
+        setFormError('Select a division for this role type.')
+        return
+      }
+      if (needsSupervisor && !supervisor) {
+        setFormError(
+          supervisorCandidates.length === 0 && !isLoadingSupervisors
+            ? 'No eligible supervisor exists in this division yet — create one first.'
+            : 'Select a supervisor for this role type.',
+        )
+        return
+      }
+
       const result = createRoleSchema.safeParse({
         code,
         name,
         description: description || undefined,
         type: roleType,
         tenant,
+        division: division || undefined,
+        supervisor: supervisor || undefined,
         permissions,
         user: {
           firstName: userFirstName,
@@ -441,6 +508,54 @@ const RoleDetailPage = () => {
                   Scoped to the same company this role belongs to.
                 </p>
               </div>
+
+              {isCreateMode && needsDivision && (
+                <div>
+                  <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+                    Division
+                  </Label>
+                  <Select value={division || undefined} onValueChange={(v) => { setDivision(v ?? ''); setSupervisor('') }}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select division">
+                        {(v) => divisions.find((d) => d.id === v)?.name ?? 'Select division'}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {divisions.map((d) => (
+                        <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {isCreateMode && needsSupervisor && (
+                <div>
+                  <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+                    Supervisor
+                  </Label>
+                  <Select value={supervisor || undefined} onValueChange={(v) => setSupervisor(v ?? '')} disabled={!division}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder={!division ? 'Select a division first' : isLoadingSupervisors ? 'Loading…' : 'Select supervisor'}>
+                        {(v) => {
+                          const s = supervisorCandidates.find((r) => r.id === v)
+                          return s ? `${s.name} (${s.code})` : 'Select supervisor'
+                        }}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {supervisorCandidates.map((r) => (
+                        <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {division && !isLoadingSupervisors && supervisorCandidates.length === 0 && (
+                    <p className="text-[11px] mt-1.5 text-danger">
+                      No eligible supervisor exists in this division yet — create one first.
+                    </p>
+                  )}
+                </div>
+              )}
 
               {!isCreateMode && (
                 <div>

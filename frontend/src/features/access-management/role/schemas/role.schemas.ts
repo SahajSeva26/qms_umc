@@ -33,6 +33,11 @@ export const createRoleSchema = z.object({
   description: z.string().trim().optional(),
   type: z.string().trim().min(1, 'Role type is required'),
   tenant: z.string().trim().min(1, 'Company is required'),
+  // Required-ness depends on RoleType/tenant type and is enforced server-side
+  // (role.service.ts's handleDivision/handleSupervisor) — kept optional here,
+  // the page itself blocks submission when its own picker says one is needed.
+  division: z.string().trim().optional(),
+  supervisor: z.string().trim().optional(),
   permissions: z
     .array(z.string())
     .optional()

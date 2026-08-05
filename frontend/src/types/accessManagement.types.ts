@@ -285,6 +285,10 @@ export interface SearchRoleQuery {
   tenant?: string
   /** RoleType id */
   type?: string
+  /** Division id */
+  division?: string
+  /** Supervisor Role id */
+  supervisor?: string
   // Free-text keyword matched against the linked user's first/last name or
   // email (role.service.ts's search(), 2026-07-27) — NOT a user id despite
   // the field name. Built for a member-picker typeahead.
@@ -302,6 +306,10 @@ export interface CreateRolePayload {
   type: string
   /** Tenant id */
   tenant: string
+  /** Division id — required server-side for non-admin roles on a customer tenant */
+  division?: string
+  /** Supervisor Role id — required server-side per ROLE_SUPERVISOR_TREE */
+  supervisor?: string
   user: RegisterOwnerPayload
 }
 
@@ -319,6 +327,10 @@ export interface UpdateRolePayload {
   status?: RoleStatus
   /** RoleType id */
   type?: string
+  /** Division id */
+  division?: string
+  /** Supervisor Role id */
+  supervisor?: string
   user?: UpdateRoleUserPayload
 }
 

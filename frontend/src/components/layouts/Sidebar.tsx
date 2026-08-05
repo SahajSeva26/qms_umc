@@ -7,7 +7,7 @@ import {
   FiClipboard, FiSun, FiVideo, FiHeart, FiDollarSign, FiUserCheck,
   FiSettings, FiMapPin, FiAlertTriangle, FiCpu, FiGlobe, FiUser,
   FiPackage, FiBox, FiFileText, FiShield, FiZap, FiMessageSquare,
-  FiChevronsLeft, FiChevronsRight, FiChevronDown, FiCircle,
+  FiChevronsLeft, FiChevronDown, FiCircle,
 } from 'react-icons/fi'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
@@ -335,12 +335,14 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
         className={cn('flex items-center gap-2 px-3 py-3.5 border-b', collapsed && 'justify-center')}
         style={{ borderColor: 'var(--qms-border)' }}
       >
-        <div
+        <button
+          onClick={collapsed ? onToggle : undefined}
           className="w-8 h-8 rounded-[10px] flex items-center justify-center shrink-0 text-white font-extrabold text-sm shadow-md"
           style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
+          aria-label={collapsed ? 'Expand sidebar' : undefined}
         >
           Q
-        </div>
+        </button>
         {!collapsed && (
           <div className="flex-1 min-w-0">
             <div className="text-sm font-extrabold tracking-tight leading-none" style={{ color: 'var(--qms-text)' }}>QMS</div>
@@ -355,16 +357,6 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
             aria-label="Collapse sidebar"
           >
             <FiChevronsLeft size={14} />
-          </button>
-        )}
-        {collapsed && (
-          <button
-            onClick={onToggle}
-            className="absolute top-3.5 right-1 w-7 h-7 rounded-lg border flex items-center justify-center transition-all hover:bg-(--qms-surface-hover)"
-            style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }}
-            aria-label="Expand sidebar"
-          >
-            <FiChevronsRight size={14} />
           </button>
         )}
       </div>

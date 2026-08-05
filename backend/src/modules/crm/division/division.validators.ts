@@ -1,19 +1,21 @@
 import { z } from 'zod';
 import { DIVISION_STATUS, DIVISION_THERAPY } from './division.constants';
-import { isValidObjectID } from '../../../shared/utils/strings';
+import { isValidObjectID, stripWhitespace } from '../../../shared/utils/strings';
 import { RegisterUserPayloadSchema } from '../../auth/auth.validators';
 
 //1: create ====================================>
 export const CreateDivisionPayloadSchema = z.object({
     tenant: z.string().min(1).openapi({ example: 'sun-pharma' }),
-    code: z
-        .string()
-        .min(3)
-        .lowercase()
-        .refine((val) => !isValidObjectID(val), {
-            message: 'Code must not be an ObjectId',
-        })
-        .openapi({ example: 'sun-cardio' }),
+    code: z.preprocess(
+        stripWhitespace,
+        z
+            .string()
+            .min(3)
+            .lowercase()
+            .refine((val) => !isValidObjectID(val), {
+                message: 'Code must not be an ObjectId',
+            }),
+    ).openapi({ example: 'sun-cardio' }),
     name: z.string().min(1).openapi({ example: 'Cardio Care' }),
     therapy: z
         .enum(Object.values(DIVISION_THERAPY))

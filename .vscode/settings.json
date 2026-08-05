@@ -1,5 +1,5 @@
 {
-  "liveServer.settings.port": 5501
+  "liveServer.settings.port": 5501,
   // "editor.fontSize": 13,
   // "editor.lineHeight": 24,
   // "editor.letterSpacing": 0.4,
@@ -7,6 +7,17 @@
   // "editor.folding": true,
   // "editor.wordWrap": "bounded",
   // "editor.wordWrapColumn": 120
+  "todo-tree.general.tags": [
 
-
+  "OPTIMIZE"
+],
+"todo-tree.highlights.customHighlight": {
+  "OPTIMIZE": {
+    "icon": "rocket",
+    "type": "tag",
+    "foreground": "#FFFFFF",
+    "background": "#FB8C00",
+    "iconColour": "#FB8C00"
+  }
+}
 }

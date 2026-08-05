@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { PERMISSION_GROUP_STATUSES } from './permissionGroup.constants';
+import { stripWhitespace } from '../../../shared/utils/strings';
 
 const PermissionSchema = z.object({
     code: z.string().min(1).openapi({ example: 'user:create' }),
@@ -9,7 +10,7 @@ const PermissionSchema = z.object({
 
 //1: create ====================================>
 export const CreatePermissionGroupPayloadSchema = z.object({
-    code: z.string().min(1).lowercase().openapi({ example: 'admin-group' }),
+    code: z.preprocess(stripWhitespace, z.string().min(1).lowercase()).openapi({ example: 'admin-group' }),
     name: z.string().min(1).openapi({ example: 'Admin Group' }),
     description: z.string().min(1).openapi({ example: 'Full access permission group' }),
     tenant: z.string().min(1).openapi({ example: '64f1a2b3c4d5e6f7a8b9c0d1' }),

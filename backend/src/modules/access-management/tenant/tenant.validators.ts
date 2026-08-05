@@ -1,18 +1,20 @@
 import { z } from 'zod';
 import { TENANT_STATUS, TENANT_TYPE } from './tenant.constants';
-import { isValidObjectID } from '../../../shared/utils/strings';
+import { isValidObjectID, stripWhitespace } from '../../../shared/utils/strings';
 import { RegisterUserPayloadSchema } from '../../auth/auth.validators';
 
 //1: create ====================================>
 export const CreateTenantPayloadSchema = z.object({
-    code: z
-        .string()
-        .min(3)
-        .lowercase()
-        .refine((val) => !isValidObjectID(val), {
-            message: 'Code must not be an ObjectId',
-        })
-        .openapi({ example: 'cipla' }),
+    code: z.preprocess(
+        stripWhitespace,
+        z
+            .string()
+            .min(3)
+            .lowercase()
+            .refine((val) => !isValidObjectID(val), {
+                message: 'Code must not be an ObjectId',
+            }),
+    ).openapi({ example: 'cipla' }),
     name: z.string().min(1).openapi({ example: 'Cipla pvt ltd' }),
     description: z.string().optional().openapi({ example: 'Cipla private limited' }),
     owner: RegisterUserPayloadSchema,

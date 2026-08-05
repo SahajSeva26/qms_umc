@@ -11,6 +11,7 @@ import { TENANT_TYPE } from '../../modules/access-management/tenant/tenant.const
 import { withTransaction } from '../helpers/transactionHelper';
 import { throwAppError } from '../utils/error';
 import { provisionDefaultRoleTypes } from './roleTypeProvisioner';
+import { ALLOWED_ROLETYPE_CODES } from '../../modules/access-management/role-type/roleType.constants';
 import { CRM_BUSINESS_ROLE_TYPES, OPERATION_BUSINESS_ROLE_TYPES } from './defaultRoleTypes';
 
 const systemUserPermissions: any = [
@@ -110,13 +111,13 @@ const seedSystemUser = async () => {
 
             // 4.2 Create system tenant admin role
             let tenantAdminRoleType = await RoleTypeModel.findOne({
-                code: `${ENV.App.SystemTenantCode}.admin`,
+                code: ALLOWED_ROLETYPE_CODES.PLATFORM.ADMIN,
                 tenant: tenant._id,
             });
             if (!tenantAdminRoleType) {
                 tenantAdminRoleType = await RoleTypeModel.create({
                     tenant: tenant._id,
-                    code: `${ENV.App.SystemTenantCode}.admin`,
+                    code: ALLOWED_ROLETYPE_CODES.PLATFORM.ADMIN,
                     name: 'System Tenant Admin',
                     description: 'System tenant admin role type',
                     isSystem: true,

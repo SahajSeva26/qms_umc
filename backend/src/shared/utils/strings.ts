@@ -28,3 +28,10 @@ export const hasAnyItem = (data: string[], required: string[]): boolean => {
 export const canTransition = (from: string, to: string, transitionMap: Record<string, string[]>) => {
     return transitionMap[from]?.includes(to);
 };
+
+// Removes ALL whitespace — leading, trailing, AND internal — from a string. Used as a Zod
+// `preprocess` to normalize user-supplied codes before validation, so " sun cardio " becomes
+// "suncardio". Non-string input is passed through untouched for Zod to reject.
+export const stripWhitespace = (val: unknown): unknown => {
+    return typeof val === 'string' ? val.replace(/\s+/g, '') : val;
+};

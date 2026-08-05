@@ -9,7 +9,7 @@ import { isValidObjectID } from '../../../shared/utils/strings';
 import { RoleService } from '../role/role.service';
 import { PermissionGroupService } from '../permission-group/permissionGroup.service';
 import { USER_PERMISSIONS, USER_STATUS } from '../../user/user.constants';
-import { DEFAULT_PHARMA_ROLE_TYPES } from '../role-type/roleType.constants';
+import { ALLOWED_ROLETYPE_CODES, DEFAULT_PHARMA_ROLE_TYPES } from '../role-type/roleType.constants';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
 import { provisionDefaultRoleTypes } from '../../../shared/env/roleTypeProvisioner';
@@ -176,7 +176,9 @@ const createTenant = async (model: ICreateTenantPayload, ctx: RequestContext) =>
             // defaults so all platform-curated role types are uniform.
             const [roleType] = await provisionDefaultRoleTypes(tenant, [
                 {
-                    code: `${tenant.code}.admin`,
+                    // flat `admin` code — role types are unique per (tenant, code), so no tenant prefix
+                    // is needed, and the ROLE_SUPERVISOR_TREE matches this admin by its plain code.
+                    code: ALLOWED_ROLETYPE_CODES.PLATFORM.ADMIN,
                     name: `${tenant.name}'s admin role type`,
                     description: `${tenant.name}'s admin role type`,
                     permissions: [TENANT_PERMISSIONS.ADMIN.code],
@@ -198,7 +200,11 @@ const createTenant = async (model: ICreateTenantPayload, ctx: RequestContext) =>
             //4: create role (RoleService.create creates + links the owner user)
             const role = await RoleService.create(
                 {
-                    code: `${tenant.code}.admin`,
+                    // flat `admin` code — roles are unique per (tenant, code), so no tenant prefix
+                    // is needed. Keeps parity with the seeded system tenant (seedSystemUser creates
+                    // its admin role as plain `admin` too) so supervisor resolution finds the admin
+                    // role by the same code in both the seeded and runtime-created tenants.
+                    code: ALLOWED_ROLETYPE_CODES.PLATFORM.ADMIN,
                     name: `${tenant.name}'s admin role`,
                     description: `${tenant.name}'s admin role`,
                     tenant: tenant._id.toString(),

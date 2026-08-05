@@ -1,19 +1,22 @@
 import { z } from 'zod';
 import { ROLE_TYPE_STATUSES } from './roleType.constants';
 import mongoose from 'mongoose';
+import { stripWhitespace } from '../../../shared/utils/strings';
 
 //1: create ====================================>
 export const CreateRoleTypePayloadSchema = z.object({
     // custom role-type codes are free-form kebab-case; reserved (system/default) codes are blocked
     // in the service via the isSystem guard, not here.
-    code: z
-        .string()
-        .min(2)
-        .max(50)
-        .regex(/^[a-z][a-z0-9-]*$/, {
-            message: 'Code must be lowercase kebab-case: start with a letter, then letters, numbers or hyphens',
-        })
-        .openapi({ example: 'field-agent' }),
+    code: z.preprocess(
+        stripWhitespace,
+        z
+            .string()
+            .min(2)
+            .max(50)
+            .regex(/^[a-z][a-z0-9-]*$/, {
+                message: 'Code must be lowercase kebab-case: start with a letter, then letters, numbers or hyphens',
+            }),
+    ).openapi({ example: 'field-agent' }),
     name: z.string().min(1).openapi({ example: 'hr' }),
     description: z.string().optional().openapi({ example: 'HR role type' }),
     tenant: z

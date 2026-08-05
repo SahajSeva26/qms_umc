@@ -2,14 +2,14 @@ import { z } from 'zod';
 import { ROLE_STATUSES } from './role.constants';
 import { RegisterUserPayloadSchema } from '../../auth/auth.validators';
 import { UpdateUserPayloadSchema } from '../../user/user.validators';
+import { stripWhitespace } from '../../../shared/utils/strings';
 
 //1: create ====================================>
 export const CreateRolePayloadSchema = z.object({
-    code: z
-        .string()
-        .min(1)
-        .lowercase()
-        .openapi({ example: 'site-manager-john' }),
+    code: z.preprocess(
+        stripWhitespace,
+        z.string().min(1).lowercase(),
+    ).openapi({ example: 'site-manager-john' }),
     name: z.string().min(1).openapi({ example: 'Site Manager' }),
     description: z
         .string()
@@ -24,7 +24,10 @@ export const CreateRolePayloadSchema = z.object({
     tenant: z.string().min(1).openapi({ example: '64f1a2b3c4d5e6f7a8b9c0d3' }),
     // optional — only customer field-force roles (MR/HO/ASM/RSM) carry a division
     division: z.string().min(1).optional().openapi({ example: '64f1a2b3c4d5e6f7a8b9c0d4' }),
-    // optional — the role this role reports to (its manager). Must be in the same tenant.
+    // optional at the schema level — the role this role reports to (its manager), must be in the
+    // same tenant. Whether it's actually REQUIRED depends on the role type: the service rejects a
+    // missing supervisor for any role the ROLE_SUPERVISOR_TREE places under a parent, and exempts
+    // roots (no/empty tree entry).
     supervisor: z.string().min(1).optional().openapi({ example: '64f1a2b3c4d5e6f7a8b9c0d5' }),
     user: RegisterUserPayloadSchema,
 });

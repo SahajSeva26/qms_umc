@@ -15,6 +15,7 @@ import { PermissionGroupModel } from '../permission-group/permissionGroup.model'
 import { TENANT_PERMISSIONS, TENANT_TYPE } from '../tenant/tenant.constants';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
 import { isValidRoleSupervisor, ROLE_SUPERVISOR_TREE } from './role.constants';
+import { ALLOWED_ROLETYPE_CODES } from '../role-type/roleType.constants';
 
 type RoleDoc = HydratedDocument<IRoleDocument> | null;
 const populate: any[] = [
@@ -89,18 +90,9 @@ const set = async (model: any, entity: HydratedDocument<IRoleDocument>, ctx: Req
         entity.type = toObjectId(model.type);
     }
 
-    if (model.division) {
-        // the division must exist AND belong to the role's own tenant (coherence) — a mismatch
-        const division: any = await DivisionService.get(model.division, ctx, { populate: true });
-        if (!division || division.tenant._id.toString() !== entity.tenant.toString()) {
-            throwAppError('Division not found', StatusCodes.NOT_FOUND);
-        }
-        // a division may only be assigned to a role on a customer-type tenant
-        if (division.tenant.type !== TENANT_TYPE.CUSTOMER) {
-            throwAppError('Division can only be assigned to a customer tenant', StatusCodes.BAD_REQUEST);
-        }
-        entity.division = toObjectId(model.division);
-    }
+    // validates a passed division (existence, tenant coherence, customer-only) and, on CREATE,
+    // REQUIRES one for any non-admin role on a customer tenant. Reuses the cached role type.
+    await handleDivision(model, entity, ctx, getRoleType);
 
     // validate a passed supervisor against the tree (create + update); on CREATE also require one for
     // any role the tree places under a parent. Reuses the cached role type resolved above.
@@ -309,6 +301,46 @@ const handlePermissionUpdate = async (model: any, ctx: RequestContext) => {
 
     log.info('Permissions validated successfully');
     return true;
+};
+
+const handleDivision = async (
+    model: any,
+    entity: HydratedDocument<IRoleDocument>,
+    ctx: RequestContext,
+    getRoleType: () => Promise<any>,
+) => {
+    // a division was supplied — validate it and attach
+    if (model.division) {
+        // the division must exist AND belong to the role's own tenant (coherence) — a mismatch
+        const division: any = await DivisionService.get(model.division, ctx, { populate: true });
+        if (!division || division.tenant._id.toString() !== entity.tenant.toString()) {
+            throwAppError('Division not found', StatusCodes.NOT_FOUND);
+        }
+        // a division may only be assigned to a role on a customer-type tenant
+        if (division.tenant.type !== TENANT_TYPE.CUSTOMER) {
+            throwAppError('Division can only be assigned to a customer tenant', StatusCodes.BAD_REQUEST);
+        }
+        entity.division = toObjectId(model.division);
+        return;
+    }
+
+    // no division supplied — required on CREATE for every role on a CUSTOMER (pharma) tenant, with
+    // one exception: the tenant admin role (holds tenant:admin) manages the whole company, isn't tied
+    // to a single division, and is minted during onboarding before any division exists — so it's exempt.
+    // Updates never force one (entity.isNew is false), so a role created with a division keeps it.
+    if (entity.isNew) {
+        // the admin role is exempt — resolve its type (cached) and check its code. The admin role
+        // type is always code `admin` (one per tenant), so the code alone is a reliable admin match.
+        const roleType: any = await getRoleType();
+        if (roleType?.code === ALLOWED_ROLETYPE_CODES.PLATFORM.ADMIN) {
+            return;
+        }
+        // only enforce on customer tenants; platform-tenant roles (sales, ops, FO) stay division-free
+        const tenant: any = await TenantService.get(entity.tenant.toString(), ctx);
+        if (tenant?.type === TENANT_TYPE.CUSTOMER) {
+            throwAppError('A division is required for roles on a customer tenant', StatusCodes.BAD_REQUEST);
+        }
+    }
 };
 
 const handleSupervisor = async (

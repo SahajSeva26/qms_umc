@@ -261,7 +261,7 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
 
           <div>
             <Label className={labelClasses} style={labelStyle}>Company *</Label>
-            <Select value={tenantId || undefined} onValueChange={(v) => selectTenant(v ?? '')}>
+            <Select key={tenantId || 'empty'} value={tenantId || undefined} onValueChange={(v) => selectTenant(v ?? '')}>
               <SelectTrigger className="w-full text-[13px]">
                 <SelectValue placeholder={tenantsLoading ? 'Loading...' : 'Select company...'}>
                   {(v: string) => tenants.find((t) => t.id === v)?.name ?? (tenantsLoading ? 'Loading...' : 'Select company...')}
@@ -277,7 +277,7 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className={labelClasses} style={labelStyle}>Division *</Label>
-              <Select value={divisionId || undefined} onValueChange={(v) => setDivisionId(v ?? '')} disabled={!tenantId}>
+              <Select key={divisionId || 'empty'} value={divisionId || undefined} onValueChange={(v) => setDivisionId(v ?? '')} disabled={!tenantId}>
                 <SelectTrigger className="w-full text-[13px]">
                   <SelectValue placeholder={!tenantId ? 'Select a company first' : divisionsLoading ? 'Loading...' : 'Select division...'}>
                     {(v: string) => divisions.find((d) => d.id === v)?.name ?? (divisionsLoading ? 'Loading...' : 'Select division...')}

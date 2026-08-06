@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { LineChart, Calculator, RefreshCw, Check } from 'lucide-react'
 import SideDrawer from '@/components/ui/SideDrawer'
 import { toast } from '@/components/ui/sonner'
@@ -90,7 +90,10 @@ function DemandForecastView({ onOpenItem }: { onOpenItem: (id: string) => void }
   const { win, setWin } = useForecastWindow()
   const rows = useDemandForecast(win)
 
-  const campsInWindow = upcomingCamps().filter((c) => (new Date(c.date).getTime() - Date.now()) / 86400000 <= win).length
+  const campsInWindow = useMemo(
+    () => upcomingCamps().filter((c) => (new Date(c.date).getTime() - Date.now()) / 86400000 <= win).length,
+    [win],
+  )
   const totProcure = totalProcureCost(rows)
 
   const handleAutoReorder = () => {

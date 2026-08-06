@@ -17,6 +17,8 @@ import { withTransaction } from '../../../shared/helpers/transactionHelper';
 import { CsvHelper } from '../../../shared/helpers/csvHelper';
 import { CreateRolePayloadSchema, ICreateRolePayload } from '../../access-management/role/role.validators';
 import { RoleTypeService } from '../../access-management/role-type/roleType.service';
+import { IRegisterUserPayload } from '../../auth/auth.validators';
+import { processInBatches } from '../../../shared/utils/batchProcessor';
 
 type DivisionDocument = HydratedDocument<IDivision> | null;
 const populate: any[] = [
@@ -193,46 +195,53 @@ const update = async (id: string, model: IUpdateDivisionPayload, ctx: RequestCon
 };
 
 const bulkCreateMr = async (payload: IBulkMrPayload, file: Express.Multer.File, ctx: RequestContext) => {
-    //check if tenant exists
-    const tenant = await TenantService.get(payload.tenant, ctx);
-    
-    if (!tenant) {
-        return throwAppError('Tenant not found', StatusCodes.NOT_FOUND);
-    }
+    const supervisor = await RoleService.get(payload.supervisor, ctx, { populate: true });
 
-    const supervisor = await RoleService.get(payload.supervisor, ctx);
     if (!supervisor) {
         return throwAppError('Supervisor not found', StatusCodes.NOT_FOUND);
     }
+    if (supervisor.tenant._id?.toString() !== payload.tenant) {
+        return throwAppError('Supervisor doesnt belong to this tenant', StatusCodes.BAD_REQUEST);
+    }
+    if (supervisor.division?._id?.toString() !== payload.division) {
+        return throwAppError('Supervisor doesnt belong to this division', StatusCodes.BAD_REQUEST);
+    }
 
-    const mrRoleType = await RoleTypeService.search(
-        {
-            tenant: supervisor.tenant.toString(),
-            code: ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR,
-            limit: '1',
-        },
+    //get role type for mr belonging to this tenant
+    let result = await RoleTypeService.search(
+        { code: ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR, tenant: payload.tenant, status: 'active', limit: '1' },
         ctx,
     );
+    if (result.count == 0) {
+        return throwAppError('MR role type not found', StatusCodes.NOT_FOUND);
+    }
+    const mrRoleType = result.items[0];
 
-    // TODO: Implement bulk MR creation logic
-    console.log('Bulk MR creation data:', payload);
     const rows = await CsvHelper.parse(file.buffer);
 
     const validRows: any[] = [];
     const inValidRows: any[] = [];
 
     rows.forEach((row: any, index: number) => {
+        const roleUser: IRegisterUserPayload = {
+            firstName: row.firstName,
+            lastName: row.lastName,
+            email: row.email,
+            phone: row.phone,
+            password: row.password,
+        };
         const rootPaylod: ICreateRolePayload = {
             code: `${ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR}.${row.firstName}`,
             name: `${ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR} role for ${row.firstName}`,
             description: `${ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR} role for ${row.firstName}, created by bulk import`,
             tenant: payload.tenant,
-            type: row.type,
-            division: row.division,
-            user: row.user,
-            permissions: row.permissions,
+            type: mrRoleType?._id.toString() || '',
+            division: payload.division,
+            user: roleUser,
+            permissions: [],
+            supervisor: supervisor?._id?.toString(),
         };
-        const { data, success, error } = CreateRolePayloadSchema.safeParse(row);
+        const { data, success, error } = CreateRolePayloadSchema.safeParse(rootPaylod);
 
         if (!success) {
             const validationErrors = formatZodError(error);
@@ -242,7 +251,23 @@ const bulkCreateMr = async (payload: IBulkMrPayload, file: Express.Multer.File, 
         }
     });
     console.log('Bulk MR creation rows:', validRows);
-    return { total: rows.length, valid: validRows.length, invalid: inValidRows.length };
+    const batchResult = await processInBatches(
+        validRows,
+        async (item: ICreateRolePayload) => {
+            return await RoleService.create(item, ctx);
+        },
+        2,
+    );
+    return {
+        totalRows: rows.length,
+        validRows: validRows.length,
+        invalidRows: inValidRows.length,
+
+        created: batchResult.success.length,
+        failed: batchResult.failed.length,
+        errors: batchResult.failed,
+    };
+    // return { total: rows.length, valid: validRows.length, invalid: inValidRows.length };
 };
 
 export const DivisionService = {

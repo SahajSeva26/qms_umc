@@ -139,8 +139,17 @@ const bulkCreateMr = async (req: any, res: any) => {
         }
 
         const result = await DivisionService.bulkCreateMr(data, req.file, ctx);
+        if (result.errors && result.errors.length > 0) {
+            return ResponseHandler.appResponse(
+                res,
+                StatusCodes.BAD_REQUEST,
+                false,
+                'MRs created with errors',
+                result.errors,
+            );
+        }
 
-        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'MRs uploaded successfully', result);
+        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'MRs created successfully', result);
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }

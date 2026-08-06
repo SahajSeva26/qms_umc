@@ -55,8 +55,15 @@ const CreateDivisionModal = ({ onClose }: CreateDivisionModalProps) => {
   const [error, setError] = useState<string | null>(null)
 
   const createDivision = useCreateDivision()
+  // No server-side `type` filter exists on GET /tenants (confirmed against
+  // tenant.service.ts's search() — no filters.type handling at all), so
+  // this filters client-side after the fetch, same as every other
+  // `t.type === 'platform'` check in this codebase (WizardStep4/5,
+  // EditLeadModal, EditProjectModal, InternalMembersPicker,
+  // crm.importResolver). A division always belongs to a customer/pharma
+  // company — QMS (the platform tenant) should never be pickable here.
   const { data: tenantsData } = useTenants({})
-  const tenants = tenantsData?.data?.items ?? []
+  const tenants = (tenantsData?.data?.items ?? []).filter((t) => t.type !== 'platform')
 
   const handleSave = async () => {
     const result = createDivisionSchema.safeParse({

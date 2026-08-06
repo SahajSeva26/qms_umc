@@ -32,6 +32,10 @@ const populate: any[] = [
         select: 'firstName lastName email phone gender status',
     },
     {
+        path: 'division',
+        select: 'name code status',
+    },
+    {
         path: 'supervisor',
         select: 'code name type tenant division',
     },
@@ -378,6 +382,10 @@ const handleSupervisor = async (
     // and belong to the role's own tenant — a role only reports to someone inside the same company
     if (supervisor.tenant?._id?.toString() !== entity.tenant.toString()) {
         throwAppError('Supervisor must belong to the same tenant', StatusCodes.BAD_REQUEST);
+    }
+    // and belong to the role's own division — a role only reports to someone inside the same division
+    if (supervisor.division?._id?.toString() !== entity.division?.toString()) {
+        throwAppError('Supervisor must belong to the same division', StatusCodes.BAD_REQUEST);
     }
 
     // the supervisor's role type must be one the tree allows for this role. A role type with no/empty

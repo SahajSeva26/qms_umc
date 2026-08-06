@@ -51,7 +51,7 @@ export const createDivisionSchema = z.object({
 // division.validators.ts's UpdateDivisionPayloadSchema exactly: name/therapy/
 // brandFocus/mrCount/status only, EVERY field optional there — never
 // tenant/code/head/owner, none of which are editable per the backend.
-// EditDivisionModal always sends every field (a full-replace UX, not a
+// DivisionDetailPage always sends every field (a full-replace UX, not a
 // partial-patch one), so name/therapy/status are still validated as
 // non-empty here — this is a stricter client-side UX choice layered on top
 // of a schema that otherwise accepts a true partial payload, matching the

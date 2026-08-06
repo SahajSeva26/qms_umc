@@ -1,4 +1,4 @@
-import multer from 'multer';
+import multer, { Multer } from 'multer';
 
 // export const multerInstance = multer({
 //     storage: multer.memoryStorage(),

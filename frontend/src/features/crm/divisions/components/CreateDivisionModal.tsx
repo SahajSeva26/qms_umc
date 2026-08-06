@@ -24,8 +24,8 @@ const GENDER_OPTIONS: { value: 'male' | 'female' | 'other'; label: string }[] = 
 ]
 
 // Create-only, per the confirmed scope ("for creating we will have modal") —
-// status/therapy/brand-focus/mrCount edits happen through EditDivisionModal
-// instead, opened from a table row click.
+// status/therapy/brand-focus/mrCount edits happen through DivisionDetailPage
+// instead, opened by navigating to a division from a table row click.
 //
 // Company picker added 2026-07-30: the backend's create endpoint now
 // requires an explicit `tenant` for EVERY caller (the old "platform tenant

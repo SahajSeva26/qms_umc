@@ -1,9 +1,11 @@
 import type { RouteObject } from 'react-router-dom'
 import RequirePermission from '@/components/layouts/RequirePermission'
 import DivisionsListPage from './pages/DivisionsListPage'
+import DivisionDetailPage from './pages/DivisionDetailPage'
 
 export const DIVISION_ROUTES = {
   DIVISIONS: '/crm/divisions',
+  DIVISION_DETAIL: '/crm/divisions/:id',
 }
 
 // Matches division.routes.ts's real guard on every Division route exactly:
@@ -20,6 +22,14 @@ export const divisionsRoutes: RouteObject[] = [
     element: (
       <RequirePermission anyOf={DIVISION_VIEW_PERMISSIONS}>
         <DivisionsListPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: DIVISION_ROUTES.DIVISION_DETAIL,
+    element: (
+      <RequirePermission anyOf={DIVISION_VIEW_PERMISSIONS}>
+        <DivisionDetailPage />
       </RequirePermission>
     ),
   },

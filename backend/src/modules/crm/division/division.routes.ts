@@ -2,6 +2,8 @@ import express from 'express';
 import { DivisionController } from './division.controller';
 import { registry } from '../../../shared/config/swagger/swagger.registry';
 import {
+    BulkMrOpenApiSchema,
+    BulkMrPayloadSchema,
     CreateDivisionPayloadSchema,
     SearchDivisionQuerySchema,
     UpdateDivisionPayloadSchema,
@@ -11,6 +13,7 @@ import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddle
 import { DIVISION_PERMISSIONS } from './division.constants';
 import { TENANT_PERMISSIONS } from '../../access-management/tenant/tenant.constants';
 import { LEAD_PERMISSIONS } from '../lead/lead.constants';
+import { csvUploader } from '../../../shared/middlewares/upload/csvUploader';
 
 export const DivisionRouter = express.Router();
 
@@ -102,6 +105,28 @@ registry.registerPath({
     },
 });
 
+registry.registerPath({
+    method: 'post',
+    path: '/divisions/bulk-mr',
+    tags: ['DIVISION'],
+    summary: 'Bulk create MRs for division with supervisor',
+
+    request: {
+        body: {
+            content: {
+                'multipart/form-data': {
+                    schema: BulkMrOpenApiSchema,
+                },
+            },
+        },
+    },
+    responses: {
+        200: { description: 'MRs created successfully' },
+        400: { description: 'Validation error' },
+        404: { description: 'Division or supervisor not found' },
+    },
+});
+
 // =======================================================================
 // ========================= EXPORT DIVISION ROUTES ======================
 // =======================================================================
@@ -129,4 +154,11 @@ DivisionRouter.post(
     '/',
     AuthorizeMiddleware([DIVISION_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.ADMIN.code]),
     DivisionController.create,
+);
+
+DivisionRouter.post(
+    '/bulk-mr',
+    AuthorizeMiddleware([DIVISION_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.ADMIN.code]),
+    csvUploader.single('file'),
+    DivisionController.bulkCreateMr,
 );

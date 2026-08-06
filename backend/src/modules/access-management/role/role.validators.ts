@@ -8,7 +8,7 @@ import { stripWhitespace } from '../../../shared/utils/strings';
 export const CreateRolePayloadSchema = z.object({
     code: z.preprocess(
         stripWhitespace,
-        z.string().min(1).lowercase(),
+        z.string().min(1).toLowerCase(),
     ).openapi({ example: 'site-manager-john' }),
     name: z.string().min(1).openapi({ example: 'Site Manager' }),
     description: z

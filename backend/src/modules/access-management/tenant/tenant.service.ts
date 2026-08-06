@@ -82,6 +82,11 @@ const search = async (filters: ISearchTenantQuery, ctx: RequestContext, options?
     if (filters.code) {
         where.code = { $regex: filters.code, $options: 'i' };
     }
+    if (filters.type) {
+        //TODO:only system user shoudld be able to do that
+        where.type = filters.type;
+    }
+
     if (filters.status && ctx.hasAnyPermissions([TENANT_PERMISSIONS.MANAGE.code])) {
         where.status = filters.status;
     }

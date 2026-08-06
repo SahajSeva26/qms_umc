@@ -1,8 +1,8 @@
 import mongoose, { HydratedDocument } from 'mongoose';
 import { IDivision, DivisionModel } from './division.model';
-import { ICreateDivisionPayload, ISearchDivisionQuery, IUpdateDivisionPayload } from './division.validators';
+import { IBulkMrPayload, ICreateDivisionPayload, ISearchDivisionQuery, IUpdateDivisionPayload } from './division.validators';
 import { DIVISION_PERMISSIONS, DIVISION_STATUS } from './division.constants';
-import { throwAppError } from '../../../shared/utils/error';
+import { formatZodError, throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
 import { isValidObjectID } from '../../../shared/utils/strings';
@@ -14,6 +14,11 @@ import { RoleService } from '../../access-management/role/role.service';
 import { RoleTypeModel } from '../../access-management/role-type/roleType.model';
 import { ALLOWED_ROLETYPE_CODES } from '../../access-management/role-type/roleType.constants';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
+import { CsvHelper } from '../../../shared/helpers/csvHelper';
+import { CreateRolePayloadSchema, ICreateRolePayload } from '../../access-management/role/role.validators';
+import { RoleTypeService } from '../../access-management/role-type/roleType.service';
+import { IRegisterUserPayload } from '../../auth/auth.validators';
+import { processInBatches } from '../../../shared/utils/batchProcessor';
 
 type DivisionDocument = HydratedDocument<IDivision> | null;
 const populate: any[] = [
@@ -134,10 +139,7 @@ const create = async (model: ICreateDivisionPayload, ctx: RequestContext): Promi
         tenant: tenant._id,
     });
     if (!headRoleType) {
-        return throwAppError(
-            'The pharma-division-head role type is not provisioned for this tenant',
-            StatusCodes.CONFLICT,
-        );
+        return throwAppError('The pharma-division-head role type is not provisioned for this tenant', StatusCodes.CONFLICT);
     }
 
     //4: create the division AND its head role in one transaction — roll back both if either fails
@@ -192,11 +194,88 @@ const update = async (id: string, model: IUpdateDivisionPayload, ctx: RequestCon
     return division;
 };
 
+const bulkCreateMr = async (payload: IBulkMrPayload, file: Express.Multer.File, ctx: RequestContext) => {
+    const supervisor = await RoleService.get(payload.supervisor, ctx, { populate: true });
+
+    if (!supervisor) {
+        return throwAppError('Supervisor not found', StatusCodes.NOT_FOUND);
+    }
+    if (supervisor.tenant._id?.toString() !== payload.tenant) {
+        return throwAppError('Supervisor doesnt belong to this tenant', StatusCodes.BAD_REQUEST);
+    }
+    if (supervisor.division?._id?.toString() !== payload.division) {
+        return throwAppError('Supervisor doesnt belong to this division', StatusCodes.BAD_REQUEST);
+    }
+
+    //get role type for mr belonging to this tenant
+    let result = await RoleTypeService.search(
+        { code: ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR, tenant: payload.tenant, status: 'active', limit: '1' },
+        ctx,
+    );
+    if (result.count == 0) {
+        return throwAppError('MR role type not found', StatusCodes.NOT_FOUND);
+    }
+    const mrRoleType = result.items[0];
+
+    const rows = await CsvHelper.parse(file.buffer);
+
+    const validRows: any[] = [];
+    const inValidRows: any[] = [];
+
+    rows.forEach((row: any, index: number) => {
+        const roleUser: IRegisterUserPayload = {
+            firstName: row.firstName,
+            lastName: row.lastName,
+            email: row.email,
+            phone: row.phone,
+            password: row.password,
+        };
+        const rootPaylod: ICreateRolePayload = {
+            code: `${ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR}.${row.firstName}`,
+            name: `${ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR} role for ${row.firstName}`,
+            description: `${ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR} role for ${row.firstName}, created by bulk import`,
+            tenant: payload.tenant,
+            type: mrRoleType?._id.toString() || '',
+            division: payload.division,
+            user: roleUser,
+            permissions: [],
+            supervisor: supervisor?._id?.toString(),
+        };
+        const { data, success, error } = CreateRolePayloadSchema.safeParse(rootPaylod);
+
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            inValidRows.push({ row: index + 1, error: validationErrors });
+        } else {
+            validRows.push(data);
+        }
+    });
+    console.log('Bulk MR creation rows:', validRows);
+    const batchResult = await processInBatches(
+        validRows,
+        async (item: ICreateRolePayload) => {
+            return await RoleService.create(item, ctx);
+        },
+        2,
+    );
+    return {
+        totalRows: rows.length,
+        validRows: validRows.length,
+        invalidRows: inValidRows.length,
+
+        created: batchResult.success.length,
+        failed: batchResult.failed.length,
+        errors: batchResult.failed,
+    };
+    // return { total: rows.length, valid: validRows.length, invalid: inValidRows.length };
+};
+
 export const DivisionService = {
     get,
     search,
     create,
     update,
+    bulkCreateMr,
 };
 
 // ========================================================================================

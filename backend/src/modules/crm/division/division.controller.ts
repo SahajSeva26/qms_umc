@@ -1,9 +1,10 @@
 import { ResponseHandler } from '../../../shared/utils/responseHandler';
-import { formatZodError } from '../../../shared/utils/error';
+import { formatZodError, throwAppError } from '../../../shared/utils/error';
 import {
     CreateDivisionPayloadSchema,
     UpdateDivisionPayloadSchema,
     SearchDivisionQuerySchema,
+    BulkMrPayloadSchema,
 } from './division.validators';
 import { StatusCodes } from 'http-status-codes';
 import { DivisionService } from './division.service';
@@ -121,9 +122,43 @@ const update = async (req: any, res: any) => {
     }
 };
 
+const bulkCreateMr = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+
+        const { data, success, error } = BulkMrPayloadSchema.safeParse(req.body);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                fields: validationErrors,
+            });
+        }
+
+        if (!req.file) {
+            return throwAppError('CSV file is required', StatusCodes.BAD_REQUEST);
+        }
+
+        const result = await DivisionService.bulkCreateMr(data, req.file, ctx);
+        if (result.errors && result.errors.length > 0) {
+            return ResponseHandler.appResponse(
+                res,
+                StatusCodes.BAD_REQUEST,
+                false,
+                'MRs created with errors',
+                result.errors,
+            );
+        }
+
+        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'MRs created successfully', result);
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
 export const DivisionController = {
     get,
     search,
     create,
     update,
+    bulkCreateMr,
 };

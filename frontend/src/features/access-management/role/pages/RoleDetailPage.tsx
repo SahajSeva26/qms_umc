@@ -238,12 +238,20 @@ const RoleDetailPage = () => {
     )
   }, [permissionGroup, boundRoleTypePermissionCodes])
 
-  // Whenever the candidate set shrinks (ceiling, role type, or forbidden-list
-  // change), drop any selected code that has fallen outside it.
-  useEffect(() => {
+  // Selected codes that have fallen outside the current candidate set
+  // (ceiling, role type, or forbidden-list changed) are dropped here, at
+  // READ time, rather than synced back into `selectedCodes` via an effect —
+  // that effect used to feed itself: `candidatePermissions` is a fresh
+  // array/Set every render (built through boundRoleTypePermissionCodes,
+  // itself built from `roleTypes = roleTypesData?.data?.items ?? []`, a new
+  // `[]` on every render before the query settles), so the effect's own
+  // dependency never stabilized and it looped — "Maximum update depth
+  // exceeded," confirmed live 2026-08-05. Deriving instead of syncing removes
+  // the setState entirely, so there's nothing left to loop.
+  const effectiveSelectedCodes = useMemo(() => {
     const allowed = new Set(candidatePermissions.map((p) => p.code))
-    setSelectedCodes((prev) => new Set([...prev].filter((c) => allowed.has(c))))
-  }, [candidatePermissions])
+    return new Set([...selectedCodes].filter((c) => allowed.has(c)))
+  }, [selectedCodes, candidatePermissions])
 
   const toggleCode = (code: string) => {
     if (ROLE_FORBIDDEN_PERMISSIONS.includes(code)) return
@@ -259,7 +267,7 @@ const RoleDetailPage = () => {
   }
 
   const handleSave = () => {
-    const permissions = [...selectedCodes]
+    const permissions = [...effectiveSelectedCodes]
 
     if (isCreateMode) {
       if (needsDivision && !division) {
@@ -375,6 +383,7 @@ const RoleDetailPage = () => {
                     Company
                   </Label>
                   <Select
+                    key={tenant || 'empty'}
                     value={tenant || undefined}
                     onValueChange={(v) => {
                       setTenant(v ?? '')
@@ -487,7 +496,7 @@ const RoleDetailPage = () => {
                 >
                   Role Type
                 </Label>
-                <Select value={roleType || undefined} onValueChange={(v) => setRoleType(v ?? '')} disabled={!tenant}>
+                <Select key={roleType || 'empty'} value={roleType || undefined} onValueChange={(v) => setRoleType(v ?? '')} disabled={!tenant}>
                   <SelectTrigger id="roleType" className="w-full">
                     <SelectValue placeholder={tenant ? 'Select role type' : 'Select a company first'}>
                       {(v) => {
@@ -514,7 +523,7 @@ const RoleDetailPage = () => {
                   <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
                     Division
                   </Label>
-                  <Select value={division || undefined} onValueChange={(v) => { setDivision(v ?? ''); setSupervisor('') }}>
+                  <Select key={division || 'empty'} value={division || undefined} onValueChange={(v) => { setDivision(v ?? ''); setSupervisor('') }}>
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select division">
                         {(v) => divisions.find((d) => d.id === v)?.name ?? 'Select division'}
@@ -534,7 +543,7 @@ const RoleDetailPage = () => {
                   <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
                     Supervisor
                   </Label>
-                  <Select value={supervisor || undefined} onValueChange={(v) => setSupervisor(v ?? '')} disabled={!division}>
+                  <Select key={supervisor || 'empty'} value={supervisor || undefined} onValueChange={(v) => setSupervisor(v ?? '')} disabled={!division}>
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder={!division ? 'Select a division first' : isLoadingSupervisors ? 'Loading…' : 'Select supervisor'}>
                         {(v) => {
@@ -705,7 +714,7 @@ const RoleDetailPage = () => {
                   >
                     Gender
                   </Label>
-                  <Select value={userGender || undefined} onValueChange={(v) => setUserGender(v as typeof userGender)}>
+                  <Select key={userGender || 'empty'} value={userGender || undefined} onValueChange={(v) => setUserGender(v as typeof userGender)}>
                     <SelectTrigger id="userGender" className="w-full">
                       <SelectValue placeholder="Optional">
                         {(v) => (v === 'male' ? 'Male' : v === 'female' ? 'Female' : v === 'other' ? 'Other' : 'Optional')}
@@ -729,7 +738,7 @@ const RoleDetailPage = () => {
                   >
                     User status
                   </Label>
-                  <Select value={userStatus || undefined} onValueChange={(v) => setUserStatus(v as typeof userStatus)}>
+                  <Select key={userStatus || 'empty'} value={userStatus || undefined} onValueChange={(v) => setUserStatus(v as typeof userStatus)}>
                     <SelectTrigger id="userStatus" className="w-full">
                       <SelectValue placeholder="Select user status">
                         {(v) => {
@@ -759,7 +768,7 @@ const RoleDetailPage = () => {
                 Elevated permissions
               </h2>
               <span className="text-[11px] font-semibold" style={{ color: 'var(--qms-text-muted)' }}>
-                {selectedCodes.size} of {candidatePermissions.length} selected
+                {effectiveSelectedCodes.size} of {candidatePermissions.length} selected
               </span>
             </div>
             <p className="text-[12px] mb-4" style={{ color: 'var(--qms-text-muted)' }}>
@@ -799,7 +808,7 @@ const RoleDetailPage = () => {
             {tenant && roleType && !isLoadingCeiling && permissionGroup && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {candidatePermissions.map((permission) => {
-                  const checked = selectedCodes.has(permission.code)
+                  const checked = effectiveSelectedCodes.has(permission.code)
                   return (
                     <label
                       key={permission.code}

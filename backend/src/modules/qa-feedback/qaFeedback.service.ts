@@ -6,6 +6,7 @@ import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../shared/utils/contextBuilder';
 import { isValidObjectID } from '../../shared/utils/strings';
 import { IServiceOptions } from '../../shared/types/service.types';
+import { JiraProvider } from '../../shared/providers/jira/jira.provider';
 
 type QaFeedbackDocument = HydratedDocument<IQaFeedback> | null;
 
@@ -59,7 +60,7 @@ const search = async (filters: ISearchQaFeedbackQuery, options?: IServiceOptions
 };
 
 const create = async (model: ICreateQaFeedbackPayload, ctx: RequestContext): Promise<HydratedDocument<IQaFeedback>> => {
-    const entity = new QaFeedbackModel({
+    let entity = new QaFeedbackModel({
         pageRoute: model.pageRoute,
         pageTitle: model.pageTitle ?? '',
         pinXPercent: model.pinXPercent,
@@ -68,7 +69,21 @@ const create = async (model: ICreateQaFeedbackPayload, ctx: RequestContext): Pro
         reportedBy: ctx.user?._id,
     });
 
-    return await entity.save();
+    // entity = await entity.save();
+
+    // The feedback is already persisted above — a Jira outage must NOT fail the
+    // request. Log and swallow any integration error instead of propagating it.
+    try {
+        const result = await JiraProvider.createTicket({
+            summary: `${model.pageTitle}-(${model.pageRoute})`,
+            description: model.comment,
+        });
+        ctx.logger.info({ issueKey: result?.key }, 'Jira ticket created');
+    } catch (err) {
+        ctx.logger.error({ err }, 'Jira ticket creation failed; feedback saved without a ticket');
+    }
+
+    return entity;
 };
 
 const update = async (id: string, model: IUpdateQaFeedbackPayload): Promise<HydratedDocument<IQaFeedback>> => {

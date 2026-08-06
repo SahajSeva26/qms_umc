@@ -56,6 +56,19 @@ let ENV = {
         RefreshExpirySec: Number(process.env.JWT_REFRESH_EXPIRY_SEC) || 60 * 60 * 24 * 7, // 7 days fallback
     },
 
+    Integrations: {
+        // Jira Cloud — credentials come from .env (gitignored). Non-secret
+        // fallbacks are fine to keep; email/token have no fallback on purpose so
+        // no secret ever lands in this git-tracked file.
+        Jira: {
+            BaseUrl: process.env.JIRA_BASE_URL || 'https://sahajseva.atlassian.net',
+            Email: process.env.JIRA_EMAIL || '',
+            ApiToken: process.env.JIRA_API_TOKEN || '',
+            ProjectKey: process.env.JIRA_PROJECT_KEY || 'QP',
+            IssueType: process.env.JIRA_ISSUE_TYPE || 'Bug',
+        },
+    },
+
     RateLimit: {
         // Global limiter — applied to the whole API
         WindowMs: Number(process.env.RATE_LIMIT_WINDOW_MS) || 60 * 1000, // 1 min

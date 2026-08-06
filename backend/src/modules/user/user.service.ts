@@ -120,7 +120,7 @@ const create = async (model: IRegisterUserPayload, ctx: RequestContext): Promise
     //2: create user
     const entity = new UserModel({
         email: model.email,
-        status: USER_STATUS.INACTIVE,
+        status: USER_STATUS.ACTIVE,
         password: hashedPassword,
     });
 

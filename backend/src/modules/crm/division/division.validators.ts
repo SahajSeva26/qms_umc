@@ -1,21 +1,26 @@
 import { z } from 'zod';
 import { DIVISION_STATUS, DIVISION_THERAPY } from './division.constants';
-import { isValidObjectID, stripWhitespace } from '../../../shared/utils/strings';
+import {
+    isValidObjectID,
+    stripWhitespace,
+} from '../../../shared/utils/strings';
 import { RegisterUserPayloadSchema } from '../../auth/auth.validators';
 
 //1: create ====================================>
 export const CreateDivisionPayloadSchema = z.object({
     tenant: z.string().min(1).openapi({ example: 'sun-pharma' }),
-    code: z.preprocess(
-        stripWhitespace,
-        z
-            .string()
-            .min(3)
-            .lowercase()
-            .refine((val) => !isValidObjectID(val), {
-                message: 'Code must not be an ObjectId',
-            }),
-    ).openapi({ example: 'sun-cardio' }),
+    code: z
+        .preprocess(
+            stripWhitespace,
+            z
+                .string()
+                .min(3)
+                .lowercase()
+                .refine((val) => !isValidObjectID(val), {
+                    message: 'Code must not be an ObjectId',
+                }),
+        )
+        .openapi({ example: 'sun-cardio' }),
     name: z.string().min(1).openapi({ example: 'Cardio Care' }),
     therapy: z
         .enum(Object.values(DIVISION_THERAPY))
@@ -79,3 +84,36 @@ export const SearchDivisionQuerySchema = z.object({
     limit: z.string().optional().openapi({ example: '10' }),
 });
 export type ISearchDivisionQuery = z.infer<typeof SearchDivisionQuerySchema>;
+
+export const BulkMrPayloadSchema = z.object({
+    division: z
+        .string()
+        .refine((val) => isValidObjectID(val), {
+            message: 'divisionId must be a valid ObjectId',
+        })
+        .openapi({ example: '64f0c2a1b3d4e5f6a7b8c9d0' }),
+    supervisor: z
+        .string()
+        .refine((val) => isValidObjectID(val), {
+            message: 'supervisorId must be a valid ObjectId',
+        })
+        .openapi({ example: '64f0c2a1b3d4e5f6a7b8c9d0' }),
+    tenant: z
+        .string()
+        .refine((val) => isValidObjectID(val), {
+            message: 'tenantId must be a valid ObjectId',
+        })
+        .openapi({ example: '64f0c2a1b3d4e5f6a7b8c9d0' }),
+
+    // file: z.any().openapi({
+    //     type: 'string',
+    //     format: 'binary',
+    // }),
+});
+export const BulkMrOpenApiSchema = BulkMrPayloadSchema.extend({
+    file: z.any().openapi({
+        type: 'string',
+        format: 'binary',
+    }),
+});
+export type IBulkMrPayload = z.infer<typeof BulkMrPayloadSchema>;

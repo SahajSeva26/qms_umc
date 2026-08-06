@@ -1,8 +1,8 @@
 import mongoose, { HydratedDocument } from 'mongoose';
 import { IDivision, DivisionModel } from './division.model';
-import { ICreateDivisionPayload, ISearchDivisionQuery, IUpdateDivisionPayload } from './division.validators';
+import { IBulkMrPayload, ICreateDivisionPayload, ISearchDivisionQuery, IUpdateDivisionPayload } from './division.validators';
 import { DIVISION_PERMISSIONS, DIVISION_STATUS } from './division.constants';
-import { throwAppError } from '../../../shared/utils/error';
+import { formatZodError, throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
 import { isValidObjectID } from '../../../shared/utils/strings';
@@ -14,6 +14,9 @@ import { RoleService } from '../../access-management/role/role.service';
 import { RoleTypeModel } from '../../access-management/role-type/roleType.model';
 import { ALLOWED_ROLETYPE_CODES } from '../../access-management/role-type/roleType.constants';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
+import { CsvHelper } from '../../../shared/helpers/csvHelper';
+import { CreateRolePayloadSchema, ICreateRolePayload } from '../../access-management/role/role.validators';
+import { RoleTypeService } from '../../access-management/role-type/roleType.service';
 
 type DivisionDocument = HydratedDocument<IDivision> | null;
 const populate: any[] = [
@@ -134,10 +137,7 @@ const create = async (model: ICreateDivisionPayload, ctx: RequestContext): Promi
         tenant: tenant._id,
     });
     if (!headRoleType) {
-        return throwAppError(
-            'The pharma-division-head role type is not provisioned for this tenant',
-            StatusCodes.CONFLICT,
-        );
+        return throwAppError('The pharma-division-head role type is not provisioned for this tenant', StatusCodes.CONFLICT);
     }
 
     //4: create the division AND its head role in one transaction — roll back both if either fails
@@ -192,11 +192,65 @@ const update = async (id: string, model: IUpdateDivisionPayload, ctx: RequestCon
     return division;
 };
 
+const bulkCreateMr = async (payload: IBulkMrPayload, file: Express.Multer.File, ctx: RequestContext) => {
+    //check if tenant exists
+    const tenant = await TenantService.get(payload.tenant, ctx);
+    
+    if (!tenant) {
+        return throwAppError('Tenant not found', StatusCodes.NOT_FOUND);
+    }
+
+    const supervisor = await RoleService.get(payload.supervisor, ctx);
+    if (!supervisor) {
+        return throwAppError('Supervisor not found', StatusCodes.NOT_FOUND);
+    }
+
+    const mrRoleType = await RoleTypeService.search(
+        {
+            tenant: supervisor.tenant.toString(),
+            code: ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR,
+            limit: '1',
+        },
+        ctx,
+    );
+
+    // TODO: Implement bulk MR creation logic
+    console.log('Bulk MR creation data:', payload);
+    const rows = await CsvHelper.parse(file.buffer);
+
+    const validRows: any[] = [];
+    const inValidRows: any[] = [];
+
+    rows.forEach((row: any, index: number) => {
+        const rootPaylod: ICreateRolePayload = {
+            code: `${ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR}.${row.firstName}`,
+            name: `${ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR} role for ${row.firstName}`,
+            description: `${ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR} role for ${row.firstName}, created by bulk import`,
+            tenant: payload.tenant,
+            type: row.type,
+            division: row.division,
+            user: row.user,
+            permissions: row.permissions,
+        };
+        const { data, success, error } = CreateRolePayloadSchema.safeParse(row);
+
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            inValidRows.push({ row: index + 1, error: validationErrors });
+        } else {
+            validRows.push(data);
+        }
+    });
+    console.log('Bulk MR creation rows:', validRows);
+    return { total: rows.length, valid: validRows.length, invalid: inValidRows.length };
+};
+
 export const DivisionService = {
     get,
     search,
     create,
     update,
+    bulkCreateMr,
 };
 
 // ========================================================================================

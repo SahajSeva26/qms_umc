@@ -3,15 +3,19 @@ import { DIVISION_THERAPY_LABEL } from '@/types/crm.types'
 
 // Hand-built table matching RoleTypesTable.tsx / PermissionGroupsTable.tsx
 // exactly: var(--qms-*) custom properties, no shadcn Table, inline empty
-// state. Rows open EditDivisionModal on click (not a navigate-to-detail-page
-// the way RolesTable does) — Divisions has no detail route, matching the
-// "for creating we will have modal" scope; same visual hover treatment as
-// RolesTable's own row-click pattern.
+// state. Rows navigate to DivisionDetailPage on click (same as RolesTable's
+// own row-click pattern) — creation still stays a modal (CreateDivisionModal,
+// "for creating we will have modal" scope), only editing moved to a page.
 
 function ownerName(owner: DivisionEntity['owner']): string | null {
   if (!owner || typeof owner === 'string') return null
   if (!owner.user) return null
   return [owner.user.firstName, owner.user.lastName].filter(Boolean).join(' ')
+}
+
+function tenantName(tenant: DivisionEntity['tenant']): string | null {
+  if (!tenant || typeof tenant === 'string') return null
+  return tenant.name
 }
 
 interface DivisionsTableProps {
@@ -39,10 +43,7 @@ const DivisionsTable = ({ divisions, onRowClick }: DivisionsTableProps) => {
                 Therapy
               </th>
               <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                Brand focus
-              </th>
-              <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                MR count
+                Tenant
               </th>
               <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
                 Head
@@ -72,10 +73,7 @@ const DivisionsTable = ({ divisions, onRowClick }: DivisionsTableProps) => {
                   {DIVISION_THERAPY_LABEL[division.therapy]}
                 </td>
                 <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                  {division.brandFocus || '—'}
-                </td>
-                <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>
-                  {division.mrCount}
+                  {tenantName(division.tenant) ?? '—'}
                 </td>
                 <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
                   {ownerName(division.owner) ?? '—'}

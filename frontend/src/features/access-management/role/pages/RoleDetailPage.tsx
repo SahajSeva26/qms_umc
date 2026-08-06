@@ -67,6 +67,14 @@ import type { RolePopulatedRoleType, RolePopulatedUser, RoleStatus } from '@/typ
 // required field). Falling back to the field's own label via its path keeps
 // the message actionable even when a future schema change reintroduces a
 // bare type-mismatch error.
+// Never offered as a NEW choice in the Role Type picker below — 'admin' is
+// minted once per tenant during onboarding, and 'pharma-division-head' is
+// minted exactly once per division (CreateDivisionModal), transactionally.
+// Only filters the picker's rendered options; the underlying `roleTypes`
+// list stays unfiltered so editing a pre-existing Role of one of these
+// types still resolves its name/permissions correctly.
+const RESTRICTED_ROLETYPE_CODES = ['admin', 'pharma-division-head']
+
 const ROLE_FIELD_LABELS: Record<string, string> = {
   code: 'Code',
   name: 'Name',
@@ -506,7 +514,7 @@ const RoleDetailPage = () => {
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {roleTypes.map((rt) => (
+                    {roleTypes.filter((rt) => !RESTRICTED_ROLETYPE_CODES.includes(rt.code)).map((rt) => (
                       <SelectItem key={rt.id} value={rt.id}>
                         {rt.name} ({rt.code})
                       </SelectItem>

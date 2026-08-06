@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { FiPlus } from 'react-icons/fi'
 import { usePermission } from '@/hooks/usePermission'
 import { useDivisions } from '@/features/crm/hooks/useDivisions'
@@ -6,7 +7,7 @@ import { useDivisionsFilters } from '@/features/crm/divisions/hooks/useDivisions
 import DivisionsFilterBar from '@/features/crm/divisions/components/DivisionsFilterBar'
 import DivisionsTable from '@/features/crm/divisions/components/DivisionsTable'
 import CreateDivisionModal from '@/features/crm/divisions/components/CreateDivisionModal'
-import EditDivisionModal from '@/features/crm/divisions/components/EditDivisionModal'
+import { DIVISION_ROUTES } from '@/features/crm/divisions/divisions.routes'
 import { Button } from '@/components/ui/button'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import type { DivisionEntity } from '@/types/crm.types'
@@ -34,10 +35,10 @@ import type { DivisionEntity } from '@/types/crm.types'
 // search is debounced, so this page never fires more than the bare minimum
 // the current filter state actually needs.
 const DivisionsListPage = () => {
+  const navigate = useNavigate()
   const { hasAnyPermission } = usePermission()
   const { filters, setFilter, reset } = useDivisionsFilters()
   const [createOpen, setCreateOpen] = useState(false)
-  const [editingDivision, setEditingDivision] = useState<DivisionEntity | null>(null)
 
   // Only accounts holding division:manage/tenant:manage can ever get a
   // non-active result back (division.service.ts's status-override gate) —
@@ -93,10 +94,14 @@ const DivisionsListPage = () => {
         </div>
       )}
 
-      {!isLoading && !error && <DivisionsTable divisions={divisions} onRowClick={setEditingDivision} />}
+      {!isLoading && !error && (
+        <DivisionsTable
+          divisions={divisions}
+          onRowClick={(division: DivisionEntity) => navigate(DIVISION_ROUTES.DIVISION_DETAIL.replace(':id', division.id))}
+        />
+      )}
 
       {createOpen && <CreateDivisionModal onClose={() => setCreateOpen(false)} />}
-      {editingDivision && <EditDivisionModal division={editingDivision} onClose={() => setEditingDivision(null)} />}
     </div>
   )
 }

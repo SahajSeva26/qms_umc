@@ -7,6 +7,7 @@ import { useDivision } from '@/features/crm/divisions/hooks/useDivision'
 import { useUpdateDivision } from '@/features/crm/divisions/hooks/useUpdateDivision'
 import { updateDivisionSchema } from '@/features/crm/divisions/schemas/division.schemas'
 import { DIVISION_ROUTES } from '@/features/crm/divisions/divisions.routes'
+import BulkMrImportCard from '@/features/crm/divisions/components/BulkMrImportCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -31,6 +32,12 @@ const DivisionDetailPage = () => {
 
   const { data, isLoading, error } = useDivision(id)
   const division = data?.data ?? null
+
+  // division.tenant is populated ({_id, name, code}) on GET-by-id — see
+  // DivisionPopulatedTenant's comment — but typed `| string` for the same
+  // create/update-echo duality seen throughout this codebase (RolePopulatedTenant
+  // et al.), so this resolves both shapes rather than assuming the object form.
+  const tenantId = division ? (typeof division.tenant === 'string' ? division.tenant : division.tenant._id) : undefined
 
   const [name, setName] = useState('')
   const [therapy, setTherapy] = useState<DivisionTherapy | ''>('')
@@ -204,6 +211,8 @@ const DivisionDetailPage = () => {
               <FiSave size={14} /> {updateDivision.isPending ? 'Saving…' : 'Save changes'}
             </Button>
           </div>
+
+          {tenantId && <BulkMrImportCard tenantId={tenantId} divisionId={division.id} />}
         </>
       )}
     </div>

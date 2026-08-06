@@ -156,6 +156,43 @@ export interface UpdateDivisionPayload {
   status?: DivisionStatus
 }
 
+// Batch-level fields for POST /divisions/bulk-mr — sent as multipart form
+// fields alongside the CSV `file`, per division.validators.ts's
+// BulkMrPayloadSchema. `supervisor` is a SINGLE Role id (must be a
+// `pharma-asm` role belonging to this division/tenant) applied to every row
+// in the CSV — the backend has no per-row supervisor column.
+export interface BulkMrPayload {
+  division: string
+  supervisor: string
+  tenant: string
+  file: File
+}
+
+// One entry in the bulk-import response's `errors` array — DB-layer failures
+// only (division.service.ts's bulkCreateMr(), via processInBatches). Schema-
+// validation failures are counted in `invalidRows` but their per-row detail
+// is NOT included here — a real gap in the backend response, not a frontend
+// omission.
+export interface BulkMrRowError {
+  item?: unknown
+  index?: number
+  error?: unknown
+}
+
+// Success shape (HTTP 200) — every count the backend computed for this run.
+// On the HTTP 400 partial-failure path (division.controller.ts drops
+// everything except `errors` in that response), the counts genuinely aren't
+// known — `undefined` there, not defaulted to 0, so the UI can say "unknown"
+// instead of a misleading zero.
+export interface BulkMrResult {
+  totalRows?: number
+  validRows?: number
+  invalidRows?: number
+  created?: number
+  failed: number
+  errors: BulkMrRowError[]
+}
+
 // ---------------------------------------------------------------------------
 // Lead
 // ---------------------------------------------------------------------------

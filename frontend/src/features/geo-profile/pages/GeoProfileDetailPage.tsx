@@ -186,7 +186,7 @@ const GeoProfileDetailPage = () => {
                   >
                     Role
                   </Label>
-                  <Select value={role || undefined} onValueChange={(v) => setRole(v ?? '')}>
+                  <Select key={role || 'empty'} value={role || undefined} onValueChange={(v) => setRole(v ?? '')}>
                     <SelectTrigger id="role" className="w-full">
                       <SelectValue placeholder="Select role">
                         {(v) => roleName(v as string)}

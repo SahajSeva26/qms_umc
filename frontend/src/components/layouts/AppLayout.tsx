@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
-import { Outlet, Navigate, useLocation } from 'react-router-dom'
+import { useState } from 'react'
+import { Outlet, Navigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useSession } from '@/hooks/useSession'
 import { AUTH_ROUTES } from '@/features/auth/auth.routes'
@@ -8,34 +8,15 @@ import Topbar from './Topbar'
 import FeedbackWidget from '@/features/qa-feedback/components/FeedbackWidget'
 
 const SB_INTENT_KEY = 'qms.sb.intent'
-const SB_SMALL_MQ = '(max-width: 1280px)'
+
 
 function getInitialCollapsed(): boolean {
-  const intent = localStorage.getItem(SB_INTENT_KEY)
-  if (intent === 'collapsed') return true
-  if (intent === 'expanded') return false
-  return window.matchMedia(SB_SMALL_MQ).matches
+  return localStorage.getItem(SB_INTENT_KEY) === 'collapsed'
 }
 
 const AppLayout = () => {
   const { isAuthenticated: isStoreAuthenticated } = useAuth()
-  // On a hard page reload, useAuthStore.user starts null (no persist
-  // middleware) even though the httpOnly session cookie may still be
-  // valid. SessionBootstrap (app/SessionBootstrap.tsx) restores the store
-  // from the real session via a useEffect — but that effect only runs
-  // AFTER the render that resolved the session data commits, and this
-  // component's OWN render (reading the store) can happen in that same
-  // window, before the effect has fired. Waiting on isLoading/isFetching
-  // alone doesn't close that window either, since by the time
-  // SessionBootstrap's effect actually runs, the query itself has already
-  // finished (isFetching already false) — so this component must check
-  // useSession()'s OWN isAuthenticated/session directly (derived straight
-  // from query data at render time, no effect-timing dependency) rather
-  // than solely trusting the store, which can lag behind by exactly one
-  // effect-flush. The store is still the source of truth everywhere else
-  // (useAuth's other consumers, hasRole, etc.) — this is only a
-  // same-render fallback so a valid session is never treated as logged-out
-  // for the single render before the store catches up.
+  
   const {
     isAuthenticated: isSessionAuthenticated,
     isFetching: isSessionFetching,
@@ -44,33 +25,6 @@ const AppLayout = () => {
   const isAuthenticated = isStoreAuthenticated || isSessionAuthenticated
   const [collapsed, setCollapsed] = useState(getInitialCollapsed)
   const [mobileOpen, setMobileOpen] = useState(false)
-  const location = useLocation()
-  const isFirstRoute = useRef(true)
-
-  // Auto-collapse/expand when crossing 1280px breakpoint, unless user has a saved intent
-  useEffect(() => {
-    const mql = window.matchMedia(SB_SMALL_MQ)
-    const onChange = (e: MediaQueryListEvent) => {
-      const intent = localStorage.getItem(SB_INTENT_KEY)
-      if (!intent) setCollapsed(e.matches)
-    }
-    mql.addEventListener('change', onChange)
-    return () => mql.removeEventListener('change', onChange)
-  }, [])
-
-  // Collapse the sidebar after navigating to a new page — skips the initial
-  // mount (that's what getInitialCollapsed's saved intent/breakpoint check is
-  // for) and fires only on an actual route change. Deliberately does NOT
-  // persist 'collapsed' to SB_INTENT_KEY here: this is a per-navigation
-  // reflex, not a change to the user's remembered expand/collapse preference
-  // — reopening the sidebar (handleToggle) still saves that as normal.
-  useEffect(() => {
-    if (isFirstRoute.current) {
-      isFirstRoute.current = false
-      return
-    }
-    setCollapsed(true)
-  }, [location.pathname])
 
   const handleToggle = () => {
     setCollapsed((prev) => {

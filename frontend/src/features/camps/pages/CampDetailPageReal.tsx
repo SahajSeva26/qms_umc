@@ -99,7 +99,13 @@ const CampDetailPageReal = () => {
   // PLATFORM_TENANT_FETCH_LIMIT) — here it's "some real companies silently
   // missing from the Company dropdown" rather than one specific tenant
   // being unreachable, but the same root cause.
-  const { data: tenantsData } = useTenants({ limit: '20' })
+  // enabled: isCreateMode — the Company/Division pickers below are
+  // themselves wrapped in `{isCreateMode && (...)}` (edit mode shows a
+  // read-only summary instead, tenant/division are immutable post-create),
+  // so this call was firing on every EDIT page load too, for a dropdown
+  // that page view can never render. Found live 2026-08-06 via the Network
+  // tab on an edit-mode camp.
+  const { data: tenantsData } = useTenants({ limit: '20' }, isCreateMode)
   const tenants = tenantsData?.data?.items ?? []
 
   const [tenant, setTenant] = useState('')
@@ -435,7 +441,7 @@ const CampDetailPageReal = () => {
                     <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
                       Move to
                     </Label>
-                    <Select value={stageTo || undefined} onValueChange={(v) => setStageTo(v as CampStatus)}>
+                    <Select key={stageTo || 'empty'} value={stageTo || undefined} onValueChange={(v) => setStageTo(v as CampStatus)}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select next stage" />
                       </SelectTrigger>
@@ -533,7 +539,7 @@ const CampDetailPageReal = () => {
                 <>
                   <div>
                     <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Company</Label>
-                    <Select value={tenant || undefined} onValueChange={(v) => { setTenant(v ?? ''); setDivision('') }}>
+                    <Select key={tenant || 'empty'} value={tenant || undefined} onValueChange={(v) => { setTenant(v ?? ''); setDivision('') }}>
                       <SelectTrigger className="w-full"><SelectValue placeholder="Select company" /></SelectTrigger>
                       <SelectContent>
                         {tenants.map((t) => <SelectItem key={t.id} value={t.id}>{t.name} ({t.code})</SelectItem>)}
@@ -542,7 +548,7 @@ const CampDetailPageReal = () => {
                   </div>
                   <div>
                     <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Division</Label>
-                    <Select value={division || undefined} onValueChange={(v) => setDivision(v ?? '')} disabled={!tenant}>
+                    <Select key={division || 'empty'} value={division || undefined} onValueChange={(v) => setDivision(v ?? '')} disabled={!tenant}>
                       <SelectTrigger className="w-full"><SelectValue placeholder={tenant ? 'Select division' : 'Select a company first'} /></SelectTrigger>
                       <SelectContent>
                         {divisions.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}

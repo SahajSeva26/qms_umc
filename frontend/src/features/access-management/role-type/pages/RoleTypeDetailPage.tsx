@@ -272,7 +272,7 @@ const RoleTypeDetailPage = () => {
                   >
                     Company
                   </Label>
-                  <Select value={tenant || undefined} onValueChange={(v) => setTenant(v ?? '')}>
+                  <Select key={tenant || 'empty'} value={tenant || undefined} onValueChange={(v) => setTenant(v ?? '')}>
                     <SelectTrigger id="tenant" className="w-full">
                       <SelectValue placeholder="Select company">
                         {(v) => {
@@ -329,7 +329,7 @@ const RoleTypeDetailPage = () => {
                   >
                     Code
                   </Label>
-                  <Select value={code || undefined} onValueChange={(v) => setCode(v as RoleTypeCode)}>
+                  <Select key={code || 'empty'} value={code || undefined} onValueChange={(v) => setCode(v as RoleTypeCode)}>
                     <SelectTrigger id="code" className="w-full">
                       <SelectValue placeholder="Select code">{(v) => (v ? String(v) : 'Select code')}</SelectValue>
                     </SelectTrigger>

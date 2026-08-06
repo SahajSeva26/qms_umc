@@ -84,7 +84,10 @@ const DashboardModule = ({ me, camps, claims, incidents, consumables, training, 
   const upcoming = useMemo(() => myCamps.filter((c) => (c.date?.slice(0, 10) ?? '') >= today && !NOT_CANCELLED.includes(c.status)), [myCamps, today])
   const lifetimePatients = useMemo(() => closed.reduce((s, c) => s + (c.patientsDone || c.patientCount || 0), 0), [closed])
 
-  const expiringCerts = training.filter((t) => t.status === 'VALID' && ((new Date(t.expiresOn).getTime() - Date.now()) / 86_400_000) < 30)
+  const expiringCerts = useMemo(() => {
+    const now = new Date(today).getTime()
+    return training.filter((t) => t.status === 'VALID' && ((new Date(t.expiresOn).getTime() - now) / 86_400_000) < 30)
+  }, [training, today])
 
   const statusBucketCounts = useMemo(() => {
     return STATUS_BUCKETS.map((b) => ({ ...b, camps: myCamps.filter((c) => b.statuses.includes(c.status)) }))

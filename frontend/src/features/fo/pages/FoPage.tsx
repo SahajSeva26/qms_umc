@@ -93,11 +93,17 @@ const FoPage = () => {
   const selfStatusLabel = STATUS_LABEL[foLiveStatus(selfPerson, camps)]
   const myPendingClaims = useMemo(() => claims.filter((c) => c.foId === selfPerson.id && c.status === 'PENDING'), [claims, selfPerson.id])
   const myPendingClaimsSum = myPendingClaims.reduce((s, c) => s + c.amount, 0)
-  const myValidCerts = useMemo(() => selfTraining.filter((t) => new Date(t.expiresOn).getTime() - Date.now() > 0).length, [selfTraining])
-  const myExpiringCerts = useMemo(() => selfTraining.filter((t) => {
-    const d = new Date(t.expiresOn).getTime() - Date.now()
-    return d > 0 && d < 30 * 86_400_000
-  }), [selfTraining])
+  const myValidCerts = useMemo(() => {
+    const now = new Date(todayIso).getTime()
+    return selfTraining.filter((t) => new Date(t.expiresOn).getTime() - now > 0).length
+  }, [selfTraining, todayIso])
+  const myExpiringCerts = useMemo(() => {
+    const now = new Date(todayIso).getTime()
+    return selfTraining.filter((t) => {
+      const d = new Date(t.expiresOn).getTime() - now
+      return d > 0 && d < 30 * 86_400_000
+    })
+  }, [selfTraining, todayIso])
 
   const visibleTabs = useMemo(() => {
     if (isPersonal) return ALL_TABS.filter((t) => !['roster', 'performance', 'qmsfo', 'tpfo', 'tpmp'].includes(t.id))

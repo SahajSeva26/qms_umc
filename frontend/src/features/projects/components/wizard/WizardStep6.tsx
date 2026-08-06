@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { FiX, FiPlus, FiCalendar, FiClipboard, FiRefreshCw, FiList, FiClock, FiBookOpen, FiEye } from 'react-icons/fi'
 import type { WizardFormState } from '@/features/projects/wizard.types'
 import type { AvailablePointer, ClientReportCadence } from '@/types/project.types'
@@ -25,7 +26,10 @@ const WizardStep6 = ({ form, setField }: WizardStep6Props) => {
   // Server-computed preview only — effectiveEarliestSlot is a real, stored
   // backend field but the exact server recompute rule isn't confirmed, so
   // this is shown as a preview and NOT included in the outgoing payload.
-  const effectiveEarliestSlotPreview = new Date(Date.now() + form.daysToBookBefore * 86400000).toISOString().slice(0, 10)
+  const effectiveEarliestSlotPreview = useMemo(
+    () => new Date(Date.now() + form.daysToBookBefore * 86400000).toISOString().slice(0, 10),
+    [form.daysToBookBefore],
+  )
   const { valueAfterGST } = computeGstBreakdown(form.valueBeforeGST, form.gst)
 
   const togglePointer = (p: AvailablePointer) => {

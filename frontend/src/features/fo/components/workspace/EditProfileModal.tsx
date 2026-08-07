@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { toast } from '@/components/ui/sonner'
+import { editProfileSchema } from '@/features/fo/schemas/editProfile.schema'
 
 interface EditProfileModalProps {
   open: boolean
@@ -23,6 +24,11 @@ const EditProfileModal = ({ open, me, onClose, onSave }: EditProfileModalProps) 
   const handleClose = () => onClose()
 
   const handleSave = () => {
+    const result = editProfileSchema.safeParse({ phone, altPhone, email, temporaryAddress })
+    if (!result.success) {
+      toast.error(result.error.issues[0]?.message ?? 'Please check the highlighted fields')
+      return
+    }
     onSave({ phone, altPhone, email, temporaryAddress })
     toast.success('Profile updated')
     handleClose()

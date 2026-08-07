@@ -135,18 +135,19 @@ const FoPage = () => {
   // training rows via the service layer directly (read-only snapshot from
   // localStorage, not a live subscription) since useFoTraining is per-FO.
   const trainingDueCount = useMemo(() => {
+    let all: { foId: string; expiresOn: string }[] = []
+    try {
+      const raw = localStorage.getItem('qms.fo.training')
+      all = raw ? JSON.parse(raw) : []
+    } catch {
+      // ignore malformed cache
+    }
+    const foIds = new Set(fos.map((f) => f.id))
     let count = 0
-    fos.forEach((f) => {
-      try {
-        const raw = localStorage.getItem('qms.fo.training')
-        const all: { foId: string; expiresOn: string }[] = raw ? JSON.parse(raw) : []
-        all.filter((r) => r.foId === f.id).forEach((r) => {
-          const days = daysUntil(r.expiresOn)
-          if (days >= 0 && days < 30) count++
-        })
-      } catch {
-        // ignore malformed cache
-      }
+    all.forEach((r) => {
+      if (!foIds.has(r.foId)) return
+      const days = daysUntil(r.expiresOn)
+      if (days >= 0 && days < 30) count++
     })
     return count
   }, [fos])

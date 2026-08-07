@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { toast } from '@/components/ui/sonner'
+import { addPersonnelSchema } from '@/features/fo/schemas/addPersonnel.schema'
 
 interface AddPersonnelModalProps {
   open: boolean
@@ -32,21 +33,22 @@ const AddPersonnelModal = ({ open, onClose, title, showVendor, onAdd }: AddPerso
   const handleClose = () => { reset(); onClose() }
 
   const handleSubmit = () => {
-    if (!name.trim()) {
-      toast.error('Name is required')
+    const result = addPersonnelSchema.safeParse({ name, email, phone, salary })
+    if (!result.success) {
+      toast.error(result.error.issues[0]?.message ?? 'Please check the highlighted fields')
       return
     }
     const person: Person = {
       id: `p-${Date.now()}`,
-      name: name.trim(),
+      name: result.data.name,
       role: 'Field Officer',
-      phone,
-      email,
+      phone: result.data.phone ?? '',
+      email: result.data.email ?? '',
       hq,
       states: hq ? [hq] : [],
       joined: new Date().toISOString().slice(0, 10),
       vendor: showVendor ? (vendor.trim() || undefined) : undefined,
-      salaryInr: Number(salary) || 0,
+      salaryInr: result.data.salary,
       campsPerDay: Number(campsPerDay) || 1,
       machinesAssigned: [],
     }

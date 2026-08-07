@@ -7,6 +7,7 @@ import { TRAINING_CATALOG } from '@/features/fo/fo.types'
 import * as foService from '@/features/fo/fo.service'
 import { initials, avatarGradient, stubRecertify, foLiveStatus } from '@/features/fo/components/fo.ui'
 import FoFilterBar, { type FoFilters } from '@/features/fo/components/FoFilterBar'
+import { foMatchesSearch } from '@/features/fo/utils/foSearch'
 import { formatDate } from '@/utils/formatters'
 
 interface TrainingTabProps {
@@ -95,11 +96,10 @@ const TrainingTab = ({ fos, camps }: TrainingTabProps) => {
   const states = useMemo(() => [...new Set(fos.flatMap((f) => f.states ?? []))].sort(), [fos])
 
   const filtered = useMemo(() => {
-    const q = filters.search.trim().toLowerCase()
     return fos.filter((f) => {
       if (filters.state !== 'ALL' && !(f.states ?? []).includes(filters.state)) return false
       if (filters.status !== 'ALL' && foLiveStatus(f, camps) !== filters.status) return false
-      if (q && !`${f.name} ${f.hq} ${f.phone}`.toLowerCase().includes(q)) return false
+      if (!foMatchesSearch(f, filters.search)) return false
       return true
     })
   }, [fos, camps, filters])

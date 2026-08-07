@@ -4,6 +4,7 @@ import type { Person } from '@/types/people.types'
 import type { Camp } from '@/types/camp.types'
 import FoFilterBar, { type FoFilters } from '@/features/fo/components/FoFilterBar'
 import { foLiveStatus, closedCampsOf, avgFeedback } from '@/features/fo/components/fo.ui'
+import { foMatchesSearch } from '@/features/fo/utils/foSearch'
 
 interface PerformanceTabProps {
   fos: Person[]
@@ -19,12 +20,11 @@ const PerformanceTab = ({ fos, camps, onOpenFo }: PerformanceTabProps) => {
   const states = useMemo(() => [...new Set(fos.flatMap((f) => f.states ?? []))].sort(), [fos])
 
   const leaderboard = useMemo(() => {
-    const q = filters.search.trim().toLowerCase()
     return fos
       .filter((f) => {
         if (filters.state !== 'ALL' && !(f.states ?? []).includes(filters.state)) return false
         if (filters.status !== 'ALL' && foLiveStatus(f, camps) !== filters.status) return false
-        if (q && !`${f.name} ${f.hq} ${f.phone}`.toLowerCase().includes(q)) return false
+        if (!foMatchesSearch(f, filters.search)) return false
         return true
       })
       .map((f) => {

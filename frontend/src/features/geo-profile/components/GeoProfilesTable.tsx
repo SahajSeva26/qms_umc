@@ -1,12 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import type { GeoProfileEntity } from '@/types/geoProfile.types'
+import { GEO_PROFILE_ROUTES, GEO_PROFILE_TYPE_LABEL } from '@/features/geo-profile/geoProfile.constants'
 import GeoProfileStatusPill from '@/features/geo-profile/components/GeoProfileStatusPill'
-
-// Mirrors `@/features/access-management/role/components/RolesTable.tsx` exactly.
-const TYPE_LABEL: Record<GeoProfileEntity['type'], string> = {
-  fo: 'Field Officer',
-  dietitian: 'Dietitian',
-}
 
 interface GeoProfilesTableProps {
   geoProfiles: GeoProfileEntity[]
@@ -51,7 +46,7 @@ const GeoProfilesTable = ({ geoProfiles, roleLabelById }: GeoProfilesTableProps)
             {geoProfiles.map((profile) => (
               <tr
                 key={profile.id}
-                onClick={() => navigate(`/geo-profiles/${profile.id}`)}
+                onClick={() => navigate(GEO_PROFILE_ROUTES.GEO_PROFILE_DETAIL.replace(':id', profile.id))}
                 className="cursor-pointer transition-colors hover:bg-(--qms-surface-hover)"
                 style={{ borderBottom: '1px solid var(--qms-border)' }}
               >
@@ -61,7 +56,7 @@ const GeoProfilesTable = ({ geoProfiles, roleLabelById }: GeoProfilesTableProps)
                   </span>
                 </td>
                 <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>
-                  {TYPE_LABEL[profile.type] ?? profile.type}
+                  {GEO_PROFILE_TYPE_LABEL[profile.type] ?? profile.type}
                 </td>
                 <td className="px-4 py-2.5 font-mono text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>
                   {profile.coordinates.length === 2 ? `${profile.coordinates[1]}, ${profile.coordinates[0]}` : '—'}

@@ -12,8 +12,8 @@ const DEFAULT_FILTERS: GeoProfilesFilterState = { type: 'ALL', status: 'ALL' }
 export const useGeoProfilesFilters = () => {
   const [filters, setFilters] = useState<GeoProfilesFilterState>(DEFAULT_FILTERS)
 
-  const setFilter = <K extends keyof GeoProfilesFilterState>(key: K, value: GeoProfilesFilterState[K]) => {
-    setFilters((prev) => ({ ...prev, [key]: value }))
+  const setFilter = <K extends keyof GeoProfilesFilterState>(key: K, value: string | null | undefined) => {
+    setFilters((prev) => ({ ...prev, [key]: (value || 'ALL') as GeoProfilesFilterState[K] }))
   }
 
   const reset = () => setFilters(DEFAULT_FILTERS)

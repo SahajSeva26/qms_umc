@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { FiArrowLeft } from 'react-icons/fi'
+import { GEO_PROFILE_ROUTES, GEO_PROFILE_TYPE_OPTIONS, GEO_PROFILE_STATUS_LABEL, GEO_PROFILE_STATUS_OPTIONS } from '@/features/geo-profile/geoProfile.constants'
+import { isValidLatitude, isValidLongitude } from '@/features/geo-profile/utils/geoProfile.utils'
 import { useGeoProfile } from '@/features/geo-profile/hooks/useGeoProfile'
 import { useCreateGeoProfile } from '@/features/geo-profile/hooks/useCreateGeoProfile'
 import { useUpdateGeoProfile } from '@/features/geo-profile/hooks/useUpdateGeoProfile'
@@ -11,11 +13,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { GeoProfileStatus, GeoProfileType } from '@/types/geoProfile.types'
-
-const TYPE_OPTIONS: { value: GeoProfileType; label: string }[] = [
-  { value: 'fo', label: 'Field Officer' },
-  { value: 'dietitian', label: 'Dietitian' },
-]
 
 // Combined create-flow + edit page, mirrors
 // `@/features/access-management/role/pages/RoleDetailPage.tsx`'s overall shape
@@ -81,8 +78,8 @@ const GeoProfileDetailPage = () => {
     if (isCreateMode) {
       if (!role) { setFormError('Role is required'); return }
       if (!type) { setFormError('Type is required'); return }
-      if (!Number.isFinite(lat) || lat < -90 || lat > 90) { setFormError('Latitude must be a number between -90 and 90'); return }
-      if (!Number.isFinite(lng) || lng < -180 || lng > 180) { setFormError('Longitude must be a number between -180 and 180'); return }
+      if (latitude.trim() === '' || !isValidLatitude(lat)) { setFormError('Latitude must be a number between -90 and 90'); return }
+      if (longitude.trim() === '' || !isValidLongitude(lng)) { setFormError('Longitude must be a number between -180 and 180'); return }
 
       setFormError(null)
       createGeoProfile.mutate(
@@ -95,7 +92,7 @@ const GeoProfileDetailPage = () => {
         {
           onSuccess: (res) => {
             if (res.data?.id) {
-              navigate(`/geo-profiles/${res.data.id}`)
+              navigate(GEO_PROFILE_ROUTES.GEO_PROFILE_DETAIL.replace(':id', res.data.id))
             }
           },
         },
@@ -103,8 +100,8 @@ const GeoProfileDetailPage = () => {
       return
     }
 
-    if (latitude && (!Number.isFinite(lat) || lat < -90 || lat > 90)) { setFormError('Latitude must be a number between -90 and 90'); return }
-    if (longitude && (!Number.isFinite(lng) || lng < -180 || lng > 180)) { setFormError('Longitude must be a number between -180 and 180'); return }
+    if (latitude && (latitude.trim() === '' || !isValidLatitude(lat))) { setFormError('Latitude must be a number between -90 and 90'); return }
+    if (longitude && (longitude.trim() === '' || !isValidLongitude(lng))) { setFormError('Longitude must be a number between -180 and 180'); return }
 
     setFormError(null)
     updateGeoProfile.mutate({
@@ -121,7 +118,7 @@ const GeoProfileDetailPage = () => {
   return (
     <div className="max-w-2xl">
       <button
-        onClick={() => navigate('/geo-profiles')}
+        onClick={() => navigate(GEO_PROFILE_ROUTES.GEO_PROFILES)}
         className="flex items-center gap-1.5 text-[13px] font-semibold mb-5 transition-colors hover:opacity-80"
         style={{ color: 'var(--qms-text-soft)' }}
       >
@@ -159,7 +156,7 @@ const GeoProfileDetailPage = () => {
                       {roleName(geoProfile.role)}
                     </div>
                     <div className="text-[13px]" style={{ color: 'var(--qms-text-muted)' }}>
-                      {TYPE_OPTIONS.find((t) => t.value === geoProfile.type)?.label ?? geoProfile.type}
+                      {GEO_PROFILE_TYPE_OPTIONS.find((t) => t.value === geoProfile.type)?.label ?? geoProfile.type}
                     </div>
                   </div>
                   <GeoProfileStatusPill status={geoProfile.status} />
@@ -230,11 +227,11 @@ const GeoProfileDetailPage = () => {
                 <Select key={type || 'empty'} value={type || undefined} onValueChange={(v) => setType(v as GeoProfileType)}>
                   <SelectTrigger id="type" className="w-full">
                     <SelectValue placeholder="Select type">
-                      {(v) => TYPE_OPTIONS.find((t) => t.value === v)?.label ?? 'Select type'}
+                      {(v) => GEO_PROFILE_TYPE_OPTIONS.find((t) => t.value === v)?.label ?? 'Select type'}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {TYPE_OPTIONS.map((t) => (
+                    {GEO_PROFILE_TYPE_OPTIONS.map((t) => (
                       <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                     ))}
                   </SelectContent>
@@ -312,12 +309,13 @@ const GeoProfileDetailPage = () => {
                   <Select key={status || 'empty'} value={status || undefined} onValueChange={(v) => setStatus(v as GeoProfileStatus)}>
                     <SelectTrigger id="status" className="w-full">
                       <SelectValue placeholder="Select status">
-                        {(v) => (v === 'active' ? 'Active' : v === 'inactive' ? 'Inactive' : 'Select status')}
+                        {(v) => GEO_PROFILE_STATUS_LABEL[v as GeoProfileStatus] ?? 'Select status'}
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
+                      {GEO_PROFILE_STATUS_OPTIONS.map((s) => (
+                        <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

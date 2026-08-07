@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react'
 import { useQueries } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { FiArrowLeft } from 'react-icons/fi'
+import { GEO_PROFILE_ROUTES, GEO_PROFILE_TYPE_OPTIONS } from '@/features/geo-profile/geoProfile.constants'
+import { isValidLatitude, isValidLongitude } from '@/features/geo-profile/utils/geoProfile.utils'
 import { useNearestGeoProfiles } from '@/features/geo-profile/hooks/useNearestGeoProfiles'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import { accessManagementService } from '@/features/access-management/accessManagement.service'
@@ -11,11 +13,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { GeoProfileType, NearestGeoProfileQuery } from '@/types/geoProfile.types'
-
-const TYPE_OPTIONS: { value: GeoProfileType; label: string }[] = [
-  { value: 'fo', label: 'Field Officer' },
-  { value: 'dietitian', label: 'Dietitian' },
-]
 
 // Exercises the allocation endpoint (GET /geo-profiles/nearest): given a type
 // + point, returns active field staff of that type whose OWN coverage radius
@@ -71,8 +68,8 @@ const NearestGeoProfilesPage = () => {
   const handleSearch = () => {
     const lat = Number(latitude)
     const lng = Number(longitude)
-    if (!Number.isFinite(lat) || lat < -90 || lat > 90) { setFormError('Latitude must be a number between -90 and 90'); return }
-    if (!Number.isFinite(lng) || lng < -180 || lng > 180) { setFormError('Longitude must be a number between -180 and 180'); return }
+    if (latitude.trim() === '' || !isValidLatitude(lat)) { setFormError('Latitude must be a number between -90 and 90'); return }
+    if (longitude.trim() === '' || !isValidLongitude(lng)) { setFormError('Longitude must be a number between -180 and 180'); return }
     setFormError(null)
     setQuery({ type, lat, lng, limit: limit || undefined })
   }
@@ -80,7 +77,7 @@ const NearestGeoProfilesPage = () => {
   return (
     <div className="max-w-3xl">
       <button
-        onClick={() => navigate('/geo-profiles')}
+        onClick={() => navigate(GEO_PROFILE_ROUTES.GEO_PROFILES)}
         className="flex items-center gap-1.5 text-[13px] font-semibold mb-5 transition-colors hover:opacity-80"
         style={{ color: 'var(--qms-text-soft)' }}
       >
@@ -109,10 +106,10 @@ const NearestGeoProfilesPage = () => {
             </Label>
             <Select value={type} onValueChange={(v) => setType(v as GeoProfileType)}>
               <SelectTrigger className="w-full">
-                <SelectValue>{(v) => TYPE_OPTIONS.find((t) => t.value === v)?.label ?? 'Select type'}</SelectValue>
+                <SelectValue>{(v) => GEO_PROFILE_TYPE_OPTIONS.find((t) => t.value === v)?.label ?? 'Select type'}</SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {TYPE_OPTIONS.map((t) => (
+                {GEO_PROFILE_TYPE_OPTIONS.map((t) => (
                   <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                 ))}
               </SelectContent>

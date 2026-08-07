@@ -2,6 +2,7 @@ import { FiCopy, FiUserCheck, FiDownload } from 'react-icons/fi'
 import SideDrawer from '@/components/ui/SideDrawer'
 import type { ClassifiedHq } from '@/features/hq/hq.types'
 import { HqStatusPill } from '@/features/hq/components/hqmapping/StatusPill'
+import { HQ_CARD_STYLE } from '@/features/hq/components/hqmapping/hq.ui'
 import { toast } from '@/components/ui/sonner'
 
 interface HqDrawerProps {
@@ -25,7 +26,7 @@ const HqDrawer = ({ hq, onClose, onAssign, onExportCoverage }: HqDrawerProps) =>
           </span>
         </div>
 
-        <div className="rounded-xl border p-3 mb-3" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
+        <div className="rounded-xl border p-3 mb-3" style={HQ_CARD_STYLE}>
           <div className="text-[13px] font-extrabold mb-2" style={{ color: 'var(--qms-text)' }}>HQ details</div>
           <table className="w-full text-[12px]">
             <tbody>
@@ -49,7 +50,7 @@ const HqDrawer = ({ hq, onClose, onAssign, onExportCoverage }: HqDrawerProps) =>
           </table>
         </div>
 
-        <div className="rounded-xl border p-3 mb-3" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
+        <div className="rounded-xl border p-3 mb-3" style={HQ_CARD_STYLE}>
           <div className="text-[13px] font-extrabold mb-2" style={{ color: 'var(--qms-text)' }}>Serviceability verdict</div>
           <div className="text-[12.5px] font-bold">{hq.reason}</div>
           {hq.nearestFo && (

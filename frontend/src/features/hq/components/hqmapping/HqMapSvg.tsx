@@ -82,10 +82,10 @@ const HqMapSvg = ({ rows, fos, radiusKm, onOpenHq }: HqMapSvgProps) => {
         </g>
       </svg>
       <div className="absolute bottom-2.5 left-2.5 rounded-lg px-2.5 py-2 text-[10.5px]" style={{ background: 'rgba(255,255,255,.92)', color: '#0f172a', boxShadow: '0 4px 12px rgba(15,23,42,.1)' }}>
-        <div className="flex items-center gap-1.5 my-0.5"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: '#10b981' }} /> GREEN · serviceable</div>
-        <div className="flex items-center gap-1.5 my-0.5"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: '#f59e0b' }} /> YELLOW · FO load high</div>
-        <div className="flex items-center gap-1.5 my-0.5"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: '#f97316' }} /> ORANGE · 35-50 KM</div>
-        <div className="flex items-center gap-1.5 my-0.5"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: '#f43f5e' }} /> RED · no FO &lt; 50 KM</div>
+        <div className="flex items-center gap-1.5 my-0.5"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: HQ_TIER_COLOR.GREEN.dot }} /> GREEN · serviceable</div>
+        <div className="flex items-center gap-1.5 my-0.5"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: HQ_TIER_COLOR.YELLOW.dot }} /> YELLOW · FO load high</div>
+        <div className="flex items-center gap-1.5 my-0.5"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: HQ_TIER_COLOR.ORANGE.dot }} /> ORANGE · 35-50 KM</div>
+        <div className="flex items-center gap-1.5 my-0.5"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: HQ_TIER_COLOR.RED.dot }} /> RED · no FO &lt; 50 KM</div>
         <div className="flex items-center gap-1.5 my-0.5"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: '#3b6dff' }} /> FO · {radiusKm} KM ring shown</div>
       </div>
       <div className="absolute top-2.5 right-2.5 rounded-lg px-2.5 py-1.5 text-[10.5px] font-bold" style={{ background: '#fff', border: '1px solid var(--qms-border)', color: '#0f172a' }}>

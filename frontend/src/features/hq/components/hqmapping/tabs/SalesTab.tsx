@@ -6,6 +6,7 @@ import { lookupCity } from '@/features/hq/cityGazetteer'
 import HqKpi from '@/features/hq/components/hqmapping/HqKpi'
 import HqTable from '@/features/hq/components/hqmapping/HqTable'
 import { HqStatusPill } from '@/features/hq/components/hqmapping/StatusPill'
+import { HQ_TIER_COLOR, HQ_CARD_STYLE } from '@/features/hq/components/hqmapping/hq.ui'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 
@@ -56,7 +57,7 @@ const SalesTab = ({ rows, fos, onOpenRow }: SalesTabProps) => {
 
   return (
     <div>
-      <div className="rounded-2xl border p-3.5 mb-2.5" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
+      <div className="rounded-2xl border p-3.5 mb-2.5" style={HQ_CARD_STYLE}>
         <div className="flex items-center gap-2">
           <FiSearch size={16} style={{ color: 'var(--qms-text-muted)' }} />
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Type a city, pharma name, division, or FO name…" className="flex-1" />
@@ -83,7 +84,7 @@ const SalesTab = ({ rows, fos, onOpenRow }: SalesTabProps) => {
         )}
       </div>
 
-      <div className="rounded-2xl border p-3.5 mb-3" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
+      <div className="rounded-2xl border p-3.5 mb-3" style={HQ_CARD_STYLE}>
         <div className="text-[13px] font-extrabold mb-2.5">Check a city</div>
         <div className="flex flex-wrap gap-2 items-end">
           <div className="flex-1 min-w-[160px]">
@@ -99,7 +100,7 @@ const SalesTab = ({ rows, fos, onOpenRow }: SalesTabProps) => {
         {checkResult && (
           <div className="mt-3">
             {'error' in checkResult ? (
-              <div className="inline-flex items-center gap-1.5 text-[11.5px] font-bold px-2.5 py-1.5 rounded-lg" style={{ background: 'rgba(244,63,94,.16)', color: '#b91c1c' }}>
+              <div className="inline-flex items-center gap-1.5 text-[11.5px] font-bold px-2.5 py-1.5 rounded-lg" style={{ background: HQ_TIER_COLOR.RED.bg, color: HQ_TIER_COLOR.RED.fg }}>
                 {checkResult.error}
               </div>
             ) : (

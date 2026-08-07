@@ -4,7 +4,7 @@ import type { ClassifiedHq, GeoFo } from '@/features/hq/hq.types'
 import type { DeviceCatalogItem } from '@/types/device.types'
 import { lookupCity } from '@/features/hq/cityGazetteer'
 import HqKpi from '@/features/hq/components/hqmapping/HqKpi'
-import { downloadCsv, todayIso } from '@/features/hq/components/hqmapping/hq.ui'
+import { downloadCsv, todayIso, HQ_TIER_COLOR, HQ_CARD_STYLE } from '@/features/hq/components/hqmapping/hq.ui'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/sonner'
 
@@ -66,7 +66,7 @@ const OpsTab = ({ rows, fos, devices, deviceLoadPct }: OpsTabProps) => {
         <HqKpi label="Devices" value={devices.length} sub={`${devices.filter((d) => d.faulty).length} faulty`} icon={FiCpu} />
       </div>
 
-      <div className="rounded-2xl border p-3.5 mb-3" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
+      <div className="rounded-2xl border p-3.5 mb-3" style={HQ_CARD_STYLE}>
         <div className="flex items-center justify-between mb-2.5">
           <span className="text-[13px] font-extrabold">Under-covered territories</span>
           <span className="text-[10.5px] font-semibold uppercase" style={{ color: 'var(--qms-text-muted)' }}>RED HQ count by state</span>
@@ -89,8 +89,8 @@ const OpsTab = ({ rows, fos, devices, deviceLoadPct }: OpsTabProps) => {
                   <tr key={state} style={{ borderBottom: '1px dashed var(--qms-border)' }}>
                     <td className="px-2 py-1.5 font-bold">{state}</td>
                     <td className="px-2 py-1.5">
-                      <span className="inline-flex items-center gap-1.5 text-[10.5px] font-extrabold px-2.5 py-1 rounded-full" style={{ background: 'rgba(244,63,94,.16)', color: '#b91c1c' }}>
-                        <span className="w-[7px] h-[7px] rounded-full" style={{ background: '#f43f5e' }} /> {list.length}
+                      <span className="inline-flex items-center gap-1.5 text-[10.5px] font-extrabold px-2.5 py-1 rounded-full" style={{ background: HQ_TIER_COLOR.RED.bg, color: HQ_TIER_COLOR.RED.fg }}>
+                        <span className="w-[7px] h-[7px] rounded-full" style={{ background: HQ_TIER_COLOR.RED.dot }} /> {list.length}
                       </span>
                     </td>
                     <td className="px-2 py-1.5">{top}</td>
@@ -109,7 +109,7 @@ const OpsTab = ({ rows, fos, devices, deviceLoadPct }: OpsTabProps) => {
             </tbody>
           </table>
         ) : (
-          <div className="text-center py-5 font-bold" style={{ color: '#10b981' }}>All territories covered.</div>
+          <div className="text-center py-5 font-bold" style={{ color: HQ_TIER_COLOR.GREEN.dot }}>All territories covered.</div>
         )}
         {expandedState && (() => {
           const list = rows.filter((r) => r.state === expandedState && r.status === 'RED')
@@ -139,14 +139,14 @@ const OpsTab = ({ rows, fos, devices, deviceLoadPct }: OpsTabProps) => {
                   </tbody>
                 </table>
               ) : (
-                <div className="text-center py-3" style={{ color: '#10b981' }}>No expansion needed in this state.</div>
+                <div className="text-center py-3" style={{ color: HQ_TIER_COLOR.GREEN.dot }}>No expansion needed in this state.</div>
               )}
             </div>
           )
         })()}
       </div>
 
-      <div className="rounded-2xl border p-3.5 mb-3" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
+      <div className="rounded-2xl border p-3.5 mb-3" style={HQ_CARD_STYLE}>
         <div className="flex items-center justify-between mb-2.5">
           <span className="text-[13px] font-extrabold">Suggested manpower expansion</span>
           <span className="text-[10.5px] font-semibold uppercase" style={{ color: 'var(--qms-text-muted)' }}>Cities with the most RED HQs</span>
@@ -164,17 +164,17 @@ const OpsTab = ({ rows, fos, devices, deviceLoadPct }: OpsTabProps) => {
                   {n} red HQ{n > 1 ? 's' : ''} {coord ? `· would unlock ${coord.state}` : ''}. Deploy <b>1 FO</b> here to lift these to GREEN.
                 </div>
               </div>
-              <span className="inline-flex items-center gap-1.5 text-[10.5px] font-extrabold px-2.5 py-1 rounded-full shrink-0" style={{ background: 'rgba(249,115,22,.18)', color: '#c2410c' }}>
-                <span className="w-[7px] h-[7px] rounded-full" style={{ background: '#f97316' }} /> Priority
+              <span className="inline-flex items-center gap-1.5 text-[10.5px] font-extrabold px-2.5 py-1 rounded-full shrink-0" style={{ background: HQ_TIER_COLOR.ORANGE.bg, color: HQ_TIER_COLOR.ORANGE.fg }}>
+                <span className="w-[7px] h-[7px] rounded-full" style={{ background: HQ_TIER_COLOR.ORANGE.dot }} /> Priority
               </span>
             </div>
           )
         }) : (
-          <div className="text-center py-4 font-bold" style={{ color: '#10b981' }}>No manpower additions needed right now.</div>
+          <div className="text-center py-4 font-bold" style={{ color: HQ_TIER_COLOR.GREEN.dot }}>No manpower additions needed right now.</div>
         )}
       </div>
 
-      <div className="rounded-2xl border p-3.5" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
+      <div className="rounded-2xl border p-3.5" style={HQ_CARD_STYLE}>
         <div className="text-[13px] font-extrabold mb-2.5">FO load distribution — today's load %</div>
         <table className="w-full text-[12px] border-collapse">
           <thead>
@@ -187,9 +187,9 @@ const OpsTab = ({ rows, fos, devices, deviceLoadPct }: OpsTabProps) => {
           <tbody>
             {[...fos].sort((a, b) => b.loadPct - a.loadPct).map((f) => {
               const tone = f.loadPct >= 100 ? 'red' : f.loadPct >= deviceLoadPct ? 'yellow' : f.loadPct === 0 ? 'grey' : 'green'
-              const barColor = tone === 'red' ? '#f43f5e' : tone === 'yellow' ? '#f59e0b' : '#10b981'
-              const pillBg = tone === 'red' ? 'rgba(244,63,94,.16)' : tone === 'yellow' ? 'rgba(245,158,11,.18)' : tone === 'grey' ? 'rgba(15,23,42,.06)' : 'rgba(16,185,129,.16)'
-              const pillFg = tone === 'red' ? '#b91c1c' : tone === 'yellow' ? '#92400e' : tone === 'grey' ? '#475569' : '#047857'
+              const barColor = tone === 'red' ? HQ_TIER_COLOR.RED.dot : tone === 'yellow' ? HQ_TIER_COLOR.YELLOW.dot : HQ_TIER_COLOR.GREEN.dot
+              const pillBg = tone === 'red' ? HQ_TIER_COLOR.RED.bg : tone === 'yellow' ? HQ_TIER_COLOR.YELLOW.bg : tone === 'grey' ? 'rgba(15,23,42,.06)' : HQ_TIER_COLOR.GREEN.bg
+              const pillFg = tone === 'red' ? HQ_TIER_COLOR.RED.fg : tone === 'yellow' ? HQ_TIER_COLOR.YELLOW.fg : tone === 'grey' ? '#475569' : HQ_TIER_COLOR.GREEN.fg
               return (
                 <tr key={f.id} style={{ borderBottom: '1px dashed var(--qms-border)' }}>
                   <td className="px-2 py-1.5 font-bold">{f.name}</td>

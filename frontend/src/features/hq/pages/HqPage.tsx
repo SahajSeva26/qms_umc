@@ -9,7 +9,7 @@ import { toast } from '@/components/ui/sonner'
 import HqFilterBar from '@/features/hq/components/hqmapping/HqFilterBar'
 import { EMPTY_HQ_FILTERS, applyHqFilters, uniqSorted } from '@/features/hq/components/hqmapping/hqFilters'
 import { HQ_TABS, defaultHqTab, type HqTabId } from '@/features/hq/components/hqmapping/hq.ui'
-import { downloadCsv, todayIso } from '@/features/hq/components/hqmapping/hq.ui'
+import { downloadCsv, todayIso, HQ_TIER_COLOR, HQ_CARD_STYLE } from '@/features/hq/components/hqmapping/hq.ui'
 import { buildReportRows } from '@/features/hq/components/hqmapping/hqReports'
 import HqDrawer from '@/features/hq/components/hqmapping/HqDrawer'
 import AdminTab from '@/features/hq/components/hqmapping/tabs/AdminTab'
@@ -23,8 +23,7 @@ import FoMasterTab from '@/features/hq/components/hqmapping/tabs/FoMasterTab'
 import BulkCheckTab from '@/features/hq/components/hqmapping/tabs/BulkCheckTab'
 import ReportsTab from '@/features/hq/components/hqmapping/tabs/ReportsTab'
 import AiTab from '@/features/hq/components/hqmapping/tabs/AiTab'
-import { MRS } from '@/types/client.types'
-import { PROJECTS } from '@/features/crm/clients/clients.mock'
+import { MRS, PROJECTS } from '@/types/client.types'
 
 const TAB_ICON: Record<HqTabId, typeof FiShield> = {
   admin: FiShield, sales: FiSearch, ops: FiClipboard, coord: FiSun, map: FiMap,
@@ -43,7 +42,7 @@ const HqPage = () => {
 
   const { people, devices } = usePeopleData()
   const { camps, patchCamp } = useCampsData()
-  const { hqs: _hqs, isLoading: hqsLoading, refetch: refetchHqs } = useHqMaster()
+  const { hqs, isLoading: hqsLoading, error: hqsError, refetch: refetchHqs } = useHqMaster()
 
   const [filters, setFilters] = useState(EMPTY_HQ_FILTERS)
   const [openHqId, setOpenHqId] = useState<string | null>(null)
@@ -54,7 +53,7 @@ const HqPage = () => {
   const setTab = (id: HqTabId) => setTabRaw(id)
 
   const fos = useMemo(() => activeFos(people, camps, devices), [people, camps, devices])
-  const allRows = useMemo(() => classifyAll(people, camps, devices), [people, camps, devices])
+  const allRows = useMemo(() => classifyAll(people, camps, devices, hqs), [people, camps, devices, hqs])
   const filteredRows = useMemo(() => applyHqFilters(allRows, filters), [allRows, filters])
   const cfg = getConfig()
 
@@ -68,7 +67,7 @@ const HqPage = () => {
 
   const green = allRows.filter((r) => r.status === 'GREEN').length
   const coveragePct = allRows.length ? Math.round((green / allRows.length) * 100) : 0
-  const coverageColor = coveragePct >= 80 ? '#047857' : coveragePct >= 50 ? '#92400e' : '#b91c1c'
+  const coverageColor = coveragePct >= 80 ? HQ_TIER_COLOR.GREEN.fg : coveragePct >= 50 ? HQ_TIER_COLOR.YELLOW.fg : HQ_TIER_COLOR.RED.fg
 
   const handleAssignFo = (campId: string, foId: string) => {
     const fo = people.find((p) => p.id === foId)
@@ -103,7 +102,7 @@ const HqPage = () => {
       </div>
 
       <div className="flex gap-2 items-center flex-wrap mb-3">
-        <div className="flex gap-1 p-1 rounded-xl border overflow-x-auto" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
+        <div className="flex gap-1 p-1 rounded-xl border overflow-x-auto" style={HQ_CARD_STYLE}>
           {showableTabs.map((t) => {
             const Icon = TAB_ICON[t.id]
             return (
@@ -143,11 +142,19 @@ const HqPage = () => {
         </div>
       </div>
 
-      {hqsLoading ? (
+      {hqsLoading && (
         <div className="flex items-center gap-2 py-10 justify-center" style={{ color: 'var(--qms-text-muted)' }}>
           <FiActivity className="animate-spin" size={16} /> Loading HQ master…
         </div>
-      ) : (
+      )}
+
+      {hqsError && !hqsLoading && (
+        <div className="text-[13px] rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
+          Failed to load HQ master data. Please try again.
+        </div>
+      )}
+
+      {!hqsLoading && !hqsError && (
         <>
           {activeTab !== 'mapping' && (
             <HqFilterBar filters={filters} onChange={(patch) => setFilters((prev) => ({ ...prev, ...patch }))} companies={companies} states={states} cities={cities} divisions={divisions} deviceTypes={deviceTypes} />

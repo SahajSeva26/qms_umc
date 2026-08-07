@@ -46,12 +46,16 @@ const DivisionsListPage = () => {
   // hides the Inactive/All options from the dropdown itself.
   const canSeeInactive = hasAnyPermission(['division:manage', 'tenant:manage'])
 
+  // Only the field matching the active `searchBy` mode is ever sent — the
+  // OTHER field stays in state (so switching modes doesn't lose what was
+  // typed) but must never leak into the query, or a stale code left over
+  // from a previous "Code" search would silently narrow a "Name" search too.
   const debouncedSearch = useDebouncedValue(filters.search, 300)
   const debouncedCode = useDebouncedValue(filters.code, 300)
 
   const { data, isLoading, error } = useDivisions({
-    name: debouncedSearch || undefined,
-    code: debouncedCode || undefined,
+    name: filters.searchBy === 'name' ? debouncedSearch || undefined : undefined,
+    code: filters.searchBy === 'code' ? debouncedCode || undefined : undefined,
     therapy: filters.therapy === 'ALL' ? undefined : filters.therapy,
     status: filters.status,
     limit: '10',

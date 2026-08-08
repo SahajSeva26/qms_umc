@@ -17,7 +17,14 @@ const EMPTY: ClientsData = {
 // sanctioned shared surface over features/auth/. Mutations stay in
 // features/crm/clients/hooks/useClientsData.ts — only CRM Clients itself
 // acts on this data.
-export const useClientsDataShared = () => {
-  const { data = EMPTY, isLoading, error } = useQuery({ queryKey: ['clients-data'], queryFn: clientsService.getData })
+// `enabled` (default true) lets a caller skip the request entirely — e.g.
+// DashboardPage, where this data feeds super_admin-only blocks and every other
+// role would otherwise fetch the payload and render none of it.
+export const useClientsDataShared = (options?: { enabled?: boolean }) => {
+  const { data = EMPTY, isLoading, error } = useQuery({
+    queryKey: ['clients-data'],
+    queryFn: clientsService.getData,
+    enabled: options?.enabled ?? true,
+  })
   return { ...data, isLoading, error }
 }

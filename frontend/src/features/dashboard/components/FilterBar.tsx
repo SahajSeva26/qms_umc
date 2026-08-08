@@ -1,5 +1,5 @@
-import { FILTERS } from '@/features/dashboard/dashboard.mock'
-import type { DashboardFilterState } from '@/features/dashboard/hooks/useDashboardFilters'
+import type { DashboardFilterState } from '@/types/dashboard.types'
+import { useDashboardFilterOptions } from '@/features/dashboard/hooks/useDashboardFilterOptions'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 
@@ -9,9 +9,14 @@ interface FilterBarProps {
   reset: () => void
 }
 
-const DATE_RANGE_ITEMS = FILTERS.dateRanges.map((r) => ({ value: r.id, label: r.label }))
-
 const FilterBar = ({ filters, setFilter, reset }: FilterBarProps) => {
+  const { data: options } = useDashboardFilterOptions()
+
+  // Options come from the data source, so the bar stays empty rather than
+  // rendering an invented option list if that source is unavailable.
+  const FILTERS = options ?? { dateRanges: [], clients: [], divisions: [], campTypes: [], salesPeople: [] }
+  const DATE_RANGE_ITEMS = FILTERS.dateRanges.map((r) => ({ value: r.id, label: r.label }))
+
   return (
     <div
       className="sticky top-0 z-20 flex flex-wrap items-center gap-2 p-2.5 mb-3 rounded-xl border backdrop-blur-xl"

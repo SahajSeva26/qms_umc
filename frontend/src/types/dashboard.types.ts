@@ -111,6 +111,11 @@ export interface ExpenseRow {
   color?: string
 }
 
+export interface ArAgingBucket {
+  label: string
+  value: number
+}
+
 export interface AccountsData {
   revenue: KpiValue
   expenses: KpiValue
@@ -119,6 +124,10 @@ export interface AccountsData {
   pat: KpiValue
   patMarginPct: KpiValue
   arOutstanding: KpiValue
+  // Aging buckets come from the data source already split. The UI must not
+  // derive them by applying ratios to `arOutstanding` — that would be
+  // fabricated math running on top of real API numbers.
+  arAging: ArAgingBucket[]
   expectedCollection: { thisWeek: KpiValue; thisMonth: KpiValue; thisYear: KpiValue }
   paymentCycleDays: KpiValue
   expenseSplit: ExpenseRow[]
@@ -165,4 +174,69 @@ export interface DashboardTask {
   status: 'PENDING' | 'SNOOZED' | 'DONE'
   snoozeUntil?: string
   canAct: boolean
+}
+
+// ===========================================================================
+// SERVICE CONTRACT
+// ---------------------------------------------------------------------------
+// Everything below is the shape `dashboard.service.ts` promises to return,
+// independent of where the data actually comes from (mock today, a real
+// aggregation endpoint later). Components/hooks type against these — never
+// against the mock module. Lives here rather than inside features/dashboard/
+// because `hooks/useDashboardDataShared.ts` exposes the same contract to
+// Analytics.
+// ===========================================================================
+
+export interface DashboardFilterState {
+  dateRange: string
+  client: string
+  division: string
+  campType: string
+  rep: string
+  yoy: boolean
+}
+
+export const DEFAULT_DASHBOARD_FILTERS: DashboardFilterState = {
+  dateRange: 'QTD',
+  client: 'All clients',
+  division: 'All divisions',
+  campType: 'All',
+  rep: 'All reps',
+  yoy: true,
+}
+
+/** Options rendered by the global filter bar. Config, not metrics — fetched separately and cached indefinitely. */
+export interface DashboardFilterOptions {
+  dateRanges: { id: string; label: string }[]
+  clients: string[]
+  divisions: string[]
+  campTypes: string[]
+  salesPeople: string[]
+}
+
+/**
+ * A headline KPI tile, pre-scoped to the active filters by the data source.
+ * The UI renders `data` verbatim — it performs no scaling/derivation of its
+ * own, so no filter math can ever be applied on top of a real API response.
+ */
+export interface HeadlineKpi {
+  id: string
+  label: string
+  data: KpiValue
+}
+
+export interface CommandCenterData {
+  quarter: string
+  tasks: DashboardTask[]
+}
+
+export interface DashboardData {
+  headline: HeadlineKpi[]
+  company: CompanyData
+  project: ProjectData
+  fo: FoData
+  sales: SalesData
+  accounts: AccountsData
+  doctors: DoctorsData
+  patients: PatientsData
 }

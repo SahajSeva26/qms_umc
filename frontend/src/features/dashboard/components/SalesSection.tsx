@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { FiUsers, FiExternalLink } from 'react-icons/fi'
 import { useDashboardData } from '@/features/dashboard/hooks/useDashboardData'
+import type { DashboardFilterState } from '@/types/dashboard.types'
 import { formatINR, formatPercent } from '@/utils/formatters'
 import SectionCard from '@/features/dashboard/components/SectionCard'
 import MiniKpiCard from '@/features/dashboard/components/MiniKpiCard'
@@ -15,12 +16,13 @@ function convClass(conv: number): string {
 }
 
 interface SalesSectionProps {
+  filters: DashboardFilterState
   onDrill: (title: string, content: string) => void
 }
 
-const SalesSection = ({ onDrill }: SalesSectionProps) => {
+const SalesSection = ({ filters, onDrill }: SalesSectionProps) => {
   const [repFilter, setRepFilter] = useState('All reps')
-  const { data } = useDashboardData()
+  const { data } = useDashboardData(filters)
 
   if (!data) return null
   const { sales } = data

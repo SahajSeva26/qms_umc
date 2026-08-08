@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { FiFolder, FiEye } from 'react-icons/fi'
 import { useDashboardData } from '@/features/dashboard/hooks/useDashboardData'
+import type { DashboardFilterState } from '@/types/dashboard.types'
 import { formatINR } from '@/utils/formatters'
 import SectionCard from '@/features/dashboard/components/SectionCard'
 import MiniKpiCard from '@/features/dashboard/components/MiniKpiCard'
@@ -23,12 +24,13 @@ const HEALTH_BUCKETS = [
 ]
 
 interface ProjectsSectionProps {
+  filters: DashboardFilterState
   onDrill: (title: string, content: string) => void
 }
 
-const ProjectsSection = ({ onDrill }: ProjectsSectionProps) => {
+const ProjectsSection = ({ filters, onDrill }: ProjectsSectionProps) => {
   const [typeFilter, setTypeFilter] = useState('ALL')
-  const { data } = useDashboardData()
+  const { data } = useDashboardData(filters)
 
   if (!data) return null
   const { project } = data

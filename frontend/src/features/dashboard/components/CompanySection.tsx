@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { FiHome, FiEye } from 'react-icons/fi'
 import { useDashboardData } from '@/features/dashboard/hooks/useDashboardData'
+import type { DashboardFilterState } from '@/types/dashboard.types'
 import { formatINR } from '@/utils/formatters'
 import SectionCard from '@/features/dashboard/components/SectionCard'
 import MiniKpiCard from '@/features/dashboard/components/MiniKpiCard'
@@ -10,12 +11,13 @@ import FilterChips from '@/features/dashboard/components/FilterChips'
 const STATUS_FILTERS = ['ALL', 'ACTIVE', 'TRIAL', 'PAUSED', 'INACTIVE']
 
 interface CompanySectionProps {
+  filters: DashboardFilterState
   onDrill: (title: string, content: string) => void
 }
 
-const CompanySection = ({ onDrill }: CompanySectionProps) => {
+const CompanySection = ({ filters, onDrill }: CompanySectionProps) => {
   const [statusFilter, setStatusFilter] = useState('ALL')
-  const { data } = useDashboardData()
+  const { data } = useDashboardData(filters)
 
   if (!data) return null
   const { company } = data

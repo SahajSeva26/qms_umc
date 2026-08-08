@@ -5,6 +5,7 @@ import { haversine } from '@/features/hq/hq.service'
 import { lookupCity } from '@/features/hq/cityGazetteer'
 import HqKpi from '@/features/hq/components/hqmapping/HqKpi'
 import { HqStatusPill } from '@/features/hq/components/hqmapping/StatusPill'
+import { HQ_TIER_COLOR, HQ_CARD_STYLE } from '@/features/hq/components/hqmapping/hq.ui'
 
 interface AiTabProps {
   rows: ClassifiedHq[]
@@ -63,7 +64,7 @@ const AiTab = ({ rows, fos }: AiTabProps) => {
         <HqKpi label="Inefficient FOs" value={inefficient.length} sub="Low load · RED HQs nearby" icon={FiThermometer} tone="yellow" />
       </div>
 
-      <div className="rounded-2xl border p-3.5 mb-2.5" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
+      <div className="rounded-2xl border p-3.5 mb-2.5" style={HQ_CARD_STYLE}>
         <div className="flex items-center gap-1.5 text-[13px] font-extrabold mb-2.5"><FiTrendingUp size={14} /> Predicted high-demand HQs</div>
         {highDemand.length ? highDemand.map((r) => (
           <div key={r.id} className="flex gap-2 items-start rounded-xl p-2.5 mb-2" style={{ background: 'linear-gradient(135deg, rgba(124,92,255,.06), rgba(14,165,233,.06))', border: '1px solid rgba(124,92,255,.2)' }}>
@@ -77,7 +78,7 @@ const AiTab = ({ rows, fos }: AiTabProps) => {
         )) : <div className="text-center py-3.5" style={{ color: 'var(--qms-text-muted)' }}>No high-demand HQs detected.</div>}
       </div>
 
-      <div className="rounded-2xl border p-3.5 mb-2.5" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
+      <div className="rounded-2xl border p-3.5 mb-2.5" style={HQ_CARD_STYLE}>
         <div className="flex items-center gap-1.5 text-[13px] font-extrabold mb-2.5"><FiUserPlus size={14} /> Suggested FO expansion</div>
         {expansion.length ? expansion.map(([city, n]) => {
           const cc = lookupCity(city)
@@ -88,15 +89,15 @@ const AiTab = ({ rows, fos }: AiTabProps) => {
                 <div className="font-extrabold">{city}</div>
                 <div className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>{n} red HQ{n > 1 ? 's' : ''}{cc ? ` · ${cc.state}` : ''} · deploy 1 FO with the right device to lift to GREEN</div>
               </div>
-              <span className="inline-flex items-center gap-1.5 text-[10.5px] font-extrabold px-2.5 py-1 rounded-full shrink-0" style={{ background: 'rgba(249,115,22,.18)', color: '#c2410c' }}>
-                <span className="w-[7px] h-[7px] rounded-full" style={{ background: '#f97316' }} /> Priority
+              <span className="inline-flex items-center gap-1.5 text-[10.5px] font-extrabold px-2.5 py-1 rounded-full shrink-0" style={{ background: HQ_TIER_COLOR.ORANGE.bg, color: HQ_TIER_COLOR.ORANGE.fg }}>
+                <span className="w-[7px] h-[7px] rounded-full" style={{ background: HQ_TIER_COLOR.ORANGE.dot }} /> Priority
               </span>
             </div>
           )
-        }) : <div className="text-center py-3.5" style={{ color: '#10b981' }}>No expansion needed.</div>}
+        }) : <div className="text-center py-3.5" style={{ color: HQ_TIER_COLOR.GREEN.dot }}>No expansion needed.</div>}
       </div>
 
-      <div className="rounded-2xl border p-3.5 mb-2.5" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
+      <div className="rounded-2xl border p-3.5 mb-2.5" style={HQ_CARD_STYLE}>
         <div className="flex items-center gap-1.5 text-[13px] font-extrabold mb-2.5"><FiCpu size={14} /> Device shortage forecast</div>
         {deviceShort.map((x) => (
           <div key={x.device} className="flex gap-2 items-start rounded-xl p-2.5 mb-2" style={{ background: 'linear-gradient(135deg, rgba(124,92,255,.06), rgba(14,165,233,.06))', border: '1px solid rgba(124,92,255,.2)' }}>
@@ -108,8 +109,8 @@ const AiTab = ({ rows, fos }: AiTabProps) => {
             <span
               className="inline-flex items-center gap-1.5 text-[10.5px] font-extrabold px-2.5 py-1 rounded-full shrink-0"
               style={{
-                background: x.coverage >= 80 ? 'rgba(16,185,129,.16)' : x.coverage >= 50 ? 'rgba(245,158,11,.18)' : 'rgba(244,63,94,.16)',
-                color: x.coverage >= 80 ? '#047857' : x.coverage >= 50 ? '#92400e' : '#b91c1c',
+                background: x.coverage >= 80 ? HQ_TIER_COLOR.GREEN.bg : x.coverage >= 50 ? HQ_TIER_COLOR.YELLOW.bg : HQ_TIER_COLOR.RED.bg,
+                color: x.coverage >= 80 ? HQ_TIER_COLOR.GREEN.fg : x.coverage >= 50 ? HQ_TIER_COLOR.YELLOW.fg : HQ_TIER_COLOR.RED.fg,
               }}
             >
               {x.coverage}%
@@ -118,7 +119,7 @@ const AiTab = ({ rows, fos }: AiTabProps) => {
         ))}
       </div>
 
-      <div className="rounded-2xl border p-3.5 mb-2.5" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
+      <div className="rounded-2xl border p-3.5 mb-2.5" style={HQ_CARD_STYLE}>
         <div className="flex items-center gap-1.5 text-[13px] font-extrabold mb-2.5"><FiNavigation size={14} /> Best FO for priority HQs</div>
         {priorityHQs.length ? priorityHQs.map((r) => (
           <div key={r.id} className="flex gap-2 items-start rounded-xl p-2.5 mb-2" style={{ background: 'linear-gradient(135deg, rgba(124,92,255,.06), rgba(14,165,233,.06))', border: '1px solid rgba(124,92,255,.2)' }}>
@@ -131,10 +132,10 @@ const AiTab = ({ rows, fos }: AiTabProps) => {
             </div>
             <HqStatusPill status={r.status} />
           </div>
-        )) : <div className="text-center py-3.5" style={{ color: '#10b981' }}>All priority HQs are GREEN.</div>}
+        )) : <div className="text-center py-3.5" style={{ color: HQ_TIER_COLOR.GREEN.dot }}>All priority HQs are GREEN.</div>}
       </div>
 
-      <div className="rounded-2xl border p-3.5" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
+      <div className="rounded-2xl border p-3.5" style={HQ_CARD_STYLE}>
         <div className="flex items-center gap-1.5 text-[13px] font-extrabold mb-2.5"><FiThermometer size={14} /> Inefficient territories</div>
         {inefficient.length ? inefficient.map((x) => (
           <div key={x.fo.id} className="flex gap-2 items-start rounded-xl p-2.5 mb-2" style={{ background: 'linear-gradient(135deg, rgba(124,92,255,.06), rgba(14,165,233,.06))', border: '1px solid rgba(124,92,255,.2)' }}>
@@ -143,11 +144,11 @@ const AiTab = ({ rows, fos }: AiTabProps) => {
               <div className="font-extrabold">{x.fo.name}</div>
               <div className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>Load {x.fo.loadPct}% · {x.nearRed} RED HQs within 100 KM · consider redeploying or shifting territory</div>
             </div>
-            <span className="inline-flex items-center gap-1.5 text-[10.5px] font-extrabold px-2.5 py-1 rounded-full shrink-0" style={{ background: 'rgba(245,158,11,.18)', color: '#92400e' }}>
-              <span className="w-[7px] h-[7px] rounded-full" style={{ background: '#f59e0b' }} /> Optimize
+            <span className="inline-flex items-center gap-1.5 text-[10.5px] font-extrabold px-2.5 py-1 rounded-full shrink-0" style={{ background: HQ_TIER_COLOR.YELLOW.bg, color: HQ_TIER_COLOR.YELLOW.fg }}>
+              <span className="w-[7px] h-[7px] rounded-full" style={{ background: HQ_TIER_COLOR.YELLOW.dot }} /> Optimize
             </span>
           </div>
-        )) : <div className="text-center py-3.5" style={{ color: '#10b981' }}>All territories optimised.</div>}
+        )) : <div className="text-center py-3.5" style={{ color: HQ_TIER_COLOR.GREEN.dot }}>All territories optimised.</div>}
       </div>
     </div>
   )

@@ -1,23 +1,17 @@
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { GeoProfilesFilterState } from '@/features/geo-profile/hooks/useGeoProfilesFilters'
+import {
+  GEO_PROFILE_TYPE_OPTIONS,
+  GEO_PROFILE_TYPE_LABEL,
+  GEO_PROFILE_STATUS_OPTIONS,
+  GEO_PROFILE_STATUS_LABEL,
+} from '@/features/geo-profile/geoProfile.constants'
 import type { GeoProfileStatus, GeoProfileType } from '@/types/geoProfile.types'
-
-const TYPE_OPTIONS: { value: GeoProfileType; label: string }[] = [
-  { value: 'fo', label: 'Field Officer' },
-  { value: 'dietitian', label: 'Dietitian' },
-]
-const TYPE_LABEL_BY_VALUE = new Map(TYPE_OPTIONS.map((t) => [t.value, t.label]))
-
-const STATUS_OPTIONS: { value: GeoProfileStatus; label: string }[] = [
-  { value: 'active', label: 'Active' },
-  { value: 'inactive', label: 'Inactive' },
-]
-const STATUS_LABEL_BY_VALUE = new Map(STATUS_OPTIONS.map((s) => [s.value, s.label]))
 
 interface GeoProfilesFilterBarProps {
   filters: GeoProfilesFilterState
-  setFilter: <K extends keyof GeoProfilesFilterState>(key: K, value: GeoProfilesFilterState[K]) => void
+  setFilter: <K extends keyof GeoProfilesFilterState>(key: K, value: string | null | undefined) => void
   reset: () => void
 }
 
@@ -32,23 +26,23 @@ const GeoProfilesFilterBar = ({ filters, setFilter, reset }: GeoProfilesFilterBa
       className="flex flex-wrap items-center gap-2 p-2.5 mb-3 rounded-xl border"
       style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}
     >
-      <Select value={filters.type} onValueChange={(v) => setFilter('type', (v ?? 'ALL') as GeoProfilesFilterState['type'])}>
+      <Select value={filters.type} onValueChange={(v) => setFilter('type', v)}>
         <SelectTrigger className="text-[12px]">
-          <SelectValue>{(v: string) => (v === 'ALL' ? 'Type' : (TYPE_LABEL_BY_VALUE.get(v as GeoProfileType) ?? 'Type'))}</SelectValue>
+          <SelectValue>{(v: string) => (v === 'ALL' ? 'Type' : (GEO_PROFILE_TYPE_LABEL[v as GeoProfileType] ?? 'Type'))}</SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="ALL">All</SelectItem>
-          {TYPE_OPTIONS.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+          {GEO_PROFILE_TYPE_OPTIONS.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
         </SelectContent>
       </Select>
 
-      <Select value={filters.status} onValueChange={(v) => setFilter('status', (v ?? 'ALL') as GeoProfilesFilterState['status'])}>
+      <Select value={filters.status} onValueChange={(v) => setFilter('status', v)}>
         <SelectTrigger className="text-[12px]">
-          <SelectValue>{(v: string) => (v === 'ALL' ? 'Status' : (STATUS_LABEL_BY_VALUE.get(v as GeoProfileStatus) ?? 'Status'))}</SelectValue>
+          <SelectValue>{(v: string) => (v === 'ALL' ? 'Status' : (GEO_PROFILE_STATUS_LABEL[v as GeoProfileStatus] ?? 'Status'))}</SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="ALL">All</SelectItem>
-          {STATUS_OPTIONS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+          {GEO_PROFILE_STATUS_OPTIONS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
         </SelectContent>
       </Select>
 

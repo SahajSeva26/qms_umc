@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { FiUpload, FiDownload } from 'react-icons/fi'
 import { Button } from '@/components/ui/button'
+import { toast } from '@/components/ui/sonner'
 import InventoryKpiStrip from '@/features/inventory/components/InventoryKpiStrip'
 import OverviewTab from '@/features/inventory/components/OverviewTab'
 import DashboardsTab from '@/features/inventory/components/DashboardsTab'
@@ -161,8 +162,8 @@ const InventoryPage = () => {
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Button variant="ghost"><FiUpload size={14} /> Import</Button>
-          <Button variant="ghost"><FiDownload size={14} /> Export</Button>
+          <Button variant="ghost" onClick={() => toast.info('Import — wiring comes next pass')}><FiUpload size={14} /> Import</Button>
+          <Button variant="ghost" onClick={() => toast.info('Export — wiring comes next pass')}><FiDownload size={14} /> Export</Button>
           <Button
             className="text-white"
             style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}

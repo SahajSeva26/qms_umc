@@ -17,6 +17,9 @@ import type {
 } from '@/features/inventory/inventory.types'
 import { ISSUE_TYPES } from '@/features/inventory/inventory.types'
 import type { Person } from '@/types/people.types'
+import { EXPIRY_BAND_STYLE } from '@/features/inventory/constants/expiryBandStyle'
+import { sortByDateDesc } from '@/features/inventory/utils/sort'
+import { TableEmptyRow, InvFilterBar } from '@/features/inventory/components/IntelTableUi'
 
 // Exact port of window.QMS_InvField.tabFieldOps() (inventory-field.js) — a
 // 3-way segmented control (Refills / Issues / Allocations) reusing the
@@ -262,18 +265,8 @@ function IssueTypePill({ type }: { type: IssueType }) {
   )
 }
 
-// .im-band pill — exact port of the shared expiry-band color map (identical
-// rgba values to inventory-masters.js's own copy; inventory-field.js
-// redeclares it locally so the tab works standalone).
-const BAND_STYLE: Record<'green' | 'yellow' | 'orange' | 'red', { bg: string; fg: string }> = {
-  green: { bg: 'rgba(16,185,129,.15)', fg: '#059669' },
-  yellow: { bg: 'rgba(234,179,8,.18)', fg: '#a16207' },
-  orange: { bg: 'rgba(249,115,22,.16)', fg: '#c2410c' },
-  red: { bg: 'rgba(244,63,94,.15)', fg: '#e11d48' },
-}
-
 function BandPill({ css, children }: { css: 'green' | 'yellow' | 'orange' | 'red'; children: React.ReactNode }) {
-  const s = BAND_STYLE[css]
+  const s = EXPIRY_BAND_STYLE[css]
   return (
     <span
       className="inline-flex items-center gap-1 font-bold uppercase rounded-full"
@@ -281,18 +274,6 @@ function BandPill({ css, children }: { css: 'green' | 'yellow' | 'orange' | 'red
     >
       {children}
     </span>
-  )
-}
-
-// ── Shared toolbar/table shell — .inv-filter + .inv-card, exact port. ──────
-function Toolbar({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      className="flex gap-2 items-center flex-wrap mb-3 rounded-[10px] border sticky z-25"
-      style={{ padding: '10px 12px', background: 'var(--qms-surface)', borderColor: 'var(--qms-border)', top: 60 }}
-    >
-      {children}
-    </div>
   )
 }
 
@@ -339,14 +320,11 @@ function RefillsView({
   onReject: (r: RefillRequest) => void
   onDispatch: (r: RefillRequest) => void
 }) {
-  const list = useMemo(
-    () => [...refills].sort((a, b) => (b.date || '').localeCompare(a.date || '')),
-    [refills],
-  )
+  const list = useMemo(() => sortByDateDesc(refills), [refills])
 
   return (
     <div>
-      <Toolbar>
+      <InvFilterBar>
         <span className="text-xs font-bold uppercase tracking-[.04em]" style={{ color: 'var(--qms-text-muted)' }}>
           Refill requests · FO &amp; dietitian
         </span>
@@ -356,7 +334,7 @@ function RefillsView({
         <Button className="ml-auto" onClick={onNew}>
           <Plus size={14} /> New refill
         </Button>
-      </Toolbar>
+      </InvFilterBar>
 
       <TableCard minWidth={780}>
         <thead>
@@ -366,7 +344,7 @@ function RefillsView({
         </thead>
         <tbody>
           {list.length === 0 ? (
-            <tr><td colSpan={7} className="text-center" style={{ padding: 24, color: 'var(--qms-text-muted)' }}>No refill requests.</td></tr>
+            <TableEmptyRow colSpan={7}>No refill requests.</TableEmptyRow>
           ) : (
             list.map((r) => (
               <tr key={r.id}>
@@ -420,10 +398,7 @@ function IssuesView({
   people: Person[]
   onNew: () => void
 }) {
-  const list = useMemo(
-    () => [...reports].sort((a, b) => (b.date || '').localeCompare(a.date || '')),
-    [reports],
-  )
+  const list = useMemo(() => sortByDateDesc(reports), [reports])
   const lossValue = useMemo(() => {
     return list
       .filter((r) => r.type === 'WASTAGE' || r.type === 'DAMAGE' || r.type === 'LOSS' || r.type === 'EXPIRY')
@@ -435,7 +410,7 @@ function IssuesView({
 
   return (
     <div>
-      <Toolbar>
+      <InvFilterBar>
         <span className="text-xs font-bold uppercase tracking-[.04em]" style={{ color: 'var(--qms-text-muted)' }}>
           Field reports
         </span>
@@ -445,7 +420,7 @@ function IssuesView({
         <Button className="ml-auto" onClick={onNew}>
           <Plus size={14} /> New report
         </Button>
-      </Toolbar>
+      </InvFilterBar>
 
       <TableCard minWidth={760}>
         <thead>
@@ -455,7 +430,7 @@ function IssuesView({
         </thead>
         <tbody>
           {list.length === 0 ? (
-            <tr><td colSpan={6} className="text-center" style={{ padding: 24, color: 'var(--qms-text-muted)' }}>No reports.</td></tr>
+            <TableEmptyRow colSpan={6}>No reports.</TableEmptyRow>
           ) : (
             list.map((r) => (
               <tr key={r.id}>
@@ -496,7 +471,7 @@ function AllocationsView({
 
   return (
     <div>
-      <Toolbar>
+      <InvFilterBar>
         <span className="text-xs font-bold uppercase tracking-[.04em]" style={{ color: 'var(--qms-text-muted)' }}>
           Allocations
         </span>
@@ -515,7 +490,7 @@ function AllocationsView({
         <Button onClick={() => onRefill(holder)}>
           <Plus size={14} /> Refill
         </Button>
-      </Toolbar>
+      </InvFilterBar>
 
       <TableCard minWidth={720}>
         <thead>
@@ -525,7 +500,7 @@ function AllocationsView({
         </thead>
         <tbody>
           {!hold || hold.consumables.length === 0 ? (
-            <tr><td colSpan={6} className="text-center" style={{ padding: 24, color: 'var(--qms-text-muted)' }}>No stock allocated.</td></tr>
+            <TableEmptyRow colSpan={6}>No stock allocated.</TableEmptyRow>
           ) : (
             hold.consumables.map((c) => (
               <tr key={c.item.id}>

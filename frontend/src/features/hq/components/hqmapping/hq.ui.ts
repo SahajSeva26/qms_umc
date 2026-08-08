@@ -23,6 +23,12 @@ export const CITY_TIER_COLOR: Record<CityTier, { bg: string; fg: string; dot: st
   RED:    HQ_TIER_COLOR.RED,
 }
 
+// The one truly identical piece of every card/tile's inline style across this
+// feature (36 occurrences, 19 files) — every section's own className (radius/
+// padding/margin) varies by context and is intentionally left alone; only
+// this 2-property style object was byte-for-byte duplicated everywhere.
+export const HQ_CARD_STYLE = { background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' } as const
+
 export type HqTabId = 'admin' | 'sales' | 'ops' | 'coord' | 'map' | 'mapping' | 'hq' | 'fo' | 'bulk' | 'reports' | 'ai'
 
 export interface HqTabDef {

@@ -2,10 +2,11 @@ import { useMemo } from 'react'
 import { FiDatabase, FiCheckCircle, FiPercent, FiAlertTriangle, FiClock, FiXCircle, FiUsers, FiCpu } from 'react-icons/fi'
 import type { ClassifiedHq, GeoFo } from '@/features/hq/hq.types'
 import type { ClientMr, ClientProject } from '@/types/client.types'
-import { CLIENTS } from '@/types/client.types'
 import type { DeviceCatalogItem } from '@/types/device.types'
 import HqKpi from '@/features/hq/components/hqmapping/HqKpi'
 import HqTable from '@/features/hq/components/hqmapping/HqTable'
+import { buildProjectRollups, mrHasAnyServiceability } from '@/features/hq/components/hqmapping/mappingRollups'
+import { HQ_TIER_COLOR, HQ_CARD_STYLE } from '@/features/hq/components/hqmapping/hq.ui'
 
 interface AdminTabProps {
   rows: ClassifiedHq[]
@@ -15,43 +16,6 @@ interface AdminTabProps {
   projects: ClientProject[]
   deviceLoadPct: number
   onOpenRow: (id: string) => void
-}
-
-interface ProjectRollupRow {
-  id: string; name: string; client: string; type: string; total: number; serv: number; non: number
-}
-
-// mrServiceableForType() — an MR can service a project if they cover at
-// least one city for THAT project's own camp type (screening/diet/lab).
-// Exact port of hq-serviceability.js:214-218 — deliberately NOT "any
-// discipline counts," which would inflate a Diet-only-serviceable MR into
-// counting as coverage for a Screening project.
-function mrServiceableForType(mr: ClientMr, type: string): boolean {
-  const t = /diet/i.test(type) ? 'diet' : /lab/i.test(type) ? 'lab' : 'screening'
-  return (mr.serviceability?.[t]?.cities ?? []).length > 0
-}
-
-function mrHasAnyServiceability(mr: ClientMr): boolean {
-  return (['screening', 'diet', 'lab'] as const).some((t) => (mr.serviceability?.[t]?.cities ?? []).length > 0)
-}
-
-// buildProjectRollups() — exact port of hq-serviceability.js's mrProjectRows()
-// (lines 223-231), scoped to this app's real ClientProject master
-// (features/crm/clients/clients.mock.ts's PROJECTS) rather than the
-// prototype's window.QMS_ADMIN.PROJECTS — same shape, same per-project
-// discipline-specific serviceability check, not an invented per-division
-// "any discipline" substitute.
-function buildProjectRollups(mrs: ClientMr[], projects: ClientProject[]): ProjectRollupRow[] {
-  return projects
-    .map((p) => {
-      const type = p.type || 'Screening'
-      const mine = mrs.filter((m) => m.clientId === p.clientId && (!p.divisionId || m.divisionId === p.divisionId))
-      const serv = mine.filter((m) => mrServiceableForType(m, type)).length
-      const client = CLIENTS.find((c) => c.id === p.clientId)?.name ?? p.clientId
-      return { id: p.id, name: p.name || p.id, client, type, total: mine.length, serv, non: mine.length - serv }
-    })
-    .filter((r) => r.total > 0)
-    .sort((a, b) => b.total - a.total)
 }
 
 const AdminTab = ({ rows, fos, devices, mrs, projects, deviceLoadPct, onOpenRow }: AdminTabProps) => {
@@ -94,7 +58,7 @@ const AdminTab = ({ rows, fos, devices, mrs, projects, deviceLoadPct, onOpenRow 
         <HqKpi label="Devices" value={`${activeDevices}/${devices.length}`} sub="Active / total" icon={FiCpu} />
       </div>
 
-      <div className="rounded-2xl border p-3.5 mb-3" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
+      <div className="rounded-2xl border p-3.5 mb-3" style={HQ_CARD_STYLE}>
         <div className="flex items-center justify-between mb-2.5">
           <span className="text-[13px] font-extrabold">State-wise coverage</span>
           <span className="text-[10.5px] font-semibold uppercase" style={{ color: 'var(--qms-text-muted)' }}>Top 12 states by HQ count</span>
@@ -118,7 +82,7 @@ const AdminTab = ({ rows, fos, devices, mrs, projects, deviceLoadPct, onOpenRow 
                   <td className="px-2 py-1.5 font-bold">{s}</td>
                   <td className="px-2 py-1.5">{b.total}</td>
                   <td className="px-2 py-1.5" style={{ width: '30%' }}>
-                    <div className="h-2 rounded-full overflow-hidden" style={{ background: `linear-gradient(to right, #10b981 0%, #10b981 ${g}%, #f59e0b ${g}% ${y}%, #f97316 ${y}% ${o}%, #f43f5e ${o}% 100%)` }} />
+                    <div className="h-2 rounded-full overflow-hidden" style={{ background: `linear-gradient(to right, ${HQ_TIER_COLOR.GREEN.dot} 0%, ${HQ_TIER_COLOR.GREEN.dot} ${g}%, ${HQ_TIER_COLOR.YELLOW.dot} ${g}% ${y}%, ${HQ_TIER_COLOR.ORANGE.dot} ${y}% ${o}%, ${HQ_TIER_COLOR.RED.dot} ${o}% 100%)` }} />
                   </td>
                   <td className="px-2 py-1.5">{b.green}</td>
                   <td className="px-2 py-1.5">{b.yellow}</td>
@@ -139,7 +103,7 @@ const AdminTab = ({ rows, fos, devices, mrs, projects, deviceLoadPct, onOpenRow 
         <HqKpi label="Projects" value={projRows.length.toLocaleString()} sub="With MR coverage" icon={FiDatabase} />
       </div>
 
-      <div className="rounded-2xl border p-3.5 mb-3" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
+      <div className="rounded-2xl border p-3.5 mb-3" style={HQ_CARD_STYLE}>
         <div className="flex items-center justify-between mb-2.5">
           <span className="text-[13px] font-extrabold">MR serviceability · by project</span>
           <span className="text-[10.5px] font-semibold uppercase" style={{ color: 'var(--qms-text-muted)' }}>Serviceable = MR covers ≥1 city for that project's camp type</span>
@@ -162,10 +126,10 @@ const AdminTab = ({ rows, fos, devices, mrs, projects, deviceLoadPct, onOpenRow 
                     <td className="px-2 py-1.5">{r.client}</td>
                     <td className="px-2 py-1.5">{r.type}</td>
                     <td className="px-2 py-1.5">{r.total}</td>
-                    <td className="px-2 py-1.5" style={{ color: '#047857', fontWeight: 700 }}>{r.serv}</td>
-                    <td className="px-2 py-1.5" style={{ color: r.non ? '#b91c1c' : 'var(--qms-text-muted)', fontWeight: 700 }}>{r.non}</td>
+                    <td className="px-2 py-1.5" style={{ color: HQ_TIER_COLOR.GREEN.fg, fontWeight: 700 }}>{r.serv}</td>
+                    <td className="px-2 py-1.5" style={{ color: r.non ? HQ_TIER_COLOR.RED.fg : 'var(--qms-text-muted)', fontWeight: 700 }}>{r.non}</td>
                     <td className="px-2 py-1.5" style={{ width: '24%' }}>
-                      <div className="h-2 rounded-full overflow-hidden" style={{ background: `linear-gradient(to right,#10b981 0%,#10b981 ${pct}%,#f43f5e ${pct}% 100%)` }} />
+                      <div className="h-2 rounded-full overflow-hidden" style={{ background: `linear-gradient(to right,${HQ_TIER_COLOR.GREEN.dot} 0%,${HQ_TIER_COLOR.GREEN.dot} ${pct}%,${HQ_TIER_COLOR.RED.dot} ${pct}% 100%)` }} />
                     </td>
                     <td className="px-2 py-1.5 font-bold">{pct}%</td>
                   </tr>

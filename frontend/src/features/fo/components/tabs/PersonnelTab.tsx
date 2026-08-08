@@ -11,6 +11,7 @@ import AddPersonnelModal from '@/features/fo/components/AddPersonnelModal'
 import PersonnelProfileDrawer from '@/features/fo/components/PersonnelProfileDrawer'
 import type { EmpTypeConfig } from '@/features/fo/components/fo.ui'
 import { initials, avatarGradient, personCamps, closedCampsOf, downloadPersonnelCsv } from '@/features/fo/components/fo.ui'
+import { foMatchesSearch } from '@/features/fo/utils/foSearch'
 import { formatINR } from '@/utils/formatters'
 
 interface PersonnelTabProps {
@@ -35,9 +36,7 @@ const PersonnelTab = ({ config, people, camps, devices, claims, leaves, salesVie
   }, [people, config.empType])
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    if (!q) return roster
-    return roster.filter((p) => `${p.name} ${p.hq} ${p.phone}`.toLowerCase().includes(q))
+    return roster.filter((p) => foMatchesSearch(p, search))
   }, [roster, search])
 
   const kpis = useMemo(() => {

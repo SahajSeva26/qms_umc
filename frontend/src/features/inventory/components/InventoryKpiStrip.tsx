@@ -1,9 +1,10 @@
 import { Sparkles } from 'lucide-react'
 import { useInventoryOverview } from '@/features/inventory/hooks/useInventory'
-import type { InventoryKpiCard, KpiTone } from '@/features/inventory/inventory.types'
+import type { InventoryKpiCard } from '@/features/inventory/inventory.types'
 import {
   Cpu, Route, CheckCircle2, AlertTriangle, Clock, Wallet, Package, Box, ArrowUpRight,
 } from 'lucide-react'
+import { KPI_TONE_COLOR } from '@/features/inventory/constants/kpiToneColor'
 
 // KPI grid + AI banner — exact port of inventory.js's renderKpis() (lines
 // 321-362) + renderAi() (lines 364-379). Shared across every tab in the
@@ -11,15 +12,6 @@ import {
 // OverviewTab.tsx (2026-08-03) into its own component so InventoryPage can
 // render it once regardless of which tab is active, matching the prototype
 // exactly rather than only showing it on the Overview tab.
-
-const KPI_TONE_COLOR: Record<KpiTone, string> = {
-  brand: '#3b6dff',
-  teal: '#14b8a6',
-  emerald: '#10b981',
-  amber: '#f59e0b',
-  rose: '#f43f5e',
-  violet: '#8b5cf6',
-}
 
 const KPI_ICONS: Record<string, typeof Cpu> = {
   cpu: Cpu,

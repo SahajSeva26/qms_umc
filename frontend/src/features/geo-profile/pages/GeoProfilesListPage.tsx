@@ -10,6 +10,7 @@ import GeoProfilesTable from '@/features/geo-profile/components/GeoProfilesTable
 import GeoProfilesFilterBar from '@/features/geo-profile/components/GeoProfilesFilterBar'
 import PaginationControls from '@/components/ui/PaginationControls'
 import { Button } from '@/components/ui/button'
+import { GEO_PROFILE_ROUTES } from '@/features/geo-profile/geoProfile.constants'
 import type { GeoProfileStatus, GeoProfileType } from '@/types/geoProfile.types'
 
 const PAGE_SIZE = 10
@@ -69,7 +70,7 @@ const GeoProfilesListPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeRoles, missingRoleQueries.map((q) => q.dataUpdatedAt).join(',')])
 
-  const handleFilterChange = <K extends keyof typeof filters>(key: K, value: (typeof filters)[K]) => {
+  const handleFilterChange = <K extends keyof typeof filters>(key: K, value: string | null | undefined) => {
     setFilter(key, value)
     setPage(1)
   }
@@ -93,11 +94,11 @@ const GeoProfilesListPage = () => {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Button variant="outline" onClick={() => navigate('/geo-profiles/nearest-lookup')}>
+          <Button variant="outline" onClick={() => navigate(GEO_PROFILE_ROUTES.GEO_PROFILE_NEAREST)}>
             <FiNavigation size={14} /> Nearest lookup
           </Button>
           <Button
-            onClick={() => navigate('/geo-profiles/new')}
+            onClick={() => navigate(GEO_PROFILE_ROUTES.GEO_PROFILE_NEW)}
             className="text-white"
             style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
           >

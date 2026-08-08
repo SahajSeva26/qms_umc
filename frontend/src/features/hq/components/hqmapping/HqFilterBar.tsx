@@ -1,7 +1,8 @@
 import { FiSearch } from 'react-icons/fi'
 import { Input } from '@/components/ui/input'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
-import type { HqFilters } from '@/features/hq/components/hqmapping/hqFilters'
+import { EMPTY_HQ_FILTERS, type HqFilters } from '@/features/hq/components/hqmapping/hqFilters'
+import { HQ_CARD_STYLE } from '@/features/hq/components/hqmapping/hq.ui'
 
 interface HqFilterBarProps {
   filters: HqFilters
@@ -26,7 +27,7 @@ const DISTANCE_OPTIONS: { value: HqFilters['distance']; label: string }[] = [
 // filters (search, company, state, city, division, device type, status,
 // distance) + reset link.
 const HqFilterBar = ({ filters, onChange, companies, states, cities, divisions, deviceTypes }: HqFilterBarProps) => (
-  <div className="rounded-xl border p-2.5 mb-3" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
+  <div className="rounded-xl border p-2.5 mb-3" style={HQ_CARD_STYLE}>
     <div className="flex flex-wrap items-center justify-between gap-2">
       <div className="relative min-w-[220px]">
         <FiSearch size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--qms-text-muted)' }} />
@@ -94,7 +95,7 @@ const HqFilterBar = ({ filters, onChange, companies, states, cities, divisions, 
         </Select>
 
         <button
-          onClick={() => onChange({ ...structuredCloneFilters() })}
+          onClick={() => onChange({ ...EMPTY_HQ_FILTERS })}
           className="text-[11px] font-bold underline shrink-0"
           style={{ color: 'var(--qms-text-muted)' }}
         >
@@ -104,12 +105,5 @@ const HqFilterBar = ({ filters, onChange, companies, states, cities, divisions, 
     </div>
   </div>
 )
-
-// Kept as a tiny local helper (rather than importing EMPTY_HQ_FILTERS
-// directly into the onChange callback above) so the Reset button's intent —
-// "restore every filter to its default" — reads clearly at the call site.
-function structuredCloneFilters(): HqFilters {
-  return { company: 'ALL', state: 'ALL', city: 'ALL', division: 'ALL', status: 'ALL', deviceType: 'ALL', distance: 'ALL', q: '' }
-}
 
 export default HqFilterBar

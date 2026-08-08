@@ -52,14 +52,24 @@ function todayIso() {
 
 // ── Config — 5 thresholds, override mechanism exists but (per the
 // prototype) has zero UI call sites; kept for parity/future use. ──────────
+// getConfig() is read from localStorage exactly once per module lifetime and
+// cached here — it was previously re-read (localStorage.getItem + JSON.parse)
+// on every call, including from inside haversine()/classifyHq(), which fans
+// out to one read per FO per HQ. saveConfig() is the only place the config
+// can change, so it's the only place the cache is invalidated.
+let configCache: HqGeoConfig | null = null
 
 export function getConfig(): HqGeoConfig {
-  return { ...DEFAULT_HQ_CONFIG, ...load(KEYS.CONFIG, {} as Partial<HqGeoConfig>) }
+  if (!configCache) {
+    configCache = { ...DEFAULT_HQ_CONFIG, ...load(KEYS.CONFIG, {} as Partial<HqGeoConfig>) }
+  }
+  return configCache
 }
 
 export function saveConfig(patch: Partial<HqGeoConfig>): HqGeoConfig {
   const next = { ...getConfig(), ...patch }
   persist(KEYS.CONFIG, next)
+  configCache = next
   return next
 }
 
@@ -214,9 +224,13 @@ export function classifyHq(hq: HqRecord, fos: GeoFo[]): ClassifiedHq {
 // memoization already handles recomputation cost at this data scale ~90-300
 // rows, so the invalidation-discipline problem the prototype's cache created
 // doesn't apply here — every call is fresh).
-export function classifyAll(people: Person[], camps: Camp[], devices: DeviceCatalogItem[]): ClassifiedHq[] {
+// `hqs` is optional and defaults to loadHqs() for backward compatibility —
+// callers that already hold the HQ master list (e.g. from useHqMaster()'s
+// query cache) can pass it directly instead of triggering a second
+// independent localStorage read of the same qms.hq.master key.
+export function classifyAll(people: Person[], camps: Camp[], devices: DeviceCatalogItem[], hqs?: HqRecord[]): ClassifiedHq[] {
   const fos = activeFos(people, camps, devices)
-  return loadHqs().map((h) => classifyHq(h, fos))
+  return (hqs ?? loadHqs()).map((h) => classifyHq(h, fos))
 }
 
 // ── nearestFoWithDevice() — hard device-type filter (unlike classifyHq's

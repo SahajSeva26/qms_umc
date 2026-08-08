@@ -3,7 +3,7 @@ import { FiPlay, FiDownload } from 'react-icons/fi'
 import type { GeoFo, BulkTestResult } from '@/features/hq/hq.types'
 import { bulkTestUniverse, computeBulk } from '@/features/hq/hq.service'
 import { BulkStatusPill } from '@/features/hq/components/hqmapping/StatusPill'
-import { downloadCsv, todayIso } from '@/features/hq/components/hqmapping/hq.ui'
+import { downloadCsv, todayIso, HQ_CARD_STYLE } from '@/features/hq/components/hqmapping/hq.ui'
 import { toast } from '@/components/ui/sonner'
 
 interface BulkCheckTabProps {
@@ -63,7 +63,7 @@ const BulkCheckTab = ({ fos }: BulkCheckTabProps) => {
 
   return (
     <div>
-      <div className="rounded-2xl border p-3.5 mb-3" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
+      <div className="rounded-2xl border p-3.5 mb-3" style={HQ_CARD_STYLE}>
         <div className="flex items-center justify-between mb-2.5">
           <span className="text-[13px] font-extrabold">Bulk City Check</span>
           <span className="text-[10.5px] font-semibold uppercase" style={{ color: 'var(--qms-text-muted)' }}>Upload a city list, pick tests, check 35 KM serviceability</span>
@@ -110,7 +110,7 @@ const BulkCheckTab = ({ fos }: BulkCheckTabProps) => {
       </div>
 
       {results ? Object.entries(results).map(([test, g]) => (
-        <div key={test} className="rounded-2xl border p-3.5 mb-3" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
+        <div key={test} className="rounded-2xl border p-3.5 mb-3" style={HQ_CARD_STYLE}>
           <div className="flex items-center justify-between mb-2.5">
             <span className="text-[13px] font-extrabold">Test · {test}</span>
             <span className="text-[10.5px] font-semibold uppercase" style={{ color: 'var(--qms-text-muted)' }}>{g.serviceable} serviceable · {g.nonServiceable} non-serviceable</span>

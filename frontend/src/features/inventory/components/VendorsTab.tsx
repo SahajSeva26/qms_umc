@@ -10,6 +10,8 @@ import { useVendors, useVendorPriceHistory } from '@/features/inventory/hooks/us
 import { inr, vendorOverallScore, vendorTone, vendorPriceTrend } from '@/features/inventory/inventory.service'
 import type { VendorFormValues } from '@/features/inventory/inventory.service'
 import type { Vendor } from '@/features/inventory/inventory.types'
+import { vendorSchema } from '@/features/inventory/schemas/vendor.schema'
+import { InvFilterBar } from '@/features/inventory/components/IntelTableUi'
 
 const inputCls = 'w-full rounded-lg border text-xs px-2.5 py-1.5'
 const inputStyle = { borderColor: 'var(--qms-border)', background: 'var(--qms-surface-input)', color: 'var(--qms-text)' }
@@ -96,8 +98,9 @@ const VendorsTab = () => {
   const set = <K extends keyof VendorFormValues>(k: K, v: VendorFormValues[K]) => setForm((f) => ({ ...f, [k]: v }))
 
   const handleSave = async () => {
-    if (!form.name.trim()) {
-      toast.error('Vendor name required')
+    const result = vendorSchema.safeParse(form)
+    if (!result.success) {
+      toast.error(result.error.issues[0]?.message ?? 'Please check the highlighted fields')
       return
     }
     setSaving(true)
@@ -116,10 +119,7 @@ const VendorsTab = () => {
     <div>
       {/* .inv-filter — sticky bar: label + vendor-count chip + New vendor. No
           search/filter controls on this tab, exact port. */}
-      <div
-        className="flex gap-2 items-center flex-wrap mb-3 rounded-[10px] border sticky z-25"
-        style={{ padding: '10px 12px', background: 'var(--qms-surface)', borderColor: 'var(--qms-border)', top: 60 }}
-      >
+      <InvFilterBar>
         <span className="text-xs font-bold uppercase tracking-[.04em]" style={{ color: 'var(--qms-text-muted)' }}>
           Vendor Master
         </span>
@@ -129,7 +129,7 @@ const VendorsTab = () => {
         <Button onClick={() => openCreate()}>
           <Plus size={14} /> New vendor
         </Button>
-      </div>
+      </InvFilterBar>
 
       {/* Card-grid gallery — NOT a table — the only tab in the module that
           lists this way. Exact port of tabVendors()'s inline grid style. */}

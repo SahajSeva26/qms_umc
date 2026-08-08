@@ -1,7 +1,7 @@
 import { FiUpload, FiDownload } from 'react-icons/fi'
 import type { GeoFo } from '@/features/hq/hq.types'
 import { toast } from '@/components/ui/sonner'
-import { downloadCsv } from '@/features/hq/components/hqmapping/hq.ui'
+import { downloadCsv, HQ_TIER_COLOR, HQ_CARD_STYLE } from '@/features/hq/components/hqmapping/hq.ui'
 
 interface FoMasterTabProps {
   fos: GeoFo[]
@@ -19,7 +19,7 @@ const FO_TEMPLATE_ROW = {
 // no-real-xlsx-parser convention (see HqMasterTab.tsx's identical note).
 const FoMasterTab = ({ fos }: FoMasterTabProps) => (
   <div>
-    <div className="rounded-2xl border p-3.5 mb-3" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
+    <div className="rounded-2xl border p-3.5 mb-3" style={HQ_CARD_STYLE}>
       <div className="flex items-center justify-between mb-2.5">
         <span className="text-[13px] font-extrabold">FO master</span>
         <span className="text-[10.5px] font-semibold uppercase" style={{ color: 'var(--qms-text-muted)' }}>
@@ -48,7 +48,7 @@ const FoMasterTab = ({ fos }: FoMasterTabProps) => (
       </div>
     </div>
 
-    <div className="rounded-2xl border p-3.5" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
+    <div className="rounded-2xl border p-3.5" style={HQ_CARD_STYLE}>
       <div className="text-[13px] font-extrabold mb-2.5">FOs · live</div>
       <table className="w-full text-[12px] border-collapse">
         <thead>
@@ -74,8 +74,8 @@ const FoMasterTab = ({ fos }: FoMasterTabProps) => (
                 {typeof f.lat === 'number' && typeof f.lng === 'number' ? (
                   `${f.lat.toFixed(4)}, ${f.lng.toFixed(4)}`
                 ) : (
-                  <span className="inline-flex items-center gap-1.5 text-[10.5px] font-extrabold px-2.5 py-1 rounded-full" style={{ background: 'rgba(244,63,94,.16)', color: '#b91c1c' }}>
-                    <span className="w-[7px] h-[7px] rounded-full" style={{ background: '#f43f5e' }} /> NO COORDS
+                  <span className="inline-flex items-center gap-1.5 text-[10.5px] font-extrabold px-2.5 py-1 rounded-full" style={{ background: HQ_TIER_COLOR.RED.bg, color: HQ_TIER_COLOR.RED.fg }}>
+                    <span className="w-[7px] h-[7px] rounded-full" style={{ background: HQ_TIER_COLOR.RED.dot }} /> NO COORDS
                   </span>
                 )}
               </td>

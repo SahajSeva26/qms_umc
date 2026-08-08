@@ -3,6 +3,8 @@ import { LineChart, Calculator, RefreshCw, Check } from 'lucide-react'
 import SideDrawer from '@/components/ui/SideDrawer'
 import { toast } from '@/components/ui/sonner'
 import { ItemDetailDrawerBody } from '@/features/inventory/components/ItemMasterTab'
+import { InvFilterBar, Th, Td, TableEmptyRow } from '@/features/inventory/components/IntelTableUi'
+import { SHORTAGE_BAND_STYLE } from '@/features/inventory/constants/shortageBandStyle'
 import {
   useItemMaster, useForecastWindow, useDemandForecast, useConsumptionCamps, useConsumedCamps,
 } from '@/features/inventory/hooks/useInventory'
@@ -21,65 +23,12 @@ import type { ForecastRow } from '@/features/inventory/inventory.types'
 // "Auto-reorder shortages" and "Apply deduction" are both toast-only
 // side-effecting actions with no confirmation step, matching the prototype.
 
-const IM_BAND_STYLE: Record<'green' | 'red', { bg: string; fg: string }> = {
-  green: { bg: 'rgba(16,185,129,.15)', fg: '#059669' },
-  red: { bg: 'rgba(244,63,94,.15)', fg: '#e11d48' },
-}
-
 function ImBand({ tone, children }: { tone: 'green' | 'red'; children: React.ReactNode }) {
-  const s = IM_BAND_STYLE[tone]
+  const s = SHORTAGE_BAND_STYLE[tone]
   return (
     <span className="inline-flex items-center font-bold rounded-full" style={{ padding: '2px 8px', fontSize: 10, background: s.bg, color: s.fg }}>
       {children}
     </span>
-  )
-}
-
-// .im-tbl shell — exact port of inventory-intel.js's injected CSS (lines
-// 136-155): border-collapse, 12px font, dashed row borders, hover tint,
-// .num right-align + tabular-nums. Wrapped inline as a '.inv-card' with
-// padding:0 (the Forecast tables override the card's normal 16px padding).
-
-function Th({ children, num }: { children: React.ReactNode; num?: boolean }) {
-  return (
-    <th
-      className={`font-bold uppercase tracking-[.04em] ${num ? 'text-right' : 'text-left'}`}
-      style={{ padding: '8px 6px', fontSize: 10, color: 'var(--qms-text-muted)', borderBottom: '1px dashed var(--qms-border)' }}
-    >
-      {children}
-    </th>
-  )
-}
-
-function Td({ children, num, bold }: { children: React.ReactNode; num?: boolean; bold?: boolean }) {
-  return (
-    <td className={num ? 'text-right tabular-nums' : ''} style={{ padding: '8px 6px', borderBottom: '1px dashed var(--qms-border)', color: 'var(--qms-text)' }}>
-      {bold ? <b>{children}</b> : children}
-    </td>
-  )
-}
-
-function EmptyRow({ colSpan, label }: { colSpan: number; label: string }) {
-  return (
-    <tr>
-      <td colSpan={colSpan} className="text-center" style={{ padding: 24, color: 'var(--qms-text-muted)' }}>
-        {label}
-      </td>
-    </tr>
-  )
-}
-
-// '.inv-filter' — sticky filter/toolbar bar shared by every intel tab, exact
-// port of inventory.js's injected CSS: flex row, gap 8px, padding 10px 12px,
-// sticky top:60px z-index:25.
-function InvFilterBar({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      className="flex items-center gap-2 flex-wrap rounded-[10px] border mb-3 sticky z-25"
-      style={{ padding: '10px 12px', background: 'var(--qms-surface)', borderColor: 'var(--qms-border)', top: 60 }}
-    >
-      {children}
-    </div>
   )
 }
 
@@ -164,7 +113,7 @@ function DemandForecastView({ onOpenItem }: { onOpenItem: (id: string) => void }
           </thead>
           <tbody>
             {rows.length === 0 ? (
-              <EmptyRow colSpan={6} label="No demand in this window." />
+              <TableEmptyRow colSpan={6}>No demand in this window.</TableEmptyRow>
             ) : (
               rows.map((r: ForecastRow) => (
                 <tr
@@ -283,7 +232,7 @@ function ConsumptionEngineView() {
           </thead>
           <tbody>
             {lines.length === 0 ? (
-              <EmptyRow colSpan={6} label="No mapped consumables for this camp." />
+              <TableEmptyRow colSpan={6}>No mapped consumables for this camp.</TableEmptyRow>
             ) : (
               lines.map((l) => (
                 <tr key={l.it.id} className="hover:bg-[rgba(59,109,255,.03)]">

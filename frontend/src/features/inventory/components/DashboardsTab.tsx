@@ -5,10 +5,13 @@ import {
   CheckCircle2, Clock, RefreshCw, Wrench, ArrowUpRight, LineChart,
 } from 'lucide-react'
 import { useDashboardsData, useDashboardSubView } from '@/features/inventory/hooks/useInventory'
+import { Th, Td } from '@/features/inventory/components/IntelTableUi'
 import { inr, buildDashboardKpis, poTotal, assetItems as getAssetItems } from '@/features/inventory/inventory.service'
 import type { DashboardsData } from '@/features/inventory/inventory.service'
 import { DASHBOARD_SEGS } from '@/features/inventory/inventory.types'
-import type { DashboardKpiCard, DashboardSubView, KpiTone, ForecastRow } from '@/features/inventory/inventory.types'
+import type { DashboardKpiCard, DashboardSubView, ForecastRow } from '@/features/inventory/inventory.types'
+import { KPI_TONE_COLOR } from '@/features/inventory/constants/kpiToneColor'
+import { SHORTAGE_BAND_STYLE } from '@/features/inventory/constants/shortageBandStyle'
 
 export type { DashboardSubView }
 
@@ -22,15 +25,6 @@ export type { DashboardSubView }
 // derived data + a single local `sub` selector (useDashboardSubView), no
 // manual DOM patching needed (the prototype's rerender()/IN.dash mutation
 // collapses to plain React state).
-
-const KPI_TONE_COLOR: Record<KpiTone, string> = {
-  brand: '#3b6dff',
-  teal: '#14b8a6',
-  emerald: '#10b981',
-  amber: '#f59e0b',
-  rose: '#f43f5e',
-  violet: '#8b5cf6',
-}
 
 // icon name → lucide component — union of every icon referenced by the 8
 // KPI sets in the research spec (kpiGrid()'s `k.icon` uses data-lucide names
@@ -190,28 +184,6 @@ function ImTable({ children, minWidth }: { children: React.ReactNode; minWidth?:
   )
 }
 
-function Th({ children, num }: { children: React.ReactNode; num?: boolean }) {
-  return (
-    <th
-      className={`font-bold uppercase tracking-[.04em] ${num ? 'text-right' : 'text-left'}`}
-      style={{ padding: '8px 6px', fontSize: 10, color: 'var(--qms-text-muted)', borderBottom: '1px dashed var(--qms-border)' }}
-    >
-      {children}
-    </th>
-  )
-}
-
-function Td({ children, num, bold }: { children: React.ReactNode; num?: boolean; bold?: boolean }) {
-  return (
-    <td
-      className={num ? 'text-right tabular-nums' : ''}
-      style={{ padding: '8px 6px', borderBottom: '1px dashed var(--qms-border)', color: 'var(--qms-text)' }}
-    >
-      {bold ? <b>{children}</b> : children}
-    </td>
-  )
-}
-
 function EmptyRow({ colSpan, label }: { colSpan: number; label: string }) {
   return (
     <tr>
@@ -222,19 +194,8 @@ function EmptyRow({ colSpan, label }: { colSpan: number; label: string }) {
   )
 }
 
-// .im-band pill — exact 5-tone palette from inventory-intel.js's injected
-// CSS (line 147), deliberately DIFFERENT hex values than the main module's
-// inv-status-pill palette (e.g. amber text #a16207 here vs #d97706
-// elsewhere) — kept as its own distinct token set, not normalized.
-const IM_BAND_STYLE: Record<'green' | 'amber' | 'orange' | 'red', { bg: string; fg: string }> = {
-  green: { bg: 'rgba(16,185,129,.15)', fg: '#059669' },
-  amber: { bg: 'rgba(234,179,8,.18)', fg: '#a16207' },
-  orange: { bg: 'rgba(249,115,22,.16)', fg: '#c2410c' },
-  red: { bg: 'rgba(244,63,94,.15)', fg: '#e11d48' },
-}
-
 function ImBand({ tone, children }: { tone: 'green' | 'amber' | 'orange' | 'red'; children: React.ReactNode }) {
-  const s = IM_BAND_STYLE[tone]
+  const s = SHORTAGE_BAND_STYLE[tone]
   return (
     <span
       className="inline-flex items-center font-bold rounded-full"

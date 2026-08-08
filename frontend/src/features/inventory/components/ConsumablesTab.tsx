@@ -4,6 +4,7 @@ import { toast } from '@/components/ui/sonner'
 import { useConsumables, useDeviceCatalog } from '@/features/inventory/hooks/useInventory'
 import { consumableStatus, inr, raisePO } from '@/features/inventory/inventory.service'
 import type { ConsumableStatusCode } from '@/features/inventory/inventory.types'
+import { InvFilterBar } from '@/features/inventory/components/IntelTableUi'
 
 // Status pill colors — exact port of inventory.js's injected <style
 // id="qms-inv-css"> .inv-status-CRIT/.inv-status-LOW/.inv-status-HEALTH
@@ -68,10 +69,7 @@ const ConsumablesTab = () => {
   return (
     <div>
       {/* renderFilter('consumables') — shared sticky .inv-filter bar */}
-      <div
-        className="flex gap-2 items-center flex-wrap mb-3 rounded-[10px] border sticky z-25"
-        style={{ padding: '10px 12px', background: 'var(--qms-surface)', borderColor: 'var(--qms-border)', top: 60 }}
-      >
+      <InvFilterBar>
         <span className="text-xs font-bold uppercase tracking-[.04em]" style={{ color: 'var(--qms-text-muted)' }}>
           Filters
         </span>
@@ -102,7 +100,7 @@ const ConsumablesTab = () => {
           className="rounded-lg border text-xs"
           style={{ padding: '6px 10px', borderColor: 'var(--qms-border)', background: 'var(--qms-surface)', minWidth: 200, color: 'var(--qms-text)' }}
         />
-      </div>
+      </InvFilterBar>
 
       {/* .inv-card padding:0;overflow:hidden — clips, does not scroll. Uses
           --qms-surface-card (not --qms-surface, which is the translucent

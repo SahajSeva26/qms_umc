@@ -32,6 +32,24 @@ function StatusPill({ code, label }: { code: string; label: string }) {
   )
 }
 
+// Section heading — exact port of invOpenDevice()'s repeated section-title
+// markup (dashed bottom border, 22px gradient icon tile, white icon).
+// Previously reimplemented inline 4 times (Description/FAQ/Consumables/Units
+// in fleet) — consolidated into one private component, same markup, same
+// values. Intentionally distinct from the shared `components/ui/SectionHeader`
+// (that one has no border and a translucent brand-tinted tile, not this
+// drawer's gradient-filled one) — not interchangeable, kept local.
+function DrawerSectionHeading({ icon: Icon, children }: { icon: typeof FiInfo; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-2 mb-2.5 pb-2 border-b border-dashed text-xs font-bold uppercase tracking-[.04em]" style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-soft)' }}>
+      <span className="w-[22px] h-[22px] rounded-[7px] text-white grid place-items-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}>
+        <Icon size={13} />
+      </span>
+      {children}
+    </div>
+  )
+}
+
 interface DeviceDetailDrawerProps {
   device: DeviceCatalogItem | null
   fleet: DeviceFleet | null
@@ -108,12 +126,7 @@ const DeviceDetailDrawer = ({ device, fleet, people, onClose }: DeviceDetailDraw
           </div>
 
           {/* Description */}
-          <div className="flex items-center gap-2 mb-2.5 pb-2 border-b border-dashed text-xs font-bold uppercase tracking-[.04em]" style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-soft)' }}>
-            <span className="w-[22px] h-[22px] rounded-[7px] text-white grid place-items-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}>
-              <FiInfo size={13} />
-            </span>
-            Description
-          </div>
+          <DrawerSectionHeading icon={FiInfo}>Description</DrawerSectionHeading>
           <div className="rounded-xl border mb-3.5 text-[13px]" style={{ padding: 12, background: 'var(--qms-surface)', borderColor: 'var(--qms-border)', color: 'var(--qms-text)' }}>
             {device.laymanDescription || '—'}
           </div>
@@ -121,12 +134,7 @@ const DeviceDetailDrawer = ({ device, fleet, people, onClose }: DeviceDetailDraw
           {/* FAQ — conditional */}
           {device.faq && (
             <>
-              <div className="flex items-center gap-2 mb-2.5 pb-2 border-b border-dashed text-xs font-bold uppercase tracking-[.04em]" style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-soft)' }}>
-                <span className="w-[22px] h-[22px] rounded-[7px] text-white grid place-items-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}>
-                  <FiHelpCircle size={13} />
-                </span>
-                FAQ
-              </div>
+              <DrawerSectionHeading icon={FiHelpCircle}>FAQ</DrawerSectionHeading>
               <div className="rounded-xl border mb-3.5 text-xs whitespace-pre-line" style={{ padding: 12, background: 'var(--qms-surface)', borderColor: 'var(--qms-border)', color: 'var(--qms-text)' }}>
                 {device.faq}
               </div>
@@ -136,12 +144,7 @@ const DeviceDetailDrawer = ({ device, fleet, people, onClose }: DeviceDetailDraw
           {/* Consumables — conditional */}
           {linkedCons.length > 0 && (
             <>
-              <div className="flex items-center gap-2 mb-2.5 pb-2 border-b border-dashed text-xs font-bold uppercase tracking-[.04em]" style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-soft)' }}>
-                <span className="w-[22px] h-[22px] rounded-[7px] text-white grid place-items-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}>
-                  <FiPackage size={13} />
-                </span>
-                Consumables ({linkedCons.length})
-              </div>
+              <DrawerSectionHeading icon={FiPackage}>{`Consumables (${linkedCons.length})`}</DrawerSectionHeading>
               <div className="overflow-x-auto mb-3.5">
                 <table className="w-full text-xs border-collapse">
                   <thead>
@@ -185,12 +188,7 @@ const DeviceDetailDrawer = ({ device, fleet, people, onClose }: DeviceDetailDraw
           )}
 
           {/* Units in fleet */}
-          <div className="flex items-center gap-2 mb-2.5 pb-2 border-b border-dashed text-xs font-bold uppercase tracking-[.04em]" style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-soft)' }}>
-            <span className="w-[22px] h-[22px] rounded-[7px] text-white grid place-items-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}>
-              <FiList size={13} />
-            </span>
-            Units in fleet ({fleet.units.length})
-          </div>
+          <DrawerSectionHeading icon={FiList}>{`Units in fleet (${fleet.units.length})`}</DrawerSectionHeading>
           <div className="overflow-x-auto">
             <table className="w-full text-xs border-collapse">
               <thead>

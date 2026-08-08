@@ -7,6 +7,8 @@ import { useLogMovement } from '@/features/inventory/hooks/useInventory'
 import { MOVEMENT_TYPE_OPTIONS, movementTypeMeta } from '@/features/inventory/inventory.types'
 import type { MovementType, InventoryUnit } from '@/features/inventory/inventory.types'
 import type { LogMovementInput } from '@/features/inventory/inventory.service'
+import { movementSchema } from '@/features/inventory/schemas/movement.schema'
+import { todayIso } from '@/features/inventory/utils/date'
 
 const inputCls = 'w-full rounded-lg border text-xs px-2.5 py-1.5'
 const inputStyle = { borderColor: 'var(--qms-border)', background: 'var(--qms-surface-input)', color: 'var(--qms-text)' }
@@ -18,13 +20,9 @@ const Field = ({ label, children, full = false }: { label: string; children: Rea
   </div>
 )
 
-function isoToday(): string {
-  return new Date().toISOString().slice(0, 10)
-}
-
 const blankForm = (): LogMovementInput => ({
   type: 'HANDOVER',
-  date: isoToday(),
+  date: todayIso(),
   unitId: '',
   from: '',
   to: '',
@@ -66,8 +64,9 @@ const LogMovementModal = ({ open, onClose, units }: LogMovementModalProps) => {
   }
 
   const handleSave = async () => {
-    if (!form.unitId) {
-      toast.error('Select a unit')
+    const result = movementSchema.safeParse(form)
+    if (!result.success) {
+      toast.error(result.error.issues[0]?.message ?? 'Please check the highlighted fields')
       return
     }
     setSaving(true)

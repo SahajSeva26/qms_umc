@@ -6,6 +6,7 @@ import {
   useDeviceCatalog, useDeviceFleetUnits, useCalibrationFilters, useCalibrationRows, useMarkCalibrated,
 } from '@/features/inventory/hooks/useInventory'
 import type { CalibStatusCode } from '@/features/inventory/inventory.types'
+import { InvFilterBar } from '@/features/inventory/components/IntelTableUi'
 
 // Exact port of inventory.js's tabCalibration() (lines 577-618) +
 // renderFilter('calibration') (lines 384-403) + window.invMarkCalibrated()
@@ -53,10 +54,7 @@ const CalibrationTab = () => {
     <div>
       {/* renderFilter('calibration') — shared sticky .inv-filter bar, plus the
           calibration-only status select (forTab==='calibration' branch). */}
-      <div
-        className="flex gap-2 items-center flex-wrap mb-3 rounded-[10px] border sticky z-25"
-        style={{ padding: '10px 12px', background: 'var(--qms-surface)', borderColor: 'var(--qms-border)', top: 60 }}
-      >
+      <InvFilterBar>
         <span className="text-xs font-bold uppercase tracking-[.04em]" style={{ color: 'var(--qms-text-muted)' }}>
           Filters
         </span>
@@ -87,7 +85,7 @@ const CalibrationTab = () => {
           className="rounded-lg border text-xs"
           style={{ padding: '6px 10px', borderColor: 'var(--qms-border)', background: 'var(--qms-surface)', minWidth: 200, color: 'var(--qms-text)' }}
         />
-      </div>
+      </InvFilterBar>
 
       {/* single full-width .inv-card, padding:0 + overflow:hidden so the
           .inv-tbl bleeds edge-to-edge inside the 14px-radius card border */}

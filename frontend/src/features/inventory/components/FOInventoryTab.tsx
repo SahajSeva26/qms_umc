@@ -5,22 +5,11 @@ import SideDrawer from '@/components/ui/SideDrawer'
 import { useFoInventoryRows, useFoHoldings } from '@/features/inventory/hooks/useInventory'
 import { inr, inrShort } from '@/features/inventory/inventory.service'
 import type { FoHoldings } from '@/features/inventory/inventory.types'
-
-// .im-band pill — exact port of inventory-masters.js's injected CSS. The
-// rollup table's own Expiry column only ever shows green/orange (it's a
-// binary "OK" vs "N soon" summary derived from expSoon, not a real band),
-// but the drawer's per-consumable table renders c.band.css directly and a
-// held item can genuinely be any of the 4 bands — same full palette as
-// ItemMasterTab.tsx's ExpiryBandPill.
-const BAND_STYLE = {
-  green: { bg: 'rgba(16,185,129,.15)', fg: '#059669' },
-  yellow: { bg: 'rgba(234,179,8,.18)', fg: '#a16207' },
-  orange: { bg: 'rgba(249,115,22,.16)', fg: '#c2410c' },
-  red: { bg: 'rgba(244,63,94,.15)', fg: '#e11d48' },
-} as const
+import { EXPIRY_BAND_STYLE } from '@/features/inventory/constants/expiryBandStyle'
+import { TableEmptyRow } from '@/features/inventory/components/IntelTableUi'
 
 const BandPill = ({ css, label }: { css: 'green' | 'yellow' | 'orange' | 'red'; label: string }) => {
-  const s = BAND_STYLE[css]
+  const s = EXPIRY_BAND_STYLE[css]
   return (
     <span
       className="inline-flex items-center gap-1 font-bold rounded-full"
@@ -100,11 +89,7 @@ const FOInventoryTab = () => {
           </thead>
           <tbody>
             {rows.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="text-center" style={{ padding: 24, color: 'var(--qms-text-muted)' }}>
-                  No Field Officers found.
-                </td>
-              </tr>
+              <TableEmptyRow colSpan={7}>No Field Officers found.</TableEmptyRow>
             ) : (
               rows.map((r) => (
                 <tr

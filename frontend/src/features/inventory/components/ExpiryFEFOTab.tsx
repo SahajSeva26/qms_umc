@@ -6,6 +6,8 @@ import { isConsumableType } from '@/features/inventory/inventory.types'
 import type { InventoryItem, ExpiryBandCode, ExpiryBandCss } from '@/features/inventory/inventory.types'
 import { expiryBand, remainingLabel } from '@/features/inventory/inventory.service'
 import { ItemDetailDrawerBody } from '@/features/inventory/components/ItemMasterTab'
+import { EXPIRY_BAND_STYLE } from '@/features/inventory/constants/expiryBandStyle'
+import { TableEmptyRow } from '@/features/inventory/components/IntelTableUi'
 
 // Exact port of window.QMS_InvMasters.tabExpiry() (inventory-masters.js:
 // 308-359) — dedicated local ai-banner (no 'Run' button, distinct from the
@@ -36,13 +38,10 @@ const BANDS: Band[] = [
 
 // .im-band pill — exact port of inventory-masters.js's injected CSS (lines
 // 209-214), including the 'grey' variant (Quarantine pill) that Item
-// Master's own BAND_STYLE never needed since it only ever shows green/
-// yellow/orange/red bands, never a plain grey FEFO-action label.
+// Master's own shared band style never needed since it only ever shows
+// green/yellow/orange/red bands, never a plain grey FEFO-action label.
 const BAND_STYLE: Record<ExpiryBandCss | 'grey', { bg: string; fg: string }> = {
-  green: { bg: 'rgba(16,185,129,.15)', fg: '#059669' },
-  yellow: { bg: 'rgba(234,179,8,.18)', fg: '#a16207' },
-  orange: { bg: 'rgba(249,115,22,.16)', fg: '#c2410c' },
-  red: { bg: 'rgba(244,63,94,.15)', fg: '#e11d48' },
+  ...EXPIRY_BAND_STYLE,
   grey: { bg: 'rgba(0,0,0,.06)', fg: 'var(--qms-text-muted)' },
 }
 
@@ -174,11 +173,7 @@ const ExpiryFEFOTab = () => {
           </thead>
           <tbody>
             {shown.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="text-center" style={{ padding: 24, color: 'var(--qms-text-muted)' }}>
-                  No batches in this band.
-                </td>
-              </tr>
+              <TableEmptyRow colSpan={8}>No batches in this band.</TableEmptyRow>
             ) : (
               shown.map((b, idx) => {
                 const it = b.it

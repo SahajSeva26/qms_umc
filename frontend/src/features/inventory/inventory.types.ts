@@ -288,25 +288,6 @@ export interface ExpiryBand {
   css: ExpiryBandCss
 }
 
-// ── Unified item master (qms.inventory.items, inventory-masters.js) ────────
-// A SEPARATE store from the two catalogs above — Item Master/Expiry-FEFO/
-// FO Inventory/Field Ops/Procurement all read+write this single localStorage-
-// backed registry, seeded once from DEVICE_CATALOG + CONSUMABLES (+ synthetic
-// asset/material rows). Exact port of inventory-masters.js's item shape
-// (fields are a superset union across all 6 item types — asset-only fields
-// like warrantyEnd are simply absent/undefined on consumable rows and vice
-// versa, matching the prototype's own untyped single object shape).
-
-export const ASSET_ITEM_TYPES: ItemType[] = ['Device', 'IT Asset', 'Office Asset']
-export const CONSUMABLE_ITEM_TYPES: ItemType[] = ['Consumable', 'General Consumable', 'Marketing Material']
-
-export function isAssetItemType(t: ItemType): boolean {
-  return ASSET_ITEM_TYPES.includes(t)
-}
-export function isConsumableItemType(t: ItemType): boolean {
-  return CONSUMABLE_ITEM_TYPES.includes(t)
-}
-
 // ── FO holdings engine (foHoldings(), inventory-masters.js:616-665) —────────
 // single source of truth shared by the FO Inventory tab AND the Field Ops →
 // Allocations sub-tab (both read the same qms.inventory.allocations ledger).
@@ -394,18 +375,6 @@ export interface DeviceFleet {
 // concepts — inventory.js's tabConsumables() and this item-master store are
 // independent mock datasets in the prototype itself.
 
-export type ItemMasterType =
-  | 'Device'
-  | 'Consumable'
-  | 'General Consumable'
-  | 'Marketing Material'
-  | 'IT Asset'
-  | 'Office Asset'
-
-// Types that carry batch/expiry tracking (isConsumable() in the prototype) —
-// these are the rows consumableItems() filters the item-master store down to.
-export const ITEM_MASTER_CONSUMABLE_TYPES: ItemMasterType[] = ['Consumable', 'General Consumable', 'Marketing Material']
-
 // Unified item-master record — one shape for all 6 item types (a given
 // record only populates the fields relevant to its own itemType). Only the
 // fields the Transfers tab's own logic actually reads are declared here in
@@ -413,7 +382,7 @@ export const ITEM_MASTER_CONSUMABLE_TYPES: ItemMasterType[] = ['Consumable', 'Ge
 export interface InventoryMasterItem {
   id: string
   sourceId?: string
-  itemType: ItemMasterType
+  itemType: ItemType
   name: string
   code: string
   category?: string
@@ -618,7 +587,7 @@ export interface HolderHoldings {
 export type FieldOpsSegment = 'refills' | 'issues' | 'alloc'
 
 // ── Item Master (qms.inventory.items, inventory-masters.js) ────────────────
-// Procurement reuses the canonical `ItemMasterType`/`InventoryItem` declared
+// Procurement reuses the canonical `ItemType`/`InventoryItem` declared
 // above (same unified item store every tab reads/writes).
 
 // ── Vendors + Procurement (inventory-procurement.js, window.QMS_InvProc) ───

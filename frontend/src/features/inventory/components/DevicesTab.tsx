@@ -4,6 +4,7 @@ import type { DeviceCatalogItem } from '@/features/inventory/inventory.types'
 import { useDeviceCatalog, useDeviceFleetUnits } from '@/features/inventory/hooks/useInventory'
 import { deviceFleet, inr } from '@/features/inventory/inventory.service'
 import DeviceDetailDrawer from '@/features/inventory/components/DeviceDetailDrawer'
+import { InvFilterBar } from '@/features/inventory/components/IntelTableUi'
 
 // Exact port of inventory.js's tabDevices() (lines 525-572) + renderFilter
 // ('devices') (lines 384-403) + window.invOpenDevice() (lines 881-973).
@@ -40,10 +41,7 @@ const DevicesTab = () => {
       {/* renderFilter('devices') — shared sticky .inv-filter bar. Devices tab
           shows only Type + Search (forTab !== 'calibration'/'consumables' so
           no extra status select). */}
-      <div
-        className="flex gap-2 items-center flex-wrap mb-3 rounded-[10px] border sticky z-25"
-        style={{ padding: '10px 12px', background: 'var(--qms-surface)', borderColor: 'var(--qms-border)', top: 60 }}
-      >
+      <InvFilterBar>
         <span className="text-xs font-bold uppercase tracking-[.04em]" style={{ color: 'var(--qms-text-muted)' }}>
           Filters
         </span>
@@ -64,7 +62,7 @@ const DevicesTab = () => {
           className="rounded-lg border text-xs"
           style={{ padding: '6px 10px', borderColor: 'var(--qms-border)', background: 'var(--qms-surface)', minWidth: 200, color: 'var(--qms-text)' }}
         />
-      </div>
+      </InvFilterBar>
 
       {list.length === 0 ? (
         <div

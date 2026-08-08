@@ -1,8 +1,7 @@
 // Shared tiny helpers for the Dietitian Profiles screen's sub-components.
 
-export function initials(name: string): string {
-  return (name || '?').split(' ').map((s) => s[0]).filter(Boolean).slice(0, 2).join('').toUpperCase()
-}
+// Moved to utils/personDisplay.ts (was duplicated four times across Diet).
+export { initials } from '@/features/diet/utils/personDisplay'
 
 export function fmtDate(d?: string | null): string {
   if (!d) return '—'

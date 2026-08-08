@@ -2,7 +2,9 @@ import type { Camp } from '@/types/camp.types'
 import type { CampReminderLog, ReminderRecipient, ReminderWindow } from '@/features/diet/diet.types'
 import type { useDietCamps } from '@/features/diet/hooks/useDietCamps'
 import { clientName } from '@/types/campref.types'
+import { errorMessage } from '@/features/diet/utils/errorMessage'
 import { Button } from '@/components/ui/button'
+import { toast } from '@/components/ui/sonner'
 import { formatDate } from '@/utils/formatters'
 
 interface RemindersTabProps {
@@ -33,6 +35,27 @@ function emptyLog(): CampReminderLog {
 const RemindersTab = ({ camps, reminders, viewOnly, diet }: RemindersTabProps) => {
   const eligible = camps.filter((c) => c.status !== 'CLOSED' && c.status !== 'CANCELLED' && c.status !== 'CANCELLED_CHARGED')
 
+  const handleSendAll = async (campId: string) => {
+    try {
+      await diet.sendAllReminders.mutateAsync(campId)
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not send the reminders — try again.'))
+    }
+  }
+
+  // NOTE: deliberately no `isPending` disable on the matrix buttons below.
+  // One shared mutation drives 15 cells per camp across every camp on screen,
+  // so disabling on isPending would grey out dozens of unrelated buttons while
+  // one saves — misleading UI in exchange for nothing (each cell is a single
+  // idempotent status write). Failures are surfaced instead.
+  const handleSetConfirmation = async (campId: string, slot: ReminderWindow, who: ReminderRecipient, status: 'SENT' | 'CONFIRMED') => {
+    try {
+      await diet.setConfirmation.mutateAsync({ campId, slot, who, status })
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not record the confirmation — try again.'))
+    }
+  }
+
   return (
     <div className="space-y-3">
       {eligible.map((camp) => {
@@ -45,7 +68,7 @@ const RemindersTab = ({ camps, reminders, viewOnly, diet }: RemindersTabProps) =
                 <div className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>{clientName(camp.clientId)} · {formatDate(camp.date)}</div>
               </div>
               {!viewOnly && (
-                <Button size="sm" variant="outline" onClick={() => diet.sendAllReminders(camp.id)}>Send all (WhatsApp + AI call)</Button>
+                <Button size="sm" variant="outline" onClick={() => handleSendAll(camp.id)} disabled={diet.sendAllReminders.isPending}>Send all (WhatsApp + AI call)</Button>
               )}
             </div>
             <div className="overflow-x-auto">
@@ -64,7 +87,7 @@ const RemindersTab = ({ camps, reminders, viewOnly, diet }: RemindersTabProps) =
                         <td key={w} className="text-center px-2 py-1">
                           <button
                             disabled={viewOnly}
-                            onClick={() => diet.setConfirmation(camp.id, w, who, log[w][who] === 'PENDING' ? 'SENT' : 'CONFIRMED')}
+                            onClick={() => handleSetConfirmation(camp.id, w, who, log[w][who] === 'PENDING' ? 'SENT' : 'CONFIRMED')}
                             className="font-bold"
                             style={{ color: STATUS_COLOR[log[w][who]] }}
                           >

@@ -1,6 +1,6 @@
 import { FiCreditCard } from 'react-icons/fi'
 import type { DietitianProfileBundle } from '@/features/diet/dietitians.types'
-import { fmtInr } from '@/features/diet/dietitians.service'
+import { fmtInr } from '@/features/diet/diet.utils'
 import { fmtDate } from './profile.utils'
 
 interface PaymentLedgerSectionProps {

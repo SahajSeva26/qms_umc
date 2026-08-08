@@ -3,7 +3,8 @@ import { FiCpu, FiPackage, FiCheckCircle, FiPackage as FiPackageSearch } from 'r
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/sonner'
 import type { DietitianProfileBundle } from '@/features/diet/dietitians.types'
-import { requestBcaScale } from '@/features/diet/dietitians.service'
+import { useRequestBcaScale } from '@/features/diet/hooks/useDietitianEquipment'
+import { errorMessage } from '@/features/diet/utils/errorMessage'
 import { fmtDate } from './profile.utils'
 import BcaVerifyDialog from './BcaVerifyDialog'
 import LogStockMovementDialog from './LogStockMovementDialog'
@@ -20,6 +21,7 @@ const BcaEquipmentCard = ({ bundle, userName, onChanged }: BcaEquipmentCardProps
   const bca = bundle.equipment.bca
   const [verifyOpen, setVerifyOpen] = useState(false)
   const [logOpen, setLogOpen] = useState(false)
+  const requestBca = useRequestBcaScale()
 
   const pill = bca.verified
     ? { bg: 'rgba(16,185,129,.16)', color: '#047857', label: '✓ VERIFIED' }
@@ -28,7 +30,12 @@ const BcaEquipmentCard = ({ bundle, userName, onChanged }: BcaEquipmentCardProps
       : { bg: 'rgba(244,63,94,.16)', color: '#b91c1c', label: 'NOT OWNED' }
 
   const handleRequest = async () => {
-    await requestBcaScale(bundle.dietitian.id, userName)
+    try {
+      await requestBca.mutateAsync({ dietitianId: bundle.dietitian.id, by: userName })
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not request a BCA scale — try again.'))
+      return
+    }
     toast.success('BCA scale requested · logistics will allocate')
     onChanged()
   }
@@ -63,7 +70,7 @@ const BcaEquipmentCard = ({ bundle, userName, onChanged }: BcaEquipmentCardProps
 
       <div className="flex flex-wrap gap-2 mt-2 mb-3">
         {!bca.owned && (
-          <Button size="sm" onClick={handleRequest}><FiPackage size={12} /> Request BCA scale</Button>
+          <Button size="sm" onClick={handleRequest} disabled={requestBca.isPending}><FiPackage size={12} /> Request BCA scale</Button>
         )}
         {bca.owned && !bca.verified && (
           <Button size="sm" onClick={() => setVerifyOpen(true)}><FiCheckCircle size={12} /> Verify (upload video)</Button>

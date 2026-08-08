@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/sonner'
-import { setDietitianDeviceAlignment } from '@/features/diet/dietitians.service'
-
+import { useSetDietitianDeviceAlignment } from '@/features/diet/hooks/useDietitianRoster'
+import { errorMessage } from '@/features/diet/utils/errorMessage'
 const DEVICE_OPTIONS = ['BCA', 'BMI', 'Bloodsugar', 'BP', 'ECG']
 
 interface DeviceAlignmentDialogProps {
@@ -16,6 +16,7 @@ interface DeviceAlignmentDialogProps {
 
 const DeviceAlignmentDialog = ({ open, dietitianId, current, onClose, onSaved }: DeviceAlignmentDialogProps) => {
   const [picked, setPicked] = useState<Set<string>>(new Set(current))
+  const setDeviceAlignment = useSetDietitianDeviceAlignment()
 
   useEffect(() => {
     if (open) setPicked(new Set(current))
@@ -31,7 +32,12 @@ const DeviceAlignmentDialog = ({ open, dietitianId, current, onClose, onSaved }:
 
   const save = async () => {
     const list = Array.from(picked)
-    await setDietitianDeviceAlignment(dietitianId, list)
+    try {
+      await setDeviceAlignment.mutateAsync({ id: dietitianId, deviceAlignment: list })
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not save the device alignment — try again.'))
+      return
+    }
     toast.success(`Device alignment saved · ${list.length ? list.join(', ') : 'none'}`)
     onSaved()
   }

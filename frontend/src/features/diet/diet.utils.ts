@@ -30,3 +30,26 @@ export function dietViewOnly(role?: UserRole): boolean {
 export function isKam(role?: UserRole): boolean {
   return role === 'sales_rep'
 }
+
+// ── Currency display ─────────────────────────────────────────────────────
+// Deliberately NOT the shared formatINR() from @/utils/formatters — that one
+// uses 2 decimals for Lakhs and has a Thousands tier; these match the Diet
+// prototype's own om-data.js tiers exactly. Merging them would change every
+// figure on the Diet screens.
+
+export function fmtInr(n: number): string {
+  n = Number(n) || 0
+  if (n >= 1e7) return '₹' + (n / 1e7).toFixed(2) + ' Cr'
+  if (n >= 1e5) return '₹' + (n / 1e5).toFixed(1) + ' L'
+  return '₹' + Math.round(n).toLocaleString('en-IN')
+}
+
+// Same tier list as fmtInr but with a Thousands step, used by
+// diet-approvals.js's dashboard KPIs (fmtInrLocal).
+export function fmtInrCompact(n: number): string {
+  n = Number(n) || 0
+  if (n >= 1e7) return '₹' + (n / 1e7).toFixed(2) + ' Cr'
+  if (n >= 1e5) return '₹' + (n / 1e5).toFixed(1) + ' L'
+  if (n >= 1e3) return '₹' + (n / 1e3).toFixed(1) + 'K'
+  return '₹' + Math.round(n).toLocaleString('en-IN')
+}

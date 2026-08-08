@@ -1,7 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { fmtInr } from '@/features/diet/dietitians.service'
-
+import { fmtInr } from '@/features/diet/diet.utils'
 export interface ReconciliationReport {
   totalRows: number
   recorded: number

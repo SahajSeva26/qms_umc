@@ -3,8 +3,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/sonner'
-import { logStockMovement } from '@/features/diet/dietitians.service'
-
+import { useLogStockMovement } from '@/features/diet/hooks/useDietitianEquipment'
+import { errorMessage } from '@/features/diet/utils/errorMessage'
 interface LogStockMovementDialogProps {
   open: boolean
   dietitianId: string
@@ -17,6 +17,7 @@ const DEFAULT_ACTION = 'Scale shipped from warehouse'
 
 const LogStockMovementDialog = ({ open, dietitianId, userName, onClose, onSaved }: LogStockMovementDialogProps) => {
   const [action, setAction] = useState(DEFAULT_ACTION)
+  const logMovement = useLogStockMovement()
 
   useEffect(() => {
     if (open) setAction(DEFAULT_ACTION)
@@ -27,7 +28,12 @@ const LogStockMovementDialog = ({ open, dietitianId, userName, onClose, onSaved 
       toast.error('Movement description is required')
       return
     }
-    await logStockMovement(dietitianId, { action: action.trim(), fromLocation: 'QMS Warehouse', toLocation: '' }, userName)
+    try {
+      await logMovement.mutateAsync({ dietitianId, action: action.trim(), fromLocation: 'QMS Warehouse', toLocation: '', by: userName })
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not log the movement — try again.'))
+      return
+    }
     toast.success('Stock movement logged')
     onSaved()
   }
@@ -44,7 +50,7 @@ const LogStockMovementDialog = ({ open, dietitianId, userName, onClose, onSaved 
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={save}>Log</Button>
+          <Button onClick={save} disabled={logMovement.isPending}>Log</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

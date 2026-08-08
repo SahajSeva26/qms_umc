@@ -1,10 +1,14 @@
 {
-   "compilerOptions": {
-    "baseUrl": ".",
+  /* Solution-style config: `files: []` means this project compiles nothing —
+     the real work is in the referenced projects below, which do NOT inherit
+     these options. `paths` is kept only because tooling that reads the root
+     tsconfig for alias resolution (the shadcn CLI) expects to find it here.
+     No `baseUrl`: it is deprecated in TS 6, and a relative mapping like
+     "./src/*" is resolved against this file's directory without it. */
+  "compilerOptions": {
     "paths": {
       "@/*": ["./src/*"]
-    },
-    "ignoreDeprecations": "5.0"
+    }
   },
   "files": [],
   "references": [

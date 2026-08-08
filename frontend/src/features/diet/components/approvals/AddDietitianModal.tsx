@@ -5,8 +5,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from '@/components/ui/sonner'
-import { addDietitianEnrollment } from '@/features/diet/dietitians.service'
+import { validateDietitianEnrollmentFields } from '@/features/diet/schemas/addDietitian.schemas'
+import { useEnrollDietitian } from '@/features/diet/hooks/useDietitianRoster'
 import type { DietitianBankAccount } from '@/features/diet/dietitians.types'
+import { errorMessage } from '@/features/diet/utils/errorMessage'
 
 interface AddDietitianModalProps {
   open: boolean
@@ -34,6 +36,7 @@ const AddDietitianModal = ({ open, onClose, onDone }: AddDietitianModalProps) =>
   const [resumeUrl, setResumeUrl] = useState('')
   const [devices, setDevices] = useState<Set<string>>(new Set())
   const [error, setError] = useState('')
+  const enrollDietitian = useEnrollDietitian()
 
   useEffect(() => {
     if (!open) return
@@ -53,7 +56,14 @@ const AddDietitianModal = ({ open, onClose, onDone }: AddDietitianModalProps) =>
   }
 
   const handleSubmit = async () => {
-    if (!name.trim()) { toast.error('Dietitian name is required'); return }
+    // Shared rules (required name, valid-if-present email, numeric rate) come
+    // from schemas/addDietitian.schemas.ts; this screen keeps its own payload
+    // construction below because it differs from the profile screen's.
+    const check = validateDietitianEnrollmentFields(
+      { name, specialty, phone, email, hq, states, ratePerCamp, pan, address, bankName, accountHolder, accountNumber, ifsc, upi, resumeUrl, devices },
+      'Dietitian name is required',
+    )
+    if (!check.ok) { toast.error(check.error); return }
     setError('')
     const bankAccounts: DietitianBankAccount[] = []
     if (accountNumber.trim() || upi.trim()) {
@@ -66,20 +76,25 @@ const AddDietitianModal = ({ open, onClose, onDone }: AddDietitianModalProps) =>
         upi: upi.trim(),
       })
     }
-    await addDietitianEnrollment({
-      name: name.trim(),
-      specialty: specialty.trim() || 'Clinical nutrition',
-      phone: phone.trim(),
-      email: email.trim(),
-      hq: hq.trim(),
-      states: states.split(',').map((s) => s.trim()).filter(Boolean),
-      ratePerCamp: Math.max(0, Number(ratePerCamp) || 0),
-      pan: pan.trim(),
-      address: address.trim(),
-      bankAccounts,
-      resumeUrl: resumeUrl.trim(),
-      deviceAlignment: Array.from(devices),
-    })
+    try {
+      await enrollDietitian.mutateAsync({
+        name: name.trim(),
+        specialty: specialty.trim() || 'Clinical nutrition',
+        phone: phone.trim(),
+        email: email.trim(),
+        hq: hq.trim(),
+        states: states.split(',').map((s) => s.trim()).filter(Boolean),
+        ratePerCamp: Math.max(0, Number(ratePerCamp) || 0),
+        pan: pan.trim(),
+        address: address.trim(),
+        bankAccounts,
+        resumeUrl: resumeUrl.trim(),
+        deviceAlignment: Array.from(devices),
+      })
+    } catch (err) {
+      setError(errorMessage(err, 'Could not enrol the dietitian — try again.'))
+      return
+    }
     toast.success(`Dietitian enrolled · ${name.trim()}`)
     onClose()
     onDone?.()
@@ -146,7 +161,7 @@ const AddDietitianModal = ({ open, onClose, onDone }: AddDietitianModalProps) =>
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSubmit}><FiUserPlus size={13} /> Enrol dietitian</Button>
+          <Button onClick={handleSubmit} disabled={enrollDietitian.isPending}><FiUserPlus size={13} /> Enrol dietitian</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -24,15 +24,20 @@
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
-    /* ===================== ADDED FOR SHADCN ===================== */
-    "baseUrl": ".",
+    /* ===================== ADDED FOR SHADCN =====================
+       `paths` without `baseUrl`. `baseUrl` is deprecated in TS 6 and was only
+       here because the shadcn snippet predates TS 4.1, which made `paths`
+       usable on its own. Without `baseUrl` a mapping must be RELATIVE — hence
+       the leading "./" — and is resolved against this file's directory, so
+       "./src/*" means "<frontend>/src/*", exactly what `baseUrl: "."` +
+       "src/*" used to mean. Vite resolves the same alias independently in
+       vite.config.ts.
+       ============================================================ */
     "paths": {
       "@/*": [
-        "src/*"
+        "./src/*"
       ]
-    },
-    "ignoreDeprecations": "5.0"
-    /* ============================================================ */
+    }
   },
   "include": [
     "src"

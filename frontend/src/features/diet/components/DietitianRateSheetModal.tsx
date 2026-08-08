@@ -5,73 +5,59 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from '@/components/ui/sonner'
 import { FiCheck, FiAlertOctagon, FiAlertCircle, FiArrowLeft, FiUserCheck, FiClock } from 'react-icons/fi'
-import type { Person } from '@/types/people.types'
+import { useAuth } from '@/hooks/useAuth'
+import { useCampsData } from '@/hooks/useCampsData'
+import {
+  suggestDietitianRates, getDietitianRateHistory, poCampCost,
+} from '@/features/diet/services/dietitianRates.service'
+import { dietitianApproved } from '@/features/diet/services/dietitianRoster.service'
+import { useDietitianCandidates } from '@/features/diet/hooks/useDietitianCandidates'
+import { useAssignDietitianWithRates } from '@/features/diet/hooks/useDietitianRates'
+import { errorMessage } from '@/features/diet/utils/errorMessage'
 
 interface DietitianRateSheetModalProps {
   open: boolean
   onClose: () => void
   campId: string
-  dietitians: Person[]
-  requiresBca?: boolean
 }
 
 type Step = 'PICK' | 'RATES'
 
-// Ranking signals mirror rankDietitiansForCamp/sortDietitiansForBcaCamp
-// (diet-rates-modal.js:71-89) — doctor-preferred pinned above the rest,
-// BCA-verified surfaced when the camp requires BCA. Real invite-response
-// and doctor-history ranking wiring comes in a later pass; for now this
-// picker orders on the two signals we can compute from Person alone.
-function rankDietitians(dietitians: Person[], requiresBca: boolean): Person[] {
-  return dietitians
-    .slice()
-    .sort((a, b) => {
-      const aPref = a.specialty ? 1 : 0
-      const bPref = b.specialty ? 1 : 0
-      if (requiresBca) {
-        const aBca = (a.machinesAssigned?.length ?? 0) > 0 ? 1 : 0
-        const bBca = (b.machinesAssigned?.length ?? 0) > 0 ? 1 : 0
-        if (aBca !== bBca) return bBca - aBca
-      }
-      if (aPref !== bPref) return bPref - aPref
-      return (b.feedbackAvg ?? 0) - (a.feedbackAvg ?? 0)
-    })
-}
+// Assign-a-dietitian-and-set-rates flow launched from the Diet Camps board.
+//
+// Every figure here comes from the Diet domain services — the same ones the
+// sibling approvals/AssignDietitianModal.tsx uses, so both assignment screens
+// rank, price and gate identically. This file previously ran on fabricated
+// data (a local Person-based ranker, a hardcoded ₹500 TA, a 3-row demo rate
+// history, a flat ₹4,000 PO camp cost and a machinesAssigned-based BCA
+// guess) and its Save button was a no-op toast; all of that is gone.
+const DietitianRateSheetModal = ({ open, onClose, campId }: DietitianRateSheetModalProps) => {
+  const { user } = useAuth()
+  const { camps } = useCampsData()
+  const userName = user ? `${user.firstName} ${user.lastName}`.trim() : 'QMS Ops'
+  const assignDietitian = useAssignDietitianWithRates()
 
-// Stub: pre-fill from the dietitian's most-recent rate history. Real
-// history lookup (om.getLastDietitianRates / suggestDietitianRates) comes
-// in a later wiring pass — for now fall back to the Person master's own
-// rate fields, matching the "first assignment" path when absent.
-function suggestRates(dietitian: Person | undefined) {
-  const hasHistory = !!(dietitian?.ratePerCamp || dietitian?.printingChargePerCamp)
-  return {
-    hasHistory,
-    remuneration: dietitian?.ratePerCamp ?? 0,
-    ta: 500,
-    printing: dietitian?.printingChargePerCamp ?? 0,
-  }
-}
+  const camp = useMemo(() => camps.find((c) => c.id === campId) ?? null, [camps, campId])
 
-// Placeholder rate-history trend rows — real history wiring (per-dietitian
-// getDietitianRateHistory) comes in a later pass.
-const DEMO_HISTORY = [
-  { date: '2026-04-12', remuneration: 3000, ta: 500, printing: 300, total: 3800, reason: 'Standard onboarding rate' },
-  { date: '2026-05-20', remuneration: 3000, ta: 500, printing: 300, total: 3800, reason: 'No change · reused previous rates' },
-  { date: '2026-06-30', remuneration: 3200, ta: 600, printing: 350, total: 4150, reason: 'Long-distance camp · fuel surcharge' },
-]
-
-// Placeholder PO camp cost (project budget per camp) — real project-budget
-// wiring (poCampCost, diet-rates-modal.js:170-185) comes in a later pass.
-const DEMO_PO_CAMP_COST = 4000
-
-const DietitianRateSheetModal = ({ open, onClose, campId, dietitians, requiresBca = false }: DietitianRateSheetModalProps) => {
   const [step, setStep] = useState<Step>('PICK')
   const [dietitianId, setDietitianId] = useState('')
   const [cameFromPicker, setCameFromPicker] = useState(false)
 
-  const ranked = useMemo(() => rankDietitians(dietitians, requiresBca), [dietitians, requiresBca])
-  const dietitian = dietitians.find((d) => d.id === dietitianId)
-  const sug = useMemo(() => suggestRates(dietitian), [dietitian])
+  // Whether this camp needs a BCA scale is derived from the camp's own tests,
+  // not passed in — the caller never supplied the old `requiresBca` prop, so
+  // the BCA gate below was previously unreachable.
+  //
+  // The shortlist arrives ranked, BCA-tiered and fully annotated (rating, last
+  // remuneration, BCA status, doctor preference) from ONE bulk read — the row
+  // loop below does no service calls at all.
+  const { requiresBca, candidates } = useDietitianCandidates(camp, camps)
+
+  const selected = candidates.find((c) => c.dietitian.id === dietitianId)
+  const dietitian = selected?.dietitian
+  const sug = useMemo(
+    () => (camp && dietitianId ? suggestDietitianRates(dietitianId, camp) : null),
+    [camp, dietitianId],
+  )
 
   const [remuneration, setRemuneration] = useState('0')
   const [ta, setTa] = useState('0')
@@ -94,8 +80,8 @@ const DietitianRateSheetModal = ({ open, onClose, campId, dietitians, requiresBc
   }
 
   const handlePick = (id: string) => {
-    const d = dietitians.find((p) => p.id === id)
-    const s = suggestRates(d)
+    if (!camp) return
+    const s = suggestDietitianRates(id, camp)
     setDietitianId(id)
     setRemuneration(String(s.remuneration))
     setTa(String(s.ta))
@@ -110,22 +96,47 @@ const DietitianRateSheetModal = ({ open, onClose, campId, dietitians, requiresBc
   const printNum = Number(printing || 0)
   const total = remNum + taNum + printNum
 
-  const changed = !sug.hasHistory || remNum !== sug.remuneration || taNum !== sug.ta || printNum !== sug.printing
+  // Target cost stays the computed total in this screen (the field is
+  // read-only here and labelled "Computed · Rem + TA + Print"), so it is not
+  // part of the changed-vs-suggested comparison.
+  const hasHistory = !!sug?.hasHistory
+  const changed = !sug || !hasHistory
+    || remNum !== (sug?.remuneration ?? 0) || taNum !== (sug?.ta ?? 0) || printNum !== (sug?.printing ?? 0)
   const reasonRequired = changed
   const reasonOk = !reasonRequired || reason.trim().length > 0
 
-  // BCA-verification gate — stubbed as a simple boolean prop; real
-  // per-dietitian verification lookup (om.bcaVerified) comes in a later pass.
-  const dietitianBcaVerified = !!dietitian?.machinesAssigned?.length
+  const dietitianBcaVerified = selected?.bca.verified ?? false
   const bcaBlocked = requiresBca && !!dietitian && !dietitianBcaVerified
+  const notApproved = !!dietitianId && !dietitianApproved(dietitianId)
 
-  const povar = DEMO_PO_CAMP_COST ? total - DEMO_PO_CAMP_COST : 0
+  const poCost = camp ? poCampCost(camp) : 0
+  const povar = poCost ? total - poCost : 0
   const overBudget = povar > 0
 
-  const canSave = !!dietitianId && reasonOk && !bcaBlocked
+  const rateHistory = dietitianId ? getDietitianRateHistory(dietitianId).slice(0, 5) : []
 
-  const handleSave = () => {
-    toast.info('UI only — wiring comes next pass')
+  const canSave = !!dietitianId && reasonOk && !bcaBlocked && !notApproved && !assignDietitian.isPending
+
+  // Same mutation as approvals/AssignDietitianModal — the camp patch and the
+  // rate-history entry are one action, owned by the hook.
+  const handleSave = async () => {
+    if (!camp || !dietitianId || !dietitian) return
+    const rates = {
+      remuneration: remNum,
+      ta: taNum,
+      printing: printNum,
+      targetCost: total,
+      reason: reason.trim() || (hasHistory ? 'No change · reused previous rates' : 'First assignment'),
+    }
+    try {
+      await assignDietitian.mutateAsync({ camp, dietitianId, by: userName, rates })
+    } catch (err) {
+      // The hook rejects with DIETITIAN_NOT_APPROVED when the OM·Diet gate
+      // blocks the assignment — the same message this screen showed before.
+      toast.error(errorMessage(err, 'Could not assign — try again.'))
+      return
+    }
+    toast.success(`Assigned · ${dietitian.name} · Total ₹${total.toLocaleString('en-IN')}`)
     handleClose()
   }
 
@@ -144,7 +155,7 @@ const DietitianRateSheetModal = ({ open, onClose, campId, dietitians, requiresBc
             <p className="text-[11.5px]" style={{ color: 'var(--qms-text-muted)' }}>
               Doctor-preferred dietitians are highlighted{requiresBca ? ' · BCA-verified dietitians are pinned for this camp' : ''}. Select one to set the rates.
             </p>
-            {ranked.length === 0 ? (
+            {candidates.length === 0 ? (
               <div className="p-6 text-center text-[13px] rounded-lg" style={{ color: 'var(--qms-text-muted)', background: 'var(--qms-surface)' }}>
                 No dietitians available — enrol one in the master first.
               </div>
@@ -160,10 +171,12 @@ const DietitianRateSheetModal = ({ open, onClose, campId, dietitians, requiresBc
                     </tr>
                   </thead>
                   <tbody>
-                    {ranked.map((d) => {
-                      const preferred = !!d.specialty
-                      const bcaVerified = (d.machinesAssigned?.length ?? 0) > 0
-                      const rating = d.feedbackAvg
+                    {candidates.map((c) => {
+                      const d = c.dietitian
+                      const preferred = c.preferred
+                      const isBcaVerified = c.bca.verified
+                      const rating = c.rating
+                      const lastRate = c.lastRates
                       return (
                         <tr key={d.id} style={{ borderTop: '1px dashed var(--qms-border)' }}>
                           <td className="px-2.5 py-2 align-top">
@@ -180,17 +193,17 @@ const DietitianRateSheetModal = ({ open, onClose, campId, dietitians, requiresBc
                             </div>
                             {requiresBca && (
                               <div className="mt-1 flex gap-1 flex-wrap">
-                                <span className="inline-block text-[9px] font-extrabold px-1.5 py-0.5 rounded-full" style={bcaVerified ? { background: 'var(--success-soft)', color: 'var(--success)' } : { background: 'var(--danger-soft)', color: 'var(--danger)' }}>
-                                  {bcaVerified ? 'BCA ✓' : 'no BCA'}
+                                <span className="inline-block text-[9px] font-extrabold px-1.5 py-0.5 rounded-full" style={isBcaVerified ? { background: 'var(--success-soft)', color: 'var(--success)' } : { background: 'var(--danger-soft)', color: 'var(--danger)' }}>
+                                  {isBcaVerified ? 'BCA ✓' : 'no BCA'}
                                 </span>
                               </div>
                             )}
                           </td>
                           <td className="px-2.5 py-2 text-center align-top text-[11.5px] font-bold" style={{ color: 'var(--qms-text)' }}>
-                            {rating ? `★ ${rating}` : 'no ratings'}
+                            {rating ? `★ ${rating.avg}` : 'no ratings'}
                           </td>
                           <td className="px-2.5 py-2 text-right align-top text-[11.5px] font-bold" style={{ color: 'var(--qms-text)' }}>
-                            {d.ratePerCamp ? `₹${d.ratePerCamp.toLocaleString('en-IN')}` : 'first time'}
+                            {lastRate ? `₹${lastRate.remuneration.toLocaleString('en-IN')}` : 'first time'}
                             <div className="text-[9.5px] font-semibold" style={{ color: 'var(--qms-text-muted)' }}>last remuneration</div>
                           </td>
                           <td className="px-2.5 py-2 text-right align-top">
@@ -208,9 +221,9 @@ const DietitianRateSheetModal = ({ open, onClose, campId, dietitians, requiresBc
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="rounded-lg px-3 py-2.5 text-[11.5px] leading-relaxed" style={sug.hasHistory ? { background: 'rgba(59,109,255,.06)', border: '1px dashed rgba(59,109,255,.3)', color: '#1d4ed8' } : { background: 'var(--warning-soft)', border: '1px dashed rgba(245,158,11,.35)', color: 'var(--warning)' }}>
+            <div className="rounded-lg px-3 py-2.5 text-[11.5px] leading-relaxed" style={hasHistory ? { background: 'rgba(59,109,255,.06)', border: '1px dashed rgba(59,109,255,.3)', color: '#1d4ed8' } : { background: 'var(--warning-soft)', border: '1px dashed rgba(245,158,11,.35)', color: 'var(--warning)' }}>
               <FiClock className="inline size-3.5 -mt-0.5 mr-1" />
-              {sug.hasHistory
+              {hasHistory
                 ? <>Loaded from previous assignment for <b>{dietitian?.name}</b>. No change needed? Click <b>Assign</b>. Editing any field will require a reason.</>
                 : <>First assignment for <b>{dietitian?.name}</b>. Set the baseline rates · a reason is required for the audit trail.</>}
             </div>
@@ -234,10 +247,10 @@ const DietitianRateSheetModal = ({ open, onClose, campId, dietitians, requiresBc
                   value={remuneration}
                   onChange={(e) => setRemuneration(e.target.value)}
                   className="font-bold"
-                  style={sug.hasHistory && remNum !== sug.remuneration ? { borderColor: 'var(--warning)', background: 'var(--warning-soft)' } : undefined}
+                  style={hasHistory && remNum !== (sug?.remuneration ?? 0) ? { borderColor: 'var(--warning)', background: 'var(--warning-soft)' } : undefined}
                 />
                 <div className="text-[10px] font-semibold mt-1" style={{ color: 'var(--qms-text-muted)' }}>
-                  Previous: <span style={{ color: 'var(--qms-brand)', fontWeight: 800 }}>{sug.hasHistory ? `₹${sug.remuneration}` : '— first —'}</span>
+                  Previous: <span style={{ color: 'var(--qms-brand)', fontWeight: 800 }}>{hasHistory ? `₹${(sug?.remuneration ?? 0)}` : '— first —'}</span>
                 </div>
               </div>
               <div>
@@ -248,10 +261,10 @@ const DietitianRateSheetModal = ({ open, onClose, campId, dietitians, requiresBc
                   value={ta}
                   onChange={(e) => setTa(e.target.value)}
                   className="font-bold"
-                  style={sug.hasHistory && taNum !== sug.ta ? { borderColor: 'var(--warning)', background: 'var(--warning-soft)' } : undefined}
+                  style={hasHistory && taNum !== (sug?.ta ?? 0) ? { borderColor: 'var(--warning)', background: 'var(--warning-soft)' } : undefined}
                 />
                 <div className="text-[10px] font-semibold mt-1" style={{ color: 'var(--qms-text-muted)' }}>
-                  Previous: <span style={{ color: 'var(--qms-brand)', fontWeight: 800 }}>{sug.hasHistory ? `₹${sug.ta}` : '— first —'}</span>
+                  Previous: <span style={{ color: 'var(--qms-brand)', fontWeight: 800 }}>{hasHistory ? `₹${(sug?.ta ?? 0)}` : '— first —'}</span>
                 </div>
               </div>
               <div>
@@ -262,10 +275,10 @@ const DietitianRateSheetModal = ({ open, onClose, campId, dietitians, requiresBc
                   value={printing}
                   onChange={(e) => setPrinting(e.target.value)}
                   className="font-bold"
-                  style={sug.hasHistory && printNum !== sug.printing ? { borderColor: 'var(--warning)', background: 'var(--warning-soft)' } : undefined}
+                  style={hasHistory && printNum !== (sug?.printing ?? 0) ? { borderColor: 'var(--warning)', background: 'var(--warning-soft)' } : undefined}
                 />
                 <div className="text-[10px] font-semibold mt-1" style={{ color: 'var(--qms-text-muted)' }}>
-                  Previous: <span style={{ color: 'var(--qms-brand)', fontWeight: 800 }}>{sug.hasHistory ? `₹${sug.printing}` : '— first —'}</span>
+                  Previous: <span style={{ color: 'var(--qms-brand)', fontWeight: 800 }}>{hasHistory ? `₹${(sug?.printing ?? 0)}` : '— first —'}</span>
                 </div>
               </div>
               <div>
@@ -279,73 +292,77 @@ const DietitianRateSheetModal = ({ open, onClose, campId, dietitians, requiresBc
               <span style={{ color: 'var(--qms-text-muted)' }}>PO camp cost (project budget per camp):</span>
               <span className="font-extrabold text-[13px]" style={{ color: 'var(--qms-brand)' }}>
                 {/* Stub — real project-budget wiring comes in a later pass. */}
-                ₹{DEMO_PO_CAMP_COST.toLocaleString('en-IN')}
+                ₹{poCost.toLocaleString('en-IN')}
               </span>
             </div>
             <div className="rounded-lg px-3 py-2 flex items-center justify-between text-[11.5px]" style={{ background: 'var(--qms-surface)' }}>
               <span style={{ color: 'var(--qms-text-muted)' }}>Total payable per camp (Rem + TA + Print):</span>
               <span className="font-extrabold text-[14px]" style={{ color: 'var(--qms-teal)' }}>₹{total.toLocaleString('en-IN')}</span>
             </div>
-            {DEMO_PO_CAMP_COST > 0 && (
+            {poCost > 0 && (
               <div className="px-1 text-[10.5px] font-bold" style={{ color: overBudget ? 'var(--danger)' : 'var(--success)' }}>
                 {overBudget
-                  ? `⚠ ₹${povar.toLocaleString('en-IN')} over the PO camp cost (₹${DEMO_PO_CAMP_COST.toLocaleString('en-IN')})`
-                  : `✓ ₹${Math.abs(povar).toLocaleString('en-IN')} within the PO camp cost (₹${DEMO_PO_CAMP_COST.toLocaleString('en-IN')})`}
+                  ? `⚠ ₹${povar.toLocaleString('en-IN')} over the PO camp cost (₹${poCost.toLocaleString('en-IN')})`
+                  : `✓ ₹${Math.abs(povar).toLocaleString('en-IN')} within the PO camp cost (₹${poCost.toLocaleString('en-IN')})`}
               </div>
             )}
 
             {changed && (
               <div className="rounded-lg px-3 py-2 flex items-center gap-1.5 text-[11.5px]" style={{ background: 'var(--warning-soft)', border: '1px dashed rgba(245,158,11,.35)', color: 'var(--warning)' }}>
                 <FiAlertCircle className="size-3.5" />
-                <span>{sug.hasHistory ? 'Values changed from previous · reason mandatory' : 'First-time rates · reason mandatory'}</span>
+                <span>{hasHistory ? 'Values changed from previous · reason mandatory' : 'First-time rates · reason mandatory'}</span>
               </div>
             )}
 
             {reasonRequired && (
               <div>
                 <label className="block text-[10.5px] font-extrabold uppercase tracking-wide mb-1" style={{ color: 'var(--qms-text-muted)' }}>
-                  Reason for {sug.hasHistory ? 'change' : 'these baseline rates'} *
+                  Reason for {hasHistory ? 'change' : 'these baseline rates'} *
                 </label>
                 <Textarea
                   rows={2}
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
-                  placeholder={sug.hasHistory ? 'e.g. Long-distance camp · weather surcharge · printing material cost up' : 'e.g. Standard onboarding rate per dietitian master rate-card'}
+                  placeholder={hasHistory ? 'e.g. Long-distance camp · weather surcharge · printing material cost up' : 'e.g. Standard onboarding rate per dietitian master rate-card'}
                 />
               </div>
             )}
 
-            <div className="pt-2" style={{ borderTop: '1px dashed var(--qms-border)' }}>
-              <div className="text-[11px] font-extrabold uppercase tracking-wide mb-1.5" style={{ color: 'var(--qms-text-muted)' }}>
-                Rate trend · last {DEMO_HISTORY.length} (demo data)
-              </div>
-              <div className="overflow-auto rounded-lg" style={{ border: '1px solid var(--qms-border)' }}>
-                <table className="w-full text-[11.5px] border-collapse">
-                  <thead>
-                    <tr style={{ background: 'var(--qms-surface)' }}>
-                      <th className="text-left px-2 py-1 text-[9.5px] uppercase" style={{ color: 'var(--qms-text-muted)' }}>Date</th>
-                      <th className="text-right px-2 py-1 text-[9.5px] uppercase" style={{ color: 'var(--qms-text-muted)' }}>Rem ₹</th>
-                      <th className="text-right px-2 py-1 text-[9.5px] uppercase" style={{ color: 'var(--qms-text-muted)' }}>TA ₹</th>
-                      <th className="text-right px-2 py-1 text-[9.5px] uppercase" style={{ color: 'var(--qms-text-muted)' }}>Print ₹</th>
-                      <th className="text-right px-2 py-1 text-[9.5px] uppercase" style={{ color: 'var(--qms-text-muted)' }}>Total ₹</th>
-                      <th className="text-left px-2 py-1 text-[9.5px] uppercase" style={{ color: 'var(--qms-text-muted)' }}>Reason</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {DEMO_HISTORY.map((r) => (
-                      <tr key={r.date} style={{ borderTop: '1px dashed var(--qms-border)' }}>
-                        <td className="px-2 py-1" style={{ color: 'var(--qms-text)' }}>{r.date}</td>
-                        <td className="px-2 py-1 text-right font-bold" style={{ color: 'var(--qms-text)' }}>{r.remuneration}</td>
-                        <td className="px-2 py-1 text-right font-bold" style={{ color: 'var(--qms-text)' }}>{r.ta}</td>
-                        <td className="px-2 py-1 text-right font-bold" style={{ color: 'var(--qms-text)' }}>{r.printing}</td>
-                        <td className="px-2 py-1 text-right font-bold" style={{ color: 'var(--qms-text)' }}>{r.total}</td>
-                        <td className="px-2 py-1" style={{ color: 'var(--qms-text-muted)' }}>{r.reason}</td>
+            {rateHistory.length > 0 && (
+              <div className="pt-2" style={{ borderTop: '1px dashed var(--qms-border)' }}>
+                <div className="text-[11px] font-extrabold uppercase tracking-wide mb-1.5" style={{ color: 'var(--qms-text-muted)' }}>
+                  Rate trend · last {rateHistory.length}
+                </div>
+                <div className="overflow-auto rounded-lg" style={{ border: '1px solid var(--qms-border)' }}>
+                  <table className="w-full text-[11.5px] border-collapse">
+                    <thead>
+                      <tr style={{ background: 'var(--qms-surface)' }}>
+                        <th className="text-left px-2 py-1 text-[9.5px] uppercase" style={{ color: 'var(--qms-text-muted)' }}>Date</th>
+                        <th className="text-right px-2 py-1 text-[9.5px] uppercase" style={{ color: 'var(--qms-text-muted)' }}>Rem ₹</th>
+                        <th className="text-right px-2 py-1 text-[9.5px] uppercase" style={{ color: 'var(--qms-text-muted)' }}>TA ₹</th>
+                        <th className="text-right px-2 py-1 text-[9.5px] uppercase" style={{ color: 'var(--qms-text-muted)' }}>Print ₹</th>
+                        <th className="text-right px-2 py-1 text-[9.5px] uppercase" style={{ color: 'var(--qms-text-muted)' }}>Total ₹</th>
+                        <th className="text-left px-2 py-1 text-[9.5px] uppercase" style={{ color: 'var(--qms-text-muted)' }}>Reason</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {/* DietitianRateEntry carries no `total` — the column is
+                          the same Rem + TA + Print sum shown above. */}
+                      {rateHistory.map((r, i) => (
+                        <tr key={`${r.setAt}-${i}`} style={{ borderTop: '1px dashed var(--qms-border)' }}>
+                          <td className="px-2 py-1" style={{ color: 'var(--qms-text)' }}>{(r.setAt || '').slice(0, 10)}</td>
+                          <td className="px-2 py-1 text-right font-bold" style={{ color: 'var(--qms-text)' }}>{r.remuneration}</td>
+                          <td className="px-2 py-1 text-right font-bold" style={{ color: 'var(--qms-text)' }}>{r.ta}</td>
+                          <td className="px-2 py-1 text-right font-bold" style={{ color: 'var(--qms-text)' }}>{r.printing}</td>
+                          <td className="px-2 py-1 text-right font-bold" style={{ color: 'var(--qms-text)' }}>{r.remuneration + r.ta + r.printing}</td>
+                          <td className="px-2 py-1" style={{ color: 'var(--qms-text-muted)' }}>{r.reason}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="rounded-lg px-3 py-2 text-[11px] leading-relaxed" style={{ background: 'var(--qms-surface)', color: 'var(--qms-text-muted)' }}>
               This assignment will be sent to the Ops Manager for rate approval before finalizing.

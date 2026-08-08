@@ -4,27 +4,16 @@
 // outside this screen's rendering. Exact port of diet-approvals.js's own
 // initials()/stringToColor()/fmtDate()/fmtDt()/csvDownload() helpers.
 import { toast } from '@/components/ui/sonner'
+import { initials, stringToColor } from '@/features/diet/utils/personDisplay'
 import type { Camp } from '@/types/camp.types'
-import { isAdminLike, resolveCoordinatorId, coordScopedCamps } from '@/features/diet/dietitians.service'
+import { resolveCoordinatorId, coordScopedCamps } from '@/features/diet/services/dietScope.service'
+import { useDietPermissions } from '@/features/diet/hooks/useDietPermissions'
 import type { UserRole } from '@/types/auth.types'
 
-export function initials(n: string | undefined | null): string {
-  return (n || '?')
-    .split(' ')
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase()
-}
-
-const PALETTE = ['#3b6dff', '#a855f7', '#10b981', '#f59e0b', '#0ea5e9', '#ec4899', '#14b8a6', '#7c5cff', '#f43f5e', '#84cc16']
-
-export function stringToColor(s: string | undefined | null): string {
-  let h = 0
-  const input = s || ''
-  for (let i = 0; i < input.length; i++) h = (h * 31 + input.charCodeAt(i)) >>> 0
-  return PALETTE[h % PALETTE.length]
-}
+// initials()/stringToColor() now live in utils/personDisplay.ts — they were
+// duplicated across four Diet components. Re-exported here so this screen's
+// existing `from './helpers'` imports keep working.
+export { initials, stringToColor }
 
 export function fmtDate(iso: string | undefined | null): string {
   if (!iso) return '—'
@@ -75,7 +64,7 @@ export function userName(user: { firstName: string; lastName: string } | null | 
 
 // Coordinator-scope resolution shared by every tab on this page.
 export function useScope(role: UserRole | undefined, name: string) {
-  const adminLike = isAdminLike(role || '')
+  const { canManageDiet: adminLike } = useDietPermissions(role || '')
   const coordId = adminLike ? null : resolveCoordinatorId(name)
   const scoped = adminLike || !!coordId
   return { adminLike, coordId, scoped }

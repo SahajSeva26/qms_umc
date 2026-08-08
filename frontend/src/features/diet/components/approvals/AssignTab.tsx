@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { FiCheckCircle, FiSend, FiUserPlus } from 'react-icons/fi'
 import type { Camp } from '@/types/camp.types'
-import {
-  rankDietitiansForCamp, sortDietitiansForBcaCamp, campRequiresBca, inviteSummary, clientName,
-} from '@/features/diet/dietitians.service'
+import { clientName } from '@/features/diet/services/dietScope.service'
+import { useDietitianCandidatesByCamp } from '@/features/diet/hooks/useDietitianCandidates'
+import { useCampInviteSummaries } from '@/features/diet/hooks/useDietitianInvites'
 import { fmtDate, stringToColor, initials } from './helpers'
 import AssignDietitianModal from './AssignDietitianModal'
 import InviteDietitianModal from './InviteDietitianModal'
@@ -24,14 +24,29 @@ function reasonTone(r: string): string {
 const AssignTab = ({ camps, allCamps, userName }: AssignTabProps) => {
   const [assignCampId, setAssignCampId] = useState<string | null>(null)
   const [inviteCampId, setInviteCampId] = useState<string | null>(null)
-  const [, setVersion] = useState(0)
 
-  // Recomputed on every render — invite/rank state (getCampInvites,
-  // rankDietitiansForCamp) reads live from localStorage, not React Query
-  // cache, so no memoization is needed given the small seed size.
-  const unassigned = camps
-    .filter((c) => !c.dietitianId && c.status !== 'CANCELLED' && c.status !== 'CANCELLED_CHARGED' && c.status !== 'CLOSED')
-    .sort((a, b) => a.date.localeCompare(b.date))
+  const unassigned = useMemo(
+    () => camps
+      .filter((c) => !c.dietitianId && c.status !== 'CANCELLED' && c.status !== 'CANCELLED_CHARGED' && c.status !== 'CLOSED')
+      .sort((a, b) => a.date.localeCompare(b.date)),
+    [camps],
+  )
+
+  // One shortlist per card, all built from a SINGLE index read. Ranking each
+  // card independently re-parsed the roster + every dietitian store once per
+  // camp, so a coordinator with 40 unassigned camps paid that cost 40 times
+  // on every render.
+  //
+  // topByScore: 8 preserves this card's existing rule exactly — the AI
+  // suggestion is the BCA-best of the 8 highest-SCORING dietitians, not the
+  // BCA-best of the whole roster (which could surface a distant match).
+  const shortlists = useDietitianCandidatesByCamp(unassigned, allCamps, 8)
+
+  // Invite counters come from the same cached invite queries the invite modal
+  // writes through, so its mutations refresh these cards on their own. This
+  // replaces a synchronous inviteSummary() read plus a whole-subtree
+  // invalidation fired on modal close purely to force a re-render.
+  const inviteSummaries = useCampInviteSummaries(unassigned.map((c) => c.id))
 
   return (
     <div>
@@ -51,10 +66,10 @@ const AssignTab = ({ camps, allCamps, userName }: AssignTabProps) => {
       ) : (
         <div className="space-y-3">
           {unassigned.map((camp) => {
-            let ranked = rankDietitiansForCamp(camp, allCamps).slice(0, 8)
-            if (campRequiresBca(camp)) ranked = sortDietitiansForBcaCamp(camp, ranked).slice(0, 8)
-            const top = ranked[0]
-            const invs = inviteSummary(camp.id)
+            const shortlist = shortlists.get(camp.id)
+            const top = shortlist?.candidates[0]
+            const requiresBca = shortlist?.requiresBca ?? false
+            const invs = inviteSummaries.get(camp.id) ?? { total: 0, accepted: 0, pending: 0, declined: 0 }
 
             if (!top) {
               return (
@@ -97,7 +112,7 @@ const AssignTab = ({ camps, allCamps, userName }: AssignTabProps) => {
                   </div>
                 </div>
 
-                {campRequiresBca(camp) && (
+                {requiresBca && (
                   <div className="rounded-lg mt-2 p-2.5" style={{ background: 'rgba(249,115,22,.08)', border: '1px solid #f97316' }}>
                     <span className="text-[11.5px] font-bold" style={{ color: '#c2410c' }}>
                       BCA required · only verified-BCA dietitians satisfy GREEN. Non-BCA picks flip the camp ORANGE.
@@ -140,16 +155,18 @@ const AssignTab = ({ camps, allCamps, userName }: AssignTabProps) => {
         </div>
       )}
 
+      {/* No cache bumps here any more: the assignment mutation invalidates
+          ['camps'] + the dietitian's profile, and the invite mutations
+          invalidate their own camp's invite key, which these cards observe. */}
       <AssignDietitianModal
         open={!!assignCampId}
         onClose={() => setAssignCampId(null)}
         campId={assignCampId}
         userName={userName}
-        onDone={() => setVersion((v) => v + 1)}
       />
       <InviteDietitianModal
         open={!!inviteCampId}
-        onClose={() => { setInviteCampId(null); setVersion((v) => v + 1) }}
+        onClose={() => setInviteCampId(null)}
         campId={inviteCampId}
         userName={userName}
       />

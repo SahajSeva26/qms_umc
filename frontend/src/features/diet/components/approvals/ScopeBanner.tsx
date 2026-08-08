@@ -1,5 +1,4 @@
-import { coordScopedProjects, coordScopedClients } from '@/features/diet/dietitians.service'
-
+import { coordScopedProjects, coordScopedClients } from '@/features/diet/services/dietScope.service'
 interface ScopeBannerProps {
   adminLike: boolean
   coordId: string | null

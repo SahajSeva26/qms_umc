@@ -1,7 +1,7 @@
 import { FiCpu, FiAlertCircle, FiPackage } from 'react-icons/fi'
 import { usePeopleData } from '@/hooks/usePeopleData'
 import KpiTile from '@/components/ui/KpiTile'
-import DoBar from '@/features/dedicatedops/components/DoBar'
+import DoBar from '@/components/ui/DoBar'
 import type { Dietitian } from '@/features/diet/diet.types'
 
 interface DevicesTabProps {

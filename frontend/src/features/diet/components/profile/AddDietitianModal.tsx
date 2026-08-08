@@ -5,8 +5,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from '@/components/ui/sonner'
-import { addDietitianEnrollment } from '@/features/diet/dietitians.service'
+import { parseDietitianEnrollment } from '@/features/diet/schemas/addDietitian.schemas'
+import { useEnrollDietitian } from '@/features/diet/hooks/useDietitianRoster'
 import type { DietitianRosterEntry } from '@/features/diet/dietitians.types'
+import { errorMessage } from '@/features/diet/utils/errorMessage'
 
 const DEVICE_OPTIONS = ['BCA', 'BMI', 'Bloodsugar', 'BP', 'ECG']
 
@@ -28,6 +30,10 @@ const emptyDraft = {
 // build brief, since that screen may not exist yet in this working tree).
 const AddDietitianModal = ({ open, onClose, onCreated }: AddDietitianModalProps) => {
   const [draft, setDraft] = useState(emptyDraft)
+  // Enrolment goes through the roster hook, not the service: calling the
+  // service directly left the cached roster stale, so the picker still showed
+  // the old list after adding someone.
+  const enrollDietitian = useEnrollDietitian()
 
   const reset = () => setDraft(emptyDraft)
   const handleClose = () => { reset(); onClose() }
@@ -41,37 +47,18 @@ const AddDietitianModal = ({ open, onClose, onCreated }: AddDietitianModalProps)
     })
 
   const save = async () => {
-    if (!draft.name.trim()) {
-      toast.error('Full name is required')
+    const result = parseDietitianEnrollment(draft)
+    if (!result.ok) {
+      toast.error(result.error)
       return
     }
-    const states = draft.states.split(',').map((s) => s.trim()).filter(Boolean)
-    const bankAccounts = (draft.accountNumber.trim() || draft.upi.trim())
-      ? [{
-          label: 'Account 1',
-          accountName: draft.accountHolder || undefined,
-          accountNumber: draft.accountNumber || undefined,
-          ifsc: draft.ifsc || undefined,
-          branch: draft.bankName || undefined,
-          upi: draft.upi || undefined,
-        }]
-      : undefined
-
-    const rec = await addDietitianEnrollment({
-      name: draft.name.trim(),
-      specialty: draft.specialty || 'Clinical nutrition',
-      phone: draft.phone,
-      email: draft.email,
-      hq: draft.hq,
-      states,
-      ratePerCamp: Number(draft.ratePerCamp) || 3000,
-      pan: draft.pan,
-      address: draft.address,
-      resumeUrl: draft.resumeUrl,
-      deviceAlignment: Array.from(draft.devices),
-      bankAccounts,
-    })
-
+    let rec
+    try {
+      rec = await enrollDietitian.mutateAsync(result.payload)
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not enrol the dietitian — try again.'))
+      return
+    }
     toast.success(`Dietitian enrolled · ${rec.name}`)
     reset()
     onCreated(rec)

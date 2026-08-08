@@ -1,23 +1,25 @@
 import { useState } from 'react'
+import { initials } from '@/features/diet/utils/personDisplay'
 import { FiCheckCircle, FiXCircle, FiPlus } from 'react-icons/fi'
 import type { Camp } from '@/types/camp.types'
 import type { Dietitian } from '@/features/diet/diet.types'
 import { Button } from '@/components/ui/button'
+import { useEnrollDietitian } from '@/features/diet/hooks/useDietitianRoster'
 import EnrollDietitianModal from '@/features/diet/components/EnrollDietitianModal'
 import DietitianDetailDrawer from '@/features/diet/components/DietitianDetailDrawer'
 
 interface DietitiansTabProps {
+  /** The joined directory (canonical roster + operational overlay). */
   dietitians: Dietitian[]
   camps: Camp[]
+  /** useDietCamps().upsertDietitianProfile — persists the operational overlay. */
+  onSaveProfile: (profile: Dietitian) => Promise<unknown>
 }
 
-function initials(name: string) {
-  return name.split(' ').map((x) => x[0]).slice(0, 2).join('').toUpperCase()
-}
-
-const DietitiansTab = ({ dietitians, camps }: DietitiansTabProps) => {
+const DietitiansTab = ({ dietitians, camps, onSaveProfile }: DietitiansTabProps) => {
   const [enrollOpen, setEnrollOpen] = useState(false)
   const [openDietitianId, setOpenDietitianId] = useState<string | null>(null)
+  const enrollDietitian = useEnrollDietitian()
 
   const openDietitian = dietitians.find((d) => d.id === openDietitianId) ?? null
 
@@ -66,7 +68,12 @@ const DietitiansTab = ({ dietitians, camps }: DietitiansTabProps) => {
         })}
       </div>
 
-      <EnrollDietitianModal open={enrollOpen} onClose={() => setEnrollOpen(false)} />
+      <EnrollDietitianModal
+        open={enrollOpen}
+        onClose={() => setEnrollOpen(false)}
+        onEnroll={(payload) => enrollDietitian.mutateAsync(payload)}
+        onSaveProfile={onSaveProfile}
+      />
 
       <DietitianDetailDrawer
         open={!!openDietitian}

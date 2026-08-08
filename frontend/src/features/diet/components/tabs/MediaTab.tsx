@@ -9,6 +9,8 @@ import AddMediaModal from '@/features/diet/components/AddMediaModal'
 interface MediaTabProps {
   camps: Camp[]
   media: Record<string, MediaItem[]>
+  /** From useDietCamps().addMedia — persists through the diet service. */
+  onAddMedia: (campId: string, item: MediaItem) => Promise<unknown>
 }
 
 // Mirrors tabMedia()/mediaSection() (diet-camps.js:1241-1296) — scope is
@@ -16,7 +18,7 @@ interface MediaTabProps {
 // clickable photo/video cells, opening the URL in a new tab, same as
 // window.open(it.url,'_blank')) and camps without media (a warning callout
 // listing their ids, first 8 + "N more").
-const MediaTab = ({ camps, media }: MediaTabProps) => {
+const MediaTab = ({ camps, media, onAddMedia }: MediaTabProps) => {
   const [uploadCampId, setUploadCampId] = useState<string | null>(null)
 
   const eligible = camps.filter((c) => c.status === 'CLOSED' || c.status === 'LIVE')
@@ -109,7 +111,7 @@ const MediaTab = ({ camps, media }: MediaTabProps) => {
       )}
 
       {uploadCampId && (
-        <AddMediaModal open={!!uploadCampId} campId={uploadCampId} onClose={() => setUploadCampId(null)} />
+        <AddMediaModal open={!!uploadCampId} campId={uploadCampId} onClose={() => setUploadCampId(null)} onAdd={onAddMedia} />
       )}
     </div>
   )

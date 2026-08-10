@@ -1,5 +1,3 @@
-import type { UserRole } from '@/types/auth.types'
-
 // Matches backend/src/modules/user/user.constants.ts's USER_STATUS — the
 // User model's real status, returned by GET /users for callers with
 // system:manage (see user.mapper.ts).
@@ -11,10 +9,8 @@ export interface User {
   firstName: string
   lastName: string
   status: UserStatus
-  // TODO: backend User model has no role field at all (a User's access comes
-  // from its bound Role/RoleType — see access-management) and no avatarTone —
-  // these are mock-filled in admin.mock.ts. Do not treat as real data.
-  role: UserRole
+  // TODO: backend User model has no avatarTone field at all — this is
+  // mock-filled in admin.mock.ts. Do not treat as real data.
   avatarTone: string
   createdAt?: string
 }

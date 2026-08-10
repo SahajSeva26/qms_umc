@@ -1,30 +1,8 @@
-import type { CampStatusMeta, CampTypeMeta, Doctor } from '@/types/camp.types'
+import type { Doctor } from '@/types/camp.types'
 
 // TODO: entirely mock — no backend endpoints exist for camps yet.
 // Values copied from the vanilla-JS prototype's camps-data.js so they match
 // the design reference exactly.
-
-export const CAMP_TYPES: CampTypeMeta[] = [
-  { id: 'Screening', name: 'Screening Camp', icon: 'Tent', color: '#3b6dff' },
-  { id: 'Diet', name: 'Diet Camp', icon: 'Apple', color: '#10b981' },
-  { id: 'Lab', name: 'Lab Camp', icon: 'FlaskConical', color: '#8b5cf6' },
-]
-
-// Real colors from the prototype's CAMP_STATUSES table — these differ from
-// CLAUDE.md §8's documented mapping, which does not match the actual code.
-export const CAMP_STATUSES: CampStatusMeta[] = [
-  { id: 'REQUESTED', name: 'Requested', color: '#94a3b8' },
-  { id: 'CONFIRMED', name: 'Confirmed', color: '#3b6dff' },
-  { id: 'SCHEDULED', name: 'Scheduled', color: '#0ea5e9' },
-  { id: 'LIVE', name: 'Live', color: '#10b981' },
-  { id: 'CLOSED', name: 'Closed', color: '#14b8a6' },
-  { id: 'CANCELLED', name: 'Cancelled', color: '#f59e0b' },
-  { id: 'CANCELLED_CHARGED', name: 'Cancelled (charged)', color: '#f43f5e' },
-  // Run Camp wizard closure outcomes (fo-camp-run.js computeFinalStatus)
-  { id: 'COMPLETE', name: 'Complete', color: '#059669' },
-  { id: 'COMPLETE_WITHOUT_REPORT', name: 'Complete · report pending', color: '#d97706' },
-  { id: 'INCOMPLETE', name: 'Incomplete', color: '#dc2626' },
-]
 
 // Promoted to types/camp.types.ts — Diet Camps/Inventory read these through
 // the shared types layer instead of reaching into this feature's internals.

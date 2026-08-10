@@ -52,11 +52,6 @@ import type { IPermission } from '@/types/accessManagement.types'
 // SYSTEM having only one action (MANAGE) is just a one-key object there, not
 // a special case, so there's no array-of-one to flatten here either.
 
-export interface PermissionResourceLabel {
-  /** Display label for the resource group header, e.g. 'Permission Group'. */
-  label: string
-}
-
 export const PERMISSION_CATALOG = {
   SYSTEM: {
     MANAGE: { code: 'system:manage', name: 'Manage System', description: 'Manage system' },

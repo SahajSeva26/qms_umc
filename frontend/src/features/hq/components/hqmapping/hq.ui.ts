@@ -4,7 +4,7 @@
 // TABS / project()/renderMapSvg() and hq-mapping.js's mapping-view helpers,
 // kept local to this feature's components folder like fo.ui.ts.
 import type { UserRole } from '@/types/auth.types'
-import type { HqTier, CityTier } from '@/features/hq/hq.types'
+import type { HqTier } from '@/features/hq/hq.types'
 
 // ── Status pill tokens (hq-serviceability.js's .hq-pill.{green,yellow,orange,red}) ──
 export const HQ_TIER_COLOR: Record<HqTier, { bg: string; fg: string; dot: string }> = {
@@ -12,15 +12,6 @@ export const HQ_TIER_COLOR: Record<HqTier, { bg: string; fg: string; dot: string
   YELLOW: { bg: 'rgba(245,158,11,.18)', fg: '#92400e', dot: '#f59e0b' },
   ORANGE: { bg: 'rgba(249,115,22,.18)', fg: '#c2410c', dot: '#f97316' },
   RED:    { bg: 'rgba(244,63,94,.16)',  fg: '#b91c1c', dot: '#f43f5e' },
-}
-
-// classifyCity()'s distinct 3-tier vocabulary (GREEN/ORANGE/RED, no YELLOW) —
-// same color values as HqTier's GREEN/ORANGE/RED but a separate lookup so the
-// two classifiers never accidentally share a type.
-export const CITY_TIER_COLOR: Record<CityTier, { bg: string; fg: string; dot: string }> = {
-  GREEN:  HQ_TIER_COLOR.GREEN,
-  ORANGE: HQ_TIER_COLOR.ORANGE,
-  RED:    HQ_TIER_COLOR.RED,
 }
 
 // The one truly identical piece of every card/tile's inline style across this

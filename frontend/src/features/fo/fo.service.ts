@@ -27,7 +27,6 @@ const FO_NAMES: Record<string, string> = {
   'p-ravi': 'Ravi Kumar',
   'p-anita': 'Anita Sharma',
   'p-amit': 'Amit Verma',
-  'p-pooja': 'Pooja Nair',
 }
 
 function load<T>(key: string, seed: T): T {

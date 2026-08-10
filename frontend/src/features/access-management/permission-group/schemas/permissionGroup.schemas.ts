@@ -22,5 +22,3 @@ export const updatePermissionGroupSchema = z.object({
     )
     .optional(),
 })
-
-export type UpdatePermissionGroupFormValues = z.infer<typeof updatePermissionGroupSchema>

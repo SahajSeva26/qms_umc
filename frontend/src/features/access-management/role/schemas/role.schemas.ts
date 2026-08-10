@@ -18,7 +18,7 @@ import { PASSWORD_MIN_LENGTH } from '@/features/access-management/accessManageme
 const forbidRoleForbiddenPermissions = (permissions: string[] | undefined) =>
   !permissions || permissions.every((code) => !ROLE_FORBIDDEN_PERMISSIONS.includes(code))
 
-export const registerOwnerSchema = z.object({
+const registerOwnerSchema = z.object({
   firstName: z.string().trim().min(1, "User's first name is required"),
   lastName: z.string().trim().optional(),
   email: z.string().trim().min(1, 'User email is required').email('Enter a valid email'),
@@ -45,8 +45,6 @@ export const createRoleSchema = z.object({
   user: registerOwnerSchema,
 })
 
-export type CreateRoleFormValues = z.infer<typeof createRoleSchema>
-
 export const updateRoleUserSchema = z.object({
   firstName: z.string().trim().min(1).optional(),
   lastName: z.string().trim().optional(),
@@ -65,5 +63,3 @@ export const updateRoleSchema = z.object({
     .refine(forbidRoleForbiddenPermissions, { message: 'A role cannot directly hold elevated tenant/system permissions' }),
   user: updateRoleUserSchema.optional(),
 })
-
-export type UpdateRoleFormValues = z.infer<typeof updateRoleSchema>

@@ -3,6 +3,7 @@ import { FiAlertTriangle } from 'react-icons/fi'
 import type { Camp, Doctor } from '@/types/camp.types'
 import type { Person } from '@/types/people.types'
 import { useAuth } from '@/hooks/useAuth'
+import { usePermission } from '@/hooks/usePermission'
 import { useErp } from '@/features/om/hooks/useErp'
 import { completedCamps, verificationFor } from '@/features/om/erp.service'
 import { VSTATUS, vMeta } from '@/features/om/erp.types'
@@ -26,6 +27,7 @@ interface VerificationTabProps {
 // Screening camp before it's billable.
 const VerificationTab = ({ camps, fos }: VerificationTabProps) => {
   const { user } = useAuth()
+  const { hasPermission } = usePermission()
   const erp = useErp()
   const [decidingId, setDecidingId] = useState<string | null>(null)
   const [pendingStatus, setPendingStatus] = useState<VerificationStatusId>('REJECTED')
@@ -34,7 +36,11 @@ const VerificationTab = ({ camps, fos }: VerificationTabProps) => {
   const [correctiveAction, setCorrectiveAction] = useState('')
   const [responsible, setResponsible] = useState('')
 
-  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin'
+  // Old placeholder UserRole check (admin/super_admin) never actually
+  // worked — every real login was hardcoded to 'super_admin' regardless of
+  // who was logged in, so this has always been true in practice. Real
+  // replacement: system:manage.
+  const isAdmin = hasPermission('system:manage')
   const completed = completedCamps(camps)
   const byName = user ? `${user.firstName} ${user.lastName}` : 'Ops Manager'
 

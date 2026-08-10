@@ -1,9 +1,7 @@
 import { useMemo, useState } from 'react'
 import { FiHeart, FiUsers, FiVideo, FiCpu, FiBell, FiImage, FiPlus } from 'react-icons/fi'
-import { useAuth } from '@/hooks/useAuth'
 import { useDietCamps } from '@/features/diet/hooks/useDietCamps'
-import { dietStage, dietViewOnly, isKam } from '@/features/diet/diet.utils'
-import { scopedClientIds } from '@/types/salesdash.types'
+import { dietStage } from '@/features/diet/diet.utils'
 import DietKpiStrip from '@/features/diet/components/DietKpiStrip'
 import CampsTab from '@/features/diet/components/tabs/CampsTab'
 import DietitiansTab from '@/features/diet/components/tabs/DietitiansTab'
@@ -26,28 +24,19 @@ const TABS: { id: TabId; label: string; icon: typeof FiHeart }[] = [
 ]
 
 const DietPage = () => {
-  const { user } = useAuth()
   const [tab, setTab] = useState<TabId>('camps')
   const [statusFilter, setStatusFilter] = useState<DietStage | 'ALL'>('ALL')
   const [newRequestOpen, setNewRequestOpen] = useState(false)
   const diet = useDietCamps()
 
-  const viewOnly = dietViewOnly(user?.role)
-  const kamScoped = isKam(user?.role)
-
-  // AuthUser has no field linking a logged-in user to a people/rep id (same
-  // root gap as CampReportSection.tsx's identical call) — passing user._id
-  // here would silently never match ASSIGNMENTS' mock rep-ids (e.g.
-  // 'p-riya'), so a KAM would see every client's diet camps unfiltered with
-  // no sign the filter failed. Pass undefined honestly until the backend
-  // adds a real user<->rep mapping; scopedClientIds resolves that to "no
-  // scoping" rather than faking a match.
-  const scopedIds = kamScoped ? scopedClientIds(user?.role, undefined) : null
-
-  const camps = useMemo(() => {
-    if (!scopedIds) return diet.camps
-    return diet.camps.filter((c) => scopedIds.has(c.clientId))
-  }, [diet.camps, scopedIds])
+  // Old placeholder UserRole checks (dietViewOnly/isKam) never once fired
+  // for a real user — every AuthUser was hardcoded to 'super_admin'
+  // regardless of who was logged in, so this page has always shown the
+  // full, unscoped, editable view to everyone. No real backend concept
+  // exists yet (camp_coord/sales_rep were never real backend roles either)
+  // to replace this with; this keeps the actual, historical behavior.
+  const viewOnly = false
+  const camps = diet.camps
 
   const filteredCamps = useMemo(() => {
     if (statusFilter === 'ALL') return camps

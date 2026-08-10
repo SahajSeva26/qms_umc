@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
+import { usePermission } from '@/hooks/usePermission'
 import { useDashboardFilters } from '@/features/dashboard/hooks/useDashboardFilters'
 import { useSalesDataShared } from '@/hooks/useSalesDataShared'
 import { useClientsDataShared } from '@/hooks/useClientsDataShared'
@@ -23,16 +24,20 @@ import { getGreeting } from '@/utils/formatters'
 
 const DashboardPage = () => {
   const { user } = useAuth()
+  const { hasPermission } = usePermission()
   const { filters, setFilter, reset } = useDashboardFilters()
   const [drill, setDrill] = useState<{ title: string; content: string } | null>(null)
   const [salesFilter, setSalesFilter] = useState<SalesFilterState>(DEFAULT_SALES_FILTER)
 
-  const isSuperAdmin = user?.role === 'super_admin'
-
   // The prototype's dashboard.html merges the Sales Command Center's filter
   // bar + KPI strip directly into this page, super_admin-only (dashboard.js:
-  // "isSuper = sess.roleId === 'super_admin'" — any other role, incl. plain
-  // admin, never sees these blocks here at all).
+  // "isSuper = sess.roleId === 'super_admin'"). The placeholder UserRole
+  // system that used to gate this (user?.role === 'super_admin') never
+  // actually worked — every real login was hardcoded to that same string
+  // regardless of who was logged in, so this block has always rendered for
+  // everyone in practice. Real replacement: system:manage, the actual
+  // backend permission that denotes full administrative access.
+  const isSuperAdmin = hasPermission('system:manage')
   const { reps, targets } = useSalesDataShared()
   const { clients, projects, invoices } = useClientsDataShared()
   const salesKpiTiles = useMemo(
@@ -73,7 +78,7 @@ const DashboardPage = () => {
       <DoctorsSection onDrill={onDrill} />
       <PatientsSection onDrill={onDrill} />
 
-      {user?.role === 'super_admin' && <SalesCommandCenter />}
+      {isSuperAdmin && <SalesCommandCenter />}
 
       <SideDrawer open={!!drill} title={drill?.title ?? ''} onClose={() => setDrill(null)}>
         <p className="text-[13px] leading-relaxed" style={{ color: 'var(--qms-text-soft)' }}>

@@ -5,7 +5,7 @@ import { FiUser, FiLock, FiEye, FiEyeOff } from 'react-icons/fi'
 import { loginSchema, type LoginFormValues } from '../auth.schemas'
 import { useLogin } from '../hooks/useLogin'
 import ThemeToggle from '@/components/ui/ThemeToggle'
-import { ROLE_HOME, DASHBOARD_ROUTES } from '@/components/layouts/navConfig'
+import { DASHBOARD_ROUTES } from '@/components/layouts/navConfig'
 import { useNavigate } from 'react-router-dom'
 
 const LoginForm = () => {
@@ -25,10 +25,8 @@ const LoginForm = () => {
 
   const onSubmit = (values: LoginFormValues) => {
     login(values, {
-      onSuccess: (data) => {
-        // TODO: once backend adds role to response, remove this fallback entirely
-        const role = data?.data?.role ?? 'super_admin'
-        navigate(ROLE_HOME[role] ?? DASHBOARD_ROUTES.DASHBOARD, { replace: true })
+      onSuccess: () => {
+        navigate(DASHBOARD_ROUTES.DASHBOARD, { replace: true })
       },
     })
   }

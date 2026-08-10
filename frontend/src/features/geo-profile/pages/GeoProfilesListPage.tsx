@@ -43,7 +43,13 @@ const GeoProfilesListPage = () => {
   // GeoProfileDetailPage.tsx's own roleName() helper. Without this, the
   // Role column rendered a raw 24-char hex id for every row. Found via a
   // 2026-07-26 ground-up test pass.
-  const { data: rolesData } = useRoles({ status: 'active', limit: '500' })
+  // GET /roles requires role:get/role:search/role:manage — a caller without
+  // any of those (e.g. a Pharma MR) gets a 403 here, which useRoles surfaces
+  // as `error`, not as an empty result. Distinguish that from "no roles
+  // exist" so the table shows an honest "Unrestricted" label instead of
+  // silently falling through to the raw ObjectId (found via a live test
+  // with a zero-permission account, 2026-08-10).
+  const { data: rolesData, error: rolesError } = useRoles({ status: 'active', limit: '500' })
   const activeRoles = rolesData?.data?.items ?? []
 
   // A GeoProfile's role can be deactivated AFTER the profile was created —
@@ -123,7 +129,7 @@ const GeoProfilesListPage = () => {
 
       {!isLoading && !error && (
         <>
-          <GeoProfilesTable geoProfiles={geoProfiles} roleLabelById={roleLabelById} />
+          <GeoProfilesTable geoProfiles={geoProfiles} roleLabelById={roleLabelById} roleNamesForbidden={!!rolesError} />
           <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} />
         </>
       )}

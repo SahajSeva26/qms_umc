@@ -5,8 +5,6 @@
 // initials()/stringToColor()/fmtDate()/fmtDt()/csvDownload() helpers.
 import { toast } from '@/components/ui/sonner'
 import type { Camp } from '@/types/camp.types'
-import { isAdminLike, resolveCoordinatorId, coordScopedCamps } from '@/features/diet/dietitians.service'
-import type { UserRole } from '@/types/auth.types'
 
 export function initials(n: string | undefined | null): string {
   return (n || '?')
@@ -73,15 +71,13 @@ export function userName(user: { firstName: string; lastName: string } | null | 
   return `${user.firstName} ${user.lastName}`.trim()
 }
 
-// Coordinator-scope resolution shared by every tab on this page.
-export function useScope(role: UserRole | undefined, name: string) {
-  const adminLike = isAdminLike(role || '')
-  const coordId = adminLike ? null : resolveCoordinatorId(name)
-  const scoped = adminLike || !!coordId
-  return { adminLike, coordId, scoped }
-}
-
-export function dietCampsForScope(camps: Camp[], adminLike: boolean, coordId: string | null): Camp[] {
-  if (adminLike || !coordId) return camps.filter((c) => c.type === 'Diet')
-  return coordScopedCamps(camps, coordId).filter((c) => c.type === 'Diet')
+// Coordinator scoping (isAdminLike/resolveCoordinatorId, keyed on the old
+// placeholder UserRole) never actually worked — every real login was
+// hardcoded to 'super_admin', which isAdminLike's allowlist always
+// included, so this page has always shown the full, admin-like, unscoped
+// view to everyone. No real backend "diet coordinator" concept exists yet
+// (Diet has no backend module at all) to replace it with; this keeps the
+// actual, historical behavior.
+export function dietCampsForScope(camps: Camp[]): Camp[] {
+  return camps.filter((c) => c.type === 'Diet')
 }

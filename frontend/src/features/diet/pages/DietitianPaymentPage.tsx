@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  FiUpload, FiDownload, FiFilter, FiGlobe, FiFileText, FiFileMinus, FiList, FiTrendingUp,
+  FiUpload, FiDownload, FiGlobe, FiFileText, FiFileMinus, FiList, FiTrendingUp,
   FiDollarSign, FiEdit2, FiCheckSquare,
 } from 'react-icons/fi'
 import { useAuth } from '@/hooks/useAuth'
@@ -12,7 +12,7 @@ import { toast } from '@/components/ui/sonner'
 import type { Camp } from '@/types/camp.types'
 import type { DietPayment } from '@/features/diet/dietitians.types'
 import {
-  dietitianById, isPaymentAdminLike, resolveCoordinatorId, isCoordCamp,
+  dietitianById,
   dietitianExpense, campPaymentStatus, paymentsForCamp, paymentsByDietitian,
   bankComplete, bankAccountsFor, dietitianDetails, getPayments, addDietPayment, fmtInr,
 } from '@/features/diet/dietitians.service'
@@ -49,22 +49,20 @@ const DietitianPaymentPage = () => {
 
   const refetch = () => setRefreshTick((t) => t + 1)
 
-  const role = user?.role ?? ''
   const userName = user ? `${user.firstName} ${user.lastName}` : ''
-  const adminLike = isPaymentAdminLike(role)
-  const coordId = !adminLike ? resolveCoordinatorId(userName) : null
-  const isCoordOnly = (role === 'diet_camp_coord' || role === 'camp_coord') && !adminLike
+  // Old placeholder UserRole checks (isPaymentAdminLike/coordinator scoping)
+  // never actually worked — every real login was hardcoded to
+  // 'super_admin', which isPaymentAdminLike's allowlist always included, so
+  // this page has always shown the full, unscoped, admin-like view to
+  // everyone. No real backend "diet coordinator" concept exists yet (Diet
+  // has no backend module at all) to replace it with; this keeps the
+  // actual, historical behavior.
+  const adminLike = true
 
   // ── Scoping ─────────────────────────────────────────────────────────────
   const scopedDietCamps = useMemo((): Camp[] => {
-    const dietCamps = camps.filter((c) => c.type === 'Diet' && !/CANCEL/i.test(c.status))
-    if (adminLike) return dietCamps
-    if (isCoordOnly) {
-      if (!coordId) return dietCamps // fail-open
-      return dietCamps.filter((c) => isCoordCamp(c, coordId))
-    }
-    return dietCamps
-  }, [camps, adminLike, isCoordOnly, coordId])
+    return camps.filter((c) => c.type === 'Diet' && !/CANCEL/i.test(c.status))
+  }, [camps])
 
   const scopeCampIds = useMemo(() => new Set(scopedDietCamps.map((c) => c.id)), [scopedDietCamps])
 
@@ -407,15 +405,9 @@ const DietitianPaymentPage = () => {
       </div>
 
       {/* Scope banner */}
-      {isCoordOnly ? (
-        <div className="rounded-lg px-3.5 py-2.5 mb-3.5 flex items-center gap-2 text-[12.5px]" style={{ background: 'rgba(59,109,255,.06)', border: '1px solid rgba(59,109,255,.2)', color: '#1d4ed8' }}>
-          <FiFilter size={13} /> Scoped to dietitians in your assigned projects.
-        </div>
-      ) : (
-        <div className="rounded-lg px-3.5 py-2.5 mb-3.5 flex items-center gap-2 text-[12.5px]" style={{ background: 'rgba(16,185,129,.06)', border: '1px solid rgba(16,185,129,.2)', color: '#047857' }}>
-          <FiGlobe size={13} /> Showing every dietitian in the portal.
-        </div>
-      )}
+      <div className="rounded-lg px-3.5 py-2.5 mb-3.5 flex items-center gap-2 text-[12.5px]" style={{ background: 'rgba(16,185,129,.06)', border: '1px solid rgba(16,185,129,.2)', color: '#047857' }}>
+        <FiGlobe size={13} /> Showing every dietitian in the portal.
+      </div>
 
       {/* KPI strip */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2.5 mb-4">

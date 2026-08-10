@@ -11,9 +11,13 @@ interface GeoProfilesTableProps {
   // display name, falling back to the raw id if the role isn't in the
   // active-roles list (e.g. deactivated after this profile was created).
   roleLabelById: Map<string, string>
+  // True when the caller lacks role:get/search/manage, so roleLabelById is
+  // known to be empty/incomplete for a permission reason, not a data reason
+  // — lets the Role column say so instead of showing a raw ObjectId.
+  roleNamesForbidden?: boolean
 }
 
-const GeoProfilesTable = ({ geoProfiles, roleLabelById }: GeoProfilesTableProps) => {
+const GeoProfilesTable = ({ geoProfiles, roleLabelById, roleNamesForbidden }: GeoProfilesTableProps) => {
   const navigate = useNavigate()
 
   return (
@@ -52,7 +56,8 @@ const GeoProfilesTable = ({ geoProfiles, roleLabelById }: GeoProfilesTableProps)
               >
                 <td className="px-4 py-2.5">
                   <span className="font-semibold truncate" style={{ color: 'var(--qms-text)' }}>
-                    {roleLabelById.get(profile.role) ?? profile.role}
+                    {roleLabelById.get(profile.role) ??
+                      (roleNamesForbidden ? 'Restricted' : profile.role)}
                   </span>
                 </td>
                 <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>

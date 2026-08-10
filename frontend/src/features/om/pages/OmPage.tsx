@@ -55,7 +55,8 @@ const OmPage = () => {
   const { camps, doctors } = useCampsData()
   const { people: fos, devices } = usePeopleData('Field Officer')
   const { people: dietitians } = usePeopleData('Dietitian')
-  const { projects } = useProjectsDataShared()
+  // GET /projects can 403 for a caller without project:search/manage or tenant:manage; surface that so OverviewTab can show an honest message instead of a misleading "No projects" empty state.
+  const { projects, error: projectsError } = useProjectsDataShared()
   const om = useOm()
 
   const isDiet = mode === 'Diet'
@@ -134,6 +135,7 @@ const OmPage = () => {
           fos={fos}
           dietitians={dietitians}
           projects={projects}
+          projectsForbidden={!!projectsError}
           expenseOverlay={om.expenseOverlay}
           onGoTab={(t) => setTab(t as TabId)}
         />

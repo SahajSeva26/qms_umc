@@ -18,15 +18,29 @@ async function getDevices(): Promise<DeviceCatalogItem[]> {
   return DEVICE_CATALOG
 }
 
-export const usePeopleData = (role?: PersonRole) => {
+interface UsePeopleDataOptions {
+  /**
+   * Fetch the device catalog alongside people. Defaults to `true` — every
+   * existing caller keeps its current behaviour unchanged. Pass `false` when
+   * a screen only reads `people` (e.g. Dedicated Ops, Ops Manager's
+   * AuditTab, Reminders) so its route doesn't pay for a fetch it never
+   * touches. Today `getDevices()` is a synchronous mock read, so this is
+   * free either way — the point is to keep the query from becoming a real,
+   * wasted network round-trip once a backend device endpoint lands.
+   */
+  devices?: boolean
+}
+
+export const usePeopleData = (role?: PersonRole, options: UsePeopleDataOptions = {}) => {
+  const wantDevices = options.devices ?? true
   const { data: people = [], isLoading: peopleLoading, error: peopleError } = useQuery({ queryKey: ['people'], queryFn: getPeople })
-  const { data: devices = [], isLoading: devicesLoading, error: devicesError } = useQuery({ queryKey: ['devices'], queryFn: getDevices })
+  const { data: devices = [], isLoading: devicesLoading, error: devicesError } = useQuery({ queryKey: ['devices'], queryFn: getDevices, enabled: wantDevices })
 
   return {
     people: role ? people.filter((p) => p.role === role) : people,
     devices,
-    isLoading: peopleLoading || devicesLoading,
-    error: peopleError || devicesError,
+    isLoading: peopleLoading || (wantDevices && devicesLoading),
+    error: peopleError || (wantDevices ? devicesError : null),
   }
 }
 

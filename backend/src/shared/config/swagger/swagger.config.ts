@@ -19,6 +19,7 @@ import '../../../modules/doctor/doctor.routes';
 import '../../../modules/operations/geoProfile/geoProfile.routes';
 import '../../../modules/operations/camp/camp.routes';
 import '../../../modules/counter/counter.routes';
+import '../../../modules/inventory/inventory-master/inventory-master.routes';
 // =============================================
 // =============================================
 

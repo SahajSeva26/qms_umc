@@ -42,9 +42,25 @@ const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
   // nav link showed to everyone, same dead-link class as projects/camps below.
   clientmgmt: ['lead:search', 'lead:manage', 'tenant:manage'],
   tenants: ['tenant:get', 'tenant:search', 'tenant:manage'],
-  permissiongroups: ['permission-group:get', 'permission-group:search', 'permission-group:manage'],
-  roletypes: ['role-type:get', 'role-type:search', 'role-type:manage'],
-  roles: ['role:get', 'role:search', 'role:manage'],
+  // CONFIRMED DRIFT (2026-08-10): was ['permission-group:get',
+  // 'permission-group:search', 'permission-group:manage'] —
+  // permission-group:manage is never checked by permissionGroup.routes.ts
+  // on any route (list is search-or-tenant:admin; detail is get-only).
+  // Fixed to the real union — matches accessManagement.routes.tsx's
+  // PERMISSION_GROUPS_VIEW_PERMISSIONS exactly.
+  permissiongroups: ['permission-group:get', 'permission-group:search', 'tenant:admin'],
+  // CONFIRMED DRIFT (2026-08-10): was ['role-type:get', 'role-type:search',
+  // 'role-type:manage'] — none of the role-type:* codes are ever checked
+  // by roleType.routes.ts; every route there is gated purely on
+  // tenant:manage/tenant:admin. Fixed to match. Matches
+  // accessManagement.routes.tsx's ROLE_TYPES_VIEW_PERMISSIONS exactly.
+  roletypes: ['tenant:manage', 'tenant:admin'],
+  // CONFIRMED DRIFT (2026-08-10): was ['role:get', 'role:search',
+  // 'role:manage'] — role:manage is never checked by role.routes.ts (only
+  // role:get/role:search individually, alongside tenant:admin/tenant:manage).
+  // Fixed to the real union. Matches accessManagement.routes.tsx's
+  // ROLES_VIEW_PERMISSIONS exactly.
+  roles: ['tenant:admin', 'tenant:manage', 'role:get', 'role:search'],
   qafeedback: ['qa-feedback:manage'],
   // Matches appointment.routes.ts's READ_GUARD and contacts.routes.tsx's
   // CONTACT_VIEW_PERMISSIONS exactly — added 2026-07-27 alongside the real
@@ -56,7 +72,13 @@ const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
   // (PERMISSION_NAV_SECTIONS, now removed) when Divisions was folded into
   // CRM — Division is a CRM-native concept (Lead/Project/Appointment all key
   // off it directly), not a separate top-level area.
-  divisions: ['division:manage', 'tenant:manage'],
+  // CONFIRMED DRIFT (2026-08-10): was ['division:manage', 'tenant:manage']
+  // — tenant:manage is never checked by division.routes.ts (the sole
+  // module missing it; every sibling CRM module treats it as baseline).
+  // Fixed to match what the backend actually enforces today — see
+  // divisions.routes.tsx's own comment for the full explanation and the
+  // flagged backend gap.
+  divisions: ['division:manage', 'tenant:admin', 'lead:manage'],
   // Matches projects.routes.tsx's PROJECTS_VIEW_PERMISSIONS exactly — found
   // 2026-08-04: this nav item had no gate at all, so a Sales Head account
   // (no project:* permission) could see and click into it and land on a

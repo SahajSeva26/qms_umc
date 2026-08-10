@@ -331,6 +331,7 @@
 }
 
 .auth-logo        { background: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%); }
+.auth-brand-gradient { background: linear-gradient(135deg, var(--qms-brand), var(--qms-teal)); }
 
 .auth-headline-accent {
   background: linear-gradient(90deg, #9ec3ff, #7be0d4);
@@ -343,6 +344,11 @@
   background:      rgba(255,255,255,0.08);
   backdrop-filter: blur(4px);
 }
+
+.auth-headline    { font-size: clamp(28px, 3.6vw, 48px); line-height: 1.05; }
+.auth-subcopy     { font-size: 16px; color: #c2cef5; line-height: 1.6; }
+.auth-stat-value  { font-size: 22px; }
+.auth-stat-label  { font-size: 12px; color: #aebbe5; }
 
 .auth-right-panel  { background: var(--qms-auth-right-bg); }
 

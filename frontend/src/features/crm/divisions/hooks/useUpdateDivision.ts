@@ -8,6 +8,7 @@ export const useUpdateDivision = (id: string) => {
   return useMutation({
     mutationFn: (payload: UpdateDivisionPayload) => crmService.updateDivision(id, payload),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['division', id] })
       queryClient.invalidateQueries({ queryKey: ['divisions'] })
     },
   })

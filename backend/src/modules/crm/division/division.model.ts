@@ -17,10 +17,15 @@ const divisionSchema = new mongoose.Schema(
             type: String,
             required: true,
         },
+        // a division can span multiple therapy areas — stored as a list (enum validates each element).
         therapy: {
-            type: String,
+            type: [String],
             enum: Object.values(DIVISION_THERAPY),
             required: true,
+            validate: {
+                validator: (v: string[]) => Array.isArray(v) && v.length > 0,
+                message: 'At least one therapy is required',
+            },
         },
         brandFocus: {
             type: String,

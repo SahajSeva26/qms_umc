@@ -17,7 +17,6 @@ export const APPOINTMENT_STATUSES = {
     PLANNED: 'planned',
     DONE: 'done',
     CANCELLED: 'cancelled',
-    BLOCKED: 'blocked',
     RELEASED: 'released',
 } as const;
 
@@ -35,18 +34,9 @@ export const MOM_SUBMISSION_DEADLINE_HOURS = 24;
 export const APPOINTMENT_COUNTER_ENTITY = 'appointment';
 
 // keyed by the stored status VALUE so moveStage can do APPOINTMENT_TRANSITION_MAP[appointment.status] directly.
-// planned is the entry point; done/cancelled are terminal. blocked/released model a slot being held then freed.
+// planned is the entry point; done/cancelled are terminal.
 export const APPOINTMENT_TRANSITION_MAP: Record<string, string[]> = {
-    [APPOINTMENT_STATUSES.PLANNED]: [
-        APPOINTMENT_STATUSES.DONE,
-        APPOINTMENT_STATUSES.CANCELLED,
-        APPOINTMENT_STATUSES.BLOCKED,
-    ],
-    [APPOINTMENT_STATUSES.BLOCKED]: [
-        APPOINTMENT_STATUSES.PLANNED,
-        APPOINTMENT_STATUSES.RELEASED,
-        APPOINTMENT_STATUSES.CANCELLED,
-    ],
+    [APPOINTMENT_STATUSES.PLANNED]: [APPOINTMENT_STATUSES.DONE, APPOINTMENT_STATUSES.CANCELLED],
     [APPOINTMENT_STATUSES.RELEASED]: [APPOINTMENT_STATUSES.PLANNED, APPOINTMENT_STATUSES.CANCELLED],
     [APPOINTMENT_STATUSES.DONE]: [],
     [APPOINTMENT_STATUSES.CANCELLED]: [],

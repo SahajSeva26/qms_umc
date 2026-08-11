@@ -37,11 +37,11 @@ export const AppointmentMapper = {
                 submittedAt: appointment.mom?.submittedAt,
                 submissionDeadline: appointment.mom?.submissionDeadline,
             },
-            nextSteps: appointment.nextSteps,
             stageHistory: (appointment.stageHistory || []).map((entry: any) => ({
                 from: entry.from,
                 to: entry.to,
                 reason: entry.reason,
+                nextSteps: entry.nextSteps,
                 actor: entry.actor,
                 createdAt: entry.createdAt,
             })),

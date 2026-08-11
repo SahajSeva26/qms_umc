@@ -31,6 +31,13 @@ const stageHistorySchema = new mongoose.Schema(
             type: String,
             required: [true, 'Reason is required'],
         },
+        // next step captured at the moment of this transition — recorded per-move rather than as a
+        // single mutable field, so the appointment carries a full history of next steps alongside
+        // its stage changes.
+        nextSteps: {
+            type: String,
+            default: '',
+        },
     },
     {
         timestamps: true,
@@ -159,10 +166,6 @@ const appointmentSchema = new mongoose.Schema(
             submissionDeadline: {
                 type: Date,
             },
-        },
-        nextSteps: {
-            type: String,
-            default: '',
         },
         // reminders: {
         //     type: Boolean,

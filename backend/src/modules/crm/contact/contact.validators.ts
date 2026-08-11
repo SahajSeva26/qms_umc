@@ -10,6 +10,8 @@ export const CreateContactPayloadSchema = z.object({
     // required only for platform (QMS) staff — which tenant this contact belongs to.
     // ignored for customer users: the service pins it to their own tenant.
     tenant: objectId('Tenant').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
+    // optional — the division (within the tenant) this contact belongs to. Must belong to the tenant.
+    division: objectId('Division').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8b' }),
     name: z.string().min(1).openapi({ example: 'Dr. Anil Mehta' }),
     designation: z.string().optional().openapi({ example: 'Medical Advisor' }),
     email: z.string().email().optional().openapi({ example: 'anil.mehta@pharma.com' }),
@@ -22,14 +24,15 @@ export const CreateContactPayloadSchema = z.object({
 export type ICreateContactPayload = z.infer<typeof CreateContactPayloadSchema>;
 
 //2: update ====================================>
-// tenant is NOT editable here — a contact never changes the company it belongs to
+// tenant is NOT editable here — a contact never changes the company it belongs to.
+// type is NOT editable either — it is fixed at creation (a pharma/customer contact stays one,
+// which also keeps the "pharma contacts require a division" invariant intact).
 export const UpdateContactPayloadSchema = z.object({
     name: z.string().min(1).optional(),
     designation: z.string().optional(),
     email: z.string().email().optional(),
     phone: z.string().optional(),
     location: z.string().optional(),
-    type: z.enum(Object.values(CONTACT_TYPES)).optional(),
     user: objectId('User').optional(),
     status: z.enum(Object.values(CONTACT_STATUS)).optional(),
 });
@@ -42,6 +45,8 @@ export const SearchContactQuerySchema = z.object({
     status: z.enum(Object.values(CONTACT_STATUS)).optional().openapi({ example: 'active' }),
     // only honoured for platform staff; customer users stay pinned to their own tenant
     tenant: objectId('Tenant').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
+    // filter to a specific division within the tenant
+    division: objectId('Division').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8b' }),
     page: z.string().optional().openapi({ example: '1' }),
     limit: z.string().optional().openapi({ example: '10' }),
 });

@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react'
 import type { Tenant, TenantStatus, TenantType } from '@/types/accessManagement.types'
 import { useUpdateTenant } from '@/features/access-management/tenant/hooks/useUpdateTenant'
+import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
+import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRoleTypes'
+import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import { updateTenantSchema } from '@/features/access-management/tenant/schemas/tenant.schemas'
+import { PLATFORM_TENANT_CODE, PLATFORM_TENANT_FETCH_LIMIT } from '@/features/access-management/accessManagement.constants'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,20 +20,29 @@ interface EditTenantModalProps {
   onClose: () => void
 }
 
-// Same field set/gating as TenantDetailPage.tsx used to render inline —
-// moved into a modal (opened from the page header's "..." menu) now that
-// the page body itself shows this company's Divisions instead of the edit
-// form. Field gating unchanged: `status` only takes effect server-side with
-// tenant:manage, `type` only with system:manage — both hidden (not
-// disabled) when the caller lacks the corresponding permission, since
-// submitting them would be silently ignored by the backend anyway.
+// Fields hidden (not disabled) when the caller lacks the permission that
+// would make them take effect server-side: `status` needs tenant:manage,
+// `type`/`salesPerson` need system:manage.
 const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: EditTenantModalProps) => {
   const updateTenant = useUpdateTenant(tenant.id)
   const [name, setName] = useState(tenant.name)
   const [description, setDescription] = useState('')
   const [status, setStatus] = useState<TenantStatus | ''>(tenant.status ?? '')
   const [type, setType] = useState<TenantType | ''>(tenant.type ?? '')
+  const [salesPerson, setSalesPerson] = useState(tenant.salesPerson ?? '')
   const [formError, setFormError] = useState<string | null>(null)
+
+  // Same sales-rep picker as CreateTenantDialog.tsx.
+  const { data: platformTenantData } = useTenants({ type: 'platform', status: 'active', limit: PLATFORM_TENANT_FETCH_LIMIT }, canManageSystem)
+  const platformTenant = platformTenantData?.data?.items.find((t) => t.type === 'platform' || t.code === PLATFORM_TENANT_CODE)
+  const { data: salesRepTypeData, isLoading: roleTypeLoading } = useRoleTypes({ code: 'sales-rep', status: 'active' }, canManageSystem)
+  const salesRepTypeId = salesRepTypeData?.data?.items[0]?.id
+  const { data: salesRepRoleData, isLoading: salesRepsLoading } = useRoles(
+    { tenant: platformTenant?.id, type: salesRepTypeId, status: 'active' },
+    canManageSystem && !!platformTenant && !!salesRepTypeId,
+  )
+  const salesReps = salesRepRoleData?.data?.items ?? []
+  const salesRepsBusy = roleTypeLoading || salesRepsLoading
 
   useEffect(() => {
     if (updateTenant.isSuccess) onClose()
@@ -40,6 +53,7 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
     const payload: Record<string, unknown> = { name, description: description || undefined }
     if (canManageTenant && status) payload.status = status
     if (canManageSystem && type) payload.type = type
+    if (canManageSystem) payload.salesPerson = salesPerson || null
 
     const result = updateTenantSchema.safeParse(payload)
     if (!result.success) {
@@ -112,6 +126,37 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
                   <SelectItem value="customer">Customer</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+          )}
+
+          {canManageSystem && (
+            <div>
+              <Label htmlFor="salesPerson" className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+                Sales rep
+              </Label>
+              <Select key={salesPerson || 'empty'} value={salesPerson || undefined} onValueChange={(v) => setSalesPerson((v as string) ?? '')}>
+                <SelectTrigger id="salesPerson" className="w-full">
+                  <SelectValue placeholder={salesRepsBusy ? 'Loading...' : 'Select sales rep...'}>
+                    {(v: string) => {
+                      const r = salesReps.find((role) => role.id === v)
+                      return r ? `${r.name} (${r.code})` : salesRepsBusy ? 'Loading...' : 'Select sales rep...'
+                    }}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {salesReps.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {salesPerson && (
+                <button
+                  type="button"
+                  onClick={() => setSalesPerson('')}
+                  className="text-[11px] mt-1 underline"
+                  style={{ color: 'var(--qms-text-muted)' }}
+                >
+                  Clear
+                </button>
+              )}
             </div>
           )}
 

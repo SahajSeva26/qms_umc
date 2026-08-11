@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import ChipPicker from '@/components/ui/ChipPicker'
 import { toast } from '@/components/ui/sonner'
 
 interface CreateDivisionModalProps {
@@ -34,7 +35,7 @@ const CreateDivisionModal = ({ onClose, defaultTenantId }: CreateDivisionModalPr
   const [tenant, setTenant] = useState(defaultTenantId ?? '')
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
-  const [therapy, setTherapy] = useState<DivisionTherapy | ''>('')
+  const [therapy, setTherapy] = useState<DivisionTherapy[]>([])
   const [brandFocus, setBrandFocus] = useState('')
   const [mrCount, setMrCount] = useState(0)
   const [headFirstName, setHeadFirstName] = useState('')
@@ -55,7 +56,7 @@ const CreateDivisionModal = ({ onClose, defaultTenantId }: CreateDivisionModalPr
       tenant,
       code: code.toLowerCase(),
       name,
-      therapy: therapy || undefined,
+      therapy,
       brandFocus: brandFocus || undefined,
       mrCount,
       head: {
@@ -134,18 +135,15 @@ const CreateDivisionModal = ({ onClose, defaultTenantId }: CreateDivisionModalPr
 
           <div>
             <Label className="block text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-              Therapy area *
+              Therapy areas *
             </Label>
-            <Select value={therapy} onValueChange={(v) => setTherapy(v as DivisionTherapy)}>
-              <SelectTrigger className="w-full text-[13px]">
-                <SelectValue placeholder="Select therapy area...">
-                  {(v: string) => DIVISION_THERAPY_LABEL[v as DivisionTherapy] ?? 'Select therapy area...'}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {THERAPY_OPTIONS.map((t) => <SelectItem key={t} value={t}>{DIVISION_THERAPY_LABEL[t]}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <ChipPicker
+              options={THERAPY_OPTIONS}
+              selected={therapy}
+              onChange={(v) => setTherapy(v as DivisionTherapy[])}
+              placeholder="Add a therapy area..."
+              labelFor={(v) => DIVISION_THERAPY_LABEL[v as DivisionTherapy]}
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-2.5">

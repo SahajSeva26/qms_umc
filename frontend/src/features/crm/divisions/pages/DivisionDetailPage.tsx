@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import ChipPicker from '@/components/ui/ChipPicker'
 
 const THERAPY_OPTIONS = Object.keys(DIVISION_THERAPY_LABEL) as DivisionTherapy[]
 const STATUS_OPTIONS: { value: DivisionStatus; label: string }[] = [
@@ -24,15 +25,7 @@ const STATUS_OPTIONS: { value: DivisionStatus; label: string }[] = [
 // and same UpdateDivisionPayloadSchema contract: name/therapy/brandFocus/
 // mrCount/status only. No Code/Company/Head/Owner fields, none of which the
 // backend allows to change post-creation. Creation stays a modal
-// (CreateDivisionModal, opened from TenantDetailPage's inline Divisions
-// section's "New Division" button) — out of scope for this page per direct
-// instruction.
-//
-// Only reachable from a company's own page now (2026-08-11: the standalone
-// /crm/divisions list was retired — Divisions live under Client Management
-// (nee "Companies"), not as a sibling top-level page) — so "back" always
-// returns to the owning company, not a divisions list that no longer
-// exists in the nav.
+
 const DivisionDetailPage = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -47,7 +40,7 @@ const DivisionDetailPage = () => {
   const tenantId = division ? (typeof division.tenant === 'string' ? division.tenant : division.tenant._id) : undefined
 
   const [name, setName] = useState('')
-  const [therapy, setTherapy] = useState<DivisionTherapy | ''>('')
+  const [therapy, setTherapy] = useState<DivisionTherapy[]>([])
   const [brandFocus, setBrandFocus] = useState('')
   const [mrCount, setMrCount] = useState(0)
   const [status, setStatus] = useState<DivisionStatus | ''>('')
@@ -68,7 +61,7 @@ const DivisionDetailPage = () => {
   const handleSave = () => {
     const result = updateDivisionSchema.safeParse({
       name,
-      therapy: therapy || undefined,
+      therapy,
       brandFocus: brandFocus || undefined,
       mrCount,
       status: status || undefined,
@@ -141,18 +134,15 @@ const DivisionDetailPage = () => {
 
               <div>
                 <Label className="block text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-                  Therapy area *
+                  Therapy areas *
                 </Label>
-                <Select key={therapy || 'empty'} value={therapy || undefined} onValueChange={(v) => setTherapy(v as DivisionTherapy)}>
-                  <SelectTrigger className="w-full text-[13px]">
-                    <SelectValue placeholder="Select therapy area...">
-                      {(v: string) => DIVISION_THERAPY_LABEL[v as DivisionTherapy] ?? 'Select therapy area...'}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {THERAPY_OPTIONS.map((t) => <SelectItem key={t} value={t}>{DIVISION_THERAPY_LABEL[t]}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <ChipPicker
+                  options={THERAPY_OPTIONS}
+                  selected={therapy}
+                  onChange={(v) => setTherapy(v as DivisionTherapy[])}
+                  placeholder="Add a therapy area..."
+                  labelFor={(v) => DIVISION_THERAPY_LABEL[v as DivisionTherapy]}
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-2.5">

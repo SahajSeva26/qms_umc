@@ -17,14 +17,32 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import DateTimePicker from '@/components/ui/DateTimePicker'
 import { Label } from '@/components/ui/label'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from '@/components/ui/sonner'
+import NewLeadWizard from '@/features/crm/components/NewLeadWizard'
 
 const STATUS_COLOR: Record<AppointmentStatus, string> = {
   planned: '#3b6dff',
   done: '#10b981',
   cancelled: '#94a3b8',
 }
+
+// Plain preset labels — picking one just sets nextSteps to that exact text.
+// None of these (including 'Cancelled'/'Rescheduled meetings') trigger the
+// real Cancel/Reschedule actions; per explicit instruction they're labels
+// only, kept fully separate from the actual status-transition buttons.
+const NEXT_STEPS_OPTIONS = [
+  'Cred send',
+  'Required PPT send',
+  'Quotation',
+  'Indent raise',
+  'Negations',
+  'PO received',
+  'Cancelled',
+  'Rescheduled meetings',
+] as const
+const NEXT_STEPS_OTHER = 'Other'
 
 const labelClasses = 'block text-[10px] font-semibold tracking-widest uppercase mb-2'
 const labelStyle = { color: 'var(--qms-text-muted)' }
@@ -82,6 +100,9 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
   const [reason, setReason] = useState('')
   const [targetStatus, setTargetStatus] = useState<AppointmentStatus | ''>('')
   const [momText, setMomText] = useState('')
+  const [nextStepsOption, setNextStepsOption] = useState<string>('')
+  const [nextStepsText, setNextStepsText] = useState('')
+  const [newLeadOpen, setNewLeadOpen] = useState(false)
   const [rescheduleStart, setRescheduleStart] = useState('')
   const [rescheduleEnd, setRescheduleEnd] = useState('')
   // True once the user has directly edited End — stops the auto-shift below.
@@ -117,25 +138,60 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
   const isTerminal = legalTargets.length === 0
   const statusColor = STATUS_COLOR[appointment.status] ?? '#94a3b8'
 
+
+  const blurActiveElement = () => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+  }
+
+  // Shared by openMoveStage and openReschedule — both dialogs offer the same
+  // Next steps dropdown, so both need to re-derive its selection/free-text
+  // from whatever's already saved on the appointment.
+  const resetNextStepsFromAppointment = () => {
+    const existingNextSteps = appointment.nextSteps ?? ''
+    const isPreset = (NEXT_STEPS_OPTIONS as readonly string[]).includes(existingNextSteps)
+    setNextStepsOption(existingNextSteps ? (isPreset ? existingNextSteps : NEXT_STEPS_OTHER) : '')
+    setNextStepsText(isPreset ? '' : existingNextSteps)
+  }
+
   const openMoveStage = (to: AppointmentStatus) => {
+    blurActiveElement()
     setError('')
     setReason('')
     setMomText(appointment.mom.details ?? '')
+    resetNextStepsFromAppointment()
     setTargetStatus(to)
     setPanel('moveStage')
   }
 
-  // MOM has its own endpoint (PUT /appointments/:id, not the stage-move one
-  // — see UpdateAppointmentPayload/appointment.service.ts's update()), so
-  // saving it alongside "Mark done" is two sequential calls, not one
-  // combined payload. Saved first: if the status flip then fails (e.g. a
-  // transition race), the MOM text the user just typed isn't lost.
+  const handleNextStepsOptionChange = (value: string | null) => {
+    const next = value ?? ''
+    setNextStepsOption(next)
+    setNextStepsText(next !== NEXT_STEPS_OTHER ? next : '')
+  }
+
+  // The saved value: the picked preset verbatim, or the free-text box's
+  // content when 'Other' is selected — either way a single plain string,
+  // so nothing downstream (save, display) needs to know about the dropdown.
+  const resolvedNextSteps = nextStepsOption === NEXT_STEPS_OTHER ? nextStepsText.trim() : nextStepsOption
+
+  // MOM and Next steps both live on the plain update endpoint (PUT
+  // /appointments/:id, not the stage-move one — see
+  // UpdateAppointmentPayload/appointment.service.ts's update()), so saving
+  // either alongside a status move is a separate call from moveStage, not
+  // one combined payload. Sent first: if the status flip then fails (e.g. a
+  // transition race), the text the user just typed isn't lost. MOM only
+  // applies when marking done; Next steps applies to every transition.
   const handleMoveStageSave = async () => {
     if (!targetStatus) return
     if (!reason.trim()) return setError('A reason is required')
     try {
-      if (targetStatus === 'done' && momText.trim() && momText.trim() !== (appointment.mom.details ?? '')) {
-        await updateAppointment.mutateAsync({ mom: { details: momText.trim() } })
+      const momChanged = targetStatus === 'done' && momText.trim() && momText.trim() !== (appointment.mom.details ?? '')
+      const nextStepsChanged = resolvedNextSteps !== (appointment.nextSteps ?? '')
+      if (momChanged || nextStepsChanged) {
+        await updateAppointment.mutateAsync({
+          ...(momChanged ? { mom: { details: momText.trim() } } : {}),
+          ...(nextStepsChanged ? { nextSteps: resolvedNextSteps || undefined } : {}),
+        })
       }
       await moveStage.mutateAsync({ to: targetStatus, reason: reason.trim() })
       toast.success(`Moved to ${APPOINTMENT_STATUS_LABEL[targetStatus]}`)
@@ -146,10 +202,12 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
   }
 
   const openReschedule = () => {
+    blurActiveElement()
     setError('')
     setRescheduleStart(appointment.duration.startTime.slice(0, 16))
     setRescheduleEnd(appointment.duration.endTime?.slice(0, 16) ?? '')
     setEndTouched(false)
+    resetNextStepsFromAppointment()
     setPanel('reschedule')
   }
 
@@ -183,9 +241,11 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
       return setError('End must be after start')
     }
     try {
+      const nextStepsChanged = resolvedNextSteps !== (appointment.nextSteps ?? '')
       await updateAppointment.mutateAsync({
         startTime: new Date(rescheduleStart).toISOString(),
         endTime: rescheduleEnd ? new Date(rescheduleEnd).toISOString() : undefined,
+        ...(nextStepsChanged ? { nextSteps: resolvedNextSteps || undefined } : {}),
       })
       toast.success('Appointment rescheduled')
       setPanel(null)
@@ -318,6 +378,11 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
               <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-[13px]" />
             </div>
             {targetStatus === 'done' && (
+              <Button type="button" size="sm" variant="outline" onClick={() => setNewLeadOpen(true)}>
+                + New lead
+              </Button>
+            )}
+            {targetStatus === 'done' && (
               <div>
                 <Label className={labelClasses} style={labelStyle}>Minutes of meeting</Label>
                 <Textarea
@@ -329,6 +394,29 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
                 />
               </div>
             )}
+            <div>
+              <Label className={labelClasses} style={labelStyle}>Next steps</Label>
+              <Select key={nextStepsOption || 'empty'} value={nextStepsOption || undefined} onValueChange={handleNextStepsOptionChange}>
+                <SelectTrigger className="w-full text-[13px]">
+                  <SelectValue placeholder="Select next step…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {NEXT_STEPS_OPTIONS.map((opt) => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                  <SelectItem value={NEXT_STEPS_OTHER}>{NEXT_STEPS_OTHER}</SelectItem>
+                </SelectContent>
+              </Select>
+              {nextStepsOption === NEXT_STEPS_OTHER && (
+                <Textarea
+                  value={nextStepsText}
+                  onChange={(e) => setNextStepsText(e.target.value)}
+                  rows={2}
+                  placeholder="What happens next…"
+                  className="text-[13px] mt-2"
+                />
+              )}
+            </div>
             {error && <p className="text-[12px] font-semibold text-danger">{error}</p>}
           </div>
           <DialogFooter>
@@ -352,6 +440,29 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
                 <DateTimePicker value={rescheduleEnd} onChange={handleRescheduleEndChange} className="text-[13px] w-full" />
               </div>
             </div>
+            <div>
+              <Label className={labelClasses} style={labelStyle}>Next steps</Label>
+              <Select key={nextStepsOption || 'empty'} value={nextStepsOption || undefined} onValueChange={handleNextStepsOptionChange}>
+                <SelectTrigger className="w-full text-[13px]">
+                  <SelectValue placeholder="Select next step…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {NEXT_STEPS_OPTIONS.map((opt) => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                  <SelectItem value={NEXT_STEPS_OTHER}>{NEXT_STEPS_OTHER}</SelectItem>
+                </SelectContent>
+              </Select>
+              {nextStepsOption === NEXT_STEPS_OTHER && (
+                <Textarea
+                  value={nextStepsText}
+                  onChange={(e) => setNextStepsText(e.target.value)}
+                  rows={2}
+                  placeholder="What happens next…"
+                  className="text-[13px] mt-2"
+                />
+              )}
+            </div>
             {error && <p className="text-[12px] font-semibold text-danger">{error}</p>}
           </div>
           <DialogFooter>
@@ -360,6 +471,13 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {newLeadOpen && (
+        <NewLeadWizard
+          onClose={() => setNewLeadOpen(false)}
+          onCreated={() => setNewLeadOpen(false)}
+        />
+      )}
     </SideDrawer>
   )
 }

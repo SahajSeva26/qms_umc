@@ -1,12 +1,10 @@
-import { useState } from 'react'
 import type { WizardFormState } from '@/features/crm/wizard.types'
-import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { useDivisions } from '@/features/crm/hooks/useDivisions'
 import { useContacts } from '@/features/contacts/hooks/useContacts'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import ChipPicker from '@/features/crm/components/wizard/ChipPicker'
+import TenantIdPicker from '@/features/crm/components/wizard/TenantIdPicker'
 import { labelClasses, labelStyle, fieldClasses } from '@/features/crm/components/wizard/wizard.styles'
 import { THERAPIES, SPECIALTIES } from '@/features/crm/crm.constants'
 
@@ -16,14 +14,6 @@ interface WizardStep1Props {
 }
 
 const WizardStep1 = ({ form, setField }: WizardStep1Props) => {
-  const [tenantSearch, setTenantSearch] = useState('')
-
-  // limit: '20' — before a search term narrows the real filter, this should
-  // still reflect a realistic slice of all active companies, not just the
-  // backend's default first-10 (requestHandler.ts).
-  const { data: tenantData, isLoading: tenantsLoading, isError: tenantsErrored } = useTenants({ name: tenantSearch || undefined, status: 'active', limit: '20' })
-  const tenants = tenantData?.data?.items ?? []
-
   // Both gated on `!!form.tenantId` — neither should fire an unscoped,
   // every-tenant call before a company is actually picked (was firing on
   // mount, before this fix: Divisions returned whichever companies' divisions
@@ -49,10 +39,9 @@ const WizardStep1 = ({ form, setField }: WizardStep1Props) => {
   const { data: contactData, isLoading: contactsLoading, isError: contactsErrored } = useContacts({ tenant: form.tenantId || undefined, status: 'active' }, { enabled: !!form.tenantId })
   const contactPeople = form.tenantId ? contactData?.data?.items ?? [] : []
 
-  const selectTenant = (tenantId: string) => {
-    const tenant = tenants.find((t) => t.id === tenantId)
+  const selectTenant = (tenantId: string, tenantLabel: string) => {
     setField('tenantId', tenantId)
-    setField('tenantLabel', tenant?.name ?? '')
+    setField('tenantLabel', tenantLabel)
     setField('divisionId', '')
     setField('divisionLabel', '')
     setField('contactPersonId', '')
@@ -75,35 +64,7 @@ const WizardStep1 = ({ form, setField }: WizardStep1Props) => {
     <div className="space-y-4">
       <div>
         <Label className={labelClasses} style={labelStyle}>Pharma company *</Label>
-        <Input
-          type="text"
-          value={tenantSearch}
-          onChange={(e) => setTenantSearch(e.target.value)}
-          className={`${fieldClasses} mb-2`}
-          placeholder="Search company by name..."
-        />
-        <Select value={form.tenantId} onValueChange={(v) => selectTenant(v as string)}>
-          <SelectTrigger className={`w-full ${fieldClasses}`}>
-            {/* Render-prop child, not a plain placeholder: base-ui's SelectValue
-                only auto-resolves a selected value's label from an `items` prop
-                passed to Select.Root, which this wrapper never supplies — left as
-                a bare placeholder it renders the raw id once something is picked
-                (see @base-ui/react/internals/resolveValueLabel.mjs). Matches the
-                lookup pattern accessManagement's RolesFilterBar already uses. */}
-            <SelectValue placeholder={tenantsLoading ? 'Loading...' : 'Select company...'}>
-              {(v: string) => {
-                const t = tenants.find((tenant) => tenant.id === v)
-                return t ? `${t.name} (${t.code})` : tenantsLoading ? 'Loading...' : 'Select company...'
-              }}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {tenants.map((t) => <SelectItem key={t.id} value={t.id}>{t.name} ({t.code})</SelectItem>)}
-          </SelectContent>
-        </Select>
-        {tenantsErrored && (
-          <p className="text-[11px] mt-1 text-danger">Couldn't load companies — try again.</p>
-        )}
+        <TenantIdPicker value={form.tenantId} label={form.tenantLabel} onChange={selectTenant} />
       </div>
 
       <div>

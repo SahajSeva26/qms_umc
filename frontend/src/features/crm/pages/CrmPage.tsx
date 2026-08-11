@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
-import { FiDownload, FiPlus, FiUpload } from 'react-icons/fi'
+import { FiDownload, FiPlus } from 'react-icons/fi'
 import type { KpiTile, LeadStatus } from '@/types/crm.types'
 import { usePermission } from '@/hooks/usePermission'
 import { useLeads } from '@/features/crm/hooks/useLeads'
@@ -17,7 +16,6 @@ import ListView from '@/features/crm/components/views/ListView'
 import CalendarView from '@/features/crm/components/views/CalendarView'
 import LeadDrawer from '@/features/crm/components/LeadDrawer'
 import NewLeadWizard from '@/features/crm/components/NewLeadWizard'
-import ImportLeadsDialog from '@/features/crm/components/ImportLeadsDialog'
 import BottomInsightsRow from '@/features/crm/components/BottomInsightsRow'
 import KpiDrillDrawer from '@/features/crm/components/KpiDrillDrawer'
 import StageDrawer from '@/features/crm/components/StageDrawer'
@@ -33,7 +31,6 @@ const VIEW_LABELS: { id: ViewMode; label: string }[] = [
 
 const CrmPage = () => {
   const { leads, isLoading, error, moveStage, updateLead } = useLeads()
-  const queryClient = useQueryClient()
   const { hasAnyPermission } = usePermission()
   // A lead:search-only caller (the real "Sales" rep business role — see
   // lead.constants.ts's LEAD_BUSINESS_ROLE_TYPES) can view their own leads
@@ -48,7 +45,6 @@ const CrmPage = () => {
   const [view, setView] = useState<ViewMode>('list')
   const [openLeadId, setOpenLeadId] = useState<string | null>(null)
   const [wizardOpen, setWizardOpen] = useState(false)
-  const [importOpen, setImportOpen] = useState(false)
   const [kpiDrill, setKpiDrill] = useState<KpiTile | null>(null)
   const [statusDrill, setStatusDrill] = useState<LeadStatus | null>(null)
 
@@ -88,15 +84,6 @@ const CrmPage = () => {
               style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
             >
               <FiPlus size={14} /> New Lead
-            </Button>
-          )}
-          {canManageLeads && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setImportOpen(true)}
-            >
-              <FiUpload size={13} /> Import
             </Button>
           )}
           <Button
@@ -147,13 +134,6 @@ const CrmPage = () => {
         <NewLeadWizard
           onClose={() => setWizardOpen(false)}
           onCreated={() => setWizardOpen(false)}
-        />
-      )}
-
-      {importOpen && (
-        <ImportLeadsDialog
-          onClose={() => setImportOpen(false)}
-          onImported={() => queryClient.invalidateQueries({ queryKey: ['leads'] })}
         />
       )}
 

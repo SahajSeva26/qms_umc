@@ -420,15 +420,15 @@ All modules follow the layered convention above; all are wired in `src/bin/app.t
 | — | counter | `/counters` | global atomic `$inc` sequence → prefixed padded codes (LEAD-/PROJECT-/CAMP-) |
 | — | doctor | `/doctors` | global registry, no tenant scoping; `pharmaCode` immutable natural key |
 | — | qa-feedback | `/qa-feedback` | QA feedback |
-| access-management | tenant | `/tenants` | types: `platform` / `customer`; owner auto-activated on create |
+| access-management | tenant | `/tenants` | types: `platform` / `customer`; owner auto-activated on create; optional updatable `salesPerson` (Role ref) — assign on create, reassign/unassign (null) on update, validated to exist AND be a `sales-rep` role type |
 | access-management | permission-group | `/permission-groups` | per-tenant permission ceiling |
 | access-management | role-type | `/role-types` | `isSystem` defaults seeded per tenant; reserved-code guard |
 | access-management | role | `/roles` | 1:1 with User; optional `division` (customer-only) + `supervisor` self-ref |
-| crm | division | `/divisions` | therapy/brand division; create also mints a pharma-division-head role + user |
+| crm | division | `/divisions` | therapy/brand division (`therapy` is a **non-empty, duplicate-free array** — multiple therapy areas per division; validated in validators + model); create also mints a pharma-division-head role + user |
 | crm | lead | `/leads` | stageHistory + moveStage; tenant from division |
 | crm | project | `/projects` | one-project-per-lead; tenant/division derived from lead |
-| crm | appointment | `/appointments` | stageHistory + moveStage; parent self-ref for follow-ups |
-| crm | contact | `/contacts` | tenant-scoped people registry, optional user/login link |
+| crm | appointment | `/appointments` | stageHistory + moveStage (each move records its own `nextSteps`); parent self-ref for follow-ups; statuses = planned/done/cancelled/released (no `blocked`) |
+| crm | contact | `/contacts` | tenant(+optional division)-scoped people registry, optional user/login link; division required for pharma (customer-type) contacts & validated against tenant; `type` immutable after create |
 | operations | camp | `/camps` | stageHistory + moveStage; tenant+division required, project optional |
 | operations | geoProfile | `/geo-profiles` | field-staff geo (2dsphere); `findNearest` ($geoNear) feeds camp allocation |
 

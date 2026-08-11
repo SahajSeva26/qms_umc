@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
+import { usePermission } from '@/hooks/usePermission'
 import { useDashboardFilters } from '@/features/dashboard/hooks/useDashboardFilters'
+import { useDashboardData } from '@/features/dashboard/hooks/useDashboardData'
 import { useSalesDataShared } from '@/hooks/useSalesDataShared'
 import { useClientsDataShared } from '@/hooks/useClientsDataShared'
 import { QUARTER } from '@/types/salesdash.types'
@@ -23,18 +25,30 @@ import { getGreeting } from '@/utils/formatters'
 
 const DashboardPage = () => {
   const { user } = useAuth()
+  const { hasPermission } = usePermission()
   const { filters, setFilter, reset } = useDashboardFilters()
   const [drill, setDrill] = useState<{ title: string; content: string } | null>(null)
   const [salesFilter, setSalesFilter] = useState<SalesFilterState>(DEFAULT_SALES_FILTER)
 
-  const isSuperAdmin = user?.role === 'super_admin'
-
   // The prototype's dashboard.html merges the Sales Command Center's filter
   // bar + KPI strip directly into this page, super_admin-only (dashboard.js:
-  // "isSuper = sess.roleId === 'super_admin'" — any other role, incl. plain
-  // admin, never sees these blocks here at all).
-  const { reps, targets } = useSalesDataShared()
-  const { clients, projects, invoices } = useClientsDataShared()
+  // "isSuper = sess.roleId === 'super_admin'"). The placeholder UserRole
+  // system that used to gate this (user?.role === 'super_admin') never
+  // actually worked — every real login was hardcoded to that same string
+  // regardless of who was logged in, so this block has always rendered for
+  // everyone in practice. Real replacement: system:manage, the actual
+  // backend permission that denotes full administrative access.
+  const isSuperAdmin = hasPermission('system:manage')
+
+  // Owns the loading/error gate for the shared dashboard query. Every section
+  // below calls useDashboardData(filters) with this same object, so they all
+  // read the one deduped cache entry rather than firing their own request.
+  const { isLoading, error } = useDashboardData(filters)
+
+  // Gated with `enabled` — these two feed super_admin-only blocks, so every
+  // other role used to fetch both payloads and render none of them.
+  const { reps, targets } = useSalesDataShared({ enabled: isSuperAdmin })
+  const { clients, projects, invoices } = useClientsDataShared({ enabled: isSuperAdmin })
   const salesKpiTiles = useMemo(
     () => (isSuperAdmin ? buildSalesHeadKpis({ reps, targets, clients, projects, invoices, filter: salesFilter, quarter: QUARTER }) : []),
     [isSuperAdmin, reps, targets, clients, projects, invoices, salesFilter]
@@ -59,21 +73,37 @@ const DashboardPage = () => {
         <SalesFilterBar filter={salesFilter} onChange={setSalesFilter} reps={reps} clients={clients} projects={projects} />
       )}
 
-      <TopKpiStrip filters={filters} />
+      {isLoading && (
+        <div className="text-[13px] py-10 text-center" style={{ color: 'var(--qms-text-muted)' }}>
+          Loading dashboard…
+        </div>
+      )}
 
-      {isSuperAdmin && <SalesKpiGrid tiles={salesKpiTiles} />}
+      {error && !isLoading && (
+        <div className="text-[13px] rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
+          Failed to load dashboard data. Please try again.
+        </div>
+      )}
 
-      <CampReportSection />
+      {!isLoading && !error && (
+        <>
+          <TopKpiStrip filters={filters} />
 
-      <CompanySection onDrill={onDrill} />
-      <ProjectsSection onDrill={onDrill} />
-      <FoSection onDrill={onDrill} />
-      <SalesSection onDrill={onDrill} />
-      <AccountsSection onDrill={onDrill} />
-      <DoctorsSection onDrill={onDrill} />
-      <PatientsSection onDrill={onDrill} />
+          {isSuperAdmin && <SalesKpiGrid tiles={salesKpiTiles} />}
 
-      {user?.role === 'super_admin' && <SalesCommandCenter />}
+          <CampReportSection />
+
+          <CompanySection filters={filters} onDrill={onDrill} />
+          <ProjectsSection filters={filters} onDrill={onDrill} />
+          <FoSection filters={filters} onDrill={onDrill} />
+          <SalesSection filters={filters} onDrill={onDrill} />
+          <AccountsSection filters={filters} onDrill={onDrill} />
+          <DoctorsSection filters={filters} onDrill={onDrill} />
+          <PatientsSection filters={filters} onDrill={onDrill} />
+
+          {isSuperAdmin && <SalesCommandCenter />}
+        </>
+      )}
 
       <SideDrawer open={!!drill} title={drill?.title ?? ''} onClose={() => setDrill(null)}>
         <p className="text-[13px] leading-relaxed" style={{ color: 'var(--qms-text-soft)' }}>

@@ -44,7 +44,7 @@ const ExpansionView = ({ camps, mrs, fos, onOpenCompanies }: ExpansionViewProps)
   return (
     <div>
       <div className="flex items-center gap-1.5 text-[12px] mb-3.5" style={{ color: 'var(--qms-text-muted)' }}>
-        <a onClick={onOpenCompanies} className="font-bold cursor-pointer" style={{ color: 'var(--qms-brand)' }}>Companies</a>
+        <button type="button" onClick={onOpenCompanies} className="font-bold cursor-pointer" style={{ color: 'var(--qms-brand)' }}>Companies</button>
         <FiChevronRight size={13} />
         <b style={{ color: 'var(--qms-text)' }}>Expansion recommender</b>
       </div>

@@ -68,12 +68,6 @@ export function projectSalesRepName(project: ProjectEntity): string {
   return typeof project.salesRep === 'string' ? project.salesRep : project.salesRep.name
 }
 
-export function projectSearchMatches(project: ProjectEntity, query: string): boolean {
-  if (!query) return true
-  const haystack = `${project.name} ${projectTenantName(project)} ${project.therapy}`.toLowerCase()
-  return haystack.includes(query.toLowerCase())
-}
-
 // KPI strip. overdue/atRisk/renewingIn30d are now derived from
 // projectNearestExpiry (real executionMode.poExpiry/.agreementEndDate data),
 // not the old mock's flat startDate/endDate — a project with no date range

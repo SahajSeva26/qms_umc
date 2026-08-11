@@ -1,6 +1,5 @@
 import type { Camp } from '@/types/camp.types'
 import type { DietStage } from '@/features/diet/diet.types'
-import type { UserRole } from '@/types/auth.types'
 
 // Mirrors dietStage() exactly (diet-camps.js:423-436) — the derived UI-facing
 // pipeline, computed live, never stored. Distinct from Camp Management's
@@ -18,15 +17,25 @@ export function dietStage(c: Camp): DietStage {
   return 'REQUESTED'
 }
 
-// dietViewOnly() — hardcoded single-role check, independent of navConfig's
-// rolesAllowed (diet-camps.js:328-330: only camp_coord is page-logic
-// view-only; other viewOnly roles per roles.js are shell-level, out of this
-// file's scope per the research).
-export function dietViewOnly(role?: UserRole): boolean {
-  return role === 'camp_coord'
+// ── Currency display ─────────────────────────────────────────────────────
+// Deliberately NOT the shared formatINR() from @/utils/formatters — that one
+// uses 2 decimals for Lakhs and has a Thousands tier; these match the Diet
+// prototype's own om-data.js tiers exactly. Merging them would change every
+// figure on the Diet screens.
+
+export function fmtInr(n: number): string {
+  n = Number(n) || 0
+  if (n >= 1e7) return '₹' + (n / 1e7).toFixed(2) + ' Cr'
+  if (n >= 1e5) return '₹' + (n / 1e5).toFixed(1) + ' L'
+  return '₹' + Math.round(n).toLocaleString('en-IN')
 }
 
-// isKam() — Key Account Manager data-scoping check (diet-camps.js:335).
-export function isKam(role?: UserRole): boolean {
-  return role === 'sales_rep'
+// Same tier list as fmtInr but with a Thousands step, used by
+// diet-approvals.js's dashboard KPIs (fmtInrLocal).
+export function fmtInrCompact(n: number): string {
+  n = Number(n) || 0
+  if (n >= 1e7) return '₹' + (n / 1e7).toFixed(2) + ' Cr'
+  if (n >= 1e5) return '₹' + (n / 1e5).toFixed(1) + ' L'
+  if (n >= 1e3) return '₹' + (n / 1e3).toFixed(1) + 'K'
+  return '₹' + Math.round(n).toLocaleString('en-IN')
 }

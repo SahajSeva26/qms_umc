@@ -2,6 +2,7 @@ import { FiBriefcase, FiZap } from 'react-icons/fi'
 import type { Client, Division, ClientMr } from '@/types/client.types'
 import type { GeoFo } from '@/features/hq/hq.types'
 import { ROLLUP_PROJECTS, mrServiceability } from '@/features/hq/components/hqmapping/mappingRollups'
+import { HQ_CARD_STYLE } from '@/features/hq/components/hqmapping/hq.ui'
 
 interface CompaniesViewProps {
   clients: Client[]
@@ -48,7 +49,7 @@ const CompaniesView = ({ clients, divisions, mrs, fos, onOpenCompany, onOpenExpa
             key={c.id}
             onClick={() => onOpenCompany(c.id)}
             className="rounded-2xl border p-4 cursor-pointer transition-transform hover:-translate-y-0.5"
-            style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}
+            style={HQ_CARD_STYLE}
           >
             <div className="flex gap-3 items-center mb-3">
               <div className="w-[46px] h-[46px] rounded-xl grid place-items-center shrink-0 text-white font-extrabold text-lg" style={{ background: c.color || '#3b6dff' }}>

@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
 import { FiCheckCircle, FiUnlock, FiX } from 'react-icons/fi'
 import type { Camp } from '@/types/camp.types'
-import { pendingReopenRequests, isCoordCamp, reopenRequestDecisionPatch } from '@/features/diet/dietitians.service'
-import { useCampsData } from '@/hooks/useCampsData'
+import { pendingReopenRequests } from '@/features/diet/services/dietCampWorkflow.service'
+import { isCoordCamp } from '@/features/diet/services/dietScope.service'
+import { errorMessage } from '@/features/diet/utils/errorMessage'
+import { useDecideReopenRequest } from '@/features/diet/hooks/useDietCampWorkflow'
 import { fmtDate, fmtDt } from './helpers'
 import DenyReopenModal from './DenyReopenModal'
 import { toast } from '@/components/ui/sonner'
@@ -16,7 +18,7 @@ interface ReopenTabProps {
 }
 
 const ReopenTab = ({ allCamps, adminLike, coordId, userName }: ReopenTabProps) => {
-  const { patchCamp } = useCampsData()
+  const decideReopen = useDecideReopenRequest()
   const [denyFor, setDenyFor] = useState<string | null>(null)
 
   const requests = useMemo(() => {
@@ -32,14 +34,24 @@ const ReopenTab = ({ allCamps, adminLike, coordId, userName }: ReopenTabProps) =
   const approve = async (campId: string) => {
     const camp = allCamps.find((c) => c.id === campId)
     if (!camp) return
-    await patchCamp(campId, reopenRequestDecisionPatch(camp, 'APPROVED', userName))
+    try {
+      await decideReopen.mutateAsync({ camp, decision: 'APPROVED', by: userName })
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not approve the reopen — try again.'))
+      return
+    }
     toast.success(`Reopen approved · 24h window restarted for ${campId}`)
   }
 
   const deny = async (campId: string, reason: string) => {
     const camp = allCamps.find((c) => c.id === campId)
     if (!camp) return
-    await patchCamp(campId, reopenRequestDecisionPatch(camp, 'DENIED', userName, reason))
+    try {
+      await decideReopen.mutateAsync({ camp, decision: 'DENIED', by: userName, denialReason: reason })
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not deny the reopen — try again.'))
+      return
+    }
     toast.info(`Reopen denied · ${campId}`)
     setDenyFor(null)
   }

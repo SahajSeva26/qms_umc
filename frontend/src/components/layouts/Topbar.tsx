@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { FiSearch, FiBell, FiHelpCircle, FiChevronDown, FiLogOut, FiUser, FiMenu } from 'react-icons/fi'
 import { useAuth } from '@/hooks/useAuth'
-import { ROLE_LABEL, ROLE_COLOR } from '@/lib/roles'
+import { useSession } from '@/hooks/useSession'
 import { getGreeting, formatClockDisplay } from '@/utils/formatters'
 import ThemeToggle from '@/components/ui/ThemeToggle'
 
@@ -15,6 +15,7 @@ function getInitials(firstName?: string, lastName?: string): string {
 
 const Topbar = ({ onMobileMenuToggle }: TopbarProps) => {
   const { user, signOut } = useAuth()
+  const { session } = useSession()
   const [clock, setClock] = useState(formatClockDisplay)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
 
@@ -25,8 +26,11 @@ const Topbar = ({ onMobileMenuToggle }: TopbarProps) => {
 
   const initials  = getInitials(user?.firstName, user?.lastName)
   const firstName = user?.firstName ?? 'there'
-  const roleLabel = user ? (ROLE_LABEL[user.role] ?? user.role) : ''
-  const roleColor = user ? (ROLE_COLOR[user.role] ?? 'var(--qms-brand)') : 'var(--qms-brand)'
+  // Real role-type name from the backend session (e.g. "Pharma MR", "System")
+  // — replaces the old placeholder UserRole label, which was always
+  // "Super Admin" for every account regardless of who was actually logged in.
+  const roleLabel = session?.roleType.name ?? ''
+  const roleColor = 'var(--qms-brand)'
 
   return (
     <header

@@ -26,6 +26,12 @@ export const CreateTenantPayloadSchema = z.object({
         .optional()
         .openapi({ example: 'Cipla private limited' }),
     owner: RegisterUserPayloadSchema,
+    // optional — the platform sales person (a Role) assigned to this tenant account
+    salesPerson: z
+        .string()
+        .refine((val) => isValidObjectID(val), { message: 'salesPerson must be a valid ObjectId' })
+        .optional()
+        .openapi({ example: '64f0c2a1b3d4e5f6a7b8c9d0' }),
 });
 export type ICreateTenantPayload = z.infer<typeof CreateTenantPayloadSchema>;
 
@@ -41,6 +47,13 @@ export const UpdateTenantPayloadSchema = z.object({
         .enum([TENANT_TYPE.PLATFORM, TENANT_TYPE.CUSTOMER])
         .optional()
         .openapi({ example: 'platform' }),
+    // reassign the sales person; pass null to unassign
+    salesPerson: z
+        .string()
+        .refine((val) => isValidObjectID(val), { message: 'salesPerson must be a valid ObjectId' })
+        .nullable()
+        .optional()
+        .openapi({ example: '64f0c2a1b3d4e5f6a7b8c9d0' }),
 });
 export type IUpdateTenantPayload = z.infer<typeof UpdateTenantPayloadSchema>;
 

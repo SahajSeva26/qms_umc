@@ -13,7 +13,6 @@ import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { useSession } from '@/hooks/useSession'
 import {
-  getNavForRole,
   FULL_NAV_SECTIONS,
   type NavItem,
   type NavSection,
@@ -37,21 +36,31 @@ import {
 const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
   crm: ['lead:search', 'lead:manage', 'tenant:manage'],
   tenants: ['tenant:get', 'tenant:search', 'tenant:manage'],
-  permissiongroups: ['permission-group:get', 'permission-group:search', 'permission-group:manage'],
-  roletypes: ['role-type:get', 'role-type:search', 'role-type:manage'],
-  roles: ['role:get', 'role:search', 'role:manage'],
+  // CONFIRMED DRIFT (2026-08-10): was ['permission-group:get',
+  // 'permission-group:search', 'permission-group:manage'] —
+  // permission-group:manage is never checked by permissionGroup.routes.ts
+  // on any route (list is search-or-tenant:admin; detail is get-only).
+  // Fixed to the real union — matches accessManagement.routes.tsx's
+  // PERMISSION_GROUPS_VIEW_PERMISSIONS exactly.
+  permissiongroups: ['permission-group:get', 'permission-group:search', 'tenant:admin'],
+  // CONFIRMED DRIFT (2026-08-10): was ['role-type:get', 'role-type:search',
+  // 'role-type:manage'] — none of the role-type:* codes are ever checked
+  // by roleType.routes.ts; every route there is gated purely on
+  // tenant:manage/tenant:admin. Fixed to match. Matches
+  // accessManagement.routes.tsx's ROLE_TYPES_VIEW_PERMISSIONS exactly.
+  roletypes: ['tenant:manage', 'tenant:admin'],
+  // CONFIRMED DRIFT (2026-08-10): was ['role:get', 'role:search',
+  // 'role:manage'] — role:manage is never checked by role.routes.ts (only
+  // role:get/role:search individually, alongside tenant:admin/tenant:manage).
+  // Fixed to the real union. Matches accessManagement.routes.tsx's
+  // ROLES_VIEW_PERMISSIONS exactly.
+  roles: ['tenant:admin', 'tenant:manage', 'role:get', 'role:search'],
   qafeedback: ['qa-feedback:manage'],
   // Matches appointment.routes.ts's READ_GUARD and contacts.routes.tsx's
   // CONTACT_VIEW_PERMISSIONS exactly — added 2026-07-27 alongside the real
   // Appointment/Contact module wiring.
   appointments: ['appointment:search', 'appointment:manage', 'tenant:manage'],
   contacts: ['contact:search', 'contact:manage', 'tenant:manage', 'tenant:admin'],
-  // Matches divisions.routes.tsx's DIVISION_VIEW_PERMISSIONS exactly. Moved
-  // here 2026-07-31 from a standalone "Company Data" section/mechanism
-  // (PERMISSION_NAV_SECTIONS, now removed) when Divisions was folded into
-  // CRM — Division is a CRM-native concept (Lead/Project/Appointment all key
-  // off it directly), not a separate top-level area.
-  divisions: ['division:manage', 'tenant:manage'],
   // Matches projects.routes.tsx's PROJECTS_VIEW_PERMISSIONS exactly — found
   // 2026-08-04: this nav item had no gate at all, so a Sales Head account
   // (no project:* permission) could see and click into it and land on a
@@ -61,6 +70,12 @@ const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
   // Matches camps.routes.tsx's CAMP_READ_PERMISSIONS exactly — same gap as
   // projects/gantt above, found + fixed 2026-08-04.
   camps: ['camp:search', 'camp:manage', 'tenant:manage'],
+  // Matches admin.routes.tsx's USERS_VIEW_PERMISSIONS exactly — found +
+  // fixed 2026-08-10 during the UserRole placeholder deletion pass: this
+  // route had no guard at all, frontend or backend-mirrored, so any
+  // authenticated user could see and click into it (would 403 on the
+  // underlying API call, but the nav link/page shell were both wide open).
+  users: ['user:get', 'user:search', 'user:update'],
 }
 
 interface SidebarProps {
@@ -268,20 +283,12 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
 
   useEffect(() => {
     setCollapsedSections(readCollapsedSections())
-  }, [user?.role])
+  }, [user])
 
-  const nav = user ? getNavForRole(user.role) : []
-
-  // getNavForRole's 'ALL' sentinel renders FULL_NAV_SECTIONS wholesale. But
-  // `user.role` is currently ALWAYS 'super_admin' for every logged-in
-  // account — the backend's login response has no `role` field at all, so
-  // useLogin/SessionBootstrap fall back to 'super_admin' unconditionally
-  // (see their own TODO comments; there's no honest mapping from the
-  // backend's real roleType.code vocabulary to this 18-value UserRole enum).
-  // That means restricting the WHOLE 'ALL' tree to real permissions would
-  // leave every other account with an empty sidebar (nothing else provides
-  // their nav yet) — a much bigger regression than the bug being fixed.
-  // Scoped fix, two layers:
+  // The old placeholder UserRole system (getNavForRole's per-role flat-list
+  // branch) has been removed entirely — every account now always renders
+  // the same FULL_NAV_SECTIONS tree, filtered down by the real permission
+  // gates below. Two layers:
   //  1. The whole "System" section (Tenants/Roles/Role Types/Permission
   //     Groups/Users/Admin/Settings) stays hidden unless the real session
   //     holds system:manage — most of its items (Users/Admin/Settings) have
@@ -363,23 +370,15 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
 
       {/* Nav */}
       <div className="flex-1 overflow-y-auto hide-scrollbar px-2 py-2">
-        {nav === 'ALL' ? (
-          visibleFullNavSections.map((section) => (
-            <SectionBlock
-              key={section.section}
-              section={section}
-              collapsed={collapsed}
-              collapsedSections={collapsedSections}
-              onToggleSection={toggleSection}
-            />
-          ))
-        ) : (
-          <div className="flex flex-col gap-0.5">
-            {nav.filter(isNavItemVisible).map((item) => (
-              <NavItemRow key={item.id} item={item} collapsed={collapsed} />
-            ))}
-          </div>
-        )}
+        {visibleFullNavSections.map((section) => (
+          <SectionBlock
+            key={section.section}
+            section={section}
+            collapsed={collapsed}
+            collapsedSections={collapsedSections}
+            onToggleSection={toggleSection}
+          />
+        ))}
       </div>
 
       {/* AI Copilot card */}

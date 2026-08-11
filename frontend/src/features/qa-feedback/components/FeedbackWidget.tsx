@@ -5,48 +5,18 @@ import { useQaFeedback } from '@/features/qa-feedback/hooks/useQaFeedback'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 
-// Global "Flag Issue" trigger — mounted once in AppLayout.tsx (sibling to
-// Sidebar/Topbar/main), so it's available on every authenticated page.
-// Draggable (pointer events on the trigger button itself) so it can be
-// moved out of the way of whatever it's covering; position is in-memory
-// only and resets to the default bottom-right corner on reload.
-//
-// Flow: click the trigger -> the whole viewport becomes clickable (a
-// transparent full-screen overlay tracks the cursor) -> tester clicks the
-// exact live element/spot they want to flag -> a small comment popover
-// appears anchored at that click point -> submit. No screenshot is
-// captured or stored — this is a lightweight text-comment + rough-position
-// report, not a visual one (deliberately dropped after an earlier version
-// captured a full-page image via html2canvas-pro; removed because
-// screenshot storage wasn't feasible to support right now).
-//
-// pinXPercent/pinYPercent are captured as a PERCENTAGE of the page's
-// current viewport (0-100) at click time, not raw pixels — same
-// resolution-independence rationale as the backend model's own comment.
 
 type Phase = 'idle' | 'picking' | 'commenting'
 
 const FeedbackWidget = () => {
   const location = useLocation()
-  // fetchList=false — this widget only ever submits new feedback, it never
-  // displays the existing list, so there's no reason to fetch it (this
-  // component renders on every authenticated page via AppLayout.tsx).
   const { createFeedback, isCreating } = useQaFeedback({}, false)
   const [phase, setPhase] = useState<Phase>('idle')
   const [pin, setPin] = useState<{ xPercent: number; yPercent: number; clientX: number; clientY: number } | null>(null)
   const [comment, setComment] = useState('')
 
-  // Trigger position — undefined means "use the default bottom-right CSS
-  // spot" (bottom-5 right-5). Once the user drags it, we switch to fixed
-  // pixel coordinates. Deliberately in-memory only (no localStorage): per
-  // user, 2026-08-04, the button should reset to the default corner on
-  // reload/new session, not remember where it was dropped.
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null)
   const dragState = useRef<{ offsetX: number; offsetY: number } | null>(null)
-  // Survives past pointerup (unlike dragState, cleared there) so the click
-  // event that fires right after pointerup can still see it and bail —
-  // otherwise a drag-release would also register as a click and immediately
-  // reopen picking mode.
   const justDragged = useRef(false)
 
   const handleDragStart = (e: React.PointerEvent<HTMLButtonElement>) => {
@@ -69,8 +39,7 @@ const FeedbackWidget = () => {
   }
 
   const handleTriggerClick = () => {
-    // A drag that actually moved the button shouldn't also fire the click
-    // that opens picking mode — only a genuine tap/click should.
+    // A drag that moved the button shouldn't also open picking mode.
     if (justDragged.current) {
       justDragged.current = false
       return
@@ -107,8 +76,6 @@ const FeedbackWidget = () => {
     }
   }
 
-  // Popover anchoring: flip to the left/above the click point when it's
-  // near the right/bottom edge, so the box never renders off-screen.
   const popoverStyle: React.CSSProperties = pin
     ? {
         position: 'fixed',
@@ -125,7 +92,7 @@ const FeedbackWidget = () => {
           onPointerDown={handleDragStart}
           onPointerMove={handleDragMove}
           onPointerUp={handleDragEnd}
-          className="fixed z-50 flex items-center gap-2 rounded-full px-4 py-3 text-[13px] font-bold text-white shadow-lg transition-transform hover:scale-105 touch-none cursor-grab active:cursor-grabbing"
+          className="fixed z-100 flex items-center gap-2 rounded-full px-4 py-3 text-[13px] font-bold text-white shadow-lg transition-transform hover:scale-105 touch-none cursor-grab active:cursor-grabbing"
           style={{
             background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))',
             ...(dragPos

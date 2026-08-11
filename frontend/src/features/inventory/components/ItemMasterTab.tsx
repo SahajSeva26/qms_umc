@@ -23,6 +23,9 @@ import {
   inr, inrShort, expiryBand, remainingLabel, itemValue, testName,
 } from '@/features/inventory/inventory.service'
 import type { ItemFormValues } from '@/features/inventory/inventory.service'
+import { itemSchema } from '@/features/inventory/schemas/item.schema'
+import { EXPIRY_BAND_STYLE } from '@/features/inventory/constants/expiryBandStyle'
+import { TableEmptyRow, InvFilterBar } from '@/features/inventory/components/IntelTableUi'
 
 // lucide icon lookup, keyed by the exact icon names TYPE_META uses in the
 // prototype (inventory-masters.js:50-57) — cpu/package/box/megaphone/laptop/armchair.
@@ -35,17 +38,8 @@ const TYPE_ICON: Record<ItemType, typeof Cpu> = {
   'Office Asset': Armchair,
 }
 
-// .im-band pill — exact port of inventory-masters.js's injected CSS
-// (lines 209-214).
-const BAND_STYLE: Record<'green' | 'yellow' | 'orange' | 'red', { bg: string; fg: string }> = {
-  green: { bg: 'rgba(16,185,129,.15)', fg: '#059669' },
-  yellow: { bg: 'rgba(234,179,8,.18)', fg: '#a16207' },
-  orange: { bg: 'rgba(249,115,22,.16)', fg: '#c2410c' },
-  red: { bg: 'rgba(244,63,94,.15)', fg: '#e11d48' },
-}
-
 const ExpiryBandPill = ({ css, label }: { css: 'green' | 'yellow' | 'orange' | 'red'; label: string }) => {
-  const s = BAND_STYLE[css]
+  const s = EXPIRY_BAND_STYLE[css]
   return (
     <span
       className="inline-flex items-center gap-1 font-bold uppercase rounded-full"
@@ -302,8 +296,9 @@ const ItemMasterTab = () => {
   }
 
   const handleSave = async () => {
-    if (!form.name.trim()) {
-      toast.error('Name is required')
+    const result = itemSchema.safeParse(form)
+    if (!result.success) {
+      toast.error(result.error.issues[0]?.message ?? 'Please check the highlighted fields')
       return
     }
     setSaving(true)
@@ -352,10 +347,7 @@ const ItemMasterTab = () => {
       </div>
 
       {/* .inv-filter — sticky search + type select + counter + New item */}
-      <div
-        className="flex gap-2 items-center flex-wrap mb-3 rounded-[10px] border sticky z-25"
-        style={{ padding: '10px 12px', background: 'var(--qms-surface)', borderColor: 'var(--qms-border)', top: 60 }}
-      >
+      <InvFilterBar>
         <Search size={14} style={{ color: 'var(--qms-text-muted)' }} />
         <input
           value={q}
@@ -379,7 +371,7 @@ const ItemMasterTab = () => {
         <Button onClick={() => { openCreate(); }}>
           <Plus size={14} /> New item
         </Button>
-      </div>
+      </InvFilterBar>
 
       {/* .inv-card padding:0;overflow:auto — 8-column item table */}
       <div className="rounded-2xl border overflow-auto" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
@@ -399,11 +391,7 @@ const ItemMasterTab = () => {
           </thead>
           <tbody>
             {rows.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="text-center" style={{ padding: 24, color: 'var(--qms-text-muted)' }}>
-                  No items match this filter.
-                </td>
-              </tr>
+              <TableEmptyRow colSpan={8}>No items match this filter.</TableEmptyRow>
             ) : (
               rows.map((it) => {
                 const band = isConsumableType(it.itemType) ? expiryBand(it.expiryDate) : null

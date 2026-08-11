@@ -12,8 +12,7 @@ export const useLogin = () => {
     mutationFn: (payload: LoginPayload) => authService.login(payload),
     onSuccess: (data) => {
       if (data?.data) {
-        // TODO: backend doesn't return role yet — remove this fallback once it does
-        setAuth({ ...data.data, role: data.data.role ?? 'super_admin' })
+        setAuth({ ...data.data })
       }
       // Invalidate the cached session (useSession/usePermission/useActiveRole)
       // so the new user's real permissions load immediately instead of

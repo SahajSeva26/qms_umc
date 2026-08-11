@@ -2,7 +2,6 @@ import { useState } from 'react'
 import type { Camp } from '@/types/camp.types'
 import type { Dietitian, DietStage } from '@/features/diet/diet.types'
 import type { useDietCamps } from '@/features/diet/hooks/useDietCamps'
-import { usePeopleData } from '@/hooks/usePeopleData'
 import DietCampCard from '@/features/diet/components/DietCampCard'
 import DietCampDetail from '@/features/diet/components/DietCampDetail'
 import InviteDietitiansModal from '@/features/diet/components/InviteDietitiansModal'
@@ -28,7 +27,6 @@ const STATUS_PILLS: { id: DietStage | 'ALL'; label: string }[] = [
 ]
 
 const CampsTab = ({ camps, dietitians, viewOnly, statusFilter, onSelectStatus, diet }: CampsTabProps) => {
-  const { people: dietitianPeople } = usePeopleData('Dietitian')
   const [openCampId, setOpenCampId] = useState<string | null>(null)
   const [inviteCampId, setInviteCampId] = useState<string | null>(null)
   const [rateSheetCampId, setRateSheetCampId] = useState<string | null>(null)
@@ -83,12 +81,14 @@ const CampsTab = ({ camps, dietitians, viewOnly, statusFilter, onSelectStatus, d
         onAssignTeam={() => { setRateSheetCampId(openCampId); setOpenCampId(null) }}
       />
 
+      {/* No `dietitians` prop — the invite modal ranks the real dietitian
+          roster via dietitians.service.ts (same source as the approvals
+          invite screen), not the Person[] list used elsewhere here. */}
       {inviteCampId && (
         <InviteDietitiansModal
           open={!!inviteCampId}
           onClose={() => setInviteCampId(null)}
           campId={inviteCampId}
-          dietitians={dietitianPeople}
           onProceedToRateSheet={() => {
             setRateSheetCampId(inviteCampId)
             setInviteCampId(null)
@@ -101,7 +101,6 @@ const CampsTab = ({ camps, dietitians, viewOnly, statusFilter, onSelectStatus, d
           open={!!rateSheetCampId}
           onClose={() => setRateSheetCampId(null)}
           campId={rateSheetCampId}
-          dietitians={dietitianPeople}
         />
       )}
     </div>

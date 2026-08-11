@@ -2,7 +2,7 @@ import { FiChevronRight, FiUsers, FiLayers, FiDownload } from 'react-icons/fi'
 import type { Client, Division, ClientMr } from '@/types/client.types'
 import type { GeoFo } from '@/features/hq/hq.types'
 import { ROLLUP_PROJECTS, PROJECT_DEVICE, mrServiceability } from '@/features/hq/components/hqmapping/mappingRollups'
-import { downloadCsv } from '@/features/hq/components/hqmapping/hq.ui'
+import { downloadCsv, HQ_CARD_STYLE } from '@/features/hq/components/hqmapping/hq.ui'
 import { toast } from '@/components/ui/sonner'
 
 interface CompanyViewProps {
@@ -49,7 +49,7 @@ const CompanyView = ({ client, divisions, mrs, fos, radiusKm, onOpenCompanies, o
   return (
     <div>
       <div className="flex items-center gap-1.5 text-[12px] mb-3.5 flex-wrap" style={{ color: 'var(--qms-text-muted)' }}>
-        <a onClick={onOpenCompanies} className="font-bold cursor-pointer" style={{ color: 'var(--qms-brand)' }}>Companies</a>
+        <button type="button" onClick={onOpenCompanies} className="font-bold cursor-pointer" style={{ color: 'var(--qms-brand)' }}>Companies</button>
         <FiChevronRight size={13} />
         <b style={{ color: 'var(--qms-text)' }}>{client.name}</b>
       </div>
@@ -64,7 +64,7 @@ const CompanyView = ({ client, divisions, mrs, fos, radiusKm, onOpenCompanies, o
         </div>
       </div>
 
-      <div className="rounded-2xl border p-4 mb-3.5" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
+      <div className="rounded-2xl border p-4 mb-3.5" style={HQ_CARD_STYLE}>
         <div className="flex items-center gap-1.5 text-[13px] font-extrabold mb-1"><FiUsers size={14} /> Overall MR serviceability — project-wise</div>
         <div className="text-[11px] mb-3" style={{ color: 'var(--qms-text-muted)' }}>
           Across all {mrList.length} MRs in {client.name}. A MR is serviceable when an FO carrying the project's device is within {radiusKm} KM of the MR HQ.
@@ -103,7 +103,7 @@ const CompanyView = ({ client, divisions, mrs, fos, radiusKm, onOpenCompanies, o
             return { pt, ok: x.serviceable.length, bad: x.nonServiceable.length }
           })
           return (
-            <div key={d.id} onClick={() => onOpenDivision(d.id)} className="rounded-2xl border p-4 cursor-pointer transition-transform hover:-translate-y-0.5" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
+            <div key={d.id} onClick={() => onOpenDivision(d.id)} className="rounded-2xl border p-4 cursor-pointer transition-transform hover:-translate-y-0.5" style={HQ_CARD_STYLE}>
               <div className="flex gap-3 items-center mb-3">
                 <div className="w-[46px] h-[46px] rounded-xl grid place-items-center shrink-0 text-white" style={{ background: client.color || '#3b6dff' }}>
                   <FiLayers size={20} />

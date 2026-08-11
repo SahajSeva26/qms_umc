@@ -5,7 +5,7 @@ import type { Camp } from '@/types/camp.types'
 import { classifyHq } from '@/features/hq/hq.service'
 import { lookupCity } from '@/features/hq/cityGazetteer'
 import HqTable from '@/features/hq/components/hqmapping/HqTable'
-import { todayIso } from '@/features/hq/components/hqmapping/hq.ui'
+import { todayIso, HQ_TIER_COLOR, HQ_CARD_STYLE } from '@/features/hq/components/hqmapping/hq.ui'
 
 interface CoordTabProps {
   rows: ClassifiedHq[]
@@ -29,7 +29,7 @@ const CoordTab = ({ rows, fos, camps, onOpenRow, onAssignFo }: CoordTabProps) =>
 
   return (
     <div>
-      <div className="rounded-2xl border p-3.5 mb-3" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
+      <div className="rounded-2xl border p-3.5 mb-3" style={HQ_CARD_STYLE}>
         <div className="flex items-center justify-between mb-2.5">
           <span className="text-[13px] font-extrabold">Open camps awaiting assignment</span>
           <span className="text-[10.5px] font-semibold uppercase" style={{ color: 'var(--qms-text-muted)' }}>{upcomingCamps.length} camps</span>
@@ -68,8 +68,8 @@ const CoordTab = ({ rows, fos, camps, onOpenRow, onAssignFo }: CoordTabProps) =>
                           <b>{cls.nearestFo.name}</b> · {cls.distanceKm?.toFixed(1)} KM · ~{cls.etaMin} min · load {cls.nearestFo.loadPct}%
                         </>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 text-[10.5px] font-extrabold px-2.5 py-1 rounded-full" style={{ background: 'rgba(244,63,94,.16)', color: '#b91c1c' }}>
-                          <span className="w-[7px] h-[7px] rounded-full" style={{ background: '#f43f5e' }} /> No FO
+                        <span className="inline-flex items-center gap-1.5 text-[10.5px] font-extrabold px-2.5 py-1 rounded-full" style={{ background: HQ_TIER_COLOR.RED.bg, color: HQ_TIER_COLOR.RED.fg }}>
+                          <span className="w-[7px] h-[7px] rounded-full" style={{ background: HQ_TIER_COLOR.RED.dot }} /> No FO
                         </span>
                       )}
                     </td>

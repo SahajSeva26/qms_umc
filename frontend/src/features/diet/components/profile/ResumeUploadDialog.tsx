@@ -3,8 +3,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/sonner'
-import { setDietitianResume } from '@/features/diet/dietitians.service'
-
+import { useSetDietitianResume } from '@/features/diet/hooks/useDietitianRoster'
+import { errorMessage } from '@/features/diet/utils/errorMessage'
 interface ResumeUploadDialogProps {
   open: boolean
   dietitianId: string
@@ -15,6 +15,7 @@ interface ResumeUploadDialogProps {
 
 const ResumeUploadDialog = ({ open, dietitianId, currentResumeUrl, onClose, onSaved }: ResumeUploadDialogProps) => {
   const [url, setUrl] = useState(currentResumeUrl)
+  const setResume = useSetDietitianResume()
 
   useEffect(() => {
     if (open) setUrl(currentResumeUrl)
@@ -25,7 +26,12 @@ const ResumeUploadDialog = ({ open, dietitianId, currentResumeUrl, onClose, onSa
       toast.error('Resume URL / file path is required')
       return
     }
-    await setDietitianResume(dietitianId, url.trim())
+    try {
+      await setResume.mutateAsync({ id: dietitianId, resumeUrl: url.trim() })
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not save the resume — try again.'))
+      return
+    }
     toast.success('Resume saved')
     onSaved()
   }

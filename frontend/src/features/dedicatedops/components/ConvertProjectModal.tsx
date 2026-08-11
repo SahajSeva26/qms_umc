@@ -3,13 +3,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import { toast } from '@/components/ui/sonner'
 import type { ProjectEntity } from '@/types/project.types'
 
 interface ConvertProjectModalProps {
   open: boolean
   onClose: () => void
   eligibleProjects: ProjectEntity[]
-  onConfirm: (projectId: string, manpower: { fo: number; coordinator: number; technician: number }, territory: { state: string; city: string; zone: string }) => void
+  /** Returns the mutation's promise so this modal can await it — see handleConfirm. */
+  onConfirm: (projectId: string, manpower: { fo: number; coordinator: number; technician: number }, territory: { state: string; city: string; zone: string }) => Promise<unknown>
 }
 
 // Mirrors the prototype's doConvertProject/doConfirmConvert flow exactly —
@@ -22,12 +24,23 @@ const ConvertProjectModal = ({ open, onClose, eligibleProjects, onConfirm }: Con
   const [state, setState] = useState('')
   const [city, setCity] = useState('')
   const [zone, setZone] = useState('')
+  const [saving, setSaving] = useState(false)
 
-  const handleConfirm = () => {
+  // Awaits the mutation before resetting/closing — a failed conversion must
+  // leave the form exactly as the user left it, not vanish as if it had
+  // succeeded.
+  const handleConfirm = async () => {
     if (!projectId) return
-    onConfirm(projectId, { fo, coordinator, technician }, { state, city, zone })
-    setProjectId(''); setFo(2); setCoordinator(1); setTechnician(0); setState(''); setCity(''); setZone('')
-    onClose()
+    setSaving(true)
+    try {
+      await onConfirm(projectId, { fo, coordinator, technician }, { state, city, zone })
+      setProjectId(''); setFo(2); setCoordinator(1); setTechnician(0); setState(''); setCity(''); setZone('')
+      onClose()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not convert the project — try again.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -72,7 +85,7 @@ const ConvertProjectModal = ({ open, onClose, eligibleProjects, onConfirm }: Con
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button disabled={!projectId} onClick={handleConfirm}>Convert</Button>
+          <Button disabled={!projectId || saving} onClick={handleConfirm}>Convert</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

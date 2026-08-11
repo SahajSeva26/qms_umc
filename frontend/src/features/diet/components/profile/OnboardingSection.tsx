@@ -3,7 +3,9 @@ import { FiBriefcase, FiCheck, FiX, FiCreditCard, FiFileText, FiCpu, FiSend } fr
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/sonner'
 import type { DietitianProfileBundle, DietitianEnrollStatus } from '@/features/diet/dietitians.types'
-import { dietitianOnboardingComplete, submitDietitianForInterview } from '@/features/diet/dietitians.service'
+import { dietitianOnboardingComplete } from '@/features/diet/services/dietitianRoster.service'
+import { useSubmitDietitianForInterview } from '@/features/diet/hooks/useDietitianRoster'
+import { errorMessage } from '@/features/diet/utils/errorMessage'
 import { fmtDate } from './profile.utils'
 import BankAddDialog from './BankAddDialog'
 import ResumeUploadDialog from './ResumeUploadDialog'
@@ -27,6 +29,7 @@ const STATUS_META: Record<DietitianEnrollStatus, { bg: string; color: string; la
 // simple "already onboarded" note with a forced ENROLLED badge.
 const OnboardingSection = ({ bundle, onChanged }: OnboardingSectionProps) => {
   const { dietitian: d, details } = bundle
+  const submitForInterview = useSubmitDietitianForInterview()
   const [bankOpen, setBankOpen] = useState(false)
   const [resumeOpen, setResumeOpen] = useState(false)
   const [deviceOpen, setDeviceOpen] = useState(false)
@@ -59,7 +62,12 @@ const OnboardingSection = ({ bundle, onChanged }: OnboardingSectionProps) => {
       toast.error('Complete bank, resume and device alignment first')
       return
     }
-    await submitDietitianForInterview(d.id)
+    try {
+      await submitForInterview.mutateAsync(d.id)
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not submit for interview — try again.'))
+      return
+    }
     toast.success('Submitted for OM·Diet interview')
     onChanged()
   }

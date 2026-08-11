@@ -1,9 +1,7 @@
-import type { UserRole } from '@/types/auth.types'
 import { AUTH_ROUTES }      from '@/features/auth/auth.routes'
 import { DASHBOARD_ROUTES } from '@/features/dashboard/dashboard.routes'
 import { CRM_ROUTES }       from '@/features/crm/crm.routes'
 import { CONTACT_ROUTES }   from '@/features/contacts/contacts.routes'
-import { DIVISION_ROUTES }  from '@/features/crm/divisions/divisions.routes'
 import { ANALYTICS_ROUTES } from '@/features/analytics/analytics.routes'
 import { CAMPS_ROUTES }     from '@/features/camps/camps.routes'
 import { DIET_ROUTES }      from '@/features/diet/diet.routes'
@@ -13,7 +11,7 @@ import { PHARMA_ROUTES }    from '@/features/pharma/pharma.routes'
 import { PROJECTS_ROUTES }  from '@/features/projects/projects.routes'
 import { OM_ROUTES }        from '@/features/om/om.routes'
 import { DOCTORS_ROUTES }   from '@/features/doctors/doctors.routes'
-import { GEO_PROFILE_ROUTES } from '@/features/geo-profile/geoProfile.routes'
+import { GEO_PROFILE_ROUTES } from '@/features/geo-profile/geoProfile.constants'
 import { BILLING_ROUTES }   from '@/features/billing/billing.routes'
 import { ADMIN_ROUTES }     from '@/features/admin/admin.routes'
 import { ACCESS_MANAGEMENT_ROUTES }      from '@/features/access-management/accessManagement.routes'
@@ -26,7 +24,6 @@ export interface NavItem {
   label:        string
   icon:         string   // react-icons/fi name without the "Fi" prefix
   path:         string   // always imported from the feature's own routes file
-  rolesAllowed: UserRole[]  // super_admin and admin resolved in getNavForRole — not listed here
 }
 
 export interface NavSubsection {
@@ -39,209 +36,148 @@ export interface NavSection {
   subs:    NavSubsection[]
 }
 
-// ── Role → landing page ──────────────────────────────────────────────────────
-
-export const ROLE_HOME: Record<UserRole, string> = {
-  super_admin:      DASHBOARD_ROUTES.DASHBOARD,
-  admin:            DASHBOARD_ROUTES.DASHBOARD,
-  sales_lead:       CRM_ROUTES.CRM,
-  sales_rep:        CRM_ROUTES.CRM,
-  camp_coord:       CAMPS_ROUTES.CAMPS,
-  diet_camp_coord:  DIET_ROUTES.DIET,
-  om_screening:     OM_ROUTES.OM,
-  om_diet:          OM_ROUTES.OM,
-  fo:               FO_ROUTES.FO,
-  dedicated_fo:     FO_ROUTES.FO,
-  logistics:        ADMIN_ROUTES.ADMIN,
-  accounts:         BILLING_ROUTES.BILLING,
-  dietitian:        DIET_ROUTES.DIET,
-  analytics_viewer: ANALYTICS_ROUTES.ANALYTICS,
-  pharma_ho:        PHARMA_ROUTES.PHARMA_HO,
-  pharma_rsm:       PHARMA_ROUTES.PHARMA_RSM,
-  pharma_asm:       PHARMA_ROUTES.PHARMA_ASM,
-  pharma_mr:        PHARMA_ROUTES.PHARMA_MR,
-}
-
 // ── Nav item registry ────────────────────────────────────────────────────────
-// Each item declares exactly which non-admin roles can see it.
-// super_admin and admin always see everything — handled in getNavForRole.
+// Real visibility is enforced by Sidebar.tsx's system:manage section gate
+// and REAL_GATED_NAV_ITEMS per-item permission checks, not by anything here.
 
 const ALL_NAV_ITEMS: NavItem[] = [
 
   // Overview
-  { id: 'dashboard',    label: 'Dashboard',                   icon: 'Grid',          path: DASHBOARD_ROUTES.DASHBOARD,
-    rolesAllowed: ['logistics', 'analytics_viewer'] },
+  { id: 'dashboard',    label: 'Dashboard',                   icon: 'Grid',          path: DASHBOARD_ROUTES.DASHBOARD },
 
-  { id: 'sales',        label: 'Dashboard',                   icon: 'Grid',          path: CRM_ROUTES.SALES,
-    rolesAllowed: ['sales_lead', 'sales_rep'] },
+  { id: 'sales',        label: 'Dashboard',                   icon: 'Grid',          path: CRM_ROUTES.SALES },
 
-  { id: 'analytics',    label: 'Sales Analytics',             icon: 'TrendingUp',    path: ANALYTICS_ROUTES.ANALYTICS_SALES,
-    rolesAllowed: ['sales_lead', 'logistics', 'analytics_viewer'] },
+  { id: 'analytics',    label: 'Sales Analytics',             icon: 'TrendingUp',    path: ANALYTICS_ROUTES.ANALYTICS_SALES },
 
-  { id: 'foanalytics',  label: 'FO Analytics',                icon: 'Navigation',    path: ANALYTICS_ROUTES.ANALYTICS_FO,
-    rolesAllowed: ['analytics_viewer'] },
+  { id: 'foanalytics',  label: 'FO Analytics',                icon: 'Navigation',    path: ANALYTICS_ROUTES.ANALYTICS_FO },
 
-  { id: 'docanalytics', label: 'Doctor Analytics',            icon: 'Activity',      path: ANALYTICS_ROUTES.ANALYTICS_DOCTORS,
-    rolesAllowed: ['analytics_viewer'] },
+  { id: 'docanalytics', label: 'Doctor Analytics',            icon: 'Activity',      path: ANALYTICS_ROUTES.ANALYTICS_DOCTORS },
 
-  { id: 'finanalytics', label: 'Financial Analytics',         icon: 'BarChart2',     path: ANALYTICS_ROUTES.ANALYTICS_FINANCIAL,
-    rolesAllowed: ['accounts', 'analytics_viewer'] },
+  { id: 'finanalytics', label: 'Financial Analytics',         icon: 'BarChart2',     path: ANALYTICS_ROUTES.ANALYTICS_FINANCIAL },
 
   // Sales & CRM — Pipeline
-  { id: 'appointments', label: 'Appointments',                icon: 'Calendar',      path: CRM_ROUTES.APPOINTMENTS,
-    rolesAllowed: ['sales_lead', 'sales_rep'] },
+  // Real visibility for all 5 items in this Pipeline group is enforced by
+  // REAL_GATED_NAV_ITEMS in Sidebar.tsx (matching each route's own
+  // RequirePermission guard, with the usual system:manage bypass) — see
+  // that map for the actual gate.
+  { id: 'appointments', label: 'Appointments',                icon: 'Calendar',      path: CRM_ROUTES.APPOINTMENTS },
 
-  { id: 'crm',          label: 'CRM',                         icon: 'Users',         path: CRM_ROUTES.CRM,
-    rolesAllowed: ['sales_lead', 'sales_rep', 'camp_coord', 'diet_camp_coord'] },
+  { id: 'crm',          label: 'CRM',                         icon: 'Users',         path: CRM_ROUTES.CRM },
 
-  { id: 'clientmgmt',   label: 'Client Management',           icon: 'Briefcase',     path: CRM_ROUTES.CLIENTS,
-    rolesAllowed: ['sales_lead', 'sales_rep', 'camp_coord', 'diet_camp_coord'] },
+  // Renamed from "Companies" and moved here from System 2026-08-11 (frontend-
+  // only: same route/page, ACCESS_MANAGEMENT_ROUTES.TENANTS / TenantsListPage
+  // + TenantDetailPage) — a company's own page now shows its Divisions
+  // inline, so this reads as "Client Management" and belongs in the CRM
+  // pipeline, not buried under System. Permission gate unchanged — see
+  // REAL_GATED_NAV_ITEMS['tenants'] in Sidebar.tsx.
+  { id: 'tenants',      label: 'Client Management',           icon: 'Globe',         path: ACCESS_MANAGEMENT_ROUTES.TENANTS },
 
-  { id: 'contacts',     label: 'Contacts',                    icon: 'Users',         path: CONTACT_ROUTES.CONTACTS,
-    rolesAllowed: ['sales_lead', 'sales_rep', 'camp_coord', 'diet_camp_coord'] },
-
-  // Moved here 2026-07-31 from a standalone "Company Data" section — Division
-  // is a CRM-native concept (Lead/Project/Appointment/Role all key off it
-  // directly), not a separate top-level area. Real visibility is enforced by
-  // REAL_GATED_NAV_ITEMS in Sidebar.tsx (division:manage / tenant:manage,
-  // with the usual system:manage bypass) — see that map for the actual gate.
-  { id: 'divisions',    label: 'Divisions',                   icon: 'Globe',         path: DIVISION_ROUTES.DIVISIONS,
-    rolesAllowed: [] },
+  { id: 'contacts',     label: 'Contacts',                    icon: 'Users',         path: CONTACT_ROUTES.CONTACTS },
 
   // Sales & CRM — Delivery
-  { id: 'projects',     label: 'Project Management',          icon: 'FolderPlus',    path: PROJECTS_ROUTES.PROJECTS,
-    rolesAllowed: ['sales_lead', 'sales_rep', 'camp_coord', 'diet_camp_coord'] },
+  { id: 'projects',     label: 'Project Management',          icon: 'FolderPlus',    path: PROJECTS_ROUTES.PROJECTS },
 
-  { id: 'gantt',        label: 'Project Gantt',               icon: 'Sliders',       path: PROJECTS_ROUTES.PROJECTS_GANTT,
-    rolesAllowed: ['camp_coord', 'diet_camp_coord', 'logistics'] },
+  { id: 'gantt',        label: 'Project Gantt',               icon: 'Sliders',       path: PROJECTS_ROUTES.PROJECTS_GANTT },
 
   // Operations — Camps
-  { id: 'omportal',     label: 'Ops Manager',                 icon: 'Clipboard',     path: OM_ROUTES.OM,
-    rolesAllowed: ['om_screening', 'om_diet'] },
+  { id: 'omportal',     label: 'Ops Manager',                 icon: 'Clipboard',     path: OM_ROUTES.OM },
 
-  { id: 'camps',        label: 'Camp Management',             icon: 'Sun',           path: CAMPS_ROUTES.CAMPS,
-    rolesAllowed: ['camp_coord', 'om_screening', 'sales_rep', 'logistics'] },
+  // Real visibility enforced by REAL_GATED_NAV_ITEMS in Sidebar.tsx.
+  { id: 'camps',        label: 'Camp Management',             icon: 'Sun',           path: CAMPS_ROUTES.CAMPS },
 
-  { id: 'telecamps',    label: 'Teleconsultation Camps',      icon: 'Video',         path: CAMPS_ROUTES.CAMPS_TELE,
-    rolesAllowed: ['camp_coord', 'om_screening', 'om_diet', 'sales_rep'] },
+  { id: 'telecamps',    label: 'Teleconsultation Camps',      icon: 'Video',         path: CAMPS_ROUTES.CAMPS_TELE },
 
-  { id: 'diet',         label: 'Diet Camps',                  icon: 'Heart',         path: DIET_ROUTES.DIET,
-    rolesAllowed: ['camp_coord', 'diet_camp_coord', 'om_diet', 'sales_lead', 'sales_rep', 'fo', 'dietitian', 'logistics', 'pharma_ho', 'pharma_mr', 'pharma_asm', 'pharma_rsm'] },
+  { id: 'diet',         label: 'Diet Camps',                  icon: 'Heart',         path: DIET_ROUTES.DIET },
 
-  { id: 'dedicatedops', label: 'Dedicated Ops',               icon: 'Briefcase',     path: DEDICATEDOPS_ROUTES.DEDICATEDOPS,
-    rolesAllowed: ['om_screening'] },
+  { id: 'dedicatedops', label: 'Dedicated Ops',               icon: 'Briefcase',     path: DEDICATEDOPS_ROUTES.DEDICATEDOPS },
 
   // Operations — Dietitians
-  { id: 'dietapprovals',label: 'Diet Coord Workspace',        icon: 'Briefcase',     path: DIET_ROUTES.DIET_APPROVALS,
-    rolesAllowed: ['diet_camp_coord', 'om_diet'] },
+  { id: 'dietapprovals',label: 'Diet Coord Workspace',        icon: 'Briefcase',     path: DIET_ROUTES.DIET_APPROVALS },
 
-  { id: 'dietpayment',  label: 'Dietitian Payment',           icon: 'DollarSign',    path: BILLING_ROUTES.BILLING_DIETITIAN,
-    rolesAllowed: ['diet_camp_coord', 'om_diet', 'accounts'] },
+  { id: 'dietpayment',  label: 'Dietitian Payment',           icon: 'DollarSign',    path: BILLING_ROUTES.BILLING_DIETITIAN },
 
-  { id: 'dietprofile',  label: 'Dietitian Profiles',          icon: 'UserCheck',     path: DIET_ROUTES.DIET_PROFILES,
-    rolesAllowed: ['diet_camp_coord', 'om_diet', 'accounts', 'dietitian'] },
+  { id: 'dietprofile',  label: 'Dietitian Profiles',          icon: 'UserCheck',     path: DIET_ROUTES.DIET_PROFILES },
 
   // Operations — Field Network
-  { id: 'fo',           label: 'FO Management',               icon: 'Navigation',    path: FO_ROUTES.FO,
-    rolesAllowed: ['sales_lead', 'sales_rep', 'camp_coord', 'om_screening', 'om_diet', 'logistics', 'dedicated_fo'] },
+  { id: 'fo',           label: 'FO Management',               icon: 'Navigation',    path: FO_ROUTES.FO },
 
-  { id: 'fo_workspace', label: 'My FO Workspace',             icon: 'Briefcase',     path: FO_ROUTES.FO_WORKSPACE,
-    rolesAllowed: ['fo'] },
+  { id: 'fo_workspace', label: 'My FO Workspace',             icon: 'Briefcase',     path: FO_ROUTES.FO_WORKSPACE },
 
-  { id: 'foconfig',     label: 'FO Config Master',            icon: 'Settings',      path: FO_ROUTES.FO_CONFIG,
-    rolesAllowed: ['om_screening', 'om_diet'] },
+  { id: 'foconfig',     label: 'FO Config Master',            icon: 'Settings',      path: FO_ROUTES.FO_CONFIG },
 
-  { id: 'doctors',      label: 'Doctor Management',           icon: 'Activity',      path: DOCTORS_ROUTES.DOCTORS,
-    rolesAllowed: ['camp_coord', 'diet_camp_coord', 'pharma_ho', 'pharma_mr', 'pharma_asm', 'pharma_rsm'] },
+  // GET /doctors is intentionally open to any authenticated user
+  // server-side (only create/update require doctor:manage) — no
+  // REAL_GATED_NAV_ITEMS entry either; gating this nav link would fight
+  // the backend's actual, deliberate contract.
+  { id: 'doctors',      label: 'Doctor Management',           icon: 'Activity',      path: DOCTORS_ROUTES.DOCTORS },
 
-  // Real-permission-backed (geo-profile:manage), like the Access Management
-  // entities below — no real backend permission maps onto the existing
-  // 18-role UserRole enum yet, so this is visible to super_admin/admin only
-  // (same convention as tenants/permissiongroups/roletypes/roles).
-  { id: 'geoprofiles',  label: 'Field Staff Coverage',        icon: 'MapPin',        path: GEO_PROFILE_ROUTES.GEO_PROFILES,
-    rolesAllowed: ['super_admin', 'admin'] },
+  // GET /geo-profiles is intentionally open to any authenticated user
+  // server-side (only create/update require geo-profile:manage) — same
+  // pattern as Doctors above. No REAL_GATED_NAV_ITEMS entry either; gating
+  // this nav link would fight the backend's actual, deliberate contract.
+  { id: 'geoprofiles',  label: 'Field Staff Coverage',        icon: 'MapPin',        path: GEO_PROFILE_ROUTES.GEO_PROFILES },
 
   // Operations — Coverage & Alerts
-  { id: 'hqmapping',    label: 'HQ Mapping & Serviceability', icon: 'MapPin',        path: ADMIN_ROUTES.ADMIN_HQ,
-    rolesAllowed: ['sales_lead', 'sales_rep', 'camp_coord', 'diet_camp_coord', 'om_screening', 'om_diet', 'fo', 'dedicated_fo', 'logistics', 'accounts', 'analytics_viewer'] },
+  { id: 'hqmapping',    label: 'HQ Mapping & Serviceability', icon: 'MapPin',        path: ADMIN_ROUTES.ADMIN_HQ },
 
-  { id: 'incidents',    label: 'Incidents · SOS',             icon: 'AlertTriangle', path: OM_ROUTES.OM_INCIDENTS,
-    rolesAllowed: ['om_screening', 'om_diet', 'fo'] },
+  { id: 'incidents',    label: 'Incidents · SOS',             icon: 'AlertTriangle', path: OM_ROUTES.OM_INCIDENTS },
 
-  { id: 'remindauto',   label: 'AI Reminders',                icon: 'Cpu',           path: ADMIN_ROUTES.ADMIN_REMINDERS,
-    rolesAllowed: ['camp_coord', 'om_screening', 'om_diet'] },
+  { id: 'remindauto',   label: 'AI Reminders',                icon: 'Cpu',           path: ADMIN_ROUTES.ADMIN_REMINDERS },
 
   // Pharma Network
-  { id: 'pharma',       label: 'Pharma Portal',               icon: 'Briefcase',     path: PHARMA_ROUTES.PHARMA,
-    rolesAllowed: [] },
+  { id: 'pharma',       label: 'Pharma Portal',               icon: 'Briefcase',     path: PHARMA_ROUTES.PHARMA },
 
-  { id: 'hoportal',     label: 'HO Portal',                   icon: 'Briefcase',     path: PHARMA_ROUTES.PHARMA_HO,
-    rolesAllowed: ['pharma_ho'] },
+  { id: 'hoportal',     label: 'HO Portal',                   icon: 'Briefcase',     path: PHARMA_ROUTES.PHARMA_HO },
 
-  { id: 'rsmportal',    label: 'RSM Portal',                  icon: 'Globe',         path: PHARMA_ROUTES.PHARMA_RSM,
-    rolesAllowed: ['pharma_rsm'] },
+  { id: 'rsmportal',    label: 'RSM Portal',                  icon: 'Globe',         path: PHARMA_ROUTES.PHARMA_RSM },
 
-  { id: 'asmportal',    label: 'ASM Portal',                  icon: 'Users',         path: PHARMA_ROUTES.PHARMA_ASM,
-    rolesAllowed: ['pharma_rsm', 'pharma_asm'] },
+  { id: 'asmportal',    label: 'ASM Portal',                  icon: 'Users',         path: PHARMA_ROUTES.PHARMA_ASM },
 
-  { id: 'mrportal',     label: 'MR Portal',                   icon: 'User',          path: PHARMA_ROUTES.PHARMA_MR,
-    rolesAllowed: ['pharma_rsm', 'pharma_asm', 'pharma_mr'] },
+  { id: 'mrportal',     label: 'MR Portal',                   icon: 'User',          path: PHARMA_ROUTES.PHARMA_MR },
 
   // Resources
-  { id: 'inventory',    label: 'Inventory & Devices',         icon: 'Package',       path: ADMIN_ROUTES.ADMIN_INVENTORY,
-    rolesAllowed: ['camp_coord', 'diet_camp_coord', 'om_screening', 'om_diet', 'fo', 'logistics', 'accounts', 'dietitian'] },
+  { id: 'inventory',    label: 'Inventory & Devices',         icon: 'Package',       path: ADMIN_ROUTES.ADMIN_INVENTORY },
 
-  { id: 'assets',       label: 'Asset Management',            icon: 'Box',           path: ADMIN_ROUTES.ADMIN_ASSETS,
-    rolesAllowed: ['logistics'] },
+  { id: 'assets',       label: 'Asset Management',            icon: 'Box',           path: ADMIN_ROUTES.ADMIN_ASSETS },
 
-  { id: 'kpi',          label: 'Order & KPI Engine',          icon: 'Activity',      path: ADMIN_ROUTES.ADMIN_KPI,
-    rolesAllowed: ['analytics_viewer'] },
+  { id: 'kpi',          label: 'Order & KPI Engine',          icon: 'Activity',      path: ADMIN_ROUTES.ADMIN_KPI },
 
   // Finance
-  { id: 'billing',      label: 'Accounting',                  icon: 'FileText',      path: BILLING_ROUTES.BILLING,
-    rolesAllowed: ['sales_lead', 'accounts', 'logistics'] },
+  { id: 'billing',      label: 'Accounting',                  icon: 'FileText',      path: BILLING_ROUTES.BILLING },
 
-  { id: 'crminvoicing', label: 'CRM Invoicing',               icon: 'FileText',      path: BILLING_ROUTES.BILLING_CRM,
-    rolesAllowed: ['om_screening', 'om_diet', 'accounts'] },
+  { id: 'crminvoicing', label: 'CRM Invoicing',               icon: 'FileText',      path: BILLING_ROUTES.BILLING_CRM },
 
-  { id: 'accounting',   label: 'CFO Accounting',              icon: 'TrendingUp',    path: BILLING_ROUTES.BILLING_CFO,
-    rolesAllowed: ['accounts'] },
+  { id: 'accounting',   label: 'CFO Accounting',              icon: 'TrendingUp',    path: BILLING_ROUTES.BILLING_CFO },
 
   // System
-  { id: 'admin',        label: 'Admin',                       icon: 'Shield',        path: ADMIN_ROUTES.ADMIN,
-    rolesAllowed: [] },
+  { id: 'admin',        label: 'Admin',                       icon: 'Shield',        path: ADMIN_ROUTES.ADMIN },
 
-  { id: 'users',        label: 'Users',                       icon: 'Users',         path: ADMIN_ROUTES.ADMIN_USERS,
-    rolesAllowed: [] },
+  // Real visibility enforced by REAL_GATED_NAV_ITEMS in Sidebar.tsx.
+  { id: 'users',        label: 'Users',                       icon: 'Users',         path: ADMIN_ROUTES.ADMIN_USERS },
 
-  { id: 'settings',     label: 'Settings',                    icon: 'Settings',      path: ADMIN_ROUTES.ADMIN_SETTINGS,
-    rolesAllowed: [] },
+  { id: 'settings',     label: 'Settings',                    icon: 'Settings',      path: ADMIN_ROUTES.ADMIN_SETTINGS },
 
-  // Access Management entities — no real backend permission maps onto the existing
-  // 18-role UserRole enum yet, so rolesAllowed is set explicitly to
-  // ['super_admin', 'admin'] rather than left at [] (which would mean
-  // "invisible to everyone except the super_admin/admin ALL-bypass" — same
-  // runtime effect via getNavForRole's early-return for those two roles,
-  // but explicit here for future readers).
-  { id: 'tenants',          label: 'Companies',               icon: 'Globe',         path: ACCESS_MANAGEMENT_ROUTES.TENANTS,
-    rolesAllowed: ['super_admin', 'admin'] },
+  // Access Management entities — real visibility enforced by
+  // REAL_GATED_NAV_ITEMS in Sidebar.tsx, matching each route's own
+  // RequirePermission guard exactly (with the usual system:manage bypass).
+  // 'tenants' itself moved into Sales & CRM > Pipeline (below 'crm') and
+  // relabeled "Client Management" 2026-08-11 — its underlying route/page
+  // are unchanged (still ACCESS_MANAGEMENT_ROUTES.TENANTS /
+  // TenantsListPage/TenantDetailPage), this is a nav-only rename+relocation,
+  // since companies-with-inline-divisions is what this nav item is
+  // actually for now.
+  { id: 'permissiongroups', label: 'Permission Groups',       icon: 'Shield',        path: ACCESS_MANAGEMENT_ROUTES.PERMISSION_GROUPS },
 
-  { id: 'permissiongroups', label: 'Permission Groups',       icon: 'Shield',        path: ACCESS_MANAGEMENT_ROUTES.PERMISSION_GROUPS,
-    rolesAllowed: ['super_admin', 'admin'] },
+  { id: 'roletypes',        label: 'Role Types',              icon: 'Sliders',       path: ACCESS_MANAGEMENT_ROUTES.ROLE_TYPES },
 
-  { id: 'roletypes',        label: 'Role Types',              icon: 'Sliders',       path: ACCESS_MANAGEMENT_ROUTES.ROLE_TYPES,
-    rolesAllowed: ['super_admin', 'admin'] },
+  { id: 'roles',            label: 'Roles',                   icon: 'UserCheck',     path: ACCESS_MANAGEMENT_ROUTES.ROLES },
 
-  { id: 'roles',            label: 'Roles',                   icon: 'UserCheck',     path: ACCESS_MANAGEMENT_ROUTES.ROLES,
-    rolesAllowed: ['super_admin', 'admin'] },
-
-  { id: 'qafeedback',       label: 'QA Feedback',             icon: 'MessageSquare', path: QA_FEEDBACK_ROUTES.QA_FEEDBACK_REVIEW,
-    rolesAllowed: ['super_admin', 'admin'] },
+  { id: 'qafeedback',       label: 'QA Feedback',             icon: 'MessageSquare', path: QA_FEEDBACK_ROUTES.QA_FEEDBACK_REVIEW },
 ]
 
 const NAV_BY_ID = Object.fromEntries(ALL_NAV_ITEMS.map((n) => [n.id, n]))
 
-// ── Full sectioned nav — super_admin and admin only ───────────────────────────
+// ── Full sectioned nav — rendered for every account, filtered by Sidebar.tsx's real permission gates ──
 
 export const FULL_NAV_SECTIONS: NavSection[] = [
   {
@@ -253,7 +189,7 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
   {
     section: 'Sales & CRM',
     subs: [
-      { title: 'Pipeline', items: ['appointments', 'crm', 'clientmgmt', 'contacts', 'divisions'].map((id) => NAV_BY_ID[id]) },
+      { title: 'Pipeline', items: ['appointments', 'crm', 'tenants', 'contacts'].map((id) => NAV_BY_ID[id]) },
       { title: 'Delivery', items: ['projects', 'gantt'].map((id) => NAV_BY_ID[id]) },
     ],
   },
@@ -287,19 +223,10 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
   {
     section: 'System',
     subs: [
-      { title: '', items: ['admin', 'users', 'settings', 'tenants', 'permissiongroups', 'roletypes', 'roles', 'qafeedback'].map((id) => NAV_BY_ID[id]) },
+      { title: '', items: ['admin', 'users', 'settings', 'permissiongroups', 'roletypes', 'roles', 'qafeedback'].map((id) => NAV_BY_ID[id]) },
     ],
   },
 ]
-
-// ── getNavForRole ─────────────────────────────────────────────────────────────
-// super_admin and admin → full sectioned view (Sidebar renders FULL_NAV_SECTIONS)
-// all other roles       → flat list filtered by rolesAllowed
-
-export function getNavForRole(role: UserRole): NavItem[] | 'ALL' {
-  if (role === 'super_admin' || role === 'admin') return 'ALL'
-  return ALL_NAV_ITEMS.filter((item) => item.rolesAllowed.includes(role))
-}
 
 // ── Path constant re-exports ──────────────────────────────────────────────────
 // Import any route constant from here — no need to know which feature owns it.

@@ -7,13 +7,33 @@ import type {
   DoctorsData,
   PatientsData,
   DashboardTask,
+  DashboardData,
+  DashboardFilterOptions,
+  DashboardFilterState,
+  CommandCenterData,
+  HeadlineKpi,
 } from '@/types/dashboard.types'
+import { QUARTER } from '@/types/salesdash.types'
 
-// TODO: entirely mock — no backend endpoints exist for dashboard data yet.
+// ===========================================================================
+// MOCK DATA SOURCE — the ONLY place fabricated dashboard numbers may live.
+// ---------------------------------------------------------------------------
+// TODO: replace with real aggregation endpoints. Verified 2026-08-08 against
+// backend/src/bin/app.ts: the API has 16 mounted routers and NONE of them is a
+// dashboard/analytics/reporting module. There is no invoice, expense, payment,
+// patient, or sales-target model anywhere in the backend, and no server-side
+// $group/$sum aggregation exists (the only `.aggregate()` in the codebase is
+// geoProfile's $geoNear, which is unrelated). See dashboard.service.ts for the
+// exact list of endpoints the backend would need to expose.
+//
 // Values copied from the vanilla-JS prototype's dashboard-data.js so the
 // numbers/labels match the design reference exactly.
+//
+// NOTHING here is exported to components. The service layer is the only
+// consumer — see the builders at the bottom of this file.
+// ===========================================================================
 
-export const FILTERS = {
+const FILTERS = {
   dateRanges: [
     { id: '7D', label: 'Last 7 days', factor: 0.2 },
     { id: '30D', label: 'Last 30 days', factor: 0.85 },
@@ -33,30 +53,43 @@ const CLIENT_MULTIPLIERS: Record<string, number> = {
   Zydus: 0.08, 'Abbott India': 0.14, Glenmark: 0.1, 'Fortis Healthcare': 0.08,
 }
 
-export function rangeFactor(dateRangeId: string): number {
+// ---------------------------------------------------------------------------
+// SIMULATED FILTERING — fabricated business logic, quarantined to the mock.
+// ---------------------------------------------------------------------------
+// These multipliers are NOT real math. They exist only so the filter bar
+// visibly does something while the dashboard is mock-backed: picking "Last 7
+// days" multiplies every headline KPI by 0.2, picking a single rep by 0.25.
+//
+// They are deliberately NOT exported. When a real aggregation endpoint lands,
+// dashboard.service.ts stops calling buildMockDashboardData() and this entire
+// block becomes unreachable — so fabricated scaling can never be applied on
+// top of real API numbers.
+// ---------------------------------------------------------------------------
+
+function rangeFactor(dateRangeId: string): number {
   return FILTERS.dateRanges.find((r) => r.id === dateRangeId)?.factor ?? 1
 }
 
-export function clientMultiplier(client: string): number {
+function clientMultiplier(client: string): number {
   return client === 'All clients' ? 1 : (CLIENT_MULTIPLIERS[client] ?? 1)
 }
 
-export function repMultiplier(rep: string): number {
+function repMultiplier(rep: string): number {
   return rep === 'All reps' ? 1 : 0.25
 }
 
-export function effFactor(dateRangeId: string, client: string, rep: string): number {
+function effFactor(dateRangeId: string, client: string, rep: string): number {
   return rangeFactor(dateRangeId) * clientMultiplier(client) * repMultiplier(rep)
 }
 
 // Applies the effective filter factor to a KpiValue, matching the prototype's
 // miniKpi() behavior: percentage values are shown as-is, everything else scales.
-export function scaleKpi<T extends { v: number; unit?: 'inr' | 'pct' }>(kpi: T, factor: number): T {
+function scaleKpi<T extends { v: number; unit?: 'inr' | 'pct' }>(kpi: T, factor: number): T {
   if (kpi.unit === 'pct') return kpi
   return { ...kpi, v: Math.round(kpi.v * factor) }
 }
 
-export const COMPANY: CompanyData = {
+const COMPANY: CompanyData = {
   totalCompanies: { v: 8, ly: 6 },
   totalDivisions: { v: 24, ly: 18 },
   accountPenetration: { v: 67, ly: 54, unit: 'pct' },
@@ -74,7 +107,7 @@ export const COMPANY: CompanyData = {
   ],
 }
 
-export const PROJECT: ProjectData = {
+const PROJECT: ProjectData = {
   totalProjects: { v: 66, ly: 48 },
   screeningProjects: { v: 32, ly: 24, camps: { v: 612, ly: 484 } },
   dietProjects: { v: 18, ly: 14, camps: { v: 184, ly: 142 } },
@@ -93,7 +126,7 @@ export const PROJECT: ProjectData = {
   ],
 }
 
-export const FO: FoData = {
+const FO: FoData = {
   occupancyRate: { v: 92, ly: 84, unit: 'pct' },
   efficiencyRate: { v: 88, ly: 82, unit: 'pct' },
   activeFOs: { v: 38, ly: 24 },
@@ -118,7 +151,7 @@ export const FO: FoData = {
   ],
 }
 
-export const SALES: SalesData = {
+const SALES: SalesData = {
   totalProjects: { v: 66, ly: 48 },
   screeningProjects: { v: 32, ly: 24, camps: { v: 612, ly: 484 } },
   dietProjects: { v: 18, ly: 14, camps: { v: 184, ly: 142 } },
@@ -138,7 +171,7 @@ export const SALES: SalesData = {
   ],
 }
 
-export const ACCOUNTS: AccountsData = {
+const ACCOUNTS: AccountsData = {
   revenue: { v: 41200000, ly: 32400000, unit: 'inr' },
   expenses: { v: 28400000, ly: 22600000, unit: 'inr' },
   ebita: { v: 12800000, ly: 9800000, unit: 'inr' },
@@ -146,6 +179,15 @@ export const ACCOUNTS: AccountsData = {
   pat: { v: 8900000, ly: 6800000, unit: 'inr' },
   patMarginPct: { v: 21.6, ly: 20.9, unit: 'pct' },
   arOutstanding: { v: 8400000, ly: 6100000, unit: 'inr' },
+  // Invented aging split (42/30/18/10 of AR) — previously computed inline in
+  // AccountsSection.tsx. Moved here so the fabrication lives with the rest of
+  // the mock and can never be applied to a real API response.
+  arAging: [
+    { label: '0-30d', value: 8400000 * 0.42 },
+    { label: '31-60d', value: 8400000 * 0.3 },
+    { label: '61-90d', value: 8400000 * 0.18 },
+    { label: '90d+', value: 8400000 * 0.1 },
+  ],
   expectedCollection: {
     thisWeek: { v: 1240000, unit: 'inr' },
     thisMonth: { v: 4820000, unit: 'inr' },
@@ -162,7 +204,7 @@ export const ACCOUNTS: AccountsData = {
   ],
 }
 
-export const DOCTORS: DoctorsData = {
+const DOCTORS: DoctorsData = {
   total: { v: 1864, ly: 1240 },
   bySpecialty: [
     { specialty: 'GP', count: 412, ly: 280 },
@@ -180,7 +222,7 @@ export const DOCTORS: DoctorsData = {
   ],
 }
 
-export const PATIENTS: PatientsData = {
+const PATIENTS: PatientsData = {
   total: { v: 28430, ly: 19200 },
   male: { v: 16200, share: 57 },
   female: { v: 11800, share: 42 },
@@ -223,12 +265,68 @@ export const PATIENTS: PatientsData = {
   ],
 }
 
-export const QUARTER = 'Q2 FY26'
-
-export const TASKS: DashboardTask[] = [
+const TASKS: DashboardTask[] = [
   { id: 't1', kind: 'MOM', title: 'Submit MOM · Lupin', detail: 'Meeting ended 2026-07-09 06:30', ownerName: 'Sneha Nair', ownerTone: 'amber', status: 'PENDING', canAct: true },
   { id: 't2', kind: 'LEAD', title: 'Follow up · Novartis', detail: 'L-2408 · stage new · 16d stuck', ownerName: 'Riya Mehta', ownerTone: 'teal', status: 'PENDING', canAct: true },
   { id: 't3', kind: 'MOM', title: 'Submit MOM · Sun Pharma', detail: 'Meeting ended 2026-07-08 09:30', ownerName: 'Riya Mehta', ownerTone: 'teal', status: 'PENDING', canAct: true },
   { id: 't4', kind: 'MOM', title: 'Submit MOM · Sun Pharma', detail: 'Meeting ended 2026-07-07 06:00', ownerName: 'Riya Mehta', ownerTone: 'teal', status: 'PENDING', canAct: true },
   { id: 't5', kind: 'MOM', title: "Submit MOM · Dr Reddy's", detail: 'Meeting ended 2026-07-07 11:30', ownerName: 'Arjun Kapoor', ownerTone: 'brand', status: 'PENDING', canAct: true },
 ]
+
+// ===========================================================================
+// BUILDERS — the mock module's only public surface.
+// ---------------------------------------------------------------------------
+// Called exclusively by dashboard.service.ts. Components and hooks must never
+// import this file; they consume the typed contract in types/dashboard.types.ts.
+// ===========================================================================
+
+/**
+ * Builds the full dashboard payload in the exact pre-aggregated shape a real
+ * `GET /dashboard` endpoint should return: scalar KPIs as `{v, ly, unit}` plus
+ * short `breakdown[]` arrays — never raw record lists for the browser to
+ * reduce. Keeping this shape is what lets the API swap be service-layer-only.
+ *
+ * `filters` currently drives only the simulated scaling of the headline strip,
+ * which is the exact scope the mock-era UI already had. The section payloads
+ * are returned unscoped, because inventing per-section filtering would mean
+ * fabricating more numbers, not fewer.
+ */
+export function buildMockDashboardData(filters: DashboardFilterState): DashboardData {
+  const factor = effFactor(filters.dateRange, filters.client, filters.rep)
+
+  const headline: HeadlineKpi[] = [
+    { id: 'totalBilling', label: 'Total Billing', data: scaleKpi(COMPANY.totalBilling, factor) },
+    { id: 'arOutstanding', label: 'AR Outstanding', data: scaleKpi(ACCOUNTS.arOutstanding, factor) },
+    { id: 'ebita', label: 'EBITA', data: scaleKpi(ACCOUNTS.ebita, factor) },
+    { id: 'projects', label: 'Projects', data: scaleKpi(PROJECT.totalProjects, factor) },
+    { id: 'activeFos', label: 'Active FOs', data: scaleKpi(FO.activeFOs, factor) },
+    { id: 'leads', label: 'Leads', data: scaleKpi(SALES.totalLeads, factor) },
+    { id: 'doctors', label: 'Doctors', data: scaleKpi(DOCTORS.total, factor) },
+    { id: 'patients', label: 'Patients', data: scaleKpi(PATIENTS.total, factor) },
+  ]
+
+  return {
+    headline,
+    company: COMPANY,
+    project: PROJECT,
+    fo: FO,
+    sales: SALES,
+    accounts: ACCOUNTS,
+    doctors: DOCTORS,
+    patients: PATIENTS,
+  }
+}
+
+export function buildMockFilterOptions(): DashboardFilterOptions {
+  return {
+    dateRanges: FILTERS.dateRanges.map((r) => ({ id: r.id, label: r.label })),
+    clients: FILTERS.clients,
+    divisions: FILTERS.divisions,
+    campTypes: FILTERS.campTypes,
+    salesPeople: FILTERS.salesPeople,
+  }
+}
+
+export function buildMockCommandCenterData(): CommandCenterData {
+  return { quarter: QUARTER, tasks: TASKS }
+}

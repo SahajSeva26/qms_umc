@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { FiUserCheck } from 'react-icons/fi'
 import { useDashboardData } from '@/features/dashboard/hooks/useDashboardData'
+import type { DashboardFilterState } from '@/types/dashboard.types'
 import SectionCard from '@/features/dashboard/components/SectionCard'
 import MiniKpiCard from '@/features/dashboard/components/MiniKpiCard'
 import FilterChips from '@/features/dashboard/components/FilterChips'
@@ -24,12 +25,13 @@ function genderScale(patients: PatientsData, genderFilter: string): number {
 }
 
 interface PatientsSectionProps {
+  filters: DashboardFilterState
   onDrill: (title: string, content: string) => void
 }
 
-const PatientsSection = ({ onDrill }: PatientsSectionProps) => {
+const PatientsSection = ({ filters, onDrill }: PatientsSectionProps) => {
   const [genderFilter, setGenderFilter] = useState('ALL')
-  const { data } = useDashboardData()
+  const { data } = useDashboardData(filters)
 
   if (!data) return null
   const { patients } = data

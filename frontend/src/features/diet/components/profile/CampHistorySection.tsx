@@ -1,7 +1,8 @@
 import { FiCalendar } from 'react-icons/fi'
 import type { DietitianProfileBundle } from '@/features/diet/dietitians.types'
-import { PROJECTS } from '@/features/crm/clients/clients.mock'
-import { dietitianExpense, campPaymentStatus } from '@/features/diet/dietitians.service'
+import { PROJECTS } from '@/types/client.types'
+import { campPaymentStatus } from '@/features/diet/services/dietitianPayment.service'
+import { dietitianExpense } from '@/features/diet/services/dietitianRates.service'
 import { fmtDate } from './profile.utils'
 
 interface CampHistorySectionProps {

@@ -3,33 +3,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button'
 import { FiSend, FiCheckCircle, FiXCircle, FiClock, FiUserCheck, FiMessageSquare } from 'react-icons/fi'
 import { toast } from '@/components/ui/sonner'
-import type { Person } from '@/types/people.types'
+import { useAuth } from '@/hooks/useAuth'
+import { useCampsData } from '@/hooks/useCampsData'
+import { summarizeInvites } from '@/features/diet/services/dietitianInvite.service'
+import { invitesByDietitianId } from '@/features/diet/services/dietitianCandidates.service'
+import { useCampInvites, useAddCampInvites, useRecordInviteResponse } from '@/features/diet/hooks/useDietitianInvites'
+import { useDietitianCandidates } from '@/features/diet/hooks/useDietitianCandidates'
+import { errorMessage } from '@/features/diet/utils/errorMessage'
 
 interface InviteDietitiansModalProps {
   open: boolean
   onClose: () => void
   campId: string
-  dietitians: Person[]
   onProceedToRateSheet?: (dietitianId: string) => void
-}
-
-type InviteResponse = 'PENDING' | 'ACCEPTED' | 'DECLINED'
-
-interface InviteEntry {
-  dietitianId: string
-  sentAt: string
-  response: InviteResponse
-}
-
-// Deterministic pseudo-random derivation from a string id — stands in for
-// the real ranking/rating/history data (om.rankDietitiansForCamp,
-// om.getLastDietitianRates, om.dietitianAverageRating, om.dietitianDoctorHistory,
-// om.bcaVerified, om.doctorPreferredDietitians — diet-invite-modal.js:49-70)
-// until the data-wiring pass connects these to real stores.
-function seedOf(id: string): number {
-  let h = 0
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0
-  return h
 }
 
 function fmtDate(iso: string): string {
@@ -62,63 +48,42 @@ function Tag({ tone, children }: { tone: keyof typeof TAG_STYLES; children: Reac
 
 // Mirrors diet-invite-modal.js in full (213 lines) — SHORTLIST (ranked
 // nearest dietitians, last remuneration, rating, same-doctor history,
-// doctor-preferred mark, BCA scale status) → SEND (simulated WhatsApp
-// invite, multi-select) → RECORD (Accepted/Declined per dietitian) →
-// ASSIGN (accepted dietitian → rate sheet). Data wiring (om.* helpers,
-// real invite persistence) is a later pass — this UI shell derives
-// display-only ranking/rating/history/BCA data locally and keeps invite
-// state in component state only.
-const InviteDietitiansModal = ({ open, onClose, campId, dietitians, onProceedToRateSheet }: InviteDietitiansModalProps) => {
-  const requiresBca = useMemo(() => seedOf(campId) % 3 === 0, [campId])
+// doctor-preferred mark, BCA scale status) → SEND (WhatsApp invite,
+// multi-select) → RECORD (Accepted/Declined per dietitian) → ASSIGN
+// (accepted dietitian → rate sheet).
+//
+// Every value below comes from the Diet domain services — the same business
+// functions the sibling approvals/InviteDietitianModal.tsx uses, so both
+// invite screens rank and rate identically. Invites are persisted through the
+// invite mutations, NOT held in component state.
+const InviteDietitiansModal = ({ open, onClose, campId, onProceedToRateSheet }: InviteDietitiansModalProps) => {
+  const { user } = useAuth()
+  const { camps } = useCampsData()
+  const userName = user ? `${user.firstName} ${user.lastName}`.trim() : 'QMS Ops'
 
-  const ranked = useMemo(() => {
-    const withSeed = dietitians.map((d) => {
-      const seed = seedOf(d.id)
-      const lastRem = 1500 + (seed % 12) * 250
-      const ratingAvg = 3 + ((seed >> 3) % 21) / 10
-      const ratingCount = 1 + (seed % 9)
-      const docHistCount = seed % 5 === 0 ? (seed % 4) + 1 : 0
-      const docHistLast = new Date(Date.now() - ((seed % 60) + 5) * 86400000).toISOString()
-      const hasBca = seed % 2 === 0
-      const bcaVerified = hasBca && seed % 4 === 0
-      const score = -((seed % 100)) + (docHistCount > 0 ? -30 : 0)
-      return { dietitian: d, seed, lastRem, ratingAvg, ratingCount, docHistCount, docHistLast, hasBca, bcaVerified, score }
-    })
-    withSeed.sort((a, b) => a.score - b.score)
-    if (requiresBca) {
-      withSeed.sort((a, b) => {
-        const aTier = a.bcaVerified ? 0 : a.hasBca ? 1 : 2
-        const bTier = b.bcaVerified ? 0 : b.hasBca ? 1 : 2
-        return aTier - bTier
-      })
-    }
-    return withSeed
-  }, [dietitians, requiresBca])
+  const camp = useMemo(() => camps.find((c) => c.id === campId) ?? null, [camps, campId])
 
-  const preferredId = useMemo(() => {
-    if (!ranked.length) return undefined
-    const withHistory = ranked.filter((r) => r.docHistCount > 0)
-    return withHistory.length ? withHistory[0].dietitian.id : undefined
-  }, [ranked])
+  const { data: inviteList = [] } = useCampInvites(campId)
+  const addInvites = useAddCampInvites(campId)
+  const recordResponseMutation = useRecordInviteResponse(campId)
+
+  // One bulk read produces the ranked, BCA-tiered, fully annotated shortlist
+  // (rating, last remuneration, BCA status, same-doctor history, doctor
+  // preference) — the row loop below performs no service calls.
+  const { requiresBca, candidates } = useDietitianCandidates(camp, camps)
+
+  // Derived from the cached invite list — no store reads here. The list
+  // refreshes because the mutations below invalidate its query key.
+  const summary = summarizeInvites(inviteList)
+  const invMap = useMemo(() => invitesByDietitianId(inviteList), [inviteList])
+
+  const pickable = candidates.filter((c) => !invMap.has(c.dietitian.id))
 
   const [selected, setSelected] = useState<Set<string>>(
-    () => new Set(ranked.slice(0, 3).map((r) => r.dietitian.id))
+    () => new Set(candidates.filter((c) => !invMap.has(c.dietitian.id)).slice(0, 3).map((c) => c.dietitian.id))
   )
-  const [invites, setInvites] = useState<Record<string, InviteEntry>>({})
 
-  const invMap = invites
-  const summary = useMemo(() => {
-    const list = Object.values(invMap)
-    return {
-      total: list.length,
-      accepted: list.filter((e) => e.response === 'ACCEPTED').length,
-      declined: list.filter((e) => e.response === 'DECLINED').length,
-      pending: list.filter((e) => e.response === 'PENDING').length,
-    }
-  }, [invMap])
-
-  const pickable = ranked.filter((r) => !invMap[r.dietitian.id])
-  const allPickableChecked = pickable.length > 0 && pickable.every((r) => selected.has(r.dietitian.id))
+  const allPickableChecked = pickable.length > 0 && pickable.every((c) => selected.has(c.dietitian.id))
 
   const toggleOne = (id: string, checked: boolean) => {
     setSelected((prev) => {
@@ -132,36 +97,42 @@ const InviteDietitiansModal = ({ open, onClose, campId, dietitians, onProceedToR
   const toggleAll = (checked: boolean) => {
     setSelected((prev) => {
       const next = new Set(prev)
-      pickable.forEach((r) => {
-        if (checked) next.add(r.dietitian.id)
-        else next.delete(r.dietitian.id)
+      pickable.forEach((c) => {
+        if (checked) next.add(c.dietitian.id)
+        else next.delete(c.dietitian.id)
       })
       return next
     })
   }
 
-  const handleSend = () => {
-    const picked = pickable.filter((r) => selected.has(r.dietitian.id)).map((r) => r.dietitian.id)
+  // addCampInvites() itself skips ids that already hold a non-DECLINED
+  // invite, so re-sending can't double-record; `pickable` also hides anyone
+  // already invited from the checkbox list.
+  const handleSend = async () => {
+    if (!camp) return
+    const picked = pickable.filter((c) => selected.has(c.dietitian.id)).map((c) => c.dietitian.id)
     if (!picked.length) {
       toast.error('Tick at least one dietitian to invite')
       return
     }
-    const now = new Date().toISOString()
-    setInvites((prev) => {
-      const next = { ...prev }
-      picked.forEach((id) => {
-        next[id] = { dietitianId: id, sentAt: now, response: 'PENDING' }
-      })
-      return next
-    })
+    try {
+      await addInvites.mutateAsync({ dietitianIds: picked, sentBy: userName })
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not send the invites — try again.'))
+      return
+    }
+    setSelected(new Set())
     toast.success(`WhatsApp invites sent · ${picked.length} dietitian${picked.length === 1 ? '' : 's'}`)
   }
 
-  const recordResponse = (dietitianId: string, response: 'ACCEPTED' | 'DECLINED') => {
-    setInvites((prev) => ({
-      ...prev,
-      [dietitianId]: { ...prev[dietitianId], dietitianId, response },
-    }))
+  const recordResponse = async (dietitianId: string, response: 'ACCEPTED' | 'DECLINED') => {
+    if (!camp) return
+    try {
+      await recordResponseMutation.mutateAsync({ dietitianId, response, note: `Recorded by ${userName}` })
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not record the response — try again.'))
+      return
+    }
     toast[response === 'ACCEPTED' ? 'success' : 'info'](`Response recorded · ${response}`)
   }
 
@@ -220,18 +191,22 @@ const InviteDietitiansModal = ({ open, onClose, campId, dietitians, onProceedToR
                 </tr>
               </thead>
               <tbody>
-                {!ranked.length && (
+                {!candidates.length && (
                   <tr>
                     <td colSpan={7} style={{ padding: 20, textAlign: 'center', color: 'var(--qms-text-soft)' }}>
                       No dietitians available — enrol one first.
                     </td>
                   </tr>
                 )}
-                {ranked.map((r) => {
-                  const d = r.dietitian
-                  const inv = invMap[d.id]
-                  const preferred = preferredId === d.id
-                  const lastRemStr = `₹${r.lastRem.toLocaleString('en-IN')}`
+                {candidates.map((c) => {
+                  const d = c.dietitian
+                  const inv = invMap.get(d.id)
+                  const preferred = c.topPreferred
+                  const lastRate = c.lastRates
+                  const avg = c.rating
+                  const hist = c.doctorHistory
+                  const hasBca = c.bca.owned
+                  const isBcaVerified = c.bca.verified
                   const rowBg = inv?.response === 'ACCEPTED' ? 'rgba(16,185,129,.05)' : undefined
 
                   return (
@@ -246,7 +221,7 @@ const InviteDietitiansModal = ({ open, onClose, campId, dietitians, onProceedToR
                         )}
                         {inv?.response === 'ACCEPTED' && <FiCheckCircle size={15} style={{ color: 'var(--success)' }} />}
                         {inv?.response === 'DECLINED' && <FiXCircle size={15} style={{ color: 'var(--danger)' }} />}
-                        {inv?.response === 'PENDING' && <FiClock size={15} style={{ color: 'var(--warning)' }} />}
+                        {inv && inv.response === null && <FiClock size={15} style={{ color: 'var(--warning)' }} />}
                       </td>
                       <td style={{ padding: '7px 8px', borderBottom: '1px dashed var(--qms-border)' }}>
                         <div className="font-extrabold" style={{ fontSize: '12.5px', color: 'var(--qms-text)' }}>
@@ -254,35 +229,41 @@ const InviteDietitiansModal = ({ open, onClose, campId, dietitians, onProceedToR
                           {preferred && <Tag tone="violet">⭐ DOCTOR&apos;S PICK</Tag>}
                           {inv?.response === 'ACCEPTED' && <Tag tone="green">ACCEPTED</Tag>}
                           {inv?.response === 'DECLINED' && <Tag tone="red">DECLINED</Tag>}
-                          {inv?.response === 'PENDING' && <Tag tone="blue">AWAITING REPLY</Tag>}
+                          {inv && inv.response === null && <Tag tone="blue">AWAITING REPLY</Tag>}
                         </div>
                         <div style={{ fontSize: '10.5px', color: 'var(--qms-text-muted)' }}>
-                          {d.hq || d.city || '—'}{d.specialty ? ` · ${d.specialty}` : ''}
+                          {d.hq || '—'}{d.specialty ? ` · ${d.specialty}` : ''}
                         </div>
                       </td>
                       <td className="text-right font-bold" style={{ padding: '7px 8px', borderBottom: '1px dashed var(--qms-border)', color: 'var(--qms-text)' }}>
-                        {lastRemStr}
+                        {lastRate ? `₹${lastRate.remuneration.toLocaleString('en-IN')}` : '—'}
                       </td>
                       <td className="text-center" style={{ padding: '7px 8px', borderBottom: '1px dashed var(--qms-border)' }}>
-                        <b style={{ color: 'var(--qms-text)' }}>{r.ratingAvg.toFixed(1)}</b>
-                        <span style={{ color: 'var(--warning)' }}> ★</span>
-                        <div style={{ fontSize: 9, color: 'var(--qms-text-muted)' }}>{r.ratingCount} rating{r.ratingCount === 1 ? '' : 's'}</div>
+                        {avg ? (
+                          <>
+                            <b style={{ color: 'var(--qms-text)' }}>{avg.avg.toFixed(1)}</b>
+                            <span style={{ color: 'var(--warning)' }}> ★</span>
+                            <div style={{ fontSize: 9, color: 'var(--qms-text-muted)' }}>{avg.count} rating{avg.count === 1 ? '' : 's'}</div>
+                          </>
+                        ) : (
+                          <span style={{ color: 'var(--qms-text-soft)' }}>—</span>
+                        )}
                       </td>
                       <td className="text-center" style={{ padding: '7px 8px', borderBottom: '1px dashed var(--qms-border)' }}>
-                        {r.bcaVerified ? (
+                        {isBcaVerified ? (
                           <Tag tone="green">✓ BCA</Tag>
-                        ) : r.hasBca ? (
+                        ) : hasBca ? (
                           <Tag tone="amber">BCA · unverified</Tag>
                         ) : (
                           <Tag tone="red">no BCA</Tag>
                         )}
                       </td>
                       <td className="text-center" style={{ padding: '7px 8px', borderBottom: '1px dashed var(--qms-border)' }}>
-                        {r.docHistCount > 0 ? (
+                        {hist.count > 0 ? (
                           <>
-                            <b style={{ color: 'var(--qms-text)' }}>{r.docHistCount}</b>
+                            <b style={{ color: 'var(--qms-text)' }}>{hist.count}</b>
                             <div style={{ fontSize: 9, color: 'var(--qms-text-muted)' }}>
-                              camp{r.docHistCount === 1 ? '' : 's'} · last {fmtDate(r.docHistLast)}
+                              camp{hist.count === 1 ? '' : 's'}{hist.lastDate ? ` · last ${fmtDate(hist.lastDate)}` : ''}
                             </div>
                           </>
                         ) : (
@@ -291,7 +272,7 @@ const InviteDietitiansModal = ({ open, onClose, campId, dietitians, onProceedToR
                       </td>
                       <td style={{ padding: '7px 8px', borderBottom: '1px dashed var(--qms-border)', whiteSpace: 'nowrap' }}>
                         {!inv && <span className="text-xs" style={{ color: 'var(--qms-text-soft)' }}>not invited</span>}
-                        {inv?.response === 'PENDING' && (
+                        {inv && inv.response === null && (
                           <div>
                             <div style={{ fontSize: '9.5px', color: 'var(--qms-text-muted)', fontWeight: 700 }}>RECORD REPLY</div>
                             <div className="flex gap-1 mt-0.5">

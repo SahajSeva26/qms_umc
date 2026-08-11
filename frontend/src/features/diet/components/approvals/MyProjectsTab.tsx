@@ -1,10 +1,10 @@
 import { useMemo } from 'react'
 import type { Camp } from '@/types/camp.types'
 import { CLIENTS } from '@/types/client.types'
-import { PROJECTS } from '@/features/crm/clients/clients.mock'
-import {
-  isDietProject, coordScopedProjects, coordScopedClients, dietitianName, isTokenLocked, tokenHoursLeft, clientName,
-} from '@/features/diet/dietitians.service'
+import { PROJECTS } from '@/types/client.types'
+import { isTokenLocked, tokenHoursLeft } from '@/features/diet/services/dietCampWorkflow.service'
+import { dietitianName } from '@/features/diet/services/dietitianRoster.service'
+import { isDietProject, coordScopedProjects, coordScopedClients, clientName } from '@/features/diet/services/dietScope.service'
 import { fmtDate } from './helpers'
 
 interface MyProjectsTabProps {

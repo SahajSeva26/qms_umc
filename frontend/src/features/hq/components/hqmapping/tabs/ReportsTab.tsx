@@ -3,7 +3,7 @@ import type { ClassifiedHq, GeoFo } from '@/features/hq/hq.types'
 import type { DeviceCatalogItem } from '@/types/device.types'
 import HqKpi from '@/features/hq/components/hqmapping/HqKpi'
 import { HQ_REPORT_DEFS, buildReportRows, type HqReportId } from '@/features/hq/components/hqmapping/hqReports'
-import { downloadCsv, printableReport, todayIso } from '@/features/hq/components/hqmapping/hq.ui'
+import { downloadCsv, printableReport, todayIso, HQ_CARD_STYLE } from '@/features/hq/components/hqmapping/hq.ui'
 import { toast } from '@/components/ui/sonner'
 
 interface ReportsTabProps {
@@ -50,7 +50,7 @@ const ReportsTab = ({ rows, fos, devices }: ReportsTabProps) => {
       {HQ_REPORT_DEFS.map((r) => {
         const Icon = REPORT_ICON[r.id]
         return (
-          <div key={r.id} className="rounded-2xl border p-3.5 mb-2.5 flex items-center gap-3.5" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
+          <div key={r.id} className="rounded-2xl border p-3.5 mb-2.5 flex items-center gap-3.5" style={HQ_CARD_STYLE}>
             <div className="w-[42px] h-[42px] rounded-xl grid place-items-center shrink-0 text-white" style={{ background: 'linear-gradient(135deg,#7c5cff,#3b6dff)' }}>
               <Icon size={20} />
             </div>

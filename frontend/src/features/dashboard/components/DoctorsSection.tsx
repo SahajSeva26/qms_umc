@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { FiActivity } from 'react-icons/fi'
 import { useDashboardData } from '@/features/dashboard/hooks/useDashboardData'
+import type { DashboardFilterState } from '@/types/dashboard.types'
 import SectionCard from '@/features/dashboard/components/SectionCard'
 import MiniKpiCard from '@/features/dashboard/components/MiniKpiCard'
 import BarListRow from '@/features/dashboard/components/BarListRow'
@@ -10,12 +11,13 @@ import { formatPercent } from '@/utils/formatters'
 const SPECIALTY_FILTERS = ['ALL', 'Cardio', 'Diabetes', 'Pulmo', 'GP', 'Other']
 
 interface DoctorsSectionProps {
+  filters: DashboardFilterState
   onDrill: (title: string, content: string) => void
 }
 
-const DoctorsSection = ({ onDrill }: DoctorsSectionProps) => {
+const DoctorsSection = ({ filters, onDrill }: DoctorsSectionProps) => {
   const [specialtyFilter, setSpecialtyFilter] = useState('ALL')
-  const { data } = useDashboardData()
+  const { data } = useDashboardData(filters)
 
   if (!data) return null
   const { doctors } = data

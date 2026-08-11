@@ -1,12 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import type { GeoProfileEntity } from '@/types/geoProfile.types'
+import { GEO_PROFILE_ROUTES, GEO_PROFILE_TYPE_LABEL } from '@/features/geo-profile/geoProfile.constants'
 import GeoProfileStatusPill from '@/features/geo-profile/components/GeoProfileStatusPill'
-
-// Mirrors `@/features/access-management/role/components/RolesTable.tsx` exactly.
-const TYPE_LABEL: Record<GeoProfileEntity['type'], string> = {
-  fo: 'Field Officer',
-  dietitian: 'Dietitian',
-}
 
 interface GeoProfilesTableProps {
   geoProfiles: GeoProfileEntity[]
@@ -16,9 +11,13 @@ interface GeoProfilesTableProps {
   // display name, falling back to the raw id if the role isn't in the
   // active-roles list (e.g. deactivated after this profile was created).
   roleLabelById: Map<string, string>
+  // True when the caller lacks role:get/search/manage, so roleLabelById is
+  // known to be empty/incomplete for a permission reason, not a data reason
+  // — lets the Role column say so instead of showing a raw ObjectId.
+  roleNamesForbidden?: boolean
 }
 
-const GeoProfilesTable = ({ geoProfiles, roleLabelById }: GeoProfilesTableProps) => {
+const GeoProfilesTable = ({ geoProfiles, roleLabelById, roleNamesForbidden }: GeoProfilesTableProps) => {
   const navigate = useNavigate()
 
   return (
@@ -51,17 +50,18 @@ const GeoProfilesTable = ({ geoProfiles, roleLabelById }: GeoProfilesTableProps)
             {geoProfiles.map((profile) => (
               <tr
                 key={profile.id}
-                onClick={() => navigate(`/geo-profiles/${profile.id}`)}
+                onClick={() => navigate(GEO_PROFILE_ROUTES.GEO_PROFILE_DETAIL.replace(':id', profile.id))}
                 className="cursor-pointer transition-colors hover:bg-(--qms-surface-hover)"
                 style={{ borderBottom: '1px solid var(--qms-border)' }}
               >
                 <td className="px-4 py-2.5">
                   <span className="font-semibold truncate" style={{ color: 'var(--qms-text)' }}>
-                    {roleLabelById.get(profile.role) ?? profile.role}
+                    {roleLabelById.get(profile.role) ??
+                      (roleNamesForbidden ? 'Restricted' : profile.role)}
                   </span>
                 </td>
                 <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>
-                  {TYPE_LABEL[profile.type] ?? profile.type}
+                  {GEO_PROFILE_TYPE_LABEL[profile.type] ?? profile.type}
                 </td>
                 <td className="px-4 py-2.5 font-mono text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>
                   {profile.coordinates.length === 2 ? `${profile.coordinates[1]}, ${profile.coordinates[0]}` : '—'}

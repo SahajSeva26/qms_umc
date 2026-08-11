@@ -5,7 +5,7 @@ import { geoProfileService } from '@/features/geo-profile/geoProfile.service'
 export const useGeoProfile = (id: string | undefined) => {
   return useQuery({
     queryKey: ['geoProfile', id],
-    queryFn: () => geoProfileService.getGeoProfile(id as string),
+    queryFn: () => geoProfileService.getGeoProfile(id!),
     enabled: !!id,
   })
 }

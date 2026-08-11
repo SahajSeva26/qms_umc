@@ -5,7 +5,6 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { toast } from '@/components/ui/sonner'
 import {
   useTransfers, useTransfersRollup, useBalancingSuggestions,
@@ -15,6 +14,12 @@ import type { NewTransferInput, DeliverPodInput } from '@/features/inventory/inv
 import { CENTRAL } from '@/features/inventory/inventory.types'
 import type { Transfer, TransferStatus, BalancingSuggestion } from '@/features/inventory/inventory.types'
 import type { Person } from '@/types/people.types'
+import { transferSchema } from '@/features/inventory/schemas/transfer.schema'
+import { transferDeliverPodSchema } from '@/features/inventory/schemas/transferDeliverPod.schema'
+import { sortByDateDesc } from '@/features/inventory/utils/sort'
+import { todayIso } from '@/features/inventory/utils/date'
+import { TableEmptyRow, InvFilterBar } from '@/features/inventory/components/IntelTableUi'
+import { NewTransferModal } from '@/features/inventory/components/NewTransferModal'
 
 // Exact port of window.QMS_InvWh.tabTransfers() (inventory-warehouse.js:218-
 // 377) — the logistics rollup strip, Emergency stock-balancing panel and the
@@ -33,10 +38,7 @@ const TransfersTab = () => {
 
   // list = transfers().slice().sort(...) — newest-first by RAW STRING compare
   // on the ISO date (localeCompare, not a true date sort — exact port).
-  const list = useMemo(
-    () => [...transfers].sort((a, b) => (b.date || '').localeCompare(a.date || '')),
-    [transfers],
-  )
+  const list = useMemo(() => sortByDateDesc(transfers), [transfers])
   const activeCount = useMemo(() => list.filter((t) => t.status !== 'DELIVERED').length, [list])
 
   const openNewTransfer = (preset?: { itemId?: string; from?: string; to?: string; qty?: number }) => {
@@ -45,12 +47,9 @@ const TransfersTab = () => {
   }
 
   const handleCreateTransfer = async (input: NewTransferInput) => {
-    if (input.from === input.to) {
-      toast.error('Pick different source and destination')
-      return
-    }
-    if (!input.qty) {
-      toast.error('Enter quantity')
+    const result = transferSchema.safeParse(input)
+    if (!result.success) {
+      toast.error(result.error.issues[0]?.message ?? 'Please check the highlighted fields')
       return
     }
     await saveTransfer(input)
@@ -64,14 +63,14 @@ const TransfersTab = () => {
   }
 
   const handleDeliver = async (id: string, pod: DeliverPodInput) => {
-    const ref = pod.ref.trim()
-    if (!ref) {
-      toast.error('POD reference is required')
+    const result = transferDeliverPodSchema.safeParse(pod)
+    if (!result.success) {
+      toast.error(result.error.issues[0]?.message ?? 'Please check the highlighted fields')
       return
     }
     await saveDeliver(id, pod)
     setDeliverId(null)
-    toast.success(`${id} delivered · POD ${ref}`)
+    toast.success(`${id} delivered · POD ${pod.ref.trim()}`)
   }
 
   const balanceTransfer = (sg: BalancingSuggestion) => {
@@ -154,10 +153,7 @@ const TransfersTab = () => {
       )}
 
       {/* .inv-filter — sticky header bar */}
-      <div
-        className="flex gap-2 items-center flex-wrap mb-3 rounded-[10px] border sticky z-25"
-        style={{ padding: '10px 12px', background: 'var(--qms-surface)', borderColor: 'var(--qms-border)', top: 60 }}
-      >
+      <InvFilterBar>
         <span
           className="text-xs font-bold uppercase tracking-[.04em]"
           style={{ color: 'var(--qms-text-muted)' }}
@@ -170,7 +166,7 @@ const TransfersTab = () => {
         <Button onClick={() => openNewTransfer()}>
           <Plus size={14} /> New transfer
         </Button>
-      </div>
+      </InvFilterBar>
 
       {/* Main transfers table — .inv-card padding:0;overflow:auto */}
       <div className="rounded-2xl border overflow-auto" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
@@ -190,11 +186,7 @@ const TransfersTab = () => {
           </thead>
           <tbody>
             {list.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="text-center" style={{ padding: 24, color: 'var(--qms-text-muted)' }}>
-                  No transfers yet.
-                </td>
-              </tr>
+              <TableEmptyRow colSpan={6}>No transfers yet.</TableEmptyRow>
             ) : (
               list.map((t) => (
                 <tr key={t.id}>
@@ -255,6 +247,7 @@ const TransfersTab = () => {
         locs={locOptions(people)}
         preset={transferPreset}
         onSave={handleCreateTransfer}
+        submitIcon={<Plus size={13} />}
       />
 
       <DeliverPodModal
@@ -322,122 +315,6 @@ function TransferStatusPill({ status }: { status: TransferStatus }) {
   )
 }
 
-// New/Balance Transfer modal — exact port of window.QMS_InvWh.openTransfer()/
-// saveTransfer() (inventory-warehouse.js:294-332). `preset` (optional)
-// prefills itemId/from/to/qty when opened from the Emergency Balancing
-// panel's "Transfer" button (balanceTransfer()).
-function NewTransferModal({
-  open, onClose, items, locs, onSave, preset,
-}: {
-  open: boolean
-  onClose: () => void
-  items: { id: string; name: string; qtyOnHand?: number | null }[]
-  locs: { code: string; label: string }[]
-  onSave: (input: NewTransferInput) => void | Promise<void>
-  preset?: { itemId?: string; from?: string; to?: string; qty?: number }
-}) {
-  const defaultFrom = () => preset?.from || CENTRAL
-  const defaultTo = () => preset?.to || (locs[1]?.code ?? CENTRAL)
-  const defaultItem = () => preset?.itemId || items[0]?.id || ''
-
-  const [from, setFrom] = useState(defaultFrom)
-  const [to, setTo] = useState(defaultTo)
-  const [itemId, setItemId] = useState(defaultItem)
-  const [qty, setQty] = useState(String(preset?.qty ?? 20))
-  const [courier, setCourier] = useState('150')
-  const [freight, setFreight] = useState('100')
-  const [packaging, setPackaging] = useState('50')
-  const [handling, setHandling] = useState('40')
-  const [notes, setNotes] = useState('')
-
-  // Rebuild the form to its defaults every time the modal (re)opens — mirrors
-  // the prototype rebuilding the modal body's DOM from scratch on each
-  // openTransfer() call (so a fresh preset from the balancing panel always
-  // takes effect even if the modal was previously open with different values).
-  const resetIfOpening = (isOpen: boolean) => {
-    if (isOpen) {
-      setFrom(preset?.from || CENTRAL)
-      setTo(preset?.to || (locs[1]?.code ?? CENTRAL))
-      setItemId(preset?.itemId || items[0]?.id || '')
-      setQty(String(preset?.qty ?? 20))
-      setCourier('150'); setFreight('100'); setPackaging('50'); setHandling('40'); setNotes('')
-    }
-  }
-
-  const handleSave = () => {
-    onSave({
-      from, to, itemId,
-      qty: Number(qty) || 0,
-      courier: Number(courier) || 0,
-      freight: Number(freight) || 0,
-      packaging: Number(packaging) || 0,
-      handling: Number(handling) || 0,
-      notes,
-    })
-  }
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        if (!o) onClose()
-        resetIfOpening(o)
-      }}
-    >
-      <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>New stock transfer</DialogTitle>
-          <p className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>Move stock between Central WH, FOs and dietitians</p>
-        </DialogHeader>
-
-        <div className="grid grid-cols-2 gap-3 text-[13px]">
-          <div>
-            <label className="block text-[11px] font-semibold mb-1" style={{ color: 'var(--qms-text-muted)' }}>From</label>
-            <Select value={from} onValueChange={(v) => setFrom(v ?? CENTRAL)}>
-              <SelectTrigger className="w-full text-[13px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {locs.map((l) => <SelectItem key={l.code} value={l.code}>{l.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <label className="block text-[11px] font-semibold mb-1" style={{ color: 'var(--qms-text-muted)' }}>To</label>
-            <Select value={to} onValueChange={(v) => setTo(v ?? CENTRAL)}>
-              <SelectTrigger className="w-full text-[13px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {locs.map((l) => <SelectItem key={l.code} value={l.code}>{l.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="col-span-2">
-            <label className="block text-[11px] font-semibold mb-1" style={{ color: 'var(--qms-text-muted)' }}>Item</label>
-            <Select value={itemId} onValueChange={(v) => setItemId(v ?? '')}>
-              <SelectTrigger className="w-full text-[13px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {items.map((it) => <SelectItem key={it.id} value={it.id}>{it.name} · central {it.qtyOnHand ?? 0}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <FieldNum label="Quantity" value={qty} onChange={setQty} />
-          <FieldNum label="Courier ₹" value={courier} onChange={setCourier} />
-          <FieldNum label="Freight ₹" value={freight} onChange={setFreight} />
-          <FieldNum label="Packaging ₹" value={packaging} onChange={setPackaging} />
-          <FieldNum label="Handling ₹" value={handling} onChange={setHandling} />
-          <div className="col-span-2">
-            <label className="block text-[11px] font-semibold mb-1" style={{ color: 'var(--qms-text-muted)' }}>Notes</label>
-            <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Camp ref, reason…" />
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSave}><Plus size={13} /> Create transfer</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
 // Deliver + POD modal — exact port of window.QMS_InvWh.openDeliver()/
 // saveDeliver() (inventory-warehouse.js:346-377). `transfer` is null when
 // closed; the modal is keyed by transfer.id so its internal form state resets
@@ -475,7 +352,7 @@ function DeliverPodModalBody({
   onClose: () => void
   onSave: (id: string, pod: DeliverPodInput) => void | Promise<void>
 }) {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayIso()
   const [ref, setRef] = useState(nextPodRef(transferCount))
   const [by, setBy] = useState('')
   const [date, setDate] = useState(today)
@@ -524,15 +401,6 @@ function DeliverPodModalBody({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
-}
-
-function FieldNum({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  return (
-    <div>
-      <label className="block text-[11px] font-semibold mb-1" style={{ color: 'var(--qms-text-muted)' }}>{label}</label>
-      <Input type="number" value={value} onChange={(e) => onChange(e.target.value)} min={0} />
-    </div>
   )
 }
 

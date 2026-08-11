@@ -8,8 +8,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { toast } from '@/components/ui/sonner'
 import type { Camp } from '@/types/camp.types'
 import type { DietPayment } from '@/features/diet/dietitians.types'
-import { dietitianExpense, campPaymentStatus, addDietPayment, fmtInr } from '@/features/diet/dietitians.service'
-
+import { fmtInr } from '@/features/diet/diet.utils'
+import { campPaymentStatus } from '@/features/diet/services/dietitianPayment.service'
+import { dietitianExpense } from '@/features/diet/services/dietitianRates.service'
+import { useAddDietPayment } from '@/features/diet/hooks/useDietitianPayments'
+import { errorMessage } from '@/features/diet/utils/errorMessage'
 interface AddPaymentModalProps {
   dietitianId: string | null
   dietitianName: string
@@ -41,6 +44,7 @@ const AddPaymentModal = ({ dietitianId, dietitianName, camps, paidBy, onClose, o
   const [excelFile, setExcelFile] = useState<File | null>(null)
   const [photosFile, setPhotosFile] = useState<File | null>(null)
   const [error, setError] = useState('')
+  const addPayment = useAddDietPayment()
 
   const expenseFor = (c: Camp) => dietitianExpense(c)
 
@@ -81,22 +85,27 @@ const AddPaymentModal = ({ dietitianId, dietitianName, camps, paidBy, onClose, o
     if (!excelFile) return setError('Attach required documents: Excel sheet')
     if (!photosFile) return setError('Attach required documents: photos')
 
-    await addDietPayment({
-      dietitianId: dietitianId as string,
-      dietitianName,
-      amount,
-      campIds,
-      paidOn,
-      mode,
-      ref,
-      notes,
-      paidBy,
-      // Filenames only — these are existence-checked, not content-validated
-      // (disclosed simplification of the prototype's QMS_PAYDOCS subsystem),
-      // but the record should still note what was attached rather than
-      // discarding the file references entirely.
-      documents: { excel: excelFile?.name, photos: photosFile ? [photosFile.name] : [] },
-    })
+    try {
+      await addPayment.mutateAsync({
+        dietitianId: dietitianId as string,
+        dietitianName,
+        amount,
+        campIds,
+        paidOn,
+        mode,
+        ref,
+        notes,
+        paidBy,
+        // Filenames only — these are existence-checked, not content-validated
+        // (disclosed simplification of the prototype's QMS_PAYDOCS subsystem),
+        // but the record should still note what was attached rather than
+        // discarding the file references entirely.
+        documents: { excel: excelFile?.name, photos: photosFile ? [photosFile.name] : [] },
+      })
+    } catch (err) {
+      setError(errorMessage(err, 'Could not record the payment — try again.'))
+      return
+    }
     toast.success(`Payment recorded · ${fmtInr(amount)} to ${dietitianName}`)
     onSaved()
   }
@@ -176,7 +185,7 @@ const AddPaymentModal = ({ dietitianId, dietitianName, camps, paidBy, onClose, o
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSubmit}><FiCheck size={13} /> Record payment</Button>
+          <Button onClick={handleSubmit} disabled={addPayment.isPending}><FiCheck size={13} /> Record payment</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

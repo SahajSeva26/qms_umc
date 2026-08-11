@@ -4,10 +4,8 @@ import { FiDollarSign, FiExternalLink } from 'react-icons/fi'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import type { Camp } from '@/types/camp.types'
-import {
-  dietitianExpense, poCampCost, campPaymentStatus, paymentsForCamp,
-} from '@/features/diet/dietitians.service'
-
+import { campPaymentStatus, paymentsForCamp } from '@/features/diet/services/dietitianPayment.service'
+import { dietitianExpense, poCampCost } from '@/features/diet/services/dietitianRates.service'
 interface ViewCampsModalProps {
   dietitianId: string | null
   dietitianName: string

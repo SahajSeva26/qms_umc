@@ -5,9 +5,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { toast } from '@/components/ui/sonner'
+import { validateBankAccount } from '@/features/diet/schemas/dietitianBank.schemas'
 import type { DietitianRosterEntry, DietitianBankAccount } from '@/features/diet/dietitians.types'
-import { dietitianDetails, updateDietitianDetails } from '@/features/diet/dietitians.service'
-
+import { dietitianDetails } from '@/features/diet/services/dietitianRoster.service'
+import { storeChequeImage } from '@/features/diet/services/dietitianDocuments.service'
+import { useUpdateDietitianDetails } from '@/features/diet/hooks/useDietitianRoster'
+import { errorMessage } from '@/features/diet/utils/errorMessage'
 interface DietitianBankModalProps {
   open: boolean
   onClose: () => void
@@ -31,6 +34,7 @@ const DietitianBankModal = ({ open, onClose, dietitian, onDone }: DietitianBankM
   const [printingCharge, setPrintingCharge] = useState('150')
   const [accounts, setAccounts] = useState<DietitianBankAccount[]>([])
   const [error, setError] = useState('')
+  const updateDetails = useUpdateDietitianDetails()
 
   useEffect(() => {
     if (!open || !dietitian) return
@@ -53,27 +57,34 @@ const DietitianBankModal = ({ open, onClose, dietitian, onDone }: DietitianBankM
     setAccounts((prev) => prev.filter((_, idx) => idx !== i))
   }
 
-  const handleFile = (i: number, file: File | null) => {
+  // Persistence (compression, size limits, where the bytes end up) belongs to
+  // the documents service — this component only holds the returned reference.
+  const handleFile = async (i: number, file: File | null) => {
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => updateAccount(i, { chequeUrl: String(reader.result || '') })
-    reader.readAsDataURL(file)
+    setError('')
+    try {
+      updateAccount(i, { chequeUrl: await storeChequeImage(file) })
+    } catch (err) {
+      setError(errorMessage(err, 'Could not attach that file — try another.'))
+    }
   }
 
   const handleSave = async () => {
     setError('')
     const toValidate = accounts.filter((a) => !isBlank(a))
+    const finalAccounts: typeof toValidate = []
     for (let i = 0; i < toValidate.length; i++) {
       const a = toValidate[i]
-      if (!a.accountName?.trim()) { setError(`Account ${i + 1}: holder name required`); return }
-      const num = (a.accountNumber || '').replace(/\s/g, '')
-      if (!/^\d{6,18}$/.test(num)) { setError(`Account ${i + 1}: 6-18 digit account number required`); return }
-      const ifscU = (a.ifsc || '').toUpperCase()
-      if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifscU)) { setError(`Account ${i + 1}: IFSC must be 11 chars (e.g. HDFC0001234)`); return }
-      if (!a.chequeUrl) { setError(`Account ${i + 1}: cancelled cheque is mandatory`); return }
+      const result = validateBankAccount(a, `Account ${i + 1}`)
+      if (!result.ok) { setError(result.error); return }
+      finalAccounts.push({ ...a, accountNumber: result.value.accountNumber, ifsc: result.value.ifsc })
     }
-    const finalAccounts = toValidate.map((a) => ({ ...a, accountNumber: (a.accountNumber || '').replace(/\s/g, ''), ifsc: (a.ifsc || '').toUpperCase() }))
-    await updateDietitianDetails(dietitian.id, { bankAccounts: finalAccounts, printingChargePerCamp: Math.max(0, Number(printingCharge) || 0) })
+    try {
+      await updateDetails.mutateAsync({ id: dietitian.id, patch: { bankAccounts: finalAccounts, printingChargePerCamp: Math.max(0, Number(printingCharge) || 0) } })
+    } catch (err) {
+      setError(errorMessage(err, 'Could not save the bank details — try again.'))
+      return
+    }
     toast.success(`Bank details saved · ${dietitian.name}`)
     onClose()
     onDone?.()

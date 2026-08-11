@@ -4,7 +4,7 @@ import type { Client, Division, ClientMr } from '@/types/client.types'
 import type { GeoFo, ClassifiedCity } from '@/features/hq/hq.types'
 import { classifyCity } from '@/features/hq/hq.service'
 import { ROLLUP_PROJECTS, PROJECT_DEVICE, type RollupProject } from '@/features/hq/components/hqmapping/mappingRollups'
-import { downloadCsv } from '@/features/hq/components/hqmapping/hq.ui'
+import { downloadCsv, HQ_CARD_STYLE } from '@/features/hq/components/hqmapping/hq.ui'
 import { toast } from '@/components/ui/sonner'
 
 interface MappingGenerateViewProps {
@@ -86,16 +86,16 @@ const MappingGenerateView = ({ division, client, mrs, fos, onOpenCompanies, onOp
   return (
     <div>
       <div className="flex items-center gap-1.5 text-[12px] mb-3.5 flex-wrap" style={{ color: 'var(--qms-text-muted)' }}>
-        <a onClick={onOpenCompanies} className="font-bold cursor-pointer" style={{ color: 'var(--qms-brand)' }}>Companies</a>
+        <button type="button" onClick={onOpenCompanies} className="font-bold cursor-pointer" style={{ color: 'var(--qms-brand)' }}>Companies</button>
         <FiChevronRight size={13} />
-        <a onClick={() => client && onOpenCompany(client.id)} className="font-bold cursor-pointer" style={{ color: 'var(--qms-brand)' }}>{client?.name || 'Company'}</a>
+        <button type="button" onClick={() => client && onOpenCompany(client.id)} className="font-bold cursor-pointer" style={{ color: 'var(--qms-brand)' }}>{client?.name || 'Company'}</button>
         <FiChevronRight size={13} />
-        <a onClick={() => onOpenDivision(division.id)} className="font-bold cursor-pointer" style={{ color: 'var(--qms-brand)' }}>{division.name}</a>
+        <button type="button" onClick={() => onOpenDivision(division.id)} className="font-bold cursor-pointer" style={{ color: 'var(--qms-brand)' }}>{division.name}</button>
         <FiChevronRight size={13} />
         <b style={{ color: 'var(--qms-text)' }}>HQ Mapping</b>
       </div>
 
-      <div className="rounded-2xl border p-4 mb-3.5" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
+      <div className="rounded-2xl border p-4 mb-3.5" style={HQ_CARD_STYLE}>
         <div className="flex items-center gap-1.5 text-[13px] font-extrabold mb-1"><FiMapPin size={14} /> HQ Mapping — {division.name}</div>
         <div className="text-[11px] mb-3.5" style={{ color: 'var(--qms-text-muted)' }}>
           Paste or prefill the MR HQ list, choose the project, then generate serviceability. Test device: <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(59,109,255,.1)', color: 'var(--qms-brand)' }}>{PROJECT_DEVICE[projectType]}</span>
@@ -187,7 +187,7 @@ const MappingGenerateView = ({ division, client, mrs, fos, onOpenCompanies, onOp
           </div>
 
           {resultTab === 'serv' ? (
-            <div className="rounded-2xl border p-3.5" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
+            <div className="rounded-2xl border p-3.5" style={HQ_CARD_STYLE}>
               <table className="w-full text-[12px] border-collapse">
                 <thead><tr>{['City', 'Status', 'Nearest device-FO', 'Distance', 'Device'].map((h) => <th key={h} className="text-left px-2 py-1.5 text-[10px] font-extrabold uppercase" style={{ color: 'var(--qms-text-muted)' }}>{h}</th>)}</tr></thead>
                 <tbody>
@@ -204,7 +204,7 @@ const MappingGenerateView = ({ division, client, mrs, fos, onOpenCompanies, onOp
               </table>
             </div>
           ) : (
-            <div className="rounded-2xl border p-3.5" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
+            <div className="rounded-2xl border p-3.5" style={HQ_CARD_STYLE}>
               <div className="text-[11px] mb-2.5" style={{ color: 'var(--qms-text-muted)' }}>For each non-serviceable city, the nearest serviceable location whose FO carries the required device, and the distance.</div>
               <table className="w-full text-[12px] border-collapse">
                 <thead><tr>{['City', 'Status', 'Nearest location with device', 'Distance', 'Required device'].map((h) => <th key={h} className="text-left px-2 py-1.5 text-[10px] font-extrabold uppercase" style={{ color: 'var(--qms-text-muted)' }}>{h}</th>)}</tr></thead>

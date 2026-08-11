@@ -1,4 +1,5 @@
 import type { IconType } from 'react-icons'
+import { HQ_CARD_STYLE } from '@/features/hq/components/hqmapping/hq.ui'
 
 // Exact port of hq-serviceability.js's kpi() helper + .hq-kpi/.hq-kpi.{tone}
 // CSS (lines 37-50) — a KPI tile toned by HqTier color rather than KpiTile's
@@ -26,7 +27,7 @@ interface HqKpiProps {
 const HqKpi = ({ label, value, sub, icon: Icon, tone = 'none' }: HqKpiProps) => {
   const t = tone === 'none' ? null : TONE_COLOR[tone]
   return (
-    <div className="relative rounded-xl border p-3" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
+    <div className="relative rounded-xl border p-3" style={HQ_CARD_STYLE}>
       <div
         className="absolute top-2.5 right-2.5 w-[30px] h-[30px] rounded-lg grid place-items-center"
         style={{ background: t ? t.bg : 'rgba(124,92,255,.12)', color: t ? t.fg : '#6d28d9' }}

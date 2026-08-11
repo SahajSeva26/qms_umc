@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
 import { FiHeart, FiUsers, FiVideo, FiCpu, FiBell, FiImage, FiPlus } from 'react-icons/fi'
-import { useAuth } from '@/hooks/useAuth'
+import { toast } from '@/components/ui/sonner'
 import { useDietCamps } from '@/features/diet/hooks/useDietCamps'
-import { dietStage, dietViewOnly, isKam } from '@/features/diet/diet.utils'
-import { scopedClientIds } from '@/types/salesdash.types'
+import { errorMessage } from '@/features/diet/utils/errorMessage'
+import { dietStage } from '@/features/diet/diet.utils'
 import DietKpiStrip from '@/features/diet/components/DietKpiStrip'
 import CampsTab from '@/features/diet/components/tabs/CampsTab'
 import DietitiansTab from '@/features/diet/components/tabs/DietitiansTab'
@@ -12,6 +12,7 @@ import DevicesTab from '@/features/diet/components/tabs/DevicesTab'
 import RemindersTab from '@/features/diet/components/tabs/RemindersTab'
 import MediaTab from '@/features/diet/components/tabs/MediaTab'
 import NewDietRequestModal from '@/features/diet/components/NewDietRequestModal'
+import type { Camp } from '@/types/camp.types'
 import type { DietStage } from '@/features/diet/diet.types'
 
 type TabId = 'camps' | 'dietitians' | 'tele' | 'devices' | 'reminders' | 'media'
@@ -26,33 +27,37 @@ const TABS: { id: TabId; label: string; icon: typeof FiHeart }[] = [
 ]
 
 const DietPage = () => {
-  const { user } = useAuth()
   const [tab, setTab] = useState<TabId>('camps')
   const [statusFilter, setStatusFilter] = useState<DietStage | 'ALL'>('ALL')
   const [newRequestOpen, setNewRequestOpen] = useState(false)
   const diet = useDietCamps()
 
-  const viewOnly = dietViewOnly(user?.role)
-  const kamScoped = isKam(user?.role)
-
-  // AuthUser has no field linking a logged-in user to a people/rep id (same
-  // root gap as CampReportSection.tsx's identical call) — passing user._id
-  // here would silently never match ASSIGNMENTS' mock rep-ids (e.g.
-  // 'p-riya'), so a KAM would see every client's diet camps unfiltered with
-  // no sign the filter failed. Pass undefined honestly until the backend
-  // adds a real user<->rep mapping; scopedClientIds resolves that to "no
-  // scoping" rather than faking a match.
-  const scopedIds = kamScoped ? scopedClientIds(user?.role, undefined) : null
-
-  const camps = useMemo(() => {
-    if (!scopedIds) return diet.camps
-    return diet.camps.filter((c) => scopedIds.has(c.clientId))
-  }, [diet.camps, scopedIds])
+  // Old placeholder UserRole checks (dietViewOnly/isKam) never once fired
+  // for a real user — every AuthUser was hardcoded to 'super_admin'
+  // regardless of who was logged in, so this page has always shown the
+  // full, unscoped, editable view to everyone. No real backend concept
+  // exists yet (camp_coord/sales_rep were never real backend roles either)
+  // to replace this with; this keeps the actual, historical behavior.
+  const viewOnly = false
+  const camps = diet.camps
 
   const filteredCamps = useMemo(() => {
     if (statusFilter === 'ALL') return camps
     return camps.filter((c) => dietStage(c) === statusFilter)
   }, [camps, statusFilter])
+
+  // The request modal used to close unconditionally the moment Submit was
+  // clicked, discarding any failure. It now closes only once the camp is
+  // actually booked, so a failed request can be retried from the open form.
+  const handleNewRequest = async (camp: Camp) => {
+    try {
+      await diet.newDietCampRequest.mutateAsync(camp)
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not submit the request — try again.'))
+      return
+    }
+    setNewRequestOpen(false)
+  }
 
   return (
     <div className="w-full">
@@ -98,26 +103,49 @@ const DietPage = () => {
         })}
       </div>
 
-      {tab === 'camps' && (
-        <CampsTab
-          camps={filteredCamps}
-          dietitians={diet.dietitians}
-          viewOnly={viewOnly}
-          statusFilter={statusFilter}
-          onSelectStatus={setStatusFilter}
-          diet={diet}
-        />
+      {/* useDietCamps already exposes isLoading/error — surfaced here so a
+          failed load shows an error instead of silently rendering empty tabs.
+          Same pattern/markup as DoctorsPage. */}
+      {diet.isLoading && (
+        <div className="text-[13px] py-10 text-center" style={{ color: 'var(--qms-text-muted)' }}>
+          Loading diet camps…
+        </div>
       )}
-      {tab === 'dietitians' && <DietitiansTab dietitians={diet.dietitians} camps={camps} />}
-      {tab === 'tele' && <TeleDietitianTab diet={diet} viewOnly={viewOnly} />}
-      {tab === 'devices' && <DevicesTab dietitians={diet.dietitians} />}
-      {tab === 'reminders' && <RemindersTab camps={camps} reminders={diet.reminders} viewOnly={viewOnly} diet={diet} />}
-      {tab === 'media' && <MediaTab camps={camps} media={diet.media} />}
+
+      {diet.error && !diet.isLoading && (
+        <div className="text-[13px] rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
+          Failed to load diet camps. Please try again.
+        </div>
+      )}
+
+      {!diet.isLoading && !diet.error && (
+        <>
+          {tab === 'camps' && (
+            <CampsTab
+              camps={filteredCamps}
+              dietitians={diet.dietitians}
+              viewOnly={viewOnly}
+              statusFilter={statusFilter}
+              onSelectStatus={setStatusFilter}
+              diet={diet}
+            />
+          )}
+          {/* The two prop-passed writes stay bound to a domain-level callback:
+              AddMediaModal and EnrollDietitianModal already own their own
+              saving state and error handling, and should not have to know
+              about TanStack mutation objects. */}
+          {tab === 'dietitians' && <DietitiansTab dietitians={diet.dietitians} camps={camps} onSaveProfile={(profile) => diet.upsertDietitianProfile.mutateAsync(profile)} />}
+          {tab === 'tele' && <TeleDietitianTab diet={diet} viewOnly={viewOnly} />}
+          {tab === 'devices' && <DevicesTab dietitians={diet.dietitians} />}
+          {tab === 'reminders' && <RemindersTab camps={camps} reminders={diet.reminders} viewOnly={viewOnly} diet={diet} />}
+          {tab === 'media' && <MediaTab camps={camps} media={diet.media} onAddMedia={(campId, item) => diet.addMedia.mutateAsync({ campId, item })} />}
+        </>
+      )}
 
       <NewDietRequestModal
         open={newRequestOpen}
         onClose={() => setNewRequestOpen(false)}
-        onConfirm={(camp) => { diet.newDietCampRequest(camp); setNewRequestOpen(false) }}
+        onConfirm={handleNewRequest}
       />
     </div>
   )

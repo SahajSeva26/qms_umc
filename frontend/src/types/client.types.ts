@@ -200,6 +200,62 @@ export interface ClientProject {
   campCost?: number
 }
 
+// Project master data lives here (not clients.mock.ts) so other features
+// (e.g. hq, diet) can read it through the shared types layer instead of
+// reaching into Client Management's internal mock file — same rationale as
+// CLIENTS/DIVISIONS/MRS above. IDs line up with camps.mock.ts/dashboard.mock.ts
+// so all modules read as one dataset.
+export const PROJECTS: ClientProject[] = [
+  {
+    id: 'PRJ-441', name: 'Sun Pharma · Cardio Care · Mumbai', clientId: 'cli-sun', divisionId: 'div-sun-cardio',
+    type: 'Screening', poNo: 'PO/SUN/2026/0418', poValueInr: 8420000, poDate: '2026-01-12',
+    campsTarget: 120, campsDone: 84, status: 'LIVE',
+    pos: [
+      { id: 'po-sun-0418', poNo: 'PO/SUN/2026/0418', confirmationType: 'PO', poDate: '2026-01-12', poExpiry: '2026-12-31', campCount: 120, value: 8420000, status: 'ACTIVE' },
+    ],
+  },
+  {
+    id: 'PRJ-438', name: 'Cipla · Endo Plus · South India', clientId: 'cli-cipla', divisionId: 'div-cipla-endo',
+    type: 'Diet', poNo: 'PO/CIP/2026/0233', poValueInr: 3210000, poDate: '2026-02-03',
+    campsTarget: 90, campsDone: 62, status: 'LIVE', pos: [], coordinatorId: 'p-tushar', campCost: 4200,
+  },
+  {
+    id: 'PRJ-448', name: 'Abbott · Weight Management · West', clientId: 'cli-abbott', divisionId: 'div-abt-diab',
+    type: 'Diet', poNo: 'PO/ABT/2026/0455', poValueInr: 2100000, poDate: '2026-04-08',
+    campsTarget: 50, campsDone: 9, status: 'LIVE', pos: [], coordinatorId: 'p-tushar', campCost: 3800,
+  },
+  {
+    id: 'PRJ-440', name: "Dr Reddy's · OncoCare · National", clientId: 'cli-drr', divisionId: 'div-drr-onco',
+    type: 'Screening', poNo: 'AGR/DRR/2026/0107', poValueInr: 4850000, poDate: '2026-01-20',
+    campsTarget: 80, campsDone: 51, status: 'LIVE', pos: [],
+  },
+  {
+    id: 'PRJ-437', name: 'Abbott · Diabetes Care · Tier-2', clientId: 'cli-abbott', divisionId: 'div-abt-diab',
+    type: 'Screening', poNo: 'PO/ABT/2026/0342', poValueInr: 5840000, poDate: '2026-02-14',
+    campsTarget: 75, campsDone: 48, status: 'LIVE', pos: [],
+  },
+  {
+    id: 'PRJ-435', name: 'Glenmark · Dermatology · West', clientId: 'cli-glenmark', divisionId: 'div-glen-derm',
+    type: 'Lab', poNo: 'PO/GLN/2026/0289', poValueInr: 2240000, poDate: '2026-03-02',
+    campsTarget: 40, campsDone: 22, status: 'LIVE', pos: [],
+  },
+  {
+    id: 'PRJ-432', name: 'Cipla · Respiratory Care · Pan India', clientId: 'cli-cipla', divisionId: 'div-cipla-resp',
+    type: 'Diet', poNo: 'PO/CIP/2026/0198', poValueInr: 3000000, poDate: '2026-01-28',
+    campsTarget: 36, campsDone: 14, status: 'LIVE', pos: [], coordinatorId: 'p-tushar', campCost: 4000,
+  },
+  {
+    id: 'PRJ-429', name: 'Lupin · Cardio Excellence · North', clientId: 'cli-lupin', divisionId: null,
+    type: 'Screening', poNo: 'MAIL/LUP/2026/0075', poValueInr: 1840000, poDate: '2026-03-18',
+    campsTarget: 30, campsDone: 14, status: 'PILOT', pos: [],
+  },
+  {
+    id: 'PRJ-422', name: 'Fortis Healthcare · Gastro Pro', clientId: 'cli-fortis', divisionId: null,
+    type: 'Lab', poNo: 'PO/FRT/2025/0512', poValueInr: 1840000, poDate: '2025-11-06',
+    campsTarget: 20, campsDone: 0, status: 'PAUSED', pos: [],
+  },
+]
+
 export type InvoiceStatus = 'SENT' | 'PAID' | 'OVERDUE'
 
 export interface ClientInvoice {

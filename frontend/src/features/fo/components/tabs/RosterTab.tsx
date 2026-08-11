@@ -3,6 +3,7 @@ import type { Person } from '@/types/people.types'
 import type { Camp } from '@/types/camp.types'
 import FoFilterBar, { type FoFilters } from '@/features/fo/components/FoFilterBar'
 import { foLiveStatus, STATUS_LABEL, STATUS_COLOR, initials, avatarGradient, personCamps, closedCampsOf, upcomingCampsOf, avgFeedback } from '@/features/fo/components/fo.ui'
+import { foMatchesSearch } from '@/features/fo/utils/foSearch'
 
 interface RosterTabProps {
   fos: Person[]
@@ -19,11 +20,10 @@ const RosterTab = ({ fos, camps, onOpenFo }: RosterTabProps) => {
   const todayIso = new Date().toISOString().slice(0, 10)
 
   const filtered = useMemo(() => {
-    const q = filters.search.trim().toLowerCase()
     return fos.filter((f) => {
       if (filters.state !== 'ALL' && !(f.states ?? []).includes(filters.state)) return false
       if (filters.status !== 'ALL' && foLiveStatus(f, camps) !== filters.status) return false
-      if (q && !`${f.name} ${f.hq} ${f.phone}`.toLowerCase().includes(q)) return false
+      if (!foMatchesSearch(f, filters.search)) return false
       return true
     })
   }, [fos, camps, filters])

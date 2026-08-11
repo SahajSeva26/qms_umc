@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { FiNavigation } from 'react-icons/fi'
 import { useDashboardData } from '@/features/dashboard/hooks/useDashboardData'
+import type { DashboardFilterState } from '@/types/dashboard.types'
 import SectionCard from '@/features/dashboard/components/SectionCard'
 import MiniKpiCard from '@/features/dashboard/components/MiniKpiCard'
 import BarListRow from '@/features/dashboard/components/BarListRow'
@@ -9,12 +10,13 @@ import FilterChips from '@/features/dashboard/components/FilterChips'
 const REGION_FILTERS = ['ALL', 'WEST', 'SOUTH', 'NORTH', 'EAST', 'CENTRAL']
 
 interface FoSectionProps {
+  filters: DashboardFilterState
   onDrill: (title: string, content: string) => void
 }
 
-const FoSection = ({ onDrill }: FoSectionProps) => {
+const FoSection = ({ filters, onDrill }: FoSectionProps) => {
   const [regionFilter, setRegionFilter] = useState('ALL')
-  const { data } = useDashboardData()
+  const { data } = useDashboardData(filters)
 
   if (!data) return null
   const { fo } = data

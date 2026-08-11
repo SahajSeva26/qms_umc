@@ -3,6 +3,7 @@ import type { Client, Division, ClientMr } from '@/types/client.types'
 import type { GeoFo } from '@/features/hq/hq.types'
 import { classifyCity } from '@/features/hq/hq.service'
 import { ROLLUP_PROJECTS, PROJECT_DEVICE, mrServiceability } from '@/features/hq/components/hqmapping/mappingRollups'
+import { HQ_CARD_STYLE } from '@/features/hq/components/hqmapping/hq.ui'
 
 interface DivisionViewProps {
   division: Division
@@ -30,9 +31,9 @@ const DivisionView = ({ division, client, mrs, fos, onOpenCompanies, onOpenCompa
   return (
     <div>
       <div className="flex items-center gap-1.5 text-[12px] mb-3.5 flex-wrap" style={{ color: 'var(--qms-text-muted)' }}>
-        <a onClick={onOpenCompanies} className="font-bold cursor-pointer" style={{ color: 'var(--qms-brand)' }}>Companies</a>
+        <button type="button" onClick={onOpenCompanies} className="font-bold cursor-pointer" style={{ color: 'var(--qms-brand)' }}>Companies</button>
         <FiChevronRight size={13} />
-        <a onClick={() => client && onOpenCompany(client.id)} className="font-bold cursor-pointer" style={{ color: 'var(--qms-brand)' }}>{client?.name || 'Company'}</a>
+        <button type="button" onClick={() => client && onOpenCompany(client.id)} className="font-bold cursor-pointer" style={{ color: 'var(--qms-brand)' }}>{client?.name || 'Company'}</button>
         <FiChevronRight size={13} />
         <b style={{ color: 'var(--qms-text)' }}>{division.name}</b>
       </div>
@@ -51,7 +52,7 @@ const DivisionView = ({ division, client, mrs, fos, onOpenCompanies, onOpenCompa
         </button>
       </div>
 
-      <div className="rounded-2xl border p-4 mb-3.5" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
+      <div className="rounded-2xl border p-4 mb-3.5" style={HQ_CARD_STYLE}>
         <div className="flex items-center gap-1.5 text-[13px] font-extrabold mb-2.5"><FiUsers size={14} /> MR serviceability — project-wise</div>
         <table className="w-full text-[12px] border-collapse">
           <thead><tr>{['Project', 'Serviceable', 'Non-serviceable', 'Coverage'].map((h) => <th key={h} className="text-left px-2 py-1.5 text-[10px] font-extrabold uppercase" style={{ color: 'var(--qms-text-muted)' }}>{h}</th>)}</tr></thead>
@@ -68,7 +69,7 @@ const DivisionView = ({ division, client, mrs, fos, onOpenCompanies, onOpenCompa
         </table>
       </div>
 
-      <div className="rounded-2xl border p-4" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
+      <div className="rounded-2xl border p-4" style={HQ_CARD_STYLE}>
         <div className="flex items-center gap-1.5 text-[13px] font-extrabold mb-2.5"><FiList size={14} /> MR roster ({dmr.length})</div>
         <table className="w-full text-[12px] border-collapse">
           <thead><tr>{['MR', 'HQ', 'Designation', 'Region', 'Screening', 'Nearest device-FO'].map((h) => <th key={h} className="text-left px-2 py-1.5 text-[10px] font-extrabold uppercase" style={{ color: 'var(--qms-text-muted)' }}>{h}</th>)}</tr></thead>

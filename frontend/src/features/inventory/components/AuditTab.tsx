@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useAuditEvents, useAuditFilter } from '@/features/inventory/hooks/useInventory'
 import { auditEventTypes, filterAuditEvents, auditDisplayRows } from '@/features/inventory/inventory.service'
 import type { AuditEvent } from '@/features/inventory/inventory.types'
+import { InvFilterBar, Th, Td, TableEmptyRow } from '@/features/inventory/components/IntelTableUi'
 
 // Exact port of window.QMS_InvIntel's Audit tab (tabAudit(), inventory-
 // intel.js lines 449-470). A flat, unified chronological ledger merged from
@@ -12,41 +13,6 @@ import type { AuditEvent } from '@/features/inventory/inventory.types'
 // indicator; the '{n} events' counter in the filter bar deliberately reflects
 // the FULL filtered count (pre-slice), so it can legitimately exceed 200
 // while only 200 rows render — preserved faithfully, not "fixed".
-
-// '.inv-filter' — same sticky filter/toolbar bar shared by every intel tab
-// (Forecast/Copilot/Audit), exact port of inventory.js's injected CSS: flex
-// row, gap 8px, padding 10px 12px, sticky top:60px z-index:25.
-function InvFilterBar({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      className="flex items-center gap-2 flex-wrap rounded-[10px] border mb-3 sticky z-25"
-      style={{ padding: '10px 12px', background: 'var(--qms-surface)', borderColor: 'var(--qms-border)', top: 60 }}
-    >
-      {children}
-    </div>
-  )
-}
-
-// '.im-tbl' th/td shells — exact port of inventory-intel.js's injected CSS
-// (border-collapse, 12px font, dashed row borders, hover tint).
-function Th({ children }: { children: React.ReactNode }) {
-  return (
-    <th
-      className="text-left font-bold uppercase tracking-[.04em]"
-      style={{ padding: '8px 6px', fontSize: 10, color: 'var(--qms-text-muted)', borderBottom: '1px dashed var(--qms-border)' }}
-    >
-      {children}
-    </th>
-  )
-}
-
-function Td({ children, bold }: { children: React.ReactNode; bold?: boolean }) {
-  return (
-    <td style={{ padding: '8px 6px', borderBottom: '1px dashed var(--qms-border)', color: 'var(--qms-text)' }}>
-      {bold ? <b>{children}</b> : children}
-    </td>
-  )
-}
 
 // Type column pill — exact port of tabAudit()'s inline-styled span
 // (inventory-intel.js:463): reuses the '.im-band' base shape (padding:2px
@@ -106,11 +72,7 @@ const AuditTab = () => {
           </thead>
           <tbody>
             {!isLoading && body.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="text-center" style={{ padding: 24, color: 'var(--qms-text-muted)' }}>
-                  No audit events.
-                </td>
-              </tr>
+              <TableEmptyRow colSpan={5}>No audit events.</TableEmptyRow>
             ) : (
               body.map((e: AuditEvent, i: number) => (
                 // eslint-disable-next-line react/no-array-index-key -- source records have no single globally-unique id across all 7 merged stores; ref+type+date+index matches the prototype's own keyless <tr> render.

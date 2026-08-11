@@ -11,16 +11,9 @@ import type { ContactEntity, ContactStatus, ContactType } from '@/types/contact.
 
 const PAGE_SIZE = 20
 
-// Contact is a small, supporting entity for Appointment/Lead (not a
-// headline module) — kept intentionally lean: one filterable/paginated
-// list plus a create/edit modal, mirroring the simplicity of
-// `@/features/doctors/pages/DoctorsPage.tsx`'s Roster tab without the
-// aggregate KPI tabs (Contact has no geography/specialty grouping concept).
+// Kept intentionally lean: one filterable/paginated list plus a create/edit modal.
 const ContactsPage = () => {
   const { hasAnyPermission } = usePermission()
-  // Matches contact.routes.ts's real write guard exactly: contact:manage,
-  // tenant:manage, tenant:admin. A Sales Rep (no contact:* grant at all,
-  // confirmed via defaultRoleTypes.ts) sees contacts read-only.
   const canManage = hasAnyPermission(['contact:manage', 'tenant:manage', 'tenant:admin'])
 
   const [search, setSearch] = useState('')
@@ -121,6 +114,9 @@ const ContactsPage = () => {
                     <div className="text-[13px] font-bold truncate" style={{ color: 'var(--qms-text)' }}>{c.name}</div>
                     {c.designation && (
                       <div className="text-[11px] truncate" style={{ color: 'var(--qms-text-muted)' }}>{c.designation}</div>
+                    )}
+                    {c.division && typeof c.division !== 'string' && (
+                      <div className="text-[10.5px] truncate" style={{ color: 'var(--qms-text-soft)' }}>{c.division.name}</div>
                     )}
                     <div className="text-[10.5px] truncate" style={{ color: 'var(--qms-text-soft)' }}>
                       {[c.email, c.phone].filter(Boolean).join(' · ') || '—'}

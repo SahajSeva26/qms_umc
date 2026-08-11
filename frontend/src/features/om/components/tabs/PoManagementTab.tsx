@@ -5,7 +5,7 @@ import { useErp } from '@/features/om/hooks/useErp'
 import { poStats, poAlerts } from '@/features/om/erp.service'
 import { isScreeningProject, projectTenantName } from '@/features/projects/projects.utils'
 import { formatINR } from '@/utils/formatters'
-import DoBar from '@/features/dedicatedops/components/DoBar'
+import DoBar from '@/components/ui/DoBar'
 
 interface PoManagementTabProps {
   camps: Camp[]

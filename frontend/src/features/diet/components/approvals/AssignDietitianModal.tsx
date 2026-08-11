@@ -5,15 +5,15 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from '@/components/ui/sonner'
-import type { Camp } from '@/types/camp.types'
-import type { DietitianRankResult } from '@/features/diet/dietitians.types'
-import {
-  rankDietitiansForCamp, sortDietitiansForBcaCamp, campRequiresBca, getCampInvites,
-  doctorPreferredDietitians, dietitianDoctorHistory, dietitianAverageRating, getLastDietitianRates,
-  suggestDietitianRates, bcaVerified, dietitianApproved, poCampCost, assignDietitianByCoordPatch,
-  recordDietitianRates, getDietitianRateHistory, clientName,
-} from '@/features/diet/dietitians.service'
+import { applyInviteTierOrder, invitesByDietitianId } from '@/features/diet/services/dietitianCandidates.service'
+import { suggestDietitianRates, poCampCost, getDietitianRateHistory } from '@/features/diet/services/dietitianRates.service'
+import { dietitianApproved } from '@/features/diet/services/dietitianRoster.service'
+import { clientName } from '@/features/diet/services/dietScope.service'
+import { errorMessage } from '@/features/diet/utils/errorMessage'
 import { useCampsData } from '@/hooks/useCampsData'
+import { useCampInvites } from '@/features/diet/hooks/useDietitianInvites'
+import { useDietitianCandidates } from '@/features/diet/hooks/useDietitianCandidates'
+import { useAssignDietitianWithRates } from '@/features/diet/hooks/useDietitianRates'
 import { fmtDate, fmtDateYear, fmtDt } from './helpers'
 
 interface AssignDietitianModalProps {
@@ -25,24 +25,10 @@ interface AssignDietitianModalProps {
   userName: string
 }
 
-// Builds the picker's final tier order: invite-accepted float to top (0),
-// doctor-preferred next (1), everyone else (2), declined-invite sink to
-// bottom (3). Stable sort within tiers (spec §3a step 3).
-function orderForPicker(camp: Camp, camps: Camp[], ranked: DietitianRankResult[]): DietitianRankResult[] {
-  const invites = getCampInvites(camp.id)
-  const acceptedIds = new Set(invites.filter((i) => i.response === 'ACCEPTED').map((i) => i.dietitianId))
-  const declinedIds = new Set(invites.filter((i) => i.response === 'DECLINED').map((i) => i.dietitianId))
-  const preferredIds = new Set(doctorPreferredDietitians(camp.doctorId, camps))
-  const tier = (id: string) => (acceptedIds.has(id) ? 0 : preferredIds.has(id) ? 1 : declinedIds.has(id) ? 3 : 2)
-  return [...ranked]
-    .map((r, i) => ({ r, i, t: tier(r.dietitian.id) }))
-    .sort((a, b) => a.t - b.t || a.i - b.i)
-    .map((x) => x.r)
-}
-
 const AssignDietitianModal = ({ open, onClose, campId, preSelectedDietitianId, onDone, userName }: AssignDietitianModalProps) => {
-  const { camps, patchCamp } = useCampsData()
+  const { camps } = useCampsData()
   const camp = useMemo(() => camps.find((c) => c.id === campId) || null, [camps, campId])
+  const assignDietitian = useAssignDietitianWithRates()
 
   const [step, setStep] = useState<'pick' | 'rates'>('pick')
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -66,18 +52,22 @@ const AssignDietitianModal = ({ open, onClose, campId, preSelectedDietitianId, o
     }
   }, [open, preSelectedDietitianId, campId])
 
-  const ranked = useMemo(() => {
-    if (!camp) return []
-    let r = rankDietitiansForCamp(camp, camps)
-    if (campRequiresBca(camp)) r = sortDietitiansForBcaCamp(camp, r)
-    return orderForPicker(camp, camps, r)
-  }, [camp, camps])
+  // One bulk read for the whole shortlist (ranking, BCA tier, rating, last
+  // remuneration, doctor history/preference) — no per-row service calls below.
+  const { requiresBca, candidates } = useDietitianCandidates(camp, camps)
 
-  const invites = camp ? getCampInvites(camp.id) : []
+  // Invites now come from the cached `dietKeys.invites` query, the same source
+  // the invite modal writes through, instead of a second synchronous store read.
+  const { data: invites = [] } = useCampInvites(campId)
+  const inviteById = useMemo(() => invitesByDietitianId(invites), [invites])
   const hasInvites = invites.length > 0
-  const preferredIds = camp ? new Set(doctorPreferredDietitians(camp.doctorId, camps)) : new Set<string>()
 
-  const selectedDietitian = selectedId ? ranked.find((r) => r.dietitian.id === selectedId)?.dietitian : undefined
+  // Invite-accepted → doctor-preferred → rest → declined (spec §3a step 3).
+  const ordered = useMemo(() => applyInviteTierOrder(candidates, invites), [candidates, invites])
+  const hasPreferred = candidates.some((c) => c.preferred)
+
+  const selected = selectedId ? ordered.find((c) => c.dietitian.id === selectedId) : undefined
+  const selectedDietitian = selected?.dietitian
   const sug = useMemo(() => (camp && selectedId ? suggestDietitianRates(selectedId, camp) : null), [camp, selectedId])
 
   useEffect(() => {
@@ -104,7 +94,13 @@ const AssignDietitianModal = ({ open, onClose, campId, preSelectedDietitianId, o
     || Number(rem) !== sug.remuneration || Number(ta) !== sug.ta
     || Number(printing) !== sug.printing || Number(targetCost) !== sug.targetCost)
 
-  const rateHistory = selectedId ? getDietitianRateHistory(selectedId).slice(0, 5) : []
+  // ONE read of the selected dietitian's history serves both the "loaded from
+  // previous assignment" banner and the rate-trend table (the banner used to
+  // call getLastDietitianRates four times in a single JSX block, each a full
+  // store parse).
+  const fullRateHistory = selectedId ? getDietitianRateHistory(selectedId) : []
+  const lastRates = fullRateHistory[0] ?? null
+  const rateHistory = fullRateHistory.slice(0, 5)
 
   const handleSubmit = async () => {
     if (!selectedId || !selectedDietitian) return
@@ -124,10 +120,12 @@ const AssignDietitianModal = ({ open, onClose, campId, preSelectedDietitianId, o
       remuneration: remN, ta: taN, printing: printN, targetCost: targetN,
       reason: reason.trim() || (sug?.hasHistory ? 'No change · reused previous rates' : 'First assignment'),
     }
-    const patch = assignDietitianByCoordPatch(camp, selectedId, userName, rates)
-    if (!patch) { toast.error('Assign failed'); return }
-    await patchCamp(camp.id, patch)
-    await recordDietitianRates(selectedId, { ...rates, campId: camp.id, setBy: userName })
+    try {
+      await assignDietitian.mutateAsync({ camp, dietitianId: selectedId, by: userName, rates })
+    } catch (err) {
+      setError(errorMessage(err, 'Could not assign — try again.'))
+      return
+    }
     toast.success(`Assigned · ${selectedDietitian.name} · Total ₹${total.toLocaleString('en-IN')}`)
     onClose()
     onDone?.()
@@ -142,14 +140,14 @@ const AssignDietitianModal = ({ open, onClose, campId, preSelectedDietitianId, o
               <DialogTitle>Assign dietitian · select from list</DialogTitle>
               <p className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>{campSubtitle(false)}</p>
             </DialogHeader>
-            {ranked.length === 0 ? (
+            {ordered.length === 0 ? (
               <p className="text-[12.5px] py-6 text-center" style={{ color: 'var(--qms-text-muted)' }}>No dietitians available — enrol one in the master first.</p>
             ) : (
               <>
                 <p className="text-[11.5px] mb-2" style={{ color: 'var(--qms-text-muted)' }}>
                   {hasInvites
                     ? 'Dietitians who accepted your WhatsApp invite are shown first, followed by doctor-preferred picks.'
-                    : preferredIds.size > 0
+                    : hasPreferred
                       ? 'This doctor has preferred dietitians from prior camps — shown first below.'
                       : 'Ranked by same-city match first, then positive last-camp feedback.'}
                 </p>
@@ -164,13 +162,13 @@ const AssignDietitianModal = ({ open, onClose, campId, preSelectedDietitianId, o
                       </tr>
                     </thead>
                     <tbody>
-                      {ranked.map((r) => {
-                        const d = r.dietitian
-                        const invite = invites.find((i) => i.dietitianId === d.id)
-                        const isPreferred = preferredIds.has(d.id)
-                        const hist = dietitianDoctorHistory(d.id, camp.doctorId, camps)
-                        const avg = dietitianAverageRating(d.id, camps)
-                        const lastRate = getLastDietitianRates(d.id)
+                      {ordered.map((c) => {
+                        const d = c.dietitian
+                        const invite = inviteById.get(d.id)
+                        const isPreferred = c.preferred
+                        const hist = c.doctorHistory
+                        const avg = c.rating
+                        const lastRate = c.lastRates
                         return (
                           <tr key={d.id} className="border-t align-top" style={{ borderColor: 'var(--qms-border)' }}>
                             <td className="py-2 px-2">
@@ -180,8 +178,8 @@ const AssignDietitianModal = ({ open, onClose, campId, preSelectedDietitianId, o
                                 {invite?.response === 'ACCEPTED' && <Badge color="#047857" bg="rgba(16,185,129,.16)">✓ ACCEPTED INVITE</Badge>}
                                 {invite?.response === 'DECLINED' && <Badge color="#b91c1c" bg="rgba(244,63,94,.16)">declined invite</Badge>}
                                 {invite && invite.response === null && <Badge color="#1d4ed8" bg="rgba(59,109,255,.14)">invite pending</Badge>}
-                                {campRequiresBca(camp) && (
-                                  bcaVerified(d.id)
+                                {requiresBca && (
+                                  c.bca.verified
                                     ? <Badge color="#047857" bg="rgba(16,185,129,.16)">BCA verified</Badge>
                                     : <Badge color="#c2410c" bg="rgba(249,115,22,.08)">no BCA</Badge>
                                 )}
@@ -222,8 +220,8 @@ const AssignDietitianModal = ({ open, onClose, campId, preSelectedDietitianId, o
 
             {sug.hasHistory ? (
               <div className="rounded-lg px-3 py-2 text-[12px] mb-2" style={{ background: 'rgba(59,109,255,.06)', color: 'var(--qms-text)' }}>
-                Loaded from previous assignment for {selectedDietitian.name} · set {fmtDate(getLastDietitianRates(selectedId!)?.setAt)} by {getLastDietitianRates(selectedId!)?.setBy || 'Coord'}
-                {getLastDietitianRates(selectedId!)?.reason ? ` · reason: ${getLastDietitianRates(selectedId!)?.reason}` : ''}.
+                Loaded from previous assignment for {selectedDietitian.name} · set {fmtDate(lastRates?.setAt)} by {lastRates?.setBy || 'Coord'}
+                {lastRates?.reason ? ` · reason: ${lastRates.reason}` : ''}.
                 <br />No change needed? Click Assign. Editing any field will require a reason.
               </div>
             ) : (
@@ -232,7 +230,7 @@ const AssignDietitianModal = ({ open, onClose, campId, preSelectedDietitianId, o
               </div>
             )}
 
-            {campRequiresBca(camp) && !bcaVerified(selectedId!) && (
+            {requiresBca && !selected?.bca.verified && (
               <div className="rounded-lg px-3 py-2 text-[12px] mb-2" style={{ border: '2px solid #f97316', background: 'rgba(249,115,22,.08)' }}>
                 <b style={{ color: '#c2410c' }}>BCA required · dietitian does not have a verified BCA scale</b>
                 <div style={{ color: 'var(--qms-text)' }}>
@@ -301,7 +299,7 @@ const AssignDietitianModal = ({ open, onClose, campId, preSelectedDietitianId, o
             <DialogFooter>
               <Button variant="outline" onClick={onClose}>Cancel</Button>
               {!preSelectedDietitianId && <Button variant="outline" onClick={() => setStep('pick')}>Back to list</Button>}
-              <Button onClick={handleSubmit}><FiUserCheck size={13} /> Assign & record rates</Button>
+              <Button onClick={handleSubmit} disabled={assignDietitian.isPending}><FiUserCheck size={13} /> Assign & record rates</Button>
             </DialogFooter>
           </>
         )}

@@ -19,9 +19,14 @@ import type {
 import {
   PR_CHAIN, PR_SOURCES, PAY_TERMS,
 } from '@/features/inventory/inventory.types'
+import { isoDateOffset } from '@/features/inventory/utils/date'
+import { TableEmptyRow, InvFilterBar } from '@/features/inventory/components/IntelTableUi'
 import type {
   PurchaseRequisition, PurchaseOrder, GoodsReceiptNote, InventoryItem, Vendor,
 } from '@/features/inventory/inventory.types'
+import { purchaseRequestSchema } from '@/features/inventory/schemas/purchaseRequest.schema'
+import { purchaseOrderSchema } from '@/features/inventory/schemas/purchaseOrder.schema'
+import { grnSchema } from '@/features/inventory/schemas/grn.schema'
 
 // ── Shared visual atoms — exact port of inventory-procurement.js's injected
 // <style id="qms-inv-proc-css"> .pr-flow/.pr-step/.po-status rules. ─────────
@@ -80,8 +85,6 @@ function PoStatusPill({ variant, children }: { variant: PoStatusVariant; childre
   )
 }
 
-const FILTER_BAR_CLS = 'flex gap-2 items-center flex-wrap mb-3 rounded-[10px] border sticky z-25'
-const FILTER_BAR_STYLE = { padding: '10px 12px', background: 'var(--qms-surface)', borderColor: 'var(--qms-border)', top: 60 }
 const CARD_CLS = 'rounded-[14px] border overflow-auto'
 const CARD_STYLE = { background: 'var(--qms-surface-card)', borderColor: 'var(--qms-border)' }
 const TH_CLS = 'text-left font-bold uppercase tracking-[.04em]'
@@ -277,7 +280,7 @@ function PrView({
 }) {
   return (
     <div>
-      <div className={FILTER_BAR_CLS} style={FILTER_BAR_STYLE}>
+      <InvFilterBar>
         <span className="text-xs font-bold uppercase tracking-[.04em]" style={{ color: 'var(--qms-text-muted)' }}>
           Purchase Requisitions
         </span>
@@ -290,7 +293,7 @@ function PrView({
         <Button onClick={onNewPR}>
           <Plus size={14} /> New PR
         </Button>
-      </div>
+      </InvFilterBar>
 
       <div className={CARD_CLS} style={CARD_STYLE}>
         <table className="text-xs border-collapse" style={{ width: '100%', minWidth: 760 }}>
@@ -303,7 +306,7 @@ function PrView({
           </thead>
           <tbody>
             {prs.length === 0 ? (
-              <tr><td colSpan={6} className="text-center" style={{ padding: 24, color: 'var(--qms-text-muted)' }}>No requisitions.</td></tr>
+              <TableEmptyRow colSpan={6}>No requisitions.</TableEmptyRow>
             ) : (
               prs.map((pr) => (
                 <tr key={pr.id}>
@@ -366,7 +369,7 @@ function PoView({
 
   return (
     <div>
-      <div className={FILTER_BAR_CLS} style={FILTER_BAR_STYLE}>
+      <InvFilterBar>
         <span className="text-xs font-bold uppercase tracking-[.04em]" style={{ color: 'var(--qms-text-muted)' }}>
           Purchase Orders
         </span>
@@ -376,7 +379,7 @@ function PoView({
         <Button className="ml-auto" onClick={onGenerate}>
           <Plus size={14} /> Generate PO
         </Button>
-      </div>
+      </InvFilterBar>
 
       <div className={CARD_CLS} style={CARD_STYLE}>
         <table className="text-xs border-collapse" style={{ width: '100%', minWidth: 820 }}>
@@ -389,7 +392,7 @@ function PoView({
           </thead>
           <tbody>
             {pos.length === 0 ? (
-              <tr><td colSpan={7} className="text-center" style={{ padding: 24, color: 'var(--qms-text-muted)' }}>No purchase orders.</td></tr>
+              <TableEmptyRow colSpan={7}>No purchase orders.</TableEmptyRow>
             ) : (
               pos.map((p) => (
                 <tr key={p.id} className="cursor-pointer" onClick={() => onOpenPO(p.id)}>
@@ -436,14 +439,14 @@ function PoView({
 function GrnView({ grns }: { grns: GoodsReceiptNote[] }) {
   return (
     <div>
-      <div className={FILTER_BAR_CLS} style={FILTER_BAR_STYLE}>
+      <InvFilterBar>
         <span className="text-xs font-bold uppercase tracking-[.04em]" style={{ color: 'var(--qms-text-muted)' }}>
           Goods Receipt Notes
         </span>
         <span className="text-xs ml-auto" style={{ color: 'var(--qms-text-muted)' }}>
           Accepted qty auto-updates item stock
         </span>
-      </div>
+      </InvFilterBar>
 
       <div className={CARD_CLS} style={CARD_STYLE}>
         <table className="text-xs border-collapse" style={{ width: '100%', minWidth: 780 }}>
@@ -456,7 +459,7 @@ function GrnView({ grns }: { grns: GoodsReceiptNote[] }) {
           </thead>
           <tbody>
             {grns.length === 0 ? (
-              <tr><td colSpan={7} className="text-center" style={{ padding: 24, color: 'var(--qms-text-muted)' }}>No goods receipts yet. Receive an open PO.</td></tr>
+              <TableEmptyRow colSpan={7}>No goods receipts yet. Receive an open PO.</TableEmptyRow>
             ) : (
               grns.map((g) => (
                 <tr key={g.id}>
@@ -512,7 +515,13 @@ function NewPrModal({
   }
 
   const handleSave = () => {
-    onSave({ itemId, qty: Number(qty) || 0, source, reason })
+    const payload = { itemId, qty: Number(qty) || 0, source, reason }
+    const result = purchaseRequestSchema.safeParse(payload)
+    if (!result.success) {
+      toast.error(result.error.issues[0]?.message ?? 'Please check the highlighted fields')
+      return
+    }
+    onSave(payload)
   }
 
   return (
@@ -617,7 +626,7 @@ function GeneratePoModal({
   }
 
   const handleSave = () => {
-    onSave({
+    const payload = {
       itemId, vendorId,
       qty: Number(qty) || 0,
       unitRate: Number(rate) || 0,
@@ -625,7 +634,13 @@ function GeneratePoModal({
       freight: Number(freight) || 0,
       paymentTerms,
       deliveryDays: Number(deliveryDays) || 7,
-    })
+    }
+    const result = purchaseOrderSchema.safeParse(payload)
+    if (!result.success) {
+      toast.error(result.error.issues[0]?.message ?? 'Please check the highlighted fields')
+      return
+    }
+    onSave(payload)
   }
 
   return (
@@ -715,12 +730,6 @@ function GoodsReceiptModal({
   return <GoodsReceiptModalBody key={po.id} po={po} grnCount={grnCount} onClose={onClose} onSave={onSave} />
 }
 
-function todayPlusDaysIso(days: number): string {
-  const d = new Date()
-  d.setDate(d.getDate() + days)
-  return d.toISOString().slice(0, 10)
-}
-
 function GoodsReceiptModalBody({
   po, grnCount, onClose, onSave,
 }: {
@@ -735,7 +744,7 @@ function GoodsReceiptModalBody({
     acceptedQty: po.qty,
     rejectedQty: 0,
     batchNo: `B${(po.itemId || '').replace(/\W+/g, '').toUpperCase().slice(0, 6)}-${24300 + grnCount}`,
-    expiryDate: todayPlusDaysIso(365),
+    expiryDate: isoDateOffset(365),
     invoiceNo: `VINV-${5600 + grnCount}`,
   }
 
@@ -748,7 +757,7 @@ function GoodsReceiptModalBody({
   const [notes, setNotes] = useState('')
 
   const handleSave = () => {
-    onSave(po.id, {
+    const payload = {
       receivedQty: Number(receivedQty) || 0,
       acceptedQty: Number(acceptedQty) || 0,
       rejectedQty: Number(rejectedQty) || 0,
@@ -756,7 +765,13 @@ function GoodsReceiptModalBody({
       expiryDate,
       invoiceNo,
       notes,
-    })
+    }
+    const result = grnSchema.safeParse(payload)
+    if (!result.success) {
+      toast.error(result.error.issues[0]?.message ?? 'Please check the highlighted fields')
+      return
+    }
+    onSave(po.id, payload)
   }
 
   return (

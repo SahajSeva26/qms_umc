@@ -1,7 +1,6 @@
 import { FiFolder } from 'react-icons/fi'
 import type { DietitianProfileBundle } from '@/features/diet/dietitians.types'
-import { fmtInr } from '@/features/diet/dietitians.service'
-
+import { fmtInr } from '@/features/diet/diet.utils'
 interface ProjectBreakdownCardProps {
   bundle: DietitianProfileBundle
 }

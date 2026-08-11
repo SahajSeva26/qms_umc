@@ -3,8 +3,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/sonner'
-import { verifyBcaScale } from '@/features/diet/dietitians.service'
-
+import { useVerifyBcaScale } from '@/features/diet/hooks/useDietitianEquipment'
+import { errorMessage } from '@/features/diet/utils/errorMessage'
 interface BcaVerifyDialogProps {
   open: boolean
   dietitianId: string
@@ -14,12 +14,18 @@ interface BcaVerifyDialogProps {
 }
 
 // Stands in for the prototype's native prompt() — asks for a training-video
-// URL, then calls verifyBcaScale() (owned=true, verified=true).
+// URL, then runs the verify mutation (sets owned=true, verified=true).
 const BcaVerifyDialog = ({ open, dietitianId, userName, onClose, onSaved }: BcaVerifyDialogProps) => {
   const [videoUrl, setVideoUrl] = useState('')
+  const verifyBca = useVerifyBcaScale()
 
   const save = async () => {
-    await verifyBcaScale(dietitianId, { videoUrl: videoUrl.trim() || undefined }, userName)
+    try {
+      await verifyBca.mutateAsync({ dietitianId, videoUrl: videoUrl.trim() || undefined, by: userName })
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not verify the BCA scale — try again.'))
+      return
+    }
     toast.success('BCA scale verified · trained dietitian')
     setVideoUrl('')
     onSaved()
@@ -37,7 +43,7 @@ const BcaVerifyDialog = ({ open, dietitianId, userName, onClose, onSaved }: BcaV
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={save}>Verify</Button>
+          <Button onClick={save} disabled={verifyBca.isPending}>Verify</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

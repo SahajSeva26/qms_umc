@@ -10,7 +10,7 @@ import {
   subjectAvailability, auditIssues,
 } from '@/features/om/om.service'
 import KpiTile from '@/components/ui/KpiTile'
-import DoBar from '@/features/dedicatedops/components/DoBar'
+import DoBar from '@/components/ui/DoBar'
 import { formatINR } from '@/utils/formatters'
 
 interface OverviewTabProps {
@@ -19,6 +19,8 @@ interface OverviewTabProps {
   fos: Person[]
   dietitians: Person[]
   projects: ProjectEntity[]
+  // True when GET /projects 403'd — distinguishes "genuinely zero projects" from "can't check."
+  projectsForbidden?: boolean
   expenseOverlay: Record<string, ExpenseStatus>
   onGoTab: (tab: string) => void
 }
@@ -49,7 +51,7 @@ function isoPlusDays(n: number) { const d = new Date(); d.setDate(d.getDate() + 
 // the manager's single combined cockpit with every tile drilling into the
 // relevant tab. This is the most complex tab in Ops Manager; every number
 // below has a literal formula ported from the prototype, not approximated.
-const OverviewTab = ({ camps, mode, fos, dietitians, projects, expenseOverlay, onGoTab }: OverviewTabProps) => {
+const OverviewTab = ({ camps, mode, fos, dietitians, projects, projectsForbidden, expenseOverlay, onGoTab }: OverviewTabProps) => {
   const isDiet = mode === 'Diet'
   const accent = ACCENT[mode]
   const subjLabel = isDiet ? 'Dietitian' : 'FO'
@@ -293,7 +295,11 @@ const OverviewTab = ({ camps, mode, fos, dietitians, projects, expenseOverlay, o
                 )
               })}
               {modeProjects.length === 0 && (
-                <tr><td colSpan={4} className="text-center py-3.5 text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>No {mode} projects.</td></tr>
+                <tr>
+                  <td colSpan={4} className="text-center py-3.5 text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>
+                    {projectsForbidden ? "You don't have permission to view projects." : `No ${mode} projects.`}
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>

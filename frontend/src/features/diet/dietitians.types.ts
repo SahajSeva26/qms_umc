@@ -112,6 +112,14 @@ export interface DietInvite {
   respondedNote?: string
 }
 
+/** Per-camp invite counters. Was an inline shape repeated in the service. */
+export interface InviteSummary {
+  total: number
+  accepted: number
+  pending: number
+  declined: number
+}
+
 export interface DietitianFeedback {
   campId: string
   rating: number
@@ -205,4 +213,27 @@ export interface DietitianProfileBundle {
   feedbacks: (DietitianFeedback & { camp: import('@/types/camp.types').Camp })[]
   averageRating: DietitianAverageRating | null
   byProject: DietitianProjectBreakdown[]
+}
+
+// Per-scope rollup row for the Dietitian Payment screen (/billing/dietitian).
+// Deliberately separate from DietitianPaymentRollup above (that one is
+// global/unscoped — Dietitian Profiles' KPI source). This screen re-derives
+// the same shape restricted to the coordinator-scoped camp set.
+// Moved here from components/payment/payment.types.ts so the payment hook can
+// consume it without a hook -> components dependency.
+export interface ScopedDietitianRollup {
+  dietitianId: string
+  dietitianName: string
+  hq: string
+  states: string[]
+  totalCamps: number
+  readyCamps: number
+  paidCamps: number
+  pendingReports: number
+  eligibleAmount: number
+  upcomingAmount: number
+  paidAmount: number
+  toBePaid: number
+  bankComplete: boolean
+  printingCharge: number
 }

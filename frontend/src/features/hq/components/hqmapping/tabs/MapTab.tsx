@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { FiMap } from 'react-icons/fi'
 import type { ClassifiedHq, GeoFo } from '@/features/hq/hq.types'
 import HqMapSvg from '@/features/hq/components/hqmapping/HqMapSvg'
+import { HQ_CARD_STYLE } from '@/features/hq/components/hqmapping/hq.ui'
 
 interface MapTabProps {
   rows: ClassifiedHq[]
@@ -27,7 +28,7 @@ const MapTab = ({ rows, fos, radiusKm, onOpenHq }: MapTabProps) => {
 
   return (
     <div>
-      <div className="rounded-2xl border p-3.5 mb-3" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
+      <div className="rounded-2xl border p-3.5 mb-3" style={HQ_CARD_STYLE}>
         <div className="flex items-center justify-between mb-2.5">
           <span className="flex items-center gap-1.5 text-[13px] font-extrabold"><FiMap size={14} /> Live coverage map</span>
           <span className="text-[10.5px] font-semibold uppercase" style={{ color: 'var(--qms-text-muted)' }}>Haversine · {radiusKm} KM rings · seeded/uploaded coordinates</span>
@@ -35,7 +36,7 @@ const MapTab = ({ rows, fos, radiusKm, onOpenHq }: MapTabProps) => {
         <HqMapSvg rows={rows} fos={fos} radiusKm={radiusKm} onOpenHq={onOpenHq} />
       </div>
 
-      <div className="rounded-2xl border p-3.5" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
+      <div className="rounded-2xl border p-3.5" style={HQ_CARD_STYLE}>
         <div className="text-[13px] font-extrabold mb-2.5">Heatmap · HQ count by state</div>
         <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(60px, 1fr))' }}>
           {byState.map(([s, b]) => {

@@ -47,12 +47,8 @@ const InternalMembersPicker = ({ selected, onChange }: InternalMembersPickerProp
   // limit: PLATFORM_TENANT_FETCH_LIMIT — see accessManagement.constants.ts;
   // the backend's default 10-result limit can silently exclude the `qms`
   // platform tenant once total active tenant count passes 10.
-  const { data: tenantData } = useTenants({ status: 'active', limit: PLATFORM_TENANT_FETCH_LIMIT })
-  // tenant.type is only present on the wire for a system:manage caller
-  // (TenantMapper.toResponse) — code is always present regardless of
-  // permission, so match on it as a fallback. Same pattern already used by
-  // WizardStep4.tsx/WizardStep5.tsx/EditProjectModal.tsx for this exact
-  // platform-tenant lookup.
+ 
+  const { data: tenantData } = useTenants({ type: 'platform', status: 'active', limit: PLATFORM_TENANT_FETCH_LIMIT })
   const platformTenant = tenantData?.data?.items.find((t) => t.type === 'platform' || t.code === PLATFORM_TENANT_CODE)
 
   useEffect(() => {

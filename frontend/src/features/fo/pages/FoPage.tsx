@@ -42,9 +42,15 @@ const ALL_TABS: { id: TabId; label: string; icon: typeof FiUsers }[] = [
 
 const FoPage = () => {
   const { user } = useAuth()
-  const role = user?.role
-  const isPersonal = role === 'fo'
-  const isSalesView = role === 'sales_lead' || role === 'sales_rep'
+  // Old placeholder UserRole checks (role === 'fo' / 'sales_lead' /
+  // 'sales_rep') never once fired for a real user — every AuthUser was
+  // hardcoded to 'super_admin' regardless of who was logged in, so this
+  // page has always shown the full "FO Management" admin view (never "My
+  // Workspace" or the sales-scoped tab set). No real backend concept
+  // exists yet to replace this with; this keeps the actual, historical
+  // behavior.
+  const isPersonal = false
+  const isSalesView = false
 
   const { people: allPeopleRaw, devices } = usePeopleData()
   const { camps } = useCampsData()
@@ -135,18 +141,19 @@ const FoPage = () => {
   // training rows via the service layer directly (read-only snapshot from
   // localStorage, not a live subscription) since useFoTraining is per-FO.
   const trainingDueCount = useMemo(() => {
+    let all: { foId: string; expiresOn: string }[] = []
+    try {
+      const raw = localStorage.getItem('qms.fo.training')
+      all = raw ? JSON.parse(raw) : []
+    } catch {
+      // ignore malformed cache
+    }
+    const foIds = new Set(fos.map((f) => f.id))
     let count = 0
-    fos.forEach((f) => {
-      try {
-        const raw = localStorage.getItem('qms.fo.training')
-        const all: { foId: string; expiresOn: string }[] = raw ? JSON.parse(raw) : []
-        all.filter((r) => r.foId === f.id).forEach((r) => {
-          const days = daysUntil(r.expiresOn)
-          if (days >= 0 && days < 30) count++
-        })
-      } catch {
-        // ignore malformed cache
-      }
+    all.forEach((r) => {
+      if (!foIds.has(r.foId)) return
+      const days = daysUntil(r.expiresOn)
+      if (days >= 0 && days < 30) count++
     })
     return count
   }, [fos])

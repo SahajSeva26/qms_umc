@@ -1,10 +1,9 @@
 // Shared UI-layer helpers for the HQ Mapping & Serviceability screen — status
 // pill color tokens, CSV export, the India-bbox SVG projection, and the tab
-// registry with role gating. Mirrors hq-serviceability.js's own STATE.filter /
-// TABS / project()/renderMapSvg() and hq-mapping.js's mapping-view helpers,
-// kept local to this feature's components folder like fo.ui.ts.
-import type { UserRole } from '@/types/auth.types'
-import type { HqTier, CityTier } from '@/features/hq/hq.types'
+// registry. Mirrors hq-serviceability.js's own STATE.filter / TABS /
+// project()/renderMapSvg() and hq-mapping.js's mapping-view helpers, kept
+// local to this feature's components folder like fo.ui.ts.
+import type { HqTier } from '@/features/hq/hq.types'
 
 // ── Status pill tokens (hq-serviceability.js's .hq-pill.{green,yellow,orange,red}) ──
 export const HQ_TIER_COLOR: Record<HqTier, { bg: string; fg: string; dot: string }> = {
@@ -14,62 +13,42 @@ export const HQ_TIER_COLOR: Record<HqTier, { bg: string; fg: string; dot: string
   RED:    { bg: 'rgba(244,63,94,.16)',  fg: '#b91c1c', dot: '#f43f5e' },
 }
 
-// classifyCity()'s distinct 3-tier vocabulary (GREEN/ORANGE/RED, no YELLOW) —
-// same color values as HqTier's GREEN/ORANGE/RED but a separate lookup so the
-// two classifiers never accidentally share a type.
-export const CITY_TIER_COLOR: Record<CityTier, { bg: string; fg: string; dot: string }> = {
-  GREEN:  HQ_TIER_COLOR.GREEN,
-  ORANGE: HQ_TIER_COLOR.ORANGE,
-  RED:    HQ_TIER_COLOR.RED,
-}
+// The one truly identical piece of every card/tile's inline style across this
+// feature (36 occurrences, 19 files) — every section's own className (radius/
+// padding/margin) varies by context and is intentionally left alone; only
+// this 2-property style object was byte-for-byte duplicated everywhere.
+export const HQ_CARD_STYLE = { background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' } as const
 
 export type HqTabId = 'admin' | 'sales' | 'ops' | 'coord' | 'map' | 'mapping' | 'hq' | 'fo' | 'bulk' | 'reports' | 'ai'
 
 export interface HqTabDef {
   id: HqTabId
   label: string
-  show: (role: UserRole | undefined) => boolean
 }
 
-// Exact port of hq-serviceability.js's TABS[].show() role predicates
-// (isAdmin/isSales/isOpsManager/isCoord) — translated from the prototype's
-// roleId() session lookup (admin/super_admin, sales_lead/sales_rep,
-// om_screening/om_diet, camp_coord/diet_camp_coord) to this app's UserRole.
-// navConfig.ts's own 'hqmapping' rolesAllowed list is WIDER than the
-// prototype's per-tab gates (it includes fo/dedicated_fo/accounts/
-// analytics_viewer/logistics so those roles can reach the page at all) — per
-// the task's instruction to prefer a read-only view over hiding a tab
-// entirely when the two sources disagree, every one of those "extra" roles
-// still gets the tabs whose show() returns true for them below (map/mapping/
-// reports are show:()=>true for everyone who can open the page; admin/sales/
-// ops/coord/hq/fo/bulk/ai stay gated to the roles the prototype itself gates
-// them to, since those are the tabs with write-affordances / operational
-// escalation content the prototype deliberately restricts).
-const isAdmin = (r?: UserRole) => r === 'super_admin' || r === 'admin'
-const isSales = (r?: UserRole) => r === 'sales_lead' || r === 'sales_rep'
-const isOpsManager = (r?: UserRole) => r === 'om_screening' || r === 'om_diet' || r === 'logistics'
-const isCoord = (r?: UserRole) => r === 'camp_coord' || r === 'diet_camp_coord'
-
+// Exact port of hq-serviceability.js's TABS registry. The prototype gated
+// most of these behind role predicates (isAdmin/isSales/isOpsManager/
+// isCoord, keyed on the old placeholder UserRole) — that gating never
+// actually worked, since every real login was hardcoded to 'super_admin',
+// which isAdmin's allowlist always included, so all 11 tabs have always
+// been shown to everyone in practice. No real backend concept exists yet
+// to replace the per-tab gating with; this keeps the actual, historical
+// behavior (all tabs visible, defaulting to 'admin').
 export const HQ_TABS: HqTabDef[] = [
-  { id: 'admin', label: 'Admin · Coverage', show: (r) => isAdmin(r) || isOpsManager(r) },
-  { id: 'sales', label: 'Sales · Live lookup', show: (r) => isAdmin(r) || isSales(r) || isOpsManager(r) || isCoord(r) },
-  { id: 'ops', label: 'Ops · Gap analysis', show: (r) => isAdmin(r) || isOpsManager(r) },
-  { id: 'coord', label: 'Coord · Assign camp', show: (r) => isAdmin(r) || isOpsManager(r) || isCoord(r) },
-  { id: 'map', label: 'Live map', show: () => true },
-  { id: 'mapping', label: 'Company → HQ mapping', show: () => true },
-  { id: 'hq', label: 'HQ master', show: (r) => isAdmin(r) || isOpsManager(r) },
-  { id: 'fo', label: 'FO master', show: (r) => isAdmin(r) || isOpsManager(r) },
-  { id: 'bulk', label: 'Bulk City Check', show: (r) => isAdmin(r) || isOpsManager(r) || isSales(r) },
-  { id: 'reports', label: 'Reports', show: () => true },
-  { id: 'ai', label: 'AI insights', show: (r) => isAdmin(r) || isOpsManager(r) },
+  { id: 'admin', label: 'Admin · Coverage' },
+  { id: 'sales', label: 'Sales · Live lookup' },
+  { id: 'ops', label: 'Ops · Gap analysis' },
+  { id: 'coord', label: 'Coord · Assign camp' },
+  { id: 'map', label: 'Live map' },
+  { id: 'mapping', label: 'Company → HQ mapping' },
+  { id: 'hq', label: 'HQ master' },
+  { id: 'fo', label: 'FO master' },
+  { id: 'bulk', label: 'Bulk City Check' },
+  { id: 'reports', label: 'Reports' },
+  { id: 'ai', label: 'AI insights' },
 ]
 
-export function defaultHqTab(role: UserRole | undefined): HqTabId {
-  if (isSales(role)) return 'sales'
-  if (isOpsManager(role)) return 'ops'
-  if (isCoord(role)) return 'coord'
-  return 'admin'
-}
+export const DEFAULT_HQ_TAB: HqTabId = 'admin'
 
 // ── India bounding-box SVG projection — EXACT port of hq-serviceability.js's
 // project()/renderMapSvg() (lat 6..37, lng 68..97 → 1000x700 viewBox). The

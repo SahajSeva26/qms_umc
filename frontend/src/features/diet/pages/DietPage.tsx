@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import { FiHeart, FiUsers, FiVideo, FiCpu, FiBell, FiImage, FiPlus } from 'react-icons/fi'
+import { toast } from '@/components/ui/sonner'
 import { useDietCamps } from '@/features/diet/hooks/useDietCamps'
+import { errorMessage } from '@/features/diet/utils/errorMessage'
 import { dietStage } from '@/features/diet/diet.utils'
 import DietKpiStrip from '@/features/diet/components/DietKpiStrip'
 import CampsTab from '@/features/diet/components/tabs/CampsTab'
@@ -10,6 +12,7 @@ import DevicesTab from '@/features/diet/components/tabs/DevicesTab'
 import RemindersTab from '@/features/diet/components/tabs/RemindersTab'
 import MediaTab from '@/features/diet/components/tabs/MediaTab'
 import NewDietRequestModal from '@/features/diet/components/NewDietRequestModal'
+import type { Camp } from '@/types/camp.types'
 import type { DietStage } from '@/features/diet/diet.types'
 
 type TabId = 'camps' | 'dietitians' | 'tele' | 'devices' | 'reminders' | 'media'
@@ -42,6 +45,19 @@ const DietPage = () => {
     if (statusFilter === 'ALL') return camps
     return camps.filter((c) => dietStage(c) === statusFilter)
   }, [camps, statusFilter])
+
+  // The request modal used to close unconditionally the moment Submit was
+  // clicked, discarding any failure. It now closes only once the camp is
+  // actually booked, so a failed request can be retried from the open form.
+  const handleNewRequest = async (camp: Camp) => {
+    try {
+      await diet.newDietCampRequest.mutateAsync(camp)
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not submit the request — try again.'))
+      return
+    }
+    setNewRequestOpen(false)
+  }
 
   return (
     <div className="w-full">
@@ -87,26 +103,49 @@ const DietPage = () => {
         })}
       </div>
 
-      {tab === 'camps' && (
-        <CampsTab
-          camps={filteredCamps}
-          dietitians={diet.dietitians}
-          viewOnly={viewOnly}
-          statusFilter={statusFilter}
-          onSelectStatus={setStatusFilter}
-          diet={diet}
-        />
+      {/* useDietCamps already exposes isLoading/error — surfaced here so a
+          failed load shows an error instead of silently rendering empty tabs.
+          Same pattern/markup as DoctorsPage. */}
+      {diet.isLoading && (
+        <div className="text-[13px] py-10 text-center" style={{ color: 'var(--qms-text-muted)' }}>
+          Loading diet camps…
+        </div>
       )}
-      {tab === 'dietitians' && <DietitiansTab dietitians={diet.dietitians} camps={camps} />}
-      {tab === 'tele' && <TeleDietitianTab diet={diet} viewOnly={viewOnly} />}
-      {tab === 'devices' && <DevicesTab dietitians={diet.dietitians} />}
-      {tab === 'reminders' && <RemindersTab camps={camps} reminders={diet.reminders} viewOnly={viewOnly} diet={diet} />}
-      {tab === 'media' && <MediaTab camps={camps} media={diet.media} />}
+
+      {diet.error && !diet.isLoading && (
+        <div className="text-[13px] rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
+          Failed to load diet camps. Please try again.
+        </div>
+      )}
+
+      {!diet.isLoading && !diet.error && (
+        <>
+          {tab === 'camps' && (
+            <CampsTab
+              camps={filteredCamps}
+              dietitians={diet.dietitians}
+              viewOnly={viewOnly}
+              statusFilter={statusFilter}
+              onSelectStatus={setStatusFilter}
+              diet={diet}
+            />
+          )}
+          {/* The two prop-passed writes stay bound to a domain-level callback:
+              AddMediaModal and EnrollDietitianModal already own their own
+              saving state and error handling, and should not have to know
+              about TanStack mutation objects. */}
+          {tab === 'dietitians' && <DietitiansTab dietitians={diet.dietitians} camps={camps} onSaveProfile={(profile) => diet.upsertDietitianProfile.mutateAsync(profile)} />}
+          {tab === 'tele' && <TeleDietitianTab diet={diet} viewOnly={viewOnly} />}
+          {tab === 'devices' && <DevicesTab dietitians={diet.dietitians} />}
+          {tab === 'reminders' && <RemindersTab camps={camps} reminders={diet.reminders} viewOnly={viewOnly} diet={diet} />}
+          {tab === 'media' && <MediaTab camps={camps} media={diet.media} onAddMedia={(campId, item) => diet.addMedia.mutateAsync({ campId, item })} />}
+        </>
+      )}
 
       <NewDietRequestModal
         open={newRequestOpen}
         onClose={() => setNewRequestOpen(false)}
-        onConfirm={(camp) => { diet.newDietCampRequest(camp); setNewRequestOpen(false) }}
+        onConfirm={handleNewRequest}
       />
     </div>
   )

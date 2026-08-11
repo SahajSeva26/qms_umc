@@ -4,9 +4,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { toast } from '@/components/ui/sonner'
+import { validateBankAccount, isBlankBankAccount } from '@/features/diet/schemas/dietitianBank.schemas'
 import type { DietitianBankAccount } from '@/features/diet/dietitians.types'
-import { dietitianDetails, updateDietitianDetails } from '@/features/diet/dietitians.service'
-
+import { dietitianDetails } from '@/features/diet/services/dietitianRoster.service'
+import { storeChequeImage } from '@/features/diet/services/dietitianDocuments.service'
+import { useUpdateDietitianDetails } from '@/features/diet/hooks/useDietitianRoster'
+import { errorMessage } from '@/features/diet/utils/errorMessage'
 interface BankEditModalProps {
   dietitianId: string | null
   dietitianName: string
@@ -18,24 +21,16 @@ const emptyAccount = (n: number): DietitianBankAccount => ({
   label: `Account ${n}`, accountName: '', accountNumber: '', ifsc: '', branch: '', accountType: 'SAVINGS', upi: '', chequeUrl: '',
 })
 
-const fileToDataUrl = (file: File): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const r = new FileReader()
-    r.onload = () => resolve(r.result as string)
-    r.onerror = reject
-    r.readAsDataURL(file)
-  })
-
 // Compact bank-edit affordance — NOT part of the ground-truth prototype for
 // THIS screen (that lives on a sibling screen); added here only because
 // "Missing bank" is a KPI/column with no other way to act on it. Reuses the
-// validation rules from features/om/components/tabs/DietitianPaymentsTab.tsx's
-// bank modal (accountNumber /^\d{6,18}$/, ifsc /^[A-Z]{4}0[A-Z0-9]{6}$/,
-// chequeUrl mandatory) but kept intentionally lighter (no printing-charge
+// shared bank rules from schemas/dietitianBank.schemas.ts, but kept
+// intentionally lighter (no printing-charge
 // field here — that's edited nowhere on this screen either, left as-is).
 const BankEditModal = ({ dietitianId, dietitianName, onClose, onSaved }: BankEditModalProps) => {
   const [accounts, setAccounts] = useState<DietitianBankAccount[]>([])
   const [error, setError] = useState('')
+  const updateDetails = useUpdateDietitianDetails()
 
   useEffect(() => {
     if (!dietitianId) return
@@ -49,28 +44,39 @@ const BankEditModal = ({ dietitianId, dietitianName, onClose, onSaved }: BankEdi
   const updateAccount = (i: number, patch: Partial<DietitianBankAccount>) =>
     setAccounts((prev) => prev.map((a, idx) => (idx === i ? { ...a, ...patch } : a)))
 
+  // Persistence (compression, size limits, where the bytes end up) belongs to
+  // the documents service — this component only holds the returned reference.
   const handleChequeUpload = async (i: number, file: File | undefined) => {
     if (!file) return
-    const dataUrl = await fileToDataUrl(file)
-    updateAccount(i, { chequeUrl: dataUrl })
+    setError('')
+    try {
+      updateAccount(i, { chequeUrl: await storeChequeImage(file) })
+    } catch (err) {
+      setError(errorMessage(err, 'Could not attach that file — try another.'))
+    }
   }
 
   const save = async () => {
     const next = [...accounts]
     for (let i = 0; i < next.length; i++) {
       const a = next[i]
-      const anyFilled = a.accountName || a.accountNumber || a.ifsc || a.chequeUrl
-      if (!anyFilled) continue
-      if (!a.accountName) return setError(`Account ${i + 1}: holder name required`)
-      const acc = String(a.accountNumber || '').replace(/\s+/g, '')
-      if (!/^\d{6,18}$/.test(acc)) return setError(`Account ${i + 1}: 6-18 digit account number required`)
-      const ifsc = String(a.ifsc || '').toUpperCase()
-      if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) return setError(`Account ${i + 1}: IFSC must be 11 chars (e.g. HDFC0001234)`)
-      if (!a.chequeUrl) return setError(`Account ${i + 1}: cancelled cheque is mandatory`)
-      next[i] = { ...a, accountNumber: acc, ifsc, capturedAt: a.capturedAt ?? new Date().toISOString() }
+      if (isBlankBankAccount(a)) continue
+      const result = validateBankAccount(a, `Account ${i + 1}`)
+      if (!result.ok) return setError(result.error)
+      next[i] = {
+        ...a,
+        accountNumber: result.value.accountNumber,
+        ifsc: result.value.ifsc,
+        capturedAt: a.capturedAt ?? new Date().toISOString(),
+      }
     }
     if (!dietitianId) return
-    await updateDietitianDetails(dietitianId, { bankAccounts: next })
+    try {
+      await updateDetails.mutateAsync({ id: dietitianId, patch: { bankAccounts: next } })
+    } catch (err) {
+      setError(errorMessage(err, 'Could not save the bank details — try again.'))
+      return
+    }
     toast.success(`Bank details saved · ${dietitianName}`)
     onSaved()
   }

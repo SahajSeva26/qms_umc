@@ -1,9 +1,11 @@
 import { useMemo } from 'react'
 import { FiDownload } from 'react-icons/fi'
 import type { Camp } from '@/types/camp.types'
-import {
-  campRequiresBca, dietitianExpense, clientName, fmtInrCompact, dietitianName,
-} from '@/features/diet/dietitians.service'
+import { fmtInrCompact } from '@/features/diet/diet.utils'
+import { campRequiresBca } from '@/features/diet/services/dietitianEquipment.service'
+import { dietitianExpense } from '@/features/diet/services/dietitianRates.service'
+import { dietitianName } from '@/features/diet/services/dietitianRoster.service'
+import { clientName } from '@/features/diet/services/dietScope.service'
 import { fmtDate, csvDownload } from './helpers'
 
 interface DashboardTabProps {

@@ -32,7 +32,7 @@ const TABS: { id: TabId; label: string; icon: typeof FiGrid }[] = [
 // into camps.mock.ts/people.mock.ts, so there's nothing for it to do.
 const DietApprovalsPage = () => {
   const { user } = useAuth()
-  const { camps } = useCampsData()
+  const { camps, isLoading, error } = useCampsData()
   const [tab, setTab] = useState<TabId>('dashboard')
 
   const name = userName(user)
@@ -77,10 +77,32 @@ const DietApprovalsPage = () => {
 
       {tab !== 'bank' && <ScopeBanner adminLike={adminLike} coordId={coordId} />}
 
-      {tab === 'dashboard' && <DashboardTab camps={scopedCamps} />}
-      {tab === 'assign' && <AssignTab camps={scopedCamps} allCamps={camps} userName={name} />}
-      {tab === 'projects' && <MyProjectsTab camps={scopedCamps} adminLike={adminLike} coordId={coordId} />}
-      {tab === 'reopen' && <ReopenTab camps={scopedCamps} allCamps={camps} adminLike={adminLike} coordId={coordId} userName={name} />}
+      {/* Every camp-backed tab derives from the shared camps query. Without
+          this, a still-loading or failed load rendered the tabs' own empty
+          states ("All diet camps have a dietitian") as if that were the
+          answer. The Dietitians & bank tab reads the roster query instead, so
+          it stays available. Same markup convention as DietPage. */}
+      {tab !== 'bank' && isLoading && (
+        <div className="text-[13px] py-10 text-center" style={{ color: 'var(--qms-text-muted)' }}>
+          Loading diet camps…
+        </div>
+      )}
+
+      {tab !== 'bank' && error && !isLoading && (
+        <div className="text-[13px] rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
+          Failed to load diet camps. Please try again.
+        </div>
+      )}
+
+      {tab !== 'bank' && !isLoading && !error && (
+        <>
+          {tab === 'dashboard' && <DashboardTab camps={scopedCamps} />}
+          {tab === 'assign' && <AssignTab camps={scopedCamps} allCamps={camps} userName={name} />}
+          {tab === 'projects' && <MyProjectsTab camps={scopedCamps} adminLike={adminLike} coordId={coordId} />}
+          {tab === 'reopen' && <ReopenTab camps={scopedCamps} allCamps={camps} adminLike={adminLike} coordId={coordId} userName={name} />}
+        </>
+      )}
+
       {tab === 'bank' && <DietitiansBankTab />}
     </div>
   )

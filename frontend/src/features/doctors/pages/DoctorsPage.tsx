@@ -30,9 +30,13 @@ const PAGE_SIZE = 20
 // derived from Camp data (camp gaps, ratings, patient counts), which the
 // real Doctor model has no relationship to at all (doctor.service.ts's own
 // comment: "Doctor is a global/system record ... it holds no references").
-// Large enough to cover realistic doctor-master sizes in one page for the
-// aggregate tabs (Specialties/Geography/Inactive) — these need the FULL
-// dataset to group/count correctly, not just the Roster tab's current page.
+//
+// Specialties/Geography still group over just this many active doctors, not
+// the full dataset — the backend has no aggregation endpoint yet, so this is
+// a known, pending-backend limitation (see the activeDoctors query below),
+// NOT something this constant's value should be raised to work around.
+// Inactive doctors no longer use this constant — see the inactive query
+// below, which now paginates like the Roster tab instead.
 const AGGREGATE_LIMIT = 10
 
 const DoctorsPage = () => {
@@ -42,18 +46,22 @@ const DoctorsPage = () => {
   const canSeeInactive = hasPermission('doctor:manage')
   const [tab, setTab] = useState<TabId>('roster')
   const [page, setPage] = useState(1)
+  const [inactivePage, setInactivePage] = useState(1)
   const [openDoctorId, setOpenDoctorId] = useState<string | null>(null)
   const [editModal, setEditModal] = useState<{ open: boolean; doctor: DoctorEntity | null }>({ open: false, doctor: null })
 
-  const { data, isLoading, error } = useDoctors({
-    name: debouncedSearch || undefined,
-    specialization: filters.specialization === 'ALL' ? undefined : filters.specialization,
-    status: filters.status === 'ALL' ? undefined : filters.status,
-    city: filters.city || undefined,
-    state: filters.state || undefined,
-    page: String(page),
-    limit: String(PAGE_SIZE),
-  })
+  const { data, isLoading, error } = useDoctors(
+    {
+      name: debouncedSearch || undefined,
+      specialization: filters.specialization === 'ALL' ? undefined : filters.specialization,
+      status: filters.status === 'ALL' ? undefined : filters.status,
+      city: filters.city || undefined,
+      state: filters.state || undefined,
+      page: String(page),
+      limit: String(PAGE_SIZE),
+    },
+    { keepPreviousData: true },
+  )
   const doctors = data?.data?.items ?? []
   const totalCount = data?.data?.count ?? 0
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
@@ -84,11 +92,19 @@ const DoctorsPage = () => {
   // type-satisfying placeholder only (not a real Mongoose `.limit(0)`
   // "no limit" footgun like the ones fixed elsewhere today, since it's
   // never actually executed).
+  //
+  // Paginated exactly like the Roster tab (same PAGE_SIZE, same
+  // page/limit contract) instead of a single AGGREGATE_LIMIT-capped fetch —
+  // doctor 11+ used to be permanently unreachable in this tab since it never
+  // rendered PaginationControls. `inactivePage` is independent of the Roster
+  // tab's own `page`, so switching tabs and back doesn't lose either one.
   const { data: inactiveData } = useDoctors(
-    canSeeInactive ? { status: 'inactive', limit: String(AGGREGATE_LIMIT) } : { limit: '0' },
-    { enabled: canSeeInactive },
+    canSeeInactive ? { status: 'inactive', page: String(inactivePage), limit: String(PAGE_SIZE) } : { limit: '0' },
+    { enabled: canSeeInactive, keepPreviousData: true },
   )
   const inactiveDoctors = canSeeInactive ? inactiveData?.data?.items ?? [] : []
+  const inactiveTotalCount = canSeeInactive ? inactiveData?.data?.count ?? 0 : 0
+  const inactiveTotalPages = Math.max(1, Math.ceil(inactiveTotalCount / PAGE_SIZE))
 
   const handleFilterChange = <K extends keyof typeof filters>(key: K, value: (typeof filters)[K]) => {
     setFilter(key, value)
@@ -100,11 +116,18 @@ const DoctorsPage = () => {
     setPage(1)
   }
 
+  // cities/specializations/active are intentionally left as-is here — they
+  // still derive from `activeDoctors` (the AGGREGATE_LIMIT-capped query) and
+  // are pending the backend `/doctors/aggregations` endpoint, not part of
+  // this pagination fix. `inactive` is switched to the response's `count`
+  // (not `inactiveDoctors.length`) because that array is now just the
+  // current inactive page — using `.length` would make this tile's number
+  // change every time the Inactive tab is paginated.
   const kpis = useMemo(() => {
     const cities = new Set(activeDoctors.map((d) => d.city).filter(Boolean)).size
     const specializations = new Set(activeDoctors.map((d) => d.specialization)).size
-    return { cities, specializations, active: activeDoctors.length, inactive: inactiveDoctors.length }
-  }, [activeDoctors, inactiveDoctors])
+    return { cities, specializations, active: activeDoctors.length, inactive: inactiveTotalCount }
+  }, [activeDoctors, inactiveTotalCount])
 
   const allKnownDoctors = [...doctors, ...activeDoctors, ...inactiveDoctors]
   const openDoctor = allKnownDoctors.find((d) => d.id === openDoctorId) ?? null
@@ -207,7 +230,10 @@ const DoctorsPage = () => {
           )}
 
           {tab === 'inactive' && (
-            <InactiveTab doctors={inactiveDoctors} onOpenDoctor={setOpenDoctorId} />
+            <>
+              <InactiveTab doctors={inactiveDoctors} onOpenDoctor={setOpenDoctorId} />
+              <PaginationControls page={inactivePage} totalPages={inactiveTotalPages} onPageChange={setInactivePage} />
+            </>
           )}
         </>
       )}

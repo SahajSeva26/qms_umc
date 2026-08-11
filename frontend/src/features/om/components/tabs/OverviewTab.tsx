@@ -10,7 +10,7 @@ import {
   subjectAvailability, auditIssues,
 } from '@/features/om/om.service'
 import KpiTile from '@/components/ui/KpiTile'
-import DoBar from '@/features/dedicatedops/components/DoBar'
+import DoBar from '@/components/ui/DoBar'
 import { formatINR } from '@/utils/formatters'
 
 interface OverviewTabProps {

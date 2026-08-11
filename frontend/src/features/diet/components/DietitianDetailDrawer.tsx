@@ -1,4 +1,5 @@
 import { FiPhone, FiMapPin, FiCheckCircle, FiEdit2, FiMessageCircle, FiCpu, FiExternalLink } from 'react-icons/fi'
+import { initials, stringToColor } from '@/features/diet/utils/personDisplay'
 import type { Camp } from '@/types/camp.types'
 import type { Dietitian } from '@/features/diet/diet.types'
 import { dietStage } from '@/features/diet/diet.utils'
@@ -18,15 +19,6 @@ interface DietitianDetailDrawerProps {
   onEdit?: () => void
 }
 
-function initials(name: string) {
-  return (name || '?').split(' ').map((s) => s[0]).slice(0, 2).join('').toUpperCase()
-}
-function stringToColor(s: string) {
-  const palette = ['#3b6dff', '#a855f7', '#10b981', '#f59e0b', '#0ea5e9', '#ec4899', '#14b8a6', '#7c5cff', '#f43f5e', '#84cc16']
-  let h = 0
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
-  return palette[h % palette.length]
-}
 function inr(n: number) {
   return '₹' + (Number(n) || 0).toLocaleString('en-IN')
 }

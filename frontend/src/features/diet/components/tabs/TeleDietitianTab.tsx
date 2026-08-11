@@ -3,7 +3,9 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { toast } from '@/components/ui/sonner'
 import type { useDietCamps } from '@/features/diet/hooks/useDietCamps'
+import { errorMessage } from '@/features/diet/utils/errorMessage'
 import type { TeleConsultStatus } from '@/features/diet/diet.types'
 
 interface TeleDietitianTabProps {
@@ -25,21 +27,44 @@ const TeleDietitianTab = ({ diet, viewOnly }: TeleDietitianTabProps) => {
   const [notes, setNotes] = useState('')
   const [plan, setPlan] = useState('')
 
-  const handleBook = () => {
+  // Both dialogs stay open when the write fails, so a failed booking or
+  // completion can be retried instead of silently vanishing.
+  const handleBook = async () => {
     if (!patientName.trim()) return
-    diet.bookTeleConsult({
-      patientName, phone: '', condition: '', dietitianId: diet.dietitians[0]?.id ?? '', clientId: '',
-      date: new Date().toISOString().slice(0, 10), time: '11:00', mode: 'Video', status: 'SCHEDULED', notes: '', plan: '',
-    })
+    try {
+      await diet.bookTeleConsult.mutateAsync({
+        patientName, phone: '', condition: '', dietitianId: diet.dietitians[0]?.id ?? '', clientId: '',
+        date: new Date().toISOString().slice(0, 10), time: '11:00', mode: 'Video', status: 'SCHEDULED', notes: '', plan: '',
+      })
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not book the tele-consult — try again.'))
+      return
+    }
     setPatientName(''); setBookOpen(false)
   }
 
   const completingConsult = diet.teleConsults.find((t) => t.id === completingId)
 
-  const handleComplete = () => {
+  const handleComplete = async () => {
     if (!completingId) return
-    diet.setTeleConsultStatus(completingId, 'COMPLETED', notes, plan)
+    try {
+      await diet.setTeleConsultStatus.mutateAsync({ id: completingId, status: 'COMPLETED', notes, plan })
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not save the consult — try again.'))
+      return
+    }
     setCompletingId(null); setNotes(''); setPlan('')
+  }
+
+  // Row actions share one mutation across every row, so an isPending disable
+  // would grey out unrelated rows. They are single-click status flips —
+  // surfacing the failure is what matters, not blocking the click.
+  const setStatus = async (id: string, status: TeleConsultStatus) => {
+    try {
+      await diet.setTeleConsultStatus.mutateAsync({ id, status })
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not update the consult — try again.'))
+    }
   }
 
   return (
@@ -73,12 +98,12 @@ const TeleDietitianTab = ({ diet, viewOnly }: TeleDietitianTabProps) => {
                   {!viewOnly && t.status === 'SCHEDULED' && (
                     <div className="flex gap-1.5">
                       <Button size="sm" variant="outline" onClick={() => setCompletingId(t.id)}>Complete</Button>
-                      <Button size="sm" variant="ghost" onClick={() => diet.setTeleConsultStatus(t.id, 'NO_SHOW')}>No-show</Button>
-                      <Button size="sm" variant="destructive" onClick={() => diet.setTeleConsultStatus(t.id, 'CANCELLED')}>Cancel</Button>
+                      <Button size="sm" variant="ghost" onClick={() => setStatus(t.id, 'NO_SHOW')}>No-show</Button>
+                      <Button size="sm" variant="destructive" onClick={() => setStatus(t.id, 'CANCELLED')}>Cancel</Button>
                     </div>
                   )}
                   {!viewOnly && (t.status === 'CANCELLED' || t.status === 'NO_SHOW') && (
-                    <Button size="sm" variant="outline" onClick={() => diet.setTeleConsultStatus(t.id, 'SCHEDULED')}>Reschedule</Button>
+                    <Button size="sm" variant="outline" onClick={() => setStatus(t.id, 'SCHEDULED')}>Reschedule</Button>
                   )}
                 </td>
               </tr>
@@ -93,7 +118,7 @@ const TeleDietitianTab = ({ diet, viewOnly }: TeleDietitianTabProps) => {
           <Input value={patientName} onChange={(e) => setPatientName(e.target.value)} placeholder="Patient name" />
           <DialogFooter>
             <Button variant="outline" onClick={() => setBookOpen(false)}>Cancel</Button>
-            <Button disabled={!patientName.trim()} onClick={handleBook}>Book</Button>
+            <Button disabled={!patientName.trim() || diet.bookTeleConsult.isPending} onClick={handleBook}>Book</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -107,7 +132,7 @@ const TeleDietitianTab = ({ diet, viewOnly }: TeleDietitianTabProps) => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCompletingId(null)}>Cancel</Button>
-            <Button onClick={handleComplete}>Save</Button>
+            <Button onClick={handleComplete} disabled={diet.setTeleConsultStatus.isPending}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

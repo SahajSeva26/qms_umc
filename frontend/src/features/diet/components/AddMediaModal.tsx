@@ -6,31 +6,55 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { FiUpload } from 'react-icons/fi'
 import { toast } from '@/components/ui/sonner'
 import { useAuth } from '@/hooks/useAuth'
+import type { MediaItem } from '@/features/diet/diet.types'
 
 interface AddMediaModalProps {
   open: boolean
   onClose: () => void
   campId: string
+  /** Persists the item — supplied by MediaTab from useDietCamps().addMedia. */
+  onAdd: (campId: string, item: MediaItem) => Promise<unknown>
 }
 
 // Mirrors window.dcAddMedia's inline modal (diet-camps.js:1761-1804) — Type
 // (photo/video), Uploaded by (defaults to the logged-in user's name, falls
-// back to 'FO'), URL, Caption. UI only for now — actual persistence into the
-// diet media log (diet.service.ts's addMedia) is a later wiring pass.
-const AddMediaModal = ({ open, onClose, campId }: AddMediaModalProps) => {
+// back to 'FO'), URL, Caption.
+//
+// Persists through useDietCamps().addMedia → diet.service.addMedia, which
+// invalidates ['diet-own-data'] so MediaTab's grid picks the item up. The
+// service, the mutation and the MediaItem type all already existed; only this
+// call site was missing.
+const AddMediaModal = ({ open, onClose, campId, onAdd }: AddMediaModalProps) => {
   const { user } = useAuth()
   const [kind, setKind] = useState<'photo' | 'video'>('photo')
   const [by, setBy] = useState(user ? `${user.firstName} ${user.lastName}`.trim() : 'FO')
   const [url, setUrl] = useState('')
   const [caption, setCaption] = useState('')
+  const [saving, setSaving] = useState(false)
 
-  const handleUpload = () => {
+  const handleUpload = async () => {
     if (!url.trim()) {
       toast.error('Add a URL')
       return
     }
-    toast.info('UI only — wiring comes next pass')
-    onClose()
+    setSaving(true)
+    try {
+      await onAdd(campId, {
+        kind,
+        url: url.trim(),
+        caption: caption.trim(),
+        by: by.trim() || 'FO',
+        when: new Date().toISOString(),
+      })
+      toast.success(`${kind === 'video' ? 'Video' : 'Photo'} added to ${campId}`)
+      setUrl('')
+      setCaption('')
+      onClose()
+    } catch {
+      toast.error('Could not add media — try again.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -66,7 +90,7 @@ const AddMediaModal = ({ open, onClose, campId }: AddMediaModalProps) => {
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleUpload}><FiUpload size={14} /> Add media</Button>
+          <Button onClick={handleUpload} disabled={saving}><FiUpload size={14} /> Add media</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

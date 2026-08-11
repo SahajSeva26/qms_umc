@@ -1,8 +1,9 @@
 import { useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { getDietitianRateHistory } from '@/features/diet/dietitians.service'
-import { toCsv, downloadCsv, slugify, todayIso } from '@/features/diet/components/payment/paymentCsv'
+import { getDietitianRateHistory } from '@/features/diet/services/dietitianRates.service'
+import { toCsv, downloadCsv } from '@/lib/csv/csv'
+import { slugify, todayIso } from '@/features/diet/utils/payments/paymentCsv'
 
 interface RateTrendModalProps {
   dietitianId: string | null

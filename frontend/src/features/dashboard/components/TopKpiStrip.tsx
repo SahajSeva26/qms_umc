@@ -1,5 +1,4 @@
-import { effFactor, scaleKpi } from '@/features/dashboard/dashboard.mock'
-import type { DashboardFilterState } from '@/features/dashboard/hooks/useDashboardFilters'
+import type { DashboardFilterState } from '@/types/dashboard.types'
 import { useDashboardData } from '@/features/dashboard/hooks/useDashboardData'
 import MiniKpiCard from '@/features/dashboard/components/MiniKpiCard'
 
@@ -7,12 +6,14 @@ interface TopKpiStripProps {
   filters: DashboardFilterState
 }
 
+// Renders whatever the data source returns for the active filters. It performs
+// no scaling or derivation of its own — the filter-scoped values arrive
+// pre-computed as `data.headline`, so no fabricated math can ever be applied
+// on top of a real API response.
 const TopKpiStrip = ({ filters }: TopKpiStripProps) => {
-  const { data } = useDashboardData()
-  const factor = effFactor(filters.dateRange, filters.client, filters.rep)
+  const { data } = useDashboardData(filters)
 
   if (!data) return null
-  const { company, accounts, project, fo, sales, doctors, patients } = data
 
   return (
     <div className="mb-3.5">
@@ -21,14 +22,9 @@ const TopKpiStrip = ({ filters }: TopKpiStripProps) => {
         Headline numbers across the org · click any tile to drill
       </p>
       <div className="grid gap-2.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
-        <MiniKpiCard label="Total Billing" data={scaleKpi(company.totalBilling, factor)} />
-        <MiniKpiCard label="AR Outstanding" data={scaleKpi(accounts.arOutstanding, factor)} />
-        <MiniKpiCard label="EBITA" data={scaleKpi(accounts.ebita, factor)} />
-        <MiniKpiCard label="Projects" data={scaleKpi(project.totalProjects, factor)} />
-        <MiniKpiCard label="Active FOs" data={scaleKpi(fo.activeFOs, factor)} />
-        <MiniKpiCard label="Leads" data={scaleKpi(sales.totalLeads, factor)} />
-        <MiniKpiCard label="Doctors" data={scaleKpi(doctors.total, factor)} />
-        <MiniKpiCard label="Patients" data={scaleKpi(patients.total, factor)} />
+        {data.headline.map((kpi) => (
+          <MiniKpiCard key={kpi.id} label={kpi.label} data={kpi.data} />
+        ))}
       </div>
     </div>
   )

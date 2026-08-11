@@ -11,7 +11,7 @@ import {
   dailyDietCampCounts, pendingByPharma, isBcaCamp, bcaByLocation, remunerationByDietitian, mrWiseCampCount, toCsv, downloadCsv,
 } from '@/features/om/om.dietDashboard'
 import KpiTile from '@/components/ui/KpiTile'
-import DoBar from '@/features/dedicatedops/components/DoBar'
+import DoBar from '@/components/ui/DoBar'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { clientName } from '@/types/campref.types'

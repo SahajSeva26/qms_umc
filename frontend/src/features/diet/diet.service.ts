@@ -1,6 +1,7 @@
 import type { Camp, CampCancellation, CampConfirmation } from '@/types/camp.types'
 import type { Dietitian, CampReminderLog, MediaItem, OnlineAssessment, TeleConsult, TeleConsultStatus } from '@/features/diet/diet.types'
 import { DIETITIANS, TELE_CONSULTS } from '@/features/diet/diet.mock'
+import { load, persist } from '@/features/diet/services/dietStorage'
 
 // TODO: replace with real API calls once backend endpoints exist.
 // Diet camps read/write the SAME qms.master.camps store Camp Management
@@ -12,30 +13,19 @@ import { DIETITIANS, TELE_CONSULTS } from '@/features/diet/diet.mock'
 // directly (features/camps/ is the sole owner of that store, CLAUDE.md §3).
 // Functions below compute a Partial<Camp> patch; the hook layer persists it.
 
+// These are the Diet-Camps stores (the dietitian-domain stores live in
+// services/dietStorage.ts's own KEYS registry). The load/persist PRIMITIVES
+// are shared, though: this module used to carry a private copy whose persist()
+// swallowed every failure in a bare `catch {}`, so a full-quota or blocked
+// write reported success while discarding the data — and every consumer below
+// resolved as if it had saved. Importing the hardened pair means a failed
+// write now rejects, exactly as a failed POST will once the API exists.
 const KEYS = {
   DIETITIANS: 'qms.diet.dietitians',
   REMINDERS: 'qms.diet.reminders',
   MEDIA: 'qms.diet.media',
   ASSESSMENTS: 'qms.diet.assessments',
   TELECONSULTS: 'qms.diet.teleconsults',
-}
-
-function load<T>(key: string, seed: T): T {
-  try {
-    const raw = localStorage.getItem(key)
-    if (raw) return JSON.parse(raw)
-  } catch {
-    // fall through to seed
-  }
-  return JSON.parse(JSON.stringify(seed))
-}
-
-function persist<T>(key: string, value: T) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value))
-  } catch {
-    // demo persistence only
-  }
 }
 
 export interface DietOwnData {
@@ -54,6 +44,27 @@ export async function getData(): Promise<DietOwnData> {
     assessments: load(KEYS.ASSESSMENTS, {} as Record<string, OnlineAssessment[]>),
     teleConsults: load(KEYS.TELECONSULTS, TELE_CONSULTS),
   }
+}
+
+// ── Dietitian operational profile ────────────────────────────────────────
+//
+// `qms.diet.dietitians` is NOT a second dietitian roster. It is the Diet
+// feature's OPERATIONAL OVERLAY, keyed by the canonical roster id
+// (services/dietitianRoster.service.ts owns identity): per-camp commercials
+// split into remuneration/TA/DA/printing, assigned machines, qualification,
+// internal code and gmap. Nothing else in the app stores those.
+//
+// Identity always comes from the roster; this store only ever enriches it.
+// See services/dietitianDirectory.service.ts for the joined view.
+
+export async function upsertDietitianProfile(profile: Dietitian): Promise<Dietitian[]> {
+  const list = load(KEYS.DIETITIANS, DIETITIANS)
+  const idx = list.findIndex((d) => d.id === profile.id)
+  const next = idx >= 0
+    ? list.map((d) => (d.id === profile.id ? { ...d, ...profile } : d))
+    : [...list, profile]
+  persist(KEYS.DIETITIANS, next)
+  return next
 }
 
 export function setPatientCountPatch(patientsDone: number, patientsExpected: number | undefined, by: string, note: string): Partial<Camp> {

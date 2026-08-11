@@ -1,24 +1,33 @@
 import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { FiUserPlus, FiEdit2 } from 'react-icons/fi'
-import { dietitianRoster, bankComplete, dietitianDetails } from '@/features/diet/dietitians.service'
-import type { DietitianRosterEntry } from '@/features/diet/dietitians.types'
+import { isBankAccountComplete, loadDietDetails } from '@/features/diet/services/dietitianRoster.service'
+import { useDietitianRoster } from '@/features/diet/hooks/useDietitianRoster'
+import { dietKeys } from '@/features/diet/hooks/dietQueryKeys'
+import type { DietitianBankAccount, DietitianRosterEntry } from '@/features/diet/dietitians.types'
 import AddDietitianModal from './AddDietitianModal'
 import DietitianBankModal from './DietitianBankModal'
 
 const DietitiansBankTab = () => {
-  const [, setVersion] = useState(0)
   const [addOpen, setAddOpen] = useState(false)
   const [bankFor, setBankFor] = useState<DietitianRosterEntry | null>(null)
 
-  // Recomputed on every render (plus a manual version bump forces a
-  // re-render after mutations) — dietitianRoster() reads live from
-  // localStorage, not React Query cache, so no memoization is needed given
-  // the small seed size.
-  const roster = dietitianRoster()
-  const withBank = roster.filter((d) => bankComplete(d.id)).length
+  // Roster is a cached query; the modals' onDone invalidates the Diet cache
+  // subtree instead of bumping a local version counter.
+  const { data: roster = [], isPending, error } = useDietitianRoster()
+
+  // The details store is read ONCE per render for the whole table.
+  // bankComplete(id) and dietitianDetails(id) each re-parse it, and the old
+  // code called them in a filter AND twice per row — 3 full parses per
+  // dietitian. Deliberately NOT memoised: one parse per render is already
+  // O(1), and a memo would have to be keyed on something that tracks writes to
+  // a store this component does not own.
+  const detailsById = loadDietDetails()
+  const withBank = roster.filter((d) => isBankAccountComplete(detailsById[d.id]?.bankAccounts ?? [])).length
   const missing = roster.length - withBank
 
-  const bump = () => setVersion((v) => v + 1)
+  const queryClient = useQueryClient()
+  const bump = () => queryClient.invalidateQueries({ queryKey: dietKeys.all })
 
   return (
     <div>
@@ -39,7 +48,11 @@ const DietitiansBankTab = () => {
       </div>
 
       <div className="rounded-xl border p-4" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
-        {roster.length === 0 ? (
+        {isPending ? (
+          <p className="text-[12.5px] py-4 text-center" style={{ color: 'var(--qms-text-muted)' }}>Loading dietitians…</p>
+        ) : error ? (
+          <p className="text-[12.5px] py-4 text-center text-danger">Failed to load the dietitian master. Please try again.</p>
+        ) : roster.length === 0 ? (
           <p className="text-[12.5px] py-4 text-center" style={{ color: 'var(--qms-text-muted)' }}>No dietitians yet.</p>
         ) : (
           <div className="overflow-x-auto">
@@ -51,14 +64,15 @@ const DietitiansBankTab = () => {
               </thead>
               <tbody>
                 {roster.map((d) => {
-                  const complete = bankComplete(d.id)
+                  const accounts = detailsById[d.id]?.bankAccounts ?? []
+                  const complete = isBankAccountComplete(accounts)
                   const details = d
                   return (
                     <tr key={d.id} className="border-t" style={{ borderColor: 'var(--qms-border)' }}>
                       <td className="py-1.5 px-2"><b>{d.name}</b> <span style={{ color: 'var(--qms-text-muted)' }}>{d.specialty || ''}</span></td>
                       <td className="py-1.5 px-2">{d.hq || '—'} <span style={{ color: 'var(--qms-text-muted)' }}>{(d.states || []).join(', ')}</span></td>
                       <td className="py-1.5 px-2">{d.status}</td>
-                      <td className="py-1.5 px-2"><BankCell dietitianId={d.id} /></td>
+                      <td className="py-1.5 px-2"><BankCell accounts={accounts} /></td>
                       <td className="py-1.5 px-2">
                         <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full" style={complete ? { background: 'rgba(16,185,129,.16)', color: '#047857' } : { background: 'rgba(244,63,94,.16)', color: '#b91c1c' }}>
                           {complete ? 'COMPLETE' : 'MISSING'}
@@ -84,11 +98,10 @@ const DietitiansBankTab = () => {
   )
 }
 
-// Bank summary cell — reads the dietitian's primary bank account directly
-// (not exposed by dietitianRoster() itself) via dietitianDetails().
-function BankCell({ dietitianId }: { dietitianId: string }) {
-  const det = dietitianDetails(dietitianId)
-  const acc = det.bankAccounts.find((b) => b.accountNumber && b.ifsc)
+// Bank summary cell — the dietitian's primary account. Accounts are passed in
+// from the table's single details read rather than looked up per row.
+function BankCell({ accounts }: { accounts: DietitianBankAccount[] }) {
+  const acc = accounts.find((b) => b.accountNumber && b.ifsc)
   if (!acc) return <span style={{ color: 'var(--qms-text-muted)' }}>—</span>
   const last4 = (acc.accountNumber || '').slice(-4)
   return <span>••{last4} · {acc.ifsc}</span>

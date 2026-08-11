@@ -1,16 +1,18 @@
 import { FiFileText } from 'react-icons/fi'
 import { useDashboardData } from '@/features/dashboard/hooks/useDashboardData'
+import type { DashboardFilterState } from '@/types/dashboard.types'
 import { formatINR } from '@/utils/formatters'
 import SectionCard from '@/features/dashboard/components/SectionCard'
 import MiniKpiCard from '@/features/dashboard/components/MiniKpiCard'
 import BarListRow from '@/features/dashboard/components/BarListRow'
 
 interface AccountsSectionProps {
+  filters: DashboardFilterState
   onDrill: (title: string, content: string) => void
 }
 
-const AccountsSection = ({ onDrill }: AccountsSectionProps) => {
-  const { data } = useDashboardData()
+const AccountsSection = ({ filters, onDrill }: AccountsSectionProps) => {
+  const { data } = useDashboardData(filters)
 
   if (!data) return null
   const { accounts } = data
@@ -51,7 +53,7 @@ const AccountsSection = ({ onDrill }: AccountsSectionProps) => {
               onClick={() =>
                 onDrill(
                   'AR aging',
-                  `0-30d: ${formatINR(accounts.arOutstanding.v * 0.42)} · 31-60d: ${formatINR(accounts.arOutstanding.v * 0.3)} · 61-90d: ${formatINR(accounts.arOutstanding.v * 0.18)} · 90d+: ${formatINR(accounts.arOutstanding.v * 0.1)}`
+                  accounts.arAging.map((b) => `${b.label}: ${formatINR(b.value)}`).join(' · ')
                 )
               }
             />

@@ -1,9 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { FiUserPlus } from 'react-icons/fi'
 import { useCampsData } from '@/hooks/useCampsData'
 import { useAuth } from '@/hooks/useAuth'
-import { dietitianRoster, dietitianProfileBundle } from '@/features/diet/dietitians.service'
+import { useDietitianProfile } from '@/features/diet/hooks/useDietitianProfile'
+import { useDietitianRoster } from '@/features/diet/hooks/useDietitianRoster'
+import { dietKeys } from '@/features/diet/hooks/dietQueryKeys'
 import type { DietitianRosterEntry } from '@/features/diet/dietitians.types'
 import PickerView from '@/features/diet/components/profile/PickerView'
 import HeroHeader from '@/features/diet/components/profile/HeroHeader'
@@ -34,19 +37,25 @@ const DietitianProfilesPage = () => {
   const { user } = useAuth()
   const userName = user ? `${user.firstName} ${user.lastName}`.trim() : 'QMS Ops'
 
-  const [refreshTick, setRefreshTick] = useState(0)
   const [addOpen, setAddOpen] = useState(false)
-  const bump = () => setRefreshTick((t) => t + 1)
 
   const id = searchParams.get('id')
 
-  const roster = useMemo(() => dietitianRoster(), [refreshTick])
+  // Roster and profile are cached queries now. Section components still call
+  // `onChanged` after a write; that invalidates the Diet cache subtree instead
+  // of bumping a counter, so both queries refresh themselves.
+  const { data: roster = [], isPending: rosterLoading, error: rosterError } = useDietitianRoster()
+  const { data: bundle = null, isPending: profileLoading, error: profileError } = useDietitianProfile(id, camps)
 
-  const bundle = useMemo(() => {
-    if (!id) return null
-    return dietitianProfileBundle(id, camps)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, camps, refreshTick])
+  // "Not found" is only true once the profile query has actually resolved —
+  // it used to render while the query was still in flight, so opening a
+  // profile flashed "Dietitian <id> not found." before the real page.
+  const loading = id ? profileLoading : rosterLoading
+  const loadError = id ? profileError : rosterError
+  const notFound = !!id && !loading && !loadError && !bundle
+
+  const queryClient = useQueryClient()
+  const bump = () => queryClient.invalidateQueries({ queryKey: dietKeys.all })
 
   const handleCreated = (rec: DietitianRosterEntry) => {
     setAddOpen(false)
@@ -72,16 +81,28 @@ const DietitianProfilesPage = () => {
         </button>
       </div>
 
-      {!id && <PickerView roster={roster} />}
+      {loading && (
+        <div className="text-[13px] py-10 text-center" style={{ color: 'var(--qms-text-muted)' }}>
+          {id ? 'Loading dietitian profile…' : 'Loading dietitians…'}
+        </div>
+      )}
 
-      {id && !bundle && (
+      {loadError && !loading && (
+        <div className="text-[13px] rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
+          Failed to load {id ? 'this dietitian profile' : 'the dietitian list'}. Please try again.
+        </div>
+      )}
+
+      {!id && !loading && !loadError && <PickerView roster={roster} />}
+
+      {notFound && (
         <div className="rounded-xl border p-6 text-center" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
           <p className="text-[14px] font-semibold mb-2" style={{ color: 'var(--qms-text)' }}>Dietitian {id} not found.</p>
           <Link to="/diet/profiles" className="text-[13px] font-bold" style={{ color: 'var(--qms-brand)' }}>← Back to picker</Link>
         </div>
       )}
 
-      {id && bundle && (
+      {id && bundle && !loading && (
         <div className="flex flex-col gap-4">
           <HeroHeader bundle={bundle} />
 

@@ -6,7 +6,9 @@ import type { useDietCamps } from '@/features/diet/hooks/useDietCamps'
 import { dietStage } from '@/features/diet/diet.utils'
 import { clientName, divisionName } from '@/types/campref.types'
 import { useAuth } from '@/hooks/useAuth'
+import { errorMessage } from '@/features/diet/utils/errorMessage'
 import SideDrawer from '@/components/ui/SideDrawer'
+import { toast } from '@/components/ui/sonner'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
@@ -45,17 +47,49 @@ const DietCampDetail = ({ camp, dietitians, viewOnly, diet, onClose, onAssignTea
   const dietitian = dietitians.find((d) => d.id === camp.dietitianId)
   const isFinal = stage === 'CANCELLED' || stage === 'CHARGED' || stage === 'COMPLETED'
 
-  const handleSetCount = () => {
+  // Every write below awaits its mutation and only clears/closes local UI on
+  // success — previously these were fire-and-forget, so a failed write left
+  // the drawer looking as though it had saved.
+  const handleSetCount = async () => {
     const n = Number(countInput)
     if (isNaN(n) || n < 0) return
-    diet.setPatientCount(camp.id, n, undefined, user?.firstName ?? 'Coordinator', 'Updated via detail view')
+    try {
+      await diet.setPatientCount.mutateAsync({
+        campId: camp.id, patientsDone: n, patientsExpected: undefined,
+        by: user?.firstName ?? 'Coordinator', note: 'Updated via detail view',
+      })
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not update the patient count — try again.'))
+      return
+    }
     setCountInput('')
   }
 
-  const handleCancelConfirm = () => {
+  const handleCancelConfirm = async () => {
     const slotHour = Number(camp.slot.match(/^(\d+)/)?.[1] ?? 10)
-    diet.cancelCamp(camp, reason, notes, slotHour)
+    try {
+      await diet.cancelCamp.mutateAsync({ camp, reason, notes, slotStartHour: slotHour })
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not cancel the camp — try again.'))
+      return
+    }
     setCancelling(false); setNotes('')
+  }
+
+  const handleMarkLive = async () => {
+    try {
+      await diet.markLive.mutateAsync(camp.id)
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not mark the camp live — try again.'))
+    }
+  }
+
+  const handleClose = async () => {
+    try {
+      await diet.closeCamp.mutateAsync(camp)
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not close the camp — try again.'))
+    }
   }
 
   return (
@@ -92,7 +126,7 @@ const DietCampDetail = ({ camp, dietitians, viewOnly, diet, onClose, onAssignTea
         {!viewOnly && !isFinal && (
           <>
             <Input type="number" min={0} value={countInput} onChange={(e) => setCountInput(e.target.value)} placeholder="New count" className="w-28 text-[12px]" />
-            <Button size="sm" onClick={handleSetCount}>Update</Button>
+            <Button size="sm" onClick={handleSetCount} disabled={diet.setPatientCount.isPending}>Update</Button>
           </>
         )}
       </div>
@@ -122,12 +156,12 @@ const DietCampDetail = ({ camp, dietitians, viewOnly, diet, onClose, onAssignTea
       {!viewOnly && !isFinal && !cancelling && (
         <div className="flex flex-wrap gap-2 mt-2">
           {camp.status === 'CONFIRMED' || camp.status === 'SCHEDULED' ? (
-            <Button size="sm" onClick={() => diet.markLive(camp.id)} className="text-white" style={{ background: 'var(--qms-brand)' }}>
+            <Button size="sm" onClick={handleMarkLive} disabled={diet.markLive.isPending} className="text-white" style={{ background: 'var(--qms-brand)' }}>
               <FiCalendar size={12} /> Mark Live
             </Button>
           ) : null}
           {camp.status === 'LIVE' && (
-            <Button size="sm" onClick={() => diet.closeCamp(camp)} className="text-white" style={{ background: 'var(--qms-teal)' }}>Close</Button>
+            <Button size="sm" onClick={handleClose} disabled={diet.closeCamp.isPending} className="text-white" style={{ background: 'var(--qms-teal)' }}>Close</Button>
           )}
           <Button size="sm" variant="destructive" onClick={() => setCancelling(true)}>Cancel</Button>
         </div>
@@ -143,7 +177,7 @@ const DietCampDetail = ({ camp, dietitians, viewOnly, diet, onClose, onAssignTea
           </Select>
           <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes (optional)..." rows={3} className="text-[13px]" />
           <div className="flex gap-2">
-            <Button size="sm" variant="destructive" onClick={handleCancelConfirm}>Confirm cancellation</Button>
+            <Button size="sm" variant="destructive" onClick={handleCancelConfirm} disabled={diet.cancelCamp.isPending}>Confirm cancellation</Button>
             <Button size="sm" variant="secondary" onClick={() => setCancelling(false)}>Back</Button>
           </div>
         </div>

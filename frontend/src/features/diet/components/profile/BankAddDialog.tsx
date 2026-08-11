@@ -3,12 +3,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/sonner'
-import { addDietitianBank } from '@/features/diet/dietitians.service'
-
+import { validateSingleBankAccount } from '@/features/diet/schemas/dietitianBank.schemas'
+import { useAddDietitianBank } from '@/features/diet/hooks/useDietitianRoster'
+import { storeChequeImage } from '@/features/diet/services/dietitianDocuments.service'
+import { errorMessage } from '@/features/diet/utils/errorMessage'
 // Compact single-account bank-add dialog — reused by both §5 (onboarding
-// action) and §11 (bank-accounts empty state) per the spec. Validation
-// mirrors the sibling Dietitian Payment screen's BankEditModal.tsx exactly:
-// accountNumber /^\d{6,18}$/, ifsc /^[A-Z]{4}0[A-Z0-9]{6}$/, chequeUrl mandatory.
+// action) and §11 (bank-accounts empty state) per the spec. Validation comes
+// from the shared schemas/dietitianBank.schemas.ts.
 interface BankAddDialogProps {
   open: boolean
   dietitianId: string
@@ -16,14 +17,6 @@ interface BankAddDialogProps {
   onClose: () => void
   onSaved: () => void
 }
-
-const fileToDataUrl = (file: File): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const r = new FileReader()
-    r.onload = () => resolve(r.result as string)
-    r.onerror = reject
-    r.readAsDataURL(file)
-  })
 
 const empty = {
   label: 'Account 1', accountName: '', accountNumber: '', ifsc: '', branch: '',
@@ -33,28 +26,38 @@ const empty = {
 const BankAddDialog = ({ open, dietitianId, dietitianName, onClose, onSaved }: BankAddDialogProps) => {
   const [draft, setDraft] = useState(empty)
   const [error, setError] = useState('')
+  const addBank = useAddDietitianBank()
 
   const reset = () => { setDraft(empty); setError('') }
   const handleClose = () => { reset(); onClose() }
 
+  // Persistence (compression, size limits, where the bytes end up) belongs to
+  // the documents service — this component only holds the returned reference.
   const handleChequeUpload = async (file: File | undefined) => {
     if (!file) return
-    const dataUrl = await fileToDataUrl(file)
-    setDraft((p) => ({ ...p, chequeUrl: dataUrl }))
+    setError('')
+    try {
+      const ref = await storeChequeImage(file)
+      setDraft((p) => ({ ...p, chequeUrl: ref }))
+    } catch (err) {
+      setError(errorMessage(err, 'Could not attach that file — try another.'))
+    }
   }
 
   const save = async () => {
-    if (!draft.accountName.trim()) return setError('Account holder name is required')
-    const acc = draft.accountNumber.replace(/\s+/g, '')
-    if (!/^\d{6,18}$/.test(acc)) return setError('6-18 digit account number required')
-    const ifsc = draft.ifsc.toUpperCase()
-    if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) return setError('IFSC must be 11 chars (e.g. HDFC0001234)')
-    if (!draft.chequeUrl) return setError('Cancelled cheque is mandatory')
+    const result = validateSingleBankAccount(draft)
+    if (!result.ok) return setError(result.error)
+    const { accountName, accountNumber: acc, ifsc } = result.value
 
-    await addDietitianBank(dietitianId, {
-      label: draft.label || 'Account', accountName: draft.accountName, accountNumber: acc, ifsc,
-      branch: draft.branch, accountType: draft.accountType, upi: draft.upi, chequeUrl: draft.chequeUrl,
-    })
+    try {
+      await addBank.mutateAsync({ id: dietitianId, account: {
+        label: draft.label || 'Account', accountName, accountNumber: acc, ifsc,
+        branch: draft.branch, accountType: draft.accountType, upi: draft.upi, chequeUrl: draft.chequeUrl,
+      } })
+    } catch (err) {
+      setError(errorMessage(err, 'Could not save the bank account — try again.'))
+      return
+    }
     toast.success(`Bank account added · ${dietitianName}`)
     reset()
     onSaved()

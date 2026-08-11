@@ -7,18 +7,27 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { usePeopleData } from '@/hooks/usePeopleData'
 import { toast } from '@/components/ui/sonner'
 import type { Dietitian, DietitianStatus } from '@/features/diet/diet.types'
+import type { DietitianRosterEntry } from '@/features/diet/dietitians.types'
+import { errorMessage } from '@/features/diet/utils/errorMessage'
 
 interface EnrollDietitianModalProps {
   open: boolean
   onClose: () => void
   existingDietitian?: Dietitian
+  /** Mints canonical identity for a NEW dietitian (roster mutation hook). */
+  onEnroll: (payload: {
+    name: string; phone: string; email: string
+    hq: string; states: string[]; ratePerCamp: number; resumeUrl: string
+  }) => Promise<DietitianRosterEntry>
+  /** Persists this screen's operational overlay (useDietCamps().upsertDietitianProfile). */
+  onSaveProfile: (profile: Dietitian) => Promise<unknown>
 }
 
 // Mirrors window.dcAddDietitian exactly (diet-camps.js:2033-2127) — same form
 // serves both enrol and edit (existingDietitian present = edit), same
 // required-field set (name/email/phone/qualification/state/city), same
 // commercial defaults (1500/500/400/150) and machines-assigned multi-pick.
-const EnrollDietitianModal = ({ open, onClose, existingDietitian }: EnrollDietitianModalProps) => {
+const EnrollDietitianModal = ({ open, onClose, existingDietitian, onEnroll, onSaveProfile }: EnrollDietitianModalProps) => {
   const { devices } = usePeopleData()
   const isEdit = !!existingDietitian
 
@@ -40,6 +49,7 @@ const EnrollDietitianModal = ({ open, onClose, existingDietitian }: EnrollDietit
   const [city, setCity] = useState('')
   const [machinesAssigned, setMachinesAssigned] = useState<string[]>([])
   const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -68,13 +78,62 @@ const EnrollDietitianModal = ({ open, onClose, existingDietitian }: EnrollDietit
     setMachinesAssigned((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
   }
 
-  const handleSave = () => {
+  // Create mints canonical identity FIRST (dietitianRoster.service, the only
+  // source assignment reads), then writes this screen's operational overlay
+  // against that id. Doing it in that order is what stops an overlay record
+  // existing without an identity — the shape that produced blank dietitian
+  // names on camp cards.
+  const handleSave = async () => {
     if (!name.trim() || !email.trim() || !phone.trim() || !qualification.trim() || !state_.trim() || !city.trim()) {
       setError('Fill all * fields')
       return
     }
-    toast.info('UI only — wiring comes next pass')
-    onClose()
+    setError('')
+    setSaving(true)
+    try {
+      let id = existingDietitian?.id
+      if (!id) {
+        const enrolled = await onEnroll({
+          name: name.trim(),
+          phone: phone.trim(),
+          email: email.trim(),
+          hq: city.trim(),
+          states: state_.trim() ? [state_.trim()] : [],
+          ratePerCamp: Number(remuneration) || 0,
+          resumeUrl: resumeUrl.trim(),
+        })
+        id = enrolled.id
+      }
+
+      await onSaveProfile({
+        id,
+        code: code.trim(),
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        qualification: qualification.trim(),
+        resumeUrl: resumeUrl.trim(),
+        interviewed: interviewed === 'yes',
+        remuneration: Number(remuneration) || 0,
+        ta: Number(ta) || 0,
+        da: Number(da) || 0,
+        printing: Number(printing) || 0,
+        address: address.trim(),
+        gmap: gmap.trim(),
+        state: state_.trim(),
+        city: city.trim(),
+        machinesAssigned,
+        status,
+        joined: existingDietitian?.joined || new Date().toISOString().slice(0, 10),
+      })
+
+      toast.success(`${isEdit ? 'Dietitian updated' : 'Dietitian enrolled'} · ${name.trim()}`)
+      onClose()
+    } catch (err) {
+      setError(errorMessage(err, 'Could not save — try again.'))
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -201,7 +260,7 @@ const EnrollDietitianModal = ({ open, onClose, existingDietitian }: EnrollDietit
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSave}><FiSave size={13} /> {isEdit ? 'Save changes' : 'Enrol dietitian'}</Button>
+          <Button onClick={handleSave} disabled={saving}><FiSave size={13} /> {isEdit ? 'Save changes' : 'Enrol dietitian'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

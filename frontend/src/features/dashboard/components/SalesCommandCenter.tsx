@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { IconType } from 'react-icons'
 import { FiCalendar, FiAlertTriangle, FiBriefcase, FiFileText, FiCheckSquare, FiZap } from 'react-icons/fi'
-import { TASKS, QUARTER } from '@/features/dashboard/dashboard.mock'
+import { useCommandCenterData } from '@/features/dashboard/hooks/useCommandCenterData'
 import { useAuth } from '@/hooks/useAuth'
 import UserAvatar from '@/components/ui/UserAvatar'
 import type { DashboardTask } from '@/types/dashboard.types'
@@ -18,20 +18,25 @@ const FILTERS: DashboardTask['status'][] = ['PENDING', 'SNOOZED', 'DONE']
 
 const SalesCommandCenter = () => {
   const { user } = useAuth()
-  const [tasks, setTasks] = useState<DashboardTask[]>(TASKS)
+  const { data } = useCommandCenterData()
   const [taskFilter, setTaskFilter] = useState<DashboardTask['status']>('PENDING')
 
+  // Local overlay on top of the fetched tasks. There is no task-mutation
+  // endpoint in the backend yet, so Yes/No is session-only and intentionally
+  // NOT written back — the fetched list stays the source of truth rather than
+  // being copied into component state and silently diverging from it.
+  // TODO: replace with a real mutation once the backend exposes one.
+  const [statusOverrides, setStatusOverrides] = useState<Record<string, DashboardTask['status']>>({})
+
   const markTask = (id: string, action: 'YES' | 'NO') => {
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === id
-          ? action === 'YES'
-            ? { ...t, status: 'DONE' }
-            : { ...t, status: 'SNOOZED', snoozeUntil: 'tomorrow' }
-          : t
-      )
-    )
+    setStatusOverrides((prev) => ({ ...prev, [id]: action === 'YES' ? 'DONE' : 'SNOOZED' }))
   }
+
+  const tasks: DashboardTask[] = (data?.tasks ?? []).map((t) => {
+    const override = statusOverrides[t.id]
+    if (!override) return t
+    return override === 'SNOOZED' ? { ...t, status: override, snoozeUntil: 'tomorrow' } : { ...t, status: override }
+  })
 
   const visible = tasks.filter((t) => t.status === taskFilter)
   const counts = {
@@ -54,7 +59,7 @@ const SalesCommandCenter = () => {
           className="text-[11px] font-bold px-2 py-1 rounded-full"
           style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text-soft)' }}
         >
-          {QUARTER}
+          {data?.quarter ?? '—'}
         </span>
       </div>
 

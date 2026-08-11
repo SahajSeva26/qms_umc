@@ -35,12 +35,6 @@ import {
 //   accessManagement.routes.tsx: TENANTS_/PERMISSION_GROUPS_/ROLE_TYPES_/ROLES_VIEW_PERMISSIONS
 const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
   crm: ['lead:search', 'lead:manage', 'tenant:manage'],
-  // Matches crm.routes.tsx's CRM_VIEW_PERMISSIONS exactly — same gate as
-  // 'crm' above, since ClientsPage is guarded by the same constant. Was
-  // missing from this map (found 2026-08-10 during the UserRole placeholder
-  // deletion pass): the route itself was always correctly gated, but the
-  // nav link showed to everyone, same dead-link class as projects/camps below.
-  clientmgmt: ['lead:search', 'lead:manage', 'tenant:manage'],
   tenants: ['tenant:get', 'tenant:search', 'tenant:manage'],
   // CONFIRMED DRIFT (2026-08-10): was ['permission-group:get',
   // 'permission-group:search', 'permission-group:manage'] —
@@ -67,18 +61,6 @@ const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
   // Appointment/Contact module wiring.
   appointments: ['appointment:search', 'appointment:manage', 'tenant:manage'],
   contacts: ['contact:search', 'contact:manage', 'tenant:manage', 'tenant:admin'],
-  // Matches divisions.routes.tsx's DIVISION_VIEW_PERMISSIONS exactly. Moved
-  // here 2026-07-31 from a standalone "Company Data" section/mechanism
-  // (PERMISSION_NAV_SECTIONS, now removed) when Divisions was folded into
-  // CRM — Division is a CRM-native concept (Lead/Project/Appointment all key
-  // off it directly), not a separate top-level area.
-  // CONFIRMED DRIFT (2026-08-10): was ['division:manage', 'tenant:manage']
-  // — tenant:manage is never checked by division.routes.ts (the sole
-  // module missing it; every sibling CRM module treats it as baseline).
-  // Fixed to match what the backend actually enforces today — see
-  // divisions.routes.tsx's own comment for the full explanation and the
-  // flagged backend gap.
-  divisions: ['division:manage', 'tenant:admin', 'lead:manage'],
   // Matches projects.routes.tsx's PROJECTS_VIEW_PERMISSIONS exactly — found
   // 2026-08-04: this nav item had no gate at all, so a Sales Head account
   // (no project:* permission) could see and click into it and land on a

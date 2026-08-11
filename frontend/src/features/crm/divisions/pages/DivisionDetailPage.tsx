@@ -6,7 +6,7 @@ import { DIVISION_THERAPY_LABEL } from '@/types/crm.types'
 import { useDivision } from '@/features/crm/divisions/hooks/useDivision'
 import { useUpdateDivision } from '@/features/crm/divisions/hooks/useUpdateDivision'
 import { updateDivisionSchema } from '@/features/crm/divisions/schemas/division.schemas'
-import { DIVISION_ROUTES } from '@/features/crm/divisions/divisions.routes'
+import { TENANT_ROUTES } from '@/features/access-management/tenant/tenant.routes'
 import BulkMrImportCard from '@/features/crm/divisions/components/BulkMrImportCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,8 +24,15 @@ const STATUS_OPTIONS: { value: DivisionStatus; label: string }[] = [
 // and same UpdateDivisionPayloadSchema contract: name/therapy/brandFocus/
 // mrCount/status only. No Code/Company/Head/Owner fields, none of which the
 // backend allows to change post-creation. Creation stays a modal
-// (CreateDivisionModal, opened from DivisionsListPage's "New Division"
-// button) — out of scope for this page per direct instruction.
+// (CreateDivisionModal, opened from TenantDetailPage's inline Divisions
+// section's "New Division" button) — out of scope for this page per direct
+// instruction.
+//
+// Only reachable from a company's own page now (2026-08-11: the standalone
+// /crm/divisions list was retired — Divisions live under Client Management
+// (nee "Companies"), not as a sibling top-level page) — so "back" always
+// returns to the owning company, not a divisions list that no longer
+// exists in the nav.
 const DivisionDetailPage = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -77,12 +84,12 @@ const DivisionDetailPage = () => {
   return (
     <div className="max-w-2xl">
       <button
-        onClick={() => navigate(DIVISION_ROUTES.DIVISIONS)}
+        onClick={() => navigate(tenantId ? TENANT_ROUTES.TENANT_DETAIL.replace(':id', tenantId) : TENANT_ROUTES.TENANTS)}
         className="flex items-center gap-1.5 text-[13px] font-semibold mb-5 transition-colors hover:opacity-80"
         style={{ color: 'var(--qms-text-soft)' }}
       >
         <FiArrowLeft size={14} />
-        Back to divisions
+        Back to company
       </button>
 
       {isLoading && (

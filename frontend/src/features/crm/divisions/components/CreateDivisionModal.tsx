@@ -14,6 +14,8 @@ import { toast } from '@/components/ui/sonner'
 
 interface CreateDivisionModalProps {
   onClose: () => void
+  /** Pre-selects the Company field when opened from a specific company's scoped Divisions view (?tenant=<id>) */
+  defaultTenantId?: string
 }
 
 const THERAPY_OPTIONS = Object.keys(DIVISION_THERAPY_LABEL) as DivisionTherapy[]
@@ -23,24 +25,13 @@ const GENDER_OPTIONS: { value: 'male' | 'female' | 'other'; label: string }[] = 
   { value: 'other', label: 'Other' },
 ]
 
-// Create-only, per the confirmed scope ("for creating we will have modal") —
-// status/therapy/brand-focus/mrCount edits happen through DivisionDetailPage
-// instead, opened by navigating to a division from a table row click.
-//
-// Company picker added 2026-07-30: the backend's create endpoint now
-// requires an explicit `tenant` for EVERY caller (the old "platform tenant
-// cannot create divisions" block was removed, and there's no force-pinning
-// to the caller's own tenant the way Contact's create does) — so unlike
-// Contact's conditional picker, this one always shows.
-//
-// Division Head section added 2026-07-31 — every division has a head; the
-// backend mints a brand-new user + Role for this person in the same
-// transaction as the division itself (same "founding owner" pattern as
-// Tenant.owner/tenant:admin). No "use an existing person" path exists
-// server-side, so this section is always shown and always required, exactly
-// mirroring CreateTenantDialog's own owner-registration section.
-const CreateDivisionModal = ({ onClose }: CreateDivisionModalProps) => {
-  const [tenant, setTenant] = useState('')
+// Create-only — editing happens on DivisionDetailPage instead. Company picker
+// always shows (backend requires an explicit `tenant` for every caller, no
+// force-pinning like Contact's create). Division Head is mandatory: the
+// backend mints a new user + Role for this person in the same transaction as
+// the division, with no "use an existing person" path.
+const CreateDivisionModal = ({ onClose, defaultTenantId }: CreateDivisionModalProps) => {
+  const [tenant, setTenant] = useState(defaultTenantId ?? '')
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
   const [therapy, setTherapy] = useState<DivisionTherapy | ''>('')

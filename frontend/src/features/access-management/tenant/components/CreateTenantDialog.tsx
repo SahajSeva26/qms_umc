@@ -92,7 +92,7 @@ const CreateTenantDialog = () => {
         className="text-white shrink-0"
         style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
       >
-        <FiPlus size={14} /> New Company
+        <FiPlus size={14} /> New Client
       </Button>
 
       <DialogContent className="sm:max-w-md">

@@ -26,6 +26,20 @@ const ADD_NEW_CONTACT_VALUE = '__add_new_contact__'
 
 const APPOINTMENT_TYPES: AppointmentType[] = ['new', 'follow-up', 'payment', 'spot']
 
+// Both are 'HH:mm' on the same calendar day (the form has one Date field for
+// both Start and End), so a plain minute-of-day difference is enough — no
+// need to round-trip through Date objects across a day boundary.
+function formatDuration(startTime: string, endTime: string): string {
+  const [sh, sm] = startTime.split(':').map(Number)
+  const [eh, em] = endTime.split(':').map(Number)
+  const totalMinutes = eh * 60 + em - (sh * 60 + sm)
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  if (hours === 0) return `${minutes} min`
+  if (minutes === 0) return `${hours} hr`
+  return `${hours} hr ${minutes} min`
+}
+
 const labelClasses = 'block text-[10px] font-semibold tracking-widest uppercase mb-2'
 const labelStyle = { color: 'var(--qms-text-muted)' }
 
@@ -64,7 +78,6 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
   const [leadLabel, setLeadLabel] = useState('')
   const [agendaPublic, setAgendaPublic] = useState('')
   const [agendaPrivate, setAgendaPrivate] = useState('')
-  const [nextSteps, setNextSteps] = useState('')
   const [error, setError] = useState('')
 
   // Inline "add new contact" — mirrors the prototype's New Meeting form,
@@ -174,7 +187,6 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
     setLeadLabel('')
     setAgendaPublic('')
     setAgendaPrivate('')
-    setNextSteps('')
     setError('')
     setAddingContact(false)
     setNewContactName('')
@@ -220,7 +232,6 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
         startTime: startAt.toISOString(),
         endTime: endAt.toISOString(),
         agenda: { public: agendaPublic.trim(), private: agendaPrivate.trim() || undefined },
-        nextSteps: nextSteps.trim() || undefined,
       })
       if (!created.data) {
         setError('Appointment created but the response was empty — refresh to see it.')
@@ -412,7 +423,17 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
               <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="text-[13px]" />
             </div>
             <div>
-              <Label className={labelClasses} style={labelStyle}>End</Label>
+              <div className="flex items-center justify-between mb-2">
+                <Label className={`${labelClasses} mb-0`} style={labelStyle}>End</Label>
+                {endTime && startTime && endTime > startTime && (
+                  <span
+                    className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                    style={{ background: 'color-mix(in oklch, var(--qms-brand), transparent 88%)', color: 'var(--qms-brand)' }}
+                  >
+                    {formatDuration(startTime, endTime)}
+                  </span>
+                )}
+              </div>
               <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="text-[13px]" />
               {endTime && startTime && endTime <= startTime && (
                 <p className="text-[11px] mt-1 text-danger">End time must be after start time</p>
@@ -428,11 +449,6 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
           <div>
             <Label className={labelClasses} style={labelStyle}>Private notes</Label>
             <Textarea value={agendaPrivate} onChange={(e) => setAgendaPrivate(e.target.value)} rows={2} className="text-[13px]" placeholder="Internal only" />
-          </div>
-
-          <div>
-            <Label className={labelClasses} style={labelStyle}>Next steps</Label>
-            <Input value={nextSteps} onChange={(e) => setNextSteps(e.target.value)} className="text-[13px]" />
           </div>
 
           {error && <p className="text-[12px] font-semibold text-danger">{error}</p>}

@@ -70,7 +70,7 @@ const DivisionsTable = ({ divisions, onRowClick }: DivisionsTableProps) => {
                   {division.name}
                 </td>
                 <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                  {DIVISION_THERAPY_LABEL[division.therapy]}
+                  {division.therapy.map((t) => DIVISION_THERAPY_LABEL[t]).join(', ')}
                 </td>
                 <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
                   {tenantName(division.tenant) ?? '—'}

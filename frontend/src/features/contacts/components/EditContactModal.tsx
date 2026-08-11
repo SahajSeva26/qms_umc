@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -7,6 +7,7 @@ import { toast } from '@/components/ui/sonner'
 import { useCreateContact } from '@/features/contacts/hooks/useCreateContact'
 import { useUpdateContact } from '@/features/contacts/hooks/useUpdateContact'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
+import { useDivisions } from '@/features/crm/hooks/useDivisions'
 import { usePermission } from '@/hooks/usePermission'
 import { createContactSchema, updateContactSchema } from '@/features/contacts/schemas/contact.schemas'
 import type { ContactEntity, ContactType, ContactStatus } from '@/types/contact.types'
@@ -51,8 +52,7 @@ interface EditContactModalProps {
   onClose: () => void
 }
 
-// Mirrors `@/features/doctors/components/EditDoctorModal.tsx`'s exact shape:
-// outer shell remounts the inner form keyed on contact id so draft state
+// Outer shell remounts the inner form keyed on contact id so draft state
 // resets cleanly between "new" and different contacts.
 const EditContactModal = ({ open, contact, onClose }: EditContactModalProps) => {
   if (!open) return null
@@ -69,39 +69,40 @@ const EditContactModalForm = ({ contact, onClose }: EditContactModalFormProps) =
   const [draft, setDraft] = useState<ContactDraft>(contact ? draftFromContact(contact) : emptyDraft)
   const [tenant, setTenant] = useState('')
 
-  // contact.service.ts's resolveTenant(): a CUSTOMER-tenant caller is force-
-  // pinned to their own tenant (whatever's sent is ignored), but a PLATFORM-
-  // tenant caller (e.g. system@gmail.com) gets a hard 400 "Tenant is
-  // required" if `tenant` is omitted — confirmed live via a direct create
-  // attempt. Only platform staff need this picker at all.
+  // A customer-tenant caller is force-pinned to their own tenant server-side
+  // regardless of what's sent; a platform-tenant caller must pick one.
   const { sessionPermissions } = usePermission()
   const needsTenantPicker = !isEdit && sessionPermissions?.tenantType === 'platform'
-  // `enabled: needsTenantPicker` — NOT `{ limit: '0' }` (fixed 2026-08-03):
-  // Mongoose's `.find().limit(0)` means "no limit at all," not "return
-  // nothing" — this was silently fetching every tenant in the system,
-  // unscoped, whenever this picker wasn't even shown.
   const { data: tenantsData } = useTenants({}, needsTenantPicker)
   const tenants = tenantsData?.data?.items ?? []
 
-  // Type on CREATE is never a manual choice — it's derived from the target
-  // company, hidden from this form entirely (2026-08-03). Two cases:
-  // 1. No picker (customer-tenant caller, force-pinned server-side): use the
-  //    caller's OWN tenant type from the session — always available, no
-  //    permission gate (it's "what tenant am I," not "tell me about another
-  //    tenant").
-  // 2. Picker shown (platform-tenant caller choosing someone else's
-  //    company): GET /tenants only includes `type` for a caller holding
-  //    system:manage (tenant.mapper.ts's toResponse gate) — most platform
-  //    staff creating a contact do NOT hold that permission, so the picked
-  //    tenant's `type` is usually invisible to this form. Best-effort: use
-  //    it if visible (system:manage caller), else default to 'customer' —
-  //    the overwhelmingly common case (adding a contact FOR a customer
-  //    company), matching the backend's own Contact.type schema default.
+  // Type on create is never a manual choice. No picker: use the caller's own
+  // tenant type. Picker shown: GET /tenants only exposes `type` for a
+  // system:manage caller, so best-effort it and default to 'customer'
+  // (the common case, matching the backend's own schema default).
   const deriveCreateType = (): ContactType => {
     if (!needsTenantPicker) return (sessionPermissions?.tenantType as ContactType) ?? 'customer'
     const selected = tenants.find((t) => t.id === tenant)
     return (selected?.type as ContactType) ?? 'customer'
   }
+
+  // Tenant a division picker should scope to: the picked Company (platform
+  // staff), or the caller's own tenant otherwise.
+  const effectiveTenantId = needsTenantPicker ? tenant : sessionPermissions?.tenantId
+  const createType = deriveCreateType()
+  const [division, setDivision] = useState('')
+  // Required (and shown) only for customer-type contacts.
+  const needsDivision = !isEdit && createType === 'customer'
+  const { data: divisionsData, isLoading: divisionsLoading } = useDivisions(
+    { tenant: effectiveTenantId || undefined } as unknown as { tenantId?: string },
+    needsDivision && !!effectiveTenantId,
+  )
+  const divisions = divisionsData?.data?.items ?? []
+
+  // Clear a stale selection if the scoped tenant changes.
+  useEffect(() => {
+    setDivision('')
+  }, [effectiveTenantId])
 
   const createContact = useCreateContact()
   const updateContact = useUpdateContact(contact?.id ?? '')
@@ -131,13 +132,19 @@ const EditContactModalForm = ({ contact, onClose }: EditContactModalFormProps) =
           toast.error('Select a company')
           return
         }
-        const result = createContactSchema.safeParse({ ...draft, tenant: tenant || undefined, type: deriveCreateType() })
+        const result = createContactSchema.safeParse({
+          ...draft,
+          tenant: tenant || undefined,
+          division: division || undefined,
+          type: deriveCreateType(),
+        })
         if (!result.success) {
           toast.error(result.error.issues[0].message)
           return
         }
         await createContact.mutateAsync({
           tenant: result.data.tenant,
+          division: result.data.division,
           name: result.data.name,
           designation: result.data.designation || undefined,
           email: result.data.email || undefined,
@@ -176,6 +183,29 @@ const EditContactModalForm = ({ contact, onClose }: EditContactModalFormProps) =
                   {tenants.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
                 </SelectContent>
               </Select>
+            </div>
+          )}
+          {needsDivision && (
+            <div className="sm:col-span-2">
+              <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Division</label>
+              <Select
+                key={division || 'empty'}
+                value={division || undefined}
+                onValueChange={(v) => setDivision(v ?? '')}
+                disabled={!effectiveTenantId}
+              >
+                <SelectTrigger className="w-full text-[13px]">
+                  <SelectValue placeholder={!effectiveTenantId ? 'Select a company first' : divisionsLoading ? 'Loading...' : 'Select division...'}>
+                    {(v: string) => divisions.find((d) => d.id === v)?.name ?? (divisionsLoading ? 'Loading...' : 'Select division...')}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {divisions.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {effectiveTenantId && !divisionsLoading && divisions.length === 0 && (
+                <p className="text-[11px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>This company has no divisions yet.</p>
+              )}
             </div>
           )}
           <div className="sm:col-span-2">

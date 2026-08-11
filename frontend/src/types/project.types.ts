@@ -1,19 +1,12 @@
-// Real backend-integrated types for the Project module, replacing the old
-// mock-only model entirely. Matches backend/src/modules/crm/project/* exactly
-// (model/constants/validators/mapper) — see the comment on each interface for
-// the specific service/mapper behavior its shape depends on.
+// Real backend-integrated types for the Project module. Matches
+// backend/src/modules/crm/project/* exactly.
 //
-// A Project is created FROM a won Lead (backend enforces exactly one Project
-// per Lead — project.service.ts's create() 409s if one already exists for the
-// given lead). tenant/division are derived server-side from the source Lead
-// and are never sent by the client on create.
+// A Project is created FROM a Lead (exactly one Project per Lead — backend
+// 409s otherwise); tenant/division are derived server-side from the Lead.
 //
-// Backend quirk, deliberately not "fixed" client-side beyond a soft UX filter:
-// project.routes.ts's Swagger summary says "create project (from a WON
-// lead)", but project.service.ts's create() never actually checks
-// lead.status === 'won' — only that the lead exists and no project already
-// exists for it. The lead picker restricts to status=won as a UX-only
-// convention; it is not a hard backend rule.
+// Backend quirk, not "fixed" client-side: despite the "from a WON lead"
+// Swagger summary, create() never actually checks lead.status === 'won' —
+// the lead picker's status=won restriction is a UX-only convention, not a backend rule.
 
 import type { DivisionTherapy, LeadPopulatedContact } from './crm.types'
 
@@ -21,10 +14,7 @@ import type { DivisionTherapy, LeadPopulatedContact } from './crm.types'
 // Enums / constants
 // ---------------------------------------------------------------------------
 
-// Same enum values as Division's own therapy field (project.constants.ts's
-// PROJECT_THERAPY_TYPES matches division.constants.ts's DIVISION_THERAPY
-// exactly, minus ophthalmology/dermatology/oncology/pediatrics — Project's
-// enum is a strict subset of Division's).
+// A strict subset of Division's own therapy enum (DivisionTherapy).
 export type ProjectTherapy =
   | 'cardiology'
   | 'diabetes'
@@ -48,9 +38,7 @@ export const PROJECT_THERAPY_LABEL: Record<ProjectTherapy, string> = {
   nephrology: 'Nephrology',
 }
 
-// project.constants.ts's PROJECT_TYPES — an ARRAY-valued field on the real
-// model (project.model.ts's `type: [{...enum}]`), unlike the old mock's
-// single-select ProjectType. A project can be more than one type at once.
+// Array-valued field — a project can be more than one type at once.
 export type ProjectType = 'screening_camp' | 'diet' | 'teleconsultation_diet' | 'lab_test' | 'mixed'
 
 export const PROJECT_TYPE_LABEL: Record<ProjectType, string> = {
@@ -61,8 +49,7 @@ export const PROJECT_TYPE_LABEL: Record<ProjectType, string> = {
   mixed: 'Mixed',
 }
 
-// project.constants.ts's PROJECT_TEST_TYPES — a closed backend enum (not an
-// Admin-master-driven dynamic list like the old mock's TESTS).
+// A closed backend enum, not an Admin-master-driven dynamic list.
 export type ProjectTest = 'fbs' | 'ppbs' | 'rbs' | 'bp' | 'spo2' | 'ecg' | 'lipid' | 'hba1c' | 'spiro' | 'bca'
 
 export const PROJECT_TEST_LABEL: Record<ProjectTest, string> = {
@@ -106,8 +93,7 @@ export const PROJECT_STATUS_COLOR: Record<ProjectStatus, string> = {
   closed: '#94a3b8',
 }
 
-// Mirrors project.constants.ts's PROJECT_TRANSITION_MAP exactly — the only
-// legal `to` values from a given current `status`. `closed` is terminal.
+// The only legal `to` values from a given current `status`. `closed` is terminal.
 export const PROJECT_STAGE_TRANSITION_MAP: Record<ProjectStatus, ProjectStatus[]> = {
   new: ['live', 'hold', 'closed'],
   live: ['hold', 'closed'],
@@ -123,8 +109,8 @@ export const PAYMENT_TERMS_LABEL: Record<PaymentTerms, string> = {
   net_90: 'Net 90',
 }
 
-// project.constants.ts's CLIENT_REPORT_CANDANCE_TYPES — field name preserves
-// the backend's own spelling (clientReportCandance) verbatim, not "fixed."
+// NOTE: the field using this type is `clientReportCandance` (backend's
+// spelling, verbatim — not a typo to "fix").
 export type ClientReportCadence = 'weekly' | 'half_monthly' | 'monthly' | 'quarterly' | 'halfyearly' | 'yearly'
 
 export const CLIENT_REPORT_CADENCE_LABEL: Record<ClientReportCadence, string> = {
@@ -136,16 +122,14 @@ export const CLIENT_REPORT_CADENCE_LABEL: Record<ClientReportCadence, string> = 
   yearly: 'Yearly',
 }
 
-// project.constants.ts's CLIENT_REPORT_POINTERS — currently a single value.
-// Kept as a Record-driven map (not a hardcoded reorder widget) so a future
-// backend addition doesn't require a UI rebuild.
+// Currently a single value — kept Record-driven so a future backend addition
+// doesn't require a UI rebuild.
 export type AvailablePointer = 'camp_executed'
 
 export const AVAILABLE_POINTER_LABEL: Record<AvailablePointer, string> = {
   camp_executed: 'Camps executed',
 }
 
-// project.constants.ts's PROJECT_GO_LIVE_SCOPE.
 export type GoLiveScopeCode = 'states' | 'cities' | 'pan'
 
 export const GO_LIVE_SCOPE_LABEL: Record<GoLiveScopeCode, string> = {
@@ -154,25 +138,18 @@ export const GO_LIVE_SCOPE_LABEL: Record<GoLiveScopeCode, string> = {
   pan: 'PAN-India',
 }
 
-// project.model.ts's whoCanBookCamp enum is ALLOWED_ROLETYPE_CODES.CUSTOMER —
-// reuse the exact customer-side RoleTypeCode subset already defined in
-// role-type/constants/roleTypeCodes.ts rather than redeclaring a parallel
-// literal union (avoids drift if the backend enum ever changes). Was typo'd
-// ('pharma-ms', 'pharms-asm' instead of 'pharma-mr', 'pharma-asm') — the real
-// backend's own Zod enum (project.validators.ts) validates against
-// ALLOWED_ROLETYPE_CODES.CUSTOMER's real values, so selecting either typo'd
-// option in the wizard would have submitted a value the backend rejects —
-// found and fixed via a 2026-07-24 test sweep of the sibling RoleType bug.
+// Must match role-type/constants/roleTypeCodes.ts's customer-side RoleTypeCode
+// values exactly — a previous typo here ('pharma-ms', 'pharms-asm') silently
+// submitted values the backend's Zod enum rejects.
 export type WhoCanBookCampCode = 'pharma-ho' | 'pharma-asm' | 'pharma-rsm' | 'pharma-mr'
 
 // ---------------------------------------------------------------------------
 // Nested value objects (plain shapes, not entities — no `id`)
 // ---------------------------------------------------------------------------
 
-// One flat object mirroring project.model.ts's executionModeSchema exactly.
-// All fields besides `mode` are optional and only meaningful for their own
-// mode (po / agreement / mail_confirmation) — the backend itself models this
-// as one sub-document, not a TS discriminated union.
+// One flat object (the backend models this as one sub-document, not a TS
+// discriminated union). Fields besides `mode` are optional, meaningful only
+// for their own mode (po / agreement / mail_confirmation).
 export interface ExecutionMode {
   mode: ExecutionModeType
   // po
@@ -184,17 +161,14 @@ export interface ExecutionMode {
   agreementStartDate?: string
   agreementEndDate?: string
   duration?: number
-  // No real file-upload endpoint confirmed for agreementDocument/emailDocument
-  // yet — both are plain string URL fields matching the backend's schema
-  // (`type: String`), not a base64 blob. See CreateProjectPayload's comment.
+  // No file-upload endpoint exists — plain string URL fields, not a base64 blob.
   agreementDocument?: string
   // mail_confirmation
   emailReference?: string
   emailDocument?: string
 }
 
-// Free-text HH:MM start/end pairs (project.model.ts's campTimeSlots) —
-// replaces the old mock's fixed slot-ID picker entirely.
+// Free-text HH:MM start/end pairs.
 export interface CampTimeSlot {
   start: string
   end: string
@@ -220,10 +194,7 @@ export interface ProjectStageHistoryEntry {
   from: ProjectStatus
   to: ProjectStatus
   reason: string
-  // Immutable actor snapshot taken at the moment of the transition (backend
-  // renamed this from a raw, never-populated `createdBy` Role id to a
-  // resolved {roleId, name, email} object — 2026-07-27 merge, same rename as
-  // Lead's own stageHistory).
+  // Immutable actor snapshot taken at the moment of the transition.
   actor: ProjectStageHistoryActor
   createdAt: string
 }
@@ -242,11 +213,11 @@ export interface ProjectPopulatedDivision {
   _id?: string
   name: string
   code: string
-  therapy: DivisionTherapy
+  // Mirrors DivisionEntity.therapy (crm.types.ts).
+  therapy: DivisionTherapy[]
 }
 
-// project.service.ts's populate array selects only 'title status' for lead —
-// a deliberately slim shape, not the full LeadEntity.
+// A deliberately slim shape, not the full LeadEntity.
 export interface ProjectPopulatedLead {
   _id?: string
   title: string
@@ -268,28 +239,18 @@ export interface ProjectPopulatedRole {
 // Project
 // ---------------------------------------------------------------------------
 
-// GET /projects/:id and GET /projects (search) BOTH always populate
-// (project.controller.ts's get() always passes {populate:true}; search()'s
-// service function calls .populate() unconditionally) — so, like Lead, there
-// is effectively no raw-string case on any read path today. The `| string`
-// union only matters for typing a create/update/moveStage response's echo,
-// since none of those three re-fetch with populate before responding
-// (project.service.ts's update()/moveStage() call get(id, ctx) with no
-// {populate:true} option — confirmed the same behavior exists on Lead's own
-// update(), so this is a repo-wide convention, not a Project-specific gap).
+// GET-by-id and search both always populate — the `| string` union only
+// matters for a create/update/moveStage response's echo (those don't re-fetch
+// with populate before responding).
 export interface ProjectEntity {
   id: string
-  // Sequential human-readable code minted via the Counter module at create
-  // time (e.g. "prj-000001") — added in the 2026-07-27 Appointment merge.
+  // Sequential human-readable code minted via the Counter module (e.g. "prj-000001").
   code: string
   name: string
-  // All 6 reference fields below are `required: true` server-side, but that
-  // only enforces new saves — an older document or a populate() that
-  // resolved to null (deleted doc, stale/pre-migration reference) can still
-  // come back null over the wire. Confirmed live 2026-08-04 via a real crash
-  // ("Cannot read properties of null (reading 'name')") on a project whose
-  // marketingContact was null — every consumer of these 6 fields must
-  // null-check before unwrapping, never assume `X | string` is exhaustive.
+  // The 6 reference fields below can come back null over the wire (deleted
+  // doc, stale reference) despite being `required` server-side — confirmed via
+  // a real crash on a project with a null marketingContact. Always null-check
+  // before unwrapping; never assume `X | string` is exhaustive.
   tenant: ProjectPopulatedTenant | string | null
   division: ProjectPopulatedDivision | string | null
   therapy: ProjectTherapy
@@ -310,9 +271,7 @@ export interface ProjectEntity {
   whoCanBookCamp: WhoCanBookCampCode[]
   salesRep: ProjectPopulatedRole | string | null
   projectCoordinator: ProjectPopulatedRole | string | null
-  // Contact reference, not Role — switched 2026-08-03 (project.model.ts's
-  // marketingContact.ref, project.service.ts's set() now calls
-  // ContactService.get() instead of RoleService.get()).
+  // Contact reference, not Role.
   marketingContact: LeadPopulatedContact | string | null
   paymentTerms: PaymentTerms
   status: ProjectStatus
@@ -375,9 +334,7 @@ export interface CreateProjectPayload {
 }
 
 // Same as create minus `lead` — lead/tenant/division/status are all immutable
-// post-create (status only ever moves through moveStage, per
-// project.service.ts's update()'s own comment: "lead/tenant/division/status
-// are not touched here").
+// post-create (status only ever moves through moveStage).
 export interface UpdateProjectPayload {
   name?: string
   therapy?: ProjectTherapy
@@ -414,9 +371,8 @@ export interface MoveProjectStagePayload {
   reason: string
 }
 
-// UI-only KPI shape for the Projects list header strip — no backend KPI
-// endpoint exists; computed client-side from the real ProjectEntity[] already
-// in cache, same convention as crm.types.ts's KpiTile.
+// UI-only KPI shape — no backend endpoint; computed client-side from the
+// real ProjectEntity[] already in cache.
 export interface ProjectKpiTile {
   id: string
   label: string

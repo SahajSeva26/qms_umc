@@ -7,13 +7,16 @@ interface ChipPickerProps {
   selected: string[]
   onChange: (next: string[]) => void
   placeholder?: string
+  /** Display label for an option/selected value — defaults to the raw string itself (existing callers pass free-text values with no separate code/label split). */
+  labelFor?: (value: string) => string
 }
 
-const ChipPicker = ({ options, selected, onChange, placeholder }: ChipPickerProps) => {
+const ChipPicker = ({ options, selected, onChange, placeholder, labelFor }: ChipPickerProps) => {
   // Controlled reset: adding a chip clears the Select back to '' so the
   // trigger shows the placeholder again ('' is only invalid for items).
   const [pending, setPending] = useState('')
   const available = options.filter((o) => !selected.includes(o))
+  const label = labelFor ?? ((v: string) => v)
 
   return (
     <div>
@@ -30,7 +33,7 @@ const ChipPicker = ({ options, selected, onChange, placeholder }: ChipPickerProp
         </SelectTrigger>
         <SelectContent>
           {available.map((o) => (
-            <SelectItem key={o} value={o}>{o}</SelectItem>
+            <SelectItem key={o} value={o}>{label(o)}</SelectItem>
           ))}
         </SelectContent>
       </Select>
@@ -42,8 +45,8 @@ const ChipPicker = ({ options, selected, onChange, placeholder }: ChipPickerProp
               className="inline-flex items-center gap-1 text-[12px] font-semibold px-3 py-1 rounded-full"
               style={{ background: 'var(--qms-brand)', color: '#fff', boxShadow: '0 1px 4px rgba(59,109,255,.25)' }}
             >
-              {s}
-              <button onClick={() => onChange(selected.filter((x) => x !== s))} aria-label={`Remove ${s}`}>
+              {label(s)}
+              <button onClick={() => onChange(selected.filter((x) => x !== s))} aria-label={`Remove ${label(s)}`}>
                 <FiX size={11} />
               </button>
             </span>

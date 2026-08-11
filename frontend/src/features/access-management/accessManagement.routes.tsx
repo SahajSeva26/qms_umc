@@ -41,9 +41,31 @@ export const ACCESS_MANAGEMENT_ROUTES = {
 // previously only the list routes were gated at all; a user could
 // navigate straight to e.g. /admin/tenants/:id with zero permission check.
 const TENANTS_VIEW_PERMISSIONS = ['tenant:get', 'tenant:search', 'tenant:manage']
-const PERMISSION_GROUPS_VIEW_PERMISSIONS = ['permission-group:get', 'permission-group:search', 'permission-group:manage']
-const ROLE_TYPES_VIEW_PERMISSIONS = ['role-type:get', 'role-type:search', 'role-type:manage']
-const ROLES_VIEW_PERMISSIONS = ['role:get', 'role:search', 'role:manage']
+// CONFIRMED DRIFT (2026-08-10): this used to be
+// ['permission-group:get', 'permission-group:search', 'permission-group:manage']
+// — a plausible-looking guess that never matched the real backend. Read
+// directly from permissionGroup.routes.ts: GET /:id requires
+// permission-group:get; GET / (list, used by both the list AND detail
+// pages' own data needs) requires permission-group:search OR tenant:admin
+// — permission-group:manage is never checked on ANY route. A caller
+// holding only permission-group:manage would pass this nav/route gate,
+// land on the page, then 403 on every real API call — the exact dead-link
+// class REAL_GATED_NAV_ITEMS/RequirePermission exist to prevent. Fixed to
+// the real union of every code that lets the page actually load.
+const PERMISSION_GROUPS_VIEW_PERMISSIONS = ['permission-group:get', 'permission-group:search', 'tenant:admin']
+// CONFIRMED DRIFT (2026-08-10): this used to be
+// ['role-type:get', 'role-type:search', 'role-type:manage'] — role-type:*
+// codes that sound right but are never checked by roleType.routes.ts at
+// all. Every Role Type route (GET/:id, GET/, POST/, PUT/:id) is actually
+// gated purely on tenant:manage/tenant:admin — role-type:manage etc. are
+// currently dead codes on the backend. Fixed to match the real guard.
+const ROLE_TYPES_VIEW_PERMISSIONS = ['tenant:manage', 'tenant:admin']
+// CONFIRMED DRIFT (2026-08-10): this used to be
+// ['role:get', 'role:search', 'role:manage'] — role:manage is never
+// checked by role.routes.ts on any route. Real guards: GET /:id requires
+// tenant:admin/tenant:manage/role:get; GET / requires
+// tenant:admin/tenant:manage/role:search. Fixed to the real union.
+const ROLES_VIEW_PERMISSIONS = ['tenant:admin', 'tenant:manage', 'role:get', 'role:search']
 
 export const accessManagementRoutes: RouteObject[] = [
   // Tenants

@@ -11,6 +11,7 @@ export const TenantMapper = {
         if (ctx.hasAnyPermissions([SYSTEM_PERMISSIONS.MANAGE.code])) {
             result.status = tenant.status;
             result.owner = tenant.owner;
+            result.salesPerson = tenant.salesPerson ?? null;
             result.createdAt = tenant.createdAt;
             result.updatedAt = tenant.updatedAt;
             result.type = tenant.type;

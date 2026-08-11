@@ -3,16 +3,16 @@
 
 export type AppointmentType = 'new' | 'follow-up' | 'payment' | 'spot'
 export type AppointmentMode = 'online' | 'offline' | 'call'
-export type AppointmentStatus = 'planned' | 'done' | 'cancelled' | 'blocked' | 'released'
+// blocked/released removed 2026-08-11 per client request — the backend is
+// dropping both statuses too, so this is a coordinated removal, not a
+// frontend-only hide.
+export type AppointmentStatus = 'planned' | 'done' | 'cancelled'
 export type AppointmentInviteStatus = 'pending' | 'accepted' | 'declined'
 
 // Keyed by current status, same shape/purpose as LEAD_TRANSITION_MAP in
-// crm.types.ts — planned is the entry point, done/cancelled are terminal,
-// blocked/released model a slot being held then freed.
+// crm.types.ts — planned is the entry point, done/cancelled are terminal.
 export const APPOINTMENT_TRANSITION_MAP: Record<AppointmentStatus, AppointmentStatus[]> = {
-  planned: ['done', 'cancelled', 'blocked'],
-  blocked: ['planned', 'released', 'cancelled'],
-  released: ['planned', 'cancelled'],
+  planned: ['done', 'cancelled'],
   done: [],
   cancelled: [],
 }
@@ -34,8 +34,6 @@ export const APPOINTMENT_STATUS_LABEL: Record<AppointmentStatus, string> = {
   planned: 'Planned',
   done: 'Done',
   cancelled: 'Cancelled',
-  blocked: 'Blocked',
-  released: 'Released',
 }
 
 export interface AppointmentPopulatedTenant {

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { FiGrid, FiUserCheck, FiFolder, FiUnlock, FiCreditCard } from 'react-icons/fi'
 import { useAuth } from '@/hooks/useAuth'
 import { useCampsData } from '@/hooks/useCampsData'
-import { useScope, dietCampsForScope, userName } from '@/features/diet/components/approvals/helpers'
+import { dietCampsForScope, userName } from '@/features/diet/components/approvals/helpers'
 import ScopeBanner from '@/features/diet/components/approvals/ScopeBanner'
 import DashboardTab from '@/features/diet/components/approvals/DashboardTab'
 import AssignTab from '@/features/diet/components/approvals/AssignTab'
@@ -36,9 +36,15 @@ const DietApprovalsPage = () => {
   const [tab, setTab] = useState<TabId>('dashboard')
 
   const name = userName(user)
-  const { adminLike, coordId } = useScope(user?.role, name)
+  // Coordinator scoping (adminLike/coordId) never actually worked — every
+  // real login was hardcoded to 'super_admin', which always resolved as
+  // "admin-like", so this page has always shown the full, unscoped view to
+  // everyone. Passed as constants to the tab components below, which still
+  // branch on them, rather than touching those files in this same pass.
+  const adminLike = true
+  const coordId = null
 
-  const scopedCamps = useMemo(() => dietCampsForScope(camps, adminLike, coordId), [camps, adminLike, coordId])
+  const scopedCamps = useMemo(() => dietCampsForScope(camps), [camps])
 
   return (
     <div className="w-full">

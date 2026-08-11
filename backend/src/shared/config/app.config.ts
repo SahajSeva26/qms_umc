@@ -64,7 +64,7 @@ let ENV = {
             BaseUrl: process.env.JIRA_BASE_URL || 'https://sahajseva.atlassian.net',
             Email: process.env.JIRA_EMAIL || '',
             ApiToken: process.env.JIRA_API_TOKEN || '',
-            ProjectKey: process.env.JIRA_PROJECT_KEY || 'QP',
+            ProjectKey: process.env.JIRA_PROJECT_KEY || 'QF',
             IssueType: process.env.JIRA_ISSUE_TYPE || 'Bug',
         },
     },

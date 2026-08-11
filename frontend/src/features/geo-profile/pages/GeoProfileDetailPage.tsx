@@ -43,7 +43,11 @@ const GeoProfileDetailPage = () => {
   // found via a 2026-07-24 test sweep (26 real roles existed, only 10 ever
   // selectable). Active-only + a real limit fixes both the truncation and
   // offering already-inactive roles as if assignable.
-  const { data: rolesData } = useRoles({ status: 'active', limit: '500' })
+  // GET /roles requires role:get/search/manage — a caller without any of
+  // those gets a 403 here, surfaced as `error`, not an empty result. Used
+  // below to show "Restricted" instead of a raw ObjectId when that happens
+  // (found via a live test with a zero-permission account, 2026-08-10).
+  const { data: rolesData, error: rolesError } = useRoles({ status: 'active', limit: '500' })
   const roles = rolesData?.data?.items ?? []
 
   const createGeoProfile = useCreateGeoProfile()
@@ -113,7 +117,7 @@ const GeoProfileDetailPage = () => {
   }
 
   const mutation = isCreateMode ? createGeoProfile : updateGeoProfile
-  const roleName = (r: string) => roles.find((x) => x.id === r)?.name ?? r
+  const roleName = (r: string) => roles.find((x) => x.id === r)?.name ?? (rolesError ? 'Restricted' : r)
 
   return (
     <div className="max-w-2xl">

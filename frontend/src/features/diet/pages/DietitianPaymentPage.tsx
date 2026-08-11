@@ -46,7 +46,15 @@ const DietitianPaymentPage = () => {
   const { user } = useAuth()
   const queryClient = useQueryClient()
 
-  const role = user?.role ?? ''
+  // No real backend "diet coordinator"/payment-admin permission concept
+  // exists yet (Diet has no backend module at all — see useDietPermissions.ts).
+  // Every real login has no `role` field to read (AuthUser no longer carries
+  // one), and the old placeholder role checks this fed into were always
+  // hardcoded to 'super_admin' regardless of who was logged in anyway — this
+  // hardcode preserves that same, actual historical behavior (full,
+  // unscoped, admin-like access for everyone) until real backend Diet
+  // permissions land.
+  const role = 'super_admin'
   const userName = user ? `${user.firstName} ${user.lastName}` : ''
 
   const { camps, payments, adminLike, isCoordOnly, scopedDietCamps, rows, kpi } =

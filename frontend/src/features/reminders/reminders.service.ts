@@ -21,7 +21,7 @@
 export { seeded } from './services/reminders.utils'
 export { getConfig, saveConfig } from './services/reminders.config.service'
 export { getTemplates, saveTemplates, renderTemplate, buildContext } from './services/reminders.templates.service'
-export { getThreads, threadsForCamp } from './services/reminders.threads.service'
+export { getThreads } from './services/reminders.threads.service'
 export { campStartMs, recipientsFor } from './services/reminders.recipients.service'
 export { sendWhatsApp, placeVoiceCall, ivrToStatus, statusLabel } from './services/reminders.dispatch.service'
 export { suggestBackup, tick, manualTrigger, bulkTrigger } from './services/reminders.triggers.service'

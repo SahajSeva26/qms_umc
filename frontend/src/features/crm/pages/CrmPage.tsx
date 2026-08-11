@@ -1,12 +1,10 @@
 import { useMemo, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
-import { FiDownload, FiPlus, FiUpload } from 'react-icons/fi'
+import { FiDownload, FiPlus } from 'react-icons/fi'
 import type { KpiTile, LeadStatus } from '@/types/crm.types'
-import { useAuth } from '@/hooks/useAuth'
 import { usePermission } from '@/hooks/usePermission'
 import { useLeads } from '@/features/crm/hooks/useLeads'
 import { useCrmFilters } from '@/features/crm/hooks/useCrmFilters'
-import { matchesFilters, scopedByOwner } from '@/features/crm/crm.filter'
+import { matchesFilters } from '@/features/crm/crm.filter'
 import { computeKpis } from '@/features/crm/crm.kpis'
 import { downloadLeadsCsv } from '@/features/crm/crm.export'
 import { Button } from '@/components/ui/button'
@@ -18,7 +16,6 @@ import ListView from '@/features/crm/components/views/ListView'
 import CalendarView from '@/features/crm/components/views/CalendarView'
 import LeadDrawer from '@/features/crm/components/LeadDrawer'
 import NewLeadWizard from '@/features/crm/components/NewLeadWizard'
-import ImportLeadsDialog from '@/features/crm/components/ImportLeadsDialog'
 import BottomInsightsRow from '@/features/crm/components/BottomInsightsRow'
 import KpiDrillDrawer from '@/features/crm/components/KpiDrillDrawer'
 import StageDrawer from '@/features/crm/components/StageDrawer'
@@ -33,10 +30,7 @@ const VIEW_LABELS: { id: ViewMode; label: string }[] = [
 ]
 
 const CrmPage = () => {
-  const { user } = useAuth()
-  const isKam = user?.role === 'sales_rep'
   const { leads, isLoading, error, moveStage, updateLead } = useLeads()
-  const queryClient = useQueryClient()
   const { hasAnyPermission } = usePermission()
   // A lead:search-only caller (the real "Sales" rep business role — see
   // lead.constants.ts's LEAD_BUSINESS_ROLE_TYPES) can view their own leads
@@ -48,16 +42,14 @@ const CrmPage = () => {
   const canManageLeads = hasAnyPermission(['lead:manage', 'tenant:manage'])
   const { filters, setFilter, reset } = useCrmFilters()
 
-  const [view, setView] = useState<ViewMode>(isKam ? 'compact' : 'list')
+  const [view, setView] = useState<ViewMode>('list')
   const [openLeadId, setOpenLeadId] = useState<string | null>(null)
   const [wizardOpen, setWizardOpen] = useState(false)
-  const [importOpen, setImportOpen] = useState(false)
   const [kpiDrill, setKpiDrill] = useState<KpiTile | null>(null)
   const [statusDrill, setStatusDrill] = useState<LeadStatus | null>(null)
 
-  const scoped = useMemo(() => scopedByOwner(leads, user?._id, isKam), [leads, user, isKam])
-  const filtered = useMemo(() => scoped.filter((l) => matchesFilters(l, filters)), [scoped, filters])
-  const kpis = useMemo(() => computeKpis(scoped, isKam), [scoped, isKam])
+  const filtered = useMemo(() => leads.filter((l) => matchesFilters(l, filters)), [leads, filters])
+  const kpis = useMemo(() => computeKpis(leads, false), [leads])
 
   const openLead = leads.find((l) => l.id === openLeadId) ?? null
 
@@ -92,15 +84,6 @@ const CrmPage = () => {
               style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
             >
               <FiPlus size={14} /> New Lead
-            </Button>
-          )}
-          {canManageLeads && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setImportOpen(true)}
-            >
-              <FiUpload size={13} /> Import
             </Button>
           )}
           <Button
@@ -141,7 +124,7 @@ const CrmPage = () => {
             {view === 'calendar' && <CalendarView leads={filtered} onOpen={setOpenLeadId} />}
           </div>
 
-          <BottomInsightsRow leads={scoped} />
+          <BottomInsightsRow leads={leads} />
         </>
       )}
 
@@ -154,20 +137,13 @@ const CrmPage = () => {
         />
       )}
 
-      {importOpen && (
-        <ImportLeadsDialog
-          onClose={() => setImportOpen(false)}
-          onImported={() => queryClient.invalidateQueries({ queryKey: ['leads'] })}
-        />
-      )}
-
       {kpiDrill && (
-        <KpiDrillDrawer tile={kpiDrill} leads={scoped} onClose={() => setKpiDrill(null)} />
+        <KpiDrillDrawer tile={kpiDrill} leads={leads} onClose={() => setKpiDrill(null)} />
       )}
 
       <StageDrawer
         status={statusDrill}
-        leads={scoped}
+        leads={leads}
         onClose={() => setStatusDrill(null)}
         onOpenLead={(id) => {
           setStatusDrill(null)

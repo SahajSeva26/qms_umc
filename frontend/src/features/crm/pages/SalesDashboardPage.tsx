@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
+import { usePermission } from '@/hooks/usePermission'
 import { useSalesData } from '@/features/crm/sales/hooks/useSalesData'
 import { useClientsData } from '@/features/crm/clients/hooks/useClientsData'
 import { QUARTER } from '@/types/salesdash.types'
@@ -16,12 +17,11 @@ import ActivityTab from '@/features/crm/sales/components/ActivityTab'
 import TargetDialog from '@/features/crm/sales/components/TargetDialog'
 import RepDrawer from '@/features/crm/sales/components/RepDrawer'
 
-const APPROVER_ROLES = ['super_admin', 'admin', 'sales_lead']
-
 type TabId = 'TODAY' | 'TEAM' | 'TARGETS' | 'JOURNEY' | 'PERFORMANCE' | 'APPROVALS' | 'ACTIVITY'
 
 const SalesDashboardPage = () => {
   const { user } = useAuth()
+  const { hasPermission } = usePermission()
   const {
     reps,
     targets,
@@ -43,7 +43,12 @@ const SalesDashboardPage = () => {
   const [openRepId, setOpenRepId] = useState<string | null>(null)
   const [salesFilter, setSalesFilter] = useState<SalesFilterState>(DEFAULT_SALES_FILTER)
 
-  const isApprover = APPROVER_ROLES.includes(user?.role ?? '')
+  // The old placeholder UserRole allowlist (super_admin/admin/sales_lead)
+  // never actually worked — every real login was hardcoded to
+  // 'super_admin' regardless of who was logged in, so this has always
+  // resolved to Sales Head view in practice. Real replacement: system:manage,
+  // the actual backend permission for full administrative access.
+  const isApprover = hasPermission('system:manage')
 
   // Matched by email, not first name: SalesRep (sales.mock.ts) has no
   // userId linking it to the real User/Auth model — "the people master is a

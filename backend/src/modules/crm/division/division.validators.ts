@@ -6,6 +6,16 @@ import {
 } from '../../../shared/utils/strings';
 import { RegisterUserPayloadSchema } from '../../auth/auth.validators';
 
+// a division may span one or more therapy areas — validated as a non-empty, duplicate-free list
+// of known therapy enums. Reused by both create (required) and update (optional).
+const TherapyListSchema = z
+    .array(z.enum(Object.values(DIVISION_THERAPY)))
+    .min(1, { message: 'At least one therapy is required' })
+    .refine((list) => new Set(list).size === list.length, {
+        message: 'Therapies must be unique',
+    })
+    .openapi({ example: ['cardiology', 'diabetes'] });
+
 //1: create ====================================>
 export const CreateDivisionPayloadSchema = z.object({
     tenant: z.string().min(1).openapi({ example: 'sun-pharma' }),
@@ -22,9 +32,8 @@ export const CreateDivisionPayloadSchema = z.object({
         )
         .openapi({ example: 'sun-cardio' }),
     name: z.string().min(1).openapi({ example: 'Cardio Care' }),
-    therapy: z
-        .enum(Object.values(DIVISION_THERAPY))
-        .openapi({ example: 'Cardiology' }),
+    // one or more therapy areas — a division may span several
+    therapy: TherapyListSchema,
     brandFocus: z.string().optional().openapi({ example: 'Atorvastatin+' }),
     mrCount: z.number().int().nonnegative().optional().openapi({ example: 38 }),
     // the division is created together with its head: a new user (registered inactive) linked to a
@@ -38,10 +47,8 @@ export type ICreateDivisionPayload = z.infer<
 //2: update ====================================>
 export const UpdateDivisionPayloadSchema = z.object({
     name: z.string().min(1).optional().openapi({ example: 'Cardio Care' }),
-    therapy: z
-        .enum(Object.values(DIVISION_THERAPY))
-        .optional()
-        .openapi({ example: 'Cardiology' }),
+    // replaces the therapy list wholesale when supplied — must be a non-empty, duplicate-free list
+    therapy: TherapyListSchema.optional(),
     brandFocus: z.string().optional().openapi({ example: 'Atorvastatin+' }),
     mrCount: z.number().int().nonnegative().optional().openapi({ example: 38 }),
     status: z

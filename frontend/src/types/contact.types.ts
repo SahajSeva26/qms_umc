@@ -1,9 +1,5 @@
-// Contact domain types — mirrors the real backend exactly:
-// backend/src/modules/crm/contact/{contact.model,contact.constants,contact.validators}.ts
-//
-// Contact has no state machine (status is a plain updatable enum field, not
-// gated behind a moveStage-style endpoint) and no code/counter — confirmed
-// via contact.constants.ts's COUNTER_ENTITY_TYPES list, which omits 'contact'.
+// Contact domain types — mirrors the real backend exactly. No state machine
+// (status is a plain enum field) and no code/counter.
 
 export type ContactType = 'customer' | 'platform'
 export type ContactStatus = 'active' | 'inactive'
@@ -14,11 +10,22 @@ export interface ContactPopulatedUser {
   email: string
 }
 
+/** Populated shape for Contact.division — nested relations carry Mongoose's raw `_id`, not a mapped `id`. */
+export interface ContactPopulatedDivision {
+  _id?: string
+  name: string
+  code: string
+  therapy: string[]
+}
+
 // tenant is only ever a raw ObjectId string on contact.mapper.ts's response —
 // no populate() call anywhere in contact.service.ts's get/search.
 export interface ContactEntity {
   id: string
   tenant: string
+  // Required for 'customer'-type contacts, unset for 'platform' ones.
+  // Populated as {_id, name, code, therapy} on GET/search.
+  division?: ContactPopulatedDivision | string | null
   name: string
   designation?: string
   email?: string
@@ -42,6 +49,7 @@ export interface SearchContactQuery {
   // Only honored for platform staff — contact.service.ts silently pins
   // customer-tenant callers to their own tenant regardless of this filter.
   tenant?: string
+  division?: string
   page?: string
   limit?: string
 }
@@ -51,6 +59,8 @@ export interface SearchContactQuery {
 // user and ignores whatever is sent here.
 export interface CreateContactPayload {
   tenant?: string
+  // Required when type is 'customer' (the default); optional for 'platform'.
+  division?: string
   name: string
   designation?: string
   email?: string

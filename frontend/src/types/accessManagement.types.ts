@@ -1,13 +1,7 @@
-// Shared types for the PBAC (permission-based access control) domain.
-//
-// This is a purely additive, NEW type module. It does not replace or touch
-// `@/types/auth.types.ts` (the existing 18-role frontend-only enum system).
-// The two systems are intentionally decoupled:
-//   - auth.types.ts / useAuth.ts gate the existing ~30 domain screens via
-//     invented frontend-only UserRole strings with no backend counterpart.
-//   - accessManagement.types.ts / usePermission.ts (below) reflect the REAL backend
-//     permission model returned by GET /auth/me, keyed on permission code
-//     strings like 'user:get', 'tenant:manage', etc.
+// Shared types for the PBAC (permission-based access control) domain —
+// reflects the REAL backend permission model returned by GET /auth/me,
+// keyed on permission code strings like 'user:get', 'tenant:manage', etc.
+// Decoupled from `@/types/auth.types.ts`'s separate frontend-only UserRole system.
 
 // ---------------------------------------------------------------------------
 // Permission catalog
@@ -44,11 +38,19 @@ export interface Tenant {
   createdAt?: string
   updatedAt?: string
   type?: TenantType
+  // Raw Role id (never populated), same system:manage-only gate. Optional
+  // server-side (default null) — required on create here per direct
+  // instruction, pending a backend decision on sales-rep vs sales-head.
+  salesPerson?: string | null
 }
 
 export interface SearchTenantQuery {
   name?: string
   code?: string
+  // No permission gate on this filter (backend's own TODO to add one) —
+  // any caller can filter by type even though it's only visible in the
+  // response to a system:manage caller.
+  type?: TenantType
   // TODO: only honored server-side if caller has `tenant:manage`; otherwise search is hard-scoped to status=active.
   status?: TenantStatus
   page?: string
@@ -69,6 +71,10 @@ export interface CreateTenantPayload {
   name: string
   description?: string
   owner: RegisterOwnerPayload
+  // Role id, must be type 'sales-rep'. Optional on the backend; required
+  // here per direct instruction — TODO: revisit once the backend settles
+  // on sales-rep vs sales-head.
+  salesPerson: string
 }
 
 export interface UpdateTenantPayload {
@@ -78,6 +84,8 @@ export interface UpdateTenantPayload {
   status?: TenantStatus
   // Only takes effect server-side if caller has `system:manage`; silently ignored otherwise.
   type?: TenantType
+  // Role id, or null to unassign — same 'sales-rep' RoleType constraint as create.
+  salesPerson?: string | null
 }
 
 // ---------------------------------------------------------------------------

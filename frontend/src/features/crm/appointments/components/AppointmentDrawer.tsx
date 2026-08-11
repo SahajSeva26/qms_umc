@@ -15,18 +15,34 @@ import SideDrawer from '@/components/ui/SideDrawer'
 import KeyValueGrid from '@/components/ui/KeyValueGrid'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
+import DateTimePicker from '@/components/ui/DateTimePicker'
 import { Label } from '@/components/ui/label'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from '@/components/ui/sonner'
+import NewLeadWizard from '@/features/crm/components/NewLeadWizard'
 
 const STATUS_COLOR: Record<AppointmentStatus, string> = {
   planned: '#3b6dff',
   done: '#10b981',
   cancelled: '#94a3b8',
-  blocked: '#f43f5e',
-  released: '#a855f7',
 }
+
+// Plain preset labels — picking one just sets nextSteps to that exact text.
+// None of these (including 'Cancelled'/'Rescheduled meetings') trigger the
+// real Cancel/Reschedule actions; per explicit instruction they're labels
+// only, kept fully separate from the actual status-transition buttons.
+const NEXT_STEPS_OPTIONS = [
+  'Cred send',
+  'Required PPT send',
+  'Quotation',
+  'Indent raise',
+  'Negations',
+  'PO received',
+  'Cancelled',
+  'Rescheduled meetings',
+] as const
+const NEXT_STEPS_OTHER = 'Other'
 
 const labelClasses = 'block text-[10px] font-semibold tracking-widest uppercase mb-2'
 const labelStyle = { color: 'var(--qms-text-muted)' }
@@ -83,12 +99,23 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
   const [panel, setPanel] = useState<PanelKind>(null)
   const [reason, setReason] = useState('')
   const [targetStatus, setTargetStatus] = useState<AppointmentStatus | ''>('')
+  const [momText, setMomText] = useState('')
+  const [nextStepsOption, setNextStepsOption] = useState<string>('')
+  const [nextStepsText, setNextStepsText] = useState('')
+  const [newLeadOpen, setNewLeadOpen] = useState(false)
   const [rescheduleStart, setRescheduleStart] = useState('')
   const [rescheduleEnd, setRescheduleEnd] = useState('')
+  // True once the user has directly edited End — stops the auto-shift below.
+  // NOT derived by comparing rescheduleEnd against its original pre-filled
+  // value on every Start change: End is already reassigned by the auto-shift
+  // itself, so that comparison goes stale after the very first shift and
+  // silently disables further shifts (found 2026-08-11: editing Start's date
+  // and then its time, as two separate DateTimePicker fields, produced an
+  // End stuck at the first shift's value instead of tracking Start).
+  const [endTouched, setEndTouched] = useState(false)
   const [error, setError] = useState('')
 
-  const { session, hasPermission } = usePermission()
-  const canManage = hasPermission('appointment:manage')
+  const { session } = usePermission()
 
   const moveStage = useMoveAppointmentStage(appointment?.id ?? '')
   const respond = useRespondToAppointment(appointment?.id ?? '')
@@ -102,21 +129,70 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
     return roleId === myRoleId
   })
 
-  const legalTargets = APPOINTMENT_TRANSITION_MAP[appointment.status]
+  // Falls back to [] for a status this map no longer knows about (e.g. a
+  // pre-existing 'blocked'/'released' record from before that status was
+  // removed 2026-08-11 — the backend hasn't dropped it yet, so one can still
+  // exist) — treats it as terminal/read-only rather than crashing on
+  // .length of undefined.
+  const legalTargets = APPOINTMENT_TRANSITION_MAP[appointment.status] ?? []
   const isTerminal = legalTargets.length === 0
-  const statusColor = STATUS_COLOR[appointment.status]
+  const statusColor = STATUS_COLOR[appointment.status] ?? '#94a3b8'
+
+
+  const blurActiveElement = () => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+  }
+
+  // Shared by openMoveStage and openReschedule — both dialogs offer the same
+  // Next steps dropdown, so both need to re-derive its selection/free-text
+  // from whatever's already saved on the appointment.
+  const resetNextStepsFromAppointment = () => {
+    const existingNextSteps = appointment.nextSteps ?? ''
+    const isPreset = (NEXT_STEPS_OPTIONS as readonly string[]).includes(existingNextSteps)
+    setNextStepsOption(existingNextSteps ? (isPreset ? existingNextSteps : NEXT_STEPS_OTHER) : '')
+    setNextStepsText(isPreset ? '' : existingNextSteps)
+  }
 
   const openMoveStage = (to: AppointmentStatus) => {
+    blurActiveElement()
     setError('')
     setReason('')
+    setMomText(appointment.mom.details ?? '')
+    resetNextStepsFromAppointment()
     setTargetStatus(to)
     setPanel('moveStage')
   }
 
+  const handleNextStepsOptionChange = (value: string | null) => {
+    const next = value ?? ''
+    setNextStepsOption(next)
+    setNextStepsText(next !== NEXT_STEPS_OTHER ? next : '')
+  }
+
+  // The saved value: the picked preset verbatim, or the free-text box's
+  // content when 'Other' is selected — either way a single plain string,
+  // so nothing downstream (save, display) needs to know about the dropdown.
+  const resolvedNextSteps = nextStepsOption === NEXT_STEPS_OTHER ? nextStepsText.trim() : nextStepsOption
+
+  // MOM and Next steps both live on the plain update endpoint (PUT
+  // /appointments/:id, not the stage-move one — see
+  // UpdateAppointmentPayload/appointment.service.ts's update()), so saving
+  // either alongside a status move is a separate call from moveStage, not
+  // one combined payload. Sent first: if the status flip then fails (e.g. a
+  // transition race), the text the user just typed isn't lost. MOM only
+  // applies when marking done; Next steps applies to every transition.
   const handleMoveStageSave = async () => {
     if (!targetStatus) return
     if (!reason.trim()) return setError('A reason is required')
     try {
+      const momChanged = targetStatus === 'done' && momText.trim() && momText.trim() !== (appointment.mom.details ?? '')
+      const nextStepsChanged = resolvedNextSteps !== (appointment.nextSteps ?? '')
+      if (momChanged || nextStepsChanged) {
+        await updateAppointment.mutateAsync({
+          ...(momChanged ? { mom: { details: momText.trim() } } : {}),
+          ...(nextStepsChanged ? { nextSteps: resolvedNextSteps || undefined } : {}),
+        })
+      }
       await moveStage.mutateAsync({ to: targetStatus, reason: reason.trim() })
       toast.success(`Moved to ${APPOINTMENT_STATUS_LABEL[targetStatus]}`)
       setPanel(null)
@@ -126,9 +202,12 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
   }
 
   const openReschedule = () => {
+    blurActiveElement()
     setError('')
     setRescheduleStart(appointment.duration.startTime.slice(0, 16))
     setRescheduleEnd(appointment.duration.endTime?.slice(0, 16) ?? '')
+    setEndTouched(false)
+    resetNextStepsFromAppointment()
     setPanel('reschedule')
   }
 
@@ -136,14 +215,13 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
   // this, changing Start to later than the pre-filled (original) End
   // silently produces an invalid range the user has to notice and fix
   // themselves. Only shifts End automatically; once the user edits End
-  // directly, that value is left alone.
+  // directly (endTouched), that value is left alone.
   const originalDurationMs = appointment.duration.endTime
     ? new Date(appointment.duration.endTime).getTime() - new Date(appointment.duration.startTime).getTime()
     : null
   const handleRescheduleStartChange = (value: string) => {
-    const wasDefaultEnd = rescheduleEnd === (appointment.duration.endTime?.slice(0, 16) ?? '')
     setRescheduleStart(value)
-    if (wasDefaultEnd && originalDurationMs && value) {
+    if (!endTouched && originalDurationMs && value) {
       const newEnd = new Date(new Date(value).getTime() + originalDurationMs)
       const pad = (n: number) => String(n).padStart(2, '0')
       setRescheduleEnd(
@@ -152,15 +230,22 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
     }
   }
 
+  const handleRescheduleEndChange = (value: string) => {
+    setEndTouched(true)
+    setRescheduleEnd(value)
+  }
+
   const handleRescheduleSave = async () => {
     if (!rescheduleStart) return setError('A new start time is required')
     if (rescheduleEnd && new Date(rescheduleEnd).getTime() <= new Date(rescheduleStart).getTime()) {
       return setError('End must be after start')
     }
     try {
+      const nextStepsChanged = resolvedNextSteps !== (appointment.nextSteps ?? '')
       await updateAppointment.mutateAsync({
         startTime: new Date(rescheduleStart).toISOString(),
         endTime: rescheduleEnd ? new Date(rescheduleEnd).toISOString() : undefined,
+        ...(nextStepsChanged ? { nextSteps: resolvedNextSteps || undefined } : {}),
       })
       toast.success('Appointment rescheduled')
       setPanel(null)
@@ -185,7 +270,7 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
           {appointment.code}
         </span>
         <Pill color="var(--qms-brand)">{APPOINTMENT_TYPE_LABEL[appointment.type]}</Pill>
-        <Pill color={statusColor}>{APPOINTMENT_STATUS_LABEL[appointment.status]}</Pill>
+        <Pill color={statusColor}>{APPOINTMENT_STATUS_LABEL[appointment.status] ?? appointment.status}</Pill>
       </div>
 
       <h3 className="text-[16px] font-bold" style={{ color: 'var(--qms-text)' }}>
@@ -231,21 +316,6 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
         )}
       </div>
 
-      {appointment.status === 'blocked' && (
-        <div className="mt-4 rounded-lg px-2.5 py-2 bg-danger-soft">
-          <p className="text-[11px] font-bold text-danger">Blocked — MOM not submitted within 24 working hours.</p>
-          <p className="text-[11px] mt-1 text-danger opacity-80">
-            Submitting the MOM alone never un-blocks this — only a release ({canManage ? 'you can do this' : 'ask someone with appointment:manage'}) clears it.
-          </p>
-        </div>
-      )}
-
-      {appointment.status === 'released' && (
-        <div className="mt-4 rounded-lg px-2.5 py-2" style={{ background: 'rgba(168,85,247,.08)', border: '1px solid rgba(168,85,247,.3)' }}>
-          <p className="text-[11px] font-bold" style={{ color: '#a855f7' }}>Block released.</p>
-        </div>
-      )}
-
       <div className="mt-4">
         <SectionLabel>Minutes of meeting</SectionLabel>
         {appointment.mom.details ? (
@@ -288,13 +358,6 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
           <div className="flex flex-wrap gap-2">
             {legalTargets.includes('done') && <Button size="sm" onClick={() => openMoveStage('done')}>Mark done</Button>}
             {appointment.status === 'planned' && <Button size="sm" variant="outline" onClick={openReschedule}>Reschedule</Button>}
-            {legalTargets.includes('blocked') && (
-              <Button size="sm" variant="destructive" onClick={() => openMoveStage('blocked')}>Block</Button>
-            )}
-            {legalTargets.includes('released') && canManage && (
-              <Button size="sm" variant="outline" onClick={() => openMoveStage('released')}>Release block</Button>
-            )}
-            {legalTargets.includes('planned') && <Button size="sm" variant="outline" onClick={() => openMoveStage('planned')}>Re-plan</Button>}
             {legalTargets.includes('cancelled') && (
               <Button size="sm" variant="destructive" onClick={() => openMoveStage('cancelled')}>Cancel</Button>
             )}
@@ -302,7 +365,7 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
         </div>
       ) : (
         <p className="mt-5 pt-4 text-[12px]" style={{ borderTop: '1px solid var(--qms-border)', color: 'var(--qms-text-muted)' }}>
-          This appointment is {APPOINTMENT_STATUS_LABEL[appointment.status].toLowerCase()} — read-only.
+          This appointment is {(APPOINTMENT_STATUS_LABEL[appointment.status] ?? appointment.status).toLowerCase()} — read-only.
         </p>
       )}
 
@@ -314,11 +377,51 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
               <Label className={labelClasses} style={labelStyle}>Reason *</Label>
               <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-[13px]" />
             </div>
+            {targetStatus === 'done' && (
+              <Button type="button" size="sm" variant="outline" onClick={() => setNewLeadOpen(true)}>
+                + New lead
+              </Button>
+            )}
+            {targetStatus === 'done' && (
+              <div>
+                <Label className={labelClasses} style={labelStyle}>Minutes of meeting</Label>
+                <Textarea
+                  value={momText}
+                  onChange={(e) => setMomText(e.target.value)}
+                  rows={3}
+                  placeholder="What was discussed / decided…"
+                  className="text-[13px]"
+                />
+              </div>
+            )}
+            <div>
+              <Label className={labelClasses} style={labelStyle}>Next steps</Label>
+              <Select key={nextStepsOption || 'empty'} value={nextStepsOption || undefined} onValueChange={handleNextStepsOptionChange}>
+                <SelectTrigger className="w-full text-[13px]">
+                  <SelectValue placeholder="Select next step…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {NEXT_STEPS_OPTIONS.map((opt) => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                  <SelectItem value={NEXT_STEPS_OTHER}>{NEXT_STEPS_OTHER}</SelectItem>
+                </SelectContent>
+              </Select>
+              {nextStepsOption === NEXT_STEPS_OTHER && (
+                <Textarea
+                  value={nextStepsText}
+                  onChange={(e) => setNextStepsText(e.target.value)}
+                  rows={2}
+                  placeholder="What happens next…"
+                  className="text-[13px] mt-2"
+                />
+              )}
+            </div>
             {error && <p className="text-[12px] font-semibold text-danger">{error}</p>}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPanel(null)}>Cancel</Button>
-            <Button onClick={handleMoveStageSave} disabled={moveStage.isPending}>Confirm</Button>
+            <Button onClick={handleMoveStageSave} disabled={moveStage.isPending || updateAppointment.isPending}>Confirm</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -330,12 +433,35 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className={labelClasses} style={labelStyle}>New start *</Label>
-                <Input type="datetime-local" value={rescheduleStart} onChange={(e) => handleRescheduleStartChange(e.target.value)} className="text-[13px]" />
+                <DateTimePicker value={rescheduleStart} onChange={handleRescheduleStartChange} className="text-[13px] w-full" />
               </div>
               <div>
                 <Label className={labelClasses} style={labelStyle}>New end</Label>
-                <Input type="datetime-local" value={rescheduleEnd} onChange={(e) => setRescheduleEnd(e.target.value)} className="text-[13px]" />
+                <DateTimePicker value={rescheduleEnd} onChange={handleRescheduleEndChange} className="text-[13px] w-full" />
               </div>
+            </div>
+            <div>
+              <Label className={labelClasses} style={labelStyle}>Next steps</Label>
+              <Select key={nextStepsOption || 'empty'} value={nextStepsOption || undefined} onValueChange={handleNextStepsOptionChange}>
+                <SelectTrigger className="w-full text-[13px]">
+                  <SelectValue placeholder="Select next step…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {NEXT_STEPS_OPTIONS.map((opt) => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                  <SelectItem value={NEXT_STEPS_OTHER}>{NEXT_STEPS_OTHER}</SelectItem>
+                </SelectContent>
+              </Select>
+              {nextStepsOption === NEXT_STEPS_OTHER && (
+                <Textarea
+                  value={nextStepsText}
+                  onChange={(e) => setNextStepsText(e.target.value)}
+                  rows={2}
+                  placeholder="What happens next…"
+                  className="text-[13px] mt-2"
+                />
+              )}
             </div>
             {error && <p className="text-[12px] font-semibold text-danger">{error}</p>}
           </div>
@@ -345,6 +471,13 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {newLeadOpen && (
+        <NewLeadWizard
+          onClose={() => setNewLeadOpen(false)}
+          onCreated={() => setNewLeadOpen(false)}
+        />
+      )}
     </SideDrawer>
   )
 }

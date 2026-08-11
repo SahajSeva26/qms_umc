@@ -6,12 +6,14 @@ import { DIVISION_THERAPY_LABEL } from '@/types/crm.types'
 import { useDivision } from '@/features/crm/divisions/hooks/useDivision'
 import { useUpdateDivision } from '@/features/crm/divisions/hooks/useUpdateDivision'
 import { updateDivisionSchema } from '@/features/crm/divisions/schemas/division.schemas'
-import { DIVISION_ROUTES } from '@/features/crm/divisions/divisions.routes'
+import { TENANT_ROUTES } from '@/features/access-management/tenant/tenant.routes'
 import BulkMrImportCard from '@/features/crm/divisions/components/BulkMrImportCard'
+import DivisionContactsSection from '@/features/crm/divisions/components/DivisionContactsSection'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import ChipPicker from '@/components/ui/ChipPicker'
 
 const THERAPY_OPTIONS = Object.keys(DIVISION_THERAPY_LABEL) as DivisionTherapy[]
 const STATUS_OPTIONS: { value: DivisionStatus; label: string }[] = [
@@ -19,13 +21,8 @@ const STATUS_OPTIONS: { value: DivisionStatus; label: string }[] = [
   { value: 'inactive', label: 'Inactive' },
 ]
 
-// Edit-only detail page for an existing division — replaces EditDivisionModal
-// (row click now navigates here instead of opening a modal), same field set
-// and same UpdateDivisionPayloadSchema contract: name/therapy/brandFocus/
-// mrCount/status only. No Code/Company/Head/Owner fields, none of which the
-// backend allows to change post-creation. Creation stays a modal
-// (CreateDivisionModal, opened from DivisionsListPage's "New Division"
-// button) — out of scope for this page per direct instruction.
+// Edit-only detail page for an existing division. No Code/Company/Head/Owner
+// fields — the backend doesn't allow changing those post-creation.
 const DivisionDetailPage = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -33,14 +30,12 @@ const DivisionDetailPage = () => {
   const { data, isLoading, error } = useDivision(id)
   const division = data?.data ?? null
 
-  // division.tenant is populated ({_id, name, code}) on GET-by-id — see
-  // DivisionPopulatedTenant's comment — but typed `| string` for the same
-  // create/update-echo duality seen throughout this codebase (RolePopulatedTenant
-  // et al.), so this resolves both shapes rather than assuming the object form.
+  // division.tenant is populated on GET-by-id but typed `| string` for the
+  // create/update-echo case — resolve both shapes rather than assume one.
   const tenantId = division ? (typeof division.tenant === 'string' ? division.tenant : division.tenant._id) : undefined
 
   const [name, setName] = useState('')
-  const [therapy, setTherapy] = useState<DivisionTherapy | ''>('')
+  const [therapy, setTherapy] = useState<DivisionTherapy[]>([])
   const [brandFocus, setBrandFocus] = useState('')
   const [mrCount, setMrCount] = useState(0)
   const [status, setStatus] = useState<DivisionStatus | ''>('')
@@ -61,7 +56,7 @@ const DivisionDetailPage = () => {
   const handleSave = () => {
     const result = updateDivisionSchema.safeParse({
       name,
-      therapy: therapy || undefined,
+      therapy,
       brandFocus: brandFocus || undefined,
       mrCount,
       status: status || undefined,
@@ -77,12 +72,12 @@ const DivisionDetailPage = () => {
   return (
     <div className="max-w-2xl">
       <button
-        onClick={() => navigate(DIVISION_ROUTES.DIVISIONS)}
+        onClick={() => navigate(tenantId ? TENANT_ROUTES.TENANT_DETAIL.replace(':id', tenantId) : TENANT_ROUTES.TENANTS)}
         className="flex items-center gap-1.5 text-[13px] font-semibold mb-5 transition-colors hover:opacity-80"
         style={{ color: 'var(--qms-text-soft)' }}
       >
         <FiArrowLeft size={14} />
-        Back to divisions
+        Back to company
       </button>
 
       {isLoading && (
@@ -134,18 +129,15 @@ const DivisionDetailPage = () => {
 
               <div>
                 <Label className="block text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-                  Therapy area *
+                  Therapy areas *
                 </Label>
-                <Select key={therapy || 'empty'} value={therapy || undefined} onValueChange={(v) => setTherapy(v as DivisionTherapy)}>
-                  <SelectTrigger className="w-full text-[13px]">
-                    <SelectValue placeholder="Select therapy area...">
-                      {(v: string) => DIVISION_THERAPY_LABEL[v as DivisionTherapy] ?? 'Select therapy area...'}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {THERAPY_OPTIONS.map((t) => <SelectItem key={t} value={t}>{DIVISION_THERAPY_LABEL[t]}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <ChipPicker
+                  options={THERAPY_OPTIONS}
+                  selected={therapy}
+                  onChange={(v) => setTherapy(v as DivisionTherapy[])}
+                  placeholder="Add a therapy area..."
+                  labelFor={(v) => DIVISION_THERAPY_LABEL[v as DivisionTherapy]}
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-2.5">
@@ -213,6 +205,7 @@ const DivisionDetailPage = () => {
           </div>
 
           {tenantId && <BulkMrImportCard tenantId={tenantId} divisionId={division.id} />}
+          {tenantId && <DivisionContactsSection tenantId={tenantId} divisionId={division.id} />}
         </>
       )}
     </div>

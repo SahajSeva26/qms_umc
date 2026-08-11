@@ -305,12 +305,6 @@ export async function omInterviewDecision(id: string, outcome: 'APPROVED' | 'REJ
   return next
 }
 
-export function dietitianApproved(d: DietitianEnrollment | Person): boolean {
-  if ('real' in d && d.real) return true
-  if ('status' in d) return d.status === 'APPROVED'
-  return true // Person (real roster) records are always approved
-}
-
 // ── Unified roster (real staff + pipeline enrollments) ──────────────────────
 // Mirrors foRoster()/dietitianRoster() exactly (om-data.js:154/236) — real
 // staff (from the shared People master) always ENROLLED/detailsComplete,
@@ -405,12 +399,6 @@ export function rankDietitiansForCamp(camp: Camp, dietitians: Person[], closedDi
     }
     return { dietitianId: d.id, score, reasons }
   }).sort((a, b) => a.score - b.score)
-}
-
-// campRequiresBca — regex-matches tests for BCA/body-composition mention.
-export function campRequiresBca(camp: Camp): boolean {
-  const haystack = `${(camp as unknown as { tests?: string[] }).tests?.join(' ') ?? ''} ${(camp as unknown as { testsConducted?: string[] }).testsConducted?.join(' ') ?? ''}`
-  return /\bBCA\b|body\s*comp|composition|fat\s*analys/i.test(haystack)
 }
 
 // ── Dietitian rate history + suggestion ─────────────────────────────────────

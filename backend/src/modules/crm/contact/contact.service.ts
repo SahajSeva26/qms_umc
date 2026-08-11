@@ -7,11 +7,14 @@ import { RequestContext } from '../../../shared/utils/contextBuilder';
 import { isValidObjectID } from '../../../shared/utils/strings';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { TENANT_TYPE } from '../../access-management/tenant/tenant.constants';
+import { DivisionService } from '../division/division.service';
+import { CONTACT_TYPES } from './contact.constants';
 
 type ContactDocument = HydratedDocument<IContact> | null;
 
 const populate: any[] = [
     { path: 'tenant', select: 'name code' },
+    { path: 'division', select: 'name code therapy' },
     { path: 'user', select: 'firstName lastName email' },
 ];
 
@@ -73,6 +76,9 @@ const search = async (filters: ISearchContactQuery, ctx: RequestContext, options
     }
 
     //3: search filters
+    if (filters.division) {
+        where.division = filters.division;
+    }
     if (filters.name) {
         where.name = { $regex: filters.name, $options: 'i' };
     }
@@ -100,7 +106,27 @@ const create = async (model: ICreateContactPayload, ctx: RequestContext): Promis
     //1: resolve the owning tenant (explicit for platform, own-tenant for customer)
     const tenant = resolveTenant(model, ctx);
 
-    //2: duplicate-email guard within the tenant (email is optional)
+    //2: pharma (customer-type) contacts must belong to a division; platform (QMS-internal) contacts
+    // need not. type defaults to customer when not supplied, so an omitted type still requires one.
+    const effectiveType = model.type || CONTACT_TYPES.CUSTOMER;
+    if (effectiveType === CONTACT_TYPES.CUSTOMER && !model.division) {
+        return throwAppError('A division is required for pharma contacts', StatusCodes.BAD_REQUEST);
+    }
+
+    //3: optional division — must exist and belong to the resolved tenant (never link across companies)
+    let division: any = null;
+    if (model.division) {
+        const divisionDoc = await DivisionService.get(model.division, ctx);
+        if (!divisionDoc) {
+            return throwAppError('Division not found', StatusCodes.NOT_FOUND);
+        }
+        if (divisionDoc.tenant?.toString() !== tenant?.toString()) {
+            return throwAppError('Division does not belong to the selected company', StatusCodes.BAD_REQUEST);
+        }
+        division = divisionDoc._id;
+    }
+
+    //4: duplicate-email guard within the tenant (email is optional)
     if (model.email) {
         const existing = await ContactModel.findOne({ tenant, email: model.email });
         if (existing) {
@@ -108,8 +134,8 @@ const create = async (model: ICreateContactPayload, ctx: RequestContext): Promis
         }
     }
 
-    //3: build + apply
-    const entity = new ContactModel({ tenant });
+    //5: build + apply
+    const entity = new ContactModel({ tenant, division });
     let contact = set(model, entity);
     contact = await contact.save();
 

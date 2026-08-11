@@ -8,9 +8,6 @@
 import type { ReminderThreadStatus, TemplateFamily, ReminderLanguage } from '@/features/reminders/reminders.types'
 import { STATUS_LABELS, STATUS_COLORS } from '@/features/reminders/reminders.types'
 
-export const STATUS_LABEL = STATUS_LABELS
-export const STATUS_COLOR = STATUS_COLORS
-
 // voice_fo/voice_diet/wa_fo/wa_diet (pre-camp, T-24/T-2) + submit_diet
 // (post-camp dietitian-submission nag) — the 5 real template families.
 export const FAMILY_LABEL: Record<TemplateFamily, string> = {
@@ -24,11 +21,11 @@ export const FAMILY_LABEL: Record<TemplateFamily, string> = {
 export const LANGUAGE_LABEL: Record<ReminderLanguage, string> = { en: 'EN', hi: 'HI', mr: 'MR' }
 
 export function statusLabel(s: ReminderThreadStatus): string {
-  return STATUS_LABEL[s] ?? s
+  return STATUS_LABELS[s] ?? s
 }
 
 export function statusColor(s: ReminderThreadStatus): string {
-  return STATUS_COLOR[s] ?? '#64748b'
+  return STATUS_COLORS[s] ?? '#64748b'
 }
 
 export function num(n: number): string {

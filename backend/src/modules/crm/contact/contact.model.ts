@@ -13,6 +13,13 @@ const contactSchema = new mongoose.Schema(
             required: [true, 'Tenant is required'],
             index: true,
         },
+        // optional — the division within the tenant this contact belongs to. Left unset for
+        // tenant-level contacts (e.g. QMS staff records) that aren't tied to a specific division.
+        division: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Division',
+            index: true,
+        },
         name: {
             type: String,
             required: [true, 'Name is required'],

@@ -22,7 +22,3 @@ export function saveThreadsInternal(list: ReminderThread[]) {
 export async function getThreads(): Promise<ReminderThread[]> {
   return loadThreads()
 }
-
-export function threadsForCamp(campId: string, threads?: ReminderThread[]): ReminderThread[] {
-  return (threads ?? loadThreads()).filter((t) => t.campId === campId)
-}

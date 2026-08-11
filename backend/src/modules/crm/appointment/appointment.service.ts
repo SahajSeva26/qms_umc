@@ -145,18 +145,10 @@ const set = async (model: any, entity: any, ctx: RequestContext): Promise<Hydrat
 
     // submissionDeadline is NOT set here — it is derived from endTime above. Only the MoM content is editable.
     if (model.mom) {
-        // MoM cannot be captured while the appointment is blocked — the meeting is on hold.
-        if (entity.status === APPOINTMENT_STATUSES.BLOCKED) {
-            return throwAppError('Minutes of meeting cannot be added while the appointment is blocked', StatusCodes.CONFLICT);
-        }
         entity.mom = entity.mom || ({} as any);
         if (model.mom.details !== undefined) {
             entity.mom.details = model.mom.details;
         }
-    }
-
-    if (model.nextSteps !== undefined) {
-        entity.nextSteps = model.nextSteps;
     }
 
     return entity;
@@ -316,14 +308,6 @@ const moveStage = async (id: string, model: IMoveStagePayload, ctx: RequestConte
         return throwAppError(`Invalid stage transition from '${from}' to '${to}'`, StatusCodes.BAD_REQUEST);
     }
 
-    //3b: releasing a blocked slot is manage-only — even tenant:manage (which the route allows for other
-    // transitions) cannot do it; only appointment:manage.
-    if (from === APPOINTMENT_STATUSES.BLOCKED && to === APPOINTMENT_STATUSES.RELEASED) {
-        if (!ctx.hasAnyPermissions([APPOINTMENT_PERMISSIONS.MANAGE.code])) {
-            return throwAppError('Only an appointment manager can release a blocked appointment', StatusCodes.FORBIDDEN);
-        }
-    }
-
     //4: append to the append-only journal + flip the cached status (one atomic save)
     // snapshot the actor's identity from the token so history stays true even if the user/role later changes
     const actorName = `${ctx.user?.firstName || ''} ${ctx.user?.lastName || ''}`.trim();
@@ -331,6 +315,7 @@ const moveStage = async (id: string, model: IMoveStagePayload, ctx: RequestConte
         from,
         to,
         reason: model.reason,
+        nextSteps: model.nextSteps,
         actor: {
             roleId: ctx.role?._id || ctx.role?.id,
             name: actorName || undefined,
@@ -360,7 +345,7 @@ const respond = async (id: string, model: IRespondPayload, ctx: RequestContext) 
     }
 
     //2b: RSVP only makes sense while the meeting is still planned — you cannot respond to one
-    // that is already done, cancelled, blocked, or released.
+    // that is already done, cancelled, or released.
     if (appointment.status !== APPOINTMENT_STATUSES.PLANNED) {
         return throwAppError(`You can only respond to a planned appointment (this one is '${appointment.status}')`, StatusCodes.CONFLICT);
     }

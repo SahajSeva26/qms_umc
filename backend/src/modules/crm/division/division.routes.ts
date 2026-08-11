@@ -152,7 +152,7 @@ DivisionRouter.get(
 );
 DivisionRouter.post(
     '/',
-    AuthorizeMiddleware([DIVISION_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.ADMIN.code]),
+    AuthorizeMiddleware([DIVISION_PERMISSIONS.MANAGE.code]),
     DivisionController.create,
 );
 

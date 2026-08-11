@@ -10,10 +10,8 @@ import AppointmentList from '@/features/crm/appointments/components/AppointmentL
 import AppointmentDrawer from '@/features/crm/appointments/components/AppointmentDrawer'
 import NewAppointmentDialog from '@/features/crm/appointments/components/NewAppointmentDialog'
 
-// Real backend-integrated Appointments calendar. Replaces the localStorage-
-// mock build (appointments.mock.ts/useMeetings.ts, kept in place but no
-// longer routed to). Per the 2026-07-27 decisions documented in
-// PROGRESS.md's Known Issues:
+// Real backend-integrated Appointments calendar. Per the 2026-07-27
+// decisions documented in PROGRESS.md's Known Issues:
 // - No "peer overlay" toggle — the backend's own applyOwnScope already
 //   limits search() to appointments the caller owns or is invited to, so
 //   every appointment fetched here is one the viewer can legitimately see.

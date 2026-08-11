@@ -5,6 +5,7 @@ export const ContactMapper = {
         const result: any = {
             id: contact._id?.toString(),
             tenant: contact.tenant,
+            division: contact.division || null,
             name: contact.name,
             designation: contact.designation,
             email: contact.email,

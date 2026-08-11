@@ -35,6 +35,24 @@ const set = async (model: any, entity: HydratedDocument<ITenant>, ctx: RequestCo
         entity.status = model.status;
     }
 
+    // salesPerson — assign/reassign the (platform) sales person owning this tenant account.
+    // A supplied id must resolve to an existing role (scoped to the actor) whose role type is
+    // sales-rep; an explicit null unassigns. Populate so the role's type.code is available to check.
+    if (model.salesPerson !== undefined) {
+        if (model.salesPerson) {
+            const salesPerson = await RoleService.get(model.salesPerson, ctx, { populate: true });
+            if (!salesPerson) {
+                return throwAppError('Sales person role not found', StatusCodes.NOT_FOUND);
+            }
+            if ((salesPerson.type as any)?.code !== ALLOWED_ROLETYPE_CODES.PLATFORM.SALES_REP) {
+                return throwAppError('Assigned sales person must be a sales-rep role', StatusCodes.BAD_REQUEST);
+            }
+            entity.salesPerson = salesPerson._id || salesPerson.id;
+        } else {
+            entity.salesPerson = null;
+        }
+    }
+
     // if (model.type && ctx.hasAnyPermissions([SYSTEM_PERMISSIONS.MANAGE.code])) {
     //     //only system user shoudld be able to do that
     //     entity.type = model.type;

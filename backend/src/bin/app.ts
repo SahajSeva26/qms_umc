@@ -19,6 +19,7 @@ import { DoctorRouter } from '../modules/doctor/doctor.routes';
 import { GeoProfileRouter } from '../modules/operations/geoProfile/geoProfile.routes';
 import { CampRouter } from '../modules/operations/camp/camp.routes';
 import { CounterRouter } from '../modules/counter/counter.routes';
+import { InventoryMasterRouter } from '../modules/inventory/inventory-master/inventory-master.routes';
 import { buildContext } from '../shared/utils/contextBuilder';
 import { httpLogger } from '../shared/logger/httpLogger';
 import ENV from '../shared/config/app.config';
@@ -80,6 +81,7 @@ app.use('/api/v1/doctors', DoctorRouter);
 app.use('/api/v1/geo-profiles', GeoProfileRouter);
 app.use('/api/v1/camps', CampRouter);
 app.use('/api/v1/counters', CounterRouter);
+app.use('/api/v1/inventory-masters', InventoryMasterRouter);
 
 // Captured once at boot — lets /health-check report how long the current deploy has been up.
 const startedAt = new Date().toISOString();

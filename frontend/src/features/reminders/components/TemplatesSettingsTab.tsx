@@ -43,6 +43,9 @@ const TemplatesSettingsTab = () => {
   const [family, setFamily] = useState<TemplateFamily>('wa_fo')
   const [lang, setLang] = useState<ReminderLanguage>('en')
   const [draft, setDraft] = useState<ReminderTemplates | null>(null)
+  const [savingTemplate, setSavingTemplate] = useState(false)
+  const [resettingTemplates, setResettingTemplates] = useState(false)
+  const [savingConfig, setSavingConfig] = useState(false)
 
   useEffect(() => {
     if (templates) setDraft(templates)
@@ -62,32 +65,41 @@ const TemplatesSettingsTab = () => {
 
   const handleSaveTemplate = async () => {
     if (!draft) return
+    setSavingTemplate(true)
     try {
       await saveTemplates(draft)
       toast.success(`Template saved · ${FAMILY_LABEL[family]} · ${LANGUAGE_LABEL[lang]}`)
-    } catch {
-      toast.error('Failed to save template')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save template')
+    } finally {
+      setSavingTemplate(false)
     }
   }
 
   const handleResetTemplates = async () => {
     if (!confirm('Reset all templates back to the QMS defaults?')) return
+    setResettingTemplates(true)
     try {
       await saveTemplates(DEFAULT_TEMPLATES)
       setDraft(DEFAULT_TEMPLATES)
       toast.info('Templates reset to defaults')
-    } catch {
-      toast.error('Failed to reset templates')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to reset templates')
+    } finally {
+      setResettingTemplates(false)
     }
   }
 
   const handleSaveConfig = async () => {
     if (!cfgDraft) return
+    setSavingConfig(true)
     try {
       await saveConfig(cfgDraft)
       toast.success('Settings saved')
-    } catch {
-      toast.error('Failed to save settings')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save settings')
+    } finally {
+      setSavingConfig(false)
     }
   }
 
@@ -139,8 +151,8 @@ const TemplatesSettingsTab = () => {
             Placeholders: <b>[Name]</b> · <b>[Camp]</b> · <b>[Date]</b> · <b>[Time]</b> · <b>[Location]</b> · <b>[Patients]</b> · <b>[Map]</b> · <b>[Link]</b>
           </div>
           <div className="flex gap-1.5 mt-2">
-            <Button onClick={handleSaveTemplate} disabled={!draft}><FiSave size={14} /> Save template</Button>
-            <Button variant="ghost" onClick={handleResetTemplates}><FiRotateCcw size={14} /> Reset all to default</Button>
+            <Button onClick={handleSaveTemplate} disabled={!draft || savingTemplate}><FiSave size={14} /> {savingTemplate ? 'Saving…' : 'Save template'}</Button>
+            <Button variant="ghost" onClick={handleResetTemplates} disabled={resettingTemplates}><FiRotateCcw size={14} /> {resettingTemplates ? 'Resetting…' : 'Reset all to default'}</Button>
           </div>
         </div>
 
@@ -260,7 +272,7 @@ const TemplatesSettingsTab = () => {
             </div>
           </div>
           <div className="mt-2.5">
-            <Button onClick={handleSaveConfig} disabled={configLoading}><FiSave size={14} /> Save settings</Button>
+            <Button onClick={handleSaveConfig} disabled={configLoading || savingConfig}><FiSave size={14} /> {savingConfig ? 'Saving…' : 'Save settings'}</Button>
           </div>
         </div>
       )}

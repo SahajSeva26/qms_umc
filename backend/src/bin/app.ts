@@ -21,6 +21,7 @@ import { CampRouter } from '../modules/operations/camp/camp.routes';
 import { CounterRouter } from '../modules/counter/counter.routes';
 import { InventoryMasterRouter } from '../modules/inventory/inventory-master/inventory-master.routes';
 import { InventoryConsumableRouter } from '../modules/inventory/inventory-consumable/inventory-consumable.routes';
+import { InventoryDeviceRouter } from '../modules/inventory/inventory-device/inventory-device.routes';
 import { buildContext } from '../shared/utils/contextBuilder';
 import { httpLogger } from '../shared/logger/httpLogger';
 import ENV from '../shared/config/app.config';
@@ -84,6 +85,7 @@ app.use('/api/v1/camps', CampRouter);
 app.use('/api/v1/counters', CounterRouter);
 app.use('/api/v1/inventory-masters', InventoryMasterRouter);
 app.use('/api/v1/inventory-consumables', InventoryConsumableRouter);
+app.use('/api/v1/inventory-devices', InventoryDeviceRouter);
 
 // Captured once at boot — lets /health-check report how long the current deploy has been up.
 const startedAt = new Date().toISOString();

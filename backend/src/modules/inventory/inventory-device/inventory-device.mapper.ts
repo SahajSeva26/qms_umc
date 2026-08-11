@@ -1,0 +1,1 @@
+// Inventory-device Mapper

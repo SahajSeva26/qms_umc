@@ -27,8 +27,9 @@ const createTicket = async (payload: CreateTicketPayload) => {
         return throwAppError('Jira integration is not configured', StatusCodes.INTERNAL_SERVER_ERROR);
     }
 
-    const url = `${BaseUrl.replace(/\/+$/, '')}/rest/api/3/issue`;
+    let url = `${BaseUrl.replace(/\/+$/, '')}/rest/api/3/issue`;
     const auth = Buffer.from(`${Email}:${ApiToken}`).toString('base64');
+    // url = url.replace('issue', 'myself');
 
     try {
         const response = await axiosInstance.post(

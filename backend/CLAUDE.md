@@ -420,7 +420,7 @@ All modules follow the layered convention above; all are wired in `src/bin/app.t
 | — | counter | `/counters` | global atomic `$inc` sequence → prefixed padded codes (LEAD-/PROJECT-/CAMP-) |
 | — | doctor | `/doctors` | global registry, no tenant scoping; `pharmaCode` immutable natural key |
 | — | qa-feedback | `/qa-feedback` | QA feedback |
-| access-management | tenant | `/tenants` | types: `platform` / `customer`; owner auto-activated on create |
+| access-management | tenant | `/tenants` | types: `platform` / `customer`; owner auto-activated on create; optional updatable `salesPerson` (Role ref) — assign on create, reassign/unassign (null) on update, validated to exist AND be a `sales-rep` role type |
 | access-management | permission-group | `/permission-groups` | per-tenant permission ceiling |
 | access-management | role-type | `/role-types` | `isSystem` defaults seeded per tenant; reserved-code guard |
 | access-management | role | `/roles` | 1:1 with User; optional `division` (customer-only) + `supervisor` self-ref |

@@ -28,6 +28,13 @@ const tenantSchema = new mongoose.Schema(
             default: null,
             // required: true
         },
+        // optional — the (platform) sales person assigned to this tenant account. Updatable;
+        // null when unassigned.
+        salesPerson: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Role',
+            default: null,
+        },
         status: {
             type: String,
             enum: [TENANT_STATUS.ACTIVE, TENANT_STATUS.INACTIVE],

@@ -427,8 +427,8 @@ All modules follow the layered convention above; all are wired in `src/bin/app.t
 | crm | division | `/divisions` | therapy/brand division; create also mints a pharma-division-head role + user |
 | crm | lead | `/leads` | stageHistory + moveStage; tenant from division |
 | crm | project | `/projects` | one-project-per-lead; tenant/division derived from lead |
-| crm | appointment | `/appointments` | stageHistory + moveStage; parent self-ref for follow-ups |
-| crm | contact | `/contacts` | tenant-scoped people registry, optional user/login link |
+| crm | appointment | `/appointments` | stageHistory + moveStage (each move records its own `nextSteps`); parent self-ref for follow-ups; statuses = planned/done/cancelled/released (no `blocked`) |
+| crm | contact | `/contacts` | tenant(+optional division)-scoped people registry, optional user/login link; division required for pharma (customer-type) contacts & validated against tenant; `type` immutable after create |
 | operations | camp | `/camps` | stageHistory + moveStage; tenant+division required, project optional |
 | operations | geoProfile | `/geo-profiles` | field-staff geo (2dsphere); `findNearest` ($geoNear) feeds camp allocation |
 

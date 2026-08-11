@@ -2,7 +2,6 @@ import { AUTH_ROUTES }      from '@/features/auth/auth.routes'
 import { DASHBOARD_ROUTES } from '@/features/dashboard/dashboard.routes'
 import { CRM_ROUTES }       from '@/features/crm/crm.routes'
 import { CONTACT_ROUTES }   from '@/features/contacts/contacts.routes'
-import { DIVISION_ROUTES }  from '@/features/crm/divisions/divisions.routes'
 import { ANALYTICS_ROUTES } from '@/features/analytics/analytics.routes'
 import { CAMPS_ROUTES }     from '@/features/camps/camps.routes'
 import { DIET_ROUTES }      from '@/features/diet/diet.routes'
@@ -65,14 +64,15 @@ const ALL_NAV_ITEMS: NavItem[] = [
 
   { id: 'crm',          label: 'CRM',                         icon: 'Users',         path: CRM_ROUTES.CRM },
 
-  { id: 'clientmgmt',   label: 'Client Management',           icon: 'Briefcase',     path: CRM_ROUTES.CLIENTS },
+  // Renamed from "Companies" and moved here from System 2026-08-11 (frontend-
+  // only: same route/page, ACCESS_MANAGEMENT_ROUTES.TENANTS / TenantsListPage
+  // + TenantDetailPage) — a company's own page now shows its Divisions
+  // inline, so this reads as "Client Management" and belongs in the CRM
+  // pipeline, not buried under System. Permission gate unchanged — see
+  // REAL_GATED_NAV_ITEMS['tenants'] in Sidebar.tsx.
+  { id: 'tenants',      label: 'Client Management',           icon: 'Globe',         path: ACCESS_MANAGEMENT_ROUTES.TENANTS },
 
   { id: 'contacts',     label: 'Contacts',                    icon: 'Users',         path: CONTACT_ROUTES.CONTACTS },
-
-  // Moved here 2026-07-31 from a standalone "Company Data" section — Division
-  // is a CRM-native concept (Lead/Project/Appointment/Role all key off it
-  // directly), not a separate top-level area.
-  { id: 'divisions',    label: 'Divisions',                   icon: 'Globe',         path: DIVISION_ROUTES.DIVISIONS },
 
   // Sales & CRM — Delivery
   { id: 'projects',     label: 'Project Management',          icon: 'FolderPlus',    path: PROJECTS_ROUTES.PROJECTS },
@@ -160,8 +160,12 @@ const ALL_NAV_ITEMS: NavItem[] = [
   // Access Management entities — real visibility enforced by
   // REAL_GATED_NAV_ITEMS in Sidebar.tsx, matching each route's own
   // RequirePermission guard exactly (with the usual system:manage bypass).
-  { id: 'tenants',          label: 'Companies',               icon: 'Globe',         path: ACCESS_MANAGEMENT_ROUTES.TENANTS },
-
+  // 'tenants' itself moved into Sales & CRM > Pipeline (below 'crm') and
+  // relabeled "Client Management" 2026-08-11 — its underlying route/page
+  // are unchanged (still ACCESS_MANAGEMENT_ROUTES.TENANTS /
+  // TenantsListPage/TenantDetailPage), this is a nav-only rename+relocation,
+  // since companies-with-inline-divisions is what this nav item is
+  // actually for now.
   { id: 'permissiongroups', label: 'Permission Groups',       icon: 'Shield',        path: ACCESS_MANAGEMENT_ROUTES.PERMISSION_GROUPS },
 
   { id: 'roletypes',        label: 'Role Types',              icon: 'Sliders',       path: ACCESS_MANAGEMENT_ROUTES.ROLE_TYPES },
@@ -185,7 +189,7 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
   {
     section: 'Sales & CRM',
     subs: [
-      { title: 'Pipeline', items: ['appointments', 'crm', 'clientmgmt', 'contacts', 'divisions'].map((id) => NAV_BY_ID[id]) },
+      { title: 'Pipeline', items: ['appointments', 'crm', 'tenants', 'contacts'].map((id) => NAV_BY_ID[id]) },
       { title: 'Delivery', items: ['projects', 'gantt'].map((id) => NAV_BY_ID[id]) },
     ],
   },
@@ -219,7 +223,7 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
   {
     section: 'System',
     subs: [
-      { title: '', items: ['admin', 'users', 'settings', 'tenants', 'permissiongroups', 'roletypes', 'roles', 'qafeedback'].map((id) => NAV_BY_ID[id]) },
+      { title: '', items: ['admin', 'users', 'settings', 'permissiongroups', 'roletypes', 'roles', 'qafeedback'].map((id) => NAV_BY_ID[id]) },
     ],
   },
 ]

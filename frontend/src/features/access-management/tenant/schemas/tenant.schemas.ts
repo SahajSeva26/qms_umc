@@ -1,10 +1,6 @@
 import { z } from 'zod'
 import { PASSWORD_MIN_LENGTH } from '@/features/access-management/accessManagement.constants'
 
-// Validation schemas for the tenant create/update forms. Follows the exact
-// pattern of `@/features/admin/schemas/user.schemas.ts` — zod objects run
-// through safeParse, first issue message surfaced to the user.
-
 export const updateTenantSchema = z.object({
   name: z.string().trim().min(1, 'Name is required'),
   description: z.string().trim().optional(),
@@ -13,13 +9,10 @@ export const updateTenantSchema = z.object({
   status: z.enum(['active', 'inactive']).optional(),
   // Only takes effect server-side if caller has `system:manage`.
   type: z.enum(['platform', 'customer']).optional(),
+  salesPerson: z.string().optional().nullable(),
 })
 
-// CreateTenantPayload embeds a full owner-user registration payload
-// (RegisterOwnerPayload) per accessManagement.types.ts — the create form collects both
-// tenant fields and the initial admin user's account fields together.
-// Matches backend `CreateTenantPayloadSchema.code` (tenant.validators.ts):
-// min(3), lowercased, and must not look like a Mongo ObjectId (24 hex chars).
+// Code must not look like a Mongo ObjectId (24 hex chars) — backend rejects it.
 const MONGO_OBJECT_ID_REGEX = /^[0-9a-fA-F]{24}$/
 
 export const createTenantSchema = z.object({
@@ -33,6 +26,8 @@ export const createTenantSchema = z.object({
     }),
   name: z.string().trim().min(1, 'Company name is required'),
   description: z.string().trim().optional(),
+  // Frontend-required (see accessManagement.types.ts's CreateTenantPayload comment).
+  salesPerson: z.string().min(1, 'Sales rep is required'),
   owner: z.object({
     firstName: z.string().trim().min(1, "Owner's first name is required"),
     lastName: z.string().trim().optional(),

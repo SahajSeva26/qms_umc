@@ -23,7 +23,7 @@ const SEARCH_BY_PLACEHOLDER: Record<DivisionsSearchBy, string> = {
 }
 // searchBy: 'name' maps to the state field `search` (not `name` — that field
 // was never renamed since it doubles as the general free-text query already
-// wired through DivisionsListPage.tsx's `name` request param).
+// wired through TenantDetailPage.tsx's `name` request param).
 const SEARCH_BY_STATE_KEY: Record<DivisionsSearchBy, 'search' | 'code'> = {
   name: 'search',
   code: 'code',
@@ -41,16 +41,19 @@ interface DivisionsFilterBarProps {
 }
 
 // Same convention as RoleTypesFilterBar.tsx — no Tenant filter here, unlike
-// that one, since Divisions is scoped to the caller's own tenant only
-// (a tenant admin never sees another company's divisions; the backend's
-// own ctx.where() scoping enforces this regardless of what this UI sends).
+// that one, since this bar only ever renders already-scoped-to-one-company
+// (TenantDetailPage.tsx passes `tenant: id` alongside these fields directly
+// to useDivisions, not via this bar) — a tenant admin caller is additionally
+// force-scoped to their own tenant server-side regardless (contextBuilder.ts's
+// ctx.where()), so there's never a case where an unscoped cross-tenant
+// Tenant filter would be useful here.
 // Matches the real backend search fields exactly: name, code, therapy,
 // status — no more, no less (division.validators.ts's SearchDivisionQuerySchema).
 //
 // One search box, not two — `searchBy` picks which of `search`/`code` the
 // box currently reads/writes (both stay in state independently so switching
 // modes never loses what was already typed under the other one), and
-// DivisionsListPage.tsx only ever sends the field matching the active mode.
+// TenantDetailPage.tsx only ever sends the field matching the active mode.
 const DivisionsFilterBar = ({ filters, setFilter, reset, canSeeInactive }: DivisionsFilterBarProps) => {
   return (
     <div

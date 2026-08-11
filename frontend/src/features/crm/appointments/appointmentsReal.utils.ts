@@ -21,8 +21,6 @@ const STATUS_COLOR: Record<AppointmentStatus, string> = {
   planned: '#3b6dff',
   done: '#10b981',
   cancelled: '#94a3b8',
-  blocked: '#f43f5e',
-  released: '#a855f7',
 }
 
 const TYPE_COLOR: Record<AppointmentEntity['type'], string> = {
@@ -52,23 +50,12 @@ export function darken(hex: string, factor = 0.72): string {
 
 const pad2 = (s: string) => (s.length < 2 ? `0${s}` : s)
 
-// IMPORTANT: unlike the prototype (which runs a client-side sweep on every
-// calendar load that force-flips status to BLOCKED once mom.submissionDeadline
-// passes), the real backend computes and stores mom.submissionDeadline
-// (24 working hours after duration.endTime, Sat/Sun skipped) but has NO
-// mechanism anywhere — no cron, no sweep, no lazy-check-on-read — that ever
-// transitions status to 'blocked' automatically. Confirmed by reading the
-// entire appointment module: 'blocked' only ever appears as an explicit
-// moveStage() target. This means an appointment can be genuinely overdue
-// (past its deadline, no MOM) while still showing status 'planned' — this
-// helper flags that overdue state for display purposes; it does NOT mean
-// the appointment IS blocked, since nothing here can make that true without
-// someone (or a future backend job) explicitly calling moveStage('blocked').
-// Flagged as a real backend gap (no auto-block job exists) — not something
-// this frontend can or should fake.
+// Flags a planned appointment whose MOM submission deadline (24 working
+// hours after duration.endTime, Sat/Sun skipped) has passed with no MOM
+// submitted — display-only, no backend status change results from this.
 export function isMomOverdue(a: AppointmentEntity, now = Date.now()): boolean {
   if (a.mom.details || !a.mom.submissionDeadline) return false
-  return (a.status === 'planned' || a.status === 'blocked' || a.status === 'released') && now > new Date(a.mom.submissionDeadline).getTime()
+  return a.status === 'planned' && now > new Date(a.mom.submissionDeadline).getTime()
 }
 
 export interface LaidOutAppointment {

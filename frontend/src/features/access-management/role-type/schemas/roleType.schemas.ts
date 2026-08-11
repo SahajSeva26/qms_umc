@@ -20,13 +20,9 @@ export const createRoleTypeSchema = z.object({
   permissions: z.array(z.string()).optional(),
 })
 
-export type CreateRoleTypeFormValues = z.infer<typeof createRoleTypeSchema>
-
 export const updateRoleTypeSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').optional(),
   description: z.string().trim().optional(),
   status: z.enum(['active', 'inactive']).optional(),
   permissions: z.array(z.string()).optional(),
 })
-
-export type UpdateRoleTypeFormValues = z.infer<typeof updateRoleTypeSchema>

@@ -9,9 +9,16 @@ import type { DivisionStatus, DivisionTherapy } from '@/types/crm.types'
 // status in one call" the way this used to be faked client-side with two
 // parallel active+inactive queries — matches the fix already applied to
 // Users' own status filter for the identical reason.
+export type DivisionsSearchBy = 'name' | 'code'
+
 export interface DivisionsFilterState {
   search: string
   code: string
+  // Which field the single search box currently searches by — 'search'
+  // (name) or 'code' both stay as separate state so switching the dropdown
+  // never loses what was typed under the other mode, but only the active
+  // one is ever sent to useDivisions (see DivisionsListPage.tsx).
+  searchBy: DivisionsSearchBy
   status: DivisionStatus
   therapy: DivisionTherapy | 'ALL'
 }
@@ -19,6 +26,7 @@ export interface DivisionsFilterState {
 const DEFAULT_FILTERS: DivisionsFilterState = {
   search: '',
   code: '',
+  searchBy: 'name',
   status: 'active',
   therapy: 'ALL',
 }

@@ -333,13 +333,6 @@ export interface AllocationRow {
   updatedOn: string
 }
 
-export interface FoInventoryRow {
-  personId: string
-  name: string
-  hq: string
-  holdings: FoHoldings
-}
-
 // ── Fleet units (qms.inventory.units, seedUnits() in inventory.js:165-219) ──
 // Reuses the canonical `InventoryUnit` declared above.
 
@@ -481,23 +474,6 @@ export interface BalancingSuggestion {
   item: InventoryMasterItem
   need: number
   suggestion: { loc: string; qty: number } | null
-}
-
-// FO field holdings — the slice of foHoldings()'s return the Transfers tab's
-// own Emergency Balancing panel consumes (consumables array with qty>4 "has
-// spare" eligibility check). Named distinctly from the richer FoHoldings/
-// FoConsumableHolding pair declared above (FO Inventory tab's full
-// devices+consumables+expSoon shape) since this is a narrower local slice,
-// not a duplicate of the same concept.
-export interface TransferFoConsumableHolding {
-  item: InventoryMasterItem
-  qty: number
-  value: number
-}
-
-export interface TransferFoHoldings {
-  consumables: TransferFoConsumableHolding[]
-  totalValue: number
 }
 
 // ── Field Ops (inventory-field.js, window.QMS_InvField) ────────────────────

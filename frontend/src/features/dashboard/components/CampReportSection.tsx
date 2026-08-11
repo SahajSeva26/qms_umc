@@ -1,12 +1,8 @@
 import { useMemo, useState } from 'react'
 import { FiMapPin, FiCalendar, FiGrid } from 'react-icons/fi'
-import { useAuth } from '@/hooks/useAuth'
 import { useCampsData } from '@/hooks/useCampsData'
-import { CLIENTS } from '@/types/client.types'
 import {
   buildCampReport,
-  canViewCampReport,
-  scopedClientIds,
   MONTHS,
   type CampReportType,
   type CampReportView,
@@ -14,12 +10,6 @@ import {
 import SectionCard from '@/features/dashboard/components/SectionCard'
 
 const COL = { Diet: '#10b981', Screening: '#3b6dff' }
-
-function scopeLabel(clientIds: Set<string> | null): string {
-  if (!clientIds) return 'All accounts'
-  const names = CLIENTS.filter((c) => clientIds.has(c.id)).map((c) => c.name)
-  return names.length ? `Your accounts: ${names.join(', ')}` : 'No accounts assigned'
-}
 
 interface KpiTileProps {
   label: string
@@ -65,15 +55,11 @@ const StackedBar = ({ parts, max, height }: StackedBarProps) => (
 )
 
 const CampReportSection = () => {
-  const { user } = useAuth()
   const { camps } = useCampsData()
   const [type, setType] = useState<CampReportType>('ALL')
   const [view, setView] = useState<CampReportView>('month')
 
-  const clientIds = useMemo(() => scopedClientIds(user?.role, undefined), [user?.role])
-  const report = useMemo(() => buildCampReport(camps, type, clientIds), [camps, type, clientIds])
-
-  if (!canViewCampReport(user?.role)) return null
+  const report = useMemo(() => buildCampReport(camps, type, null), [camps, type])
 
   const H = view === 'month' ? 120 : 110
   const { curM, daysInCurM, dayElapsed } = report
@@ -118,7 +104,7 @@ const CampReportSection = () => {
       icon={FiMapPin}
       iconGradient="linear-gradient(135deg, #3b6dff, #14b8a6)"
       title="Camp report — Diet & Screening"
-      subtitle={scopeLabel(clientIds)}
+      subtitle="All accounts"
       headerAction={
         <div className="flex gap-2 flex-wrap">
           <div className="flex gap-1">{(['ALL', 'Diet', 'Screening'] as CampReportType[]).map((id) => typeBtn(id, id === 'ALL' ? 'All' : id))}</div>

@@ -2,9 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/features/auth/store'
 import { AUTH_ROUTES } from '@/features/auth/auth.routes'
-import { INTERNAL_ROLES, PHARMA_ROLES } from '@/lib/roles'
 import { authService } from '@/features/auth/auth.service'
-import type { UserRole } from '@/types/auth.types'
 
 export const useAuth = () => {
   const { user, clearAuth } = useAuthStore()
@@ -12,14 +10,6 @@ export const useAuth = () => {
   const navigate = useNavigate()
 
   const isAuthenticated = !!user
-
-  const hasRole = (...roles: UserRole[]) => {
-    if (!user) return false
-    return roles.includes(user.role)
-  }
-
-  const isQmsInternal = () => !!user && (INTERNAL_ROLES as readonly string[]).includes(user.role)
-  const isPharma      = () => !!user && (PHARMA_ROLES  as readonly string[]).includes(user.role)
 
   const signOut = () => {
     // Fire-and-forget: tell the backend to invalidate this session (clears
@@ -50,5 +40,5 @@ export const useAuth = () => {
     navigate(AUTH_ROUTES.LOGIN, { replace: true })
   }
 
-  return { user, isAuthenticated, hasRole, isQmsInternal, isPharma, signOut }
+  return { user, isAuthenticated, signOut }
 }

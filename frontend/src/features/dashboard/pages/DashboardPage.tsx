@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
+import { usePermission } from '@/hooks/usePermission'
 import { useDashboardFilters } from '@/features/dashboard/hooks/useDashboardFilters'
 import { useDashboardData } from '@/features/dashboard/hooks/useDashboardData'
 import { useSalesDataShared } from '@/hooks/useSalesDataShared'
@@ -24,21 +25,26 @@ import { getGreeting } from '@/utils/formatters'
 
 const DashboardPage = () => {
   const { user } = useAuth()
+  const { hasPermission } = usePermission()
   const { filters, setFilter, reset } = useDashboardFilters()
   const [drill, setDrill] = useState<{ title: string; content: string } | null>(null)
   const [salesFilter, setSalesFilter] = useState<SalesFilterState>(DEFAULT_SALES_FILTER)
 
-  const isSuperAdmin = user?.role === 'super_admin'
+  // The prototype's dashboard.html merges the Sales Command Center's filter
+  // bar + KPI strip directly into this page, super_admin-only (dashboard.js:
+  // "isSuper = sess.roleId === 'super_admin'"). The placeholder UserRole
+  // system that used to gate this (user?.role === 'super_admin') never
+  // actually worked — every real login was hardcoded to that same string
+  // regardless of who was logged in, so this block has always rendered for
+  // everyone in practice. Real replacement: system:manage, the actual
+  // backend permission that denotes full administrative access.
+  const isSuperAdmin = hasPermission('system:manage')
 
   // Owns the loading/error gate for the shared dashboard query. Every section
   // below calls useDashboardData(filters) with this same object, so they all
   // read the one deduped cache entry rather than firing their own request.
   const { isLoading, error } = useDashboardData(filters)
 
-  // The prototype's dashboard.html merges the Sales Command Center's filter
-  // bar + KPI strip directly into this page, super_admin-only (dashboard.js:
-  // "isSuper = sess.roleId === 'super_admin'" — any other role, incl. plain
-  // admin, never sees these blocks here at all).
   // Gated with `enabled` — these two feed super_admin-only blocks, so every
   // other role used to fetch both payloads and render none of them.
   const { reps, targets } = useSalesDataShared({ enabled: isSuperAdmin })

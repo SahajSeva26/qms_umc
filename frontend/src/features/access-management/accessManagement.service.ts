@@ -57,11 +57,6 @@ const getTenant = async (id: string) => {
   return res.data
 }
 
-const getMyTenant = async () => {
-  const res = await api.get<ApiResponse<Tenant>>('/tenants/me')
-  return res.data
-}
-
 const createTenant = async (payload: CreateTenantPayload) => {
   const res = await api.post<ApiResponse<Tenant>>('/tenants', payload)
   return res.data
@@ -154,7 +149,6 @@ export const accessManagementService = {
   getMe,
   searchTenants,
   getTenant,
-  getMyTenant,
   createTenant,
   updateTenant,
   searchPermissionGroups,

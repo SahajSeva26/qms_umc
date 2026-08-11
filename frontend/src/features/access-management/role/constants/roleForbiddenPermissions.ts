@@ -16,7 +16,3 @@
 // three codes as choices, rather than relying solely on the backend to 403
 // an attempt. Kept in exact sync with that backend source.
 export const ROLE_FORBIDDEN_PERMISSIONS: string[] = ['tenant:admin', 'tenant:manage', 'system:manage']
-
-export function isForbiddenRolePermission(code: string): boolean {
-  return ROLE_FORBIDDEN_PERMISSIONS.includes(code)
-}

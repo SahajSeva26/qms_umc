@@ -27,11 +27,36 @@ function load<T>(key: string, seed: T): T {
   return JSON.parse(JSON.stringify(seed))
 }
 
+export class StorageWriteError extends Error {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options)
+    this.name = 'StorageWriteError'
+  }
+}
+
+// A failed write must not look like a successful one. This used to swallow
+// every failure in a bare `catch {}`, so a full-quota or blocked write still
+// resolved as if it had saved — the mutation's onSuccess would fire and
+// invalidate the query, and the UI would show the change as persisted when
+// nothing was written. Throwing makes the write reject, which the mutation
+// layer (useDedicatedOps.ts) now surfaces to the component. This mirrors the
+// real behaviour an API call already has (a failed POST rejects), so nothing
+// here changes when the backend lands — see features/diet/services/
+// dietStorage.ts for the same fix applied to that feature; not imported
+// directly since it's Diet-internal (features communicate only through
+// shared types/hooks/lib, never another feature's service internals).
 function persist<T>(key: string, value: T) {
   try {
     localStorage.setItem(key, JSON.stringify(value))
-  } catch {
-    // demo persistence only
+  } catch (err) {
+    const quota = err instanceof DOMException
+      && (err.name === 'QuotaExceededError' || err.name === 'NS_ERROR_DOM_QUOTA_REACHED')
+    throw new StorageWriteError(
+      quota
+        ? 'Local storage is full — could not save. Free up space and try again.'
+        : 'Could not save changes locally.',
+      { cause: err },
+    )
   }
 }
 
@@ -145,24 +170,30 @@ export function fosOnProject(assignments: Record<string, Assignment>, projectId:
 
 // complianceFor() — the literal 6-item SOP-gating checklist + overdue rule,
 // ported exactly from dedicated-data.js:440-471.
+//
+// TAKES PRE-RESOLVED INPUTS, NOT FULL ARRAYS. This used to take the whole
+// `attendance`/`screenings` arrays and do its own `.find()`/`.filter()` per
+// call — correct, but it meant every caller that ran this once per assignment
+// re-scanned both arrays in full each time (O(F × (A + S)) for F assignments).
+// The only caller (DedicatedOpsPage, via useDedicatedOpsCompliance.ts) now
+// builds a Map/index over `attendance` and `screenings` ONCE and passes this
+// function the already-resolved attendance record and today's screening
+// count — the checklist/overdue FORMULA below is byte-for-byte unchanged,
+// only how its two inputs are looked up changed. `assignment` is still
+// nullable so the "no assignment for this FO" outcome is preserved exactly.
 export function complianceFor(
-  foId: string,
-  assignments: Record<string, Assignment>,
-  attendance: Attendance[],
-  screenings: Screening[],
+  assignment: Assignment | undefined,
+  att: Attendance | undefined,
+  todaysScreeningsCount: number,
   sopConfig: SopConfig,
-  dateIso: string
 ): ComplianceResult | null {
-  const assignment = assignments[foId]
   if (!assignment) return null
-  const att = attendance.find((a) => a.foId === foId && a.date === dateIso)
   const checkedIn = !!att?.checkInAt
   const checkedOut = !!att?.checkOutAt
   const hasGeo = !!(att?.geoLat && att?.geoLng)
   const hasSelfie = !!att?.selfieUrl
   const hasClinicPhoto = !!att?.clinicPhotoUrl
-  const todaysScreenings = screenings.filter((s) => s.foId === foId && s.date === dateIso).length
-  const meetsScreenings = todaysScreenings >= sopConfig.minScreeningsPerDay
+  const meetsScreenings = todaysScreeningsCount >= sopConfig.minScreeningsPerDay
 
   const checks: ComplianceCheck[] = [
     { id: 'checkIn', label: 'FO checked in', ok: checkedIn },
@@ -181,7 +212,7 @@ export function complianceFor(
   const overdue = checkedIn && overdueHours > sopConfig.uploadDeadlineHours && done < total
 
   return {
-    foId, projectId: assignment.projectId, foName: assignment.foName,
+    foId: assignment.foId, projectId: assignment.projectId, foName: assignment.foName,
     checks, total, done, pct, overdue, overdueHours, ok: done === total,
   }
 }

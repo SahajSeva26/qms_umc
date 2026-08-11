@@ -8,13 +8,26 @@ export const DIVISION_ROUTES = {
   DIVISION_DETAIL: '/crm/divisions/:id',
 }
 
-// Matches division.routes.ts's real guard on every Division route exactly:
-// division:manage OR tenant:manage (division routes actually accept
-// tenant:admin server-side too, but tenant:admin is a single-use, non-
-// grantable "founding owner" marker minted once per tenant — tenant:manage
-// is the real, normally-grantable permission meant to cover this case day to
-// day, per direct instruction).
-const DIVISION_VIEW_PERMISSIONS = ['division:manage', 'tenant:manage']
+// CONFIRMED DRIFT (2026-08-10): this used to be ['division:manage',
+// 'tenant:manage'] on the theory that tenant:admin is a non-grantable,
+// single-use "founding owner" marker and tenant:manage is the real,
+// day-to-day grantable equivalent. Direct read of division.routes.ts shows
+// the opposite is true for THIS module: every Division route
+// (GET/PUT/POST /:id, GET/POST /, POST /bulk-mr) checks division:manage +
+// tenant:admin — tenant:manage is never checked anywhere in that file,
+// even though tenant:admin is in fact a normal, freely-assignable
+// permission (it's just the code the auto-provisioned per-tenant "admin"
+// RoleType happens to carry — nothing stops granting it to any other
+// RoleType via Permission Groups). Every sibling module (Lead, Project,
+// Camp, Contact, Appointment) DOES check tenant:manage as its baseline —
+// Division is the sole outlier missing it, which looks like a real
+// backend gap worth a direct fix request, not a frontend guess to route
+// around. Per instruction: match what the backend actually does today,
+// not what it "should" do — union of every code that lets list OR detail
+// load (list search also accepts lead:manage; tenant:manage matches
+// nothing here and is intentionally left out until/unless the backend
+// route is updated to accept it like its siblings do).
+const DIVISION_VIEW_PERMISSIONS = ['division:manage', 'tenant:admin', 'lead:manage']
 
 export const divisionsRoutes: RouteObject[] = [
   {

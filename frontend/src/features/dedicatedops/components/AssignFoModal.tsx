@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import { toast } from '@/components/ui/sonner'
 import type { Person } from '@/types/people.types'
 import type { Doctor } from '@/types/camp.types'
 import type { Assignment, ScheduleType } from '@/features/dedicatedops/dedicatedops.types'
@@ -14,7 +15,8 @@ interface AssignFoModalProps {
   fos: Person[]
   doctors: Doctor[]
   assignments: Record<string, Assignment>
-  onConfirm: (args: { foId: string; doctorId: string; clinicLabel: string; startDate: string; scheduleType: ScheduleType }) => void
+  /** Returns the mutation's promise so this modal can await it — see handleConfirm. */
+  onConfirm: (args: { foId: string; doctorId: string; clinicLabel: string; startDate: string; scheduleType: ScheduleType }) => Promise<unknown>
 }
 
 const SCHEDULE_OPTIONS: { id: ScheduleType; label: string }[] = [
@@ -37,12 +39,23 @@ const AssignFoModal = ({ open, onClose, projectId, fos, doctors, assignments, on
   const [clinicLabel, setClinicLabel] = useState('')
   const [startDate, setStartDate] = useState(todayIso())
   const [scheduleType, setScheduleType] = useState<ScheduleType>('mon-sat')
+  const [saving, setSaving] = useState(false)
 
-  const handleConfirm = () => {
+  // Awaits the mutation before resetting/closing — a failed or unauthorized
+  // assign must leave the form exactly as the user left it, not vanish as if
+  // it had succeeded.
+  const handleConfirm = async () => {
     if (!foId) return
-    onConfirm({ foId, doctorId, clinicLabel, startDate, scheduleType })
-    setFoId(''); setDoctorId(''); setClinicLabel(''); setStartDate(todayIso()); setScheduleType('mon-sat')
-    onClose()
+    setSaving(true)
+    try {
+      await onConfirm({ foId, doctorId, clinicLabel, startDate, scheduleType })
+      setFoId(''); setDoctorId(''); setClinicLabel(''); setStartDate(todayIso()); setScheduleType('mon-sat')
+      onClose()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not assign the FO — try again.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -97,7 +110,7 @@ const AssignFoModal = ({ open, onClose, projectId, fos, doctors, assignments, on
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button disabled={!foId} onClick={handleConfirm}>Assign</Button>
+          <Button disabled={!foId || saving} onClick={handleConfirm}>Assign</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

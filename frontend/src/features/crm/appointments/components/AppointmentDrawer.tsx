@@ -81,6 +81,7 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
   const [panel, setPanel] = useState<PanelKind>(null)
   const [reason, setReason] = useState('')
   const [targetStatus, setTargetStatus] = useState<AppointmentStatus | ''>('')
+  const [momText, setMomText] = useState('')
   const [rescheduleStart, setRescheduleStart] = useState('')
   const [rescheduleEnd, setRescheduleEnd] = useState('')
   // True once the user has directly edited End — stops the auto-shift below.
@@ -119,14 +120,23 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
   const openMoveStage = (to: AppointmentStatus) => {
     setError('')
     setReason('')
+    setMomText(appointment.mom.details ?? '')
     setTargetStatus(to)
     setPanel('moveStage')
   }
 
+  // MOM has its own endpoint (PUT /appointments/:id, not the stage-move one
+  // — see UpdateAppointmentPayload/appointment.service.ts's update()), so
+  // saving it alongside "Mark done" is two sequential calls, not one
+  // combined payload. Saved first: if the status flip then fails (e.g. a
+  // transition race), the MOM text the user just typed isn't lost.
   const handleMoveStageSave = async () => {
     if (!targetStatus) return
     if (!reason.trim()) return setError('A reason is required')
     try {
+      if (targetStatus === 'done' && momText.trim() && momText.trim() !== (appointment.mom.details ?? '')) {
+        await updateAppointment.mutateAsync({ mom: { details: momText.trim() } })
+      }
       await moveStage.mutateAsync({ to: targetStatus, reason: reason.trim() })
       toast.success(`Moved to ${APPOINTMENT_STATUS_LABEL[targetStatus]}`)
       setPanel(null)
@@ -307,11 +317,23 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
               <Label className={labelClasses} style={labelStyle}>Reason *</Label>
               <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-[13px]" />
             </div>
+            {targetStatus === 'done' && (
+              <div>
+                <Label className={labelClasses} style={labelStyle}>Minutes of meeting</Label>
+                <Textarea
+                  value={momText}
+                  onChange={(e) => setMomText(e.target.value)}
+                  rows={3}
+                  placeholder="What was discussed / decided…"
+                  className="text-[13px]"
+                />
+              </div>
+            )}
             {error && <p className="text-[12px] font-semibold text-danger">{error}</p>}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPanel(null)}>Cancel</Button>
-            <Button onClick={handleMoveStageSave} disabled={moveStage.isPending}>Confirm</Button>
+            <Button onClick={handleMoveStageSave} disabled={moveStage.isPending || updateAppointment.isPending}>Confirm</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

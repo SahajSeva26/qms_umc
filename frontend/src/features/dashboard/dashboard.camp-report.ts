@@ -1,31 +1,9 @@
 import type { Camp, CampType } from '@/types/camp.types'
-import type { UserRole } from '@/types/auth.types'
-
-// Mirrors the prototype's camp-report.js exactly: a role-scoped Camp Report
-// (Diet & Screening) segment on the Dashboard. super_admin/admin/sales_lead
-// see all clients; sales_rep (KAM) sees only their assigned clients.
-// TODO: our AuthUser has no direct link to a people/rep id yet (same gap
-// flagged elsewhere this session), so a sales_rep always falls back to "all
-// accounts" here rather than a real per-rep subset — there's no live data to
-// scope by until that mapping exists.
-
-export const CAMP_REPORT_ROLES: UserRole[] = ['super_admin', 'admin', 'sales_lead', 'sales_rep']
-
-export function canViewCampReport(role: UserRole | undefined): boolean {
-  return !!role && CAMP_REPORT_ROLES.includes(role)
-}
 
 export type CampReportType = 'ALL' | CampType
 export type CampReportView = 'month' | 'day'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-
-// Promoted to types/salesdash.types.ts (alongside ASSIGNMENTS, which it
-// reads) so other features can use it through the shared types layer
-// instead of reaching into features/dashboard/ internals — same pattern as
-// the CLIENTS/DIVISIONS/STAGES promotions. Re-exported here for backward
-// compatibility with existing imports in this feature.
-export { scopedClientIds } from '@/types/salesdash.types'
 
 function typeMatch(type: CampType, filter: CampReportType): boolean {
   return filter === 'ALL' || type === filter

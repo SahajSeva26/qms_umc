@@ -49,6 +49,13 @@ export interface Tenant {
 export interface SearchTenantQuery {
   name?: string
   code?: string
+  // Added server-side 2026-08-06 (tenant.service.ts's search()) — accepted
+  // with NO permission gate at all (unlike `status` below), per that file's
+  // own `//TODO: only system user shoudld be able to do that` comment. Any
+  // authenticated caller can filter by type today even though `type` itself
+  // is only ever visible in the RESPONSE for a `system:manage` caller
+  // (TenantMapper.toResponse's separate gate) — the two are independent.
+  type?: TenantType
   // TODO: only honored server-side if caller has `tenant:manage`; otherwise search is hard-scoped to status=active.
   status?: TenantStatus
   page?: string

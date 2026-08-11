@@ -15,8 +15,6 @@ export const updateTenantSchema = z.object({
   type: z.enum(['platform', 'customer']).optional(),
 })
 
-export type UpdateTenantFormValues = z.infer<typeof updateTenantSchema>
-
 // CreateTenantPayload embeds a full owner-user registration payload
 // (RegisterOwnerPayload) per accessManagement.types.ts — the create form collects both
 // tenant fields and the initial admin user's account fields together.
@@ -44,5 +42,3 @@ export const createTenantSchema = z.object({
     gender: z.enum(['male', 'female', 'other']).optional(),
   }),
 })
-
-export type CreateTenantFormValues = z.infer<typeof createTenantSchema>

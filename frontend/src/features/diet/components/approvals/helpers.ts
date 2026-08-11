@@ -6,9 +6,6 @@
 import { toast } from '@/components/ui/sonner'
 import { initials, stringToColor } from '@/features/diet/utils/personDisplay'
 import type { Camp } from '@/types/camp.types'
-import { resolveCoordinatorId, coordScopedCamps } from '@/features/diet/services/dietScope.service'
-import { useDietPermissions } from '@/features/diet/hooks/useDietPermissions'
-import type { UserRole } from '@/types/auth.types'
 
 // initials()/stringToColor() now live in utils/personDisplay.ts — they were
 // duplicated across four Diet components. Re-exported here so this screen's
@@ -62,15 +59,13 @@ export function userName(user: { firstName: string; lastName: string } | null | 
   return `${user.firstName} ${user.lastName}`.trim()
 }
 
-// Coordinator-scope resolution shared by every tab on this page.
-export function useScope(role: UserRole | undefined, name: string) {
-  const { canManageDiet: adminLike } = useDietPermissions(role || '')
-  const coordId = adminLike ? null : resolveCoordinatorId(name)
-  const scoped = adminLike || !!coordId
-  return { adminLike, coordId, scoped }
-}
-
-export function dietCampsForScope(camps: Camp[], adminLike: boolean, coordId: string | null): Camp[] {
-  if (adminLike || !coordId) return camps.filter((c) => c.type === 'Diet')
-  return coordScopedCamps(camps, coordId).filter((c) => c.type === 'Diet')
+// Coordinator scoping (isAdminLike/resolveCoordinatorId, keyed on the old
+// placeholder UserRole) never actually worked — every real login was
+// hardcoded to 'super_admin', which isAdminLike's allowlist always
+// included, so this page has always shown the full, admin-like, unscoped
+// view to everyone. No real backend "diet coordinator" concept exists yet
+// (Diet has no backend module at all) to replace it with; this keeps the
+// actual, historical behavior.
+export function dietCampsForScope(camps: Camp[]): Camp[] {
+  return camps.filter((c) => c.type === 'Diet')
 }

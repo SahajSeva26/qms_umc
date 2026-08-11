@@ -20,16 +20,6 @@ import { useAuthStore } from '@/features/auth/store'
 // already handles "don't show protected content before we know who's
 // logged in" correctly on its own — this component only needs to populate
 // the store once the check resolves, not block rendering.
-//
-// role is deliberately left as the 'super_admin' fallback here, same as
-// useLogin.ts's existing fallback — there is no honest mapping from the
-// backend's real roleType.code vocabulary (system/hr/admin/sales/
-// sales-head/pharma-ho/...) to the frontend's invented 18-value UserRole
-// enum (super_admin/sales_lead/om_screening/...); the 18-role system was
-// always meant to be a placeholder retired once real PBAC existed, and
-// migrating the ~30 screens still gated by it off UserRole entirely is a
-// separate, larger, explicitly-deferred effort — not something to paper
-// over with a fabricated mapping table here.
 
 const SessionBootstrap = ({ children }: { children: ReactNode }) => {
   const { session, isLoading, isConfirmedUnauthenticated } = useSession()
@@ -39,16 +29,12 @@ const SessionBootstrap = ({ children }: { children: ReactNode }) => {
     if (isLoading) return
 
     if (session && !user) {
-      // TODO: same fallback as useLogin.ts/LoginPage.tsx — remove once the
-      // backend exposes a real, frontend-compatible role, or once the ~30
-      // domain screens migrate off UserRole entirely.
       setAuth({
         _id: session.user.id,
         email: session.user.email,
         firstName: session.user.firstName,
         lastName: session.user.lastName,
         avatar: session.user.avatar,
-        role: 'super_admin',
       })
     }
 

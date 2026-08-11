@@ -98,10 +98,6 @@ export async function getThreads(): Promise<ReminderThread[]> {
   return loadThreads()
 }
 
-export function threadsForCamp(campId: string, threads?: ReminderThread[]): ReminderThread[] {
-  return (threads ?? loadThreads()).filter((t) => t.campId === campId)
-}
-
 // slotStartHour() — "10-2" → 10 (AM); "6-10" → 18 (PM). Exact port.
 function slotStartHour(slot: string | undefined): number {
   const m = String(slot || '').match(/^(\d+)/)

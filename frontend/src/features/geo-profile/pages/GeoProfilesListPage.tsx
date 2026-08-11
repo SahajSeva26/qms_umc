@@ -15,11 +15,7 @@ import type { GeoProfileStatus, GeoProfileType } from '@/types/geoProfile.types'
 
 const PAGE_SIZE = 10
 
-// Mirrors `@/features/access-management/role/pages/RolesListPage.tsx` exactly.
-// geoProfile.service.ts's search() defaults `where.status = 'active'`
-// unconditionally, only overridden when the caller both asks for a status AND
-// holds `geo-profile:manage` — so an unfiltered call already returns
-// everything the caller is allowed to see, same as Role/Doctor.
+// Mirrors `@/features/access-management/role/pages/RolesListPage.tsx` exactly — an unfiltered call already returns everything the caller is allowed to see.
 const GeoProfilesListPage = () => {
   const navigate = useNavigate()
   const { filters, setFilter, reset } = useGeoProfilesFilters()
@@ -35,28 +31,20 @@ const GeoProfilesListPage = () => {
   const totalCount = data?.data?.count ?? 0
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
 
-  // GeoProfileMapper.toResponse (backend) always flattens `role` to a bare
-  // ObjectId string, even though geoProfile.service.ts's search() populates
-  // it server-side — the populated name/code is discarded before the
-  // response ever leaves the backend, so this list has no way to get a
-  // resolved name except a separate lookup, same pattern already used by
-  // GeoProfileDetailPage.tsx's own roleName() helper. Without this, the
-  // Role column rendered a raw 24-char hex id for every row. Found via a
-  // 2026-07-26 ground-up test pass.
-  const { data: rolesData } = useRoles({ status: 'active', limit: '500' })
+  // Backend always flattens `role` to a bare ObjectId, so resolve names via a separate lookup (mirrors GeoProfileDetailPage.tsx's roleName() helper).
+  // `error` here distinguishes "403, no role:get/search/manage" from "genuinely no roles" so the table can show an honest "Restricted" label instead of a raw ObjectId.
+  const { data: rolesData, error: rolesError, isFetched: rolesFetched } = useRoles({ status: 'active', limit: '500' })
   const activeRoles = rolesData?.data?.items ?? []
 
-  // A GeoProfile's role can be deactivated AFTER the profile was created —
-  // the active-only list above won't include it. SearchRoleQuery has no
-  // "give me these specific ids" filter, so resolve whichever ids on THIS
-  // page aren't already in the active list via individual GET /roles/:id
-  // calls instead (bounded to page size, max 10, so this stays cheap).
+  // Roles deactivated after a profile was created won't be in the active-only list above, so resolve the rest by id (bounded to page size, max 10).
+  // Gated on rolesFetched (not just !rolesError): on first mount `rolesError` is still undefined before the bulk query settles, so gating on error alone let these fire anyway a render early and 403 redundantly.
   const activeRoleIds = new Set(activeRoles.map((r) => r.id))
   const missingRoleIds = [...new Set(geoProfiles.map((p) => p.role))].filter((id) => !activeRoleIds.has(id))
   const missingRoleQueries = useQueries({
     queries: missingRoleIds.map((id) => ({
       queryKey: ['role', id],
       queryFn: () => accessManagementService.getRole(id),
+      enabled: rolesFetched && !rolesError,
     })),
   })
 
@@ -123,7 +111,7 @@ const GeoProfilesListPage = () => {
 
       {!isLoading && !error && (
         <>
-          <GeoProfilesTable geoProfiles={geoProfiles} roleLabelById={roleLabelById} />
+          <GeoProfilesTable geoProfiles={geoProfiles} roleLabelById={roleLabelById} roleNamesForbidden={!!rolesError} />
           <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} />
         </>
       )}

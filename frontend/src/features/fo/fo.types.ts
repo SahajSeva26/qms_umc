@@ -120,11 +120,9 @@ export interface Incident {
   cancelledAt?: string
   cancelledReason?: string
   slaMinutes?: number
-  slaBreached?: boolean
   city?: string
   replacementDeviceId?: string
   replacementNotes?: string
-  escalatedAt?: string
   history?: { at: string; action: string; by: string; note?: string }[]
 }
 

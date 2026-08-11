@@ -1,5 +1,3 @@
-import type { UserRole } from '@/types/auth.types'
-
 export type SalesRole = 'Key Account Manager' | 'Sales Head'
 export type TargetStatus = 'ON_TRACK' | 'AT_RISK' | 'BREACHED' | 'EXCEEDED'
 export type ApprovalType = 'CLIENT' | 'DIVISION' | 'MARKETING' | 'BRAND'
@@ -58,14 +56,13 @@ export const ASSIGNMENTS: RepAssignment[] = [
 ]
 
 // KAM (sales_rep) client-scoping — a role is scoped only if it's sales_rep
-// AND a real repId is supplied. AuthUser has no field linking a logged-in
-// user to a people/rep id yet, so every current caller passes repId=
-// undefined, which correctly resolves to "no scoping" rather than faking a
-// match against a wrong id. Lives here (not features/dashboard/) so Diet
-// Camps and the Dashboard's Camp Report section can both read it through
-// the shared types layer instead of reaching into features/dashboard/
-// internals — same pattern as CLIENTS/DIVISIONS/STAGES/QUARTER.
-export function scopedClientIds(role: UserRole | undefined, repId?: string): Set<string> | null {
+// AND a real repId is supplied. AuthUser has no role field and no field
+// linking a logged-in user to a people/rep id, so every current caller has
+// no way to satisfy either condition — this always resolves to "no
+// scoping" rather than faking a match against a wrong id. Zero real call
+// sites currently exist; kept for the day a real KAM identity/role concept
+// exists to scope against.
+export function scopedClientIds(role: string | undefined, repId?: string): Set<string> | null {
   if (role !== 'sales_rep' || !repId) return null
   const ids = ASSIGNMENTS.filter((a) => a.repId === repId).map((a) => a.clientId)
   return ids.length ? new Set(ids) : null

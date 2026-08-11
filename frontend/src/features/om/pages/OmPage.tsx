@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FiGrid, FiBarChart2, FiFolderPlus, FiUserPlus, FiClipboard, FiDollarSign, FiCreditCard, FiRotateCcw, FiUsers, FiCheckSquare, FiExternalLink, FiShield, FiFileText, FiTrendingUp, FiDatabase, FiNavigation } from 'react-icons/fi'
 import { useAuth } from '@/hooks/useAuth'
+import { usePermission } from '@/hooks/usePermission'
 import { useCampsData } from '@/hooks/useCampsData'
 import { usePeopleData } from '@/hooks/usePeopleData'
 import { useProjectsDataShared } from '@/hooks/useProjectsDataShared'
@@ -29,13 +30,22 @@ type TabId =
 
 const OmPage = () => {
   const { user } = useAuth()
+  const { hasPermission } = usePermission()
   const navigate = useNavigate()
-  const canToggleMode = user?.role === 'admin' || user?.role === 'super_admin'
-  const initialMode: Mode = user?.role === 'om_diet' ? 'Diet' : 'Screening'
-  const [mode, setMode] = useState<Mode>(initialMode)
+  // Old placeholder UserRole check (admin/super_admin) never actually
+  // worked — every real login was hardcoded to 'super_admin' regardless of
+  // who was logged in, so this has always been true in practice. Real
+  // replacement: system:manage.
+  const canToggleMode = hasPermission('system:manage')
+  // Old placeholder check (role === 'om_diet') never once fired for a real
+  // user either — every OM has always landed on Screening mode/Command
+  // Center by default, since AuthUser has no field distinguishing which
+  // kind of Ops Manager is logged in. No real backend concept exists yet
+  // to replace it with; this keeps the actual, historical behavior.
+  const [mode, setMode] = useState<Mode>('Screening')
   // Mirrors om-portal.js:123: Diet OMs land on Dashboard (its richer default
   // view), Screening OMs land on Command Center.
-  const [tab, setTab] = useState<TabId>(initialMode === 'Diet' ? 'dashboard' : 'overview')
+  const [tab, setTab] = useState<TabId>('overview')
 
   const handleModeChange = (next: Mode) => {
     setMode(next)
@@ -45,7 +55,8 @@ const OmPage = () => {
   const { camps, doctors } = useCampsData()
   const { people: fos, devices } = usePeopleData('Field Officer')
   const { people: dietitians } = usePeopleData('Dietitian')
-  const { projects } = useProjectsDataShared()
+  // GET /projects can 403 for a caller without project:search/manage or tenant:manage; surface that so OverviewTab can show an honest message instead of a misleading "No projects" empty state.
+  const { projects, error: projectsError } = useProjectsDataShared()
   const om = useOm()
 
   const isDiet = mode === 'Diet'
@@ -124,6 +135,7 @@ const OmPage = () => {
           fos={fos}
           dietitians={dietitians}
           projects={projects}
+          projectsForbidden={!!projectsError}
           expenseOverlay={om.expenseOverlay}
           onGoTab={(t) => setTab(t as TabId)}
         />

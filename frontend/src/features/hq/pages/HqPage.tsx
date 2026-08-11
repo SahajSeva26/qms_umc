@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
 import { FiUpload, FiDownload, FiZap, FiShield, FiSearch, FiClipboard, FiSun, FiMap, FiMapPin, FiDatabase, FiUsers, FiList, FiFileText, FiActivity } from 'react-icons/fi'
-import { useAuth } from '@/hooks/useAuth'
 import { usePeopleData } from '@/hooks/usePeopleData'
 import { useCampsData } from '@/hooks/useCampsData'
 import { useHqMaster } from '@/features/hq/hooks/useHq'
@@ -8,7 +7,7 @@ import { activeFos, classifyAll, getConfig } from '@/features/hq/hq.service'
 import { toast } from '@/components/ui/sonner'
 import HqFilterBar from '@/features/hq/components/hqmapping/HqFilterBar'
 import { EMPTY_HQ_FILTERS, applyHqFilters, uniqSorted } from '@/features/hq/components/hqmapping/hqFilters'
-import { HQ_TABS, defaultHqTab, type HqTabId } from '@/features/hq/components/hqmapping/hq.ui'
+import { HQ_TABS, DEFAULT_HQ_TAB, type HqTabId } from '@/features/hq/components/hqmapping/hq.ui'
 import { downloadCsv, todayIso, HQ_TIER_COLOR, HQ_CARD_STYLE } from '@/features/hq/components/hqmapping/hq.ui'
 import { buildReportRows } from '@/features/hq/components/hqmapping/hqReports'
 import HqDrawer from '@/features/hq/components/hqmapping/HqDrawer'
@@ -37,9 +36,6 @@ const TAB_ICON: Record<HqTabId, typeof FiShield> = {
 // STATE.tab==='mapping' branch that re-mounts #hqmap-root and calls
 // QMS_initHqMapping() unchanged). Filters/classifyAll() drive every other tab.
 const HqPage = () => {
-  const { user } = useAuth()
-  const role = user?.role
-
   const { people, devices } = usePeopleData()
   const { camps, patchCamp } = useCampsData()
   const { hqs, isLoading: hqsLoading, error: hqsError, refetch: refetchHqs } = useHqMaster()
@@ -47,8 +43,14 @@ const HqPage = () => {
   const [filters, setFilters] = useState(EMPTY_HQ_FILTERS)
   const [openHqId, setOpenHqId] = useState<string | null>(null)
 
-  const showableTabs = useMemo(() => HQ_TABS.filter((t) => t.show(role)), [role])
-  const [tab, setTabRaw] = useState<HqTabId>(() => defaultHqTab(role))
+  // Old placeholder UserRole-based tab gating (HQ_TABS' per-tab show()
+  // predicates, defaultHqTab) never actually worked — every real login was
+  // hardcoded to 'super_admin', which every predicate's isAdmin() check
+  // always included, so every tab has always been shown to everyone in
+  // practice, defaulting to 'admin'. No real backend concept exists yet to
+  // replace this with; HQ_TABS/DEFAULT_HQ_TAB now reflect that directly.
+  const showableTabs = HQ_TABS
+  const [tab, setTabRaw] = useState<HqTabId>(DEFAULT_HQ_TAB)
   const activeTab = showableTabs.some((t) => t.id === tab) ? tab : (showableTabs[0]?.id ?? 'admin')
   const setTab = (id: HqTabId) => setTabRaw(id)
 

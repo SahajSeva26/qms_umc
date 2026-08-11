@@ -18,8 +18,6 @@ export const createContactSchema = z.object({
   type: z.enum(['customer', 'platform']).optional(),
 })
 
-export type CreateContactFormValues = z.infer<typeof createContactSchema>
-
 export const updateContactSchema = z.object({
   name: z.string().trim().min(1, 'Name is required'),
   designation: z.string().trim().optional(),
@@ -29,5 +27,3 @@ export const updateContactSchema = z.object({
   type: z.enum(['customer', 'platform']).optional(),
   status: z.enum(['active', 'inactive']).optional(),
 })
-
-export type UpdateContactFormValues = z.infer<typeof updateContactSchema>

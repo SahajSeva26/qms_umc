@@ -1,5 +1,5 @@
-import type { HqTier, CityTier, BulkCityStatus } from '@/features/hq/hq.types'
-import { HQ_TIER_COLOR, CITY_TIER_COLOR } from '@/features/hq/components/hqmapping/hq.ui'
+import type { HqTier, BulkCityStatus } from '@/features/hq/hq.types'
+import { HQ_TIER_COLOR } from '@/features/hq/components/hqmapping/hq.ui'
 
 // One pill component per status vocabulary — deliberately NOT unified, per
 // the task's instruction that HqTier/CityTier/BulkCityStatus must stay
@@ -7,19 +7,6 @@ import { HQ_TIER_COLOR, CITY_TIER_COLOR } from '@/features/hq/components/hqmappi
 
 export function HqStatusPill({ status }: { status: HqTier }) {
   const c = HQ_TIER_COLOR[status]
-  return (
-    <span
-      className="inline-flex items-center gap-1.5 text-[10.5px] font-extrabold px-2.5 py-1 rounded-full tracking-wide"
-      style={{ background: c.bg, color: c.fg }}
-    >
-      <span className="w-[7px] h-[7px] rounded-full" style={{ background: c.dot }} />
-      {status}
-    </span>
-  )
-}
-
-export function CityStatusPill({ status }: { status: CityTier }) {
-  const c = CITY_TIER_COLOR[status]
   return (
     <span
       className="inline-flex items-center gap-1.5 text-[10.5px] font-extrabold px-2.5 py-1 rounded-full tracking-wide"

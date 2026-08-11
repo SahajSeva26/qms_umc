@@ -31,10 +31,18 @@ const WizardStep5 = ({ form, setField }: WizardStep5Props) => {
   // limit: PLATFORM_TENANT_FETCH_LIMIT — the backend defaults to 10 results;
   // with 14+ active tenants seeded, the `qms` platform tenant can sort past
   // that window and never resolve, permanently emptying both pickers below.
-  const { data: tenantData, isError: tenantsErrored } = useTenants({ status: 'active', limit: PLATFORM_TENANT_FETCH_LIMIT })
-  // tenant.type is only present on the wire for a system:manage caller
-  // (TenantMapper.toResponse) — code is always present regardless of
-  // permission, so match on it as a fallback. Found via a 2026-07-26 test pass.
+  //
+  // type: 'platform' is a real server-side filter (tenant.service.ts's
+  // search(), added 2026-08-06) — the fetch itself now only ever returns the
+  // platform tenant. Kept the .find()+code fallback below regardless: `type`
+  // still comes back empty on the wire for a non-system:manage caller
+  // (TenantMapper.toResponse's separate, still-unchanged gate) — and this
+  // wizard's own route guard (PROJECTS_VIEW_PERMISSIONS) only requires
+  // project:search/project:manage/tenant:manage, none of which imply
+  // system:manage — so a caller like that would get back every active
+  // tenant unfiltered despite the request param; the code match is what
+  // actually resolves it for them.
+  const { data: tenantData, isError: tenantsErrored } = useTenants({ type: 'platform', status: 'active', limit: PLATFORM_TENANT_FETCH_LIMIT })
   const platformTenant = tenantData?.data?.items.find((t) => t.type === 'platform' || t.code === PLATFORM_TENANT_CODE)
 
   // Sales rep — narrowed to the sales-rep RoleType only, same exact recipe

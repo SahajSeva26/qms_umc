@@ -24,30 +24,9 @@ const WizardStep4 = ({ form, setField }: WizardStep4Props) => {
   // limit: PLATFORM_TENANT_FETCH_LIMIT — see accessManagement.constants.ts;
   // the backend's default 10-result limit can silently exclude the `qms`
   // platform tenant once total active tenant count passes 10.
-  const { data: tenantData, isError: tenantsErrored } = useTenants({ status: 'active', limit: PLATFORM_TENANT_FETCH_LIMIT })
-  // tenant.type is only present on the wire for a system:manage caller
-  // (TenantMapper.toResponse) — code is always present regardless of
-  // permission, so match on it as a fallback rather than leaving this
-  // permanently unresolved for every other real caller (tenant:manage
-  // admins included). Found via a 2026-07-26 test pass.
+  const { data: tenantData, isError: tenantsErrored } = useTenants({ type: 'platform', status: 'active', limit: PLATFORM_TENANT_FETCH_LIMIT })
   const platformTenant = tenantData?.data?.items.find((t) => t.type === 'platform' || t.code === PLATFORM_TENANT_CODE)
 
-  // "Sales rep" here means someone with the sales-rep OR sales-head RoleType
-  // — NOT "any platform-tenant Role" (the old query), which let Admin/System
-  // accounts show up as pickable "sales reps." lead.service.ts's own
-  // salesPerson check only verifies "belongs to the platform tenant," no
-  // job-type check at all — that's a backend-side gap, flagged separately;
-  // this fixes the UI so the form never OFFERS something nonsensical like
-  // "System role," even though the backend wouldn't reject it if sent
-  // directly. Roles' own `type` search filter only accepts one RoleType id
-  // at a time (role.service.ts's search()), so both role types are queried
-  // in parallel and merged, since Sales Head can also own leads directly
-  // (holds lead:manage, per defaultRoleTypes.ts) same as Sales Rep.
-  // No `tenant` filter needed on these two lookups — `code` is an exact
-  // match and 'sales-rep'/'sales-head' are platform-only conventions
-  // (confirmed live: exactly one of each exists system-wide); the actual
-  // tenant scoping that matters happens implicitly below, since a Role's
-  // `type` must belong to the same tenant as the Role itself.
   const { data: salesRepTypeData, isLoading: roleTypesLoading, isError: roleTypesErrored } = useRoleTypes({ code: 'sales-rep', status: 'active' })
   const { data: salesHeadTypeData } = useRoleTypes({ code: 'sales-head', status: 'active' })
   const salesRepTypeId = salesRepTypeData?.data?.items[0]?.id

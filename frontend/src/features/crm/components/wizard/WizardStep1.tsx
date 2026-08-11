@@ -30,7 +30,15 @@ const WizardStep1 = ({ form, setField }: WizardStep1Props) => {
   // happened to sort first, Roles returned whichever tenant's roles sorted
   // first — both wrong-scoped and both wasted, since this step is unusable
   // without a company selected anyway).
-  const { data: divisionData, isLoading: divisionsLoading, isError: divisionsErrored } = useDivisions({ tenantId: form.tenantId || undefined }, !!form.tenantId)
+  //
+  // NOT `tenantId` — SearchDivisionQuery's own field is stale (see its
+  // comment); the real backend query param is `tenant`
+  // (division.validators.ts's SearchDivisionQuerySchema). Sending `tenantId`
+  // compiles but is silently ignored server-side, returning EVERY tenant's
+  // divisions unscoped — confirmed live 2026-08-07 (selecting "Sun Pharma"
+  // still showed "Cadila Healthcare Cardiology Division" as pickable). Same
+  // root cause already worked around in RoleDetailPage.tsx/NewAppointmentDialog.tsx.
+  const { data: divisionData, isLoading: divisionsLoading, isError: divisionsErrored } = useDivisions({ tenant: form.tenantId || undefined } as unknown as { tenantId?: string }, !!form.tenantId)
   const divisions = form.tenantId ? divisionData?.data?.items ?? [] : []
 
   // Backend switched Lead.contactPerson from a Role reference to a Contact

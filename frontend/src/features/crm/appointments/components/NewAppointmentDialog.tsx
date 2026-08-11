@@ -92,11 +92,27 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
   // accessManagement.constants.ts's PLATFORM_TENANT_FETCH_LIMIT) — here it's
   // "some real companies silently missing from the Company dropdown" rather
   // than "one specific tenant unreachable," but the same root cause.
-  const { data: tenantData, isLoading: tenantsLoading, isError: tenantsErrored } = useTenants({ status: 'active', limit: '20' })
+  //
+  // `enabled: open` — this dialog is always mounted on AppointmentsPage (no
+  // conditional render there), so without this gate the Company list fetches
+  // on every Appointments page load even while the dialog is closed. `open`
+  // only ever becomes true from user action, and `divisions`/`contacts` below
+  // already gate on `tenantId`, which itself can't be set until this Select
+  // renders while the dialog is open — so nothing downstream needs `tenants`
+  // populated before `open` flips true.
+  const { data: tenantData, isLoading: tenantsLoading, isError: tenantsErrored } = useTenants({ status: 'active', limit: '20' }, open)
   const tenants = tenantData?.data?.items ?? []
 
+  // NOT `tenantId` — SearchDivisionQuery's own field is stale (see its
+  // comment); the real backend query param is `tenant`
+  // (division.validators.ts's SearchDivisionQuerySchema). Sending `tenantId`
+  // compiles but is silently ignored server-side, returning EVERY tenant's
+  // divisions unscoped — same root cause already worked around in
+  // RoleDetailPage.tsx. FLAGGED FOR LATER: fix SearchDivisionQuery itself
+  // (rename tenantId -> tenant in crm.types.ts) and remove every one of these
+  // per-call-site casts at once, rather than adding another here.
   const { data: divisionData, isLoading: divisionsLoading, isError: divisionsErrored } =
-    useDivisions({ tenantId: tenantId || undefined }, !!tenantId)
+    useDivisions({ tenant: tenantId || undefined } as unknown as { tenantId?: string }, !!tenantId)
   const divisions = tenantId ? divisionData?.data?.items ?? [] : []
 
   // `enabled: !!tenantId` — NOT `{ limit: '0' }` (the prior approach, fixed

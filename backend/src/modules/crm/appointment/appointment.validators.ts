@@ -40,7 +40,6 @@ export const CreateAppointmentPayloadSchema = z.object({
     endTime: z.coerce.date().optional().openapi({ example: '2026-08-01T11:00:00.000Z' }),
     agenda: AgendaSchema.optional(),
     mom: MomSchema.optional(),
-    nextSteps: z.string().optional().openapi({ example: 'Send proposal draft by Friday' }),
 });
 export type ICreateAppointmentPayload = z.infer<typeof CreateAppointmentPayloadSchema>;
 
@@ -57,7 +56,6 @@ export const UpdateAppointmentPayloadSchema = z.object({
     endTime: z.coerce.date().optional(),
     agenda: AgendaSchema.optional(),
     mom: MomSchema.optional(),
-    nextSteps: z.string().optional(),
 });
 export type IUpdateAppointmentPayload = z.infer<typeof UpdateAppointmentPayloadSchema>;
 
@@ -66,6 +64,9 @@ export type IUpdateAppointmentPayload = z.infer<typeof UpdateAppointmentPayloadS
 export const MoveStagePayloadSchema = z.object({
     to: z.enum(Object.values(APPOINTMENT_STATUSES)).openapi({ example: 'done' }),
     reason: z.string().min(1).openapi({ example: 'Meeting completed, MoM captured' }),
+    // next step captured together with this transition — stored on the stage-history entry, not as a
+    // standalone field, so every move carries its own next step.
+    nextSteps: z.string().optional().openapi({ example: 'Send proposal draft by Friday' }),
 });
 export type IMoveStagePayload = z.infer<typeof MoveStagePayloadSchema>;
 

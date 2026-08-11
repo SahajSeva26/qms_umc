@@ -49,7 +49,12 @@ const createTicket = async (payload: CreateTicketPayload) => {
         return response.data;
     } catch (error: any) {
         logger.error(
-            { err: error, status: error?.response?.status, data: error?.response?.data },
+            {
+                err: error,
+                status: error?.response?.status,
+                data: error?.response?.data,
+                message: error?.response?.data?.errorMessages?.join(','),
+            },
             'Jira ticket creation failed',
         );
         return throwAppError('Failed to create Jira ticket', StatusCodes.BAD_GATEWAY);

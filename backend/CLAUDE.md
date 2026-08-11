@@ -424,7 +424,7 @@ All modules follow the layered convention above; all are wired in `src/bin/app.t
 | access-management | permission-group | `/permission-groups` | per-tenant permission ceiling |
 | access-management | role-type | `/role-types` | `isSystem` defaults seeded per tenant; reserved-code guard |
 | access-management | role | `/roles` | 1:1 with User; optional `division` (customer-only) + `supervisor` self-ref |
-| crm | division | `/divisions` | therapy/brand division; create also mints a pharma-division-head role + user |
+| crm | division | `/divisions` | therapy/brand division (`therapy` is a **non-empty, duplicate-free array** — multiple therapy areas per division; validated in validators + model); create also mints a pharma-division-head role + user |
 | crm | lead | `/leads` | stageHistory + moveStage; tenant from division |
 | crm | project | `/projects` | one-project-per-lead; tenant/division derived from lead |
 | crm | appointment | `/appointments` | stageHistory + moveStage (each move records its own `nextSteps`); parent self-ref for follow-ups; statuses = planned/done/cancelled/released (no `blocked`) |

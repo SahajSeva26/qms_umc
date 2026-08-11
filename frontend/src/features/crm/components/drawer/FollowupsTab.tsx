@@ -1,9 +1,17 @@
 import type { LeadEntity } from '@/types/crm.types'
 import { LEAD_STATUS_LABEL } from '@/types/crm.types'
-import { useMeetings } from '@/features/crm/appointments/hooks/useMeetings'
-import { MEETING_STATUS_META, MEETING_TYPE_META } from '@/types/meeting.types'
+import { useAppointmentsReal } from '@/features/crm/appointments/hooks/useAppointmentsReal'
+import { APPOINTMENT_STATUS_LABEL, APPOINTMENT_TYPE_LABEL } from '@/types/appointment.types'
+import { appointmentStatusColor } from '@/features/crm/appointments/appointmentsReal.utils'
 import { formatDate } from '@/utils/formatters'
 import { formatTimeRange } from '@/features/crm/appointments/appointments.utils'
+
+const TYPE_COLOR: Record<string, string> = {
+  new: '#3b6dff',
+  'follow-up': '#14b8a6',
+  payment: '#f59e0b',
+  spot: '#a855f7',
+}
 
 interface FollowupsTabProps {
   lead: LeadEntity
@@ -12,15 +20,15 @@ interface FollowupsTabProps {
 const FollowupsTab = ({ lead }: FollowupsTabProps) => {
   const history = [...lead.stageHistory].reverse()
 
-  // Meetings live in the Appointments module — read through its own hook
-  // (not its internals) and cross-reference by linkedLeadId, mirroring the
-  // prototype's renderFollowups() (crm.js) which does the same join.
-  const { meetings: allMeetings, isLoading, error } = useMeetings()
-  const linkedMeetings = [...allMeetings]
-    .filter((m) => m.linkedLeadId === lead.id)
-    .sort((a, b) => b.startAt.localeCompare(a.startAt))
-  const completedCount = linkedMeetings.filter((m) => m.status === 'DONE').length
-  const openCount = linkedMeetings.filter((m) => m.status === 'PLANNED' || m.status === 'BLOCKED' || m.status === 'RELEASED').length
+  // Real backend-wired — migrated 2026-08-11 off the old localStorage-mock
+  // Meeting system (useMeetings.ts/appointments.mock.ts), which was never
+  // updated when the Appointments calendar page itself migrated to real
+  // data. SearchAppointmentQuery.lead filters server-side.
+  const { data, isLoading, error } = useAppointmentsReal({ lead: lead.id, limit: '200' })
+  const linkedAppointments = [...(data?.data?.items ?? [])]
+    .sort((a, b) => b.duration.startTime.localeCompare(a.duration.startTime))
+  const completedCount = linkedAppointments.filter((a) => a.status === 'done').length
+  const openCount = linkedAppointments.filter((a) => a.status === 'planned').length
 
   return (
     <div className="space-y-4">
@@ -37,51 +45,52 @@ const FollowupsTab = ({ lead }: FollowupsTabProps) => {
       </div>
 
       {isLoading && (
-        <p className="text-[13px] py-4 text-center" style={{ color: 'var(--qms-text-muted)' }}>Loading follow-up meetings…</p>
+        <p className="text-[13px] py-4 text-center" style={{ color: 'var(--qms-text-muted)' }}>Loading follow-up appointments…</p>
       )}
 
       {error && !isLoading && (
         <div className="text-[12px] rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
-          Failed to load follow-up meetings. Please try again.
+          Failed to load follow-up appointments. Please try again.
         </div>
       )}
 
       {!isLoading && !error && (
         <>
           <div className="flex items-center gap-3 text-[11px] font-semibold" style={{ color: 'var(--qms-text-muted)' }}>
-            <span>{linkedMeetings.length} follow-up{linkedMeetings.length === 1 ? '' : 's'}</span>
+            <span>{linkedAppointments.length} follow-up{linkedAppointments.length === 1 ? '' : 's'}</span>
             <span>{completedCount} completed</span>
             <span>{openCount} open</span>
           </div>
 
-          {linkedMeetings.length === 0 ? (
+          {linkedAppointments.length === 0 ? (
             <p className="text-[13px]" style={{ color: 'var(--qms-text-muted)' }}>
-              No follow-up meetings linked to this lead yet. Book a Follow-up meeting and link this lead no.
+              No follow-up appointments linked to this lead yet. Book a Follow-up appointment and link this lead.
             </p>
           ) : (
             <div className="space-y-2">
-              {linkedMeetings.map((m) => {
-                const typeMeta = MEETING_TYPE_META[m.type]
-                const statusMeta = MEETING_STATUS_META[m.status]
+              {linkedAppointments.map((a) => {
+                const typeColor = TYPE_COLOR[a.type] ?? '#3b6dff'
+                const statusColor = appointmentStatusColor(a.status)
                 return (
-                  <div key={m.id} className="rounded-lg p-2.5" style={{ background: 'var(--qms-surface-strong)' }}>
+                  <div key={a.id} className="rounded-lg p-2.5" style={{ background: 'var(--qms-surface-strong)' }}>
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[12px] font-semibold" style={{ color: 'var(--qms-text)' }}>
-                        {typeMeta.name} · {formatDate(m.startAt)}, {formatTimeRange(m.startAt, m.endAt)}
+                        <span style={{ color: typeColor }}>{APPOINTMENT_TYPE_LABEL[a.type]}</span> · {formatDate(a.duration.startTime)}
+                        {a.duration.endTime ? `, ${formatTimeRange(a.duration.startTime, a.duration.endTime)}` : ''}
                       </span>
                       <span
                         className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0"
-                        style={{ background: `${statusMeta.color}22`, color: statusMeta.color }}
+                        style={{ background: `${statusColor}22`, color: statusColor }}
                       >
-                        {statusMeta.name}
+                        {APPOINTMENT_STATUS_LABEL[a.status]}
                       </span>
                     </div>
-                    {m.momText && (
-                      <p className="text-[12px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>{m.momText}</p>
+                    {a.mom.details && (
+                      <p className="text-[12px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>{a.mom.details}</p>
                     )}
-                    {m.nextSteps && (
+                    {a.nextSteps && (
                       <p className="text-[11px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>
-                        Next: {m.nextSteps}
+                        Next: {a.nextSteps}
                       </p>
                     )}
                   </div>

@@ -60,14 +60,14 @@ const TenantDetailPage = () => {
 
   const { data: divisionsData, isLoading: divisionsLoading, error: divisionsError } = useDivisions(
     {
-      tenant: id,
+      tenant: tenant?.id,
       name: filters.searchBy === 'name' ? debouncedSearch || undefined : undefined,
       code: filters.searchBy === 'code' ? debouncedCode || undefined : undefined,
       therapy: filters.therapy === 'ALL' ? undefined : filters.therapy,
       status: filters.status,
       limit: '10',
     } as Parameters<typeof useDivisions>[0],
-    canViewDivisions && !!id,
+    canViewDivisions && !!tenant?.id,
   )
   const divisions = divisionsData?.data?.items ?? []
   const totalDivisions = divisionsData?.data?.count ?? 0

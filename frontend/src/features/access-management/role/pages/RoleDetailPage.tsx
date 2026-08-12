@@ -23,56 +23,23 @@ import { createRoleSchema, updateRoleSchema } from '@/features/access-management
 import { useScrollIntoViewOnChange } from '@/hooks/useScrollIntoViewOnChange'
 import type { RolePopulatedRoleType, RolePopulatedUser, RoleStatus } from '@/types/accessManagement.types'
 
-// Combined create-flow + edit page for Role — the "ID card" entity binding
-// one user to one RoleType within a tenant:
-//   - no `:id` param (route is ROLE_NEW)          -> create form (embeds a
-//     full user-registration payload, per CreateRolePayload.user)
-//   - `:id` param present (route is ROLE_DETAIL)  -> load + edit form
-//
-// Mirrors `@/features/access-management/role-type/pages/RoleTypeDetailPage.tsx`'s overall
-// shape (back link, header summary card, editable card(s), save button wired
-// to a mutation with isPending/isError/isSuccess feedback) and reuses its
-// ceiling-scoped permission-picker pattern via the SAME
-// `useTenantPermissionGroup` hook (role-type's, not duplicated) — this
-// mirrors backend `role.service.ts`'s `handlePermissionUpdate`, which
-// resolves the ceiling via `PermissionGroupService.search({ tenant:
-// ctx.tenant._id })`, the exact same call RoleType's ceiling check makes.
-//
-// TWO IMPORTANT DIFFERENCES from RoleType's permission picker:
-//
-// 1. Forbidden-code exclusion: per role.service.ts's
-//    `ROLE_FORBIDDEN_PERMISSIONS = [TENANT_PERMISSIONS.ADMIN.code,
-//    TENANT_PERMISSIONS.MANAGE.code, SYSTEM_PERMISSIONS.MANAGE.code]`, a Role
-//    may NEVER directly hold 'tenant:admin' / 'tenant:manage' /
-//    'system:manage' — "no bypass, applies even to system" per that file's
-//    own comment. The picker below excludes these three codes from its
-//    candidate list entirely (constants/roleForbiddenPermissions.ts), it does
-//    not just rely on the backend's 403.
-//
-// 2. RoleType-scoped ceiling: a Role's `permissions` field is conceptually
-//    "elevated permissions" layered ON TOP of whatever the bound RoleType
-//    already grants (e.g. a same-domain grant like 'sales.manage' for one
-//    person) — not a duplicate of the RoleType's own list, and not an
-//    unbounded pick from the full tenant PermissionGroup ceiling either. So
-//    the offered choices here are the INTERSECTION of the tenant's
-//    PermissionGroup ceiling and the currently-selected RoleType's own
-//    `permissions` array, minus the 3 forbidden codes — never a free-for-all
-//    across the whole PermissionGroup.
+// Combined create-flow + edit page for Role, the "ID card" binding one user
+// to one RoleType within a tenant (no :id -> create, :id -> edit). Mirrors
+// RoleTypeDetailPage.tsx's shape and reuses its ceiling-scoped permission
+// picker via useTenantPermissionGroup. Two differences from RoleType's
+// picker: (1) a Role can never directly hold tenant:admin/tenant:manage/
+// system:manage (role.service.ts's ROLE_FORBIDDEN_PERMISSIONS, no bypass —
+// excluded from the candidate list here, not just relying on the backend's
+// 403), and (2) offered permissions are the INTERSECTION of the tenant's
+// PermissionGroup ceiling and the selected RoleType's own permissions, minus
+// those 3 forbidden codes — elevated grants layered on top, not a free pick.
 
-// Zod 4's built-in type-mismatch message ("Invalid input: expected string,
-// received undefined") never names the field — only the custom `.min()`
-// messages in role.schemas.ts do, and those are skipped whenever the value
-// passed in is actually `undefined` rather than an empty string (which is
-// exactly what `code || undefined`-style coercion produced for an empty
-// required field). Falling back to the field's own label via its path keeps
-// the message actionable even when a future schema change reintroduces a
-// bare type-mismatch error.
-// Never offered as a NEW choice in the Role Type picker below — 'admin' is
-// minted once per tenant during onboarding, and 'pharma-division-head' is
-// minted exactly once per division (CreateDivisionModal), transactionally.
-// Only filters the picker's rendered options; the underlying `roleTypes`
-// list stays unfiltered so editing a pre-existing Role of one of these
-// types still resolves its name/permissions correctly.
+// Zod 4's bare type-mismatch message never names the field; falls back to
+// the field's own label via its path so the message stays actionable.
+// 'admin'/'pharma-division-head' are minted once per tenant/division
+// transactionally, so they're excluded as NEW choices here (existing Roles
+// of those types still resolve correctly since `roleTypes` itself is
+// unfiltered).
 const RESTRICTED_ROLETYPE_CODES = ['admin', 'pharma-division-head']
 
 const ROLE_FIELD_LABELS: Record<string, string> = {
@@ -103,9 +70,8 @@ const RoleDetailPage = () => {
   const { data, isLoading, error } = useRole(id)
   const role = data?.data ?? null
 
-  // limit: '20' — the backend defaults to 10 results; with 16+ active
-  // tenants seeded, `qms` (created earliest, sorts last) fell past that
-  // window and never appeared in this picker at all. Confirmed live 2026-08-05.
+  // limit: '20' — backend defaults to 10; `qms` (sorts last) fell past that
+  // window with 16+ tenants seeded and never appeared in this picker.
   const { data: tenantsData } = useTenants({ limit: '20' })
   const tenants = tenantsData?.data?.items ?? []
 
@@ -115,12 +81,8 @@ const RoleDetailPage = () => {
   const [tenant, setTenant] = useState(searchParams.get('tenant') ?? '')
   useEffect(() => {
     if (role && !isCreateMode) {
-      // role.tenant is a raw ObjectId string on create/update responses but a
-      // populated {_id, name, code} object on GET-by-id/search — see
-      // RolePopulatedTenant's comment in accessManagement.types.ts. Reading
-      // `.id` here (rather than `._id`) always fell through to '', which
-      // permanently disabled the Role Type picker below since it requires a
-      // resolved tenant id.
+      // role.tenant is a raw id string on create/update but a populated
+      // {_id, name, code} object on GET-by-id/search — see RolePopulatedTenant.
       const tenantValue = role.tenant
       setTenant(typeof tenantValue === 'string' ? tenantValue : (tenantValue?._id ?? ''))
     }
@@ -149,37 +111,28 @@ const RoleDetailPage = () => {
   const [formError, setFormError] = useState<string | null>(null)
   const errorRef = useScrollIntoViewOnChange<HTMLDivElement>(formError)
 
-  // Pharma role hierarchy (create only — see role.service.ts's
-  // handleDivision/handleSupervisor, both gated on entity.isNew): a division
-  // is required for a non-root pharma role type, and a supervisor must be an
-  // existing Role of the immediate parent type within that same division.
+  // Pharma role hierarchy (create only): a division is required for a
+  // non-root pharma role type, and a supervisor must be an existing Role of
+  // the immediate parent type within that same division.
   const selectedRoleTypeCode = roleTypes.find((rt) => rt.id === roleType)?.code
   const supervisorParentCode = selectedRoleTypeCode ? PHARMA_SUPERVISOR_PARENT_CODE[selectedRoleTypeCode] : undefined
   const needsDivision = selectedRoleTypeCode !== undefined && selectedRoleTypeCode in PHARMA_SUPERVISOR_PARENT_CODE
   const needsSupervisor = !!supervisorParentCode
 
-  // NOT `tenantId` — SearchDivisionQuery's own field is stale (see its
-  // comment); the real backend query param is `tenant`
-  // (division.validators.ts's SearchDivisionQuerySchema), confirmed live
-  // 2026-08-05. Sending `tenantId` compiles but is silently ignored
-  // server-side, returning EVERY tenant's divisions unscoped — asserting the
-  // param shape here rather than widening SearchDivisionQuery itself, since
-  // fixing every other caller is a separate, already-flagged follow-up.
+  // NOT `tenantId` — the real backend query param is `tenant`
+  // (division.validators.ts); `tenantId` compiles but is silently ignored,
+  // returning every tenant's divisions unscoped.
   const { data: divisionsData } = useDivisions(
     { tenant: tenant || undefined } as unknown as { tenantId?: string },
     isCreateMode && needsDivision && !!tenant,
   )
   const divisions = divisionsData?.data?.items ?? []
 
-  // Resolved from the roleTypes list already fetched above (line 118) —
-  // no second useRoleTypes call needed, the parent code's id is already in
-  // that response since it's the same tenant's full RoleType list.
+  // Resolved from the roleTypes list already fetched above — no second call.
   const parentTypeId = roleTypes.find((rt) => rt.code === supervisorParentCode)?.id
 
-  // status: 'active' — the backend's own supervisor validation never checks
-  // the candidate's status (confirmed live 2026-08-05: an inactive Role is
-  // silently accepted as a supervisor), so this filter is the only thing
-  // keeping an inactive/deactivated person out of the picker.
+  // status: 'active' — the backend's supervisor validation never checks the
+  // candidate's status, so this filter is what keeps an inactive person out.
   const { data: supervisorCandidatesData, isLoading: isLoadingSupervisors } = useRoles(
     { tenant: tenant || undefined, division: division || undefined, type: parentTypeId, status: 'active' },
     isCreateMode && needsSupervisor && !!tenant && !!division && !!parentTypeId,
@@ -205,12 +158,10 @@ const RoleDetailPage = () => {
       setName(role.name)
       setDescription(role.description ?? '')
       setStatus(role.status ?? '')
-      // role.permissions is a bare string[] on the wire (see RoleEntity
-      // comment in accessManagement.types.ts) — no .code projection needed.
+      // role.permissions is a bare string[] on the wire — no .code projection.
       setSelectedCodes(new Set(role.permissions ?? []))
 
-      // role.type has the same populated-vs-string duality as role.tenant
-      // above — see RolePopulatedRoleType's comment.
+      // Same populated-vs-string duality as role.tenant above.
       const typeValue = role.type
       setRoleType(typeof typeValue === 'string' ? typeValue : (typeValue?._id ?? ''))
 
@@ -583,15 +534,10 @@ const RoleDetailPage = () => {
                   >
                     Status
                   </Label>
-                  {/* key={status || 'empty'} forces a fresh mount once the real
-                      value loads from the async fetch — base-ui's Select
-                      decides controlled-vs-uncontrolled on its very first
-                      render and never revisits it, so without this the
-                      trigger permanently shows "Select status" even after
-                      the real value arrives (same bug as
-                      TenantDetailPage.tsx/GeoProfileDetailPage.tsx/
-                      CampDetailPageReal.tsx). Data-only display bug — the
-                      underlying value was always correct. */}
+                  {/* key={status || 'empty'} forces a remount once the real value
+                      loads — base-ui's Select fixes controlled/uncontrolled on
+                      first render, so without this the trigger keeps showing
+                      "Select status" after the value arrives (recurs elsewhere). */}
                   <Select key={status || 'empty'} value={status || undefined} onValueChange={(v) => setStatus(v as RoleStatus)}>
                     <SelectTrigger id="status" className="w-full">
                       <SelectValue placeholder="Select status">

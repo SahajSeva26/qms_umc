@@ -21,15 +21,9 @@ import type { DivisionEntity } from '@/types/crm.types'
 import type { RolePopulatedUser } from '@/types/accessManagement.types'
 
 // A company's detail page: header summary + this company's Divisions,
-// inline — not a link out to a separate page (2026-08-11: replaced the
-// earlier "View divisions" button-to-/crm/divisions?tenant= redirect per
-// direct instruction — divisions should live "under" the company, not be a
-// hop away). Editing the company itself (name/description/status/type)
-// moved out of the page body into an "Edit client" button + modal
-// (EditTenantModal), since the page body is now the Divisions list instead
-// of the edit form. (Originally a "..." Popover menu here, per direct
-// instruction changed to a plain visible button — there's only ever the one
-// action, so a menu just adds an extra click.)
+// inline rather than a link to a separate page. Editing the company itself
+// lives in the "Edit client" button + modal (EditTenantModal) instead of
+// the page body, since the body is the Divisions list.
 const TenantDetailPage = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()

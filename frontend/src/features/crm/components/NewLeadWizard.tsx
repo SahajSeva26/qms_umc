@@ -16,10 +16,8 @@ import WizardStep2 from '@/features/crm/components/wizard/WizardStep2'
 import WizardStep3 from '@/features/crm/components/wizard/WizardStep3'
 import WizardStep4 from '@/features/crm/components/wizard/WizardStep4'
 
-// Matches the prototype's exact per-step pane-h / pane-sub copy (crm-sales-leads.js).
-// Note: the modal breadcrumb literally says "Commercial" for step 3 even
-// though the step pill itself says "QMS offer" — a real prototype quirk,
-// replicated exactly rather than "fixed."
+// Breadcrumb literally says "Commercial" for step 3 while the step pill says
+// "QMS offer" — a prototype quirk, replicated rather than "fixed."
 const STEPS = [
   { label: 'Pharma', heading: 'Pharma context', sub: '' },
   { label: 'Opportunity', heading: 'Opportunity & current activity', sub: "Describe the client's problem, their MR strength, and what they run today." },
@@ -90,10 +88,8 @@ const NewLeadWizard = ({ onClose, onCreated }: NewLeadWizardProps) => {
       followUpDate: form.followUpDate,
     }
 
-    // Await so the modal only closes on real success — useLeads' own
-    // onError toast still fires on failure, and the modal stays open with
-    // its filled-in form intact so the user can retry rather than losing
-    // their input to a silently-closed dialog.
+    // Await so the modal only closes on real success — stays open with its
+    // filled-in form on failure so the user can retry.
     try {
       await createLead(payload)
       onCreated()

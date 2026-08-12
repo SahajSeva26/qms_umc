@@ -26,15 +26,11 @@ const GENDER_OPTIONS: { value: 'male' | 'female' | 'other'; label: string }[] = 
   { value: 'other', label: 'Other' },
 ]
 
-// Create-only — editing happens on DivisionDetailPage instead. Company picker
-// always shows (backend requires an explicit `tenant` for every caller, no
-// force-pinning like Contact's create). Division Head is mandatory: the
-// backend mints a new user + Role for this person in the same transaction as
-// the division, with no "use an existing person" path.
-//
-// Two-step form, same shape as CreateTenantDialog.tsx: step 1 is the
-// division's own details, step 2 is the embedded Division Head user
-// registration the backend creates in the same call.
+// Create-only — editing happens on DivisionDetailPage instead. Division Head
+// is mandatory: the backend mints a new user + Role for this person in the
+// same transaction as the division, no "use an existing person" path.
+// Two-step form (same shape as CreateTenantDialog.tsx): step 1 is the
+// division's own details, step 2 registers the Division Head.
 
 const EMPTY_FORM = {
   code: '',

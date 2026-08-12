@@ -16,63 +16,24 @@ import { PHARMA_SUPERVISOR_PARENT_CODE } from '@/features/access-management/role
 import RoleStatusPill from '@/features/access-management/role/components/RoleStatusPill'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import FieldLabel from '@/components/ui/FieldLabel'
+import MutationStatusBanner from '@/components/ui/MutationStatusBanner'
+import TenantPicker from '@/components/ui/TenantPicker'
+import PermissionCheckboxRow from '@/components/ui/PermissionCheckboxRow'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { createRoleSchema, updateRoleSchema } from '@/features/access-management/role/schemas/role.schemas'
 import type { RolePopulatedRoleType, RolePopulatedUser, RoleStatus } from '@/types/accessManagement.types'
 
-// Combined create-flow + edit page for Role — the "ID card" entity binding
-// one user to one RoleType within a tenant:
-//   - no `:id` param (route is ROLE_NEW)          -> create form (embeds a
-//     full user-registration payload, per CreateRolePayload.user)
-//   - `:id` param present (route is ROLE_DETAIL)  -> load + edit form
-//
-// Mirrors `@/features/access-management/role-type/pages/RoleTypeDetailPage.tsx`'s overall
-// shape (back link, header summary card, editable card(s), save button wired
-// to a mutation with isPending/isError/isSuccess feedback) and reuses its
-// ceiling-scoped permission-picker pattern via `useRolePermissionPicker`,
-// which in turn reuses role-type's `useTenantPermissionGroup` — this mirrors
-// backend `role.service.ts`'s `handlePermissionUpdate`, which resolves the
-// ceiling via `PermissionGroupService.search({ tenant: ctx.tenant._id })`,
-// the exact same call RoleType's ceiling check makes.
-//
-// TWO IMPORTANT DIFFERENCES from RoleType's permission picker:
-//
-// 1. Forbidden-code exclusion: per role.service.ts's
-//    `ROLE_FORBIDDEN_PERMISSIONS = [TENANT_PERMISSIONS.ADMIN.code,
-//    TENANT_PERMISSIONS.MANAGE.code, SYSTEM_PERMISSIONS.MANAGE.code]`, a Role
-//    may NEVER directly hold 'tenant:admin' / 'tenant:manage' /
-//    'system:manage' — "no bypass, applies even to system" per that file's
-//    own comment. useRolePermissionPicker excludes these three codes from
-//    its candidate list entirely, it does not just rely on the backend's 403.
-//
-// 2. RoleType-scoped ceiling: a Role's `permissions` field is conceptually
-//    "elevated permissions" layered ON TOP of whatever the bound RoleType
-//    already grants (e.g. a same-domain grant like 'sales.manage' for one
-//    person) — not a duplicate of the RoleType's own list, and not an
-//    unbounded pick from the full tenant PermissionGroup ceiling either. So
-//    the offered choices are the INTERSECTION of the tenant's PermissionGroup
-//    ceiling and the currently-selected RoleType's own `permissions` array,
-//    minus the 3 forbidden codes — never a free-for-all across the whole
-//    PermissionGroup.
-//
-// Form state uses react-hook-form + zodResolver (mirrors auth/LoginForm.tsx's
-// pattern — the only other RHF usage in the codebase so far), resolving
-// against createRoleSchema in create mode and updateRoleSchema in edit mode.
-// One RoleFormValues shape covers both: most fields are optional at the type
-// level since "required-ness" differs by mode and is enforced by whichever
-// schema the resolver is pointed at, not by the TS type itself. The
-// elevated-permissions picker is NOT part of this form — it's driven by
-// useRolePermissionPicker (a Set<string>, not a plain field) and merged into
-// the payload at submit time, same as before this migration.
+// Combined create-flow + edit page for Role (no :id -> create, :id -> edit).
+// Permission picker is ceiling-scoped via useRolePermissionPicker: candidates
+// are the tenant's PermissionGroup ceiling ∩ the selected RoleType's own
+// permissions, minus tenant:admin/tenant:manage/system:manage (a Role can
+// never hold those directly — role.service.ts's ROLE_FORBIDDEN_PERMISSIONS).
 
-// Never offered as a NEW choice in the Role Type picker below — 'admin' is
-// minted once per tenant during onboarding, and 'pharma-division-head' is
-// minted exactly once per division (CreateDivisionModal), transactionally.
-// Only filters the picker's rendered options; the underlying `roleTypes`
-// list stays unfiltered so editing a pre-existing Role of one of these
-// types still resolves its name/permissions correctly.
+// 'admin'/'pharma-division-head' are minted once per tenant/division, so
+// they're excluded as NEW choices (existing Roles of those types still
+// resolve correctly since `roleTypes` itself stays unfiltered).
 const RESTRICTED_ROLETYPE_CODES = ['admin', 'pharma-division-head']
 
 interface RoleFormValues {
@@ -111,23 +72,12 @@ const EMPTY_FORM_VALUES: RoleFormValues = {
   userStatus: '',
 }
 
-// createRoleSchema/updateRoleSchema (role.schemas.ts) use the wire payload's
-// own field names/shape (`type`, nested `user: {firstName, ...}`) — not this
-// form's flat RoleFormValues (`roleType`, `userFirstName`, ...), since those
-// schemas are shared with the raw CreateRolePayload/UpdateRolePayload types
-// elsewhere. Rather than reshape the schemas themselves (used outside this
-// page too) or maintain a parallel RHF-shaped schema (drifts from the real
-// one), this resolver translates RoleFormValues -> the schema's payload
-// shape, runs zodResolver against THAT, then maps any resulting error paths
-// back to their RoleFormValues field names so RHF's `errors.<field>` still
-// resolves correctly for each input.
-//
-// IMPORTANT: react-hook-form's zodResolver returns `errors` as a NESTED
-// object mirroring the schema shape (e.g. `errors.user.firstName`), NOT
-// flat dot-notation string keys (`errors['user.firstName']`) — confirmed by
-// directly running zodResolver against a nested test schema. The lookup
-// table below is therefore two levels: top-level payload field -> form
-// field, plus a separate nested walk for `user.*`.
+// createRoleSchema/updateRoleSchema use the wire payload's field names/shape
+// (`type`, nested `user: {firstName, ...}`), not this form's flat
+// RoleFormValues. This resolver maps RoleFormValues -> the payload shape,
+// runs zodResolver against that, then maps errors back to RoleFormValues
+// field names. zodResolver's `errors` is a NESTED object (`errors.user.
+// firstName`), not flat dot-notation keys — hence the two-level lookup below.
 const TOP_LEVEL_TO_FORM_FIELD: Record<string, keyof RoleFormValues> = {
   type: 'roleType',
 }
@@ -142,10 +92,9 @@ const USER_FIELD_TO_FORM_FIELD: Record<string, keyof RoleFormValues> = {
 }
 
 const toRoleFormResolver = (schema: typeof createRoleSchema | typeof updateRoleSchema): Resolver<RoleFormValues> => {
-  // zodResolver's own generic is tied to the schema's payload shape, not
-  // RoleFormValues — this resolver never uses react-hook-form's `context`
-  // option (useForm below doesn't pass one), so it's safe to not thread it
-  // through to the base resolver rather than fight the type mismatch.
+  // zodResolver's generic is tied to the payload shape, not RoleFormValues;
+  // `context` is never used (useForm below doesn't pass one), so it's safe
+  // to not thread it through rather than fight the type mismatch.
   const baseResolver = zodResolver(schema) as (payload: unknown, context: unknown, options: unknown) => Promise<{
     values: Record<string, unknown>
     errors: Record<string, { message?: string; type?: string } | Record<string, { message?: string; type?: string }>>
@@ -185,9 +134,8 @@ const toRoleFormResolver = (schema: typeof createRoleSchema | typeof updateRoleS
       mappedErrors[formField] = err
     }
     const hasErrors = Object.keys(mappedErrors).length > 0
-    // react-hook-form resolvers return the ORIGINAL form values (RoleFormValues
-    // shape) on success — `values` here is a real RoleFormValues already; only
-    // `errors` needed reshaping from the payload's field names to this form's.
+    // RHF resolvers return the original form values on success — only `errors`
+    // needed reshaping from the payload's field names to this form's.
     return { values: hasErrors ? {} : values, errors: mappedErrors } as never
   }
 }
@@ -225,23 +173,16 @@ const RoleDetailPage = () => {
   const supervisor = watch('supervisor')
   const userEmail = watch('userEmail')
 
-  // limit: '20' — the backend defaults to 10 results; with 16+ active
-  // tenants seeded, `qms` (created earliest, sorts last) fell past that
-  // window and never appeared in this picker at all. Confirmed live 2026-08-05.
+  // limit: '20' — backend defaults to 10; `qms` (sorts last) fell past that
+  // window with 16+ tenants seeded and never appeared in this picker.
   const { data: tenantsData } = useTenants({ limit: '20' })
   const tenants = tenantsData?.data?.items ?? []
 
-  // On create, the tenant is chosen via a picker (optionally pre-filled from
-  // ?tenant=<id> query param, set in defaultValues above); on edit, it comes
-  // from the loaded Role's populated tenant relation.
+  // On create, tenant comes from the ?tenant= param (defaultValues above);
+  // on edit, from the loaded Role's populated tenant relation.
   useEffect(() => {
     if (role && !isCreateMode) {
-      // role.tenant is a raw ObjectId string on create/update responses but a
-      // populated {_id, name, code} object on GET-by-id/search — see
-      // RolePopulatedTenant's comment in accessManagement.types.ts. Reading
-      // `.id` here (rather than `._id`) always fell through to '', which
-      // permanently disabled the Role Type picker below since it requires a
-      // resolved tenant id.
+      // Raw id string on create/update, populated {_id, name, code} on GET/search.
       const tenantValue = role.tenant
       setValue('tenant', typeof tenantValue === 'string' ? tenantValue : (tenantValue?._id ?? ''))
     }
@@ -263,37 +204,26 @@ const RoleDetailPage = () => {
     toggleCode,
   } = useRolePermissionPicker(tenant || undefined, roleType, roleTypes)
 
-  // Pharma role hierarchy (create only — see role.service.ts's
-  // handleDivision/handleSupervisor, both gated on entity.isNew): a division
-  // is required for a non-root pharma role type, and a supervisor must be an
-  // existing Role of the immediate parent type within that same division.
+  // Pharma role hierarchy (create only): non-root pharma role types need a
+  // division + an existing supervisor Role of the parent type in it.
   const selectedRoleTypeCode = roleTypes.find((rt) => rt.id === roleType)?.code
   const supervisorParentCode = selectedRoleTypeCode ? PHARMA_SUPERVISOR_PARENT_CODE[selectedRoleTypeCode] : undefined
   const needsDivision = selectedRoleTypeCode !== undefined && selectedRoleTypeCode in PHARMA_SUPERVISOR_PARENT_CODE
   const needsSupervisor = !!supervisorParentCode
 
-  // NOT `tenantId` — SearchDivisionQuery's own field is stale (see its
-  // comment); the real backend query param is `tenant`
-  // (division.validators.ts's SearchDivisionQuerySchema), confirmed live
-  // 2026-08-05. Sending `tenantId` compiles but is silently ignored
-  // server-side, returning EVERY tenant's divisions unscoped — asserting the
-  // param shape here rather than widening SearchDivisionQuery itself, since
-  // fixing every other caller is a separate, already-flagged follow-up.
+  // NOT `tenantId` — the real query param is `tenant`; `tenantId` compiles
+  // but is silently ignored, returning every tenant's divisions unscoped.
   const { data: divisionsData } = useDivisions(
     { tenant: tenant || undefined } as unknown as { tenantId?: string },
     isCreateMode && needsDivision && !!tenant,
   )
   const divisions = divisionsData?.data?.items ?? []
 
-  // Resolved from the roleTypes list already fetched above — no second
-  // useRoleTypes call needed, the parent code's id is already in that
-  // response since it's the same tenant's full RoleType list.
+  // Resolved from the roleTypes list already fetched above — no second call.
   const parentTypeId = roleTypes.find((rt) => rt.code === supervisorParentCode)?.id
 
-  // status: 'active' — the backend's own supervisor validation never checks
-  // the candidate's status (confirmed live 2026-08-05: an inactive Role is
-  // silently accepted as a supervisor), so this filter is the only thing
-  // keeping an inactive/deactivated person out of the picker.
+  // status: 'active' — the backend's supervisor validation never checks the
+  // candidate's status, so this filter is what keeps an inactive person out.
   const { data: supervisorCandidatesData, isLoading: isLoadingSupervisors } = useRoles(
     { tenant: tenant || undefined, division: division || undefined, type: parentTypeId, status: 'active' },
     isCreateMode && needsSupervisor && !!tenant && !!division && !!parentTypeId,
@@ -303,11 +233,7 @@ const RoleDetailPage = () => {
   useEffect(() => {
     setValue('division', '')
     setValue('supervisor', '')
-    // Only reset when roleType/tenant actually change — setValue itself is
-    // stable across renders (react-hook-form), so it's safe to omit here
-    // without re-adding the same feedback-loop risk useRolePermissionPicker's
-    // own comment warns about; division/supervisor are never read by this
-    // effect's own trigger condition.
+    // setValue is stable across renders; safe to omit from deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roleType, tenant])
 
@@ -330,8 +256,7 @@ const RoleDetailPage = () => {
         userGender: typeof userValue !== 'string' ? ((userValue.gender as RoleFormValues['userGender']) ?? '') : '',
         userStatus: typeof userValue !== 'string' ? ((userValue.status as RoleFormValues['userStatus']) ?? '') : '',
       })
-      // role.permissions is a bare string[] on the wire (see RoleEntity
-      // comment in accessManagement.types.ts) — no .code projection needed.
+      // role.permissions is a bare string[] on the wire — no .code projection.
       setSelectedCodes(new Set(role.permissions ?? []))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -386,12 +311,8 @@ const RoleDetailPage = () => {
     })
   }
 
-  // needsDivision/needsSupervisor block submission on create via the
-  // schema's own refinement path is NOT used here — those two fields'
-  // "required when this role type needs one" rule depends on data
-  // (roleTypes/PHARMA_SUPERVISOR_PARENT_CODE) the static Zod schema can't
-  // see, so it stays as an imperative guard layered in front of
-  // handleSubmit, exactly as it worked before this migration.
+  // needsDivision/needsSupervisor depend on data the static Zod schema can't
+  // see, so they stay as an imperative guard in front of handleSubmit.
   const guardedSubmit = handleSubmit((values) => {
     if (isCreateMode) {
       if (needsDivision && !values.division) return
@@ -438,41 +359,22 @@ const RoleDetailPage = () => {
                   New role
                 </div>
                 <div>
-                  <Label
-                    htmlFor="tenant"
-                    className="text-[10px] font-semibold tracking-widest uppercase mb-2"
-                    style={{ color: 'var(--qms-text-muted)' }}
-                  >
+                  <FieldLabel htmlFor="tenant">
                     Company
-                  </Label>
+                  </FieldLabel>
                   <Controller
                     control={control}
                     name="tenant"
                     render={({ field }) => (
-                      <Select
-                        key={field.value || 'empty'}
-                        value={field.value || undefined}
+                      <TenantPicker
+                        id="tenant"
+                        tenants={tenants}
+                        value={field.value}
                         onValueChange={(v) => {
-                          field.onChange(v ?? '')
+                          field.onChange(v)
                           setValue('roleType', '')
                         }}
-                      >
-                        <SelectTrigger id="tenant" className="w-full">
-                          <SelectValue placeholder="Select company">
-                            {(v) => {
-                              const t = tenants.find((t) => t.id === v)
-                              return t ? `${t.name} (${t.code})` : 'Select company'
-                            }}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {tenants.map((t) => (
-                            <SelectItem key={t.id} value={t.id}>
-                              {t.name} ({t.code})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      />
                     )}
                   />
                   {touchedFields.tenant && errors.tenant && (
@@ -516,49 +418,33 @@ const RoleDetailPage = () => {
             <div className="space-y-4">
               {isCreateMode && (
                 <div>
-                  <Label
-                    htmlFor="code"
-                    className="text-[10px] font-semibold tracking-widest uppercase mb-2"
-                    style={{ color: 'var(--qms-text-muted)' }}
-                  >
+                  <FieldLabel htmlFor="code">
                     Code
-                  </Label>
+                  </FieldLabel>
                   <Input id="code" type="text" placeholder="e.g. site-manager-john" {...register('code')} />
                   {touchedFields.code && errors.code && <p className="text-xs text-danger mt-1.5">{errors.code.message}</p>}
                 </div>
               )}
 
               <div>
-                <Label
-                  htmlFor="name"
-                  className="text-[10px] font-semibold tracking-widest uppercase mb-2"
-                  style={{ color: 'var(--qms-text-muted)' }}
-                >
+                <FieldLabel htmlFor="name">
                   Name
-                </Label>
+                </FieldLabel>
                 <Input id="name" type="text" {...register('name')} />
                 {touchedFields.name && errors.name && <p className="text-xs text-danger mt-1.5">{errors.name.message}</p>}
               </div>
 
               <div>
-                <Label
-                  htmlFor="description"
-                  className="text-[10px] font-semibold tracking-widest uppercase mb-2"
-                  style={{ color: 'var(--qms-text-muted)' }}
-                >
+                <FieldLabel htmlFor="description">
                   Description
-                </Label>
+                </FieldLabel>
                 <Textarea id="description" placeholder="Optional" {...register('description')} />
               </div>
 
               <div>
-                <Label
-                  htmlFor="roleType"
-                  className="text-[10px] font-semibold tracking-widest uppercase mb-2"
-                  style={{ color: 'var(--qms-text-muted)' }}
-                >
+                <FieldLabel htmlFor="roleType">
                   Role Type
-                </Label>
+                </FieldLabel>
                 <Controller
                   control={control}
                   name="roleType"
@@ -592,9 +478,9 @@ const RoleDetailPage = () => {
 
               {isCreateMode && needsDivision && (
                 <div>
-                  <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+                  <FieldLabel>
                     Division
-                  </Label>
+                  </FieldLabel>
                   <Controller
                     control={control}
                     name="division"
@@ -625,9 +511,9 @@ const RoleDetailPage = () => {
 
               {isCreateMode && needsSupervisor && (
                 <div>
-                  <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+                  <FieldLabel>
                     Supervisor
-                  </Label>
+                  </FieldLabel>
                   <Controller
                     control={control}
                     name="supervisor"
@@ -659,22 +545,13 @@ const RoleDetailPage = () => {
 
               {!isCreateMode && (
                 <div>
-                  <Label
-                    htmlFor="status"
-                    className="text-[10px] font-semibold tracking-widest uppercase mb-2"
-                    style={{ color: 'var(--qms-text-muted)' }}
-                  >
+                  <FieldLabel htmlFor="status">
                     Status
-                  </Label>
-                  {/* key={status || 'empty'} forces a fresh mount once the real
-                      value loads from the async fetch — base-ui's Select
-                      decides controlled-vs-uncontrolled on its very first
-                      render and never revisits it, so without this the
-                      trigger permanently shows "Select status" even after
-                      the real value arrives (same bug as
-                      TenantDetailPage.tsx/GeoProfileDetailPage.tsx/
-                      CampDetailPageReal.tsx). Data-only display bug — the
-                      underlying value was always correct. */}
+                  </FieldLabel>
+                  {/* key={status || 'empty'} forces a remount once the real value
+                      loads — base-ui's Select fixes controlled/uncontrolled on
+                      first render, so without this the trigger keeps showing
+                      "Select status" after the value arrives (recurs elsewhere). */}
                   <Controller
                     control={control}
                     name="status"
@@ -713,26 +590,18 @@ const RoleDetailPage = () => {
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <Label
-                    htmlFor="userFirstName"
-                    className="text-[10px] font-semibold tracking-widest uppercase mb-2"
-                    style={{ color: 'var(--qms-text-muted)' }}
-                  >
+                  <FieldLabel htmlFor="userFirstName">
                     First name
-                  </Label>
+                  </FieldLabel>
                   <Input id="userFirstName" type="text" {...register('userFirstName')} />
                   {touchedFields.userFirstName && errors.userFirstName && (
                     <p className="text-xs text-danger mt-1.5">{errors.userFirstName.message}</p>
                   )}
                 </div>
                 <div>
-                  <Label
-                    htmlFor="userLastName"
-                    className="text-[10px] font-semibold tracking-widest uppercase mb-2"
-                    style={{ color: 'var(--qms-text-muted)' }}
-                  >
+                  <FieldLabel htmlFor="userLastName">
                     Last name
-                  </Label>
+                  </FieldLabel>
                   <Input id="userLastName" type="text" {...register('userLastName')} />
                 </div>
               </div>
@@ -740,26 +609,18 @@ const RoleDetailPage = () => {
               {isCreateMode && (
                 <>
                   <div>
-                    <Label
-                      htmlFor="userEmail"
-                      className="text-[10px] font-semibold tracking-widest uppercase mb-2"
-                      style={{ color: 'var(--qms-text-muted)' }}
-                    >
+                    <FieldLabel htmlFor="userEmail">
                       Email
-                    </Label>
+                    </FieldLabel>
                     <Input id="userEmail" type="email" {...register('userEmail')} />
                     {touchedFields.userEmail && errors.userEmail && (
                       <p className="text-xs text-danger mt-1.5">{errors.userEmail.message}</p>
                     )}
                   </div>
                   <div>
-                    <Label
-                      htmlFor="userPassword"
-                      className="text-[10px] font-semibold tracking-widest uppercase mb-2"
-                      style={{ color: 'var(--qms-text-muted)' }}
-                    >
+                    <FieldLabel htmlFor="userPassword">
                       Password
-                    </Label>
+                    </FieldLabel>
                     <Input id="userPassword" type="password" {...register('userPassword')} />
                     {touchedFields.userPassword && errors.userPassword && (
                       <p className="text-xs text-danger mt-1.5">{errors.userPassword.message}</p>
@@ -770,9 +631,9 @@ const RoleDetailPage = () => {
 
               {!isCreateMode && userEmail && (
                 <div>
-                  <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+                  <FieldLabel>
                     Email
-                  </Label>
+                  </FieldLabel>
                   <div className="text-[13px] rounded-lg border px-3 py-2" style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text)' }}>
                     {userEmail}
                   </div>
@@ -781,23 +642,15 @@ const RoleDetailPage = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <Label
-                    htmlFor="userPhone"
-                    className="text-[10px] font-semibold tracking-widest uppercase mb-2"
-                    style={{ color: 'var(--qms-text-muted)' }}
-                  >
+                  <FieldLabel htmlFor="userPhone">
                     Phone
-                  </Label>
+                  </FieldLabel>
                   <Input id="userPhone" type="text" placeholder="Optional" disabled={!isCreateMode} {...register('userPhone')} />
                 </div>
                 <div>
-                  <Label
-                    htmlFor="userGender"
-                    className="text-[10px] font-semibold tracking-widest uppercase mb-2"
-                    style={{ color: 'var(--qms-text-muted)' }}
-                  >
+                  <FieldLabel htmlFor="userGender">
                     Gender
-                  </Label>
+                  </FieldLabel>
                   <Controller
                     control={control}
                     name="userGender"
@@ -821,13 +674,9 @@ const RoleDetailPage = () => {
 
               {!isCreateMode && (
                 <div>
-                  <Label
-                    htmlFor="userStatus"
-                    className="text-[10px] font-semibold tracking-widest uppercase mb-2"
-                    style={{ color: 'var(--qms-text-muted)' }}
-                  >
+                  <FieldLabel htmlFor="userStatus">
                     User status
-                  </Label>
+                  </FieldLabel>
                   <Controller
                     control={control}
                     name="userStatus"
@@ -903,34 +752,14 @@ const RoleDetailPage = () => {
 
             {tenant && roleType && !isLoadingCeiling && permissionGroup && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {candidatePermissions.map((permission) => {
-                  const checked = effectiveSelectedCodes.has(permission.code)
-                  return (
-                    <label
-                      key={permission.code}
-                      className="flex items-start gap-2.5 rounded-lg border px-3 py-2 cursor-pointer transition-colors hover:bg-(--qms-surface-hover)"
-                      style={{
-                        borderColor: checked ? 'var(--qms-brand)' : 'var(--qms-border)',
-                        background: checked ? 'color-mix(in oklch, var(--qms-brand), transparent 92%)' : 'transparent',
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggleCode(permission.code)}
-                        className="mt-0.5 accent-(--qms-brand)"
-                      />
-                      <span className="min-w-0">
-                        <span className="block text-[13px] font-semibold truncate" style={{ color: 'var(--qms-text)' }}>
-                          {permission.name}
-                        </span>
-                        <span className="block text-[11px] font-mono truncate" style={{ color: 'var(--qms-text-muted)' }}>
-                          {permission.code}
-                        </span>
-                      </span>
-                    </label>
-                  )
-                })}
+                {candidatePermissions.map((permission) => (
+                  <PermissionCheckboxRow
+                    key={permission.code}
+                    permission={permission}
+                    checked={effectiveSelectedCodes.has(permission.code)}
+                    onToggle={toggleCode}
+                  />
+                ))}
 
                 {candidatePermissions.length === 0 && (
                   <div className="text-[13px] py-6 text-center col-span-full" style={{ color: 'var(--qms-text-muted)' }}>
@@ -960,17 +789,7 @@ const RoleDetailPage = () => {
               </div>
             )}
 
-            {mutation.isError && (
-              <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger mt-4">
-                {(mutation.error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-                  'Failed to save changes.'}
-              </div>
-            )}
-            {mutation.isSuccess && !isCreateMode && (
-              <div className="text-xs rounded-xl px-3 py-2 bg-success-soft text-success mt-4">
-                Saved.
-              </div>
-            )}
+            <MutationStatusBanner mutation={mutation} showSuccess={!isCreateMode} />
 
             <Button type="submit" disabled={mutation.isPending} className="mt-4">
               {mutation.isPending ? 'Saving…' : isCreateMode ? 'Create role' : 'Save changes'}

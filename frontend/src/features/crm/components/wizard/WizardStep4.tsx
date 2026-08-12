@@ -1,5 +1,4 @@
 import type { WizardFormState } from '@/features/crm/wizard.types'
-import { computeWizardScore } from '@/features/crm/wizard.types'
 import { LEAD_PROJECT_TYPE_LABEL } from '@/types/crm.types'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
@@ -19,8 +18,6 @@ interface WizardStep4Props {
 }
 
 const WizardStep4 = ({ form, setField }: WizardStep4Props) => {
-  const score = computeWizardScore(form)
-
   // limit: PLATFORM_TENANT_FETCH_LIMIT — see accessManagement.constants.ts;
   // the backend's default 10-result limit can silently exclude the `qms`
   // platform tenant once total active tenant count passes 10.
@@ -122,7 +119,6 @@ const WizardStep4 = ({ form, setField }: WizardStep4Props) => {
           <ReviewField label="MRs" value={form.numberOfMRS ? String(form.numberOfMRS) : '—'} />
           <ReviewField label="Project type" value={form.projectType ? LEAD_PROJECT_TYPE_LABEL[form.projectType] : '—'} />
           <ReviewField label="QMS offer" value={form.offers.length ? String(form.offers.length) : '—'} />
-          <ReviewField label="AI score" value={String(score)} />
           <ReviewField label="Value" value={formatINR(form.estimatedValue)} />
         </ReviewGrid>
         {form.problemStatement && (

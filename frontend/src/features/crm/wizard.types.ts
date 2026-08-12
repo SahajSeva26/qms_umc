@@ -56,13 +56,3 @@ export const DEFAULT_WIZARD_FORM: WizardFormState = {
   salesPersonId: '',
   salesPersonLabel: '',
 }
-
-export function computeWizardScore(form: WizardFormState): number {
-  let score = form.confidence
-  if (form.estimatedValue > 5_000_000) score += 6
-  if (form.estimatedValue > 1_000_000) score += 3
-  if (form.problemStatement.length > 80) score += 4
-  if (form.focusTherapyDoctor.length > 0) score += 2
-  if (form.divisionId) score += 2
-  return Math.max(5, Math.min(99, Math.round(score)))
-}

@@ -1,7 +1,5 @@
 import type { RouteObject } from 'react-router-dom'
-import GeoProfilesListPage from '@/features/geo-profile/pages/GeoProfilesListPage'
-import GeoProfileDetailPage from '@/features/geo-profile/pages/GeoProfileDetailPage'
-import NearestGeoProfilesPage from '@/features/geo-profile/pages/NearestGeoProfilesPage'
+import { lazyRoute } from '@/lib/router/lazyRoute'
 
 import { GEO_PROFILE_ROUTES } from '@/features/geo-profile/geoProfile.constants'
 
@@ -13,8 +11,8 @@ import { GEO_PROFILE_ROUTES } from '@/features/geo-profile/geoProfile.constants'
 // backend's own 403 in the mutation's error state (same pattern as Doctor's
 // EditDoctorModal).
 export const geoProfileRoutes: RouteObject[] = [
-  { path: GEO_PROFILE_ROUTES.GEO_PROFILES, element: <GeoProfilesListPage /> },
-  { path: GEO_PROFILE_ROUTES.GEO_PROFILE_NEAREST, element: <NearestGeoProfilesPage /> },
-  { path: GEO_PROFILE_ROUTES.GEO_PROFILE_NEW, element: <GeoProfileDetailPage /> },
-  { path: GEO_PROFILE_ROUTES.GEO_PROFILE_DETAIL, element: <GeoProfileDetailPage /> },
+  { path: GEO_PROFILE_ROUTES.GEO_PROFILES, lazy: lazyRoute(() => import('@/features/geo-profile/pages/GeoProfilesListPage')) },
+  { path: GEO_PROFILE_ROUTES.GEO_PROFILE_NEAREST, lazy: lazyRoute(() => import('@/features/geo-profile/pages/NearestGeoProfilesPage')) },
+  { path: GEO_PROFILE_ROUTES.GEO_PROFILE_NEW, lazy: lazyRoute(() => import('@/features/geo-profile/pages/GeoProfileDetailPage')) },
+  { path: GEO_PROFILE_ROUTES.GEO_PROFILE_DETAIL, lazy: lazyRoute(() => import('@/features/geo-profile/pages/GeoProfileDetailPage')) },
 ]

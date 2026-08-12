@@ -1,6 +1,5 @@
 import type { RouteObject } from 'react-router-dom'
-import RequirePermission from '@/components/layouts/RequirePermission'
-import ContactsPage from './pages/ContactsPage'
+import { lazyRoute } from '@/lib/router/lazyRoute'
 
 export const CONTACT_ROUTES = {
   CONTACTS: '/crm/contacts',
@@ -13,10 +12,6 @@ const CONTACT_VIEW_PERMISSIONS = ['contact:search', 'contact:manage', 'tenant:ma
 export const contactsRoutes: RouteObject[] = [
   {
     path: CONTACT_ROUTES.CONTACTS,
-    element: (
-      <RequirePermission anyOf={CONTACT_VIEW_PERMISSIONS}>
-        <ContactsPage />
-      </RequirePermission>
-    ),
+    lazy: lazyRoute(() => import('./pages/ContactsPage'), CONTACT_VIEW_PERMISSIONS),
   },
 ]

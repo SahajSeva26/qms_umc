@@ -1,11 +1,5 @@
 import type { RouteObject } from 'react-router-dom'
-import RequirePermission from '@/components/layouts/RequirePermission'
-import AdminPage from './pages/AdminPage'
-import UsersPage from './pages/UsersPage'
-import UserDetailPage from './pages/UserDetailPage'
-import HqPage from '@/features/hq/pages/HqPage'
-import RemindersPage from '@/features/reminders/pages/RemindersPage'
-import InventoryPage from '@/features/inventory/pages/InventoryPage'
+import { lazyRoute } from '@/lib/router/lazyRoute'
 
 export const ADMIN_ROUTES = {
   ADMIN:              '/admin',
@@ -27,28 +21,30 @@ export const ADMIN_ROUTES = {
 // per-request 403 on the underlying API calls.
 const USERS_VIEW_PERMISSIONS = ['user:get', 'user:search', 'user:update']
 
+// HQ, Reminders and Inventory are separate features (features/hq,
+// features/reminders, features/inventory) mounted under /admin/* for nav
+// purposes only — same cross-feature-routing pattern billing.routes.tsx uses
+// for Diet's DietitianPaymentPage. None have their own permission codes
+// today (no RequirePermission wrapper existed before this change either) —
+// lazy-loading doesn't change that; it only stops their (individually
+// large — Inventory and HQ in particular) chunks from shipping to every
+// authenticated user regardless of whether they ever open /admin.
+const adminPage = lazyRoute(() => import('./pages/AdminPage'))
+
 export const adminRoutes: RouteObject[] = [
-  { path: ADMIN_ROUTES.ADMIN,           element: <AdminPage /> },
-  { path: ADMIN_ROUTES.ADMIN_HQ,        element: <HqPage /> },
-  { path: ADMIN_ROUTES.ADMIN_REMINDERS, element: <RemindersPage /> },
-  { path: ADMIN_ROUTES.ADMIN_INVENTORY, element: <InventoryPage /> },
-  { path: ADMIN_ROUTES.ADMIN_ASSETS,    element: <AdminPage /> },
-  { path: ADMIN_ROUTES.ADMIN_KPI,       element: <AdminPage /> },
-  { path: ADMIN_ROUTES.ADMIN_SETTINGS,  element: <AdminPage /> },
+  { path: ADMIN_ROUTES.ADMIN,           lazy: adminPage },
+  { path: ADMIN_ROUTES.ADMIN_HQ,        lazy: lazyRoute(() => import('@/features/hq/pages/HqPage')) },
+  { path: ADMIN_ROUTES.ADMIN_REMINDERS, lazy: lazyRoute(() => import('@/features/reminders/pages/RemindersPage')) },
+  { path: ADMIN_ROUTES.ADMIN_INVENTORY, lazy: lazyRoute(() => import('@/features/inventory/pages/InventoryPage')) },
+  { path: ADMIN_ROUTES.ADMIN_ASSETS,    lazy: adminPage },
+  { path: ADMIN_ROUTES.ADMIN_KPI,       lazy: adminPage },
+  { path: ADMIN_ROUTES.ADMIN_SETTINGS,  lazy: adminPage },
   {
     path: ADMIN_ROUTES.ADMIN_USERS,
-    element: (
-      <RequirePermission anyOf={USERS_VIEW_PERMISSIONS}>
-        <UsersPage />
-      </RequirePermission>
-    ),
+    lazy: lazyRoute(() => import('./pages/UsersPage'), USERS_VIEW_PERMISSIONS),
   },
   {
     path: ADMIN_ROUTES.ADMIN_USER_DETAIL,
-    element: (
-      <RequirePermission anyOf={USERS_VIEW_PERMISSIONS}>
-        <UserDetailPage />
-      </RequirePermission>
-    ),
+    lazy: lazyRoute(() => import('./pages/UserDetailPage'), USERS_VIEW_PERMISSIONS),
   },
 ]

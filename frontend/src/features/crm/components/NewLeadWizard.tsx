@@ -1,7 +1,7 @@
 import { Fragment, useState } from 'react'
 import { FiBriefcase, FiArrowLeft, FiArrowRight, FiSave, FiX } from 'react-icons/fi'
 import type { CreateLeadPayload } from '@/types/crm.types'
-import { DEFAULT_WIZARD_FORM, computeWizardScore, type WizardFormState } from '@/features/crm/wizard.types'
+import { DEFAULT_WIZARD_FORM, type WizardFormState } from '@/features/crm/wizard.types'
 import { useLeads } from '@/features/crm/hooks/useLeads'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -103,7 +103,6 @@ const NewLeadWizard = ({ onClose, onCreated }: NewLeadWizardProps) => {
   }
 
   const currentStep = STEPS[step]
-  const score = computeWizardScore(form)
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
@@ -176,7 +175,7 @@ const NewLeadWizard = ({ onClose, onCreated }: NewLeadWizardProps) => {
 
         <div className="flex items-center justify-between gap-3 px-5 pb-5 pt-3" style={{ borderTop: '1px solid var(--qms-border)' }}>
           <div className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>
-            New lead · {form.tenantLabel || '(no company)'} · score {score}
+            New lead · {form.tenantLabel || '(no company)'}
           </div>
           <div className="flex flex-col items-end gap-1.5">
             {error && <p className="text-[12px] text-danger">{error}</p>}

@@ -1,7 +1,6 @@
 import api from '@/lib/api/api'
 import type { ApiResponse, PaginatedResponse } from '@/types/common.types'
 import type {
-  CreatePermissionGroupPayload,
   CreateRolePayload,
   CreateRoleTypePayload,
   CreateTenantPayload,
@@ -83,15 +82,6 @@ const getPermissionGroup = async (id: string) => {
   return res.data
 }
 
-// TODO: backend POST /permission-groups route is currently commented out in
-// permissionGroup.routes.ts — there is no live create endpoint. This call is
-// wired per the documented CreatePermissionGroupPayloadSchema so it "just
-// works" the moment the route is re-enabled, but calling it today will 404.
-const createPermissionGroup = async (payload: CreatePermissionGroupPayload) => {
-  const res = await api.post<ApiResponse<PermissionGroupEntity>>('/permission-groups', payload)
-  return res.data
-}
-
 const updatePermissionGroup = async (id: string, payload: UpdatePermissionGroupPayload) => {
   const res = await api.put<ApiResponse<PermissionGroupEntity>>(`/permission-groups/${id}`, payload)
   return res.data
@@ -153,7 +143,6 @@ export const accessManagementService = {
   updateTenant,
   searchPermissionGroups,
   getPermissionGroup,
-  createPermissionGroup,
   updatePermissionGroup,
   searchRoleTypes,
   getRoleType,

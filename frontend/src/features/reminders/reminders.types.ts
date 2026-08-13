@@ -19,6 +19,18 @@ export type ReminderLanguage = 'en' | 'hi' | 'mr'
 // never produces MR/Doctor recipients; those don't exist in this engine).
 export type RecipientType = 'FO' | 'Dietitian'
 
+// A resolved reminder recipient — output of recipientsFor()
+// (reminders.recipients.service.ts), consumed by reminders.templates.service.ts
+// (buildContext) and reminders.triggers.service.ts (createThread/dispatch).
+// Lives here, not in either of those service modules, so neither one depends
+// on the other just to share this shape.
+export interface EngineRecipient {
+  type: RecipientType
+  id: string
+  name: string
+  phone: string
+}
+
 // Template families — voice_fo/voice_diet/wa_fo/wa_diet (pre-camp, T-24/T-2)
 // plus submit_diet (post-camp dietitian-submission nag, WhatsApp-only,
 // repeats every 24h for up to 30 days via a POSTSUBMIT_<n> stage until the

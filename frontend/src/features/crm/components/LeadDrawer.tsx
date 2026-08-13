@@ -105,7 +105,7 @@ const LeadDrawer = ({ lead, onClose, onMoveStage, onUpdateLead, canManage }: Lea
               className={`text-[12px] font-bold px-3 py-2 rounded-lg transition-colors ${to === 'lost' ? 'bg-danger-soft text-danger' : ''}`}
               style={to === 'lost' ? undefined : { background: 'var(--qms-surface-strong)', color: 'var(--qms-text)' }}
             >
-              {LEAD_STATUS_LABEL[to]} →
+              {LEAD_STATUS_LABEL[lead.status]} → {LEAD_STATUS_LABEL[to]}
             </button>
           ))}
         </div>

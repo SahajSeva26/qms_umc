@@ -24,10 +24,19 @@ const WizardStep4 = ({ form, setField }: WizardStep4Props) => {
   const { data: tenantData, isError: tenantsErrored } = useTenants({ type: 'platform', status: 'active', limit: PLATFORM_TENANT_FETCH_LIMIT })
   const platformTenant = tenantData?.data?.items.find((t) => t.type === 'platform' || t.code === PLATFORM_TENANT_CODE)
 
-  const { data: salesRepTypeData, isLoading: roleTypesLoading, isError: roleTypesErrored } = useRoleTypes({ code: 'sales-rep', status: 'active' })
-  const { data: salesHeadTypeData } = useRoleTypes({ code: 'sales-head', status: 'active' })
-  const salesRepTypeId = salesRepTypeData?.data?.items[0]?.id
-  const salesHeadTypeId = salesHeadTypeData?.data?.items[0]?.id
+  // TODO: ask whether this field should really offer both sales-rep and
+  // sales-head, or only one of the two — combined into one fetch for now
+  // (backend's role-type search only supports a single exact `code`, not a
+  // list, so codes are split out client-side instead of two filtered calls).
+  // limit: '50' — sorted newest-first, and sales-rep/sales-head were seeded
+  // early, so the backend's default 10-result page already excludes both
+  // once the platform tenant has 10+ role types (confirmed live).
+  const { data: roleTypesData, isLoading: roleTypesLoading, isError: roleTypesErrored } = useRoleTypes(
+    { tenant: platformTenant?.id, status: 'active', limit: '50' },
+    !!platformTenant,
+  )
+  const salesRepTypeId = roleTypesData?.data?.items.find((t) => t.code === 'sales-rep')?.id
+  const salesHeadTypeId = roleTypesData?.data?.items.find((t) => t.code === 'sales-head')?.id
 
   const { data: salesRepRoleData, isLoading: salesRepRolesLoading, isError: salesRepRolesErrored } = useRoles(
     { tenant: platformTenant?.id, type: salesRepTypeId, status: 'active' },

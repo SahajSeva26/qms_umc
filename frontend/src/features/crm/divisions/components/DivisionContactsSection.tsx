@@ -4,8 +4,10 @@ import { useContacts } from '@/features/contacts/hooks/useContacts'
 import { usePermission } from '@/hooks/usePermission'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import PaginationControls from '@/components/ui/PaginationControls'
 import EditContactModal from '@/features/contacts/components/EditContactModal'
+import ContactsTable from '@/features/crm/divisions/components/ContactsTable'
 import type { ContactEntity } from '@/types/contact.types'
 
 interface DivisionContactsSectionProps {
@@ -15,8 +17,6 @@ interface DivisionContactsSectionProps {
 
 const PAGE_SIZE = 10
 
-// Contacts scoped to one division — the real home for Contacts now that the
-// standalone /crm/contacts page is gone.
 const DivisionContactsSection = ({ tenantId, divisionId }: DivisionContactsSectionProps) => {
   const { hasAnyPermission } = usePermission()
   const canManage = hasAnyPermission(['contact:manage', 'tenant:manage', 'tenant:admin'])
@@ -37,31 +37,30 @@ const DivisionContactsSection = ({ tenantId, divisionId }: DivisionContactsSecti
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
 
   return (
-    <div
-      className="rounded-xl border p-5 mt-5"
-      style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}
-    >
-      <div className="flex items-center gap-2 mb-4">
-        <div
-          className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-          style={{ background: 'color-mix(in oklch, var(--qms-brand), transparent 88%)' }}
-        >
-          <FiUser size={14} style={{ color: 'var(--qms-brand)' }} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-bold" style={{ color: 'var(--qms-text)' }}>Contacts</h2>
-          <p className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>
-            {!isLoading && !error ? `${totalCount} total` : 'Contacts for this division'}
-          </p>
+    <div>
+      <div className="mb-3 flex items-start justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <div
+            className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+            style={{ background: 'color-mix(in oklch, var(--qms-brand), transparent 88%)' }}
+          >
+            <FiUser size={14} style={{ color: 'var(--qms-brand)' }} />
+          </div>
+          <div>
+            <h2 className="text-base font-bold" style={{ color: 'var(--qms-text)' }}>Contacts</h2>
+            <p className="text-[12px] mt-0.5" style={{ color: 'var(--qms-text-muted)' }}>
+              {!isLoading && !error ? `${totalCount} total` : 'Contacts for this division.'}
+            </p>
+          </div>
         </div>
         {canManage && (
-          <button
+          <Button
             onClick={() => setEditModal({ open: true, contact: null })}
-            className="flex items-center gap-1.5 text-[12px] font-bold px-3 py-1.5 rounded-lg text-white shrink-0"
+            className="text-white shrink-0"
             style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
           >
-            <FiPlus size={13} /> New contact
-          </button>
+            <FiPlus size={14} /> New Contact
+          </Button>
         )}
       </div>
 
@@ -80,7 +79,7 @@ const DivisionContactsSection = ({ tenantId, divisionId }: DivisionContactsSecti
       </div>
 
       {isLoading && (
-        <div className="text-[13px] py-6 text-center" style={{ color: 'var(--qms-text-muted)' }}>
+        <div className="text-[13px] py-10 text-center" style={{ color: 'var(--qms-text-muted)' }}>
           Loading contacts…
         </div>
       )}
@@ -93,51 +92,10 @@ const DivisionContactsSection = ({ tenantId, divisionId }: DivisionContactsSecti
 
       {!isLoading && !error && (
         <>
-          <div className="space-y-1.5">
-            {contacts.map((c) => (
-              <div
-                key={c.id}
-                onClick={() => canManage && setEditModal({ open: true, contact: c })}
-                className="flex items-center gap-3 rounded-lg border p-2.5 transition-colors"
-                style={{
-                  borderColor: 'var(--qms-border)',
-                  cursor: canManage ? 'pointer' : 'default',
-                }}
-                onMouseEnter={(e) => { if (canManage) e.currentTarget.style.background = 'var(--qms-surface-hover)' }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
-              >
-                <div
-                  className="w-9 h-9 rounded-lg flex items-center justify-center text-white shrink-0"
-                  style={{ background: 'linear-gradient(135deg,#3b6dff,#8b5cf6)' }}
-                >
-                  <FiUser size={14} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-[13px] font-bold truncate" style={{ color: 'var(--qms-text)' }}>{c.name}</div>
-                  <div className="text-[11px] truncate" style={{ color: 'var(--qms-text-muted)' }}>
-                    {[c.designation, c.email, c.phone].filter(Boolean).join(' · ') || '—'}
-                  </div>
-                </div>
-                <span
-                  className="text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0"
-                  style={{
-                    background: c.status === 'active' ? 'var(--qms-success-soft, #dcfce7)' : 'var(--qms-surface-strong)',
-                    color: c.status === 'active' ? 'var(--qms-success, #16a34a)' : 'var(--qms-text-muted)',
-                  }}
-                >
-                  {c.status === 'active' ? 'Active' : 'Inactive'}
-                </span>
-              </div>
-            ))}
-            {contacts.length === 0 && (
-              <div
-                className="rounded-xl border border-dashed p-6 text-center text-[12px]"
-                style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }}
-              >
-                {debouncedSearch ? 'No contacts match this search.' : 'No contacts on record for this division.'}
-              </div>
-            )}
-          </div>
+          <ContactsTable
+            contacts={contacts}
+            onRowClick={(contact) => canManage && setEditModal({ open: true, contact })}
+          />
           {totalPages > 1 && <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} />}
         </>
       )}

@@ -53,6 +53,10 @@ interface EditContactModalProps {
   // Pins create to a known tenant/division — skips both pickers below.
   fixedTenantId?: string
   fixedDivisionId?: string
+  // The fixed tenant's own type — needed when fixedTenantId belongs to
+  // someone other than the caller (e.g. TenantDetailPage), since otherwise
+  // deriveCreateType() would wrongly fall back to the caller's own type.
+  fixedTenantType?: ContactType
   // Fires with the new contact on successful create (not edit), so a
   // "quick add" caller (e.g. NewAppointmentDialog) can auto-select it.
   onCreated?: (contact: { id: string; name: string }) => void
@@ -60,7 +64,7 @@ interface EditContactModalProps {
 
 // Outer shell remounts the inner form keyed on contact id so draft state
 // resets cleanly between "new" and different contacts.
-const EditContactModal = ({ open, contact, onClose, fixedTenantId, fixedDivisionId, onCreated }: EditContactModalProps) => {
+const EditContactModal = ({ open, contact, onClose, fixedTenantId, fixedDivisionId, fixedTenantType, onCreated }: EditContactModalProps) => {
   if (!open) return null
   return (
     <EditContactModalForm
@@ -69,6 +73,7 @@ const EditContactModal = ({ open, contact, onClose, fixedTenantId, fixedDivision
       onClose={onClose}
       fixedTenantId={fixedTenantId}
       fixedDivisionId={fixedDivisionId}
+      fixedTenantType={fixedTenantType}
       onCreated={onCreated}
     />
   )
@@ -79,10 +84,11 @@ interface EditContactModalFormProps {
   onClose: () => void
   fixedTenantId?: string
   fixedDivisionId?: string
+  fixedTenantType?: ContactType
   onCreated?: (contact: { id: string; name: string }) => void
 }
 
-const EditContactModalForm = ({ contact, onClose, fixedTenantId, fixedDivisionId, onCreated }: EditContactModalFormProps) => {
+const EditContactModalForm = ({ contact, onClose, fixedTenantId, fixedDivisionId, fixedTenantType, onCreated }: EditContactModalFormProps) => {
   const isEdit = !!contact
   const [draft, setDraft] = useState<ContactDraft>(contact ? draftFromContact(contact) : emptyDraft)
   const [tenant, setTenant] = useState(fixedTenantId ?? '')
@@ -94,11 +100,11 @@ const EditContactModalForm = ({ contact, onClose, fixedTenantId, fixedDivisionId
   const { data: tenantsData } = useTenants({}, needsTenantPicker)
   const tenants = tenantsData?.data?.items ?? []
 
-  // No manual choice on create: use the caller's own tenant type, or
-  // 'customer' by default. fixedDivisionId always means 'customer' —
-  // divisions only exist under customer tenants.
+  // No manual choice on create — fixedDivisionId always means 'customer';
+  // otherwise use fixedTenantType, the caller's own type, or a picked tenant's.
   const deriveCreateType = (): ContactType => {
     if (fixedDivisionId) return 'customer'
+    if (fixedTenantType) return fixedTenantType
     if (!needsTenantPicker) return (sessionPermissions?.tenantType as ContactType) ?? 'customer'
     const selected = tenants.find((t) => t.id === tenant)
     return (selected?.type as ContactType) ?? 'customer'

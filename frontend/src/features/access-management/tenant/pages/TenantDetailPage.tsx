@@ -10,6 +10,7 @@ import DivisionsFilterBar from '@/features/crm/divisions/components/DivisionsFil
 import DivisionsTable from '@/features/crm/divisions/components/DivisionsTable'
 import CreateDivisionModal from '@/features/crm/divisions/components/CreateDivisionModal'
 import EditTenantModal from '@/features/access-management/tenant/components/EditTenantModal'
+import EditContactModal from '@/features/contacts/components/EditContactModal'
 import { DIVISION_ROUTES } from '@/features/crm/divisions/divisions.routes'
 import { usePermission } from '@/hooks/usePermission'
 import { TENANT_ROUTES } from '@/features/access-management/tenant/tenant.routes'
@@ -38,6 +39,8 @@ const TenantDetailPage = () => {
   // only show the Divisions section when the caller could actually load it.
   const canViewDivisions = hasAnyPermission(['division:manage', 'tenant:admin', 'lead:manage'])
   const canSeeInactiveDivisions = hasAnyPermission(['division:manage', 'tenant:manage'])
+  // Matches DivisionContactsSection.tsx's own gate exactly.
+  const canManageContacts = hasAnyPermission(['contact:manage', 'tenant:manage', 'tenant:admin'])
 
   const { data: ownerRoleData } = useRole(tenant?.owner)
   const ownerRole = ownerRoleData?.data ?? null
@@ -47,6 +50,7 @@ const TenantDetailPage = () => {
 
   const [editOpen, setEditOpen] = useState(false)
   const [createDivisionOpen, setCreateDivisionOpen] = useState(false)
+  const [addContactOpen, setAddContactOpen] = useState(false)
 
   const { filters, setFilter, reset } = useDivisionsFilters()
   const debouncedSearch = useDebouncedValue(filters.search, 300)
@@ -141,13 +145,24 @@ const TenantDetailPage = () => {
                     {!divisionsLoading && !divisionsError ? `${totalDivisions} total` : 'Divisions under this company.'}
                   </p>
                 </div>
-                <Button
-                  onClick={() => setCreateDivisionOpen(true)}
-                  className="text-white shrink-0"
-                  style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
-                >
-                  <FiPlus size={14} /> New Division
-                </Button>
+                <div className="flex items-center gap-2 shrink-0">
+                  {canManageContacts && (
+                    <Button
+                      onClick={() => setAddContactOpen(true)}
+                      className="text-white"
+                      style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
+                    >
+                      <FiPlus size={14} /> New Contact
+                    </Button>
+                  )}
+                  <Button
+                    onClick={() => setCreateDivisionOpen(true)}
+                    className="text-white"
+                    style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
+                  >
+                    <FiPlus size={14} /> New Division
+                  </Button>
+                </div>
               </div>
 
               <DivisionsFilterBar filters={filters} setFilter={setFilter} reset={reset} canSeeInactive={canSeeInactiveDivisions} />
@@ -185,6 +200,14 @@ const TenantDetailPage = () => {
           {createDivisionOpen && (
             <CreateDivisionModal onClose={() => setCreateDivisionOpen(false)} defaultTenantId={tenant.id} />
           )}
+
+          <EditContactModal
+            open={addContactOpen}
+            contact={null}
+            onClose={() => setAddContactOpen(false)}
+            fixedTenantId={tenant.id}
+            fixedTenantType={tenant.type}
+          />
         </>
       )}
     </div>

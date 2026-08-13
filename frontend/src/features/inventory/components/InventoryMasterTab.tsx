@@ -3,17 +3,19 @@ import { FiPlus, FiSearch } from 'react-icons/fi'
 import { usePermission } from '@/hooks/usePermission'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { useInventoryMasters } from '@/features/inventory/hooks/useInventoryMasters'
-import { useUpdateInventoryMaster } from '@/features/inventory/hooks/useUpdateInventoryMaster'
 import { INVENTORY_MASTER_TYPE_LABEL, INVENTORY_MASTER_TYPES } from '@/types/inventoryMaster.types'
 import type { InventoryMasterEntity, InventoryMasterStatus, InventoryMasterType } from '@/types/inventoryMaster.types'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import PaginationControls from '@/components/ui/PaginationControls'
+import CopyButton from '@/components/ui/CopyButton'
 import EditInventoryMasterModal from '@/features/inventory/components/EditInventoryMasterModal'
-import { toast } from '@/components/ui/sonner'
 
 const PAGE_SIZE = 10
+const CODE_DISPLAY_LENGTH = 10
+
+const truncateCode = (code: string) => (code.length > CODE_DISPLAY_LENGTH ? `${code.slice(0, CODE_DISPLAY_LENGTH)}…` : code)
 
 // Real backend-wired replacement for the "Item Master" tab — deliberately a
 // separate component from ItemMasterTab.tsx (the old mock), which stays
@@ -28,18 +30,10 @@ const InventoryMasterTab = () => {
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search, 300)
   const [type, setType] = useState<InventoryMasterType | 'ALL'>('ALL')
-  // No "all statuses" option — the backend's search() always assigns
-  // where.status (defaulting to 'active') and only ever overwrites it with
-  // an explicit filter value; there is no code path that removes the status
-  // filter entirely, so a request with no `status` param silently behaves
-  // exactly like status=active instead of returning everything. Only
-  // Active/Inactive are real, distinct results. Only a manage caller can
-  // override the default at all (non-manage callers never see inactive
-  // items), so this only matters/renders for canManage below.
+
   const [statusFilter, setStatusFilter] = useState<InventoryMasterStatus>('active')
   const [page, setPage] = useState(1)
   const [editModal, setEditModal] = useState<{ open: boolean; item: InventoryMasterEntity | null }>({ open: false, item: null })
-  const [deactivatingId, setDeactivatingId] = useState<string | null>(null)
 
   const { data, isLoading, error } = useInventoryMasters({
     name: debouncedSearch || undefined,
@@ -51,28 +45,6 @@ const InventoryMasterTab = () => {
   const items = data?.data?.items ?? []
   const totalCount = data?.data?.count ?? 0
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
-
-  const toggleStatusMutation = useUpdateInventoryMaster(deactivatingId ?? '')
-
-  const handleToggleStatus = (item: InventoryMasterEntity) => {
-    // No DELETE endpoint exists on the backend — the only way to retire (or
-    // restore) an item is PUT .../:id with the opposite status.
-    const nextStatus = item.status === 'active' ? 'inactive' : 'active'
-    setDeactivatingId(item.id)
-    toggleStatusMutation.mutate(
-      { status: nextStatus },
-      {
-        onSuccess: () => {
-          toast.success(`${item.name} ${nextStatus === 'active' ? 'reactivated' : 'deactivated'}`)
-          setDeactivatingId(null)
-        },
-        onError: () => {
-          toast.error('Could not update the item — try again.')
-          setDeactivatingId(null)
-        },
-      },
-    )
-  }
 
   return (
     <div>
@@ -147,7 +119,7 @@ const InventoryMasterTab = () => {
               <table className="w-full text-[13px]">
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--qms-border)' }}>
-                    {['Code', 'Name', 'Type', 'SKU', 'Unit', 'Min / Max stock', ...(canManage ? ['Status', ''] : [])].map((h) => (
+                    {['Code', 'Name', 'Type', 'SKU', 'Unit', ...(canManage ? ['Status'] : []), 'Stock range'].map((h) => (
                       <th
                         key={h}
                         className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5"
@@ -166,36 +138,27 @@ const InventoryMasterTab = () => {
                       className={canManage ? 'cursor-pointer transition-colors hover:bg-(--qms-surface-hover)' : ''}
                       style={{ borderBottom: '1px solid var(--qms-border)' }}
                     >
-                      <td className="px-4 py-2.5 font-mono" style={{ color: 'var(--qms-text)' }}>{item.code}</td>
+                      <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono" title={item.code}>{truncateCode(item.code)}</span>
+                          <CopyButton value={item.code} label="Code" />
+                        </div>
+                      </td>
                       <td className="px-4 py-2.5 font-semibold" style={{ color: 'var(--qms-text)' }}>{item.name}</td>
                       <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{INVENTORY_MASTER_TYPE_LABEL[item.type]}</td>
                       <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{item.sku}</td>
                       <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{item.unit}</td>
-                      <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{item.minStock} / {item.maxStock}</td>
                       {canManage && (
-                        <>
-                          <td className="px-4 py-2.5">
-                            <span
-                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${item.status === 'active' ? 'bg-success-soft text-success' : ''}`}
-                              style={item.status !== 'active' ? { background: 'var(--qms-surface-strong)', color: 'var(--qms-text-muted)' } : undefined}
-                            >
-                              {item.status === 'active' ? 'ACTIVE' : 'INACTIVE'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-2.5 text-right">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={(e) => { e.stopPropagation(); handleToggleStatus(item) }}
-                              disabled={deactivatingId === item.id && toggleStatusMutation.isPending}
-                            >
-                              {deactivatingId === item.id && toggleStatusMutation.isPending
-                                ? (item.status === 'active' ? 'Deactivating…' : 'Reactivating…')
-                                : (item.status === 'active' ? 'Deactivate' : 'Reactivate')}
-                            </Button>
-                          </td>
-                        </>
+                        <td className="px-4 py-2.5">
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${item.status === 'active' ? 'bg-success-soft text-success' : ''}`}
+                            style={item.status !== 'active' ? { background: 'var(--qms-surface-strong)', color: 'var(--qms-text-muted)' } : undefined}
+                          >
+                            {item.status === 'active' ? 'ACTIVE' : 'INACTIVE'}
+                          </span>
+                        </td>
                       )}
+                      <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{item.minStock} - {item.maxStock}</td>
                     </tr>
                   ))}
                 </tbody>

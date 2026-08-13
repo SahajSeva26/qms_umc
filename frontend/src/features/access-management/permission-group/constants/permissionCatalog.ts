@@ -1,54 +1,22 @@
 import type { IPermission } from '@/types/accessManagement.types'
 
 // Hardcoded mirror of the REAL backend permission catalog
-// (`backend/src/shared/env/permissions.ts` -> PERMISSIONS / PERMISSIONS_ARRAY),
-// assembled from the resource `*.constants.ts` files it aggregates. See that
-// file's own import list for the authoritative, current set of modules — do
-// not re-enumerate them here, since that list itself has been the thing that
-// silently went stale (see the drift incidents below).
-//
+// (`backend/src/shared/env/permissions.ts` -> PERMISSIONS / PERMISSIONS_ARRAY).
 // There is no dedicated "list all permissions" endpoint on the backend, so
 // this catalog is hardcoded here to power the permission-group "shopping
 // cart" UI: every known permission code is always rendered, grouped by
 // resource, with the ones already on the group checked.
-// CONFIRMED DRIFT INCIDENT (2026-07-17): this file sat at 27/6 for a while
-// after `division`/`lead` were merged into the backend (PR #3/#4) — nobody
-// updated this hardcoded list, so a real Permission Group in the DB that had
-// been granted the 2 new codes rendered as "29 of 27 selected" (an
-// impossible-looking count) until this file was updated to match.
-// CONFIRMED DRIFT INCIDENT #2 (2026-07-21): happened again — a `main` merge
-// (the "feature/lead-management" PR) split `lead:manage` into 5 codes
-// (search/create/update/get + manage), but this file wasn't updated
-// alongside it, so a real tenant's Permission Group holding e.g. `lead:search`
-// rendered it as invisible/unselectable here (the code existed on the group
-// document but had no matching catalog entry to check a box against) —
-// caught live while testing a Permission Group's edit screen post-merge.
-// CONFIRMED DRIFT INCIDENT #3 (2026-07-24): happened again — the real Camp
-// and Doctor backend modules (`camp.constants.ts`'s 5 codes, `doctor.constants.ts`'s
-// 1 code) were never added here, so any RoleType/PermissionGroup actually
-// holding e.g. `camp:update`/`doctor:manage` (like the real seeded "Camp
-// Coordinator" RoleType) showed a nonzero "N of 47 selected" header with
-// every checkbox unchecked and no way to see or edit which permissions those
-// were — found via a live test sweep, fixed by adding the CAMP/DOCTOR groups.
-// CONFIRMED DRIFT INCIDENT #4 (2026-08-10): found live, undetected until an
-// explicit backend-vs-frontend audit — CONTACT/APPOINTMENT/PROJECT/
-// GEO_PROFILE/COUNTER (5 whole resource groups, 22 codes) had been added to
-// the backend's `permissions.ts` aggregator across several merges but never
-// mirrored here, same failure mode as incidents #1-3, just never caught
-// live this time because none of those RoleTypes/PermissionGroups had been
-// exercised through this specific screen yet. Fixed by adding all 5 groups
-// below. If a `GET /permissions` endpoint is ever added, prefer fetching this
-// list live instead of hand-maintaining it — see PROGRESS.md's "No backend
-// endpoint to list the full permission catalog" Known Issue. Until then: any
-// change to a module's own `*_PERMISSIONS` constant on the backend MUST be
-// mirrored here in the same commit/PR — this has now drifted 4 times.
 //
-// Shape deliberately mirrors the backend's own PERMISSIONS object exactly —
-// an object keyed by resource, each resource an object keyed by action name
-// (e.g. PERMISSIONS.TENANT.CREATE) — rather than the array-of-groups shape
-// this file used before. The backend never represents this as an array;
-// SYSTEM having only one action (MANAGE) is just a one-key object there, not
-// a special case, so there's no array-of-one to flatten here either.
+// This has drifted out of sync with the backend 5 times already (new backend
+// modules adding a `*_PERMISSIONS` constant without a matching update here),
+// each time silently breaking the permission-picker UI for whichever
+// RoleType/PermissionGroup used the missing codes. Any change to a module's
+// `*_PERMISSIONS` constant on the backend MUST be mirrored here in the same
+// commit/PR. If a `GET /permissions` endpoint is ever added, prefer fetching
+// this list live instead of hand-maintaining it.
+//
+// Shape mirrors the backend's own PERMISSIONS object exactly — keyed by
+// resource, each resource keyed by action name (e.g. PERMISSIONS.TENANT.CREATE).
 
 export const PERMISSION_CATALOG = {
   SYSTEM: {
@@ -145,6 +113,9 @@ export const PERMISSION_CATALOG = {
   COUNTER: {
     MANAGE: { code: 'counter:manage', name: 'Manage Counter', description: 'Manage counters (full visibility, incl. inactive)' },
   },
+  INVENTORY_MASTER: {
+    MANAGE: { code: 'inventory-master:manage', name: 'Manage Inventory Master', description: 'Manage inventory master items (full visibility, incl. inactive)' },
+  },
 } as const
 
 /** Display labels for each resource group header — keys must match PERMISSION_CATALOG exactly. */
@@ -165,6 +136,7 @@ export const PERMISSION_RESOURCE_LABELS: Record<keyof typeof PERMISSION_CATALOG,
   DOCTOR: 'Doctor',
   GEO_PROFILE: 'Geo Profile',
   COUNTER: 'Counter',
+  INVENTORY_MASTER: 'Inventory Master',
 }
 
 /** Flat list of every catalog permission, in the same order as PERMISSION_CATALOG's keys. */

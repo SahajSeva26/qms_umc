@@ -14,30 +14,16 @@ interface WizardStep1Props {
 }
 
 const WizardStep1 = ({ form, setField }: WizardStep1Props) => {
-  // Both gated on `!!form.tenantId` — neither should fire an unscoped,
-  // every-tenant call before a company is actually picked (was firing on
-  // mount, before this fix: Divisions returned whichever companies' divisions
-  // happened to sort first, Roles returned whichever tenant's roles sorted
-  // first — both wrong-scoped and both wasted, since this step is unusable
-  // without a company selected anyway).
-  //
-  // NOT `tenantId` — SearchDivisionQuery's own field is stale (see its
-  // comment); the real backend query param is `tenant`
-  // (division.validators.ts's SearchDivisionQuerySchema). Sending `tenantId`
-  // compiles but is silently ignored server-side, returning EVERY tenant's
-  // divisions unscoped — confirmed live 2026-08-07 (selecting "Sun Pharma"
-  // still showed "Cadila Healthcare Cardiology Division" as pickable). Same
-  // root cause already worked around in RoleDetailPage.tsx/NewAppointmentDialog.tsx.
+  // NOT `tenantId` — SearchDivisionQuery's real backend param is `tenant`
+  // (division.validators.ts). Sending `tenantId` is silently ignored server-side.
   const { data: divisionData, isLoading: divisionsLoading, isError: divisionsErrored } = useDivisions({ tenant: form.tenantId || undefined } as unknown as { tenantId?: string }, !!form.tenantId)
   const divisions = form.tenantId ? divisionData?.data?.items ?? [] : []
 
-  // Backend switched Lead.contactPerson from a Role reference to a Contact
-  // reference 2026-08-03 (lead.model.ts's contactPerson.ref, lead.service.ts's
-  // set() now calls ContactService.get() instead of RoleService.get()) — this
-  // picker follows that change; previously deliberately sourced from Roles
-  // per the old ref, now Contacts per the new one.
-  const { data: contactData, isLoading: contactsLoading, isError: contactsErrored } = useContacts({ tenant: form.tenantId || undefined, status: 'active' }, { enabled: !!form.tenantId })
-  const contactPeople = form.tenantId ? contactData?.data?.items ?? [] : []
+  // Scoped by division, not tenant — Contact.division is required for
+  // customer-type contacts (contact.service.ts:112). Gated on divisionId
+  // since there's nothing to pick until one is chosen.
+  const { data: contactData, isLoading: contactsLoading, isError: contactsErrored } = useContacts({ division: form.divisionId || undefined, status: 'active' }, { enabled: !!form.divisionId })
+  const contactPeople = form.divisionId ? contactData?.data?.items ?? [] : []
 
   const selectTenant = (tenantId: string, tenantLabel: string) => {
     setField('tenantId', tenantId)
@@ -52,6 +38,8 @@ const WizardStep1 = ({ form, setField }: WizardStep1Props) => {
     const division = divisions.find((d) => d.id === divisionId)
     setField('divisionId', divisionId)
     setField('divisionLabel', division?.name ?? '')
+    setField('contactPersonId', '')
+    setField('contactPersonLabel', '')
   }
 
   const selectContactPerson = (contactId: string) => {
@@ -69,10 +57,13 @@ const WizardStep1 = ({ form, setField }: WizardStep1Props) => {
 
       <div>
         <Label className={labelClasses} style={labelStyle}>Division *</Label>
-        <Select value={form.divisionId} onValueChange={(v) => selectDivision(v as string)} disabled={!form.tenantId}>
+        <Select key={form.divisionId || 'empty'} value={form.divisionId || undefined} onValueChange={(v) => selectDivision(v as string)} disabled={!form.tenantId}>
           <SelectTrigger className={`w-full ${fieldClasses}`}>
-            <SelectValue placeholder={!form.tenantId ? 'Select a company first' : divisionsLoading ? 'Loading...' : 'Select division...'}>
-              {(v: string) => divisions.find((d) => d.id === v)?.name ?? (divisionsLoading ? 'Loading...' : 'Select division...')}
+            <SelectValue placeholder="Select division...">
+              {(v: string) =>
+                divisions.find((d) => d.id === v)?.name ??
+                (!form.tenantId ? 'Select a company first' : divisionsLoading ? 'Loading...' : 'Select division...')
+              }
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -89,10 +80,13 @@ const WizardStep1 = ({ form, setField }: WizardStep1Props) => {
 
       <div>
         <Label className={labelClasses} style={labelStyle}>Contact person *</Label>
-        <Select value={form.contactPersonId} onValueChange={(v) => selectContactPerson(v as string)} disabled={!form.tenantId}>
+        <Select key={form.contactPersonId || 'empty'} value={form.contactPersonId || undefined} onValueChange={(v) => selectContactPerson(v as string)} disabled={!form.divisionId}>
           <SelectTrigger className={`w-full ${fieldClasses}`}>
-            <SelectValue placeholder={!form.tenantId ? 'Select a company first' : contactsLoading ? 'Loading...' : 'Select contact person...'}>
-              {(v: string) => contactPeople.find((c) => c.id === v)?.name ?? (contactsLoading ? 'Loading...' : 'Select contact person...')}
+            <SelectValue placeholder="Select contact person...">
+              {(v: string) =>
+                contactPeople.find((c) => c.id === v)?.name ??
+                (!form.divisionId ? 'Select a division first' : contactsLoading ? 'Loading...' : 'Select contact person...')
+              }
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -102,8 +96,8 @@ const WizardStep1 = ({ form, setField }: WizardStep1Props) => {
         {contactsErrored && (
           <p className="text-[11px] mt-1 text-danger">Couldn't load contacts — try again.</p>
         )}
-        {!contactsErrored && !contactsLoading && form.tenantId && contactPeople.length === 0 && (
-          <p className="text-[11px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>This company has no contacts yet.</p>
+        {!contactsErrored && !contactsLoading && form.divisionId && contactPeople.length === 0 && (
+          <p className="text-[11px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>This division has no contacts yet.</p>
         )}
       </div>
 

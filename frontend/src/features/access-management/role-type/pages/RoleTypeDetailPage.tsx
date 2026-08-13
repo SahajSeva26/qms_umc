@@ -12,7 +12,10 @@ import { ROLE_TYPE_CODE_GROUPS, isReservedTenantAdminCode } from '@/features/acc
 import RoleTypeStatusPill from '@/features/access-management/role-type/components/RoleTypeStatusPill'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import FieldLabel from '@/components/ui/FieldLabel'
+import MutationStatusBanner from '@/components/ui/MutationStatusBanner'
+import TenantPicker from '@/components/ui/TenantPicker'
+import PermissionCheckboxRow from '@/components/ui/PermissionCheckboxRow'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Accordion, AccordionItem, AccordionTrigger, AccordionPanel } from '@/components/ui/accordion'
@@ -265,30 +268,10 @@ const RoleTypeDetailPage = () => {
                   New role type
                 </div>
                 <div>
-                  <Label
-                    htmlFor="tenant"
-                    className="text-[10px] font-semibold tracking-widest uppercase mb-2"
-                    style={{ color: 'var(--qms-text-muted)' }}
-                  >
+                  <FieldLabel htmlFor="tenant">
                     Company
-                  </Label>
-                  <Select key={tenant || 'empty'} value={tenant || undefined} onValueChange={(v) => setTenant(v ?? '')}>
-                    <SelectTrigger id="tenant" className="w-full">
-                      <SelectValue placeholder="Select company">
-                        {(v) => {
-                          const t = tenants.find((t) => t.id === v)
-                          return t ? `${t.name} (${t.code})` : 'Select company'
-                        }}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {tenants.map((t) => (
-                        <SelectItem key={t.id} value={t.id}>
-                          {t.name} ({t.code})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  </FieldLabel>
+                  <TenantPicker id="tenant" tenants={tenants} value={tenant} onValueChange={setTenant} />
                   <p className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
                     The available permissions below are limited to this company's own permission group.
                   </p>
@@ -322,13 +305,9 @@ const RoleTypeDetailPage = () => {
             <div className="space-y-4">
               {isCreateMode && (
                 <div>
-                  <Label
-                    htmlFor="code"
-                    className="text-[10px] font-semibold tracking-widest uppercase mb-2"
-                    style={{ color: 'var(--qms-text-muted)' }}
-                  >
+                  <FieldLabel htmlFor="code">
                     Code
-                  </Label>
+                  </FieldLabel>
                   <Select key={code || 'empty'} value={code || undefined} onValueChange={(v) => setCode(v as RoleTypeCode)}>
                     <SelectTrigger id="code" className="w-full">
                       <SelectValue placeholder="Select code">{(v) => (v ? String(v) : 'Select code')}</SelectValue>
@@ -353,9 +332,9 @@ const RoleTypeDetailPage = () => {
 
               {!isCreateMode && reservedCode && (
                 <div>
-                  <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+                  <FieldLabel>
                     Code
-                  </Label>
+                  </FieldLabel>
                   <div className="text-[13px] font-mono rounded-lg border px-3 py-2" style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text)' }}>
                     {roleType?.code}
                   </div>
@@ -366,24 +345,16 @@ const RoleTypeDetailPage = () => {
               )}
 
               <div>
-                <Label
-                  htmlFor="name"
-                  className="text-[10px] font-semibold tracking-widest uppercase mb-2"
-                  style={{ color: 'var(--qms-text-muted)' }}
-                >
+                <FieldLabel htmlFor="name">
                   Name
-                </Label>
+                </FieldLabel>
                 <Input id="name" type="text" value={name} onChange={(e) => setName(e.target.value)} />
               </div>
 
               <div>
-                <Label
-                  htmlFor="description"
-                  className="text-[10px] font-semibold tracking-widest uppercase mb-2"
-                  style={{ color: 'var(--qms-text-muted)' }}
-                >
+                <FieldLabel htmlFor="description">
                   Description
-                </Label>
+                </FieldLabel>
                 <Textarea
                   id="description"
                   value={description}
@@ -394,13 +365,9 @@ const RoleTypeDetailPage = () => {
 
               {!isCreateMode && (
                 <div>
-                  <Label
-                    htmlFor="status"
-                    className="text-[10px] font-semibold tracking-widest uppercase mb-2"
-                    style={{ color: 'var(--qms-text-muted)' }}
-                  >
+                  <FieldLabel htmlFor="status">
                     Status
-                  </Label>
+                  </FieldLabel>
                   {/* key={status || 'empty'} forces a fresh mount once the real
                       value loads from the async fetch — base-ui's Select
                       decides controlled-vs-uncontrolled on its very first
@@ -494,34 +461,14 @@ const RoleTypeDetailPage = () => {
                       </AccordionTrigger>
                       <AccordionPanel>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {resourcePermissions.map((permission) => {
-                            const checked = selectedCodes.has(permission.code)
-                            return (
-                              <label
-                                key={permission.code}
-                                className="flex items-start gap-2.5 rounded-lg border px-3 py-2 cursor-pointer transition-colors hover:bg-(--qms-surface-hover)"
-                                style={{
-                                  borderColor: checked ? 'var(--qms-brand)' : 'var(--qms-border)',
-                                  background: checked ? 'color-mix(in oklch, var(--qms-brand), transparent 92%)' : 'transparent',
-                                }}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  onChange={() => toggleCode(permission.code)}
-                                  className="mt-0.5 accent-(--qms-brand)"
-                                />
-                                <span className="min-w-0">
-                                  <span className="block text-[13px] font-semibold truncate" style={{ color: 'var(--qms-text)' }}>
-                                    {permission.name}
-                                  </span>
-                                  <span className="block text-[11px] font-mono truncate" style={{ color: 'var(--qms-text-muted)' }}>
-                                    {permission.code}
-                                  </span>
-                                </span>
-                              </label>
-                            )
-                          })}
+                          {resourcePermissions.map((permission) => (
+                            <PermissionCheckboxRow
+                              key={permission.code}
+                              permission={permission}
+                              checked={selectedCodes.has(permission.code)}
+                              onToggle={toggleCode}
+                            />
+                          ))}
                         </div>
                       </AccordionPanel>
                     </AccordionItem>
@@ -536,17 +483,7 @@ const RoleTypeDetailPage = () => {
               </div>
             )}
 
-            {mutation.isError && (
-              <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger mt-4">
-                {(mutation.error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-                  'Failed to save changes.'}
-              </div>
-            )}
-            {mutation.isSuccess && !isCreateMode && (
-              <div className="text-xs rounded-xl px-3 py-2 bg-success-soft text-success mt-4">
-                Saved.
-              </div>
-            )}
+            <MutationStatusBanner mutation={mutation} showSuccess={!isCreateMode} />
 
             {formError && (
               <div ref={errorRef} className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger mt-4">

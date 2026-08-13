@@ -56,11 +56,9 @@ const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
   // ROLES_VIEW_PERMISSIONS exactly.
   roles: ['tenant:admin', 'tenant:manage', 'role:get', 'role:search'],
   qafeedback: ['qa-feedback:manage'],
-  // Matches appointment.routes.ts's READ_GUARD and contacts.routes.tsx's
-  // CONTACT_VIEW_PERMISSIONS exactly — added 2026-07-27 alongside the real
-  // Appointment/Contact module wiring.
+  // Matches appointment.routes.ts's READ_GUARD exactly — added 2026-07-27
+  // alongside the real Appointment module wiring.
   appointments: ['appointment:search', 'appointment:manage', 'tenant:manage'],
-  contacts: ['contact:search', 'contact:manage', 'tenant:manage', 'tenant:admin'],
   // Matches projects.routes.tsx's PROJECTS_VIEW_PERMISSIONS exactly — found
   // 2026-08-04: this nav item had no gate at all, so a Sales Head account
   // (no project:* permission) could see and click into it and land on a

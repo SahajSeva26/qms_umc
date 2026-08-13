@@ -10,12 +10,8 @@ interface TenantIdPickerProps {
   onChange: (tenantId: string, tenantLabel: string) => void
 }
 
-// Same shape as LeadIdPicker.tsx (this wizard's own Linked lead field) — a
-// single search box whose results appear automatically as you type, instead
-// of a separate text box + Select the user had to remember to click open
-// themselves (found 2026-08-11: the search itself worked, but nothing
-// visibly happened on typing since the matching results only ever rendered
-// inside a closed dropdown).
+// Same shape as LeadIdPicker.tsx — a single search box whose results appear
+// automatically as you type, rather than a separate text box + dropdown.
 const TenantIdPicker = ({ value, label, onChange }: TenantIdPickerProps) => {
   const [query, setQuery] = useState('')
   const debouncedQuery = useDebouncedValue(query, 300)
@@ -47,7 +43,8 @@ const TenantIdPicker = ({ value, label, onChange }: TenantIdPickerProps) => {
     setOpen(false)
   }
 
-  const clearSelection = () => {
+  const clearSelection = (e?: React.MouseEvent) => {
+    e?.stopPropagation()
     onChange('', '')
     setQuery('')
   }
@@ -56,7 +53,8 @@ const TenantIdPicker = ({ value, label, onChange }: TenantIdPickerProps) => {
     <div ref={containerRef} className="relative">
       {value ? (
         <div
-          className="flex items-center gap-2 h-8 rounded-lg border px-2.5 text-[13px]"
+          onClick={() => { clearSelection(); setOpen(true) }}
+          className="flex items-center gap-2 h-8 rounded-lg border px-2.5 text-[13px] cursor-pointer"
           style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text)' }}
         >
           <span className="flex-1 truncate">{label || value}</span>

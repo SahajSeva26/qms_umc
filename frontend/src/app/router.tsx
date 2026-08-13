@@ -7,7 +7,6 @@ import RouteErrorBoundary from '@/components/layouts/RouteErrorBoundary'
 import { authRoutes, AUTH_ROUTES } from '@/features/auth/auth.routes'
 import { dashboardRoutes } from '@/features/dashboard/dashboard.routes'
 import { crmRoutes } from '@/features/crm/crm.routes'
-import { contactsRoutes } from '@/features/contacts/contacts.routes'
 import { campsRoutes } from '@/features/camps/camps.routes'
 import { dietRoutes } from '@/features/diet/diet.routes'
 import { foRoutes } from '@/features/fo/fo.routes'
@@ -54,7 +53,6 @@ const appRouter = createBrowserRouter([
           { path: '/unauthorized', element: <UnauthorizedPage /> },
           ...dashboardRoutes,
           ...crmRoutes,
-          ...contactsRoutes,
           ...campsRoutes,
           ...dietRoutes,
           ...foRoutes,

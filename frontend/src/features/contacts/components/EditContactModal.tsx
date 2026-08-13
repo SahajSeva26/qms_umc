@@ -50,15 +50,17 @@ interface EditContactModalProps {
   open: boolean
   contact: ContactEntity | null
   onClose: () => void
-  // Pins create to a known tenant/division (e.g. opened from a Division
-  // page) — skips both pickers below entirely.
+  // Pins create to a known tenant/division — skips both pickers below.
   fixedTenantId?: string
   fixedDivisionId?: string
+  // Fires with the new contact on successful create (not edit), so a
+  // "quick add" caller (e.g. NewAppointmentDialog) can auto-select it.
+  onCreated?: (contact: { id: string; name: string }) => void
 }
 
 // Outer shell remounts the inner form keyed on contact id so draft state
 // resets cleanly between "new" and different contacts.
-const EditContactModal = ({ open, contact, onClose, fixedTenantId, fixedDivisionId }: EditContactModalProps) => {
+const EditContactModal = ({ open, contact, onClose, fixedTenantId, fixedDivisionId, onCreated }: EditContactModalProps) => {
   if (!open) return null
   return (
     <EditContactModalForm
@@ -67,6 +69,7 @@ const EditContactModal = ({ open, contact, onClose, fixedTenantId, fixedDivision
       onClose={onClose}
       fixedTenantId={fixedTenantId}
       fixedDivisionId={fixedDivisionId}
+      onCreated={onCreated}
     />
   )
 }
@@ -76,9 +79,10 @@ interface EditContactModalFormProps {
   onClose: () => void
   fixedTenantId?: string
   fixedDivisionId?: string
+  onCreated?: (contact: { id: string; name: string }) => void
 }
 
-const EditContactModalForm = ({ contact, onClose, fixedTenantId, fixedDivisionId }: EditContactModalFormProps) => {
+const EditContactModalForm = ({ contact, onClose, fixedTenantId, fixedDivisionId, onCreated }: EditContactModalFormProps) => {
   const isEdit = !!contact
   const [draft, setDraft] = useState<ContactDraft>(contact ? draftFromContact(contact) : emptyDraft)
   const [tenant, setTenant] = useState(fixedTenantId ?? '')
@@ -156,7 +160,7 @@ const EditContactModalForm = ({ contact, onClose, fixedTenantId, fixedDivisionId
           toast.error(result.error.issues[0].message)
           return
         }
-        await createContact.mutateAsync({
+        const created = await createContact.mutateAsync({
           tenant: result.data.tenant,
           division: result.data.division,
           name: result.data.name,
@@ -167,6 +171,7 @@ const EditContactModalForm = ({ contact, onClose, fixedTenantId, fixedDivisionId
           type: result.data.type,
         })
         toast.success('Contact added')
+        if (created.data) onCreated?.({ id: created.data.id, name: created.data.name })
       }
       handleClose()
     } catch (err: any) {

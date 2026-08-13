@@ -50,7 +50,8 @@ const LeadIdPicker = ({ value, label, onChange }: LeadIdPickerProps) => {
     setOpen(false)
   }
 
-  const clearSelection = () => {
+  const clearSelection = (e?: React.MouseEvent) => {
+    e?.stopPropagation()
     onChange('', '')
     setQuery('')
   }
@@ -59,7 +60,8 @@ const LeadIdPicker = ({ value, label, onChange }: LeadIdPickerProps) => {
     <div ref={containerRef} className="relative">
       {value ? (
         <div
-          className="flex items-center gap-2 h-8 rounded-lg border px-2.5 text-[13px]"
+          onClick={() => { clearSelection(); setOpen(true) }}
+          className="flex items-center gap-2 h-8 rounded-lg border px-2.5 text-[13px] cursor-pointer"
           style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text)' }}
         >
           <span className="flex-1 truncate">{label || value}</span>

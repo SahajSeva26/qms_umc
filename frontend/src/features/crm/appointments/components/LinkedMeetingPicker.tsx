@@ -43,14 +43,18 @@ const LinkedMeetingPicker = ({ value, label, divisionId, onChange }: LinkedMeeti
     setOpen(false)
   }
 
-  const clearSelection = () => onChange('', '')
+  const clearSelection = (e?: React.MouseEvent) => {
+    e?.stopPropagation()
+    onChange('', '')
+  }
 
   return (
     <div ref={containerRef} className="relative">
       {value ? (
         <div
+          onClick={() => { if (divisionId) { clearSelection(); setOpen(true) } }}
           className="flex items-center gap-2 h-8 rounded-lg border px-2.5 text-[13px]"
-          style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text)' }}
+          style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text)', cursor: divisionId ? 'pointer' : 'default' }}
         >
           <span className="flex-1 truncate">{label || value}</span>
           <button type="button" onClick={clearSelection} aria-label="Clear linked meeting">

@@ -5,7 +5,6 @@ import { APPOINTMENT_TYPE_LABEL, APPOINTMENT_MODE_LABEL } from '@/types/appointm
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { useDivisions } from '@/features/crm/hooks/useDivisions'
 import { useContacts } from '@/features/contacts/hooks/useContacts'
-import { useCreateContact } from '@/features/contacts/hooks/useCreateContact'
 import { useCreateAppointment } from '@/features/crm/appointments/hooks/useCreateAppointment'
 import { toast } from '@/components/ui/sonner'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -19,6 +18,7 @@ import { Button } from '@/components/ui/button'
 import InternalMembersPicker from '@/features/crm/appointments/components/InternalMembersPicker'
 import LeadIdPicker from '@/features/crm/appointments/components/LeadIdPicker'
 import LinkedMeetingPicker from '@/features/crm/appointments/components/LinkedMeetingPicker'
+import EditContactModal from '@/features/contacts/components/EditContactModal'
 
 // Sentinel value for the inline "+ Add new contact" option inside the
 // Contact person <Select> — a real contact id is never this string, so it's
@@ -76,14 +76,10 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
   const [agendaPrivate, setAgendaPrivate] = useState('')
   const [error, setError] = useState('')
 
-  // Inline "add new contact" — kept deliberately minimal (name +
-  // designation); a fuller edit is available from the Division page.
+  // "Add new contact" opens EditContactModal fixed to this tenant/division.
   const [addingContact, setAddingContact] = useState(false)
-  const [newContactName, setNewContactName] = useState('')
-  const [newContactDesignation, setNewContactDesignation] = useState('')
-  const [newContactError, setNewContactError] = useState('')
-  // Papers over useContacts()'s async invalidation lag right after an
-  // inline create, so the trigger shows the new name immediately.
+  // Papers over useContacts()'s async invalidation lag right after a
+  // create, so the trigger shows the new name immediately.
   const [justCreatedContact, setJustCreatedContact] = useState<{ id: string; name: string } | null>(null)
 
   // limit: '20' avoids the backend's default first-10 truncation.
@@ -104,39 +100,13 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
   const contacts = divisionId ? contactData?.data?.items ?? [] : []
 
   const createAppointment = useCreateAppointment()
-  const createContact = useCreateContact()
 
   const handleContactSelect = (value: string | null) => {
     if (value === ADD_NEW_CONTACT_VALUE) {
-      setNewContactError('')
-      setNewContactName('')
-      setNewContactDesignation('')
       setAddingContact(true)
       return
     }
     setContactPersonId(value ?? '')
-  }
-
-  const handleCreateContact = async () => {
-    if (!newContactName.trim()) return setNewContactError('Name is required')
-    try {
-      const created = await createContact.mutateAsync({
-        tenant: tenantId,
-        division: divisionId,
-        name: newContactName.trim(),
-        designation: newContactDesignation.trim() || undefined,
-      })
-      if (!created.data) {
-        setNewContactError('Contact created but the response was empty — try selecting it from the list.')
-        return
-      }
-      toast.success('Contact added')
-      setJustCreatedContact({ id: created.data.id, name: created.data.name })
-      setContactPersonId(created.data.id)
-      setAddingContact(false)
-    } catch (err: any) {
-      setNewContactError(err?.response?.data?.message || 'Could not add contact — try again.')
-    }
   }
 
   const reset = () => {
@@ -158,9 +128,6 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
     setAgendaPrivate('')
     setError('')
     setAddingContact(false)
-    setNewContactName('')
-    setNewContactDesignation('')
-    setNewContactError('')
     setJustCreatedContact(null)
   }
 
@@ -298,9 +265,8 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
             </div>
             <div>
               <Label className={labelClasses} style={labelStyle}>Contact person *</Label>
-              {/* key forces a remount when set programmatically (e.g. after
-                  inline "Add new contact") — base-ui's Select otherwise keeps
-                  showing the placeholder even though the value is set. */}
+              {/* key forces a remount when set programmatically — base-ui's
+                  Select otherwise keeps showing the placeholder. */}
               <Select key={contactPersonId || 'empty'} value={contactPersonId || undefined} onValueChange={handleContactSelect} disabled={!divisionId}>
                 <SelectTrigger className="w-full text-[13px]">
                   <SelectValue placeholder={!divisionId ? 'Select a division first' : contactsLoading ? 'Loading...' : 'Select contact...'}>
@@ -323,31 +289,8 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
                 </SelectContent>
               </Select>
               {contactsErrored && <p className="text-[11px] mt-1 text-danger">Couldn't load contacts.</p>}
-              {!contactsErrored && !contactsLoading && divisionId && contacts.length === 0 && !addingContact && (
-                <p className="text-[11px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>This company has no contacts yet — add one below.</p>
-              )}
-              {addingContact && (
-                <div className="mt-2 p-2.5 rounded-lg border space-y-2" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-strong)' }}>
-                  <Input
-                    value={newContactName}
-                    onChange={(e) => setNewContactName(e.target.value)}
-                    placeholder="Contact name *"
-                    className="text-[13px]"
-                  />
-                  <Input
-                    value={newContactDesignation}
-                    onChange={(e) => setNewContactDesignation(e.target.value)}
-                    placeholder="Designation (optional)"
-                    className="text-[13px]"
-                  />
-                  {newContactError && <p className="text-[11px] font-semibold text-danger">{newContactError}</p>}
-                  <div className="flex gap-2">
-                    <Button size="sm" type="button" onClick={handleCreateContact} disabled={createContact.isPending}>
-                      {createContact.isPending ? 'Saving...' : 'Save contact'}
-                    </Button>
-                    <Button size="sm" type="button" variant="outline" onClick={() => setAddingContact(false)}>Cancel</Button>
-                  </div>
-                </div>
+              {!contactsErrored && !contactsLoading && divisionId && contacts.length === 0 && (
+                <p className="text-[11px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>This company has no contacts yet — add one above.</p>
               )}
             </div>
           </div>
@@ -461,6 +404,18 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <EditContactModal
+        open={addingContact}
+        contact={null}
+        onClose={() => setAddingContact(false)}
+        fixedTenantId={tenantId}
+        fixedDivisionId={divisionId}
+        onCreated={(created) => {
+          setJustCreatedContact(created)
+          setContactPersonId(created.id)
+        }}
+      />
     </Dialog>
   )
 }

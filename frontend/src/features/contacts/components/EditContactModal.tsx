@@ -50,59 +50,73 @@ interface EditContactModalProps {
   open: boolean
   contact: ContactEntity | null
   onClose: () => void
+  // Pins create to a known tenant/division (e.g. opened from a Division
+  // page) — skips both pickers below entirely.
+  fixedTenantId?: string
+  fixedDivisionId?: string
 }
 
 // Outer shell remounts the inner form keyed on contact id so draft state
 // resets cleanly between "new" and different contacts.
-const EditContactModal = ({ open, contact, onClose }: EditContactModalProps) => {
+const EditContactModal = ({ open, contact, onClose, fixedTenantId, fixedDivisionId }: EditContactModalProps) => {
   if (!open) return null
-  return <EditContactModalForm key={contact?.id ?? '__new__'} contact={contact} onClose={onClose} />
+  return (
+    <EditContactModalForm
+      key={contact?.id ?? '__new__'}
+      contact={contact}
+      onClose={onClose}
+      fixedTenantId={fixedTenantId}
+      fixedDivisionId={fixedDivisionId}
+    />
+  )
 }
 
 interface EditContactModalFormProps {
   contact: ContactEntity | null
   onClose: () => void
+  fixedTenantId?: string
+  fixedDivisionId?: string
 }
 
-const EditContactModalForm = ({ contact, onClose }: EditContactModalFormProps) => {
+const EditContactModalForm = ({ contact, onClose, fixedTenantId, fixedDivisionId }: EditContactModalFormProps) => {
   const isEdit = !!contact
   const [draft, setDraft] = useState<ContactDraft>(contact ? draftFromContact(contact) : emptyDraft)
-  const [tenant, setTenant] = useState('')
+  const [tenant, setTenant] = useState(fixedTenantId ?? '')
 
-  // A customer-tenant caller is force-pinned to their own tenant server-side
-  // regardless of what's sent; a platform-tenant caller must pick one.
+  // A customer-tenant caller is force-pinned to their own tenant server-side;
+  // a platform-tenant caller must pick one. Never shown if fixedTenantId is set.
   const { sessionPermissions } = usePermission()
-  const needsTenantPicker = !isEdit && sessionPermissions?.tenantType === 'platform'
+  const needsTenantPicker = !isEdit && !fixedTenantId && sessionPermissions?.tenantType === 'platform'
   const { data: tenantsData } = useTenants({}, needsTenantPicker)
   const tenants = tenantsData?.data?.items ?? []
 
-  // Type on create is never a manual choice. No picker: use the caller's own
-  // tenant type. Picker shown: GET /tenants only exposes `type` for a
-  // system:manage caller, so best-effort it and default to 'customer'
-  // (the common case, matching the backend's own schema default).
+  // No manual choice on create: use the caller's own tenant type, or
+  // 'customer' by default. fixedDivisionId always means 'customer' —
+  // divisions only exist under customer tenants.
   const deriveCreateType = (): ContactType => {
+    if (fixedDivisionId) return 'customer'
     if (!needsTenantPicker) return (sessionPermissions?.tenantType as ContactType) ?? 'customer'
     const selected = tenants.find((t) => t.id === tenant)
     return (selected?.type as ContactType) ?? 'customer'
   }
 
-  // Tenant a division picker should scope to: the picked Company (platform
-  // staff), or the caller's own tenant otherwise.
-  const effectiveTenantId = needsTenantPicker ? tenant : sessionPermissions?.tenantId
+  const effectiveTenantId = fixedTenantId || (needsTenantPicker ? tenant : sessionPermissions?.tenantId)
   const createType = deriveCreateType()
-  const [division, setDivision] = useState('')
+  const [division, setDivision] = useState(fixedDivisionId ?? '')
   // Required (and shown) only for customer-type contacts.
-  const needsDivision = !isEdit && createType === 'customer'
+  const needsDivision = !isEdit && !fixedDivisionId && createType === 'customer'
   const { data: divisionsData, isLoading: divisionsLoading } = useDivisions(
     { tenant: effectiveTenantId || undefined } as unknown as { tenantId?: string },
     needsDivision && !!effectiveTenantId,
   )
   const divisions = divisionsData?.data?.items ?? []
 
-  // Clear a stale selection if the scoped tenant changes.
+  // Clear a stale selection if the scoped tenant changes. Skipped when
+  // fixedDivisionId is set — effects run once on mount regardless, and
+  // would otherwise wipe the fixed value immediately.
   useEffect(() => {
-    setDivision('')
-  }, [effectiveTenantId])
+    if (!fixedDivisionId) setDivision('')
+  }, [effectiveTenantId, fixedDivisionId])
 
   const createContact = useCreateContact()
   const updateContact = useUpdateContact(contact?.id ?? '')

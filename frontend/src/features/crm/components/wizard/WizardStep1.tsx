@@ -69,7 +69,7 @@ const WizardStep1 = ({ form, setField }: WizardStep1Props) => {
 
       <div>
         <Label className={labelClasses} style={labelStyle}>Division *</Label>
-        <Select value={form.divisionId} onValueChange={(v) => selectDivision(v as string)} disabled={!form.tenantId}>
+        <Select key={form.divisionId || 'empty'} value={form.divisionId} onValueChange={(v) => selectDivision(v as string)} disabled={!form.tenantId}>
           <SelectTrigger className={`w-full ${fieldClasses}`}>
             <SelectValue placeholder={!form.tenantId ? 'Select a company first' : divisionsLoading ? 'Loading...' : 'Select division...'}>
               {(v: string) => divisions.find((d) => d.id === v)?.name ?? (divisionsLoading ? 'Loading...' : 'Select division...')}
@@ -89,7 +89,7 @@ const WizardStep1 = ({ form, setField }: WizardStep1Props) => {
 
       <div>
         <Label className={labelClasses} style={labelStyle}>Contact person *</Label>
-        <Select value={form.contactPersonId} onValueChange={(v) => selectContactPerson(v as string)} disabled={!form.tenantId}>
+        <Select key={form.contactPersonId || 'empty'} value={form.contactPersonId} onValueChange={(v) => selectContactPerson(v as string)} disabled={!form.tenantId}>
           <SelectTrigger className={`w-full ${fieldClasses}`}>
             <SelectValue placeholder={!form.tenantId ? 'Select a company first' : contactsLoading ? 'Loading...' : 'Select contact person...'}>
               {(v: string) => contactPeople.find((c) => c.id === v)?.name ?? (contactsLoading ? 'Loading...' : 'Select contact person...')}

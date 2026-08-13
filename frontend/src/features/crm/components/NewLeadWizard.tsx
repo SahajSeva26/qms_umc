@@ -38,15 +38,18 @@ function validateStep(step: number, form: WizardFormState): string | null {
 interface NewLeadWizardProps {
   onClose: () => void
   onCreated: () => void
+  // Prefills Step 1's account fields (e.g. from an appointment's own
+  // tenant/division/contact/salesPerson).
+  prefill?: Partial<WizardFormState>
 }
 
-const NewLeadWizard = ({ onClose, onCreated }: NewLeadWizardProps) => {
+const NewLeadWizard = ({ onClose, onCreated, prefill }: NewLeadWizardProps) => {
   // fetchList=false — this wizard only ever creates a new lead, it never
   // displays the existing list, so there's no reason to fetch all ~1000
   // leads company-wide every time it opens.
   const { createLead, isCreating } = useLeads({}, false)
   const [step, setStep] = useState(0)
-  const [form, setForm] = useState<WizardFormState>(DEFAULT_WIZARD_FORM)
+  const [form, setForm] = useState<WizardFormState>({ ...DEFAULT_WIZARD_FORM, ...prefill })
   const [error, setError] = useState<string | null>(null)
 
   const setField = <K extends keyof WizardFormState>(key: K, value: WizardFormState[K]) => {

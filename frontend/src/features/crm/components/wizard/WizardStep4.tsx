@@ -86,7 +86,7 @@ const WizardStep4 = ({ form, setField }: WizardStep4Props) => {
 
       <div>
         <Label className={labelClasses} style={labelStyle}>Sales rep *</Label>
-        <Select value={form.salesPersonId} onValueChange={(v) => selectSalesPerson(v as string)}>
+        <Select key={form.salesPersonId || 'empty'} value={form.salesPersonId} onValueChange={(v) => selectSalesPerson(v as string)}>
           <SelectTrigger className={`w-full ${fieldClasses}`}>
             <SelectValue placeholder={rolesLoading ? 'Loading...' : 'Select sales rep...'}>
               {(v: string) => {

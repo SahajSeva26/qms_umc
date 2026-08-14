@@ -1,7 +1,7 @@
 // Inventory-consumable Model
 
 import mongoose from 'mongoose';
-import { INVENTORY_CONSUMABLE_LOCATION, INVENTORY_CONSUMABLE_STATUS } from './inventory-consumable.constants';
+import { INVENTORY_CONSUMABLE_STATUS } from './inventory-consumable.constants';
 
 const inventoryConsumableSchema = new mongoose.Schema(
     {
@@ -10,11 +10,6 @@ const inventoryConsumableSchema = new mongoose.Schema(
             ref: 'InventoryMaster',
             required: true,
             index: true,
-        },
-        location: {
-            type: String,
-            enum: Object.values(INVENTORY_CONSUMABLE_LOCATION),
-            required: true,
         },
         batch: {
             type: String,

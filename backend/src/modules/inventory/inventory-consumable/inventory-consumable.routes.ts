@@ -61,7 +61,7 @@ registry.registerPath({
         201: { description: 'Consumable lot created successfully' },
         400: { description: 'Validation error' },
         404: { description: 'The referenced inventory item does not exist' },
-        409: { description: 'A consumable lot with this item, batch and location already exists' },
+        409: { description: 'A consumable lot with this item and batch already exists' },
     },
 });
 

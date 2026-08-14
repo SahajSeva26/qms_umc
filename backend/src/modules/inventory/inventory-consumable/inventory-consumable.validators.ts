@@ -1,12 +1,11 @@
 // Inventory-consumable Validators
 import { z } from 'zod';
-import { INVENTORY_CONSUMABLE_LOCATION, INVENTORY_CONSUMABLE_STATUS } from './inventory-consumable.constants';
+import { INVENTORY_CONSUMABLE_STATUS } from './inventory-consumable.constants';
 
 //1: create ====================================>
 // item is the immutable ref to the InventoryMaster catalog record this lot is stock of.
 export const CreateInventoryConsumablePayloadSchema = z.object({
     item: z.string().min(1).openapi({ example: '665f1a2b3c4d5e6f70819293' }),
-    location: z.enum(Object.values(INVENTORY_CONSUMABLE_LOCATION)).openapi({ example: 'warehouse' }),
     batch: z.string().min(1).openapi({ example: 'BATCH-2026-014' }),
     manufacturingDate: z.coerce.date().openapi({ example: '2026-01-15' }),
     expiryDate: z.coerce.date().openapi({ example: '2027-01-15' }),
@@ -17,7 +16,6 @@ export type ICreateInventoryConsumablePayload = z.infer<typeof CreateInventoryCo
 //2: update ====================================>
 // item is intentionally omitted — a lot never changes which catalog item it is stock of.
 export const UpdateInventoryConsumablePayloadSchema = z.object({
-    location: z.enum(Object.values(INVENTORY_CONSUMABLE_LOCATION)).optional(),
     batch: z.string().min(1).optional(),
     manufacturingDate: z.coerce.date().optional(),
     expiryDate: z.coerce.date().optional(),
@@ -29,7 +27,6 @@ export type IUpdateInventoryConsumablePayload = z.infer<typeof UpdateInventoryCo
 //3: search ====================================>
 export const SearchInventoryConsumableQuerySchema = z.object({
     item: z.string().optional().openapi({ example: '665f1a2b3c4d5e6f70819293' }),
-    location: z.enum(Object.values(INVENTORY_CONSUMABLE_LOCATION)).optional().openapi({ example: 'warehouse' }),
     batch: z.string().optional().openapi({ example: 'BATCH-2026-014' }),
     status: z.enum(Object.values(INVENTORY_CONSUMABLE_STATUS)).optional().openapi({ example: 'active' }),
     page: z.string().optional().openapi({ example: '1' }),

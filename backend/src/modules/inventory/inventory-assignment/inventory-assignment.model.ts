@@ -1,32 +1,8 @@
 // Inventory-assignment Model
 
 import mongoose from 'mongoose';
-import { INVENTORY_ASSIGNMENT_STATUS } from './inventory-assignment.constants';
 
-const inventoryAssignmentItemSchema = new mongoose.Schema(
-    {
-        inventory: {
-            type: mongoose.Schema.Types.ObjectId,
-            required: [true, 'Inventory is required'],
-            refPath: 'inventoryPath',
-        },
-        inventoryPath: {
-            type: String,
-            required: [true, 'Inventory type is required'],
-            enum: ['InventoryDevice', 'InventoryConsumable'],
-        },
-        quantity: {
-            type: Number,
-            required: [true, 'Quantity is required'],
-            min: [1, 'Quantity must be at least 1'],
-        },
-    },
-    {
-        _id: false,
-    },
-);
-
-const inventoryAssginmentSchema = new mongoose.Schema(
+const inventoryAssignmentSchema = new mongoose.Schema(
     {
         assignee: {
             type: mongoose.Schema.Types.ObjectId,
@@ -47,7 +23,9 @@ const inventoryAssginmentSchema = new mongoose.Schema(
                 quantity: {
                     type: Number,
                     required: [true, 'Quantity is required'],
-                    min: [1, 'Quantity must be at least 1'],
+                    min: [1, 'Quantity must be 1'],
+                    max: [1, 'Quantity must be 1'],
+                    default: 1,
                 },
             },
         ],
@@ -73,5 +51,5 @@ const inventoryAssginmentSchema = new mongoose.Schema(
     },
 );
 
-export const InventoryAssignmentModel = mongoose.model('InventoryAssignment', inventoryAssginmentSchema);
-export type IInventoryAssignment = mongoose.InferSchemaType<typeof inventoryAssginmentSchema>;
+export const InventoryAssignmentModel = mongoose.model('InventoryAssignment', inventoryAssignmentSchema);
+export type IInventoryAssignment = mongoose.InferSchemaType<typeof inventoryAssignmentSchema>;

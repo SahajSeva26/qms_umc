@@ -26,7 +26,6 @@ export const InventoryConsumableMapper = {
             item: mapItem(lot.item),
 
             // lot identity + shelf life
-            location: lot.location,
             batch: lot.batch,
             manufacturingDate: lot.manufacturingDate,
             expiryDate: lot.expiryDate,

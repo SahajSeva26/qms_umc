@@ -19,8 +19,8 @@ type InventoryConsumableDocument = HydratedDocument<IInventoryConsumable> | null
 const populate: any[] = [{ path: 'item' }];
 
 // A consumable is a physical stock lot of an InventoryMaster catalog item. Like the catalog it
-// belongs to no tenant, so there is no ctx.where() scoping. A lot's identity is (item, batch,
-// location); the item ref is immutable and seeded at create.
+// belongs to no tenant, so there is no ctx.where() scoping. A lot's identity is (item, batch);
+// the item ref is immutable and seeded at create.
 
 // ========================================================================================
 // CORE FUNCTIONS
@@ -28,7 +28,6 @@ const populate: any[] = [{ path: 'item' }];
 
 // item is seeded at construction in create() and never handled here, so update() can't reassign it.
 const set = async (model: any, entity: HydratedDocument<IInventoryConsumable>, ctx: RequestContext) => {
-    if (model.location) entity.location = model.location;
     if (model.batch) entity.batch = model.batch;
     if (model.manufacturingDate) entity.manufacturingDate = model.manufacturingDate;
     if (model.expiryDate) entity.expiryDate = model.expiryDate;
@@ -63,9 +62,6 @@ const search = async (filters: ISearchInventoryConsumableQuery, ctx: RequestCont
     if (filters.item) {
         where.item = filters.item;
     }
-    if (filters.location) {
-        where.location = filters.location;
-    }
     if (filters.batch) {
         where.batch = { $regex: filters.batch, $options: 'i' };
     }
@@ -94,10 +90,10 @@ const create = async (model: ICreateInventoryConsumablePayload, ctx: RequestCont
         return throwAppError('The referenced inventory item does not exist', StatusCodes.NOT_FOUND);
     }
 
-    //2: guard — a lot is identified by (item, batch, location); it must not already exist
-    const existing = await InventoryConsumableModel.findOne({ item: model.item, batch: model.batch, location: model.location });
+    //2: guard — a lot is identified by (item, batch); it must not already exist
+    const existing = await InventoryConsumableModel.findOne({ item: model.item, batch: model.batch });
     if (existing) {
-        return throwAppError('A consumable lot with this item, batch and location already exists', StatusCodes.CONFLICT);
+        return throwAppError('A consumable lot with this item and batch already exists', StatusCodes.CONFLICT);
     }
 
     //3: build entity — item (immutable ref) is seeded here, never in set()

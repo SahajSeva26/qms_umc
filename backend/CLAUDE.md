@@ -19,6 +19,8 @@ src/modules/
   access-management/        tenant, role, role-type, permission-group (RBAC)
   crm/                      division, lead, project, appointment, contact
   operations/               camp, geoProfile (field-staff geo + camp allocation)
+  inventory/                inventory-master (catalog), inventory-device, inventory-consumable
+                            (+ inventory-assignment, inventory-transaction — scaffolded, not built)
 ```
 
 Every module contains exactly these files:
@@ -431,6 +433,11 @@ All modules follow the layered convention above; all are wired in `src/bin/app.t
 | crm | contact | `/contacts` | tenant(+optional division)-scoped people registry, optional user/login link; division required for pharma (customer-type) contacts & validated against tenant; `type` immutable after create |
 | operations | camp | `/camps` | stageHistory + moveStage; tenant+division required, project optional |
 | operations | geoProfile | `/geo-profiles` | field-staff geo (2dsphere); `findNearest` ($geoNear) feeds camp allocation |
+| inventory | inventory-master | `/inventory-masters` | **global/system catalog** (no tenant scoping); `code` immutable natural key; `type` = device/consumable/accessory/other; `active`/`inactive` status is a soft-delete visibility flag (manage-gated); `sku`/`unit`/`minStock`/`maxStock`. Reads open, writes guarded `inventory-master:manage` |
+| inventory | inventory-device | `/inventory-devices` | individual physical unit of a catalog item; refs `item` (InventoryMaster) + unique `serialNumber` (both immutable); `location` warehouse/field-officer/camp; `status` = operational lifecycle (available/assigned/maintainance/lost/damaged — NOT soft-delete, fully readable); calibration/warranty/mfg dates. No tenant scoping. Reads open, writes guarded `inventory-device:manage` |
+| inventory | inventory-consumable | `/inventory-consumables` | physical stock **lot** of a catalog item; lot identity = (`item`,`batch`,`location`); `item` immutable; `quantity`/mfg/expiry dates; `location` warehouse/camp; `active`/`expired` status (manage-gated visibility); search sorts by `expiryDate` asc. No tenant scoping. Reads open, writes guarded `inventory-consumable:manage` |
+| inventory | inventory-assignment | — | **scaffolded only** (empty stub files, not built/wired) |
+| inventory | inventory-transaction | — | **scaffolded only** (empty stub files, not built/wired) |
 
 Cross-cutting: `AuthMiddleware` + `AuthorizeMiddleware` (AND/OR permission guards), system-user
 seeding + per-tenant default-role-type provisioning on boot, `PERMISSIONS`/`PERMISSIONS_ARRAY`
@@ -438,6 +445,11 @@ registry, pino logging (`pino-http`), rate limiting (global + auth), `withTransa
 
 ## What's Next (planned)
 
+- Inventory — finish the 4-concept plan: build the two scaffolded modules, `inventory-assignment`
+  (who holds what — device/consumable → FO/camp) and `inventory-transaction` (append-only stock
+  ledger: issue/return/consume/adjust that drives consumable quantity & device location/status).
+  Open: tenant-scoping decision (catalog + stock are global today, like `doctor`), how camp/FO refs
+  hang off assignments, and the FO/logistics role types. Note the two typo constants in
+  `inventory-device.constants.ts` (`MAINTAINANCE`, `DMAGAED`) — decide before frontend depends on them.
 - Invoicing / billing (camp-to-cash, PO compliance, AR aging) — spec captured, not started
-- Inventory & devices — Phase 2
 - Scaling/concurrency hardening (clustering, `maxPoolSize`, `UV_THREADPOOL_SIZE`, user-search index)

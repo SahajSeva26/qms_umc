@@ -10,17 +10,18 @@ const inventoryDeviceSchema = new mongoose.Schema(
             type: mongoose.Schema.Types.ObjectId,
             ref: 'InventoryMaster',
             required: true,
-        },
-        location: {
-            type: String,
-            enum: Object.values(INVENTORY_DEVICE_LOCATION),
-            required: true,
+            index: true,
         },
         serialNumber: {
             type: String,
             required: true,
             trim: true,
             unique: true,
+        },
+        location: {
+            type: String,
+            enum: Object.values(INVENTORY_DEVICE_LOCATION),
+            required: true,
         },
         manufacturingDate: {
             type: Date,
@@ -46,5 +47,5 @@ const inventoryDeviceSchema = new mongoose.Schema(
     },
 );
 
-export const InventoryDevice = mongoose.model('InventoryDevice', inventoryDeviceSchema);
+export const InventoryDeviceModel = mongoose.model('InventoryDevice', inventoryDeviceSchema);
 export type IInventoryDevice = mongoose.InferSchemaType<typeof inventoryDeviceSchema>;

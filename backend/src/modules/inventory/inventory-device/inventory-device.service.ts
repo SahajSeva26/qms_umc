@@ -1,11 +1,7 @@
 // Inventory-device Service
 import { HydratedDocument } from 'mongoose';
-import { InventoryDevice, IInventoryDevice } from './inventory-device.model';
-import {
-    ICreateInventoryDevicePayload,
-    ISearchInventoryDeviceQuery,
-    IUpdateInventoryDevicePayload,
-} from './inventory-device.validators';
+import { InventoryDeviceModel, IInventoryDevice } from './inventory-device.model';
+import { ICreateInventoryDevicePayload, ISearchInventoryDeviceQuery, IUpdateInventoryDevicePayload } from './inventory-device.validators';
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
@@ -43,7 +39,7 @@ const set = async (model: any, entity: HydratedDocument<IInventoryDevice>, ctx: 
 const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): Promise<InventoryDeviceDocument> => {
     const where: any = isValidObjectID(id) ? { _id: id } : { serialNumber: id };
 
-    const query = InventoryDevice.findOne(where);
+    const query = InventoryDeviceModel.findOne(where);
     if (options?.populate) {
         query.populate(populate);
     }
@@ -72,8 +68,8 @@ const search = async (filters: ISearchInventoryDeviceQuery, ctx: RequestContext,
     }
 
     //3: execute count + data together
-    const countPromise = InventoryDevice.countDocuments(where);
-    const dataPromise = InventoryDevice.find(where)
+    const countPromise = InventoryDeviceModel.countDocuments(where);
+    const dataPromise = InventoryDeviceModel.find(where)
         .populate(populate)
         .limit(options?.pagination?.limit)
         .skip(options?.pagination?.skip)
@@ -98,7 +94,7 @@ const create = async (model: ICreateInventoryDevicePayload, ctx: RequestContext)
     }
 
     //3: build entity — item + serialNumber (immutable) are seeded here, never in set()
-    let entity = new InventoryDevice({ item: model.item, serialNumber: model.serialNumber });
+    let entity = new InventoryDeviceModel({ item: model.item, serialNumber: model.serialNumber });
     entity = await set(model, entity, ctx);
     entity = await entity.save();
 

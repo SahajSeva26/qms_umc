@@ -1,6 +1,6 @@
 // Inventory-consumable Service
 import { HydratedDocument } from 'mongoose';
-import { InventoryConsumable, IInventoryConsumable } from './inventory-consumable.model';
+import { InventoryConsumableModel, IInventoryConsumable } from './inventory-consumable.model';
 import {
     ICreateInventoryConsumablePayload,
     ISearchInventoryConsumableQuery,
@@ -44,7 +44,7 @@ const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): 
         return null;
     }
 
-    const query = InventoryConsumable.findOne({ _id: id });
+    const query = InventoryConsumableModel.findOne({ _id: id });
     if (options?.populate) {
         query.populate(populate);
     }
@@ -75,8 +75,8 @@ const search = async (filters: ISearchInventoryConsumableQuery, ctx: RequestCont
     }
 
     //3: execute count + data together
-    const countPromise = InventoryConsumable.countDocuments(where);
-    const dataPromise = InventoryConsumable.find(where)
+    const countPromise = InventoryConsumableModel.countDocuments(where);
+    const dataPromise = InventoryConsumableModel.find(where)
         .populate(populate)
         .limit(options?.pagination?.limit)
         .skip(options?.pagination?.skip)
@@ -95,13 +95,13 @@ const create = async (model: ICreateInventoryConsumablePayload, ctx: RequestCont
     }
 
     //2: guard — a lot is identified by (item, batch, location); it must not already exist
-    const existing = await InventoryConsumable.findOne({ item: model.item, batch: model.batch, location: model.location });
+    const existing = await InventoryConsumableModel.findOne({ item: model.item, batch: model.batch, location: model.location });
     if (existing) {
         return throwAppError('A consumable lot with this item, batch and location already exists', StatusCodes.CONFLICT);
     }
 
     //3: build entity — item (immutable ref) is seeded here, never in set()
-    let entity = new InventoryConsumable({ item: model.item });
+    let entity = new InventoryConsumableModel({ item: model.item });
     entity = await set(model, entity, ctx);
     entity = await entity.save();
 

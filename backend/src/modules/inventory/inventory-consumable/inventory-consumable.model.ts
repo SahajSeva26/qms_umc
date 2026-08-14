@@ -44,5 +44,5 @@ const inventoryConsumableSchema = new mongoose.Schema(
     { timestamps: true },
 );
 
-export const InventoryConsumable = mongoose.model('InventoryConsumable', inventoryConsumableSchema);
+export const InventoryConsumableModel = mongoose.model('InventoryConsumable', inventoryConsumableSchema);
 export type IInventoryConsumable = mongoose.InferSchemaType<typeof inventoryConsumableSchema>;

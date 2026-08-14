@@ -1,6 +1,6 @@
 // Inventory-master Service
 import { HydratedDocument } from 'mongoose';
-import { InventoryMaster, IInventoryMaster } from './inventory-master.model';
+import { InventoryMasterModel, IInventoryMaster } from './inventory-master.model';
 import { ICreateInventoryMasterPayload, ISearchInventoryMasterQuery, IUpdateInventoryMasterPayload } from './inventory-master.validators';
 import { INVENTORY_MASTER_PERMISSIONS, ITEM_STATUS } from './inventory-master.constants';
 import { throwAppError } from '../../../shared/utils/error';
@@ -37,7 +37,7 @@ const set = async (model: any, entity: HydratedDocument<IInventoryMaster>, ctx: 
 const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): Promise<InventoryMasterDocument> => {
     const where: any = isValidObjectID(id) ? { _id: id } : { code: id };
 
-    return await InventoryMaster.findOne(where);
+    return await InventoryMasterModel.findOne(where);
 };
 
 const search = async (filters: ISearchInventoryMasterQuery, ctx: RequestContext, options?: IServiceOptions) => {
@@ -66,8 +66,8 @@ const search = async (filters: ISearchInventoryMasterQuery, ctx: RequestContext,
     }
 
     //3: execute count + data together
-    const countPromise = InventoryMaster.countDocuments(where);
-    const dataPromise = InventoryMaster.find(where).limit(options?.pagination?.limit).skip(options?.pagination?.skip).sort(sort);
+    const countPromise = InventoryMasterModel.countDocuments(where);
+    const dataPromise = InventoryMasterModel.find(where).limit(options?.pagination?.limit).skip(options?.pagination?.skip).sort(sort);
 
     const [count, items] = await Promise.all([countPromise, dataPromise]);
 
@@ -82,7 +82,7 @@ const create = async (model: ICreateInventoryMasterPayload, ctx: RequestContext)
     }
 
     //2: build entity — code (immutable natural key) is seeded here, never in set()
-    let entity = new InventoryMaster({ code: model.code });
+    let entity = new InventoryMasterModel({ code: model.code });
     entity = await set(model, entity, ctx);
     entity = await entity.save();
 

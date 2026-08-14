@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { Controller, useForm, type Resolver } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import type { Tenant, TenantStatus, TenantType } from '@/types/accessManagement.types'
 import { useUpdateTenant } from '@/features/access-management/tenant/hooks/useUpdateTenant'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
@@ -20,26 +22,73 @@ interface EditTenantModalProps {
   onClose: () => void
 }
 
+interface EditTenantFormValues {
+  name: string
+  description: string
+  status: TenantStatus | ''
+  type: TenantType | ''
+  salesPerson: string
+}
+
+// base-ui Select represents "nothing chosen" as '' — but updateTenantSchema's
+// status/type are bare enums with no '' member, so '' must be normalized to
+// undefined before zodResolver sees it.
+const toEditTenantFormResolver = (): Resolver<EditTenantFormValues> => {
+  const baseResolver = zodResolver(updateTenantSchema) as (payload: unknown, context: unknown, options: unknown) => Promise<{
+    values: Record<string, unknown>
+    errors: Record<string, { message?: string; type?: string }>
+  }>
+
+  return async (values, context, options) => {
+    const payload = {
+      name: values.name,
+      description: values.description || undefined,
+      status: values.status || undefined,
+      type: values.type || undefined,
+      salesPerson: values.salesPerson || undefined,
+    }
+    const result = await baseResolver(payload, context, options)
+    const hasErrors = Object.keys(result.errors).length > 0
+    return { values: hasErrors ? {} : values, errors: result.errors } as never
+  }
+}
+
 // Fields hidden (not disabled) when the caller lacks the permission that
 // would make them take effect server-side: `status` needs tenant:manage,
 // `type`/`salesPerson` need system:manage.
 const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: EditTenantModalProps) => {
   const updateTenant = useUpdateTenant(tenant.id)
-  const [name, setName] = useState(tenant.name)
-  const [description, setDescription] = useState('')
-  const [status, setStatus] = useState<TenantStatus | ''>(tenant.status ?? '')
-  const [type, setType] = useState<TenantType | ''>(tenant.type ?? '')
-  const [salesPerson, setSalesPerson] = useState(tenant.salesPerson ?? '')
-  const [formError, setFormError] = useState<string | null>(null)
 
-  // Same sales-rep picker as CreateTenantDialog.tsx.
-  const { data: platformTenantData } = useTenants({ type: 'platform', status: 'active', limit: PLATFORM_TENANT_FETCH_LIMIT }, canManageSystem)
+  const {
+    register,
+    handleSubmit,
+    control,
+    formState: { errors, touchedFields, isSubmitted },
+  } = useForm<EditTenantFormValues>({
+    resolver: toEditTenantFormResolver(),
+    mode: 'onChange',
+    defaultValues: {
+      name: tenant.name,
+      description: '',
+      status: tenant.status ?? '',
+      type: tenant.type ?? '',
+      salesPerson: tenant.salesPerson ?? '',
+    },
+  })
+
+  // The query chain only fires once the dropdown has been opened, unless the
+  // tenant already has a sales rep assigned — then it loads eagerly so the
+  // trigger can resolve and show that rep's name right away.
+  const [salesRepPickerOpened, setSalesRepPickerOpened] = useState(false)
+  const salesRepQueriesEnabled = canManageSystem && (salesRepPickerOpened || !!tenant.salesPerson)
+
+  const { data: platformTenantData } = useTenants({ type: 'platform', status: 'active', limit: PLATFORM_TENANT_FETCH_LIMIT }, salesRepQueriesEnabled)
   const platformTenant = platformTenantData?.data?.items.find((t) => t.type === 'platform' || t.code === PLATFORM_TENANT_CODE)
-  const { data: salesRepTypeData, isLoading: roleTypeLoading } = useRoleTypes({ code: 'sales-rep', status: 'active' }, canManageSystem)
+  const { data: salesRepTypeData, isLoading: roleTypeLoading } = useRoleTypes({ code: 'sales-rep', status: 'active' }, salesRepQueriesEnabled)
   const salesRepTypeId = salesRepTypeData?.data?.items[0]?.id
   const { data: salesRepRoleData, isLoading: salesRepsLoading } = useRoles(
     { tenant: platformTenant?.id, type: salesRepTypeId, status: 'active' },
-    canManageSystem && !!platformTenant && !!salesRepTypeId,
+    salesRepQueriesEnabled && !!platformTenant && !!salesRepTypeId,
   )
   const salesReps = salesRepRoleData?.data?.items ?? []
   const salesRepsBusy = roleTypeLoading || salesRepsLoading
@@ -49,19 +98,15 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [updateTenant.isSuccess])
 
-  const handleSave = () => {
-    const payload: Record<string, unknown> = { name, description: description || undefined }
-    if (canManageTenant && status) payload.status = status
-    if (canManageSystem && type) payload.type = type
-    if (canManageSystem) payload.salesPerson = salesPerson || null
+  const fieldError = (field: keyof EditTenantFormValues) =>
+    (touchedFields[field] || isSubmitted) ? errors[field]?.message : undefined
 
-    const result = updateTenantSchema.safeParse(payload)
-    if (!result.success) {
-      setFormError(result.error.issues[0].message)
-      return
-    }
-    setFormError(null)
-    updateTenant.mutate(result.data)
+  const onSubmit = (values: EditTenantFormValues) => {
+    const payload: Record<string, unknown> = { name: values.name, description: values.description || undefined }
+    if (canManageTenant && values.status) payload.status = values.status
+    if (canManageSystem && values.type) payload.type = values.type
+    if (canManageSystem) payload.salesPerson = values.salesPerson || null
+    updateTenant.mutate(payload)
   }
 
   return (
@@ -71,12 +116,13 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
           <DialogTitle className="text-sm font-bold" style={{ color: 'var(--qms-text)' }}>Edit company</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
           <div>
             <Label htmlFor="name" className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
               Name
             </Label>
-            <Input id="name" type="text" value={name} onChange={(e) => setName(e.target.value)} />
+            <Input id="name" type="text" {...register('name')} />
+            {fieldError('name') && <p className="text-[11px] mt-1 text-danger">{fieldError('name')}</p>}
           </div>
 
           <div>
@@ -85,9 +131,8 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
             </Label>
             <Textarea
               id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
               placeholder="Leave blank to keep unchanged (not returned by GET, so it can't be pre-filled)"
+              {...register('description')}
             />
           </div>
 
@@ -96,17 +141,23 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
               <Label htmlFor="status" className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
                 Status
               </Label>
-              <Select key={status || 'empty'} value={status || undefined} onValueChange={(v) => setStatus(v as TenantStatus)}>
-                <SelectTrigger id="status" className="w-full">
-                  <SelectValue placeholder="Select status">
-                    {(v) => (v === 'active' ? 'Active' : v === 'inactive' ? 'Inactive' : 'Select status')}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
+              <Controller
+                control={control}
+                name="status"
+                render={({ field }) => (
+                  <Select key={field.value || 'empty'} value={field.value || undefined} onValueChange={field.onChange}>
+                    <SelectTrigger id="status" className="w-full">
+                      <SelectValue placeholder="Select status">
+                        {(v) => (v === 'active' ? 'Active' : v === 'inactive' ? 'Inactive' : 'Select status')}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
             </div>
           )}
 
@@ -115,17 +166,23 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
               <Label htmlFor="type" className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
                 Type
               </Label>
-              <Select key={type || 'empty'} value={type || undefined} onValueChange={(v) => setType(v as TenantType)}>
-                <SelectTrigger id="type" className="w-full">
-                  <SelectValue placeholder="Select type">
-                    {(v) => (v === 'platform' ? 'Platform' : v === 'customer' ? 'Customer' : 'Select type')}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="platform">Platform</SelectItem>
-                  <SelectItem value="customer">Customer</SelectItem>
-                </SelectContent>
-              </Select>
+              <Controller
+                control={control}
+                name="type"
+                render={({ field }) => (
+                  <Select key={field.value || 'empty'} value={field.value || undefined} onValueChange={field.onChange}>
+                    <SelectTrigger id="type" className="w-full">
+                      <SelectValue placeholder="Select type">
+                        {(v) => (v === 'platform' ? 'Platform' : v === 'customer' ? 'Customer' : 'Select type')}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="platform">Platform</SelectItem>
+                      <SelectItem value="customer">Customer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
             </div>
           )}
 
@@ -134,29 +191,42 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
               <Label htmlFor="salesPerson" className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
                 Sales rep
               </Label>
-              <Select key={salesPerson || 'empty'} value={salesPerson || undefined} onValueChange={(v) => setSalesPerson((v as string) ?? '')}>
-                <SelectTrigger id="salesPerson" className="w-full">
-                  <SelectValue placeholder={salesRepsBusy ? 'Loading...' : 'Select sales rep...'}>
-                    {(v: string) => {
-                      const r = salesReps.find((role) => role.id === v)
-                      return r ? `${r.name} (${r.code})` : salesRepsBusy ? 'Loading...' : 'Select sales rep...'
-                    }}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {salesReps.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
-                </SelectContent>
-              </Select>
-              {salesPerson && (
-                <button
-                  type="button"
-                  onClick={() => setSalesPerson('')}
-                  className="text-[11px] mt-1 underline"
-                  style={{ color: 'var(--qms-text-muted)' }}
-                >
-                  Clear
-                </button>
-              )}
+              <Controller
+                control={control}
+                name="salesPerson"
+                render={({ field }) => (
+                  <>
+                    <Select
+                      key={field.value || 'empty'}
+                      value={field.value || undefined}
+                      onValueChange={field.onChange}
+                      onOpenChange={(next) => next && setSalesRepPickerOpened(true)}
+                    >
+                      <SelectTrigger id="salesPerson" className="w-full">
+                        <SelectValue placeholder={salesRepsBusy ? 'Loading...' : 'Select sales rep...'}>
+                          {(v: string) => {
+                            const r = salesReps.find((role) => role.id === v)
+                            return r ? `${r.name} (${r.code})` : salesRepsBusy ? 'Loading...' : 'Select sales rep...'
+                          }}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {salesReps.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    {field.value && (
+                      <button
+                        type="button"
+                        onClick={() => field.onChange('')}
+                        className="text-[11px] mt-1 underline"
+                        style={{ color: 'var(--qms-text-muted)' }}
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </>
+                )}
+              />
             </div>
           )}
 
@@ -173,19 +243,13 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
             </div>
           )}
 
-          {formError && (
-            <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
-              {formError}
-            </div>
-          )}
-
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={onClose}>Cancel</Button>
-            <Button onClick={handleSave} disabled={updateTenant.isPending}>
+            <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+            <Button type="submit" disabled={updateTenant.isPending}>
               {updateTenant.isPending ? 'Saving…' : 'Save changes'}
             </Button>
           </div>
-        </div>
+        </form>
       </DialogContent>
     </Dialog>
   )

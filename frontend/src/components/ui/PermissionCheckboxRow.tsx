@@ -1,3 +1,5 @@
+import { memo } from 'react'
+
 interface Permission {
   code: string
   name: string
@@ -9,11 +11,9 @@ interface PermissionCheckboxRowProps {
   onToggle: (code: string) => void
 }
 
-// Single permission checkbox row shared by RoleDetailPage.tsx and
-// RoleTypeDetailPage.tsx's permission pickers — the two pages differ in how
-// they GROUP these rows (flat grid vs. an Accordion by resource), but the
-// row itself is identical, so only the row is shared here.
-const PermissionCheckboxRow = ({ permission, checked, onToggle }: PermissionCheckboxRowProps) => (
+// Memoized so toggling one checkbox doesn't re-render every other row in the
+// list — callers must pass a stable (useCallback-wrapped) `onToggle`.
+const PermissionCheckboxRow = memo(({ permission, checked, onToggle }: PermissionCheckboxRowProps) => (
   <label
     className="flex items-start gap-2.5 rounded-lg border px-3 py-2 cursor-pointer transition-colors hover:bg-(--qms-surface-hover)"
     style={{
@@ -36,6 +36,6 @@ const PermissionCheckboxRow = ({ permission, checked, onToggle }: PermissionChec
       </span>
     </span>
   </label>
-)
+))
 
 export default PermissionCheckboxRow

@@ -7,6 +7,7 @@ import { TENANT_PERMISSIONS } from '../../modules/access-management/tenant/tenan
 import { DIVISION_PERMISSIONS } from '../../modules/crm/division/division.constants';
 import { CONTACT_PERMISSIONS } from '../../modules/crm/contact/contact.constants';
 import { ROLE_PERMISSIONS } from '../../modules/access-management/role/role.constants';
+import { INVENTORY_REQUEST_PERMISSIONS } from '../../modules/inventory/inventory-request/inventory-request.constants';
 
 // CRM ROLE TYPES
 export const CRM_BUSINESS_ROLE_TYPES = [
@@ -132,6 +133,11 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
             APPOINTMENT_PERMISSIONS.SEARCH.code,
             APPOINTMENT_PERMISSIONS.GET.code,
             APPOINTMENT_PERMISSIONS.RSVP.code,
+            // raise and manage their own refill/return requests (progressing the stage is manage-only)
+            INVENTORY_REQUEST_PERMISSIONS.CREATE.code,
+            INVENTORY_REQUEST_PERMISSIONS.GET.code,
+            INVENTORY_REQUEST_PERMISSIONS.SEARCH.code,
+            INVENTORY_REQUEST_PERMISSIONS.UPDATE.code,
         ],
     },
 ];

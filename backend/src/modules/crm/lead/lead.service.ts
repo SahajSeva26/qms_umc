@@ -11,6 +11,7 @@ import { DivisionService } from '../division/division.service';
 import { RoleService } from '../../access-management/role/role.service';
 import { ContactService } from '../contact/contact.service';
 import { TENANT_TYPE } from '../../access-management/tenant/tenant.constants';
+import { TenantService } from '../../access-management/tenant/tenant.service';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
 import { CounterService } from '../../counter/counter.service';
 
@@ -22,6 +23,29 @@ const populate: any[] = [
     { path: 'contactPerson' },
     { path: 'salesPerson' },
 ];
+
+// ========================================================================================
+// HELPERS
+// ========================================================================================
+
+// any actor without lead:manage can only see their own leads (system:manage / lead:manage see all)
+const applyOwnScope = (where: any, ctx: RequestContext) => {
+    if (!ctx.hasAnyPermissions([LEAD_PERMISSIONS.MANAGE.code])) {
+        where.salesPerson = ctx.role?._id || ctx.role?.id;
+    }
+};
+
+// a lead's salesPerson must exist and be QMS internal (platform) staff
+const assertPlatformSalesPerson = async (salesPersonId: string, ctx: RequestContext) => {
+    const salesPerson = await RoleService.get(salesPersonId, ctx, { populate: true });
+    if (!salesPerson) {
+        return throwAppError('Sales person not found', StatusCodes.NOT_FOUND);
+    }
+    if ((salesPerson.tenant as any)?.type !== TENANT_TYPE.PLATFORM) {
+        return throwAppError('Sales person must be QMS internal staff', StatusCodes.BAD_REQUEST);
+    }
+    return salesPerson;
+};
 
 // ========================================================================================
 // CORE FUNCTIONS
@@ -41,17 +65,8 @@ const set = async (model: any, entity: HydratedDocument<ILead>, ctx: RequestCont
         entity.contactPerson = model.contactPerson;
     }
 
-    // salesPerson must exist and be QMS internal (platform) staff.
-    if (model.salesPerson) {
-        const salesPerson = await RoleService.get(model.salesPerson, ctx, { populate: true });
-        if (!salesPerson) {
-            return throwAppError('Sales person not found', StatusCodes.NOT_FOUND);
-        }
-        if ((salesPerson.tenant as any)?.type !== TENANT_TYPE.PLATFORM) {
-            return throwAppError('Sales person must be QMS internal staff', StatusCodes.BAD_REQUEST);
-        }
-        entity.salesPerson = model.salesPerson;
-    }
+    // salesPerson is intentionally NOT handled here — create() defaults/validates it and update()
+    // gates changes to managers (see those functions).
 
     if (model.title) entity.title = model.title;
     if (model.problemStatement) entity.problemStatement = model.problemStatement;
@@ -77,10 +92,7 @@ const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): 
         where.code = id;
     }
 
-    // reps (lead:search, not lead:manage) can only see their own leads
-    if (ctx.hasAnyPermissions([LEAD_PERMISSIONS.SEARCH.code]) && !ctx.hasAnyPermissions([LEAD_PERMISSIONS.MANAGE.code])) {
-        where.salesPerson = ctx.role?._id;
-    }
+    applyOwnScope(where, ctx);
 
     let query = LeadModel.findOne(where);
 
@@ -96,11 +108,6 @@ const search = async (filters: ISearchLeadQuery, ctx: RequestContext, options?: 
 
     //1: add default scoping
     const where: mongoose.QueryFilter<ILead> = { ...ctx.where() };
-
-    // reps (lead:search, not lead:manage) can only see their own leads
-    if (ctx.hasAnyPermissions([LEAD_PERMISSIONS.SEARCH.code]) && !ctx.hasAnyPermissions([LEAD_PERMISSIONS.MANAGE.code])) {
-        where.salesPerson = ctx.role?._id;
-    }
 
     //2: add search filters
     if (filters.title) {
@@ -119,7 +126,11 @@ const search = async (filters: ISearchLeadQuery, ctx: RequestContext, options?: 
         where.salesPerson = filters.salesPerson;
     }
 
-    //3: execute queries
+    //3: own-scope LAST so it always wins — a non-manage actor can never widen past their own leads
+    //   by passing a salesPerson filter
+    applyOwnScope(where, ctx);
+
+    //4: execute queries
     const countPromise = LeadModel.countDocuments(where);
     const dataPromise = LeadModel.find(where)
         .populate(populate)
@@ -144,6 +155,28 @@ const create = async (model: ICreateLeadPayload, ctx: RequestContext): Promise<H
         return throwAppError('Division does not belong to the selected company', StatusCodes.BAD_REQUEST);
     }
 
+    //2b: resolve the salesPerson — a lead defaults to the company's assigned sales person
+    //    (tenant.salesPerson). A manager may override with a different one; a non-manager may not.
+    //    When the company has no assigned sales person, the payload sales person (any) is required.
+    const tenant = await TenantService.get(division.tenant.toString(), ctx);
+    let salesPersonId: string | undefined;
+    if (tenant?.salesPerson) {
+        salesPersonId = tenant.salesPerson.toString();
+        if (model.salesPerson && model.salesPerson !== salesPersonId) {
+            if (!ctx.hasAnyPermissions([LEAD_PERMISSIONS.MANAGE.code])) {
+                return throwAppError('Only a manager can assign this company’s lead to a different sales person', StatusCodes.FORBIDDEN);
+            }
+            salesPersonId = model.salesPerson; // manager override
+        }
+    } else {
+        salesPersonId = model.salesPerson;
+        if (!salesPersonId) {
+            return throwAppError('A sales person is required', StatusCodes.BAD_REQUEST);
+        }
+    }
+    //2c: the resolved sales person must be QMS internal (platform) staff
+    await assertPlatformSalesPerson(salesPersonId, ctx);
+
     const lead = await withTransaction(async () => {
         const code: string = await CounterService.next(LEAD_COUNTER_ENTITY, ctx);
         //3: build entity — tenant is derived from the division (the pharma company, source of truth).
@@ -151,10 +184,11 @@ const create = async (model: ICreateLeadPayload, ctx: RequestContext): Promise<H
         let entity = new LeadModel({
             tenant: division.tenant,
             division: division._id,
+            salesPerson: salesPersonId,
             code,
         });
 
-        //4: set validates + applies contactPerson/salesPerson and the remaining fields
+        //4: set validates + applies contactPerson and the remaining fields
         entity = await set(model, entity, ctx);
         entity = await entity.save();
         return entity;
@@ -164,13 +198,22 @@ const create = async (model: ICreateLeadPayload, ctx: RequestContext): Promise<H
 };
 
 const update = async (id: string, model: IUpdateLeadPayload, ctx: RequestContext) => {
-    //1: get lead first (scoped)
+    //1: get lead first (scoped — a non-manager can only reach their own lead)
     let lead = await LeadService.get(id, ctx);
     if (!lead) {
         return throwAppError('Lead not found', StatusCodes.NOT_FOUND);
     }
 
-    //2: apply editable fields (status/division/tenant are not touched here)
+    //2: salesPerson can only be changed by a manager (override allowed); a non-manager cannot reassign
+    if (model.salesPerson !== undefined) {
+        if (!ctx.hasAnyPermissions([LEAD_PERMISSIONS.MANAGE.code])) {
+            return throwAppError('Only a manager can change the sales person of a lead', StatusCodes.FORBIDDEN);
+        }
+        await assertPlatformSalesPerson(model.salesPerson, ctx);
+        lead.salesPerson = model.salesPerson as any;
+    }
+
+    //3: apply the remaining editable fields (status/division/tenant/salesPerson are not touched here)
     lead = await set(model, lead, ctx);
     lead = await lead.save();
 

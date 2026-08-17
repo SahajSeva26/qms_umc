@@ -2,6 +2,7 @@
 import { ResponseHandler } from '../../../shared/utils/responseHandler';
 import { formatZodError } from '../../../shared/utils/error';
 import {
+    CreateInventoryAssignmentPayloadSchema,
     SearchInventoryAssignmentQuerySchema,
     UpdateInventoryAssignmentPayloadSchema,
 } from './inventory-assignment.validators';
@@ -65,12 +66,38 @@ const search = async (req: any, res: any) => {
     }
 };
 
+const create = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+
+        const { data, success, error } = CreateInventoryAssignmentPayloadSchema.safeParse(req.body);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                fields: validationErrors,
+            });
+        }
+
+        const assignment = await InventoryAssignmentService.create(data, ctx);
+
+        return ResponseHandler.appResponse(
+            res,
+            StatusCodes.CREATED,
+            true,
+            'Assignment created successfully',
+            InventoryAssignmentMapper.toResponse(assignment),
+        );
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
 const update = async (req: any, res: any) => {
     try {
         const ctx: RequestContext = req.context;
-        const { assignee } = req?.params;
-        if (!assignee) {
-            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Assignee ID is required', null);
+        const { id } = req?.params;
+        if (!id) {
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Assignment ID is required', null);
         }
 
         const { data, success, error } = UpdateInventoryAssignmentPayloadSchema.safeParse(req.body);
@@ -81,7 +108,7 @@ const update = async (req: any, res: any) => {
             });
         }
 
-        const assignment = await InventoryAssignmentService.update(assignee, data, ctx);
+        const assignment = await InventoryAssignmentService.update(id, data, ctx);
 
         return ResponseHandler.appResponse(
             res,
@@ -95,8 +122,26 @@ const update = async (req: any, res: any) => {
     }
 };
 
+const remove = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+        const { id } = req?.params;
+        if (!id) {
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Assignment ID is required', null);
+        }
+
+        await InventoryAssignmentService.remove(id, ctx);
+
+        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Assignment removed successfully', null);
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
 export const InventoryAssignmentController = {
     get,
     search,
+    create,
     update,
+    remove,
 };

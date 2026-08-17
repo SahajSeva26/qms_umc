@@ -8,48 +8,32 @@ const inventoryAssignmentSchema = new mongoose.Schema(
             type: mongoose.Schema.Types.ObjectId,
             required: [true, 'Assignee is required'],
             ref: 'Role',
-            unique: true,
             index: true,
         },
-
-        devices: [
-            {
-                inventory: {
-                    type: mongoose.Schema.Types.ObjectId,
-                    required: [true, 'Inventory is required'],
-                    ref: 'InventoryDevice',
-                },
-
-                quantity: {
-                    type: Number,
-                    required: [true, 'Quantity is required'],
-                    min: [1, 'Quantity must be 1'],
-                    max: [1, 'Quantity must be 1'],
-                    default: 1,
-                },
-            },
-        ],
-
-        consumables: [
-            {
-                inventory: {
-                    type: mongoose.Schema.Types.ObjectId,
-                    required: [true, 'Inventory is required'],
-                    ref: 'InventoryConsumable',
-                },
-
-                quantity: {
-                    type: Number,
-                    required: [true, 'Quantity is required'],
-                    min: [1, 'Quantity must be at least 1'],
-                },
-            },
-        ],
+        inventoryType: {
+            type: String,
+            enum: ['InventoryDevice', 'InventoryConsumable'],
+            required: [true, 'Inventory type is required'],
+        },
+        inventory: {
+            type: mongoose.Schema.Types.ObjectId,
+            required: [true, 'Inventory is required'],
+            refPath: 'inventoryType',
+            index: true,
+        },
+        quantity: {
+            type: Number,
+            required: [true, 'Quantity is required'],
+            min: [1, 'Quantity must be at least 1'],
+            default: 1,
+        },
     },
     {
         timestamps: true,
     },
 );
+
+inventoryAssignmentSchema.index({ assignee: 1, inventoryType: 1, inventory: 1 }, { unique: true });
 
 export const InventoryAssignmentModel = mongoose.model('InventoryAssignment', inventoryAssignmentSchema);
 export type IInventoryAssignment = mongoose.InferSchemaType<typeof inventoryAssignmentSchema>;

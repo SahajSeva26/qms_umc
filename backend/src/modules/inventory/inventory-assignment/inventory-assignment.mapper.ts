@@ -1,4 +1,5 @@
 // Inventory-assignment Mapper
+import { INVENTORY_ASSIGNMENT_TYPES } from './inventory-assignment.constants';
 
 // assignee may be a populated Role doc or a raw ObjectId ref — surface a shallow shape either way.
 const mapAssignee = (assignee: any) => {
@@ -13,24 +14,16 @@ const mapAssignee = (assignee: any) => {
     return { id: assignee.toString() };
 };
 
-// a device ref may be a populated InventoryDevice doc or a raw ObjectId.
-const mapDeviceLine = (line: any) => {
-    const inv = line.inventory;
-    const device =
-        inv && typeof inv === 'object' && inv._id
-            ? { id: inv._id.toString(), serialNumber: inv.serialNumber, status: inv.status, location: inv.location }
-            : { id: inv?.toString() };
-    return { inventory: device, quantity: line.quantity };
-};
-
-// a consumable ref may be a populated InventoryConsumable doc or a raw ObjectId.
-const mapConsumableLine = (line: any) => {
-    const inv = line.inventory;
-    const consumable =
-        inv && typeof inv === 'object' && inv._id
-            ? { id: inv._id.toString(), batch: inv.batch, expiryDate: inv.expiryDate }
-            : { id: inv?.toString() };
-    return { inventory: consumable, quantity: line.quantity };
+// the inventory ref may be a populated device/consumable doc or a raw ObjectId. Shape depends on type.
+const mapInventory = (inventoryType: string, inv: any) => {
+    if (!inv) return null;
+    if (typeof inv !== 'object' || !inv._id) {
+        return { id: inv.toString() };
+    }
+    if (inventoryType === INVENTORY_ASSIGNMENT_TYPES.DEVICE) {
+        return { id: inv._id.toString(), serialNumber: inv.serialNumber, status: inv.status, location: inv.location };
+    }
+    return { id: inv._id.toString(), batch: inv.batch, expiryDate: inv.expiryDate };
 };
 
 export const InventoryAssignmentMapper = {
@@ -40,9 +33,10 @@ export const InventoryAssignmentMapper = {
         // the role holding the inventory
         assignee: mapAssignee(assignment.assignee),
 
-        // current holdings
-        devices: (assignment.devices || []).map(mapDeviceLine),
-        consumables: (assignment.consumables || []).map(mapConsumableLine),
+        // the single holding on this row
+        inventoryType: assignment.inventoryType,
+        inventory: mapInventory(assignment.inventoryType, assignment.inventory),
+        quantity: assignment.quantity,
 
         createdAt: assignment.createdAt,
         updatedAt: assignment.updatedAt,

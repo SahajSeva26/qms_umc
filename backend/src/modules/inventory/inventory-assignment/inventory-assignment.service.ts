@@ -6,6 +6,7 @@ import {
     ISearchInventoryAssignmentQuery,
     IUpdateInventoryAssignmentPayload,
 } from './inventory-assignment.validators';
+import { INVENTORY_ASSIGNMENT_TYPES } from './inventory-assignment.constants';
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
@@ -18,61 +19,41 @@ import { InventoryConsumableService } from '../inventory-consumable/inventory-co
 
 type InventoryAssignmentDocument = HydratedDocument<IInventoryAssignment> | null;
 
-const populate: any[] = [{ path: 'assignee' }, { path: 'devices.inventory' }, { path: 'consumables.inventory' }];
+const populate: any[] = [{ path: 'assignee' }, { path: 'inventory' }];
 
 // ========================================================================================
 // HELPERS
 // ========================================================================================
 
-// Validate every referenced device exists and dedupe within the list; quantity is fixed at 1.
-const resolveDevices = async (lines: { inventory: string }[], ctx: RequestContext) => {
-    const seen = new Set<string>();
-    const result: { inventory: string; quantity: number }[] = [];
-    for (const line of lines) {
-        if (seen.has(line.inventory)) {
-            return throwAppError('The same device is listed more than once', StatusCodes.BAD_REQUEST);
-        }
-        seen.add(line.inventory);
-
-        const device = await InventoryDeviceService.get(line.inventory, ctx);
+// The referenced inventory item must exist. Which collection to look in depends on the row's type.
+const assertInventoryExists = async (inventoryType: string, inventory: string, ctx: RequestContext) => {
+    if (inventoryType === INVENTORY_ASSIGNMENT_TYPES.DEVICE) {
+        const device = await InventoryDeviceService.get(inventory, ctx);
         if (!device) {
-            return throwAppError(`Device ${line.inventory} does not exist`, StatusCodes.NOT_FOUND);
+            return throwAppError('The referenced device does not exist', StatusCodes.NOT_FOUND);
         }
-        result.push({ inventory: device._id.toString(), quantity: 1 });
+        return device;
     }
-    return result;
-};
-
-// Validate every referenced consumable lot exists and dedupe within the list.
-const resolveConsumables = async (lines: { inventory: string; quantity: number }[], ctx: RequestContext) => {
-    const seen = new Set<string>();
-    const result: { inventory: string; quantity: number }[] = [];
-    for (const line of lines) {
-        if (seen.has(line.inventory)) {
-            return throwAppError('The same consumable is listed more than once', StatusCodes.BAD_REQUEST);
-        }
-        seen.add(line.inventory);
-
-        const consumable = await InventoryConsumableService.get(line.inventory, ctx);
-        if (!consumable) {
-            return throwAppError(`Consumable ${line.inventory} does not exist`, StatusCodes.NOT_FOUND);
-        }
-        result.push({ inventory: consumable._id.toString(), quantity: line.quantity });
+    const consumable = await InventoryConsumableService.get(inventory, ctx);
+    if (!consumable) {
+        return throwAppError('The referenced consumable does not exist', StatusCodes.NOT_FOUND);
     }
-    return result;
+    return consumable;
 };
 
 // ========================================================================================
 // CORE FUNCTIONS
 // ========================================================================================
 
-// assignee is seeded at construction in create() and never handled here, so update() can't reassign it.
+// identity (assignee + inventoryType + inventory) is seeded in create() and never handled here,
+// so update() can only ever change the quantity.
 const set = async (model: any, entity: HydratedDocument<IInventoryAssignment>, ctx: RequestContext) => {
-    if (model.devices) {
-        entity.devices = (await resolveDevices(model.devices, ctx)) as any;
-    }
-    if (model.consumables) {
-        entity.consumables = (await resolveConsumables(model.consumables, ctx)) as any;
+    if (model.quantity !== undefined) {
+        // a device is a single physical unit — its quantity is always 1.
+        if (entity.inventoryType === INVENTORY_ASSIGNMENT_TYPES.DEVICE && model.quantity !== 1) {
+            return throwAppError('A device holding always has a quantity of 1', StatusCodes.BAD_REQUEST);
+        }
+        entity.quantity = model.quantity;
     }
 
     return entity;
@@ -101,11 +82,11 @@ const search = async (filters: ISearchInventoryAssignmentQuery, ctx: RequestCont
     if (filters.assignee) {
         where.assignee = filters.assignee;
     }
-    if (filters.device) {
-        where['devices.inventory'] = filters.device;
+    if (filters.inventoryType) {
+        where.inventoryType = filters.inventoryType;
     }
-    if (filters.consumable) {
-        where['consumables.inventory'] = filters.consumable;
+    if (filters.inventory) {
+        where.inventory = filters.inventory;
     }
 
     //3: execute count + data together
@@ -121,9 +102,11 @@ const search = async (filters: ISearchInventoryAssignmentQuery, ctx: RequestCont
     return { count, items };
 };
 
-const create = async (model: ICreateInventoryAssignmentPayload, ctx: RequestContext): Promise<HydratedDocument<IInventoryAssignment>> => {
-    //1: the assignee Role must exist (resolved through the actor's scope); populate so the
-    //   role type code is available to check
+const create = async (
+    model: ICreateInventoryAssignmentPayload,
+    ctx: RequestContext,
+): Promise<HydratedDocument<IInventoryAssignment>> => {
+    //1: the assignee Role must exist (resolved through the actor's scope); populate to read its type code
     const assignee = await RoleService.get(model.assignee, ctx, { populate: true });
     if (!assignee) {
         return throwAppError('The assignee does not exist', StatusCodes.NOT_FOUND);
@@ -134,36 +117,60 @@ const create = async (model: ICreateInventoryAssignmentPayload, ctx: RequestCont
         return throwAppError('The assignee must be a field officer', StatusCodes.BAD_REQUEST);
     }
 
-    //2: guard — one assignment per assignee (assignee is the unique natural key)
-    const existing = await InventoryAssignmentService.search({ assignee: model.assignee }, ctx);
-    if (existing.count > 0) {
-        return throwAppError('An assignment for this assignee already exists', StatusCodes.CONFLICT);
+    //2: the referenced inventory item must exist
+    await assertInventoryExists(model.inventoryType, model.inventory, ctx);
+
+    //3: resolve quantity — a device is always 1; a consumable must carry an explicit quantity
+    let quantity = 1;
+    if (model.inventoryType === INVENTORY_ASSIGNMENT_TYPES.CONSUMABLE) {
+        if (!model.quantity) {
+            return throwAppError('Quantity is required for a consumable', StatusCodes.BAD_REQUEST);
+        }
+        quantity = model.quantity;
     }
 
-    //3: build entity — assignee (immutable) is seeded here, never in set()
-    let entity = new InventoryAssignmentModel({ assignee: model.assignee });
-    entity = await set(model, entity, ctx);
-    entity = await entity.save();
+    //4: guard — one row per (assignee, inventoryType, inventory) (also enforced by the compound index)
+    const existing = await InventoryAssignmentService.search(
+        { assignee: model.assignee, inventoryType: model.inventoryType, inventory: model.inventory },
+        ctx,
+    );
+    if (existing.count > 0) {
+        return throwAppError('This item is already assigned to this assignee', StatusCodes.CONFLICT);
+    }
 
-    return entity;
+    //5: build + save — identity is seeded here (immutable); set() only touches quantity later
+    const entity = new InventoryAssignmentModel({
+        assignee: model.assignee,
+        inventoryType: model.inventoryType,
+        inventory: model.inventory,
+        quantity,
+    });
+
+    return await entity.save();
 };
 
-const update = async (assignee: string, model: IUpdateInventoryAssignmentPayload, ctx: RequestContext) => {
-    //1: find the existing assignment for this assignee (guard invalid ids → treated as "missing")
-    let entity: any = null;
-    if (isValidObjectID(assignee)) {
-        const existing = await InventoryAssignmentService.search({ assignee }, ctx);
-        entity = existing.items[0];
-    }
-
-    //2: create-on-miss — delegate to create() so the assignee-exists + one-per-assignee
+const update = async (id: string, model: IUpdateInventoryAssignmentPayload, ctx: RequestContext) => {
+    //1: the row must exist
+    let entity = await get(id, ctx);
     if (!entity) {
-        entity = await InventoryAssignmentService.create({ assignee }, ctx);
+        return throwAppError('Assignment not found', StatusCodes.NOT_FOUND);
     }
 
-    //3: apply editable fields (assignee is immutable — set() ignores it)
+    //2: apply editable fields (only quantity)
     entity = await set(model, entity, ctx);
-    entity = await entity.save();
+
+    return await entity.save();
+};
+
+const remove = async (id: string, ctx: RequestContext) => {
+    //1: the row must exist
+    const entity = await get(id, ctx);
+    if (!entity) {
+        return throwAppError('Assignment not found', StatusCodes.NOT_FOUND);
+    }
+
+    //2: delete the holding row
+    await entity.deleteOne();
 
     return entity;
 };
@@ -173,4 +180,5 @@ export const InventoryAssignmentService = {
     search,
     create,
     update,
+    remove,
 };

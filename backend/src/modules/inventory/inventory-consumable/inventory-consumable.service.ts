@@ -63,7 +63,7 @@ const search = async (filters: ISearchInventoryConsumableQuery, ctx: RequestCont
         where.item = filters.item;
     }
     if (filters.batch) {
-        where.batch = { $regex: filters.batch, $options: 'i' };
+        where.batch = filters.batch;
     }
     // only a manage-level actor may look past active (see expired lots)
     if (filters.status && ctx.hasAnyPermissions([INVENTORY_CONSUMABLE_PERMISSIONS.MANAGE.code])) {
@@ -91,8 +91,13 @@ const create = async (model: ICreateInventoryConsumablePayload, ctx: RequestCont
     }
 
     //2: guard — a lot is identified by (item, batch); it must not already exist
-    const existing = await InventoryConsumableModel.findOne({ item: model.item, batch: model.batch });
-    if (existing) {
+    // FIXME (followup): search() defaults to status:active, so an EXPIRED lot with the same
+    // (item, batch) is invisible here — this guard passes, then save() hits the unique
+    // (item, batch) index and throws E11000 → a 500 instead of a clean 409. The dupe is still
+    // prevented (index), but the status code is wrong. Fix by having this dedup check across all
+    // statuses (e.g. an internal search that ignores the active-only default) so it returns 409.
+    const existing = await InventoryConsumableService.search({ item: model.item, batch: model.batch }, ctx);
+    if (existing.count > 0) {
         return throwAppError('A consumable lot with this item and batch already exists', StatusCodes.CONFLICT);
     }
 

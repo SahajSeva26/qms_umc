@@ -39,5 +39,9 @@ const inventoryConsumableSchema = new mongoose.Schema(
     { timestamps: true },
 );
 
+// a lot's identity is (item, batch) — the same catalog item can have many batches, but a given
+// (item, batch) pair is unique. This backs the create() dedup guard.
+inventoryConsumableSchema.index({ item: 1, batch: 1 }, { unique: true });
+
 export const InventoryConsumableModel = mongoose.model('InventoryConsumable', inventoryConsumableSchema);
 export type IInventoryConsumable = mongoose.InferSchemaType<typeof inventoryConsumableSchema>;

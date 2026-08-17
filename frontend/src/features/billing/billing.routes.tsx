@@ -1,11 +1,6 @@
 import type { RouteObject } from 'react-router-dom'
 import BillingPage from './pages/BillingPage'
-// Dietitian Payment is a Diet Camp Coordination screen (payment workbench
-// over Diet camps/dietitians) routed under /billing/dietitian for nav
-// purposes only — its page component lives in features/diet/ alongside the
-// other 2 Dietitians-section screens, not in this (otherwise still-stub)
-// billing feature.
-import DietitianPaymentPage from '@/features/diet/pages/DietitianPaymentPage'
+import { lazyRoute } from '@/lib/router/lazyRoute'
 
 export const BILLING_ROUTES = {
   BILLING:          '/billing',
@@ -14,9 +9,17 @@ export const BILLING_ROUTES = {
   BILLING_CFO:      '/billing/cfo',
 }
 
+// BillingPage itself is still a stub (no dedicated backend module yet, see
+// root CLAUDE.md's module status table) — kept eager since it's reused
+// across 3 routes and too small to be worth a chunk round-trip. Dietitian
+// Payment is a Diet Camp Coordination screen (payment workbench over Diet
+// camps/dietitians) routed under /billing/dietitian for nav purposes only —
+// its page component lives in features/diet/ alongside the other 2
+// Dietitians-section screens, not in this (otherwise still-stub) billing
+// feature, and is real, substantial Diet feature code — worth lazy-loading.
 export const billingRoutes: RouteObject[] = [
   { path: BILLING_ROUTES.BILLING,           element: <BillingPage /> },
-  { path: BILLING_ROUTES.BILLING_DIETITIAN, element: <DietitianPaymentPage /> },
+  { path: BILLING_ROUTES.BILLING_DIETITIAN, lazy: lazyRoute(() => import('@/features/diet/pages/DietitianPaymentPage')) },
   { path: BILLING_ROUTES.BILLING_CRM,       element: <BillingPage /> },
   { path: BILLING_ROUTES.BILLING_CFO,       element: <BillingPage /> },
 ]

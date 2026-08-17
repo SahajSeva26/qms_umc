@@ -10,7 +10,7 @@ import { toast } from '@/components/ui/sonner'
 import InventoryKpiStrip from '@/features/inventory/components/InventoryKpiStrip'
 import OverviewTab from '@/features/inventory/components/OverviewTab'
 import DashboardsTab from '@/features/inventory/components/DashboardsTab'
-import ItemMasterTab from '@/features/inventory/components/ItemMasterTab'
+import InventoryMasterTab from '@/features/inventory/components/InventoryMasterTab'
 import ExpiryFEFOTab from '@/features/inventory/components/ExpiryFEFOTab'
 import DevicesTab from '@/features/inventory/components/DevicesTab'
 import CalibrationTab from '@/features/inventory/components/CalibrationTab'
@@ -30,11 +30,6 @@ import LogMovementModal from '@/features/inventory/components/LogMovementModal'
 import { useDeviceFleetUnits } from '@/features/inventory/hooks/useInventory'
 import type { DashboardSubView } from '@/features/inventory/inventory.types'
 
-// All 17 prototype tab ids, in the prototype's own order (pages/inventory.html's
-// data-inv-tab buttons) — only 4 are built so far (2026-08-03 batch 1); the
-// rest render a plain "coming soon" placeholder until later batches land.
-// Adding a newly-built tab is a 2-line change: import its component and add
-// its case to renderTab() below — no other structural change needed.
 type InventoryTabId =
   | 'overview' | 'dashboards' | 'masters' | 'expiry' | 'devices' | 'calibration'
   | 'warehouse' | 'transfers' | 'assignments' | 'foinventory' | 'fieldops'
@@ -61,8 +56,8 @@ const TABS: { id: InventoryTabId; label: string; icon: typeof LayoutDashboard }[
   { id: 'movements', label: 'Movements', icon: ArrowRightLeft },
 ]
 
-// Tabs with a real built component so far — everything else falls through
-// to the placeholder in renderTab().
+// Every tab is built; kept as a set (not just "always true") so a future
+// still-unbuilt tab can drop out of it and fall through to ComingSoonTab.
 const BUILT_TABS = new Set<InventoryTabId>(['overview', 'dashboards', 'masters', 'expiry', 'devices', 'calibration', 'warehouse', 'transfers', 'assignments', 'foinventory', 'fieldops', 'vendors', 'consumables', 'procurement', 'movements', 'forecast', 'copilot', 'audit'])
 
 function ComingSoonTab({ label }: { label: string }) {
@@ -76,31 +71,17 @@ function ComingSoonTab({ label }: { label: string }) {
   )
 }
 
-// Inventory & Devices — exact port of pages/inventory.html's shell (page-head,
-// chip row, KPI grid + AI banner shared above every tab, 17-tab strip).
-// Mock/frontend-only, same convention as features/reminders and features/hq
-// — no real backend module exists yet; when it lands this page's data hooks
-// (useInventory.ts) get swapped for real API calls, the same one-module-at-a-
-// time migration path already used for Camps/Doctor/GeoProfile/Lead/Division/
-// Project in earlier sessions. Built incrementally in batches due to session
-// quota limits — see md-files/PROGRESS.md's 2026-08-04 entry for the full
-// build log and remaining-tabs list.
+// Every tab is still mock/localStorage-backed (useInventory.ts) except
+// "masters" (InventoryMasterTab.tsx), which is wired to the real backend —
+// the other tabs get their own migration once their backend modules exist.
 const InventoryPage = () => {
   const [tab, setTab] = useState<InventoryTabId>('overview')
-  // Dashboards' segmented sub-view — lifted up (rather than left as
-  // DashboardsTab's own internal-only state) solely so Copilot's "Readiness
-  // →" card can chain window.QMS_InvIntel.setDash('readiness') +
-  // window.invSetTab('dashboards') into one click, landing the user directly
-  // on the Readiness dashboard. Every other route into Dashboards (tab-strip
-  // click, other KPI tiles) leaves this untouched and DashboardsTab falls
-  // back to its own local state whenever these aren't threaded in.
+  // Lifted (not owned by DashboardsTab) so Copilot's "Readiness →" card can
+  // jump straight to the Readiness sub-view in one click.
   const [dashSub, setDashSub] = useState<DashboardSubView>('exec')
 
-  // Page-head "New transfer" button — despite the label, the prototype wires
-  // this to window.invNewMovement() (pages/inventory.html:32), the SAME "Log
-  // inventory movement" modal as the Movements tab's own button, not the
-  // Transfer modal owned by Warehouse/Transfers. Reused here via
-  // LogMovementModal.tsx rather than duplicated.
+  // Despite the label, "New transfer" opens the same "Log inventory movement"
+  // modal as the Movements tab — not a separate Transfer modal.
   const [logMovementOpen, setLogMovementOpen] = useState(false)
   const { units } = useDeviceFleetUnits()
 
@@ -112,7 +93,7 @@ const InventoryPage = () => {
     switch (tab) {
       case 'overview': return <OverviewTab />
       case 'dashboards': return <DashboardsTab onNavigateTab={navigateTab} sub={dashSub} onSubChange={setDashSub} />
-      case 'masters': return <ItemMasterTab />
+      case 'masters': return <InventoryMasterTab />
       case 'expiry': return <ExpiryFEFOTab />
       case 'devices': return <DevicesTab />
       case 'calibration': return <CalibrationTab />
@@ -139,7 +120,6 @@ const InventoryPage = () => {
 
   return (
     <div className="w-full">
-      {/* .page-head — crumb/title/chip row + Import/Export/New transfer actions */}
       <div className="flex items-start justify-between gap-3 mb-3.5 flex-wrap">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--qms-text-muted)' }}>
@@ -174,10 +154,8 @@ const InventoryPage = () => {
         </div>
       </div>
 
-      {/* KPI grid + AI banner — shared across every tab, rendered once here */}
       <InventoryKpiStrip onNavigateTab={(t) => setTab(t as InventoryTabId)} />
 
-      {/* .page-tabs — 17-tab strip, horizontally scrollable */}
       <div className="flex gap-1 mb-4 border-b overflow-x-auto" style={{ borderColor: 'var(--qms-border)' }}>
         {TABS.map((t) => {
           const Icon = t.icon

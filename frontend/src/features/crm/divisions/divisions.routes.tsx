@@ -1,6 +1,5 @@
 import type { RouteObject } from 'react-router-dom'
-import RequirePermission from '@/components/layouts/RequirePermission'
-import DivisionDetailPage from './pages/DivisionDetailPage'
+import { lazyRoute } from '@/lib/router/lazyRoute'
 
 // Divisions live inline under a company's own page (TenantDetailPage.tsx) —
 // no standalone list route. DIVISION_DETAIL is still reached from that
@@ -18,10 +17,6 @@ const DIVISION_VIEW_PERMISSIONS = ['division:manage', 'tenant:admin', 'lead:mana
 export const divisionsRoutes: RouteObject[] = [
   {
     path: DIVISION_ROUTES.DIVISION_DETAIL,
-    element: (
-      <RequirePermission anyOf={DIVISION_VIEW_PERMISSIONS}>
-        <DivisionDetailPage />
-      </RequirePermission>
-    ),
+    lazy: lazyRoute(() => import('./pages/DivisionDetailPage'), DIVISION_VIEW_PERMISSIONS),
   },
 ]

@@ -40,8 +40,8 @@ const CampTimelinesTab = ({ threads, camps, people, manualTrigger }: CampTimelin
     try {
       const t = await manualTrigger(thread.campId, thread.recipientType, thread.recipientId, thread.stage)
       toast.success(t ? `Retry dispatched · ${thread.recipientType} ${thread.recipientName}` : 'Retry failed')
-    } catch {
-      toast.error('Retry failed')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Retry failed')
     }
   }
 

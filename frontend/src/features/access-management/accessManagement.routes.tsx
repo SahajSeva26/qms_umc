@@ -1,13 +1,5 @@
 import type { RouteObject } from 'react-router-dom'
-import RequirePermission from '@/components/layouts/RequirePermission'
-import TenantsListPage from '@/features/access-management/tenant/pages/TenantsListPage'
-import TenantDetailPage from '@/features/access-management/tenant/pages/TenantDetailPage'
-import PermissionGroupsListPage from '@/features/access-management/permission-group/pages/PermissionGroupsListPage'
-import PermissionGroupDetailPage from '@/features/access-management/permission-group/pages/PermissionGroupDetailPage'
-import RoleTypesListPage from '@/features/access-management/role-type/pages/RoleTypesListPage'
-import RoleTypeDetailPage from '@/features/access-management/role-type/pages/RoleTypeDetailPage'
-import RolesListPage from '@/features/access-management/role/pages/RolesListPage'
-import RoleDetailPage from '@/features/access-management/role/pages/RoleDetailPage'
+import { lazyRoute } from '@/lib/router/lazyRoute'
 
 // This feature owns its own routes file per CLAUDE.md's routing convention
 // ("Feature routes … Export a `routes` array … Define all paths for that
@@ -32,14 +24,14 @@ export const ACCESS_MANAGEMENT_ROUTES = {
   ROLE_DETAIL:          '/admin/roles/:id',
 }
 
-// Named permission-code sets for each entity's <RequirePermission> route
-// guard, pulled out of the JSX below rather than inlined per route —
-// matches each backend route's own real AuthorizeMiddleware([...], 'OR')
-// guard exactly (see the research this module was built against:
-// tenant/permission-group/role-type/role routes.ts, all default OR
-// semantics). Applied to BOTH the list route and its detail/new routes —
-// previously only the list routes were gated at all; a user could
-// navigate straight to e.g. /admin/tenants/:id with zero permission check.
+// Named permission-code sets for each entity's lazyRoute permission check,
+// pulled out of the JSX below rather than inlined per route — matches each
+// backend route's own real AuthorizeMiddleware([...], 'OR') guard exactly
+// (see the research this module was built against: tenant/permission-group/
+// role-type/role routes.ts, all default OR semantics). Applied to BOTH the
+// list route and its detail/new routes — previously only the list routes
+// were gated at all; a user could navigate straight to e.g.
+// /admin/tenants/:id with zero permission check.
 const TENANTS_VIEW_PERMISSIONS = ['tenant:get', 'tenant:search', 'tenant:manage']
 // CONFIRMED DRIFT (2026-08-10): this used to be
 // ['permission-group:get', 'permission-group:search', 'permission-group:manage']
@@ -71,88 +63,48 @@ export const accessManagementRoutes: RouteObject[] = [
   // Tenants
   {
     path: ACCESS_MANAGEMENT_ROUTES.TENANTS,
-    element: (
-      <RequirePermission anyOf={TENANTS_VIEW_PERMISSIONS}>
-        <TenantsListPage />
-      </RequirePermission>
-    ),
+    lazy: lazyRoute(() => import('@/features/access-management/tenant/pages/TenantsListPage'), TENANTS_VIEW_PERMISSIONS),
   },
   {
     path: ACCESS_MANAGEMENT_ROUTES.TENANT_DETAIL,
-    element: (
-      <RequirePermission anyOf={TENANTS_VIEW_PERMISSIONS}>
-        <TenantDetailPage />
-      </RequirePermission>
-    ),
+    lazy: lazyRoute(() => import('@/features/access-management/tenant/pages/TenantDetailPage'), TENANTS_VIEW_PERMISSIONS),
   },
 
   // Permission Groups
   {
     path: ACCESS_MANAGEMENT_ROUTES.PERMISSION_GROUPS,
-    element: (
-      <RequirePermission anyOf={PERMISSION_GROUPS_VIEW_PERMISSIONS}>
-        <PermissionGroupsListPage />
-      </RequirePermission>
-    ),
+    lazy: lazyRoute(() => import('@/features/access-management/permission-group/pages/PermissionGroupsListPage'), PERMISSION_GROUPS_VIEW_PERMISSIONS),
   },
   {
     path: ACCESS_MANAGEMENT_ROUTES.PERMISSION_GROUP_DETAIL,
-    element: (
-      <RequirePermission anyOf={PERMISSION_GROUPS_VIEW_PERMISSIONS}>
-        <PermissionGroupDetailPage />
-      </RequirePermission>
-    ),
+    lazy: lazyRoute(() => import('@/features/access-management/permission-group/pages/PermissionGroupDetailPage'), PERMISSION_GROUPS_VIEW_PERMISSIONS),
   },
 
   // Role Types
   {
     path: ACCESS_MANAGEMENT_ROUTES.ROLE_TYPES,
-    element: (
-      <RequirePermission anyOf={ROLE_TYPES_VIEW_PERMISSIONS}>
-        <RoleTypesListPage />
-      </RequirePermission>
-    ),
+    lazy: lazyRoute(() => import('@/features/access-management/role-type/pages/RoleTypesListPage'), ROLE_TYPES_VIEW_PERMISSIONS),
   },
   {
     path: ACCESS_MANAGEMENT_ROUTES.ROLE_TYPE_NEW,
-    element: (
-      <RequirePermission anyOf={ROLE_TYPES_VIEW_PERMISSIONS}>
-        <RoleTypeDetailPage />
-      </RequirePermission>
-    ),
+    lazy: lazyRoute(() => import('@/features/access-management/role-type/pages/RoleTypeDetailPage'), ROLE_TYPES_VIEW_PERMISSIONS),
   },
   {
     path: ACCESS_MANAGEMENT_ROUTES.ROLE_TYPE_DETAIL,
-    element: (
-      <RequirePermission anyOf={ROLE_TYPES_VIEW_PERMISSIONS}>
-        <RoleTypeDetailPage />
-      </RequirePermission>
-    ),
+    lazy: lazyRoute(() => import('@/features/access-management/role-type/pages/RoleTypeDetailPage'), ROLE_TYPES_VIEW_PERMISSIONS),
   },
 
   // Roles
   {
     path: ACCESS_MANAGEMENT_ROUTES.ROLES,
-    element: (
-      <RequirePermission anyOf={ROLES_VIEW_PERMISSIONS}>
-        <RolesListPage />
-      </RequirePermission>
-    ),
+    lazy: lazyRoute(() => import('@/features/access-management/role/pages/RolesListPage'), ROLES_VIEW_PERMISSIONS),
   },
   {
     path: ACCESS_MANAGEMENT_ROUTES.ROLE_NEW,
-    element: (
-      <RequirePermission anyOf={ROLES_VIEW_PERMISSIONS}>
-        <RoleDetailPage />
-      </RequirePermission>
-    ),
+    lazy: lazyRoute(() => import('@/features/access-management/role/pages/RoleDetailPage'), ROLES_VIEW_PERMISSIONS),
   },
   {
     path: ACCESS_MANAGEMENT_ROUTES.ROLE_DETAIL,
-    element: (
-      <RequirePermission anyOf={ROLES_VIEW_PERMISSIONS}>
-        <RoleDetailPage />
-      </RequirePermission>
-    ),
+    lazy: lazyRoute(() => import('@/features/access-management/role/pages/RoleDetailPage'), ROLES_VIEW_PERMISSIONS),
   },
 ]

@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { Outlet, Navigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useSession } from '@/hooks/useSession'
 import { AUTH_ROUTES } from '@/features/auth/auth.routes'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
+import RouteFallback from './RouteFallback'
 import FeedbackWidget from '@/features/qa-feedback/components/FeedbackWidget'
 
 const SB_INTENT_KEY = 'qms.sb.intent'
@@ -78,7 +79,9 @@ const AppLayout = () => {
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <Topbar onMobileMenuToggle={() => setMobileOpen((v) => !v)} />
         <main className="flex-1 overflow-auto p-6">
-          <Outlet />
+          <Suspense fallback={<RouteFallback />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
 

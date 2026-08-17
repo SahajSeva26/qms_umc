@@ -3,6 +3,7 @@ import { FiX } from 'react-icons/fi'
 import { Input } from '@/components/ui/input'
 import { useQuery } from '@tanstack/react-query'
 import { crmService } from '@/features/crm/crm.service'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { LEAD_STATUS_LABEL } from '@/types/crm.types'
 import type { LeadEntity } from '@/types/crm.types'
 
@@ -12,28 +13,15 @@ interface LeadIdPickerProps {
   onChange: (leadId: string, leadLabel: string) => void
 }
 
-// Free-text typeahead over GET /leads?title=<keyword> (lead.service.ts's
-// search(), case-insensitive partial match) — replaces the old raw
-// "paste a Lead ObjectId by hand" text box, which had no way to actually
-// find/discover the right id (found 2026-08-03: the field looked inert
-// because nothing about it was searchable, even though the backend already
-// supports title search). Same plain state + manually-positioned dropdown
-// pattern as InternalMembersPicker.tsx (NOT a base-ui Popover — see that
-// file's comment for why Popover.Trigger fights a live text input). Unlike
-// that component this is a single-select: picking a result replaces the
-// current value entirely rather than adding to a list.
+// Free-text typeahead over GET /leads?title=<keyword> (case-insensitive
+// partial match). Same pattern as InternalMembersPicker.tsx, but
+// single-select: picking a result replaces the value instead of adding to
+// a list.
 const LeadIdPicker = ({ value, label, onChange }: LeadIdPickerProps) => {
   const [query, setQuery] = useState('')
-  const [debouncedQuery, setDebouncedQuery] = useState('')
+  const debouncedQuery = useDebouncedValue(query)
   const [open, setOpen] = useState(false)
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const containerRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    clearTimeout(timeoutRef.current)
-    timeoutRef.current = setTimeout(() => setDebouncedQuery(query), 300)
-    return () => clearTimeout(timeoutRef.current)
-  }, [query])
 
   useEffect(() => {
     if (!open) return
@@ -59,21 +47,21 @@ const LeadIdPicker = ({ value, label, onChange }: LeadIdPickerProps) => {
   const pickLead = (lead: LeadEntity) => {
     onChange(lead.id, leadLabel(lead))
     setQuery('')
-    setDebouncedQuery('')
     setOpen(false)
   }
 
-  const clearSelection = () => {
+  const clearSelection = (e?: React.MouseEvent) => {
+    e?.stopPropagation()
     onChange('', '')
     setQuery('')
-    setDebouncedQuery('')
   }
 
   return (
     <div ref={containerRef} className="relative">
       {value ? (
         <div
-          className="flex items-center gap-2 h-8 rounded-lg border px-2.5 text-[13px]"
+          onClick={() => { clearSelection(); setOpen(true) }}
+          className="flex items-center gap-2 h-8 rounded-lg border px-2.5 text-[13px] cursor-pointer"
           style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text)' }}
         >
           <span className="flex-1 truncate">{label || value}</span>

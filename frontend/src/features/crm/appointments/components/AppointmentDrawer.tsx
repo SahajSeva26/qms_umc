@@ -66,18 +66,22 @@ const refName = (ref: unknown, fallback = '—'): string => {
   return obj.name ?? fallback
 }
 
-// Lead's own populated shape uses `title`, not `name` (appointment.
-// service.ts's populate array: `{ path: 'lead', select: 'code title status' }`)
-// — a real crash found 2026-08-04: the old call site cast the raw Lead
-// object itself as the fallback string (`refName(lead, lead as string)`),
-// which meant refName's `obj.name` miss returned the OBJECT as "the
-// fallback string," and that object got rendered directly into JSX
-// (React error #31, "object with keys {_id, code, status, title}").
+// Lead's own populated shape uses `title`, not `name` — using refName()
+// directly here previously rendered the raw object into JSX (React error
+// #31) whenever the name lookup missed.
 const leadRefName = (ref: unknown, fallback = '—'): string => {
   if (!ref) return fallback
   if (typeof ref === 'string') return ref
   const obj = ref as { title?: string }
   return obj.title ?? fallback
+}
+
+// Populated refs use `_id` (raw Mongoose populate), not `id`.
+const refId = (ref: unknown): string => {
+  if (!ref) return ''
+  if (typeof ref === 'string') return ref
+  const obj = ref as { _id?: string }
+  return obj._id ?? ''
 }
 
 type PanelKind = 'moveStage' | 'reschedule' | null
@@ -87,14 +91,6 @@ interface AppointmentDrawerProps {
   onClose: () => void
 }
 
-// Mirrors the prototype's drawer field order (sales-calendar.js's
-// renderDrawer): header pills -> title/subtitle -> meta grid -> agenda card
-// -> next steps -> MOM panel -> invitee panel -> action buttons. Per the
-// 2026-07-27 decision documented in PROGRESS.md: no outcome panel (dropped),
-// no reschedule-history block (reschedule is a plain field update), no
-// peer-overlay concept (own-scope is the real backend's own permission
-// model, enforced server-side — this drawer only ever opens for an
-// appointment the viewer can already see).
 const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => {
   const [panel, setPanel] = useState<PanelKind>(null)
   const [reason, setReason] = useState('')
@@ -106,12 +102,9 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
   const [rescheduleStart, setRescheduleStart] = useState('')
   const [rescheduleEnd, setRescheduleEnd] = useState('')
   // True once the user has directly edited End — stops the auto-shift below.
-  // NOT derived by comparing rescheduleEnd against its original pre-filled
-  // value on every Start change: End is already reassigned by the auto-shift
-  // itself, so that comparison goes stale after the very first shift and
-  // silently disables further shifts (found 2026-08-11: editing Start's date
-  // and then its time, as two separate DateTimePicker fields, produced an
-  // End stuck at the first shift's value instead of tracking Start).
+  // Tracked as its own flag rather than diffing rescheduleEnd against its
+  // original value, since End is reassigned by the auto-shift itself and
+  // that comparison would go stale after the first shift.
   const [endTouched, setEndTouched] = useState(false)
   const [error, setError] = useState('')
 
@@ -129,11 +122,9 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
     return roleId === myRoleId
   })
 
-  // Falls back to [] for a status this map no longer knows about (e.g. a
-  // pre-existing 'blocked'/'released' record from before that status was
-  // removed 2026-08-11 — the backend hasn't dropped it yet, so one can still
-  // exist) — treats it as terminal/read-only rather than crashing on
-  // .length of undefined.
+  // Falls back to [] for a status this map doesn't know about (e.g. a
+  // pre-existing record in a since-removed status) — treats it as
+  // terminal/read-only rather than crashing.
   const legalTargets = APPOINTMENT_TRANSITION_MAP[appointment.status] ?? []
   const isTerminal = legalTargets.length === 0
   const statusColor = STATUS_COLOR[appointment.status] ?? '#94a3b8'
@@ -174,16 +165,16 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
   // so nothing downstream (save, display) needs to know about the dropdown.
   const resolvedNextSteps = nextStepsOption === NEXT_STEPS_OTHER ? nextStepsText.trim() : nextStepsOption
 
-  // MOM and Next steps both live on the plain update endpoint (PUT
-  // /appointments/:id, not the stage-move one — see
-  // UpdateAppointmentPayload/appointment.service.ts's update()), so saving
-  // either alongside a status move is a separate call from moveStage, not
-  // one combined payload. Sent first: if the status flip then fails (e.g. a
-  // transition race), the text the user just typed isn't lost. MOM only
-  // applies when marking done; Next steps applies to every transition.
+  // MOM/Next steps save via the plain update endpoint, not the stage-move
+  // one, so they're a separate call sent before moveStage — if the status
+  // flip then fails, the text already typed isn't lost.
   const handleMoveStageSave = async () => {
     if (!targetStatus) return
     if (!reason.trim()) return setError('A reason is required')
+    // Frontend-only check — moveStage() on the backend has no equivalent
+    // guard yet, so this can still be bypassed via a direct API call. Move
+    // this into appointment.service.ts's moveStage() once that's built.
+    if (targetStatus === 'done' && !momText.trim()) return setError('Minutes of meeting are required to mark this appointment done')
     try {
       const momChanged = targetStatus === 'done' && momText.trim() && momText.trim() !== (appointment.mom.details ?? '')
       const nextStepsChanged = resolvedNextSteps !== (appointment.nextSteps ?? '')
@@ -211,11 +202,8 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
     setPanel('reschedule')
   }
 
-  // Keeps the original duration when only the start time is moved — without
-  // this, changing Start to later than the pre-filled (original) End
-  // silently produces an invalid range the user has to notice and fix
-  // themselves. Only shifts End automatically; once the user edits End
-  // directly (endTouched), that value is left alone.
+  // Keeps the original duration when only Start is moved, so a later Start
+  // doesn't silently produce an invalid range. Stops once End is edited directly.
   const originalDurationMs = appointment.duration.endTime
     ? new Date(appointment.duration.endTime).getTime() - new Date(appointment.duration.startTime).getTime()
     : null
@@ -378,11 +366,6 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
               <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-[13px]" />
             </div>
             {targetStatus === 'done' && (
-              <Button type="button" size="sm" variant="outline" onClick={() => setNewLeadOpen(true)}>
-                + New lead
-              </Button>
-            )}
-            {targetStatus === 'done' && (
               <div>
                 <Label className={labelClasses} style={labelStyle}>Minutes of meeting</Label>
                 <Textarea
@@ -419,9 +402,16 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
             </div>
             {error && <p className="text-[12px] font-semibold text-danger">{error}</p>}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPanel(null)}>Cancel</Button>
-            <Button onClick={handleMoveStageSave} disabled={moveStage.isPending || updateAppointment.isPending}>Confirm</Button>
+          <DialogFooter className="sm:justify-between">
+            {targetStatus === 'done' ? (
+              <Button type="button" size="sm" variant="outline" onClick={() => setNewLeadOpen(true)}>
+                + New lead
+              </Button>
+            ) : <div />}
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setPanel(null)}>Cancel</Button>
+              <Button onClick={handleMoveStageSave} disabled={moveStage.isPending || updateAppointment.isPending}>Confirm</Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -476,6 +466,16 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
         <NewLeadWizard
           onClose={() => setNewLeadOpen(false)}
           onCreated={() => setNewLeadOpen(false)}
+          prefill={{
+            tenantId: refId(appointment.tenant),
+            tenantLabel: refName(appointment.tenant),
+            divisionId: refId(appointment.division),
+            divisionLabel: refName(appointment.division),
+            contactPersonId: refId(appointment.contactPerson),
+            contactPersonLabel: refName(appointment.contactPerson),
+            salesPersonId: refId(appointment.salesPerson),
+            salesPersonLabel: refName(appointment.salesPerson),
+          }}
         />
       )}
     </SideDrawer>

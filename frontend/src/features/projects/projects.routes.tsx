@@ -1,7 +1,5 @@
 import type { RouteObject } from 'react-router-dom'
-import RequirePermission from '@/components/layouts/RequirePermission'
-import ProjectsPage from './pages/ProjectsPage'
-import ProjectGanttPage from './pages/ProjectGanttPage'
+import { lazyRoute } from '@/lib/router/lazyRoute'
 
 export const PROJECTS_ROUTES = {
   PROJECTS:       '/projects',
@@ -19,18 +17,10 @@ const PROJECTS_VIEW_PERMISSIONS = ['project:search', 'project:manage', 'tenant:m
 export const projectsRoutes: RouteObject[] = [
   {
     path: PROJECTS_ROUTES.PROJECTS,
-    element: (
-      <RequirePermission anyOf={PROJECTS_VIEW_PERMISSIONS}>
-        <ProjectsPage />
-      </RequirePermission>
-    ),
+    lazy: lazyRoute(() => import('./pages/ProjectsPage'), PROJECTS_VIEW_PERMISSIONS),
   },
   {
     path: PROJECTS_ROUTES.PROJECTS_GANTT,
-    element: (
-      <RequirePermission anyOf={PROJECTS_VIEW_PERMISSIONS}>
-        <ProjectGanttPage />
-      </RequirePermission>
-    ),
+    lazy: lazyRoute(() => import('./pages/ProjectGanttPage'), PROJECTS_VIEW_PERMISSIONS),
   },
 ]

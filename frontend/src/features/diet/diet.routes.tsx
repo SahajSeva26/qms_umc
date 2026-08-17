@@ -1,7 +1,5 @@
 import type { RouteObject } from 'react-router-dom'
-import DietPage from './pages/DietPage'
-import DietApprovalsPage from './pages/DietApprovalsPage'
-import DietitianProfilesPage from './pages/DietitianProfilesPage'
+import { lazyRoute } from '@/lib/router/lazyRoute'
 
 export const DIET_ROUTES = {
   DIET:           '/diet',
@@ -10,7 +8,7 @@ export const DIET_ROUTES = {
 }
 
 export const dietRoutes: RouteObject[] = [
-  { path: DIET_ROUTES.DIET,           element: <DietPage /> },
-  { path: DIET_ROUTES.DIET_APPROVALS, element: <DietApprovalsPage /> },
-  { path: DIET_ROUTES.DIET_PROFILES,  element: <DietitianProfilesPage /> },
+  { path: DIET_ROUTES.DIET,           lazy: lazyRoute(() => import('./pages/DietPage')) },
+  { path: DIET_ROUTES.DIET_APPROVALS, lazy: lazyRoute(() => import('./pages/DietApprovalsPage')) },
+  { path: DIET_ROUTES.DIET_PROFILES,  lazy: lazyRoute(() => import('./pages/DietitianProfilesPage')) },
 ]

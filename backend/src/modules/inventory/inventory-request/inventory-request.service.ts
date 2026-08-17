@@ -482,11 +482,17 @@ const moveStage = async (id: string, model: IMoveStagePayload, ctx: RequestConte
         },
     });
 
-    //5: record who processed the request when it leaves the requester's hands (approve/reject/receive)
-    // FIXME: processedBy should ALWAYS be the inventory manager, but an FO confirming a refill 'received'
-    // currently overwrites it with the FO. Gate this assignment on ctx.hasAnyPermissions([MANAGE]) so a
-    // requester's receipt-confirmation can't clobber the approving manager. (Full trail is in stageHistory.)
-    if (to === INVENTORY_REQUEST_STATUS.APPROVED || to === INVENTORY_REQUEST_STATUS.REJECTED || to === INVENTORY_REQUEST_STATUS.RECEIVED) {
+    //5: record who processed the request — always the inventory manager. Gated on MANAGE so a
+    //   requester's own move (e.g. an FO confirming a refill 'received', or cancelling) can't overwrite
+    //   the approving manager. Only a manager's approve/reject/receive sets it. (Full actor trail per
+    //   transition is in stageHistory regardless.)
+    const isManager = ctx.hasAnyPermissions([INVENTORY_REQUEST_PERMISSIONS.MANAGE.code]);
+    const processedStages: string[] = [
+        INVENTORY_REQUEST_STATUS.APPROVED,
+        INVENTORY_REQUEST_STATUS.REJECTED,
+        INVENTORY_REQUEST_STATUS.RECEIVED,
+    ];
+    if (isManager && processedStages.includes(to)) {
         request.processedBy = (ctx.role?._id || ctx.role?.id) as any;
     }
 

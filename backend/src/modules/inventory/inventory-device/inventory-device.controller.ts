@@ -1,14 +1,14 @@
-// Inventory-assignment Controller
+// Inventory-device Controller
 import { ResponseHandler } from '../../../shared/utils/responseHandler';
 import { formatZodError } from '../../../shared/utils/error';
 import {
-    CreateInventoryAssignmentPayloadSchema,
-    SearchInventoryAssignmentQuerySchema,
-    UpdateInventoryAssignmentPayloadSchema,
-} from './inventory-assignment.validators';
+    CreateInventoryDevicePayloadSchema,
+    SearchInventoryDeviceQuerySchema,
+    UpdateInventoryDevicePayloadSchema,
+} from './inventory-device.validators';
 import { StatusCodes } from 'http-status-codes';
-import { InventoryAssignmentService } from './inventory-assignment.service';
-import { InventoryAssignmentMapper } from './inventory-assignment.mapper';
+import { InventoryDeviceService } from './inventory-device.service';
+import { InventoryDeviceMapper } from './inventory-device.mapper';
 import { RequestHandler } from '../../../shared/utils/requestHandler';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
 
@@ -17,21 +17,21 @@ const get = async (req: any, res: any) => {
         const ctx: RequestContext = req.context;
         const { id } = req?.params;
         if (!id) {
-            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Assignment ID is required', null);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Device ID is required', null);
         }
 
-        const assignment = await InventoryAssignmentService.get(id, ctx, { populate: true });
+        const device = await InventoryDeviceService.get(id, ctx, { populate: true });
 
-        if (!assignment) {
-            return ResponseHandler.appResponse(res, StatusCodes.NOT_FOUND, false, 'Assignment not found', null);
+        if (!device) {
+            return ResponseHandler.appResponse(res, StatusCodes.NOT_FOUND, false, 'Device not found', null);
         }
 
         return ResponseHandler.appResponse(
             res,
             StatusCodes.OK,
             true,
-            'Assignment fetched successfully',
-            InventoryAssignmentMapper.toResponse(assignment),
+            'Device fetched successfully',
+            InventoryDeviceMapper.toResponse(device),
         );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
@@ -42,7 +42,7 @@ const search = async (req: any, res: any) => {
     try {
         const ctx: RequestContext = req.context;
 
-        const { data: filters, success, error } = SearchInventoryAssignmentQuerySchema.safeParse(req.query);
+        const { data: filters, success, error } = SearchInventoryDeviceQuerySchema.safeParse(req.query);
         if (!success) {
             const validationErrors = formatZodError(error);
             return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
@@ -52,14 +52,14 @@ const search = async (req: any, res: any) => {
 
         const pagination = RequestHandler.getPagination(filters);
 
-        const result = await InventoryAssignmentService.search(filters, ctx, { pagination });
+        const result = await InventoryDeviceService.search(filters, ctx, { pagination });
 
         return ResponseHandler.appResponse(
             res,
             StatusCodes.OK,
             true,
-            'Assignments fetched successfully',
-            InventoryAssignmentMapper.toSearchResponse(result),
+            'Devices fetched successfully',
+            InventoryDeviceMapper.toSearchResponse(result),
         );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
@@ -70,7 +70,7 @@ const create = async (req: any, res: any) => {
     try {
         const ctx: RequestContext = req.context;
 
-        const { data, success, error } = CreateInventoryAssignmentPayloadSchema.safeParse(req.body);
+        const { data, success, error } = CreateInventoryDevicePayloadSchema.safeParse(req.body);
         if (!success) {
             const validationErrors = formatZodError(error);
             return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
@@ -78,14 +78,14 @@ const create = async (req: any, res: any) => {
             });
         }
 
-        const assignment = await InventoryAssignmentService.create(data, ctx);
+        const device = await InventoryDeviceService.create(data, ctx);
 
         return ResponseHandler.appResponse(
             res,
             StatusCodes.CREATED,
             true,
-            'Assignment created successfully',
-            InventoryAssignmentMapper.toResponse(assignment),
+            'Device created successfully',
+            InventoryDeviceMapper.toResponse(device),
         );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
@@ -97,10 +97,10 @@ const update = async (req: any, res: any) => {
         const ctx: RequestContext = req.context;
         const { id } = req?.params;
         if (!id) {
-            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Assignment ID is required', null);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Device ID is required', null);
         }
 
-        const { data, success, error } = UpdateInventoryAssignmentPayloadSchema.safeParse(req.body);
+        const { data, success, error } = UpdateInventoryDevicePayloadSchema.safeParse(req.body);
         if (!success) {
             const validationErrors = formatZodError(error);
             return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
@@ -108,40 +108,23 @@ const update = async (req: any, res: any) => {
             });
         }
 
-        const assignment = await InventoryAssignmentService.update(id, data, ctx);
+        const device = await InventoryDeviceService.update(id, data, ctx);
 
         return ResponseHandler.appResponse(
             res,
             StatusCodes.OK,
             true,
-            'Assignment updated successfully',
-            InventoryAssignmentMapper.toResponse(assignment),
+            'Device updated successfully',
+            InventoryDeviceMapper.toResponse(device),
         );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }
 };
 
-const remove = async (req: any, res: any) => {
-    try {
-        const ctx: RequestContext = req.context;
-        const { id } = req?.params;
-        if (!id) {
-            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Assignment ID is required', null);
-        }
-
-        await InventoryAssignmentService.remove(id, ctx);
-
-        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Assignment removed successfully', null);
-    } catch (error: any) {
-        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
-    }
-};
-
-export const InventoryAssignmentController = {
+export const InventoryDeviceController = {
     get,
     search,
     create,
     update,
-    remove,
 };

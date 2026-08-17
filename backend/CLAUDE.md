@@ -19,6 +19,9 @@ src/modules/
   access-management/        tenant, role, role-type, permission-group (RBAC)
   crm/                      division, lead, project, appointment, contact
   operations/               camp, geoProfile (field-staff geo + camp allocation)
+  inventory/                inventory-master (catalog), inventory-device, inventory-consumable,
+                            inventory-assignment (who holds what), inventory-request (refill/return lifecycle)
+                            (+ inventory-transaction — scaffolded, not built)
 ```
 
 Every module contains exactly these files:
@@ -431,6 +434,12 @@ All modules follow the layered convention above; all are wired in `src/bin/app.t
 | crm | contact | `/contacts` | tenant(+optional division)-scoped people registry, optional user/login link; division required for pharma (customer-type) contacts & validated against tenant; `type` immutable after create |
 | operations | camp | `/camps` | stageHistory + moveStage; tenant+division required, project optional |
 | operations | geoProfile | `/geo-profiles` | field-staff geo (2dsphere); `findNearest` ($geoNear) feeds camp allocation |
+| inventory | inventory-master | `/inventory-masters` | **global/system catalog** (no tenant scoping); `code` immutable natural key; `type` = device/consumable/accessory/other; `active`/`inactive` status is a soft-delete visibility flag (manage-gated); `sku`/`unit`/`minStock`/`maxStock`. Reads open, writes guarded `inventory-master:manage` |
+| inventory | inventory-device | `/inventory-devices` | individual physical unit of a catalog item; refs `item` (InventoryMaster) + unique `serialNumber` (both immutable); `location` warehouse/field-officer/camp; `status` = operational lifecycle (available/assigned/maintainance/lost/damaged — NOT soft-delete, fully readable); calibration/warranty/mfg dates. No tenant scoping. Reads open, writes guarded `inventory-device:manage` |
+| inventory | inventory-consumable | `/inventory-consumables` | physical stock **lot** of a catalog item; lot identity = (`item`,`batch`,`location`); `item` immutable; `quantity`/mfg/expiry dates; `location` warehouse/camp; `active`/`expired` status (manage-gated visibility); search sorts by `expiryDate` asc. No tenant scoping. Reads open, writes guarded `inventory-consumable:manage` |
+| inventory | inventory-assignment | `/inventory-assignments` | **who holds what** — one record per assignee (Role, must be `field-officer` type), unique/immutable; holds `devices[]` (qty forced 1) + `consumables[]` (qty). No POST — mutated via `PUT /:assignee` upsert. No tenant scoping. Reads open, writes guarded `inventory-assignment:manage`. (Does NOT touch device status/consumable qty — that's the transaction ledger's job.) |
+| inventory | inventory-request | `/inventory-requests` | **refill/return request lifecycle**; `type` = refill/return; lines ref actual stock (`InventoryDevice`/`InventoryConsumable`) + qty; stageHistory + moveStage; statuses = requested→approved/rejected→received (terminal) + cancelled; transition map keyed by status values. Full CRUD perms (`create`/`get`/`search`/`update`/`manage`). `requestedBy` = creator (always FO); `processedBy` = inventory manager. **Own-scope:** non-manage actors see/edit only their own requests. **moveStage authz:** manager does any valid move; a requester can move a refill→cancelled/received or a return→cancelled only (approve/reject stay manage-only). No tenant scoping. `FIXME` in service: FO's refill-received overwrites `processedBy`. Stock movement on `received` (FEFO pull / return restore + transaction + assignment delta) NOT yet wired. |
+| inventory | inventory-transaction | — | **scaffolded only** (empty stub files, not built/wired) |
 
 Cross-cutting: `AuthMiddleware` + `AuthorizeMiddleware` (AND/OR permission guards), system-user
 seeding + per-tenant default-role-type provisioning on boot, `PERMISSIONS`/`PERMISSIONS_ARRAY`
@@ -438,6 +447,15 @@ registry, pino logging (`pino-http`), rate limiting (global + auth), `withTransa
 
 ## What's Next (planned)
 
+- Inventory — `inventory-assignment` + `inventory-request` are now BUILT/wired. Remaining: build the
+  last scaffolded module `inventory-transaction` (append-only stock ledger: issue/return/consume/adjust
+  that drives consumable quantity & device location/status), and wire the **`received`** step of a
+  request to actually move stock: refill → pull warehouse lots FEFO / pick available devices; return →
+  restore the exact lot/unit; write the transaction row; apply the assignment delta. (Seam left as a
+  `NOTE` in `inventory-request.service.ts` `moveStage`.) Roles: **`inventory-manager`** platform role
+  type added (`:manage` on all 5 inventory modules); FO role type granted `inventory-request`
+  create/get/search/update. Still open: tenant-scoping decision (inventory is global today, like
+  `doctor`), how camp/FO refs hang off assignments. Note the two typo constants in
+  `inventory-device.constants.ts` (`MAINTAINANCE`, `DMAGAED`) and the `FIXME` on request `processedBy`.
 - Invoicing / billing (camp-to-cash, PO compliance, AR aging) — spec captured, not started
-- Inventory & devices — Phase 2
 - Scaling/concurrency hardening (clustering, `maxPoolSize`, `UV_THREADPOOL_SIZE`, user-search index)

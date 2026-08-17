@@ -16,7 +16,8 @@ export const CreateLeadPayloadSchema = z.object({
     tenant: objectId('Tenant').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
     division: objectId('Division').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8b' }),
     contactPerson: objectId('Contact person').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8c' }),
-    salesPerson: objectId('Sales person').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8d' }),
+    // optional — defaults to the company's assigned sales person when one exists; required otherwise
+    salesPerson: objectId('Sales person').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8d' }),
     title: z.string().min(1).openapi({ example: 'Cardio screening drive Q3' }),
     problemStatement: z.string().min(1).openapi({ example: 'Low patient identification in tier-2 cities' }),
     numberOfMRS: z.number().int().nonnegative().openapi({ example: 38 }),

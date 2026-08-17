@@ -7,6 +7,12 @@ import { TENANT_PERMISSIONS } from '../../modules/access-management/tenant/tenan
 import { DIVISION_PERMISSIONS } from '../../modules/crm/division/division.constants';
 import { CONTACT_PERMISSIONS } from '../../modules/crm/contact/contact.constants';
 import { ROLE_PERMISSIONS } from '../../modules/access-management/role/role.constants';
+import { INVENTORY_REQUEST_PERMISSIONS } from '../../modules/inventory/inventory-request/inventory-request.constants';
+import { INVENTORY_MASTER_PERMISSIONS } from '../../modules/inventory/inventory-master/inventory-master.constants';
+import { INVENTORY_CONSUMABLE_PERMISSIONS } from '../../modules/inventory/inventory-consumable/inventory-consumable.constants';
+import { INVENTORY_DEVICE_PERMISSIONS } from '../../modules/inventory/inventory-device/inventory-device.constants';
+import { INVENTORY_ASSIGNMENT_PERMISSIONS } from '../../modules/inventory/inventory-assignment/inventory-assignment.constants';
+import { INVENTORY_LEDGER_PERMISSIONS } from '../../modules/inventory/inventory-ledger/inventory-ledger.constants';
 
 // CRM ROLE TYPES
 export const CRM_BUSINESS_ROLE_TYPES = [
@@ -123,6 +129,19 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
     },
 
     {
+        code: ALLOWED_ROLETYPE_CODES.PLATFORM.INVENTORY_MANAGER,
+        name: 'Inventory Manager',
+        description: 'Inventory manager — full control over the inventory domain',
+        permissions: [
+            INVENTORY_MASTER_PERMISSIONS.MANAGE.code,
+            INVENTORY_CONSUMABLE_PERMISSIONS.MANAGE.code,
+            INVENTORY_DEVICE_PERMISSIONS.MANAGE.code,
+            INVENTORY_ASSIGNMENT_PERMISSIONS.MANAGE.code,
+            INVENTORY_REQUEST_PERMISSIONS.MANAGE.code,
+            INVENTORY_LEDGER_PERMISSIONS.MANAGE.code,
+        ],
+    },
+    {
         code: ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER,
         name: 'Field Officer',
         description: 'Field officer',
@@ -132,6 +151,11 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
             APPOINTMENT_PERMISSIONS.SEARCH.code,
             APPOINTMENT_PERMISSIONS.GET.code,
             APPOINTMENT_PERMISSIONS.RSVP.code,
+            // raise and manage their own refill/return requests (progressing the stage is manage-only)
+            INVENTORY_REQUEST_PERMISSIONS.CREATE.code,
+            INVENTORY_REQUEST_PERMISSIONS.GET.code,
+            INVENTORY_REQUEST_PERMISSIONS.SEARCH.code,
+            INVENTORY_REQUEST_PERMISSIONS.UPDATE.code,
         ],
     },
 ];

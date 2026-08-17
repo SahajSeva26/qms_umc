@@ -18,6 +18,8 @@ export const ALLOWED_ROLETYPE_CODES = {
         OPERATION_MANAGER_SCREENING: 'operation-manager-screening',
         OPERATION_MANAGER_DIET: 'operation-manager-diet',
 
+        INVENTORY_MANAGER: 'inventory-manager',
+
         FIELD_OFFICER: 'field-officer',
     },
     CUSTOMER: {

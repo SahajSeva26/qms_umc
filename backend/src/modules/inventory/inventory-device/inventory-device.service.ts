@@ -133,9 +133,16 @@ const update = async (id: string, model: IUpdateInventoryDevicePayload, ctx: Req
     return entity;
 };
 
+// Transaction-safe (single find, no Promise.all — so it is safe inside withTransaction, unlike
+// search()). Returns up to `limit` available units of a catalog item, to reserve stock for a refill.
+const findAvailable = async (item: string, limit: number, ctx: RequestContext): Promise<HydratedDocument<IInventoryDevice>[]> => {
+    return await InventoryDeviceModel.find({ item, status: INVENTORY_DEVICE_STATUS.AVAILABLE }).limit(limit);
+};
+
 export const InventoryDeviceService = {
     get,
     search,
     create,
     update,
+    findAvailable,
 };

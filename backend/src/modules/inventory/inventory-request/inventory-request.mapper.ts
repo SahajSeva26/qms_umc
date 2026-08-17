@@ -34,6 +34,13 @@ const mapLine = (line: any) => ({
     itemType: line.itemType,
     item: mapItem(line.itemType, line.item),
     quantity: line.quantity,
+    // the concrete units/lots reserved for this line (refill only; empty otherwise). item is a raw
+    // id here — it's internal reservation bookkeeping, not populated.
+    fulfillment: (line.fulfillment || []).map((f: any) => ({
+        itemType: f.itemType,
+        item: f.item?.toString(),
+        quantity: f.quantity,
+    })),
 });
 
 export const InventoryRequestMapper = {

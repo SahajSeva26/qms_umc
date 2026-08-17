@@ -140,9 +140,57 @@ const update = async (id: string, model: IUpdateInventoryConsumablePayload, ctx:
     return entity;
 };
 
+// Transaction-safe (single find, no Promise.all). Draw `quantity` units of a catalog item from the
+// warehouse, earliest-expiry-first (FEFO), across as many active lots as needed. get() can't express
+// this — it fetches one lot by id, whereas FEFO must discover a master's lots sorted by expiry.
+// Decrements each lot in place and returns the per-lot draw plan. Throws if stock is short (txn rolls back).
+const pullFEFO = async (item: string, quantity: number, ctx: RequestContext): Promise<{ item: string; quantity: number }[]> => {
+    const lots = await InventoryConsumableModel.find({
+        item,
+        status: INVENTORY_CONSUMABLE_STATUS.ACTIVE,
+        quantity: { $gt: 0 },
+    }).sort({ expiryDate: 1 });
+
+    let remaining = quantity;
+    const draws: { item: string; quantity: number }[] = [];
+    for (const lot of lots) {
+        if (remaining <= 0) {
+            break;
+        }
+        const take = Math.min(lot.quantity, remaining);
+        lot.quantity -= take;
+        await lot.save();
+        draws.push({ item: lot._id.toString(), quantity: take });
+        remaining -= take;
+    }
+
+    if (remaining > 0) {
+        return throwAppError('Insufficient consumable stock to fulfill the request', StatusCodes.BAD_REQUEST);
+    }
+
+    return draws;
+};
+
+// Transaction-safe. Add `delta` (may be negative) to a specific lot's quantity — used to restore
+// stock on a return-approve or a refill-cancel. Reuses get() to fetch the lot; guards against negative.
+const adjustQuantity = async (id: string, delta: number, ctx: RequestContext): Promise<HydratedDocument<IInventoryConsumable>> => {
+    const lot = await InventoryConsumableService.get(id, ctx);
+    if (!lot) {
+        return throwAppError('Consumable lot not found', StatusCodes.NOT_FOUND);
+    }
+    const next = lot.quantity + delta;
+    if (next < 0) {
+        return throwAppError('Consumable lot quantity cannot go negative', StatusCodes.BAD_REQUEST);
+    }
+    lot.quantity = next;
+    return await lot.save();
+};
+
 export const InventoryConsumableService = {
     get,
     search,
     create,
     update,
+    pullFEFO,
+    adjustQuantity,
 };

@@ -1,6 +1,10 @@
 // Inventory-device Constants
 export const INVENTORY_DEVICE_STATUS = {
     AVAILABLE: 'available',
+    // reserved for an FO by an approved refill, but not yet received — out of the warehouse's
+    // available pool, not yet an assignment. Flips to 'assigned' on receive, back to 'available' on
+    // cancel-after-approve.
+    IN_TRANSIT: 'in-transit',
     ASSIGNED: 'assigned',
     MAINTAINANCE: 'maintainance',
     LOST: 'lost',

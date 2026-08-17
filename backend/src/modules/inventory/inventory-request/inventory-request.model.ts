@@ -28,6 +28,35 @@ const stageHistorySchema = new mongoose.Schema({
 });
 
 // ---------------------------------------------
+// Fulfillment (Option A reservation bookkeeping)
+// ---------------------------------------------
+// The concrete stock picked to satisfy a refill line — a specific device unit or a specific
+// consumable lot (never a master). Written at approve, read at receive, restored at cancel.
+const fulfillmentSchema = new mongoose.Schema(
+    {
+        itemType: {
+            type: String,
+            enum: [INVENTORY_REQUEST_ITEM_TYPE.DEVICE, INVENTORY_REQUEST_ITEM_TYPE.CONSUMABLE],
+            required: [true, 'Fulfillment item type is required'],
+        },
+        // the reserved device/lot. No refPath — resolved by itemType in the service; this is internal
+        // reservation bookkeeping, not populated for the client.
+        item: {
+            type: mongoose.Schema.Types.ObjectId,
+            required: [true, 'Fulfillment item is required'],
+        },
+        quantity: {
+            type: Number,
+            required: [true, 'Fulfillment quantity is required'],
+            min: [1, 'Quantity must be at least 1'],
+        },
+    },
+    {
+        _id: false,
+    },
+);
+
+// ---------------------------------------------
 // Request Line Item
 // ---------------------------------------------
 const lineItemSchema = new mongoose.Schema(
@@ -50,6 +79,14 @@ const lineItemSchema = new mongoose.Schema(
             required: [true, 'Quantity is required'],
             min: [1, 'Quantity must be at least 1'],
             default: 1,
+        },
+
+        // the concrete units/lots reserved for THIS line at approve (refill only). receive assigns
+        // exactly these; cancel-after-approve restores exactly these. Empty until a refill is approved;
+        // always empty for returns (their lines are already concrete device/lot refs).
+        fulfillment: {
+            type: [fulfillmentSchema],
+            default: [],
         },
     },
     {

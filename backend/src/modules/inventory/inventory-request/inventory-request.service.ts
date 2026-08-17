@@ -22,8 +22,12 @@ import { isValidObjectID } from '../../../shared/utils/strings';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { canTransition } from '../../crm/lead/lead.validators';
 import { InventoryMasterService } from '../inventory-master/inventory-master.service';
+import { ITEM_TYPES } from '../inventory-master/inventory-master.constants';
 import { InventoryDeviceService } from '../inventory-device/inventory-device.service';
+import { INVENTORY_DEVICE_STATUS } from '../inventory-device/inventory-device.constants';
 import { InventoryConsumableService } from '../inventory-consumable/inventory-consumable.service';
+import { InventoryAssignmentService } from '../inventory-assignment/inventory-assignment.service';
+import { withTransaction } from '../../../shared/helpers/transactionHelper';
 
 type InventoryRequestDocument = HydratedDocument<IInventoryRequest> | null;
 
@@ -77,10 +81,7 @@ const resolveLineItems = async (
     for (const line of lines) {
         //1: coherence — the line's itemType must be valid for this request type
         if (!allowedTypes.includes(line.itemType)) {
-            return throwAppError(
-                `A '${requestType}' request cannot include a '${line.itemType}' line`,
-                StatusCodes.BAD_REQUEST,
-            );
+            return throwAppError(`A '${requestType}' request cannot include a '${line.itemType}' line`, StatusCodes.BAD_REQUEST);
         }
 
         //2: dedupe within the list
@@ -96,11 +97,177 @@ const resolveLineItems = async (
         }
 
         //4: a device is a single physical unit — force quantity to 1; others use the supplied qty (default 1)
-        const quantity = line.itemType === INVENTORY_REQUEST_ITEM_TYPE.DEVICE ? 1 : line.quantity ?? 1;
+        const quantity = line.itemType === INVENTORY_REQUEST_ITEM_TYPE.DEVICE ? 1 : (line.quantity ?? 1);
         result.push({ itemType: line.itemType, item: record._id.toString(), quantity });
     }
 
     return result;
+};
+
+// the FO who holds the stock — always the requester (raw ObjectId, requestedBy is not populated here).
+const assigneeOf = (request: HydratedDocument<IInventoryRequest>) => (request.requestedBy as any).toString();
+
+const DEVICE = INVENTORY_REQUEST_ITEM_TYPE.DEVICE;
+const CONSUMABLE = INVENTORY_REQUEST_ITEM_TYPE.CONSUMABLE;
+
+// -- refill: approve -> reserve concrete stock out of the warehouse, record the picks on each line --
+// refill lines point at a MASTER; pick the actual units/lots now and remember them in `fulfillment`
+// so receive can hand over exactly these.
+const reserveRefill = async (request: HydratedDocument<IInventoryRequest>, ctx: RequestContext) => {
+    for (const line of request.lineItems as any[]) {
+        const master = await InventoryMasterService.get(line.item.toString(), ctx);
+        if (!master) {
+            return throwAppError('The referenced inventory item does not exist', StatusCodes.NOT_FOUND);
+        }
+
+        const picks: { itemType: string; item: string; quantity: number }[] = [];
+        if (master.type === ITEM_TYPES.DEVICE) {
+            const devices = await InventoryDeviceService.findAvailable(line.item.toString(), line.quantity, ctx);
+            if (devices.length < line.quantity) {
+                return throwAppError('Insufficient device stock to fulfill the request', StatusCodes.BAD_REQUEST);
+            }
+            for (const d of devices) {
+                await InventoryDeviceService.update(d._id.toString(), { status: INVENTORY_DEVICE_STATUS.IN_TRANSIT } as any, ctx);
+                picks.push({ itemType: DEVICE, item: d._id.toString(), quantity: 1 });
+            }
+        } else {
+            const draws = await InventoryConsumableService.pullFEFO(line.item.toString(), line.quantity, ctx);
+            for (const dr of draws) {
+                picks.push({ itemType: CONSUMABLE, item: dr.item, quantity: dr.quantity });
+            }
+        }
+        line.fulfillment = picks;
+    }
+};
+
+// -- refill: receive -> hand the reserved stock to the FO (in-transit -> FO) --
+const issueRefill = async (request: HydratedDocument<IInventoryRequest>, ctx: RequestContext) => {
+    const assignee = assigneeOf(request);
+    for (const line of request.lineItems as any[]) {
+        for (const f of line.fulfillment as any[]) {
+            if (f.itemType === DEVICE) {
+                await InventoryDeviceService.update(f.item.toString(), { status: INVENTORY_DEVICE_STATUS.ASSIGNED } as any, ctx);
+                await InventoryAssignmentService.adjustHolding(assignee, DEVICE, f.item.toString(), 1, ctx);
+            } else {
+                await InventoryAssignmentService.adjustHolding(assignee, CONSUMABLE, f.item.toString(), f.quantity, ctx);
+            }
+        }
+    }
+};
+
+// -- refill: cancel after approve -> release the reservation back to the warehouse (in-transit -> warehouse) --
+const releaseRefill = async (request: HydratedDocument<IInventoryRequest>, ctx: RequestContext) => {
+    for (const line of request.lineItems as any[]) {
+        for (const f of line.fulfillment as any[]) {
+            if (f.itemType === DEVICE) {
+                await InventoryDeviceService.update(f.item.toString(), { status: INVENTORY_DEVICE_STATUS.AVAILABLE } as any, ctx);
+            } else {
+                await InventoryConsumableService.adjustQuantity(f.item.toString(), f.quantity, ctx);
+            }
+        }
+        line.fulfillment = [];
+    }
+};
+
+// -- return: requested -> withdraw the named stock from the FO (FO -> in-transit) --
+// return lines already name the concrete device/lot, so no picking is needed.
+const withdrawReturn = async (request: HydratedDocument<IInventoryRequest>, ctx: RequestContext) => {
+    const assignee = assigneeOf(request);
+    for (const line of request.lineItems as any[]) {
+        if (line.itemType === DEVICE) {
+            await InventoryAssignmentService.adjustHolding(assignee, DEVICE, line.item.toString(), -1, ctx);
+            await InventoryDeviceService.update(line.item.toString(), { status: INVENTORY_DEVICE_STATUS.IN_TRANSIT } as any, ctx);
+        } else {
+            await InventoryAssignmentService.adjustHolding(assignee, CONSUMABLE, line.item.toString(), -line.quantity, ctx);
+        }
+    }
+};
+
+// -- return: approve -> land the in-transit stock back in the warehouse (in-transit -> warehouse) --
+const restockReturn = async (request: HydratedDocument<IInventoryRequest>, ctx: RequestContext) => {
+    for (const line of request.lineItems as any[]) {
+        if (line.itemType === DEVICE) {
+            await InventoryDeviceService.update(line.item.toString(), { status: INVENTORY_DEVICE_STATUS.AVAILABLE } as any, ctx);
+        } else {
+            await InventoryConsumableService.adjustQuantity(line.item.toString(), line.quantity, ctx);
+        }
+    }
+};
+
+// -- return: reject/cancel while still requested -> give the in-transit stock back to the FO --
+const restoreReturnToFO = async (request: HydratedDocument<IInventoryRequest>, ctx: RequestContext) => {
+    const assignee = assigneeOf(request);
+    for (const line of request.lineItems as any[]) {
+        if (line.itemType === DEVICE) {
+            await InventoryDeviceService.update(line.item.toString(), { status: INVENTORY_DEVICE_STATUS.ASSIGNED } as any, ctx);
+            await InventoryAssignmentService.adjustHolding(assignee, DEVICE, line.item.toString(), 1, ctx);
+        } else {
+            await InventoryAssignmentService.adjustHolding(assignee, CONSUMABLE, line.item.toString(), line.quantity, ctx);
+        }
+    }
+};
+
+// `from` is the status being left (null when a request is first created into 'requested'); the new
+// status is request.status. Reversals (cancel/reject) depend on WHERE the stock currently sits, so
+// the branch must key off the (from → to) transition, not just the new status. Every branch's writes
+// run inside the caller's transaction (create/moveStage wrap this + the request save), so a failure
+// here (e.g. insufficient stock) rolls the whole move back.
+const resolveStockMovement = async (
+    request: HydratedDocument<IInventoryRequest>,
+    from: string | null,
+    ctx: RequestContext,
+) => {
+    const to = request.status as string;
+    ctx.logger.info({ type: request.type, from, to }, 'resolveStockMovement');
+
+    switch (request.type) {
+        case INVENTORY_REQUEST_TYPE.REFILL: {
+            // commit: warehouse → in-transit — the manager approves, stock leaves the warehouse
+            if (to === INVENTORY_REQUEST_STATUS.APPROVED) {
+                await reserveRefill(request, ctx);
+                break;
+            }
+            // commit: in-transit → FO — the FO confirms receipt
+            if (to === INVENTORY_REQUEST_STATUS.RECEIVED) {
+                await issueRefill(request, ctx);
+                break;
+            }
+            // reversal: an APPROVED refill that is cancelled never reached the FO — put the in-transit
+            // stock back in the warehouse. (Cancelling from 'requested' moved nothing → no-op.)
+            if (to === INVENTORY_REQUEST_STATUS.CANCELLED && from === INVENTORY_REQUEST_STATUS.APPROVED) {
+                await releaseRefill(request, ctx);
+                break;
+            }
+            break;
+        }
+
+        case INVENTORY_REQUEST_TYPE.RETURN: {
+            // commit: FO → in-transit — the stock leaves the FO the moment the return is raised
+            if (to === INVENTORY_REQUEST_STATUS.REQUESTED) {
+                await withdrawReturn(request, ctx);
+                break;
+            }
+            // commit: in-transit → warehouse — the manager approves, stock lands back in the warehouse
+            if (to === INVENTORY_REQUEST_STATUS.APPROVED) {
+                await restockReturn(request, ctx);
+                break;
+            }
+            // reversal: a return rejected or cancelled while still 'requested' never reached the
+            // warehouse — give the in-transit stock back to the FO.
+            if (
+                (to === INVENTORY_REQUEST_STATUS.REJECTED || to === INVENTORY_REQUEST_STATUS.CANCELLED) &&
+                from === INVENTORY_REQUEST_STATUS.REQUESTED
+            ) {
+                await restoreReturnToFO(request, ctx);
+                break;
+            }
+            break;
+        }
+
+        default: {
+            ctx.logger.info('no side-effect for request type: ' + request.type);
+        }
+    }
 };
 
 // ========================================================================================
@@ -188,7 +355,15 @@ const create = async (model: ICreateInventoryRequestPayload, ctx: RequestContext
 
     //2: set validates + applies the line items (at least one is enforced in the validator, coherence in set)
     entity = await set(model, entity, ctx);
-    entity = await entity.save();
+
+    //3: a request enters 'requested' here (via create, not moveStage), so any stock movement that a
+    //   fresh request implies must be resolved here too — a RETURN withdraws the FO's stock the moment
+    //   it is raised. from = null (no prior status). The movement + the request save run in one
+    //   transaction so they commit or roll back together. (A REFILL has no side effect at 'requested'.)
+    entity = await withTransaction(async () => {
+        await resolveStockMovement(entity, null, ctx);
+        return await entity.save();
+    });
 
     return entity;
 };
@@ -228,8 +403,10 @@ const moveStage = async (id: string, model: IMoveStagePayload, ctx: RequestConte
         return throwAppError(`Request is already in the '${to}' stage`, StatusCodes.BAD_REQUEST);
     }
 
-    //3: guard — transition must be allowed
-    if (!canTransition(INVENTORY_REQUEST_TRANSITION_MAP, from, to)) {
+    //3: guard — transition must be allowed for THIS request type (refill and return have different
+    //   lifecycles: a return is terminal once approved, so it can't be cancelled/received afterwards)
+    const transitionMap = INVENTORY_REQUEST_TRANSITION_MAP[request.type as string] || {};
+    if (!canTransition(transitionMap, from, to)) {
         return throwAppError(`Invalid stage transition from '${from}' to '${to}'`, StatusCodes.BAD_REQUEST);
     }
 
@@ -266,22 +443,22 @@ const moveStage = async (id: string, model: IMoveStagePayload, ctx: RequestConte
     // FIXME: processedBy should ALWAYS be the inventory manager, but an FO confirming a refill 'received'
     // currently overwrites it with the FO. Gate this assignment on ctx.hasAnyPermissions([MANAGE]) so a
     // requester's receipt-confirmation can't clobber the approving manager. (Full trail is in stageHistory.)
-    if (
-        to === INVENTORY_REQUEST_STATUS.APPROVED ||
-        to === INVENTORY_REQUEST_STATUS.REJECTED ||
-        to === INVENTORY_REQUEST_STATUS.RECEIVED
-    ) {
+    if (to === INVENTORY_REQUEST_STATUS.APPROVED || to === INVENTORY_REQUEST_STATUS.REJECTED || to === INVENTORY_REQUEST_STATUS.RECEIVED) {
         request.processedBy = (ctx.role?._id || ctx.role?.id) as any;
     }
 
     request.status = to;
-    request = await request.save();
 
-    // NOTE: the actual stock movement on RECEIVED (refill → pull warehouse lots/devices,
-    // return → restore the exact lot/unit) plus the InventoryTransaction ledger entry and the
-    // InventoryAssignment delta are handled separately — not in this lifecycle service.
+    //6: resolve the stock movement this transition implies, then persist the state + history — all in
+    //   one transaction so they commit or roll back together. `from` disambiguates reversals (a
+    //   cancel/reject only reverses stock that had already moved). A failure here (e.g. insufficient
+    //   stock) aborts the whole move.
+    const saved = await withTransaction(async () => {
+        await resolveStockMovement(request!, from, ctx);
+        return await request!.save();
+    });
 
-    return request;
+    return saved;
 };
 
 export const InventoryRequestService = {

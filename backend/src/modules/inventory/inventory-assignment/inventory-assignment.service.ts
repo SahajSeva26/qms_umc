@@ -175,10 +175,52 @@ const remove = async (id: string, ctx: RequestContext) => {
     return entity;
 };
 
+// Transaction-safe (findOne + single save/delete, no Promise.all). Moves stock into or out of an
+// assignee's holding of a specific device/lot by `delta`:
+//   • delta > 0 → increment the existing holding row, or create it if none exists (issue to FO)
+//   • delta < 0 → decrement; remove the row when it hits 0 (withdraw from FO); errors if the FO
+//                 doesn't hold enough (or any) — so the caller's transaction rolls back.
+// This is the assignment side of every stock move; it does NOT touch device status / lot quantity.
+const adjustHolding = async (
+    assignee: string,
+    inventoryType: string,
+    inventory: string,
+    delta: number,
+    ctx: RequestContext,
+): Promise<InventoryAssignmentDocument> => {
+    const filter: any = { assignee, inventoryType, inventory };
+    const row = await InventoryAssignmentModel.findOne(filter);
+
+    if (delta >= 0) {
+        if (row) {
+            row.quantity += delta;
+            return await row.save();
+        }
+        const entity = new InventoryAssignmentModel({ assignee, inventoryType, inventory, quantity: delta });
+        return await entity.save();
+    }
+
+    // delta < 0: the assignee must actually hold enough to give back
+    if (!row) {
+        return throwAppError('The assignee does not hold this item', StatusCodes.CONFLICT);
+    }
+    const next = row.quantity + delta;
+    if (next < 0) {
+        return throwAppError('The assignee does not hold enough of this item', StatusCodes.CONFLICT);
+    }
+    if (next === 0) {
+        await row.deleteOne();
+        return null;
+    }
+    row.quantity = next;
+    return await row.save();
+};
+
 export const InventoryAssignmentService = {
     get,
     search,
     create,
     update,
     remove,
+    adjustHolding,
 };

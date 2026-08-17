@@ -24,6 +24,7 @@ import '../../../modules/inventory/inventory-consumable/inventory-consumable.rou
 import '../../../modules/inventory/inventory-device/inventory-device.routes';
 import '../../../modules/inventory/inventory-assignment/inventory-assignment.routes';
 import '../../../modules/inventory/inventory-request/inventory-request.routes';
+import '../../../modules/inventory/inventory-ledger/inventory-ledger.routes';
 // =============================================
 // =============================================
 

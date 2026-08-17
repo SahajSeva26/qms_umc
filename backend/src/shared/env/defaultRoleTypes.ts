@@ -12,6 +12,7 @@ import { INVENTORY_MASTER_PERMISSIONS } from '../../modules/inventory/inventory-
 import { INVENTORY_CONSUMABLE_PERMISSIONS } from '../../modules/inventory/inventory-consumable/inventory-consumable.constants';
 import { INVENTORY_DEVICE_PERMISSIONS } from '../../modules/inventory/inventory-device/inventory-device.constants';
 import { INVENTORY_ASSIGNMENT_PERMISSIONS } from '../../modules/inventory/inventory-assignment/inventory-assignment.constants';
+import { INVENTORY_LEDGER_PERMISSIONS } from '../../modules/inventory/inventory-ledger/inventory-ledger.constants';
 
 // CRM ROLE TYPES
 export const CRM_BUSINESS_ROLE_TYPES = [
@@ -137,6 +138,7 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
             INVENTORY_DEVICE_PERMISSIONS.MANAGE.code,
             INVENTORY_ASSIGNMENT_PERMISSIONS.MANAGE.code,
             INVENTORY_REQUEST_PERMISSIONS.MANAGE.code,
+            INVENTORY_LEDGER_PERMISSIONS.MANAGE.code,
         ],
     },
     {

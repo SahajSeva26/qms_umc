@@ -24,6 +24,7 @@ import { InventoryConsumableRouter } from '../modules/inventory/inventory-consum
 import { InventoryDeviceRouter } from '../modules/inventory/inventory-device/inventory-device.routes';
 import { InventoryAssignmentRouter } from '../modules/inventory/inventory-assignment/inventory-assignment.routes';
 import { InventoryRequestRouter } from '../modules/inventory/inventory-request/inventory-request.routes';
+import { InventoryLedgerRouter } from '../modules/inventory/inventory-ledger/inventory-ledger.routes';
 import { buildContext } from '../shared/utils/contextBuilder';
 import { httpLogger } from '../shared/logger/httpLogger';
 import ENV from '../shared/config/app.config';
@@ -90,6 +91,7 @@ app.use('/api/v1/inventory-consumables', InventoryConsumableRouter);
 app.use('/api/v1/inventory-devices', InventoryDeviceRouter);
 app.use('/api/v1/inventory-assignments', InventoryAssignmentRouter);
 app.use('/api/v1/inventory-requests', InventoryRequestRouter);
+app.use('/api/v1/inventory-ledgers', InventoryLedgerRouter);
 
 // Captured once at boot — lets /health-check report how long the current deploy has been up.
 const startedAt = new Date().toISOString();

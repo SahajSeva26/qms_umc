@@ -27,6 +27,8 @@ import { InventoryDeviceService } from '../inventory-device/inventory-device.ser
 import { INVENTORY_DEVICE_STATUS } from '../inventory-device/inventory-device.constants';
 import { InventoryConsumableService } from '../inventory-consumable/inventory-consumable.service';
 import { InventoryAssignmentService } from '../inventory-assignment/inventory-assignment.service';
+import { InventoryLedgerService } from '../inventory-ledger/inventory-ledger.service';
+import { INVENTORY_LEDGER_LOCATION } from '../inventory-ledger/inventory-ledger.constants';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
 
 type InventoryRequestDocument = HydratedDocument<IInventoryRequest> | null;
@@ -110,6 +112,35 @@ const assigneeOf = (request: HydratedDocument<IInventoryRequest>) => (request.re
 const DEVICE = INVENTORY_REQUEST_ITEM_TYPE.DEVICE;
 const CONSUMABLE = INVENTORY_REQUEST_ITEM_TYPE.CONSUMABLE;
 
+const WAREHOUSE = INVENTORY_LEDGER_LOCATION.WAREHOUSE;
+const IN_TRANSIT = INVENTORY_LEDGER_LOCATION.IN_TRANSIT;
+const FIELD_OFFICER = INVENTORY_LEDGER_LOCATION.FIELD_OFFICER;
+
+// append one ledger row for a single item movement — called alongside each stock change (same txn),
+// so the audit trail commits/rolls back with the movement it records.
+const logMovement = (
+    request: HydratedDocument<IInventoryRequest>,
+    inventoryType: string,
+    inventory: string,
+    quantity: number,
+    from: string,
+    to: string,
+    ctx: RequestContext,
+) =>
+    InventoryLedgerService.record(
+        {
+            request: (request._id as any).toString(),
+            requestType: request.type as string,
+            inventoryType,
+            inventory,
+            quantity,
+            from,
+            to,
+            assignee: assigneeOf(request),
+        } as any,
+        ctx,
+    );
+
 // -- refill: approve -> reserve concrete stock out of the warehouse, record the picks on each line --
 // refill lines point at a MASTER; pick the actual units/lots now and remember them in `fulfillment`
 // so receive can hand over exactly these.
@@ -128,11 +159,13 @@ const reserveRefill = async (request: HydratedDocument<IInventoryRequest>, ctx: 
             }
             for (const d of devices) {
                 await InventoryDeviceService.update(d._id.toString(), { status: INVENTORY_DEVICE_STATUS.IN_TRANSIT } as any, ctx);
+                await logMovement(request, DEVICE, d._id.toString(), 1, WAREHOUSE, IN_TRANSIT, ctx);
                 picks.push({ itemType: DEVICE, item: d._id.toString(), quantity: 1 });
             }
         } else {
             const draws = await InventoryConsumableService.pullFEFO(line.item.toString(), line.quantity, ctx);
             for (const dr of draws) {
+                await logMovement(request, CONSUMABLE, dr.item, dr.quantity, WAREHOUSE, IN_TRANSIT, ctx);
                 picks.push({ itemType: CONSUMABLE, item: dr.item, quantity: dr.quantity });
             }
         }
@@ -148,8 +181,10 @@ const issueRefill = async (request: HydratedDocument<IInventoryRequest>, ctx: Re
             if (f.itemType === DEVICE) {
                 await InventoryDeviceService.update(f.item.toString(), { status: INVENTORY_DEVICE_STATUS.ASSIGNED } as any, ctx);
                 await InventoryAssignmentService.adjustHolding(assignee, DEVICE, f.item.toString(), 1, ctx);
+                await logMovement(request, DEVICE, f.item.toString(), 1, IN_TRANSIT, FIELD_OFFICER, ctx);
             } else {
                 await InventoryAssignmentService.adjustHolding(assignee, CONSUMABLE, f.item.toString(), f.quantity, ctx);
+                await logMovement(request, CONSUMABLE, f.item.toString(), f.quantity, IN_TRANSIT, FIELD_OFFICER, ctx);
             }
         }
     }
@@ -161,8 +196,10 @@ const releaseRefill = async (request: HydratedDocument<IInventoryRequest>, ctx: 
         for (const f of line.fulfillment as any[]) {
             if (f.itemType === DEVICE) {
                 await InventoryDeviceService.update(f.item.toString(), { status: INVENTORY_DEVICE_STATUS.AVAILABLE } as any, ctx);
+                await logMovement(request, DEVICE, f.item.toString(), 1, IN_TRANSIT, WAREHOUSE, ctx);
             } else {
                 await InventoryConsumableService.adjustQuantity(f.item.toString(), f.quantity, ctx);
+                await logMovement(request, CONSUMABLE, f.item.toString(), f.quantity, IN_TRANSIT, WAREHOUSE, ctx);
             }
         }
         line.fulfillment = [];
@@ -177,8 +214,10 @@ const withdrawReturn = async (request: HydratedDocument<IInventoryRequest>, ctx:
         if (line.itemType === DEVICE) {
             await InventoryAssignmentService.adjustHolding(assignee, DEVICE, line.item.toString(), -1, ctx);
             await InventoryDeviceService.update(line.item.toString(), { status: INVENTORY_DEVICE_STATUS.IN_TRANSIT } as any, ctx);
+            await logMovement(request, DEVICE, line.item.toString(), 1, FIELD_OFFICER, IN_TRANSIT, ctx);
         } else {
             await InventoryAssignmentService.adjustHolding(assignee, CONSUMABLE, line.item.toString(), -line.quantity, ctx);
+            await logMovement(request, CONSUMABLE, line.item.toString(), line.quantity, FIELD_OFFICER, IN_TRANSIT, ctx);
         }
     }
 };
@@ -188,8 +227,10 @@ const restockReturn = async (request: HydratedDocument<IInventoryRequest>, ctx: 
     for (const line of request.lineItems as any[]) {
         if (line.itemType === DEVICE) {
             await InventoryDeviceService.update(line.item.toString(), { status: INVENTORY_DEVICE_STATUS.AVAILABLE } as any, ctx);
+            await logMovement(request, DEVICE, line.item.toString(), 1, IN_TRANSIT, WAREHOUSE, ctx);
         } else {
             await InventoryConsumableService.adjustQuantity(line.item.toString(), line.quantity, ctx);
+            await logMovement(request, CONSUMABLE, line.item.toString(), line.quantity, IN_TRANSIT, WAREHOUSE, ctx);
         }
     }
 };
@@ -201,8 +242,10 @@ const restoreReturnToFO = async (request: HydratedDocument<IInventoryRequest>, c
         if (line.itemType === DEVICE) {
             await InventoryDeviceService.update(line.item.toString(), { status: INVENTORY_DEVICE_STATUS.ASSIGNED } as any, ctx);
             await InventoryAssignmentService.adjustHolding(assignee, DEVICE, line.item.toString(), 1, ctx);
+            await logMovement(request, DEVICE, line.item.toString(), 1, IN_TRANSIT, FIELD_OFFICER, ctx);
         } else {
             await InventoryAssignmentService.adjustHolding(assignee, CONSUMABLE, line.item.toString(), line.quantity, ctx);
+            await logMovement(request, CONSUMABLE, line.item.toString(), line.quantity, IN_TRANSIT, FIELD_OFFICER, ctx);
         }
     }
 };

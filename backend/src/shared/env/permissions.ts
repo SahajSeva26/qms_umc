@@ -18,6 +18,7 @@ import { INVENTORY_CONSUMABLE_PERMISSIONS } from '../../modules/inventory/invent
 import { INVENTORY_DEVICE_PERMISSIONS } from '../../modules/inventory/inventory-device/inventory-device.constants';
 import { INVENTORY_ASSIGNMENT_PERMISSIONS } from '../../modules/inventory/inventory-assignment/inventory-assignment.constants';
 import { INVENTORY_REQUEST_PERMISSIONS } from '../../modules/inventory/inventory-request/inventory-request.constants';
+import { INVENTORY_LEDGER_PERMISSIONS } from '../../modules/inventory/inventory-ledger/inventory-ledger.constants';
 
 export const SYSTEM_PERMISSIONS = {
     MANAGE: {
@@ -48,6 +49,7 @@ export const PERMISSIONS = {
     INVENTORY_DEVICE: INVENTORY_DEVICE_PERMISSIONS,
     INVENTORY_ASSIGNMENT: INVENTORY_ASSIGNMENT_PERMISSIONS,
     INVENTORY_REQUEST: INVENTORY_REQUEST_PERMISSIONS,
+    INVENTORY_LEDGER: INVENTORY_LEDGER_PERMISSIONS,
 };
 
 export const PERMISSIONS_ARRAY = Object.values(PERMISSIONS)

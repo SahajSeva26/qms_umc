@@ -21,6 +21,7 @@ const inventoryDeviceSchema = new mongoose.Schema(
         location: {
             type: String,
             enum: Object.values(INVENTORY_DEVICE_LOCATION),
+            default: INVENTORY_DEVICE_LOCATION.WAREHOUSE,
             required: true,
         },
         manufacturingDate: {
@@ -33,6 +34,7 @@ const inventoryDeviceSchema = new mongoose.Schema(
             type: String,
             enum: Object.values(INVENTORY_DEVICE_STATUS),
             default: INVENTORY_DEVICE_STATUS.AVAILABLE,
+            required: true,
         },
         // Calibration information
         lastCalibrationDate: {

@@ -8,6 +8,8 @@ import { RequestContext } from '../../../shared/utils/contextBuilder';
 import { isValidObjectID } from '../../../shared/utils/strings';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { InventoryMasterService } from '../inventory-master/inventory-master.service';
+import { ITEM_TYPES } from '../inventory-master/inventory-master.constants';
+import { INVENTORY_DEVICE_STATUS, INVENTORY_DEVICE_LOCATION } from './inventory-device.constants';
 
 type InventoryDeviceDocument = HydratedDocument<IInventoryDevice> | null;
 
@@ -25,12 +27,24 @@ const populate: any[] = [{ path: 'item' }];
 
 // item + serialNumber are seeded at construction in create() and never handled here.
 const set = async (model: any, entity: HydratedDocument<IInventoryDevice>, ctx: RequestContext) => {
-    if (model.location) entity.location = model.location;
-    if (model.status) entity.status = model.status;
-    if (model.manufacturingDate) entity.manufacturingDate = model.manufacturingDate;
-    if (model.warrantyExpiryDate) entity.warrantyExpiryDate = model.warrantyExpiryDate;
-    if (model.lastCalibrationDate) entity.lastCalibrationDate = model.lastCalibrationDate;
-    if (model.nextCalibrationDate) entity.nextCalibrationDate = model.nextCalibrationDate;
+    if (model.location) {
+        entity.location = model.location;
+    }
+    if (model.status) {
+        entity.status = model.status;
+    }
+    if (model.manufacturingDate) {
+        entity.manufacturingDate = model.manufacturingDate;
+    }
+    if (model.warrantyExpiryDate) {
+        entity.warrantyExpiryDate = model.warrantyExpiryDate;
+    }
+    if (model.lastCalibrationDate) {
+        entity.lastCalibrationDate = model.lastCalibrationDate;
+    }
+    if (model.nextCalibrationDate) {
+        entity.nextCalibrationDate = model.nextCalibrationDate;
+    }
 
     return entity;
 };
@@ -87,14 +101,25 @@ const create = async (model: ICreateInventoryDevicePayload, ctx: RequestContext)
         return throwAppError('The referenced inventory item does not exist', StatusCodes.NOT_FOUND);
     }
 
+    //1b: the catalog item must actually be a device — can't register a device against a consumable master
+    if (item.type !== ITEM_TYPES.DEVICE) {
+        return throwAppError('The referenced inventory item is not a device', StatusCodes.BAD_REQUEST);
+    }
+
     //2: guard — serialNumber is the unique natural key (reuse get on it)
     const existing = await InventoryDeviceService.get(model.serialNumber, ctx);
     if (existing) {
         return throwAppError('A device with this serial number already exists', StatusCodes.CONFLICT);
     }
 
-    //3: build entity — item + serialNumber (immutable) are seeded here, never in set()
-    let entity = new InventoryDeviceModel({ item: model.item, serialNumber: model.serialNumber });
+    //3: build entity — item + serialNumber (immutable) are seeded here, never in set().
+    // status/location are not accepted at create — a new device always starts available in the warehouse.
+    let entity = new InventoryDeviceModel({
+        item: model.item,
+        serialNumber: model.serialNumber,
+        status: INVENTORY_DEVICE_STATUS.AVAILABLE,
+        location: INVENTORY_DEVICE_LOCATION.WAREHOUSE,
+    });
     entity = await set(model, entity, ctx);
     entity = await entity.save();
 

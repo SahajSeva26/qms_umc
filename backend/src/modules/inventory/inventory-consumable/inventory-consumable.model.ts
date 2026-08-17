@@ -34,6 +34,7 @@ const inventoryConsumableSchema = new mongoose.Schema(
             type: String,
             enum: Object.values(INVENTORY_CONSUMABLE_STATUS),
             default: INVENTORY_CONSUMABLE_STATUS.ACTIVE,
+            required: true,
         },
     },
     { timestamps: true },

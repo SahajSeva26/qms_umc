@@ -13,6 +13,7 @@ import { RequestContext } from '../../../shared/utils/contextBuilder';
 import { isValidObjectID } from '../../../shared/utils/strings';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { InventoryMasterService } from '../inventory-master/inventory-master.service';
+import { ITEM_TYPES } from '../inventory-master/inventory-master.constants';
 
 type InventoryConsumableDocument = HydratedDocument<IInventoryConsumable> | null;
 
@@ -28,12 +29,22 @@ const populate: any[] = [{ path: 'item' }];
 
 // item is seeded at construction in create() and never handled here, so update() can't reassign it.
 const set = async (model: any, entity: HydratedDocument<IInventoryConsumable>, ctx: RequestContext) => {
-    if (model.batch) entity.batch = model.batch;
-    if (model.manufacturingDate) entity.manufacturingDate = model.manufacturingDate;
-    if (model.expiryDate) entity.expiryDate = model.expiryDate;
-    if (model.quantity !== undefined) entity.quantity = model.quantity;
+    if (model.batch) {
+        entity.batch = model.batch;
+    }
+    if (model.manufacturingDate) {
+        entity.manufacturingDate = model.manufacturingDate;
+    }
+    if (model.expiryDate) {
+        entity.expiryDate = model.expiryDate;
+    }
+    if (model.quantity !== undefined) {
+        entity.quantity = model.quantity;
+    }
     // only a manage-level actor may set the lot status (e.g. mark expired)
-    if (model.status && ctx.hasAnyPermissions([INVENTORY_CONSUMABLE_PERMISSIONS.MANAGE.code])) entity.status = model.status;
+    if (model.status && ctx.hasAnyPermissions([INVENTORY_CONSUMABLE_PERMISSIONS.MANAGE.code])) {
+        entity.status = model.status;
+    }
 
     return entity;
 };
@@ -90,6 +101,11 @@ const create = async (model: ICreateInventoryConsumablePayload, ctx: RequestCont
         return throwAppError('The referenced inventory item does not exist', StatusCodes.NOT_FOUND);
     }
 
+    //1b: the catalog item must actually be a consumable — can't register a lot against a device master
+    if (item.type !== ITEM_TYPES.CONSUMABLE) {
+        return throwAppError('The referenced inventory item is not a consumable', StatusCodes.BAD_REQUEST);
+    }
+
     //2: guard — a lot is identified by (item, batch); it must not already exist
     // FIXME (followup): search() defaults to status:active, so an EXPIRED lot with the same
     // (item, batch) is invisible here — this guard passes, then save() hits the unique
@@ -101,8 +117,9 @@ const create = async (model: ICreateInventoryConsumablePayload, ctx: RequestCont
         return throwAppError('A consumable lot with this item and batch already exists', StatusCodes.CONFLICT);
     }
 
-    //3: build entity — item (immutable ref) is seeded here, never in set()
-    let entity = new InventoryConsumableModel({ item: model.item });
+    //3: build entity — item (immutable ref) is seeded here, never in set().
+    // status is not accepted at create — a new lot always starts active.
+    let entity = new InventoryConsumableModel({ item: model.item, status: INVENTORY_CONSUMABLE_STATUS.ACTIVE });
     entity = await set(model, entity, ctx);
     entity = await entity.save();
 

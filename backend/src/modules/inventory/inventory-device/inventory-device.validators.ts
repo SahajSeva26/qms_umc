@@ -6,11 +6,9 @@ import { INVENTORY_DEVICE_LOCATION, INVENTORY_DEVICE_STATUS } from './inventory-
 // item (catalog ref) and serialNumber (natural key) are immutable after create.
 export const CreateInventoryDevicePayloadSchema = z.object({
     item: z.string().min(1).openapi({ example: '665f1a2b3c4d5e6f70819293' }),
-    location: z.enum(Object.values(INVENTORY_DEVICE_LOCATION)).openapi({ example: 'warehouse' }),
     serialNumber: z.string().min(1).openapi({ example: 'SN-ACGLU-000142' }),
     manufacturingDate: z.coerce.date().optional().openapi({ example: '2026-01-15' }),
     warrantyExpiryDate: z.coerce.date().optional().openapi({ example: '2028-01-15' }),
-    status: z.enum(Object.values(INVENTORY_DEVICE_STATUS)).optional().openapi({ example: 'available' }),
     lastCalibrationDate: z.coerce.date().optional().openapi({ example: '2026-06-01' }),
     nextCalibrationDate: z.coerce.date().optional().openapi({ example: '2026-12-01' }),
 });

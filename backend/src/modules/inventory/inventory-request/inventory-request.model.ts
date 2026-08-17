@@ -1,8 +1,8 @@
 // Inventory-request Model
 import mongoose from 'mongoose';
-import { INVENTORY_REQUEST_STATUS, INVENTORY_REQUEST_TYPE } from './inventory-request.constants';
+import { INVENTORY_REQUEST_ITEM_TYPE, INVENTORY_REQUEST_STATUS, INVENTORY_REQUEST_TYPE } from './inventory-request.constants';
 
-// lead status transition
+// append-only stage-transition journal entry
 const stageHistorySchema = new mongoose.Schema({
     from: {
         type: String,
@@ -27,6 +27,35 @@ const stageHistorySchema = new mongoose.Schema({
     },
 });
 
+// ---------------------------------------------
+// Request Line Item
+// ---------------------------------------------
+const lineItemSchema = new mongoose.Schema(
+    {
+        itemType: {
+            type: String,
+            enum: Object.values(INVENTORY_REQUEST_ITEM_TYPE),
+            required: [true, 'Inventory type is required'],
+        },
+        item: {
+            type: mongoose.Schema.Types.ObjectId,
+            // full path from the parent — for an array of subdocs, refPath must be 'lineItems.itemType',
+            // not the relative 'itemType', or populate silently resolves nothing.
+            refPath: 'lineItems.itemType',
+            required: [true, 'Item is required'],
+        },
+
+        quantity: {
+            type: Number,
+            required: [true, 'Quantity is required'],
+            min: [1, 'Quantity must be at least 1'],
+            default: 1,
+        },
+    },
+    {
+        _id: false,
+    },
+);
 export const inventoryRequestSchema = new mongoose.Schema(
     {
         requestedBy: {
@@ -43,45 +72,21 @@ export const inventoryRequestSchema = new mongoose.Schema(
             enum: Object.values(INVENTORY_REQUEST_TYPE),
             required: true,
         },
-        // Requested devices
-        devices: [
-            {
-                item: {
-                    type: mongoose.Schema.Types.ObjectId,
-                    ref: 'InventoryDevice',
-                    required: true,
-                },
+        lineItems: {
+            type: [lineItemSchema],
+            required: true,
 
-                quantity: {
-                    type: Number,
-                    required: true,
-                    min: 1,
-                    max: 1,
-                    default: 1,
-                },
+            validate: {
+                validator: (items: unknown[]) => items.length > 0,
+                message: 'At least one inventory item is required',
             },
-        ],
-        consumables: [
-            {
-                item: {
-                    type: mongoose.Schema.Types.ObjectId,
-                    ref: 'InventoryConsumable',
-                    required: true,
-                },
-
-                quantity: {
-                    type: Number,
-                    required: true,
-                    min: 1,
-                    default: 1,
-                },
-            },
-        ],
+        },
 
         status: {
             type: String,
             enum: Object.values(INVENTORY_REQUEST_STATUS),
             default: INVENTORY_REQUEST_STATUS.REQUESTED,
+            required: true,
         },
         stageHistory: [stageHistorySchema],
     },

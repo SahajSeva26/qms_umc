@@ -1,4 +1,5 @@
 // Inventory-request Mapper
+import { INVENTORY_REQUEST_ITEM_TYPE } from './inventory-request.constants';
 
 // a Role ref (requestedBy/processedBy) may be a populated doc or a raw ObjectId — surface a shallow shape either way.
 const mapRole = (role: any) => {
@@ -9,25 +10,31 @@ const mapRole = (role: any) => {
     return { id: role.toString() };
 };
 
-// a device ref may be a populated InventoryDevice doc or a raw ObjectId.
-const mapDeviceLine = (line: any) => {
-    const inv = line.item;
-    const device =
-        inv && typeof inv === 'object' && inv._id
-            ? { id: inv._id.toString(), serialNumber: inv.serialNumber, status: inv.status, location: inv.location }
-            : { id: inv?.toString() };
-    return { item: device, quantity: line.quantity };
+// a line's item is polymorphic — a populated Master/Device/Consumable doc or a raw ObjectId.
+// surface a shallow shape with the fields that identify each type.
+const mapItem = (itemType: string, inv: any) => {
+    if (!inv) return null;
+    if (typeof inv !== 'object' || !inv._id) {
+        return { id: inv?.toString() };
+    }
+    const base = { id: inv._id.toString() };
+    if (itemType === INVENTORY_REQUEST_ITEM_TYPE.DEVICE) {
+        return { ...base, serialNumber: inv.serialNumber, status: inv.status, location: inv.location };
+    }
+    if (itemType === INVENTORY_REQUEST_ITEM_TYPE.CONSUMABLE) {
+        return { ...base, batch: inv.batch, expiryDate: inv.expiryDate };
+    }
+    if (itemType === INVENTORY_REQUEST_ITEM_TYPE.MASTER) {
+        return { ...base, code: inv.code, name: inv.name, type: inv.type };
+    }
+    return base;
 };
 
-// a consumable ref may be a populated InventoryConsumable doc or a raw ObjectId.
-const mapConsumableLine = (line: any) => {
-    const inv = line.item;
-    const consumable =
-        inv && typeof inv === 'object' && inv._id
-            ? { id: inv._id.toString(), batch: inv.batch, expiryDate: inv.expiryDate }
-            : { id: inv?.toString() };
-    return { item: consumable, quantity: line.quantity };
-};
+const mapLine = (line: any) => ({
+    itemType: line.itemType,
+    item: mapItem(line.itemType, line.item),
+    quantity: line.quantity,
+});
 
 export const InventoryRequestMapper = {
     toResponse: (request: any) => ({
@@ -40,9 +47,8 @@ export const InventoryRequestMapper = {
         requestedBy: mapRole(request.requestedBy),
         processedBy: mapRole(request.processedBy),
 
-        // requested lines
-        devices: (request.devices || []).map(mapDeviceLine),
-        consumables: (request.consumables || []).map(mapConsumableLine),
+        // requested lines (polymorphic — master for refill, device/consumable for return)
+        lineItems: (request.lineItems || []).map(mapLine),
 
         // append-only lifecycle journal
         stageHistory: (request.stageHistory || []).map((entry: any) => ({

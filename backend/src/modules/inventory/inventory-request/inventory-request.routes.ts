@@ -61,7 +61,7 @@ registry.registerPath({
     responses: {
         201: { description: 'Request created successfully' },
         400: { description: 'Validation error' },
-        404: { description: 'A referenced device or consumable was not found' },
+        404: { description: 'A referenced line item (master/device/consumable) was not found' },
     },
 });
 

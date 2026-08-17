@@ -8,6 +8,8 @@ import {
     IUpdateInventoryRequestPayload,
 } from './inventory-request.validators';
 import {
+    ALLOWED_ITEM_TYPES_BY_REQUEST_TYPE,
+    INVENTORY_REQUEST_ITEM_TYPE,
     INVENTORY_REQUEST_PERMISSIONS,
     INVENTORY_REQUEST_STATUS,
     INVENTORY_REQUEST_TRANSITION_MAP,
@@ -19,6 +21,7 @@ import { RequestContext } from '../../../shared/utils/contextBuilder';
 import { isValidObjectID } from '../../../shared/utils/strings';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { canTransition } from '../../crm/lead/lead.validators';
+import { InventoryMasterService } from '../inventory-master/inventory-master.service';
 import { InventoryDeviceService } from '../inventory-device/inventory-device.service';
 import { InventoryConsumableService } from '../inventory-consumable/inventory-consumable.service';
 
@@ -27,8 +30,8 @@ type InventoryRequestDocument = HydratedDocument<IInventoryRequest> | null;
 const populate: any[] = [
     { path: 'requestedBy' },
     { path: 'processedBy' },
-    { path: 'devices.item' },
-    { path: 'consumables.item' },
+    // lineItems.item is polymorphic (refPath: itemType) — mongoose resolves the right model per line
+    { path: 'lineItems.item' },
 ];
 
 // ========================================================================================
@@ -43,41 +46,60 @@ const applyOwnScope = (where: any, ctx: RequestContext) => {
     }
 };
 
-// Validate every referenced device exists and dedupe within the list; quantity is fixed at 1.
-const resolveDevices = async (lines: { item: string }[], ctx: RequestContext) => {
-    const seen = new Set<string>();
-    const result: { item: string; quantity: number }[] = [];
-    for (const line of lines) {
-        if (seen.has(line.item)) {
-            return throwAppError('The same device is listed more than once', StatusCodes.BAD_REQUEST);
-        }
-        seen.add(line.item);
-
-        const device = await InventoryDeviceService.get(line.item, ctx);
-        if (!device) {
-            return throwAppError(`Device ${line.item} does not exist`, StatusCodes.NOT_FOUND);
-        }
-        result.push({ item: device._id.toString(), quantity: 1 });
+// Confirm a referenced record exists, routing to the right service by itemType.
+const itemExists = async (itemType: string, id: string, ctx: RequestContext) => {
+    if (itemType === INVENTORY_REQUEST_ITEM_TYPE.MASTER) {
+        return await InventoryMasterService.get(id, ctx);
     }
-    return result;
+    if (itemType === INVENTORY_REQUEST_ITEM_TYPE.DEVICE) {
+        return await InventoryDeviceService.get(id, ctx);
+    }
+    if (itemType === INVENTORY_REQUEST_ITEM_TYPE.CONSUMABLE) {
+        return await InventoryConsumableService.get(id, ctx);
+    }
+    return null;
 };
 
-// Validate every referenced consumable lot exists and dedupe within the list.
-const resolveConsumables = async (lines: { item: string; quantity: number }[], ctx: RequestContext) => {
+// Validate + normalize the polymorphic line list for a given request type:
+//  • itemType↔request-type coherence (refill→master, return→device/consumable) — enforced HERE (service-only)
+//  • every referenced record must exist (routed by itemType)
+//  • dedupe within the list (a given record can't appear twice)
+//  • a device line's quantity is always forced to 1 (a device is a single physical unit)
+const resolveLineItems = async (
+    lines: { itemType: string; item: string; quantity?: number }[],
+    requestType: string,
+    ctx: RequestContext,
+) => {
+    const allowedTypes = ALLOWED_ITEM_TYPES_BY_REQUEST_TYPE[requestType] || [];
     const seen = new Set<string>();
-    const result: { item: string; quantity: number }[] = [];
+    const result: { itemType: string; item: string; quantity: number }[] = [];
+
     for (const line of lines) {
+        //1: coherence — the line's itemType must be valid for this request type
+        if (!allowedTypes.includes(line.itemType)) {
+            return throwAppError(
+                `A '${requestType}' request cannot include a '${line.itemType}' line`,
+                StatusCodes.BAD_REQUEST,
+            );
+        }
+
+        //2: dedupe within the list
         if (seen.has(line.item)) {
-            return throwAppError('The same consumable is listed more than once', StatusCodes.BAD_REQUEST);
+            return throwAppError('The same item is listed more than once', StatusCodes.BAD_REQUEST);
         }
         seen.add(line.item);
 
-        const consumable = await InventoryConsumableService.get(line.item, ctx);
-        if (!consumable) {
-            return throwAppError(`Consumable ${line.item} does not exist`, StatusCodes.NOT_FOUND);
+        //3: the referenced record must exist
+        const record = await itemExists(line.itemType, line.item, ctx);
+        if (!record) {
+            return throwAppError(`${line.itemType} ${line.item} does not exist`, StatusCodes.NOT_FOUND);
         }
-        result.push({ item: consumable._id.toString(), quantity: line.quantity });
+
+        //4: a device is a single physical unit — force quantity to 1; others use the supplied qty (default 1)
+        const quantity = line.itemType === INVENTORY_REQUEST_ITEM_TYPE.DEVICE ? 1 : line.quantity ?? 1;
+        result.push({ itemType: line.itemType, item: record._id.toString(), quantity });
     }
+
     return result;
 };
 
@@ -88,11 +110,10 @@ const resolveConsumables = async (lines: { item: string; quantity: number }[], c
 // requestedBy/type are seeded at construction in create() and never handled here, so update()
 // can neither reassign the requester nor change the request type.
 const set = async (model: any, entity: HydratedDocument<IInventoryRequest>, ctx: RequestContext) => {
-    if (model.devices) {
-        entity.devices = (await resolveDevices(model.devices, ctx)) as any;
-    }
-    if (model.consumables) {
-        entity.consumables = (await resolveConsumables(model.consumables, ctx)) as any;
+    // entity.type is already set (seeded at construction on create; existing value on update),
+    // so line coherence is validated against the request's own type.
+    if (model.lineItems) {
+        entity.lineItems = (await resolveLineItems(model.lineItems, entity.type as string, ctx)) as any;
     }
 
     return entity;
@@ -133,11 +154,11 @@ const search = async (filters: ISearchInventoryRequestQuery, ctx: RequestContext
     if (filters.processedBy) {
         where.processedBy = filters.processedBy;
     }
-    if (filters.device) {
-        where['devices.item'] = filters.device;
+    if (filters.item) {
+        where['lineItems.item'] = filters.item;
     }
-    if (filters.consumable) {
-        where['consumables.item'] = filters.consumable;
+    if (filters.itemType) {
+        where['lineItems.itemType'] = filters.itemType;
     }
 
     //3: own-scope LAST so it always wins — a non-manage actor can never widen past their own
@@ -165,7 +186,7 @@ const create = async (model: ICreateInventoryRequestPayload, ctx: RequestContext
         type: model.type,
     });
 
-    //2: set validates + applies the device/consumable lines (at least one is enforced in the validator)
+    //2: set validates + applies the line items (at least one is enforced in the validator, coherence in set)
     entity = await set(model, entity, ctx);
     entity = await entity.save();
 

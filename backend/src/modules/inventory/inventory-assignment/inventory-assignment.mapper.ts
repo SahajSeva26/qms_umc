@@ -21,7 +21,7 @@ const mapInventory = (inventoryType: string, inv: any) => {
         return { id: inv.toString() };
     }
     if (inventoryType === INVENTORY_ASSIGNMENT_TYPES.DEVICE) {
-        return { id: inv._id.toString(), serialNumber: inv.serialNumber, status: inv.status, location: inv.location };
+        return { id: inv._id.toString(), serialNumber: inv.serialNumber, status: inv.status };
     }
     return { id: inv._id.toString(), batch: inv.batch, expiryDate: inv.expiryDate };
 };

@@ -19,7 +19,7 @@ const mapItem = (itemType: string, inv: any) => {
     }
     const base = { id: inv._id.toString() };
     if (itemType === INVENTORY_REQUEST_ITEM_TYPE.DEVICE) {
-        return { ...base, serialNumber: inv.serialNumber, status: inv.status, location: inv.location };
+        return { ...base, serialNumber: inv.serialNumber, status: inv.status };
     }
     if (itemType === INVENTORY_REQUEST_ITEM_TYPE.CONSUMABLE) {
         return { ...base, batch: inv.batch, expiryDate: inv.expiryDate };

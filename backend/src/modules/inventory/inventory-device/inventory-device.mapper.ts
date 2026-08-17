@@ -22,9 +22,8 @@ export const InventoryDeviceMapper = {
         // catalog item this unit is an instance of
         item: mapItem(device.item),
 
-        // unit identity + placement + lifecycle
+        // unit identity + lifecycle
         serialNumber: device.serialNumber,
-        location: device.location,
         status: device.status,
 
         // shelf life / warranty

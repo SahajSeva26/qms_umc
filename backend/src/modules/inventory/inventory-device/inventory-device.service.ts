@@ -9,7 +9,7 @@ import { isValidObjectID } from '../../../shared/utils/strings';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { InventoryMasterService } from '../inventory-master/inventory-master.service';
 import { ITEM_TYPES } from '../inventory-master/inventory-master.constants';
-import { INVENTORY_DEVICE_STATUS, INVENTORY_DEVICE_LOCATION } from './inventory-device.constants';
+import { INVENTORY_DEVICE_STATUS } from './inventory-device.constants';
 
 type InventoryDeviceDocument = HydratedDocument<IInventoryDevice> | null;
 
@@ -27,9 +27,6 @@ const populate: any[] = [{ path: 'item' }];
 
 // item + serialNumber are seeded at construction in create() and never handled here.
 const set = async (model: any, entity: HydratedDocument<IInventoryDevice>, ctx: RequestContext) => {
-    if (model.location) {
-        entity.location = model.location;
-    }
     if (model.status) {
         entity.status = model.status;
     }
@@ -71,9 +68,6 @@ const search = async (filters: ISearchInventoryDeviceQuery, ctx: RequestContext,
     if (filters.item) {
         where.item = filters.item;
     }
-    if (filters.location) {
-        where.location = filters.location;
-    }
     if (filters.serialNumber) {
         where.serialNumber = { $regex: filters.serialNumber, $options: 'i' };
     }
@@ -113,12 +107,11 @@ const create = async (model: ICreateInventoryDevicePayload, ctx: RequestContext)
     }
 
     //3: build entity — item + serialNumber (immutable) are seeded here, never in set().
-    // status/location are not accepted at create — a new device always starts available in the warehouse.
+    // status is not accepted at create — a new device always starts available.
     let entity = new InventoryDeviceModel({
         item: model.item,
         serialNumber: model.serialNumber,
         status: INVENTORY_DEVICE_STATUS.AVAILABLE,
-        location: INVENTORY_DEVICE_LOCATION.WAREHOUSE,
     });
     entity = await set(model, entity, ctx);
     entity = await entity.save();

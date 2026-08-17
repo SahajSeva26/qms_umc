@@ -1,6 +1,6 @@
 // Inventory-device Validators
 import { z } from 'zod';
-import { INVENTORY_DEVICE_LOCATION, INVENTORY_DEVICE_STATUS } from './inventory-device.constants';
+import { INVENTORY_DEVICE_STATUS } from './inventory-device.constants';
 
 //1: create ====================================>
 // item (catalog ref) and serialNumber (natural key) are immutable after create.
@@ -17,7 +17,6 @@ export type ICreateInventoryDevicePayload = z.infer<typeof CreateInventoryDevice
 //2: update ====================================>
 // item and serialNumber are intentionally omitted — both are immutable after create.
 export const UpdateInventoryDevicePayloadSchema = z.object({
-    location: z.enum(Object.values(INVENTORY_DEVICE_LOCATION)).optional(),
     manufacturingDate: z.coerce.date().optional(),
     warrantyExpiryDate: z.coerce.date().optional(),
     status: z.enum(Object.values(INVENTORY_DEVICE_STATUS)).optional(),
@@ -29,7 +28,6 @@ export type IUpdateInventoryDevicePayload = z.infer<typeof UpdateInventoryDevice
 //3: search ====================================>
 export const SearchInventoryDeviceQuerySchema = z.object({
     item: z.string().optional().openapi({ example: '665f1a2b3c4d5e6f70819293' }),
-    location: z.enum(Object.values(INVENTORY_DEVICE_LOCATION)).optional().openapi({ example: 'warehouse' }),
     serialNumber: z.string().optional().openapi({ example: 'SN-ACGLU-000142' }),
     status: z.enum(Object.values(INVENTORY_DEVICE_STATUS)).optional().openapi({ example: 'available' }),
     page: z.string().optional().openapi({ example: '1' }),

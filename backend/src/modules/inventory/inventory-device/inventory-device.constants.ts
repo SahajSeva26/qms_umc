@@ -1,10 +1,4 @@
 // Inventory-device Constants
-export const INVENTORY_DEVICE_LOCATION = {
-    WAREHOUSE: 'warehouse',
-    FO: 'field-officer',
-    CAMP: 'camp',
-};
-
 export const INVENTORY_DEVICE_STATUS = {
     AVAILABLE: 'available',
     ASSIGNED: 'assigned',
@@ -19,6 +13,6 @@ export const INVENTORY_DEVICE_PERMISSIONS = {
     MANAGE: {
         code: 'inventory-device:manage',
         name: 'Manage Inventory Device',
-        description: 'Manage individual device units (create, update lifecycle/location/calibration)',
+        description: 'Manage individual device units (create, update lifecycle/calibration)',
     } as const,
 };

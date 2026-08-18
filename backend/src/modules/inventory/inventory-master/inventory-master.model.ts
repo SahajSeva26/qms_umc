@@ -60,5 +60,5 @@ const inventoryMasterSchema = new mongoose.Schema(
     { timestamps: true },
 );
 
-export const InventoryMaster = mongoose.model('InventoryMaster', inventoryMasterSchema);
+export const InventoryMasterModel = mongoose.model('InventoryMaster', inventoryMasterSchema);
 export type IInventoryMaster = mongoose.InferSchemaType<typeof inventoryMasterSchema>;

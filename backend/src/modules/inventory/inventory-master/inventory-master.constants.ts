@@ -3,8 +3,8 @@
 export const ITEM_TYPES = {
     DEVICE: 'device',
     CONSUMABLE: 'consumable',
-    ACCESSORY: 'accessory',
-    OTHER: 'other',
+    // ACCESSORY: 'accessory',
+    // OTHER: 'other',
 } as const;
 
 export const ITEM_STATUS = {

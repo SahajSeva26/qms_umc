@@ -1,14 +1,15 @@
-// Inventory-assignment Controller
+// Inventory-request Controller
 import { ResponseHandler } from '../../../shared/utils/responseHandler';
 import { formatZodError } from '../../../shared/utils/error';
 import {
-    CreateInventoryAssignmentPayloadSchema,
-    SearchInventoryAssignmentQuerySchema,
-    UpdateInventoryAssignmentPayloadSchema,
-} from './inventory-assignment.validators';
+    CreateInventoryRequestPayloadSchema,
+    MoveStagePayloadSchema,
+    SearchInventoryRequestQuerySchema,
+    UpdateInventoryRequestPayloadSchema,
+} from './inventory-request.validators';
 import { StatusCodes } from 'http-status-codes';
-import { InventoryAssignmentService } from './inventory-assignment.service';
-import { InventoryAssignmentMapper } from './inventory-assignment.mapper';
+import { InventoryRequestService } from './inventory-request.service';
+import { InventoryRequestMapper } from './inventory-request.mapper';
 import { RequestHandler } from '../../../shared/utils/requestHandler';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
 
@@ -17,21 +18,21 @@ const get = async (req: any, res: any) => {
         const ctx: RequestContext = req.context;
         const { id } = req?.params;
         if (!id) {
-            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Assignment ID is required', null);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Request ID is required', null);
         }
 
-        const assignment = await InventoryAssignmentService.get(id, ctx, { populate: true });
+        const request = await InventoryRequestService.get(id, ctx, { populate: true });
 
-        if (!assignment) {
-            return ResponseHandler.appResponse(res, StatusCodes.NOT_FOUND, false, 'Assignment not found', null);
+        if (!request) {
+            return ResponseHandler.appResponse(res, StatusCodes.NOT_FOUND, false, 'Request not found', null);
         }
 
         return ResponseHandler.appResponse(
             res,
             StatusCodes.OK,
             true,
-            'Assignment fetched successfully',
-            InventoryAssignmentMapper.toResponse(assignment),
+            'Request fetched successfully',
+            InventoryRequestMapper.toResponse(request),
         );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
@@ -42,7 +43,7 @@ const search = async (req: any, res: any) => {
     try {
         const ctx: RequestContext = req.context;
 
-        const { data: filters, success, error } = SearchInventoryAssignmentQuerySchema.safeParse(req.query);
+        const { data: filters, success, error } = SearchInventoryRequestQuerySchema.safeParse(req.query);
         if (!success) {
             const validationErrors = formatZodError(error);
             return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
@@ -52,14 +53,14 @@ const search = async (req: any, res: any) => {
 
         const pagination = RequestHandler.getPagination(filters);
 
-        const result = await InventoryAssignmentService.search(filters, ctx, { pagination });
+        const result = await InventoryRequestService.search(filters, ctx, { pagination });
 
         return ResponseHandler.appResponse(
             res,
             StatusCodes.OK,
             true,
-            'Assignments fetched successfully',
-            InventoryAssignmentMapper.toSearchResponse(result),
+            'Requests fetched successfully',
+            InventoryRequestMapper.toSearchResponse(result),
         );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
@@ -70,7 +71,7 @@ const create = async (req: any, res: any) => {
     try {
         const ctx: RequestContext = req.context;
 
-        const { data, success, error } = CreateInventoryAssignmentPayloadSchema.safeParse(req.body);
+        const { data, success, error } = CreateInventoryRequestPayloadSchema.safeParse(req.body);
         if (!success) {
             const validationErrors = formatZodError(error);
             return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
@@ -78,14 +79,14 @@ const create = async (req: any, res: any) => {
             });
         }
 
-        const assignment = await InventoryAssignmentService.create(data, ctx);
+        const request = await InventoryRequestService.create(data, ctx);
 
         return ResponseHandler.appResponse(
             res,
             StatusCodes.CREATED,
             true,
-            'Assignment created successfully',
-            InventoryAssignmentMapper.toResponse(assignment),
+            'Request created successfully',
+            InventoryRequestMapper.toResponse(request),
         );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
@@ -97,10 +98,10 @@ const update = async (req: any, res: any) => {
         const ctx: RequestContext = req.context;
         const { id } = req?.params;
         if (!id) {
-            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Assignment ID is required', null);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Request ID is required', null);
         }
 
-        const { data, success, error } = UpdateInventoryAssignmentPayloadSchema.safeParse(req.body);
+        const { data, success, error } = UpdateInventoryRequestPayloadSchema.safeParse(req.body);
         if (!success) {
             const validationErrors = formatZodError(error);
             return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
@@ -108,40 +109,54 @@ const update = async (req: any, res: any) => {
             });
         }
 
-        const assignment = await InventoryAssignmentService.update(id, data, ctx);
+        const request = await InventoryRequestService.update(id, data, ctx);
 
         return ResponseHandler.appResponse(
             res,
             StatusCodes.OK,
             true,
-            'Assignment updated successfully',
-            InventoryAssignmentMapper.toResponse(assignment),
+            'Request updated successfully',
+            InventoryRequestMapper.toResponse(request),
         );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }
 };
 
-const remove = async (req: any, res: any) => {
+const moveStage = async (req: any, res: any) => {
     try {
         const ctx: RequestContext = req.context;
         const { id } = req?.params;
         if (!id) {
-            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Assignment ID is required', null);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Request ID is required', null);
         }
 
-        await InventoryAssignmentService.remove(id, ctx);
+        const { data, success, error } = MoveStagePayloadSchema.safeParse(req.body);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                fields: validationErrors,
+            });
+        }
 
-        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Assignment removed successfully', null);
+        const request = await InventoryRequestService.moveStage(id, data, ctx);
+
+        return ResponseHandler.appResponse(
+            res,
+            StatusCodes.OK,
+            true,
+            'Request stage updated successfully',
+            InventoryRequestMapper.toResponse(request),
+        );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }
 };
 
-export const InventoryAssignmentController = {
+export const InventoryRequestController = {
     get,
     search,
     create,
     update,
-    remove,
+    moveStage,
 };

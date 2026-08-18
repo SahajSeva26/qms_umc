@@ -14,6 +14,11 @@ import { GEO_PROFILE_PERMISSIONS } from '../../modules/operations/geoProfile/geo
 import { CAMP_PERMISSIONS } from '../../modules/operations/camp/camp.constants';
 import { COUNTER_PERMISSIONS } from '../../modules/counter/counter.constants';
 import { INVENTORY_MASTER_PERMISSIONS } from '../../modules/inventory/inventory-master/inventory-master.constants';
+import { INVENTORY_CONSUMABLE_PERMISSIONS } from '../../modules/inventory/inventory-consumable/inventory-consumable.constants';
+import { INVENTORY_DEVICE_PERMISSIONS } from '../../modules/inventory/inventory-device/inventory-device.constants';
+import { INVENTORY_ASSIGNMENT_PERMISSIONS } from '../../modules/inventory/inventory-assignment/inventory-assignment.constants';
+import { INVENTORY_REQUEST_PERMISSIONS } from '../../modules/inventory/inventory-request/inventory-request.constants';
+import { INVENTORY_LEDGER_PERMISSIONS } from '../../modules/inventory/inventory-ledger/inventory-ledger.constants';
 
 export const SYSTEM_PERMISSIONS = {
     MANAGE: {
@@ -40,6 +45,11 @@ export const PERMISSIONS = {
     CAMP: CAMP_PERMISSIONS,
     COUNTER: COUNTER_PERMISSIONS,
     INVENTORY_MASTER: INVENTORY_MASTER_PERMISSIONS,
+    INVENTORY_CONSUMABLE: INVENTORY_CONSUMABLE_PERMISSIONS,
+    INVENTORY_DEVICE: INVENTORY_DEVICE_PERMISSIONS,
+    INVENTORY_ASSIGNMENT: INVENTORY_ASSIGNMENT_PERMISSIONS,
+    INVENTORY_REQUEST: INVENTORY_REQUEST_PERMISSIONS,
+    INVENTORY_LEDGER: INVENTORY_LEDGER_PERMISSIONS,
 };
 
 export const PERMISSIONS_ARRAY = Object.values(PERMISSIONS)

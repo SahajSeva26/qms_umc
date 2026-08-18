@@ -8,32 +8,23 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { labelClasses, labelStyle } from '@/features/projects/components/wizard/wizard.styles'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { unwrapId } from '@/utils/unwrapId'
 
 interface WizardStep0Props {
   form: WizardFormState
   setField: <K extends keyof WizardFormState>(key: K, value: WizardFormState[K]) => void
 }
 
-// New step, doesn't exist on the old mock wizard — POST /projects requires an
-// existing `lead` id, and tenant/division are derived server-side from it.
-//
-// Restricted to status=won leads as a UX-only convention (backend's own
-// create() never actually checks the source lead's status — only that it
-// exists and no Project already exists for it yet). A power user hitting the
-// API directly could still create a Project from a non-won lead; this picker
-// simply never offers that path through the UI.
+// POST /projects requires an existing `lead` id; tenant/division are derived
+// server-side from it. Restricted to status=won leads as a UX-only
+// convention — the backend never actually checks the source lead's status.
 const WizardStep0 = ({ form, setField }: WizardStep0Props) => {
   const [search, setSearch] = useState('')
-  // Same 300ms debounce already used everywhere else in this app (Contacts/
-  // Doctors/Camps/Projects list search, Divisions/Users/Tenants/Roles) — this
-  // typeahead was firing a network request on every keystroke.
   const debouncedSearch = useDebouncedValue(search, 300)
   const hasSearch = debouncedSearch.trim().length > 0
 
-  // No default/browse-all list — a real won-lead roster could be in the
-  // hundreds, so this is search-only: nothing fetches until the user actually
-  // types a title. `enabled: hasSearch` means an empty search box never hits
-  // the network at all, not even for the default-10 list.
+  // Search-only, no default/browse-all list — nothing fetches until the
+  // user types a title.
   const { data, isLoading, isError } = useQuery({
     queryKey: ['project-wizard-won-leads', debouncedSearch],
     queryFn: () => projectsService.searchWonLeads({ title: debouncedSearch }),
@@ -42,11 +33,12 @@ const WizardStep0 = ({ form, setField }: WizardStep0Props) => {
 
   const leads = hasSearch ? data?.data?.items ?? [] : []
 
-  const selectLead = (leadId: string, title: string, tenantId: string, tenantName: string, divisionName: string) => {
+  const selectLead = (leadId: string, title: string, tenantId: string, tenantName: string, divisionId: string, divisionName: string) => {
     setField('leadId', leadId)
     setField('leadTitle', title)
     setField('leadTenantId', tenantId)
     setField('leadTenantName', tenantName)
+    setField('leadDivisionId', divisionId)
     setField('leadDivisionName', divisionName)
   }
 
@@ -88,14 +80,15 @@ const WizardStep0 = ({ form, setField }: WizardStep0Props) => {
 
       <div className="space-y-1.5 max-h-72 overflow-y-auto">
         {leads.map((lead) => {
-          const tenantId = typeof lead.tenant === 'string' ? lead.tenant : lead.tenant._id ?? ''
+          const tenantId = unwrapId(lead.tenant)
           const tenantName = typeof lead.tenant === 'string' ? '' : lead.tenant.name
+          const divisionId = unwrapId(lead.division)
           const divisionName = typeof lead.division === 'string' ? '' : lead.division.name
           const active = form.leadId === lead.id
           return (
             <button
               key={lead.id}
-              onClick={() => selectLead(lead.id, lead.title, tenantId, tenantName, divisionName)}
+              onClick={() => selectLead(lead.id, lead.title, tenantId, tenantName, divisionId, divisionName)}
               className="w-full flex items-center justify-between gap-3 p-2.5 rounded-xl border text-left transition-colors"
               style={
                 active

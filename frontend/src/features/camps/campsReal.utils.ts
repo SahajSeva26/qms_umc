@@ -1,19 +1,28 @@
-// Resolves a Camp reference field (tenant/division/project/doctor/fo/mr/asm/
-// rsm) to a plain id string regardless of whether the value is a populated
-// object (search()/get(), which pass {populate:true}) or a bare ObjectId
-// string (create()/update()/moveStage()/allocateFo(), which never populate)
-// — see campReal.types.ts's CampEntity comment for why both shapes occur.
+// Resolves a Camp reference field to a plain id string regardless of whether
+// the value is a populated object or a bare ObjectId string (see campReal.types.ts).
 export function campRefId(value: { _id?: string; id?: string } | string | null | undefined): string | null {
   if (value == null) return null
   if (typeof value === 'string') return value
   return value._id ?? value.id ?? null
 }
 
-// Reads a populated object's own display name directly (avoiding a lookup
-// table entirely) when the value IS populated — falls back to null when it's
-// only a bare id string, so the caller can fall back to a resolver-hook
-// lookup by id instead.
+// Returns the populated object's own name directly; null for a bare id string
+// so the caller can fall back to a resolver-hook lookup by id instead.
 export function campRefName(value: { name?: string } | string | null | undefined): string | null {
   if (value == null || typeof value === 'string') return null
   return value.name ?? null
+}
+
+// Zod validation failures respond with data.data.fields (per-field reasons),
+// not a specific top-level message; fall back to the plain message otherwise.
+export function saveErrorMessage(err: unknown): string {
+  const response = (err as { response?: { data?: { message?: string; data?: { fields?: Record<string, string> } } } })
+    ?.response
+  const fields = response?.data?.data?.fields
+  if (fields && Object.keys(fields).length > 0) {
+    return Object.entries(fields)
+      .map(([field, reason]) => `${field}: ${reason}`)
+      .join('; ')
+  }
+  return response?.data?.message || 'Failed to save changes.'
 }

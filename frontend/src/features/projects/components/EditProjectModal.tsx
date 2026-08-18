@@ -18,16 +18,15 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { labelClasses, labelStyle, fieldClasses } from '@/features/projects/components/wizard/wizard.styles'
+import { unwrapId } from '@/utils/unwrapId'
 
 interface EditProjectModalProps {
   project: ProjectEntity
   onClose: () => void
 }
 
-// Mirrors EditLeadModal.tsx's pattern: a flat single-scroll form scoped to
-// UpdateProjectPayload's fields (a strict subset of Create's — no lead/
-// tenant/division/status), with its own toFormState mapper doing the same
-// populated-relation-or-string unwrap idiom.
+// Scoped to UpdateProjectPayload's fields — a strict subset of Create's,
+// with no lead/tenant/division/status.
 interface EditFormState {
   name: string
   therapy: ProjectTherapy | ''
@@ -38,22 +37,16 @@ interface EditFormState {
   paymentTerms: PaymentTerms
 }
 
-// Guards against null even though these 3 fields are `required: true` in
-// project.model.ts — that only enforces new saves, not older documents or a
-// populate() that resolved to null (stale/pre-migration reference, deleted
-// doc, etc). Found live 2026-08-04 via a real crash on ProjectDetailDrawer.tsx's
-// identical unwrap idiom for the same 3 fields — same fix applied here before
-// this modal hit the same crash on an affected project.
-const refId = (value: { _id?: string } | string | null | undefined): string =>
-  !value ? '' : typeof value === 'string' ? value : value._id ?? ''
-
+// unwrapId guards against null even though these 3 fields are `required: true`
+// in project.model.ts — that only enforces new saves, not a populate() that
+// resolved to null (stale reference, deleted doc, etc).
 const toFormState = (project: ProjectEntity): EditFormState => ({
   name: project.name,
   therapy: project.therapy,
   type: project.type,
-  salesRepId: refId(project.salesRep),
-  projectCoordinatorId: refId(project.projectCoordinator),
-  marketingContactId: refId(project.marketingContact),
+  salesRepId: unwrapId(project.salesRep),
+  projectCoordinatorId: unwrapId(project.projectCoordinator),
+  marketingContactId: unwrapId(project.marketingContact),
   paymentTerms: project.paymentTerms,
 })
 
@@ -61,11 +54,8 @@ const THERAPY_OPTIONS = Object.keys(PROJECT_THERAPY_LABEL) as ProjectTherapy[]
 const TYPE_OPTIONS = Object.keys(PROJECT_TYPE_LABEL) as ProjectType[]
 const PAYMENT_TERMS_OPTIONS: PaymentTerms[] = ['net_30', 'net_60', 'net_90']
 
-// Matches WizardStep1.tsx's icon choices exactly, for visual consistency
-// between create and edit. Found via live testing: PickCard's colored tile
-// renders independent of its `active` prop, so omitting icon+color here (as
-// the original version did) made every type card look identically
-// "selected" — this fixes that, not just a cosmetic mismatch.
+// Matches WizardStep1.tsx's icon choices for visual consistency between
+// create and edit.
 const TYPE_ICONS: Record<ProjectType, typeof FiActivity> = {
   screening_camp: FiActivity,
   diet: FiHeart,
@@ -87,34 +77,21 @@ const EditProjectModal = ({ project, onClose }: EditProjectModalProps) => {
     setField('type', form.type.includes(t) ? form.type.filter((x) => x !== t) : [...form.type, t])
   }
 
-  // salesRep/projectCoordinator: platform-tenant roles. marketingContact:
-  // a Contact belonging to the project's own (immutable) tenant — same rules
-  // as create, replicated exactly from EditLeadModal's own recipe.
-  // marketingContact sourced from Contacts, not Roles — project.model.ts's
-  // marketingContact.ref switched from Role to Contact 2026-08-03 (same
-  // change already applied to Lead.contactPerson).
-  const projectTenantId = !project.tenant ? undefined : typeof project.tenant === 'string' ? project.tenant : project.tenant._id
-  // limit: PLATFORM_TENANT_FETCH_LIMIT — see accessManagement.constants.ts;
-  // the backend's default 10-result limit can silently exclude the `qms`
-  // platform tenant once total active tenant count passes 10.
+  // marketingContact is sourced from Contacts scoped to the project's own
+  // (immutable) division, not Roles.
+  const projectDivisionId = unwrapId(project.division, undefined)
+  // limit: PLATFORM_TENANT_FETCH_LIMIT — the backend's default 10-result
+  // limit can silently exclude the `qms` platform tenant past 10 tenants.
   const { data: tenantData, isError: tenantsErrored } = useTenants({ status: 'active', limit: PLATFORM_TENANT_FETCH_LIMIT })
-  // tenant.type is only present on the wire for a system:manage caller
-  // (TenantMapper.toResponse) — code is always present regardless of
-  // permission, so match on it as a fallback. Found via a 2026-07-26 test pass.
+  // tenant.type is only present on the wire for a system:manage caller; code
+  // is always present, so match on it as a fallback.
   const platformTenant = tenantData?.data?.items.find((t) => t.type === 'platform' || t.code === PLATFORM_TENANT_CODE)
-  // Sales rep — narrowed to the sales-rep RoleType only, same recipe as
-  // WizardStep5.tsx/CRM's WizardStep4.tsx — confirmed live 2026-08-04 the
-  // old unfiltered-by-tenant-only query showed System/Admin/every QA test
-  // role as pickable "sales reps." Sales Head was queried alongside
-  // sales-rep initially but explicitly excluded per user, 2026-08-04:
-  // "remove sales head he is not needed here only sales rep should be
-  // allowed."
+  // Sales rep — narrowed to the sales-rep RoleType only; Sales Head is
+  // explicitly excluded.
   const { data: salesRepTypeData, isLoading: salesRepTypeLoading, isError: salesRepTypeErrored, isSuccess: salesRepTypeLoaded } = useRoleTypes({ code: 'sales-rep', status: 'active' })
   const salesRepTypeId = salesRepTypeData?.data?.items[0]?.id
   // Hard-stop: `sales-rep` is a required seeded RoleType — if the lookup
-  // succeeds but returns zero items, it's been deleted/renamed and the
-  // picker can never resolve a valid sales rep (per user, 2026-08-04: "if
-  // not exists throw error and stop creation").
+  // succeeds but returns zero items, the picker can never resolve a rep.
   const salesRepTypeMissing = salesRepTypeLoaded && !salesRepTypeId
 
   const { data: salesRepRoleData, isLoading: salesRepRolesLoading, isError: salesRepRolesErrored } = useRoles(
@@ -126,12 +103,7 @@ const EditProjectModal = ({ project, onClose }: EditProjectModalProps) => {
   const salesRolesErrored = tenantsErrored || salesRepTypeErrored || salesRepRolesErrored
 
   // Project coordinator — narrowed to the camp-coordinator-screening/
-  // camp-coordinator-diet RoleTypes, the prototype's own intended filter for
-  // this field (projects-manager.js's renderStep5:
-  // /camp coordinator|admin|operations/i) — confirmed 2026-08-04 after
-  // re-checking the prototype source; previously left unnarrowed because no
-  // permission-based signal existed, but this RoleType-based signal does.
-  // Same merge + hard-stop shape as Sales rep above.
+  // camp-coordinator-diet RoleTypes. Same merge + hard-stop shape as Sales rep above.
   const { data: coordScreeningTypeData, isLoading: coordScreeningTypeLoading, isError: coordScreeningTypeErrored, isSuccess: coordScreeningTypeLoaded } = useRoleTypes({ code: 'camp-coordinator-screening', status: 'active' })
   const { data: coordDietTypeData } = useRoleTypes({ code: 'camp-coordinator-diet', status: 'active' })
   const coordScreeningTypeId = coordScreeningTypeData?.data?.items[0]?.id
@@ -152,7 +124,7 @@ const EditProjectModal = ({ project, onClose }: EditProjectModalProps) => {
   const platformRolesErrored = tenantsErrored || coordScreeningTypeErrored || coordScreeningRolesErrored || coordDietRolesErrored
 
   const { data: marketingContactData, isLoading: marketingContactsLoading, isError: marketingContactsErrored } =
-    useContacts({ tenant: projectTenantId, status: 'active' }, { enabled: !!projectTenantId })
+    useContacts({ division: projectDivisionId, status: 'active' }, { enabled: !!projectDivisionId })
   const marketingContacts = marketingContactData?.data?.items ?? []
 
   const handleSave = async () => {
@@ -185,8 +157,7 @@ const EditProjectModal = ({ project, onClose }: EditProjectModalProps) => {
       await updateProject.mutateAsync({ id: project.id, payload })
       onClose()
     } catch {
-      // no-op: useUpdateProject has no onError toast of its own; a silent
-      // close-on-failure would hide the error, so surface a generic one here.
+      // no-op: surface handled elsewhere; avoid a silent close-on-failure.
     }
   }
 

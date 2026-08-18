@@ -1,13 +1,13 @@
-import { useQuery } from '@tanstack/react-query'
+import { useEntityQuery } from '@/hooks/useEntityQuery'
+import { createEntityKeys } from '@/hooks/entityQueryKeys'
 import { inventoryMasterService } from '@/features/inventory/inventoryMaster.service'
 import type { SearchInventoryMasterQuery } from '@/types/inventoryMaster.types'
 
-// Thin useQuery wrapper, same pattern as useDivisions/useRoles. Reads are
-// open to any authenticated user on the backend (inventory-master.routes.ts)
-// — no permission gate needed here, only on the write hooks below.
-export const useInventoryMasters = (query: SearchInventoryMasterQuery) => {
-  return useQuery({
-    queryKey: ['inventory-masters', query],
-    queryFn: () => inventoryMasterService.searchInventoryMasters(query),
-  })
-}
+// No singular 'inventory-master' entry — this entity has no single-get
+// hook/query, only the list.
+export const inventoryMasterKeys = createEntityKeys<SearchInventoryMasterQuery>('inventory-masters')
+
+// Reads are open to any authenticated user on the backend — no permission
+// gate needed here, only on the write hooks.
+export const useInventoryMasters = (query: SearchInventoryMasterQuery) =>
+  useEntityQuery(inventoryMasterKeys, (q) => inventoryMasterService.searchInventoryMasters(q), query)

@@ -1,16 +1,10 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useUpdateEntity } from '@/hooks/useUpdateEntity'
 import { accessManagementService } from '@/features/access-management/accessManagement.service'
+import { tenantKeys } from '@/features/access-management/tenant/hooks/useTenants'
 import type { UpdateTenantPayload } from '@/types/accessManagement.types'
 
-// Mirrors `@/features/admin/hooks/useUpdateUser.ts` exactly.
-export const useUpdateTenant = (id: string) => {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: (payload: UpdateTenantPayload) => accessManagementService.updateTenant(id, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tenant', id] })
-      queryClient.invalidateQueries({ queryKey: ['tenants'] })
-    },
-  })
-}
+export const useUpdateTenant = (id: string) =>
+  useUpdateEntity(
+    (payload: UpdateTenantPayload) => accessManagementService.updateTenant(id, payload),
+    [tenantKeys.detail(id), tenantKeys.all],
+  )

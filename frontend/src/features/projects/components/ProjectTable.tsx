@@ -6,10 +6,6 @@ import ProjectStatusPill from '@/features/projects/components/ProjectStatusPill'
 import ProjectExecutionCell from '@/features/projects/components/ProjectExecutionCell'
 import ProjectRowMenu from '@/features/projects/components/ProjectRowMenu'
 
-// Dropped the old "POs" column entirely — the real model has no separate
-// pos[] array, only a single nested `mode` object (shown in the Execution
-// cell). Dropped the "Camps" progress-bar column too — no campsDone counter
-// exists on Project; totalCamps alone is shown inline where useful instead.
 const COLUMNS = ['Project', 'Type', 'Execution', 'Total camps', 'Value', 'Status', 'Owner', '']
 
 interface ProjectTableProps {
@@ -61,7 +57,6 @@ const ProjectTable = ({ projects, onOpenDetail, onEdit, onChangeStatus }: Projec
               </td>
               <td className="px-1 py-2.5 align-top whitespace-nowrap">
                 <ProjectRowMenu
-                  project={project}
                   onViewDetail={() => onOpenDetail(project.id)}
                   onEdit={() => onEdit(project.id)}
                   onChangeStatus={() => onChangeStatus(project.id)}

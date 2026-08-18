@@ -1,17 +1,11 @@
 import { useMemo } from 'react'
-import { BarChart3, Package, AlertTriangle } from 'lucide-react'
+import { FiBarChart2, FiPackage, FiAlertTriangle } from 'react-icons/fi'
 import type { Person } from '@/types/people.types'
 import { useInventoryOverview, useConsumables } from '@/features/inventory/hooks/useInventory'
 import { getDeviceCatalog, calibStatus } from '@/features/inventory/inventory.service'
 
-// Exact port of inventory.js's tabOverview() (lines 416-520) — a 2-col grid
-// of "Fleet by device type" + "Consumables stock health" cards, followed by
-// a full-width "Calibration alerts" table. The shared KPI grid (renderKpis(),
-// lines 321-362) and AI banner (renderAi(), lines 364-379) that sit above
-// every tab in the prototype's shell now live in their own
-// InventoryKpiStrip.tsx component, rendered once by InventoryPage regardless
-// of active tab (2026-08-03 — previously duplicated in here, matching the
-// prototype's real shared-header behavior instead of an Overview-only copy).
+// The page-level KPI grid and AI banner live in InventoryKpiStrip.tsx, rendered
+// once by InventoryPage regardless of active tab.
 const OverviewTab = () => {
   const { people, fleetByType, statusMix, overdueUnits, criticalConsumables } = useInventoryOverview()
   const { consumables } = useConsumables()
@@ -33,13 +27,11 @@ const OverviewTab = () => {
 
   return (
     <div>
-      {/* Overview body — exact port of tabOverview() */}
       <div className="grid gap-4 grid-cols-2 max-[1100px]:grid-cols-1">
-        {/* Fleet by device type */}
         <div className="rounded-[14px] border p-4" style={{ background: 'var(--card)', borderColor: 'var(--qms-border)' }}>
           <div className="flex items-center gap-2 text-[13px] font-bold mb-3.5" style={{ color: 'var(--qms-text)' }}>
             <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white shrink-0" style={{ background: '#3b6dff' }}>
-              <BarChart3 size={14} />
+              <FiBarChart2 size={14} />
             </div>
             Fleet by device type
             <span className="ml-auto text-[11px] font-medium" style={{ color: 'var(--qms-text-muted)' }}>
@@ -57,11 +49,10 @@ const OverviewTab = () => {
           ))}
         </div>
 
-        {/* Consumables stock health */}
         <div className="rounded-[14px] border p-4" style={{ background: 'var(--card)', borderColor: 'var(--qms-border)' }}>
           <div className="flex items-center gap-2 text-[13px] font-bold mb-3.5" style={{ color: 'var(--qms-text)' }}>
             <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white shrink-0" style={{ background: '#10b981' }}>
-              <Package size={14} />
+              <FiPackage size={14} />
             </div>
             Consumables stock health
             <span className="ml-auto text-[11px] font-medium" style={{ color: 'var(--qms-text-muted)' }}>
@@ -106,11 +97,10 @@ const OverviewTab = () => {
         </div>
       </div>
 
-      {/* Calibration alerts */}
       <div className="rounded-[14px] border p-4 mt-4" style={{ background: 'var(--card)', borderColor: 'var(--qms-border)' }}>
         <div className="flex items-center gap-2 text-[13px] font-bold mb-3.5" style={{ color: 'var(--qms-text)' }}>
           <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white shrink-0" style={{ background: '#f43f5e' }}>
-            <AlertTriangle size={14} />
+            <FiAlertTriangle size={14} />
           </div>
           Calibration alerts
           <span className="ml-auto text-[11px] font-medium" style={{ color: 'var(--qms-text-muted)' }}>

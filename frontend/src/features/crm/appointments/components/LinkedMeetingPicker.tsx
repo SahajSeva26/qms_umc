@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
 import { FiX } from 'react-icons/fi'
 import { useAppointmentsReal } from '@/features/crm/appointments/hooks/useAppointmentsReal'
+import { useAsyncPickerState } from '@/hooks/useAsyncPickerState'
 import { APPOINTMENT_TYPE_LABEL } from '@/types/appointment.types'
 import type { AppointmentEntity } from '@/types/appointment.types'
 
@@ -11,23 +11,10 @@ interface LinkedMeetingPickerProps {
   onChange: (appointmentId: string, appointmentLabel: string) => void
 }
 
-// Picks a prior appointment as this follow-up's `parent`. No free-text
-// search exists on appointment search, so this is a scoped list (by
-// division) rather than a typeahead like LeadIdPicker.
+// Picks a prior appointment as this follow-up's `parent`. Scoped list by division,
+// not a typeahead — appointment search has no free-text option.
 const LinkedMeetingPicker = ({ value, label, divisionId, onChange }: LinkedMeetingPickerProps) => {
-  const [open, setOpen] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [open])
+  const { open, setOpen, containerRef } = useAsyncPickerState()
 
   const { data, isFetching } = useAppointmentsReal(
     { division: divisionId, limit: '20' },

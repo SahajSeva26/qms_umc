@@ -27,11 +27,8 @@ export interface Division {
   therapy: string
 }
 
-// Client/division master data lives here (not clients.mock.ts) so any feature
-// can read it through the shared types layer instead of reaching into Client
-// Management's internal mock file. IDs line up with camps.mock.ts /
-// dashboard.mock.ts / features/projects/projects.mock.ts so all four modules
-// read as one dataset.
+// Client/division master data lives here so any feature can read it via the
+// shared types layer; IDs line up with camps/dashboard/projects mock data.
 export const CLIENTS: Client[] = [
   { id: 'cli-sun', name: 'Sun Pharma', type: 'PHARMA', city: 'Mumbai', state: 'MH', logo: 'S', color: '#f59e0b', status: 'ACTIVE', contact: 'Rajesh Khanna', email: 'rajesh.khanna@sunpharma.com', phone: '+91 98200 11223' },
   { id: 'cli-cipla', name: 'Cipla', type: 'PHARMA', city: 'Mumbai', state: 'MH', logo: 'C', color: '#0ea5e9', status: 'ACTIVE', contact: 'Sneha Kulkarni', email: 'sneha.kulkarni@cipla.com', phone: '+91 98200 22334' },
@@ -83,10 +80,8 @@ export interface ClientMr {
 
 const noService: MrServiceability = { screening: { cities: [] }, diet: { cities: [] }, lab: { cities: [] } }
 
-// MR master data lives here (not clients.mock.ts) so other features (e.g.
-// doctors, for the "MRs covering this doctor" drawer section) can read it
-// through the shared types layer instead of reaching into Client
-// Management's internal mock file — same rationale as CLIENTS/DIVISIONS above.
+// MR master data lives here so other features (e.g. doctors) can read it via
+// the shared types layer — same rationale as CLIENTS/DIVISIONS above.
 export const MRS: ClientMr[] = [
   {
     id: 'mr-sun-cardio-1', clientId: 'cli-sun', divisionId: 'div-sun-cardio', name: 'Suresh Patil', empCode: 'SUN-0412',
@@ -186,10 +181,8 @@ export interface ClientProject {
   campsDone: number
   status: ClientProjectStatus
   pos: PurchaseOrder[]
-  /** Additional camp types a Mixed project covers, e.g. ['Diet'] on a
-   * Screening-primary project that also runs diet camps — mirrors
-   * diet-approvals.js's isDietProject() Mixed-subtype check. Only meaningful
-   * when type === 'Mixed'. */
+  /** Additional camp types a Mixed project covers; only meaningful when
+   * type === 'Mixed'. */
   mixedSubTypes?: ClientProjectType[]
   /** Diet Camp Coordinator assigned to this project — mirrors om-data.js's
    * project.coordinatorId, read by resolveCoordinatorId()/isCoordCamp(). */
@@ -200,11 +193,8 @@ export interface ClientProject {
   campCost?: number
 }
 
-// Project master data lives here (not clients.mock.ts) so other features
-// (e.g. hq, diet) can read it through the shared types layer instead of
-// reaching into Client Management's internal mock file — same rationale as
-// CLIENTS/DIVISIONS/MRS above. IDs line up with camps.mock.ts/dashboard.mock.ts
-// so all modules read as one dataset.
+// Project master data lives here so other features (e.g. hq, diet) can read
+// it via the shared types layer — same rationale as CLIENTS/DIVISIONS/MRS above.
 export const PROJECTS: ClientProject[] = [
   {
     id: 'PRJ-441', name: 'Sun Pharma · Cardio Care · Mumbai', clientId: 'cli-sun', divisionId: 'div-sun-cardio',
@@ -273,6 +263,20 @@ export interface ClientInvoice {
   /** Days since due date (0 if not yet due) */
   age: number
 }
+
+// Invoice master data lives here so Analytics/DashboardPage/useClientsDataShared
+// read it straight from the shared types layer. Same NAME-join quirk as above.
+export const INVOICES: ClientInvoice[] = [
+  { id: 'inv-9001', clientName: 'Sun Pharma', divisionId: 'div-sun-cardio', amount: 2450000, status: 'PAID', date: '2026-05-18', project: 'Sun Pharma · Cardio Care · Mumbai', due: '2026-06-17', age: 0 },
+  { id: 'inv-9002', clientName: 'Sun Pharma', divisionId: 'div-sun-cardio', amount: 1840000, status: 'SENT', date: '2026-06-22', project: 'Sun Pharma · Cardio Care · Mumbai', due: '2026-07-22', age: 0 },
+  { id: 'inv-9003', clientName: 'Sun Pharma', divisionId: 'div-sun-diabeto', amount: 720000, status: 'OVERDUE', date: '2026-05-05', project: 'Sun Pharma · DiabetoMax', due: '2026-06-04', age: 39 },
+  { id: 'inv-9004', clientName: 'Cipla', divisionId: 'div-cipla-endo', amount: 1210000, status: 'PAID', date: '2026-05-28', project: 'Cipla · Endo Plus · South India', due: '2026-06-27', age: 0 },
+  { id: 'inv-9005', clientName: 'Cipla', divisionId: 'div-cipla-resp', amount: 980000, status: 'OVERDUE', date: '2026-04-30', project: 'Cipla · Respiratory Care · Pan India', due: '2026-05-30', age: 44 },
+  { id: 'inv-9006', clientName: "Dr Reddy's", divisionId: 'div-drr-onco', amount: 1620000, status: 'SENT', date: '2026-06-30', project: "Dr Reddy's · OncoCare · National", due: '2026-07-30', age: 0 },
+  { id: 'inv-9007', clientName: 'Abbott India', divisionId: 'div-abt-diab', amount: 2140000, status: 'PAID', date: '2026-05-12', project: 'Abbott · Diabetes Care · Tier-2', due: '2026-06-11', age: 0 },
+  { id: 'inv-9008', clientName: 'Abbott India', divisionId: 'div-abt-diab', amount: 1410000, status: 'SENT', date: '2026-06-25', project: 'Abbott · Diabetes Care · Tier-2', due: '2026-07-25', age: 0 },
+  { id: 'inv-9009', clientName: 'Glenmark', divisionId: 'div-glen-derm', amount: 860000, status: 'OVERDUE', date: '2026-04-15', project: 'Glenmark · Dermatology · West', due: '2026-05-15', age: 59 },
+]
 
 export interface ClientDoctor {
   id: string

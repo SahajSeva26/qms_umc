@@ -1,10 +1,6 @@
-import { useQuery } from '@tanstack/react-query'
+import { useGetEntity } from '@/hooks/useGetEntity'
 import { appointmentsRealService } from '@/features/crm/appointments/appointmentsReal.service'
+import { appointmentRealKeys } from '@/features/crm/appointments/hooks/useAppointmentsReal'
 
-export const useAppointmentReal = (id: string | undefined) => {
-  return useQuery({
-    queryKey: ['appointmentReal', id],
-    queryFn: () => appointmentsRealService.getAppointment(id as string),
-    enabled: !!id,
-  })
-}
+export const useAppointmentReal = (id: string | undefined) =>
+  useGetEntity(appointmentRealKeys.detail, appointmentsRealService.getAppointment, id)

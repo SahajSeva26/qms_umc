@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { Controller, useForm, type Resolver } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
+import { Controller, useForm } from 'react-hook-form'
 import { FiArrowLeft, FiPlus } from 'react-icons/fi'
 import { useNavigate } from 'react-router-dom'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
@@ -14,12 +13,12 @@ import { useTenants } from '@/features/access-management/tenant/hooks/useTenants
 import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRoleTypes'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import { createTenantSchema } from '@/features/access-management/tenant/schemas/tenant.schemas'
+import { useReshapingResolver } from '@/hooks/useReshapingResolver'
 import { TENANT_ROUTES } from '@/features/access-management/tenant/tenant.routes'
 import { PLATFORM_TENANT_CODE, PLATFORM_TENANT_FETCH_LIMIT } from '@/features/access-management/accessManagement.constants'
 
 // Two-step form: step 1 is the company's own details, step 2 is the owner
-// account CreateTenantPayload embeds — the tenant's initial admin user is
-// created in the same call.
+// account — the tenant's initial admin user is created in the same call.
 
 interface TenantFormValues {
   code: string
@@ -47,9 +46,7 @@ const EMPTY_FORM_VALUES: TenantFormValues = {
   ownerGender: '',
 }
 
-// zodResolver's generic is tied to createTenantSchema's nested payload shape
-// (owner: {...}), not this flat form — this maps the resolver's nested
-// owner.* error paths back to the form's flat ownerX field names.
+// Maps the resolver's nested owner.* error paths back to the form's flat ownerX fields.
 const OWNER_FIELD_TO_FORM_FIELD: Record<string, keyof TenantFormValues> = {
   firstName: 'ownerFirstName',
   lastName: 'ownerLastName',
@@ -59,14 +56,10 @@ const OWNER_FIELD_TO_FORM_FIELD: Record<string, keyof TenantFormValues> = {
   gender: 'ownerGender',
 }
 
-const toTenantFormResolver = (): Resolver<TenantFormValues> => {
-  const baseResolver = zodResolver(createTenantSchema) as (payload: unknown, context: unknown, options: unknown) => Promise<{
-    values: Record<string, unknown>
-    errors: Record<string, { message?: string; type?: string } | Record<string, { message?: string; type?: string }>>
-  }>
-
-  return async (values, context, options) => {
-    const payload = {
+const useTenantFormResolver = () =>
+  useReshapingResolver<TenantFormValues>({
+    schema: createTenantSchema,
+    toPayload: (values) => ({
       code: values.code,
       name: values.name,
       description: values.description || undefined,
@@ -79,32 +72,19 @@ const toTenantFormResolver = (): Resolver<TenantFormValues> => {
         phone: values.ownerPhone || undefined,
         gender: values.ownerGender || undefined,
       },
-    }
-    const result = await baseResolver(payload, context, options)
-    const mappedErrors: Record<string, unknown> = {}
-    for (const [path, err] of Object.entries(result.errors)) {
-      if (path === 'owner' && err && typeof err === 'object' && !('message' in err)) {
-        for (const [ownerField, ownerErr] of Object.entries(err)) {
-          mappedErrors[OWNER_FIELD_TO_FORM_FIELD[ownerField] ?? ownerField] = ownerErr
-        }
-        continue
-      }
-      mappedErrors[path] = err
-    }
-    const hasErrors = Object.keys(mappedErrors).length > 0
-    return { values: hasErrors ? {} : values, errors: mappedErrors } as never
-  }
-}
+    }),
+    nestedFieldMaps: { owner: OWNER_FIELD_TO_FORM_FIELD },
+  })
 
 const CreateTenantDialog = () => {
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState(0)
-  // trigger() validates but doesn't mark fields "touched" like blurring
-  // does, so without this a blind Next click on a blank step 1 would only
-  // show the error for whichever field the user happened to click into.
+  // trigger() doesn't mark fields "touched", so without this a blind Next
+  // click on a blank step 1 wouldn't show errors for untouched fields.
   const [step1Attempted, setStep1Attempted] = useState(false)
   const navigate = useNavigate()
   const createTenant = useCreateTenant()
+  const resolver = useTenantFormResolver()
 
   const {
     register,
@@ -114,16 +94,13 @@ const CreateTenantDialog = () => {
     trigger,
     formState: { errors, touchedFields, isSubmitted },
   } = useForm<TenantFormValues>({
-    resolver: toTenantFormResolver(),
+    resolver,
     mode: 'onChange',
     defaultValues: EMPTY_FORM_VALUES,
   })
 
-  // Sales rep picker, scoped to the platform ('qms') tenant since sales reps
-  // are platform-side staff. Only 'sales-rep' is offered — TODO: add
-  // 'sales-head' too if/when the backend accepts it as well.
-  // The query chain below only fires once the dropdown has been opened at
-  // least once, not just whenever the dialog is open.
+  // Sales rep picker is scoped to the platform tenant; queries only fire
+  // once the dropdown has been opened, not just whenever the dialog is open.
   const [salesRepPickerOpened, setSalesRepPickerOpened] = useState(false)
   const salesRepQueriesEnabled = open && salesRepPickerOpened
 
@@ -153,9 +130,7 @@ const CreateTenantDialog = () => {
     setOpen(false)
   }
 
-  // Blocks advancing with an incomplete step 1 — full validation still runs
-  // via createTenantSchema on final submit. Only validates step-1 fields so
-  // step-2's (still-empty) owner fields don't block the Next click.
+  // Only validates step-1 fields so step-2's still-empty owner fields don't block Next.
   const handleNext = async () => {
     setStep1Attempted(true)
     const valid = await trigger(['code', 'name', 'salesPerson'])

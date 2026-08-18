@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { FiX, FiPlus, FiCalendar, FiClipboard, FiRefreshCw, FiList, FiClock, FiBookOpen, FiEye } from 'react-icons/fi'
 import type { WizardFormState } from '@/features/projects/wizard.types'
 import type { AvailablePointer, ClientReportCadence } from '@/types/project.types'
@@ -23,12 +23,13 @@ interface WizardStep6Props {
 }
 
 const WizardStep6 = ({ form, setField }: WizardStep6Props) => {
-  // Server-computed preview only — effectiveEarliestSlot is a real, stored
-  // backend field but the exact server recompute rule isn't confirmed, so
-  // this is shown as a preview and NOT included in the outgoing payload.
+  // Lazy initializer so "now" is captured once, not on every render.
+  const [now] = useState(() => Date.now())
+  // Preview only — the exact server recompute rule isn't confirmed, so this
+  // is NOT included in the outgoing payload.
   const effectiveEarliestSlotPreview = useMemo(
-    () => new Date(Date.now() + form.daysToBookBefore * 86400000).toISOString().slice(0, 10),
-    [form.daysToBookBefore],
+    () => new Date(now + form.daysToBookBefore * 86400000).toISOString().slice(0, 10),
+    [form.daysToBookBefore, now],
   )
   const { valueAfterGST } = computeGstBreakdown(form.valueBeforeGST, form.gst)
 

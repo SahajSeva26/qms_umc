@@ -1,11 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
+import { useGetEntity } from '@/hooks/useGetEntity'
 import { accessManagementService } from '@/features/access-management/accessManagement.service'
+import { tenantKeys } from '@/features/access-management/tenant/hooks/useTenants'
 
-// Mirrors `@/features/admin/hooks/useUser.ts` exactly.
-export const useTenant = (id: string | undefined) => {
-  return useQuery({
-    queryKey: ['tenant', id],
-    queryFn: () => accessManagementService.getTenant(id as string),
-    enabled: !!id,
-  })
-}
+export const useTenant = (id: string | undefined) => useGetEntity(tenantKeys.detail, accessManagementService.getTenant, id)

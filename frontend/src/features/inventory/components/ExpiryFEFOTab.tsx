@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { CalendarClock, Clock, XCircle } from 'lucide-react'
+import { FiCalendar, FiClock, FiXCircle } from 'react-icons/fi'
 import SideDrawer from '@/components/ui/SideDrawer'
 import { useItemMaster } from '@/features/inventory/hooks/useInventory'
 import { isConsumableType } from '@/features/inventory/inventory.types'
@@ -9,14 +9,6 @@ import { ItemDetailDrawerBody } from '@/features/inventory/components/ItemMaster
 import { EXPIRY_BAND_STYLE } from '@/features/inventory/constants/expiryBandStyle'
 import { TableEmptyRow } from '@/features/inventory/components/IntelTableUi'
 
-// Exact port of window.QMS_InvMasters.tabExpiry() (inventory-masters.js:
-// 308-359) — dedicated local ai-banner (no 'Run' button, distinct from the
-// shell's own global one), 5-tile band-filter strip, and the 8-column FEFO
-// batch table. Reuses the SAME injected `#qms-inv-masters-css` stylesheet as
-// Item Master (.im-type-strip/.im-type-card/.im-band/.im-fefo-row/.im-tbl) —
-// no separate CSS injection needed here since ItemMasterTab's mount already
-// guarantees it (guarded by `document.getElementById`, safe either order).
-
 interface Band {
   code: ExpiryBandCode
   label: string
@@ -24,10 +16,7 @@ interface Band {
   tileColor: string
 }
 
-// Band-strip cards — exact port of tabExpiry()'s `cards` array
-// (inventory-masters.js:316-322). Tile colors are literal hex, NOT the same
-// palette as ITEM_TYPE_META — RED and EXPIRED share the identical red tile
-// color (#f43f5e === --rose-500), distinguished only by icon + label.
+// RED and EXPIRED share the same tile color, distinguished only by icon + label.
 const BANDS: Band[] = [
   { code: 'GREEN', label: '> 180 days', css: 'green', tileColor: '#10b981' },
   { code: 'YELLOW', label: '90–180 days', css: 'yellow', tileColor: '#eab308' },
@@ -36,10 +25,7 @@ const BANDS: Band[] = [
   { code: 'EXPIRED', label: 'Expired', css: 'red', tileColor: '#f43f5e' },
 ]
 
-// .im-band pill — exact port of inventory-masters.js's injected CSS (lines
-// 209-214), including the 'grey' variant (Quarantine pill) that Item
-// Master's own shared band style never needed since it only ever shows
-// green/yellow/orange/red bands, never a plain grey FEFO-action label.
+// 'grey' variant is only used by the Quarantine pill here, not by Item Master.
 const BAND_STYLE: Record<ExpiryBandCss | 'grey', { bg: string; fg: string }> = {
   ...EXPIRY_BAND_STYLE,
   grey: { bg: 'rgba(0,0,0,.06)', fg: 'var(--qms-text-muted)' },
@@ -57,9 +43,6 @@ const BandPill = ({ css, children }: { css: ExpiryBandCss | 'grey'; children: Re
   )
 }
 
-// FEFO-action pill logic — exact port of tabExpiry()'s tbody expression
-// (inventory-masters.js:341): firstActive → red 'Consume first'; else
-// EXPIRED → grey 'Quarantine'; else RED → orange 'Allocate next'; else '—'.
 const FefoActionCell = ({ firstActive, bandCode }: { firstActive: boolean; bandCode: ExpiryBandCode }) => {
   if (firstActive) return <BandPill css="red">Consume first</BandPill>
   if (bandCode === 'EXPIRED') return <BandPill css="grey">Quarantine</BandPill>
@@ -77,9 +60,8 @@ const ExpiryFEFOTab = () => {
   const [openItemId, setOpenItemId] = useState<string | null>(null)
   const [band, setBand] = useState<ExpiryBandCode | 'ALL'>('ALL')
 
-  // FEFO universe — exact port: consumable-type items with a truthy
-  // expiryDate, sorted ascending by expiry (soonest first), computed once
-  // over the FULL set before any band filter narrows it.
+  // Consumable-type items with an expiry date, sorted soonest-first, over the
+  // full set before any band filter narrows it.
   const batches = useMemo<FefoBatch[]>(() => {
     return items
       .filter((it) => isConsumableType(it.itemType) && it.expiryDate)
@@ -87,11 +69,9 @@ const ExpiryFEFOTab = () => {
       .sort((a, b) => new Date(a.it.expiryDate!).getTime() - new Date(b.it.expiryDate!).getTime())
   }, [items])
 
-  // bandCount() — exact port: always against the full band-filter-independent
-  // batches array, never the narrowed `shown` list.
+  // Counts always run against the full batches array, not the narrowed `shown` list.
   const bandCount = (code: ExpiryBandCode) => batches.filter((b) => b.band.code === code).length
 
-  // shown — band filter narrows the already-sorted list, never re-sorts.
   const shown = band === 'ALL' ? batches : batches.filter((b) => b.band.code === band)
 
   const toggleBand = (code: ExpiryBandCode) => setBand((cur) => (cur === code ? 'ALL' : code))
@@ -100,9 +80,6 @@ const ExpiryFEFOTab = () => {
 
   return (
     <div>
-      {/* Local per-tab ai-banner — exact port of tabExpiry()'s
-          `.ai-banner.fade-in` strip (inventory-masters.js:346-349). No
-          action button on this instance, unlike the shell's own banner. */}
       <div
         className="flex items-center gap-3 rounded-[20px] border p-3.5 mb-3.5"
         style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border-strong)' }}
@@ -111,7 +88,7 @@ const ExpiryFEFOTab = () => {
           className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-white"
           style={{ background: 'linear-gradient(135deg, var(--qms-violet, #8b5cf6), var(--qms-brand))' }}
         >
-          <CalendarClock size={18} />
+          <FiCalendar size={18} />
         </div>
         <div className="flex-1 text-sm" style={{ color: 'var(--qms-text-soft)' }}>
           <b style={{ color: 'var(--qms-text)' }}>FEFO engine:</b>{' '}
@@ -125,11 +102,10 @@ const ExpiryFEFOTab = () => {
         </div>
       </div>
 
-      {/* .im-type-strip — 5 clickable band-filter cards */}
       <div className="flex gap-2 flex-wrap mb-3.5">
         {BANDS.map((b) => {
           const active = band === b.code
-          const Icon = b.code === 'EXPIRED' ? XCircle : Clock
+          const Icon = b.code === 'EXPIRED' ? FiXCircle : FiClock
           return (
             <button
               key={b.code}
@@ -155,7 +131,6 @@ const ExpiryFEFOTab = () => {
         })}
       </div>
 
-      {/* .inv-card padding:0;overflow:auto — 8-column FEFO batch table */}
       <div className="rounded-2xl border overflow-auto" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
         <table className="border-collapse text-xs" style={{ width: '100%', minWidth: 780 }}>
           <thead>
@@ -177,8 +152,6 @@ const ExpiryFEFOTab = () => {
             ) : (
               shown.map((b, idx) => {
                 const it = b.it
-                // firstActive — exact port: TRUE only for the very first row
-                // of the unfiltered (band==='ALL') table.
                 const firstActive = band === 'ALL' && idx === 0
                 return (
                   <tr
@@ -211,10 +184,6 @@ const ExpiryFEFOTab = () => {
         </table>
       </div>
 
-      {/* Shared item detail drawer — identical to Item Master's openItem(),
-          since every row here is by construction a consumable-type item
-          with a set expiryDate (the 'Batch · Expiry · Storage' section will
-          always render). No tab-specific modal exists on this tab. */}
       <SideDrawer open={!!openItem} title={openItem?.name ?? 'Item'} onClose={() => setOpenItemId(null)} widthClassName="max-w-3xl">
         {openItem && (
           <ItemDetailDrawerBody

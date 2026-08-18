@@ -1,12 +1,11 @@
-import { useQuery } from '@tanstack/react-query'
+import { useEntityQuery } from '@/hooks/useEntityQuery'
+import { createEntityKeys } from '@/hooks/entityQueryKeys'
 import { accessManagementService } from '@/features/access-management/accessManagement.service'
 import type { SearchPermissionGroupQuery } from '@/types/accessManagement.types'
 
-// Mirrors `@/features/admin/hooks/useUsers.ts` exactly: a thin useQuery
-// wrapper keyed on the raw search query so callers get free refetch-on-change.
-export const usePermissionGroups = (query: SearchPermissionGroupQuery) => {
-  return useQuery({
-    queryKey: ['permission-groups', query],
-    queryFn: () => accessManagementService.searchPermissionGroups(query),
-  })
-}
+export const permissionGroupKeys = createEntityKeys<SearchPermissionGroupQuery>('permission-groups', 'permission-group')
+
+// No create hook — permission groups are seeded/managed elsewhere, this
+// feature only lists/views/updates them.
+export const usePermissionGroups = (query: SearchPermissionGroupQuery) =>
+  useEntityQuery(permissionGroupKeys, (q) => accessManagementService.searchPermissionGroups(q), query)

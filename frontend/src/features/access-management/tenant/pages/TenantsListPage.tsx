@@ -1,35 +1,28 @@
-import { useState } from 'react'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { useTenantsFilters } from '@/features/access-management/tenant/hooks/useTenantsFilters'
 import TenantsTable from '@/features/access-management/tenant/components/TenantsTable'
 import TenantsFilterBar from '@/features/access-management/tenant/components/TenantsFilterBar'
 import CreateTenantDialog from '@/features/access-management/tenant/components/CreateTenantDialog'
 import PaginationControls from '@/components/ui/PaginationControls'
+import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import { usePermission } from '@/hooks/usePermission'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { usePagination } from '@/hooks/usePagination'
 import type { TenantStatus } from '@/types/accessManagement.types'
 
 const PAGE_SIZE = 10
 
-// Same convention as RolesListPage.tsx: filters feed the react-query hook
-// directly, with real server-side pagination since status/search are both
-// genuinely applied in the backend's where-clause.
 const TenantsListPage = () => {
   const { filters, setFilter, reset } = useTenantsFilters()
-  const [page, setPage] = useState(1)
-  // Backend's real POST /tenants guard only accepts tenant:manage/system:manage,
-  // but this page itself is reachable by tenant:get/tenant:search alone — the
-  // "New Tenant" button rendered unconditionally for any of those 3, so a
-  // read-only tenant viewer could open the dialog and fill it out only to
-  // 403 on submit. Mirrors TenantDetailPage.tsx's own canManageTenant gate.
-  // Found via a 2026-07-24 test sweep.
+  const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
+  // Page is reachable by tenant:get/tenant:search alone, but only tenant:manage
+  // can actually submit — gate the "New Tenant" button so read-only viewers can't 403.
   const { hasPermission } = usePermission()
   const canManageTenant = hasPermission('tenant:manage')
 
-  // Debounced
   const debouncedSearch = useDebouncedValue(filters.search, 300)
 
-  const { data, isLoading, error } = useTenants({
+  const { data, isLoading, error, refetch } = useTenants({
     name: debouncedSearch || undefined,
     status: filters.status === 'ALL' ? undefined : (filters.status as TenantStatus),
     page: String(page),
@@ -37,16 +30,15 @@ const TenantsListPage = () => {
   })
   const tenants = data?.data?.items ?? []
   const totalCount = data?.data?.count ?? 0
-  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
 
   const handleFilterChange = <K extends keyof typeof filters>(key: K, value: (typeof filters)[K]) => {
     setFilter(key, value)
-    setPage(1)
+    resetToFirstPage()
   }
 
   const handleReset = () => {
     reset()
-    setPage(1)
+    resetToFirstPage()
   }
 
   return (
@@ -65,24 +57,10 @@ const TenantsListPage = () => {
 
       <TenantsFilterBar filters={filters} setFilter={handleFilterChange} reset={handleReset} />
 
-      {isLoading && (
-        <div className="text-[13px] py-10 text-center" style={{ color: 'var(--qms-text-muted)' }}>
-          Loading clients…
-        </div>
-      )}
-
-      {error && !isLoading && (
-        <div className="text-[13px] rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
-          Failed to load clients. Please try again.
-        </div>
-      )}
-
-      {!isLoading && !error && (
-        <>
-          <TenantsTable tenants={tenants} />
-          <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} />
-        </>
-      )}
+      <QueryStateBlock isLoading={isLoading} error={error} loadingLabel="Loading clients…" errorLabel="Failed to load clients. Please try again." onRetry={refetch}>
+        <TenantsTable tenants={tenants} />
+        <PaginationControls page={page} totalPages={totalPages(totalCount)} onPageChange={setPage} />
+      </QueryStateBlock>
     </div>
   )
 }

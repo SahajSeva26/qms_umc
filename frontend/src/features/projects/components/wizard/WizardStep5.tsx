@@ -19,48 +19,23 @@ interface WizardStep5Props {
   setField: <K extends keyof WizardFormState>(key: K, value: WizardFormState[K]) => void
 }
 
-// salesRep/projectCoordinator both must be QMS platform-tenant Roles
-// (project.service.ts's assertPlatformStaff — this is the ONLY thing the
-// backend actually checks for either field, no job-type rule at all).
-// marketingContact must belong to the project's OWN tenant (the lead-derived
-// tenant from Step 0), a separate, different rule from the other two — and
-// is sourced from Contacts, not Roles, matching project.model.ts's
-// marketingContact.ref switching from Role to Contact 2026-08-03 (same
-// change already applied to Lead.contactPerson).
+// salesRep/projectCoordinator both must be QMS platform-tenant Roles (the
+// only thing the backend checks — no job-type rule). marketingContact must
+// belong to the project's own tenant and is sourced from Contacts, not Roles.
 const WizardStep5 = ({ form, setField }: WizardStep5Props) => {
   // limit: PLATFORM_TENANT_FETCH_LIMIT — the backend defaults to 10 results;
-  // with 14+ active tenants seeded, the `qms` platform tenant can sort past
-  // that window and never resolve, permanently emptying both pickers below.
-  //
-  // type: 'platform' is a real server-side filter (tenant.service.ts's
-  // search(), added 2026-08-06) — the fetch itself now only ever returns the
-  // platform tenant. Kept the .find()+code fallback below regardless: `type`
-  // still comes back empty on the wire for a non-system:manage caller
-  // (TenantMapper.toResponse's separate, still-unchanged gate) — and this
-  // wizard's own route guard (PROJECTS_VIEW_PERMISSIONS) only requires
-  // project:search/project:manage/tenant:manage, none of which imply
-  // system:manage — so a caller like that would get back every active
-  // tenant unfiltered despite the request param; the code match is what
-  // actually resolves it for them.
+  // the `qms` platform tenant can sort past that window and never resolve.
+  // Kept the .find()+code fallback since `type` comes back empty on the wire
+  // for a non-system:manage caller.
   const { data: tenantData, isError: tenantsErrored } = useTenants({ type: 'platform', status: 'active', limit: PLATFORM_TENANT_FETCH_LIMIT })
   const platformTenant = tenantData?.data?.items.find((t) => t.type === 'platform' || t.code === PLATFORM_TENANT_CODE)
 
-  // Sales rep — narrowed to the sales-rep RoleType only, same exact recipe
-  // already proven on the Lead wizard's Sales Rep picker (CRM's
-  // WizardStep4.tsx) — confirmed live 2026-08-04 this was showing
-  // System/Admin/every QA test role as pickable "sales reps," since the old
-  // query only filtered by tenant, not job type. Sales Head was queried
-  // alongside sales-rep initially but explicitly excluded per user,
-  // 2026-08-04: "remove sales head he is not needed here only sales rep
-  // should be allowed."
+  // Sales rep — narrowed to the sales-rep RoleType only; Sales Head is
+  // explicitly excluded.
   const { data: salesRepTypeData, isLoading: salesRepTypeLoading, isError: salesRepTypeErrored, isSuccess: salesRepTypeLoaded } = useRoleTypes({ code: 'sales-rep', status: 'active' })
   const salesRepTypeId = salesRepTypeData?.data?.items[0]?.id
-  // Hard-stop: `sales-rep` is a required seeded RoleType (roleType.constants.ts's
-  // ALLOWED_ROLETYPE_CODES.PLATFORM.SALES_REP) — if the lookup succeeds but
-  // returns zero items, the RoleType has been deleted/renamed and the picker
-  // can never resolve a valid sales rep. Block rather than silently show an
-  // empty, unexplained dropdown (per user, 2026-08-04: "if not exists throw
-  // error and stop creation").
+  // Hard-stop: `sales-rep` is a required seeded RoleType — if the lookup
+  // succeeds but returns zero items, the picker can never resolve a rep.
   const salesRepTypeMissing = salesRepTypeLoaded && !salesRepTypeId
 
   const { data: salesRepRoleData, isLoading: salesRepRolesLoading, isError: salesRepRolesErrored } = useRoles(
@@ -72,13 +47,7 @@ const WizardStep5 = ({ form, setField }: WizardStep5Props) => {
   const salesRolesErrored = tenantsErrored || salesRepTypeErrored || salesRepRolesErrored
 
   // Project coordinator — narrowed to the camp-coordinator-screening/
-  // camp-coordinator-diet RoleTypes (roleType.constants.ts's
-  // ALLOWED_ROLETYPE_CODES.PLATFORM.CAMP_COORDINATOR_SCREENING/_DIET), the
-  // prototype's own intended filter for this field (projects-manager.js's
-  // renderStep5: /camp coordinator|admin|operations/i) — confirmed 2026-08-04
-  // after re-checking the prototype source; previously left unnarrowed
-  // because no permission-based signal existed, but this RoleType-based
-  // signal does. Same merge + hard-stop shape as Sales rep above.
+  // camp-coordinator-diet RoleTypes. Same merge + hard-stop shape as Sales rep above.
   const { data: coordScreeningTypeData, isLoading: coordScreeningTypeLoading, isError: coordScreeningTypeErrored, isSuccess: coordScreeningTypeLoaded } = useRoleTypes({ code: 'camp-coordinator-screening', status: 'active' })
   const { data: coordDietTypeData } = useRoleTypes({ code: 'camp-coordinator-diet', status: 'active' })
   const coordScreeningTypeId = coordScreeningTypeData?.data?.items[0]?.id
@@ -98,10 +67,10 @@ const WizardStep5 = ({ form, setField }: WizardStep5Props) => {
   const platformRolesLoading = coordScreeningTypeLoading || coordScreeningRolesLoading || coordDietRolesLoading
   const platformRolesErrored = tenantsErrored || coordScreeningTypeErrored || coordScreeningRolesErrored || coordDietRolesErrored
 
-  // Same `enabled` fix, plus Contacts instead of Roles for the reason above.
+  // Scoped to the source lead's own division.
   const { data: marketingContactData, isLoading: marketingContactsLoading, isError: marketingContactsErrored } =
-    useContacts({ tenant: form.leadTenantId, status: 'active' }, { enabled: !!form.leadTenantId })
-  const marketingContacts = form.leadTenantId ? marketingContactData?.data?.items ?? [] : []
+    useContacts({ division: form.leadDivisionId, status: 'active' }, { enabled: !!form.leadDivisionId })
+  const marketingContacts = form.leadDivisionId ? marketingContactData?.data?.items ?? [] : []
 
   return (
     <div className="space-y-1">

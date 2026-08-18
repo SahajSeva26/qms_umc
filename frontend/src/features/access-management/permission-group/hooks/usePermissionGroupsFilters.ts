@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useFilterState } from '@/hooks/useFilterState'
 import type { PermissionGroupStatus } from '@/types/accessManagement.types'
 
 export interface PermissionGroupsFilterState {
@@ -13,16 +13,4 @@ const DEFAULT_FILTERS: PermissionGroupsFilterState = {
   tenant: 'ALL',
 }
 
-// Same shape as useRoleTypesFilters.ts — one useState bag, a setFilter
-// setter, a reset back to defaults.
-export const usePermissionGroupsFilters = () => {
-  const [filters, setFilters] = useState<PermissionGroupsFilterState>(DEFAULT_FILTERS)
-
-  const setFilter = <K extends keyof PermissionGroupsFilterState>(key: K, value: PermissionGroupsFilterState[K]) => {
-    setFilters((prev) => ({ ...prev, [key]: value }))
-  }
-
-  const reset = () => setFilters(DEFAULT_FILTERS)
-
-  return { filters, setFilter, reset }
-}
+export const usePermissionGroupsFilters = () => useFilterState<PermissionGroupsFilterState>(DEFAULT_FILTERS)

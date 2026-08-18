@@ -1,6 +1,5 @@
-import { FiSearch } from 'react-icons/fi'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import SearchInput from '@/components/ui/SearchInput'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { TenantsFilterState } from '@/features/access-management/tenant/hooks/useTenantsFilters'
 import type { TenantStatus } from '@/types/accessManagement.types'
@@ -17,34 +16,20 @@ interface TenantsFilterBarProps {
   reset: () => void
 }
 
-// Same convention as RoleTypesFilterBar.tsx: the trigger shows the fixed
-// dimension name ("Status") at the default "ALL" value, switching to the
-// selected option's own label once something specific is picked.
-//
 // Status filtering here is only honored server-side for callers with
-// tenant:manage (tenant.validators.ts's SearchTenantQuery doc comment) —
-// a caller without it is hard-scoped to status=active regardless of what
-// this control is set to. The filter still renders unconditionally rather
-// than being hidden per-permission (matches this list's existing "no
-// per-field permission gating" precedent) — picking "Inactive" as a
-// non-privileged caller just silently returns the same active-only results
-// the backend would have returned anyway, not an error.
+// tenant:manage — others are hard-scoped to status=active regardless.
 const TenantsFilterBar = ({ filters, setFilter, reset }: TenantsFilterBarProps) => {
   return (
     <div
       className="flex flex-wrap items-center justify-between gap-2 p-2.5 mb-3 rounded-xl border"
       style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}
     >
-      <div className="relative">
-        <FiSearch size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--qms-text-muted)' }} />
-        <Input
-          type="text"
-          value={filters.search}
-          onChange={(e) => setFilter('search', e.target.value)}
-          placeholder="Search by name..."
-          className="w-56 pl-7 text-[12px]"
-        />
-      </div>
+      <SearchInput
+        value={filters.search}
+        onChange={(v) => setFilter('search', v)}
+        placeholder="Search by name..."
+        className="w-56 text-[12px]"
+      />
 
       <div className="flex flex-wrap items-center gap-2">
         <Select value={filters.status} onValueChange={(v) => setFilter('status', (v ?? 'ALL') as TenantsFilterState['status'])}>

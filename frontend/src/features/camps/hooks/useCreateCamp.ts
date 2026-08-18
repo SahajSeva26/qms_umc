@@ -1,14 +1,6 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useCreateEntity } from '@/hooks/useCreateEntity'
 import { campsRealService } from '@/features/camps/campsReal.service'
+import { campRealKeys } from '@/features/camps/hooks/useCampsReal'
 import type { CreateCampPayload } from '@/types/campReal.types'
 
-export const useCreateCamp = () => {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: (payload: CreateCampPayload) => campsRealService.createCamp(payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['campsReal'] })
-    },
-  })
-}
+export const useCreateCamp = () => useCreateEntity((payload: CreateCampPayload) => campsRealService.createCamp(payload), campRealKeys.all)

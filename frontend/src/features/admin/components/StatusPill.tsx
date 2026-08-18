@@ -1,4 +1,5 @@
 import type { UserStatus } from '@/types/user.types'
+import SharedStatusPill from '@/components/ui/StatusPill'
 
 const STATUS_CLASSES: Record<UserStatus, string> = {
   active:    'bg-success-soft text-success',
@@ -19,10 +20,7 @@ interface StatusPillProps {
 }
 
 const StatusPill = ({ status }: StatusPillProps) => (
-  <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold ${STATUS_CLASSES[status]}`}>
-    <span className="w-1.5 h-1.5 rounded-full bg-current" />
-    {STATUS_LABEL[status]}
-  </span>
+  <SharedStatusPill status={status} classes={STATUS_CLASSES} labels={STATUS_LABEL} />
 )
 
 export default StatusPill

@@ -3,10 +3,11 @@ import { FiUserPlus } from 'react-icons/fi'
 import type { AppointmentType, AppointmentMode } from '@/types/appointment.types'
 import { APPOINTMENT_TYPE_LABEL, APPOINTMENT_MODE_LABEL } from '@/types/appointment.types'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
-import { useDivisions } from '@/features/crm/hooks/useDivisions'
+import { useDivisions } from '@/features/crm/divisions/hooks/useDivisions'
 import { useContacts } from '@/features/contacts/hooks/useContacts'
 import { useCreateAppointment } from '@/features/crm/appointments/hooks/useCreateAppointment'
 import { toast } from '@/components/ui/sonner'
+import { getApiErrorMessage } from '@/utils/apiError'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
@@ -20,17 +21,13 @@ import LeadIdPicker from '@/features/crm/appointments/components/LeadIdPicker'
 import LinkedMeetingPicker from '@/features/crm/appointments/components/LinkedMeetingPicker'
 import EditContactModal from '@/features/contacts/components/EditContactModal'
 
-// Sentinel value for the inline "+ Add new contact" option inside the
-// Contact person <Select> — a real contact id is never this string, so it's
-// safe to use as a Select item value (base-ui's Select requires a non-empty
-// string value, ruling out '').
+// Sentinel for the inline "+ Add new contact" option — never a real contact id,
+// and non-empty as base-ui's Select requires.
 const ADD_NEW_CONTACT_VALUE = '__add_new_contact__'
 
 const APPOINTMENT_TYPES: AppointmentType[] = ['new', 'follow-up', 'payment', 'spot']
 
-// Both are 'HH:mm' on the same calendar day (the form has one Date field for
-// both Start and End), so a plain minute-of-day difference is enough — no
-// need to round-trip through Date objects across a day boundary.
+// Both are 'HH:mm' on the same calendar day, so a plain minute-of-day diff suffices.
 function formatDuration(startTime: string, endTime: string): string {
   const [sh, sm] = startTime.split(':').map(Number)
   const [eh, em] = endTime.split(':').map(Number)
@@ -76,25 +73,18 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
   const [agendaPrivate, setAgendaPrivate] = useState('')
   const [error, setError] = useState('')
 
-  // "Add new contact" opens EditContactModal fixed to this tenant/division.
   const [addingContact, setAddingContact] = useState(false)
-  // Papers over useContacts()'s async invalidation lag right after a
-  // create, so the trigger shows the new name immediately.
+  // Shows the new contact's name immediately, ahead of useContacts()'s invalidation lag.
   const [justCreatedContact, setJustCreatedContact] = useState<{ id: string; name: string } | null>(null)
 
-  // limit: '20' avoids the backend's default first-10 truncation.
-  // enabled: open — skip fetching while the dialog is closed.
   const { data: tenantData, isLoading: tenantsLoading, isError: tenantsErrored } = useTenants({ status: 'active', limit: '20' }, open)
   const tenants = tenantData?.data?.items ?? []
 
-  // NOT `tenantId` — SearchDivisionQuery's real backend param is `tenant`
-  // (division.validators.ts). Sending `tenantId` is silently ignored server-side.
   const { data: divisionData, isLoading: divisionsLoading, isError: divisionsErrored } =
-    useDivisions({ tenant: tenantId || undefined } as unknown as { tenantId?: string }, !!tenantId)
+    useDivisions({ tenant: tenantId || undefined }, !!tenantId)
   const divisions = tenantId ? divisionData?.data?.items ?? [] : []
 
-  // Scoped by division, not tenant — Contact.division is required for
-  // customer-type contacts (contact.service.ts:112).
+  // Scoped by division, not tenant — Contact.division is required for customer-type contacts.
   const { data: contactData, isLoading: contactsLoading, isError: contactsErrored } =
     useContacts({ division: divisionId || undefined, status: 'active' }, { enabled: !!divisionId })
   const contacts = divisionId ? contactData?.data?.items ?? [] : []
@@ -179,8 +169,8 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
       toast.success('Appointment scheduled')
       reset()
       onCreated(created.data.id)
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Could not schedule the appointment — try again.')
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Could not schedule the appointment — try again.'))
     }
   }
 
@@ -265,8 +255,7 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
             </div>
             <div>
               <Label className={labelClasses} style={labelStyle}>Contact person *</Label>
-              {/* key forces a remount when set programmatically — base-ui's
-                  Select otherwise keeps showing the placeholder. */}
+              {/* key forces a remount when set programmatically, else the Select keeps showing the placeholder. */}
               <Select key={contactPersonId || 'empty'} value={contactPersonId || undefined} onValueChange={handleContactSelect} disabled={!divisionId}>
                 <SelectTrigger className="w-full text-[13px]">
                   <SelectValue placeholder={!divisionId ? 'Select a division first' : contactsLoading ? 'Loading...' : 'Select contact...'}>

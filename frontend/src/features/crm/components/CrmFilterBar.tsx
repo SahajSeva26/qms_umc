@@ -1,6 +1,5 @@
-import { FiSearch } from 'react-icons/fi'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
-import { Input } from '@/components/ui/input'
+import SearchInput from '@/components/ui/SearchInput'
 import { Button } from '@/components/ui/button'
 import { LEAD_STATUS_LABEL } from '@/types/crm.types'
 import type { LeadStatus } from '@/types/crm.types'
@@ -21,16 +20,13 @@ const CrmFilterBar = ({ filters, setFilter, reset }: CrmFilterBarProps) => (
     className="flex flex-wrap items-center justify-between gap-2 p-2.5 mb-3 rounded-xl border"
     style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}
   >
-    <div className="relative w-56">
-      <FiSearch size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 z-10" style={{ color: 'var(--qms-text-muted)' }} />
-      <Input
-        type="text"
-        value={filters.q}
-        onChange={(e) => setFilter('q', e.target.value)}
-        placeholder="Search title..."
-        className="pl-7 text-[12px]"
-      />
-    </div>
+    <SearchInput
+      value={filters.q}
+      onChange={(v) => setFilter('q', v)}
+      placeholder="Search title..."
+      className="text-[12px]"
+      wrapperClassName="w-56"
+    />
 
     <div className="flex flex-wrap items-center gap-2">
       <Select value={filters.status || 'ALL'} onValueChange={(v) => setFilter('status', (v as string) === 'ALL' ? '' : (v as LeadStatus))}>

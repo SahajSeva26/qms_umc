@@ -10,22 +10,13 @@ import { transferSchema } from '@/features/inventory/schemas/transfer.schema'
 import { TableEmptyRow, InvFilterBar } from '@/features/inventory/components/IntelTableUi'
 import { NewTransferModal } from '@/features/inventory/components/NewTransferModal'
 
-// Exact port of inventory-warehouse.js's tabWarehouse() + openTransfer()/
-// saveTransfer(). Network model: ONE central warehouse at Head Office
-// (authoritative bulk stock = item.qtyOnHand on the shared qms.inventory.items
-// store) — FO field stock / Dietitian stock / In-transit are derived/display
-// valuations, not separately-editable stores. Row click on the stock table
-// opens the Item Master drawer (out of scope for this tab's own build — the
-// call-through is a no-op stub until that feature exists).
+// One central warehouse (authoritative stock); FO/Dietitian/In-transit are derived valuations, not separately-editable stores.
 const WarehouseTab = () => {
   const warehouse = useWarehouse()
   const { people, dietitians, transfers, saveTransfer } = warehouse
   const network = useWarehouseNetwork(warehouse)
 
-  // WH.locFilter — exact port of the prototype's module-level mutable state.
-  // Toggling a location card sets .active visual state only; per the
-  // prototype's own dead-code path, it does NOT filter the stock table below
-  // (no consumer of locFilter besides the card's own active class).
+  // Toggling a location card only sets its active visual state — it does not filter the stock table below.
   const [locFilter, setLocFilter] = useState<WarehouseLocCode | 'ALL'>('ALL')
   const [transferOpen, setTransferOpen] = useState(false)
 
@@ -51,7 +42,6 @@ const WarehouseTab = () => {
 
   return (
     <div>
-      {/* .wh-loc — 4-card network-location strip; collapses to 2 cols under 900px */}
       <div className="grid grid-cols-2 min-[900px]:grid-cols-4 gap-2.5 mb-3.5">
         <LocCard
           active={locFilter === 'CENTRAL'}
@@ -91,7 +81,6 @@ const WarehouseTab = () => {
         />
       </div>
 
-      {/* .inv-filter — sticky header bar */}
       <InvFilterBar>
         <span
           className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-[.04em]"
@@ -107,7 +96,6 @@ const WarehouseTab = () => {
         </Button>
       </InvFilterBar>
 
-      {/* .inv-card padding:0;overflow:auto — Central Warehouse stock table */}
       <div className="rounded-2xl border overflow-auto" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
         <table className="border-collapse text-xs" style={{ width: '100%', minWidth: 720 }}>
           <thead>
@@ -177,13 +165,9 @@ const WarehouseTab = () => {
   )
 }
 
-// Row click on the Central Warehouse stock table opens the Item Master
-// drawer (window.QMS_InvMasters.openItem(it.id) in the prototype) — that
-// feature is a separate build task, so the call-through is a no-op stub
-// until it exists, matching the task boundary ("wire the onclick call-through
-// if the Item Master feature exists; otherwise a no-op/TODO is acceptable").
-function openItemMasterDrawer(_itemId: string): void {
+function openItemMasterDrawer(itemId: string): void {
   // TODO: wire to the Item Master drawer once that feature is built.
+  void itemId
 }
 
 function LocCard({

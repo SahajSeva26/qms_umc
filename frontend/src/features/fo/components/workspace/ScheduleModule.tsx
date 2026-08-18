@@ -5,7 +5,7 @@ import type { Camp } from '@/types/camp.types'
 import { Button } from '@/components/ui/button'
 import { formatDate } from '@/utils/formatters'
 import MiniCalendar from '@/features/fo/components/workspace/MiniCalendar'
-import { isCampRunnable } from '@/features/fo/components/workspace/DashboardModule'
+import { isCampRunnable } from '@/features/fo/components/workspace/campEligibility'
 
 interface ScheduleModuleProps {
   me: Person
@@ -22,8 +22,7 @@ const VIEWS: { id: ViewId; label: string }[] = [
 ]
 
 const NOT_CANCELLED: Camp['status'][] = ['CANCELLED', 'CANCELLED_CHARGED']
-// "Finished" = prototype's isCompleted() — excludes COMPLETE_WITHOUT_REPORT, which still needs the
-// FO to finish closure paperwork (mirrors DashboardModule's split; Past view = prototype's myClosed()).
+// Excludes COMPLETE_WITHOUT_REPORT, which still needs closure paperwork (mirrors DashboardModule's split).
 const FINISHED_STATUSES: Camp['status'][] = ['CLOSED', 'COMPLETE']
 
 function todayIso() {

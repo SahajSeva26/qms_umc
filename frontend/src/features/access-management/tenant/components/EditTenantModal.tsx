@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Controller, useForm, type Resolver } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
+import { Controller, useForm } from 'react-hook-form'
 import type { Tenant, TenantStatus, TenantType } from '@/types/accessManagement.types'
 import { useUpdateTenant } from '@/features/access-management/tenant/hooks/useUpdateTenant'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRoleTypes'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
+import { useReshapingResolver } from '@/hooks/useReshapingResolver'
 import { updateTenantSchema } from '@/features/access-management/tenant/schemas/tenant.schemas'
 import { PLATFORM_TENANT_CODE, PLATFORM_TENANT_FETCH_LIMIT } from '@/features/access-management/accessManagement.constants'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -30,34 +30,24 @@ interface EditTenantFormValues {
   salesPerson: string
 }
 
-// base-ui Select represents "nothing chosen" as '' — but updateTenantSchema's
-// status/type are bare enums with no '' member, so '' must be normalized to
-// undefined before zodResolver sees it.
-const toEditTenantFormResolver = (): Resolver<EditTenantFormValues> => {
-  const baseResolver = zodResolver(updateTenantSchema) as (payload: unknown, context: unknown, options: unknown) => Promise<{
-    values: Record<string, unknown>
-    errors: Record<string, { message?: string; type?: string }>
-  }>
-
-  return async (values, context, options) => {
-    const payload = {
+// '' (no selection) must be normalized to undefined — status/type are bare enums with no '' member.
+const useEditTenantFormResolver = () =>
+  useReshapingResolver<EditTenantFormValues>({
+    schema: updateTenantSchema,
+    toPayload: (values) => ({
       name: values.name,
       description: values.description || undefined,
       status: values.status || undefined,
       type: values.type || undefined,
       salesPerson: values.salesPerson || undefined,
-    }
-    const result = await baseResolver(payload, context, options)
-    const hasErrors = Object.keys(result.errors).length > 0
-    return { values: hasErrors ? {} : values, errors: result.errors } as never
-  }
-}
+    }),
+  })
 
-// Fields hidden (not disabled) when the caller lacks the permission that
-// would make them take effect server-side: `status` needs tenant:manage,
-// `type`/`salesPerson` need system:manage.
+// Fields are hidden (not disabled) when the caller lacks the permission
+// that would make them take effect server-side.
 const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: EditTenantModalProps) => {
   const updateTenant = useUpdateTenant(tenant.id)
+  const resolver = useEditTenantFormResolver()
 
   const {
     register,
@@ -65,7 +55,7 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
     control,
     formState: { errors, touchedFields, isSubmitted },
   } = useForm<EditTenantFormValues>({
-    resolver: toEditTenantFormResolver(),
+    resolver,
     mode: 'onChange',
     defaultValues: {
       name: tenant.name,
@@ -76,9 +66,7 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
     },
   })
 
-  // The query chain only fires once the dropdown has been opened, unless the
-  // tenant already has a sales rep assigned — then it loads eagerly so the
-  // trigger can resolve and show that rep's name right away.
+  // Loads eagerly when a sales rep is already assigned so the trigger can show that rep's name right away.
   const [salesRepPickerOpened, setSalesRepPickerOpened] = useState(false)
   const salesRepQueriesEnabled = canManageSystem && (salesRepPickerOpened || !!tenant.salesPerson)
 

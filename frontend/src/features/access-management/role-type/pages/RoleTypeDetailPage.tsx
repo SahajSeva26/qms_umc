@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Controller, useForm, type Resolver } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
+import { Controller, useForm } from 'react-hook-form'
 import { FiArrowLeft } from 'react-icons/fi'
 import { usePermissionCodeSelection } from '@/hooks/usePermissionCodeSelection'
 import { useRoleType } from '@/features/access-management/role-type/hooks/useRoleType'
@@ -23,11 +22,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Accordion, AccordionItem, AccordionTrigger, AccordionPanel } from '@/components/ui/accordion'
 import { PERMISSION_CATALOG, PERMISSION_RESOURCE_LABELS } from '@/features/access-management/permission-group/constants/permissionCatalog'
 import { createRoleTypeSchema, updateRoleTypeSchema } from '@/features/access-management/role-type/schemas/roleType.schemas'
+import { unwrapId } from '@/utils/unwrapId'
+import { useReshapingResolver } from '@/hooks/useReshapingResolver'
 import type { RoleTypeCode, RoleTypeStatus } from '@/types/accessManagement.types'
 
-// Maps every catalog permission code back to its resource key so the
-// ceiling-scoped permission list (the tenant's own subset, not the full
-// catalog) can still be grouped by resource.
+// Maps every catalog permission code back to its resource key for grouping.
 const CODE_TO_RESOURCE_KEY: Record<string, keyof typeof PERMISSION_CATALOG> = Object.fromEntries(
   (Object.entries(PERMISSION_CATALOG) as [keyof typeof PERMISSION_CATALOG, Record<string, { code: string }>][]).flatMap(
     ([resourceKey, actions]) => Object.values(actions).map((permission) => [permission.code, resourceKey]),
@@ -42,38 +41,23 @@ interface RoleTypeFormValues {
   status: RoleTypeStatus | ''
 }
 
-// One flat form backs both create and update schemas — '' (this form's
-// "unset" sentinel) is normalized to undefined so whichever schema applies
-// to the current mode validates it correctly. `permissions` stays owned by
-// usePermissionCodeSelection and is merged into the payload at submit time.
-const toRoleTypeFormResolver = (schema: typeof createRoleTypeSchema | typeof updateRoleTypeSchema): Resolver<RoleTypeFormValues> => {
-  const baseResolver = zodResolver(schema) as (payload: unknown, context: unknown, options: unknown) => Promise<{
-    values: Record<string, unknown>
-    errors: Record<string, { message?: string; type?: string }>
-  }>
-
-  return async (values, context, options) => {
-    const payload = {
-      // name/tenant are left as raw '' (not undefined) so Zod's custom
-      // .min(1, '...') message fires instead of a generic type mismatch.
+// '' (this form's "unset" sentinel) is normalized to undefined so whichever
+// schema applies to the current mode validates it correctly.
+const useRoleTypeFormResolver = (schema: typeof createRoleTypeSchema | typeof updateRoleTypeSchema) =>
+  useReshapingResolver<RoleTypeFormValues>({
+    schema,
+    toPayload: (values) => ({
+      // name/tenant stay raw '' so Zod's .min(1) message fires instead of a type mismatch.
       code: values.code || undefined,
       name: values.name,
       description: values.description || undefined,
       tenant: values.tenant,
       status: values.status || undefined,
-    }
-    const result = await baseResolver(payload, context, options)
-    const hasErrors = Object.keys(result.errors).length > 0
-    return { values: hasErrors ? {} : values, errors: result.errors } as never
-  }
-}
+    }),
+  })
 
 // Combined create-flow + edit page (no `:id` -> create, `:id` -> edit).
-// Pickable permissions are CEILING-SCOPED: not the full catalog, but exactly
-// whatever the target tenant's own PermissionGroup contains. The
-// `{tenantCode}.admin` reserved, system-seeded code is never offered as a
-// creatable option — if an existing RoleType already has that shape, it's
-// shown read-only instead of the code selector.
+// Pickable permissions are ceiling-scoped to the target tenant's own PermissionGroup.
 const RoleTypeDetailPage = () => {
   const { id } = useParams<{ id: string }>()
   const isCreateMode = !id
@@ -86,6 +70,8 @@ const RoleTypeDetailPage = () => {
   const { data: tenantsData } = useTenants({})
   const tenants = tenantsData?.data?.items ?? []
 
+  const resolver = useRoleTypeFormResolver(isCreateMode ? createRoleTypeSchema : updateRoleTypeSchema)
+
   const {
     register,
     handleSubmit,
@@ -94,7 +80,7 @@ const RoleTypeDetailPage = () => {
     setValue,
     formState: { errors, touchedFields, isSubmitted },
   } = useForm<RoleTypeFormValues>({
-    resolver: toRoleTypeFormResolver(isCreateMode ? createRoleTypeSchema : updateRoleTypeSchema),
+    resolver,
     mode: 'onChange',
     defaultValues: {
       code: '',
@@ -107,13 +93,10 @@ const RoleTypeDetailPage = () => {
 
   const tenant = watch('tenant')
 
-  // On create, the tenant is chosen via a picker (optionally pre-filled from
-  // ?tenant=<id> query param); on edit, it comes from the loaded RoleType.
   useEffect(() => {
     if (roleType && !isCreateMode) {
-      // roleType.tenant is a raw id on GET-by-id but a populated object on GET (search).
-      const tenantValue = roleType.tenant
-      setValue('tenant', typeof tenantValue === 'string' ? tenantValue : (tenantValue?._id ?? ''))
+      // roleType.tenant may be a raw id or a populated object depending on the endpoint.
+      setValue('tenant', unwrapId(roleType.tenant))
     }
   }, [roleType, isCreateMode, setValue])
 
@@ -122,8 +105,6 @@ const RoleTypeDetailPage = () => {
   const { permissionGroup, isLoading: isLoadingCeiling } = useTenantPermissionGroup(tenant || undefined)
   const ceilingPermissions = useMemo(() => permissionGroup?.permissions ?? [], [permissionGroup])
 
-  // Groups the ceiling-scoped permission list by resource, only emitting
-  // resources that actually have at least one ceiling permission.
   const groupedCeilingPermissions = useMemo(() => {
     const byResource = new Map<keyof typeof PERMISSION_CATALOG, typeof ceilingPermissions>()
     for (const permission of ceilingPermissions) {
@@ -145,9 +126,7 @@ const RoleTypeDetailPage = () => {
   const createRoleType = useCreateRoleType()
 
   const { selectedCodes, setSelectedCodes, setSelection, toggleCode } = usePermissionCodeSelection()
-  // Permissions dropped because the tenant's ceiling shrank since this
-  // RoleType was last saved — surfaced as a visible notice rather than
-  // silently vanishing from the checked list.
+  // Codes dropped by a shrunken ceiling, surfaced as a visible notice instead of silently vanishing.
   const [prunedCodes, setPrunedCodes] = useState<string[]>([])
 
   useEffect(() => {
@@ -159,9 +138,7 @@ const RoleTypeDetailPage = () => {
     }
   }, [roleType, isCreateMode, setValue, setSelection])
 
-  // Whenever the ceiling changes, drop any selected code that falls outside
-  // it (the backend would reject it on save anyway), and record what was
-  // dropped so the notice above can tell the admin what's about to be revoked.
+  // Drop any selected code outside the ceiling (backend would reject it anyway) and record it for the notice above.
   useEffect(() => {
     if (!permissionGroup) return
     const allowed = new Set(ceilingPermissions.map((p) => p.code))
@@ -359,10 +336,7 @@ const RoleTypeDetailPage = () => {
                     control={control}
                     name="status"
                     render={({ field }) => (
-                      // key forces a fresh mount once the async value loads —
-                      // base-ui's Select fixes controlled/uncontrolled on its
-                      // first render, so without this the trigger would keep
-                      // showing the placeholder even after the real value arrives.
+                      // key forces a remount once the async value loads, to work around base-ui's Select controlled/uncontrolled quirk.
                       <Select key={field.value || 'empty'} value={field.value || undefined} onValueChange={field.onChange}>
                         <SelectTrigger id="status" className="w-full">
                           <SelectValue placeholder="Select status">

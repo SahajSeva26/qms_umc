@@ -18,9 +18,12 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import DateTimePicker from '@/components/ui/DateTimePicker'
 import { Label } from '@/components/ui/label'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import { unwrapId } from '@/utils/unwrapId'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from '@/components/ui/sonner'
 import NewLeadWizard from '@/features/crm/components/NewLeadWizard'
+import { latestAppointmentNextSteps } from '@/features/crm/appointments/appointmentsReal.utils'
+import { getApiErrorMessage } from '@/utils/apiError'
 
 const STATUS_COLOR: Record<AppointmentStatus, string> = {
   planned: '#3b6dff',
@@ -28,10 +31,7 @@ const STATUS_COLOR: Record<AppointmentStatus, string> = {
   cancelled: '#94a3b8',
 }
 
-// Plain preset labels — picking one just sets nextSteps to that exact text.
-// None of these (including 'Cancelled'/'Rescheduled meetings') trigger the
-// real Cancel/Reschedule actions; per explicit instruction they're labels
-// only, kept fully separate from the actual status-transition buttons.
+// Display text only — 'Cancelled'/'Rescheduled meetings' don't trigger the real Cancel/Reschedule actions.
 const NEXT_STEPS_OPTIONS = [
   'Cred send',
   'Required PPT send',
@@ -66,9 +66,7 @@ const refName = (ref: unknown, fallback = '—'): string => {
   return obj.name ?? fallback
 }
 
-// Lead's own populated shape uses `title`, not `name` — using refName()
-// directly here previously rendered the raw object into JSX (React error
-// #31) whenever the name lookup missed.
+// Lead's own populated shape uses `title`, not `name`.
 const leadRefName = (ref: unknown, fallback = '—'): string => {
   if (!ref) return fallback
   if (typeof ref === 'string') return ref
@@ -76,7 +74,6 @@ const leadRefName = (ref: unknown, fallback = '—'): string => {
   return obj.title ?? fallback
 }
 
-// Populated refs use `_id` (raw Mongoose populate), not `id`.
 const refId = (ref: unknown): string => {
   if (!ref) return ''
   if (typeof ref === 'string') return ref
@@ -102,9 +99,6 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
   const [rescheduleStart, setRescheduleStart] = useState('')
   const [rescheduleEnd, setRescheduleEnd] = useState('')
   // True once the user has directly edited End — stops the auto-shift below.
-  // Tracked as its own flag rather than diffing rescheduleEnd against its
-  // original value, since End is reassigned by the auto-shift itself and
-  // that comparison would go stale after the first shift.
   const [endTouched, setEndTouched] = useState(false)
   const [error, setError] = useState('')
 
@@ -118,13 +112,10 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
 
   const myRoleId = session?.role.id
   const myInvite = appointment.internalMembers.find((m) => {
-    const roleId = typeof m.role === 'string' ? m.role : m.role._id
+    const roleId = unwrapId(m.role)
     return roleId === myRoleId
   })
 
-  // Falls back to [] for a status this map doesn't know about (e.g. a
-  // pre-existing record in a since-removed status) — treats it as
-  // terminal/read-only rather than crashing.
   const legalTargets = APPOINTMENT_TRANSITION_MAP[appointment.status] ?? []
   const isTerminal = legalTargets.length === 0
   const statusColor = STATUS_COLOR[appointment.status] ?? '#94a3b8'
@@ -134,11 +125,9 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
   }
 
-  // Shared by openMoveStage and openReschedule — both dialogs offer the same
-  // Next steps dropdown, so both need to re-derive its selection/free-text
-  // from whatever's already saved on the appointment.
+  // Only moveStage persists nextSteps — pre-fill from the latest stage-history entry.
   const resetNextStepsFromAppointment = () => {
-    const existingNextSteps = appointment.nextSteps ?? ''
+    const existingNextSteps = latestAppointmentNextSteps(appointment)
     const isPreset = (NEXT_STEPS_OPTIONS as readonly string[]).includes(existingNextSteps)
     setNextStepsOption(existingNextSteps ? (isPreset ? existingNextSteps : NEXT_STEPS_OTHER) : '')
     setNextStepsText(isPreset ? '' : existingNextSteps)
@@ -160,35 +149,25 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
     setNextStepsText(next !== NEXT_STEPS_OTHER ? next : '')
   }
 
-  // The saved value: the picked preset verbatim, or the free-text box's
-  // content when 'Other' is selected — either way a single plain string,
-  // so nothing downstream (save, display) needs to know about the dropdown.
   const resolvedNextSteps = nextStepsOption === NEXT_STEPS_OTHER ? nextStepsText.trim() : nextStepsOption
 
-  // MOM/Next steps save via the plain update endpoint, not the stage-move
-  // one, so they're a separate call sent before moveStage — if the status
-  // flip then fails, the text already typed isn't lost.
+  // MOM saves via the plain update endpoint before moveStage, so a failed
+  // status flip doesn't lose the already-typed text.
   const handleMoveStageSave = async () => {
     if (!targetStatus) return
     if (!reason.trim()) return setError('A reason is required')
-    // Frontend-only check — moveStage() on the backend has no equivalent
-    // guard yet, so this can still be bypassed via a direct API call. Move
-    // this into appointment.service.ts's moveStage() once that's built.
+    // Frontend-only check — not yet enforced by moveStage() on the backend.
     if (targetStatus === 'done' && !momText.trim()) return setError('Minutes of meeting are required to mark this appointment done')
     try {
       const momChanged = targetStatus === 'done' && momText.trim() && momText.trim() !== (appointment.mom.details ?? '')
-      const nextStepsChanged = resolvedNextSteps !== (appointment.nextSteps ?? '')
-      if (momChanged || nextStepsChanged) {
-        await updateAppointment.mutateAsync({
-          ...(momChanged ? { mom: { details: momText.trim() } } : {}),
-          ...(nextStepsChanged ? { nextSteps: resolvedNextSteps || undefined } : {}),
-        })
+      if (momChanged) {
+        await updateAppointment.mutateAsync({ mom: { details: momText.trim() } })
       }
-      await moveStage.mutateAsync({ to: targetStatus, reason: reason.trim() })
+      await moveStage.mutateAsync({ to: targetStatus, reason: reason.trim(), nextSteps: resolvedNextSteps || undefined })
       toast.success(`Moved to ${APPOINTMENT_STATUS_LABEL[targetStatus]}`)
       setPanel(null)
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Could not update the appointment status.')
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Could not update the appointment status.'))
     }
   }
 
@@ -198,12 +177,9 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
     setRescheduleStart(appointment.duration.startTime.slice(0, 16))
     setRescheduleEnd(appointment.duration.endTime?.slice(0, 16) ?? '')
     setEndTouched(false)
-    resetNextStepsFromAppointment()
     setPanel('reschedule')
   }
 
-  // Keeps the original duration when only Start is moved, so a later Start
-  // doesn't silently produce an invalid range. Stops once End is edited directly.
   const originalDurationMs = appointment.duration.endTime
     ? new Date(appointment.duration.endTime).getTime() - new Date(appointment.duration.startTime).getTime()
     : null
@@ -229,16 +205,14 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
       return setError('End must be after start')
     }
     try {
-      const nextStepsChanged = resolvedNextSteps !== (appointment.nextSteps ?? '')
       await updateAppointment.mutateAsync({
         startTime: new Date(rescheduleStart).toISOString(),
         endTime: rescheduleEnd ? new Date(rescheduleEnd).toISOString() : undefined,
-        ...(nextStepsChanged ? { nextSteps: resolvedNextSteps || undefined } : {}),
       })
       toast.success('Appointment rescheduled')
       setPanel(null)
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Could not reschedule.')
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Could not reschedule.'))
     }
   }
 
@@ -246,8 +220,8 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
     try {
       await respond.mutateAsync({ status })
       toast.success(status === 'accepted' ? 'Accepted' : 'Declined')
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Could not record your response.')
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'Could not record your response.'))
     }
   }
 
@@ -296,10 +270,10 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
             <p className="text-[12px]" style={{ color: 'var(--qms-text)' }}>{appointment.agenda.private}</p>
           </div>
         )}
-        {appointment.nextSteps && (
+        {latestAppointmentNextSteps(appointment) && (
           <div>
             <SectionLabel>Next steps</SectionLabel>
-            <p className="text-[13px]" style={{ color: 'var(--qms-text)' }}>{appointment.nextSteps}</p>
+            <p className="text-[13px]" style={{ color: 'var(--qms-text)' }}>{latestAppointmentNextSteps(appointment)}</p>
           </div>
         )}
       </div>
@@ -322,7 +296,7 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
           <SectionLabel>Internal team invitations</SectionLabel>
           <div className="space-y-1.5">
             {appointment.internalMembers.map((m, i) => {
-              const roleId = typeof m.role === 'string' ? m.role : m.role._id
+              const roleId = unwrapId(m.role)
               const color = m.status === 'accepted' ? '#10b981' : m.status === 'declined' ? '#f43f5e' : '#f59e0b'
               return (
                 <div key={roleId ?? i} className="flex items-center justify-between text-[12px] rounded-lg border px-2.5 py-1.5" style={{ borderColor: 'var(--qms-border)' }}>
@@ -429,29 +403,6 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
                 <Label className={labelClasses} style={labelStyle}>New end</Label>
                 <DateTimePicker value={rescheduleEnd} onChange={handleRescheduleEndChange} className="text-[13px] w-full" />
               </div>
-            </div>
-            <div>
-              <Label className={labelClasses} style={labelStyle}>Next steps</Label>
-              <Select key={nextStepsOption || 'empty'} value={nextStepsOption || undefined} onValueChange={handleNextStepsOptionChange}>
-                <SelectTrigger className="w-full text-[13px]">
-                  <SelectValue placeholder="Select next step…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {NEXT_STEPS_OPTIONS.map((opt) => (
-                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                  ))}
-                  <SelectItem value={NEXT_STEPS_OTHER}>{NEXT_STEPS_OTHER}</SelectItem>
-                </SelectContent>
-              </Select>
-              {nextStepsOption === NEXT_STEPS_OTHER && (
-                <Textarea
-                  value={nextStepsText}
-                  onChange={(e) => setNextStepsText(e.target.value)}
-                  rows={2}
-                  placeholder="What happens next…"
-                  className="text-[13px] mt-2"
-                />
-              )}
             </div>
             {error && <p className="text-[12px] font-semibold text-danger">{error}</p>}
           </div>

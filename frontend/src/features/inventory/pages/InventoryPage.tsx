@@ -1,10 +1,10 @@
 import { useState } from 'react'
+import type { IconType } from 'react-icons'
 import {
-  LayoutDashboard, Gauge, Library, CalendarClock, Cpu, Wrench, Warehouse as WarehouseIcon,
-  Truck, Route, UsersRound, ClipboardList, Package, Contact, ShoppingCart, LineChart,
-  Sparkles, History, ArrowRightLeft, Dot, QrCode, PackageCheck,
-} from 'lucide-react'
-import { FiUpload, FiDownload } from 'react-icons/fi'
+  FiGrid, FiBookOpen, FiCalendar, FiCpu, FiTool, FiTruck, FiUsers, FiClipboard, FiPackage,
+  FiUser, FiShoppingCart, FiTrendingUp, FiClock, FiRepeat, FiCircle, FiUpload, FiDownload,
+} from 'react-icons/fi'
+import { TbGauge, TbBuildingWarehouse, TbRoute, TbSparkles, TbPackageImport } from 'react-icons/tb'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/sonner'
 import InventoryKpiStrip from '@/features/inventory/components/InventoryKpiStrip'
@@ -35,29 +35,29 @@ type InventoryTabId =
   | 'warehouse' | 'transfers' | 'assignments' | 'foinventory' | 'fieldops'
   | 'consumables' | 'vendors' | 'procurement' | 'forecast' | 'copilot' | 'audit' | 'movements'
 
-const TABS: { id: InventoryTabId; label: string; icon: typeof LayoutDashboard }[] = [
-  { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-  { id: 'dashboards', label: 'Dashboards', icon: Gauge },
-  { id: 'masters', label: 'Item Master', icon: Library },
-  { id: 'expiry', label: 'Expiry / FEFO', icon: CalendarClock },
-  { id: 'devices', label: 'Devices', icon: Cpu },
-  { id: 'calibration', label: 'Calibration', icon: Wrench },
-  { id: 'warehouse', label: 'Warehouse', icon: WarehouseIcon },
-  { id: 'transfers', label: 'Transfers', icon: Truck },
-  { id: 'assignments', label: 'Assignments', icon: Route },
-  { id: 'foinventory', label: 'FO Inventory', icon: UsersRound },
-  { id: 'fieldops', label: 'Field Ops', icon: ClipboardList },
-  { id: 'consumables', label: 'Consumables', icon: Package },
-  { id: 'vendors', label: 'Vendors', icon: Contact },
-  { id: 'procurement', label: 'Procurement', icon: ShoppingCart },
-  { id: 'forecast', label: 'Forecast', icon: LineChart },
-  { id: 'copilot', label: 'Copilot', icon: Sparkles },
-  { id: 'audit', label: 'Audit', icon: History },
-  { id: 'movements', label: 'Movements', icon: ArrowRightLeft },
+const TABS: { id: InventoryTabId; label: string; icon: IconType }[] = [
+  { id: 'overview', label: 'Overview', icon: FiGrid },
+  { id: 'dashboards', label: 'Dashboards', icon: TbGauge },
+  { id: 'masters', label: 'Item Master', icon: FiBookOpen },
+  { id: 'expiry', label: 'Expiry / FEFO', icon: FiCalendar },
+  { id: 'devices', label: 'Devices', icon: FiCpu },
+  { id: 'calibration', label: 'Calibration', icon: FiTool },
+  { id: 'warehouse', label: 'Warehouse', icon: TbBuildingWarehouse },
+  { id: 'transfers', label: 'Transfers', icon: FiTruck },
+  { id: 'assignments', label: 'Assignments', icon: TbRoute },
+  { id: 'foinventory', label: 'FO Inventory', icon: FiUsers },
+  { id: 'fieldops', label: 'Field Ops', icon: FiClipboard },
+  { id: 'consumables', label: 'Consumables', icon: FiPackage },
+  { id: 'vendors', label: 'Vendors', icon: FiUser },
+  { id: 'procurement', label: 'Procurement', icon: FiShoppingCart },
+  { id: 'forecast', label: 'Forecast', icon: FiTrendingUp },
+  { id: 'copilot', label: 'Copilot', icon: TbSparkles },
+  { id: 'audit', label: 'Audit', icon: FiClock },
+  { id: 'movements', label: 'Movements', icon: FiRepeat },
 ]
 
-// Every tab is built; kept as a set (not just "always true") so a future
-// still-unbuilt tab can drop out of it and fall through to ComingSoonTab.
+// Kept as a set (not just "always true") so a future still-unbuilt tab can
+// drop out of it and fall through to ComingSoonTab.
 const BUILT_TABS = new Set<InventoryTabId>(['overview', 'dashboards', 'masters', 'expiry', 'devices', 'calibration', 'warehouse', 'transfers', 'assignments', 'foinventory', 'fieldops', 'vendors', 'consumables', 'procurement', 'movements', 'forecast', 'copilot', 'audit'])
 
 function ComingSoonTab({ label }: { label: string }) {
@@ -71,13 +71,12 @@ function ComingSoonTab({ label }: { label: string }) {
   )
 }
 
-// Every tab is still mock/localStorage-backed (useInventory.ts) except
-// "masters" (InventoryMasterTab.tsx), which is wired to the real backend —
-// the other tabs get their own migration once their backend modules exist.
+// Every tab is still mock/localStorage-backed except "masters"
+// (InventoryMasterTab.tsx), which is wired to the real backend.
 const InventoryPage = () => {
   const [tab, setTab] = useState<InventoryTabId>('overview')
-  // Lifted (not owned by DashboardsTab) so Copilot's "Readiness →" card can
-  // jump straight to the Readiness sub-view in one click.
+  // Lifted so Copilot's "Readiness →" card can jump straight to the
+  // Readiness sub-view in one click.
   const [dashSub, setDashSub] = useState<DashboardSubView>('exec')
 
   // Despite the label, "New transfer" opens the same "Log inventory movement"
@@ -128,16 +127,16 @@ const InventoryPage = () => {
           <h1 className="text-2xl font-bold" style={{ color: 'var(--qms-text)' }}>Inventory &amp; Devices</h1>
           <div className="flex flex-wrap items-center gap-2 mt-1.5">
             <span className="inline-flex items-center gap-1 text-[11px] font-semibold rounded-full px-2.5 py-1" style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text-soft)' }}>
-              <Dot size={14} style={{ color: 'var(--qms-emerald, #10b981)' }} /> Fleet · live
+              <FiCircle size={14} style={{ color: 'var(--qms-emerald, #10b981)' }} /> Fleet · live
             </span>
             <span className="inline-flex items-center gap-1 text-[11px] font-semibold rounded-full px-2.5 py-1" style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text-soft)' }}>
-              <QrCode size={12} /> QR-tracked
+              <FiGrid size={12} /> QR-tracked
             </span>
             <span className="inline-flex items-center gap-1 text-[11px] font-semibold rounded-full px-2.5 py-1" style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text-soft)' }}>
-              <Wrench size={12} /> Calibration alerts
+              <FiTool size={12} /> Calibration alerts
             </span>
             <span className="inline-flex items-center gap-1 text-[11px] font-semibold rounded-full px-2.5 py-1" style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text-soft)' }}>
-              <PackageCheck size={12} /> Consumables reorder
+              <TbPackageImport size={12} /> Consumables reorder
             </span>
           </div>
         </div>
@@ -149,7 +148,7 @@ const InventoryPage = () => {
             style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
             onClick={() => setLogMovementOpen(true)}
           >
-            <ArrowRightLeft size={14} /> New transfer
+            <FiRepeat size={14} /> New transfer
           </Button>
         </div>
       </div>

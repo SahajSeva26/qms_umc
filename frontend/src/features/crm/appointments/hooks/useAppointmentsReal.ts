@@ -1,13 +1,9 @@
-import { useQuery } from '@tanstack/react-query'
+import { useEntityQuery } from '@/hooks/useEntityQuery'
+import { createEntityKeys } from '@/hooks/entityQueryKeys'
 import { appointmentsRealService } from '@/features/crm/appointments/appointmentsReal.service'
 import type { SearchAppointmentQuery } from '@/types/appointment.types'
 
-// Thin useQuery wrapper keyed on the raw search query.
-// `enabled` (default true) lets a caller skip the fetch entirely.
-export const useAppointmentsReal = (query: SearchAppointmentQuery, options?: { enabled?: boolean }) => {
-  return useQuery({
-    queryKey: ['appointmentsReal', query],
-    queryFn: () => appointmentsRealService.searchAppointments(query),
-    enabled: options?.enabled ?? true,
-  })
-}
+export const appointmentRealKeys = createEntityKeys<SearchAppointmentQuery>('appointmentsReal', 'appointmentReal')
+
+export const useAppointmentsReal = (query: SearchAppointmentQuery, options?: { enabled?: boolean }) =>
+  useEntityQuery(appointmentRealKeys, (q) => appointmentsRealService.searchAppointments(q), query, options)

@@ -6,13 +6,20 @@ import { AUTH_ROUTES } from '@/features/auth/auth.routes'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 import RouteFallback from './RouteFallback'
+import SessionLoading from './SessionLoading'
+import SessionRecovery from './SessionRecovery'
 import FeedbackWidget from '@/features/qa-feedback/components/FeedbackWidget'
 
 const SB_INTENT_KEY = 'qms.sb.intent'
 
-
 function getInitialCollapsed(): boolean {
-  return localStorage.getItem(SB_INTENT_KEY) === 'collapsed'
+  try { return localStorage.getItem(SB_INTENT_KEY) === 'collapsed' }
+  catch { return false }
+}
+
+function saveCollapsedIntent(next: boolean) {
+  try { localStorage.setItem(SB_INTENT_KEY, next ? 'collapsed' : 'expanded') }
+  catch { /* cosmetic-only state, ok to silently skip */ }
 }
 
 const AppLayout = () => {
@@ -21,39 +28,45 @@ const AppLayout = () => {
   const {
     isAuthenticated: isSessionAuthenticated,
     isFetching: isSessionFetching,
+    isError: isSessionError,
     isConfirmedUnauthenticated,
+    refetchSession,
   } = useSession()
   const isAuthenticated = isStoreAuthenticated || isSessionAuthenticated
   const [collapsed, setCollapsed] = useState(getInitialCollapsed)
   const [mobileOpen, setMobileOpen] = useState(false)
 
+  // Latches isSessionError because React Query resets it to false the instant
+  // a retry starts. Gated on !isAuthenticated in both directions since a
+  // background refetch can fail while a cached session is still served.
+  const [sawSessionError, setSawSessionError] = useState(false)
+  if (isSessionError && !isAuthenticated && !sawSessionError) setSawSessionError(true)
+  if (isAuthenticated && sawSessionError) setSawSessionError(false)
+
   const handleToggle = () => {
     setCollapsed((prev) => {
       const next = !prev
-      localStorage.setItem(SB_INTENT_KEY, next ? 'collapsed' : 'expanded')
+      saveCollapsedIntent(next)
       return next
     })
   }
 
-  // Don't decide "not authenticated, redirect" until we've had a chance to
-  // restore a valid session from the cookie — only relevant on the very
-  // first render after a hard reload (isAuthenticated is already true on
-  // every subsequent client-side navigation, so this never blocks normal use).
-  if (!isAuthenticated && isSessionFetching) return null
+  // Only redirect on a confirmed 401 — GET /auth/me shares a rate limiter
+  // with login/refresh, so a 429 does not mean the session is invalid.
+  if (!isAuthenticated && isConfirmedUnauthenticated) {
+    return <Navigate to={AUTH_ROUTES.LOGIN} replace />
+  }
 
-  // GET /auth/me shares the same rate limiter as /auth/login and
-  // /auth/refresh-token (rateLimiter.ts, mounted on all of /api/v1/auth/*),
-  // so a burst of requests can make it come back 429 even for a perfectly
-  // valid, still-logged-in session — found live: this hard-redirected a
-  // genuinely authenticated user to /login purely because of rate-limiter
-  // traffic, not because their session was actually invalid. Only redirect
-  // when the backend has ACTUALLY confirmed the caller is unauthenticated
-  // (a real 401); any other failure just renders nothing for this pass and
-  // lets react-query's own retry (useSession.ts's retry policy) resolve it,
-  // rather than forcing a login screen on a session that may still be fine.
-  if (!isAuthenticated && !isConfirmedUnauthenticated) return null
+  // Settled but inconclusive (429, network blip, 5xx) — show retry UI
+  // rather than rendering null forever.
+  if (!isAuthenticated && sawSessionError) {
+    return <SessionRecovery onRetry={refetchSession} pending={isSessionFetching} />
+  }
 
-  if (!isAuthenticated) return <Navigate to={AUTH_ROUTES.LOGIN} replace />
+  // Only relevant on the very first render after a hard reload.
+  if (!isAuthenticated && isSessionFetching) return <SessionLoading />
+
+  if (!isAuthenticated) return null
 
   return (
     <div className="app-bg flex h-dvh overflow-hidden">

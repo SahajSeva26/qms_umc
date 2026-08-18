@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { FiUserPlus, FiX } from 'react-icons/fi'
 import { Input } from '@/components/ui/input'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { useAsyncPickerState } from '@/hooks/useAsyncPickerState'
 import { PLATFORM_TENANT_CODE, PLATFORM_TENANT_FETCH_LIMIT } from '@/features/access-management/accessManagement.constants'
 import type { RoleEntity } from '@/types/accessManagement.types'
 
@@ -17,34 +18,16 @@ interface InternalMembersPickerProps {
   onChange: (members: SelectedMember[]) => void
 }
 
-// NOT a base-ui Popover — its Trigger fights a live text input that needs
-// to keep keyboard focus while typing.
-//
-// "QMS side" = the platform tenant — scoped via `tenant: platformTenant.id`
-// since role.service.ts's search() only restricts CUSTOMER-tenant callers,
-// not platform ones.
+// Not a base-ui Popover — its Trigger fights a live text input needing keyboard focus.
+// "QMS side" = the platform tenant, scoped via `tenant: platformTenant.id`.
 const InternalMembersPicker = ({ selected, onChange }: InternalMembersPickerProps) => {
   const [query, setQuery] = useState('')
   const debouncedQuery = useDebouncedValue(query)
-  const [open, setOpen] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
+  const { open, setOpen, containerRef } = useAsyncPickerState()
 
   const { data: tenantData } = useTenants({ type: 'platform', status: 'active', limit: PLATFORM_TENANT_FETCH_LIMIT })
   const platformTenant = tenantData?.data?.items.find((t) => t.type === 'platform' || t.code === PLATFORM_TENANT_CODE)
 
-  useEffect(() => {
-    if (!open) return
-    const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [open])
-
-  // Gated on a non-empty query, not `limit: '0'` — Mongoose's
-  // `.find().limit(0)` means "no limit at all," not "return nothing."
   const { data, isFetching } = useRoles(
     { user: debouncedQuery.trim(), tenant: platformTenant?.id, status: 'active', limit: '10' },
     !!debouncedQuery.trim() && !!platformTenant,

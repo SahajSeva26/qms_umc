@@ -7,9 +7,10 @@ import { toast } from '@/components/ui/sonner'
 import { useCreateContact } from '@/features/contacts/hooks/useCreateContact'
 import { useUpdateContact } from '@/features/contacts/hooks/useUpdateContact'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
-import { useDivisions } from '@/features/crm/hooks/useDivisions'
+import { useDivisions } from '@/features/crm/divisions/hooks/useDivisions'
 import { usePermission } from '@/hooks/usePermission'
 import { createContactSchema, updateContactSchema } from '@/features/contacts/schemas/contact.schemas'
+import { getApiErrorMessage } from '@/utils/apiError'
 import type { ContactEntity, ContactType, ContactStatus } from '@/types/contact.types'
 
 const TYPE_OPTIONS: { value: ContactType; label: string }[] = [
@@ -53,17 +54,14 @@ interface EditContactModalProps {
   // Pins create to a known tenant/division — skips both pickers below.
   fixedTenantId?: string
   fixedDivisionId?: string
-  // The fixed tenant's own type — needed when fixedTenantId belongs to
-  // someone other than the caller (e.g. TenantDetailPage), since otherwise
-  // deriveCreateType() would wrongly fall back to the caller's own type.
+  // Needed when fixedTenantId belongs to someone other than the caller, else
+  // deriveCreateType() wrongly falls back to the caller's own type.
   fixedTenantType?: ContactType
-  // Fires with the new contact on successful create (not edit), so a
-  // "quick add" caller (e.g. NewAppointmentDialog) can auto-select it.
+  // Fires with the new contact on successful create only, so a "quick add" caller can auto-select it.
   onCreated?: (contact: { id: string; name: string }) => void
 }
 
-// Outer shell remounts the inner form keyed on contact id so draft state
-// resets cleanly between "new" and different contacts.
+// Remounts the inner form keyed on contact id so draft state resets between "new" and different contacts.
 const EditContactModal = ({ open, contact, onClose, fixedTenantId, fixedDivisionId, fixedTenantType, onCreated }: EditContactModalProps) => {
   if (!open) return null
   return (
@@ -93,15 +91,11 @@ const EditContactModalForm = ({ contact, onClose, fixedTenantId, fixedDivisionId
   const [draft, setDraft] = useState<ContactDraft>(contact ? draftFromContact(contact) : emptyDraft)
   const [tenant, setTenant] = useState(fixedTenantId ?? '')
 
-  // A customer-tenant caller is force-pinned to their own tenant server-side;
-  // a platform-tenant caller must pick one. Never shown if fixedTenantId is set.
   const { sessionPermissions } = usePermission()
   const needsTenantPicker = !isEdit && !fixedTenantId && sessionPermissions?.tenantType === 'platform'
   const { data: tenantsData } = useTenants({}, needsTenantPicker)
   const tenants = tenantsData?.data?.items ?? []
 
-  // No manual choice on create — fixedDivisionId always means 'customer';
-  // otherwise use fixedTenantType, the caller's own type, or a picked tenant's.
   const deriveCreateType = (): ContactType => {
     if (fixedDivisionId) return 'customer'
     if (fixedTenantType) return fixedTenantType
@@ -113,17 +107,14 @@ const EditContactModalForm = ({ contact, onClose, fixedTenantId, fixedDivisionId
   const effectiveTenantId = fixedTenantId || (needsTenantPicker ? tenant : sessionPermissions?.tenantId)
   const createType = deriveCreateType()
   const [division, setDivision] = useState(fixedDivisionId ?? '')
-  // Required (and shown) only for customer-type contacts.
   const needsDivision = !isEdit && !fixedDivisionId && createType === 'customer'
   const { data: divisionsData, isLoading: divisionsLoading } = useDivisions(
-    { tenant: effectiveTenantId || undefined } as unknown as { tenantId?: string },
+    { tenant: effectiveTenantId || undefined },
     needsDivision && !!effectiveTenantId,
   )
   const divisions = divisionsData?.data?.items ?? []
 
-  // Clear a stale selection if the scoped tenant changes. Skipped when
-  // fixedDivisionId is set — effects run once on mount regardless, and
-  // would otherwise wipe the fixed value immediately.
+  // Skip when fixedDivisionId is set, else this wipes the fixed value on mount.
   useEffect(() => {
     if (!fixedDivisionId) setDivision('')
   }, [effectiveTenantId, fixedDivisionId])
@@ -180,8 +171,8 @@ const EditContactModalForm = ({ contact, onClose, fixedTenantId, fixedDivisionId
         if (created.data) onCreated?.({ id: created.data.id, name: created.data.name })
       }
       handleClose()
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Could not save contact — try again.')
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'Could not save contact — try again.'))
     }
   }
 

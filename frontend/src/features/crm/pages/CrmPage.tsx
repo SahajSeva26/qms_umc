@@ -32,13 +32,9 @@ const VIEW_LABELS: { id: ViewMode; label: string }[] = [
 const CrmPage = () => {
   const { leads, isLoading, error, moveStage, updateLead } = useLeads()
   const { hasAnyPermission } = usePermission()
-  // A lead:search-only caller (the real "Sales" rep business role — see
-  // lead.constants.ts's LEAD_BUSINESS_ROLE_TYPES) can view their own leads
-  // (server-side row-scoped) but the backend's create/update/move-stage
-  // routes still require lead:manage/tenant:manage (lead.routes.ts's GUARD,
-  // deliberately narrower than READ_GUARD — confirmed via the teammate's own
-  // commit history, not an oversight). Hide the controls that would only
-  // 403 for such a caller rather than showing them and letting them fail.
+  // A lead:search-only caller can view their own leads but create/update/
+  // move-stage still require lead:manage/tenant:manage — hide controls that
+  // would only 403 rather than showing them and letting them fail.
   const canManageLeads = hasAnyPermission(['lead:manage', 'tenant:manage'])
   const { filters, setFilter, reset } = useCrmFilters()
 
@@ -49,7 +45,7 @@ const CrmPage = () => {
   const [statusDrill, setStatusDrill] = useState<LeadStatus | null>(null)
 
   const filtered = useMemo(() => leads.filter((l) => matchesFilters(l, filters)), [leads, filters])
-  const kpis = useMemo(() => computeKpis(leads, false), [leads])
+  const kpis = useMemo(() => computeKpis(leads), [leads])
 
   const openLead = leads.find((l) => l.id === openLeadId) ?? null
 

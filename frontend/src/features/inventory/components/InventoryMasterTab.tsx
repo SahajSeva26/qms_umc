@@ -9,20 +9,18 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import PaginationControls from '@/components/ui/PaginationControls'
+import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import CopyButton from '@/components/ui/CopyButton'
 import EditInventoryMasterModal from '@/features/inventory/components/EditInventoryMasterModal'
+import { usePagination } from '@/hooks/usePagination'
 
 const PAGE_SIZE = 10
 const CODE_DISPLAY_LENGTH = 10
 
 const truncateCode = (code: string) => (code.length > CODE_DISPLAY_LENGTH ? `${code.slice(0, CODE_DISPLAY_LENGTH)}…` : code)
 
-// Real backend-wired replacement for the "Item Master" tab — deliberately a
-// separate component from ItemMasterTab.tsx (the old mock), which stays
-// untouched since ExpiryFEFOTab.tsx/ForecastTab.tsx still import its
-// ItemDetailDrawerBody export for their own (still-mock) data. Once a real
-// inventory-item/transaction/assignment module lands, those other 17 tabs
-// get their own migration pass — out of scope here.
+// Real backend-wired replacement for the "Item Master" tab. Kept separate
+// from ItemMasterTab.tsx (mock), which other tabs still import from for now.
 const InventoryMasterTab = () => {
   const { hasAnyPermission } = usePermission()
   const canManage = hasAnyPermission(['inventory-master:manage'])
@@ -32,10 +30,10 @@ const InventoryMasterTab = () => {
   const [type, setType] = useState<InventoryMasterType | 'ALL'>('ALL')
 
   const [statusFilter, setStatusFilter] = useState<InventoryMasterStatus>('active')
-  const [page, setPage] = useState(1)
+  const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
   const [editModal, setEditModal] = useState<{ open: boolean; item: InventoryMasterEntity | null }>({ open: false, item: null })
 
-  const { data, isLoading, error } = useInventoryMasters({
+  const { data, isLoading, error, refetch } = useInventoryMasters({
     name: debouncedSearch || undefined,
     type: type === 'ALL' ? undefined : type,
     status: canManage ? statusFilter : undefined,
@@ -44,7 +42,6 @@ const InventoryMasterTab = () => {
   })
   const items = data?.data?.items ?? []
   const totalCount = data?.data?.count ?? 0
-  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
 
   return (
     <div>
@@ -72,11 +69,11 @@ const InventoryMasterTab = () => {
           <Input
             placeholder="Search by name..."
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+            onChange={(e) => { setSearch(e.target.value); resetToFirstPage() }}
             className="pl-8 text-[13px]"
           />
         </div>
-        <Select value={type} onValueChange={(v) => { setType(v as InventoryMasterType | 'ALL'); setPage(1) }}>
+        <Select value={type} onValueChange={(v) => { setType(v as InventoryMasterType | 'ALL'); resetToFirstPage() }}>
           <SelectTrigger className="w-40 text-[13px]">
             <SelectValue>{() => (type === 'ALL' ? 'All types' : INVENTORY_MASTER_TYPE_LABEL[type])}</SelectValue>
           </SelectTrigger>
@@ -88,7 +85,7 @@ const InventoryMasterTab = () => {
           </SelectContent>
         </Select>
         {canManage && (
-          <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v as InventoryMasterStatus); setPage(1) }}>
+          <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v as InventoryMasterStatus); resetToFirstPage() }}>
             <SelectTrigger className="w-36 text-[13px]">
               <SelectValue>{() => (statusFilter === 'active' ? 'Active' : 'Inactive')}</SelectValue>
             </SelectTrigger>
@@ -100,80 +97,66 @@ const InventoryMasterTab = () => {
         )}
       </div>
 
-      {isLoading && (
-        <div className="text-[13px] py-10 text-center" style={{ color: 'var(--qms-text-muted)' }}>
-          Loading items…
-        </div>
-      )}
-
-      {error && !isLoading && (
-        <div className="text-[13px] rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
-          Failed to load items. Please try again.
-        </div>
-      )}
-
-      {!isLoading && !error && (
-        <>
-          <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}>
-            <div className="overflow-x-auto">
-              <table className="w-full text-[13px]">
-                <thead>
-                  <tr style={{ borderBottom: '1px solid var(--qms-border)' }}>
-                    {['Code', 'Name', 'Type', 'SKU', 'Unit', ...(canManage ? ['Status'] : []), 'Stock range'].map((h) => (
-                      <th
-                        key={h}
-                        className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5"
-                        style={{ color: 'var(--qms-text-muted)' }}
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((item) => (
-                    <tr
-                      key={item.id}
-                      onClick={() => canManage && setEditModal({ open: true, item })}
-                      className={canManage ? 'cursor-pointer transition-colors hover:bg-(--qms-surface-hover)' : ''}
-                      style={{ borderBottom: '1px solid var(--qms-border)' }}
+      <QueryStateBlock isLoading={isLoading} error={error} loadingLabel="Loading items…" errorLabel="Failed to load items. Please try again." onRetry={refetch}>
+        <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}>
+          <div className="overflow-x-auto">
+            <table className="w-full text-[13px]">
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--qms-border)' }}>
+                  {['Code', 'Name', 'Type', 'SKU', 'Unit', ...(canManage ? ['Status'] : []), 'Stock range'].map((h) => (
+                    <th
+                      key={h}
+                      className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5"
+                      style={{ color: 'var(--qms-text-muted)' }}
                     >
-                      <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-mono" title={item.code}>{truncateCode(item.code)}</span>
-                          <CopyButton value={item.code} label="Code" />
-                        </div>
-                      </td>
-                      <td className="px-4 py-2.5 font-semibold" style={{ color: 'var(--qms-text)' }}>{item.name}</td>
-                      <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{INVENTORY_MASTER_TYPE_LABEL[item.type]}</td>
-                      <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{item.sku}</td>
-                      <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{item.unit}</td>
-                      {canManage && (
-                        <td className="px-4 py-2.5">
-                          <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${item.status === 'active' ? 'bg-success-soft text-success' : ''}`}
-                            style={item.status !== 'active' ? { background: 'var(--qms-surface-strong)', color: 'var(--qms-text-muted)' } : undefined}
-                          >
-                            {item.status === 'active' ? 'ACTIVE' : 'INACTIVE'}
-                          </span>
-                        </td>
-                      )}
-                      <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{item.minStock} - {item.maxStock}</td>
-                    </tr>
+                      {h}
+                    </th>
                   ))}
-                </tbody>
-              </table>
-            </div>
-
-            {items.length === 0 && (
-              <div className="px-4 py-10 text-center text-[13px]" style={{ color: 'var(--qms-text-muted)' }}>
-                No items found.
-              </div>
-            )}
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item) => (
+                  <tr
+                    key={item.id}
+                    onClick={() => canManage && setEditModal({ open: true, item })}
+                    className={canManage ? 'cursor-pointer transition-colors hover:bg-(--qms-surface-hover)' : ''}
+                    style={{ borderBottom: '1px solid var(--qms-border)' }}
+                  >
+                    <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono" title={item.code}>{truncateCode(item.code)}</span>
+                        <CopyButton value={item.code} label="Code" />
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5 font-semibold" style={{ color: 'var(--qms-text)' }}>{item.name}</td>
+                    <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{INVENTORY_MASTER_TYPE_LABEL[item.type]}</td>
+                    <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{item.sku}</td>
+                    <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{item.unit}</td>
+                    {canManage && (
+                      <td className="px-4 py-2.5">
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${item.status === 'active' ? 'bg-success-soft text-success' : ''}`}
+                          style={item.status !== 'active' ? { background: 'var(--qms-surface-strong)', color: 'var(--qms-text-muted)' } : undefined}
+                        >
+                          {item.status === 'active' ? 'ACTIVE' : 'INACTIVE'}
+                        </span>
+                      </td>
+                    )}
+                    <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{item.minStock} - {item.maxStock}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          {totalPages > 1 && <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} />}
-        </>
-      )}
+
+          {items.length === 0 && (
+            <div className="px-4 py-10 text-center text-[13px]" style={{ color: 'var(--qms-text-muted)' }}>
+              No items found.
+            </div>
+          )}
+        </div>
+        <PaginationControls page={page} totalPages={totalPages(totalCount)} onPageChange={setPage} />
+      </QueryStateBlock>
 
       {editModal.open && (
         <EditInventoryMasterModal

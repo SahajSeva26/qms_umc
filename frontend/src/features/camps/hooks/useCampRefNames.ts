@@ -1,5 +1,5 @@
 import { useDoctors } from '@/features/doctors/hooks/useDoctors'
-import { useDivisions } from '@/features/crm/hooks/useDivisions'
+import { useDivisions } from '@/features/crm/divisions/hooks/useDivisions'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import { useProjects } from '@/features/projects/hooks/useProjects'
 import { campRefId, campRefName } from '@/features/camps/campsReal.utils'
@@ -14,19 +14,8 @@ interface UseCampRefNamesOptions {
   projects?: boolean
 }
 
-// CampMapper's link fields are a populated-object-or-bare-string union
-// depending on which endpoint returned them (see campReal.types.ts) — this
-// hook first reads a populated object's own `.name` directly (no lookup
-// needed), and only falls back to a batch-fetched id->name table when the
-// value is a bare id string (create/update/moveStage/allocate responses).
-// Each of the 4 fallback tables is fetched ONLY if its caller opts in —
-// CampTableReal.tsx never calls projectName() (list rows are always fully
-// populated by camp.service.ts's search()), and CampDetailPageReal.tsx has
-// its own separate roles fetch (assignableRoles) it uses for roleLabel
-// instead of this hook's — so neither caller was ever using all 4, yet all
-// 4 fired unconditionally on every render. Found live (2026-08-04): the
-// Camp Management list screen alone fired doctors/divisions/roles/projects
-// every load, 3 of them always wasted since search() already populates.
+// Each fallback table (doctors/divisions/roles/projects) is fetched only if its
+// caller opts in via `options` — most callers only need a subset.
 export const useCampRefNames = (options: UseCampRefNamesOptions = {}) => {
   const { data: doctorsData } = useDoctors({ limit: '10' }, { enabled: options.doctors ?? false })
   const doctors = doctorsData?.data?.items ?? []

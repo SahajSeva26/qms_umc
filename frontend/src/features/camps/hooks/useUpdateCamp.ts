@@ -1,15 +1,7 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useUpdateEntity } from '@/hooks/useUpdateEntity'
 import { campsRealService } from '@/features/camps/campsReal.service'
+import { campRealKeys } from '@/features/camps/hooks/useCampsReal'
 import type { UpdateCampPayload } from '@/types/campReal.types'
 
-export const useUpdateCamp = (id: string) => {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: (payload: UpdateCampPayload) => campsRealService.updateCamp(id, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['campReal', id] })
-      queryClient.invalidateQueries({ queryKey: ['campsReal'] })
-    },
-  })
-}
+export const useUpdateCamp = (id: string) =>
+  useUpdateEntity((payload: UpdateCampPayload) => campsRealService.updateCamp(id, payload), [campRealKeys.detail(id), campRealKeys.all])

@@ -1,27 +1,22 @@
-import { Sparkles } from 'lucide-react'
+import type { IconType } from 'react-icons'
 import { useInventoryOverview } from '@/features/inventory/hooks/useInventory'
 import type { InventoryKpiCard } from '@/features/inventory/inventory.types'
 import {
-  Cpu, Route, CheckCircle2, AlertTriangle, Clock, Wallet, Package, Box, ArrowUpRight,
-} from 'lucide-react'
+  FiCpu, FiCheckCircle, FiAlertTriangle, FiClock, FiPackage, FiBox, FiArrowUpRight,
+} from 'react-icons/fi'
+import { TbRoute, TbWallet, TbSparkles } from 'react-icons/tb'
 import { KPI_TONE_COLOR } from '@/features/inventory/constants/kpiToneColor'
 
-// KPI grid + AI banner — exact port of inventory.js's renderKpis() (lines
-// 321-362) + renderAi() (lines 364-379). Shared across every tab in the
-// prototype's shell (rendered once, above the tab strip) — lifted out of
-// OverviewTab.tsx (2026-08-03) into its own component so InventoryPage can
-// render it once regardless of which tab is active, matching the prototype
-// exactly rather than only showing it on the Overview tab.
-
-const KPI_ICONS: Record<string, typeof Cpu> = {
-  cpu: Cpu,
-  route: Route,
-  'check-circle-2': CheckCircle2,
-  'alert-triangle': AlertTriangle,
-  clock: Clock,
-  wallet: Wallet,
-  package: Package,
-  box: Box,
+// KPI grid + AI banner, rendered once above the tab strip regardless of which tab is active.
+const KPI_ICONS: Record<string, IconType> = {
+  cpu: FiCpu,
+  route: TbRoute,
+  'check-circle-2': FiCheckCircle,
+  'alert-triangle': FiAlertTriangle,
+  clock: FiClock,
+  wallet: TbWallet,
+  package: FiPackage,
+  box: FiBox,
 }
 
 function KpiCard({ card, onNavigate }: { card: InventoryKpiCard; onNavigate: (tab: string) => void }) {
@@ -46,7 +41,7 @@ function KpiCard({ card, onNavigate }: { card: InventoryKpiCard; onNavigate: (ta
           style={{ background: 'linear-gradient(135deg, rgba(36,81,240,.16), rgba(20,184,166,.16))', border: '1px solid var(--qms-border-strong)', color: 'var(--qms-brand)' }}
         >
           {(() => {
-            const Icon = KPI_ICONS[card.icon] ?? Cpu
+            const Icon = KPI_ICONS[card.icon] ?? FiCpu
             return <Icon size={15} />
           })()}
         </div>
@@ -58,7 +53,7 @@ function KpiCard({ card, onNavigate }: { card: InventoryKpiCard; onNavigate: (ta
         {card.value}
       </div>
       <div className="relative text-xs" style={{ color: 'var(--qms-text-muted)' }}>{card.sub}</div>
-      <ArrowUpRight
+      <FiArrowUpRight
         size={14}
         className="absolute bottom-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
         style={{ color: 'var(--qms-brand-600, var(--qms-brand))' }}
@@ -68,7 +63,7 @@ function KpiCard({ card, onNavigate }: { card: InventoryKpiCard; onNavigate: (ta
 }
 
 interface InventoryKpiStripProps {
-  /** Fires when a KPI tile is clicked — exact port of window.invSetTab(tab). */
+  /** Fires when a KPI tile is clicked, navigating to its target tab. */
   onNavigateTab: (tab: string) => void
 }
 
@@ -77,15 +72,12 @@ const InventoryKpiStrip = ({ onNavigateTab }: InventoryKpiStripProps) => {
 
   return (
     <>
-      {/* KPI grid — shared '.kpi-grid' (repeat(4,1fr), gap:10px, margin-bottom:16px;
-          responsive 3/2/1 cols under 1300/980/560px) */}
       <div className="grid gap-2.5 mb-4 grid-cols-4 max-[1300px]:grid-cols-3 max-[980px]:grid-cols-2 max-[560px]:grid-cols-1">
         {kpis.map((card) => (
           <KpiCard key={card.label} card={card} onNavigate={onNavigateTab} />
         ))}
       </div>
 
-      {/* AI banner — shared '.ai-banner' strip */}
       <div
         className="flex items-center gap-3 rounded-[20px] border p-3.5 mb-4"
         style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border-strong)' }}
@@ -94,7 +86,7 @@ const InventoryKpiStrip = ({ onNavigateTab }: InventoryKpiStripProps) => {
           className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-white"
           style={{ background: 'linear-gradient(135deg, var(--qms-violet, #8b5cf6), var(--qms-brand))' }}
         >
-          <Sparkles size={18} />
+          <TbSparkles size={18} />
         </div>
         <div className="flex-1 text-sm" style={{ color: 'var(--qms-text-soft)' }}>
           <b style={{ color: 'var(--qms-text)' }}>Inventory copilot:</b>{' '}

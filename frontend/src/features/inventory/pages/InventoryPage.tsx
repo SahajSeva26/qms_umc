@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { IconType } from 'react-icons'
 import {
-  FiGrid, FiBookOpen, FiCalendar, FiCpu, FiTool, FiTruck, FiUsers, FiClipboard, FiPackage,
+  FiGrid, FiCalendar, FiCpu, FiTool, FiTruck, FiUsers, FiClipboard, FiPackage,
   FiUser, FiShoppingCart, FiTrendingUp, FiClock, FiRepeat, FiCircle, FiUpload, FiDownload,
 } from 'react-icons/fi'
 import { TbGauge, TbBuildingWarehouse, TbRoute, TbSparkles, TbPackageImport } from 'react-icons/tb'
@@ -10,7 +10,6 @@ import { toast } from '@/components/ui/sonner'
 import InventoryKpiStrip from '@/features/inventory/components/InventoryKpiStrip'
 import OverviewTab from '@/features/inventory/components/OverviewTab'
 import DashboardsTab from '@/features/inventory/components/DashboardsTab'
-import InventoryMasterTab from '@/features/inventory/components/InventoryMasterTab'
 import ExpiryFEFOTab from '@/features/inventory/components/ExpiryFEFOTab'
 import DevicesTab from '@/features/inventory/components/DevicesTab'
 import CalibrationTab from '@/features/inventory/components/CalibrationTab'
@@ -31,14 +30,13 @@ import { useDeviceFleetUnits } from '@/features/inventory/hooks/useInventory'
 import type { DashboardSubView } from '@/features/inventory/inventory.types'
 
 type InventoryTabId =
-  | 'overview' | 'dashboards' | 'masters' | 'expiry' | 'devices' | 'calibration'
+  | 'overview' | 'dashboards' | 'expiry' | 'devices' | 'calibration'
   | 'warehouse' | 'transfers' | 'assignments' | 'foinventory' | 'fieldops'
   | 'consumables' | 'vendors' | 'procurement' | 'forecast' | 'copilot' | 'audit' | 'movements'
 
 const TABS: { id: InventoryTabId; label: string; icon: IconType }[] = [
   { id: 'overview', label: 'Overview', icon: FiGrid },
   { id: 'dashboards', label: 'Dashboards', icon: TbGauge },
-  { id: 'masters', label: 'Item Master', icon: FiBookOpen },
   { id: 'expiry', label: 'Expiry / FEFO', icon: FiCalendar },
   { id: 'devices', label: 'Devices', icon: FiCpu },
   { id: 'calibration', label: 'Calibration', icon: FiTool },
@@ -58,7 +56,7 @@ const TABS: { id: InventoryTabId; label: string; icon: IconType }[] = [
 
 // Kept as a set (not just "always true") so a future still-unbuilt tab can
 // drop out of it and fall through to ComingSoonTab.
-const BUILT_TABS = new Set<InventoryTabId>(['overview', 'dashboards', 'masters', 'expiry', 'devices', 'calibration', 'warehouse', 'transfers', 'assignments', 'foinventory', 'fieldops', 'vendors', 'consumables', 'procurement', 'movements', 'forecast', 'copilot', 'audit'])
+const BUILT_TABS = new Set<InventoryTabId>(['overview', 'dashboards', 'expiry', 'devices', 'calibration', 'warehouse', 'transfers', 'assignments', 'foinventory', 'fieldops', 'vendors', 'consumables', 'procurement', 'movements', 'forecast', 'copilot', 'audit'])
 
 function ComingSoonTab({ label }: { label: string }) {
   return (
@@ -71,8 +69,8 @@ function ComingSoonTab({ label }: { label: string }) {
   )
 }
 
-// Every tab is still mock/localStorage-backed except "masters"
-// (InventoryMasterTab.tsx), which is wired to the real backend.
+// Every tab here is still mock/localStorage-backed — the one real,
+// backend-wired module (Item Master) now lives at its own /admin/inventory-masters page.
 const InventoryPage = () => {
   const [tab, setTab] = useState<InventoryTabId>('overview')
   // Lifted so Copilot's "Readiness →" card can jump straight to the
@@ -92,7 +90,6 @@ const InventoryPage = () => {
     switch (tab) {
       case 'overview': return <OverviewTab />
       case 'dashboards': return <DashboardsTab onNavigateTab={navigateTab} sub={dashSub} onSubChange={setDashSub} />
-      case 'masters': return <InventoryMasterTab />
       case 'expiry': return <ExpiryFEFOTab />
       case 'devices': return <DevicesTab />
       case 'calibration': return <CalibrationTab />

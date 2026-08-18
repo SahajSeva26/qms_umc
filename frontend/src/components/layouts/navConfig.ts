@@ -118,6 +118,8 @@ const ALL_NAV_ITEMS: NavItem[] = [
   // Resources
   { id: 'inventory',    label: 'Inventory & Devices',         icon: 'Package',       path: ADMIN_ROUTES.ADMIN_INVENTORY },
 
+  { id: 'itemmaster',   label: 'Item Master',                 icon: 'BookOpen',      path: ADMIN_ROUTES.ADMIN_INVENTORY_MASTERS },
+
   { id: 'assets',       label: 'Asset Management',            icon: 'Box',           path: ADMIN_ROUTES.ADMIN_ASSETS },
 
   { id: 'kpi',          label: 'Order & KPI Engine',          icon: 'Activity',      path: ADMIN_ROUTES.ADMIN_KPI },
@@ -183,7 +185,7 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
   {
     section: 'Resources',
     subs: [
-      { title: '', items: ['inventory', 'assets', 'kpi'].map((id) => NAV_BY_ID[id]) },
+      { title: '', items: ['inventory', 'itemmaster', 'assets', 'kpi'].map((id) => NAV_BY_ID[id]) },
     ],
   },
   {

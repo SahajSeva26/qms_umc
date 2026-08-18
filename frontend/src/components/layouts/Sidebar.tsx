@@ -7,7 +7,7 @@ import {
   FiClipboard, FiSun, FiVideo, FiHeart, FiDollarSign, FiUserCheck,
   FiSettings, FiMapPin, FiAlertTriangle, FiCpu, FiGlobe, FiUser,
   FiPackage, FiBox, FiFileText, FiShield, FiZap, FiMessageSquare,
-  FiChevronsLeft, FiChevronDown, FiCircle,
+  FiChevronsLeft, FiChevronDown, FiCircle, FiBookOpen,
 } from 'react-icons/fi'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
@@ -65,6 +65,7 @@ const ICON_MAP: Record<string, IconType> = {
   User:          FiUser,
   Package:       FiPackage,
   Box:           FiBox,
+  BookOpen:      FiBookOpen,
   FileText:      FiFileText,
   Shield:        FiShield,
   Zap:           FiZap,

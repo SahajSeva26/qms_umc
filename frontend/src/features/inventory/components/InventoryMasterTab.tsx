@@ -47,7 +47,6 @@ const InventoryMasterTab = () => {
     <div>
       <div className="mb-3 flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-base font-bold" style={{ color: 'var(--qms-text)' }}>Item Master</h2>
           <p className="text-[12px] mt-0.5" style={{ color: 'var(--qms-text-muted)' }}>
             {!isLoading && !error ? `${totalCount} total` : 'The shared catalog of inventory item codes.'}
           </p>
@@ -58,7 +57,7 @@ const InventoryMasterTab = () => {
             className="text-white shrink-0"
             style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
           >
-            <FiPlus size={14} /> New item
+            <FiPlus size={14} /> New Catalogue
           </Button>
         )}
       </div>
@@ -128,7 +127,7 @@ const InventoryMasterTab = () => {
                         <CopyButton value={item.code} label="Code" />
                       </div>
                     </td>
-                    <td className="px-4 py-2.5 font-semibold" style={{ color: 'var(--qms-text)' }}>{item.name}</td>
+                    <td className="px-4 py-2.5 font-semibold max-w-xs truncate" style={{ color: 'var(--qms-text)' }} title={item.name}>{item.name}</td>
                     <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{INVENTORY_MASTER_TYPE_LABEL[item.type]}</td>
                     <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{item.sku}</td>
                     <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{item.unit}</td>

@@ -1,11 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
+import { useGetEntity } from '@/hooks/useGetEntity'
 import { accessManagementService } from '@/features/access-management/accessManagement.service'
+import { roleTypeKeys } from '@/features/access-management/role-type/hooks/useRoleTypes'
 
-// Mirrors `@/features/admin/hooks/useUser.ts` / `usePermissionGroup.ts` exactly.
-export const useRoleType = (id: string | undefined) => {
-  return useQuery({
-    queryKey: ['role-type', id],
-    queryFn: () => accessManagementService.getRoleType(id as string),
-    enabled: !!id,
-  })
-}
+export const useRoleType = (id: string | undefined) => useGetEntity(roleTypeKeys.detail, accessManagementService.getRoleType, id)

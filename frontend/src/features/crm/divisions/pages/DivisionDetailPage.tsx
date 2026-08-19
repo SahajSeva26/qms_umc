@@ -8,6 +8,7 @@ import BulkMrImportCard from '@/features/crm/divisions/components/BulkMrImportCa
 import DivisionContactsSection from '@/features/crm/divisions/components/DivisionContactsSection'
 import EditDivisionModal from '@/features/crm/divisions/components/EditDivisionModal'
 import { Button } from '@/components/ui/button'
+import { unwrapId } from '@/utils/unwrapId'
 
 const DivisionDetailPage = () => {
   const { id } = useParams<{ id: string }>()
@@ -16,9 +17,8 @@ const DivisionDetailPage = () => {
   const { data, isLoading, error } = useDivision(id)
   const division = data?.data ?? null
 
-  // division.tenant is populated on GET-by-id but typed `| string` for the
-  // create/update-echo case — resolve both shapes rather than assume one.
-  const tenantId = division ? (typeof division.tenant === 'string' ? division.tenant : division.tenant._id) : undefined
+  // division.tenant may be populated object or a plain id string; resolve both shapes.
+  const tenantId = division ? unwrapId(division.tenant, undefined) : undefined
 
   const [editOpen, setEditOpen] = useState(false)
 

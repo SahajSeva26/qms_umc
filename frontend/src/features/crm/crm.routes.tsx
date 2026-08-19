@@ -3,7 +3,6 @@ import { lazyRoute } from '@/lib/router/lazyRoute'
 
 export const CRM_ROUTES = {
   CRM:          '/crm',
-  SALES:        '/crm/sales',
   APPOINTMENTS: '/crm/appointments',
 }
 
@@ -20,10 +19,6 @@ export const crmRoutes: RouteObject[] = [
   {
     path: CRM_ROUTES.CRM,
     lazy: lazyRoute(() => import('./pages/CrmPage'), CRM_VIEW_PERMISSIONS),
-  },
-  {
-    path: CRM_ROUTES.SALES,
-    lazy: lazyRoute(() => import('./pages/SalesDashboardPage'), CRM_VIEW_PERMISSIONS),
   },
   {
     path: CRM_ROUTES.APPOINTMENTS,

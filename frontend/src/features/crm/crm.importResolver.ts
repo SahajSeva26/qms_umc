@@ -1,22 +1,10 @@
 import { accessManagementService } from '@/features/access-management/accessManagement.service'
 import { PLATFORM_TENANT_CODE } from '@/features/access-management/accessManagement.constants'
-import { crmService } from '@/features/crm/crm.service'
+import { divisionService } from '@/features/crm/divisions/division.service'
 import { contactsService } from '@/features/contacts/contacts.service'
 
-// Resolves the human-readable names a CSV row provides (matching Export's own
-// column shape — Company/Division/Contact/Sales rep as display names, not
-// IDs) back into the real ObjectIds CreateLeadPayload requires. Uses each
-// resource's own search endpoint's server-side `name` filter (confirmed
-// case-insensitive partial/regex match — tenant.service.ts/role.service.ts/
-// division.service.ts all do `{ $regex: name, $options: 'i' }`) rather than
-// fetching every record and filtering client-side — no backend changes
-// needed, this is exactly what those endpoints were already built to do
-// for the wizard's own pickers.
-//
-// A name match must be EXACT (case-insensitive) and UNIQUE to resolve
-// automatically — a partial/ambiguous match is surfaced as an error rather
-// than guessed, since silently picking "the first match" could bind a lead
-// to the wrong tenant/division/person.
+// Resolves a CSV row's Company/Division/Contact/Sales rep names into ObjectIds.
+// A match must be exact and unique — ambiguous matches error rather than guess.
 
 export interface ResolvedRow {
   tenantId: string
@@ -31,7 +19,7 @@ export interface ResolvedRow {
 
 export type ResolveError = { field: string; message: string }
 
-const exactMatch = <T extends { }>(items: T[], nameOf: (item: T) => string, target: string): T | null => {
+const exactMatch = <T extends object>(items: T[], nameOf: (item: T) => string, target: string): T | null => {
   const wanted = target.trim().toLowerCase()
   const matches = items.filter((item) => nameOf(item).trim().toLowerCase() === wanted)
   return matches.length === 1 ? matches[0] : null
@@ -51,7 +39,6 @@ export async function resolveRowNames(row: {
 }): Promise<{ resolved: ResolvedRow | null; errors: ResolveError[] }> {
   const errors: ResolveError[] = []
 
-  // 1: Tenant (Company) — searched unscoped, by name.
   const tenantRes = await accessManagementService.searchTenants({ name: row.company, limit: '10' })
   const tenant = exactMatch(tenantRes.data?.items ?? [], (t) => t.name, row.company)
   if (!tenant) {
@@ -64,12 +51,12 @@ export async function resolveRowNames(row: {
     })
   }
 
-  // 2: Division — scoped to the resolved tenant (division names are only
-  // unique within a tenant, matching how the wizard's own Division picker
-  // is scoped), so this step is skipped if Company didn't resolve.
+  // Division names are only unique within a tenant, so this step is skipped if Company didn't resolve.
   let division: { id: string; name: string } | null = null
   if (tenant) {
-    const divisionRes = await crmService.searchDivisions({ tenantId: tenant.id, name: row.division, limit: '10' })
+    const divisionRes = await divisionService.searchDivisions(
+      { tenant: tenant.id, name: row.division, limit: '10' },
+    )
     division = exactMatch(divisionRes.data?.items ?? [], (d) => d.name, row.division)
     if (!division) {
       const count = (divisionRes.data?.items ?? []).length
@@ -82,11 +69,7 @@ export async function resolveRowNames(row: {
     }
   }
 
-  // 3: Contact person — a Contact under the SAME tenant as Company (mirrors
-  // EditLeadModal.tsx's own contactPerson scoping rule: contactPerson.tenant
-  // must equal the lead's tenant, enforced server-side in lead.service.ts).
-  // Contact, not Role — Lead.contactPerson switched from a Role reference
-  // to a Contact reference 2026-08-03 (lead.model.ts's contactPerson.ref).
+  // Contact must belong to the same tenant as Company, enforced server-side too.
   let contact: { id: string; name: string } | null = null
   if (tenant) {
     const contactRes = await contactsService.searchContacts({ tenant: tenant.id, name: row.contact, status: 'active', limit: '10' })
@@ -102,15 +85,9 @@ export async function resolveRowNames(row: {
     }
   }
 
-  // 4: Sales rep — a Role under the PLATFORM tenant specifically (mirrors
-  // WizardStep4.tsx's own salesPerson scoping rule), never the pharma
-  // client's own tenant, resolved independently of Company/Division.
+  // Sales rep is a Role under the PLATFORM tenant, never the pharma client's own tenant.
   const platformTenantRes = await accessManagementService.searchTenants({ limit: '10' })
-  // tenant.type is only present on the wire for a system:manage caller
-  // (TenantMapper.toResponse) — code is always present regardless of
-  // permission, so match on it as a fallback. Without this, CSV import
-  // silently imported 0 rows for any non-system:manage caller, since every
-  // row failed on Sales rep resolution alone. Found via a 2026-07-26 test pass.
+  // tenant.type is only on the wire for a system:manage caller; fall back to code.
   const platformTenant = (platformTenantRes.data?.items ?? []).find((t) => t.type === 'platform' || t.code === PLATFORM_TENANT_CODE)
   let salesRep: { id: string; name: string } | null = null
   if (!platformTenant) {

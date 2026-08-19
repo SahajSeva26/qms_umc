@@ -1,5 +1,4 @@
-import { FiSearch } from 'react-icons/fi'
-import { Input } from '@/components/ui/input'
+import SearchInput from '@/components/ui/SearchInput'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { EMPTY_HQ_FILTERS, type HqFilters } from '@/features/hq/components/hqmapping/hqFilters'
 import { HQ_CARD_STYLE } from '@/features/hq/components/hqmapping/hq.ui'
@@ -23,21 +22,15 @@ const DISTANCE_OPTIONS: { value: HqFilters['distance']; label: string }[] = [
   { value: '>50', label: '> 50 KM' },
 ]
 
-// Exact port of hq-serviceability.js's renderFilters()/bindFilters() — 7
-// filters (search, company, state, city, division, device type, status,
-// distance) + reset link.
 const HqFilterBar = ({ filters, onChange, companies, states, cities, divisions, deviceTypes }: HqFilterBarProps) => (
   <div className="rounded-xl border p-2.5 mb-3" style={HQ_CARD_STYLE}>
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <div className="relative min-w-[220px]">
-        <FiSearch size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--qms-text-muted)' }} />
-        <Input
-          value={filters.q}
-          onChange={(e) => onChange({ q: e.target.value })}
-          placeholder="Search HQ / company / city / FO…"
-          className="pl-7"
-        />
-      </div>
+      <SearchInput
+        value={filters.q}
+        onChange={(v) => onChange({ q: v })}
+        placeholder="Search HQ / company / city / FO…"
+        wrapperClassName="min-w-[220px]"
+      />
 
       <div className="flex flex-wrap items-center gap-2">
         <Select value={filters.company} onValueChange={(v) => onChange({ company: v ?? 'ALL' })}>

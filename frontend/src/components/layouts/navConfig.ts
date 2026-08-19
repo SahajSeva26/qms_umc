@@ -44,8 +44,6 @@ const ALL_NAV_ITEMS: NavItem[] = [
   // Overview
   { id: 'dashboard',    label: 'Dashboard',                   icon: 'Grid',          path: DASHBOARD_ROUTES.DASHBOARD },
 
-  { id: 'sales',        label: 'Dashboard',                   icon: 'Grid',          path: CRM_ROUTES.SALES },
-
   { id: 'analytics',    label: 'Sales Analytics',             icon: 'TrendingUp',    path: ANALYTICS_ROUTES.ANALYTICS_SALES },
 
   { id: 'foanalytics',  label: 'FO Analytics',                icon: 'Navigation',    path: ANALYTICS_ROUTES.ANALYTICS_FO },
@@ -55,20 +53,11 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { id: 'finanalytics', label: 'Financial Analytics',         icon: 'BarChart2',     path: ANALYTICS_ROUTES.ANALYTICS_FINANCIAL },
 
   // Sales & CRM — Pipeline
-  // Real visibility for all 5 items in this Pipeline group is enforced by
-  // REAL_GATED_NAV_ITEMS in Sidebar.tsx (matching each route's own
-  // RequirePermission guard, with the usual system:manage bypass) — see
-  // that map for the actual gate.
+  // Real visibility for this group is enforced by REAL_GATED_NAV_ITEMS in Sidebar.tsx.
   { id: 'appointments', label: 'Appointments',                icon: 'Calendar',      path: CRM_ROUTES.APPOINTMENTS },
 
   { id: 'crm',          label: 'CRM',                         icon: 'Users',         path: CRM_ROUTES.CRM },
 
-  // Renamed from "Companies" and moved here from System 2026-08-11 (frontend-
-  // only: same route/page, ACCESS_MANAGEMENT_ROUTES.TENANTS / TenantsListPage
-  // + TenantDetailPage) — a company's own page now shows its Divisions
-  // inline, so this reads as "Client Management" and belongs in the CRM
-  // pipeline, not buried under System. Permission gate unchanged — see
-  // REAL_GATED_NAV_ITEMS['tenants'] in Sidebar.tsx.
   { id: 'tenants',      label: 'Client Management',           icon: 'Globe',         path: ACCESS_MANAGEMENT_ROUTES.TENANTS },
 
   // Sales & CRM — Delivery
@@ -102,16 +91,10 @@ const ALL_NAV_ITEMS: NavItem[] = [
 
   { id: 'foconfig',     label: 'FO Config Master',            icon: 'Settings',      path: FO_ROUTES.FO_CONFIG },
 
-  // GET /doctors is intentionally open to any authenticated user
-  // server-side (only create/update require doctor:manage) — no
-  // REAL_GATED_NAV_ITEMS entry either; gating this nav link would fight
-  // the backend's actual, deliberate contract.
+  // GET /doctors is open to any authenticated user server-side — no REAL_GATED_NAV_ITEMS entry.
   { id: 'doctors',      label: 'Doctor Management',           icon: 'Activity',      path: DOCTORS_ROUTES.DOCTORS },
 
-  // GET /geo-profiles is intentionally open to any authenticated user
-  // server-side (only create/update require geo-profile:manage) — same
-  // pattern as Doctors above. No REAL_GATED_NAV_ITEMS entry either; gating
-  // this nav link would fight the backend's actual, deliberate contract.
+  // GET /geo-profiles is open to any authenticated user server-side — no REAL_GATED_NAV_ITEMS entry.
   { id: 'geoprofiles',  label: 'Field Staff Coverage',        icon: 'MapPin',        path: GEO_PROFILE_ROUTES.GEO_PROFILES },
 
   // Operations — Coverage & Alerts
@@ -135,6 +118,12 @@ const ALL_NAV_ITEMS: NavItem[] = [
   // Resources
   { id: 'inventory',    label: 'Inventory & Devices',         icon: 'Package',       path: ADMIN_ROUTES.ADMIN_INVENTORY },
 
+  { id: 'itemmaster',   label: 'Item Master',                 icon: 'BookOpen',      path: ADMIN_ROUTES.ADMIN_INVENTORY_MASTERS },
+
+  { id: 'inventoryitems', label: 'Inventory Items',           icon: 'Cpu',           path: ADMIN_ROUTES.ADMIN_INVENTORY_ITEMS },
+
+  { id: 'inventoryops', label: 'Inventory Operations',        icon: 'UserCheck',     path: ADMIN_ROUTES.ADMIN_INVENTORY_OPERATIONS },
+
   { id: 'assets',       label: 'Asset Management',            icon: 'Box',           path: ADMIN_ROUTES.ADMIN_ASSETS },
 
   { id: 'kpi',          label: 'Order & KPI Engine',          icon: 'Activity',      path: ADMIN_ROUTES.ADMIN_KPI },
@@ -154,15 +143,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
 
   { id: 'settings',     label: 'Settings',                    icon: 'Settings',      path: ADMIN_ROUTES.ADMIN_SETTINGS },
 
-  // Access Management entities — real visibility enforced by
-  // REAL_GATED_NAV_ITEMS in Sidebar.tsx, matching each route's own
-  // RequirePermission guard exactly (with the usual system:manage bypass).
-  // 'tenants' itself moved into Sales & CRM > Pipeline (below 'crm') and
-  // relabeled "Client Management" 2026-08-11 — its underlying route/page
-  // are unchanged (still ACCESS_MANAGEMENT_ROUTES.TENANTS /
-  // TenantsListPage/TenantDetailPage), this is a nav-only rename+relocation,
-  // since companies-with-inline-divisions is what this nav item is
-  // actually for now.
+  // Access Management entities — real visibility enforced by REAL_GATED_NAV_ITEMS in Sidebar.tsx.
   { id: 'permissiongroups', label: 'Permission Groups',       icon: 'Shield',        path: ACCESS_MANAGEMENT_ROUTES.PERMISSION_GROUPS },
 
   { id: 'roletypes',        label: 'Role Types',              icon: 'Sliders',       path: ACCESS_MANAGEMENT_ROUTES.ROLE_TYPES },
@@ -208,7 +189,7 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
   {
     section: 'Resources',
     subs: [
-      { title: '', items: ['inventory', 'assets', 'kpi'].map((id) => NAV_BY_ID[id]) },
+      { title: '', items: ['inventory', 'itemmaster', 'inventoryitems', 'inventoryops', 'assets', 'kpi'].map((id) => NAV_BY_ID[id]) },
     ],
   },
   {

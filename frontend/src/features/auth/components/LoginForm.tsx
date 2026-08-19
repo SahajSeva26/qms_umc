@@ -7,6 +7,7 @@ import { useLogin } from '../hooks/useLogin'
 import ThemeToggle from '@/components/ui/ThemeToggle'
 import { DASHBOARD_ROUTES } from '@/components/layouts/navConfig'
 import { useNavigate } from 'react-router-dom'
+import { getApiErrorMessage } from '@/utils/apiError'
 
 const LoginForm = () => {
   const navigate = useNavigate()
@@ -105,15 +106,7 @@ const LoginForm = () => {
 
           {error && (
             <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
-              {/* error.message is Axios's generic "Request failed with status code N" —
-                  the real backend message (e.g. "Account not active contact admin",
-                  "Account is locked, try again in N minutes", "Invalid credentials,
-                  attempt remaining: N", "Too many authentication attempts, please try
-                  again later") lives at error.response.data.message, same pattern
-                  already used elsewhere (e.g. CreateTenantDialog.tsx). This call site
-                  was missed by that earlier fix — found via a 2026-07-24 test sweep. */}
-              {(error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-                'Invalid email or password.'}
+              {getApiErrorMessage(error, 'Invalid email or password.')}
             </div>
           )}
 

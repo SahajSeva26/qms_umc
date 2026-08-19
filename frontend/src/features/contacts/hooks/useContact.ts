@@ -1,11 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
+import { useGetEntity } from '@/hooks/useGetEntity'
 import { contactsService } from '@/features/contacts/contacts.service'
+import { contactKeys } from '@/features/contacts/hooks/useContacts'
 
-// Mirrors `@/features/access-management/role/hooks/useRole.ts` exactly.
-export const useContact = (id: string | undefined) => {
-  return useQuery({
-    queryKey: ['contact', id],
-    queryFn: () => contactsService.getContact(id as string),
-    enabled: !!id,
-  })
-}
+export const useContact = (id: string | undefined) => useGetEntity(contactKeys.detail, contactsService.getContact, id)

@@ -1,31 +1,21 @@
 import { useState } from 'react'
-import { Cpu, Warehouse } from 'lucide-react'
+import { FiCpu } from 'react-icons/fi'
+import { TbBuildingWarehouse } from 'react-icons/tb'
 import { toast } from '@/components/ui/sonner'
 import { useDeviceCatalog, useDeviceFleetUnits } from '@/features/inventory/hooks/useInventory'
 import { allFos, calibStatus, deviceFleet } from '@/features/inventory/inventory.service'
 import type { InventoryUnit } from '@/features/inventory/inventory.types'
 import DeviceDetailDrawer from '@/features/inventory/components/DeviceDetailDrawer'
 
-// Exact port of inventory.js's tabAssignments() (lines 650-690) +
-// window.invOpenUnit() (lines 975-980). NOT a real <table> — a flat
-// CSS-grid "row-pair" structure (.inv-assignment-grid: 220px name column +
-// 1fr chip column), one name/chip pair per Field Officer plus one trailing
-// pair for unassigned/hub units. Clicking any device chip reuses the shared
-// wide Device Detail drawer (already built for the Devices tab) via
-// invOpenUnit()'s unit → device resolution, then shows an info toast.
+// Flat CSS-grid "row-pair" layout, not a <table>: one name/chip row per FO
+// plus a trailing row for unassigned/hub units.
 const AssignmentsTab = () => {
   const { devices } = useDeviceCatalog()
   const { units, people } = useDeviceFleetUnits()
   const [openUnitId, setOpenUnitId] = useState<string | null>(null)
 
-  // fos() — exact port of inventory.js:145 (functionally identical to
-  // allFos(), the same filter already shared by the Warehouse tab's
-  // FO/Dietitian holder lists — reused here rather than re-declared).
   const list = allFos(people)
 
-  // window.invOpenUnit() — resolves the unit, opens the shared Device
-  // Detail drawer for its device, then (after a 50ms delay, exact port)
-  // shows an info toast naming the serial.
   const openUnit = (unitId: string) => {
     const u = units.find((x) => x.id === unitId)
     if (!u) return
@@ -64,7 +54,6 @@ const AssignmentsTab = () => {
           )
         })}
 
-        {/* Trailing "In hubs / available" row */}
         <div
           className="text-xs font-bold"
           style={{ padding: '10px 12px', borderBottom: '1px dashed var(--qms-border)', background: 'rgba(0,0,0,.02)', fontSize: 12 }}
@@ -82,7 +71,7 @@ const AssignmentsTab = () => {
                 className="inline-flex items-center gap-1 rounded-full font-semibold cursor-pointer"
                 style={{ padding: '3px 8px', fontSize: 11, background: 'rgba(59,109,255,.1)', color: 'var(--qms-brand-700, #1d40c4)' }}
               >
-                <Warehouse size={11} />
+                <TbBuildingWarehouse size={11} />
                 {dev?.type || '—'} · {u.sn} · {u.location || '—'}
               </span>
             )
@@ -140,7 +129,7 @@ const FoRow = ({ name, hq, states, units, devices, onOpenUnit }: FoRowProps) => 
               className="inline-flex items-center gap-1 rounded-full font-semibold cursor-pointer"
               style={{ padding: '3px 8px', fontSize: 11, background: 'rgba(59,109,255,.1)', color: 'var(--qms-brand-700, #1d40c4)', ...override }}
             >
-              <Cpu size={11} />
+              <FiCpu size={11} />
               {dev?.type || '—'} · {u.sn}
             </span>
           )

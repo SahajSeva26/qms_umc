@@ -1,6 +1,5 @@
-import { FiSearch } from 'react-icons/fi'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import SearchInput from '@/components/ui/SearchInput'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { UsersFilterState } from '@/features/admin/hooks/useUsersFilters'
 import type { UserStatus } from '@/types/user.types'
@@ -27,11 +26,8 @@ interface UsersFilterBarProps {
   onCompanyDropdownOpen?: () => void
 }
 
-// The Status trigger always shows the selected option's own label (default
-// is "active" — see useUsersFilters.ts — there is no "All" choice, since the
-// backend can't return every status in one call). Tenant keeps its "All"
-// sentinel since that filter is applied client-side over whatever page of
-// results already came back, not sent to the server.
+// Status has no "All" option (backend can't return every status in one call);
+// Tenant keeps "All" since it's filtered client-side over the fetched page.
 const UsersFilterBar = ({ filters, setFilter, reset, tenantOptions, onCompanyDropdownOpen }: UsersFilterBarProps) => {
   const tenantLabelById = new Map(tenantOptions.map((t) => [t.id, t.label]))
 
@@ -40,16 +36,12 @@ const UsersFilterBar = ({ filters, setFilter, reset, tenantOptions, onCompanyDro
       className="flex flex-wrap items-center justify-between gap-2 p-2.5 mb-3 rounded-xl border"
       style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}
     >
-      <div className="relative">
-        <FiSearch size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--qms-text-muted)' }} />
-        <Input
-          type="text"
-          value={filters.search}
-          onChange={(e) => setFilter('search', e.target.value)}
-          placeholder="Search by name..."
-          className="w-56 pl-7 text-[12px]"
-        />
-      </div>
+      <SearchInput
+        value={filters.search}
+        onChange={(v) => setFilter('search', v)}
+        placeholder="Search by name..."
+        className="w-56 text-[12px]"
+      />
 
       <div className="flex flex-wrap items-center gap-2">
         <Select value={filters.status} onValueChange={(v) => setFilter('status', (v ?? 'active') as UsersFilterState['status'])}>

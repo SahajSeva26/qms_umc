@@ -6,10 +6,7 @@ import { INVENTORY_FILTER_DEFAULTS } from '@/features/inventory/inventory.types'
 import type { InventoryUnit, DashboardSubView, FieldOpsSegment } from '@/features/inventory/inventory.types'
 import { usePeopleData } from '@/hooks/usePeopleData'
 
-// Mock/frontend-only catalogs — no real backend module exists yet (same
-// pattern as features/reminders and features/hq). Query hooks exist mainly
-// to keep this feature's data-access shape consistent with the rest of the
-// app (TanStack Query) even though the underlying data is a static list.
+// Mock/frontend-only catalog — no real backend module exists yet.
 export const useConsumables = () => {
   const { data: consumables = [], isLoading, error } = useQuery({
     queryKey: ['inventory', 'consumables'],
@@ -37,11 +34,8 @@ export const useTestCatalog = () => {
   return { tests, isLoading, error }
 }
 
-// ── Item Master (qms.inventory.items, inventory-masters.js) ────────────────
 // The unified item registry backing the Item Master / Expiry-FEFO / Field
-// Ops / Procurement tabs. seed() runs lazily inside service.getItems() (only
-// gated by the query's own `enabled`, never by a sentinel param) — this hook
-// is always enabled since the mock store needs no external input to seed.
+// Ops / Procurement tabs.
 export const useItemMaster = () => {
   const queryClient = useQueryClient()
   const { data: items = [], isLoading, error } = useQuery({
@@ -64,16 +58,12 @@ export const useItemMaster = () => {
   }
 }
 
-// Local filter-state slice for the Item Master tab (type/q) — mirrors the
-// prototype's module-level mutable `MST.f` object; each tab instance owns its
-// own slice instead of a shared global.
 export const useItemMasterFilters = () => {
   const [type, setType] = useState<string>(INVENTORY_FILTER_DEFAULTS.type)
   const [q, setQ] = useState<string>(INVENTORY_FILTER_DEFAULTS.q)
 
-  // setType() — exact port (inventory-masters.js:725): clicking an already-
-  // active type-strip card toggles back to 'ALL'; the type <select> just sets
-  // directly (never toggles) — callers choose which behavior they want.
+  // Clicking an already-active type toggles back to 'ALL'; the <select> just
+  // sets directly (never toggles) — callers choose which behavior they want.
   const toggleType = (t: string) => setType((cur) => (cur === t ? 'ALL' : t))
 
   return { type, setType, toggleType, q, setQ }
@@ -83,13 +73,8 @@ export const useItemMasterList = (items: ReturnType<typeof useItemMaster>['items
   return useMemo(() => service.filterItems(items, type, q), [items, type, q])
 }
 
-// ── Devices tab (seedUnits()/deviceFleet()/calibStatus(), inventory.js
-// lines 165-257) ─────────────────────────────────────────────────────────
-// The per-serial fleet-unit ledger (qms.inventory.units) shared by the
-// Devices/Calibration/Assignments/Movements tabs. seedUnits() needs the FO
-// roster (Person[]) to bind deployed units by machinesAssigned, so this
-// query is genuinely gated on the people list being loaded — never via a
-// sentinel query param, via TanStack Query's own `enabled` boolean.
+// The per-serial fleet-unit ledger shared by the Devices/Calibration/
+// Assignments/Movements tabs — gated on the people list being loaded.
 export const useDeviceFleetUnits = () => {
   const { people, isLoading: peopleLoading } = usePeopleData()
   const { data: units = [], isLoading, error } = useQuery({
@@ -101,21 +86,13 @@ export const useDeviceFleetUnits = () => {
   return { units, people, isLoading: peopleLoading || isLoading, error }
 }
 
-// deviceFleet() rollup for one catalog device — exact port of
-// inventory.js:247-257, recomputed from the shared seeded units list.
+// Rollup for one catalog device, recomputed from the shared seeded units list.
 export const useDeviceFleet = (units: ReturnType<typeof useDeviceFleetUnits>['units'], deviceId: string) => {
   return useMemo(() => service.deviceFleet(units, deviceId), [units, deviceId])
 }
 
-// ── Warehouse tab (qms.inventory.items/transfers/dietitians,
-// inventory-warehouse.js) ───────────────────────────────────────────────────
-// Central Warehouse stock (consumableItems()) reads the SAME shared Item
-// Master store as useItemMaster() above, so this hook shares that query key
-// — invalidating either one keeps both in sync. Transfers/dietitians need
-// the live FO roster (Person[]) to seed their demo rows, so — per this
-// codebase's enabled-gating discipline (never a sentinel query param) —
-// both queries are genuinely gated on `enabled: !peopleLoading`, not fired
-// with an empty/placeholder people[] and re-fired later.
+// Shares the item-master query key with useItemMaster() so invalidating
+// either keeps both in sync; transfers/dietitians are gated on people loading.
 export const useWarehouse = () => {
   const { people, isLoading: peopleLoading } = usePeopleData()
   const queryClient = useQueryClient()
@@ -157,10 +134,7 @@ export const useWarehouse = () => {
   }
 }
 
-// consumableItems() slice + valuation numbers for the Warehouse tab's 4
-// location cards + stock table — recomputed whenever the underlying items/
-// dietitians/transfers/people change, exact port of inventory-warehouse.js's
-// centralValue()/foFieldValue()/dietFieldValue()/transitValue().
+// Valuation numbers for the Warehouse tab's location cards + stock table.
 export const useWarehouseNetwork = (data: ReturnType<typeof useWarehouse>) => {
   const { people, items, dietitians, transfers } = data
   return useMemo(() => {
@@ -171,19 +145,12 @@ export const useWarehouseNetwork = (data: ReturnType<typeof useWarehouse>) => {
     const transit = service.transitValue()
     const fos = service.allFos(people)
     return { stock, central, foVal, dietVal, transit, fos }
-    // items/dietitians/transfers are read from the shared localStorage-backed
-    // service store, not passed as args to these pure fns — they're listed
-    // as deps purely so this recomputes after a mutation invalidates them.
+    // items/dietitians/transfers aren't read directly below — they're deps
+    // purely so this recomputes after a mutation invalidates them.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [people, items, dietitians, transfers])
 }
 
-// ── Overview tab (renderKpis()/renderAi()/tabOverview(), inventory.js lines
-// 321-520) ───────────────────────────────────────────────────────────────
-// Reuses the same shared seeded-units query as the Devices tab (useDeviceFleetUnits)
-// so KPI counts agree across tabs — Overview only adds its own derived
-// computations (KPI cards, AI summary, fleet-by-type bars, consumables
-// status mix, overdue-units slice) on top of that one shared units list.
 export const useInventoryOverview = () => {
   const { units, people, isLoading, error } = useDeviceFleetUnits()
   const { consumables } = useConsumables()
@@ -191,8 +158,13 @@ export const useInventoryOverview = () => {
   const kpis = useMemo(() => service.buildInventoryKpis(units), [units])
   const aiSummary = useMemo(() => service.buildInventoryAiSummary(units), [units])
   const fleetByType = useMemo(() => service.fleetByDeviceType(), [])
+  // consumablesStatusMix()/criticalConsumables() take no args and read
+  // getConsumables() internally; `consumables` is kept as a dep so this is
+  // ready to recompute once that becomes real invalidation-backed data.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const statusMix = useMemo(() => service.consumablesStatusMix(), [consumables])
   const overdueUnits = useMemo(() => service.overdueUnitsForOverview(units), [units])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const criticalConsumables = useMemo(() => service.criticalConsumables(), [consumables])
 
   return {
@@ -209,11 +181,6 @@ export const useInventoryOverview = () => {
   }
 }
 
-// ── Calibration tab (tabCalibration()/window.invMarkCalibrated(),
-// inventory.js lines 577-645) ───────────────────────────────────────────────
-// Reuses the same shared seeded-units query as Devices/Overview
-// (useDeviceFleetUnits) so the fleet-wide per-serial list agrees with every
-// other tab reading qms.inventory.units.
 export const useCalibrationRows = (
   units: ReturnType<typeof useDeviceFleetUnits>['units'],
   people: ReturnType<typeof useDeviceFleetUnits>['people'],
@@ -224,9 +191,6 @@ export const useCalibrationRows = (
   return useMemo(() => service.buildCalibrationRows(units, people, type, status, q), [units, people, type, status, q])
 }
 
-// Local filter-state slice for the Calibration tab (type/status/q) — mirrors
-// the prototype's module-level mutable `state.filter` object; each tab
-// instance owns its own slice instead of a shared global.
 export const useCalibrationFilters = () => {
   const [type, setType] = useState<string>(INVENTORY_FILTER_DEFAULTS.type)
   const [status, setStatus] = useState<string>(INVENTORY_FILTER_DEFAULTS.status)
@@ -235,10 +199,8 @@ export const useCalibrationFilters = () => {
   return { type, setType, status, setStatus, q, setQ }
 }
 
-// window.invMarkCalibrated() — one-click, no-confirmation mutation (matches
-// the prototype exactly: no modal/confirm step). Also appends a synthetic
-// CALIB movement record (service.markCalibrated's own doing), so both the
-// shared units query AND the movements query are invalidated in sync.
+// One-click, no-confirmation mutation. Also appends a synthetic CALIB
+// movement record, so both the units and movements queries are invalidated.
 export const useMarkCalibrated = () => {
   const queryClient = useQueryClient()
   const { people } = usePeopleData()
@@ -258,11 +220,6 @@ export const useMarkCalibrated = () => {
   }
 }
 
-// ── Vendors (window.QMS_InvProc, inventory-procurement.js) ─────────────────
-// seedVendors()/seedPriceHistory() run lazily inside service.getVendors()/
-// getPriceHistory() (gated only by the query's own enabled/queryFn, never a
-// sentinel param) — both are always-enabled since the mock stores need no
-// external input to seed, same as useItemMaster() above.
 export const useVendors = () => {
   const queryClient = useQueryClient()
   const { data: vendors = [], isLoading, error } = useQuery({
@@ -285,9 +242,8 @@ export const useVendors = () => {
   }
 }
 
-// Price history feeds the Vendor Detail drawer's trend table — a separate
-// query so it can seed independently of the vendor roster query above (both
-// gated only by their own queryFn, never a sentinel param).
+// Feeds the Vendor Detail drawer's trend table — a separate query so it can
+// seed independently of the vendor roster query above.
 export const useVendorPriceHistory = () => {
   const { data: priceHistory = [], isLoading, error } = useQuery({
     queryKey: ['inventory', 'priceHistory'],
@@ -297,14 +253,8 @@ export const useVendorPriceHistory = () => {
   return { priceHistory, isLoading, error }
 }
 
-// ── Movements tab (tabMovements(), inventory.js lines 749-786) ─────────────
-// The full ledger table, newest-first — reads the same shared seeded-units
-// query as Devices/Overview/Calibration (useDeviceFleetUnits) so unitId→
-// deviceType/serial lookups agree with every other tab, then layers its own
-// seedMovementsIfEmpty() query on top. Genuinely gated on the units list
-// being ready via TanStack Query's own `enabled`, never a sentinel param —
-// seedMovementsIfEmpty() needs a live units[] to filter out rows whose
-// referenced unit doesn't exist.
+// The full movements ledger, newest-first — gated on the units list being
+// ready since seeding needs a live units[] to filter out orphaned rows.
 export const useMovements = () => {
   const { units, people, isLoading: unitsLoading } = useDeviceFleetUnits()
   const { data: movements = [], isLoading: movementsLoading, error } = useQuery({
@@ -316,12 +266,8 @@ export const useMovements = () => {
   return { movements, units, people, isLoading: unitsLoading || movementsLoading, error }
 }
 
-// ── Transfers tab (window.QMS_InvWh.tabTransfers()/balancingSuggestions()/
-// dispatch()/openDeliver()/saveDeliver(), inventory-warehouse.js:218-377) ──
-// Reuses the SAME shared transfers/items/people queries as useWarehouse()
-// above (same qms.inventory.transfers + qms.inventory.items stores) so both
-// tabs stay in sync — invalidating one tab's mutation refreshes the other's
-// view of the same data.
+// Shares the same transfers/items query keys as useWarehouse() so both tabs
+// stay in sync — invalidating one tab's mutation refreshes the other's view.
 export const useTransfers = () => {
   const { people, isLoading: peopleLoading } = usePeopleData()
   const queryClient = useQueryClient()
@@ -376,28 +322,19 @@ export const useTransfers = () => {
   }
 }
 
-// Logistics rollup strip (Logistics spend / Cost per transfer / Cost per camp
-// / Cost per patient) — recomputed whenever the transfers list changes.
 export const useTransfersRollup = (transfers: ReturnType<typeof useTransfers>['transfers']) => {
   return useMemo(() => service.transfersLogisticsRollup(transfers), [transfers])
 }
 
-// Emergency stock-balancing panel — exact port of balancingSuggestions().
-// No foHoldings() engine exists yet in this build (FO Inventory/Item Master
-// per-FO holdings tab isn't built), so this always degrades to the
-// `suggestion: null` branch, matching the prototype's own guard exactly —
-// once that engine lands, thread it in here as the first argument.
+// No foHoldings() engine exists yet, so this always degrades to the
+// `suggestion: null` branch — thread it in as the first argument once it lands.
 export const useBalancingSuggestions = (people: ReturnType<typeof useTransfers>['people']) => {
   return useMemo(() => service.balancingSuggestions(undefined, people), [people])
 }
 
-// ── Log inventory movement modal (window.invNewMovement(), inventory.js
-// lines 789-876) — reachable from the shared page-head "New transfer" button
-// on every tab including Overview, and from the Movements tab's own "+ Log
-// movement" button (the SAME modal in both places — distinct from the
-// Warehouse/Transfers tabs' own separate stock-transfer modal). Mutates both
-// the movements ledger and (depending on type) the underlying unit's live
-// state, so a successful log invalidates both shared queries. ─────────────
+// Reachable from the shared page-head "New transfer" button on every tab and
+// from the Movements tab's own "+ Log movement" button — the same modal in
+// both places, distinct from the Warehouse/Transfers stock-transfer modal.
 export const useLogMovement = () => {
   const queryClient = useQueryClient()
   const { people } = usePeopleData()
@@ -418,16 +355,8 @@ export const useLogMovement = () => {
   }
 }
 
-// ── Dashboards tab (window.QMS_InvIntel.tabDashboards()/dashBody(),
-// inventory-intel.js lines 175-315) — 8 sub-views, each its own kpiGrid() +
-// supporting table, all derived from the shared units/items/transfers/
-// vendors/priceHistory stores plus the mock PR/PO/GRN/refill/field-report
-// seeds added alongside this tab. Reuses the SAME shared seeded-units query
-// as Devices/Overview/Calibration (useDeviceFleetUnits) so fleet counts agree
-// across every tab. No foHoldings() engine exists yet (FO Inventory/Item
-// Master per-FO holdings tab isn't built), so valuation()'s fieldValue
-// degrades to 0 exactly like the prototype's own guard — once that engine
-// lands, thread it in here as buildDashboardsData's 3rd argument.
+// No foHoldings() engine exists yet, so valuation()'s fieldValue degrades to
+// 0 — thread it in as buildDashboardsData's 3rd argument once it lands.
 export const useDashboardsData = () => {
   const { units, people, isLoading: unitsLoading } = useDeviceFleetUnits()
 
@@ -444,20 +373,11 @@ export const useDashboardsData = () => {
   }
 }
 
-// Local sub-view state (Executive/Inventory/Procurement/.../Operations) —
-// mirrors the prototype's module-local mutable `IN.dash` — plain useState,
-// no manual DOM re-render needed in the React port (see research spec).
 export const useDashboardSubView = () => {
   const [sub, setSub] = useState<DashboardSubView>('exec')
   return { sub, setSub }
 }
 
-// ── FO Inventory tab (window.QMS_InvMasters.tabFoInventory()/foHoldings(),
-// inventory-masters.js lines 569-722) ──────────────────────────────────────
-// Reuses the SAME shared seeded-units query as Devices/Overview/Calibration/
-// Movements (useDeviceFleetUnits) so per-FO device holdings agree with every
-// other tab reading qms.inventory.units — genuinely gated on `enabled:
-// !unitsLoading` via TanStack Query's own boolean, never a sentinel param.
 export const useFoInventoryRows = () => {
   const { units, people, isLoading: unitsLoading } = useDeviceFleetUnits()
 
@@ -470,9 +390,8 @@ export const useFoInventoryRows = () => {
   return { rows, units, people, isLoading: unitsLoading || rowsLoading, error }
 }
 
-// Per-FO holdings recompute for the drawer (openFoInventory()) — exact port
-// of foHoldings(foId), reusing the same shared units/people already loaded by
-// useFoInventoryRows() above so opening the drawer needs no extra query.
+// Reuses the units/people already loaded by useFoInventoryRows() above so
+// opening the drawer needs no extra query.
 export const useFoHoldings = (
   foId: string | null,
   units: ReturnType<typeof useDeviceFleetUnits>['units'],
@@ -481,13 +400,8 @@ export const useFoHoldings = (
   return useMemo(() => (foId ? service.foHoldings(foId, units, people) : null), [foId, units, people])
 }
 
-// ── Procurement tab (window.QMS_InvProc.tabProcurement(), inventory-
-// procurement.js:336-641) — the real persisted PR → PO → GRN pipeline.
-// Reuses the SAME qms.inventory.prs/pos/grns stores the Dashboards tab reads
-// via service.getPrs/getPos/getGrns (seedProcurementDocs()'s one-time seed),
-// so every mutation here invalidates the one shared query key set both tabs
-// read from. Always-enabled (no external input needed to seed), same as
-// useVendors()/useItemMaster() above.
+// The real persisted PR → PO → GRN pipeline. Shares its query keys with the
+// Dashboards tab, so every mutation here invalidates both.
 export const useProcurement = () => {
   const queryClient = useQueryClient()
 
@@ -503,8 +417,6 @@ export const useProcurement = () => {
     queryKey: ['inventory', 'grns'],
     queryFn: async () => service.getGrns(),
   })
-  // Vendors + the shared item-master store are both read by the New PR /
-  // Generate PO modals (item picker, vendor picker, vendorByName lookups).
   const { vendors } = useVendors()
   const { items } = useItemMaster()
 
@@ -568,22 +480,12 @@ export const useProcurement = () => {
   }
 }
 
-// Local segmented-control state (Requisitions/Purchase Orders/Goods Receipt)
-// — mirrors the prototype's module-level mutable `PROC.seg` object; plain
-// useState, no manual DOM re-render needed in the React port.
 export type ProcurementSeg = 'PR' | 'PO' | 'GRN'
 export const useProcurementSeg = () => {
   const [seg, setSeg] = useState<ProcurementSeg>('PR')
   return { seg, setSeg }
 }
 
-// ── Forecast tab (window.QMS_InvIntel.tabForecast()/viewDemand()/
-// viewConsumption(), inventory-intel.js lines 318-393) ─────────────────────
-// Demand forecast sub-view: forecast(windowDays) is pure/synchronous (no
-// external input needed beyond the shared items store, which self-seeds), so
-// it's recomputed via useMemo off the window-selector state rather than a
-// separate TanStack Query — same treatment as useDashboardSubView's local
-// `sub` selector, since there's nothing async to gate here.
 export const useForecastWindow = () => {
   const [win, setWin] = useState(30)
   return { win, setWin }
@@ -593,10 +495,6 @@ export const useDemandForecast = (win: number) => {
   return useMemo(() => service.forecast(win), [win])
 }
 
-// Camp Consumption Engine sub-view: needs the shared seeded-units + people
-// roster (foConsumableHoldings() inside applyConsumption() reads both), so
-// the camp list + selection state + mutation are genuinely gated on
-// `enabled: !unitsLoading` via useDeviceFleetUnits, never a sentinel param.
 export const useConsumptionCamps = () => {
   return useMemo(() => service.consumptionCamps(), [])
 }
@@ -628,12 +526,6 @@ export const useConsumedCamps = () => {
   }
 }
 
-// ── Field Ops tab (window.QMS_InvField.tabFieldOps(), inventory-field.js) ──
-// Refills + reports + the allocations ledger all need the fleet-unit ledger
-// (units) and FO/dietitian roster (people) to seed — seedFieldOps() derives
-// each FO's starting allocation kit via foConsumableHoldings(), which itself
-// reads the shared qms.inventory.units store. Genuinely gated on `enabled:
-// !unitsLoading` via useDeviceFleetUnits, never a sentinel query param.
 export const useFieldOps = () => {
   const { units, people, isLoading: unitsLoading } = useDeviceFleetUnits()
   const queryClient = useQueryClient()
@@ -651,9 +543,7 @@ export const useFieldOps = () => {
   })
 
   // Allocations aren't fetched as their own query — holderHoldings()/holders()
-  // are pure/synchronous reads off the same localStorage ledger, recomputed
-  // via useMemo in the component after each mutation invalidates this key set
-  // (matching the prototype's own rerender()-on-every-mutation model).
+  // are recomputed via useMemo after each mutation invalidates this key set.
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['inventory', 'fieldops'] })
     queryClient.invalidateQueries({ queryKey: ['inventory', 'items'] })
@@ -700,10 +590,6 @@ export const useFieldOps = () => {
   }
 }
 
-// holders()/holderHoldings() recompute — pure/synchronous reads off the
-// shared allocations ledger, recomputed whenever people or the mutation
-// invalidation bumps `refills`/`reports` (used as a cheap "something in Field
-// Ops changed" signal since the ledger itself isn't its own query).
 export const useHolders = (people: ReturnType<typeof useDeviceFleetUnits>['people']) => {
   return useMemo(() => service.holders(people), [people])
 }
@@ -713,27 +599,18 @@ export const useHolderHoldings = (holder: string, refreshKey: unknown) => {
   return useMemo(() => service.holderHoldings(holder), [holder, refreshKey])
 }
 
-// Local segment state (Refills/Issues/Allocations) — mirrors the prototype's
-// module-level mutable FIELD.seg; plain useState, default 'refills'.
 export const useFieldOpsSegment = () => {
   const [seg, setSeg] = useState<FieldOpsSegment>('refills')
   return { seg, setSeg }
 }
 
-// Local holder-select state for the Allocations sub-view — mirrors FIELD.holder.
 export const useFieldOpsHolder = () => {
   const [holder, setHolder] = useState<string>('')
   return { holder, setHolder }
 }
 
-// ── Audit tab (window.QMS_InvIntel.tabAudit(), inventory-intel.js lines
-// 449-470) — merges the shared units/people-derived Movements/Refills/Field-
-// reports stores with the Transfers/PR/PO/GRN stores into one flat ledger.
-// Reuses the SAME shared seeded-units query as Devices/Overview/Calibration/
-// Movements (useDeviceFleetUnits) so unitId→deviceType lookups agree with
-// every other tab, and primes the Transfers store's FO-dependent seed the
-// same way useWarehouse()/useTransfers() do. Genuinely gated on `enabled:
-// !unitsLoading` via TanStack Query's own boolean — never a sentinel param.
+// Merges the units/people-derived Movements/Refills/Field-reports stores with
+// the Transfers/PR/PO/GRN stores into one flat ledger.
 export const useAuditEvents = () => {
   const { units, people, isLoading: unitsLoading } = useDeviceFleetUnits()
 
@@ -749,20 +626,11 @@ export const useAuditEvents = () => {
   return { events, isLoading: unitsLoading || eventsLoading, error }
 }
 
-// Local filter-state slice for the Audit tab's single <select> — mirrors the
-// prototype's module-level mutable IN.audit (default 'ALL').
 export const useAuditFilter = () => {
   const [type, setType] = useState<string>('ALL')
   return { type, setType }
 }
 
-// ── Copilot tab (window.QMS_InvIntel.tabCopilot(), inventory-intel.js lines
-// 396-421) — 9 natural-language Q&A cards, every answer recomputed fresh (no
-// caching) from the same shared units/people-derived stores every other tab
-// reads. Reuses the SAME shared seeded-units query as Devices/Overview/
-// Calibration/Movements/Dashboards/Audit (useDeviceFleetUnits) so fleet/FO
-// counts agree with every other tab. Genuinely gated on `enabled:
-// !unitsLoading` via TanStack Query's own boolean — never a sentinel param.
 export const useCopilotData = () => {
   const { units, people, isLoading: unitsLoading } = useDeviceFleetUnits()
 

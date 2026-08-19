@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Save } from 'lucide-react'
+import { FiSave } from 'react-icons/fi'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { toast } from '@/components/ui/sonner'
@@ -29,14 +29,8 @@ const blankForm = (): LogMovementInput => ({
   notes: '',
 })
 
-// window.invNewMovement() (inventory.js:789-876) — the SAME "Log inventory
-// movement" modal reachable from both the Movements tab's own "+ Log
-// movement" button AND, per pages/inventory.html:32, the shared page-head
-// "New transfer" button on EVERY tab (the prototype's own label is a slight
-// misnomer — it opens this modal, not the Transfer modal in
-// TransfersTab.tsx/WarehouseTab.tsx). Extracted out of MovementsTab.tsx into
-// its own controlled (open/onClose) component so InventoryPage.tsx can wire
-// it to the page-head button without duplicating the form.
+// Controlled (open/onClose) so both the Movements tab's own button and the
+// page-head "New transfer" button (every tab) can open the same modal.
 interface LogMovementModalProps {
   open: boolean
   onClose: () => void
@@ -51,9 +45,6 @@ const LogMovementModal = ({ open, onClose, units }: LogMovementModalProps) => {
 
   const set = <K extends keyof LogMovementInput>(k: K, v: LogMovementInput[K]) => setForm((f) => ({ ...f, [k]: v }))
 
-  // Unit select options — first 100 units as '<serial> · <deviceType> ·
-  // <location-or-assignee-name-or-—>' — exact port of invNewMovement()'s
-  // <select id="mv-unit"> option builder (inventory.js:805-808).
   const unitOptions = useMemo(() => units.slice(0, 100).map((u) => ({
     id: u.id,
     label: `${u.sn} · ${u.deviceType} · ${u.location || u.assignedTo || '—'}`,
@@ -138,7 +129,7 @@ const LogMovementModal = ({ open, onClose, units }: LogMovementModalProps) => {
         <DialogFooter>
           <Button variant="ghost" onClick={() => onClose()}>Cancel</Button>
           <Button onClick={handleSave} disabled={saving}>
-            <Save size={14} /> Log movement
+            <FiSave size={14} /> Log movement
           </Button>
         </DialogFooter>
       </DialogContent>

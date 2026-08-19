@@ -1,11 +1,4 @@
-// HQ Mapping & Serviceability — the geo/serviceability engine. Exact port of
-// hq-serviceability.js's window.QMS_HQ_GEO public API (Haversine, the
-// 4-tier classifyHq/classifyAll engine, activeFos(), nearestFoWithDevice)
-// plus hq-mapping.js's own classifyCity() (a DELIBERATELY DIFFERENT, thinner
-// 3-tier classifier — do not unify with classifyHq, see hq.types.ts).
-// Designed as a standalone module (pure functions + local storage), matching
-// the prototype's own note that classifyAll() is "used by Client Management"
-// — i.e. more than one screen may eventually depend on this exact contract.
+// HQ geo/serviceability engine. classifyCity() is a deliberately different, thinner classifier — do not unify with classifyHq.
 // TODO: entirely mock/frontend-only — no backend endpoints exist yet.
 
 import type { Person } from '@/types/people.types'
@@ -50,13 +43,8 @@ function todayIso() {
   return new Date().toISOString().slice(0, 10)
 }
 
-// ── Config — 5 thresholds, override mechanism exists but (per the
-// prototype) has zero UI call sites; kept for parity/future use. ──────────
-// getConfig() is read from localStorage exactly once per module lifetime and
-// cached here — it was previously re-read (localStorage.getItem + JSON.parse)
-// on every call, including from inside haversine()/classifyHq(), which fans
-// out to one read per FO per HQ. saveConfig() is the only place the config
-// can change, so it's the only place the cache is invalidated.
+// Cached after first load since haversine()/classifyHq() call getConfig() per FO per HQ.
+// saveConfig() is the only place that invalidates the cache.
 let configCache: HqGeoConfig | null = null
 
 export function getConfig(): HqGeoConfig {
@@ -72,8 +60,6 @@ export function saveConfig(patch: Partial<HqGeoConfig>): HqGeoConfig {
   configCache = next
   return next
 }
-
-// ── Haversine ──────────────────────────────────────────────────────────
 
 function toRad(d: number): number {
   return (d * Math.PI) / 180
@@ -92,8 +78,6 @@ export function etaMinutes(km: number): number {
   return Math.round((km / getConfig().avgKmh) * 60)
 }
 
-// ── HQ master store ────────────────────────────────────────────────────
-
 export function loadHqs(): HqRecord[] {
   return load(KEYS.HQS, SEED_HQS)
 }
@@ -102,15 +86,8 @@ export function saveHqs(list: HqRecord[]): void {
   persist(KEYS.HQS, list)
 }
 
-// ── activeFos() — normalized FO view for the geo engine ─────────────────
-// people().filter(role==='Field Officer' && !relievedOn), auto-geocoded via
-// lookupCity(hq) once, enriched with today's load%. Exact port of
-// hq-serviceability.js:239-263 — every active FO is returned regardless of
-// whether coordinates resolve; a FO whose HQ city isn't in the gazetteer (and
-// has no explicit Person.lat/lng) still appears here with lat/lng undefined,
-// so FO Master/KPI counts/load-distribution stay accurate. Only the ranking
-// steps inside classifyHq()/nearestFoWithDevice() skip no-coords FOs.
-
+// Returns every active FO regardless of whether coordinates resolve, so FO Master/KPI
+// counts stay accurate; only the ranking in classifyHq()/nearestFoWithDevice() skips no-coords FOs.
 export function activeFos(people: Person[], camps: Camp[], devices: DeviceCatalogItem[]): GeoFo[] {
   const today = todayIso()
   return people
@@ -144,8 +121,6 @@ export function activeFos(people: Person[], camps: Camp[], devices: DeviceCatalo
       }
     })
 }
-
-// ── classifyHq() — the 4-tier engine, exact port of hq-serviceability.js:336-404 ──
 
 export function classifyHq(hq: HqRecord, fos: GeoFo[]): ClassifiedHq {
   const cfg = getConfig()
@@ -184,8 +159,8 @@ export function classifyHq(hq: HqRecord, fos: GeoFo[]): ClassifiedHq {
       deviceMatch: false, deviceLoadPct: 0, lastUpdated: nowIso(), reason: 'No active FOs in master',
     }
   }
-  let status: ClassifiedHq['status'] = 'RED'
-  let reason = ''
+  let status: ClassifiedHq['status']
+  let reason: string
   if (top.km <= cfg.radiusKm) {
     if (top.deviceMatch && top.fo.loadPct < cfg.deviceLoadPct) {
       status = 'GREEN'; reason = 'FO + matching device within 35 KM'
@@ -219,23 +194,14 @@ export function classifyHq(hq: HqRecord, fos: GeoFo[]): ClassifiedHq {
   }
 }
 
-// classifyAll() — no time-based cache in the React port (unlike the
-// prototype's 4s-TTL CACHE keyed only on Date.now(); React Query / component
-// memoization already handles recomputation cost at this data scale ~90-300
-// rows, so the invalidation-discipline problem the prototype's cache created
-// doesn't apply here — every call is fresh).
-// `hqs` is optional and defaults to loadHqs() for backward compatibility —
-// callers that already hold the HQ master list (e.g. from useHqMaster()'s
-// query cache) can pass it directly instead of triggering a second
-// independent localStorage read of the same qms.hq.master key.
+// `hqs` is optional (defaults to loadHqs()) so callers already holding the HQ master
+// list can pass it directly instead of triggering a second localStorage read.
 export function classifyAll(people: Person[], camps: Camp[], devices: DeviceCatalogItem[], hqs?: HqRecord[]): ClassifiedHq[] {
   const fos = activeFos(people, camps, devices)
   return (hqs ?? loadHqs()).map((h) => classifyHq(h, fos))
 }
 
-// ── nearestFoWithDevice() — hard device-type filter (unlike classifyHq's
-// soft preference-bonus), used by classifyCity/expansion/machine-replacement. ──
-
+// Hard device-type filter (unlike classifyHq's soft preference-bonus).
 export function nearestFoWithDevice(originCity: string, deviceType: string | null, fos: GeoFo[]): NearestFoWithDevice | null {
   const coord = lookupCity(originCity)
   if (!coord) return null
@@ -255,9 +221,7 @@ export function nearestFoWithDevice(originCity: string, deviceType: string | nul
   return { fo: best, km: +bestKm.toFixed(2), etaMin: etaMinutes(bestKm) }
 }
 
-// ── classifyCity() — hq-mapping.js's own 3-tier (GREEN/ORANGE/RED, no
-// YELLOW, no loadPct concept) wrapper, built purely on the primitives above. ──
-
+// 3-tier (GREEN/ORANGE/RED, no YELLOW, no loadPct) wrapper built on the primitives above.
 export function classifyCity(city: string, deviceType: string | null, fos: GeoFo[]): ClassifiedCity {
   const coord = lookupCity(city)
   if (!coord) {
@@ -267,8 +231,8 @@ export function classifyCity(city: string, deviceType: string | null, fos: GeoFo
   const withDev = nearestFoWithDevice(city, deviceType, fos)
   const anyFo = nearestFoWithDevice(city, null, fos)
   let serviceable = false
-  let status: ClassifiedCity['status'] = 'RED'
-  let reason = ''
+  let status: ClassifiedCity['status']
+  let reason: string
   if (withDev && withDev.km <= cfg.radiusKm) {
     serviceable = true; status = 'GREEN'
     reason = `${withDev.fo.name} (${withDev.fo.hq}) · ${withDev.km} KM with ${deviceType || 'device'}`
@@ -286,8 +250,6 @@ export function classifyCity(city: string, deviceType: string | null, fos: GeoFo
   }
 }
 
-// ── Bulk city-serviceability check ────────────────────────────────────
-
 const DEFAULT_TESTS = ['BP', 'Glucometer', 'ECG', 'SpO2', 'BMI', 'Lipid']
 
 export function bulkTestUniverse(fos: GeoFo[]): string[] {
@@ -296,9 +258,7 @@ export function bulkTestUniverse(fos: GeoFo[]): string[] {
   return set.size ? Array.from(set) : DEFAULT_TESTS
 }
 
-// cityServiceable() — exact-array-membership device match (NOT the substring
-// match classifyHq/nearestFoWithDevice use) — a deliberately different rule
-// specific to the bulk checker, per hq-serviceability.js.
+// Exact-array-membership device match (not the substring match classifyHq/nearestFoWithDevice use).
 function cityServiceable(coord: { lat: number; lng: number }, test: string, fos: GeoFo[]): { fo: GeoFo; km: number } | null {
   const cfg = getConfig()
   let best: { fo: GeoFo; km: number } | null = null
@@ -351,11 +311,6 @@ export function computeBulk(cities: string[], tests: string[], fos: GeoFo[]): Re
   }
   return out
 }
-
-// ── Expansion recommender — buildExpansion(), exact scoring formula ─────
-// (hq-mapping.js:682-756). Lives here (not a separate hqMapping.service.ts)
-// since it only needs camps/people/MR data + the primitives above — kept
-// alongside the rest of the engine per the "one geo module" design intent.
 
 export interface MrLike {
   hq: string

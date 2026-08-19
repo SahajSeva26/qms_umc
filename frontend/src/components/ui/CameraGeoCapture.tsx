@@ -23,12 +23,8 @@ interface CameraGeoCaptureProps {
   onClose: () => void
 }
 
-// Shared camera+geo capture primitive — used by Attendance check-in and every
-// stage of the Run Camp wizard (check-in selfie, setup photo, additional
-// photos, closure photo). Mirrors the prototype's openCapture()/
-// captureCheckIn() (near-identical code duplicated across fo-portal.js and
-// fo-camp-run.js) consolidated into one component, per the research spec's
-// explicit recommendation.
+// Shared camera+geo capture primitive used by Attendance check-in and every
+// stage of the Run Camp wizard.
 const CameraGeoCapture = ({ open, title, facing = 'environment', onConfirm, onClose }: CameraGeoCaptureProps) => {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -39,6 +35,8 @@ const CameraGeoCapture = ({ open, title, facing = 'environment', onConfirm, onCl
 
   useEffect(() => {
     if (!open) return
+    // Resets UI to "acquiring" before each fresh camera/GPS acquisition cycle.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSnapshot(null)
     setGeo(null)
     setGeoStatus('pending')

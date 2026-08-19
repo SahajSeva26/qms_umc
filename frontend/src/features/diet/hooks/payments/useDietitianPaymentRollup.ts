@@ -17,16 +17,9 @@ interface UseDietitianPaymentRollupArgs {
   userName: string
 }
 
-/**
- * Everything the Dietitian Payment screen derives from data: role scoping,
- * the per-dietitian rollup rows, and the KPI totals. No JSX, no UI state —
- * search/filtering stays in the page because it is presentation state.
- *
- * The rollup keeps Phase 1's DietitianRollupIndex: each backing store is
- * parsed exactly ONCE per computation and the dietitian × camp loop does O(1)
- * lookups against it. Do not replace the *From() helpers with their
- * single-shot equivalents — that reintroduces the N+1.
- */
+// Derives role scoping, per-dietitian rollup rows, and KPI totals. Each
+// backing store is parsed once via DietitianRollupIndex; don't replace the
+// *From() helpers with per-item equivalents — that reintroduces the N+1.
 export const useDietitianPaymentRollup = ({ role, userName }: UseDietitianPaymentRollupArgs) => {
   const { camps } = useCampsData()
   const { data: payments = [] } = useDietPayments()
@@ -50,19 +43,15 @@ export const useDietitianPaymentRollup = ({ role, userName }: UseDietitianPaymen
 
   const dietitiansInScope = useMemo(() => {
     const ids = Array.from(new Set(scopedDietCamps.map((c) => c.dietitianId).filter((id): id is string => !!id)))
-    // One roster read for the whole list — dietitianById() re-parses the
-    // roster store on every call, which was one parse per dietitian here.
+    // One roster read for the whole list, avoiding a re-parse per dietitian.
     const rosterById = new Map(dietitianRoster().map((d) => [d.id, d]))
     return ids.map((id) => rosterById.get(id) ?? { id, name: id, real: false, phone: '', email: '', hq: '', states: [], ratePerCamp: 0, status: 'ENROLLED' as const, detailsComplete: false, appliedOn: '' })
   }, [scopedDietCamps])
 
   const rows = useMemo((): ScopedDietitianRollup[] => {
-    // Every store this rollup needs (details / rate history / ledger / roster)
-    // is parsed exactly ONCE here.
     const ix = loadRollupIndex()
 
-    // Group the in-scope camps by dietitian in one pass, replacing a full
-    // camps.filter() per dietitian.
+    // Group in-scope camps by dietitian in one pass instead of filtering per dietitian.
     const campsByDietitian = new Map<string, Camp[]>()
     camps.forEach((c) => {
       if (c.type !== 'Diet' || !c.dietitianId) return
@@ -103,9 +92,9 @@ export const useDietitianPaymentRollup = ({ role, userName }: UseDietitianPaymen
       }
     })
     return list.sort((a, b) => b.toBePaid - a.toBePaid)
-    // `payments` is a real dependency, not a refresh hack: the rollup reads
-    // the ledger through loadRollupIndex(), so it must recompute whenever the
-    // cached ledger changes.
+    // `payments` isn't referenced by name, but loadRollupIndex() reads the
+    // same ledger store it's backed by — kept as a dep so cache refetches invalidate this memo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dietitiansInScope, camps, scopeCampIds, payments])
 
   const kpi = useMemo(() => {

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FiPlus } from 'react-icons/fi'
 import { useCampsReal } from '@/features/camps/hooks/useCampsReal'
@@ -9,42 +9,31 @@ import CampsFilterBarReal from '@/features/camps/components/CampsFilterBarReal'
 import CampsKpiStripReal from '@/features/camps/components/CampsKpiStripReal'
 import CampTableReal from '@/features/camps/components/CampTableReal'
 import PaginationControls from '@/components/ui/PaginationControls'
+import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import { Button } from '@/components/ui/button'
+import { usePagination } from '@/hooks/usePagination'
 import type { BillingType, CampStatus, CampType } from '@/types/campReal.types'
+import { EMPTY_ARRAY } from '@/utils/emptyArray'
 
-// camp.routes.ts's real GUARD for create/update/moveStage/allocate is
-// [camp:manage, tenant:manage] — a camp:search-only actor (e.g. an FO, whose
-// RoleType only grants search+get) can legitimately read/list camps but the
-// backend 403s any write. Hiding the "New camp" button for that case avoids
-// sending them into a create flow that can only ever fail — found via a
-// live low-privilege-user test pass (the button was visible and the route
-// was reachable, but POST correctly still 403'd server-side; this is a UX
-// gap, not a real security hole, since the backend never trusted the UI).
+// Hides "New camp" for camp:search-only actors (e.g. FOs) since the backend 403s any write.
 const CAMP_WRITE_PERMISSIONS = ['camp:manage', 'tenant:manage']
 
 const PAGE_SIZE = 20
 const AGGREGATE_LIMIT = 10
 const ALL_STATUSES: CampStatus[] = ['requested', 'confirmed', 'live', 'closed', 'cancelled', 'cancelled_charged']
 
-// Rebuilt from scratch against the real backend contract
-// (backend/src/modules/operations/camp/**) — replaces the entirely mock/
-// localStorage previous build. Real 6-status state machine (not the old
-// mock's 10-status enum + derived "stage" concept), real fo/mr/asm/rsm as
-// Role references, no teleconsult/close-out/reminders/resource-assignment
-// (zero backend support for any of those). Same server-side search+
-// pagination+aggregate-KPI pattern as DoctorsPage.tsx.
 const CampsPageReal = () => {
   const navigate = useNavigate()
   const { hasAnyPermission } = usePermission()
   const canWrite = hasAnyPermission(CAMP_WRITE_PERMISSIONS)
   const { filters, setFilter, reset } = useCampsRealFilters()
-  const [page, setPage] = useState(1)
+  const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
   const debouncedCity = useDebouncedValue(filters.city, 300)
   const debouncedState = useDebouncedValue(filters.state, 300)
 
   const activeStatus = filters.status
 
-  const { data, isLoading, error } = useCampsReal({
+  const { data, isLoading, error, refetch } = useCampsReal({
     status: activeStatus === 'ALL' ? undefined : activeStatus,
     type: filters.type === 'ALL' ? undefined : (filters.type as CampType),
     billingType: filters.billingType === 'ALL' ? undefined : (filters.billingType as BillingType),
@@ -55,15 +44,12 @@ const CampsPageReal = () => {
     page: String(page),
     limit: String(PAGE_SIZE),
   })
-  const camps = data?.data?.items ?? []
+  const camps = data?.data?.items ?? EMPTY_ARRAY
   const totalCount = data?.data?.count ?? 0
-  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
 
-  // Aggregate, unpaginated fetch (mirrors DoctorsPage.tsx's activeDoctors/
-  // inactiveDoctors pattern) so the KPI strip's per-status counts reflect the
-  // WHOLE dataset, not just the current page.
+  // Separate unpaginated fetch so the KPI strip's per-status counts reflect the whole dataset.
   const { data: allData } = useCampsReal({ limit: String(AGGREGATE_LIMIT) })
-  const allCamps = allData?.data?.items ?? []
+  const allCamps = allData?.data?.items ?? EMPTY_ARRAY
   const counts = useMemo(() => {
     const result: Record<CampStatus, number> = {
       requested: 0, confirmed: 0, live: 0, closed: 0, cancelled: 0, cancelled_charged: 0,
@@ -76,12 +62,12 @@ const CampsPageReal = () => {
 
   const handleFilterChange = <K extends keyof typeof filters>(key: K, value: (typeof filters)[K]) => {
     setFilter(key, value)
-    setPage(1)
+    resetToFirstPage()
   }
 
   const handleReset = () => {
     reset()
-    setPage(1)
+    resetToFirstPage()
   }
 
   return (
@@ -115,24 +101,10 @@ const CampsPageReal = () => {
 
       <CampsFilterBarReal filters={filters} setFilter={handleFilterChange} reset={handleReset} />
 
-      {isLoading && (
-        <div className="text-[13px] py-10 text-center" style={{ color: 'var(--qms-text-muted)' }}>
-          Loading camps…
-        </div>
-      )}
-
-      {error && !isLoading && (
-        <div className="text-[13px] rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
-          Failed to load camps. Please try again.
-        </div>
-      )}
-
-      {!isLoading && !error && (
-        <>
-          <CampTableReal camps={camps} onOpen={(id) => navigate(`/camps/${id}`)} />
-          <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} />
-        </>
-      )}
+      <QueryStateBlock isLoading={isLoading} error={error} loadingLabel="Loading camps…" errorLabel="Failed to load camps. Please try again." onRetry={refetch}>
+        <CampTableReal camps={camps} onOpen={(id) => navigate(`/camps/${id}`)} />
+        <PaginationControls page={page} totalPages={totalPages(totalCount)} onPageChange={setPage} />
+      </QueryStateBlock>
     </div>
   )
 }

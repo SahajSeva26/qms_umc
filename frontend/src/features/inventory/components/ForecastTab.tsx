@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { LineChart, Calculator, RefreshCw, Check } from 'lucide-react'
+import { FiTrendingUp, FiRefreshCw, FiCheck } from 'react-icons/fi'
+import { TbCalculator } from 'react-icons/tb'
 import SideDrawer from '@/components/ui/SideDrawer'
 import { toast } from '@/components/ui/sonner'
 import { ItemDetailDrawerBody } from '@/features/inventory/components/ItemMasterTab'
@@ -13,15 +14,8 @@ import { inr, inrShort, totalProcureCost, runAutoReorder, campConsumptionLines, 
 import type { CampConsumptionLine } from '@/features/inventory/inventory.service'
 import type { ForecastRow } from '@/features/inventory/inventory.types'
 
-// Exact port of window.QMS_InvIntel's Forecast tab (tabForecast()/
-// viewDemand()/viewConsumption(), inventory-intel.js lines 318-393). No page-
-// level KPI grid here (that's exclusive to Dashboards) — this tab's only two
-// surfaces are a tab-switch segment (Demand forecast / Camp consumption
-// engine) and, within Demand, a second window-selector row (30/60/90/180d).
-// Zero modals of its own: table rows in the Demand sub-view open the SHARED
-// Item Master detail drawer (same component ItemMasterTab.tsx exports),
-// "Auto-reorder shortages" and "Apply deduction" are both toast-only
-// side-effecting actions with no confirmation step, matching the prototype.
+// Two sub-views: Demand forecast (with a 30/60/90/180d window selector) and
+// Camp consumption engine. Demand rows open the shared Item Master drawer.
 
 function ImBand({ tone, children }: { tone: 'green' | 'red'; children: React.ReactNode }) {
   const s = SHORTAGE_BAND_STYLE[tone]
@@ -34,14 +28,15 @@ function ImBand({ tone, children }: { tone: 'green' | 'red'; children: React.Rea
 
 const WINDOWS = [30, 60, 90, 180]
 
-// ── Demand forecast sub-view (viewDemand()) ─────────────────────────────────
 function DemandForecastView({ onOpenItem }: { onOpenItem: (id: string) => void }) {
   const { win, setWin } = useForecastWindow()
   const rows = useDemandForecast(win)
 
+  // Lazy initializer so "now" is captured once per mount, not on every render.
+  const [now] = useState(() => Date.now())
   const campsInWindow = useMemo(
-    () => upcomingCamps().filter((c) => (new Date(c.date).getTime() - Date.now()) / 86400000 <= win).length,
-    [win],
+    () => upcomingCamps().filter((c) => (new Date(c.date).getTime() - now) / 86400000 <= win).length,
+    [win, now],
   )
   const totProcure = totalProcureCost(rows)
 
@@ -56,9 +51,6 @@ function DemandForecastView({ onOpenItem }: { onOpenItem: (id: string) => void }
 
   return (
     <>
-      {/* Second window-selector segment — individually bordered pills on a
-          transparent background (inline style="background:transparent;
-          padding:0" in the prototype), NOT the pill-group '.in-seg' look. */}
       <div className="inline-flex gap-1 mb-3.5 flex-wrap">
         {WINDOWS.map((w) => {
           const active = win === w
@@ -95,7 +87,7 @@ function DemandForecastView({ onOpenItem }: { onOpenItem: (id: string) => void }
           className="inline-flex items-center gap-1.5 rounded-[14px] text-xs font-bold text-white ml-auto"
           style={{ padding: '7px 14px', background: 'linear-gradient(135deg, var(--qms-brand-600, var(--qms-brand)), var(--qms-brand) 60%, var(--qms-teal))', border: '1px solid transparent' }}
         >
-          <RefreshCw size={13} /> Auto-reorder shortages
+          <FiRefreshCw size={13} /> Auto-reorder shortages
         </button>
       </InvFilterBar>
 
@@ -140,7 +132,6 @@ function DemandForecastView({ onOpenItem }: { onOpenItem: (id: string) => void }
   )
 }
 
-// ── Camp consumption engine sub-view (viewConsumption()) ────────────────────
 function ConsumptionEngineView() {
   const camps = useConsumptionCamps()
   const { consumed, applyConsumption } = useConsumedCamps()
@@ -148,8 +139,6 @@ function ConsumptionEngineView() {
   const [campId, setCampId] = useState<string>('')
   const [applying, setApplying] = useState(false)
 
-  // IN.camp defaults to the first (most recent) camp id when nothing is
-  // selected yet and the list is non-empty — exact port of viewConsumption().
   const selectedId = campId || camps[0]?.id || ''
   const camp = camps.find((c) => c.id === selectedId) ?? null
 
@@ -209,7 +198,7 @@ function ConsumptionEngineView() {
           className="inline-flex items-center gap-1.5 rounded-[14px] text-xs font-bold text-white ml-auto disabled:opacity-60 disabled:cursor-not-allowed"
           style={{ padding: '7px 14px', background: 'linear-gradient(135deg, var(--qms-brand-600, var(--qms-brand)), var(--qms-brand) 60%, var(--qms-teal))', border: '1px solid transparent' }}
         >
-          <Check size={13} /> {already ? 'Already deducted' : 'Apply deduction'}
+          <FiCheck size={13} /> {already ? 'Already deducted' : 'Apply deduction'}
         </button>
       </InvFilterBar>
 
@@ -262,7 +251,6 @@ function ConsumptionEngineView() {
   )
 }
 
-// ── Top-level tab: the .in-seg segmented control + one of the two sub-views ─
 const ForecastTab = () => {
   const [fseg, setFseg] = useState<'demand' | 'consumption'>('demand')
   const { items } = useItemMaster()
@@ -271,7 +259,6 @@ const ForecastTab = () => {
 
   return (
     <div>
-      {/* .in-seg — tab-switch segment, pill-group background */}
       <div className="inline-flex gap-1 p-1 rounded-[10px] mb-3.5 flex-wrap" style={{ background: 'var(--qms-surface-strong)' }}>
         <button
           type="button"
@@ -284,7 +271,7 @@ const ForecastTab = () => {
             boxShadow: fseg === 'demand' ? '0 1px 4px rgba(0,0,0,.08)' : 'none',
           }}
         >
-          <LineChart size={13} /> Demand forecast
+          <FiTrendingUp size={13} /> Demand forecast
         </button>
         <button
           type="button"
@@ -297,7 +284,7 @@ const ForecastTab = () => {
             boxShadow: fseg === 'consumption' ? '0 1px 4px rgba(0,0,0,.08)' : 'none',
           }}
         >
-          <Calculator size={13} /> Camp consumption engine
+          <TbCalculator size={13} /> Camp consumption engine
         </button>
       </div>
 
@@ -307,8 +294,6 @@ const ForecastTab = () => {
         <ConsumptionEngineView />
       )}
 
-      {/* Cross-tab integration point: Demand-forecast rows open the SAME
-          shared Item Master detail drawer as the Item Master/Expiry tabs. */}
       <SideDrawer open={!!openItem} title={openItem?.name ?? 'Item'} onClose={() => setOpenItemId(null)} widthClassName="max-w-3xl">
         {openItem && (
           <ItemDetailDrawerBody item={openItem} onEdit={() => setOpenItemId(null)} onClose={() => setOpenItemId(null)} />

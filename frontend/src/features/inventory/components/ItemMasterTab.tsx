@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react'
 import {
-  Search, Plus, Hash, Wallet, Activity, ShieldCheck, TrendingDown, Box, Fingerprint,
-  ReceiptIndianRupee, Pencil, Save,
-  Cpu, Package, Megaphone, Laptop, Armchair,
-} from 'lucide-react'
+  FiSearch, FiPlus, FiHash, FiActivity, FiShield, FiTrendingDown, FiBox,
+  FiEdit2, FiSave, FiCpu, FiPackage, FiMonitor,
+} from 'react-icons/fi'
+import {
+  TbWallet, TbFingerprint, TbReceiptRupee, TbSpeakerphone, TbArmchair,
+} from 'react-icons/tb'
 import type { IconType } from 'react-icons'
 import { Button } from '@/components/ui/button'
 import SideDrawer from '@/components/ui/SideDrawer'
@@ -27,15 +29,13 @@ import { itemSchema } from '@/features/inventory/schemas/item.schema'
 import { EXPIRY_BAND_STYLE } from '@/features/inventory/constants/expiryBandStyle'
 import { TableEmptyRow, InvFilterBar } from '@/features/inventory/components/IntelTableUi'
 
-// lucide icon lookup, keyed by the exact icon names TYPE_META uses in the
-// prototype (inventory-masters.js:50-57) — cpu/package/box/megaphone/laptop/armchair.
-const TYPE_ICON: Record<ItemType, typeof Cpu> = {
-  'Device': Cpu,
-  'Consumable': Package,
-  'General Consumable': Box,
-  'Marketing Material': Megaphone,
-  'IT Asset': Laptop,
-  'Office Asset': Armchair,
+const TYPE_ICON: Record<ItemType, IconType> = {
+  'Device': FiCpu,
+  'Consumable': FiPackage,
+  'General Consumable': FiBox,
+  'Marketing Material': TbSpeakerphone,
+  'IT Asset': FiMonitor,
+  'Office Asset': TbArmchair,
 }
 
 const ExpiryBandPill = ({ css, label }: { css: 'green' | 'yellow' | 'orange' | 'red'; label: string }) => {
@@ -50,9 +50,7 @@ const ExpiryBandPill = ({ css, label }: { css: 'green' | 'yellow' | 'orange' | '
   )
 }
 
-// .inv-status-pill.inv-status-OK — exact quirk preserved from the prototype:
-// every asset status text renders with the SAME green "OK" styling
-// regardless of the actual assetStatus value (inventory-masters.js:279).
+// Every asset status renders with the same green "OK" styling regardless of the actual value.
 const AssetStatusPill = ({ text }: { text: string }) => (
   <span
     className="inline-flex items-center gap-1 font-bold uppercase rounded-full"
@@ -62,8 +60,6 @@ const AssetStatusPill = ({ text }: { text: string }) => (
   </span>
 )
 
-// .im-pill — Type column badge: type color at ~10% alpha bg / full color fg,
-// per-type icon (exact port of inventory-masters.js:272).
 const TypePill = ({ type }: { type: ItemType }) => {
   const meta = ITEM_TYPE_META[type]
   const Icon = TYPE_ICON[type]
@@ -85,8 +81,6 @@ interface FieldsProps {
   testOptions: { id: string; name: string }[]
 }
 
-// text/date/number field helpers rendering the `.form-grid` 2-col layout —
-// exact field set per fieldsFor()'s 3 variants (inventory-masters.js:448-494).
 const Field = ({ label, children, full = false }: { label: string; children: React.ReactNode; full?: boolean }) => (
   <div className={full ? 'col-span-2' : ''}>
     <label className="block text-xs font-bold mb-1" style={{ color: 'var(--qms-text-muted)' }}>{label}</label>
@@ -252,10 +246,6 @@ const formFromItem = (it: InventoryItem): ItemFormValues => ({
   linkedDeviceId: it.linkedDeviceId,
 })
 
-// Exact port of window.QMS_InvMasters.tabItemMaster() (inventory-masters.js:
-// 251-305) — type-filter strip, sticky filter/toolbar row, and the 8-column
-// item table. Detail drawer (openItem()) + create/edit modal (openCreate())
-// are the other two prototype surfaces, ported below as SideDrawer/Dialog.
 const ItemMasterTab = () => {
   const { items, saveItem } = useItemMaster()
   const { devices } = useDeviceCatalog()
@@ -275,8 +265,7 @@ const ItemMasterTab = () => {
     return c
   }, [items])
 
-  // Toolbar total — summed over ALL items regardless of active filter, exact
-  // port of tabItemMaster()'s totalValue reduce (inventory-masters.js:283).
+  // Summed over all items regardless of active filter.
   const totalValue = useMemo(() => items.reduce((a, it) => a + itemValue(it), 0), [items])
 
   const openItem = items.find((x) => x.id === openItemId) ?? null
@@ -315,7 +304,6 @@ const ItemMasterTab = () => {
 
   return (
     <div>
-      {/* .im-type-strip — 6 clickable type-filter cards */}
       <div className="flex gap-2 flex-wrap mb-3.5">
         {ITEM_TYPES.map((t) => {
           const meta = ITEM_TYPE_META[t]
@@ -346,9 +334,8 @@ const ItemMasterTab = () => {
         })}
       </div>
 
-      {/* .inv-filter — sticky search + type select + counter + New item */}
       <InvFilterBar>
-        <Search size={14} style={{ color: 'var(--qms-text-muted)' }} />
+        <FiSearch size={14} style={{ color: 'var(--qms-text-muted)' }} />
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -369,11 +356,10 @@ const ItemMasterTab = () => {
           {rows.length} of {items.length} items · {inrShort(totalValue)} value
         </span>
         <Button onClick={() => { openCreate(); }}>
-          <Plus size={14} /> New item
+          <FiPlus size={14} /> New item
         </Button>
       </InvFilterBar>
 
-      {/* .inv-card padding:0;overflow:auto — 8-column item table */}
       <div className="rounded-2xl border overflow-auto" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
         <table className="border-collapse text-xs" style={{ width: '100%', minWidth: 760 }}>
           <thead>
@@ -424,7 +410,6 @@ const ItemMasterTab = () => {
         </table>
       </div>
 
-      {/* Detail drawer — exact port of openItem() (inventory-masters.js:362-445) */}
       <SideDrawer open={!!openItem} title={openItem?.name ?? 'Item'} onClose={() => setOpenItemId(null)} widthClassName="max-w-3xl">
         {openItem && (
           <ItemDetailDrawerBody
@@ -435,7 +420,6 @@ const ItemMasterTab = () => {
         )}
       </SideDrawer>
 
-      {/* Create/edit modal — exact port of openCreate()/fieldsFor()/saveItem() */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="max-w-[720px] w-[92vw] sm:max-w-[720px]">
           <DialogHeader>
@@ -467,7 +451,7 @@ const ItemMasterTab = () => {
           <DialogFooter>
             <Button variant="ghost" onClick={() => setModalOpen(false)}>Cancel</Button>
             <Button onClick={handleSave} disabled={saving}>
-              <Save size={14} /> {editId ? 'Save changes' : 'Create item'}
+              <FiSave size={14} /> {editId ? 'Save changes' : 'Create item'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -476,11 +460,7 @@ const ItemMasterTab = () => {
   )
 }
 
-// ── Detail drawer body — exact port of openItem()'s HTML assembly ─────────
-// Exported (not just used locally) — the Expiry/FEFO tab opens the SAME
-// shared drawer (openItem(id) is one function in the prototype, reused
-// verbatim rather than re-implemented) since both tabs read the same
-// qms.inventory.items store.
+// Exported — the Expiry/FEFO tab and Forecast tab open this same drawer.
 export const ItemDetailDrawerBody = ({ item, onEdit, onClose }: { item: InventoryItem; onEdit: () => void; onClose: () => void }) => {
   const meta = ITEM_TYPE_META[item.itemType]
   const Icon = TYPE_ICON[item.itemType]
@@ -501,22 +481,22 @@ export const ItemDetailDrawerBody = ({ item, onEdit, onClose }: { item: Inventor
           </div>
           <div className="flex gap-1.5 flex-wrap mt-2">
             <span className="inline-flex items-center gap-1 rounded-full text-[11px] font-semibold" style={{ padding: '2px 8px', background: 'rgba(59,109,255,.1)', color: 'var(--qms-brand)' }}>
-              <Hash size={11} /> {item.code || '—'}
+              <FiHash size={11} /> {item.code || '—'}
             </span>
             <span className="inline-flex items-center gap-1 rounded-full text-[11px] font-semibold" style={{ padding: '2px 8px', background: 'rgba(59,109,255,.1)', color: 'var(--qms-brand)' }}>
-              <Wallet size={11} /> {inr(item.purchaseCost ?? 0)}{item.uom ? ` / ${item.uom}` : ''}
+              <TbWallet size={11} /> {inr(item.purchaseCost ?? 0)}{item.uom ? ` / ${item.uom}` : ''}
             </span>
             {band && <ExpiryBandPill css={band.css} label={band.label} />}
           </div>
         </div>
       </div>
 
-      <Section icon={Fingerprint} title="Identity" rows={[
+      <Section icon={TbFingerprint} title="Identity" rows={[
         ['Item code', item.code], ['Category', item.category], ['Manufacturer', item.manufacturer],
         ['Model', item.model], ['Serial no', item.serialNo], ['QR code', item.qrCode], ['Barcode', item.barcode],
       ]} />
 
-      <Section icon={ReceiptIndianRupee} title="Commercial" rows={[
+      <Section icon={TbReceiptRupee} title="Commercial" rows={[
         ['Vendor', item.vendor],
         ['Purchase date', item.purchaseDate],
         ['Purchase cost', item.purchaseCost != null ? inr(item.purchaseCost) : ''],
@@ -527,11 +507,11 @@ export const ItemDetailDrawerBody = ({ item, onEdit, onClose }: { item: Inventor
 
       {item.itemType === 'Device' && (item.usedForTests?.length ?? 0) > 0 && (
         <>
-          <SectionHeader icon={Activity as unknown as IconType}>{`Device → Test mapping (${item.usedForTests!.length})`}</SectionHeader>
+          <SectionHeader icon={FiActivity}>{`Device → Test mapping (${item.usedForTests!.length})`}</SectionHeader>
           <div className="rounded-xl border p-3 mb-3.5 flex gap-1.5 flex-wrap" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface)' }}>
             {item.usedForTests!.map((tid) => (
               <span key={tid} className="inline-flex items-center gap-1 rounded-full text-[11px] font-semibold" style={{ padding: '2px 8px', background: 'rgba(59,109,255,.1)', color: 'var(--qms-brand-700, var(--qms-brand))' }}>
-                <Activity size={11} /> {testName(tid)}
+                <FiActivity size={11} /> {testName(tid)}
               </span>
             ))}
           </div>
@@ -540,13 +520,13 @@ export const ItemDetailDrawerBody = ({ item, onEdit, onClose }: { item: Inventor
 
       {asset && (
         <>
-          <Section icon={ShieldCheck} title="Warranty · AMC · Calibration" rows={[
+          <Section icon={FiShield} title="Warranty · AMC · Calibration" rows={[
             ['Warranty', item.warrantyYears ? `${item.warrantyYears} yr (till ${item.warrantyEnd || '—'})` : ''],
             ['AMC', item.amcApplicable ? `${inr(item.amcCost ?? 0)} · ${item.amcStart || '?'} → ${item.amcEnd || '?'}` : 'Not applicable'],
             ['Calibration', item.calibApplicable ? `Every ${item.calibFreqDays}d · due ${item.calibDue || '—'}` : 'Not applicable'],
             ['Asset status', item.assetStatus],
           ]} />
-          <Section icon={TrendingDown} title="Depreciation · Valuation" rows={[
+          <Section icon={FiTrendingDown} title="Depreciation · Valuation" rows={[
             ['Useful life', item.usefulLifeYears ? `${item.usefulLifeYears} yr` : ''],
             ['Method', item.deprMethod],
             ['Rate', item.deprPct != null ? `${item.deprPct}%` : ''],
@@ -556,7 +536,7 @@ export const ItemDetailDrawerBody = ({ item, onEdit, onClose }: { item: Inventor
       )}
 
       {consumable && (
-        <Section icon={Box} title="Batch · Expiry · Storage" rows={[
+        <Section icon={FiBox} title="Batch · Expiry · Storage" rows={[
           ['Batch no', item.batchNo],
           ['Mfg date', item.mfgDate],
           ['Expiry date', item.expiryDate],
@@ -568,21 +548,20 @@ export const ItemDetailDrawerBody = ({ item, onEdit, onClose }: { item: Inventor
       )}
 
       <div className="flex gap-2 mt-3.5">
-        <Button variant="ghost" onClick={onEdit}><Pencil size={14} /> Edit</Button>
+        <Button variant="ghost" onClick={onEdit}><FiEdit2 size={14} /> Edit</Button>
         <Button variant="ghost" className="ml-auto" onClick={onClose}>Close</Button>
       </div>
     </div>
   )
 }
 
-// section() — exact port: blank/null/undefined rows are dropped entirely,
-// and the whole section (heading + card) is omitted if zero rows remain.
-const Section = ({ icon, title, rows }: { icon: typeof Cpu; title: string; rows: [string, string | number | null | undefined][] }) => {
+// Blank/null/undefined rows are dropped; the whole section is omitted if none remain.
+const Section = ({ icon, title, rows }: { icon: IconType; title: string; rows: [string, string | number | null | undefined][] }) => {
   const kept = rows.filter(([, v]) => v !== '' && v != null)
   if (!kept.length) return null
   return (
     <>
-      <SectionHeader icon={icon as unknown as IconType}>{title}</SectionHeader>
+      <SectionHeader icon={icon}>{title}</SectionHeader>
       <div className="rounded-xl border p-3 mb-3.5" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface)' }}>
         <KeyValueGrid items={kept.map(([label, value]) => ({ label, value }))} />
       </div>

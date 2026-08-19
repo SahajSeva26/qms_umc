@@ -3,28 +3,17 @@ import { crmService } from '@/features/crm/crm.service'
 import { LEAD_STATUS_LABEL } from '@/types/crm.types'
 import type { CreateLeadPayload, LeadStatus, SearchLeadQuery, UpdateLeadPayload } from '@/types/crm.types'
 import { toast } from '@/components/ui/sonner'
+import { getApiErrorMessage } from '@/utils/apiError'
 
-// Single source of truth for leads state via one ['leads', query] TanStack
-// Query cache — all mutations invalidate it so every view refetches.
+// `lost` is reached through the same PATCH /leads/:id/stage moveStage path;
+// there is no separate markLost/reopen endpoint, and won/lost are terminal.
 //
-// Real backend has NO separate markLost/reopen endpoints (unlike the old
-// mock service) — `lost` is just another status reached through the same
-// PATCH /leads/:id/stage moveStage path, and there is no reopen path at all
-// once a lead is `won`/`lost` (both are terminal in LEAD_TRANSITION_MAP).
-//
-// Default limit: 10 — matches the backend's own page=1/limit=10 default in
-// RequestHandler.getPagination. No search fetches more than 10 by default; a
-// caller that needs the full working set (Kanban board, KPI strip, client-side
-// status/text filter, KAM ownership-scoping) must opt into a higher limit by
-// passing its own explicit `limit`.
+// Default limit matches the backend's page=1/limit=10 default. A caller
+// needing the full working set must pass its own explicit `limit`.
 const DEFAULT_LEADS_LIMIT = '10'
 
 // `fetchList` (default true) lets a caller that only needs the mutations
-// (moveStage/updateLead/createLead) skip the list query entirely.
-// NewLeadWizard.tsx, for example, only calls createLead — but calling this
-// hook at all used to unconditionally fetch all ~1000 leads company-wide
-// every time the wizard opened, for a value it never reads. Found live via
-// the Network tab: a `leads?limit=1000` fetch with no on-screen consumer.
+// skip the list query entirely.
 export const useLeads = (query: SearchLeadQuery = {}, fetchList: boolean = true) => {
   const queryClient = useQueryClient()
   const effectiveQuery: SearchLeadQuery = { limit: DEFAULT_LEADS_LIMIT, ...query }
@@ -47,8 +36,7 @@ export const useLeads = (query: SearchLeadQuery = {}, fetchList: boolean = true)
       invalidate()
       toast.success(`Moved to ${LEAD_STATUS_LABEL[to]}`)
     },
-    onError: (err: any) =>
-      toast.error(err?.response?.data?.message || 'Could not move the lead — try again.'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Could not move the lead — try again.')),
   })
 
   const updateLeadMutation = useMutation({
@@ -57,7 +45,7 @@ export const useLeads = (query: SearchLeadQuery = {}, fetchList: boolean = true)
       invalidate()
       toast.success('Lead updated')
     },
-    onError: (err: any) => toast.error(err?.response?.data?.message || 'Could not update the lead — try again.'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Could not update the lead — try again.')),
   })
 
   const createLeadMutation = useMutation({
@@ -66,19 +54,15 @@ export const useLeads = (query: SearchLeadQuery = {}, fetchList: boolean = true)
       invalidate()
       toast.success('New lead created')
     },
-    onError: (err: any) => toast.error(err?.response?.data?.message || 'Could not create the lead — try again.'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Could not create the lead — try again.')),
   })
 
   const moveStage = (id: string, to: LeadStatus, reason: string) => moveStageMutation.mutate({ id, to, reason })
 
-  // mutateAsync (not mutate) so callers — e.g. EditLeadModal — can await the
-  // save and only close on real success, same convention as createLead below.
+  // mutateAsync so callers can await the save and only close on real success.
   const updateLead = (id: string, payload: UpdateLeadPayload) => updateLeadMutation.mutateAsync({ id, payload })
 
-  // mutateAsync (not mutate) so callers — e.g. NewLeadWizard — can await
-  // creation and only close/reset on real success, matching the mutateAsync
-  // convention used by every other feature's data hook in this app (see
-  // useCampsData/useFo/useDoctors/useDedicatedOps/etc).
+  // mutateAsync so callers can await creation and only close/reset on real success.
   const createLead = (payload: CreateLeadPayload) => createLeadMutation.mutateAsync(payload)
 
   return {

@@ -1,17 +1,8 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useCreateEntity } from '@/hooks/useCreateEntity'
 import { projectsService } from '@/features/projects/projects.service'
+import { projectKeys } from '@/features/projects/hooks/useProjects'
 import type { CreateProjectPayload } from '@/types/project.types'
 
-// Mirrors useCreateDivision.ts exactly. Consumer calls mutateAsync and awaits
-// it (per EditLeadModal's consumption convention), only closing the wizard on
-// real success.
-export const useCreateProject = () => {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: (payload: CreateProjectPayload) => projectsService.createProject(payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] })
-    },
-  })
-}
+// Consumer calls mutateAsync and awaits it (per EditLeadModal's consumption
+// convention), only closing the wizard on real success.
+export const useCreateProject = () => useCreateEntity((payload: CreateProjectPayload) => projectsService.createProject(payload), projectKeys.all)

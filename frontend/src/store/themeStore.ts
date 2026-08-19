@@ -20,10 +20,16 @@ export const useThemeStore = create<ThemeState>()(
   )
 )
 
+// Runs synchronously before React mounts — must not throw, or a corrupt
+// storage value would crash to a white screen with no error boundary yet.
 export const initTheme = () => {
-  const stored = localStorage.getItem('qms-theme')
-  if (stored) {
-    const { state } = JSON.parse(stored)
-    if (state?.isDark) document.documentElement.classList.add('dark')
+  try {
+    const stored = localStorage.getItem('qms-theme')
+    if (stored) {
+      const { state } = JSON.parse(stored)
+      if (state?.isDark) document.documentElement.classList.add('dark')
+    }
+  } catch {
+    // fall back to light-theme default
   }
 }

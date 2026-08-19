@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Plus, Building2, TrendingUp, Pencil, Save } from 'lucide-react'
+import { FiPlus, FiTrendingUp, FiEdit2, FiSave } from 'react-icons/fi'
+import { TbBuilding } from 'react-icons/tb'
 import { Button } from '@/components/ui/button'
 import SideDrawer from '@/components/ui/SideDrawer'
 import SectionHeader from '@/components/ui/SectionHeader'
@@ -43,9 +44,6 @@ const formFromVendor = (v: Vendor): VendorFormValues => ({
   complaintRate: v.complaintRate,
 })
 
-// Mini scorecard bar — exact port of tabVendors()'s bar() helper
-// (inventory-procurement.js:234): label + bold value, then a .ven-bar track
-// with an inner div sized to width:{val}% in the metric's own color.
 const ScoreBar = ({ label, value, color }: { label: string; value: number; color: string }) => (
   <div className="text-[11px]" style={{ color: 'var(--qms-text-soft)' }}>
     <div>
@@ -57,10 +55,7 @@ const ScoreBar = ({ label, value, color }: { label: string; value: number; color
   </div>
 )
 
-// Overall-score pill — reuses the Procurement tab's .po-status.po-CLOSED
-// class, which is ALWAYS emerald regardless of the actual score — exact
-// port of tabVendors()'s card markup (inventory-procurement.js:239), a
-// deliberate/incidental visual quirk preserved as-is (see research spec).
+// Always emerald regardless of the actual score value — deliberate.
 const OverallBadge = ({ value }: { value: number }) => (
   <span
     className="inline-flex items-center font-bold rounded-full"
@@ -70,15 +65,13 @@ const OverallBadge = ({ value }: { value: number }) => (
   </span>
 )
 
-// Exact port of inventory-procurement.js's tabVendors() (lines 227-256) +
-// openVendor() (258-299) + openVendorEdit()/saveVendor() (301-333). Primary
-// listing is a CSS-grid card gallery — NOT a table — the only tab in the
-// module that renders its list this way. No page-level KPI strip and no
-// search/filter controls on this tab (both deliberate, per the prototype).
+// Listing is a CSS-grid card gallery, not a table — the only tab in the
+// module that renders its list this way. No page-level KPI strip or
+// search/filter controls, both deliberate.
 const VendorsTab = () => {
   const { vendors, saveVendor } = useVendors()
   const { priceHistory } = useVendorPriceHistory()
-  void priceHistory // seeded eagerly so vendorPriceTrend() below reads a warm store
+  void priceHistory
 
   const [openVendorId, setOpenVendorId] = useState<string | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
@@ -117,8 +110,6 @@ const VendorsTab = () => {
 
   return (
     <div>
-      {/* .inv-filter — sticky bar: label + vendor-count chip + New vendor. No
-          search/filter controls on this tab, exact port. */}
       <InvFilterBar>
         <span className="text-xs font-bold uppercase tracking-[.04em]" style={{ color: 'var(--qms-text-muted)' }}>
           Vendor Master
@@ -127,12 +118,10 @@ const VendorsTab = () => {
           {vendors.length} vendors
         </span>
         <Button onClick={() => openCreate()}>
-          <Plus size={14} /> New vendor
+          <FiPlus size={14} /> New vendor
         </Button>
       </InvFilterBar>
 
-      {/* Card-grid gallery — NOT a table — the only tab in the module that
-          lists this way. Exact port of tabVendors()'s inline grid style. */}
       <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
         {vendors.map((v) => {
           const overall = vendorOverallScore(v)
@@ -172,7 +161,6 @@ const VendorsTab = () => {
         })}
       </div>
 
-      {/* Vendor Detail drawer — exact port of openVendor(). */}
       <SideDrawer
         open={!!openVendor}
         title={openVendor?.name ?? 'Vendor'}
@@ -188,9 +176,6 @@ const VendorsTab = () => {
         )}
       </SideDrawer>
 
-      {/* Create/edit modal — exact port of openVendorEdit()/saveVendor(). All
-          fields are half-width .form-grid cells (none full-width), unlike
-          other modals in the module. */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="max-w-[640px] w-[92vw] sm:max-w-[640px]">
           <DialogHeader>
@@ -240,7 +225,7 @@ const VendorsTab = () => {
           <DialogFooter>
             <Button variant="ghost" onClick={() => setModalOpen(false)}>Cancel</Button>
             <Button onClick={handleSave} disabled={saving}>
-              <Save size={14} /> {editId ? 'Save' : 'Create'}
+              <FiSave size={14} /> {editId ? 'Save' : 'Create'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -249,17 +234,12 @@ const VendorsTab = () => {
   )
 }
 
-// Vendor Detail drawer body — exact port of openVendor() (inventory-
-// procurement.js:258-299): 4-tile id-kpi-grid scorecard → Registration
-// section (im-kv) → Price history section (table or "No supply history."
-// fallback) → footer row (Edit + Close).
 const VendorDetailDrawerBody = ({ vendor, onEdit, onClose }: { vendor: Vendor; onEdit: () => void; onClose: () => void }) => {
   const overall = vendorOverallScore(vendor)
   const trend = vendorPriceTrend(vendor.name)
 
   return (
     <div>
-      {/* id-kpi-grid — 4 cells */}
       <div className="grid gap-2.5 mb-3.5" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
         {[
           { l: 'Overall', v: String(overall), d: 'scorecard' },
@@ -276,7 +256,7 @@ const VendorDetailDrawerBody = ({ vendor, onEdit, onClose }: { vendor: Vendor; o
       </div>
 
       {/* Registration */}
-      <SectionHeader icon={Building2} spaced={false}>Registration</SectionHeader>
+      <SectionHeader icon={TbBuilding} spaced={false}>Registration</SectionHeader>
       <div className="rounded-xl border mb-3.5" style={{ padding: 12, background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
         <KeyValueGrid
           items={[
@@ -292,7 +272,7 @@ const VendorDetailDrawerBody = ({ vendor, onEdit, onClose }: { vendor: Vendor; o
       </div>
 
       {/* Price history */}
-      <SectionHeader icon={TrendingUp}>{`Price history (${trend.length} items)`}</SectionHeader>
+      <SectionHeader icon={FiTrendingUp}>{`Price history (${trend.length} items)`}</SectionHeader>
       {trend.length === 0 ? (
         <div className="text-xs mb-3.5" style={{ color: 'var(--qms-text-muted)' }}>No supply history.</div>
       ) : (
@@ -334,14 +314,13 @@ const VendorDetailDrawerBody = ({ vendor, onEdit, onClose }: { vendor: Vendor; o
         </div>
       )}
 
-      {/* Footer row — Edit (left) + Close (right) */}
       <div className="flex gap-2 items-center flex-wrap mt-3.5">
         <button
           onClick={onEdit}
           className="inline-flex items-center gap-1.5 rounded-lg border text-xs font-medium"
           style={{ padding: '7px 12px', borderColor: 'var(--qms-border)', color: 'var(--qms-text)' }}
         >
-          <Pencil size={14} /> Edit
+          <FiEdit2 size={14} /> Edit
         </button>
         <button
           onClick={onClose}

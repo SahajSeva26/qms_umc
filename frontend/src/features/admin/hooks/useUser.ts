@@ -1,10 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
+import { useGetEntity } from '@/hooks/useGetEntity'
 import { adminService } from '@/features/admin/admin.service'
+import { userKeys } from '@/features/admin/hooks/useUsers'
 
-export const useUser = (id: string | undefined) => {
-  return useQuery({
-    queryKey: ['user', id],
-    queryFn: () => adminService.getUser(id as string),
-    enabled: !!id,
-  })
-}
+export const useUser = (id: string | undefined) => useGetEntity(userKeys.detail, adminService.getUser, id)

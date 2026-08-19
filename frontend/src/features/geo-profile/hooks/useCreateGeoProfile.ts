@@ -1,15 +1,7 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useCreateEntity } from '@/hooks/useCreateEntity'
 import { geoProfileService } from '@/features/geo-profile/geoProfile.service'
+import { geoProfileKeys } from '@/features/geo-profile/hooks/useGeoProfiles'
 import type { CreateGeoProfilePayload } from '@/types/geoProfile.types'
 
-// Mirrors `@/features/access-management/role/hooks/useCreateRole.ts` exactly.
-export const useCreateGeoProfile = () => {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: (payload: CreateGeoProfilePayload) => geoProfileService.createGeoProfile(payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['geoProfiles'] })
-    },
-  })
-}
+export const useCreateGeoProfile = () =>
+  useCreateEntity((payload: CreateGeoProfilePayload) => geoProfileService.createGeoProfile(payload), geoProfileKeys.all)

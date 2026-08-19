@@ -4,7 +4,7 @@ import { FiArrowLeft, FiEdit2, FiPlus } from 'react-icons/fi'
 import { useTenant } from '@/features/access-management/tenant/hooks/useTenant'
 import { useRole } from '@/features/access-management/role/hooks/useRole'
 import { ROLE_ROUTES } from '@/features/access-management/role/role.routes'
-import { useDivisions } from '@/features/crm/hooks/useDivisions'
+import { useDivisions } from '@/features/crm/divisions/hooks/useDivisions'
 import { useDivisionsFilters } from '@/features/crm/divisions/hooks/useDivisionsFilters'
 import DivisionsFilterBar from '@/features/crm/divisions/components/DivisionsFilterBar'
 import DivisionsTable from '@/features/crm/divisions/components/DivisionsTable'
@@ -21,10 +21,6 @@ import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import type { DivisionEntity } from '@/types/crm.types'
 import type { RolePopulatedUser } from '@/types/accessManagement.types'
 
-// A company's detail page: header summary + this company's Divisions,
-// inline rather than a link to a separate page. Editing the company itself
-// lives in the "Edit client" button + modal (EditTenantModal) instead of
-// the page body, since the body is the Divisions list.
 const TenantDetailPage = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -35,11 +31,8 @@ const TenantDetailPage = () => {
   const canManageTenant = hasPermission('tenant:manage')
   const canManageSystem = hasPermission('system:manage')
   const canViewRole = hasAnyPermission(['role:get', 'role:search', 'role:manage'])
-  // Matches divisions.routes.tsx's own DIVISION_VIEW_PERMISSIONS exactly —
-  // only show the Divisions section when the caller could actually load it.
   const canViewDivisions = hasAnyPermission(['division:manage', 'tenant:admin', 'lead:manage'])
   const canSeeInactiveDivisions = hasAnyPermission(['division:manage', 'tenant:manage'])
-  // Matches DivisionContactsSection.tsx's own gate exactly.
   const canManageContacts = hasAnyPermission(['contact:manage', 'tenant:manage', 'tenant:admin'])
 
   const { data: ownerRoleData } = useRole(tenant?.owner)
@@ -64,7 +57,7 @@ const TenantDetailPage = () => {
       therapy: filters.therapy === 'ALL' ? undefined : filters.therapy,
       status: filters.status,
       limit: '10',
-    } as Parameters<typeof useDivisions>[0],
+    },
     canViewDivisions && !!tenant?.id,
   )
   const divisions = divisionsData?.data?.items ?? []

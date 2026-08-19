@@ -1,5 +1,5 @@
 import type { WizardFormState } from '@/features/crm/wizard.types'
-import { useDivisions } from '@/features/crm/hooks/useDivisions'
+import { useDivisions } from '@/features/crm/divisions/hooks/useDivisions'
 import { useContacts } from '@/features/contacts/hooks/useContacts'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
@@ -14,9 +14,7 @@ interface WizardStep1Props {
 }
 
 const WizardStep1 = ({ form, setField }: WizardStep1Props) => {
-  // NOT `tenantId` — SearchDivisionQuery's real backend param is `tenant`
-  // (division.validators.ts). Sending `tenantId` is silently ignored server-side.
-  const { data: divisionData, isLoading: divisionsLoading, isError: divisionsErrored } = useDivisions({ tenant: form.tenantId || undefined } as unknown as { tenantId?: string }, !!form.tenantId)
+  const { data: divisionData, isLoading: divisionsLoading, isError: divisionsErrored } = useDivisions({ tenant: form.tenantId || undefined }, !!form.tenantId)
   const divisions = form.tenantId ? divisionData?.data?.items ?? [] : []
 
   // Scoped by division, not tenant — Contact.division is required for

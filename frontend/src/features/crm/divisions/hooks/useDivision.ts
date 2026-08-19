@@ -1,11 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
-import { crmService } from '@/features/crm/crm.service'
+import { useGetEntity } from '@/hooks/useGetEntity'
+import { divisionService } from '@/features/crm/divisions/division.service'
+import { divisionKeys } from '@/features/crm/divisions/hooks/useDivisions'
 
-// Mirrors `@/features/access-management/role-type/hooks/useRoleType.ts` exactly.
-export const useDivision = (id: string | undefined) => {
-  return useQuery({
-    queryKey: ['division', id],
-    queryFn: () => crmService.getDivision(id as string),
-    enabled: !!id,
-  })
-}
+export const useDivision = (id: string | undefined) => useGetEntity(divisionKeys.detail, divisionService.getDivision, id)

@@ -1,11 +1,7 @@
 import type { LeadEntity } from '@/types/crm.types'
 import type { CrmFilterState } from '@/features/crm/hooks/useCrmFilters'
 
-// Search matches Title only (2026-08-03) — previously also matched contact
-// person and division name, which no longer made sense once the list view's
-// own Contact column was dropped in favor of dedicated Company/Division
-// columns; search is now scoped to exactly the one free-text field the table
-// doesn't already expose a dedicated filter for.
+// Search matches Title only — Company/Division have their own dedicated filters.
 export function matchesFilters(lead: LeadEntity, filters: CrmFilterState): boolean {
   if (filters.status && lead.status !== filters.status) return false
   if (filters.q) {
@@ -13,17 +9,4 @@ export function matchesFilters(lead: LeadEntity, filters: CrmFilterState): boole
     if (!lead.title.toLowerCase().includes(q)) return false
   }
   return true
-}
-
-// KAM (sales_rep) role-scoping: only see leads where they are the salesPerson.
-//
-// LeadEntity.salesPerson is always populated as the full Role document on
-// search (see LeadPopulatedRole in crm.types.ts), whose own `.user` field
-// stays a raw ObjectId string (Lead's populate doesn't expand Role -> User).
-// That string is the User's own _id, which is exactly what AuthUser._id is
-// (see useAuth/auth.types.ts) — so comparing salesPerson.user === currentUserId
-// is a real, resolvable match, not a lookup that doesn't exist.
-export function scopedByOwner(leads: LeadEntity[], currentUserId: string | undefined, isKam: boolean): LeadEntity[] {
-  if (!isKam || !currentUserId) return leads
-  return leads.filter((l) => typeof l.salesPerson !== 'string' && l.salesPerson.user === currentUserId)
 }

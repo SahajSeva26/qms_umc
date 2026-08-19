@@ -1,6 +1,5 @@
-import { FiSearch } from 'react-icons/fi'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import SearchInput from '@/components/ui/SearchInput'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { PermissionGroupsFilterState } from '@/features/access-management/permission-group/hooks/usePermissionGroupsFilters'
 import type { PermissionGroupStatus } from '@/types/accessManagement.types'
@@ -23,9 +22,8 @@ interface PermissionGroupsFilterBarProps {
   tenantOptions: TenantOption[]
 }
 
-// Same convention as RoleTypesFilterBar.tsx: the trigger shows the fixed
-// dimension name ("Status", "Tenant") at the default "ALL" value, switching
-// to the selected option's own label once something specific is picked.
+// Trigger shows the dimension name ("Status", "Tenant") at "ALL", switching
+// to the selected option's label once something specific is picked.
 const PermissionGroupsFilterBar = ({ filters, setFilter, reset, tenantOptions }: PermissionGroupsFilterBarProps) => {
   const tenantLabelById = new Map(tenantOptions.map((t) => [t.id, t.label]))
 
@@ -34,16 +32,12 @@ const PermissionGroupsFilterBar = ({ filters, setFilter, reset, tenantOptions }:
       className="flex flex-wrap items-center justify-between gap-2 p-2.5 mb-3 rounded-xl border"
       style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}
     >
-      <div className="relative">
-        <FiSearch size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--qms-text-muted)' }} />
-        <Input
-          type="text"
-          value={filters.search}
-          onChange={(e) => setFilter('search', e.target.value)}
-          placeholder="Search by name..."
-          className="w-56 pl-7 text-[12px]"
-        />
-      </div>
+      <SearchInput
+        value={filters.search}
+        onChange={(v) => setFilter('search', v)}
+        placeholder="Search by name..."
+        className="w-56 text-[12px]"
+      />
 
       <div className="flex flex-wrap items-center gap-2">
         <Select value={filters.status} onValueChange={(v) => setFilter('status', (v ?? 'ALL') as PermissionGroupsFilterState['status'])}>

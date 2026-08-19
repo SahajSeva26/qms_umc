@@ -1,9 +1,7 @@
 import { FiMoreHorizontal, FiEye, FiEdit2, FiTag } from 'react-icons/fi'
-import type { ProjectEntity } from '@/types/project.types'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
 interface ProjectRowMenuProps {
-  project: ProjectEntity
   onViewDetail: () => void
   onEdit: () => void
   onChangeStatus: () => void
@@ -11,14 +9,8 @@ interface ProjectRowMenuProps {
 
 const itemClasses = 'w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-[13px] font-medium text-left transition-colors hover:bg-(--qms-surface-hover)'
 
-// Renew/Add-void-camp/separate-Close menu items removed — the backend
-// exposes a single generic moveStage(to, reason) endpoint; "close" is just
-// a stage move to 'closed' via the same Change-status dialog (see
-// StatusChangeDialog, which lists only the legal next statuses from the
-// project's current one). Renew has no backend clone/renew endpoint at all
-// (dropped per explicit decision). Void-camp status lives on individual Camp
-// records, not Project — out of scope for this module.
-const ProjectRowMenu = ({ project: _project, onViewDetail, onEdit, onChangeStatus }: ProjectRowMenuProps) => (
+// "Close" is just a stage move to 'closed' via the Change-status dialog; no separate close action exists.
+const ProjectRowMenu = ({ onViewDetail, onEdit, onChangeStatus }: ProjectRowMenuProps) => (
   <Popover>
     <PopoverTrigger
       onClick={(e) => e.stopPropagation()}

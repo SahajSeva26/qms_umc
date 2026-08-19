@@ -1,9 +1,7 @@
 import type { Camp, CampStage } from '@/types/camp.types'
 import { DOCTORS } from '@/features/camps/camps.mock'
 
-// Mirrors the prototype's campStage() exactly — this is a real behavioral rule,
-// not cosmetic: REQUESTED/UPCOMING are split by whether an FO is assigned,
-// regardless of raw `status` being REQUESTED or CONFIRMED/SCHEDULED.
+// REQUESTED/UPCOMING are split by whether an FO is assigned, not by raw `status`.
 export function campStage(c: Camp): CampStage {
   if (c.status === 'CANCELLED_CHARGED') return 'CANCELLED_CHARGED'
   if (c.status === 'CANCELLED') return 'CANCELLED'
@@ -19,12 +17,6 @@ export function campStage(c: Camp): CampStage {
 
 export function getDoctor(doctorId: string) {
   return DOCTORS.find((d) => d.id === doctorId)
-}
-
-export function isCampOnHold(_c: Camp): boolean {
-  // TODO: prototype derives this from device-fault status (window.QMS_isCampOnHold),
-  // which we have no device/inventory module for yet — always false for now.
-  return false
 }
 
 export function isChargeableCancellation(c: Camp): boolean {

@@ -1,4 +1,6 @@
 import api from '@/lib/api/api'
+import { validateApiResponse } from '@/lib/api/validateApiResponse'
+import { AuthMeResponseSchema } from '@/features/access-management/accessManagement.response-schemas'
 import type { ApiResponse, PaginatedResponse } from '@/types/common.types'
 import type {
   CreateRolePayload,
@@ -19,26 +21,13 @@ import type {
   UpdateTenantPayload,
 } from '@/types/accessManagement.types'
 
-// Follows the exact pattern of `@/features/admin/admin.service.ts`:
-// - same shared `api` axios instance (withCredentials cookie auth, untouched)
-// - same ApiResponse/PaginatedResponse envelope typing from '@/types/common.types'
-// - a plain object export, no class/default export
-// - honest '// TODO' comments wherever the backend under/over-returns vs. what's ideal
-//
-// This file is purely additive and does not import from or modify any of the
-// existing auth/admin files.
-
 // ---------------------------------------------------------------------------
 // Session (GET /auth/me)
 // ---------------------------------------------------------------------------
 
-/**
- * Fetches the current session: user, active role, role type, tenant, and the
- * flattened permission-code list. This is a NEW, independent read — it is not
- * wired into useAuthStore/useLogin/useAuth in any way.
- */
 const getMe = async () => {
   const res = await api.get<ApiResponse<SessionResponse>>('/auth/me')
+  validateApiResponse(AuthMeResponseSchema, res.data, '/auth/me')
   return res.data
 }
 

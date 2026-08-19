@@ -1,30 +1,18 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { FiArrowLeft } from 'react-icons/fi'
-import type { IPermission } from '@/types/accessManagement.types'
+import { usePermissionCodeSelection } from '@/hooks/usePermissionCodeSelection'
 import { usePermissionGroup } from '@/features/access-management/permission-group/hooks/usePermissionGroup'
 import { useUpdatePermissionGroup } from '@/features/access-management/permission-group/hooks/useUpdatePermissionGroup'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { PERMISSION_GROUP_ROUTES } from '@/features/access-management/permission-group/permission-group.routes'
 import { PERMISSION_CATALOG, PERMISSION_CATALOG_FLAT, PERMISSION_RESOURCE_LABELS } from '@/features/access-management/permission-group/constants/permissionCatalog'
 import PermissionGroupStatusPill from '@/features/access-management/permission-group/components/PermissionGroupStatusPill'
+import PermissionCheckboxRow from '@/components/ui/PermissionCheckboxRow'
 import { Button } from '@/components/ui/button'
 import { Accordion, AccordionItem, AccordionTrigger, AccordionPanel } from '@/components/ui/accordion'
 import { updatePermissionGroupSchema } from '@/features/access-management/permission-group/schemas/permissionGroup.schemas'
 import { useScrollIntoViewOnChange } from '@/hooks/useScrollIntoViewOnChange'
-
-// Mirrors `@/features/admin/pages/UserDetailPage.tsx`'s overall shape (back
-// link, header summary card, editable card below, save button wired to a
-// useUpdate* mutation with isPending/isError/isSuccess feedback) — but the
-// editable section here is the permission-group "shopping cart": every
-// permission in the full PERMISSION_CATALOG (see that file's own header
-// comment for the current code/resource count — it drifts as backend
-// modules add permissions, so don't hardcode a number here too) is
-// always rendered as a checkbox, grouped by resource, with the group's
-// currently-granted permissions pre-checked. Toggling a box adds/removes
-// that permission from local state; Save sends the full resulting list to
-// PUT /permission-groups/:id via UpdatePermissionGroupPayload.permissions
-// (IPermission[], not bare codes — see accessManagement.types.ts).
 
 const PermissionGroupDetailPage = () => {
   const { id } = useParams<{ id: string }>()
@@ -34,37 +22,20 @@ const PermissionGroupDetailPage = () => {
 
   const updatePermissionGroup = useUpdatePermissionGroup(id ?? '')
 
-  // group.tenant is a raw ObjectId string (never populated server-side —
-  // same PermissionGroupEntity.tenant: string shape PermissionGroupsTable.tsx
-  // already documents), so it needs the same tenantLabelById resolution
-  // PermissionGroupsListPage.tsx already builds for that list page's own
-  // Company column — this detail page was missing the equivalent lookup
-  // entirely and rendered the bare id instead of a name. Found via a
-  // 2026-07-25 live UI check.
+  // group.tenant is a raw ObjectId string (never populated server-side), so
+  // it needs its own name lookup here rather than rendering the bare id.
   const { data: tenantsData } = useTenants({})
   const tenantLabelById = new Map((tenantsData?.data?.items ?? []).map((t) => [t.id, t.name]))
 
-  const [selectedCodes, setSelectedCodes] = useState<Set<string>>(new Set())
+  const { selectedCodes, setSelection, toggleCode } = usePermissionCodeSelection()
   const [formError, setFormError] = useState<string | null>(null)
   const errorRef = useScrollIntoViewOnChange<HTMLDivElement>(formError)
 
   useEffect(() => {
     if (group) {
-      setSelectedCodes(new Set((group.permissions ?? []).map((p) => p.code)))
+      setSelection((group.permissions ?? []).map((p) => p.code))
     }
-  }, [group])
-
-  const toggleCode = (permission: IPermission) => {
-    setSelectedCodes((prev) => {
-      const next = new Set(prev)
-      if (next.has(permission.code)) {
-        next.delete(permission.code)
-      } else {
-        next.add(permission.code)
-      }
-      return next
-    })
-  }
+  }, [group, setSelection])
 
   const handleSave = () => {
     const permissions = PERMISSION_CATALOG_FLAT.filter((permission) => selectedCodes.has(permission.code))
@@ -167,34 +138,14 @@ const PermissionGroupDetailPage = () => {
                     </AccordionTrigger>
                     <AccordionPanel>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {resourcePermissions.map((permission) => {
-                          const checked = selectedCodes.has(permission.code)
-                          return (
-                            <label
-                              key={permission.code}
-                              className="flex items-start gap-2.5 rounded-lg border px-3 py-2 cursor-pointer transition-colors hover:bg-(--qms-surface-hover)"
-                              style={{
-                                borderColor: checked ? 'var(--qms-brand)' : 'var(--qms-border)',
-                                background: checked ? 'color-mix(in oklch, var(--qms-brand), transparent 92%)' : 'transparent',
-                              }}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={() => toggleCode(permission)}
-                                className="mt-0.5 accent-(--qms-brand)"
-                              />
-                              <span className="min-w-0">
-                                <span className="block text-[13px] font-semibold truncate" style={{ color: 'var(--qms-text)' }}>
-                                  {permission.name}
-                                </span>
-                                <span className="block text-[11px] font-mono truncate" style={{ color: 'var(--qms-text-muted)' }}>
-                                  {permission.code}
-                                </span>
-                              </span>
-                            </label>
-                          )
-                        })}
+                        {resourcePermissions.map((permission) => (
+                          <PermissionCheckboxRow
+                            key={permission.code}
+                            permission={permission}
+                            checked={selectedCodes.has(permission.code)}
+                            onToggle={toggleCode}
+                          />
+                        ))}
                       </div>
                     </AccordionPanel>
                   </AccordionItem>

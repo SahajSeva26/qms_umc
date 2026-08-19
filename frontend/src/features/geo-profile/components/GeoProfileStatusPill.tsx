@@ -1,7 +1,7 @@
 import type { GeoProfileStatus } from '@/types/geoProfile.types'
 import { GEO_PROFILE_STATUS_LABEL } from '@/features/geo-profile/geoProfile.constants'
+import StatusPill from '@/components/ui/StatusPill'
 
-// Mirrors `@/features/access-management/role/components/RoleStatusPill.tsx` exactly.
 const STATUS_CLASSES: Record<GeoProfileStatus, string> = {
   active: 'bg-success-soft text-success',
   inactive: 'bg-danger-soft text-danger',
@@ -11,21 +11,8 @@ interface GeoProfileStatusPillProps {
   status?: GeoProfileStatus
 }
 
-const GeoProfileStatusPill = ({ status }: GeoProfileStatusPillProps) => {
-  if (!status) {
-    return (
-      <span className="inline-flex items-center text-[11px] font-bold" style={{ color: 'var(--qms-text-muted)' }}>
-        —
-      </span>
-    )
-  }
-
-  return (
-    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold ${STATUS_CLASSES[status]}`}>
-      <span className="w-1.5 h-1.5 rounded-full bg-current" />
-      {GEO_PROFILE_STATUS_LABEL[status]}
-    </span>
-  )
-}
+const GeoProfileStatusPill = ({ status }: GeoProfileStatusPillProps) => (
+  <StatusPill status={status} classes={STATUS_CLASSES} labels={GEO_PROFILE_STATUS_LABEL} />
+)
 
 export default GeoProfileStatusPill

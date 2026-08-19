@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useFilterState } from '@/hooks/useFilterState'
 import type { BillingType, CampStatus, CampType } from '@/types/campReal.types'
 
 export interface CampsRealFilterState {
@@ -21,14 +21,4 @@ const DEFAULT_FILTERS: CampsRealFilterState = {
   dateTo: '',
 }
 
-export const useCampsRealFilters = () => {
-  const [filters, setFilters] = useState<CampsRealFilterState>(DEFAULT_FILTERS)
-
-  const setFilter = <K extends keyof CampsRealFilterState>(key: K, value: CampsRealFilterState[K]) => {
-    setFilters((prev) => ({ ...prev, [key]: value }))
-  }
-
-  const reset = () => setFilters(DEFAULT_FILTERS)
-
-  return { filters, setFilter, reset }
-}
+export const useCampsRealFilters = () => useFilterState<CampsRealFilterState>(DEFAULT_FILTERS)

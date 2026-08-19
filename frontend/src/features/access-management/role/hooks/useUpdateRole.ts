@@ -1,16 +1,7 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useUpdateEntity } from '@/hooks/useUpdateEntity'
 import { accessManagementService } from '@/features/access-management/accessManagement.service'
+import { roleKeys } from '@/features/access-management/role/hooks/useRoles'
 import type { UpdateRolePayload } from '@/types/accessManagement.types'
 
-// Mirrors `@/features/access-management/role-type/hooks/useUpdateRoleType.ts` exactly.
-export const useUpdateRole = (id: string) => {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: (payload: UpdateRolePayload) => accessManagementService.updateRole(id, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['role', id] })
-      queryClient.invalidateQueries({ queryKey: ['roles'] })
-    },
-  })
-}
+export const useUpdateRole = (id: string) =>
+  useUpdateEntity((payload: UpdateRolePayload) => accessManagementService.updateRole(id, payload), [roleKeys.detail(id), roleKeys.all])

@@ -1,18 +1,17 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { crmService } from '@/features/crm/crm.service'
+import { divisionService } from '@/features/crm/divisions/division.service'
+import { roleKeys } from '@/features/access-management/role/hooks/useRoles'
 import type { BulkMrPayload } from '@/types/crm.types'
 
-// Mirrors useCreateDivision.ts's shape. Invalidates 'roles' (not 'divisions')
-// since a successful run creates Role/User rows under this division, not a
-// division itself — DivisionsTable/DivisionDetailPage never read a role list,
-// so nothing here needs the 'divisions' cache invalidated.
+// Invalidates roleKeys.all, not 'divisions' — a successful run creates
+// Role/User rows under this division, not a division itself.
 export const useBulkCreateMr = () => {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (payload: BulkMrPayload) => crmService.bulkCreateMr(payload),
+    mutationFn: (payload: BulkMrPayload) => divisionService.bulkCreateMr(payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['roles'] })
+      queryClient.invalidateQueries({ queryKey: roleKeys.all })
     },
   })
 }

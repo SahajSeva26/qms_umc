@@ -11,24 +11,16 @@ import type {
   WhoCanBookCampCode,
 } from '@/types/project.types'
 
-// Flat wizard form state — one object across all 7 steps (Step 0 is new: the
-// wizard didn't previously need a lead-selection step since the old mock had
-// no Lead concept at all). Mirrors crm/wizard.types.ts's convention: flatten
-// all steps' fields onto one state shape rather than nesting per-step
-// sub-objects.
+// Flat wizard form state across all 7 steps — mirrors crm/wizard.types.ts's
+// convention of one flat shape rather than nested per-step sub-objects.
 export interface WizardFormState {
-  // Step 0 — Lead (new). Read-only, lead-derived display values are carried
-  // alongside the id purely for showing "creating for {tenant} / {division}"
-  // on every later step — never sent in the create payload (tenant/division
-  // are derived server-side from `lead`, not accepted in CreateProjectPayload).
-  // leadTenantId IS needed at runtime (not just for display): Step 5's
-  // marketingContact picker must scope to this exact tenant id, mirroring
-  // project.service.ts's set() check that marketingContact.tenant must equal
-  // the project's own (lead-derived) tenant.
+  // Step 0 — Lead. leadTenantId/leadDivisionId are used at runtime too, not
+  // just for display: they scope Step 5's marketingContact/role pickers.
   leadId: string
   leadTitle: string
   leadTenantId: string
   leadTenantName: string
+  leadDivisionId: string
   leadDivisionName: string
 
   // Step 1 — Basics
@@ -88,6 +80,7 @@ export const DEFAULT_WIZARD_FORM: WizardFormState = {
   leadTitle: '',
   leadTenantId: '',
   leadTenantName: '',
+  leadDivisionId: '',
   leadDivisionName: '',
 
   name: '',

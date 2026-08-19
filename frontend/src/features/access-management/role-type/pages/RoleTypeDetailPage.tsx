@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Controller, useForm } from 'react-hook-form'
 import { FiArrowLeft } from 'react-icons/fi'
-import type { ZodIssue } from 'zod'
+import { usePermissionCodeSelection } from '@/hooks/usePermissionCodeSelection'
 import { useRoleType } from '@/features/access-management/role-type/hooks/useRoleType'
 import { useUpdateRoleType } from '@/features/access-management/role-type/hooks/useUpdateRoleType'
 import { useCreateRoleType } from '@/features/access-management/role-type/hooks/useCreateRoleType'
@@ -21,64 +22,42 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Accordion, AccordionItem, AccordionTrigger, AccordionPanel } from '@/components/ui/accordion'
 import { PERMISSION_CATALOG, PERMISSION_RESOURCE_LABELS } from '@/features/access-management/permission-group/constants/permissionCatalog'
 import { createRoleTypeSchema, updateRoleTypeSchema } from '@/features/access-management/role-type/schemas/roleType.schemas'
-import { useScrollIntoViewOnChange } from '@/hooks/useScrollIntoViewOnChange'
+import { unwrapId } from '@/utils/unwrapId'
+import { useReshapingResolver } from '@/hooks/useReshapingResolver'
 import type { RoleTypeCode, RoleTypeStatus } from '@/types/accessManagement.types'
 
-// Maps every catalog permission code back to its PERMISSION_CATALOG resource
-// key (e.g. 'role-type:create' -> 'ROLE_TYPE') so this page's ceiling-scoped
-// `ceilingPermissions` (a flat IPermission[] from the tenant's own
-// PermissionGroup — NOT the full catalog) can be grouped into the same
-// resource sections PermissionGroupDetailPage.tsx uses, without duplicating
-// its full-catalog iteration (which would wrongly show every resource/action
-// regardless of whether the tenant's ceiling actually grants anything in it).
+// Maps every catalog permission code back to its resource key for grouping.
 const CODE_TO_RESOURCE_KEY: Record<string, keyof typeof PERMISSION_CATALOG> = Object.fromEntries(
   (Object.entries(PERMISSION_CATALOG) as [keyof typeof PERMISSION_CATALOG, Record<string, { code: string }>][]).flatMap(
     ([resourceKey, actions]) => Object.values(actions).map((permission) => [permission.code, resourceKey]),
   ),
 )
 
-// Same rationale as RoleDetailPage.tsx's identical helper: Zod 4's built-in
-// type-mismatch message never names the field, and the custom `.min()`/enum
-// messages in roleType.schemas.ts are skipped whenever the value passed in
-// is genuinely `undefined` rather than an empty string.
-const ROLE_TYPE_FIELD_LABELS: Record<string, string> = {
-  code: 'Code',
-  name: 'Name',
-  tenant: 'Company',
+interface RoleTypeFormValues {
+  code: RoleTypeCode | ''
+  name: string
+  description: string
+  tenant: string
+  status: RoleTypeStatus | ''
 }
 
-const formatZodIssue = (issue: ZodIssue): string => {
-  const path = issue.path.join('.')
-  const label = ROLE_TYPE_FIELD_LABELS[path]
-  if (!label || issue.message.toLowerCase().includes(label.toLowerCase())) return issue.message
-  return `${label}: ${issue.message}`
-}
+// '' (this form's "unset" sentinel) is normalized to undefined so whichever
+// schema applies to the current mode validates it correctly.
+const useRoleTypeFormResolver = (schema: typeof createRoleTypeSchema | typeof updateRoleTypeSchema) =>
+  useReshapingResolver<RoleTypeFormValues>({
+    schema,
+    toPayload: (values) => ({
+      // name/tenant stay raw '' so Zod's .min(1) message fires instead of a type mismatch.
+      code: values.code || undefined,
+      name: values.name,
+      description: values.description || undefined,
+      tenant: values.tenant,
+      status: values.status || undefined,
+    }),
+  })
 
-// Combined create-flow + edit page:
-//   - no `:id` param (route is ROLE_TYPE_NEW)  -> create form
-//   - `:id` param present (route is ROLE_TYPE_DETAIL) -> load + edit form
-// Mirrors `@/features/access-management/permission-group/pages/PermissionGroupDetailPage.tsx`'s
-// overall shape (back link, header summary card, editable card, save button
-// wired to a mutation with isPending/isError/isSuccess feedback) and reuses
-// its permission-picker checkbox UI pattern — but CEILING-SCOPED: the pickable
-// permissions here are NOT the full 27-code PERMISSION_CATALOG, they are
-// exactly whatever permissions the target tenant's OWN PermissionGroup
-// contains (fetched via useTenantPermissionGroup, which mirrors backend
-// `roleType.service.ts`'s `handlePermissionUpdate` ceiling check:
-// `PermissionGroupService.search({ tenant: ctx.tenant._id }).items[0]`).
-//
-// `code` is a <Select> constrained to the backend's ALLOWED_ROLETYPE_CODES
-// enum (roleTypeCodes.ts) on create. The `{tenantCode}.admin` reserved,
-// system-seeded pattern is never offered as a creatable option here — if an
-// existing RoleType already has that shape (loaded on the edit path), it is
-// shown read-only with an explanatory note instead of the (disabled) code
-// selector, since `code` is not editable via UpdateRoleTypePayload anyway.
-//
-// Permissions are sent as bare string codes (CreateRoleTypePayload /
-// UpdateRoleTypePayload both type `permissions?: string[]`), unlike
-// PermissionGroup's `IPermission[]` — the toggle logic below tracks a
-// Set<string> of codes directly.
-
+// Combined create-flow + edit page (no `:id` -> create, `:id` -> edit).
+// Pickable permissions are ceiling-scoped to the target tenant's own PermissionGroup.
 const RoleTypeDetailPage = () => {
   const { id } = useParams<{ id: string }>()
   const isCreateMode = !id
@@ -91,29 +70,41 @@ const RoleTypeDetailPage = () => {
   const { data: tenantsData } = useTenants({})
   const tenants = tenantsData?.data?.items ?? []
 
-  // On create, the tenant is chosen via a picker (optionally pre-filled from
-  // ?tenant=<id> query param); on edit, it comes from the loaded RoleType.
-  const [tenant, setTenant] = useState(searchParams.get('tenant') ?? '')
+  const resolver = useRoleTypeFormResolver(isCreateMode ? createRoleTypeSchema : updateRoleTypeSchema)
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    watch,
+    setValue,
+    formState: { errors, touchedFields, isSubmitted },
+  } = useForm<RoleTypeFormValues>({
+    resolver,
+    mode: 'onChange',
+    defaultValues: {
+      code: '',
+      name: '',
+      description: '',
+      tenant: searchParams.get('tenant') ?? '',
+      status: '',
+    },
+  })
+
+  const tenant = watch('tenant')
+
   useEffect(() => {
     if (roleType && !isCreateMode) {
-      // roleType.tenant is a raw ObjectId string on GET-by-id but a populated
-      // {_id, name, code} object on GET (search) — see RoleTypePopulatedTenant.
-      const tenantValue = roleType.tenant
-      setTenant(typeof tenantValue === 'string' ? tenantValue : (tenantValue?._id ?? ''))
+      // roleType.tenant may be a raw id or a populated object depending on the endpoint.
+      setValue('tenant', unwrapId(roleType.tenant))
     }
-  }, [roleType, isCreateMode])
+  }, [roleType, isCreateMode, setValue])
 
   const selectedTenantRecord = tenants.find((t) => t.id === tenant)
 
   const { permissionGroup, isLoading: isLoadingCeiling } = useTenantPermissionGroup(tenant || undefined)
   const ceilingPermissions = useMemo(() => permissionGroup?.permissions ?? [], [permissionGroup])
 
-  // Groups the ceiling-scoped permission list by resource, in PERMISSION_CATALOG's
-  // own key order — mirrors PermissionGroupDetailPage.tsx's Accordion grouping,
-  // but over `ceilingPermissions` (the tenant's own granted subset) instead of
-  // the full catalog, and only emits resources that actually have at least one
-  // ceiling permission (an empty accordion section for a resource the tenant's
-  // PermissionGroup grants nothing in would just be dead weight to expand).
   const groupedCeilingPermissions = useMemo(() => {
     const byResource = new Map<keyof typeof PERMISSION_CATALOG, typeof ceilingPermissions>()
     for (const permission of ceilingPermissions) {
@@ -134,39 +125,20 @@ const RoleTypeDetailPage = () => {
   const updateRoleType = useUpdateRoleType(id ?? '')
   const createRoleType = useCreateRoleType()
 
-  const [code, setCode] = useState<RoleTypeCode | ''>('')
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [status, setStatus] = useState<RoleTypeStatus | ''>('')
-  const [selectedCodes, setSelectedCodes] = useState<Set<string>>(new Set())
-  const [formError, setFormError] = useState<string | null>(null)
-  const errorRef = useScrollIntoViewOnChange<HTMLDivElement>(formError)
-  // Permissions dropped from selectedCodes because the tenant's PermissionGroup
-  // ceiling has shrunk since this RoleType was last saved (see the pruning
-  // effect below) — surfaced as a visible notice rather than silently
-  // vanishing from the checked list, since an admin could otherwise revoke a
-  // permission from a role type without ever intending to, just by opening
-  // and re-saving the page.
+  const { selectedCodes, setSelectedCodes, setSelection, toggleCode } = usePermissionCodeSelection()
+  // Codes dropped by a shrunken ceiling, surfaced as a visible notice instead of silently vanishing.
   const [prunedCodes, setPrunedCodes] = useState<string[]>([])
 
   useEffect(() => {
     if (roleType && !isCreateMode) {
-      setName(roleType.name)
-      setDescription(roleType.description ?? '')
-      setStatus(roleType.status ?? '')
-      // roleType.permissions is a bare string[] on the wire (see RoleTypeEntity
-      // comment in accessManagement.types.ts) — no .code projection needed.
-      setSelectedCodes(new Set(roleType.permissions ?? []))
+      setValue('name', roleType.name)
+      setValue('description', roleType.description ?? '')
+      setValue('status', roleType.status ?? '')
+      setSelection(roleType.permissions ?? [])
     }
-  }, [roleType, isCreateMode])
+  }, [roleType, isCreateMode, setValue, setSelection])
 
-  // Whenever the ceiling (tenant's PermissionGroup) changes, drop any
-  // selected code that has fallen outside it — the ceiling is authoritative
-  // and the backend would reject an out-of-ceiling code on save anyway. But
-  // don't do this silently: record which codes were actually dropped so a
-  // visible notice can tell the admin exactly what's about to be revoked,
-  // rather than a permission quietly disappearing from the checked list
-  // with no trace before they click Save.
+  // Drop any selected code outside the ceiling (backend would reject it anyway) and record it for the notice above.
   useEffect(() => {
     if (!permissionGroup) return
     const allowed = new Set(ceilingPermissions.map((p) => p.code))
@@ -175,60 +147,42 @@ const RoleTypeDetailPage = () => {
       if (dropped.length > 0) setPrunedCodes((existing) => [...new Set([...existing, ...dropped])])
       return new Set([...prev].filter((c) => allowed.has(c)))
     })
-  }, [permissionGroup, ceilingPermissions])
-
-  const toggleCode = (code: string) => {
-    setSelectedCodes((prev) => {
-      const next = new Set(prev)
-      if (next.has(code)) {
-        next.delete(code)
-      } else {
-        next.add(code)
-      }
-      return next
-    })
-  }
+  }, [permissionGroup, ceilingPermissions, setSelectedCodes])
 
   const reservedCode = !isCreateMode && roleType ? isReservedTenantAdminCode(roleType.code, selectedTenantRecord?.code) : false
 
-  const handleSave = () => {
+  const fieldError = (field: keyof RoleTypeFormValues) =>
+    (touchedFields[field] || isSubmitted) ? errors[field]?.message : undefined
+
+  const onSubmit = (values: RoleTypeFormValues) => {
     const permissions = [...selectedCodes]
 
     if (isCreateMode) {
-      const result = createRoleTypeSchema.safeParse({
-        code,
-        name,
-        description: description || undefined,
-        tenant,
-        permissions,
-      })
-      if (!result.success) {
-        setFormError(formatZodIssue(result.error.issues[0]))
-        return
-      }
-      setFormError(null)
-      createRoleType.mutate(result.data as Parameters<typeof createRoleType.mutate>[0], {
-        onSuccess: (res) => {
-          if (res.data?.id) {
-            navigate(ROLE_TYPE_ROUTES.ROLE_TYPE_DETAIL.replace(':id', res.data.id))
-          }
+      createRoleType.mutate(
+        {
+          code: values.code as RoleTypeCode,
+          name: values.name,
+          description: values.description || undefined,
+          tenant: values.tenant,
+          permissions,
         },
-      })
+        {
+          onSuccess: (res) => {
+            if (res.data?.id) {
+              navigate(ROLE_TYPE_ROUTES.ROLE_TYPE_DETAIL.replace(':id', res.data.id))
+            }
+          },
+        },
+      )
       return
     }
 
-    const result = updateRoleTypeSchema.safeParse({
-      name,
-      description: description || undefined,
-      status: status || undefined,
+    updateRoleType.mutate({
+      name: values.name,
+      description: values.description || undefined,
+      status: values.status || undefined,
       permissions,
     })
-    if (!result.success) {
-      setFormError(formatZodIssue(result.error.issues[0]))
-      return
-    }
-    setFormError(null)
-    updateRoleType.mutate(result.data)
   }
 
   const mutation = isCreateMode ? createRoleType : updateRoleType
@@ -257,7 +211,7 @@ const RoleTypeDetailPage = () => {
       )}
 
       {(isCreateMode || (roleType && !isLoading)) && (
-        <>
+        <form onSubmit={handleSubmit(onSubmit)} noValidate>
           <div
             className="rounded-xl border p-5 mb-5"
             style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}
@@ -271,7 +225,14 @@ const RoleTypeDetailPage = () => {
                   <FieldLabel htmlFor="tenant">
                     Company
                   </FieldLabel>
-                  <TenantPicker id="tenant" tenants={tenants} value={tenant} onValueChange={setTenant} />
+                  <Controller
+                    control={control}
+                    name="tenant"
+                    render={({ field }) => (
+                      <TenantPicker id="tenant" tenants={tenants} value={field.value} onValueChange={field.onChange} />
+                    )}
+                  />
+                  {fieldError('tenant') && <p className="text-[11px] mt-1.5 text-danger">{fieldError('tenant')}</p>}
                   <p className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
                     The available permissions below are limited to this company's own permission group.
                   </p>
@@ -308,22 +269,29 @@ const RoleTypeDetailPage = () => {
                   <FieldLabel htmlFor="code">
                     Code
                   </FieldLabel>
-                  <Select key={code || 'empty'} value={code || undefined} onValueChange={(v) => setCode(v as RoleTypeCode)}>
-                    <SelectTrigger id="code" className="w-full">
-                      <SelectValue placeholder="Select code">{(v) => (v ? String(v) : 'Select code')}</SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ROLE_TYPE_CODE_GROUPS.map((group) => (
-                        <div key={group.label}>
-                          {group.codes.map((c) => (
-                            <SelectItem key={c} value={c}>
-                              {c}
-                            </SelectItem>
+                  <Controller
+                    control={control}
+                    name="code"
+                    render={({ field }) => (
+                      <Select key={field.value || 'empty'} value={field.value || undefined} onValueChange={field.onChange}>
+                        <SelectTrigger id="code" className="w-full">
+                          <SelectValue placeholder="Select code">{(v) => (v ? String(v) : 'Select code')}</SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ROLE_TYPE_CODE_GROUPS.map((group) => (
+                            <div key={group.label}>
+                              {group.codes.map((c) => (
+                                <SelectItem key={c} value={c}>
+                                  {c}
+                                </SelectItem>
+                              ))}
+                            </div>
                           ))}
-                        </div>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  {fieldError('code') && <p className="text-[11px] mt-1.5 text-danger">{fieldError('code')}</p>}
                   <p className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
                     Must be one of the platform's allowed role-type codes.
                   </p>
@@ -348,19 +316,15 @@ const RoleTypeDetailPage = () => {
                 <FieldLabel htmlFor="name">
                   Name
                 </FieldLabel>
-                <Input id="name" type="text" value={name} onChange={(e) => setName(e.target.value)} />
+                <Input id="name" type="text" {...register('name')} />
+                {fieldError('name') && <p className="text-[11px] mt-1.5 text-danger">{fieldError('name')}</p>}
               </div>
 
               <div>
                 <FieldLabel htmlFor="description">
                   Description
                 </FieldLabel>
-                <Textarea
-                  id="description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Optional"
-                />
+                <Textarea id="description" placeholder="Optional" {...register('description')} />
               </div>
 
               {!isCreateMode && (
@@ -368,27 +332,24 @@ const RoleTypeDetailPage = () => {
                   <FieldLabel htmlFor="status">
                     Status
                   </FieldLabel>
-                  {/* key={status || 'empty'} forces a fresh mount once the real
-                      value loads from the async fetch — base-ui's Select
-                      decides controlled-vs-uncontrolled on its very first
-                      render and never revisits it, so without this the
-                      trigger permanently shows "Select status" even after
-                      the real value arrives (same bug as
-                      TenantDetailPage.tsx/RoleDetailPage.tsx/
-                      GeoProfileDetailPage.tsx/CampDetailPageReal.tsx).
-                      Data-only display bug — the underlying value was
-                      always correct. */}
-                  <Select key={status || 'empty'} value={status || undefined} onValueChange={(v) => setStatus(v as RoleTypeStatus)}>
-                    <SelectTrigger id="status" className="w-full">
-                      <SelectValue placeholder="Select status">
-                        {(v) => (v === 'active' ? 'Active' : v === 'inactive' ? 'Inactive' : 'Select status')}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Controller
+                    control={control}
+                    name="status"
+                    render={({ field }) => (
+                      // key forces a remount once the async value loads, to work around base-ui's Select controlled/uncontrolled quirk.
+                      <Select key={field.value || 'empty'} value={field.value || undefined} onValueChange={field.onChange}>
+                        <SelectTrigger id="status" className="w-full">
+                          <SelectValue placeholder="Select status">
+                            {(v) => (v === 'active' ? 'Active' : v === 'inactive' ? 'Inactive' : 'Select status')}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="inactive">Inactive</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
                 </div>
               )}
             </div>
@@ -485,17 +446,11 @@ const RoleTypeDetailPage = () => {
 
             <MutationStatusBanner mutation={mutation} showSuccess={!isCreateMode} />
 
-            {formError && (
-              <div ref={errorRef} className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger mt-4">
-                {formError}
-              </div>
-            )}
-
-            <Button onClick={handleSave} disabled={mutation.isPending} className="mt-4">
+            <Button type="submit" disabled={mutation.isPending} className="mt-4">
               {mutation.isPending ? 'Saving…' : isCreateMode ? 'Create role type' : 'Save changes'}
             </Button>
           </div>
-        </>
+        </form>
       )}
     </div>
   )

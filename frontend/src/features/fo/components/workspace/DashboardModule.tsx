@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import {
   FiPlay, FiArrowRight, FiFileText, FiAlertTriangle, FiPackage, FiTrendingDown, FiClock,
   FiCalendar, FiCheckCircle, FiActivity, FiStar, FiCpu, FiAward, FiDollarSign, FiUsers,
@@ -10,6 +10,7 @@ import KpiTile from '@/components/ui/KpiTile'
 import { Button } from '@/components/ui/button'
 import { formatINR, formatDate } from '@/utils/formatters'
 import MiniCalendar from '@/features/fo/components/workspace/MiniCalendar'
+import { isCampRunnable, FINISHED_STATUSES, NOT_CANCELLED } from '@/features/fo/components/workspace/campEligibility'
 
 interface DashboardModuleProps {
   me: Person
@@ -22,21 +23,11 @@ interface DashboardModuleProps {
   onNavigate: (moduleId: string) => void
 }
 
-const NOT_CANCELLED: Camp['status'][] = ['CANCELLED', 'CANCELLED_CHARGED']
-// "Finished" excludes COMPLETE_WITHOUT_REPORT on purpose — that status still needs the FO to come
-// back and finish closure paperwork, so it must stay runnable (see isRunnable's OR-clause below).
-const FINISHED_STATUSES: Camp['status'][] = ['CLOSED', 'COMPLETE', 'INCOMPLETE']
-// Used for aggregate counts (KPI tiles, "closed" buckets) where COMPLETE_WITHOUT_REPORT should
-// count as closed — distinct from FINISHED_STATUSES, which gates the Run/Finish button.
+// Distinct from FINISHED_STATUSES (which gates the Run/Finish button): here COMPLETE_WITHOUT_REPORT counts as closed.
 const CLOSED_STATUSES: Camp['status'][] = ['CLOSED', 'COMPLETE', 'COMPLETE_WITHOUT_REPORT']
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10)
-}
-
-function isRunnable(c: Camp, today: string): boolean {
-  if (FINISHED_STATUSES.includes(c.status) || NOT_CANCELLED.includes(c.status)) return false
-  return (c.date?.slice(0, 10) ?? '') <= today || c.status === 'LIVE' || c.status === 'COMPLETE_WITHOUT_REPORT'
 }
 
 const STATUS_BUCKETS: { id: string; label: string; statuses: Camp['status'][]; tone: string }[] = [
@@ -48,17 +39,19 @@ const STATUS_BUCKETS: { id: string; label: string; statuses: Camp['status'][]; t
 ]
 
 const DashboardModule = ({ me, camps, claims, incidents, consumables, training, onRunCamp, onNavigate }: DashboardModuleProps) => {
+  // Frozen once at mount so date-window filters below stay internally consistent per render.
+  const [now] = useState(() => Date.now())
   const today = todayIso()
   const myCamps = useMemo(() => camps.filter((c) => c.foId === me.id), [camps, me.id])
 
   const todayCamp = useMemo(() => myCamps.find((c) => c.date?.slice(0, 10) === today), [myCamps, today])
 
   const next7 = useMemo(() => {
-    const in7 = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10)
+    const in7 = new Date(now + 7 * 86_400_000).toISOString().slice(0, 10)
     return myCamps
       .filter((c) => (c.date?.slice(0, 10) ?? '') > today && (c.date?.slice(0, 10) ?? '') <= in7 && !NOT_CANCELLED.includes(c.status))
       .sort((a, b) => (a.date < b.date ? -1 : 1))
-  }, [myCamps, today])
+  }, [myCamps, today, now])
 
   const pendingClosure = useMemo(() => myCamps.filter((c) => {
     const isPastUnclosed = (c.date?.slice(0, 10) ?? '') < today && !FINISHED_STATUSES.includes(c.status) && !NOT_CANCELLED.includes(c.status)
@@ -69,9 +62,9 @@ const DashboardModule = ({ me, camps, claims, incidents, consumables, training, 
 
   const expiringConsumables = useMemo(() => consumables.filter((c) => {
     if (!c.expiry) return false
-    const days = (new Date(c.expiry).getTime() - Date.now()) / 86_400_000
+    const days = (new Date(c.expiry).getTime() - now) / 86_400_000
     return days >= 0 && days < 30
-  }), [consumables])
+  }), [consumables, now])
 
   const lowStock = useMemo(() => consumables.filter((c) => c.reorderAt != null && c.qty <= c.reorderAt), [consumables])
 
@@ -93,11 +86,10 @@ const DashboardModule = ({ me, camps, claims, incidents, consumables, training, 
     return STATUS_BUCKETS.map((b) => ({ ...b, camps: myCamps.filter((c) => b.statuses.includes(c.status)) }))
   }, [myCamps])
 
-  const runnableTodayCamp = todayCamp && isRunnable(todayCamp, today) ? todayCamp : null
+  const runnableTodayCamp = todayCamp && isCampRunnable(todayCamp, today) ? todayCamp : null
 
   return (
     <div className="space-y-4">
-      {/* Live/today camp banner */}
       {todayCamp ? (
         <div
           className="rounded-2xl px-5 py-4 flex items-center justify-between gap-4 flex-wrap"
@@ -125,7 +117,6 @@ const DashboardModule = ({ me, camps, claims, incidents, consumables, training, 
         </div>
       )}
 
-      {/* Alerts strip */}
       {(pendingClosure.length > 0 || openSos.length > 0 || expiringConsumables.length > 0 || lowStock.length > 0 || notCheckedIn) && (
         <div className="flex flex-wrap gap-2">
           {pendingClosure.length > 0 && (
@@ -156,7 +147,6 @@ const DashboardModule = ({ me, camps, claims, incidents, consumables, training, 
         </div>
       )}
 
-      {/* 10-tile KPI grid */}
       <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
         <KpiTile label="Today's camps" value={String(myCamps.filter((c) => c.date?.slice(0, 10) === today).length)} tone="brand" icon={FiCalendar} />
         <KpiTile label="Upcoming" value={String(upcoming.length)} tone="teal" icon={FiClock} />
@@ -172,7 +162,6 @@ const DashboardModule = ({ me, camps, claims, incidents, consumables, training, 
 
       <div className="grid gap-4" style={{ gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,1fr)' }}>
         <div className="space-y-4">
-          {/* Camps by status */}
           <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
             <div className="px-3.5 py-2.5 text-[12px] font-bold uppercase tracking-wide border-b" style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }}>Camps by status</div>
             <div className="grid grid-cols-5">
@@ -190,7 +179,6 @@ const DashboardModule = ({ me, camps, claims, incidents, consumables, training, 
             </div>
           </div>
 
-          {/* Today + next 7 days list */}
           <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
             <div className="px-3.5 py-2.5 text-[12px] font-bold uppercase tracking-wide border-b" style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }}>Today + next 7 days</div>
             <div>
@@ -205,7 +193,7 @@ const DashboardModule = ({ me, camps, claims, incidents, consumables, training, 
                     </div>
                     <div className="text-[11.5px]" style={{ color: 'var(--qms-text-muted)' }}>{formatDate(c.date)} · {c.city} · {c.slot}</div>
                   </div>
-                  {isRunnable(c, today) && (
+                  {isCampRunnable(c, today) && (
                     <Button size="sm" onClick={() => onRunCamp(c.id)}><FiPlay size={12} /> Run</Button>
                   )}
                 </div>
@@ -218,10 +206,8 @@ const DashboardModule = ({ me, camps, claims, incidents, consumables, training, 
         </div>
 
         <div className="space-y-4">
-          {/* Mini-calendar */}
           <MiniCalendar camps={myCamps} onSelectDay={(dayCamps) => { if (dayCamps[0]) onRunCamp(dayCamps[0].id) }} />
 
-          {/* Quick actions */}
           <div className="rounded-xl border p-3.5" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
             <div className="text-[11px] font-bold uppercase tracking-wide mb-2.5" style={{ color: 'var(--qms-text-muted)' }}>Quick actions</div>
             <div className="grid grid-cols-2 gap-2">
@@ -243,4 +229,3 @@ const DashboardModule = ({ me, camps, claims, incidents, consumables, training, 
 }
 
 export default DashboardModule
-export { isRunnable as isCampRunnable }

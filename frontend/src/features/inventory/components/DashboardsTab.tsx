@@ -1,9 +1,14 @@
+import type { IconType } from 'react-icons'
 import {
-  Gauge, Package, ShoppingCart, ReceiptIndianRupee, Contact, Truck, ListChecks, Activity,
-  Cpu, Route, CalendarClock, Tent, AlertTriangle, Warehouse, FileText, UserCheck, PackageCheck,
-  TrendingDown, ShieldCheck, CalendarX, TriangleAlert, Star, Award, TrendingUp, Wallet, User,
-  CheckCircle2, Clock, RefreshCw, Wrench, ArrowUpRight, LineChart,
-} from 'lucide-react'
+  FiPackage, FiShoppingCart, FiUser, FiTruck, FiCheckSquare, FiActivity,
+  FiCpu, FiCalendar, FiAlertTriangle, FiFileText, FiUserCheck,
+  FiTrendingDown, FiShield, FiStar, FiAward, FiTrendingUp, FiCheckCircle,
+  FiClock, FiRefreshCw, FiTool, FiArrowUpRight,
+} from 'react-icons/fi'
+import {
+  TbGauge, TbReceiptRupee, TbRoute, TbTent, TbBuildingWarehouse, TbPackageImport,
+  TbCalendarX, TbWallet,
+} from 'react-icons/tb'
 import { useDashboardsData, useDashboardSubView } from '@/features/inventory/hooks/useInventory'
 import { Th, Td } from '@/features/inventory/components/IntelTableUi'
 import { inr, buildDashboardKpis, poTotal, assetItems as getAssetItems } from '@/features/inventory/inventory.service'
@@ -15,72 +20,56 @@ import { SHORTAGE_BAND_STYLE } from '@/features/inventory/constants/shortageBand
 
 export type { DashboardSubView }
 
-// Exact port of window.QMS_InvIntel's Dashboards tab (tabDashboards()/
-// dashBody(), inventory-intel.js lines 175-315). Pure read-only analytics
-// view — 8 sub-views selected via a segmented-control strip, each rendering
-// its own kpiGrid() + one supporting table (Executive has no table). Every
-// KPI tile that carries a `tab` navigates to a DIFFERENT tab via
-// onNavigateTab (window.invSetTab in the prototype); table rows are never
-// clickable in this tab. Zero Dialog/Drawer state — everything here is
-// derived data + a single local `sub` selector (useDashboardSubView), no
-// manual DOM patching needed (the prototype's rerender()/IN.dash mutation
-// collapses to plain React state).
+// Pure read-only analytics view — 8 sub-views selected via a segmented
+// control, each rendering its own KPI grid + one supporting table.
 
-// icon name → lucide component — union of every icon referenced by the 8
-// KPI sets in the research spec (kpiGrid()'s `k.icon` uses data-lucide names
-// 1:1 with these PascalCase equivalents).
-const KPI_ICONS: Record<string, typeof Package> = {
-  package: Package,
-  cpu: Cpu,
-  route: Route,
-  'shopping-cart': ShoppingCart,
-  'calendar-clock': CalendarClock,
-  tent: Tent,
-  'list-checks': ListChecks,
-  'alert-triangle': AlertTriangle,
-  warehouse: Warehouse,
-  'file-text': FileText,
-  'user-check': UserCheck,
-  'package-check': PackageCheck,
-  'trending-down': TrendingDown,
-  'shield-check': ShieldCheck,
-  'calendar-x': CalendarX,
-  'triangle-alert': TriangleAlert,
-  truck: Truck,
-  contact: Contact,
-  star: Star,
-  award: Award,
-  'trending-up': TrendingUp,
-  wallet: Wallet,
-  user: User,
-  'check-circle-2': CheckCircle2,
-  clock: Clock,
-  'refresh-cw': RefreshCw,
-  wrench: Wrench,
+// Icon keys are a data contract with inventory.service.ts's KPI definitions.
+const KPI_ICONS: Record<string, IconType> = {
+  package: FiPackage,
+  cpu: FiCpu,
+  route: TbRoute,
+  'shopping-cart': FiShoppingCart,
+  'calendar-clock': FiCalendar,
+  tent: TbTent,
+  'list-checks': FiCheckSquare,
+  'alert-triangle': FiAlertTriangle,
+  warehouse: TbBuildingWarehouse,
+  'file-text': FiFileText,
+  'user-check': FiUserCheck,
+  'package-check': TbPackageImport,
+  'trending-down': FiTrendingDown,
+  'shield-check': FiShield,
+  'calendar-x': TbCalendarX,
+  'triangle-alert': FiAlertTriangle,
+  truck: FiTruck,
+  contact: FiUser,
+  star: FiStar,
+  award: FiAward,
+  'trending-up': FiTrendingUp,
+  wallet: TbWallet,
+  user: FiUser,
+  'check-circle-2': FiCheckCircle,
+  clock: FiClock,
+  'refresh-cw': FiRefreshCw,
+  wrench: FiTool,
 }
 
-// SEG_ICONS — segmented-control strip icons, exact order/copy of
-// tabDashboards()'s `segs` array (inventory-intel.js:177).
-const SEG_ICONS: Record<string, typeof Gauge> = {
-  gauge: Gauge,
-  package: Package,
-  'shopping-cart': ShoppingCart,
-  'receipt-indian-rupee': ReceiptIndianRupee,
-  contact: Contact,
-  truck: Truck,
-  'list-checks': ListChecks,
-  activity: Activity,
+const SEG_ICONS: Record<string, IconType> = {
+  gauge: TbGauge,
+  package: FiPackage,
+  'shopping-cart': FiShoppingCart,
+  'receipt-indian-rupee': TbReceiptRupee,
+  contact: FiUser,
+  truck: FiTruck,
+  'list-checks': FiCheckSquare,
+  activity: FiActivity,
 }
 
-// Shared KPI tile — exact visual port of kpiGrid()/.kpi (14px radius,
-// translucent --qms-surface bg, colored blob accent by tone), identical to
-// InventoryKpiStrip's own tile markup. `card.tab` is genuinely optional here
-// (Executive's "Avg readiness", every Finance tile, Vendor's "Avg
-// scorecard" render with no click-through) — exact port of kpiGrid()'s
-// `${k.tab ? 'clickable' : ''}` conditional.
+// `card.tab` is optional — some tiles (Executive's "Avg readiness", Finance,
+// Vendor's "Avg scorecard") render with no click-through.
 function DashKpiTile({ card, onNavigate }: { card: DashboardKpiCard; onNavigate: (tab: string) => void }) {
   const color = KPI_TONE_COLOR[card.tone]
-  const Icon = KPI_ICONS[card.icon] ?? Package
+  const Icon = KPI_ICONS[card.icon] ?? FiPackage
   const clickable = !!card.tab
 
   const inner = (
@@ -105,7 +94,7 @@ function DashKpiTile({ card, onNavigate }: { card: DashboardKpiCard; onNavigate:
       </div>
       <div className="relative text-xs" style={{ color: 'var(--qms-text-muted)' }}>{card.sub}</div>
       {clickable && (
-        <ArrowUpRight
+        <FiArrowUpRight
           size={14}
           className="absolute bottom-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
           style={{ color: 'var(--qms-brand-600, var(--qms-brand))' }}
@@ -150,11 +139,7 @@ function KpiGrid({ cards, onNavigate }: { cards: DashboardKpiCard[]; onNavigate:
   )
 }
 
-// .form-section-h — exact port (flex row, gap:8px, margin:18px 0 10px,
-// dashed bottom border, 12px/700/uppercase/.04em tracking) with a 22×22
-// rounded-7 gradient icon swatch (brand-600→teal-500, white icon) — reuses
-// the same inline pattern already established by DeviceDetailDrawer.tsx.
-function FormSectionH({ icon: Icon, children }: { icon: typeof LineChart; children: React.ReactNode }) {
+function FormSectionH({ icon: Icon, children }: { icon: IconType; children: React.ReactNode }) {
   return (
     <div
       className="flex items-center gap-2 text-xs font-bold uppercase tracking-[.04em]"
@@ -171,9 +156,6 @@ function FormSectionH({ icon: Icon, children }: { icon: typeof LineChart; childr
   )
 }
 
-// .im-tbl — shared table shell (border-collapse, 12px font, dashed row
-// borders, hover tint, .num right-align+tabular-nums) — used by all 6
-// supporting tables. Wrapped in '.inv-card' (padding:0, overflow:auto).
 function ImTable({ children, minWidth }: { children: React.ReactNode; minWidth?: number }) {
   return (
     <div className="rounded-2xl border overflow-auto" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
@@ -206,15 +188,13 @@ function ImBand({ tone, children }: { tone: 'green' | 'amber' | 'orange' | 'red'
   )
 }
 
-// tableFromForecast() — exact port (inventory-intel.js:272-276). Shared by
-// the Inventory sub-view (60-day window) and Operations sub-view (30-day
-// window), both sliced to first 10 rows (forecast() itself is pre-sorted by
-// shortage DESC).
+// Shared by Inventory (60-day) and Operations (30-day) sub-views, sliced to
+// first 10 rows; `rows` is pre-sorted by shortage DESC.
 function TableFromForecast({ rows, title }: { rows: ForecastRow[]; title: string }) {
   const body = rows.slice(0, 10)
   return (
     <>
-      <FormSectionH icon={LineChart}>{title}</FormSectionH>
+      <FormSectionH icon={FiTrendingUp}>{title}</FormSectionH>
       <ImTable>
         <thead>
           <tr>
@@ -245,7 +225,6 @@ function TableFromForecast({ rows, title }: { rows: ForecastRow[]; title: string
   )
 }
 
-// poTable() — exact port (inventory-intel.js:277-280). First 12 POs, stored order.
 function PoTable({ data }: { data: DashboardsData }) {
   const body = data.pos.slice(0, 12)
   return (
@@ -278,12 +257,7 @@ function PoTable({ data }: { data: DashboardsData }) {
   )
 }
 
-// depreciationTable() — exact port (inventory-intel.js:281-288). First 14
-// asset items. annual = WDV branch uses currentValue-or-purchaseCost × pct%,
-// else Straight Line uses purchaseCost × pct%. Reads assetItems() directly
-// (service-level export) rather than threading it through DashboardsData,
-// since it's a pure re-derivation of the same item-master store already
-// loaded for valuation().
+// First 14 asset items; WDV uses currentValue-or-purchaseCost × pct%, Straight Line uses purchaseCost × pct%.
 function DepreciationScheduleTable() {
   const rows = getAssetItems().slice(0, 14)
   return (
@@ -321,8 +295,6 @@ function DepreciationScheduleTable() {
   )
 }
 
-// vendorTable() — exact port (inventory-intel.js:289-291). First 12 ranked
-// vendors (already sorted descending by sc).
 function VendorTable({ data }: { data: DashboardsData }) {
   const rows = data.ranked.slice(0, 12)
   return (
@@ -357,8 +329,6 @@ function VendorTable({ data }: { data: DashboardsData }) {
   )
 }
 
-// transferTable() — exact port (inventory-intel.js:293-296). First 12
-// transfers, stored order. Status underscores replaced with spaces.
 function TransferTable({ data }: { data: DashboardsData }) {
   const rows = data.logisticsTransfers.slice(0, 12)
   return (
@@ -389,8 +359,6 @@ function TransferTable({ data }: { data: DashboardsData }) {
   )
 }
 
-// gauge() — exact port (inventory-intel.js:306): tiny inline factor label,
-// colored by its own fraction ≥0.9 (green) / ≥0.6 (amber) / else (red).
 function ReadinessGauge({ label, frac }: { label: string; frac: number }) {
   const color = frac >= 0.9 ? '#059669' : frac >= 0.6 ? '#a16207' : '#e11d48'
   return (
@@ -400,9 +368,7 @@ function ReadinessGauge({ label, frac }: { label: string; frac: number }) {
   )
 }
 
-// readinessTable() — exact port (inventory-intel.js:297-305). Sorted
-// ASCENDING by score (worst-first), min-width:760px to force horizontal
-// scroll on narrow viewports.
+// Sorted ascending by score (worst-first).
 function ReadinessTable({ data }: { data: DashboardsData }) {
   const rows = [...data.ready].sort((a, b) => a.r.score - b.r.score)
   return (
@@ -482,7 +448,7 @@ function DashboardBody({ sub, data, onNavigate }: { sub: DashboardSubView; data:
     return (
       <>
         <KpiGrid cards={kpis} onNavigate={onNavigate} />
-        <FormSectionH icon={TrendingDown}>Depreciation schedule</FormSectionH>
+        <FormSectionH icon={FiTrendingDown}>Depreciation schedule</FormSectionH>
         <DepreciationScheduleTable />
       </>
     )
@@ -515,7 +481,6 @@ function DashboardBody({ sub, data, onNavigate }: { sub: DashboardSubView; data:
     )
   }
 
-  // operations
   return (
     <>
       <KpiGrid cards={kpis} onNavigate={onNavigate} />
@@ -525,19 +490,10 @@ function DashboardBody({ sub, data, onNavigate }: { sub: DashboardSubView; data:
 }
 
 interface DashboardsTabProps {
-  /** window.invSetTab(tab) in the prototype — every Dashboards KPI tile that
-   * carries a `tab` navigates to a DIFFERENT tab within the same Inventory &
-   * Devices shell. InventoryPage owns the active-tab state and passes its
-   * own setter down, the same wiring pattern already used for
-   * InventoryKpiStrip's onNavigateTab prop. */
   onNavigateTab: (tab: string) => void
   /** Optional externally-controlled sub-view + setter — lets a sibling tab's
-   * deep-link (Copilot's "Readiness →" card: `window.QMS_InvIntel.setDash(
-   * 'readiness'); window.invSetTab('dashboards')`, chained in one onclick)
-   * preset the segmented control before this tab mounts/re-renders. Falls
-   * back to the tab's own local useDashboardSubView() state when the parent
-   * doesn't pass these — every other caller (plain tab-strip clicks) is
-   * unaffected. */
+   * deep-link preset the segmented control before this tab mounts. Falls
+   * back to local useDashboardSubView() state otherwise. */
   sub?: DashboardSubView
   onSubChange?: (sub: DashboardSubView) => void
 }
@@ -558,13 +514,12 @@ const DashboardsTab = ({ onNavigateTab, sub: subProp, onSubChange }: DashboardsT
 
   return (
     <div>
-      {/* .in-seg — segmented-control strip, 8 buttons */}
       <div
         className="inline-flex gap-1 p-1 rounded-[10px] mb-3.5 flex-wrap"
         style={{ background: 'var(--qms-surface-strong)' }}
       >
         {DASHBOARD_SEGS.map((s) => {
-          const Icon = SEG_ICONS[s.icon] ?? Gauge
+          const Icon = SEG_ICONS[s.icon] ?? TbGauge
           const active = sub === s.id
           return (
             <button

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useFilterState } from '@/hooks/useFilterState'
 import type { RoleTypeStatus } from '@/types/accessManagement.types'
 
 export interface RoleTypesFilterState {
@@ -13,14 +13,4 @@ const DEFAULT_FILTERS: RoleTypesFilterState = {
   tenant: 'ALL',
 }
 
-export const useRoleTypesFilters = () => {
-  const [filters, setFilters] = useState<RoleTypesFilterState>(DEFAULT_FILTERS)
-
-  const setFilter = <K extends keyof RoleTypesFilterState>(key: K, value: RoleTypesFilterState[K]) => {
-    setFilters((prev) => ({ ...prev, [key]: value }))
-  }
-
-  const reset = () => setFilters(DEFAULT_FILTERS)
-
-  return { filters, setFilter, reset }
-}
+export const useRoleTypesFilters = () => useFilterState<RoleTypesFilterState>(DEFAULT_FILTERS)

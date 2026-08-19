@@ -1,14 +1,7 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useCreateEntity } from '@/hooks/useCreateEntity'
 import { appointmentsRealService } from '@/features/crm/appointments/appointmentsReal.service'
+import { appointmentRealKeys } from '@/features/crm/appointments/hooks/useAppointmentsReal'
 import type { CreateAppointmentPayload } from '@/types/appointment.types'
 
-export const useCreateAppointment = () => {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: (payload: CreateAppointmentPayload) => appointmentsRealService.createAppointment(payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['appointmentsReal'] })
-    },
-  })
-}
+export const useCreateAppointment = () =>
+  useCreateEntity((payload: CreateAppointmentPayload) => appointmentsRealService.createAppointment(payload), appointmentRealKeys.all)

@@ -1,12 +1,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { projectsService } from '@/features/projects/projects.service'
+import { projectKeys } from '@/features/projects/hooks/useProjects'
 import type { MoveProjectStagePayload } from '@/types/project.types'
 import { toast } from '@/components/ui/sonner'
+import { getApiErrorMessage } from '@/utils/apiError'
 
-// The single mutation backing every stage transition (StatusChangeDialog,
-// "Close project" — folded into the same generic dialog per the backend's
-// one moveStage(to, reason) endpoint; no separate close/renew/void-camp
-// endpoints exist).
+// Backs every stage transition dialog — the backend has one moveStage(to,
+// reason) endpoint, no separate close/renew/void-camp endpoints.
 export const useMoveProjectStage = () => {
   const queryClient = useQueryClient()
 
@@ -14,10 +14,10 @@ export const useMoveProjectStage = () => {
     mutationFn: ({ id, payload }: { id: string; payload: MoveProjectStagePayload }) =>
       projectsService.moveProjectStage(id, payload),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] })
-      queryClient.invalidateQueries({ queryKey: ['project', variables.id] })
+      queryClient.invalidateQueries({ queryKey: projectKeys.all })
+      queryClient.invalidateQueries({ queryKey: projectKeys.detail(variables.id) })
       toast.success('Project status updated')
     },
-    onError: (err: any) => toast.error(err?.response?.data?.message || 'Could not update status — try again.'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Could not update status — try again.')),
   })
 }

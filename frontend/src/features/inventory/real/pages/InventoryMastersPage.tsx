@@ -1,4 +1,4 @@
-import InventoryMasterTab from '@/features/inventory/components/InventoryMasterTab'
+import InventoryMasterTab from '@/features/inventory/real/components/InventoryMasterTab'
 
 const InventoryMastersPage = () => {
   return (

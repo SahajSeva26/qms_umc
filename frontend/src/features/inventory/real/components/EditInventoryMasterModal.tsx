@@ -3,12 +3,12 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import type { ReactNode } from 'react'
 import type { InventoryMasterEntity } from '@/types/inventoryMaster.types'
 import { INVENTORY_MASTER_TYPE_LABEL, INVENTORY_MASTER_TYPES } from '@/types/inventoryMaster.types'
-import { useCreateInventoryMaster } from '@/features/inventory/hooks/useCreateInventoryMaster'
-import { useUpdateInventoryMaster } from '@/features/inventory/hooks/useUpdateInventoryMaster'
+import { useCreateInventoryMaster } from '@/features/inventory/real/hooks/useCreateInventoryMaster'
+import { useUpdateInventoryMaster } from '@/features/inventory/real/hooks/useUpdateInventoryMaster'
 import {
   createInventoryMasterSchema,
   type InventoryMasterFormValues,
-} from '@/features/inventory/schemas/inventoryMaster.schemas'
+} from '@/features/inventory/real/schemas/inventoryMaster.schemas'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -48,10 +48,8 @@ const EditInventoryMasterModal = ({ item, onClose }: EditInventoryMasterModalPro
     control,
     formState: { errors, touchedFields, isSubmitted },
   } = useForm<InventoryMasterFormValues>({
-    // One resolver for both modes — `code` is always present/valid in edit
-    // mode too (disabled, pre-filled from the item, never blank), so
-    // validating it there is harmless; it's stripped from the payload
-    // before sending since the update schema/endpoint don't accept it.
+    // One resolver for both modes — code is always valid in edit mode (disabled,
+    // pre-filled), harmless to validate; it's stripped before sending since update doesn't accept it.
     resolver: zodResolver(createInventoryMasterSchema),
     mode: 'onChange',
     defaultValues: {
@@ -95,7 +93,7 @@ const EditInventoryMasterModal = ({ item, onClose }: EditInventoryMasterModalPro
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 min-w-0" noValidate>
           <Field label="Code *" error={fieldError('code')}>
             <Input type="text" disabled={isEdit} className="text-[13px]" {...register('code')} />
             {isEdit && (
@@ -108,7 +106,9 @@ const EditInventoryMasterModal = ({ item, onClose }: EditInventoryMasterModalPro
           </Field>
 
           <Field label="Description *" error={fieldError('description')}>
-            <Textarea rows={2} className="text-[13px]" {...register('description')} />
+            {/* Textarea auto-grows with content — capped with max-h/overflow so a
+                pre-existing oversized legacy value can't stretch the dialog off-screen. */}
+            <Textarea rows={2} className="text-[13px] max-h-40 overflow-y-auto" {...register('description')} />
           </Field>
 
           <div className="grid grid-cols-2 gap-2.5">

@@ -1,19 +1,15 @@
-// Real backend-wired Inventory Master types — matches
-// backend/src/modules/inventory/inventory-master exactly. Deliberately
-// separate from features/inventory/inventory.types.ts, which is the older,
-// much richer mock-data type used by the other 17 (still-mock) Inventory &
-// Devices tabs — the two are unrelated models, not a renamed version of the
-// same thing, so they must never be merged or cross-imported.
+// Matches backend/inventory-master exactly — deliberately separate from the
+// older, richer mock-data type in inventory.types.ts. The two are unrelated models; never merge or cross-import them.
 
-export type InventoryMasterType = 'device' | 'consumable' | 'accessory' | 'other'
+// 'accessory'/'other' are dead, commented-out backend constants — offering
+// them here let the type filter send a value the backend 400s on, stalling the list.
+export type InventoryMasterType = 'device' | 'consumable'
 
-export const INVENTORY_MASTER_TYPES: InventoryMasterType[] = ['device', 'consumable', 'accessory', 'other']
+export const INVENTORY_MASTER_TYPES: InventoryMasterType[] = ['device', 'consumable']
 
 export const INVENTORY_MASTER_TYPE_LABEL: Record<InventoryMasterType, string> = {
   device: 'Device',
   consumable: 'Consumable',
-  accessory: 'Accessory',
-  other: 'Other',
 }
 
 export type InventoryMasterStatus = 'active' | 'inactive'

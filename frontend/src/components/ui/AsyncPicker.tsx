@@ -52,10 +52,10 @@ function AsyncPicker<TResult>({
       {value ? (
         <div
           onClick={() => { clearSelection(); onOpenChange(true) }}
-          className="flex items-center gap-2 h-8 rounded-lg border px-2.5 text-[13px] cursor-pointer"
+          className="flex items-center gap-2 h-8 min-w-0 rounded-lg border px-2.5 text-[13px] cursor-pointer"
           style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text)' }}
         >
-          <span className="flex-1 truncate">{label || value}</span>
+          <span className="flex-1 min-w-0 truncate">{label || value}</span>
           <button type="button" onClick={clearSelection} aria-label={clearAriaLabel}>
             <FiX size={13} style={{ color: 'var(--qms-text-muted)' }} />
           </button>

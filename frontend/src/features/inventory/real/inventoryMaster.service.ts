@@ -7,14 +7,6 @@ import type {
   UpdateInventoryMasterPayload,
 } from '@/types/inventoryMaster.types'
 
-// Real backend-integrated Inventory Master service — the ONLY real (non-mock)
-// module wired so far under features/inventory. Follows the exact pattern of
-// crm.service.ts / accessManagement.service.ts: same shared `api` axios
-// instance, same ApiResponse/PaginatedResponse envelope typing, a plain
-// object export, no class/default export. Every other Inventory & Devices
-// tab stays on the old mock inventory.service.ts until its own backend
-// module lands.
-
 const searchInventoryMasters = async (query: SearchInventoryMasterQuery) => {
   const res = await api.get<PaginatedResponse<InventoryMasterEntity>>('/inventory-masters', { params: query })
   return res.data

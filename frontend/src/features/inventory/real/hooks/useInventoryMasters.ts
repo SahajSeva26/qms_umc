@@ -1,6 +1,6 @@
 import { useEntityQuery } from '@/hooks/useEntityQuery'
 import { createEntityKeys } from '@/hooks/entityQueryKeys'
-import { inventoryMasterService } from '@/features/inventory/inventoryMaster.service'
+import { inventoryMasterService } from '@/features/inventory/real/inventoryMaster.service'
 import type { SearchInventoryMasterQuery } from '@/types/inventoryMaster.types'
 
 // No singular 'inventory-master' entry — this entity has no single-get

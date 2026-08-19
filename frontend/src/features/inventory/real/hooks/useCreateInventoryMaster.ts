@@ -1,6 +1,6 @@
 import { useCreateEntity } from '@/hooks/useCreateEntity'
-import { inventoryMasterService } from '@/features/inventory/inventoryMaster.service'
-import { inventoryMasterKeys } from '@/features/inventory/hooks/useInventoryMasters'
+import { inventoryMasterService } from '@/features/inventory/real/inventoryMaster.service'
+import { inventoryMasterKeys } from '@/features/inventory/real/hooks/useInventoryMasters'
 import type { CreateInventoryMasterPayload } from '@/types/inventoryMaster.types'
 
 export const useCreateInventoryMaster = () =>

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { FiPlus, FiSearch } from 'react-icons/fi'
 import { usePermission } from '@/hooks/usePermission'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
-import { useInventoryMasters } from '@/features/inventory/hooks/useInventoryMasters'
+import { useInventoryMasters } from '@/features/inventory/real/hooks/useInventoryMasters'
 import { INVENTORY_MASTER_TYPE_LABEL, INVENTORY_MASTER_TYPES } from '@/types/inventoryMaster.types'
 import type { InventoryMasterEntity, InventoryMasterStatus, InventoryMasterType } from '@/types/inventoryMaster.types'
 import { Input } from '@/components/ui/input'
@@ -11,16 +11,12 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import PaginationControls from '@/components/ui/PaginationControls'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import CopyButton from '@/components/ui/CopyButton'
-import EditInventoryMasterModal from '@/features/inventory/components/EditInventoryMasterModal'
+import EditInventoryMasterModal from '@/features/inventory/real/components/EditInventoryMasterModal'
 import { usePagination } from '@/hooks/usePagination'
+import { truncateIdentifier } from '@/features/inventory/real/utils/truncateIdentifier'
 
 const PAGE_SIZE = 10
-const CODE_DISPLAY_LENGTH = 10
 
-const truncateCode = (code: string) => (code.length > CODE_DISPLAY_LENGTH ? `${code.slice(0, CODE_DISPLAY_LENGTH)}…` : code)
-
-// Real backend-wired replacement for the "Item Master" tab. Kept separate
-// from ItemMasterTab.tsx (mock), which other tabs still import from for now.
 const InventoryMasterTab = () => {
   const { hasAnyPermission } = usePermission()
   const canManage = hasAnyPermission(['inventory-master:manage'])
@@ -123,14 +119,14 @@ const InventoryMasterTab = () => {
                   >
                     <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>
                       <div className="flex items-center gap-1.5">
-                        <span className="font-mono" title={item.code}>{truncateCode(item.code)}</span>
+                        <span className="font-mono" title={item.code}>{truncateIdentifier(item.code)}</span>
                         <CopyButton value={item.code} label="Code" />
                       </div>
                     </td>
                     <td className="px-4 py-2.5 font-semibold max-w-xs truncate" style={{ color: 'var(--qms-text)' }} title={item.name}>{item.name}</td>
                     <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{INVENTORY_MASTER_TYPE_LABEL[item.type]}</td>
-                    <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{item.sku}</td>
-                    <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{item.unit}</td>
+                    <td className="px-4 py-2.5 max-w-xs truncate" style={{ color: 'var(--qms-text-muted)' }} title={item.sku}>{item.sku}</td>
+                    <td className="px-4 py-2.5 max-w-xs truncate" style={{ color: 'var(--qms-text-muted)' }} title={item.unit}>{item.unit}</td>
                     {canManage && (
                       <td className="px-4 py-2.5">
                         <span

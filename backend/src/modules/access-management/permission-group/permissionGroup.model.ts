@@ -24,7 +24,7 @@ const permissionGroupSchema = new mongoose.Schema(
         },
         permissions: [
             {
-                code: { type: String },
+                code: String,
                 name: String,
                 description: String,
             },

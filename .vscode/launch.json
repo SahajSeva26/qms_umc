@@ -6,12 +6,17 @@
       "type": "node",
       "request": "launch",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "cwd": "${workspaceFolder}/backend",
       "console": "integratedTerminal",
       "sourceMaps": true,
       "autoAttachChildProcesses": true,
-      "skipFiles": ["<node_internals>/**"],
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
       "env": {
         "NODE_ENV": "development"
       }

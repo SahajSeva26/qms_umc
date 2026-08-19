@@ -12,7 +12,11 @@ export const PERMISSION_GROUP_PERMISSIONS = {
         name: 'Create Permission Group',
         description: 'Create Permission Group',
     },
-    GET: { code: 'permission-group:get', name: 'Get Permission Group', description: 'Get Permission Group' },
+    GET: {
+        code: 'permission-group:get',
+        name: 'Get Permission Group',
+        description: 'Get Permission Group'
+    },
     SEARCH: {
         code: 'permission-group:search',
         name: 'Search Permission Group',

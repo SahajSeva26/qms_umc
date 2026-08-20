@@ -29,6 +29,16 @@ const STATUS_STYLE: Record<InventoryRequestStatus, { bg: string; fg: string }> =
   cancelled: { bg: 'var(--qms-surface-strong)', fg: 'var(--qms-text-soft)' },
 }
 
+// Stage-action buttons are commands ("Approve this request"), not the resulting
+// status noun — only overrides where the verb reads differently from the label.
+const STAGE_ACTION_VERB: Partial<Record<InventoryRequestStatus, string>> = {
+  approved: 'Approve',
+  rejected: 'Reject',
+  cancelled: 'Cancel',
+  requested: 'Reopen',
+  received: 'Receive',
+}
+
 // Unlike device/consumable/master, GET here requires inventory-request:search
 // OR :manage — the list must never mount unguarded. :create is independent of :search, so the button can show even when the list can't load.
 const InventoryRequestsPanel = () => {
@@ -159,7 +169,7 @@ const InventoryRequestsPanel = () => {
                                   className="text-[10px] font-bold px-2 py-0.5 rounded-full border transition-colors hover:bg-(--qms-surface-hover)"
                                   style={{ borderColor: 'var(--qms-border-strong)', color: 'var(--qms-text-soft)' }}
                                 >
-                                  {INVENTORY_REQUEST_STATUS_LABEL[to]}
+                                  {STAGE_ACTION_VERB[to] ?? INVENTORY_REQUEST_STATUS_LABEL[to]}
                                 </button>
                               ))}
                               {canViewLedger && (

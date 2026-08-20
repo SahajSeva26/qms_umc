@@ -57,6 +57,28 @@ describe('InventoryRequestsPanel — permission gating', () => {
     expect(screen.getByRole('button', { name: /new request/i })).toBeInTheDocument()
   })
 
+  it('defaults the status filter to "requested" (the actionable inbox), not "All statuses"', async () => {
+    const { usePermission } = await import('@/hooks/usePermission')
+    vi.mocked(usePermission).mockReturnValue({
+      hasAnyPermission: (codes: string[]) => codes.includes('inventory-request:search'),
+    } as unknown as ReturnType<typeof usePermission>)
+
+    const { inventoryRequestService } = await import('@/features/inventory/real/inventoryRequest.service')
+    const InventoryRequestsPanel = (await import('@/features/inventory/real/components/InventoryRequestsPanel')).default
+
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <InventoryRequestsPanel />
+      </QueryClientProvider>,
+    )
+
+    await screen.findByText(/no requests found/i)
+    expect(inventoryRequestService.searchInventoryRequests).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'requested' }),
+    )
+    expect(screen.getByText('Requested')).toBeInTheDocument()
+  })
+
   it('search permission only (no create): list mounts and queries, "New request" is not shown', async () => {
     const { usePermission } = await import('@/hooks/usePermission')
     vi.mocked(usePermission).mockReturnValue({

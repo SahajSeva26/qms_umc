@@ -52,7 +52,7 @@ const InventoryRequestsPanel = () => {
   const canViewLedger = hasAnyPermission(['inventory-ledger:manage'])
 
   const [typeFilter, setTypeFilter] = useState<InventoryRequestType | 'ALL'>('ALL')
-  const [statusFilter, setStatusFilter] = useState<InventoryRequestStatus | 'ALL'>('ALL')
+  const [statusFilter, setStatusFilter] = useState<InventoryRequestStatus | 'ALL'>('requested')
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
   const [editModal, setEditModal] = useState<{ open: boolean; request: InventoryRequestEntity | null }>({ open: false, request: null })
   const [stageAction, setStageAction] = useState<{ requestId: string; to: InventoryRequestStatus } | null>(null)

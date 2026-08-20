@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import InventoryAssignmentsPanel from '@/features/inventory/real/components/InventoryAssignmentsPanel'
 import InventoryRequestsPanel from '@/features/inventory/real/components/InventoryRequestsPanel'
+import InventoryLedgerPanel from '@/features/inventory/real/components/InventoryLedgerPanel'
 
-type InventoryOperationsView = 'assignments' | 'requests'
+type InventoryOperationsView = 'assignments' | 'requests' | 'ledger'
 
 const InventoryOperationsPage = () => {
   const [view, setView] = useState<InventoryOperationsView>('assignments')
@@ -48,9 +49,25 @@ const InventoryOperationsPage = () => {
         >
           Requests
         </button>
+        <button
+          type="button"
+          aria-pressed={view === 'ledger'}
+          onClick={() => setView('ledger')}
+          className="rounded-lg text-xs font-bold border-0"
+          style={{
+            padding: '6px 14px',
+            background: view === 'ledger' ? 'var(--qms-card)' : 'transparent',
+            color: view === 'ledger' ? 'var(--qms-text)' : 'var(--qms-text-muted)',
+            boxShadow: view === 'ledger' ? '0 1px 4px rgba(0,0,0,.08)' : 'none',
+          }}
+        >
+          Ledger
+        </button>
       </div>
 
-      {view === 'assignments' ? <InventoryAssignmentsPanel /> : <InventoryRequestsPanel />}
+      {view === 'assignments' && <InventoryAssignmentsPanel />}
+      {view === 'requests' && <InventoryRequestsPanel />}
+      {view === 'ledger' && <InventoryLedgerPanel />}
     </div>
   )
 }

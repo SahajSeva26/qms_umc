@@ -10,24 +10,19 @@ interface InventoryMasterItemPickerProps {
   value: string
   label: string
   onChange: (itemId: string, itemLabel: string) => void
-  // Scopes the search to one catalog type — a device picker only ever offers
-  // 'device' master items, a consumable picker only 'consumable' ones,
-  // matching the type-coherence check the backend enforces on create.
   type: InventoryMasterType
 }
 
 const itemLabel = (item: InventoryMasterEntity) => `${item.name} (${item.code})`
 
-// Free-text typeahead over GET /inventory-masters?name=<keyword>&type=<type>;
-// single-select. Create-only — item is immutable on both device and
-// consumable, so this is never rendered in edit mode.
+// Free-text typeahead over GET /inventory-masters, scoped to type.
 const InventoryMasterItemPicker = ({ value, label, onChange, type }: InventoryMasterItemPickerProps) => {
   const [query, setQuery] = useState('')
   const debouncedQuery = useDebouncedValue(query, 300)
   const { open, setOpen, containerRef } = useAsyncPickerState()
 
   const searchQuery = { name: debouncedQuery.trim(), type, limit: '10' }
-  const { data, isFetching } = useQuery({
+  const { data, isFetching, isError, refetch } = useQuery({
     queryKey: ['inventory-masters', 'item-picker', searchQuery],
     queryFn: () => inventoryMasterService.searchInventoryMasters(searchQuery),
     enabled: !!debouncedQuery.trim(),
@@ -53,6 +48,9 @@ const InventoryMasterItemPicker = ({ value, label, onChange, type }: InventoryMa
       emptyQueryText="Type an item name to search."
       noResultsText="No matching catalog items found."
       renderResult={(item) => <>{itemLabel(item)}</>}
+      isError={isError}
+      errorText="Couldn't search the catalog. Try again."
+      onRetry={() => refetch()}
     />
   )
 }

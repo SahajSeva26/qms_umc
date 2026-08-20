@@ -1,18 +1,20 @@
 import { useState } from 'react'
-import { FiPlus, FiSearch } from 'react-icons/fi'
+import { FiPlus, FiClock } from 'react-icons/fi'
 import { usePermission } from '@/hooks/usePermission'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { useInventoryDevices } from '@/features/inventory/real/hooks/useInventoryDevices'
 import { INVENTORY_DEVICE_STATUS_LABEL, INVENTORY_DEVICE_STATUSES } from '@/types/inventoryDevice.types'
 import type { InventoryDeviceEntity, InventoryDeviceStatus } from '@/types/inventoryDevice.types'
-import { Input } from '@/components/ui/input'
+import type { InventoryMovementHistorySource } from '@/types/inventoryLedger.types'
 import { Button } from '@/components/ui/button'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import PaginationControls from '@/components/ui/PaginationControls'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import CopyButton from '@/components/ui/CopyButton'
 import EditInventoryDeviceModal from '@/features/inventory/real/components/EditInventoryDeviceModal'
-import InventoryMasterItemPicker from '@/features/inventory/real/components/InventoryMasterItemPicker'
+import InventoryDeviceSearchBar from '@/features/inventory/real/components/InventoryDeviceSearchBar'
+import type { InventoryDeviceSearchBarValue } from '@/features/inventory/real/components/InventoryDeviceSearchBar'
+import InventoryMovementHistoryDrawer from '@/features/inventory/real/components/InventoryMovementHistoryDrawer'
 import { usePagination } from '@/hooks/usePagination'
 import { truncateIdentifier } from '@/features/inventory/real/utils/truncateIdentifier'
 
@@ -33,19 +35,21 @@ const STATUS_STYLE: Record<InventoryDeviceStatus, { bg: string; fg: string }> = 
 const InventoryDevicesPanel = () => {
   const { hasAnyPermission } = usePermission()
   const canManage = hasAnyPermission(['inventory-device:manage'])
+  // Independent of inventory-device:manage — the History trigger must show for anyone
+  // holding inventory-ledger:manage, whether or not they can edit this device.
+  const canViewLedger = hasAnyPermission(['inventory-ledger:manage'])
 
-  const [search, setSearch] = useState('')
-  const debouncedSearch = useDebouncedValue(search, 300)
+  const [searchBar, setSearchBar] = useState<InventoryDeviceSearchBarValue>({ serial: '', item: null })
+  const debouncedSerial = useDebouncedValue(searchBar.serial, 300)
   const [status, setStatus] = useState<InventoryDeviceStatus | 'ALL'>('ALL')
-  const [itemId, setItemId] = useState('')
-  const [itemLabel, setItemLabel] = useState('')
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
   const [editModal, setEditModal] = useState<{ open: boolean; device: InventoryDeviceEntity | null }>({ open: false, device: null })
+  const [historySource, setHistorySource] = useState<InventoryMovementHistorySource | null>(null)
 
   const { data, isLoading, error, refetch } = useInventoryDevices({
-    serialNumber: debouncedSearch || undefined,
+    serialNumber: debouncedSerial.trim() || undefined,
     status: status === 'ALL' ? undefined : status,
-    item: itemId || undefined,
+    item: searchBar.item?.id || undefined,
     page: String(page),
     limit: String(PAGE_SIZE),
   })
@@ -70,33 +74,22 @@ const InventoryDevicesPanel = () => {
       </div>
 
       <div className="flex flex-wrap items-center gap-2 mb-3">
-        <div className="relative flex-1 min-w-[220px] max-w-xs">
-          <FiSearch size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--qms-text-muted)' }} />
-          <Input
-            placeholder="Search by serial number..."
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); resetToFirstPage() }}
-            className="pl-8 text-[13px]"
-          />
-        </div>
-        <Select value={status} onValueChange={(v) => { setStatus(v as InventoryDeviceStatus | 'ALL'); resetToFirstPage() }}>
-          <SelectTrigger className="w-40 text-[13px]">
-            <SelectValue>{() => (status === 'ALL' ? 'All statuses' : INVENTORY_DEVICE_STATUS_LABEL[status])}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ALL">All statuses</SelectItem>
-            {INVENTORY_DEVICE_STATUSES.map((s) => (
-              <SelectItem key={s} value={s}>{INVENTORY_DEVICE_STATUS_LABEL[s]}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <div className="w-56">
-          <InventoryMasterItemPicker
-            type="device"
-            value={itemId}
-            label={itemLabel}
-            onChange={(id, label) => { setItemId(id); setItemLabel(label); resetToFirstPage() }}
-          />
+        <InventoryDeviceSearchBar
+          value={searchBar}
+          onChange={(v) => { setSearchBar(v); resetToFirstPage() }}
+        />
+        <div className="sm:ml-auto">
+          <Select value={status} onValueChange={(v) => { setStatus(v as InventoryDeviceStatus | 'ALL'); resetToFirstPage() }}>
+            <SelectTrigger className="w-40 text-[13px]">
+              <SelectValue>{() => (status === 'ALL' ? 'All statuses' : INVENTORY_DEVICE_STATUS_LABEL[status])}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All statuses</SelectItem>
+              {INVENTORY_DEVICE_STATUSES.map((s) => (
+                <SelectItem key={s} value={s}>{INVENTORY_DEVICE_STATUS_LABEL[s]}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -106,7 +99,7 @@ const InventoryDevicesPanel = () => {
             <table className="w-full text-[13px]">
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--qms-border)' }}>
-                  {['Serial number', 'Item', 'Status', 'Mfg date', 'Warranty', 'Next calibration'].map((h) => (
+                  {['Serial number', 'Item', 'Status', 'Mfg date', 'Warranty', 'Next calibration', ...(canViewLedger ? [''] : [])].map((h) => (
                     <th
                       key={h}
                       className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5"
@@ -147,6 +140,27 @@ const InventoryDevicesPanel = () => {
                       <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{device.manufacturingDate?.slice(0, 10) ?? '—'}</td>
                       <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{device.warrantyExpiryDate?.slice(0, 10) ?? '—'}</td>
                       <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{device.nextCalibrationDate?.slice(0, 10) ?? '—'}</td>
+                      {canViewLedger && (
+                        <td className="px-4 py-2.5">
+                          <button
+                            type="button"
+                            title="View movement history" aria-label="View movement history"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setHistorySource({
+                                mode: 'inventory',
+                                inventoryType: 'InventoryDevice',
+                                inventoryId: device.id,
+                                summary: { serialNumber: device.serialNumber, itemName: device.item.name ?? device.item.id, status: device.status },
+                              })
+                            }}
+                            className="rounded p-1 transition-colors hover:bg-(--qms-surface-hover)"
+                            style={{ color: 'var(--qms-text-muted)' }}
+                          >
+                            <FiClock size={13} />
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   )
                 })}
@@ -167,6 +181,15 @@ const InventoryDevicesPanel = () => {
         <EditInventoryDeviceModal
           device={editModal.device}
           onClose={() => setEditModal({ open: false, device: null })}
+        />
+      )}
+
+      {historySource && (
+        <InventoryMovementHistoryDrawer
+          open
+          source={historySource}
+          canManage={canViewLedger}
+          onClose={() => setHistorySource(null)}
         />
       )}
     </div>

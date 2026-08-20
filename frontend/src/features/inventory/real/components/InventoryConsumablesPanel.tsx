@@ -1,16 +1,18 @@
 import { useState } from 'react'
-import { FiPlus, FiSearch } from 'react-icons/fi'
+import { FiPlus, FiClock } from 'react-icons/fi'
 import { usePermission } from '@/hooks/usePermission'
-import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { useInventoryConsumables } from '@/features/inventory/real/hooks/useInventoryConsumables'
 import type { InventoryConsumableEntity, InventoryConsumableStatus } from '@/types/inventoryConsumable.types'
-import { Input } from '@/components/ui/input'
+import type { InventoryMovementHistorySource } from '@/types/inventoryLedger.types'
 import { Button } from '@/components/ui/button'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import CopyButton from '@/components/ui/CopyButton'
 import PaginationControls from '@/components/ui/PaginationControls'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import EditInventoryConsumableModal from '@/features/inventory/real/components/EditInventoryConsumableModal'
-import InventoryMasterItemPicker from '@/features/inventory/real/components/InventoryMasterItemPicker'
+import InventoryConsumableSearchBar from '@/features/inventory/real/components/InventoryConsumableSearchBar'
+import type { InventoryConsumableSearchBarValue } from '@/features/inventory/real/components/InventoryConsumableSearchBar'
+import InventoryMovementHistoryDrawer from '@/features/inventory/real/components/InventoryMovementHistoryDrawer'
 import { usePagination } from '@/hooks/usePagination'
 import { truncateIdentifier } from '@/features/inventory/real/utils/truncateIdentifier'
 
@@ -21,19 +23,20 @@ const PAGE_SIZE = 10
 const InventoryConsumablesPanel = () => {
   const { hasAnyPermission } = usePermission()
   const canManage = hasAnyPermission(['inventory-consumable:manage'])
+  // Independent of inventory-consumable:manage — the History trigger must show for anyone
+  // holding inventory-ledger:manage, whether or not they can edit this lot.
+  const canViewLedger = hasAnyPermission(['inventory-ledger:manage'])
 
-  const [search, setSearch] = useState('')
-  const debouncedSearch = useDebouncedValue(search, 300)
+  const [searchBar, setSearchBar] = useState<InventoryConsumableSearchBarValue>({ batch: '', item: null })
   const [status, setStatus] = useState<InventoryConsumableStatus | 'ALL'>('ALL')
-  const [itemId, setItemId] = useState('')
-  const [itemLabel, setItemLabel] = useState('')
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
   const [editModal, setEditModal] = useState<{ open: boolean; lot: InventoryConsumableEntity | null }>({ open: false, lot: null })
+  const [historySource, setHistorySource] = useState<InventoryMovementHistorySource | null>(null)
 
   const { data, isLoading, error, refetch } = useInventoryConsumables({
-    batch: debouncedSearch || undefined,
+    batch: searchBar.batch || undefined,
     status: canManage && status !== 'ALL' ? status : undefined,
-    item: itemId || undefined,
+    item: searchBar.item?.id || undefined,
     page: String(page),
     limit: String(PAGE_SIZE),
   })
@@ -58,35 +61,24 @@ const InventoryConsumablesPanel = () => {
       </div>
 
       <div className="flex flex-wrap items-center gap-2 mb-3">
-        <div className="relative flex-1 min-w-[220px] max-w-xs">
-          <FiSearch size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--qms-text-muted)' }} />
-          <Input
-            placeholder="Search by batch..."
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); resetToFirstPage() }}
-            className="pl-8 text-[13px]"
-          />
-        </div>
+        <InventoryConsumableSearchBar
+          value={searchBar}
+          onChange={(v) => { setSearchBar(v); resetToFirstPage() }}
+        />
         {canManage && (
-          <Select value={status} onValueChange={(v) => { setStatus(v as InventoryConsumableStatus | 'ALL'); resetToFirstPage() }}>
-            <SelectTrigger className="w-36 text-[13px]">
-              <SelectValue>{() => (status === 'ALL' ? 'All statuses' : status === 'active' ? 'Active' : 'Expired')}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All statuses</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="expired">Expired</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="sm:ml-auto">
+            <Select value={status} onValueChange={(v) => { setStatus(v as InventoryConsumableStatus | 'ALL'); resetToFirstPage() }}>
+              <SelectTrigger className="w-36 text-[13px]">
+                <SelectValue>{() => (status === 'ALL' ? 'All statuses' : status === 'active' ? 'Active' : 'Expired')}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All statuses</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="expired">Expired</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         )}
-        <div className="w-56">
-          <InventoryMasterItemPicker
-            type="consumable"
-            value={itemId}
-            label={itemLabel}
-            onChange={(id, label) => { setItemId(id); setItemLabel(label); resetToFirstPage() }}
-          />
-        </div>
       </div>
 
       <QueryStateBlock isLoading={isLoading} error={error} loadingLabel="Loading lots…" errorLabel="Failed to load lots. Please try again." onRetry={refetch}>
@@ -95,7 +87,7 @@ const InventoryConsumablesPanel = () => {
             <table className="w-full text-[13px]">
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--qms-border)' }}>
-                  {['Batch', 'Item', 'Qty', 'Mfg date', 'Expiry date', ...(canManage ? ['Status'] : [])].map((h) => (
+                  {['Batch', 'Item', 'Qty', 'Mfg date', 'Expiry date', ...(canManage ? ['Status'] : []), ...(canViewLedger ? [' '] : [])].map((h) => (
                     <th
                       key={h}
                       className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5"
@@ -114,7 +106,12 @@ const InventoryConsumablesPanel = () => {
                     className={canManage ? 'cursor-pointer transition-colors hover:bg-(--qms-surface-hover)' : ''}
                     style={{ borderBottom: '1px solid var(--qms-border)' }}
                   >
-                    <td className="px-4 py-2.5 font-mono" style={{ color: 'var(--qms-text)' }} title={lot.batch}>{truncateIdentifier(lot.batch)}</td>
+                    <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono" title={lot.batch}>{truncateIdentifier(lot.batch)}</span>
+                        <CopyButton value={lot.batch} label="Batch number" />
+                      </div>
+                    </td>
                     <td className="px-4 py-2.5 max-w-xs truncate" style={{ color: 'var(--qms-text)' }} title={lot.item.name}>
                       {lot.item.name ?? lot.item.id}
                     </td>
@@ -129,6 +126,27 @@ const InventoryConsumablesPanel = () => {
                         >
                           {lot.status === 'active' ? 'ACTIVE' : 'EXPIRED'}
                         </span>
+                      </td>
+                    )}
+                    {canViewLedger && (
+                      <td className="px-4 py-2.5">
+                        <button
+                          type="button"
+                          title="View movement history" aria-label="View movement history"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setHistorySource({
+                              mode: 'inventory',
+                              inventoryType: 'InventoryConsumable',
+                              inventoryId: lot.id,
+                              summary: { batch: lot.batch, itemName: lot.item.name ?? lot.item.id, quantity: lot.quantity, status: lot.status, expiryDate: lot.expiryDate },
+                            })
+                          }}
+                          className="rounded p-1 transition-colors hover:bg-(--qms-surface-hover)"
+                          style={{ color: 'var(--qms-text-muted)' }}
+                        >
+                          <FiClock size={13} />
+                        </button>
                       </td>
                     )}
                   </tr>
@@ -151,6 +169,15 @@ const InventoryConsumablesPanel = () => {
           lot={editModal.lot}
           onClose={() => setEditModal({ open: false, lot: null })}
           canManageStatus={canManage}
+        />
+      )}
+
+      {historySource && (
+        <InventoryMovementHistoryDrawer
+          open
+          source={historySource}
+          canManage={canViewLedger}
+          onClose={() => setHistorySource(null)}
         />
       )}
     </div>

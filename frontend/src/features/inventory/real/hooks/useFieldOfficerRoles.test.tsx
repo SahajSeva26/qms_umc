@@ -44,4 +44,17 @@ describe('useFieldOfficerRoles', () => {
       ),
     )
   })
+
+  it('enabled=false: never queries role-types or roles (the caller lacks tenant:manage/tenant:admin)', async () => {
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    const { useFieldOfficerRoles } = await import('@/features/inventory/real/hooks/useFieldOfficerRoles')
+
+    renderHook(() => useFieldOfficerRoles(false), { wrapper: makeWrapper() })
+
+    // Give any accidental fetch a chance to fire before asserting its absence.
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    expect(accessManagementService.searchRoleTypes).not.toHaveBeenCalled()
+    expect(accessManagementService.searchRoles).not.toHaveBeenCalled()
+  })
 })

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FiPlus } from 'react-icons/fi'
+import { FiPlus, FiClock } from 'react-icons/fi'
 import { usePermission } from '@/hooks/usePermission'
 import { useInventoryRequests } from '@/features/inventory/real/hooks/useInventoryRequests'
 import {
@@ -9,12 +9,14 @@ import {
   getAllowedStageActions,
 } from '@/types/inventoryRequest.types'
 import type { InventoryRequestEntity, InventoryRequestStatus, InventoryRequestType } from '@/types/inventoryRequest.types'
+import type { InventoryMovementHistorySource } from '@/types/inventoryLedger.types'
 import { Button } from '@/components/ui/button'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import PaginationControls from '@/components/ui/PaginationControls'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import EditInventoryRequestModal from '@/features/inventory/real/components/EditInventoryRequestModal'
 import MoveRequestStageDialog from '@/features/inventory/real/components/MoveRequestStageDialog'
+import InventoryMovementHistoryDrawer from '@/features/inventory/real/components/InventoryMovementHistoryDrawer'
 import { usePagination } from '@/hooks/usePagination'
 
 const PAGE_SIZE = 10
@@ -35,12 +37,16 @@ const InventoryRequestsPanel = () => {
   const canCreate = hasAnyPermission(['inventory-request:create', 'inventory-request:manage'])
   const canUpdate = hasAnyPermission(['inventory-request:update', 'inventory-request:manage'])
   const canManage = hasAnyPermission(['inventory-request:manage'])
+  // Independent of every other permission on this panel — a viewer can hold
+  // inventory-ledger:manage without holding any inventory-request:* code, and vice versa.
+  const canViewLedger = hasAnyPermission(['inventory-ledger:manage'])
 
   const [typeFilter, setTypeFilter] = useState<InventoryRequestType | 'ALL'>('ALL')
   const [statusFilter, setStatusFilter] = useState<InventoryRequestStatus | 'ALL'>('ALL')
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
   const [editModal, setEditModal] = useState<{ open: boolean; request: InventoryRequestEntity | null }>({ open: false, request: null })
   const [stageAction, setStageAction] = useState<{ requestId: string; to: InventoryRequestStatus } | null>(null)
+  const [historySource, setHistorySource] = useState<InventoryMovementHistorySource | null>(null)
 
   const { data, isLoading, error, refetch } = useInventoryRequests(
     {
@@ -77,7 +83,7 @@ const InventoryRequestsPanel = () => {
         </div>
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-2 mb-3">
+          <div className="flex flex-wrap items-center gap-2 mb-3 sm:justify-end">
             <Select value={typeFilter} onValueChange={(v) => { setTypeFilter(v as InventoryRequestType | 'ALL'); resetToFirstPage() }}>
               <SelectTrigger className="w-36 text-[13px]">
                 <SelectValue>{() => (typeFilter === 'ALL' ? 'All types' : INVENTORY_REQUEST_TYPE_LABEL[typeFilter])}</SelectValue>
@@ -144,21 +150,30 @@ const InventoryRequestsPanel = () => {
                           <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{request.lineItems.length}</td>
                           <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{request.createdAt.slice(0, 10)}</td>
                           <td className="px-4 py-2.5">
-                            {canUpdate && actions.length > 0 && (
-                              <div className="flex flex-wrap gap-1" onClick={(e) => e.stopPropagation()}>
-                                {actions.map((to) => (
-                                  <button
-                                    key={to}
-                                    type="button"
-                                    onClick={() => setStageAction({ requestId: request.id, to })}
-                                    className="text-[10px] font-bold px-2 py-0.5 rounded-full border transition-colors hover:bg-(--qms-surface-hover)"
-                                    style={{ borderColor: 'var(--qms-border-strong)', color: 'var(--qms-text-soft)' }}
-                                  >
-                                    {INVENTORY_REQUEST_STATUS_LABEL[to]}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
+                            <div className="flex flex-wrap items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                              {canUpdate && actions.map((to) => (
+                                <button
+                                  key={to}
+                                  type="button"
+                                  onClick={() => setStageAction({ requestId: request.id, to })}
+                                  className="text-[10px] font-bold px-2 py-0.5 rounded-full border transition-colors hover:bg-(--qms-surface-hover)"
+                                  style={{ borderColor: 'var(--qms-border-strong)', color: 'var(--qms-text-soft)' }}
+                                >
+                                  {INVENTORY_REQUEST_STATUS_LABEL[to]}
+                                </button>
+                              ))}
+                              {canViewLedger && (
+                                <button
+                                  type="button"
+                                  title="View movement history" aria-label="View movement history"
+                                  onClick={() => setHistorySource({ mode: 'request', requestId: request.id, requestType: request.type, requestStatus: request.status })}
+                                  className="rounded p-1 transition-colors hover:bg-(--qms-surface-hover)"
+                                  style={{ color: 'var(--qms-text-muted)' }}
+                                >
+                                  <FiClock size={13} />
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       )
@@ -191,6 +206,15 @@ const InventoryRequestsPanel = () => {
           to={stageAction.to}
           onClose={() => setStageAction(null)}
           onSuccess={() => setStageAction(null)}
+        />
+      )}
+
+      {historySource && (
+        <InventoryMovementHistoryDrawer
+          open
+          source={historySource}
+          canManage={canViewLedger}
+          onClose={() => setHistorySource(null)}
         />
       )}
     </div>

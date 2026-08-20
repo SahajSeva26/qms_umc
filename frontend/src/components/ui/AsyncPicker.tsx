@@ -17,23 +17,24 @@ interface AsyncPickerProps<TResult> {
   renderResult: (result: TResult) => React.ReactNode
   searchPlaceholder: string
   clearAriaLabel: string
-  // Shown instead of a results list when the query is empty (e.g. a "type
-  // to search" prompt for callers that never fetch on an empty query).
+  // Shown when the query is empty and the caller never fetches on an empty query.
   emptyQueryText?: string
-  // Shown when the query is empty but the fetch still ran and returned zero
-  // results. Falls back to noResultsText if omitted.
+  // Shown when the query is empty but the fetch ran anyway and found nothing; falls back to noResultsText.
   emptyResultsText?: string
   noResultsText: string
   dropdownClassName?: string
+  // Takes priority over the other empty/no-results states.
+  isError?: boolean
+  errorText?: string
+  onRetry?: () => void
 }
 
-// Shared shell for a single-select, search-as-you-type dropdown field: an
-// input that swaps for a chip-with-clear once a value is picked. Query
-// state/fetching stays with the caller — this component only owns the JSX shell.
+// Shared shell for a single-select, search-as-you-type dropdown field. Query state stays with the caller.
 function AsyncPicker<TResult>({
   value, label, onChange, query, onQueryChange, open, onOpenChange, containerRef,
   results, isFetching, getId, getLabel, renderResult, searchPlaceholder, clearAriaLabel,
   emptyQueryText, emptyResultsText, noResultsText, dropdownClassName,
+  isError, errorText, onRetry,
 }: AsyncPickerProps<TResult>) {
   const pickResult = (result: TResult) => {
     onChange(getId(result), getLabel(result))
@@ -80,16 +81,30 @@ function AsyncPicker<TResult>({
           {isFetching && (
             <div className="text-[12px] px-2 py-2" style={{ color: 'var(--qms-text-muted)' }}>Searching…</div>
           )}
-          {!isFetching && query.trim() && results.length === 0 && (
+          {!isFetching && isError && (
+            <div className="flex items-center justify-between gap-2 text-[12px] px-2 py-2 text-danger">
+              <span>{errorText ?? 'Search failed. Try again.'}</span>
+              {onRetry && (
+                <button
+                  type="button"
+                  onClick={onRetry}
+                  className="shrink-0 font-semibold underline decoration-dotted underline-offset-2 hover:no-underline"
+                >
+                  Retry
+                </button>
+              )}
+            </div>
+          )}
+          {!isFetching && !isError && query.trim() && results.length === 0 && (
             <div className="text-[12px] px-2 py-2" style={{ color: 'var(--qms-text-muted)' }}>{noResultsText}</div>
           )}
-          {!isFetching && !query.trim() && emptyQueryText && (
+          {!isFetching && !isError && !query.trim() && emptyQueryText && (
             <div className="text-[12px] px-2 py-2" style={{ color: 'var(--qms-text-muted)' }}>{emptyQueryText}</div>
           )}
-          {!isFetching && !query.trim() && !emptyQueryText && results.length === 0 && (
+          {!isFetching && !isError && !query.trim() && !emptyQueryText && results.length === 0 && (
             <div className="text-[12px] px-2 py-2" style={{ color: 'var(--qms-text-muted)' }}>{emptyResultsText ?? noResultsText}</div>
           )}
-          {results.map((result) => (
+          {!isError && results.map((result) => (
             <button
               key={getId(result)}
               type="button"

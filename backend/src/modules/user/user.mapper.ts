@@ -37,8 +37,6 @@ export const UserMapper = {
         return result;
     },
 
-    // shapes UserService.report's already zero-filled report result into a stable dashboard
-    // response — every known status/gender bucket is always present, even with 0 users.
     toReportResponse: (report: any) => {
         const statusCounts = new Map((report?.statusCounts || []).map((s: any) => [s._id, s.count]));
         const genderCounts = new Map((report?.genderCounts || []).map((g: any) => [g._id, g.count]));

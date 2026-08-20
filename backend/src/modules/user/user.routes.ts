@@ -93,12 +93,7 @@ registry.registerPath({
     },
 });
 
-// NOTE: /report is declared before /:id so the literal path is not swallowed by the param route.
-// Gated on MANAGE, not SEARCH: the report has no tenant filter (see UserService.report), so SEARCH
-// (which every customer tenant's permission group already includes — see tenant.service.ts
-// createTenant) would let a customer-tenant admin see global, cross-tenant counts. MANAGE is
-// structurally confined to the platform tenant by the permission-group ceiling in role.service.ts /
-// roleType.service.ts, so this is the only permission that keeps the report platform-only.
+
 UserRouter.get(
     '/report',
     AuthMiddleware,

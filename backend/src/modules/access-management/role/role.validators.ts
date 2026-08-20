@@ -6,10 +6,12 @@ import { stripWhitespace } from '../../../shared/utils/strings';
 
 //1: create ====================================>
 export const CreateRolePayloadSchema = z.object({
+    // optional — for pharma field-force roles (MR/ASM/RSM) the service auto-generates a code from
+    // the universal pharma-role counter when omitted; every other role type still requires one.
     code: z.preprocess(
         stripWhitespace,
         z.string().min(1).toLowerCase(),
-    ).openapi({ example: 'site-manager-john' }),
+    ).optional().openapi({ example: 'site-manager-john' }),
     name: z.string().min(1).openapi({ example: 'Site Manager' }),
     description: z
         .string()

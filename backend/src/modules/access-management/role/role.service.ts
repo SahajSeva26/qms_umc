@@ -14,8 +14,9 @@ import { IServiceOptions } from '../../../shared/types/service.types';
 import { PermissionGroupModel } from '../permission-group/permissionGroup.model';
 import { TENANT_PERMISSIONS, TENANT_TYPE } from '../tenant/tenant.constants';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
-import { isValidRoleSupervisor, ROLE_SUPERVISOR_TREE } from './role.constants';
+import { isValidRoleSupervisor, ROLE_SUPERVISOR_TREE, PHARMA_FIELD_FORCE_TYPE_CODES, PHARMA_ROLE_COUNTER_ENTITY } from './role.constants';
 import { ALLOWED_ROLETYPE_CODES } from '../role-type/roleType.constants';
+import { CounterService } from '../../counter/counter.service';
 
 type RoleDoc = HydratedDocument<IRoleDocument> | null;
 const populate: any[] = [
@@ -60,8 +61,19 @@ const set = async (model: any, entity: HydratedDocument<IRoleDocument>, ctx: Req
         return cachedRoleType;
     };
 
+    // code: honor a supplied one; otherwise, on CREATE, auto-generate for pharma field-force roles
+    // (MR/ASM/RSM) from the universal pharma-role counter. next() runs inside the caller's
+    // transaction (create wraps set in withTransaction), so a failed create rolls the increment
+    // back — no burned code. Every other role type still requires an explicit code.
     if (model.code) {
         entity.code = model.code;
+    } else if (entity.isNew) {
+        const roleType: any = await getRoleType();
+        if (roleType && PHARMA_FIELD_FORCE_TYPE_CODES.includes(roleType.code)) {
+            entity.code = await CounterService.next(PHARMA_ROLE_COUNTER_ENTITY, ctx);
+        } else {
+            throwAppError('code is required', StatusCodes.BAD_REQUEST);
+        }
     }
     if (model.name) {
         entity.name = model.name;
@@ -203,7 +215,12 @@ const create = async (model: ICreateRolePayload, ctx: RequestContext): Promise<H
     // { tenant, code }. Not RoleService.get(code, ctx): that runs under ctx.where(), which is
     // unscoped for a god-mode (system:manage) actor and would wrongly match a same-coded role in
     // another tenant (e.g. the seeded system tenant's `admin`), 409-ing every new tenant's admin.
-    const existingRolePromise = RoleModel.findOne({ tenant: toObjectId(model.tenant), code: model.code });
+    // Only pre-check when a code was supplied — an omitted code is generated inside set() (pharma
+    // field-force) from the counter, so it's unique by construction; checking `code: undefined`
+    // here would strip to `{ tenant }` and falsely 409 on the tenant's first role.
+    const existingRolePromise = model.code
+        ? RoleModel.findOne({ tenant: toObjectId(model.tenant), code: model.code })
+        : Promise.resolve(null);
 
     let [tenant, existingRole] = await Promise.all([tenantPromise, existingRolePromise]);
 

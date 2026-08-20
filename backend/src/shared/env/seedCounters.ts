@@ -3,6 +3,7 @@ import { LEAD_COUNTER_ENTITY } from '../../modules/crm/lead/lead.constants';
 import { PROJECT_COUNTER_ENTITY } from '../../modules/crm/project/project.constants';
 import { CAMP_COUNTER_ENTITY } from '../../modules/operations/camp/camp.constants';
 import { APPOINTMENT_COUNTER_ENTITY } from '../../modules/crm/appointment/appointment.constants';
+import { PHARMA_ROLE_COUNTER_ENTITY } from '../../modules/access-management/role/role.constants';
 import logger from '../utils/logger';
 import { throwAppError } from '../utils/error';
 
@@ -40,6 +41,13 @@ const COUNTERS = [
         separator: '-',
         padding: 6,
         description: 'Sequential code for appointments (mtg-000001)',
+    },
+    {
+        entity: PHARMA_ROLE_COUNTER_ENTITY,
+        prefix: 'phr',
+        separator: '-',
+        padding: 6,
+        description: 'Sequential code for pharma field-force roles (phr-000001)',
     },
 ];
 

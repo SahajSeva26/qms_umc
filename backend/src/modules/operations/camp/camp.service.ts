@@ -116,7 +116,8 @@ const set = async (model: any, entity: HydratedDocument<ICamp>, ctx: RequestCont
         }
     }
 
-    // doctor — global registry, validated for existence
+    // doctor — tenant-scoped registry; DoctorService.get runs under ctx.where(), so this also
+    // enforces that the doctor belongs to the actor's tenant (a foreign id 404s "Doctor not found")
     if (model.doctor) {
         const doctor = await DoctorService.get(model.doctor, ctx);
         if (!doctor) {

@@ -3,10 +3,16 @@ import { DOCTOR_SPECIALIZATION, DOCTOR_STATUS } from './doctor.constants';
 
 // Doctor Model
 const doctorSchema = new mongoose.Schema({
+    // owner / isolation key — which tenant this doctor belongs to
+    tenant: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Tenant',
+        required: [true, 'Tenant is required'],
+        index: true,
+    },
     pharmaCode: {
         type: String,
         required: true,
-        unique: true,
     },
     name: {
         type: String,
@@ -35,7 +41,6 @@ const doctorSchema = new mongoose.Schema({
     },
     email: {
         type: String,
-        unique: true,
         required: [true, 'Email is required'],
     },
     googleMapLink: {
@@ -50,6 +55,11 @@ const doctorSchema = new mongoose.Schema({
 },{
     timestamps: true,
 });
+
+// Uniqueness is scoped to the tenant, never global — two different tenants may each own a
+// doctor with the same pharmaCode / email (each tenant keeps its own copy of a doctor).
+doctorSchema.index({ tenant: 1, pharmaCode: 1 }, { unique: true });
+doctorSchema.index({ tenant: 1, email: 1 }, { unique: true });
 
 export const DoctorModel = mongoose.model('Doctor', doctorSchema);
 export type IDoctor = mongoose.InferSchemaType<typeof doctorSchema>;

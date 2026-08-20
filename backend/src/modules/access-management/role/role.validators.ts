@@ -90,9 +90,11 @@ export const SearchRoleQuerySchema = z.object({
         .string()
         .optional()
         .openapi({ example: '64f1a2b3c4d5e6f7a8b9c0d4' }),
-    // filter roles by their manager — e.g. "list everyone reporting to this ASM"
+    // filter roles by their manager — e.g. "list everyone reporting to this ASM". Accepts a single
+    // id OR a list of ids (→ $in), so callers can fetch "everyone reporting to any of these managers"
+    // in one paginated query (used by the RSM downline lookup, which spans many ASMs).
     supervisor: z
-        .string()
+        .union([z.string(), z.array(z.string())])
         .optional()
         .openapi({ example: '64f1a2b3c4d5e6f7a8b9c0d5' }),
     page: z.string().optional().openapi({ example: '1' }),
@@ -100,3 +102,14 @@ export const SearchRoleQuerySchema = z.object({
 });
 
 export type ISearchRoleQuery = z.infer<typeof SearchRoleQuerySchema>;
+
+//4: downline MRs ====================================>
+// query for GET /roles/mrs — returns the caller's own downline MRs (pharma HO/RSM/ASM only).
+// `name` is the MR person's name (matched against the linked user), not the role's name field.
+export const SearchDownlineMrQuerySchema = z.object({
+    name: z.string().optional().openapi({ example: 'priya' }),
+    page: z.string().optional().openapi({ example: '1' }),
+    limit: z.string().optional().openapi({ example: '20' }),
+});
+
+export type ISearchDownlineMrQuery = z.infer<typeof SearchDownlineMrQuerySchema>;

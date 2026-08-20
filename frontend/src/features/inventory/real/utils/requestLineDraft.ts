@@ -8,6 +8,8 @@ import type { InventoryRequestLineItemPayload, InventoryRequestType } from '@/ty
 export type StockKind = 'device' | 'consumable'
 
 export interface RequestLineDraft extends InventoryRequestLineItemPayload {
+  // UI-only, stable identity — used as the React list key instead of array index.
+  draftId: string
   // UI-only — which sub-picker this line uses. Derived into itemType on submit.
   stockKind: StockKind
   // UI-only display label for the picked item (never sent to the backend).
@@ -16,6 +18,13 @@ export interface RequestLineDraft extends InventoryRequestLineItemPayload {
   // the quantity input. Undefined for refill lines / device lines.
   heldQuantity?: number
 }
+
+// Single construction point so draftId is never forgotten on a new call site.
+export const createRequestLineDraft = (overrides: Partial<RequestLineDraft> & Pick<RequestLineDraft, 'stockKind' | 'itemType' | 'item' | 'itemLabel'>): RequestLineDraft => ({
+  draftId: crypto.randomUUID(),
+  quantity: undefined,
+  ...overrides,
+})
 
 // Split out of InventoryRequestLineItemsEditor.tsx (a component file) since a
 // non-component export alongside a component breaks Fast Refresh lint.

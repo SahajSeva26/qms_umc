@@ -6,7 +6,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Input } from '@/components/ui/input'
 import FieldLabel from '@/components/ui/FieldLabel'
 import type { InventoryRequestType } from '@/types/inventoryRequest.types'
-import type { RequestLineDraft, StockKind } from '@/features/inventory/real/utils/requestLineDraft'
+import { createRequestLineDraft, type RequestLineDraft, type StockKind } from '@/features/inventory/real/utils/requestLineDraft'
 
 interface InventoryRequestLineItemsEditorProps {
   type: InventoryRequestType
@@ -14,7 +14,7 @@ interface InventoryRequestLineItemsEditorProps {
   onChange: (lines: RequestLineDraft[]) => void
 }
 
-const emptyLine = (stockKind: StockKind): RequestLineDraft => ({
+const emptyLine = (stockKind: StockKind): RequestLineDraft => createRequestLineDraft({
   stockKind,
   itemType: stockKind === 'device' ? 'InventoryDevice' : 'InventoryConsumable',
   item: '',
@@ -56,7 +56,7 @@ const InventoryRequestLineItemsEditor = ({ type, lines, onChange }: InventoryReq
         const overQuantity = !isRefill && line.heldQuantity !== undefined && (line.quantity ?? 0) > line.heldQuantity
 
         return (
-          <div key={index} className="rounded-lg border p-2.5 space-y-2 min-w-0" style={{ borderColor: 'var(--qms-border)' }}>
+          <div key={line.draftId} className="rounded-lg border p-2.5 space-y-2 min-w-0" style={{ borderColor: 'var(--qms-border)' }}>
             <div className="flex items-center gap-2">
               <Select
                 value={line.stockKind}

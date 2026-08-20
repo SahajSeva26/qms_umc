@@ -3,7 +3,7 @@ import type { InventoryRequestEntity, InventoryRequestType } from '@/types/inven
 import { useCreateInventoryRequest } from '@/features/inventory/real/hooks/useCreateInventoryRequest'
 import { useUpdateInventoryRequest } from '@/features/inventory/real/hooks/useUpdateInventoryRequest'
 import InventoryRequestLineItemsEditor from '@/features/inventory/real/components/InventoryRequestLineItemsEditor'
-import { isLineSetValid, type RequestLineDraft } from '@/features/inventory/real/utils/requestLineDraft'
+import { createRequestLineDraft, isLineSetValid, type RequestLineDraft } from '@/features/inventory/real/utils/requestLineDraft'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
@@ -16,12 +16,11 @@ interface EditInventoryRequestModalProps {
   onClose: () => void
 }
 
-const emptyLine = (): RequestLineDraft => ({
+const emptyLine = (): RequestLineDraft => createRequestLineDraft({
   stockKind: 'device',
   itemType: 'InventoryDevice',
   item: '',
   itemLabel: '',
-  quantity: undefined,
 })
 
 // The sub-picker "kind" a line resolves to on re-open. For a return line
@@ -31,13 +30,12 @@ const emptyLine = (): RequestLineDraft => ({
 // (li.item.type), not on itemType. Checking itemType alone here previously
 // mis-classified a consumable-typed Master as 'device' on every edit-reopen.
 const linesFromRequest = (request: InventoryRequestEntity): RequestLineDraft[] =>
-  request.lineItems.map((li) => ({
+  request.lineItems.map((li) => createRequestLineDraft({
     stockKind: li.itemType === 'InventoryConsumable' || li.item.type === 'consumable' ? 'consumable' : 'device',
     itemType: li.itemType,
     item: li.item.id,
     itemLabel: li.item.name ?? li.item.serialNumber ?? li.item.batch ?? li.item.id,
     quantity: li.quantity,
-    heldQuantity: undefined,
   }))
 
 // Edit mode is only reachable while status === 'requested'; submitting

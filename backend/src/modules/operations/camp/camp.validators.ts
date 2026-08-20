@@ -56,6 +56,30 @@ export const CreateCampPayloadSchema = z.object({
 });
 export type ICreateCampPayload = z.infer<typeof CreateCampPayloadSchema>;
 
+//1b: book ====================================>
+// Slim payload for a pharma field-force booking (POST /camps/book). tenant is taken from ctx,
+// division + asm + rsm are DERIVED from the target MR's supervisor chain, and fo is left unset
+// (QMS allocates it later). `mr` is optional only for an MR booking for themselves; a manager
+// (HO/RSM/ASM) must name the downline MR the camp is for.
+export const BookCampPayloadSchema = z.object({
+    mr: objectId('MR').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8d' }),
+    doctor: objectId('Doctor').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8b' }),
+
+    type: z.enum(Object.values(CAMP_TYPES)).optional().openapi({ example: 'screening' }),
+    patientExpectation: z.number().int().nonnegative().optional().openapi({ example: 50 }),
+
+    date: z.coerce.date().openapi({ example: '2026-08-15' }),
+    timeSlot: TimeSlotSchema,
+    city: z.string().min(1).openapi({ example: 'Mumbai' }),
+    state: z.string().min(1).openapi({ example: 'Maharashtra' }),
+    coordinates: CoordinatesSchema,
+
+    devices: z.array(z.string()).optional().openapi({ example: ['bp-monitor', 'glucometer'] }),
+    notes: z.string().optional().openapi({ example: 'Society clubhouse, ground floor' }),
+    conscentPath: z.string().optional().openapi({ example: 'https://cdn/consent-123.pdf' }),
+});
+export type IBookCampPayload = z.infer<typeof BookCampPayloadSchema>;
+
 //2: update ====================================>
 // project/tenant/division/status are NOT editable here — status moves through moveStage()
 export const UpdateCampPayloadSchema = z.object({

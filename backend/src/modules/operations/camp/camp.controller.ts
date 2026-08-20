@@ -2,6 +2,7 @@
 import { ResponseHandler } from '../../../shared/utils/responseHandler';
 import { formatZodError } from '../../../shared/utils/error';
 import {
+    BookCampPayloadSchema,
     CreateCampPayloadSchema,
     MoveStagePayloadSchema,
     SearchCampQuerySchema,
@@ -86,6 +87,32 @@ const create = async (req: any, res: any) => {
             StatusCodes.CREATED,
             true,
             'Camp created successfully',
+            CampMapper.toResponse(camp, ctx),
+        );
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
+const book = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+
+        const { data, success, error } = BookCampPayloadSchema.safeParse(req.body);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                fields: validationErrors,
+            });
+        }
+
+        const camp = await CampService.book(data, ctx);
+
+        return ResponseHandler.appResponse(
+            res,
+            StatusCodes.CREATED,
+            true,
+            'Camp booked successfully',
             CampMapper.toResponse(camp, ctx),
         );
     } catch (error: any) {
@@ -179,6 +206,7 @@ export const CampController = {
     get,
     search,
     create,
+    book,
     update,
     moveStage,
     allocateFo,

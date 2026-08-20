@@ -72,7 +72,7 @@ const InventoryAssignmentsPanel = () => {
             <table className="w-full text-[13px]">
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--qms-border)' }}>
-                  {['Field officer', 'Type', 'Item', 'Qty'].map((h) => (
+                  {['Field officer', 'Item', 'Type', 'Qty'].map((h) => (
                     <th
                       key={h}
                       className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5"
@@ -91,8 +91,8 @@ const InventoryAssignmentsPanel = () => {
                       <td className="px-4 py-2.5 max-w-xs truncate" style={{ color: 'var(--qms-text)' }} title={assignment.assignee.name}>
                         {assignment.assignee.name ?? assignment.assignee.id}
                       </td>
-                      <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{assignment.inventoryType === 'InventoryDevice' ? 'Device' : 'Consumable'}</td>
                       <td className="px-4 py-2.5 font-mono" style={{ color: 'var(--qms-text)' }} title={identifier}>{truncateIdentifier(identifier)}</td>
+                      <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{assignment.inventoryType === 'InventoryDevice' ? 'Device' : 'Consumable'}</td>
                       <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>{assignment.quantity}</td>
                     </tr>
                   )

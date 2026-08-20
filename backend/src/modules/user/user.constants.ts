@@ -13,16 +13,6 @@ export const USER_GENDERS = {
     OTHER: 'other',
 };
 
-// USER REPORT — registration trend bucket size
-export const USER_REPORT_GRANULARITY = {
-    DAY: 'day',
-    MONTH: 'month',
-};
-
-// USER REPORT — default trend window when the caller doesn't pass from/to
-export const USER_REPORT_DEFAULT_TREND_DAYS = 30;
-export const USER_REPORT_DEFAULT_TREND_MONTHS = 12;
-
 // =========================================================
 // ==============USER PERMISSIONS CONSTANTS==================
 // =========================================================

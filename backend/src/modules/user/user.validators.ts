@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { USER_GENDERS, USER_REPORT_GRANULARITY, USER_STATUS } from './user.constants';
+import { USER_GENDERS, USER_STATUS } from './user.constants';
 
 //1: update ====================================>
 export const UpdateUserPayloadSchema = z.object({
@@ -53,15 +53,3 @@ export const SearchUserQuerySchema = z.object({
 });
 
 export type ISearchUserQuery = z.infer<typeof SearchUserQuerySchema>;
-
-//3: report ====================================>
-export const UserReportQuerySchema = z.object({
-    from: z.iso.datetime().optional().openapi({ example: '2026-07-01T00:00:00.000Z' }),
-    to: z.iso.datetime().optional().openapi({ example: '2026-08-01T00:00:00.000Z' }),
-    granularity: z
-        .enum([USER_REPORT_GRANULARITY.DAY, USER_REPORT_GRANULARITY.MONTH])
-        .optional()
-        .openapi({ example: 'day' }),
-});
-
-export type IUserReportQuery = z.infer<typeof UserReportQuerySchema>;

@@ -76,4 +76,79 @@ describe('InventoryRequestsPanel — permission gating', () => {
     expect(inventoryRequestService.searchInventoryRequests).toHaveBeenCalled()
     expect(screen.queryByRole('button', { name: /new request/i })).not.toBeInTheDocument()
   })
+
+  it('History trigger visibility is driven by inventory-ledger:manage alone, independent of inventory-request:* permissions', async () => {
+    const { usePermission } = await import('@/hooks/usePermission')
+    // holds request:search + request:manage (so the row itself has stage actions) but NOT ledger:manage
+    vi.mocked(usePermission).mockReturnValue({
+      hasAnyPermission: (codes: string[]) => codes.includes('inventory-request:search') || codes.includes('inventory-request:manage'),
+    } as unknown as ReturnType<typeof usePermission>)
+
+    vi.doMock('@/features/inventory/real/inventoryRequest.service', () => ({
+      inventoryRequestService: {
+        searchInventoryRequests: vi.fn(async () => ({
+          success: true,
+          message: '',
+          data: {
+            count: 1,
+            items: [{
+              id: 'req-1', type: 'refill', status: 'requested',
+              requestedBy: { id: 'r1', name: 'Vikram' }, processedBy: null,
+              lineItems: [{ itemType: 'InventoryMaster', item: { id: 'm1' }, quantity: 1, fulfillment: [] }],
+              createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+            }],
+          },
+        })),
+      },
+    }))
+    vi.resetModules()
+
+    const InventoryRequestsPanel = (await import('@/features/inventory/real/components/InventoryRequestsPanel')).default
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <InventoryRequestsPanel />
+      </QueryClientProvider>,
+    )
+
+    await screen.findByText('Vikram')
+    expect(screen.queryByRole('button', { name: /view movement history/i })).not.toBeInTheDocument()
+  })
+
+  it('History trigger IS shown with only request:search + ledger:manage — no request:update/manage needed', async () => {
+    const { usePermission } = await import('@/hooks/usePermission')
+    // can see the list (request:search) and view history (ledger:manage), but
+    // cannot edit or move stages (no request:update/manage) — History must still render.
+    vi.mocked(usePermission).mockReturnValue({
+      hasAnyPermission: (codes: string[]) => codes.includes('inventory-request:search') || codes.includes('inventory-ledger:manage'),
+    } as unknown as ReturnType<typeof usePermission>)
+
+    vi.doMock('@/features/inventory/real/inventoryRequest.service', () => ({
+      inventoryRequestService: {
+        searchInventoryRequests: vi.fn(async () => ({
+          success: true,
+          message: '',
+          data: {
+            count: 1,
+            items: [{
+              id: 'req-1', type: 'refill', status: 'requested',
+              requestedBy: { id: 'r1', name: 'Vikram' }, processedBy: null,
+              lineItems: [{ itemType: 'InventoryMaster', item: { id: 'm1' }, quantity: 1, fulfillment: [] }],
+              createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+            }],
+          },
+        })),
+      },
+    }))
+    vi.resetModules()
+
+    const InventoryRequestsPanel = (await import('@/features/inventory/real/components/InventoryRequestsPanel')).default
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <InventoryRequestsPanel />
+      </QueryClientProvider>,
+    )
+
+    await screen.findByText('Vikram')
+    expect(screen.getByRole('button', { name: /view movement history/i })).toBeInTheDocument()
+  })
 })

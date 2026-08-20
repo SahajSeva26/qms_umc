@@ -70,4 +70,54 @@ describe('InventoryMasterItemPicker', () => {
       expect.objectContaining({ type: 'device' }),
     )
   })
+
+  // A failed search must not look identical to "no results."
+  it('a failed search shows an explicit error message, not the "no matching items" empty state', async () => {
+    const { inventoryMasterService } = await import('@/features/inventory/real/inventoryMaster.service')
+    vi.mocked(inventoryMasterService.searchInventoryMasters).mockRejectedValue(new Error('network down'))
+    const InventoryMasterItemPicker = (await import('@/features/inventory/real/components/InventoryMasterItemPicker')).default
+
+    const queryClient = makeQueryClient()
+    const user = userEvent.setup()
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <InventoryMasterItemPicker type="device" value="" label="" onChange={vi.fn()} />
+      </QueryClientProvider>,
+    )
+
+    const input = screen.getByPlaceholderText(/search catalog item/i)
+    await user.type(input, 'glucometer')
+
+    await screen.findByText(/couldn't search the catalog/i)
+    expect(screen.queryByText(/no matching catalog items found/i)).not.toBeInTheDocument()
+  })
+
+  it('retrying a failed search re-fires the query with the same term', async () => {
+    const { inventoryMasterService } = await import('@/features/inventory/real/inventoryMaster.service')
+    vi.mocked(inventoryMasterService.searchInventoryMasters).mockRejectedValueOnce(new Error('network down'))
+    const InventoryMasterItemPicker = (await import('@/features/inventory/real/components/InventoryMasterItemPicker')).default
+
+    const queryClient = makeQueryClient()
+    const user = userEvent.setup()
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <InventoryMasterItemPicker type="device" value="" label="" onChange={vi.fn()} />
+      </QueryClientProvider>,
+    )
+
+    const input = screen.getByPlaceholderText(/search catalog item/i)
+    await user.type(input, 'glucometer')
+    await screen.findByText(/couldn't search the catalog/i)
+
+    vi.mocked(inventoryMasterService.searchInventoryMasters).mockResolvedValue({
+      success: true,
+      message: '',
+      data: { count: 1, items: [{ id: 'm1', code: 'ACGLU-001', name: 'Glucometer', description: '', type: 'device', sku: '', unit: '', minStock: 0, maxStock: 0, createdAt: '', updatedAt: '' }] },
+    })
+
+    await user.click(screen.getByRole('button', { name: /retry/i }))
+    await screen.findByText('Glucometer (ACGLU-001)')
+  })
 })

@@ -4,6 +4,7 @@ import { inventoryRequestKeys } from '@/features/inventory/real/hooks/useInvento
 import { inventoryAssignmentKeys } from '@/features/inventory/real/hooks/useInventoryAssignments'
 import { inventoryDeviceKeys } from '@/features/inventory/real/hooks/useInventoryDevices'
 import { inventoryConsumableKeys } from '@/features/inventory/real/hooks/useInventoryConsumables'
+import { inventoryLedgerKeys } from '@/features/inventory/real/hooks/useInventoryLedgers'
 import type { CreateInventoryRequestPayload } from '@/types/inventoryRequest.types'
 
 // Not useCreateEntity (single-key only) — a fresh 'return' request withdraws
@@ -21,6 +22,7 @@ export const useCreateInventoryRequest = () => {
       queryClient.invalidateQueries({ queryKey: inventoryAssignmentKeys.all })
       queryClient.invalidateQueries({ queryKey: inventoryDeviceKeys.all })
       queryClient.invalidateQueries({ queryKey: inventoryConsumableKeys.all })
+      queryClient.invalidateQueries({ queryKey: inventoryLedgerKeys.all })
     },
   })
 }

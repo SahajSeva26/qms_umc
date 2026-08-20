@@ -162,30 +162,35 @@ const getUserWithPassword = async (identifier: string) => {
     return await UserModel.findOne(where).select('+password');
 };
 
-// UTC calendar-month equivalents of dates.ts's startOfUTCDay/endOfUTCDay — kept local since this
-// report is (so far) the only caller of month-bucketed ranges.
+
 const startOfUTCMonth = (date: Date): Date => new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
 const endOfUTCMonth = (date: Date): Date =>
     new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0, 23, 59, 59, 999));
 
-// aggregate stats for the admin/dashboard User Report. Status/gender/lockout counts are current-state
-// snapshots (unfiltered); only the registration trend is windowed by from/to+granularity. All four are
-// independent branches over the same collection, so one $facet aggregation replaces four separate queries.
-//
-// NOT tenant-scoped, deliberately: User has no `tenant` field (only indirectly via Role.user/Role.tenant,
-// same as UserService.get/search above), so it's a global registry like `doctor`/`inventory-*`, not a
-// tenant-owned collection. This endpoint is also only reachable with USER_PERMISSIONS.MANAGE, which the
-// tenant-permission-group ceiling (see role.service.ts/roleType.service.ts) makes structurally impossible
-// to grant inside any customer tenant — createTenant() only ever seeds GET/SEARCH/UPDATE into a new
-// tenant's permission group (see tenant.service.ts createTenant). So only platform/system-tenant actors,
-// who already get an unscoped ctx.where() everywhere else, can ever reach this report. Do not add a
-// ctx.where()/$lookup-based tenant filter here — there is no tenant field to filter by without joining
-// `roles`, which would reach across module boundaries for a filter no reachable caller needs.
+const enumeratePeriods = (from: Date, to: Date, granularity: string): string[] => {
+    const periods: string[] = [];
+
+    if (granularity === USER_REPORT_GRANULARITY.MONTH) {
+        const cursor = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), 1));
+        const end = new Date(Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), 1));
+        while (cursor <= end) {
+            periods.push(`${cursor.getUTCFullYear()}-${String(cursor.getUTCMonth() + 1).padStart(2, '0')}`);
+            cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+        }
+        return periods;
+    }
+
+    const cursor = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate()));
+    const end = new Date(Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), to.getUTCDate()));
+    while (cursor <= end) {
+        periods.push(cursor.toISOString().slice(0, 10));
+        cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+    return periods;
+};
+
 const report = async (filters: IUserReportQuery, ctx: RequestContext) => {
-    //1: resolve granularity + the raw (unaligned) window — defaults: last 30 days, or last 12
-    // calendar months when granularity=month is requested without an explicit range. Calendar-month
-    // arithmetic (setUTCMonth) is used instead of "months * 30 days" so the window is exact regardless
-    // of how many days those 12 months actually contain.
+
     const granularity = filters.granularity || USER_REPORT_GRANULARITY.DAY;
     const rawTo = filters.to ? new Date(filters.to) : new Date();
 
@@ -199,17 +204,12 @@ const report = async (filters: IUserReportQuery, ctx: RequestContext) => {
         rawFrom = new Date(rawTo.getTime() - USER_REPORT_DEFAULT_TREND_DAYS * 24 * 60 * 60 * 1000);
     }
 
-    //2: align the window to whole UTC bucket boundaries (day or month) so the $match range exactly
-    // covers every bucket $dateToString will produce below — otherwise a partial first/last bucket
-    // would under-count relative to a full one.
     const from = granularity === USER_REPORT_GRANULARITY.MONTH ? startOfUTCMonth(rawFrom) : startOfUTCDay(rawFrom);
     const to = granularity === USER_REPORT_GRANULARITY.MONTH ? endOfUTCMonth(rawTo) : endOfUTCDay(rawTo);
 
     const trendDateFormat = granularity === USER_REPORT_GRANULARITY.MONTH ? '%Y-%m' : '%Y-%m-%d';
 
-    //3: single aggregation, single collection scan. Bucketing is explicitly UTC (timezone: 'UTC') to
-    // match this project's only date convention (see shared/utils/dates.ts) — there is no per-user or
-    // business timezone anywhere in this codebase to bucket against instead.
+    //single aggregation, single collection scan.
     const [result] = await UserModel.aggregate([
         {
             $facet: {
@@ -231,7 +231,13 @@ const report = async (filters: IUserReportQuery, ctx: RequestContext) => {
         },
     ]);
 
-    return { ...result, meta: { granularity, from, to } };
+    const trendCounts = new Map((result?.registrationTrend || []).map((r: any) => [r._id, r.count]));
+    const registrationTrend = enumeratePeriods(from, to, granularity).map((period) => ({
+        period,
+        count: trendCounts.get(period) || 0,
+    }));
+
+    return { ...result, registrationTrend, meta: { granularity, from, to } };
 };
 
 export const UserService = {

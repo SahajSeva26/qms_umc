@@ -8,25 +8,27 @@ const objectId = (label: string) =>
 
 //1: create ====================================>
 // tenant is NOT accepted here — it is derived from the source project.
+// subtotal is NOT accepted — it is driven by the invoice's line items (sum of amounts).
 // total is NOT accepted — it is computed from subtotal + tax - discount.
 export const CreateInvoicePayloadSchema = z.object({
     project: objectId('Project').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
     issueDate: z.coerce.date().optional().openapi({ example: '2026-08-21' }),
     dueDate: z.coerce.date().optional().openapi({ example: '2026-09-20' }),
-    subtotal: z.number().nonnegative().optional().openapi({ example: 500000 }),
     tax: z.number().nonnegative().optional().openapi({ example: 90000 }),
     discount: z.number().nonnegative().optional().openapi({ example: 10000 }),
+    syncToTally: z.boolean().optional().openapi({ example: false }),
 });
 export type ICreateInvoicePayload = z.infer<typeof CreateInvoicePayloadSchema>;
 
 //2: update ====================================>
-// project/tenant/code/status are NOT editable here — status moves through moveStage().
+// project/tenant/code/status/subtotal are NOT editable here — status moves through moveStage(),
+// subtotal is driven by line items.
 export const UpdateInvoicePayloadSchema = z.object({
     issueDate: z.coerce.date().optional(),
     dueDate: z.coerce.date().optional(),
-    subtotal: z.number().nonnegative().optional(),
     tax: z.number().nonnegative().optional(),
     discount: z.number().nonnegative().optional(),
+    syncToTally: z.boolean().optional(),
 });
 export type IUpdateInvoicePayload = z.infer<typeof UpdateInvoicePayloadSchema>;
 

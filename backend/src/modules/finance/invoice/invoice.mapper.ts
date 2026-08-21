@@ -21,6 +21,9 @@ export const InvoiceMapper = {
             discount: invoice.discount,
             total: invoice.total,
 
+            // accounting sync
+            syncToTally: invoice.syncToTally,
+
             // lifecycle
             status: invoice.status,
             stageHistory: (invoice.stageHistory || []).map((entry: any) => ({

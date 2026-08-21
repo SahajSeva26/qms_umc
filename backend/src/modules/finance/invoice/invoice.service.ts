@@ -21,21 +21,26 @@ const populate: any[] = [
     { path: 'project', select: 'name code status' },
 ];
 
+// The single formula for an invoice's payable total. Exported so the line-item service can reuse
+// it when it recomputes the parent invoice after its lines change — one source of truth.
+export const computeInvoiceTotal = (subtotal: number, tax: number, discount: number): number =>
+    (subtotal || 0) + (tax || 0) - (discount || 0);
+
 // ========================================================================================
 // CORE FUNCTIONS
 // ========================================================================================
 
-// applies the editable money/date fields, then recomputes total from the resulting values so
-// total is always subtotal + tax - discount (never trusted from the payload). A discount larger
-// than subtotal + tax would make total negative — rejected here rather than at model save.
+// applies the editable invoice-level fields (dates, tax, discount, tally flag), then recomputes
+// total. subtotal is NOT set here — it is driven by the invoice's line items (see the line-item
+// service). A discount larger than subtotal + tax would make total negative — rejected here.
 const set = async (model: any, entity: HydratedDocument<IInvoice>, ctx: RequestContext) => {
     if (model.issueDate) entity.issueDate = model.issueDate;
     if (model.dueDate !== undefined) entity.dueDate = model.dueDate;
-    if (model.subtotal !== undefined) entity.subtotal = model.subtotal;
     if (model.tax !== undefined) entity.tax = model.tax;
     if (model.discount !== undefined) entity.discount = model.discount;
+    if (model.syncToTally !== undefined) entity.syncToTally = model.syncToTally;
 
-    const total = (entity.subtotal || 0) + (entity.tax || 0) - (entity.discount || 0);
+    const total = computeInvoiceTotal(entity.subtotal || 0, entity.tax || 0, entity.discount || 0);
     if (total < 0) {
         return throwAppError('Discount cannot exceed subtotal plus tax', StatusCodes.BAD_REQUEST);
     }

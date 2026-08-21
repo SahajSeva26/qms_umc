@@ -14,6 +14,7 @@ import { INVENTORY_DEVICE_PERMISSIONS } from '../../modules/inventory/inventory-
 import { INVENTORY_ASSIGNMENT_PERMISSIONS } from '../../modules/inventory/inventory-assignment/inventory-assignment.constants';
 import { INVENTORY_LEDGER_PERMISSIONS } from '../../modules/inventory/inventory-ledger/inventory-ledger.constants';
 import { INVOICE_PERMISSIONS } from '../../modules/finance/invoice/invoice.constants';
+import { INVOICE_LINE_ITEM_PERMISSIONS } from '../../modules/finance/invoiceLineItem/invoiceLineItem.constants';
 
 // CRM ROLE TYPES
 export const CRM_BUSINESS_ROLE_TYPES = [
@@ -167,6 +168,6 @@ export const FINANCE_BUSINESS_ROLE_TYPES = [
         code: ALLOWED_ROLETYPE_CODES.PLATFORM.FINANCE_MANAGER,
         name: 'Finance Manager',
         description: 'Finance manager — full control over invoicing',
-        permissions: [INVOICE_PERMISSIONS.MANAGE.code],
+        permissions: [INVOICE_PERMISSIONS.MANAGE.code, INVOICE_LINE_ITEM_PERMISSIONS.MANAGE.code],
     },
 ];

@@ -94,6 +94,14 @@ const invoiceSchema = new mongoose.Schema(
             enum: Object.values(INVOICE_STATUS),
             default: INVOICE_STATUS.DRAFT,
         },
+
+        // whether this invoice has been pushed to Tally (accounting sync). Defaults false;
+        // flipped true once the sync succeeds.
+        syncToTally: {
+            type: Boolean,
+            default: false,
+        },
+
         stageHistory: [stageHistorySchema],
     },
     {

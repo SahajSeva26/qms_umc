@@ -26,6 +26,7 @@ import '../../../modules/inventory/inventory-assignment/inventory-assignment.rou
 import '../../../modules/inventory/inventory-request/inventory-request.routes';
 import '../../../modules/inventory/inventory-ledger/inventory-ledger.routes';
 import '../../../modules/finance/invoice/invoice.routes';
+import '../../../modules/finance/invoiceLineItem/invoiceLineItem.routes';
 // =============================================
 // =============================================
 

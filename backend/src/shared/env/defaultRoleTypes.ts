@@ -59,6 +59,8 @@ export const CRM_BUSINESS_ROLE_TYPES = [
 
             DIVISION_PERMISSIONS.MANAGE.code,
             CONTACT_PERMISSIONS.MANAGE.code,
+
+            INVOICE_PERMISSIONS.MANAGE.code,
         ],
     },
 ];

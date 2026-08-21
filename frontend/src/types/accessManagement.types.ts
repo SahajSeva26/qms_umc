@@ -167,7 +167,7 @@ export type RoleTypeCode =
   | 'operation-manager-screening'
   | 'operation-manager-diet'
   | 'field-officer'
-  | 'pharma-ho'
+  | 'pharma-division-head'
   | 'pharma-asm'
   | 'pharma-rsm'
   | 'pharma-mr'

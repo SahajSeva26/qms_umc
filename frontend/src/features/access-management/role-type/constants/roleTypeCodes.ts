@@ -39,7 +39,7 @@ export const ROLE_TYPE_CODE_GROUPS: { label: string; codes: RoleTypeCode[] }[] =
   },
   {
     label: 'Customer',
-    codes: ['pharma-ho', 'pharma-asm', 'pharma-rsm', 'pharma-mr'],
+    codes: ['pharma-division-head', 'pharma-asm', 'pharma-rsm', 'pharma-mr'],
   },
 ]
 

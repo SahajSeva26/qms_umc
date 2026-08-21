@@ -26,7 +26,7 @@ const TenantIdPicker = ({ value, label, onChange }: TenantIdPickerProps) => {
   const { open, setOpen, containerRef } = useAsyncPickerState()
 
   const { data, isFetching } = useTenants(
-    { name: debouncedQuery.trim() || undefined, status: 'active', limit: '20' },
+    { name: debouncedQuery.trim() || undefined, status: 'active', type: 'customer', limit: '20' },
     open,
   )
   const results = data?.data?.items ?? []

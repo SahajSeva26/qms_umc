@@ -1,6 +1,11 @@
 import { ResponseHandler } from '../../../shared/utils/responseHandler';
 import { formatZodError } from '../../../shared/utils/error';
-import { CreateRolePayloadSchema, SearchRoleQuerySchema, UpdateRolePayloadSchema } from './role.validators';
+import {
+    CreateRolePayloadSchema,
+    SearchDownlineMrQuerySchema,
+    SearchRoleQuerySchema,
+    UpdateRolePayloadSchema,
+} from './role.validators';
 import { StatusCodes } from 'http-status-codes';
 import { RoleService } from './role.service';
 import { RoleMapper } from './role.mapper';
@@ -116,9 +121,37 @@ const update = async (req: any, res: any) => {
     }
 };
 
+const searchMrs = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+
+        const { data: filters, success, error } = SearchDownlineMrQuerySchema.safeParse(req.query);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                errors: validationErrors,
+            });
+        }
+        const pagination = RequestHandler.getPagination(filters);
+
+        const result = await RoleService.searchMrs(filters, ctx, { pagination });
+
+        return ResponseHandler.appResponse(
+            res,
+            StatusCodes.OK,
+            true,
+            'MRs fetched successfully',
+            RoleMapper.toSearchResponse(result),
+        );
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
 export const RoleController = {
     get,
     search,
     create,
     update,
+    searchMrs,
 };

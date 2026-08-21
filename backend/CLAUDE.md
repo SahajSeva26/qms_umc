@@ -14,7 +14,7 @@ src/modules/
   auth/                     user login / refresh / password reset
   user/                     user records (linked 1:1 to a Role)
   counter/                  global atomic per-entity sequence (feeds LEAD-/PROJECT-/CAMP- codes)
-  doctor/                   global doctor registry (no tenant scoping)
+  doctor/                   tenant-scoped doctor registry
   qa-feedback/              QA feedback
   access-management/        tenant, role, role-type, permission-group (RBAC)
   crm/                      division, lead, project, appointment, contact
@@ -269,7 +269,8 @@ const doc = await FooModel.findOne(where)
   "fix" its cross-tenant reach).
 - Coherence checks compare against the entity's own tenant (`entity.tenant`), NOT `ctx`, so a
   system user still can't link records across tenants.
-- Global registries (`doctor`) are intentionally NOT tenant-scoped.
+- Inventory registries (`inventory-master`/`inventory-device`/`inventory-consumable`) are
+  intentionally NOT tenant-scoped (global catalogs). Everything else is scoped via `ctx.where()`.
 
 ### Transactions — `withTransaction`
 
@@ -421,7 +422,7 @@ All modules follow the layered convention above; all are wired in `src/bin/app.t
 | — | auth | `/auth` | login, logout, refresh-token, reset-password (self), forgot-password (tenant:admin) |
 | — | user | `/users` | linked 1:1 to a Role; registers inactive by default |
 | — | counter | `/counters` | global atomic `$inc` sequence → prefixed padded codes (LEAD-/PROJECT-/CAMP-) |
-| — | doctor | `/doctors` | global registry, no tenant scoping; `pharmaCode` immutable natural key |
+| — | doctor | `/doctors` | tenant-scoped registry (`ctx.where()`); `pharmaCode` immutable natural key, unique per tenant `{tenant, pharmaCode}` (email also unique per tenant); tenant pinned on create (platform supplies, customer own-tenant), open reads / manage-guarded writes |
 | — | qa-feedback | `/qa-feedback` | QA feedback |
 | access-management | tenant | `/tenants` | types: `platform` / `customer`; owner auto-activated on create; optional updatable `salesPerson` (Role ref) — assign on create, reassign/unassign (null) on update, validated to exist AND be a `sales-rep` role type |
 | access-management | permission-group | `/permission-groups` | per-tenant permission ceiling |
@@ -454,8 +455,8 @@ registry, pino logging (`pino-http`), rate limiting (global + auth), `withTransa
   restore the exact lot/unit; write the transaction row; apply the assignment delta. (Seam left as a
   `NOTE` in `inventory-request.service.ts` `moveStage`.) Roles: **`inventory-manager`** platform role
   type added (`:manage` on all 5 inventory modules); FO role type granted `inventory-request`
-  create/get/search/update. Still open: tenant-scoping decision (inventory is global today, like
-  `doctor`), how camp/FO refs hang off assignments. Note the two typo constants in
+  create/get/search/update. Still open: tenant-scoping decision (inventory is global today — note
+  `doctor` was global but is now tenant-scoped), how camp/FO refs hang off assignments. Note the two typo constants in
   `inventory-device.constants.ts` (`MAINTAINANCE`, `DMAGAED`) and the `FIXME` on request `processedBy`.
 - Invoicing / billing (camp-to-cash, PO compliance, AR aging) — spec captured, not started
 - Scaling/concurrency hardening (clustering, `maxPoolSize`, `UV_THREADPOOL_SIZE`, user-search index)

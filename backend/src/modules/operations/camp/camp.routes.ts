@@ -3,6 +3,7 @@ import express from 'express';
 import { CampController } from './camp.controller';
 import { registry } from '../../../shared/config/swagger/swagger.registry';
 import {
+    BookCampPayloadSchema,
     CreateCampPayloadSchema,
     MoveStagePayloadSchema,
     SearchCampQuerySchema,
@@ -63,6 +64,29 @@ registry.registerPath({
         201: { description: 'Camp created successfully' },
         400: { description: 'Validation error' },
         404: { description: 'Project or division not found' },
+    },
+});
+
+// book camp (pharma field force — for an MR)
+registry.registerPath({
+    method: 'post',
+    path: '/camps/book',
+    tags: ['CAMP'],
+    summary: 'Book a camp for an MR (pharma HO/RSM/ASM/MR — MR books only for themselves)',
+    request: {
+        body: {
+            content: {
+                'application/json': {
+                    schema: BookCampPayloadSchema,
+                },
+            },
+        },
+    },
+    responses: {
+        201: { description: 'Camp booked successfully' },
+        400: { description: 'Validation error / MR not in your tenant or division' },
+        403: { description: 'Not allowed to book for this MR' },
+        404: { description: 'MR or doctor not found' },
     },
 });
 
@@ -186,3 +210,7 @@ CampRouter.post(
     ]),
     CampController.create,
 );
+
+// pharma field-force booking — only pharma role types hold camp:book. The service then authorizes
+// the caller against the target MR (self / downline). No manage fallback: booking is pharma-only.
+CampRouter.post('/book', AuthorizeMiddleware([CAMP_PERMISSIONS.BOOK.code]), CampController.book);

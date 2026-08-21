@@ -7,6 +7,9 @@ export const DoctorMapper = {
         const result: any = {
             id: doctor._id?.toString(),
 
+            // owning tenant (populated { name, code } when requested, else the raw id)
+            tenant: doctor.tenant,
+
             // identity
             pharmaCode: doctor.pharmaCode,
             name: doctor.name,

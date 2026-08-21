@@ -3,13 +3,13 @@ import { FiDownload } from 'react-icons/fi'
 import type { LeadEntity, LeadStatus } from '@/types/crm.types'
 import { LEAD_STATUS_LABEL, LEAD_TRANSITION_MAP } from '@/types/crm.types'
 import { downloadLeadsCsv } from '@/features/crm/crm.export'
-import { formatINR, formatDate } from '@/utils/formatters'
+import { formatINR } from '@/utils/formatters'
 import { roleLabel, divisionLabel, tenantLabel } from '@/features/crm/crm.utils'
 import { Button } from '@/components/ui/button'
 import StagePill from '@/features/crm/components/StagePill'
 import LeadAdvanceModal from '@/features/crm/components/LeadAdvanceModal'
 
-const COLUMNS = ['Title', 'Company', 'Division', 'Sales rep', 'Status', 'Value', 'Created', 'Actions']
+const COLUMNS = ['Code', 'Title', 'Company', 'Division', 'Sales rep', 'Status', 'Value', 'Actions']
 
 interface ListViewProps {
   leads: LeadEntity[]
@@ -64,13 +64,13 @@ const ListView = ({ leads, onOpen, onMoveStage, canManage }: ListViewProps) => {
                 className="cursor-pointer transition-colors hover:bg-(--qms-surface-hover)"
                 style={{ borderBottom: '1px solid var(--qms-border)' }}
               >
-                <td className="px-3 py-2 font-bold whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>{lead.title}</td>
+                <td className="px-3 py-2 font-bold whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>{lead.code}</td>
+                <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>{lead.title}</td>
                 <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>{tenantLabel(lead.tenant)}</td>
                 <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>{divisionLabel(lead.division)}</td>
                 <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>{roleLabel(lead.salesPerson)}</td>
                 <td className="px-3 py-2 whitespace-nowrap"><StagePill status={lead.status} /></td>
                 <td className="px-3 py-2 whitespace-nowrap font-bold text-right" style={{ color: 'var(--qms-text)' }}>{formatINR(lead.estimatedValue)}</td>
-                <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--qms-text-muted)' }}>{formatDate(lead.createdAt)}</td>
                 <td className="px-3 py-2 whitespace-nowrap">
                   {isFinal && (
                     <div className="flex justify-center" style={{ color: 'var(--qms-text-muted)' }}>-</div>

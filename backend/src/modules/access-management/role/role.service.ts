@@ -1,6 +1,6 @@
 import mongoose, { HydratedDocument } from 'mongoose';
 import { RoleModel, RoleDocument as IRoleDocument } from './role.model';
-import { ICreateRolePayload, ISearchRoleQuery, IUpdateRolePayload } from './role.validators';
+import { ICreateRolePayload, ISearchDownlineMrQuery, ISearchRoleQuery, IUpdateRolePayload } from './role.validators';
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
@@ -14,8 +14,9 @@ import { IServiceOptions } from '../../../shared/types/service.types';
 import { PermissionGroupModel } from '../permission-group/permissionGroup.model';
 import { TENANT_PERMISSIONS, TENANT_TYPE } from '../tenant/tenant.constants';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
-import { isValidRoleSupervisor, ROLE_SUPERVISOR_TREE } from './role.constants';
+import { isValidRoleSupervisor, ROLE_SUPERVISOR_TREE, PHARMA_FIELD_FORCE_TYPE_CODES, PHARMA_ROLE_COUNTER_ENTITY } from './role.constants';
 import { ALLOWED_ROLETYPE_CODES } from '../role-type/roleType.constants';
+import { CounterService } from '../../counter/counter.service';
 
 type RoleDoc = HydratedDocument<IRoleDocument> | null;
 const populate: any[] = [
@@ -60,8 +61,19 @@ const set = async (model: any, entity: HydratedDocument<IRoleDocument>, ctx: Req
         return cachedRoleType;
     };
 
+    // code: honor a supplied one; otherwise, on CREATE, auto-generate for pharma field-force roles
+    // (MR/ASM/RSM) from the universal pharma-role counter. next() runs inside the caller's
+    // transaction (create wraps set in withTransaction), so a failed create rolls the increment
+    // back — no burned code. Every other role type still requires an explicit code.
     if (model.code) {
         entity.code = model.code;
+    } else if (entity.isNew) {
+        const roleType: any = await getRoleType();
+        if (roleType && PHARMA_FIELD_FORCE_TYPE_CODES.includes(roleType.code)) {
+            entity.code = await CounterService.next(PHARMA_ROLE_COUNTER_ENTITY, ctx);
+        } else {
+            throwAppError('code is required', StatusCodes.BAD_REQUEST);
+        }
     }
     if (model.name) {
         entity.name = model.name;
@@ -178,7 +190,11 @@ const search = async (filters: ISearchRoleQuery, ctx: RequestContext, options?: 
         where.division = toObjectId(filters.division);
     }
     if (filters.supervisor) {
-        where.supervisor = toObjectId(filters.supervisor);
+        // accept a single id or a list of ids (→ $in) — the RSM downline lookup passes every ASM
+        // reporting to it and asks for all MRs under any of them in one paginated query.
+        where.supervisor = Array.isArray(filters.supervisor)
+            ? { $in: filters.supervisor.map((id: string) => toObjectId(id)) }
+            : toObjectId(filters.supervisor);
     }
 
     const countPromise = RoleModel.countDocuments(where);
@@ -203,7 +219,12 @@ const create = async (model: ICreateRolePayload, ctx: RequestContext): Promise<H
     // { tenant, code }. Not RoleService.get(code, ctx): that runs under ctx.where(), which is
     // unscoped for a god-mode (system:manage) actor and would wrongly match a same-coded role in
     // another tenant (e.g. the seeded system tenant's `admin`), 409-ing every new tenant's admin.
-    const existingRolePromise = RoleModel.findOne({ tenant: toObjectId(model.tenant), code: model.code });
+    // Only pre-check when a code was supplied — an omitted code is generated inside set() (pharma
+    // field-force) from the counter, so it's unique by construction; checking `code: undefined`
+    // here would strip to `{ tenant }` and falsely 409 on the tenant's first role.
+    const existingRolePromise = model.code
+        ? RoleModel.findOne({ tenant: toObjectId(model.tenant), code: model.code })
+        : Promise.resolve(null);
 
     let [tenant, existingRole] = await Promise.all([tenantPromise, existingRolePromise]);
 
@@ -247,11 +268,84 @@ const update = async (id: string, model: IUpdateRolePayload, ctx: RequestContext
     return role;
 };
 
+// Returns the MRs that fall under the CALLER in the pharma org tree. The caller's own role type
+// decides the reach (simple per-level branching — no generic tree walk):
+//   - division head (HO) → every MR in the caller's division
+//   - RSM              → MRs under any ASM that reports to this RSM (two hops)
+//   - ASM              → MRs directly reporting to this ASM
+// Anyone else (platform staff, tenant admin, or an MR with no downline) is rejected 403.
+// Delegates the actual fetch — including the `name` person-name filter and pagination — to
+// RoleService.search, so tenant scoping (ctx.where) and user-name resolution are reused as-is.
+const searchMrs = async (filters: ISearchDownlineMrQuery, ctx: RequestContext, options?: IServiceOptions) => {
+    const { CUSTOMER } = ALLOWED_ROLETYPE_CODES;
+    const caller = ctx.role;
+    const callerTypeCode: string | undefined = caller?.type?.code;
+
+    // resolve THIS tenant's pharma-mr role type (natural-key get runs under ctx.where(), so it
+    // matches the caller's own tenant). Every customer tenant gets its own pharma role types.
+    const mrType = await RoleTypeService.get(CUSTOMER.PHARMA_MR, ctx);
+    if (!mrType) {
+        return throwAppError('MR role type not found for this tenant', StatusCodes.NOT_FOUND);
+    }
+
+    // base filter for the final MR query: only pharma-mr roles, pinned to the caller's own tenant
+    // (taken from ctx), optional person-name search. RoleService.search also re-applies ctx.where()
+    // tenant scoping — this explicit filter makes the tenant boundary obvious at the call site.
+    const mrFilters: ISearchRoleQuery = {
+        type: mrType._id.toString(),
+        tenant: ctx.tenant?._id?.toString(),
+    };
+    if (filters.name) {
+        // `name` here is the MR person's name → RoleService.search's `user` free-text filter,
+        // which resolves it against the linked user (name/email) before matching roles.
+        mrFilters.user = filters.name;
+    }
+
+    switch (callerTypeCode) {
+        case CUSTOMER.PHARMA_DIVISION_HEAD: {
+            // HO — all MRs tagged to the caller's own division
+            if (!caller.division) {
+                return throwAppError('Your role is not assigned to a division', StatusCodes.BAD_REQUEST);
+            }
+            mrFilters.division = caller.division.toString();
+            break;
+        }
+        case CUSTOMER.PHARMA_RSM: {
+            // RSM — first the ASMs reporting to this RSM, then the MRs under any of those ASMs
+            const asmType = await RoleTypeService.get(CUSTOMER.PHARMA_ASM, ctx);
+            const asms = await RoleService.search(
+                { supervisor: caller._id.toString(), type: asmType?._id?.toString() },
+                ctx,
+            );
+            const asmIds = asms.items.map((asm: any) => asm._id.toString());
+            if (asmIds.length === 0) {
+                return { count: 0, items: [] };
+            }
+            mrFilters.supervisor = asmIds;
+            break;
+        }
+        case CUSTOMER.PHARMA_ASM: {
+            // ASM — MRs reporting directly to this ASM
+            mrFilters.supervisor = caller._id.toString();
+            break;
+        }
+        default: {
+            return throwAppError(
+                'Forbidden: only pharma division head, RSM, or ASM can list downline MRs',
+                StatusCodes.FORBIDDEN,
+            );
+        }
+    }
+
+    return await RoleService.search(mrFilters, ctx, options);
+};
+
 export const RoleService = {
     get,
     search,
     create,
     update,
+    searchMrs,
 };
 
 // ========================================================================================

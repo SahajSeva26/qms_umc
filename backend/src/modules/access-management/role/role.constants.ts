@@ -27,6 +27,13 @@ export const ROLE_SUPERVISOR_TREE: any = {
     [CUSTOMER.PHARMA_ASM]: [CUSTOMER.PHARMA_RSM],
     [CUSTOMER.PHARMA_MR]: [CUSTOMER.PHARMA_ASM],
 };
+// pharma field-force role types whose code is auto-generated from the universal pharma-role
+// counter when the create payload omits `code` (see RoleService.set). The division head keeps
+// its own derived `${division.code}-head` code and is minted through the division flow, so it is
+// intentionally NOT in this list.
+export const PHARMA_ROLE_COUNTER_ENTITY = 'pharma-role';
+export const PHARMA_FIELD_FORCE_TYPE_CODES: string[] = [CUSTOMER.PHARMA_RSM, CUSTOMER.PHARMA_ASM, CUSTOMER.PHARMA_MR];
+
 export const isValidRoleSupervisor = (roleTypeCode: string, supervisorRoleTypeCode: string): boolean => {
     if (!roleTypeCode || !supervisorRoleTypeCode) {
         return false;

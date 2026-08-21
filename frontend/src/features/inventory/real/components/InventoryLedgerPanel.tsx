@@ -119,7 +119,7 @@ const InventoryLedgerPanel = () => {
                 <table className="w-full text-[13px]">
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--qms-border)' }}>
-                      {['Date & time', 'Type', 'Status (now)', 'Movement', 'Item', 'Qty', 'Field officer', 'Performed by'].map((h) => (
+                      {['Date & time', 'Item', 'Type', 'Status (now)', 'Movement', 'Qty', 'Field officer', 'Performed by'].map((h) => (
                         <th
                           key={h}
                           className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5"
@@ -138,6 +138,9 @@ const InventoryLedgerPanel = () => {
                       return (
                         <tr key={row.id} style={{ borderBottom: '1px solid var(--qms-border)' }}>
                           <td className="px-4 py-2.5 whitespace-nowrap" style={{ color: 'var(--qms-text-muted)' }}>{formatDateTime(row.createdAt)}</td>
+                          <td className="px-4 py-2.5 max-w-xs truncate font-mono" style={{ color: 'var(--qms-text)' }} title={itemIdentifier}>
+                            {itemIdentifier ? truncateIdentifier(itemIdentifier) : '—'}
+                          </td>
                           <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>{INVENTORY_REQUEST_TYPE_LABEL[row.requestType]}</td>
                           <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
                             {row.request?.status ? INVENTORY_REQUEST_STATUS_LABEL[row.request.status] : '—'}

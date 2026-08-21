@@ -141,7 +141,7 @@ export const GO_LIVE_SCOPE_LABEL: Record<GoLiveScopeCode, string> = {
 // Must match role-type/constants/roleTypeCodes.ts's customer-side RoleTypeCode
 // values exactly — a previous typo here ('pharma-ms', 'pharms-asm') silently
 // submitted values the backend's Zod enum rejects.
-export type WhoCanBookCampCode = 'pharma-ho' | 'pharma-asm' | 'pharma-rsm' | 'pharma-mr'
+export type WhoCanBookCampCode = 'pharma-division-head' | 'pharma-asm' | 'pharma-rsm' | 'pharma-mr'
 
 // ---------------------------------------------------------------------------
 // Nested value objects (plain shapes, not entities — no `id`)

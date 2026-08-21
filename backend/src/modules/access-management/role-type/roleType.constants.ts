@@ -1,7 +1,12 @@
+import { CAMP_PERMISSIONS } from '../../operations/camp/camp.constants';
+
 export const ROLE_TYPE_STATUSES = {
     ACTIVE: 'active',
     INACTIVE: 'inactive',
 } as const;
+
+// pharma field force may book camps (self/downline). Booking only — no read perms granted here.
+const PHARMA_CAMP_PERMISSIONS = [CAMP_PERMISSIONS.BOOK.code];
 
 export const ALLOWED_ROLETYPE_CODES = {
     PLATFORM: {
@@ -56,24 +61,24 @@ export const DEFAULT_PHARMA_ROLE_TYPES = [
         code: ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_DIVISION_HEAD,
         name: 'Pharma Division Head',
         description: 'Pharma division head',
-        permissions: [] as string[],
+        permissions: [...PHARMA_CAMP_PERMISSIONS] as string[],
     },
     {
         code: ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_RSM,
         name: 'Pharma RSM',
         description: 'Pharma regional sales manager',
-        permissions: [] as string[],
+        permissions: [...PHARMA_CAMP_PERMISSIONS] as string[],
     },
     {
         code: ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_ASM,
         name: 'Pharma ASM',
         description: 'Pharma area sales manager',
-        permissions: [] as string[],
+        permissions: [...PHARMA_CAMP_PERMISSIONS] as string[],
     },
     {
         code: ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR,
         name: 'Pharma MR',
         description: 'Pharma MR',
-        permissions: [] as string[],
+        permissions: [...PHARMA_CAMP_PERMISSIONS] as string[],
     },
 ];

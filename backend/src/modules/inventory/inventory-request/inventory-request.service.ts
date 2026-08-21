@@ -255,11 +255,7 @@ const restoreReturnToFO = async (request: HydratedDocument<IInventoryRequest>, c
 // the branch must key off the (from → to) transition, not just the new status. Every branch's writes
 // run inside the caller's transaction (create/moveStage wrap this + the request save), so a failure
 // here (e.g. insufficient stock) rolls the whole move back.
-const resolveStockMovement = async (
-    request: HydratedDocument<IInventoryRequest>,
-    from: string | null,
-    ctx: RequestContext,
-) => {
+const resolveStockMovement = async (request: HydratedDocument<IInventoryRequest>, from: string | null, ctx: RequestContext) => {
     const to = request.status as string;
     ctx.logger.info({ type: request.type, from, to }, 'resolveStockMovement');
 
@@ -350,6 +346,7 @@ const search = async (filters: ISearchInventoryRequestQuery, ctx: RequestContext
 
     //1: no tenant scoping — the request is global (like the rest of the inventory domain)
     const where: any = {};
+    applyOwnScope(where, ctx);
 
     //2: add search filters
     if (filters.type) {

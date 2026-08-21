@@ -1,4 +1,4 @@
-import { FiClock, FiXCircle, FiMap, FiMapPin, FiGlobe, FiUsers, FiPlus, FiX } from 'react-icons/fi'
+import { FiClock, FiXCircle, FiMap, FiMapPin, FiGlobe, FiUsers } from 'react-icons/fi'
 import type { WizardFormState } from '@/features/projects/wizard.types'
 import type { GoLiveScopeCode, WhoCanBookCampCode } from '@/types/project.types'
 import { GO_LIVE_SCOPE_LABEL } from '@/types/project.types'
@@ -15,6 +15,16 @@ import { labelClasses, labelStyle, fieldClasses } from '@/features/projects/comp
 const SCOPE_ICONS: Record<GoLiveScopeCode, typeof FiMap> = { states: FiMap, cities: FiMapPin, pan: FiGlobe }
 const SCOPE_OPTIONS: GoLiveScopeCode[] = ['states', 'cities', 'pan']
 
+// Fixed preset slots, not a free-typed range — kept separate from camp.types.ts's SLOTS since that also drives Diet Camps.
+const CAMP_SLOT_PRESETS: { start: string; end: string; label: string }[] = [
+  { start: '08:00', end: '09:00', label: '8 AM – 9 AM' },
+  { start: '09:00', end: '13:00', label: '9 AM – 1 PM' },
+  { start: '10:00', end: '14:00', label: '10 AM – 2 PM' },
+  { start: '11:00', end: '15:00', label: '11 AM – 3 PM' },
+  { start: '16:00', end: '17:00', label: '4 PM – 5 PM' },
+  { start: '18:00', end: '22:00', label: '6 PM – 10 PM' },
+]
+
 // Real customer-side RoleType codes (backend's whoCanBookCamp enum is
 // ALLOWED_ROLETYPE_CODES.CUSTOMER) — replaces the old mock's invented
 // MR/ASM/RM/HO booking-hierarchy vocabulary entirely. ROLE_TYPE_CODE_GROUPS'
@@ -28,10 +38,17 @@ interface WizardStep4Props {
 }
 
 const WizardStep4 = ({ form, setField }: WizardStep4Props) => {
-  const addSlot = () => setField('campTimeSlots', [...form.campTimeSlots, { start: '', end: '' }])
-  const updateSlot = (i: number, field: 'start' | 'end', value: string) =>
-    setField('campTimeSlots', form.campTimeSlots.map((s, idx) => (idx === i ? { ...s, [field]: value } : s)))
-  const removeSlot = (i: number) => setField('campTimeSlots', form.campTimeSlots.filter((_, idx) => idx !== i))
+  const isSlotSelected = (preset: { start: string; end: string }) =>
+    form.campTimeSlots.some((s) => s.start === preset.start && s.end === preset.end)
+
+  const toggleSlot = (preset: { start: string; end: string }) => {
+    setField(
+      'campTimeSlots',
+      isSlotSelected(preset)
+        ? form.campTimeSlots.filter((s) => !(s.start === preset.start && s.end === preset.end))
+        : [...form.campTimeSlots, { start: preset.start, end: preset.end }],
+    )
+  }
 
   const toggleState = (state: string) => {
     setField('goLiveScopeValues', form.goLiveScopeValues.includes(state) ? form.goLiveScopeValues.filter((s) => s !== state) : [...form.goLiveScopeValues, state])
@@ -43,33 +60,14 @@ const WizardStep4 = ({ form, setField }: WizardStep4Props) => {
 
   return (
     <div className="space-y-1">
-      <SectionHeader icon={FiClock} spaced={false}>Camp time slots *</SectionHeader>
-      <div className="space-y-2">
-        {form.campTimeSlots.map((slot, i) => {
-          // Plain string compare is valid for "HH:MM" same-day values — same
-          // live-warning pattern as NewAppointmentDialog.tsx's start/end
-          // check. Found live 2026-08-04: this step had zero time-order
-          // validation at all (schema only checks `.min(1)` slots exist), so
-          // a slot could be submitted with its end before its start.
-          const invalidOrder = !!slot.start && !!slot.end && slot.end <= slot.start
-          return (
-            <div key={i}>
-              <div className="flex items-center gap-2">
-                <Input type="time" value={slot.start} onChange={(e) => updateSlot(i, 'start', e.target.value)} className={fieldClasses} />
-                <span className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>to</span>
-                <Input type="time" value={slot.end} onChange={(e) => updateSlot(i, 'end', e.target.value)} className={fieldClasses} />
-                <button onClick={() => removeSlot(i)} aria-label="Remove slot" style={{ color: 'var(--qms-text-muted)' }}><FiX size={16} /></button>
-              </div>
-              {invalidOrder && (
-                <p className="text-[11px] mt-1 text-danger">End time must be after start time</p>
-              )}
-            </div>
-          )
-        })}
-      </div>
-      <button onClick={addSlot} className="flex items-center gap-1.5 text-[12px] font-semibold mt-1.5" style={{ color: 'var(--qms-brand)' }}>
-        <FiPlus size={13} /> Add time slot
-      </button>
+      <SectionHeader icon={FiClock} spaced={false}>Camp time slots (multi-select) *</SectionHeader>
+      <ChipRow>
+        {CAMP_SLOT_PRESETS.map((preset) => (
+          <ChipToggle key={preset.label} active={isSlotSelected(preset)} onClick={() => toggleSlot(preset)}>
+            {preset.label}
+          </ChipToggle>
+        ))}
+      </ChipRow>
 
       <SectionHeader icon={FiXCircle}>Cancellation policy</SectionHeader>
       <div className="grid grid-cols-3 gap-2.5">

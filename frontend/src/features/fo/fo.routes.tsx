@@ -1,7 +1,5 @@
 import type { RouteObject } from 'react-router-dom'
-import FoPage from './pages/FoPage'
-import FoWorkspacePage from './pages/FoWorkspacePage'
-import FoConfigPage from './pages/FoConfigPage'
+import { lazyRoute } from '@/lib/router/lazyRoute'
 
 export const FO_ROUTES = {
   FO:           '/fo',
@@ -10,7 +8,7 @@ export const FO_ROUTES = {
 }
 
 export const foRoutes: RouteObject[] = [
-  { path: FO_ROUTES.FO,           element: <FoPage /> },
-  { path: FO_ROUTES.FO_WORKSPACE, element: <FoWorkspacePage /> },
-  { path: FO_ROUTES.FO_CONFIG,    element: <FoConfigPage /> },
+  { path: FO_ROUTES.FO,           lazy: lazyRoute(() => import('./pages/FoPage')) },
+  { path: FO_ROUTES.FO_WORKSPACE, lazy: lazyRoute(() => import('./pages/FoWorkspacePage')) },
+  { path: FO_ROUTES.FO_CONFIG,    lazy: lazyRoute(() => import('./pages/FoConfigPage')) },
 ]

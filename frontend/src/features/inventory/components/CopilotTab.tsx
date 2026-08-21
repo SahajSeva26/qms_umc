@@ -1,38 +1,22 @@
+import type { IconType } from 'react-icons'
 import {
-  Sparkles, CalendarClock, Route, AlertTriangle, Contact, ShoppingCart, ArrowRightLeft, PowerOff, Wrench, Calendar,
-} from 'lucide-react'
+  FiCalendar, FiAlertTriangle, FiUser, FiShoppingCart, FiRepeat, FiPower, FiTool,
+} from 'react-icons/fi'
+import { TbSparkles, TbRoute } from 'react-icons/tb'
 import { toast } from '@/components/ui/sonner'
 import { useCopilotData } from '@/features/inventory/hooks/useInventory'
 import { inr, inrShort, runAutoReorder } from '@/features/inventory/inventory.service'
 
-// Exact port of window.QMS_InvIntel's Copilot tab (tabCopilot(), inventory-
-// intel.js lines 396-421). No segmented control, no filter bar, no table, no
-// KPI grid — a single vertical stack of one '.ai-banner' intro block (a
-// SEPARATE in-tab instance of the same component reused at the page level by
-// InventoryKpiStrip, with a 'fade-in' utility + margin-bottom:14px override)
-// followed by exactly 9 stacked '.in-q' Q&A cards in a fixed order. Every
-// answer is computed fresh on each render (no caching) straight from the
-// shared units/items/transfers/vendors/priceHistory stores. Zero modals of
-// its own — cards may contain a plain <button> deep-link that switches the
-// outer page tab (window.invSetTab) or, for Card 3 only, ALSO presets the
-// Dashboards sub-view to 'readiness' before switching (window.QMS_InvIntel
-// .setDash + invSetTab chained in one onclick) — Card 5's "Auto-reorder →"
-// triggers the SAME toast-only side effect as the Forecast tab's button,
-// with no modal either.
+// 9 stacked Q&A cards in a fixed order; every answer is computed fresh on
+// each render from the shared units/items/transfers/vendors/priceHistory stores.
 
 interface CopilotTabProps {
-  /** window.invSetTab(tab) — switches the outer Inventory & Devices page tab. */
   onNavigateTab: (tab: string) => void
-  /** Card 3 ("Which camp is at risk?") only — chains
-   * window.QMS_InvIntel.setDash('readiness'); window.invSetTab('dashboards')
-   * into one click so the user lands directly on the Readiness dashboard. */
+  /** Card 3 ("Which camp is at risk?") also presets the Dashboards sub-view
+   * to 'readiness' before switching, so the user lands there directly. */
   onOpenReadiness: () => void
 }
 
-// '.ai-banner' — exact CSS port (styles.css:415-441): border-radius 20px
-// (--r-lg), gradient teal→brand→violet wash, 1px border-strong, padding
-// 16px 20px. This in-tab instance adds 'fade-in' + overrides margin-bottom
-// to 14px (vs the page-level instance's 22px default).
 function CopilotBanner() {
   return (
     <div
@@ -58,7 +42,7 @@ function CopilotBanner() {
           boxShadow: '0 10px 24px -8px rgba(139,92,246,.6)',
         }}
       >
-        <Sparkles size={18} />
+        <TbSparkles size={18} />
       </div>
       <div className="flex-1" style={{ color: 'var(--qms-text)' }}>
         <b style={{ fontWeight: 700 }}>Inventory Copilot</b> — answers computed live from your inventory, camps, field stock and procurement.
@@ -67,13 +51,7 @@ function CopilotBanner() {
   )
 }
 
-// '.in-q' card shell — exact CSS port of inventory-intel.js's injected CSS:
-// border 1px solid var(--qms-border), radius 12px, padding 12px 14px,
-// margin-bottom 10px, background var(--qms-surface). '.qq' — 12.5px/800,
-// flex row with 7px gap, margin-bottom 6px; its icon is tinted brand-600
-// inline (not via a CSS class). '.aa' — 12.5px body text; '.aa b' renders in
-// brand-700, the "AI answer emphasis" look.
-function InQ({ icon: Icon, question, children }: { icon: typeof CalendarClock; question: string; children: React.ReactNode }) {
+function InQ({ icon: Icon, question, children }: { icon: IconType; question: string; children: React.ReactNode }) {
   return (
     <div
       className="border"
@@ -90,16 +68,10 @@ function InQ({ icon: Icon, question, children }: { icon: typeof CalendarClock; q
   )
 }
 
-// Every bolded computed value/count inside an answer renders in brand-700 —
-// the "AI answer emphasis" look, exact port of '.in-q .aa b { color:
-// var(--brand-700) }'.
 function Emph({ children }: { children: React.ReactNode }) {
   return <b style={{ color: 'var(--qms-brand-700, #1d40c4)' }}>{children}</b>
 }
 
-// The inline "Label →" deep-links — NOT real <a href> navigations in the
-// prototype (span-like clickable text wired via onclick), rendered here as
-// real <button>s styled identically: brand-600, no underline, cursor pointer.
 function CopilotLink({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
   return (
     <button
@@ -143,7 +115,7 @@ const CopilotTab = ({ onNavigateTab, onOpenReadiness }: CopilotTabProps) => {
       <CopilotBanner />
 
       {/* 1 — Which items are expiring? */}
-      <InQ icon={CalendarClock} question="Which items are expiring?">
+      <InQ icon={FiCalendar} question="Which items are expiring?">
         {expiring.length === 0 ? (
           'Nothing expiring within 90 days.'
         ) : (
@@ -156,7 +128,7 @@ const CopilotTab = ({ onNavigateTab, onOpenReadiness }: CopilotTabProps) => {
       </InQ>
 
       {/* 2 — Which FO has excess stock? */}
-      <InQ icon={Route} question="Which FO has excess stock?">
+      <InQ icon={TbRoute} question="Which FO has excess stock?">
         {!foExcess ? (
           'No FO holdings yet.'
         ) : (
@@ -169,7 +141,7 @@ const CopilotTab = ({ onNavigateTab, onOpenReadiness }: CopilotTabProps) => {
       </InQ>
 
       {/* 3 — Which camp is at risk? */}
-      <InQ icon={AlertTriangle} question="Which camp is at risk?">
+      <InQ icon={FiAlertTriangle} question="Which camp is at risk?">
         {campsAtRisk.length === 0 ? (
           'All upcoming camps ≥ 70% ready.'
         ) : (
@@ -182,7 +154,7 @@ const CopilotTab = ({ onNavigateTab, onOpenReadiness }: CopilotTabProps) => {
       </InQ>
 
       {/* 4 — Which vendor is cheapest? */}
-      <InQ icon={Contact} question="Which vendor is cheapest?">
+      <InQ icon={FiUser} question="Which vendor is cheapest?">
         {!cheapest ? (
           'No price history.'
         ) : (
@@ -193,7 +165,7 @@ const CopilotTab = ({ onNavigateTab, onOpenReadiness }: CopilotTabProps) => {
       </InQ>
 
       {/* 5 — What should be procured? */}
-      <InQ icon={ShoppingCart} question="What should be procured?">
+      <InQ icon={FiShoppingCart} question="What should be procured?">
         {shortages30.length === 0 ? (
           'No 30-day shortages.'
         ) : (
@@ -206,7 +178,7 @@ const CopilotTab = ({ onNavigateTab, onOpenReadiness }: CopilotTabProps) => {
       </InQ>
 
       {/* 6 — What can be transferred? */}
-      <InQ icon={ArrowRightLeft} question="What can be transferred?">
+      <InQ icon={FiRepeat} question="What can be transferred?">
         {balancing.length === 0 ? (
           'No field surplus to rebalance.'
         ) : (
@@ -222,7 +194,7 @@ const CopilotTab = ({ onNavigateTab, onOpenReadiness }: CopilotTabProps) => {
       </InQ>
 
       {/* 7 — Which assets are idle? */}
-      <InQ icon={PowerOff} question="Which assets are idle?">
+      <InQ icon={FiPower} question="Which assets are idle?">
         {idle.length === 0 ? (
           'Asset utilisation looks healthy.'
         ) : (
@@ -234,7 +206,7 @@ const CopilotTab = ({ onNavigateTab, onOpenReadiness }: CopilotTabProps) => {
       </InQ>
 
       {/* 8 — Which assets need calibration? */}
-      <InQ icon={Wrench} question="Which assets need calibration?">
+      <InQ icon={FiTool} question="Which assets need calibration?">
         {calib.length === 0 ? (
           'All calibrations current.'
         ) : (
@@ -245,7 +217,7 @@ const CopilotTab = ({ onNavigateTab, onOpenReadiness }: CopilotTabProps) => {
       </InQ>
 
       {/* 9 — What inventory is required next quarter? */}
-      <InQ icon={Calendar} question="What inventory is required next quarter?">
+      <InQ icon={FiCalendar} question="What inventory is required next quarter?">
         {forecast180.length === 0 ? (
           'No projected demand.'
         ) : (

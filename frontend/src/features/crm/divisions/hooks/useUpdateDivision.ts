@@ -1,15 +1,7 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { crmService } from '@/features/crm/crm.service'
+import { useUpdateEntity } from '@/hooks/useUpdateEntity'
+import { divisionService } from '@/features/crm/divisions/division.service'
+import { divisionKeys } from '@/features/crm/divisions/hooks/useDivisions'
 import type { UpdateDivisionPayload } from '@/types/crm.types'
 
-export const useUpdateDivision = (id: string) => {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: (payload: UpdateDivisionPayload) => crmService.updateDivision(id, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['division', id] })
-      queryClient.invalidateQueries({ queryKey: ['divisions'] })
-    },
-  })
-}
+export const useUpdateDivision = (id: string) =>
+  useUpdateEntity((payload: UpdateDivisionPayload) => divisionService.updateDivision(id, payload), [divisionKeys.detail(id), divisionKeys.all])

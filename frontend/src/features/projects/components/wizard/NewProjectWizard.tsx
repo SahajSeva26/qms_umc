@@ -23,11 +23,10 @@ import WizardStep3 from '@/features/projects/components/wizard/WizardStep3'
 import WizardStep4 from '@/features/projects/components/wizard/WizardStep4'
 import WizardStep5 from '@/features/projects/components/wizard/WizardStep5'
 import WizardStep6 from '@/features/projects/components/wizard/WizardStep6'
+import { unwrapId } from '@/utils/unwrapId'
 
-// Step 0 (pick a won lead) is new — doesn't exist on the old mock wizard.
-// Edit mode skips it entirely: lead/tenant/division are immutable post-create
-// (UpdateProjectPayload has no lead field), so an edit session starts at
-// step 1 with the project's existing lead-derived context shown read-only.
+// Edit mode skips Step 0 entirely: lead/tenant/division are immutable
+// post-create, so an edit session starts at step 1.
 const CREATE_STEPS = [
   { label: 'Lead', heading: 'Pick the source lead', sub: 'A project is created from a won lead — company and division are derived from it automatically.' },
   { label: 'Basics', heading: 'Project basics', sub: 'Identity, therapy, project type(s), and tests conducted.' },
@@ -52,26 +51,24 @@ function validateStep(schemas: typeof CREATE_STEP_SCHEMAS, step: number, form: W
 
 // Guards against null even though lead/tenant/salesRep/projectCoordinator/
 // marketingContact are all `required: true` in project.model.ts — that only
-// enforces new saves, not older documents or a populate() that resolved to
-// null (stale/pre-migration reference, deleted doc, etc). Found live
-// 2026-08-04 via a real crash on ProjectDetailDrawer.tsx's identical unwrap
-// idiom — same fix applied here before this wizard hit the same crash when
-// editing an affected project.
+// enforces new saves, not a populate() that resolved to null.
 function projectToForm(p: ProjectEntity): WizardFormState {
-  const leadId = !p.lead ? '' : typeof p.lead === 'string' ? p.lead : p.lead._id ?? ''
+  const leadId = unwrapId(p.lead)
   const leadTitle = !p.lead || typeof p.lead === 'string' ? '' : p.lead.title
-  const tenantId = !p.tenant ? '' : typeof p.tenant === 'string' ? p.tenant : p.tenant._id ?? ''
+  const tenantId = unwrapId(p.tenant)
   const tenantName = !p.tenant || typeof p.tenant === 'string' ? '' : p.tenant.name
+  const divisionId = unwrapId(p.division)
   const divisionName = !p.division || typeof p.division === 'string' ? '' : p.division.name
-  const salesRep = !p.salesRep ? '' : typeof p.salesRep === 'string' ? p.salesRep : p.salesRep._id ?? ''
-  const projectCoordinator = !p.projectCoordinator ? '' : typeof p.projectCoordinator === 'string' ? p.projectCoordinator : p.projectCoordinator._id ?? ''
-  const marketingContact = !p.marketingContact ? '' : typeof p.marketingContact === 'string' ? p.marketingContact : p.marketingContact._id ?? ''
+  const salesRep = unwrapId(p.salesRep)
+  const projectCoordinator = unwrapId(p.projectCoordinator)
+  const marketingContact = unwrapId(p.marketingContact)
 
   return {
     leadId,
     leadTitle,
     leadTenantId: tenantId,
     leadTenantName: tenantName,
+    leadDivisionId: divisionId,
     leadDivisionName: divisionName,
 
     name: p.name,
@@ -174,8 +171,7 @@ const NewProjectWizard = ({ editProject, onClose, onSaved }: NewProjectWizardPro
     }
 
     // Every field common to both Create and Update — required on Create,
-    // optional on Update (per UpdateProjectPayload's own doc comment: lead/
-    // tenant/division/status are the only fields absent entirely).
+    // optional on Update.
     const commonFields = {
       name: form.name,
       therapy: form.therapy as ProjectTherapy,
@@ -220,8 +216,6 @@ const NewProjectWizard = ({ editProject, onClose, onSaved }: NewProjectWizardPro
       }
       onClose()
     } catch {
-      // no-op: useCreateProject/useUpdateProject have no onError toast of
-      // their own yet — surface a generic one here so failures aren't silent.
       toast.error(isEdit ? 'Could not save changes — try again.' : 'Could not create the project — try again.')
     } finally {
       setIsSaving(false)

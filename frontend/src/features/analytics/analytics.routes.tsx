@@ -1,5 +1,5 @@
 import type { RouteObject } from 'react-router-dom'
-import AnalyticsPage from './pages/AnalyticsPage'
+import { lazyRoute } from '@/lib/router/lazyRoute'
 
 export const ANALYTICS_ROUTES = {
   ANALYTICS:           '/analytics',
@@ -9,10 +9,12 @@ export const ANALYTICS_ROUTES = {
   ANALYTICS_FINANCIAL: '/analytics/financial',
 }
 
+const analyticsPage = lazyRoute(() => import('./pages/AnalyticsPage'))
+
 export const analyticsRoutes: RouteObject[] = [
-  { path: ANALYTICS_ROUTES.ANALYTICS,           element: <AnalyticsPage /> },
-  { path: ANALYTICS_ROUTES.ANALYTICS_SALES,     element: <AnalyticsPage /> },
-  { path: ANALYTICS_ROUTES.ANALYTICS_FO,        element: <AnalyticsPage /> },
-  { path: ANALYTICS_ROUTES.ANALYTICS_DOCTORS,   element: <AnalyticsPage /> },
-  { path: ANALYTICS_ROUTES.ANALYTICS_FINANCIAL, element: <AnalyticsPage /> },
+  { path: ANALYTICS_ROUTES.ANALYTICS,           lazy: analyticsPage },
+  { path: ANALYTICS_ROUTES.ANALYTICS_SALES,     lazy: analyticsPage },
+  { path: ANALYTICS_ROUTES.ANALYTICS_FO,        lazy: analyticsPage },
+  { path: ANALYTICS_ROUTES.ANALYTICS_DOCTORS,   lazy: analyticsPage },
+  { path: ANALYTICS_ROUTES.ANALYTICS_FINANCIAL, lazy: analyticsPage },
 ]

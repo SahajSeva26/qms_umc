@@ -5,39 +5,34 @@ import UsersTable from '@/features/admin/components/UsersTable'
 import UsersFilterBar from '@/features/admin/components/UsersFilterBar'
 import { useUsersFilters } from '@/features/admin/hooks/useUsersFilters'
 import PaginationControls from '@/components/ui/PaginationControls'
+import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { usePagination } from '@/hooks/usePagination'
 import { useQuery } from '@tanstack/react-query'
+import { EMPTY_ARRAY } from '@/utils/emptyArray'
 
 const PAGE_SIZE = 10
-// Tenant isn't a field GET /users can filter on (it lives on the Role a user
-// is bound to, not the User itself), so whenever the Tenant filter is active,
-// pagination happens client-side over a generously-fetched single-status set
-// instead of the server's page/limit. Real users total in the dozens today,
-// so this cap is generous without risking silent truncation.
+// Tenant isn't a field GET /users can filter on (it lives on the Role, not the User),
+// so the Tenant filter paginates client-side over this capped set instead — truncates past 200 users.
 const CLIENT_SIDE_FETCH_LIMIT = 200
 
 const UsersPage = () => {
   const { filters, setFilter, reset } = useUsersFilters()
-  const [page, setPage] = useState(1)
+  const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
 
-  // Debounced so each keystroke doesn't fire its own request — only the
-  // value still present 300ms after typing stops flows into the query below.
   const debouncedSearch = useDebouncedValue(filters.search, 300)
 
   const needsClientSidePagination = filters.tenant !== 'ALL'
 
-  // Server-paginated path: no tenant filter active. Disabled (via `enabled`)
-  // whenever the client-side path is active instead, so this doesn't fire a
-  // redundant/stale request.
+  // Server-paginated path: disabled while the client-side path is active instead.
   const singleStatusQuery = useUsers(
     { name: debouncedSearch || undefined, status: filters.status, page, limit: PAGE_SIZE },
     !needsClientSidePagination,
   )
 
-  // Client-side path: one generously-fetched request for the selected status,
-  // filtered/paginated locally by tenant afterward.
+  // Client-side path: one capped request, filtered/paginated locally by tenant.
   const clientSideQuery = useQuery({
     queryKey: ['users', { name: debouncedSearch || undefined, status: filters.status, limit: CLIENT_SIDE_FETCH_LIMIT }],
     queryFn: () => adminService.searchUsers({ name: debouncedSearch || undefined, status: filters.status, limit: CLIENT_SIDE_FETCH_LIMIT }),
@@ -46,27 +41,18 @@ const UsersPage = () => {
 
   const isLoading = needsClientSidePagination ? clientSideQuery.isLoading : singleStatusQuery.isLoading
   const isError = needsClientSidePagination ? clientSideQuery.isError : singleStatusQuery.isError
+  const refetchUsers = needsClientSidePagination ? clientSideQuery.refetch : singleStatusQuery.refetch
 
-  // Both queries below only exist to power the Company filter dropdown and
-  // its email->tenant matching — neither fires until that dropdown has been
-  // opened at least once (see onCompanyDropdownOpen), since most page visits
-  // never touch this filter at all.
+  // Both queries below only power the Company filter dropdown — neither fires
+  // until it's opened at least once (see onCompanyDropdownOpen).
   const [companyFilterTouched, setCompanyFilterTouched] = useState(false)
 
-  // Real bound-Role lookup, keyed by email (RolePopulatedUser carries no id
-  // of its own — see accessManagement.types.ts) — the only way to resolve a
-  // user's tenant, since User itself has no tenant field. Requires
-  // tenant:admin/tenant:manage (GET /roles's real permission gate) — callers
-  // without it get a 403 here, handled as "unknown, show nothing" rather than
-  // breaking the whole Users screen. Fetched with a generous limit — GET
-  // /roles defaults to 10 results per page same as GET /users, and this
-  // lookup needs every role, not just the first page's worth.
+  // Only way to resolve a user's tenant (User itself has no tenant field).
+  // Requires tenant:admin/tenant:manage; a 403 here is handled as "unknown, show nothing".
   const { data: rolesData } = useRoles({ limit: String(CLIENT_SIDE_FETCH_LIMIT) }, companyFilterTouched)
-  const roles = rolesData?.data?.items ?? []
+  const roles = rolesData?.data?.items ?? EMPTY_ARRAY
 
-  // role.tenant is a nested populated relation, which carries Mongoose's raw
-  // `_id` (not the mapped `id` the top-level Tenant entity has — see
-  // RolePopulatedTenant's comment).
+  // role.tenant carries Mongoose's raw `_id`, not the mapped `id` on the top-level Tenant entity.
   const tenantByEmail = useMemo(() => {
     const map = new Map<string, string>()
     for (const role of roles) {
@@ -98,16 +84,14 @@ const UsersPage = () => {
     ? (tenantFiltered ?? []).length
     : (singleStatusQuery.data?.data?.count ?? 0)
 
-  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
-
   const handleFilterChange = <K extends keyof typeof filters>(key: K, value: (typeof filters)[K]) => {
     setFilter(key, value)
-    setPage(1)
+    resetToFirstPage()
   }
 
   const handleReset = () => {
     reset()
-    setPage(1)
+    resetToFirstPage()
   }
 
   return (
@@ -129,24 +113,10 @@ const UsersPage = () => {
         onCompanyDropdownOpen={() => setCompanyFilterTouched(true)}
       />
 
-      {isLoading && (
-        <div className="text-[13px] py-10 text-center" style={{ color: 'var(--qms-text-muted)' }}>
-          Loading users…
-        </div>
-      )}
-
-      {isError && !isLoading && (
-        <div className="text-[13px] rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
-          Failed to load users. Please try again.
-        </div>
-      )}
-
-      {!isLoading && !isError && (
-        <>
-          <UsersTable users={users} />
-          <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} />
-        </>
-      )}
+      <QueryStateBlock isLoading={isLoading} error={isError} loadingLabel="Loading users…" errorLabel="Failed to load users. Please try again." onRetry={refetchUsers}>
+        <UsersTable users={users} />
+        <PaginationControls page={page} totalPages={totalPages(totalCount)} onPageChange={setPage} />
+      </QueryStateBlock>
     </div>
   )
 }

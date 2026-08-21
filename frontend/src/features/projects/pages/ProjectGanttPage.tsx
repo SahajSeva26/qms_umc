@@ -16,15 +16,11 @@ import ProjectStatusPill from '@/features/projects/components/ProjectStatusPill'
 import ProjectTypePills from '@/features/projects/components/ProjectTypePill'
 import NewProjectWizard from '@/features/projects/components/wizard/NewProjectWizard'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import { EMPTY_ARRAY } from '@/utils/emptyArray'
 
 type StatusFilter = 'all' | ProjectStatus
 
-// Timeline geometry — a project's bar spans [start, end] within the visible
-// window (earliest start across all dated projects → latest end, padded a
-// few days either side). Health score (0-100, see projectHealthScore) tints
-// the bar; a project past its own end date still renders (clamped into the
-// visible window) since a project can be overdue for renewal and still be
-// the most operationally relevant row on the board.
+// Bar color tints by health score (0-100, see projectHealthScore).
 const HEALTH_COLOR_GOOD = '#10b981'
 const HEALTH_COLOR_WARN = '#f59e0b'
 const HEALTH_COLOR_BAD = '#ef4444'
@@ -40,14 +36,12 @@ const ProjectGanttPage = () => {
   const [wizardOpen, setWizardOpen] = useState(false)
 
   const { data, isLoading, error } = useProjects(statusFilter !== 'all' ? { status: statusFilter } : {})
-  const projects = data?.data?.items ?? []
+  const projects = data?.data?.items ?? EMPTY_ARRAY
 
   const kpis = useMemo(() => computeProjectKpis(projects), [projects])
 
-  // Only projects with a real date range (PO or agreement mode, both dates
-  // present) can be plotted on a timeline. Mail-confirmation-mode projects
-  // and any project with `mode` unset have nothing to plot — listed
-  // separately below rather than silently dropped.
+  // Only projects with a real date range plot on the timeline; the rest are
+  // listed separately below rather than silently dropped.
   const { dated, undated } = useMemo(() => {
     const dated: { project: (typeof projects)[number]; start: Date; end: Date }[] = []
     const undated: (typeof projects)[number][] = []

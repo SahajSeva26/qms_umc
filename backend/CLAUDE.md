@@ -14,11 +14,15 @@ src/modules/
   auth/                     user login / refresh / password reset
   user/                     user records (linked 1:1 to a Role)
   counter/                  global atomic per-entity sequence (feeds LEAD-/PROJECT-/CAMP- codes)
-  doctor/                   global doctor registry (no tenant scoping)
+  doctor/                   tenant-scoped doctor registry
   qa-feedback/              QA feedback
   access-management/        tenant, role, role-type, permission-group (RBAC)
   crm/                      division, lead, project, appointment, contact
   operations/               camp, geoProfile (field-staff geo + camp allocation)
+  inventory/                inventory-master (catalog), inventory-device, inventory-consumable,
+                            inventory-assignment (who holds what), inventory-request (refill/return lifecycle)
+                            (+ inventory-transaction — scaffolded, not built)
+  finance/                  invoice (camp-to-cash bill), invoiceLineItem (one line per billed camp)
 ```
 
 Every module contains exactly these files:
@@ -266,7 +270,8 @@ const doc = await FooModel.findOne(where)
   "fix" its cross-tenant reach).
 - Coherence checks compare against the entity's own tenant (`entity.tenant`), NOT `ctx`, so a
   system user still can't link records across tenants.
-- Global registries (`doctor`) are intentionally NOT tenant-scoped.
+- Inventory registries (`inventory-master`/`inventory-device`/`inventory-consumable`) are
+  intentionally NOT tenant-scoped (global catalogs). Everything else is scoped via `ctx.where()`.
 
 ### Transactions — `withTransaction`
 
@@ -418,7 +423,7 @@ All modules follow the layered convention above; all are wired in `src/bin/app.t
 | — | auth | `/auth` | login, logout, refresh-token, reset-password (self), forgot-password (tenant:admin) |
 | — | user | `/users` | linked 1:1 to a Role; registers inactive by default |
 | — | counter | `/counters` | global atomic `$inc` sequence → prefixed padded codes (LEAD-/PROJECT-/CAMP-) |
-| — | doctor | `/doctors` | global registry, no tenant scoping; `pharmaCode` immutable natural key |
+| — | doctor | `/doctors` | tenant-scoped registry (`ctx.where()`); `pharmaCode` immutable natural key, unique per tenant `{tenant, pharmaCode}` (email also unique per tenant); tenant pinned on create (platform supplies, customer own-tenant), open reads / manage-guarded writes |
 | — | qa-feedback | `/qa-feedback` | QA feedback |
 | access-management | tenant | `/tenants` | types: `platform` / `customer`; owner auto-activated on create; optional updatable `salesPerson` (Role ref) — assign on create, reassign/unassign (null) on update, validated to exist AND be a `sales-rep` role type |
 | access-management | permission-group | `/permission-groups` | per-tenant permission ceiling |
@@ -431,6 +436,14 @@ All modules follow the layered convention above; all are wired in `src/bin/app.t
 | crm | contact | `/contacts` | tenant(+optional division)-scoped people registry, optional user/login link; division required for pharma (customer-type) contacts & validated against tenant; `type` immutable after create |
 | operations | camp | `/camps` | stageHistory + moveStage; tenant+division required, project optional |
 | operations | geoProfile | `/geo-profiles` | field-staff geo (2dsphere); `findNearest` ($geoNear) feeds camp allocation |
+| inventory | inventory-master | `/inventory-masters` | **global/system catalog** (no tenant scoping); `code` immutable natural key; `type` = device/consumable/accessory/other; `active`/`inactive` status is a soft-delete visibility flag (manage-gated); `sku`/`unit`/`minStock`/`maxStock`. Reads open, writes guarded `inventory-master:manage` |
+| inventory | inventory-device | `/inventory-devices` | individual physical unit of a catalog item; refs `item` (InventoryMaster) + unique `serialNumber` (both immutable); `location` warehouse/field-officer/camp; `status` = operational lifecycle (available/assigned/maintainance/lost/damaged — NOT soft-delete, fully readable); calibration/warranty/mfg dates. No tenant scoping. Reads open, writes guarded `inventory-device:manage` |
+| inventory | inventory-consumable | `/inventory-consumables` | physical stock **lot** of a catalog item; lot identity = (`item`,`batch`,`location`); `item` immutable; `quantity`/mfg/expiry dates; `location` warehouse/camp; `active`/`expired` status (manage-gated visibility); search sorts by `expiryDate` asc. No tenant scoping. Reads open, writes guarded `inventory-consumable:manage` |
+| inventory | inventory-assignment | `/inventory-assignments` | **who holds what** — one record per assignee (Role, must be `field-officer` type), unique/immutable; holds `devices[]` (qty forced 1) + `consumables[]` (qty). No POST — mutated via `PUT /:assignee` upsert. No tenant scoping. Reads open, writes guarded `inventory-assignment:manage`. (Does NOT touch device status/consumable qty — that's the transaction ledger's job.) |
+| inventory | inventory-request | `/inventory-requests` | **refill/return request lifecycle**; `type` = refill/return; lines ref actual stock (`InventoryDevice`/`InventoryConsumable`) + qty; stageHistory + moveStage; statuses = requested→approved/rejected→received (terminal) + cancelled; transition map keyed by status values. Full CRUD perms (`create`/`get`/`search`/`update`/`manage`). `requestedBy` = creator (always FO); `processedBy` = inventory manager. **Own-scope:** non-manage actors see/edit only their own requests. **moveStage authz:** manager does any valid move; a requester can move a refill→cancelled/received or a return→cancelled only (approve/reject stay manage-only). No tenant scoping. `FIXME` in service: FO's refill-received overwrites `processedBy`. Stock movement on `received` (FEFO pull / return restore + transaction + assignment delta) NOT yet wired. |
+| inventory | inventory-transaction | — | **scaffolded only** (empty stub files, not built/wired) |
+| finance | invoice | `/invoices` | camp-to-cash bill; tenant derived from a required `project` (any project status — no live gate); `code` from `invoice` counter (`inv-`); **line items DRIVE the money** — `subtotal` = Σ line amounts, `total` = subtotal + tax − discount (shared `computeInvoiceTotal`); `syncToTally` bool (default false); stageHistory + moveStage over `draft→approved→issued→{grn_signed→paid \| cancelled}`. **Create takes `camps: [id]`** and bills them in one txn (see line item). Standalone edits (tax/discount/dueDate/syncToTally) via PUT; `subtotal` never accepted. Reads/writes guarded `invoice:*` (+ `tenant:manage`) |
+| finance | invoiceLineItem | `/invoice-line-items` | one line per billed **camp**; fields `invoice`/`camp`/`amount`. **Nested resource — no tenant of its own**; scoped transitively via the parent invoice (`InvoiceService.get` under `ctx.where()`), so search REQUIRES an `invoice` filter. `amount` is NOT supplied — it snapshots the project's `campCost`. **No update path** (nothing editable → change = delete + re-add). Mutations only while the invoice is `draft`; each add/delete recomputes the parent totals in a txn. Per-camp billing rules (shared by invoice-create): camp exists, belongs to the invoice's project, is `billingType=billable` **and** status `closed`/`cancelled_charged`, and is not already on a **non-cancelled** invoice (`assertCampBillable` — the uniqueness guard; **no unique index**, a cancelled invoice frees the camp to be re-billed). Guarded `invoice-line-item:*` (create/get/search/delete/manage) |
 
 Cross-cutting: `AuthMiddleware` + `AuthorizeMiddleware` (AND/OR permission guards), system-user
 seeding + per-tenant default-role-type provisioning on boot, `PERMISSIONS`/`PERMISSIONS_ARRAY`
@@ -438,6 +451,24 @@ registry, pino logging (`pino-http`), rate limiting (global + auth), `withTransa
 
 ## What's Next (planned)
 
-- Invoicing / billing (camp-to-cash, PO compliance, AR aging) — spec captured, not started
-- Inventory & devices — Phase 2
+- Inventory — `inventory-assignment` + `inventory-request` are now BUILT/wired. Remaining: build the
+  last scaffolded module `inventory-transaction` (append-only stock ledger: issue/return/consume/adjust
+  that drives consumable quantity & device location/status), and wire the **`received`** step of a
+  request to actually move stock: refill → pull warehouse lots FEFO / pick available devices; return →
+  restore the exact lot/unit; write the transaction row; apply the assignment delta. (Seam left as a
+  `NOTE` in `inventory-request.service.ts` `moveStage`.) Roles: **`inventory-manager`** platform role
+  type added (`:manage` on all 5 inventory modules); FO role type granted `inventory-request`
+  create/get/search/update. Still open: tenant-scoping decision (inventory is global today — note
+  `doctor` was global but is now tenant-scoped), how camp/FO refs hang off assignments. Note the two typo constants in
+  `inventory-device.constants.ts` (`MAINTAINANCE`, `DMAGAED`) and the `FIXME` on request `processedBy`.
+- Invoicing / billing — **`invoice` + `invoiceLineItem` now BUILT + wired + e2e-verified** (see What's
+  Done). A **`finance-manager`** platform role type was added on seeding (`invoice:manage` +
+  `invoice-line-item:manage`); `invoice` counter seeded (`inv-`). Still open on billing:
+  (1) **`cancelled_charged` pricing** — such a camp is currently billed at the FULL `campCost`; it
+  likely should be the cancellation charge (`project.campCostDeductionOnChargableCancel` %), not full.
+  (2) a "billable, unbilled camps for a project" picker query (closed/cancelled_charged, billable, not
+  yet on a live invoice) — today the caller passes camp ids. (3) the `assertCampBillable` race window
+  (read-then-write; no unique index, since re-bill-after-cancel needs it) — acceptable for now.
+  (4) PO compliance, AR aging/dunning, GST/e-invoice, actual Tally sync (the `syncToTally` flag exists
+  but nothing pushes yet).
 - Scaling/concurrency hardening (clustering, `maxPoolSize`, `UV_THREADPOOL_SIZE`, user-search index)

@@ -1,13 +1,11 @@
-import { FiSearch } from 'react-icons/fi'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import SearchInput from '@/components/ui/SearchInput'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { DoctorsFilterState } from '@/features/doctors/hooks/useDoctorsFilters'
 import type { DoctorSpecialization, DoctorStatus } from '@/types/doctor.types'
 
-// Real backend enum — DOCTOR_SPECIALIZATION only has these two values
-// (doctor.constants.ts). Do not add more; the mock-era 13-item specialty
-// list this feature used to show has no backend counterpart.
+// Backend enum only has these two values — do not add more.
 const SPECIALIZATION_OPTIONS: { value: DoctorSpecialization; label: string }[] = [
   { value: 'cp', label: 'CP' },
   { value: 'gp', label: 'GP' },
@@ -26,27 +24,20 @@ interface DoctorFilterBarProps {
   reset: () => void
 }
 
-// Same convention as RolesFilterBar.tsx. `status` is only actually honored
-// server-side for callers with `doctor:manage` (doctor.service.ts's search()
-// hard-scopes everyone else to status=active regardless of this control) —
-// still rendered unconditionally, matching Tenants' own "no per-field
-// permission gating" precedent (picking "Inactive" as a non-privileged
-// caller just silently returns the same active-only results).
+// `status` is only honored server-side for callers with doctor:manage;
+// others are hard-scoped to active regardless, so the control is rendered
+// unconditionally but silently no-ops for them.
 const DoctorFilterBar = ({ filters, setFilter, reset }: DoctorFilterBarProps) => (
   <div
     className="flex flex-wrap items-center justify-between gap-2 p-2.5 mb-3 rounded-xl border"
     style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}
   >
-    <div className="relative">
-      <FiSearch size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--qms-text-muted)' }} />
-      <Input
-        type="text"
-        value={filters.search}
-        onChange={(e) => setFilter('search', e.target.value)}
-        placeholder="Search by name..."
-        className="w-56 pl-7 text-[12px]"
-      />
-    </div>
+    <SearchInput
+      value={filters.search}
+      onChange={(v) => setFilter('search', v)}
+      placeholder="Search by name..."
+      className="w-56 text-[12px]"
+    />
 
     <div className="flex flex-wrap items-center gap-2">
       <Select value={filters.specialization} onValueChange={(v) => setFilter('specialization', (v ?? 'ALL') as DoctorsFilterState['specialization'])}>

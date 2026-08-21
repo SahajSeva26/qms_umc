@@ -24,8 +24,7 @@ function daysUntil(iso?: string): number | null {
   return Math.floor((new Date(iso).getTime() - Date.now()) / 86_400_000)
 }
 
-// Fuzzy-matches a consumable id/name (e.g. 'GLUCOSE_STRIP') against this FO's
-// raw inventory lots by id/type/name substring, per the research spec.
+// Fuzzy-matches a consumable id/name (e.g. 'GLUCOSE_STRIP') against lots by id/type/name substring.
 function matchLots(consumableId: string, lots: ConsumableLot[]): ConsumableLot[] {
   const needle = consumableId.toLowerCase().replace(/_/g, ' ')
   const needleTokens = needle.split(' ').filter(Boolean)
@@ -42,6 +41,8 @@ const ConsumablesStage = ({ camp, project, consumables, onResolveLots }: Consuma
 
   useEffect(() => {
     let cancelled = false
+    // Must fire before the first await so the loading indicator appears immediately.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
     async function run() {
       const cfg = await resolveForCamp(camp, project)
@@ -62,8 +63,7 @@ const ConsumablesStage = ({ camp, project, consumables, onResolveLots }: Consuma
       setNeedRows(rows)
       setLoading(false)
 
-      // Auto-FIFO: first 6 nearest-expiry lots across everything this row
-      // set touches (fully automatic, no manual picker per the spec).
+      // Auto-FIFO: first 6 nearest-expiry lots across everything this row set touches.
       const touchedIds = new Set(rows.flatMap((r) => r.matched.map((l) => l.id)))
       const pool = touchedIds.size > 0 ? consumables.filter((l) => touchedIds.has(l.id)) : consumables
       const sorted = [...pool].sort((a, b) => {

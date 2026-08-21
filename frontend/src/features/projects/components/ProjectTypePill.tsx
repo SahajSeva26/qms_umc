@@ -12,11 +12,11 @@ interface ProjectTypePillsProps {
 const ProjectTypePills = ({ types }: ProjectTypePillsProps) => (
   <div className="flex flex-wrap gap-1">
     {types.length === 0 && <span className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>—</span>}
-    {types.map((type) => {
+    {types.map((type, i) => {
       const color = PROJECT_TYPE_COLOR[type] ?? '#94a3b8'
       return (
         <span
-          key={type}
+          key={`${type}-${i}`}
           className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold"
           style={{ background: `${color}18`, color }}
         >

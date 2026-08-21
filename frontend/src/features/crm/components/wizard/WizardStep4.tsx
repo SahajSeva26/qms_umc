@@ -1,5 +1,4 @@
 import type { WizardFormState } from '@/features/crm/wizard.types'
-import { computeWizardScore } from '@/features/crm/wizard.types'
 import { LEAD_PROJECT_TYPE_LABEL } from '@/types/crm.types'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
@@ -19,18 +18,25 @@ interface WizardStep4Props {
 }
 
 const WizardStep4 = ({ form, setField }: WizardStep4Props) => {
-  const score = computeWizardScore(form)
-
   // limit: PLATFORM_TENANT_FETCH_LIMIT — see accessManagement.constants.ts;
   // the backend's default 10-result limit can silently exclude the `qms`
   // platform tenant once total active tenant count passes 10.
   const { data: tenantData, isError: tenantsErrored } = useTenants({ type: 'platform', status: 'active', limit: PLATFORM_TENANT_FETCH_LIMIT })
   const platformTenant = tenantData?.data?.items.find((t) => t.type === 'platform' || t.code === PLATFORM_TENANT_CODE)
 
-  const { data: salesRepTypeData, isLoading: roleTypesLoading, isError: roleTypesErrored } = useRoleTypes({ code: 'sales-rep', status: 'active' })
-  const { data: salesHeadTypeData } = useRoleTypes({ code: 'sales-head', status: 'active' })
-  const salesRepTypeId = salesRepTypeData?.data?.items[0]?.id
-  const salesHeadTypeId = salesHeadTypeData?.data?.items[0]?.id
+  // TODO: ask whether this field should really offer both sales-rep and
+  // sales-head, or only one of the two — combined into one fetch for now
+  // (backend's role-type search only supports a single exact `code`, not a
+  // list, so codes are split out client-side instead of two filtered calls).
+  // limit: '50' — sorted newest-first, and sales-rep/sales-head were seeded
+  // early, so the backend's default 10-result page already excludes both
+  // once the platform tenant has 10+ role types (confirmed live).
+  const { data: roleTypesData, isLoading: roleTypesLoading, isError: roleTypesErrored } = useRoleTypes(
+    { tenant: platformTenant?.id, status: 'active', limit: '50' },
+    !!platformTenant,
+  )
+  const salesRepTypeId = roleTypesData?.data?.items.find((t) => t.code === 'sales-rep')?.id
+  const salesHeadTypeId = roleTypesData?.data?.items.find((t) => t.code === 'sales-head')?.id
 
   const { data: salesRepRoleData, isLoading: salesRepRolesLoading, isError: salesRepRolesErrored } = useRoles(
     { tenant: platformTenant?.id, type: salesRepTypeId, status: 'active' },
@@ -89,7 +95,7 @@ const WizardStep4 = ({ form, setField }: WizardStep4Props) => {
 
       <div>
         <Label className={labelClasses} style={labelStyle}>Sales rep *</Label>
-        <Select value={form.salesPersonId} onValueChange={(v) => selectSalesPerson(v as string)}>
+        <Select key={form.salesPersonId || 'empty'} value={form.salesPersonId} onValueChange={(v) => selectSalesPerson(v as string)}>
           <SelectTrigger className={`w-full ${fieldClasses}`}>
             <SelectValue placeholder={rolesLoading ? 'Loading...' : 'Select sales rep...'}>
               {(v: string) => {
@@ -122,7 +128,6 @@ const WizardStep4 = ({ form, setField }: WizardStep4Props) => {
           <ReviewField label="MRs" value={form.numberOfMRS ? String(form.numberOfMRS) : '—'} />
           <ReviewField label="Project type" value={form.projectType ? LEAD_PROJECT_TYPE_LABEL[form.projectType] : '—'} />
           <ReviewField label="QMS offer" value={form.offers.length ? String(form.offers.length) : '—'} />
-          <ReviewField label="AI score" value={String(score)} />
           <ReviewField label="Value" value={formatINR(form.estimatedValue)} />
         </ReviewGrid>
         {form.problemStatement && (

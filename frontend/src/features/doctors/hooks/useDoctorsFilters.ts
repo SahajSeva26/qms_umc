@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useFilterState } from '@/hooks/useFilterState'
 import type { DoctorSpecialization, DoctorStatus } from '@/types/doctor.types'
 
 export interface DoctorsFilterState {
@@ -17,15 +17,4 @@ const DEFAULT_FILTERS: DoctorsFilterState = {
   state: '',
 }
 
-// Mirrors `@/features/access-management/role/hooks/useRolesFilters.ts` exactly.
-export const useDoctorsFilters = () => {
-  const [filters, setFilters] = useState<DoctorsFilterState>(DEFAULT_FILTERS)
-
-  const setFilter = <K extends keyof DoctorsFilterState>(key: K, value: DoctorsFilterState[K]) => {
-    setFilters((prev) => ({ ...prev, [key]: value }))
-  }
-
-  const reset = () => setFilters(DEFAULT_FILTERS)
-
-  return { filters, setFilter, reset }
-}
+export const useDoctorsFilters = () => useFilterState<DoctorsFilterState>(DEFAULT_FILTERS)

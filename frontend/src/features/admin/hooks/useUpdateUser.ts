@@ -1,15 +1,7 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useUpdateEntity } from '@/hooks/useUpdateEntity'
 import { adminService } from '@/features/admin/admin.service'
+import { userKeys } from '@/features/admin/hooks/useUsers'
 import type { UpdateUserPayload } from '@/types/user.types'
 
-export const useUpdateUser = (id: string) => {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: (payload: UpdateUserPayload) => adminService.updateUser(id, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['user', id] })
-      queryClient.invalidateQueries({ queryKey: ['users'] })
-    },
-  })
-}
+export const useUpdateUser = (id: string) =>
+  useUpdateEntity((payload: UpdateUserPayload) => adminService.updateUser(id, payload), [userKeys.detail(id), userKeys.all])

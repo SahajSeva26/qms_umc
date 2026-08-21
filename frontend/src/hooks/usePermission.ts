@@ -14,6 +14,7 @@ export const usePermission = () => {
     isSettled,
     isError,
     error,
+    isConfirmedUnauthenticated,
     session,
     permissions,
     hasPermission,
@@ -35,16 +36,14 @@ export const usePermission = () => {
     : null
 
   return {
-    // raw query state, for loading/error handling by callers.
-    // isLoading is only true for the query's very FIRST fetch ever, not
-    // subsequent refetches — callers deciding "has the session ever
-    // resolved" (e.g. a route guard) should use isSettled instead; see
-    // useSession.ts's own doc comment on this exact distinction.
+    // isLoading is only true for the very first fetch; use isSettled to
+    // check "has the session ever resolved".
     isLoading,
     isFetching,
     isSettled,
     isError,
     error,
+    isConfirmedUnauthenticated,
     refetch: refetchSession,
 
     // raw session payload, for display purposes

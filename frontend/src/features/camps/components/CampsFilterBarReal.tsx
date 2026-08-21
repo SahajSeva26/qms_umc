@@ -1,6 +1,6 @@
-import { FiSearch } from 'react-icons/fi'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import SearchInput from '@/components/ui/SearchInput'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { CampsRealFilterState } from '@/features/camps/hooks/useCampsRealFilters'
 import type { BillingType, CampStatus, CampType } from '@/types/campReal.types'
@@ -25,27 +25,20 @@ interface CampsFilterBarRealProps {
   reset: () => void
 }
 
-// Filters strictly what SearchCampQuerySchema actually accepts server-side:
-// status, type, billingType, city/state (regex contains-match), and a
-// dateFrom/dateTo range. project/division/doctor/fo are also real query
-// params but are ObjectId-based and left out of the quick filter bar — no
-// picker UI for them yet, matches this pass's scope of the core fields only.
+// project/division/doctor/fo are also real query params but are ObjectId-based
+// and left out of this quick filter bar — no picker UI for them yet.
 const CampsFilterBarReal = ({ filters, setFilter, reset }: CampsFilterBarRealProps) => {
   return (
     <div
       className="flex flex-wrap items-center justify-between gap-2 p-2.5 mb-3 rounded-xl border"
       style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}
     >
-      <div className="relative">
-        <FiSearch size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--qms-text-muted)' }} />
-        <Input
-          type="text"
-          value={filters.city}
-          onChange={(e) => setFilter('city', e.target.value)}
-          placeholder="City..."
-          className="w-32 pl-7 text-[12px]"
-        />
-      </div>
+      <SearchInput
+        value={filters.city}
+        onChange={(v) => setFilter('city', v)}
+        placeholder="City..."
+        className="w-32 text-[12px]"
+      />
 
       <div className="flex flex-wrap items-center gap-2">
         <Select value={filters.status} onValueChange={(v) => setFilter('status', (v ?? 'ALL') as CampsRealFilterState['status'])}>

@@ -20,6 +20,7 @@ import { SegRow, SegButton } from '@/components/ui/SegButton'
 import { WzChipRow, WzChipToggle } from '@/components/ui/WzChip'
 import ChipPicker from '@/features/crm/components/wizard/ChipPicker'
 import { labelClasses, labelStyle, fieldClasses } from '@/features/crm/components/wizard/wizard.styles'
+import { unwrapId } from '@/utils/unwrapId'
 
 interface EditLeadModalProps {
   lead: LeadEntity
@@ -27,11 +28,8 @@ interface EditLeadModalProps {
   onClose: () => void
 }
 
-// All 13 fields UpdateLeadPayloadSchema accepts (crm.types.ts's own doc
-// comment on UpdateLeadPayload lists exactly this set) — tenant/division/
-// status are deliberately absent from both the payload and this form:
-// tenant/division are immutable post-create, and status only ever moves
-// through moveStage, never this endpoint.
+// tenant/division/status are deliberately absent: tenant/division are immutable
+// post-create, and status only ever moves through moveStage, never this form.
 interface EditFormState {
   contactPersonId: string
   salesPersonId: string
@@ -50,8 +48,8 @@ interface EditFormState {
 }
 
 const toFormState = (lead: LeadEntity): EditFormState => ({
-  contactPersonId: typeof lead.contactPerson === 'string' ? lead.contactPerson : lead.contactPerson._id ?? '',
-  salesPersonId: typeof lead.salesPerson === 'string' ? lead.salesPerson : lead.salesPerson._id ?? '',
+  contactPersonId: unwrapId(lead.contactPerson),
+  salesPersonId: unwrapId(lead.salesPerson),
   title: lead.title,
   problemStatement: lead.problemStatement,
   numberOfMRS: lead.numberOfMRS,
@@ -77,28 +75,14 @@ const EditLeadModal = ({ lead, onSave, onClose }: EditLeadModalProps) => {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
-  // Lead's own tenant is immutable here — contact person is scoped to it,
-  // same rule the wizard enforces at create time (contactPerson.tenant must
-  // equal the lead's tenant, see lead.service.ts's create() guard). Sourced
-  // from Contacts, not Roles — Lead.contactPerson switched from a Role
-  // reference to a Contact reference 2026-08-03 (lead.model.ts's
-  // contactPerson.ref, lead.service.ts's set()).
-  // `enabled: !!tenantId` — NOT `{ limit: '0' }` (fixed 2026-08-03):
-  // Mongoose's `.find().limit(0)` means "no limit at all," not "return
-  // nothing" — a Lead always has a tenant in practice, so this branch rarely
-  // triggers, but it was still wrong in principle.
-  const tenantId = typeof lead.tenant === 'string' ? lead.tenant : lead.tenant._id
+  // Contact person is scoped to the lead's own (immutable) division, same as WizardStep1.tsx.
+  const divisionId = unwrapId(lead.division)
   const { data: contactPersonData, isLoading: contactPeopleLoading, isError: contactPeopleErrored } =
-    useContacts({ tenant: tenantId, status: 'active' }, { enabled: !!tenantId })
+    useContacts({ division: divisionId, status: 'active' }, { enabled: !!divisionId })
   const contactPeople = contactPersonData?.data?.items ?? []
 
-  // limit: PLATFORM_TENANT_FETCH_LIMIT — see accessManagement.constants.ts;
-  // the backend's default 10-result limit can silently exclude the `qms`
-  // platform tenant once total active tenant count passes 10.
   const { data: tenantData, isError: tenantsErrored } = useTenants({ status: 'active', limit: PLATFORM_TENANT_FETCH_LIMIT })
-  // tenant.type is only present on the wire for a system:manage caller
-  // (TenantMapper.toResponse) — code is always present regardless of
-  // permission, so match on it as a fallback. Found via a 2026-07-26 test pass.
+  // tenant.type is only on the wire for a system:manage caller; code is always present, so fall back to it.
   const platformTenant = tenantData?.data?.items.find((t) => t.type === 'platform' || t.code === PLATFORM_TENANT_CODE)
   const { data: salesRoleData, isLoading: salesRolesLoading, isError: salesRolesErrored } =
     useRoles(platformTenant ? { tenant: platformTenant.id, status: 'active' } : { tenant: undefined })

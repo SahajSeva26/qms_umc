@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { FiArrowLeft } from 'react-icons/fi'
 import { useUser } from '@/features/admin/hooks/useUser'
@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { updateUserSchema } from '@/features/admin/schemas/user.schemas'
 import { useScrollIntoViewOnChange } from '@/hooks/useScrollIntoViewOnChange'
-import type { UserStatus } from '@/types/user.types'
+import type { User, UserStatus } from '@/types/user.types'
 
 const STATUS_OPTIONS: { value: UserStatus; label: string }[] = [
   { value: 'active', label: 'Active' },
@@ -22,9 +22,7 @@ const STATUS_OPTIONS: { value: UserStatus; label: string }[] = [
   { value: 'deleted', label: 'Deleted' },
 ]
 
-// Literal path (not imported from admin.routes.tsx) — that file imports this
-// component, so importing back from it here would be a circular module
-// dependency (same pattern as CampDetailPage.tsx / CampDrawer.tsx).
+// Literal path (not imported from admin.routes.tsx) to avoid a circular import.
 const ADMIN_USERS_PATH = '/admin/users'
 
 const UserDetailPage = () => {
@@ -32,53 +30,6 @@ const UserDetailPage = () => {
   const navigate = useNavigate()
   const { data, isLoading, error } = useUser(id)
   const user = data?.data ?? null
-
-  // Real bound-Role lookup by user (this user's OWN Role, not the
-  // hash-derived fake `user.role`/`RoleBadge` this page used before — see
-  // admin.mock.ts's withMockFields: `role` is computed from a hash of the
-  // user's _id and has zero relationship to their real backend RoleType).
-  // A user may hold zero or more than one Role in principle; showing every
-  // one found (usually exactly one) rather than assuming a single result.
-  //
-  // `user` used to be an exact-match ObjectId filter; it's now a free-text
-  // name/email keyword resolved server-side against the linked user
-  // (role.service.ts's search(), 2026-07-27 — built for a member-picker
-  // typeahead). Passing this page's raw `id` param would now match nothing
-  // (a regex search for a 24-char hex string against real names/emails is
-  // effectively never a hit) — use the loaded user's own email instead,
-  // which is unique and gives an exact-enough match (regex substring, but a
-  // real email is specific enough not to collide with another user's).
-  // `enabled: !!user?.email` — NOT `{ limit: '0' }` (fixed 2026-08-03):
-  // Mongoose's `.find().limit(0)` means "no limit at all," not "return
-  // nothing" — this was silently fetching every role in the system,
-  // unscoped, before `user` had loaded.
-  const { data: rolesData, isLoading: isLoadingRoles } = useRoles({ user: user?.email, limit: '10' }, !!user?.email)
-  const roles = rolesData?.data?.items ?? []
-
-  const updateUser = useUpdateUser(id ?? '')
-  const [firstName, setFirstName] = useState('')
-  const [lastName, setLastName] = useState('')
-  const [status, setStatus] = useState<UserStatus | ''>('')
-  const [formError, setFormError] = useState<string | null>(null)
-  const errorRef = useScrollIntoViewOnChange<HTMLDivElement>(formError)
-
-  useEffect(() => {
-    if (user) {
-      setFirstName(user.firstName)
-      setLastName(user.lastName)
-      setStatus(user.status)
-    }
-  }, [user])
-
-  const handleSave = () => {
-    const result = updateUserSchema.safeParse({ firstName, lastName, status: status || undefined })
-    if (!result.success) {
-      setFormError(result.error.issues[0].message)
-      return
-    }
-    setFormError(null)
-    updateUser.mutate(result.data)
-  }
 
   return (
     <div className="max-w-2xl">
@@ -103,138 +54,150 @@ const UserDetailPage = () => {
         </div>
       )}
 
-      {user && !isLoading && (
-        <>
-          <div
-            className="rounded-xl border p-5 mb-5 flex items-center gap-4"
-            style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}
-          >
-            <UserAvatar firstName={user.firstName} lastName={user.lastName} tone={user.avatarTone} size="lg" />
-            <div className="min-w-0">
-              <div className="text-lg font-bold truncate" style={{ color: 'var(--qms-text)' }}>
-                {user.firstName} {user.lastName}
-              </div>
-              <div className="text-[13px] truncate mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-                {user.email}
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <RealRoleBadge
-                  roleTypeName={roles[0] ? (typeof roles[0].type === 'string' ? roles[0].code : roles[0].type.name) : null}
-                  isLoading={isLoadingRoles}
-                />
-                <StatusPill status={user.status} />
-              </div>
-            </div>
-          </div>
-
-          <div
-            className="rounded-xl border p-5"
-            style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}
-          >
-            <h2 className="text-sm font-bold mb-4" style={{ color: 'var(--qms-text)' }}>
-              Edit profile
-            </h2>
-
-            <div className="space-y-4">
-              <div>
-                <Label
-                  htmlFor="firstName"
-                  className="text-[10px] font-semibold tracking-widest uppercase mb-2"
-                  style={{ color: 'var(--qms-text-muted)' }}
-                >
-                  First name
-                </Label>
-                <Input
-                  id="firstName"
-                  type="text"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <Label
-                  htmlFor="lastName"
-                  className="text-[10px] font-semibold tracking-widest uppercase mb-2"
-                  style={{ color: 'var(--qms-text-muted)' }}
-                >
-                  Last name
-                </Label>
-                <Input
-                  id="lastName"
-                  type="text"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <Label
-                  htmlFor="status"
-                  className="text-[10px] font-semibold tracking-widest uppercase mb-2"
-                  style={{ color: 'var(--qms-text-muted)' }}
-                >
-                  Status
-                </Label>
-                {/* Keyed on whether the user's real status has loaded yet —
-                    forces exactly ONE remount, from "not yet loaded" to
-                    "loaded", so this Select's first REAL render already has
-                    the actual value. base-ui locks a Select into controlled/
-                    uncontrolled mode based on whether `value` is `undefined`
-                    on mount (React's classic controlled-component rule) and
-                    won't honor a later change from undefined to a real
-                    value — without this key, the useEffect-driven
-                    `setStatus` below arrives one render too late and the
-                    trigger is stuck showing the placeholder forever. Keying
-                    on the status VALUE itself (rather than just "loaded or
-                    not") would also remount on every user selection, causing
-                    a visible flicker while they're actively using it — this
-                    key only flips once. */}
-                <Select key={status ? 'loaded' : 'loading'} value={status || undefined} onValueChange={(v) => setStatus(v as UserStatus)}>
-                  <SelectTrigger id="status" className="w-full">
-                    {/* Render-prop child, not a plain placeholder — base-ui's
-                        SelectValue only auto-resolves a selected value's label
-                        from an `items` prop passed to Select.Root, which this
-                        app's Select wrapper never supplies, so a bare
-                        placeholder shows correctly only until something is
-                        selected, then falls back to the raw value. Same fix
-                        applied to the CRM wizard's pickers earlier. */}
-                    <SelectValue placeholder="Select status">
-                      {(v: string) => STATUS_OPTIONS.find((s) => s.value === v)?.label ?? 'Select status'}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STATUS_OPTIONS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {updateUser.isError && (
-                <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
-                  {(updateUser.error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-                    'Failed to save changes.'}
-                </div>
-              )}
-              {updateUser.isSuccess && (
-                <div className="text-xs rounded-xl px-3 py-2 bg-success-soft text-success">
-                  Saved.
-                </div>
-              )}
-
-              {formError && (
-                <div ref={errorRef} className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
-                  {formError}
-                </div>
-              )}
-
-              <Button onClick={handleSave} disabled={updateUser.isPending}>
-                {updateUser.isPending ? 'Saving…' : 'Save changes'}
-              </Button>
-            </div>
-          </div>
-        </>
-      )}
+      {/* key={user._id} forces a fresh mount/draft when navigating between users. */}
+      {user && !isLoading && <UserEditor key={user._id} user={user} />}
     </div>
+  )
+}
+
+interface UserEditorProps {
+  user: User
+}
+
+const UserEditor = ({ user }: UserEditorProps) => {
+  // useRoles' `user` param is a free-text name/email keyword, not an id filter —
+  // this page's raw id param wouldn't match, so query by the loaded user's email instead.
+  const { data: rolesData, isLoading: isLoadingRoles } = useRoles({ user: user.email, limit: '10' })
+  const roles = rolesData?.data?.items ?? []
+
+  const updateUser = useUpdateUser(user._id)
+  const [firstName, setFirstName] = useState(user.firstName)
+  const [lastName, setLastName] = useState(user.lastName)
+  const [status, setStatus] = useState<UserStatus | ''>(user.status)
+  const [formError, setFormError] = useState<string | null>(null)
+  const errorRef = useScrollIntoViewOnChange<HTMLDivElement>(formError)
+
+  const handleSave = () => {
+    const result = updateUserSchema.safeParse({ firstName, lastName, status: status || undefined })
+    if (!result.success) {
+      setFormError(result.error.issues[0].message)
+      return
+    }
+    setFormError(null)
+    updateUser.mutate(result.data)
+  }
+
+  return (
+    <>
+      <div
+        className="rounded-xl border p-5 mb-5 flex items-center gap-4"
+        style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}
+      >
+        <UserAvatar firstName={user.firstName} lastName={user.lastName} tone={user.avatarTone} size="lg" />
+        <div className="min-w-0">
+          <div className="text-lg font-bold truncate" style={{ color: 'var(--qms-text)' }}>
+            {user.firstName} {user.lastName}
+          </div>
+          <div className="text-[13px] truncate mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+            {user.email}
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <RealRoleBadge
+              roleTypeName={roles[0] && typeof roles[0].type !== 'string' ? roles[0].type.name : null}
+              isLoading={isLoadingRoles}
+            />
+            <StatusPill status={user.status} />
+          </div>
+        </div>
+      </div>
+
+      <div
+        className="rounded-xl border p-5"
+        style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}
+      >
+        <h2 className="text-sm font-bold mb-4" style={{ color: 'var(--qms-text)' }}>
+          Edit profile
+        </h2>
+
+        <div className="space-y-4">
+          <div>
+            <Label
+              htmlFor="firstName"
+              className="text-[10px] font-semibold tracking-widest uppercase mb-2"
+              style={{ color: 'var(--qms-text-muted)' }}
+            >
+              First name
+            </Label>
+            <Input
+              id="firstName"
+              type="text"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <Label
+              htmlFor="lastName"
+              className="text-[10px] font-semibold tracking-widest uppercase mb-2"
+              style={{ color: 'var(--qms-text-muted)' }}
+            >
+              Last name
+            </Label>
+            <Input
+              id="lastName"
+              type="text"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <Label
+              htmlFor="status"
+              className="text-[10px] font-semibold tracking-widest uppercase mb-2"
+              style={{ color: 'var(--qms-text-muted)' }}
+            >
+              Status
+            </Label>
+            <Select value={status || undefined} onValueChange={(v) => setStatus(v as UserStatus)}>
+              <SelectTrigger id="status" className="w-full">
+                {/* Render-prop child: base-ui's SelectValue needs this since the
+                    Select wrapper doesn't pass an `items` prop to auto-resolve labels. */}
+                <SelectValue placeholder="Select status">
+                  {(v: string) => STATUS_OPTIONS.find((s) => s.value === v)?.label ?? 'Select status'}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {STATUS_OPTIONS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {updateUser.isError && (
+            <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
+              {(updateUser.error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+                'Failed to save changes.'}
+            </div>
+          )}
+          {updateUser.isSuccess && (
+            <div className="text-xs rounded-xl px-3 py-2 bg-success-soft text-success">
+              Saved.
+            </div>
+          )}
+
+          {formError && (
+            <div ref={errorRef} className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
+              {formError}
+            </div>
+          )}
+
+          <Button onClick={handleSave} disabled={updateUser.isPending}>
+            {updateUser.isPending ? 'Saving…' : 'Save changes'}
+          </Button>
+        </div>
+      </div>
+    </>
   )
 }
 

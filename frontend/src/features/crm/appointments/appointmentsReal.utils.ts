@@ -1,11 +1,7 @@
 import type { AppointmentEntity, AppointmentStatus } from '@/types/appointment.types'
 
-// Resolves an Appointment reference field (tenant/division/salesPerson/
-// contactPerson/lead/parent/internalMembers.role) to a plain id string
-// regardless of whether the value is a populated object (search()/get(),
-// which both always populate — see appointment.types.ts's comments) or a
-// bare ObjectId string (a create/update response's own echo before a
-// follow-up GET).
+// Resolves an Appointment reference field to a plain id string regardless
+// of whether the value is a populated object or a bare ObjectId string.
 export function appointmentRefId(value: { _id?: string; id?: string } | string | null | undefined): string | null {
   if (value == null) return null
   if (typeof value === 'string') return value
@@ -30,15 +26,19 @@ const TYPE_COLOR: Record<AppointmentEntity['type'], string> = {
   spot: '#a855f7',
 }
 
-// Calendar chip background: type color while planned, overridden by status
-// color once it's left that state — mirrors the prototype's chipColor()
-// exactly (sales-calendar-data.js's per-type/per-status color tables).
+// Calendar chip background: type color while planned, overridden by status color once it's left that state.
 export function appointmentChipColor(a: AppointmentEntity): string {
   return a.status === 'planned' ? TYPE_COLOR[a.type] : STATUS_COLOR[a.status]
 }
 
 export function appointmentStatusColor(status: AppointmentStatus): string {
   return STATUS_COLOR[status]
+}
+
+// nextSteps has no top-level field on the entity — only per-transition on
+// stageHistory (append-only, oldest first), so the last entry is current.
+export function latestAppointmentNextSteps(a: AppointmentEntity): string {
+  return a.stageHistory[a.stageHistory.length - 1]?.nextSteps ?? ''
 }
 
 /** Darker shade of a #rrggbb color, used for a chip's left border. */
@@ -50,8 +50,7 @@ export function darken(hex: string, factor = 0.72): string {
 
 const pad2 = (s: string) => (s.length < 2 ? `0${s}` : s)
 
-// Flags a planned appointment whose MOM submission deadline (24 working
-// hours after duration.endTime, Sat/Sun skipped) has passed with no MOM
+// Flags a planned appointment past its MOM submission deadline with no MOM
 // submitted — display-only, no backend status change results from this.
 export function isMomOverdue(a: AppointmentEntity, now = Date.now()): boolean {
   if (a.mom.details || !a.mom.submissionDeadline) return false
@@ -68,20 +67,8 @@ export interface LaidOutAppointment {
   columnCount: number
 }
 
-// Google-Calendar/Outlook-style overlap-aware column packing — found
-// missing 2026-07-28 (a real week with many concurrent appointments simply
-// stacked all of them at full width on top of each other, illegible). The
-// original prototype (sales-calendar.js) never solved this either — its
-// only overlap-detection helper is used solely for the New Meeting form's
-// per-person free/busy clash check, not for chip layout — so this is new,
-// not adapted from anywhere.
-//
-// Algorithm: sort by start time, greedily place each appointment in the
-// lowest-numbered column whose previously-placed appointment has already
-// ended (classic interval partitioning / "meeting rooms" greedy). Distinct,
-// non-overlapping clusters (a gap with no active appointment at all) reset
-// independently so a single early-morning appointment doesn't get squeezed
-// narrow just because the afternoon is busy.
+// Interval-partitioning greedy: sort by start time, place each appointment
+// in the lowest-numbered column whose prior occupant has already ended.
 export function layoutDayAppointments(appointments: AppointmentEntity[]): LaidOutAppointment[] {
   const withTimes = appointments
     .map((a) => {
@@ -91,19 +78,15 @@ export function layoutDayAppointments(appointments: AppointmentEntity[]): LaidOu
     })
     .sort((x, y) => x.start.getTime() - y.start.getTime())
 
-  // Column end times, index = column number. A column is "free" for a new
-  // item once that column's last-placed end time is <= the new item's start.
+  // Column is "free" once its last-placed end time is <= the new item's start.
   const columnEnds: number[] = []
-  // Which cluster each column currently belongs to, so columnCount can be
-  // computed per-cluster rather than globally once we know the final shape.
   const placements: { start: Date; end: Date; appointment: AppointmentEntity; column: number; clusterId: number }[] = []
   let clusterId = -1
   let clusterMaxEnd = -Infinity
 
   for (const item of withTimes) {
     const startMs = item.start.getTime()
-    // A new cluster begins whenever this item starts after every
-    // previously-seen item (in this cluster) has already ended.
+    // A new cluster begins once every previously-seen item has already ended.
     if (startMs >= clusterMaxEnd) {
       clusterId += 1
       columnEnds.length = 0

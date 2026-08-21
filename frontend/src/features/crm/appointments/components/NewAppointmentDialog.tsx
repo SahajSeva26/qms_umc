@@ -3,32 +3,31 @@ import { FiUserPlus } from 'react-icons/fi'
 import type { AppointmentType, AppointmentMode } from '@/types/appointment.types'
 import { APPOINTMENT_TYPE_LABEL, APPOINTMENT_MODE_LABEL } from '@/types/appointment.types'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
-import { useDivisions } from '@/features/crm/hooks/useDivisions'
+import { useDivisions } from '@/features/crm/divisions/hooks/useDivisions'
 import { useContacts } from '@/features/contacts/hooks/useContacts'
-import { useCreateContact } from '@/features/contacts/hooks/useCreateContact'
 import { useCreateAppointment } from '@/features/crm/appointments/hooks/useCreateAppointment'
 import { toast } from '@/components/ui/sonner'
+import { getApiErrorMessage } from '@/utils/apiError'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import DatePicker from '@/components/ui/DatePicker'
+import { TimePicker } from '@/components/ui/TimePicker'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import InternalMembersPicker from '@/features/crm/appointments/components/InternalMembersPicker'
 import LeadIdPicker from '@/features/crm/appointments/components/LeadIdPicker'
+import LinkedMeetingPicker from '@/features/crm/appointments/components/LinkedMeetingPicker'
+import EditContactModal from '@/features/contacts/components/EditContactModal'
 
-// Sentinel value for the inline "+ Add new contact" option inside the
-// Contact person <Select> — a real contact id is never this string, so it's
-// safe to use as a Select item value (base-ui's Select requires a non-empty
-// string value, ruling out '').
+// Sentinel for the inline "+ Add new contact" option — never a real contact id,
+// and non-empty as base-ui's Select requires.
 const ADD_NEW_CONTACT_VALUE = '__add_new_contact__'
 
 const APPOINTMENT_TYPES: AppointmentType[] = ['new', 'follow-up', 'payment', 'spot']
 
-// Both are 'HH:mm' on the same calendar day (the form has one Date field for
-// both Start and End), so a plain minute-of-day difference is enough — no
-// need to round-trip through Date objects across a day boundary.
+// Both are 'HH:mm' on the same calendar day, so a plain minute-of-day diff suffices.
 function formatDuration(startTime: string, endTime: string): string {
   const [sh, sm] = startTime.split(':').map(Number)
   const [eh, em] = endTime.split(':').map(Number)
@@ -55,14 +54,6 @@ interface NewAppointmentDialogProps {
   prefill?: { date: string; hour: number }
 }
 
-// Mirrors the prototype's New Meeting modal layout order (sales-calendar.js's
-// renderNewMeeting): Type cards -> Follow-up lead reference (conditional) ->
-// Account section (Company -> Division -> Contact, cascading, matching
-// WizardStep1.tsx's exact pattern) -> Mode -> Internal team invitees -> Time
-// -> Agenda. Per explicit decision (2026-07-27, documented in PROGRESS.md):
-// no "peer overlay"/outcome/reschedule-history concepts here since none have
-// a real backend field; the Leads-view and Weekly-planning-panel features
-// are out of scope entirely.
 const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointmentDialogProps) => {
   const [type, setType] = useState<AppointmentType>('new')
   const [tenantId, setTenantId] = useState('')
@@ -76,100 +67,36 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
   const [destinationLink, setDestinationLink] = useState('')
   const [leadId, setLeadId] = useState('')
   const [leadLabel, setLeadLabel] = useState('')
+  const [parentId, setParentId] = useState('')
+  const [parentLabel, setParentLabel] = useState('')
   const [agendaPublic, setAgendaPublic] = useState('')
   const [agendaPrivate, setAgendaPrivate] = useState('')
   const [error, setError] = useState('')
 
-  // Inline "add new contact" — mirrors the prototype's New Meeting form,
-  // which lets the user create a contact for the chosen company without
-  // leaving the appointment modal (sales-calendar.js's inline
-  // "➕ Add new contact…" option + name/designation sub-form). Kept
-  // deliberately minimal (name + designation) — a fuller edit (email/phone/
-  // location/type) is always available afterward via the standalone
-  // Contacts page.
   const [addingContact, setAddingContact] = useState(false)
-  const [newContactName, setNewContactName] = useState('')
-  const [newContactDesignation, setNewContactDesignation] = useState('')
-  const [newContactError, setNewContactError] = useState('')
-  // Names the just-created contact locally so the Select shows it
-  // immediately — useContacts()'s query invalidation is async, so relying
-  // solely on `contacts.find(...)` leaves the trigger showing the
-  // "Select contact..." placeholder for a beat (or longer, if the refetch
-  // is still in flight) right after a successful inline creation, even
-  // though contactPersonId is already correctly set underneath.
+  // Shows the new contact's name immediately, ahead of useContacts()'s invalidation lag.
   const [justCreatedContact, setJustCreatedContact] = useState<{ id: string; name: string } | null>(null)
 
-  // limit: '20' — this Company picker should list every active tenant, not
-  // just the backend's default first-10 (requestHandler.ts). Same class of
-  // truncation bug as the platform-tenant-resolution fix elsewhere (see
-  // accessManagement.constants.ts's PLATFORM_TENANT_FETCH_LIMIT) — here it's
-  // "some real companies silently missing from the Company dropdown" rather
-  // than "one specific tenant unreachable," but the same root cause.
-  //
-  // `enabled: open` — this dialog is always mounted on AppointmentsPage (no
-  // conditional render there), so without this gate the Company list fetches
-  // on every Appointments page load even while the dialog is closed. `open`
-  // only ever becomes true from user action, and `divisions`/`contacts` below
-  // already gate on `tenantId`, which itself can't be set until this Select
-  // renders while the dialog is open — so nothing downstream needs `tenants`
-  // populated before `open` flips true.
   const { data: tenantData, isLoading: tenantsLoading, isError: tenantsErrored } = useTenants({ status: 'active', limit: '20' }, open)
   const tenants = tenantData?.data?.items ?? []
 
-  // NOT `tenantId` — SearchDivisionQuery's own field is stale (see its
-  // comment); the real backend query param is `tenant`
-  // (division.validators.ts's SearchDivisionQuerySchema). Sending `tenantId`
-  // compiles but is silently ignored server-side, returning EVERY tenant's
-  // divisions unscoped — same root cause already worked around in
-  // RoleDetailPage.tsx. FLAGGED FOR LATER: fix SearchDivisionQuery itself
-  // (rename tenantId -> tenant in crm.types.ts) and remove every one of these
-  // per-call-site casts at once, rather than adding another here.
   const { data: divisionData, isLoading: divisionsLoading, isError: divisionsErrored } =
-    useDivisions({ tenant: tenantId || undefined } as unknown as { tenantId?: string }, !!tenantId)
+    useDivisions({ tenant: tenantId || undefined }, !!tenantId)
   const divisions = tenantId ? divisionData?.data?.items ?? [] : []
 
-  // `enabled: !!tenantId` — NOT `{ limit: '0' }` (the prior approach, fixed
-  // 2026-08-03): Mongoose's `.find().limit(0)` means "no limit at all," not
-  // "return nothing" — `limit: '0'` was silently fetching every contact in
-  // the system, unscoped, before a company was even picked. Confirmed live:
-  // GET /contacts?limit=0 returned all 16+ real contacts, not zero.
+  // Scoped by division, not tenant — Contact.division is required for customer-type contacts.
   const { data: contactData, isLoading: contactsLoading, isError: contactsErrored } =
-    useContacts({ tenant: tenantId || undefined, status: 'active' }, { enabled: !!tenantId })
-  const contacts = tenantId ? contactData?.data?.items ?? [] : []
+    useContacts({ division: divisionId || undefined, status: 'active' }, { enabled: !!divisionId })
+  const contacts = divisionId ? contactData?.data?.items ?? [] : []
 
   const createAppointment = useCreateAppointment()
-  const createContact = useCreateContact()
 
   const handleContactSelect = (value: string | null) => {
     if (value === ADD_NEW_CONTACT_VALUE) {
-      setNewContactError('')
-      setNewContactName('')
-      setNewContactDesignation('')
       setAddingContact(true)
       return
     }
     setContactPersonId(value ?? '')
-  }
-
-  const handleCreateContact = async () => {
-    if (!newContactName.trim()) return setNewContactError('Name is required')
-    try {
-      const created = await createContact.mutateAsync({
-        tenant: tenantId,
-        name: newContactName.trim(),
-        designation: newContactDesignation.trim() || undefined,
-      })
-      if (!created.data) {
-        setNewContactError('Contact created but the response was empty — try selecting it from the list.')
-        return
-      }
-      toast.success('Contact added')
-      setJustCreatedContact({ id: created.data.id, name: created.data.name })
-      setContactPersonId(created.data.id)
-      setAddingContact(false)
-    } catch (err: any) {
-      setNewContactError(err?.response?.data?.message || 'Could not add contact — try again.')
-    }
   }
 
   const reset = () => {
@@ -185,13 +112,12 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
     setDestinationLink('')
     setLeadId('')
     setLeadLabel('')
+    setParentId('')
+    setParentLabel('')
     setAgendaPublic('')
     setAgendaPrivate('')
     setError('')
     setAddingContact(false)
-    setNewContactName('')
-    setNewContactDesignation('')
-    setNewContactError('')
     setJustCreatedContact(null)
   }
 
@@ -206,6 +132,8 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
     setContactPersonId('')
     setAddingContact(false)
     setJustCreatedContact(null)
+    setParentId('')
+    setParentLabel('')
   }
 
   const handleSave = async () => {
@@ -213,7 +141,7 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
     if (!divisionId) return setError('Select a division')
     if (!contactPersonId) return setError('Select a contact person')
     if (!agendaPublic.trim()) return setError('Public agenda is required')
-    if (type === 'follow-up' && !leadId.trim()) return setError('Linked lead id is required for follow-up appointments')
+    if (type === 'follow-up' && !leadId.trim() && !parentId.trim()) return setError('Follow-up appointments need a linked lead or a linked meeting')
     const startAt = new Date(`${date}T${startTime}:00`)
     const endAt = new Date(`${date}T${endTime}:00`)
     if (endAt.getTime() <= startAt.getTime()) return setError('End time must be after start time')
@@ -227,6 +155,7 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
         contactPerson: contactPersonId,
         internalMembers: members.map((m) => m.roleId),
         lead: leadId.trim() || undefined,
+        parent: parentId.trim() || undefined,
         mode,
         destinationLink: destinationLink.trim() || undefined,
         startTime: startAt.toISOString(),
@@ -240,8 +169,8 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
       toast.success('Appointment scheduled')
       reset()
       onCreated(created.data.id)
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Could not schedule the appointment — try again.')
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Could not schedule the appointment — try again.'))
     }
   }
 
@@ -279,13 +208,6 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
             </div>
           </div>
 
-          {type === 'follow-up' && (
-            <div>
-              <Label className={labelClasses} style={labelStyle}>Linked lead *</Label>
-              <LeadIdPicker value={leadId} label={leadLabel} onChange={(id, label) => { setLeadId(id); setLeadLabel(label) }} />
-            </div>
-          )}
-
           <div>
             <Label className={labelClasses} style={labelStyle}>Company *</Label>
             <Select key={tenantId || 'empty'} value={tenantId || undefined} onValueChange={(v) => selectTenant(v ?? '')}>
@@ -304,7 +226,19 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className={labelClasses} style={labelStyle}>Division *</Label>
-              <Select key={divisionId || 'empty'} value={divisionId || undefined} onValueChange={(v) => setDivisionId(v ?? '')} disabled={!tenantId}>
+              <Select
+                key={divisionId || 'empty'}
+                value={divisionId || undefined}
+                onValueChange={(v) => {
+                  setDivisionId(v ?? '')
+                  setContactPersonId('')
+                  setAddingContact(false)
+                  setJustCreatedContact(null)
+                  setParentId('')
+                  setParentLabel('')
+                }}
+                disabled={!tenantId}
+              >
                 <SelectTrigger className="w-full text-[13px]">
                   <SelectValue placeholder={!tenantId ? 'Select a company first' : divisionsLoading ? 'Loading...' : 'Select division...'}>
                     {(v: string) => divisions.find((d) => d.id === v)?.name ?? (divisionsLoading ? 'Loading...' : 'Select division...')}
@@ -321,17 +255,10 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
             </div>
             <div>
               <Label className={labelClasses} style={labelStyle}>Contact person *</Label>
-              {/* key forces a remount once a real value exists — base-ui's
-                  Select decides controlled-vs-uncontrolled on its very first
-                  render and never revisits it (same fix already used by
-                  RoleTypeDetailPage.tsx's Status select); without this,
-                  setting contactPersonId programmatically (e.g. right after
-                  the inline "Add new contact" flow) leaves the trigger
-                  permanently showing "Select contact..." even though the
-                  value is genuinely set underneath. */}
-              <Select key={contactPersonId || 'empty'} value={contactPersonId || undefined} onValueChange={handleContactSelect} disabled={!tenantId}>
+              {/* key forces a remount when set programmatically, else the Select keeps showing the placeholder. */}
+              <Select key={contactPersonId || 'empty'} value={contactPersonId || undefined} onValueChange={handleContactSelect} disabled={!divisionId}>
                 <SelectTrigger className="w-full text-[13px]">
-                  <SelectValue placeholder={!tenantId ? 'Select a company first' : contactsLoading ? 'Loading...' : 'Select contact...'}>
+                  <SelectValue placeholder={!divisionId ? 'Select a division first' : contactsLoading ? 'Loading...' : 'Select contact...'}>
                     {(v: string) =>
                       contacts.find((c) => c.id === v)?.name ??
                       (justCreatedContact?.id === v ? justCreatedContact.name : null) ??
@@ -341,7 +268,7 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
                 </SelectTrigger>
                 <SelectContent>
                   {contacts.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                  {tenantId && (
+                  {divisionId && (
                     <SelectItem value={ADD_NEW_CONTACT_VALUE}>
                       <span className="flex items-center gap-1.5" style={{ color: 'var(--qms-brand)' }}>
                         <FiUserPlus size={12} /> Add new contact…
@@ -351,34 +278,34 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
                 </SelectContent>
               </Select>
               {contactsErrored && <p className="text-[11px] mt-1 text-danger">Couldn't load contacts.</p>}
-              {!contactsErrored && !contactsLoading && tenantId && contacts.length === 0 && !addingContact && (
-                <p className="text-[11px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>This company has no contacts yet — add one below.</p>
-              )}
-              {addingContact && (
-                <div className="mt-2 p-2.5 rounded-lg border space-y-2" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-strong)' }}>
-                  <Input
-                    value={newContactName}
-                    onChange={(e) => setNewContactName(e.target.value)}
-                    placeholder="Contact name *"
-                    className="text-[13px]"
-                  />
-                  <Input
-                    value={newContactDesignation}
-                    onChange={(e) => setNewContactDesignation(e.target.value)}
-                    placeholder="Designation (optional)"
-                    className="text-[13px]"
-                  />
-                  {newContactError && <p className="text-[11px] font-semibold text-danger">{newContactError}</p>}
-                  <div className="flex gap-2">
-                    <Button size="sm" type="button" onClick={handleCreateContact} disabled={createContact.isPending}>
-                      {createContact.isPending ? 'Saving...' : 'Save contact'}
-                    </Button>
-                    <Button size="sm" type="button" variant="outline" onClick={() => setAddingContact(false)}>Cancel</Button>
-                  </div>
-                </div>
+              {!contactsErrored && !contactsLoading && divisionId && contacts.length === 0 && (
+                <p className="text-[11px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>This company has no contacts yet — add one above.</p>
               )}
             </div>
           </div>
+
+          {type === 'follow-up' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className={labelClasses} style={labelStyle}>Linked lead {!parentId && '*'}</Label>
+                <LeadIdPicker value={leadId} label={leadLabel} onChange={(id, label) => { setLeadId(id); setLeadLabel(label) }} />
+              </div>
+              <div>
+                <Label className={labelClasses} style={labelStyle}>Linked meeting {!leadId && '*'}</Label>
+                <LinkedMeetingPicker
+                  value={parentId}
+                  label={parentLabel}
+                  divisionId={divisionId}
+                  onChange={(id, label) => { setParentId(id); setParentLabel(label) }}
+                />
+              </div>
+              {!leadId && !parentId && (
+                <p className="text-[11px] col-span-2" style={{ color: 'var(--qms-text-muted)' }}>
+                  Follow-up appointments need either a linked lead or a linked meeting.
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -420,7 +347,7 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
             </div>
             <div>
               <Label className={labelClasses} style={labelStyle}>Start *</Label>
-              <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="text-[13px]" />
+              <TimePicker value={startTime} onChange={setStartTime} />
             </div>
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -434,7 +361,7 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
                   </span>
                 )}
               </div>
-              <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="text-[13px]" />
+              <TimePicker value={endTime} onChange={setEndTime} />
               {endTime && startTime && endTime <= startTime && (
                 <p className="text-[11px] mt-1 text-danger">End time must be after start time</p>
               )}
@@ -466,6 +393,18 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <EditContactModal
+        open={addingContact}
+        contact={null}
+        onClose={() => setAddingContact(false)}
+        fixedTenantId={tenantId}
+        fixedDivisionId={divisionId}
+        onCreated={(created) => {
+          setJustCreatedContact(created)
+          setContactPersonId(created.id)
+        }}
+      />
     </Dialog>
   )
 }

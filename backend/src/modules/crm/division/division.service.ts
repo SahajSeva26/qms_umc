@@ -232,7 +232,8 @@ const bulkCreateMr = async (payload: IBulkMrPayload, file: Express.Multer.File, 
             password: row.password,
         };
         const rootPaylod: ICreateRolePayload = {
-            code: `${ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR}.${row.firstName}`,
+            // code omitted — RoleService.create auto-generates it from the universal pharma-role
+            // counter (was `pharma-mr.${firstName}`, which collided on duplicate first names)
             name: `${ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR} role for ${row.firstName}`,
             description: `${ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR} role for ${row.firstName}, created by bulk import`,
             tenant: payload.tenant,

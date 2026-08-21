@@ -12,7 +12,7 @@ import { withTransaction } from '../helpers/transactionHelper';
 import { throwAppError } from '../utils/error';
 import { provisionDefaultRoleTypes } from './roleTypeProvisioner';
 import { ALLOWED_ROLETYPE_CODES } from '../../modules/access-management/role-type/roleType.constants';
-import { CRM_BUSINESS_ROLE_TYPES, OPERATION_BUSINESS_ROLE_TYPES } from './defaultRoleTypes';
+import { CRM_BUSINESS_ROLE_TYPES, OPERATION_BUSINESS_ROLE_TYPES, FINANCE_BUSINESS_ROLE_TYPES } from './defaultRoleTypes';
 
 const systemUserPermissions: any = [
     PERMISSIONS.SYSTEM.MANAGE,
@@ -134,6 +134,9 @@ const seedSystemUser = async () => {
 
             // 4.4 Provision the platform's camp/operations role types (coordinators, ops managers, fo)
             await provisionDefaultRoleTypes(tenant, OPERATION_BUSINESS_ROLE_TYPES);
+
+            // 4.5 Provision the platform's finance role type (invoicing)
+            await provisionDefaultRoleTypes(tenant, FINANCE_BUSINESS_ROLE_TYPES);
 
             //5: Create corresponding users for Role-Type ==========================================================>
             // 5.1 Create system user

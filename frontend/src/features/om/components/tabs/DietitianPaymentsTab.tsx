@@ -29,11 +29,6 @@ const fileToDataUrl = (file: File): Promise<string> =>
     r.readAsDataURL(file)
   })
 
-// Mirrors tabDietPayments() exactly (om-portal.js:1435-1602): section A
-// (dietitian-wise payment table), section B (state-wise aggregation), plus
-// the bank-details modal (om-portal.js:1612-1761) — multiple bank accounts,
-// account-number/IFSC regex validation, mandatory cancelled-cheque upload,
-// printing-charge-per-camp field.
 const DietitianPaymentsTab = ({ camps, dietitians, om }: DietitianPaymentsTabProps) => {
   const [bankModalId, setBankModalId] = useState<string | null>(null)
   const [stateModal, setStateModal] = useState<string | null>(null)
@@ -72,8 +67,11 @@ const DietitianPaymentsTab = ({ camps, dietitians, om }: DietitianPaymentsTabPro
   }
 
   const saveBankDetails = () => {
-    for (let i = 0; i < accounts.length; i++) {
-      const a = accounts[i]
+    // Builds a new array rather than mutating `accounts[i]` in place, which
+    // would bypass React's change-detection.
+    const normalized = [...accounts]
+    for (let i = 0; i < normalized.length; i++) {
+      const a = normalized[i]
       const anyFilled = a.accountName || a.accountNumber || a.ifsc || a.chequeUrl
       if (!anyFilled) continue
       if (!a.accountName) return setFormError(`Account ${i + 1}: holder name required`)
@@ -82,10 +80,11 @@ const DietitianPaymentsTab = ({ camps, dietitians, om }: DietitianPaymentsTabPro
       const ifsc = String(a.ifsc || '').toUpperCase()
       if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) return setFormError(`Account ${i + 1}: IFSC must be 11 chars (e.g. HDFC0001234)`)
       if (!a.chequeUrl) return setFormError(`Account ${i + 1}: cancelled cheque is mandatory`)
-      accounts[i] = { ...a, accountNumber: acc, ifsc, capturedAt: a.capturedAt ?? new Date().toISOString() }
+      normalized[i] = { ...a, accountNumber: acc, ifsc, capturedAt: a.capturedAt ?? new Date().toISOString() }
     }
     if (!bankModalId) return
-    om.saveDietPaymentDetails(bankModalId, { bankAccounts: accounts, printingChargePerCamp: printing })
+    setAccounts(normalized)
+    om.saveDietPaymentDetails(bankModalId, { bankAccounts: normalized, printingChargePerCamp: printing })
     setBankModalId(null)
   }
 
@@ -226,7 +225,6 @@ const DietitianPaymentsTab = ({ camps, dietitians, om }: DietitianPaymentsTabPro
         </div>
       </div>
 
-      {/* Bank details modal */}
       <Dialog open={!!bankModalId} onOpenChange={(o) => !o && setBankModalId(null)}>
         <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
@@ -328,7 +326,6 @@ const DietitianPaymentsTab = ({ camps, dietitians, om }: DietitianPaymentsTabPro
         </DialogContent>
       </Dialog>
 
-      {/* State camps drill-down */}
       <Dialog open={!!stateModal} onOpenChange={(o) => !o && setStateModal(null)}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader><DialogTitle>Diet camps · {stateModal}</DialogTitle></DialogHeader>

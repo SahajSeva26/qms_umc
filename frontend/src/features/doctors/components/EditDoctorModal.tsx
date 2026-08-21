@@ -6,6 +6,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { toast } from '@/components/ui/sonner'
 import { useCreateDoctor } from '@/features/doctors/hooks/useCreateDoctor'
 import { useUpdateDoctor } from '@/features/doctors/hooks/useUpdateDoctor'
+import { getApiErrorMessage } from '@/utils/apiError'
 import type { DoctorEntity, DoctorSpecialization, DoctorStatus } from '@/types/doctor.types'
 
 const SPECIALIZATION_OPTIONS: { value: DoctorSpecialization; label: string }[] = [
@@ -54,10 +55,8 @@ interface EditDoctorModalProps {
   onClose: () => void
 }
 
-// Outer shell only renders the actual form while open, keyed on the doctor
-// id — remounts the inner form (resetting its draft state) every time a
-// different doctor (or "new") is opened, without needing a useEffect to
-// re-sync state from props.
+// Keyed on doctor id so the inner form remounts (resetting draft state)
+// per doctor without needing a useEffect to re-sync from props.
 const EditDoctorModal = ({ open, doctor, onClose }: EditDoctorModalProps) => {
   if (!open) return null
   return <EditDoctorModalForm key={doctor?.id ?? '__new__'} doctor={doctor} onClose={onClose} />
@@ -118,8 +117,8 @@ const EditDoctorModalForm = ({ doctor, onClose }: EditDoctorModalFormProps) => {
         toast.success('Doctor added')
       }
       handleClose()
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Could not save doctor — try again.')
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'Could not save doctor — try again.'))
     }
   }
 

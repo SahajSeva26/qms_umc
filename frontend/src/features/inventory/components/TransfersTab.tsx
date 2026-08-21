@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import {
-  Wallet, Package, Tent, User, GitCompare, ArrowRight, Plus, Truck, PackageCheck, Check, Info,
-} from 'lucide-react'
+  FiPackage, FiUser, FiArrowRight, FiPlus, FiTruck, FiCheck, FiInfo,
+} from 'react-icons/fi'
+import { TbWallet, TbTent, TbGitCompare, TbPackageImport } from 'react-icons/tb'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,11 +22,6 @@ import { todayIso } from '@/features/inventory/utils/date'
 import { TableEmptyRow, InvFilterBar } from '@/features/inventory/components/IntelTableUi'
 import { NewTransferModal } from '@/features/inventory/components/NewTransferModal'
 
-// Exact port of window.QMS_InvWh.tabTransfers() (inventory-warehouse.js:218-
-// 377) — the logistics rollup strip, Emergency stock-balancing panel and the
-// main transfers table with dispatch/deliver+POD action flows. Reuses the
-// same qms.inventory.transfers/items stores as the Warehouse tab's own "New
-// transfer" entry point (useTransfers() shares those query keys).
 const TransfersTab = () => {
   const data = useTransfers()
   const { people, items, transfers, saveTransfer, dispatchTransfer, saveDeliver } = data
@@ -36,8 +32,6 @@ const TransfersTab = () => {
   const [transferPreset, setTransferPreset] = useState<{ itemId?: string; from?: string; to?: string; qty?: number } | undefined>(undefined)
   const [deliverId, setDeliverId] = useState<string | null>(null)
 
-  // list = transfers().slice().sort(...) — newest-first by RAW STRING compare
-  // on the ISO date (localeCompare, not a true date sort — exact port).
   const list = useMemo(() => sortByDateDesc(transfers), [transfers])
   const activeCount = useMemo(() => list.filter((t) => t.status !== 'DELIVERED').length, [list])
 
@@ -82,22 +76,20 @@ const TransfersTab = () => {
 
   return (
     <div>
-      {/* Logistics rollup strip — .wh-loc reused, explicitly 4 cols */}
       <div className="grid grid-cols-2 min-[900px]:grid-cols-4 gap-2.5 mb-3.5">
-        <RollupCard icon={<Wallet size={13} />} color="#f59e0b" label="Logistics spend" value={inrShort(rollup.totLog)} sub={`${rollup.transferCount} transfers`} />
-        <RollupCard icon={<Package size={13} />} color="var(--qms-brand)" label="Cost / transfer" value={inr(rollup.costPerTransfer)} sub="avg all-in" />
-        <RollupCard icon={<Tent size={13} />} color="#14b8a6" label="Cost / camp" value={inr(rollup.costPerCamp)} sub={`${rollup.campCount} camps`} />
-        <RollupCard icon={<User size={13} />} color="#10b981" label="Cost / patient" value={inr(rollup.costPerPatient)} sub={`${rollup.patientCount} patients`} />
+        <RollupCard icon={<TbWallet size={13} />} color="#f59e0b" label="Logistics spend" value={inrShort(rollup.totLog)} sub={`${rollup.transferCount} transfers`} />
+        <RollupCard icon={<FiPackage size={13} />} color="var(--qms-brand)" label="Cost / transfer" value={inr(rollup.costPerTransfer)} sub="avg all-in" />
+        <RollupCard icon={<TbTent size={13} />} color="#14b8a6" label="Cost / camp" value={inr(rollup.costPerCamp)} sub={`${rollup.campCount} camps`} />
+        <RollupCard icon={<FiUser size={13} />} color="#10b981" label="Cost / patient" value={inr(rollup.costPerPatient)} sub={`${rollup.patientCount} patients`} />
       </div>
 
-      {/* Emergency stock-balancing panel — .wh-bal, conditional on suggestions.length > 0 */}
       {suggestions.length > 0 && (
         <div
           className="rounded-xl border mb-3.5"
           style={{ padding: 12, borderColor: 'var(--qms-border)', background: 'rgba(245,158,11,.05)' }}
         >
           <h4 className="flex items-center gap-1.5 font-extrabold" style={{ margin: '0 0 8px', fontSize: 12 }}>
-            <GitCompare size={14} color="#b45309" />
+            <TbGitCompare size={14} color="#b45309" />
             Emergency stock-balancing · recommend transfers before procurement ({suggestions.length})
           </h4>
           <div className="overflow-auto">
@@ -139,7 +131,7 @@ const TransfersTab = () => {
                       <td style={{ padding: '8px 6px', borderBottom: '1px dashed var(--qms-border)' }}>
                         {sg.suggestion ? (
                           <Button variant="ghost" style={{ padding: '4px 9px' }} onClick={() => balanceTransfer(sg)}>
-                            <GitCompare size={13} /> Transfer
+                            <TbGitCompare size={13} /> Transfer
                           </Button>
                         ) : null}
                       </td>
@@ -152,7 +144,6 @@ const TransfersTab = () => {
         </div>
       )}
 
-      {/* .inv-filter — sticky header bar */}
       <InvFilterBar>
         <span
           className="text-xs font-bold uppercase tracking-[.04em]"
@@ -164,11 +155,10 @@ const TransfersTab = () => {
           {activeCount} active
         </span>
         <Button onClick={() => openNewTransfer()}>
-          <Plus size={14} /> New transfer
+          <FiPlus size={14} /> New transfer
         </Button>
       </InvFilterBar>
 
-      {/* Main transfers table — .inv-card padding:0;overflow:auto */}
       <div className="rounded-2xl border overflow-auto" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
         <table className="border-collapse text-xs" style={{ width: '100%', minWidth: 820 }}>
           <thead>
@@ -197,7 +187,7 @@ const TransfersTab = () => {
                   <td style={{ padding: '8px 6px', borderBottom: '1px dashed var(--qms-border)', color: 'var(--qms-text)' }}>
                     <span className="inline-flex items-center gap-1">
                       {locLabel(t.from, people)}
-                      <ArrowRight size={11} color="var(--qms-text-muted)" />
+                      <FiArrowRight size={11} color="var(--qms-text-muted)" />
                       {locLabel(t.to, people)}
                     </span>
                   </td>
@@ -215,18 +205,18 @@ const TransfersTab = () => {
                   <td style={{ padding: '8px 6px', borderBottom: '1px dashed var(--qms-border)', whiteSpace: 'nowrap' }}>
                     {t.status === 'REQUESTED' && (
                       <Button style={{ padding: '4px 10px' }} onClick={() => handleDispatch(t)}>
-                        <Truck size={13} /> Dispatch
+                        <FiTruck size={13} /> Dispatch
                       </Button>
                     )}
                     {t.status === 'IN_TRANSIT' && (
                       <Button style={{ padding: '4px 10px' }} onClick={() => setDeliverId(t.id)}>
-                        <PackageCheck size={13} /> Deliver + POD
+                        <TbPackageImport size={13} /> Deliver + POD
                       </Button>
                     )}
                     {t.status === 'DELIVERED' && (
                       t.pod ? (
                         <span className="inline-flex items-center gap-1 text-xs" style={{ color: '#059669' }}>
-                          <Check size={12} /> {t.pod.ref}
+                          <FiCheck size={12} /> {t.pod.ref}
                         </span>
                       ) : (
                         <span className="text-xs" style={{ color: 'var(--qms-text-muted)' }}>delivered</span>
@@ -247,7 +237,7 @@ const TransfersTab = () => {
         locs={locOptions(people)}
         preset={transferPreset}
         onSave={handleCreateTransfer}
-        submitIcon={<Plus size={13} />}
+        submitIcon={<FiPlus size={13} />}
       />
 
       <DeliverPodModal
@@ -270,10 +260,6 @@ function RollupCard({
   value: string
   sub: string
 }) {
-  // .wh-loc-card reused verbatim but cursor:default / no onclick — non-
-  // interactive tiles (the prototype's own hover transform still technically
-  // applies via the shared class since no override is added; preserved as-is
-  // per the research spec's note on this minor quirk).
   return (
     <div
       className="relative overflow-hidden transition-[border-color,transform] duration-150 hover:-translate-y-0.5"
@@ -315,9 +301,7 @@ function TransferStatusPill({ status }: { status: TransferStatus }) {
   )
 }
 
-// Deliver + POD modal — exact port of window.QMS_InvWh.openDeliver()/
-// saveDeliver() (inventory-warehouse.js:346-377). `transfer` is null when
-// closed; the modal is keyed by transfer.id so its internal form state resets
+// `transfer` is null when closed; keyed by transfer.id so form state resets
 // whenever a different transfer is targeted.
 function DeliverPodModal({
   transfer, transferCount, people, onClose, onSave,
@@ -392,12 +376,12 @@ function DeliverPodModalBody({
         </div>
 
         <div className="flex items-center gap-1.5 text-xs" style={{ marginTop: 8, color: 'var(--qms-text-muted)' }}>
-          <Info size={12} /> POD is mandatory to close a transfer.
+          <FiInfo size={12} /> POD is mandatory to close a transfer.
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSave}><PackageCheck size={14} /> Confirm + capture POD</Button>
+          <Button onClick={handleSave}><TbPackageImport size={14} /> Confirm + capture POD</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

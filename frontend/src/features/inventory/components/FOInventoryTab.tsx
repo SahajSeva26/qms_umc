@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { Wallet, UsersRound, CalendarClock, Cpu, Package } from 'lucide-react'
+import type { IconType } from 'react-icons'
+import { FiUsers, FiCalendar, FiCpu, FiPackage } from 'react-icons/fi'
+import { TbWallet } from 'react-icons/tb'
 import { Button } from '@/components/ui/button'
 import SideDrawer from '@/components/ui/SideDrawer'
 import { useFoInventoryRows, useFoHoldings } from '@/features/inventory/hooks/useInventory'
@@ -20,9 +22,7 @@ const BandPill = ({ css, label }: { css: 'green' | 'yellow' | 'orange' | 'red'; 
   )
 }
 
-// .im-type-card — exact port of inventory-masters.js's injected CSS
-// (cursor:default, non-clickable — unlike Item Master's own clickable strip).
-const KpiCard = ({ icon: Icon, color, label, value, sub }: { icon: typeof Wallet; color: string; label: string; value: string | number; sub: string }) => (
+const KpiCard = ({ icon: Icon, color, label, value, sub }: { icon: IconType; color: string; label: string; value: string | number; sub: string }) => (
   <div
     className="flex-1 flex items-center gap-2.5 rounded-xl border"
     style={{ minWidth: 120, padding: 12, background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}
@@ -38,11 +38,8 @@ const KpiCard = ({ icon: Icon, color, label, value, sub }: { icon: typeof Wallet
   </div>
 )
 
-// Exact port of window.QMS_InvMasters.tabFoInventory() (inventory-masters.js:
-// 668-701) — a 3-tile KPI strip + single full-width read-only drill-down
-// table listing every active Field Officer's rollup holdings. No create/edit
-// modal on this tab; row click opens the shared per-FO holdings drawer
-// (openFoInventory()).
+// Read-only drill-down table of every active Field Officer's rollup
+// holdings; row click opens the shared per-FO holdings drawer.
 const FOInventoryTab = () => {
   const { rows, units, people, isLoading } = useFoInventoryRows()
   const [openFoId, setOpenFoId] = useState<string | null>(null)
@@ -64,14 +61,12 @@ const FOInventoryTab = () => {
 
   return (
     <div>
-      {/* .im-type-strip — 3 non-clickable KPI tiles */}
       <div className="flex gap-2 flex-wrap mb-3.5">
-        <KpiCard icon={Wallet} color="#3b6dff" label="Field valuation" value={inrShort(totField)} sub="held by FOs" />
-        <KpiCard icon={UsersRound} color="#14b8a6" label="Field Officers" value={rows.length} sub={`${totDev} devices out`} />
-        <KpiCard icon={CalendarClock} color={totExp ? '#f97316' : '#10b981'} label="Expiring kits" value={totExp} sub="consumables < 90d" />
+        <KpiCard icon={TbWallet} color="#3b6dff" label="Field valuation" value={inrShort(totField)} sub="held by FOs" />
+        <KpiCard icon={FiUsers} color="#14b8a6" label="Field Officers" value={rows.length} sub={`${totDev} devices out`} />
+        <KpiCard icon={FiCalendar} color={totExp ? '#f97316' : '#10b981'} label="Expiring kits" value={totExp} sub="consumables < 90d" />
       </div>
 
-      {/* .inv-card padding:0;overflow:auto — single rollup table */}
       <div className="rounded-2xl border overflow-auto" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
         <table className="border-collapse text-xs" style={{ width: '100%', minWidth: 720 }}>
           <thead>
@@ -126,7 +121,6 @@ const FOInventoryTab = () => {
         </table>
       </div>
 
-      {/* Drawer — exact port of openFoInventory() (inventory-masters.js:703-722) */}
       <SideDrawer
         open={!!openFo}
         title={openFo ? `${openFo.name} · inventory` : ''}
@@ -141,22 +135,15 @@ const FOInventoryTab = () => {
   )
 }
 
-// ── Drawer body — exact port of openFoInventory()'s HTML assembly +
-// foInventoryHtml()'s shared holdings block (inventory-masters.js:628-722).
-// This SAME foInventoryHtml() block is also reused verbatim in the FO
-// Profile page elsewhere in the prototype — the React port replicates the
-// visual result here (FO Profile is a separate, not-yet-built page).
 const FoInventoryDrawerBody = ({ fo, holdings, onClose }: { fo: { name: string; hq: string }; holdings: FoHoldings; onClose: () => void }) => {
   const initials = (fo.name || '?').split(' ').map((s) => s[0]).slice(0, 2).join('').toUpperCase()
 
   return (
     <div>
-      {/* Subtitle line (drawer-head's .text-xs.muted in the prototype) */}
       <div className="text-xs mb-3" style={{ color: 'var(--qms-text-muted)' }}>
         Holdings &amp; valuation · {fo.hq || '—'}
       </div>
 
-      {/* Avatar + name block */}
       <div className="flex items-center gap-3.5 mb-3.5">
         <div
           className="rounded-[14px] grid place-items-center text-white font-extrabold shrink-0"
@@ -170,17 +157,16 @@ const FoInventoryDrawerBody = ({ fo, holdings, onClose }: { fo: { name: string; 
         </div>
       </div>
 
-      {/* foInventoryHtml() shared block — 4-tile strip + devices/consumables tables */}
       <div className="flex gap-2 flex-wrap mb-3.5">
-        <KpiCard icon={Wallet} color="#3b6dff" label="Total valuation" value={inrShort(holdings.totalValue)} sub="current book value" />
-        <KpiCard icon={Cpu} color="#14b8a6" label="Devices" value={holdings.devices.length} sub={`${inrShort(holdings.deviceCurrent)} · repl ${inrShort(holdings.deviceReplace)}`} />
-        <KpiCard icon={Package} color="#10b981" label="Consumables" value={holdings.consumables.length} sub={`${inrShort(holdings.consumableValue)} on hand`} />
-        <KpiCard icon={CalendarClock} color={holdings.expSoon ? '#f97316' : '#10b981'} label="Expiring soon" value={holdings.expSoon} sub="< 90 days" />
+        <KpiCard icon={TbWallet} color="#3b6dff" label="Total valuation" value={inrShort(holdings.totalValue)} sub="current book value" />
+        <KpiCard icon={FiCpu} color="#14b8a6" label="Devices" value={holdings.devices.length} sub={`${inrShort(holdings.deviceCurrent)} · repl ${inrShort(holdings.deviceReplace)}`} />
+        <KpiCard icon={FiPackage} color="#10b981" label="Consumables" value={holdings.consumables.length} sub={`${inrShort(holdings.consumableValue)} on hand`} />
+        <KpiCard icon={FiCalendar} color={holdings.expSoon ? '#f97316' : '#10b981'} label="Expiring soon" value={holdings.expSoon} sub="< 90 days" />
       </div>
 
       <div className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wide mb-1.5" style={{ color: 'var(--qms-text-soft)' }}>
         <span className="inline-flex items-center justify-center w-5.5 h-5.5 rounded-[7px] shrink-0" style={{ background: 'color-mix(in srgb, var(--qms-brand) 10%, transparent)', color: 'var(--qms-brand)' }}>
-          <Cpu size={12} />
+          <FiCpu size={12} />
         </span>
         Devices ({holdings.devices.length})
       </div>
@@ -220,7 +206,7 @@ const FoInventoryDrawerBody = ({ fo, holdings, onClose }: { fo: { name: string; 
 
       <div className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wide mb-1.5" style={{ color: 'var(--qms-text-soft)' }}>
         <span className="inline-flex items-center justify-center w-5.5 h-5.5 rounded-[7px] shrink-0" style={{ background: 'color-mix(in srgb, var(--qms-brand) 10%, transparent)', color: 'var(--qms-brand)' }}>
-          <Package size={12} />
+          <FiPackage size={12} />
         </span>
         Consumables ({holdings.consumables.length})
       </div>

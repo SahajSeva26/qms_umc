@@ -3,9 +3,6 @@
 
 export type AppointmentType = 'new' | 'follow-up' | 'payment' | 'spot'
 export type AppointmentMode = 'online' | 'offline' | 'call'
-// blocked/released removed 2026-08-11 per client request — the backend is
-// dropping both statuses too, so this is a coordinated removal, not a
-// frontend-only hide.
 export type AppointmentStatus = 'planned' | 'done' | 'cancelled'
 export type AppointmentInviteStatus = 'pending' | 'accepted' | 'declined'
 
@@ -49,11 +46,8 @@ export interface AppointmentPopulatedDivision {
   therapy: string
 }
 
-// salesPerson/contactPerson/internalMembers.role populate with NO `select`
-// in appointment.service.ts (unlike tenant/division/lead/parent, which use
-// a narrow projection) — same real backend over-fetch pattern already
-// documented on Lead's contactPerson/salesPerson (crm.types.ts's
-// LeadPopulatedRole). Do not widen further; only read fields actually needed.
+// salesPerson/contactPerson/internalMembers.role populate with no `select` (full-document over-fetch).
+// Do not widen further; only read fields actually needed.
 export interface AppointmentPopulatedRole {
   _id?: string
   code: string
@@ -66,9 +60,7 @@ export interface AppointmentPopulatedRole {
   tenant: string
 }
 
-// contactPerson refs the Contact module (not Role) — populated with no
-// `select`, so the full ContactEntity shape (minus the `id` alias, since raw
-// Mongoose populate uses `_id`) is available.
+// contactPerson refs the Contact module (not Role); raw Mongoose populate uses `_id`, not the `id` alias.
 export interface AppointmentPopulatedContact {
   _id?: string
   tenant: string
@@ -97,11 +89,7 @@ export interface AppointmentPopulatedParent {
 }
 
 export interface AppointmentInternalMember {
-  // Populated {AppointmentPopulatedRole} on GET-by-id/search (both always
-  // populate — appointment.service.ts's search() calls .populate()
-  // unconditionally, same quirk as Lead's own search(); get() is always
-  // called with {populate:true} by the controller). Raw ObjectId string only
-  // in a create/update response's echo before a follow-up GET.
+  // Always populated on GET-by-id/search; raw ObjectId string only in a create/update echo.
   role: AppointmentPopulatedRole | string
   status: AppointmentInviteStatus
   note?: string
@@ -119,6 +107,9 @@ export interface AppointmentStageHistoryEntry {
   from: AppointmentStatus
   to: AppointmentStatus
   reason: string
+  // Captured per-transition, not as a standalone field — every stage move
+  // carries its own next step (appointment.model.ts's stageHistorySchema).
+  nextSteps?: string
   actor: AppointmentStageHistoryActor
   createdAt: string
 }
@@ -135,11 +126,9 @@ export interface AppointmentAgenda {
 
 export interface AppointmentMom {
   details?: string
-  // Defined on the model but never actually set anywhere in
-  // appointment.service.ts today — always undefined in practice.
+  // Defined on the model but never actually set server-side today.
   submittedAt?: string
-  // Derived server-side (24 working hours after duration.endTime) —
-  // never client-settable, see CreateAppointmentPayloadSchema's comment.
+  // Derived server-side (24 working hours after duration.endTime); never client-settable.
   submissionDeadline?: string
 }
 
@@ -160,7 +149,7 @@ export interface AppointmentEntity {
   agenda: AppointmentAgenda
   status: AppointmentStatus
   mom: AppointmentMom
-  nextSteps?: string
+  // No top-level nextSteps field exists — it only ever lives inside stageHistory[].nextSteps.
   stageHistory: AppointmentStageHistoryEntry[]
   createdAt: string
   updatedAt: string
@@ -182,8 +171,7 @@ export interface SearchAppointmentQuery {
 }
 
 // salesPerson is NOT accepted — auto-set to the creator in the service.
-// tenant/division/contactPerson/startTime are the only hard-required fields;
-// endTime/agenda/mom/mode/nextSteps/internalMembers/lead/parent are all optional.
+// nextSteps only exists on the move-stage payload (see MoveAppointmentStagePayload).
 export interface CreateAppointmentPayload {
   tenant: string
   division: string
@@ -199,11 +187,10 @@ export interface CreateAppointmentPayload {
   endTime?: string
   agenda?: AppointmentAgenda
   mom?: { details?: string }
-  nextSteps?: string
 }
 
-// tenant/division/salesPerson/parent/status are NOT editable here — status
-// only ever moves through moveStage().
+// tenant/division/salesPerson/parent/status are NOT editable here — status only moves via moveStage().
+// nextSteps is not accepted here either; sending it is a no-op.
 export interface UpdateAppointmentPayload {
   type?: AppointmentType
   contactPerson?: string
@@ -215,12 +202,14 @@ export interface UpdateAppointmentPayload {
   endTime?: string
   agenda?: AppointmentAgenda
   mom?: { details?: string }
-  nextSteps?: string
 }
 
 export interface MoveAppointmentStagePayload {
   to: AppointmentStatus
   reason: string
+  // Captured together with this transition — the ONLY write path nextSteps
+  // actually has (MoveStagePayloadSchema on the backend).
+  nextSteps?: string
 }
 
 // pending is the initial system state — a member can only respond

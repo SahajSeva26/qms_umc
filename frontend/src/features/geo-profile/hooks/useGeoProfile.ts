@@ -1,11 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
+import { useGetEntity } from '@/hooks/useGetEntity'
 import { geoProfileService } from '@/features/geo-profile/geoProfile.service'
+import { geoProfileKeys } from '@/features/geo-profile/hooks/useGeoProfiles'
 
-// Mirrors `@/features/access-management/role/hooks/useRole.ts` exactly.
-export const useGeoProfile = (id: string | undefined) => {
-  return useQuery({
-    queryKey: ['geoProfile', id],
-    queryFn: () => geoProfileService.getGeoProfile(id!),
-    enabled: !!id,
-  })
-}
+export const useGeoProfile = (id: string | undefined) => useGetEntity(geoProfileKeys.detail, geoProfileService.getGeoProfile, id)

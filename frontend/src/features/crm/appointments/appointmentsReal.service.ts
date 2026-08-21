@@ -1,4 +1,9 @@
 import api from '@/lib/api/api'
+import { validateApiResponse } from '@/lib/api/validateApiResponse'
+import {
+  AppointmentDetailResponseSchema,
+  MoveAppointmentStageResponseSchema,
+} from '@/features/crm/appointments/appointmentsReal.response-schemas'
 import type { ApiResponse, PaginatedResponse } from '@/types/common.types'
 import type {
   AppointmentEntity,
@@ -9,13 +14,8 @@ import type {
   UpdateAppointmentPayload,
 } from '@/types/appointment.types'
 
-// Real backend-integrated Appointment service. Follows the exact pattern of
-// `@/features/camps/campsReal.service.ts` — same shared `api` axios
-// instance, same ApiResponse/PaginatedResponse envelope typing. Named
-// "Real" (not replacing appointments.service.ts) since the existing
-// localStorage-mock Meeting UI is being migrated in place, same as Camp's
-// mock->real transition.
-
+// Named "Real" (not replacing appointments.service.ts) since the existing
+// localStorage-mock Meeting UI is being migrated in place.
 const searchAppointments = async (query: SearchAppointmentQuery) => {
   const res = await api.get<PaginatedResponse<AppointmentEntity>>('/appointments', { params: query })
   return res.data
@@ -23,6 +23,7 @@ const searchAppointments = async (query: SearchAppointmentQuery) => {
 
 const getAppointment = async (id: string) => {
   const res = await api.get<ApiResponse<AppointmentEntity>>(`/appointments/${id}`)
+  validateApiResponse(AppointmentDetailResponseSchema, res.data, `/appointments/${id}`)
   return res.data
 }
 
@@ -38,6 +39,7 @@ const updateAppointment = async (id: string, payload: UpdateAppointmentPayload) 
 
 const moveAppointmentStage = async (id: string, payload: MoveAppointmentStagePayload) => {
   const res = await api.patch<ApiResponse<AppointmentEntity>>(`/appointments/${id}/stage`, payload)
+  validateApiResponse(MoveAppointmentStageResponseSchema, res.data, `/appointments/${id}/stage`)
   return res.data
 }
 

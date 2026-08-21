@@ -1,10 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
+import { useGetEntity } from '@/hooks/useGetEntity'
 import { campsRealService } from '@/features/camps/campsReal.service'
+import { campRealKeys } from '@/features/camps/hooks/useCampsReal'
 
-export const useCampReal = (id: string | undefined) => {
-  return useQuery({
-    queryKey: ['campReal', id],
-    queryFn: () => campsRealService.getCamp(id as string),
-    enabled: !!id,
-  })
-}
+export const useCampReal = (id: string | undefined) => useGetEntity(campRealKeys.detail, campsRealService.getCamp, id)

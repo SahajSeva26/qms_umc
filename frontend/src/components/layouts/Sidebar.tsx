@@ -7,7 +7,7 @@ import {
   FiClipboard, FiSun, FiVideo, FiHeart, FiDollarSign, FiUserCheck,
   FiSettings, FiMapPin, FiAlertTriangle, FiCpu, FiGlobe, FiUser,
   FiPackage, FiBox, FiFileText, FiShield, FiZap, FiMessageSquare,
-  FiChevronsLeft, FiChevronDown, FiCircle,
+  FiChevronsLeft, FiChevronDown, FiCircle, FiBookOpen,
 } from 'react-icons/fi'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
@@ -18,63 +18,25 @@ import {
   type NavSection,
 } from './navConfig'
 
-// Existing FULL_NAV_SECTIONS items (the legacy 'ALL' tree every account
-// currently renders, per the super_admin-fallback bug documented below)
-// whose ROUTE is actually wrapped in RequirePermission — i.e. clicking them
-// is not just "probably fine," it's really gated, and the account seeing
-// them may not actually be able to get in. Without this map, those items
-// show as dead links: visible in the sidebar, but bounced to /unauthorized
-// on click (confirmed live for a tenant:admin-only account seeing "CRM").
-// Every OTHER item in FULL_NAV_SECTIONS has no real permission code to
-// check at all yet (no RequirePermission on its route), so it's correctly
-// left alone — hiding those would have no real backend backing them and
-// would just be guessing.
-//
-// Mirrors each route's own guard exactly:
-//   crm.routes.tsx: CRM_VIEW_PERMISSIONS
-//   accessManagement.routes.tsx: TENANTS_/PERMISSION_GROUPS_/ROLE_TYPES_/ROLES_VIEW_PERMISSIONS
+// FULL_NAV_SECTIONS items whose route is wrapped in RequirePermission — used
+// to hide items the viewer would otherwise click into and get bounced from.
 const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
+  // Temporary, v1-only: 'system:manage' specifically, NOT the real invoice
+  // permission array. Sales Head already holds invoice:manage (separate
+  // hotfix) but has zero Project/Camp read permissions, so it would see
+  // this link and 403 inside the page's pickers. Revisit once real
+  // role-scoping for Finance/Sales is designed.
+  crminvoicing: ['system:manage'],
   crm: ['lead:search', 'lead:manage', 'tenant:manage'],
   tenants: ['tenant:get', 'tenant:search', 'tenant:manage'],
-  // CONFIRMED DRIFT (2026-08-10): was ['permission-group:get',
-  // 'permission-group:search', 'permission-group:manage'] —
-  // permission-group:manage is never checked by permissionGroup.routes.ts
-  // on any route (list is search-or-tenant:admin; detail is get-only).
-  // Fixed to the real union — matches accessManagement.routes.tsx's
-  // PERMISSION_GROUPS_VIEW_PERMISSIONS exactly.
   permissiongroups: ['permission-group:get', 'permission-group:search', 'tenant:admin'],
-  // CONFIRMED DRIFT (2026-08-10): was ['role-type:get', 'role-type:search',
-  // 'role-type:manage'] — none of the role-type:* codes are ever checked
-  // by roleType.routes.ts; every route there is gated purely on
-  // tenant:manage/tenant:admin. Fixed to match. Matches
-  // accessManagement.routes.tsx's ROLE_TYPES_VIEW_PERMISSIONS exactly.
   roletypes: ['tenant:manage', 'tenant:admin'],
-  // CONFIRMED DRIFT (2026-08-10): was ['role:get', 'role:search',
-  // 'role:manage'] — role:manage is never checked by role.routes.ts (only
-  // role:get/role:search individually, alongside tenant:admin/tenant:manage).
-  // Fixed to the real union. Matches accessManagement.routes.tsx's
-  // ROLES_VIEW_PERMISSIONS exactly.
   roles: ['tenant:admin', 'tenant:manage', 'role:get', 'role:search'],
   qafeedback: ['qa-feedback:manage'],
-  // Matches appointment.routes.ts's READ_GUARD and contacts.routes.tsx's
-  // CONTACT_VIEW_PERMISSIONS exactly — added 2026-07-27 alongside the real
-  // Appointment/Contact module wiring.
   appointments: ['appointment:search', 'appointment:manage', 'tenant:manage'],
-  contacts: ['contact:search', 'contact:manage', 'tenant:manage', 'tenant:admin'],
-  // Matches projects.routes.tsx's PROJECTS_VIEW_PERMISSIONS exactly — found
-  // 2026-08-04: this nav item had no gate at all, so a Sales Head account
-  // (no project:* permission) could see and click into it and land on a
-  // real 403 "Failed to load projects" screen.
   projects: ['project:search', 'project:manage', 'tenant:manage'],
   gantt: ['project:search', 'project:manage', 'tenant:manage'],
-  // Matches camps.routes.tsx's CAMP_READ_PERMISSIONS exactly — same gap as
-  // projects/gantt above, found + fixed 2026-08-04.
   camps: ['camp:search', 'camp:manage', 'tenant:manage'],
-  // Matches admin.routes.tsx's USERS_VIEW_PERMISSIONS exactly — found +
-  // fixed 2026-08-10 during the UserRole placeholder deletion pass: this
-  // route had no guard at all, frontend or backend-mirrored, so any
-  // authenticated user could see and click into it (would 403 on the
-  // underlying API call, but the nav link/page shell were both wide open).
   users: ['user:get', 'user:search', 'user:update'],
 }
 
@@ -109,6 +71,7 @@ const ICON_MAP: Record<string, IconType> = {
   User:          FiUser,
   Package:       FiPackage,
   Box:           FiBox,
+  BookOpen:      FiBookOpen,
   FileText:      FiFileText,
   Shield:        FiShield,
   Zap:           FiZap,
@@ -123,7 +86,8 @@ function readCollapsedSections(): Set<string> {
 }
 
 function saveCollapsedSections(set: Set<string>) {
-  try { localStorage.setItem(SECTIONS_KEY, JSON.stringify([...set])) } catch {}
+  try { localStorage.setItem(SECTIONS_KEY, JSON.stringify([...set])) }
+  catch { /* localStorage can fail (quota, private browsing) — sidebar collapse state is cosmetic, ok to silently skip */ }
 }
 
 const NavIcon = ({ name, size = 16 }: { name: string; size?: number }) => {
@@ -131,19 +95,8 @@ const NavIcon = ({ name, size = 16 }: { name: string; size?: number }) => {
   return <Icon size={size} />
 }
 
-// Every real nav path, flattened once from the fixed FULL_NAV_SECTIONS tree —
-// used to find the single BEST (most specific) match for the current
-// location, rather than letting every ancestor path light up independently.
-// Several real routes are literal path-prefixes of others (e.g. Admin is
-// '/admin', but Users/Settings/Tenants/Permission Groups/Role Types/Roles/HQ
-// Mapping/AI Reminders/Inventory/Assets/Order & KPI Engine are all
-// '/admin/...') — visiting '/admin/tenants' used to highlight BOTH "Admin"
-// and "Companies" in the sidebar simultaneously, since the old isActive check
-// only asked "does this item's path prefix-match the URL," never "is there a
-// MORE SPECIFIC item that also matches." Found via a live screenshot showing
-// two simultaneous highlights, confirmed to recur throughout the whole
-// sidebar wherever a section's own landing route (e.g. '/admin', '/pharma')
-// is also the literal path-prefix of its own child items.
+// Flattened once from FULL_NAV_SECTIONS so the single MOST SPECIFIC path match
+// highlights, since several routes (e.g. '/admin/...') are prefixes of others.
 const ALL_NAV_PATHS: string[] = FULL_NAV_SECTIONS.flatMap((section) =>
   section.subs.flatMap((sub) => sub.items.map((item) => item.path)),
 )
@@ -282,36 +235,16 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
   }
 
   useEffect(() => {
+    // Re-read on user change: collapse state is per-browser, not per-account.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCollapsedSections(readCollapsedSections())
   }, [user])
 
-  // The old placeholder UserRole system (getNavForRole's per-role flat-list
-  // branch) has been removed entirely — every account now always renders
-  // the same FULL_NAV_SECTIONS tree, filtered down by the real permission
-  // gates below. Two layers:
-  //  1. The whole "System" section (Tenants/Roles/Role Types/Permission
-  //     Groups/Users/Admin/Settings) stays hidden unless the real session
-  //     holds system:manage — most of its items (Users/Admin/Settings) have
-  //     no real permission code to check individually, so the section-level
-  //     gate is the only real signal available for those.
-  //  2. Individual items ANYWHERE in the tree whose own route IS wrapped in
-  //     RequirePermission (REAL_GATED_NAV_ITEMS) are hidden unless the real
-  //     session passes that item's own check — catches items living outside
-  //     "System" too (e.g. "CRM" under Sales & CRM), which the section-level
-  //     filter alone would miss. Confirmed live: a tenant:admin-only account
-  //     saw "CRM" in its sidebar but was correctly bounced to /unauthorized
-  //     on click — a dead link, not an access-control gap (the route guard
-  //     was already correct), but confusing and worth closing.
-  // Raw permissions.includes, not hasAnyPermission/hasAnyPermission-derived
-  // helpers — same rationale as PERMISSION_NAV_SECTIONS: CRM/access-management
-  // items are meant to bypass for system:manage (matches their own route
-  // guards, which use the default hasAnyPermission), so a plain `.some(...)`
-  // over the raw array reproduces that bypass correctly without importing
-  // the helper's own semantics wholesale. (isRealSystemManage itself is
-  // computed once, earlier in this component, and reused here.)
+  // Two gates: the "System" section is hidden unless system:manage, and
+  // individual items elsewhere in the tree are hidden per REAL_GATED_NAV_ITEMS.
   const isNavItemVisible = (item: NavItem): boolean => {
     const requiredCodes = REAL_GATED_NAV_ITEMS[item.id]
-    if (!requiredCodes) return true // no real gate defined for this item — leave it alone
+    if (!requiredCodes) return true
     if (!isSettled) return false
     return isRealSystemManage || requiredCodes.some((code) => permissions.includes(code))
   }

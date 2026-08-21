@@ -1,16 +1,7 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useUpdateEntity } from '@/hooks/useUpdateEntity'
 import { contactsService } from '@/features/contacts/contacts.service'
+import { contactKeys } from '@/features/contacts/hooks/useContacts'
 import type { UpdateContactPayload } from '@/types/contact.types'
 
-// Mirrors `@/features/doctors/hooks/useUpdateDoctor.ts` exactly.
-export const useUpdateContact = (id: string) => {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: (payload: UpdateContactPayload) => contactsService.updateContact(id, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['contact', id] })
-      queryClient.invalidateQueries({ queryKey: ['contacts'] })
-    },
-  })
-}
+export const useUpdateContact = (id: string) =>
+  useUpdateEntity((payload: UpdateContactPayload) => contactsService.updateContact(id, payload), [contactKeys.detail(id), contactKeys.all])

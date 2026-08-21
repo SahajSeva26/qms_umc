@@ -1,5 +1,4 @@
-import { FiSearch } from 'react-icons/fi'
-import { Input } from '@/components/ui/input'
+import SearchInput from '@/components/ui/SearchInput'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import type { FoLiveStatus } from '@/features/fo/components/fo.ui'
 
@@ -19,15 +18,12 @@ const STATUS_OPTIONS: (FoLiveStatus | 'ALL')[] = ['ALL', 'AT_CAMP', 'ON_ROUTE', 
 
 const FoFilterBar = ({ filters, onChange, states }: FoFilterBarProps) => (
   <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-    <div className="relative min-w-[180px]">
-      <FiSearch size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--qms-text-muted)' }} />
-      <Input
-        value={filters.search}
-        onChange={(e) => onChange({ search: e.target.value })}
-        placeholder="Search name, HQ, phone…"
-        className="pl-7"
-      />
-    </div>
+    <SearchInput
+      value={filters.search}
+      onChange={(v) => onChange({ search: v })}
+      placeholder="Search name, HQ, phone…"
+      wrapperClassName="min-w-[180px]"
+    />
 
     <div className="flex flex-wrap items-center gap-2">
       <Select value={filters.state} onValueChange={(v) => onChange({ state: v ?? 'ALL' })}>

@@ -62,8 +62,8 @@ const TriggersTab = ({ camps, people, threads, manualTrigger, bulkTrigger, runTi
     try {
       const t = await manualTrigger(row.camp.id, row.recipient.type, row.recipient.id, row.stage)
       toast.success(t ? `Dispatched · status ${statusLabel(t.status)}` : 'Trigger failed')
-    } catch {
-      toast.error('Trigger failed')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Trigger failed')
     } finally {
       setBusyKey(null)
     }
@@ -74,8 +74,8 @@ const TriggersTab = ({ camps, people, threads, manualTrigger, bulkTrigger, runTi
     try {
       const n = await bulkTrigger(stage)
       toast.success(`Bulk ${stage} · ${n} new reminder thread(s)`)
-    } catch {
-      toast.error('Bulk trigger failed')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Bulk trigger failed')
     } finally {
       setBulkBusy(null)
     }
@@ -87,8 +87,8 @@ const TriggersTab = ({ camps, people, threads, manualTrigger, bulkTrigger, runTi
       const r = await runTick()
       if (r.skipped === 'holiday') toast.info('Tick skipped · holiday mode is on')
       else toast.success(r.created ? `Tick fired · ${r.created} new reminder thread(s)` : 'Tick · no new reminders due')
-    } catch {
-      toast.error('Tick failed')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Tick failed')
     } finally {
       setTickBusy(false)
     }

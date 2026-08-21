@@ -2,20 +2,17 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Camp } from '@/types/camp.types'
 import * as campsService from '@/features/camps/camps.service'
 
-// Shared wrapper around the Camps feature's data — lets other features
-// (Dashboard, Projects, Analytics, CRM/Clients, Ops Manager, Diet Camps)
-// read camp records and write fields without importing features/camps/
-// internals directly. Mirrors useAuth.ts's role as the sanctioned shared
-// surface over features/auth/. Camp-specific mutations (setStatus, assignFo,
-// toggleTele) stay in features/camps/hooks/useCamps.ts — only Camps itself
-// acts on its own records' lifecycle; addCamp/patchCamp here are for OTHER
-// features booking a new camp or patching fields Camps' own hook doesn't
-// cover (e.g. Ops Manager's dietitian-rate writes, Diet Camps' cancellation).
+// Shared wrapper over Camps feature data for other features (Dashboard,
+// Projects, Ops Manager, etc.) — camp-lifecycle mutations stay in
+// features/camps/hooks/useCamps.ts; addCamp/patchCamp here are for other
+// features booking/patching without importing features/camps/ internals.
 export const useCampsData = () => {
   const queryClient = useQueryClient()
 
   const { data: camps = [], isLoading: campsLoading, error: campsError } = useQuery({ queryKey: ['camps'], queryFn: campsService.getCamps })
-  const { data: doctors = [], isLoading: doctorsLoading, error: doctorsError } = useQuery({ queryKey: ['doctors'], queryFn: campsService.getDoctors })
+  // 'mockCampDoctors', not 'doctors' — the real Doctor entity (features/doctors)
+  // owns the plain 'doctors' key; a shared key would cross-invalidate both.
+  const { data: doctors = [], isLoading: doctorsLoading, error: doctorsError } = useQuery({ queryKey: ['mockCampDoctors'], queryFn: campsService.getDoctors })
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['camps'] })
 

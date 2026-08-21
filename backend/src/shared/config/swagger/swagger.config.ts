@@ -20,6 +20,13 @@ import '../../../modules/operations/geoProfile/geoProfile.routes';
 import '../../../modules/operations/camp/camp.routes';
 import '../../../modules/counter/counter.routes';
 import '../../../modules/inventory/inventory-master/inventory-master.routes';
+import '../../../modules/inventory/inventory-consumable/inventory-consumable.routes';
+import '../../../modules/inventory/inventory-device/inventory-device.routes';
+import '../../../modules/inventory/inventory-assignment/inventory-assignment.routes';
+import '../../../modules/inventory/inventory-request/inventory-request.routes';
+import '../../../modules/inventory/inventory-ledger/inventory-ledger.routes';
+import '../../../modules/finance/invoice/invoice.routes';
+import '../../../modules/finance/invoiceLineItem/invoiceLineItem.routes';
 // =============================================
 // =============================================
 

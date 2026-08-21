@@ -84,8 +84,7 @@ export interface DivisionEntity {
 }
 
 export interface SearchDivisionQuery {
-  // Named `tenantId` here, unlike every other search query in this app (`tenant`).
-  tenantId?: string
+  tenant?: string
   code?: string
   name?: string
   // Still a single value (not an array like DivisionEntity.therapy) — Mongo's
@@ -123,11 +122,8 @@ export interface UpdateDivisionPayload {
   status?: DivisionStatus
 }
 
-// Batch-level fields for POST /divisions/bulk-mr — sent as multipart form
-// fields alongside the CSV `file`, per division.validators.ts's
-// BulkMrPayloadSchema. `supervisor` is a SINGLE Role id (must be a
-// `pharma-asm` role belonging to this division/tenant) applied to every row
-// in the CSV — the backend has no per-row supervisor column.
+// Batch-level fields for POST /divisions/bulk-mr, sent as multipart form
+// fields alongside the CSV `file`. `supervisor` applies to every row in the CSV.
 export interface BulkMrPayload {
   division: string
   supervisor: string

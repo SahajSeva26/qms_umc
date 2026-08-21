@@ -1,12 +1,8 @@
 import type { RouteObject } from 'react-router-dom'
-import RequirePermission from '@/components/layouts/RequirePermission'
-import CrmPage from './pages/CrmPage'
-import AppointmentsPage from './pages/AppointmentsPage'
-import SalesDashboardPage from './pages/SalesDashboardPage'
+import { lazyRoute } from '@/lib/router/lazyRoute'
 
 export const CRM_ROUTES = {
   CRM:          '/crm',
-  SALES:        '/crm/sales',
   APPOINTMENTS: '/crm/appointments',
 }
 
@@ -22,26 +18,10 @@ const APPOINTMENT_VIEW_PERMISSIONS = ['appointment:search', 'appointment:manage'
 export const crmRoutes: RouteObject[] = [
   {
     path: CRM_ROUTES.CRM,
-    element: (
-      <RequirePermission anyOf={CRM_VIEW_PERMISSIONS}>
-        <CrmPage />
-      </RequirePermission>
-    ),
-  },
-  {
-    path: CRM_ROUTES.SALES,
-    element: (
-      <RequirePermission anyOf={CRM_VIEW_PERMISSIONS}>
-        <SalesDashboardPage />
-      </RequirePermission>
-    ),
+    lazy: lazyRoute(() => import('./pages/CrmPage'), CRM_VIEW_PERMISSIONS),
   },
   {
     path: CRM_ROUTES.APPOINTMENTS,
-    element: (
-      <RequirePermission anyOf={APPOINTMENT_VIEW_PERMISSIONS}>
-        <AppointmentsPage />
-      </RequirePermission>
-    ),
+    lazy: lazyRoute(() => import('./pages/AppointmentsPage'), APPOINTMENT_VIEW_PERMISSIONS),
   },
 ]

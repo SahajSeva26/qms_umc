@@ -1,7 +1,5 @@
 import type { RouteObject } from 'react-router-dom'
-import RequirePermission from '@/components/layouts/RequirePermission'
-import CampsPageReal from './pages/CampsPageReal'
-import CampDetailPageReal from './pages/CampDetailPageReal'
+import { lazyRoute } from '@/lib/router/lazyRoute'
 import TeleconsultationCampsStubPage from './pages/TeleconsultationCampsStubPage'
 
 export const CAMPS_ROUTES = {
@@ -46,27 +44,15 @@ const CAMP_DETAIL_PERMISSIONS = ['camp:get', 'camp:manage', 'tenant:manage']
 export const campsRoutes: RouteObject[] = [
   {
     path: CAMPS_ROUTES.CAMPS,
-    element: (
-      <RequirePermission anyOf={CAMP_READ_PERMISSIONS}>
-        <CampsPageReal />
-      </RequirePermission>
-    ),
+    lazy: lazyRoute(() => import('./pages/CampsPageReal'), CAMP_READ_PERMISSIONS),
   },
   { path: CAMPS_ROUTES.CAMPS_TELE, element: <TeleconsultationCampsStubPage /> },
   {
     path: CAMPS_ROUTES.CAMP_NEW,
-    element: (
-      <RequirePermission anyOf={CAMP_WRITE_PERMISSIONS}>
-        <CampDetailPageReal />
-      </RequirePermission>
-    ),
+    lazy: lazyRoute(() => import('./pages/CampDetailPageReal'), CAMP_WRITE_PERMISSIONS),
   },
   {
     path: CAMPS_ROUTES.CAMP_DETAIL,
-    element: (
-      <RequirePermission anyOf={CAMP_DETAIL_PERMISSIONS}>
-        <CampDetailPageReal />
-      </RequirePermission>
-    ),
+    lazy: lazyRoute(() => import('./pages/CampDetailPageReal'), CAMP_DETAIL_PERMISSIONS),
   },
 ]

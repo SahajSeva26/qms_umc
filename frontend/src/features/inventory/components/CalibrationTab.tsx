@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Check } from 'lucide-react'
+import { FiCheck } from 'react-icons/fi'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/sonner'
 import {
@@ -8,12 +8,6 @@ import {
 import type { CalibStatusCode } from '@/features/inventory/inventory.types'
 import { InvFilterBar } from '@/features/inventory/components/IntelTableUi'
 
-// Exact port of inventory.js's tabCalibration() (lines 577-618) +
-// renderFilter('calibration') (lines 384-403) + window.invMarkCalibrated()
-// (lines 620-645). The fleet-wide per-SERIAL view across every device type
-// (the superset the Devices tab's cards summarize), with an inline one-click
-// "Mark done" action per overdue/soon-due row — no confirmation step, no
-// drawer, matching the prototype's UX exactly.
 const STATUS_OPTS: { value: string; label: string }[] = [
   { value: 'ALL', label: 'All statuses' },
   { value: 'OVER', label: 'Overdue' },
@@ -21,8 +15,6 @@ const STATUS_OPTS: { value: string; label: string }[] = [
   { value: 'OK', label: 'Calibrated' },
 ]
 
-// Maps CalibStatusCode → the .inv-status-{code} pill's exact
-// background/text colors (inventory.js's scoped <style> block, lines 77-79).
 const STATUS_PILL_STYLE: Record<CalibStatusCode, { background: string; color: string }> = {
   OVER: { background: 'rgba(244,63,94,.15)', color: 'var(--qms-rose-600, #e11d48)' },
   SOON: { background: 'rgba(245,158,11,.15)', color: '#d97706' },
@@ -35,8 +27,6 @@ const CalibrationTab = () => {
   const { type, setType, status, setStatus, q, setQ } = useCalibrationFilters()
   const { markCalibrated } = useMarkCalibrated()
 
-  // typeOpts — ['ALL', ...distinct device().type values], exact port of
-  // renderFilter's typeOpts (inventory.js:386).
   const typeOpts = useMemo(() => ['ALL', ...new Set(devices.map((d) => d.type))], [devices])
 
   const rows = useCalibrationRows(units, people, type, status, q)
@@ -52,8 +42,6 @@ const CalibrationTab = () => {
 
   return (
     <div>
-      {/* renderFilter('calibration') — shared sticky .inv-filter bar, plus the
-          calibration-only status select (forTab==='calibration' branch). */}
       <InvFilterBar>
         <span className="text-xs font-bold uppercase tracking-[.04em]" style={{ color: 'var(--qms-text-muted)' }}>
           Filters
@@ -87,8 +75,6 @@ const CalibrationTab = () => {
         />
       </InvFilterBar>
 
-      {/* single full-width .inv-card, padding:0 + overflow:hidden so the
-          .inv-tbl bleeds edge-to-edge inside the 14px-radius card border */}
       <div className="rounded-[14px] border overflow-hidden" style={{ padding: 0, background: 'var(--card)', borderColor: 'var(--qms-border)' }}>
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-xs">
@@ -148,7 +134,7 @@ const CalibrationTab = () => {
                           style={{ padding: '3px 8px', height: 'auto' }}
                           onClick={() => handleMarkDone(u.id, u.sn)}
                         >
-                          <Check size={13} /> Mark done
+                          <FiCheck size={13} /> Mark done
                         </Button>
                       )}
                     </td>

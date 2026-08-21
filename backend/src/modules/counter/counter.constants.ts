@@ -5,6 +5,8 @@ export const COUNTER_ENTITY_TYPES = {
     INVOICE: 'invoice',
     CAMP: 'camp',
     APPOINTMENT: 'appointment',
+    // universal sequence for pharma field-force roles (MR/ASM/RSM) created without an explicit code
+    PHARMA_ROLE: 'pharma-role',
 };
 export const COUNTER_RESET_POLICIES = {
     NEVER: 'never',

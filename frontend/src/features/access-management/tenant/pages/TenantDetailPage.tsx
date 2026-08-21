@@ -4,12 +4,13 @@ import { FiArrowLeft, FiEdit2, FiPlus } from 'react-icons/fi'
 import { useTenant } from '@/features/access-management/tenant/hooks/useTenant'
 import { useRole } from '@/features/access-management/role/hooks/useRole'
 import { ROLE_ROUTES } from '@/features/access-management/role/role.routes'
-import { useDivisions } from '@/features/crm/hooks/useDivisions'
+import { useDivisions } from '@/features/crm/divisions/hooks/useDivisions'
 import { useDivisionsFilters } from '@/features/crm/divisions/hooks/useDivisionsFilters'
 import DivisionsFilterBar from '@/features/crm/divisions/components/DivisionsFilterBar'
 import DivisionsTable from '@/features/crm/divisions/components/DivisionsTable'
 import CreateDivisionModal from '@/features/crm/divisions/components/CreateDivisionModal'
 import EditTenantModal from '@/features/access-management/tenant/components/EditTenantModal'
+import EditContactModal from '@/features/contacts/components/EditContactModal'
 import { DIVISION_ROUTES } from '@/features/crm/divisions/divisions.routes'
 import { usePermission } from '@/hooks/usePermission'
 import { TENANT_ROUTES } from '@/features/access-management/tenant/tenant.routes'
@@ -20,16 +21,6 @@ import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import type { DivisionEntity } from '@/types/crm.types'
 import type { RolePopulatedUser } from '@/types/accessManagement.types'
 
-// A company's detail page: header summary + this company's Divisions,
-// inline — not a link out to a separate page (2026-08-11: replaced the
-// earlier "View divisions" button-to-/crm/divisions?tenant= redirect per
-// direct instruction — divisions should live "under" the company, not be a
-// hop away). Editing the company itself (name/description/status/type)
-// moved out of the page body into an "Edit client" button + modal
-// (EditTenantModal), since the page body is now the Divisions list instead
-// of the edit form. (Originally a "..." Popover menu here, per direct
-// instruction changed to a plain visible button — there's only ever the one
-// action, so a menu just adds an extra click.)
 const TenantDetailPage = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -40,10 +31,9 @@ const TenantDetailPage = () => {
   const canManageTenant = hasPermission('tenant:manage')
   const canManageSystem = hasPermission('system:manage')
   const canViewRole = hasAnyPermission(['role:get', 'role:search', 'role:manage'])
-  // Matches divisions.routes.tsx's own DIVISION_VIEW_PERMISSIONS exactly —
-  // only show the Divisions section when the caller could actually load it.
   const canViewDivisions = hasAnyPermission(['division:manage', 'tenant:admin', 'lead:manage'])
   const canSeeInactiveDivisions = hasAnyPermission(['division:manage', 'tenant:manage'])
+  const canManageContacts = hasAnyPermission(['contact:manage', 'tenant:manage', 'tenant:admin'])
 
   const { data: ownerRoleData } = useRole(tenant?.owner)
   const ownerRole = ownerRoleData?.data ?? null
@@ -53,6 +43,7 @@ const TenantDetailPage = () => {
 
   const [editOpen, setEditOpen] = useState(false)
   const [createDivisionOpen, setCreateDivisionOpen] = useState(false)
+  const [addContactOpen, setAddContactOpen] = useState(false)
 
   const { filters, setFilter, reset } = useDivisionsFilters()
   const debouncedSearch = useDebouncedValue(filters.search, 300)
@@ -60,14 +51,14 @@ const TenantDetailPage = () => {
 
   const { data: divisionsData, isLoading: divisionsLoading, error: divisionsError } = useDivisions(
     {
-      tenant: id,
+      tenant: tenant?.id,
       name: filters.searchBy === 'name' ? debouncedSearch || undefined : undefined,
       code: filters.searchBy === 'code' ? debouncedCode || undefined : undefined,
       therapy: filters.therapy === 'ALL' ? undefined : filters.therapy,
       status: filters.status,
       limit: '10',
-    } as Parameters<typeof useDivisions>[0],
-    canViewDivisions && !!id,
+    },
+    canViewDivisions && !!tenant?.id,
   )
   const divisions = divisionsData?.data?.items ?? []
   const totalDivisions = divisionsData?.data?.count ?? 0
@@ -147,13 +138,24 @@ const TenantDetailPage = () => {
                     {!divisionsLoading && !divisionsError ? `${totalDivisions} total` : 'Divisions under this company.'}
                   </p>
                 </div>
-                <Button
-                  onClick={() => setCreateDivisionOpen(true)}
-                  className="text-white shrink-0"
-                  style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
-                >
-                  <FiPlus size={14} /> New Division
-                </Button>
+                <div className="flex items-center gap-2 shrink-0">
+                  {canManageContacts && (
+                    <Button
+                      onClick={() => setAddContactOpen(true)}
+                      className="text-white"
+                      style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
+                    >
+                      <FiPlus size={14} /> New Contact
+                    </Button>
+                  )}
+                  <Button
+                    onClick={() => setCreateDivisionOpen(true)}
+                    className="text-white"
+                    style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
+                  >
+                    <FiPlus size={14} /> New Division
+                  </Button>
+                </div>
               </div>
 
               <DivisionsFilterBar filters={filters} setFilter={setFilter} reset={reset} canSeeInactive={canSeeInactiveDivisions} />
@@ -191,6 +193,14 @@ const TenantDetailPage = () => {
           {createDivisionOpen && (
             <CreateDivisionModal onClose={() => setCreateDivisionOpen(false)} defaultTenantId={tenant.id} />
           )}
+
+          <EditContactModal
+            open={addContactOpen}
+            contact={null}
+            onClose={() => setAddContactOpen(false)}
+            fixedTenantId={tenant.id}
+            fixedTenantType={tenant.type}
+          />
         </>
       )}
     </div>

@@ -8,16 +8,14 @@ import StatusPill from '@/features/doctors/components/StatusPill'
 
 interface DoctorDrawerProps {
   doctor: DoctorEntity | null
+  canEdit: boolean
   onClose: () => void
   onEdit: () => void
 }
 
-// Real fields only — pharmaCode, name, specialization, mobile, email, city/
-// state/pincode, googleMapLink, status. The mock-era engagement stats, AI
-// prediction, company empanelment, MR coverage, and camp history sections
-// have no backend equivalent (all camp-derived) and are dropped entirely,
-// not faked.
-const DoctorDrawer = ({ doctor, onClose, onEdit }: DoctorDrawerProps) => {
+// Real fields only; mock-era engagement/AI/empanelment/camp-history sections
+// have no backend equivalent and are dropped entirely.
+const DoctorDrawer = ({ doctor, canEdit, onClose, onEdit }: DoctorDrawerProps) => {
   if (!doctor) return <SideDrawer open={false} title="" onClose={onClose}>{null}</SideDrawer>
 
   const d = doctor
@@ -61,7 +59,9 @@ const DoctorDrawer = ({ doctor, onClose, onEdit }: DoctorDrawerProps) => {
       <div className="flex items-center gap-2 flex-wrap mt-3">
         {d.mobile && <Button variant="outline" onClick={handleWhatsApp}><FiMessageCircle size={13} /> WhatsApp</Button>}
         {d.email && <Button variant="outline" onClick={handleEmail}><FiMail size={13} /> Email</Button>}
-        <Button onClick={onEdit}><FiEdit2 size={13} /> Edit</Button>
+        {/* PUT /doctors/:id is gated on doctor:manage server-side — hide the
+            entry point rather than let an edit attempt hit a 403. */}
+        {canEdit && <Button onClick={onEdit}><FiEdit2 size={13} /> Edit</Button>}
         <Button variant="outline" className="ml-auto" onClick={onClose}>Close</Button>
       </div>
     </SideDrawer>

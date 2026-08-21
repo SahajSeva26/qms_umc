@@ -5,7 +5,7 @@ import { FiArrowLeft } from 'react-icons/fi'
 import { GEO_PROFILE_ROUTES, GEO_PROFILE_TYPE_OPTIONS } from '@/features/geo-profile/geoProfile.constants'
 import { isValidLatitude, isValidLongitude } from '@/features/geo-profile/utils/geoProfile.utils'
 import { useNearestGeoProfiles } from '@/features/geo-profile/hooks/useNearestGeoProfiles'
-import { useRoles } from '@/features/access-management/role/hooks/useRoles'
+import { useRoles, roleKeys } from '@/features/access-management/role/hooks/useRoles'
 import { accessManagementService } from '@/features/access-management/accessManagement.service'
 import GeoProfileStatusPill from '@/features/geo-profile/components/GeoProfileStatusPill'
 import { Button } from '@/components/ui/button'
@@ -14,9 +14,6 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { GeoProfileType, NearestGeoProfileQuery } from '@/types/geoProfile.types'
 
-// Exercises the allocation endpoint (GET /geo-profiles/nearest): given a type
-// + point, returns active field staff of that type whose OWN coverage radius
-// reaches the point, nearest first, each annotated with `distance` (meters).
 // Query only fires once a valid type + lat/lng have been submitted — this is
 // a lookup tool, not a live-as-you-type search.
 const NearestGeoProfilesPage = () => {
@@ -32,25 +29,16 @@ const NearestGeoProfilesPage = () => {
   const { data, isLoading, isFetching, error } = useNearestGeoProfiles(query)
   const results = data?.data?.items ?? []
 
-  // Same fix as GeoProfilesTable.tsx: GeoProfileMapper.toResponse (backend)
-  // always flattens `role` to a bare ObjectId string, even for /nearest —
-  // the populated name/code is discarded before the response leaves the
-  // backend. Found via a 2026-07-26 ground-up test pass.
+  // Backend flattens `role` to a bare ObjectId string, so we resolve names client-side.
   const { data: rolesData } = useRoles({ status: 'active', limit: '500' })
   const activeRoles = rolesData?.data?.items ?? []
 
-  // findNearest (geoProfile.service.ts) only filters by the GeoProfile's OWN
-  // status=active — it says nothing about the bound Role's status, and
-  // Role/GeoProfile are independently managed (GeoProfile.type is
-  // deliberately decoupled from the Role's own RoleType). So an active
-  // GeoProfile can legitimately point at a Role deactivated afterward, and
-  // /nearest correctly still surfaces it — resolve those ids too rather
-  // than leaving that row stuck on a raw id.
+  // An active GeoProfile can point at a Role deactivated afterward; resolve those ids too.
   const activeRoleIds = new Set(activeRoles.map((r) => r.id))
   const missingRoleIds = [...new Set(results.map((p) => p.role))].filter((id) => !activeRoleIds.has(id))
   const missingRoleQueries = useQueries({
     queries: missingRoleIds.map((id) => ({
-      queryKey: ['role', id],
+      queryKey: roleKeys.detail(id),
       queryFn: () => accessManagementService.getRole(id),
     })),
   })

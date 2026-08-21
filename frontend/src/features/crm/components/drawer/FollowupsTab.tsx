@@ -2,7 +2,7 @@ import type { LeadEntity } from '@/types/crm.types'
 import { LEAD_STATUS_LABEL } from '@/types/crm.types'
 import { useAppointmentsReal } from '@/features/crm/appointments/hooks/useAppointmentsReal'
 import { APPOINTMENT_STATUS_LABEL, APPOINTMENT_TYPE_LABEL } from '@/types/appointment.types'
-import { appointmentStatusColor } from '@/features/crm/appointments/appointmentsReal.utils'
+import { appointmentStatusColor, latestAppointmentNextSteps } from '@/features/crm/appointments/appointmentsReal.utils'
 import { formatDate } from '@/utils/formatters'
 import { formatTimeRange } from '@/features/crm/appointments/appointments.utils'
 
@@ -20,10 +20,6 @@ interface FollowupsTabProps {
 const FollowupsTab = ({ lead }: FollowupsTabProps) => {
   const history = [...lead.stageHistory].reverse()
 
-  // Real backend-wired — migrated 2026-08-11 off the old localStorage-mock
-  // Meeting system (useMeetings.ts/appointments.mock.ts), which was never
-  // updated when the Appointments calendar page itself migrated to real
-  // data. SearchAppointmentQuery.lead filters server-side.
   const { data, isLoading, error } = useAppointmentsReal({ lead: lead.id, limit: '200' })
   const linkedAppointments = [...(data?.data?.items ?? [])]
     .sort((a, b) => b.duration.startTime.localeCompare(a.duration.startTime))
@@ -88,9 +84,9 @@ const FollowupsTab = ({ lead }: FollowupsTabProps) => {
                     {a.mom.details && (
                       <p className="text-[12px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>{a.mom.details}</p>
                     )}
-                    {a.nextSteps && (
+                    {latestAppointmentNextSteps(a) && (
                       <p className="text-[11px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>
-                        Next: {a.nextSteps}
+                        Next: {latestAppointmentNextSteps(a)}
                       </p>
                     )}
                   </div>

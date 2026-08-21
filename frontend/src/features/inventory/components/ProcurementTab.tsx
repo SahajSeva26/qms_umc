@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import {
-  FileText, ShoppingCart, PackageCheck, ChevronRight, Plus, RefreshCw, Check, X, Send,
-  Save, UserCheck,
-} from 'lucide-react'
+  FiFileText, FiShoppingCart, FiChevronRight, FiPlus, FiRefreshCw, FiCheck, FiX, FiSend,
+  FiSave, FiUserCheck,
+} from 'react-icons/fi'
+import { TbPackageImport } from 'react-icons/tb'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
@@ -28,10 +29,6 @@ import { purchaseRequestSchema } from '@/features/inventory/schemas/purchaseRequ
 import { purchaseOrderSchema } from '@/features/inventory/schemas/purchaseOrder.schema'
 import { grnSchema } from '@/features/inventory/schemas/grn.schema'
 
-// ── Shared visual atoms — exact port of inventory-procurement.js's injected
-// <style id="qms-inv-proc-css"> .pr-flow/.pr-step/.po-status rules. ─────────
-
-// .pr-step — default/pending grey; .done emerald; .cur brand-blue; .rej rose.
 function PrStep({ label, state }: { label: string; state: 'pending' | 'done' | 'cur' | 'rej' }) {
   const style =
     state === 'done' ? { background: 'rgba(16,185,129,.15)', color: '#059669' } :
@@ -48,23 +45,20 @@ function PrStep({ label, state }: { label: string; state: 'pending' | 'done' | '
   )
 }
 
-// .pr-flow — chip sequence joined by a chevron-right icon.
 function PrFlow({ steps }: { steps: { label: string; state: 'pending' | 'done' | 'cur' | 'rej' }[] }) {
   return (
     <div className="flex gap-1 items-center flex-wrap">
       {steps.map((s, i) => (
         <span key={s.label} className="inline-flex items-center gap-1">
           <PrStep label={s.label} state={s.state} />
-          {i < steps.length - 1 && <ChevronRight size={11} color="var(--qms-text-muted)" />}
+          {i < steps.length - 1 && <FiChevronRight size={11} color="var(--qms-text-muted)" />}
         </span>
       ))}
     </div>
   )
 }
 
-// .po-status pill — OPEN brand, PENDING/AWAITING amber, DELAYED rose, CLOSED
-// emerald, CANCELLED muted+strikethrough. Also reused (with the po-CLOSED/
-// po-DELAYED variants) for the PR status pill (Approved/Rejected).
+// Also reused for the PR status pill (Approved/Rejected).
 type PoStatusVariant = 'OPEN' | 'PENDING' | 'AWAITING' | 'DELAYED' | 'CLOSED' | 'CANCELLED'
 const PO_STATUS_STYLE: Record<PoStatusVariant, React.CSSProperties> = {
   OPEN: { background: 'rgba(59,109,255,.14)', color: 'var(--qms-brand-700, #2451f0)' },
@@ -91,12 +85,8 @@ const TH_CLS = 'text-left font-bold uppercase tracking-[.04em]'
 const TH_STYLE = { padding: '8px 6px', fontSize: 10, color: 'var(--qms-text-muted)', borderBottom: '1px dashed var(--qms-border)' }
 const TD_STYLE = { padding: '8px 6px', borderBottom: '1px dashed var(--qms-border)' }
 
-// Exact port of window.QMS_InvProc.tabProcurement() (inventory-procurement.js
-// :336-641) — a 3-way segmented control (Requisitions/Purchase Orders/Goods
-// Receipt, each with a live count in its own label) over the REAL persisted
-// PR → PO → GRN pipeline, as opposed to the Consumables tab's fire-and-forget
-// "Raise PO" toast. Reuses the same qms.inventory.prs/pos/grns stores the
-// Dashboards tab reads.
+// The real persisted PR → PO → GRN pipeline, as opposed to the Consumables
+// tab's fire-and-forget "Raise PO" toast.
 const ProcurementTab = () => {
   const proc = useProcurement()
   const { prs, pos, grns, vendors, items } = proc
@@ -154,15 +144,14 @@ const ProcurementTab = () => {
 
   return (
     <div>
-      {/* .pr-seg — segmented control, 3 buttons with live counts */}
       <div className="inline-flex gap-1 mb-3.5 rounded-[10px]" style={{ padding: 4, background: 'var(--qms-surface-strong,rgba(0,0,0,.04))' }}>
-        <SegTab active={seg === 'PR'} onClick={() => setSeg('PR')} icon={<FileText size={13} />}>
+        <SegTab active={seg === 'PR'} onClick={() => setSeg('PR')} icon={<FiFileText size={13} />}>
           Requisitions ({pendingPrCount})
         </SegTab>
-        <SegTab active={seg === 'PO'} onClick={() => setSeg('PO')} icon={<ShoppingCart size={13} />}>
+        <SegTab active={seg === 'PO'} onClick={() => setSeg('PO')} icon={<FiShoppingCart size={13} />}>
           Purchase Orders ({awaitingPoCount} ⏳)
         </SegTab>
-        <SegTab active={seg === 'GRN'} onClick={() => setSeg('GRN')} icon={<PackageCheck size={13} />}>
+        <SegTab active={seg === 'GRN'} onClick={() => setSeg('GRN')} icon={<TbPackageImport size={13} />}>
           Goods Receipt ({grns.length})
         </SegTab>
       </div>
@@ -258,8 +247,6 @@ function SegTab({ active, onClick, icon, children }: { active: boolean; onClick:
   )
 }
 
-// ── PR (Requisitions) sub-view — exact port of viewPR() (inventory-
-// procurement.js:348-379). ───────────────────────────────────────────────────
 function prFlowSteps(pr: PurchaseRequisition): { label: string; state: 'pending' | 'done' | 'cur' | 'rej' }[] {
   return PR_CHAIN.map((s) => {
     const done = pr.history.some((h) => h.stage === s && h.action === 'approved')
@@ -288,10 +275,10 @@ function PrView({
           Workflow · {PR_CHAIN.join(' → ')}
         </span>
         <Button variant="ghost" className="ml-auto" onClick={onAutoReorder}>
-          <RefreshCw size={14} /> Auto-reorder scan
+          <FiRefreshCw size={14} /> Auto-reorder scan
         </Button>
         <Button onClick={onNewPR}>
-          <Plus size={14} /> New PR
+          <FiPlus size={14} /> New PR
         </Button>
       </InvFilterBar>
 
@@ -332,11 +319,11 @@ function PrView({
                   <td style={{ ...TD_STYLE, whiteSpace: 'nowrap' }}>
                     {pr.status === 'PENDING' ? (
                       <span className="inline-flex gap-1">
-                        <Button variant="ghost" style={{ padding: '4px 8px' }} onClick={() => onAdvance(pr.id, true)}><Check size={13} /></Button>
-                        <Button variant="ghost" style={{ padding: '4px 8px' }} onClick={() => onAdvance(pr.id, false)}><X size={13} /></Button>
+                        <Button variant="ghost" style={{ padding: '4px 8px' }} onClick={() => onAdvance(pr.id, true)}><FiCheck size={13} /></Button>
+                        <Button variant="ghost" style={{ padding: '4px 8px' }} onClick={() => onAdvance(pr.id, false)}><FiX size={13} /></Button>
                       </span>
                     ) : pr.status === 'APPROVED' ? (
-                      <Button style={{ padding: '4px 10px' }} onClick={() => onPrToPO(pr.id)}><ShoppingCart size={13} /> PO</Button>
+                      <Button style={{ padding: '4px 10px' }} onClick={() => onPrToPO(pr.id)}><FiShoppingCart size={13} /> PO</Button>
                     ) : (
                       <span className="text-xs" style={{ color: 'var(--qms-text-muted)' }}>—</span>
                     )}
@@ -351,8 +338,6 @@ function PrView({
   )
 }
 
-// ── PO (Purchase Orders) sub-view — exact port of viewPO() (inventory-
-// procurement.js:439-469). ──────────────────────────────────────────────────
 function PoView({
   pos, onOpenPO, onApprove, onReject, onReceive, onGenerate,
 }: {
@@ -377,7 +362,7 @@ function PoView({
           {awaiting.length} awaiting OM approval · {open.length} open · {inrShort(openVal)} committed
         </span>
         <Button className="ml-auto" onClick={onGenerate}>
-          <Plus size={14} /> Generate PO
+          <FiPlus size={14} /> Generate PO
         </Button>
       </InvFilterBar>
 
@@ -413,11 +398,11 @@ function PoView({
                   <td style={{ ...TD_STYLE, whiteSpace: 'nowrap' }} onClick={(e) => e.stopPropagation()}>
                     {p.status === 'AWAITING' ? (
                       <span className="inline-flex gap-1">
-                        <Button style={{ padding: '4px 9px' }} title="Ops Manager approve" onClick={() => onApprove(p.id)}><Check size={13} /></Button>
-                        <Button variant="ghost" style={{ padding: '4px 9px' }} title="Reject" onClick={() => onReject(p.id)}><X size={13} /></Button>
+                        <Button style={{ padding: '4px 9px' }} title="Ops Manager approve" onClick={() => onApprove(p.id)}><FiCheck size={13} /></Button>
+                        <Button variant="ghost" style={{ padding: '4px 9px' }} title="Reject" onClick={() => onReject(p.id)}><FiX size={13} /></Button>
                       </span>
                     ) : (p.status === 'OPEN' || p.status === 'PENDING' || p.status === 'DELAYED') ? (
-                      <Button style={{ padding: '4px 10px' }} onClick={() => onReceive(p.id)}><PackageCheck size={13} /> Receive</Button>
+                      <Button style={{ padding: '4px 10px' }} onClick={() => onReceive(p.id)}><TbPackageImport size={13} /> Receive</Button>
                     ) : p.status === 'CLOSED' ? (
                       <span className="text-xs" style={{ color: 'var(--qms-text-muted)' }}>received</span>
                     ) : (
@@ -434,8 +419,6 @@ function PoView({
   )
 }
 
-// ── GRN (Goods Receipt) sub-view — exact port of viewGRN() (inventory-
-// procurement.js:588-602). ──────────────────────────────────────────────────
 function GrnView({ grns }: { grns: GoodsReceiptNote[] }) {
   return (
     <div>
@@ -486,8 +469,6 @@ function GrnView({ grns }: { grns: GoodsReceiptNote[] }) {
   )
 }
 
-// ── New requisition modal — exact port of openPR()/savePR()
-// (inventory-procurement.js:389-411). ───────────────────────────────────────
 function NewPrModal({
   open, onClose, items, preset, onSave,
 }: {
@@ -563,17 +544,14 @@ function NewPrModal({
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSave}><Save size={14} /> Raise PR</Button>
+          <Button onClick={handleSave}><FiSave size={14} /> Raise PR</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   )
 }
 
-// ── Generate purchase order (direct, no PR) modal — exact port of
-// openPOCreate()/poItemPick()/savePOCreate() (inventory-procurement.js:489-
-// 538). poItemPick() runs once on modal open (and on every item change) to
-// auto-fill rate/GST/vendor from the picked item. ───────────────────────────
+// Picking an item auto-fills rate/GST/vendor from that item's defaults.
 function GeneratePoModal({
   open, onClose, items, vendors, onSave,
 }: {
@@ -703,17 +681,15 @@ function GeneratePoModal({
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSave}><Send size={14} /> Generate &amp; send for approval</Button>
+          <Button onClick={handleSave}><FiSend size={14} /> Generate &amp; send for approval</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   )
 }
 
-// ── Goods receipt modal — exact port of openGRN()/saveGRN()
-// (inventory-procurement.js:603-641). Guarded by the caller (openGrnFor() in
-// the parent component) exactly like the prototype's own openGRN() guards —
-// this component only ever renders once a valid receivable PO id is passed.
+// Guarded by the caller (openGrnFor()) — only ever renders once a valid
+// receivable PO id is passed.
 function GoodsReceiptModal({
   poId, pos, grnCount, onClose, onSave,
 }: {
@@ -815,15 +791,13 @@ function GoodsReceiptModalBody({
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSave}><PackageCheck size={14} /> Receive &amp; update stock</Button>
+          <Button onClick={handleSave}><TbPackageImport size={14} /> Receive &amp; update stock</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   )
 }
 
-// ── PO detail drawer — exact port of openPO() (inventory-procurement.js:549-
-// 585). ──────────────────────────────────────────────────────────────────────
 function PoDetailDrawer({
   poId, pos, grns, onClose, onApprove, onReject, onReceive,
 }: {
@@ -875,11 +849,11 @@ function PoDetailDrawer({
               className="rounded-xl border mb-3.5 flex gap-2 items-center"
               style={{ padding: 12, background: 'rgba(245,158,11,.08)', borderColor: 'var(--qms-border)' }}
             >
-              <UserCheck size={16} color="#b45309" />
+              <FiUserCheck size={16} color="#b45309" />
               <div className="text-xs flex-1" style={{ color: 'var(--qms-text)' }}>
                 Generated by Logistics — needs <b>Ops Manager</b> approval before goods can be received.
               </div>
-              <Button style={{ padding: '5px 12px' }} onClick={() => { onClose(); onApprove(po.id) }}><Check size={14} /> Approve</Button>
+              <Button style={{ padding: '5px 12px' }} onClick={() => { onClose(); onApprove(po.id) }}><FiCheck size={14} /> Approve</Button>
               <Button variant="ghost" style={{ padding: '5px 12px' }} onClick={() => { onClose(); onReject(po.id) }}>Reject</Button>
             </div>
           )}
@@ -891,7 +865,7 @@ function PoDetailDrawer({
                   className="inline-flex items-center justify-center w-5.5 h-5.5 rounded-[7px] shrink-0"
                   style={{ background: 'color-mix(in srgb, var(--qms-brand) 10%, transparent)', color: 'var(--qms-brand)' }}
                 >
-                  <PackageCheck size={12} />
+                  <TbPackageImport size={12} />
                 </span>
                 Goods receipts
               </div>
@@ -919,7 +893,7 @@ function PoDetailDrawer({
 
           <div className="flex items-center gap-2 flex-wrap mt-3.5">
             {(po.status === 'OPEN' || po.status === 'PENDING' || po.status === 'DELAYED') && (
-              <Button onClick={() => { onClose(); onReceive(po.id) }}><PackageCheck size={14} /> Receive goods</Button>
+              <Button onClick={() => { onClose(); onReceive(po.id) }}><TbPackageImport size={14} /> Receive goods</Button>
             )}
             <button
               onClick={onClose}

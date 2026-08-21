@@ -1,28 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { FiArrowLeft, FiSave } from 'react-icons/fi'
-import type { DivisionStatus, DivisionTherapy } from '@/types/crm.types'
-import { DIVISION_THERAPY_LABEL } from '@/types/crm.types'
+import { FiArrowLeft, FiEdit2 } from 'react-icons/fi'
 import { useDivision } from '@/features/crm/divisions/hooks/useDivision'
-import { useUpdateDivision } from '@/features/crm/divisions/hooks/useUpdateDivision'
-import { updateDivisionSchema } from '@/features/crm/divisions/schemas/division.schemas'
 import { TENANT_ROUTES } from '@/features/access-management/tenant/tenant.routes'
+import { DIVISION_THERAPY_LABEL } from '@/types/crm.types'
 import BulkMrImportCard from '@/features/crm/divisions/components/BulkMrImportCard'
 import DivisionContactsSection from '@/features/crm/divisions/components/DivisionContactsSection'
+import EditDivisionModal from '@/features/crm/divisions/components/EditDivisionModal'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
-import ChipPicker from '@/components/ui/ChipPicker'
+import { unwrapId } from '@/utils/unwrapId'
 
-const THERAPY_OPTIONS = Object.keys(DIVISION_THERAPY_LABEL) as DivisionTherapy[]
-const STATUS_OPTIONS: { value: DivisionStatus; label: string }[] = [
-  { value: 'active', label: 'Active' },
-  { value: 'inactive', label: 'Inactive' },
-]
-
-// Edit-only detail page for an existing division. No Code/Company/Head/Owner
-// fields — the backend doesn't allow changing those post-creation.
 const DivisionDetailPage = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -30,47 +17,13 @@ const DivisionDetailPage = () => {
   const { data, isLoading, error } = useDivision(id)
   const division = data?.data ?? null
 
-  // division.tenant is populated on GET-by-id but typed `| string` for the
-  // create/update-echo case — resolve both shapes rather than assume one.
-  const tenantId = division ? (typeof division.tenant === 'string' ? division.tenant : division.tenant._id) : undefined
+  // division.tenant may be populated object or a plain id string; resolve both shapes.
+  const tenantId = division ? unwrapId(division.tenant, undefined) : undefined
 
-  const [name, setName] = useState('')
-  const [therapy, setTherapy] = useState<DivisionTherapy[]>([])
-  const [brandFocus, setBrandFocus] = useState('')
-  const [mrCount, setMrCount] = useState(0)
-  const [status, setStatus] = useState<DivisionStatus | ''>('')
-  const [formError, setFormError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (division) {
-      setName(division.name)
-      setTherapy(division.therapy)
-      setBrandFocus(division.brandFocus ?? '')
-      setMrCount(division.mrCount ?? 0)
-      setStatus(division.status ?? 'active')
-    }
-  }, [division])
-
-  const updateDivision = useUpdateDivision(id ?? '')
-
-  const handleSave = () => {
-    const result = updateDivisionSchema.safeParse({
-      name,
-      therapy,
-      brandFocus: brandFocus || undefined,
-      mrCount,
-      status: status || undefined,
-    })
-    if (!result.success) {
-      setFormError(result.error.issues[0]?.message ?? 'Please complete the required fields.')
-      return
-    }
-    setFormError(null)
-    updateDivision.mutate(result.data)
-  }
+  const [editOpen, setEditOpen] = useState(false)
 
   return (
-    <div className="max-w-2xl">
+    <div className="w-full">
       <button
         onClick={() => navigate(tenantId ? TENANT_ROUTES.TENANT_DETAIL.replace(':id', tenantId) : TENANT_ROUTES.TENANTS)}
         className="flex items-center gap-1.5 text-[13px] font-semibold mb-5 transition-colors hover:opacity-80"
@@ -95,117 +48,47 @@ const DivisionDetailPage = () => {
       {division && !isLoading && (
         <>
           <div
-            className="rounded-xl border p-5 mb-5"
+            className="rounded-xl border p-5 mb-5 flex items-start justify-between gap-3"
             style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}
           >
-            <div className="text-lg font-bold" style={{ color: 'var(--qms-text)' }}>
-              {division.name}
-            </div>
-            <div className="text-[13px] font-mono" style={{ color: 'var(--qms-text-muted)' }}>
-              {division.code}
-            </div>
-          </div>
-
-          <div
-            className="rounded-xl border p-5"
-            style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}
-          >
-            <h2 className="text-sm font-bold mb-4" style={{ color: 'var(--qms-text)' }}>
-              Edit division
-            </h2>
-
-            <div className="space-y-4">
-              <div>
-                <Label className="block text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-                  Name *
-                </Label>
-                <Input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="text-[13px]"
-                />
+            <div className="min-w-0">
+              <div className="text-lg font-bold truncate" style={{ color: 'var(--qms-text)' }}>
+                {division.name}
               </div>
-
-              <div>
-                <Label className="block text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-                  Therapy areas *
-                </Label>
-                <ChipPicker
-                  options={THERAPY_OPTIONS}
-                  selected={therapy}
-                  onChange={(v) => setTherapy(v as DivisionTherapy[])}
-                  placeholder="Add a therapy area..."
-                  labelFor={(v) => DIVISION_THERAPY_LABEL[v as DivisionTherapy]}
-                />
+              <div className="text-[13px] font-mono truncate mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+                {division.code}
               </div>
-
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <Label className="block text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-                    Brand focus
-                  </Label>
-                  <Input
-                    type="text"
-                    value={brandFocus}
-                    onChange={(e) => setBrandFocus(e.target.value)}
-                    className="text-[13px]"
-                  />
-                </div>
-                <div>
-                  <Label className="block text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-                    MR count
-                  </Label>
-                  <Input
-                    type="number"
-                    value={mrCount || ''}
-                    onChange={(e) => setMrCount(Number(e.target.value))}
-                    className="text-[13px]"
-                  />
-                </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {division.therapy.map((t) => (
+                  <span
+                    key={t}
+                    className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                    style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text-muted)' }}
+                  >
+                    {DIVISION_THERAPY_LABEL[t]}
+                  </span>
+                ))}
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${division.status === 'active' ? 'bg-success-soft text-success' : ''}`}
+                  style={division.status !== 'active' ? { background: 'var(--qms-surface-strong)', color: 'var(--qms-text-muted)' } : undefined}
+                >
+                  {division.status === 'active' ? 'ACTIVE' : 'INACTIVE'}
+                </span>
               </div>
-
-              <div>
-                <Label className="block text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-                  Status *
-                </Label>
-                <Select key={status || 'empty'} value={status || undefined} onValueChange={(v) => setStatus(v as DivisionStatus)}>
-                  <SelectTrigger className="w-full text-[13px]">
-                    <SelectValue>{(v: string) => STATUS_OPTIONS.find((s) => s.value === v)?.label ?? 'Status'}</SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STATUS_OPTIONS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {formError && <p className="text-[12px] text-danger">{formError}</p>}
             </div>
 
-            {updateDivision.isError && (
-              <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger mt-4">
-                {(updateDivision.error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-                  'Could not update the division — try again.'}
-              </div>
-            )}
-            {updateDivision.isSuccess && (
-              <div className="text-xs rounded-xl px-3 py-2 bg-success-soft text-success mt-4">
-                Saved.
-              </div>
-            )}
-
-            <Button
-              onClick={handleSave}
-              disabled={updateDivision.isPending}
-              className="mt-4 font-bold text-white"
-              style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
-            >
-              <FiSave size={14} /> {updateDivision.isPending ? 'Saving…' : 'Save changes'}
+            <Button variant="outline" size="sm" className="shrink-0" onClick={() => setEditOpen(true)}>
+              <FiEdit2 size={14} /> Edit division
             </Button>
           </div>
 
           {tenantId && <BulkMrImportCard tenantId={tenantId} divisionId={division.id} />}
-          {tenantId && <DivisionContactsSection tenantId={tenantId} divisionId={division.id} />}
+
+          <div className="mt-5">
+            {tenantId && <DivisionContactsSection tenantId={tenantId} divisionId={division.id} />}
+          </div>
+
+          {editOpen && <EditDivisionModal division={division} onClose={() => setEditOpen(false)} />}
         </>
       )}
     </div>

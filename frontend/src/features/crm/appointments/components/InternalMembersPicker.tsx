@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { FiUserPlus, FiX } from 'react-icons/fi'
 import { Input } from '@/components/ui/input'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { useAsyncPickerState } from '@/hooks/useAsyncPickerState'
 import { PLATFORM_TENANT_CODE, PLATFORM_TENANT_FETCH_LIMIT } from '@/features/access-management/accessManagement.constants'
 import type { RoleEntity } from '@/types/accessManagement.types'
 
@@ -16,64 +18,16 @@ interface InternalMembersPickerProps {
   onChange: (members: SelectedMember[]) => void
 }
 
-// Free-text typeahead over GET /roles?user=<keyword> (role.service.ts's
-// search(), 2026-07-27 — resolves against the linked user's first/last name
-// or email server-side). No existing multi-select-with-search component in
-// this codebase to reuse, so this is a small, self-contained picker: an
-// Input with a plain, manually-positioned results list underneath (NOT a
-// base-ui Popover — Popover.Trigger manages its own focus/open state around
-// a single click-to-toggle button, which fights a live text input that
-// needs to keep keyboard focus while the user types; that mismatch caused
-// the list to flash open and immediately close, blocking typing entirely —
-// fixed 2026-08-01 by dropping Popover for this field and controlling
-// open/close with plain state + a click-outside listener instead). Clicking
-// a result adds it as a removable chip below. Debounced locally (300ms)
-// since every keystroke would otherwise fire a fresh search request.
-//
-// "QMS side" means the platform tenant specifically — the search is scoped
-// to it via `tenant: platformTenant.id` (found 2026-08-03: without this, a
-// platform-tenant caller's search is entirely unscoped server-side —
-// role.service.ts's search() only restricts a CUSTOMER-tenant caller from
-// leaking across tenants; a platform caller sees every tenant's roles by
-// default — so this field was silently offering customer-side admins, e.g.
-// "cipla pvt ltd's admin role," as if they were QMS internal staff).
+// Not a base-ui Popover — its Trigger fights a live text input needing keyboard focus.
+// "QMS side" = the platform tenant, scoped via `tenant: platformTenant.id`.
 const InternalMembersPicker = ({ selected, onChange }: InternalMembersPickerProps) => {
   const [query, setQuery] = useState('')
-  const [debouncedQuery, setDebouncedQuery] = useState('')
-  const [open, setOpen] = useState(false)
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  const containerRef = useRef<HTMLDivElement>(null)
+  const debouncedQuery = useDebouncedValue(query)
+  const { open, setOpen, containerRef } = useAsyncPickerState()
 
-  // limit: PLATFORM_TENANT_FETCH_LIMIT — see accessManagement.constants.ts;
-  // the backend's default 10-result limit can silently exclude the `qms`
-  // platform tenant once total active tenant count passes 10.
- 
   const { data: tenantData } = useTenants({ type: 'platform', status: 'active', limit: PLATFORM_TENANT_FETCH_LIMIT })
   const platformTenant = tenantData?.data?.items.find((t) => t.type === 'platform' || t.code === PLATFORM_TENANT_CODE)
 
-  useEffect(() => {
-    clearTimeout(timeoutRef.current)
-    timeoutRef.current = setTimeout(() => setDebouncedQuery(query), 300)
-    return () => clearTimeout(timeoutRef.current)
-  }, [query])
-
-  useEffect(() => {
-    if (!open) return
-    const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [open])
-
-  // `enabled: !!debouncedQuery.trim() && !!platformTenant` — NOT `{ limit:
-  // '0' }` (fixed 2026-08-03): Mongoose's `.find().limit(0)` means "no limit
-  // at all," not "return nothing" — this was silently fetching every role in
-  // the system, unscoped, whenever the search box was empty (its default
-  // state). `tenant: platformTenant.id` scopes the search to QMS internal
-  // staff only, matching this field's own "QMS side" label.
   const { data, isFetching } = useRoles(
     { user: debouncedQuery.trim(), tenant: platformTenant?.id, status: 'active', limit: '10' },
     !!debouncedQuery.trim() && !!platformTenant,
@@ -90,7 +44,6 @@ const InternalMembersPicker = ({ selected, onChange }: InternalMembersPickerProp
   const addMember = (role: RoleEntity) => {
     onChange([...selected, { roleId: role.id, label: roleLabel(role) }])
     setQuery('')
-    setDebouncedQuery('')
     setOpen(false)
   }
 

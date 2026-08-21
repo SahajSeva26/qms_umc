@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { FiEdit2 } from 'react-icons/fi'
 import type { LeadEntity, LeadStatus, UpdateLeadPayload } from '@/types/crm.types'
-import { LEAD_TRANSITION_MAP } from '@/types/crm.types'
+import { LEAD_STATUS_LABEL, LEAD_TRANSITION_MAP } from '@/types/crm.types'
 import { contactPersonLabel, divisionLabel } from '@/features/crm/crm.utils'
 import SideDrawer from '@/components/ui/SideDrawer'
 import StagePill from '@/features/crm/components/StagePill'
@@ -9,7 +9,7 @@ import OverviewTab from '@/features/crm/components/drawer/OverviewTab'
 import FollowupsTab from '@/features/crm/components/drawer/FollowupsTab'
 import AiRecommendationsTab from '@/features/crm/components/drawer/AiRecommendationsTab'
 import ActivityTab from '@/features/crm/components/drawer/ActivityTab'
-import StageMoveModal from '@/features/crm/components/StageMoveModal'
+import LeadAdvanceModal from '@/features/crm/components/LeadAdvanceModal'
 import EditLeadModal from '@/features/crm/components/EditLeadModal'
 import { formatINR } from '@/utils/formatters'
 
@@ -26,30 +26,23 @@ interface LeadDrawerProps {
 
 const LeadDrawer = ({ lead, onClose, onMoveStage, onUpdateLead, canManage }: LeadDrawerProps) => {
   const [tab, setTab] = useState<Tab>('Overview')
-  const [markingLost, setMarkingLost] = useState(false)
+  const [advanceTo, setAdvanceTo] = useState<LeadStatus | null>(null)
   const [editing, setEditing] = useState(false)
 
-  // LeadDrawer is a single persistent instance (CrmPage.tsx mounts it once,
-  // not keyed per lead id) — `lead` can change to a DIFFERENT lead without
-  // this component ever unmounting, via StageDrawer's onOpenLead callback
-  // (CrmPage.tsx sets openLeadId directly, bypassing this drawer's own
-  // onClose entirely). Without this reset, opening Edit or Mark-as-Lost for
-  // one lead and then switching to another via that path would leave the
-  // modal open and re-render it against the NEW lead's data — never
-  // requested for that lead. Reset every per-lead transient UI state
-  // whenever the underlying lead identity changes.
+  // LeadDrawer is a single persistent instance — `lead` can change to a
+  // different one without unmounting, so reset transient UI state whenever
+  // the lead identity changes (otherwise a stage-move/edit modal opened for
+  // one lead could stay open while showing another lead's data).
   useEffect(() => {
     setTab('Overview')
-    setMarkingLost(false)
+    setAdvanceTo(null)
     setEditing(false)
   }, [lead?.id])
 
   if (!lead) return <SideDrawer open={false} title="" onClose={onClose}>{null}</SideDrawer>
 
-  // Lost/reopen is a status transition like any other — no separate backend
-  // endpoint exists. There is no reopen path at all: won/lost are both
-  // terminal in LEAD_TRANSITION_MAP, so no button is shown for either.
-  const canMarkLost = canManage && LEAD_TRANSITION_MAP[lead.status].includes('lost')
+  // Same "Move to {next} →" buttons as ListView.tsx — empty once won/lost.
+  const nextStatuses = canManage ? LEAD_TRANSITION_MAP[lead.status] : []
 
   return (
     <SideDrawer open={!!lead} title={lead.title} onClose={onClose}>
@@ -103,24 +96,28 @@ const LeadDrawer = ({ lead, onClose, onMoveStage, onUpdateLead, canManage }: Lea
       {tab === 'AI Recommendations' && <AiRecommendationsTab />}
       {tab === 'Activity' && <ActivityTab lead={lead} />}
 
-      {canMarkLost && (
-        <div className="flex gap-2 mt-5 pt-4" style={{ borderTop: '1px dashed var(--qms-border)' }}>
-          <button onClick={() => setMarkingLost(true)} className="flex-1 text-[12px] font-bold py-2 rounded-lg bg-danger-soft text-danger">
-            Mark as Lost
-          </button>
+      {nextStatuses.length > 0 && (
+        <div className="flex flex-wrap gap-2 mt-5 pt-4" style={{ borderTop: '1px dashed var(--qms-border)' }}>
+          {nextStatuses.map((to) => (
+            <button
+              key={to}
+              onClick={() => setAdvanceTo(to)}
+              className={`text-[12px] font-bold px-3 py-2 rounded-lg transition-colors ${to === 'lost' ? 'bg-danger-soft text-danger' : ''}`}
+              style={to === 'lost' ? undefined : { background: 'var(--qms-surface-strong)', color: 'var(--qms-text)' }}
+            >
+              {LEAD_STATUS_LABEL[lead.status]} → {LEAD_STATUS_LABEL[to]}
+            </button>
+          ))}
         </div>
       )}
 
-      {markingLost && (
-        <StageMoveModal
-          fromStatus={lead.status}
-          toStatus="lost"
-          requireReason
-          onConfirm={(reason) => {
-            onMoveStage(lead.id, 'lost', reason)
-            setMarkingLost(false)
-          }}
-          onCancel={() => setMarkingLost(false)}
+      {advanceTo && (
+        <LeadAdvanceModal
+          leadId={lead.id}
+          currentStatus={lead.status}
+          toStatus={advanceTo}
+          onMoveStage={onMoveStage}
+          onClose={() => setAdvanceTo(null)}
         />
       )}
 

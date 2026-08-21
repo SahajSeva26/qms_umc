@@ -148,6 +148,9 @@ const InventoryLedgerPanel = () => {
                           <td className="px-4 py-2.5 whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>
                             {INVENTORY_LEDGER_LOCATION_LABEL[row.from]} → {INVENTORY_LEDGER_LOCATION_LABEL[row.to]}
                           </td>
+                          <td className="px-4 py-2.5 max-w-xs truncate font-mono" style={{ color: 'var(--qms-text)' }} title={itemIdentifier}>
+                            {itemIdentifier ? truncateIdentifier(itemIdentifier) : '—'}
+                          </td>
                           <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>{row.quantity}</td>
                           <td className="px-4 py-2.5 max-w-xs truncate" style={{ color: 'var(--qms-text-muted)' }} title={row.assignee?.name}>
                             {row.assignee?.name ?? row.assignee?.id ?? '—'}

@@ -21,18 +21,11 @@ export interface IPermission {
 export type TenantType = 'platform' | 'customer'
 export type TenantStatus = 'active' | 'inactive'
 
-/**
- * Tenant entity shape.
- * NOTE: per backend TenantMapper.toResponse, `status`/`owner`/`createdAt`/
- * `updatedAt`/`type` are only present when the caller holds `system:manage`.
- * For all other authorized callers, only {id, code, name} come back.
- * These extra fields are typed optional to reflect that gap honestly.
- */
+// Fields below `name` are optional: only present when the caller holds `system:manage`.
 export interface Tenant {
   id: string
   code: string
   name: string
-  // TODO: only present server-side if caller has `system:manage` (TenantMapper.toResponse gate).
   status?: TenantStatus
   owner?: string
   createdAt?: string
@@ -94,14 +87,8 @@ export interface UpdateTenantPayload {
 
 export type PermissionGroupStatus = 'active' | 'inactive'
 
-/**
- * Named `PermissionGroupEntity` (not `PermissionGroup`) to avoid any name
- * clash with an existing `PermissionGroup` identifier elsewhere in the app.
- *
- * NOTE: per backend PermissionGroupMapper, `status`/`permissions` are only
- * present when the caller holds `system:manage` OR `tenant:admin`; everyone
- * else gets just {id, code, name, description, tenant, createdAt, updatedAt}.
- */
+// Named Entity to avoid a name clash with an existing `PermissionGroup` identifier elsewhere.
+// Fields below `updatedAt` are optional: only present for a system:manage/tenant:admin caller.
 export interface PermissionGroupEntity {
   id: string
   code: string
@@ -110,7 +97,6 @@ export interface PermissionGroupEntity {
   tenant: string
   createdAt: string
   updatedAt: string
-  // TODO: only present server-side if caller has `system:manage` or `tenant:admin` (mapper gate).
   status?: PermissionGroupStatus
   permissions?: IPermission[]
 }
@@ -148,14 +134,8 @@ export interface UpdatePermissionGroupPayload {
 
 export type RoleTypeStatus = 'active' | 'inactive'
 
-// NOTE: the backend's CreateRoleTypePayloadSchema.code is NO LONGER a fixed
-// enum (roleType.validators.ts switched to a free-form kebab-case regex,
-// `/^[a-z][a-z0-9-]*$/` — reserved/default codes are blocked in the service
-// layer via an isSystem lookup, not by restricting the input set). This type
-// still lists the backend's known/default codes (ALLOWED_ROLETYPE_CODES in
-// roleType.constants.ts) since the create form's dropdown offers exactly
-// these — found stale (missing 5 real operations codes, 2 typo'd pharma
-// codes, 1 wrong sales code) via a 2026-07-24 test sweep and corrected here.
+// Mirrors ALLOWED_ROLETYPE_CODES (roleType.constants.ts) — the backend's own
+// code field is a free-form regex, this type just lists the known set.
 export type RoleTypeCode =
   | 'system'
   | 'hr'
@@ -172,12 +152,8 @@ export type RoleTypeCode =
   | 'pharma-rsm'
   | 'pharma-mr'
 
-// Populated shape for `tenant` as returned by GET /role-types (search) —
-// roleType.service.ts's search() unconditionally populates `tenant` with
-// `select: 'name code'`, so this nested relation carries Mongoose's raw
-// `_id`, not a mapped `id` (same pattern as RolePopulatedTenant). GET
-// /role-types/:id (single) does NOT populate — `tenant` comes back as a bare
-// ObjectId string on that path instead, hence the union below.
+// Populated on GET (search) only — GET-by-id returns a bare ObjectId string
+// instead, hence the union on RoleTypeEntity.tenant below.
 export interface RoleTypePopulatedTenant {
   _id?: string
   name: string
@@ -189,9 +165,7 @@ export interface RoleTypeEntity {
   code: string
   name: string
   description: string
-  // Backend `roleType.model.ts` stores `permissions` as `[{ type: String }]`
-  // and `RoleTypeMapper.toResponse` passes it through untouched — this is a
-  // bare array of permission-code strings, NOT expanded {code,name,description}
+  // Bare permission-code strings, not expanded {code,name,description}
   // objects (that expansion only happens for PermissionGroup.permissions).
   permissions: string[]
   // Populated {RoleTypePopulatedTenant} on GET (search); raw ObjectId string
@@ -235,11 +209,12 @@ export interface UpdateRoleTypePayload {
 
 export type RoleStatus = 'active' | 'inactive'
 
-/** Populated shape for `type`/`user`/`tenant` as returned by GET-by-id/search (not create/update, which return raw ObjectIds). */
+// Nested populated relations (type/user/tenant below) pass through
+// Mongoose's raw .populate() output untouched, so they carry `_id`, not the
+// mapped `id` — only present on GET-by-id/search, not create/update.
+
+/** Populated shape for `type` as returned by GET-by-id/search. */
 export interface RolePopulatedRoleType {
-  // RoleMapper.toResponse only maps `id` on the top-level Role — nested
-  // populated relations (type/user/tenant) pass through Mongoose's raw
-  // .populate() output untouched, so this is `_id`, not `id`.
   _id?: string
   name: string
   code: string
@@ -257,8 +232,6 @@ export interface RolePopulatedUser {
 }
 
 export interface RolePopulatedTenant {
-  // See RolePopulatedRoleType's comment — nested populated relations use
-  // Mongoose's raw `_id`, not the mapped `id`.
   _id?: string
   name: string
   code: string
@@ -271,9 +244,7 @@ export interface RoleEntity {
   code: string
   name: string
   description?: string
-  // Backend `role.model.ts` stores `permissions` as `[{ type: String }]` and
-  // `RoleMapper.toResponse` passes it through untouched — bare permission-code
-  // strings, NOT expanded {code,name,description} objects.
+  // Bare permission-code strings — see the same note on RoleTypeEntity.permissions.
   permissions: string[]
   status: RoleStatus
   // Populated {RolePopulatedRoleType} on GET-by-id/search; raw ObjectId string on create/update responses.

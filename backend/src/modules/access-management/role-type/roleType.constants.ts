@@ -25,6 +25,8 @@ export const ALLOWED_ROLETYPE_CODES = {
 
         INVENTORY_MANAGER: 'inventory-manager',
 
+        FINANCE_MANAGER: 'finance-manager',
+
         FIELD_OFFICER: 'field-officer',
     },
     CUSTOMER: {

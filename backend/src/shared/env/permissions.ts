@@ -19,6 +19,8 @@ import { INVENTORY_DEVICE_PERMISSIONS } from '../../modules/inventory/inventory-
 import { INVENTORY_ASSIGNMENT_PERMISSIONS } from '../../modules/inventory/inventory-assignment/inventory-assignment.constants';
 import { INVENTORY_REQUEST_PERMISSIONS } from '../../modules/inventory/inventory-request/inventory-request.constants';
 import { INVENTORY_LEDGER_PERMISSIONS } from '../../modules/inventory/inventory-ledger/inventory-ledger.constants';
+import { INVOICE_PERMISSIONS } from '../../modules/finance/invoice/invoice.constants';
+import { INVOICE_LINE_ITEM_PERMISSIONS } from '../../modules/finance/invoiceLineItem/invoiceLineItem.constants';
 
 export const SYSTEM_PERMISSIONS = {
     MANAGE: {
@@ -50,6 +52,8 @@ export const PERMISSIONS = {
     INVENTORY_ASSIGNMENT: INVENTORY_ASSIGNMENT_PERMISSIONS,
     INVENTORY_REQUEST: INVENTORY_REQUEST_PERMISSIONS,
     INVENTORY_LEDGER: INVENTORY_LEDGER_PERMISSIONS,
+    INVOICE: INVOICE_PERMISSIONS,
+    INVOICE_LINE_ITEM: INVOICE_LINE_ITEM_PERMISSIONS,
 };
 
 export const PERMISSIONS_ARRAY = Object.values(PERMISSIONS)

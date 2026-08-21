@@ -2,7 +2,7 @@
 import { HydratedDocument } from 'mongoose';
 import { InvoiceLineItemModel, IInvoiceLineItem } from './invoiceLineItem.model';
 import { ICreateInvoiceLineItemPayload, ISearchInvoiceLineItemQuery } from './invoiceLineItem.validators';
-import { InvoiceService, computeInvoiceTotal, assertCampBillable } from '../invoice/invoice.service';
+import { InvoiceService, computeInvoiceTotal, assertCampBillable, assertCampEligibleForBilling } from '../invoice/invoice.service';
 import { IInvoice } from '../invoice/invoice.model';
 import { INVOICE_STATUS } from '../invoice/invoice.constants';
 import { CampService } from '../../operations/camp/camp.service';
@@ -141,7 +141,9 @@ const create = async (
         return throwAppError("Camp does not belong to the invoice's project", StatusCodes.BAD_REQUEST);
     }
 
-    //3: a camp may sit on at most one non-cancelled invoice (no unique index — cancelled frees it)
+    //3: camp must be billable-type and in a billable state (closed / cancelled_charged), and may sit
+    // on at most one non-cancelled invoice (no unique index — cancelled frees it)
+    assertCampEligibleForBilling(camp);
     await assertCampBillable(camp);
 
     //4: create the line (at campCost) + recompute the parent's subtotal/total, atomically

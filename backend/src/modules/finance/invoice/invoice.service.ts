@@ -15,6 +15,7 @@ import { endOfUTCDay } from '../../../shared/utils/dates';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { ProjectService } from '../../crm/project/project.service';
 import { CampService } from '../../operations/camp/camp.service';
+import { BILLING_TYPES, CAMP_STATUSES } from '../../operations/camp/camp.constants';
 
 type InvoiceDocument = HydratedDocument<IInvoice> | null;
 
@@ -27,6 +28,25 @@ const populate: any[] = [
 // it when it recomputes the parent invoice after its lines change — one source of truth.
 export const computeInvoiceTotal = (subtotal: number, tax: number, discount: number): number =>
     (subtotal || 0) + (tax || 0) - (discount || 0);
+
+// Camp lifecycle states that can be billed: a camp that actually ran (closed) or was cancelled with
+// a charge (cancelled_charged — the cancellation fee is billable). Anything earlier hasn't happened.
+const BILLABLE_CAMP_STATUSES: string[] = [CAMP_STATUSES.CLOSED, CAMP_STATUSES.CANCELLED_CHARGED];
+
+// A camp is eligible to bill only if it is a BILLABLE-type camp (not a void camp, which must go
+// through PO mapping first) AND it has reached a billable lifecycle state (closed / cancelled_charged).
+// Exported so both invoice.create (bulk) and the line-item service (single add) enforce the same rule.
+export const assertCampEligibleForBilling = (camp: any) => {
+    if (camp.billingType !== BILLING_TYPES.BILLABLE) {
+        return throwAppError(`Camp ${camp.code} is a void camp and cannot be billed`, StatusCodes.BAD_REQUEST);
+    }
+    if (!BILLABLE_CAMP_STATUSES.includes(camp.status)) {
+        return throwAppError(
+            `Camp ${camp.code} must be closed or cancelled-charged before it can be billed`,
+            StatusCodes.CONFLICT,
+        );
+    }
+};
 
 // A camp may sit on at most ONE non-cancelled invoice. This is the uniqueness guard (there is no
 // unique index — a cancelled invoice frees the camp to be re-billed). Any existing line item that
@@ -142,6 +162,7 @@ const create = async (model: ICreateInvoicePayload, ctx: RequestContext): Promis
         if (!camp.project || camp.project.toString() !== project._id.toString()) {
             return throwAppError(`Camp ${camp.code} does not belong to this project`, StatusCodes.BAD_REQUEST);
         }
+        assertCampEligibleForBilling(camp);
         await assertCampBillable(camp);
         camps.push(camp);
     }

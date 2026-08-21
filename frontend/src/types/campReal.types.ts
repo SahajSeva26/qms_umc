@@ -73,6 +73,7 @@ export interface CampPopulatedRole { _id?: string; code: string; name: string; s
 
 export interface CampEntity {
   id: string
+  code: string
   tenant: CampPopulatedTenant | string
   division: CampPopulatedDivision | string
   project: CampPopulatedProject | string | null

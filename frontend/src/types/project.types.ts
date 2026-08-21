@@ -1,12 +1,9 @@
-// Real backend-integrated types for the Project module. Matches
-// backend/src/modules/crm/project/* exactly.
+// Real backend-integrated types for the Project module.
 //
-// A Project is created FROM a Lead (exactly one Project per Lead — backend
-// 409s otherwise); tenant/division are derived server-side from the Lead.
-//
-// Backend quirk, not "fixed" client-side: despite the "from a WON lead"
-// Swagger summary, create() never actually checks lead.status === 'won' —
-// the lead picker's status=won restriction is a UX-only convention, not a backend rule.
+// A Project is created FROM a Lead (exactly one per Lead — backend 409s
+// otherwise); tenant/division are derived server-side from the Lead. The
+// lead picker's status=won restriction is a UX-only convention — create()
+// itself never checks lead.status.
 
 import type { DivisionTherapy, LeadPopulatedContact } from './crm.types'
 
@@ -224,11 +221,9 @@ export interface ProjectPopulatedLead {
   status: string
 }
 
-// Reused for salesRep/projectCoordinator — both populate as the full Role
-// document (project.service.ts's populate array has no `select` for these,
-// same over-fetch pattern as Lead's salesPerson). Only the fields actually
-// consumed here are typed. marketingContact switched to a Contact reference
-// 2026-08-03 (see LeadPopulatedContact import) — no longer this type.
+// Reused for salesRep/projectCoordinator (both populate as the full Role
+// document; only the fields consumed here are typed). marketingContact is a
+// Contact reference instead — see LeadPopulatedContact import.
 export interface ProjectPopulatedRole {
   _id?: string
   code: string
@@ -239,18 +234,14 @@ export interface ProjectPopulatedRole {
 // Project
 // ---------------------------------------------------------------------------
 
-// GET-by-id and search both always populate — the `| string` union only
-// matters for a create/update/moveStage response's echo (those don't re-fetch
-// with populate before responding).
+// `| string` only applies to a create/update/moveStage echo (no re-fetch with
+// populate before responding); GET-by-id/search always populate.
 export interface ProjectEntity {
   id: string
-  // Sequential human-readable code minted via the Counter module (e.g. "prj-000001").
   code: string
   name: string
-  // The 6 reference fields below can come back null over the wire (deleted
-  // doc, stale reference) despite being `required` server-side — confirmed via
-  // a real crash on a project with a null marketingContact. Always null-check
-  // before unwrapping; never assume `X | string` is exhaustive.
+  // Reference fields can come back null (deleted doc, stale reference)
+  // despite being `required` server-side — always null-check before unwrapping.
   tenant: ProjectPopulatedTenant | string | null
   division: ProjectPopulatedDivision | string | null
   therapy: ProjectTherapy

@@ -3,6 +3,7 @@ import { LEAD_COUNTER_ENTITY } from '../../modules/crm/lead/lead.constants';
 import { PROJECT_COUNTER_ENTITY } from '../../modules/crm/project/project.constants';
 import { CAMP_COUNTER_ENTITY } from '../../modules/operations/camp/camp.constants';
 import { APPOINTMENT_COUNTER_ENTITY } from '../../modules/crm/appointment/appointment.constants';
+import { INVOICE_COUNTER_ENTITY } from '../../modules/finance/invoice/invoice.constants';
 import logger from '../utils/logger';
 import { throwAppError } from '../utils/error';
 
@@ -40,6 +41,13 @@ const COUNTERS = [
         separator: '-',
         padding: 6,
         description: 'Sequential code for appointments (mtg-000001)',
+    },
+    {
+        entity: INVOICE_COUNTER_ENTITY,
+        prefix: 'inv',
+        separator: '-',
+        padding: 6,
+        description: 'Sequential code for invoices (inv-000001)',
     },
 ];
 

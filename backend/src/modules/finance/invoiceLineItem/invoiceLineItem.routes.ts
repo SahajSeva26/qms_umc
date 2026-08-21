@@ -2,11 +2,7 @@
 import express from 'express';
 import { InvoiceLineItemController } from './invoiceLineItem.controller';
 import { registry } from '../../../shared/config/swagger/swagger.registry';
-import {
-    CreateInvoiceLineItemPayloadSchema,
-    SearchInvoiceLineItemQuerySchema,
-    UpdateInvoiceLineItemPayloadSchema,
-} from './invoiceLineItem.validators';
+import { CreateInvoiceLineItemPayloadSchema, SearchInvoiceLineItemQuerySchema } from './invoiceLineItem.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
 import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
 import { INVOICE_LINE_ITEM_PERMISSIONS } from './invoiceLineItem.constants';
@@ -48,7 +44,7 @@ registry.registerPath({
     method: 'post',
     path: '/invoice-line-items',
     tags: ['INVOICE LINE ITEM'],
-    summary: 'Add a line item to a draft invoice (recomputes the invoice subtotal/total)',
+    summary: 'Add one camp to a draft invoice (amount = project campCost; recomputes subtotal/total)',
     request: {
         body: {
             content: {
@@ -60,33 +56,9 @@ registry.registerPath({
     },
     responses: {
         201: { description: 'Invoice line item created successfully' },
-        400: { description: 'Validation error or camp/company mismatch' },
+        400: { description: 'Validation error, or camp not in the invoice project' },
         404: { description: 'Invoice or camp not found' },
-        409: { description: 'Invoice is not a draft, or the camp is already invoiced' },
-    },
-});
-
-// update invoice line item
-registry.registerPath({
-    method: 'put',
-    path: '/invoice-line-items/{id}',
-    tags: ['INVOICE LINE ITEM'],
-    summary: 'Update a line item amount on a draft invoice (recomputes the invoice subtotal/total)',
-    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-    request: {
-        body: {
-            content: {
-                'application/json': {
-                    schema: UpdateInvoiceLineItemPayloadSchema,
-                },
-            },
-        },
-    },
-    responses: {
-        200: { description: 'Invoice line item updated successfully' },
-        400: { description: 'Validation error' },
-        404: { description: 'Invoice line item not found' },
-        409: { description: 'Invoice is not a draft' },
+        409: { description: 'Invoice is not a draft, or the camp is already billed on a live invoice' },
     },
 });
 
@@ -116,15 +88,6 @@ InvoiceLineItemRouter.get(
         TENANT_PERMISSIONS.MANAGE.code,
     ]),
     InvoiceLineItemController.get,
-);
-InvoiceLineItemRouter.put(
-    '/:id',
-    AuthorizeMiddleware([
-        INVOICE_LINE_ITEM_PERMISSIONS.UPDATE.code,
-        INVOICE_LINE_ITEM_PERMISSIONS.MANAGE.code,
-        TENANT_PERMISSIONS.MANAGE.code,
-    ]),
-    InvoiceLineItemController.update,
 );
 InvoiceLineItemRouter.delete(
     '/:id',

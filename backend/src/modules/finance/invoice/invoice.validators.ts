@@ -8,10 +8,13 @@ const objectId = (label: string) =>
 
 //1: create ====================================>
 // tenant is NOT accepted here — it is derived from the source project.
-// subtotal is NOT accepted — it is driven by the invoice's line items (sum of amounts).
+// subtotal is NOT accepted — it is the sum of the line items (one per camp, at the project campCost).
 // total is NOT accepted — it is computed from subtotal + tax - discount.
 export const CreateInvoicePayloadSchema = z.object({
     project: objectId('Project').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
+    // the camps to bill on this invoice — each becomes a line item at the project's campCost.
+    // Every camp must exist, belong to this project, and not already be on a non-cancelled invoice.
+    camps: z.array(objectId('Camp')).min(1).openapi({ example: ['665f0c3a1a2b3c4d5e6f7a8b'] }),
     issueDate: z.coerce.date().optional().openapi({ example: '2026-08-21' }),
     dueDate: z.coerce.date().optional().openapi({ example: '2026-09-20' }),
     tax: z.number().nonnegative().optional().openapi({ example: 90000 }),

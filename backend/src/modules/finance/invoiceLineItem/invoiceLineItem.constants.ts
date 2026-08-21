@@ -21,12 +21,6 @@ export const INVOICE_LINE_ITEM_PERMISSIONS = {
         description: 'Create invoice line items',
     } as const,
 
-    UPDATE: {
-        code: 'invoice-line-item:update',
-        name: 'Update Invoice Line Item',
-        description: 'Update invoice line items',
-    } as const,
-
     GET: {
         code: 'invoice-line-item:get',
         name: 'Get Invoice Line Item',

@@ -28,8 +28,14 @@ const invoiceLineItemSchema = new mongoose.Schema(
     },
 );
 
-// A camp can only be processed/invoiced once
-invoiceLineItemSchema.index({ camp: 1 }, { unique: true });
+// A camp can be re-billed after its previous invoice was cancelled, so a camp may legitimately
+// appear on more than one line item over time (the cancelled one + a live one). Uniqueness is
+// therefore enforced in the service (assertCampBillable — a camp may sit on at most one
+// non-cancelled invoice), NOT by a unique index. These indexes are plain, for lookup speed:
+//   - by camp: the "is this camp already billed?" check
+//   - by invoice: listing a given invoice's lines
+invoiceLineItemSchema.index({ camp: 1 });
+invoiceLineItemSchema.index({ invoice: 1 });
 
 export const InvoiceLineItemModel = mongoose.model('InvoiceLineItem', invoiceLineItemSchema);
 

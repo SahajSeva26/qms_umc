@@ -1,15 +1,12 @@
 // InvoiceLineItem Service
 import { HydratedDocument } from 'mongoose';
 import { InvoiceLineItemModel, IInvoiceLineItem } from './invoiceLineItem.model';
-import {
-    ICreateInvoiceLineItemPayload,
-    ISearchInvoiceLineItemQuery,
-    IUpdateInvoiceLineItemPayload,
-} from './invoiceLineItem.validators';
-import { InvoiceService, computeInvoiceTotal } from '../invoice/invoice.service';
+import { ICreateInvoiceLineItemPayload, ISearchInvoiceLineItemQuery } from './invoiceLineItem.validators';
+import { InvoiceService, computeInvoiceTotal, assertCampBillable } from '../invoice/invoice.service';
 import { IInvoice } from '../invoice/invoice.model';
 import { INVOICE_STATUS } from '../invoice/invoice.constants';
 import { CampService } from '../../operations/camp/camp.service';
+import { ProjectService } from '../../crm/project/project.service';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
@@ -122,32 +119,37 @@ const create = async (
     model: ICreateInvoiceLineItemPayload,
     ctx: RequestContext,
 ): Promise<HydratedDocument<IInvoiceLineItem>> => {
-    //1: parent invoice must exist + be visible to the actor, and be a draft
+    //1: parent invoice must exist + be visible to the actor, and be a draft. Its project supplies
+    // the line amount (campCost) — same source of truth as bulk invoice creation.
     const invoice = await resolveParentInvoice(model.invoice, ctx);
     assertInvoiceEditable(invoice);
+    const project = await ProjectService.get(invoice.project.toString(), ctx);
+    if (!project) {
+        return throwAppError('Invoice project not found', StatusCodes.NOT_FOUND);
+    }
+    const campCost = project.campCost || 0;
+    if (campCost <= 0) {
+        return throwAppError('Project has no camp cost set — cannot bill its camps', StatusCodes.BAD_REQUEST);
+    }
 
-    //2: camp must exist and belong to the SAME company as the invoice (coherence vs the invoice's
-    // own tenant, not ctx — a system actor still can't bill a camp across tenants)
+    //2: camp must exist and belong to the invoice's project (which pins the company too)
     const camp = await CampService.get(model.camp, ctx);
     if (!camp) {
         return throwAppError('Camp not found', StatusCodes.NOT_FOUND);
     }
-    if (camp.tenant.toString() !== invoice.tenant.toString()) {
-        return throwAppError("Camp does not belong to the invoice's company", StatusCodes.BAD_REQUEST);
+    if (!camp.project || camp.project.toString() !== project._id.toString()) {
+        return throwAppError("Camp does not belong to the invoice's project", StatusCodes.BAD_REQUEST);
     }
 
-    //3: a camp can be billed only once (unique index backs this; pre-check gives a clean 409)
-    const existing = await InvoiceLineItemModel.findOne({ camp: model.camp });
-    if (existing) {
-        return throwAppError('This camp has already been invoiced', StatusCodes.CONFLICT);
-    }
+    //3: a camp may sit on at most one non-cancelled invoice (no unique index — cancelled frees it)
+    await assertCampBillable(camp);
 
-    //4: create the line + recompute the parent's subtotal/total, atomically
+    //4: create the line (at campCost) + recompute the parent's subtotal/total, atomically
     const lineItem = await withTransaction(async () => {
         const entity = new InvoiceLineItemModel({
             invoice: invoice._id,
             camp: model.camp,
-            amount: model.amount,
+            amount: campCost,
         });
         const created = await entity.save();
         await recomputeInvoiceTotals(invoice);
@@ -155,28 +157,6 @@ const create = async (
     });
 
     return lineItem;
-};
-
-const update = async (id: string, model: IUpdateInvoiceLineItemPayload, ctx: RequestContext) => {
-    //1: get line item (authorized via parent)
-    const lineItem = await InvoiceLineItemService.get(id, ctx);
-    if (!lineItem) {
-        return throwAppError('Invoice line item not found', StatusCodes.NOT_FOUND);
-    }
-
-    //2: parent must be a draft to change amounts
-    const invoice = await resolveParentInvoice(lineItem.invoice.toString(), ctx);
-    assertInvoiceEditable(invoice);
-
-    //3: apply + recompute the parent, atomically (invoice/camp are immutable — not touched)
-    const updated = await withTransaction(async () => {
-        lineItem.amount = model.amount;
-        const saved = await lineItem.save();
-        await recomputeInvoiceTotals(invoice);
-        return saved;
-    });
-
-    return updated;
 };
 
 const remove = async (id: string, ctx: RequestContext) => {
@@ -203,6 +183,5 @@ export const InvoiceLineItemService = {
     get,
     search,
     create,
-    update,
     remove,
 };

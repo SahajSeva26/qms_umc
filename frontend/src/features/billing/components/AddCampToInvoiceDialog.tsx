@@ -1,9 +1,11 @@
 import { useMemo, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import type { ProjectEntity } from '@/types/project.types'
 import type { InvoiceEntity } from '@/types/invoice.types'
 import { useEligibleInvoiceCamps } from '@/features/billing/hooks/useEligibleInvoiceCamps'
 import { useAllInvoiceLineItems } from '@/features/billing/hooks/useAllInvoiceLineItems'
 import { useAddInvoiceLineItem } from '@/features/billing/hooks/useAddInvoiceLineItem'
+import { invoiceKeys } from '@/features/billing/hooks/useInvoices'
 import CampSelectionRow from '@/features/billing/components/CampSelectionRow'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -26,6 +28,7 @@ interface AddCampToInvoiceDialogProps {
 // adds one line per call, so a multi-add UI here would issue N sequential
 // requests that could partially fail, leaving an inconsistent draft.
 const AddCampToInvoiceDialog = ({ invoice, project, onClose, onSubmittingChange }: AddCampToInvoiceDialogProps) => {
+  const queryClient = useQueryClient()
   const [selectedCampId, setSelectedCampId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const { data: camps, isLoading: campsLoading, isFetching: campsFetching, error: campsError, refetch: refetchCamps } = useEligibleInvoiceCamps(project.id)
@@ -105,6 +108,18 @@ const AddCampToInvoiceDialog = ({ invoice, project, onClose, onSubmittingChange 
       setError(getApiErrorMessage(err, 'Could not add this camp — it may already be billed. Try another.'))
       submittingRef.current = false
       onSubmittingChange?.(false)
+      // Unlike a success (which useAddInvoiceLineItem's onSuccess already
+      // invalidates), a failure here leaves this dialog's own state stale —
+      // most commonly a 409 because the camp was billed elsewhere or the
+      // invoice left draft status concurrently. Refetch this dialog's own
+      // sources so the picker reflects reality (the just-failed camp may
+      // now need excluding), AND invalidate the invoice detail query the
+      // parent drawer reads — so if the invoice's status changed underneath
+      // this dialog, the drawer picks that up once this dialog closes,
+      // instead of continuing to show stale "still draft" controls.
+      refetchCamps()
+      refetchLineItems()
+      queryClient.invalidateQueries({ queryKey: invoiceKeys.detail(invoice.id) })
     }
   }
 
@@ -120,8 +135,18 @@ const AddCampToInvoiceDialog = ({ invoice, project, onClose, onSubmittingChange 
   // background refetches that isLoading doesn't.
   const isSettling = isLoading || campsFetching || lineItemsFetching
 
+  // onOpenChange fires for Escape, backdrop-click, AND the Cancel button —
+  // it must check submittingRef.current (set synchronously the instant
+  // handleSubmit starts), not addLineItem.isPending. isPending only updates
+  // on React's NEXT render after mutateAsync begins; in the tiny window
+  // between the mutation starting and that render committing, isPending is
+  // still stale-false, so a dismissal attempt in that window would have
+  // closed the dialog while the add was still genuinely in flight. The
+  // Cancel button's visible `disabled` styling below still uses isPending —
+  // that's a rendered prop, so it only needs to be correct once React has
+  // actually re-rendered, unlike the dismissal guard here.
   return (
-    <Dialog open onOpenChange={(o) => { if (!o && !addLineItem.isPending) onClose() }}>
+    <Dialog open onOpenChange={(o) => { if (!o && !submittingRef.current) onClose() }}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-sm font-bold" style={{ color: 'var(--qms-text)' }}>

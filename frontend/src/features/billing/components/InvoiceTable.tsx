@@ -4,12 +4,17 @@ import InvoiceStatusPill from '@/features/billing/components/InvoiceStatusPill'
 
 // No camp-count column — the invoice API returns no line count, and
 // fetching line items per row to compute one would be an N+1 problem.
-const COLUMNS = ['Code', 'Status', 'Issue date', 'Total']
+const COLUMNS = ['Code', 'Project', 'Status', 'Issue date', 'Total']
 
 interface InvoiceTableProps {
   invoices: InvoiceEntity[]
   onOpenDetail: (id: string) => void
 }
+
+// search() always populates `project` (see invoice.types.ts) — only
+// create()/update()/moveStage() echo back a bare id string instead.
+const projectLabel = (invoice: InvoiceEntity) =>
+  typeof invoice.project === 'string' ? invoice.project : `${invoice.project.name} (${invoice.project.code})`
 
 const InvoiceTable = ({ invoices, onOpenDetail }: InvoiceTableProps) => (
   <div className="overflow-x-auto rounded-xl border backdrop-blur-xl" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface)' }}>
@@ -32,6 +37,7 @@ const InvoiceTable = ({ invoices, onOpenDetail }: InvoiceTableProps) => (
             style={{ borderBottom: '1px solid var(--qms-border)' }}
           >
             <td className="px-3 py-2.5 align-top font-semibold" style={{ color: 'var(--qms-text)' }}>{invoice.code}</td>
+            <td className="px-3 py-2.5 align-top" style={{ color: 'var(--qms-text-muted)' }}>{projectLabel(invoice)}</td>
             <td className="px-3 py-2.5 align-top whitespace-nowrap"><InvoiceStatusPill status={invoice.status} /></td>
             <td className="px-3 py-2.5 align-top whitespace-nowrap" style={{ color: 'var(--qms-text-muted)' }}>
               {formatDate(invoice.issueDate)}

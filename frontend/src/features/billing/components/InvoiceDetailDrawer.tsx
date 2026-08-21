@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { ProjectEntity } from '@/types/project.types'
 import { useInvoice } from '@/features/billing/hooks/useInvoice'
+import { useBillingProject } from '@/features/billing/hooks/useBillingProject'
 import { useInvoiceLineItems } from '@/features/billing/hooks/useInvoiceLineItems'
 import { useRemoveInvoiceLineItem } from '@/features/billing/hooks/useRemoveInvoiceLineItem'
 import InvoiceStatusPill from '@/features/billing/components/InvoiceStatusPill'
@@ -28,25 +28,23 @@ const Row = ({ label, value }: { label: string; value: ReactNode }) => (
 
 interface InvoiceDetailDrawerProps {
   invoiceId: string | null
-  project: ProjectEntity | null
   onClose: () => void
-  // Refetches the parent page's billing project cache — awaited before
-  // opening AddCampToInvoiceDialog so the campCost it displays is confirmed
-  // current, not whatever happened to still be cached (up to 5 minutes
-  // stale, per useBillingProject's default staleTime). Typed to at least the
-  // `isError` field so handleOpenAddCamp can tell a failed refetch apart
-  // from a successful one — this is always useBillingProject's own `refetch`
-  // (a QueryObserverResult-returning function) in practice.
-  onRefetchProject: () => Promise<{ isError: boolean }>
 }
 
-// Reuses the SideDrawer pattern from ProjectDetailDrawer.tsx. `project` is
-// passed in by the caller (already known from the page's selected project)
-// so this drawer doesn't need its own project fetch just to label camps —
-// only used for the "Add camp" dialog's campCost prop.
-const InvoiceDetailDrawer = ({ invoiceId, project, onClose, onRefetchProject }: InvoiceDetailDrawerProps) => {
+// Reuses the SideDrawer pattern from ProjectDetailDrawer.tsx. The invoice
+// list page no longer tracks one "selected project" (the project picker
+// there is just a filter, not a prerequisite), so this drawer resolves its
+// own full ProjectEntity (needed for campCost) from whichever invoice it's
+// currently showing — get()/search() always populate invoice.project.
+const InvoiceDetailDrawer = ({ invoiceId, onClose }: InvoiceDetailDrawerProps) => {
   const { data, isLoading, error, refetch } = useInvoice(invoiceId ?? undefined)
   const invoice = data?.data ?? null
+  const invoiceProjectId = invoice ? (typeof invoice.project === 'string' ? invoice.project : invoice.project._id) : undefined
+  const {
+    data: projectData,
+    refetch: refetchProject,
+  } = useBillingProject(invoiceProjectId)
+  const project = projectData?.data ?? null
   const { hasAnyPermission } = usePermission()
   const { page, setPage, pageSize, totalPages, resetToFirstPage } = usePagination(LINE_ITEM_PAGE_SIZE)
   const [addCampOpen, setAddCampOpen] = useState(false)
@@ -54,29 +52,34 @@ const InvoiceDetailDrawer = ({ invoiceId, project, onClose, onRefetchProject }: 
   const [stageDialogOpen, setStageDialogOpen] = useState(false)
   const [addSubmitting, setAddSubmitting] = useState(false)
 
-  // Read inside handleOpenAddCamp's awaited continuation to detect the
-  // `project` prop changing (parent switched projects) WHILE the refetch
-  // below was in flight. `project` itself can't be used for this comparison
-  // — handleOpenAddCamp is redefined every render, so the specific closure
-  // instance that's executing still only ever sees the `project` value from
-  // the render where it was created and invoked; comparing it against
-  // itself can never detect a later change. A ref, updated every render, is
-  // what actually reflects the LIVE prop value at the moment the check runs.
-  const projectRef = useRef(project)
+  // Monotonically increasing token identifying "this exact invoice being
+  // open in this drawer, right now." Bumped on every invoiceId change,
+  // including closing to null AND reopening the SAME invoice again — a
+  // plain invoiceId comparison can't tell those two "sessions" apart, which
+  // matters for two real races: (1) an Add Camp refresh started for invoice
+  // A can otherwise still resolve and open the dialog after the drawer
+  // closed and reopened on a DIFFERENT invoice under the same project (the
+  // project-id check alone doesn't catch this, since the project is
+  // unchanged); (2) closing and reopening the SAME invoice while a removal
+  // is queued can otherwise let that old, now-detached queue keep running
+  // concurrently alongside a fresh queue for the reopened session. Any
+  // async work below captures this token at start time and re-checks it
+  // against sessionTokenRef.current once its await resolves.
+  const sessionTokenRef = useRef(0)
   useEffect(() => {
-    projectRef.current = project
-  }, [project])
+    sessionTokenRef.current += 1
+  }, [invoiceId])
 
   const handleOpenAddCamp = async () => {
     setAddCampOpening(true)
-    const targetProjectId = project?.id
+    const startedForToken = sessionTokenRef.current
     try {
-      const result = await onRefetchProject()
-      // Same two failure modes as InvoicesPage's handleOpenGenerate: don't
-      // open on a failed refetch, and don't open if the `project` prop
-      // itself changed (parent switched projects) while this was in flight
-      // — that would open on a project this refetch never actually confirmed.
-      if (result.isError || projectRef.current?.id !== targetProjectId) return
+      const result = await refetchProject()
+      // Refuse to open if the refetch failed, OR if this drawer has since
+      // moved to a different invoice/session (even the SAME invoiceId
+      // reopened counts as a different session) — either way, this refetch
+      // never actually confirmed whatever is currently displayed.
+      if (result.isError || sessionTokenRef.current !== startedForToken) return
       setAddCampOpen(true)
     } finally {
       setAddCampOpening(false)
@@ -119,19 +122,17 @@ const InvoiceDetailDrawer = ({ invoiceId, project, onClose, onRefetchProject }: 
   const removeQueueRef = useRef<Promise<void>>(Promise.resolve())
 
   // This is one persistent component instance reused across every invoice
-  // the user opens — without resetting these, a removal still in flight for
-  // invoice A when the user closes and opens invoice B would keep running
-  // in B's context: A's queued callback would call B's refetchLineItems/
-  // setPage (re-created fresh for B), silently touching B's pagination for
-  // a removal that was never about B's data.
-  //
-  // invoiceIdRef (read inside handleRemove's callback via closure) lets
-  // that in-flight work detect the drawer has moved on and skip touching
-  // shared state — refs written inside an effect, the sanctioned pattern
-  // this repo's lint rules allow (mirrors the pre-existing pageRef above).
-  const invoiceIdRef = useRef(invoiceId)
+  // the user opens — without resetting these on every session change
+  // (including reopening the SAME invoice after closing it), a removal
+  // still in flight for an earlier session would keep running: its queued
+  // callback would call the NEW session's refetchLineItems/setPage
+  // (re-created fresh), silently touching pagination for a removal that
+  // was never about the reopened session's data. Detaching the queue here
+  // (a fresh resolved promise) lets old in-flight work finish harmlessly —
+  // guarded separately in handleRemove via sessionTokenRef — without a NEW
+  // click ever chaining onto the OLD, now-orphaned queue and running
+  // concurrently alongside it.
   useEffect(() => {
-    invoiceIdRef.current = invoiceId
     removeQueueRef.current = Promise.resolve()
     removingIdsRef.current = new Set()
   }, [invoiceId])
@@ -161,8 +162,15 @@ const InvoiceDetailDrawer = ({ invoiceId, project, onClose, onRefetchProject }: 
     const fresh = await refetchLineItems()
     const freshCount = fresh.data?.data?.count ?? 0
     const currentPage = pageRef.current
-    if (currentPage > 1 && freshCount <= (currentPage - 1) * pageSize) {
-      setPage(currentPage - 1)
+    // Clamp to the actual final valid page, not just one page back — a
+    // single decrement was only ever correct for losing exactly one page's
+    // worth of items. Concurrent deletions (e.g. another actor removing
+    // several lines while this drawer sits on page 4) can drop the valid
+    // page count by more than one in a single refresh; stepping back only
+    // one page could still strand the user on a now-empty page 3.
+    const lastValidPage = Math.max(1, Math.ceil(freshCount / pageSize))
+    if (currentPage > lastValidPage) {
+      setPage(lastValidPage)
     }
   }
 
@@ -171,7 +179,7 @@ const InvoiceDetailDrawer = ({ invoiceId, project, onClose, onRefetchProject }: 
     if (!window.confirm(`Remove ${campLabel} from this invoice?`)) return
     removingIdsRef.current.add(lineItemId)
     setRemovingIds(new Set(removingIdsRef.current))
-    const startedForInvoiceId = invoiceId
+    const startedForToken = sessionTokenRef.current
 
     // Chain onto the queue so a second click (on a different line) waits for
     // the first remove's mutation AND its explicit refetch to fully settle
@@ -179,18 +187,18 @@ const InvoiceDetailDrawer = ({ invoiceId, project, onClose, onRefetchProject }: 
     removeQueueRef.current = removeQueueRef.current.then(async () => {
       try {
         await removeLineItem.mutateAsync(lineItemId)
-        // If the drawer has since moved on to a different invoice (closed
-        // and reopened elsewhere while this was in flight), the mutation
-        // itself already succeeded server-side — nothing to undo — but
-        // reconciling here would touch the NEW invoice's page/line state,
-        // which this remove was never actually about. Skip the toast and
-        // reconciliation, the useEffect above already reset this drawer's
-        // queue/removingIds for the new invoice.
-        if (invoiceIdRef.current !== startedForInvoiceId) return
+        // If the drawer has since moved to a different session (closed and
+        // reopened — even on the SAME invoiceId — while this was in flight),
+        // the mutation itself already succeeded server-side — nothing to
+        // undo — but reconciling here would touch the NEW session's
+        // page/line state, which this remove was never actually about. Skip
+        // the toast and reconciliation; the useEffect above already reset
+        // this drawer's queue/removingIds for the new session.
+        if (sessionTokenRef.current !== startedForToken) return
         toast.success('Camp removed from invoice')
         await refreshLineStateAndClampPage()
       } catch (err) {
-        if (invoiceIdRef.current !== startedForInvoiceId) return
+        if (sessionTokenRef.current !== startedForToken) return
         toast.error(getApiErrorMessage(err, 'Could not remove this line — try again.'))
         // A 409 here usually means another actor moved this invoice out of
         // draft since this drawer last fetched it — refetch so the stale
@@ -202,9 +210,9 @@ const InvoiceDetailDrawer = ({ invoiceId, project, onClose, onRefetchProject }: 
         // must not strand the user on an invalid page for the fresh count.
         await refreshLineStateAndClampPage()
       } finally {
-        // Only this drawer's OWN removingIds (for startedForInvoiceId) should
-        // be touched — if the invoice already changed, the useEffect above
-        // already cleared removingIds for the new invoice; re-clearing here
+        // Only this drawer's OWN removingIds (for startedForToken) should be
+        // touched — if the session already changed, the useEffect above
+        // already cleared removingIds for the new session; re-clearing here
         // with a leftover reference to the old id would be a harmless no-op
         // at worst, so this stays unconditional for simplicity.
         removingIdsRef.current.delete(lineItemId)

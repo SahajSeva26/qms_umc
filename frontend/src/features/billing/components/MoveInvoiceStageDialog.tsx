@@ -70,8 +70,18 @@ const MoveInvoiceStageDialog = ({ invoice, lineItemCount, onClose }: MoveInvoice
     )
   }
 
+  // onOpenChange fires for Escape, backdrop-click, AND the Cancel button —
+  // it must check submittingRef.current (set synchronously the instant
+  // handleSave starts), not moveStage.isPending. isPending only updates on
+  // React's NEXT render after mutateAsync begins; in the tiny window
+  // between the mutation starting and that render committing, isPending is
+  // still stale-false, so a dismissal attempt in that window would have
+  // closed the dialog while the stage move was still genuinely in flight.
+  // The Cancel button's visible `disabled` styling below still uses
+  // isPending — that's a rendered prop, so it only needs to be correct once
+  // React has actually re-rendered, unlike the dismissal guard here.
   return (
-    <Dialog open onOpenChange={(o) => { if (!o && !moveStage.isPending) onClose() }}>
+    <Dialog open onOpenChange={(o) => { if (!o && !submittingRef.current) onClose() }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-sm font-bold" style={{ color: 'var(--qms-text)' }}>Change status · {invoice.code}</DialogTitle>

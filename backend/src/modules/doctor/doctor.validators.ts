@@ -1,10 +1,17 @@
 // Doctor Validators
 import { z } from 'zod';
 import { DOCTOR_SPECIALIZATION, DOCTOR_STATUS } from './doctor.constants';
+import { isValidObjectID } from '../../shared/utils/strings';
+
+const objectId = (label: string) =>
+    z.string().refine((val) => isValidObjectID(val), { message: `${label} must be a valid id` });
 
 //1: create ====================================>
 // pharmaCode is the natural key — required here, and never editable afterwards.
 export const CreateDoctorPayloadSchema = z.object({
+    // required only for platform (QMS) staff — which tenant this doctor belongs to.
+    // ignored for customer users: the service pins it to their own tenant.
+    tenant: objectId('Tenant').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
     pharmaCode: z.string().min(1).openapi({ example: 'DOC-0012' }),
     name: z.string().min(1).openapi({ example: 'Dr. Anil Kumar' }),
     specialization: z.enum(Object.values(DOCTOR_SPECIALIZATION)).openapi({ example: 'cp' }),
@@ -35,6 +42,8 @@ export type IUpdateDoctorPayload = z.infer<typeof UpdateDoctorPayloadSchema>;
 
 //3: search ====================================>
 export const SearchDoctorQuerySchema = z.object({
+    // only honoured for platform staff; customer users stay pinned to their own tenant
+    tenant: objectId('Tenant').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
     name: z.string().optional().openapi({ example: 'Anil' }),
     specialization: z.enum(Object.values(DOCTOR_SPECIALIZATION)).optional().openapi({ example: 'cp' }),
     status: z.enum(Object.values(DOCTOR_STATUS)).optional().openapi({ example: 'active' }),

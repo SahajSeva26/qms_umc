@@ -1,14 +1,15 @@
+// Invoice Controller
 import { ResponseHandler } from '../../../shared/utils/responseHandler';
 import { formatZodError } from '../../../shared/utils/error';
 import {
-    CreateRolePayloadSchema,
-    SearchDownlineMrQuerySchema,
-    SearchRoleQuerySchema,
-    UpdateRolePayloadSchema,
-} from './role.validators';
+    CreateInvoicePayloadSchema,
+    MoveStagePayloadSchema,
+    SearchInvoiceQuerySchema,
+    UpdateInvoicePayloadSchema,
+} from './invoice.validators';
 import { StatusCodes } from 'http-status-codes';
-import { RoleService } from './role.service';
-import { RoleMapper } from './role.mapper';
+import { InvoiceService } from './invoice.service';
+import { InvoiceMapper } from './invoice.mapper';
 import { RequestHandler } from '../../../shared/utils/requestHandler';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
 
@@ -17,21 +18,21 @@ const get = async (req: any, res: any) => {
         const ctx: RequestContext = req.context;
         const { id } = req?.params;
         if (!id) {
-            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Role ID is required', null);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Invoice ID is required', null);
         }
 
-        const role = await RoleService.get(id, ctx, { populate: true });
+        const invoice = await InvoiceService.get(id, ctx, { populate: true });
 
-        if (!role) {
-            return ResponseHandler.appResponse(res, StatusCodes.NOT_FOUND, false, 'Role not found', null);
+        if (!invoice) {
+            return ResponseHandler.appResponse(res, StatusCodes.NOT_FOUND, false, 'Invoice not found', null);
         }
 
         return ResponseHandler.appResponse(
             res,
             StatusCodes.OK,
             true,
-            'Role fetched successfully',
-            RoleMapper.toResponse(role),
+            'Invoice fetched successfully',
+            InvoiceMapper.toResponse(invoice, ctx),
         );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
@@ -42,23 +43,24 @@ const search = async (req: any, res: any) => {
     try {
         const ctx: RequestContext = req.context;
 
-        const { data: filters, success, error } = SearchRoleQuerySchema.safeParse(req.query);
+        const { data: filters, success, error } = SearchInvoiceQuerySchema.safeParse(req.query);
         if (!success) {
             const validationErrors = formatZodError(error);
             return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
                 errors: validationErrors,
             });
         }
+
         const pagination = RequestHandler.getPagination(filters);
 
-        const result = await RoleService.search(filters, ctx, { pagination });
+        const result = await InvoiceService.search(filters, ctx, { pagination });
 
         return ResponseHandler.appResponse(
             res,
             StatusCodes.OK,
             true,
-            'Roles fetched successfully',
-            RoleMapper.toSearchResponse(result),
+            'Invoices fetched successfully',
+            InvoiceMapper.toSearchResponse(result, ctx),
         );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
@@ -69,7 +71,7 @@ const create = async (req: any, res: any) => {
     try {
         const ctx: RequestContext = req.context;
 
-        const { data, success, error } = CreateRolePayloadSchema.safeParse(req.body);
+        const { data, success, error } = CreateInvoicePayloadSchema.safeParse(req.body);
         if (!success) {
             const validationErrors = formatZodError(error);
             return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
@@ -77,14 +79,14 @@ const create = async (req: any, res: any) => {
             });
         }
 
-        const role = await RoleService.create(data, ctx);
+        const invoice = await InvoiceService.create(data, ctx);
 
         return ResponseHandler.appResponse(
             res,
             StatusCodes.CREATED,
             true,
-            'Role created successfully',
-            RoleMapper.toResponse(role),
+            'Invoice created successfully',
+            InvoiceMapper.toResponse(invoice, ctx),
         );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
@@ -96,10 +98,10 @@ const update = async (req: any, res: any) => {
         const ctx: RequestContext = req.context;
         const { id } = req?.params;
         if (!id) {
-            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Role ID is required', null);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Invoice ID is required', null);
         }
 
-        const { data, success, error } = UpdateRolePayloadSchema.safeParse(req.body);
+        const { data, success, error } = UpdateInvoicePayloadSchema.safeParse(req.body);
         if (!success) {
             const validationErrors = formatZodError(error);
             return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
@@ -107,51 +109,54 @@ const update = async (req: any, res: any) => {
             });
         }
 
-        const role = await RoleService.update(id, data, ctx);
+        const invoice = await InvoiceService.update(id, data, ctx);
 
         return ResponseHandler.appResponse(
             res,
             StatusCodes.OK,
             true,
-            'Role updated successfully',
-            RoleMapper.toResponse(role),
+            'Invoice updated successfully',
+            InvoiceMapper.toResponse(invoice, ctx),
         );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }
 };
 
-const searchMrs = async (req: any, res: any) => {
+const moveStage = async (req: any, res: any) => {
     try {
         const ctx: RequestContext = req.context;
+        const { id } = req?.params;
+        if (!id) {
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Invoice ID is required', null);
+        }
 
-        const { data: filters, success, error } = SearchDownlineMrQuerySchema.safeParse(req.query);
+        const { data, success, error } = MoveStagePayloadSchema.safeParse(req.body);
         if (!success) {
             const validationErrors = formatZodError(error);
             return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
-                errors: validationErrors,
+                fields: validationErrors,
             });
         }
-        const pagination = RequestHandler.getPagination(filters);
 
-        const result = await RoleService.searchMrs(filters, ctx, { pagination });
+        const invoice = await InvoiceService.moveStage(id, data, ctx);
 
         return ResponseHandler.appResponse(
             res,
             StatusCodes.OK,
             true,
-            'MRs fetched successfully',
-            RoleMapper.toSearchResponse(result),
+            'Invoice stage updated successfully',
+            InvoiceMapper.toResponse(invoice, ctx),
         );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }
 };
 
-export const RoleController = {
+export const InvoiceController = {
     get,
     search,
     create,
     update,
-    searchMrs,
+    moveStage,
 };

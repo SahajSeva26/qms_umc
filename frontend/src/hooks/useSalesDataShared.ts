@@ -1,4 +1,4 @@
-import { ASSIGNMENTS, REPS, TARGETS } from '@/types/salesdash.types'
+import { ASSIGNMENTS, REPS, TARGETS } from '@/types/salesdash.mock'
 
 // Read-only shared surface over CRM Sales' static rep/target data — kept as
 // a hook so the call site keeps the same shape/options/isLoading/error fields.

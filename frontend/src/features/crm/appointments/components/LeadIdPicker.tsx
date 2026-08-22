@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { crmService } from '@/features/crm/crm.service'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { useAsyncPickerState } from '@/hooks/useAsyncPickerState'
-import { LEAD_STATUS_LABEL } from '@/features/crm/crm.types'
+import { LEAD_STATUS_LABEL } from '@/features/crm/crm.constants'
 import type { LeadEntity } from '@/features/crm/crm.types'
 import AsyncPicker from '@/components/ui/AsyncPicker'
 

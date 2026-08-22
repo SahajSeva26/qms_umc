@@ -5,7 +5,7 @@
 // arbitrary per-project TESTS→device lookup — the representative device per
 // project type below mirrors the prototype's own PROJECT_DEVICE map).
 import type { ClientMr, ClientProject } from '@/types/client.types'
-import { CLIENTS } from '@/types/client.types'
+import { CLIENTS } from '@/types/client.mock'
 import type { GeoFo } from '@/features/hq/hq.types'
 import { classifyCity } from '@/features/hq/hq.service'
 

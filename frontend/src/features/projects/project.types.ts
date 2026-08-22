@@ -23,117 +23,30 @@ export type ProjectTherapy =
   | 'hepatology'
   | 'nephrology'
 
-export const PROJECT_THERAPY_LABEL: Record<ProjectTherapy, string> = {
-  cardiology: 'Cardiology',
-  diabetes: 'Diabetes',
-  pulmonology: 'Pulmonology',
-  endocrine: 'Endocrine',
-  orthopedics: 'Orthopedics',
-  gynaecology: 'Gynaecology',
-  neurology: 'Neurology',
-  hepatology: 'Hepatology',
-  nephrology: 'Nephrology',
-}
-
 // Array-valued field — a project can be more than one type at once.
 export type ProjectType = 'screening_camp' | 'diet' | 'teleconsultation_diet' | 'lab_test' | 'mixed'
-
-export const PROJECT_TYPE_LABEL: Record<ProjectType, string> = {
-  screening_camp: 'Screening Camp',
-  diet: 'Diet',
-  teleconsultation_diet: 'Teleconsultation Diet',
-  lab_test: 'Lab Test',
-  mixed: 'Mixed',
-}
 
 // A closed backend enum, not an Admin-master-driven dynamic list.
 export type ProjectTest = 'fbs' | 'ppbs' | 'rbs' | 'bp' | 'spo2' | 'ecg' | 'lipid' | 'hba1c' | 'spiro' | 'bca'
 
-export const PROJECT_TEST_LABEL: Record<ProjectTest, string> = {
-  fbs: 'FBS',
-  ppbs: 'PPBS',
-  rbs: 'RBS',
-  bp: 'BP',
-  spo2: 'SPO2',
-  ecg: 'ECG',
-  lipid: 'Lipid',
-  hba1c: 'HbA1c',
-  spiro: 'Spiro',
-  bca: 'BCA',
-}
-
 export type ExecutionModeType = 'po' | 'agreement' | 'mail_confirmation'
-
-export const EXECUTION_MODE_LABEL: Record<ExecutionModeType, string> = {
-  po: 'PO Based',
-  agreement: 'Agreement Based',
-  mail_confirmation: 'Mail Confirmation',
-}
 
 // project.constants.ts's PROJECT_STATUS — 4 values (the old mock had only
 // LIVE/HOLD/CLOSED, no `new`). Every project starts at `new` server-side
 // (model default) and only moves via PATCH /projects/:id/stage.
 export type ProjectStatus = 'new' | 'live' | 'hold' | 'closed'
 
-export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
-  new: 'New',
-  live: 'Live',
-  hold: 'Hold',
-  closed: 'Closed',
-}
-
-// Not defined server-side — one consistent swatch per status for pills.
-export const PROJECT_STATUS_COLOR: Record<ProjectStatus, string> = {
-  new: '#3b6dff',
-  live: '#10b981',
-  hold: '#f59e0b',
-  closed: '#94a3b8',
-}
-
-// The only legal `to` values from a given current `status`. `closed` is terminal.
-export const PROJECT_STAGE_TRANSITION_MAP: Record<ProjectStatus, ProjectStatus[]> = {
-  new: ['live', 'hold', 'closed'],
-  live: ['hold', 'closed'],
-  hold: ['live', 'closed'],
-  closed: [],
-}
-
 export type PaymentTerms = 'net_30' | 'net_60' | 'net_90'
-
-export const PAYMENT_TERMS_LABEL: Record<PaymentTerms, string> = {
-  net_30: 'Net 30',
-  net_60: 'Net 60',
-  net_90: 'Net 90',
-}
 
 // NOTE: the field using this type is `clientReportCandance` (backend's
 // spelling, verbatim — not a typo to "fix").
 export type ClientReportCadence = 'weekly' | 'half_monthly' | 'monthly' | 'quarterly' | 'halfyearly' | 'yearly'
 
-export const CLIENT_REPORT_CADENCE_LABEL: Record<ClientReportCadence, string> = {
-  weekly: 'Weekly',
-  half_monthly: 'Half-monthly',
-  monthly: 'Monthly',
-  quarterly: 'Quarterly',
-  halfyearly: 'Half-yearly',
-  yearly: 'Yearly',
-}
-
 // Currently a single value — kept Record-driven so a future backend addition
 // doesn't require a UI rebuild.
 export type AvailablePointer = 'camp_executed'
 
-export const AVAILABLE_POINTER_LABEL: Record<AvailablePointer, string> = {
-  camp_executed: 'Camps executed',
-}
-
 export type GoLiveScopeCode = 'states' | 'cities' | 'pan'
-
-export const GO_LIVE_SCOPE_LABEL: Record<GoLiveScopeCode, string> = {
-  states: 'Specific states',
-  cities: 'Specific cities',
-  pan: 'PAN-India',
-}
 
 // Must match role-type/constants/roleTypeCodes.ts's customer-side RoleTypeCode
 // values exactly — a previous typo here ('pharma-ms', 'pharms-asm') silently

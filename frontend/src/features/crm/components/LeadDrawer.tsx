@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { FiEdit2 } from 'react-icons/fi'
 import type { LeadEntity, LeadStatus, UpdateLeadPayload } from '@/features/crm/crm.types'
-import { LEAD_STATUS_LABEL, LEAD_TRANSITION_MAP } from '@/features/crm/crm.types'
+import { LEAD_STATUS_LABEL, LEAD_TRANSITION_MAP } from '@/features/crm/crm.constants'
 import { contactPersonLabel, divisionLabel } from '@/features/crm/crm.utils'
 import SideDrawer from '@/components/ui/SideDrawer'
 import StagePill from '@/features/crm/components/StagePill'

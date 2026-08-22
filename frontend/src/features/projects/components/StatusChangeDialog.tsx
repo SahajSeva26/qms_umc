@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ProjectEntity, ProjectStatus } from '@/features/projects/project.types'
-import { PROJECT_STAGE_TRANSITION_MAP, PROJECT_STATUS_LABEL } from '@/features/projects/project.types'
+import { PROJECT_STAGE_TRANSITION_MAP, PROJECT_STATUS_LABEL } from '@/features/projects/projects.constants'
 import { useMoveProjectStage } from '@/features/projects/hooks/useMoveProjectStage'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'

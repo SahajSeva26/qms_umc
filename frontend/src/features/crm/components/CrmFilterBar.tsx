@@ -1,7 +1,7 @@
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import SearchInput from '@/components/ui/SearchInput'
 import { Button } from '@/components/ui/button'
-import { LEAD_STATUS_LABEL } from '@/features/crm/crm.types'
+import { LEAD_STATUS_LABEL } from '@/features/crm/crm.constants'
 import type { LeadStatus } from '@/features/crm/crm.types'
 import type { CrmFilterState } from '@/features/crm/hooks/useCrmFilters'
 

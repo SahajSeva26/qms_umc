@@ -3,7 +3,7 @@ import SearchInput from '@/components/ui/SearchInput'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { DivisionsFilterState, DivisionsSearchBy } from '@/features/crm/divisions/hooks/useDivisionsFilters'
 import type { DivisionStatus, DivisionTherapy } from '@/features/crm/crm.types'
-import { DIVISION_THERAPY_LABEL } from '@/features/crm/crm.types'
+import { DIVISION_THERAPY_LABEL } from '@/features/crm/crm.constants'
 
 const STATUS_OPTIONS: { value: DivisionStatus; label: string }[] = [
   { value: 'active', label: 'Active' },

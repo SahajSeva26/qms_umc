@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { GeoFo } from '@/features/hq/hq.types'
 import type { Camp } from '@/features/camps/camp.types'
-import { CLIENTS, DIVISIONS, MRS } from '@/types/client.types'
+import { CLIENTS, DIVISIONS, MRS } from '@/types/client.mock'
 import CompaniesView from '@/features/hq/components/hqmapping/mapping/CompaniesView'
 import CompanyView from '@/features/hq/components/hqmapping/mapping/CompanyView'
 import DivisionView from '@/features/hq/components/hqmapping/mapping/DivisionView'
@@ -19,7 +19,7 @@ type MappingView = 'companies' | 'company' | 'division' | 'mapping' | 'expansion
 // Exact port of hq-mapping.js's own view-router (STATE.view / render(), lines
 // 204-232) — Company → Division → HQ Mapping drill-down plus the Expansion
 // recommender, reusing the shared classifyCity()/buildExpansion() engine.
-// Source data: CLIENTS/DIVISIONS/MRS straight from types/client.types.ts (the
+// Source data: CLIENTS/DIVISIONS/MRS straight from types/client.mock.ts (the
 // shared cross-feature master this task specifies), not CRM's own mutable
 // clients.service.ts store — this tab is a read-only drill-down/planning
 // view, it never edits client/division/MR records.

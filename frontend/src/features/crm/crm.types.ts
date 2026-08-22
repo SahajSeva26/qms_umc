@@ -23,23 +23,6 @@ export type DivisionTherapy =
   | 'pediatrics'
   | 'wellness'
 
-export const DIVISION_THERAPY_LABEL: Record<DivisionTherapy, string> = {
-  cardiology: 'Cardiology',
-  diabetes: 'Diabetes',
-  pulmonology: 'Pulmonology',
-  endocrine: 'Endocrine',
-  orthopedics: 'Orthopedics',
-  gynaecology: 'Gynaecology',
-  neurology: 'Neurology',
-  hepatology: 'Hepatology',
-  nephrology: 'Nephrology',
-  ophthalmology: 'Ophthalmology',
-  dermatology: 'Dermatology',
-  oncology: 'Oncology',
-  pediatrics: 'Pediatrics',
-  wellness: 'Wellness',
-}
-
 export type DivisionStatus = 'active' | 'inactive'
 
 /** Populated shape for Division.tenant (search always populates). Nested relations carry Mongoose's raw `_id`, not a mapped `id`. */
@@ -157,48 +140,7 @@ export interface BulkMrResult {
 
 export type LeadStatus = 'new' | 'qualified' | 'proposal' | 'pilot' | 'negotiation' | 'won' | 'lost'
 
-// The only legal `to` values from a given current `status`. `won`/`lost` are
-// terminal — there is no reopen path via this API.
-export const LEAD_TRANSITION_MAP: Record<LeadStatus, LeadStatus[]> = {
-  new: ['qualified'],
-  qualified: ['proposal', 'lost'],
-  proposal: ['pilot', 'negotiation', 'lost'],
-  pilot: ['negotiation', 'won', 'lost'],
-  negotiation: ['won', 'lost'],
-  won: [],
-  lost: [],
-}
-
-export const LEAD_STATUS_LABEL: Record<LeadStatus, string> = {
-  new: 'New',
-  qualified: 'Qualified',
-  proposal: 'Proposal',
-  pilot: 'Pilot',
-  negotiation: 'Negotiation',
-  won: 'Won',
-  lost: 'Lost',
-}
-
-// Not backend-defined — one consistent swatch per status for the UI.
-export const LEAD_STATUS_COLOR: Record<LeadStatus, string> = {
-  new: '#3b6dff',
-  qualified: '#0ea5e9',
-  proposal: '#f59e0b',
-  pilot: '#8b5cf6',
-  negotiation: '#ec4899',
-  won: '#10b981',
-  lost: '#f43f5e',
-}
-
 export type LeadProjectType = 'screening' | 'diet' | 'tele_diet' | 'lab' | 'mixed'
-
-export const LEAD_PROJECT_TYPE_LABEL: Record<LeadProjectType, string> = {
-  screening: 'Screening',
-  diet: 'Diet',
-  tele_diet: 'Tele-Diet',
-  lab: 'Lab',
-  mixed: 'Mixed',
-}
 
 export interface LeadOffer {
   code: string

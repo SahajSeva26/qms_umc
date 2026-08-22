@@ -6,7 +6,7 @@
 
 import type { Camp } from '@/features/camps/camp.types'
 import { PEOPLE } from '@/types/people.mock'
-import { CLIENTS, PROJECTS } from '@/types/client.types'
+import { CLIENTS, PROJECTS } from '@/types/client.mock'
 import type { ClientProject } from '@/types/client.types'
 import { arr } from './dietStorage'
 

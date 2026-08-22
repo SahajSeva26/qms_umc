@@ -1,5 +1,5 @@
 import type { LeadEntity } from '@/features/crm/crm.types'
-import { LEAD_STATUS_LABEL } from '@/features/crm/crm.types'
+import { LEAD_STATUS_LABEL } from '@/features/crm/crm.constants'
 import { formatDate } from '@/utils/formatters'
 
 interface ActivityTabProps {

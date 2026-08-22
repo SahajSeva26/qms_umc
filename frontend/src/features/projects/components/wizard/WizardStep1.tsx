@@ -1,7 +1,7 @@
 import { FiActivity, FiHeart, FiVideo, FiDroplet, FiShuffle, FiTag, FiInfo } from 'react-icons/fi'
 import type { WizardFormState } from '@/features/projects/wizard.types'
 import type { ProjectTest, ProjectTherapy, ProjectType } from '@/features/projects/project.types'
-import { PROJECT_TEST_LABEL, PROJECT_THERAPY_LABEL, PROJECT_TYPE_LABEL } from '@/features/projects/project.types'
+import { PROJECT_TEST_LABEL, PROJECT_THERAPY_LABEL, PROJECT_TYPE_LABEL } from '@/features/projects/projects.constants'
 import { PROJECT_TYPE_COLOR } from '@/features/projects/projects.utils'
 import { PickCard, PickGrid } from '@/components/ui/PickCard'
 import SectionHeader from '@/components/ui/SectionHeader'

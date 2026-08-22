@@ -2,7 +2,7 @@ import { FiNavigation, FiUserCheck, FiCreditCard, FiBriefcase, FiFileText, FiDol
 import type { Camp } from '@/features/camps/camp.types'
 import type { Person } from '@/types/people.types'
 import type { ProjectEntity } from '@/features/projects/project.types'
-import { PROJECT_STATUS_LABEL } from '@/features/projects/project.types'
+import { PROJECT_STATUS_LABEL } from '@/features/projects/projects.constants'
 import { computeGstBreakdown, projectTenantName } from '@/features/projects/projects.utils'
 import type { ExpenseStatus } from '@/features/om/om.types'
 import {

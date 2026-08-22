@@ -1,4 +1,4 @@
-import { CLIENTS, DIVISIONS, INVOICES, MRS, PROJECTS } from '@/types/client.types'
+import { CLIENTS, DIVISIONS, INVOICES, MRS, PROJECTS } from '@/types/client.mock'
 
 // Read-only shared surface over Client Management's static master data —
 // kept as a hook so callers keep the same shape/options/isLoading/error fields.

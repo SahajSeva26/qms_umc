@@ -22,7 +22,7 @@ import FoMasterTab from '@/features/hq/components/hqmapping/tabs/FoMasterTab'
 import BulkCheckTab from '@/features/hq/components/hqmapping/tabs/BulkCheckTab'
 import ReportsTab from '@/features/hq/components/hqmapping/tabs/ReportsTab'
 import AiTab from '@/features/hq/components/hqmapping/tabs/AiTab'
-import { MRS, PROJECTS } from '@/types/client.types'
+import { MRS, PROJECTS } from '@/types/client.mock'
 
 const TAB_ICON: Record<HqTabId, typeof FiShield> = {
   admin: FiShield, sales: FiSearch, ops: FiClipboard, coord: FiSun, map: FiMap,

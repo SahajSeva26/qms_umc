@@ -1,5 +1,5 @@
 import type { ProjectType } from '@/features/projects/project.types'
-import { PROJECT_TYPE_LABEL } from '@/features/projects/project.types'
+import { PROJECT_TYPE_LABEL } from '@/features/projects/projects.constants'
 import { PROJECT_TYPE_COLOR } from '@/features/projects/projects.utils'
 
 interface ProjectTypePillsProps {

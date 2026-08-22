@@ -7,7 +7,7 @@
 
 import type { Camp } from '@/features/camps/camp.types'
 import type { Person } from '@/types/people.types'
-import { CLIENTS } from '@/types/client.types'
+import { CLIENTS } from '@/types/client.mock'
 import type {
   ReminderThread, ReminderConfig, RecipientType, ThreadAttempt, TickResult, EngineRecipient, ReminderTemplates,
 } from '@/features/reminders/reminders.types'

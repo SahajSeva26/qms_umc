@@ -6,7 +6,7 @@
 // and the screen's components need no change.
 
 import type { Camp } from '@/features/camps/camp.types'
-import { PROJECTS } from '@/types/client.types'
+import { PROJECTS } from '@/types/client.mock'
 import type { DietitianProfileBundle, DietitianProjectBreakdown } from '@/features/diet/dietitians.types'
 import { dietitianById, dietitianDetails } from './dietitianRoster.service'
 import { getDietitianEquipment } from './dietitianEquipment.service'

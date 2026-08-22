@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { LeadStatus } from '@/features/crm/crm.types'
-import { LEAD_STATUS_LABEL } from '@/features/crm/crm.types'
+import { LEAD_STATUS_LABEL } from '@/features/crm/crm.constants'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'

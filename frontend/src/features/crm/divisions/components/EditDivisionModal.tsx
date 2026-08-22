@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { DivisionEntity, DivisionStatus, DivisionTherapy } from '@/features/crm/crm.types'
-import { DIVISION_THERAPY_LABEL } from '@/features/crm/crm.types'
+import { DIVISION_THERAPY_LABEL } from '@/features/crm/crm.constants'
 import { useUpdateDivision } from '@/features/crm/divisions/hooks/useUpdateDivision'
 import { updateDivisionSchema } from '@/features/crm/divisions/schemas/division.schemas'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'

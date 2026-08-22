@@ -1,5 +1,5 @@
 import type { LeadEntity } from '@/features/crm/crm.types'
-import { LEAD_STATUS_LABEL } from '@/features/crm/crm.types'
+import { LEAD_STATUS_LABEL } from '@/features/crm/crm.constants'
 import { useAppointmentsReal } from '@/features/crm/appointments/hooks/useAppointmentsReal'
 import { APPOINTMENT_STATUS_LABEL, APPOINTMENT_TYPE_LABEL } from '@/features/crm/appointments/appointment.types'
 import { appointmentStatusColor, latestAppointmentNextSteps } from '@/features/crm/appointments/appointmentsReal.utils'

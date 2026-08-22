@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { FiPackage, FiSave } from 'react-icons/fi'
 import type { LeadEntity, LeadOffer, LeadProjectType } from '@/features/crm/crm.types'
-import { LEAD_PROJECT_TYPE_LABEL } from '@/features/crm/crm.types'
+import { LEAD_PROJECT_TYPE_LABEL } from '@/features/crm/crm.constants'
 import type { UpdateLeadPayload } from '@/features/crm/crm.types'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'

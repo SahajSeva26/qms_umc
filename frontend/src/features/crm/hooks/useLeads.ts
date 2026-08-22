@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { crmService } from '@/features/crm/crm.service'
-import { LEAD_STATUS_LABEL } from '@/features/crm/crm.types'
+import { LEAD_STATUS_LABEL } from '@/features/crm/crm.constants'
 import type { CreateLeadPayload, LeadStatus, SearchLeadQuery, UpdateLeadPayload } from '@/features/crm/crm.types'
 import { toast } from '@/components/ui/sonner'
 import { getApiErrorMessage } from '@/utils/apiError'

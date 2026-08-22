@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
-import { accessManagementService } from '@/features/access-management/accessManagement.service'
+import { authService } from '@/features/auth/auth.service'
 import type { SessionResponse } from '@/types/session.types'
 
 // The ONE central session hook, owning the single GET /auth/me fetch that
@@ -16,7 +16,7 @@ export const useSession = () => {
 
   const query = useQuery({
     queryKey: SESSION_QUERY_KEY,
-    queryFn: () => accessManagementService.getMe(),
+    queryFn: () => authService.getMe(),
     staleTime: 5 * 60 * 1000, // 5 minutes — permissions rarely change mid-session
     // Never retry a 401 (no valid session) — retrying doubles isLoading
     // time, and SessionBootstrap blocks the whole router on isLoading.

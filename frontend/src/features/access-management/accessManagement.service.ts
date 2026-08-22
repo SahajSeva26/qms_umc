@@ -1,6 +1,4 @@
 import api from '@/lib/api/api'
-import { validateApiResponse } from '@/lib/api/validateApiResponse'
-import { AuthMeResponseSchema } from '@/features/access-management/accessManagement.response-schemas'
 import type { ApiResponse, PaginatedResponse } from '@/types/common.types'
 import type {
   CreateRolePayload,
@@ -19,17 +17,6 @@ import type {
   UpdateRoleTypePayload,
   UpdateTenantPayload,
 } from '@/features/access-management/accessManagement.types'
-import type { SessionResponse } from '@/types/session.types'
-
-// ---------------------------------------------------------------------------
-// Session (GET /auth/me)
-// ---------------------------------------------------------------------------
-
-const getMe = async () => {
-  const res = await api.get<ApiResponse<SessionResponse>>('/auth/me')
-  validateApiResponse(AuthMeResponseSchema, res.data, '/auth/me')
-  return res.data
-}
 
 // ---------------------------------------------------------------------------
 // Tenants
@@ -125,7 +112,6 @@ const updateRole = async (id: string, payload: UpdateRolePayload) => {
 }
 
 export const accessManagementService = {
-  getMe,
   searchTenants,
   getTenant,
   createTenant,

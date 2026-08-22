@@ -15,9 +15,6 @@ export const LEAD_STATUSES = {
 // entity key for the sequential lead-code counter (seeded at startup, incremented on create)
 export const LEAD_COUNTER_ENTITY = 'lead';
 
-// LEAD REPORT — default trend window when the caller doesn't pass from/to
-export const LEAD_REPORT_DEFAULT_TREND_DAYS = 30;
-
 export const LEAD_PROJECT_TYPES = {
     SCREENING: 'screening',
     DIET: 'diet',

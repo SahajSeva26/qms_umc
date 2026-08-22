@@ -2,7 +2,6 @@ import { ResponseHandler } from '../../../shared/utils/responseHandler';
 import { formatZodError } from '../../../shared/utils/error';
 import {
     CreateLeadPayloadSchema,
-    LeadReportQuerySchema,
     MoveStagePayloadSchema,
     SearchLeadQuerySchema,
     UpdateLeadPayloadSchema,
@@ -153,37 +152,10 @@ const moveStage = async (req: any, res: any) => {
     }
 };
 
-const report = async (req: any, res: any) => {
-    try {
-        const ctx: RequestContext = req.context;
-
-        const { data: filters, success, error } = LeadReportQuerySchema.safeParse(req.query);
-        if (!success) {
-            const validationErrors = formatZodError(error);
-            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
-                fields: validationErrors,
-            });
-        }
-
-        const result = await LeadService.report(filters, ctx);
-
-        return ResponseHandler.appResponse(
-            res,
-            StatusCodes.OK,
-            true,
-            'Lead report generated successfully',
-            LeadMapper.toReportResponse(result),
-        );
-    } catch (error: any) {
-        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
-    }
-};
-
 export const LeadController = {
     get,
     search,
     create,
     update,
     moveStage,
-    report,
 };

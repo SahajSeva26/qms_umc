@@ -75,13 +75,3 @@ export const SearchLeadQuerySchema = z.object({
     limit: z.string().optional().openapi({ example: '10' }),
 });
 export type ISearchLeadQuery = z.infer<typeof SearchLeadQuerySchema>;
-
-//5: report ====================================>
-export const LeadReportQuerySchema = z.object({
-    division: objectId('Division').optional(),
-    salesPerson: objectId('Sales person').optional(),
-    projectType: z.enum(Object.values(LEAD_PROJECT_TYPES)).optional().openapi({ example: 'screening' }),
-    from: z.coerce.date().optional().openapi({ example: '2026-07-01' }),
-    to: z.coerce.date().optional().openapi({ example: '2026-08-01' }),
-});
-export type ILeadReportQuery = z.infer<typeof LeadReportQuerySchema>;

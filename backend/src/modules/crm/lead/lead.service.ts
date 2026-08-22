@@ -1,20 +1,7 @@
 import mongoose, { HydratedDocument } from 'mongoose';
 import { ILead, LeadModel } from './lead.model';
-import {
-    ICreateLeadPayload,
-    ILeadReportQuery,
-    IMoveStagePayload,
-    ISearchLeadQuery,
-    IUpdateLeadPayload,
-    canTransition,
-} from './lead.validators';
-import {
-    LEAD_COUNTER_ENTITY,
-    LEAD_PERMISSIONS,
-    LEAD_REPORT_DEFAULT_TREND_DAYS,
-    LEAD_STATUSES,
-    LEAD_TRANSITION_MAP,
-} from './lead.constants';
+import { ICreateLeadPayload, IMoveStagePayload, ISearchLeadQuery, IUpdateLeadPayload, canTransition } from './lead.validators';
+import { LEAD_COUNTER_ENTITY, LEAD_PERMISSIONS, LEAD_TRANSITION_MAP } from './lead.constants';
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
@@ -27,7 +14,6 @@ import { TENANT_TYPE } from '../../access-management/tenant/tenant.constants';
 import { TenantService } from '../../access-management/tenant/tenant.service';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
 import { CounterService } from '../../counter/counter.service';
-import { endOfUTCDay, startOfUTCDay } from '../../../shared/utils/dates';
 
 type LeadDocument = HydratedDocument<ILead> | null;
 
@@ -285,93 +271,12 @@ const moveStage = async (id: string, model: IMoveStagePayload, ctx: RequestConte
     return lead;
 };
 
-
-const enumerateDays = (from: Date, to: Date): string[] => {
-    const days: string[] = [];
-    const cursor = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate()));
-    const end = new Date(Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), to.getUTCDate()));
-    while (cursor <= end) {
-        days.push(cursor.toISOString().slice(0, 10));
-        cursor.setUTCDate(cursor.getUTCDate() + 1);
-    }
-    return days;
-};
-
-
-const TERMINAL_LEAD_STATUSES = Object.entries(LEAD_TRANSITION_MAP)
-    .filter(([, next]) => next.length === 0)
-    .map(([status]) => status);
-
-const report = async (filters: ILeadReportQuery, ctx: RequestContext) => {
-    //1: scope — same layering as search(): ctx.where() first, then the caller's own filters
-    const where: mongoose.QueryFilter<ILead> = { ...ctx.where() };
-    if (filters.division) {
-        where.division = filters.division as any;
-    }
-    if (filters.salesPerson) {
-        where.salesPerson = filters.salesPerson as any;
-    }
-    if (filters.projectType) {
-        where.projectType = filters.projectType;
-    }
-
-    //2: trend window — defaults to the last LEAD_REPORT_DEFAULT_TREND_DAYS days
-    const to = filters.to ? endOfUTCDay(filters.to) : endOfUTCDay(new Date());
-    const from = filters.from
-        ? startOfUTCDay(filters.from)
-        : startOfUTCDay(new Date(to.getTime() - LEAD_REPORT_DEFAULT_TREND_DAYS * 24 * 60 * 60 * 1000));
-
-    //single aggregation, single collection scan.
-    const [result] = await LeadModel.aggregate([
-        { $match: where },
-        {
-            $facet: {
-                totalLeads: [{ $count: 'count' }],
-                statusCounts: [{ $group: { _id: '$status', count: { $sum: 1 } } }],
-                projectTypeCounts: [{ $group: { _id: '$projectType', count: { $sum: 1 } } }],
-                newLeadsTrend: [
-                    { $match: { createdAt: { $gte: from, $lte: to } } },
-                    {
-                        $group: {
-                            _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: 'UTC' } },
-                            count: { $sum: 1 },
-                        },
-                    },
-                    { $sort: { _id: 1 } },
-                ],
-            },
-        },
-    ]);
-
-    const trendCounts = new Map((result?.newLeadsTrend || []).map((r: any) => [r._id, r.count]));
-    const newLeadsTrend = enumerateDays(from, to).map((period) => ({
-        period,
-        count: trendCounts.get(period) || 0,
-    }));
-
-    //3: derive the summary numbers from statusCounts — this interprets the status
-    const statusCounts = new Map<string, number>((result?.statusCounts || []).map((s: any) => [s._id, s.count]));
-    const totalLeads: number = result?.totalLeads?.[0]?.count || 0;
-    const converted = statusCounts.get(LEAD_STATUSES.WON) || 0;
-    const lost = statusCounts.get(LEAD_STATUSES.LOST) || 0;
-    const closed = TERMINAL_LEAD_STATUSES.reduce((sum, status) => sum + (statusCounts.get(status) || 0), 0);
-    const open = totalLeads - closed;
-
-    return {
-        ...result,
-        newLeadsTrend,
-        summary: { totalLeads, converted, lost, open },
-        meta: { from, to },
-    };
-};
-
 export const LeadService = {
     get,
     search,
     create,
     update,
     moveStage,
-    report,
 };
 
 // ========================================================================================

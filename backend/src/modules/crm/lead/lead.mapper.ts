@@ -1,5 +1,4 @@
 import { RequestContext } from '../../../shared/utils/contextBuilder';
-import { LEAD_PROJECT_TYPES, LEAD_STATUSES } from './lead.constants';
 
 export const LeadMapper = {
     toResponse: (lead: any, ctx: RequestContext) => {
@@ -48,30 +47,5 @@ export const LeadMapper = {
             result.items.push(LeadMapper.toResponse(lead, ctx));
         }
         return result;
-    },
-    toReportResponse: (report: any) => {
-        const statusCounts = new Map<string, number>((report?.statusCounts || []).map((s: any) => [s._id, s.count]));
-        const projectTypeCounts = new Map<string, number>(
-            (report?.projectTypeCounts || []).map((p: any) => [p._id, p.count]),
-        );
-
-        return {
-            summary: report?.summary,
-            byStatus: Object.values(LEAD_STATUSES).map((status) => ({
-                status,
-                count: statusCounts.get(status) || 0,
-            })),
-            byProjectType: Object.values(LEAD_PROJECT_TYPES).map((projectType) => ({
-                projectType,
-                count: projectTypeCounts.get(projectType) || 0,
-            })),
-            trends: {
-                newLeads: {
-                    from: report?.meta?.from,
-                    to: report?.meta?.to,
-                    data: report?.newLeadsTrend || [],
-                },
-            },
-        };
     },
 };

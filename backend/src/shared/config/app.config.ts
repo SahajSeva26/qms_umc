@@ -77,10 +77,6 @@ let ENV = {
         // Strict limiter — applied to auth endpoints (brute-force targets)
         AuthWindowMs: Number(process.env.AUTH_RATE_LIMIT_WINDOW_MS) || 60 * 1000, // 1 min
         AuthMax: Number(process.env.AUTH_RATE_LIMIT_MAX) || 10, // requests per window per IP
-
-        // Report limiter — applied to report endpoints (heavy/aggregation queries)
-        ReportWindowMs: Number(process.env.REPORT_RATE_LIMIT_WINDOW_MS) || 60 * 1000, // 1 min
-        ReportMax: Number(process.env.REPORT_RATE_LIMIT_MAX) || 50, // requests per window per IP
     },
 };
 

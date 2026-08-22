@@ -20,6 +20,7 @@ export const createTenantSchema = z.object({
     .string()
     .trim()
     .min(3, 'Company code must be at least 3 characters')
+    .regex(/^\S+$/, 'Company code cannot contain spaces.')
     .toLowerCase()
     .refine((val) => !MONGO_OBJECT_ID_REGEX.test(val), {
       message: 'Company code must not look like an ObjectId',

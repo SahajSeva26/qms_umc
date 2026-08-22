@@ -1,12 +1,14 @@
 import api from '@/lib/api/api'
 import { validateApiResponse } from '@/lib/api/validateApiResponse'
 import { AuthMeResponseSchema } from '@/features/access-management/accessManagement.response-schemas'
+import { LoginResponseSchema } from '@/features/auth/auth.schemas'
 import type { LoginPayload, AuthUser } from '@/features/auth/auth.types'
 import type { ApiResponse } from '@/types/common.types'
 import type { SessionResponse } from '@/types/session.types'
 
 const login = async (payload: LoginPayload) => {
   const res = await api.post<ApiResponse<AuthUser>>('/auth/login', payload)
+  validateApiResponse(LoginResponseSchema, res.data, '/auth/login')
   return res.data
 }
 

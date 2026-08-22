@@ -118,7 +118,7 @@ const IncidentsPage = () => {
       deviceId: payload.deviceId,
       title: payload.title,
       notes: payload.notes,
-      raisedById: user?._id ?? 'om',
+      raisedById: user?.id ?? 'om',
       raisedByName: byName,
       foId: payload.foId,
       foName: payload.foName,

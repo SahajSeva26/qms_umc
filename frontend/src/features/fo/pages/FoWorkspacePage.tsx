@@ -60,10 +60,10 @@ const FoWorkspacePage = () => {
   const me: Person = useMemo(() => {
     if (!user) return fos[0] ?? ({} as Person)
     const fullName = `${user.firstName} ${user.lastName}`.trim()
-    const match = fos.find((f) => f.name === fullName || f.email === user.email || f.id === user._id)
+    const match = fos.find((f) => f.name === fullName || f.email === user.email || f.id === user.id)
     if (match) return match
     return {
-      id: user._id,
+      id: user.id,
       name: fullName || 'Field Officer',
       role: 'Field Officer',
       phone: '',

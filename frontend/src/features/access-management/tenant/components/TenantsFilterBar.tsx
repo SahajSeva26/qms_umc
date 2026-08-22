@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button'
 import SearchInput from '@/components/ui/SearchInput'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { TenantsFilterState } from '@/features/access-management/tenant/hooks/useTenantsFilters'
-import type { TenantStatus } from '@/types/accessManagement.types'
+import type { TenantStatus } from '@/features/access-management/accessManagement.types'
 
 const STATUS_OPTIONS: { value: TenantStatus; label: string }[] = [
   { value: 'active', label: 'Active' },

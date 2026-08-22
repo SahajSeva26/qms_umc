@@ -1,5 +1,5 @@
 import { useSession, SESSION_QUERY_KEY } from '@/hooks/useSession'
-import type { SessionPermissions } from '@/types/accessManagement.types'
+import type { SessionPermissions } from '@/types/session.types'
 
 // Thin wrapper over the central `useSession()` hook — kept as its own export
 // (rather than migrating call sites to useSession directly) so existing

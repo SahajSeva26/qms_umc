@@ -1,4 +1,4 @@
-import type { TenantStatus } from '@/types/accessManagement.types'
+import type { TenantStatus } from '@/features/access-management/accessManagement.types'
 import StatusPill from '@/components/ui/StatusPill'
 
 const STATUS_CLASSES: Record<TenantStatus, string> = {

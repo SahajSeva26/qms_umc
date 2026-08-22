@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button'
 import MutationStatusBanner from '@/components/ui/MutationStatusBanner'
 import { useEditRoleFormResolver, toUpdateRolePayload, type UpdateRoleFormValues } from '@/features/access-management/role/roleForm'
 import { unwrapId } from '@/utils/unwrapId'
-import type { RoleEntity, RolePopulatedRoleType, RolePopulatedTenant, RolePopulatedUser } from '@/types/accessManagement.types'
+import type { RoleEntity, RolePopulatedRoleType, RolePopulatedTenant, RolePopulatedUser } from '@/features/access-management/accessManagement.types'
 
 interface EditRoleEditorProps {
   role: RoleEntity

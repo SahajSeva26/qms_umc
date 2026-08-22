@@ -1,5 +1,5 @@
 import { useFilterState } from '@/hooks/useFilterState'
-import type { TenantStatus } from '@/types/accessManagement.types'
+import type { TenantStatus } from '@/features/access-management/accessManagement.types'
 
 export interface TenantsFilterState {
   search: string

@@ -1,4 +1,4 @@
-import type { RegisterOwnerPayload } from '@/types/accessManagement.types'
+import type { RegisterOwnerPayload } from '@/features/access-management/accessManagement.types'
 
 // Real backend-integrated types for the CRM/Lead pipeline (Division + Lead).
 // Matches backend/src/modules/{division,crm/lead}/* exactly.

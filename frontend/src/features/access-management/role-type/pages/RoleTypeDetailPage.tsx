@@ -24,7 +24,7 @@ import { PERMISSION_CATALOG, PERMISSION_RESOURCE_LABELS } from '@/features/acces
 import { createRoleTypeSchema, updateRoleTypeSchema } from '@/features/access-management/role-type/schemas/roleType.schemas'
 import { unwrapId } from '@/utils/unwrapId'
 import { useReshapingResolver } from '@/features/access-management/hooks/useReshapingResolver'
-import type { RoleTypeCode, RoleTypeStatus } from '@/types/accessManagement.types'
+import type { RoleTypeCode, RoleTypeStatus } from '@/features/access-management/accessManagement.types'
 
 // Maps every catalog permission code back to its resource key for grouping.
 const CODE_TO_RESOURCE_KEY: Record<string, keyof typeof PERMISSION_CATALOG> = Object.fromEntries(

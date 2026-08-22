@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import type { Tenant } from '@/types/accessManagement.types'
+import type { Tenant } from '@/features/access-management/accessManagement.types'
 import { TENANT_ROUTES } from '@/features/access-management/tenant/tenant.routes'
 import TenantTypeBadge from '@/features/access-management/tenant/components/TenantTypeBadge'
 import TenantStatusPill from '@/features/access-management/tenant/components/TenantStatusPill'

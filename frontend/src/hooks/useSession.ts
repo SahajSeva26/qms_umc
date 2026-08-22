@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
 import { accessManagementService } from '@/features/access-management/accessManagement.service'
-import type { SessionResponse } from '@/types/accessManagement.types'
+import type { SessionResponse } from '@/types/session.types'
 
 // The ONE central session hook, owning the single GET /auth/me fetch that
 // every permission/role check derives from. Does not replace `useAuth`/`useAuthStore`.

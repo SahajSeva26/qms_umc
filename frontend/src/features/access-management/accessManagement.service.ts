@@ -13,13 +13,13 @@ import type {
   SearchRoleQuery,
   SearchRoleTypeQuery,
   SearchTenantQuery,
-  SessionResponse,
   Tenant,
   UpdatePermissionGroupPayload,
   UpdateRolePayload,
   UpdateRoleTypePayload,
   UpdateTenantPayload,
-} from '@/types/accessManagement.types'
+} from '@/features/access-management/accessManagement.types'
+import type { SessionResponse } from '@/types/session.types'
 
 // ---------------------------------------------------------------------------
 // Session (GET /auth/me)

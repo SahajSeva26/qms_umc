@@ -1,7 +1,7 @@
 import { useEntityQuery } from '@/hooks/useEntityQuery'
 import { createEntityKeys } from '@/hooks/entityQueryKeys'
 import { accessManagementService } from '@/features/access-management/accessManagement.service'
-import type { SearchRoleTypeQuery } from '@/types/accessManagement.types'
+import type { SearchRoleTypeQuery } from '@/features/access-management/accessManagement.types'
 
 export const roleTypeKeys = createEntityKeys<SearchRoleTypeQuery>('role-types', 'role-type')
 

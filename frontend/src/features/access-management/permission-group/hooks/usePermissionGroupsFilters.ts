@@ -1,5 +1,5 @@
 import { useFilterState } from '@/hooks/useFilterState'
-import type { PermissionGroupStatus } from '@/types/accessManagement.types'
+import type { PermissionGroupStatus } from '@/features/access-management/accessManagement.types'
 
 export interface PermissionGroupsFilterState {
   search: string

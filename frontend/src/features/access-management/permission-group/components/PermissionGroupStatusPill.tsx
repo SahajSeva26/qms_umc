@@ -1,4 +1,4 @@
-import type { PermissionGroupStatus } from '@/types/accessManagement.types'
+import type { PermissionGroupStatus } from '@/features/access-management/accessManagement.types'
 import StatusPill from '@/components/ui/StatusPill'
 
 const STATUS_CLASSES: Record<PermissionGroupStatus, string> = {

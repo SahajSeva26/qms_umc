@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button'
 import SearchInput from '@/components/ui/SearchInput'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { PermissionGroupsFilterState } from '@/features/access-management/permission-group/hooks/usePermissionGroupsFilters'
-import type { PermissionGroupStatus } from '@/types/accessManagement.types'
+import type { PermissionGroupStatus } from '@/features/access-management/accessManagement.types'
 
 const STATUS_OPTIONS: { value: PermissionGroupStatus; label: string }[] = [
   { value: 'active', label: 'Active' },

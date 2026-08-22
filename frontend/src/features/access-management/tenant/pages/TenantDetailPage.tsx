@@ -19,7 +19,7 @@ import TenantStatusPill from '@/features/access-management/tenant/components/Ten
 import { Button } from '@/components/ui/button'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import type { DivisionEntity } from '@/features/crm/crm.types'
-import type { RolePopulatedUser } from '@/types/accessManagement.types'
+import type { RolePopulatedUser } from '@/features/access-management/accessManagement.types'
 
 const TenantDetailPage = () => {
   const { id } = useParams<{ id: string }>()

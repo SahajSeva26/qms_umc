@@ -1,7 +1,7 @@
 import queryClient from '@/lib/api/queryClient'
 import { SESSION_QUERY_KEY } from '@/hooks/useSession'
 import type { ApiResponse } from '@/types/common.types'
-import type { SessionResponse } from '@/types/accessManagement.types'
+import type { SessionResponse } from '@/types/session.types'
 
 /** Mirrors backend `authorizeMiddleware.ts` — a caller holding `system:manage` bypasses every check. */
 const SYSTEM_MANAGE_CODE = 'system:manage'

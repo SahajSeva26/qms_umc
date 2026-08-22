@@ -1,4 +1,4 @@
-import type { IPermission } from '@/types/accessManagement.types'
+import type { IPermission } from '@/features/access-management/accessManagement.types'
 
 // Hardcoded mirror of the REAL backend permission catalog
 // (`backend/src/shared/env/permissions.ts` -> PERMISSIONS / PERMISSIONS_ARRAY).

@@ -1,4 +1,4 @@
-import type { RoleTypeStatus } from '@/types/accessManagement.types'
+import type { RoleTypeStatus } from '@/features/access-management/accessManagement.types'
 import StatusPill from '@/components/ui/StatusPill'
 
 const STATUS_CLASSES: Record<RoleTypeStatus, string> = {

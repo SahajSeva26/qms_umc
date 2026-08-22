@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
-import type { Tenant, TenantStatus, TenantType } from '@/types/accessManagement.types'
+import type { Tenant, TenantStatus, TenantType } from '@/features/access-management/accessManagement.types'
 import { useUpdateTenant } from '@/features/access-management/tenant/hooks/useUpdateTenant'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRoleTypes'

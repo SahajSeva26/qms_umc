@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
-import type { RoleEntity, RoleTypeEntity } from '@/types/accessManagement.types'
+import type { RoleEntity, RoleTypeEntity } from '@/features/access-management/accessManagement.types'
 
 vi.mock('@/hooks/usePermission')
 

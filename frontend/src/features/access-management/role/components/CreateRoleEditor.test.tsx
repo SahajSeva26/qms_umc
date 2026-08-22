@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import type { RoleTypeEntity, PermissionGroupEntity, RoleEntity } from '@/types/accessManagement.types'
+import type { RoleTypeEntity, PermissionGroupEntity, RoleEntity } from '@/features/access-management/accessManagement.types'
 import type { DivisionEntity } from '@/features/crm/crm.types'
 
 vi.mock('@/features/access-management/accessManagement.service', () => ({

@@ -5,7 +5,7 @@ import { inventoryAssignmentKeys } from '@/features/inventory/real/hooks/useInve
 import { inventoryDeviceKeys } from '@/features/inventory/real/hooks/useInventoryDevices'
 import { inventoryConsumableKeys } from '@/features/inventory/real/hooks/useInventoryConsumables'
 import { inventoryLedgerKeys } from '@/features/inventory/real/hooks/useInventoryLedgers'
-import type { MoveInventoryRequestStagePayload } from '@/types/inventoryRequest.types'
+import type { MoveInventoryRequestStagePayload } from '@/features/inventory/real/inventoryRequest.types'
 
 // A stage move has cross-module side effects (resolveStockMovement on the
 // backend): it can change Assignment holdings, Device status, and Consumable

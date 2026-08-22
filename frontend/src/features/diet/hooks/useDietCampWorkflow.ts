@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import { reopenRequestDecisionPatch } from '@/features/diet/services/dietCampWorkflow.service'
-import { useCampsData } from '@/hooks/useCampsData'
+import { useCampsShared } from '@/features/camps/hooks/useCampsShared'
 
 // Diet camp workflow decisions taken by a coordinator.
 //
@@ -25,7 +25,7 @@ import { useCampsData } from '@/hooks/useCampsData'
 // API MIGRATION: maps onto POST /camps/:id/reopen-requests/decision.
 
 export const useDecideReopenRequest = () => {
-  const { patchCamp } = useCampsData()
+  const { patchCamp } = useCampsShared()
 
   return useMutation({
     mutationFn: ({ camp, decision, by, denialReason }: {

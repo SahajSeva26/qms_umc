@@ -1,4 +1,4 @@
-import type { ProjectEntity } from '@/types/project.types'
+import type { ProjectEntity } from '@/features/projects/project.types'
 import { formatINR } from '@/utils/formatters'
 import { computeGstBreakdown, projectSalesRepName } from '@/features/projects/projects.utils'
 import ProjectTypePills from '@/features/projects/components/ProjectTypePill'

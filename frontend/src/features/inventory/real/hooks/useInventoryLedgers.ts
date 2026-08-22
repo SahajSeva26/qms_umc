@@ -1,7 +1,7 @@
 import { useEntityQuery } from '@/hooks/useEntityQuery'
 import { createEntityKeys } from '@/hooks/entityQueryKeys'
 import { inventoryLedgerService } from '@/features/inventory/real/inventoryLedger.service'
-import type { SearchInventoryLedgerQuery } from '@/types/inventoryLedger.types'
+import type { SearchInventoryLedgerQuery } from '@/features/inventory/real/inventoryLedger.types'
 
 export const inventoryLedgerKeys = createEntityKeys<SearchInventoryLedgerQuery>('inventory-ledgers')
 

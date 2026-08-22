@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import type { GeoProfileType, NearestGeoProfileQuery } from '@/types/geoProfile.types'
+import type { GeoProfileType, NearestGeoProfileQuery } from '@/features/geo-profile/geoProfile.types'
 
 // Query only fires once a valid type + lat/lng have been submitted — this is
 // a lookup tool, not a live-as-you-type search.

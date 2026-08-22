@@ -1,5 +1,5 @@
 import { FiUserX } from 'react-icons/fi'
-import type { Doctor } from '@/types/camp.types'
+import type { Doctor } from '@/features/camps/camp.types'
 import type { Assignment, Attendance, ComplianceResult } from '@/features/dedicatedops/dedicatedops.types'
 import DoPill from '@/features/dedicatedops/components/DoPill'
 import DoBar from '@/components/ui/DoBar'

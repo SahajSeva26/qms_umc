@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { FiChevronRight, FiDownload, FiUsers, FiWatch as FiApple, FiNavigation } from 'react-icons/fi'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { ClientMr } from '@/types/client.types'
 import type { GeoFo, ExpansionRecommendation } from '@/features/hq/hq.types'
 import { buildExpansion } from '@/features/hq/hq.service'

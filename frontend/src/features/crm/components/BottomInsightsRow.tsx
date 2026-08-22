@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { FiZap } from 'react-icons/fi'
-import type { LeadEntity } from '@/types/crm.types'
+import type { LeadEntity } from '@/features/crm/crm.types'
 import { formatINR } from '@/utils/formatters'
 import UserAvatar from '@/components/ui/UserAvatar'
 import RecordsDrawer from '@/features/crm/components/RecordsDrawer'

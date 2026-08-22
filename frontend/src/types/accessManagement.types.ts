@@ -1,7 +1,7 @@
 // Shared types for the PBAC (permission-based access control) domain —
 // reflects the REAL backend permission model returned by GET /auth/me,
 // keyed on permission code strings like 'user:get', 'tenant:manage', etc.
-// Decoupled from `@/types/auth.types.ts`'s separate frontend-only UserRole system.
+// Decoupled from `@/features/auth/auth.types.ts`'s separate frontend-only UserRole system.
 
 // ---------------------------------------------------------------------------
 // Permission catalog

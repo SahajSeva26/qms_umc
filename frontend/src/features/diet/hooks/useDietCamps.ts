@@ -1,9 +1,9 @@
 import { useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { Camp, CampCancellation, CampConfirmation } from '@/types/camp.types'
+import type { Camp, CampCancellation, CampConfirmation } from '@/features/camps/camp.types'
 import type { Dietitian, MediaItem, OnlineAssessment, TeleConsult, TeleConsultStatus } from '@/features/diet/diet.types'
 import * as dietService from '@/features/diet/diet.service'
-import { useCampsData } from '@/hooks/useCampsData'
+import { useCampsShared } from '@/features/camps/hooks/useCampsShared'
 import { dietitianDirectory } from '@/features/diet/services/dietitianDirectory.service'
 import { dietKeys } from './dietQueryKeys'
 
@@ -29,7 +29,7 @@ import { dietKeys } from './dietQueryKeys'
 // service bodies for api.* calls later needs no component change.
 export const useDietCamps = () => {
   const queryClient = useQueryClient()
-  const { camps: allCamps, addCamp, patchCamp } = useCampsData()
+  const { camps: allCamps, addCamp, patchCamp } = useCampsShared()
   const { data, isLoading, error } = useQuery({ queryKey: ['diet-own-data'], queryFn: dietService.getData })
 
   const camps = allCamps.filter((c) => c.type === 'Diet')

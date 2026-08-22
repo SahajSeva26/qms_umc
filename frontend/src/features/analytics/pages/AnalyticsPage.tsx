@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import type { AnalyticsTab } from '@/types/analytics.types'
+import type { AnalyticsTab } from '@/features/analytics/analytics.types'
 import { useAnalyticsFilters } from '@/features/analytics/hooks/useAnalyticsFilters'
 import { useAnalyticsData } from '@/features/analytics/hooks/useAnalyticsData'
 import { computeAnalyticsKpis } from '@/features/analytics/analytics.kpis'

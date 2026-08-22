@@ -4,7 +4,7 @@ import {
   FiFolder, FiCheckCircle, FiXCircle, FiClipboard,
 } from 'react-icons/fi'
 import type { Person } from '@/types/people.types'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { DeviceCatalogItem } from '@/types/device.types'
 import type { Incident, IncidentCategory, IncidentSeverity } from '@/features/fo/fo.types'
 import KpiTile from '@/components/ui/KpiTile'

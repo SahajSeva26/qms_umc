@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Controller, useForm } from 'react-hook-form'
 import { FiArrowLeft } from 'react-icons/fi'
-import { usePermissionCodeSelection } from '@/hooks/usePermissionCodeSelection'
+import { usePermissionCodeSelection } from '@/features/access-management/hooks/usePermissionCodeSelection'
 import { useRoleType } from '@/features/access-management/role-type/hooks/useRoleType'
 import { useUpdateRoleType } from '@/features/access-management/role-type/hooks/useUpdateRoleType'
 import { useCreateRoleType } from '@/features/access-management/role-type/hooks/useCreateRoleType'
@@ -23,7 +23,7 @@ import { Accordion, AccordionItem, AccordionTrigger, AccordionPanel } from '@/co
 import { PERMISSION_CATALOG, PERMISSION_RESOURCE_LABELS } from '@/features/access-management/permission-group/constants/permissionCatalog'
 import { createRoleTypeSchema, updateRoleTypeSchema } from '@/features/access-management/role-type/schemas/roleType.schemas'
 import { unwrapId } from '@/utils/unwrapId'
-import { useReshapingResolver } from '@/hooks/useReshapingResolver'
+import { useReshapingResolver } from '@/features/access-management/hooks/useReshapingResolver'
 import type { RoleTypeCode, RoleTypeStatus } from '@/types/accessManagement.types'
 
 // Maps every catalog permission code back to its resource key for grouping.

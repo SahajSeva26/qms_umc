@@ -1,5 +1,5 @@
 import { useInventoryAssignments } from '@/features/inventory/real/hooks/useInventoryAssignments'
-import type { InventoryAssignmentType } from '@/types/inventoryAssignment.types'
+import type { InventoryAssignmentType } from '@/features/inventory/real/inventoryAssignment.types'
 
 // Feeds a picker over what one FO holds, not a paginated table — the panel's
 // default PAGE_SIZE of 10 would make holdings past page 1 unselectable for a return.

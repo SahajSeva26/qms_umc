@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { Person } from '@/types/people.types'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { DeviceCatalogItem } from '@/types/device.types'
 import FoFilterBar, { type FoFilters } from '@/features/fo/components/FoFilterBar'
 import { foLiveStatus } from '@/features/fo/components/fo.ui'

@@ -4,7 +4,7 @@ import type {
   FoClaim, ClaimStatus, LeaveRequest, TrainingRecord, TrainingStatus, Incident, IncidentStatus,
   ConsumableLot, FoNotification, MachineFlag,
 } from '@/features/fo/fo.types'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import { formatINR } from '@/utils/formatters'
 
 // buildLiveNotifications — synthesizes the FO's notification feed from live

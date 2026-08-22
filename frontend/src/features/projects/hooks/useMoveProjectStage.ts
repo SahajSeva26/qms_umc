@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { projectsService } from '@/features/projects/projects.service'
 import { projectKeys } from '@/features/projects/hooks/useProjects'
-import type { MoveProjectStagePayload } from '@/types/project.types'
+import type { MoveProjectStagePayload } from '@/features/projects/project.types'
 import { toast } from '@/components/ui/sonner'
 import { getApiErrorMessage } from '@/utils/apiError'
 

@@ -9,7 +9,7 @@ import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import EditContactModal from '@/features/contacts/components/EditContactModal'
 import ContactsTable from '@/features/crm/divisions/components/ContactsTable'
 import { usePagination } from '@/hooks/usePagination'
-import type { ContactEntity } from '@/types/contact.types'
+import type { ContactEntity } from '@/features/contacts/contact.types'
 
 interface DivisionContactsSectionProps {
   tenantId: string

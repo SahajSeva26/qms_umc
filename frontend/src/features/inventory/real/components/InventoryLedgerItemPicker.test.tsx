@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { InventoryDeviceEntity } from '@/types/inventoryDevice.types'
-import type { InventoryConsumableEntity } from '@/types/inventoryConsumable.types'
+import type { InventoryDeviceEntity } from '@/features/inventory/real/inventoryDevice.types'
+import type { InventoryConsumableEntity } from '@/features/inventory/real/inventoryConsumable.types'
 
 const searchInventoryDevices = vi.fn<(query: unknown) => Promise<{ success: boolean; message: string; data: { items: InventoryDeviceEntity[]; count: number } }>>()
 const searchInventoryConsumables = vi.fn<(query: unknown) => Promise<{ success: boolean; message: string; data: { items: InventoryConsumableEntity[]; count: number } }>>()

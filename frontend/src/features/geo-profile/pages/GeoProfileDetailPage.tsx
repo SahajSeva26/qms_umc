@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import type { GeoProfileEntity, GeoProfileStatus, GeoProfileType } from '@/types/geoProfile.types'
+import type { GeoProfileEntity, GeoProfileStatus, GeoProfileType } from '@/features/geo-profile/geoProfile.types'
 import type { RoleEntity } from '@/types/accessManagement.types'
 
 // `role` is required on create and immutable afterward (1:1 link, unique).

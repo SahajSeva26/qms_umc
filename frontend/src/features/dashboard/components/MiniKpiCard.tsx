@@ -1,6 +1,6 @@
 import { FiArrowUp, FiArrowDown } from 'react-icons/fi'
 import { formatINR, formatPercent } from '@/utils/formatters'
-import type { KpiValue } from '@/types/dashboard.types'
+import type { KpiValue } from '@/features/dashboard/dashboard.types'
 
 interface MiniKpiCardProps {
   label: string

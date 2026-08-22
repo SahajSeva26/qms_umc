@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { billingCampsService } from '@/features/billing/billingCamps.service'
-import type { CampEntity, CampStatus } from '@/types/campReal.types'
+import type { CampEntity, CampStatus } from '@/features/camps/campReal.types'
 
 // A camp qualifies for billing only if it is billable-type AND has reached a
 // billable lifecycle state — mirrors invoice.service.ts's own

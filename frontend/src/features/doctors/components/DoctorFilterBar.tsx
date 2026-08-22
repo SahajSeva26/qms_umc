@@ -3,7 +3,7 @@ import { Input } from '@/components/ui/input'
 import SearchInput from '@/components/ui/SearchInput'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { DoctorsFilterState } from '@/features/doctors/hooks/useDoctorsFilters'
-import type { DoctorSpecialization, DoctorStatus } from '@/types/doctor.types'
+import type { DoctorSpecialization, DoctorStatus } from '@/features/doctors/doctor.types'
 
 // Backend enum only has these two values — do not add more.
 const SPECIALIZATION_OPTIONS: { value: DoctorSpecialization; label: string }[] = [

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { FiArrowLeft } from 'react-icons/fi'
-import { usePermissionCodeSelection } from '@/hooks/usePermissionCodeSelection'
+import { usePermissionCodeSelection } from '@/features/access-management/hooks/usePermissionCodeSelection'
 import { usePermissionGroup } from '@/features/access-management/permission-group/hooks/usePermissionGroup'
 import { useUpdatePermissionGroup } from '@/features/access-management/permission-group/hooks/useUpdatePermissionGroup'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'

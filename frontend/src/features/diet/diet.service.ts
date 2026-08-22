@@ -1,4 +1,4 @@
-import type { Camp, CampCancellation, CampConfirmation } from '@/types/camp.types'
+import type { Camp, CampCancellation, CampConfirmation } from '@/features/camps/camp.types'
 import type { Dietitian, CampReminderLog, MediaItem, OnlineAssessment, TeleConsult, TeleConsultStatus } from '@/features/diet/diet.types'
 import { DIETITIANS, TELE_CONSULTS } from '@/features/diet/diet.mock'
 import { load, persist } from '@/features/diet/services/dietStorage'

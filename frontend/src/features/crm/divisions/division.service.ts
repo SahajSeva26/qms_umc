@@ -9,7 +9,7 @@ import type {
   DivisionEntity,
   SearchDivisionQuery,
   UpdateDivisionPayload,
-} from '@/types/crm.types'
+} from '@/features/crm/crm.types'
 
 const searchDivisions = async (query: SearchDivisionQuery) => {
   const res = await api.get<PaginatedResponse<DivisionEntity>>('/divisions', { params: query })

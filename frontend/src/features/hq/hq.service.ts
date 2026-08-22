@@ -2,7 +2,7 @@
 // TODO: entirely mock/frontend-only — no backend endpoints exist yet.
 
 import type { Person } from '@/types/people.types'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { DeviceCatalogItem } from '@/types/device.types'
 import { lookupCity, CITY_COORDS } from '@/features/hq/cityGazetteer'
 import type {

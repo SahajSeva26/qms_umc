@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { FiCheck } from 'react-icons/fi'
 import type { ClassifiedHq, GeoFo, HqRecord } from '@/features/hq/hq.types'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import { classifyHq } from '@/features/hq/hq.service'
 import { lookupCity } from '@/features/hq/cityGazetteer'
 import HqTable from '@/features/hq/components/hqmapping/HqTable'

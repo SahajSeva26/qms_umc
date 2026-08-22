@@ -5,7 +5,7 @@ import { useUpdateTenant } from '@/features/access-management/tenant/hooks/useUp
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRoleTypes'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
-import { useReshapingResolver } from '@/hooks/useReshapingResolver'
+import { useReshapingResolver } from '@/features/access-management/hooks/useReshapingResolver'
 import { updateTenantSchema } from '@/features/access-management/tenant/schemas/tenant.schemas'
 import { PLATFORM_TENANT_CODE, PLATFORM_TENANT_FETCH_LIMIT } from '@/features/access-management/accessManagement.constants'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'

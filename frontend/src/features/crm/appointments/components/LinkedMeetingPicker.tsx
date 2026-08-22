@@ -1,8 +1,8 @@
 import { FiX } from 'react-icons/fi'
 import { useAppointmentsReal } from '@/features/crm/appointments/hooks/useAppointmentsReal'
 import { useAsyncPickerState } from '@/hooks/useAsyncPickerState'
-import { APPOINTMENT_TYPE_LABEL } from '@/types/appointment.types'
-import type { AppointmentEntity } from '@/types/appointment.types'
+import { APPOINTMENT_TYPE_LABEL } from '@/features/crm/appointments/appointment.types'
+import type { AppointmentEntity } from '@/features/crm/appointments/appointment.types'
 
 interface LinkedMeetingPickerProps {
   value: string

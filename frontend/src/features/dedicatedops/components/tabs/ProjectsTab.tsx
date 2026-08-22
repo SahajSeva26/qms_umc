@@ -1,5 +1,5 @@
 import { FiBriefcase, FiRadio, FiClipboard, FiDownload, FiUserPlus } from 'react-icons/fi'
-import type { ProjectEntity } from '@/types/project.types'
+import type { ProjectEntity } from '@/features/projects/project.types'
 import type { Assignment, DedicatedProjectConfig } from '@/features/dedicatedops/dedicatedops.types'
 import KpiTile from '@/components/ui/KpiTile'
 import { Button } from '@/components/ui/button'

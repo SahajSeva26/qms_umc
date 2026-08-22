@@ -1,4 +1,4 @@
-import type { Camp, CampStatus, Doctor } from '@/types/camp.types'
+import type { Camp, CampStatus, Doctor } from '@/features/camps/camp.types'
 import { CAMPS as SEED_CAMPS, DOCTORS } from '@/features/camps/camps.mock'
 
 const STORAGE_KEY = 'qms.master.camps'

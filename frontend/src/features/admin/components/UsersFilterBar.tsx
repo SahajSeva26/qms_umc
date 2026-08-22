@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button'
 import SearchInput from '@/components/ui/SearchInput'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { UsersFilterState } from '@/features/admin/hooks/useUsersFilters'
-import type { UserStatus } from '@/types/user.types'
+import type { UserStatus } from '@/features/admin/user.types'
 
 const STATUS_OPTIONS: { value: UserStatus; label: string }[] = [
   { value: 'active', label: 'Active' },

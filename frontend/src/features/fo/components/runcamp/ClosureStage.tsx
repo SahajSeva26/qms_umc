@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { toast } from '@/components/ui/sonner'
 import CameraGeoCapture, { type CaptureResult } from '@/components/ui/CameraGeoCapture'
 import { DEFAULT_ADDITIONAL_PHOTOS } from '@/features/fo/foConfig.types'
-import type { RunCampScreeningResult } from '@/types/camp.types'
+import type { RunCampScreeningResult } from '@/features/camps/camp.types'
 import type { ConsumableLot } from '@/features/fo/fo.types'
 
 export type FinalStatus = 'INCOMPLETE' | 'COMPLETE_WITHOUT_REPORT' | 'COMPLETE'

@@ -1,7 +1,7 @@
 import { createEntityKeys } from '@/hooks/entityQueryKeys'
 import { useEntityQuery } from '@/hooks/useEntityQuery'
 import { invoiceService } from '@/features/billing/invoice.service'
-import type { SearchInvoiceQuery } from '@/types/invoice.types'
+import type { SearchInvoiceQuery } from '@/features/billing/invoice.types'
 
 export const invoiceKeys = createEntityKeys<SearchInvoiceQuery>('invoices', 'invoice')
 

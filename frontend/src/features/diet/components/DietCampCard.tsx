@@ -1,8 +1,8 @@
 import { FiUser, FiVideo, FiPhone } from 'react-icons/fi'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { Dietitian } from '@/features/diet/diet.types'
 import { dietStage } from '@/features/diet/diet.utils'
-import { clientName } from '@/types/campref.types'
+import { clientName } from '@/features/camps/camps.refs'
 import { formatDate } from '@/utils/formatters'
 import DietStatusPill from '@/features/diet/components/DietStatusPill'
 

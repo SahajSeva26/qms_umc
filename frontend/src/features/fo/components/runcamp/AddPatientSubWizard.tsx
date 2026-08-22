@@ -9,7 +9,7 @@ import { toast } from '@/components/ui/sonner'
 import type { PatientFieldDef, FoTestDef } from '@/features/fo/foConfig.types'
 import { DEFAULT_PATIENT_FIELDS } from '@/features/fo/foConfig.types'
 import { interpret, getTest } from '@/features/fo/foConfig.service'
-import type { RunCampScreeningResult } from '@/types/camp.types'
+import type { RunCampScreeningResult } from '@/features/camps/camp.types'
 
 const FALLBACK_TESTS = ['BP_SYS', 'BP_DIA', 'RBS', 'WT', 'HT', 'BMI']
 

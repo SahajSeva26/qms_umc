@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { FiCheck, FiX, FiPlus } from 'react-icons/fi'
 import type { Person } from '@/types/people.types'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { FoClaim, ClaimType } from '@/features/fo/fo.types'
 import { Button } from '@/components/ui/button'
 import KpiTile from '@/components/ui/KpiTile'

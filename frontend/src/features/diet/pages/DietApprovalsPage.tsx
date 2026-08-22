@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { FiGrid, FiUserCheck, FiFolder, FiUnlock, FiCreditCard } from 'react-icons/fi'
 import { useAuth } from '@/hooks/useAuth'
-import { useCampsData } from '@/hooks/useCampsData'
+import { useCampsShared } from '@/features/camps/hooks/useCampsShared'
 import { dietCampsForScope, userName } from '@/features/diet/components/approvals/helpers'
 import ScopeBanner from '@/features/diet/components/approvals/ScopeBanner'
 import DashboardTab from '@/features/diet/components/approvals/DashboardTab'
@@ -32,7 +32,7 @@ const TABS: { id: TabId; label: string; icon: typeof FiGrid }[] = [
 // into camps.mock.ts/people.mock.ts, so there's nothing for it to do.
 const DietApprovalsPage = () => {
   const { user } = useAuth()
-  const { camps, isLoading, error } = useCampsData()
+  const { camps, isLoading, error } = useCampsShared()
   const [tab, setTab] = useState<TabId>('dashboard')
 
   const name = userName(user)

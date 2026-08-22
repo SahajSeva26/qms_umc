@@ -5,7 +5,7 @@
 // not be reordered. Blob/download stays in paymentCsv.ts; deciding *when* to
 // export stays in the page. Nothing here touches the DOM or a store.
 
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { DietPayment, ScopedDietitianRollup } from '@/features/diet/dietitians.types'
 import { dietitianExpenseFrom } from '@/features/diet/services/dietitianRates.service'
 import {

@@ -1,4 +1,4 @@
-import type { CampStatus } from '@/types/campReal.types'
+import type { CampStatus } from '@/features/camps/campReal.types'
 import ColorPill from '@/components/ui/ColorPill'
 
 // Uses ColorPill's raw hex + alpha-blend background since Camp has 6 statuses

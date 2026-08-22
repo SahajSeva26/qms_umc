@@ -1,5 +1,5 @@
-import type { AppointmentEntity } from '@/types/appointment.types'
-import { APPOINTMENT_STATUS_LABEL, APPOINTMENT_TYPE_LABEL } from '@/types/appointment.types'
+import type { AppointmentEntity } from '@/features/crm/appointments/appointment.types'
+import { APPOINTMENT_STATUS_LABEL, APPOINTMENT_TYPE_LABEL } from '@/features/crm/appointments/appointment.types'
 import { addDays, dayKey, DAY_START_HOUR, HOUR_PX, HOURS, isSameDay } from '@/features/crm/appointments/appointments.utils'
 import { appointmentChipColor, appointmentRefName, darken, isMomOverdue, layoutDayAppointments } from '@/features/crm/appointments/appointmentsReal.utils'
 

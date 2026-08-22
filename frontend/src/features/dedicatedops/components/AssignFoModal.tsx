@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { toast } from '@/components/ui/sonner'
 import type { Person } from '@/types/people.types'
-import type { Doctor } from '@/types/camp.types'
+import type { Doctor } from '@/features/camps/camp.types'
 import type { Assignment, ScheduleType } from '@/features/dedicatedops/dedicatedops.types'
 
 interface AssignFoModalProps {

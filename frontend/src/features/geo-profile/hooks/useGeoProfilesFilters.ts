@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { GeoProfileStatus, GeoProfileType } from '@/types/geoProfile.types'
+import type { GeoProfileStatus, GeoProfileType } from '@/features/geo-profile/geoProfile.types'
 
 export interface GeoProfilesFilterState {
   type: GeoProfileType | 'ALL'

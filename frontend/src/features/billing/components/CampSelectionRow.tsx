@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import type { CampEntity } from '@/types/campReal.types'
+import type { CampEntity } from '@/features/camps/campReal.types'
 import { formatDate, formatINRFull } from '@/utils/formatters'
 
 interface CampSelectionRowProps {

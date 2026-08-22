@@ -1,4 +1,4 @@
-import type { AppointmentEntity, AppointmentStatus } from '@/types/appointment.types'
+import type { AppointmentEntity, AppointmentStatus } from '@/features/crm/appointments/appointment.types'
 
 // Resolves an Appointment reference field to a plain id string regardless
 // of whether the value is a populated object or a bare ObjectId string.

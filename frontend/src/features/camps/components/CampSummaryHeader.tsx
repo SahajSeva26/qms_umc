@@ -1,5 +1,5 @@
 import CampStatusPillReal from '@/features/camps/components/CampStatusPillReal'
-import type { CampEntity, CampPopulatedDivision, CampPopulatedDoctor, CampPopulatedProject } from '@/types/campReal.types'
+import type { CampEntity, CampPopulatedDivision, CampPopulatedDoctor, CampPopulatedProject } from '@/features/camps/campReal.types'
 
 type RefValue<T> = T | string | null | undefined
 

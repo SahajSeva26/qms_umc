@@ -1,4 +1,4 @@
-import type { InventoryRequestLineItemPayload, InventoryRequestType } from '@/types/inventoryRequest.types'
+import type { InventoryRequestLineItemPayload, InventoryRequestType } from '@/features/inventory/real/inventoryRequest.types'
 
 // A line's chosen device/consumable "sub-type" — separate from the request's
 // own itemType field, which the backend derives from this: refill lines

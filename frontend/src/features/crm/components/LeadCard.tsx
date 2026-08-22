@@ -1,6 +1,6 @@
 import { FiClock } from 'react-icons/fi'
-import type { LeadEntity, LeadStatus } from '@/types/crm.types'
-import { LEAD_STATUS_LABEL, LEAD_TRANSITION_MAP } from '@/types/crm.types'
+import type { LeadEntity, LeadStatus } from '@/features/crm/crm.types'
+import { LEAD_STATUS_LABEL, LEAD_TRANSITION_MAP } from '@/features/crm/crm.types'
 import { formatINR } from '@/utils/formatters'
 import { roleLabel, contactPersonLabel, divisionLabel } from '@/features/crm/crm.utils'
 import UserAvatar from '@/components/ui/UserAvatar'

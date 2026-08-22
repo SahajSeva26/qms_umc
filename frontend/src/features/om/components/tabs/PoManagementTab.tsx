@@ -1,6 +1,6 @@
 import { FiAlertTriangle } from 'react-icons/fi'
-import type { Camp } from '@/types/camp.types'
-import { useProjectsDataShared } from '@/hooks/useProjectsDataShared'
+import type { Camp } from '@/features/camps/camp.types'
+import { useProjectsDataShared } from '@/features/projects/hooks/useProjectsDataShared'
 import { useErp } from '@/features/om/hooks/useErp'
 import { poStats, poAlerts } from '@/features/om/erp.service'
 import { isScreeningProject, projectTenantName } from '@/features/projects/projects.utils'

@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { billingProjectsService } from '@/features/billing/billingProjects.service'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { useAsyncPickerState } from '@/hooks/useAsyncPickerState'
-import type { ProjectEntity } from '@/types/project.types'
+import type { ProjectEntity } from '@/features/projects/project.types'
 import AsyncPicker from '@/components/ui/AsyncPicker'
 
 interface BillingProjectPickerProps {

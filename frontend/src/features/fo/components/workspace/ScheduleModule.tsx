@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { FiPlay, FiCheckCircle } from 'react-icons/fi'
 import type { Person } from '@/types/people.types'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import { Button } from '@/components/ui/button'
 import { formatDate } from '@/utils/formatters'
 import MiniCalendar from '@/features/fo/components/workspace/MiniCalendar'

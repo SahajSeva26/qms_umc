@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { INVENTORY_REQUEST_STATUS_LABEL } from '@/types/inventoryRequest.types'
-import type { InventoryRequestStatus } from '@/types/inventoryRequest.types'
+import { INVENTORY_REQUEST_STATUS_LABEL } from '@/features/inventory/real/inventoryRequest.types'
+import type { InventoryRequestStatus } from '@/features/inventory/real/inventoryRequest.types'
 import { useMoveInventoryRequestStage } from '@/features/inventory/real/hooks/useMoveInventoryRequestStage'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'

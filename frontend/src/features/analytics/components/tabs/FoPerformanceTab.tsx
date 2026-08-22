@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { FiAward, FiMapPin } from 'react-icons/fi'
-import type { Camp } from '@/types/camp.types'
-import type { FieldOfficer } from '@/types/analytics.types'
+import type { Camp } from '@/features/camps/camp.types'
+import type { FieldOfficer } from '@/features/analytics/analytics.types'
 import AnalyticsSectionCard from '@/features/analytics/components/AnalyticsSectionCard'
 import BarsHorizontal from '@/features/analytics/components/charts/BarsHorizontal'
 

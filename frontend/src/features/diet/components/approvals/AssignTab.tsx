@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { FiCheckCircle, FiSend, FiUserPlus } from 'react-icons/fi'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import { clientName } from '@/features/diet/services/dietScope.service'
 import { useDietitianCandidatesByCamp } from '@/features/diet/hooks/useDietitianCandidates'
 import { useCampInviteSummaries } from '@/features/diet/hooks/useDietitianInvites'

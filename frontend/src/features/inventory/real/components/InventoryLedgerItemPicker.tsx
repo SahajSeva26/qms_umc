@@ -8,8 +8,8 @@ import { inventoryConsumableService } from '@/features/inventory/real/inventoryC
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
-import type { InventoryDeviceEntity } from '@/types/inventoryDevice.types'
-import type { InventoryConsumableEntity } from '@/types/inventoryConsumable.types'
+import type { InventoryDeviceEntity } from '@/features/inventory/real/inventoryDevice.types'
+import type { InventoryConsumableEntity } from '@/features/inventory/real/inventoryConsumable.types'
 
 type PickerMode = 'InventoryDevice' | 'InventoryConsumable'
 

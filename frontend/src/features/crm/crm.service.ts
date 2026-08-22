@@ -6,7 +6,7 @@ import type {
   MoveLeadStagePayload,
   SearchLeadQuery,
   UpdateLeadPayload,
-} from '@/types/crm.types'
+} from '@/features/crm/crm.types'
 
 const searchLeads = async (query: SearchLeadQuery) => {
   const res = await api.get<PaginatedResponse<LeadEntity>>('/leads', { params: query })

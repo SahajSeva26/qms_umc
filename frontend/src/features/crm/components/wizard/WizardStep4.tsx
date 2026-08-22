@@ -1,5 +1,5 @@
 import type { WizardFormState } from '@/features/crm/wizard.types'
-import { LEAD_PROJECT_TYPE_LABEL } from '@/types/crm.types'
+import { LEAD_PROJECT_TYPE_LABEL } from '@/features/crm/crm.types'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRoleTypes'

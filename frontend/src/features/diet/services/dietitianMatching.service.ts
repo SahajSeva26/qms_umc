@@ -5,7 +5,7 @@
 // Owns no store of its own: it ranks the roster (dietitianRoster.service)
 // using ratings carried on the Camp records themselves.
 
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { DietitianRankResult, DietitianRosterEntry } from '@/features/diet/dietitians.types'
 import { dietitianRoster } from './dietitianRoster.service'
 

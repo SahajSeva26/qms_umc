@@ -1,6 +1,6 @@
 import { FiFileText, FiFile, FiMail } from 'react-icons/fi'
-import type { ExecutionModeType, ProjectEntity } from '@/types/project.types'
-import { EXECUTION_MODE_LABEL } from '@/types/project.types'
+import type { ExecutionModeType, ProjectEntity } from '@/features/projects/project.types'
+import { EXECUTION_MODE_LABEL } from '@/features/projects/project.types'
 import { formatDate } from '@/utils/formatters'
 
 const ICONS: Record<ExecutionModeType, typeof FiFileText> = {

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { FiPlusCircle, FiMessageCircle, FiPhone, FiAlertTriangle, FiCheckCircle, FiRotateCw, FiUserPlus } from 'react-icons/fi'
 import type { ReminderThread } from '@/features/reminders/reminders.types'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { Person } from '@/types/people.types'
 import SideDrawer from '@/components/ui/SideDrawer'
 import { Button } from '@/components/ui/button'

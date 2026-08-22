@@ -1,5 +1,5 @@
 import { useFilterState } from '@/hooks/useFilterState'
-import type { DoctorSpecialization, DoctorStatus } from '@/types/doctor.types'
+import type { DoctorSpecialization, DoctorStatus } from '@/features/doctors/doctor.types'
 
 export interface DoctorsFilterState {
   search: string

@@ -1,7 +1,7 @@
 import { FiAlertOctagon } from 'react-icons/fi'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { MachineFlag } from '@/features/fo/fo.types'
 import type { DeviceCatalogItem } from '@/types/device.types'
 import { fmtDt } from './incidents.ui'

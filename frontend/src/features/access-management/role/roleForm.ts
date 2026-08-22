@@ -1,5 +1,5 @@
 import { createRoleSchema, updateRoleSchema } from '@/features/access-management/role/schemas/role.schemas'
-import { useReshapingResolver } from '@/hooks/useReshapingResolver'
+import { useReshapingResolver } from '@/features/access-management/hooks/useReshapingResolver'
 import type { RoleStatus } from '@/types/accessManagement.types'
 
 export interface CreateRoleFormValues {

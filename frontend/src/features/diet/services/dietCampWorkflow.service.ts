@@ -5,7 +5,7 @@
 // caller persists through the shared camps hook (features/camps/ is the sole
 // owner of the camp store).
 
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { CampReopenRequest } from '@/features/diet/dietitians.types'
 import { arr } from './dietStorage'
 import { dietitianApproved, dietitianById, dietitianName } from './dietitianRoster.service'

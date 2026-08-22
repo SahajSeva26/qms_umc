@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { FiAlertTriangle } from 'react-icons/fi'
 import type { Person } from '@/types/people.types'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { DeviceCatalogItem } from '@/types/device.types'
 import type { IncidentCategory, IncidentSeverity } from '@/features/fo/fo.types'
 import { INCIDENT_CATEGORIES } from '@/features/fo/fo.types'

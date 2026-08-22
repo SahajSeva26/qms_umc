@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button'
 import { GEO_PROFILE_ROUTES } from '@/features/geo-profile/geoProfile.constants'
 import { usePagination } from '@/hooks/usePagination'
 import { usePermission } from '@/hooks/usePermission'
-import type { GeoProfileStatus, GeoProfileType } from '@/types/geoProfile.types'
+import type { GeoProfileStatus, GeoProfileType } from '@/features/geo-profile/geoProfile.types'
 
 const PAGE_SIZE = 10
 

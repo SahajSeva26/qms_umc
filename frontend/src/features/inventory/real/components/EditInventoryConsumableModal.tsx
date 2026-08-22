@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import type { ReactNode } from 'react'
-import type { InventoryConsumableEntity } from '@/types/inventoryConsumable.types'
+import type { InventoryConsumableEntity } from '@/features/inventory/real/inventoryConsumable.types'
 import { useCreateInventoryConsumable } from '@/features/inventory/real/hooks/useCreateInventoryConsumable'
 import { useUpdateInventoryConsumable } from '@/features/inventory/real/hooks/useUpdateInventoryConsumable'
 import {

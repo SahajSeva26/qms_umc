@@ -1,6 +1,6 @@
-import type { InventoryRequestStatus, InventoryRequestType } from '@/types/inventoryRequest.types'
-import type { InventoryDeviceStatus } from '@/types/inventoryDevice.types'
-import type { InventoryConsumableStatus } from '@/types/inventoryConsumable.types'
+import type { InventoryRequestStatus, InventoryRequestType } from '@/features/inventory/real/inventoryRequest.types'
+import type { InventoryDeviceStatus } from '@/features/inventory/real/inventoryDevice.types'
+import type { InventoryConsumableStatus } from '@/features/inventory/real/inventoryConsumable.types'
 
 export type InventoryLedgerItemType = 'InventoryDevice' | 'InventoryConsumable'
 

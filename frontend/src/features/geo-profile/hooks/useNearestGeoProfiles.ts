@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { geoProfileService } from '@/features/geo-profile/geoProfile.service'
-import type { NearestGeoProfileQuery } from '@/types/geoProfile.types'
+import type { NearestGeoProfileQuery } from '@/features/geo-profile/geoProfile.types'
 
 // Wraps GET /geo-profiles/nearest — the allocation lookup (nearest active
 // field staff of a type whose own coverage radius reaches the query point).

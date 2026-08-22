@@ -1,7 +1,7 @@
 import { useEntityQuery } from '@/hooks/useEntityQuery'
 import { createEntityKeys } from '@/hooks/entityQueryKeys'
 import { inventoryAssignmentService } from '@/features/inventory/real/inventoryAssignment.service'
-import type { SearchInventoryAssignmentQuery } from '@/types/inventoryAssignment.types'
+import type { SearchInventoryAssignmentQuery } from '@/features/inventory/real/inventoryAssignment.types'
 
 export const inventoryAssignmentKeys = createEntityKeys<SearchInventoryAssignmentQuery>('inventory-assignments')
 

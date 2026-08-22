@@ -12,7 +12,7 @@ import type {
   RespondAppointmentPayload,
   SearchAppointmentQuery,
   UpdateAppointmentPayload,
-} from '@/types/appointment.types'
+} from '@/features/crm/appointments/appointment.types'
 
 // Named "Real" (not replacing appointments.service.ts) since the existing
 // localStorage-mock Meeting UI is being migrated in place.

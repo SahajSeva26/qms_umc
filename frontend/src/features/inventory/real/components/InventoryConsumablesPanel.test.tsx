@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
-import type { InventoryConsumableEntity } from '@/types/inventoryConsumable.types'
+import type { InventoryConsumableEntity } from '@/features/inventory/real/inventoryConsumable.types'
 
 vi.mock('@/hooks/usePermission')
 

@@ -7,7 +7,7 @@
 // behavior change.
 
 import type { Person } from '@/types/people.types'
-import { CAMPS } from '@/types/camp.types'
+import { CAMPS } from '@/features/camps/camp.types'
 import type {
   Movement, InventoryUnit, Transfer, TransferPod, BalancingSuggestion, InventoryMasterItem, FoHoldings,
 } from '@/features/inventory/inventory.types'

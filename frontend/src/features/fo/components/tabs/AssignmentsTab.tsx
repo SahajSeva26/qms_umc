@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi'
 import type { Person } from '@/types/people.types'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import { Button } from '@/components/ui/button'
 import FoFilterBar, { type FoFilters } from '@/features/fo/components/FoFilterBar'
 import { foLiveStatus, stubOpenCamp } from '@/features/fo/components/fo.ui'

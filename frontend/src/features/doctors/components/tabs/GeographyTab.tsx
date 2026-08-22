@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { FiMap } from 'react-icons/fi'
-import type { DoctorEntity } from '@/types/doctor.types'
+import type { DoctorEntity } from '@/features/doctors/doctor.types'
 import DoBar from '@/components/ui/DoBar'
 
 interface GeographyTabProps {

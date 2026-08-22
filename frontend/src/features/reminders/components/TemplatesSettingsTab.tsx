@@ -11,7 +11,7 @@ import { renderTemplate, buildContext } from '@/features/reminders/reminders.ser
 import type { EngineRecipient } from '@/features/reminders/reminders.service'
 import { useReminderTemplates, useReminderConfig } from '@/features/reminders/hooks/useReminders'
 import { FAMILY_LABEL, LANGUAGE_LABEL } from '@/features/reminders/reminders.ui'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 
 const FAMILIES: TemplateFamily[] = ['voice_fo', 'voice_diet', 'wa_fo', 'wa_diet', 'submit_diet']
 const LANGS: ReminderLanguage[] = ['en', 'hi', 'mr']

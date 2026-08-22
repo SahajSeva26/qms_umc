@@ -10,7 +10,7 @@
 // injected as callbacks so they read live on every row — reconciliation
 // interleaves with payment writes, and a snapshot would go stale.
 
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { DietPayment } from '@/features/diet/dietitians.types'
 import { todayIso, normDate, normPayStatus } from './paymentCsv'
 

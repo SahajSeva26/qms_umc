@@ -1,6 +1,6 @@
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import { useAuth } from '@/hooks/useAuth'
-import { useProjectsDataShared } from '@/hooks/useProjectsDataShared'
+import { useProjectsDataShared } from '@/features/projects/hooks/useProjectsDataShared'
 import { useErp } from '@/features/om/hooks/useErp'
 import { billableCampsForProject } from '@/features/om/erp.service'
 import { computeGstBreakdown, isScreeningProject, projectTenantName } from '@/features/projects/projects.utils'

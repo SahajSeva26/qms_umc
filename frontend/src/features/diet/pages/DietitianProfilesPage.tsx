@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { FiUserPlus } from 'react-icons/fi'
-import { useCampsData } from '@/hooks/useCampsData'
+import { useCampsShared } from '@/features/camps/hooks/useCampsShared'
 import { useAuth } from '@/hooks/useAuth'
 import { useDietitianProfile } from '@/features/diet/hooks/useDietitianProfile'
 import { useDietitianRoster } from '@/features/diet/hooks/useDietitianRoster'
@@ -33,7 +33,7 @@ import AddDietitianModal from '@/features/diet/components/profile/AddDietitianMo
 const DietitianProfilesPage = () => {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const { camps } = useCampsData()
+  const { camps } = useCampsShared()
   const { user } = useAuth()
   const userName = user ? `${user.firstName} ${user.lastName}`.trim() : 'QMS Ops'
 

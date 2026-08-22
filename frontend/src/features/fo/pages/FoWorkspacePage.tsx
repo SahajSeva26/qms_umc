@@ -5,7 +5,7 @@ import {
 } from 'react-icons/fi'
 import { useAuth } from '@/hooks/useAuth'
 import { usePeopleData } from '@/hooks/usePeopleData'
-import { useCampsData } from '@/hooks/useCampsData'
+import { useCampsShared } from '@/features/camps/hooks/useCampsShared'
 import {
   useFoClaims, useFoTraining, useFoLeaves, useFoIncidents, useFoConsumables, useFoNotifications,
 } from '@/features/fo/hooks/useFo'
@@ -49,7 +49,7 @@ const TABS: { id: TabId; label: string; icon: typeof FiUser }[] = [
 const FoWorkspacePage = () => {
   const { user } = useAuth()
   const { people: allPeople, devices } = usePeopleData()
-  const { camps, patchCamp } = useCampsData()
+  const { camps, patchCamp } = useCampsShared()
 
   const fos = useMemo(() => allPeople.filter((p) => p.role === 'Field Officer'), [allPeople])
 

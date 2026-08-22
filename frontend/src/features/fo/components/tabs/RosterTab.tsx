@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { Person } from '@/types/people.types'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import FoFilterBar, { type FoFilters } from '@/features/fo/components/FoFilterBar'
 import { foLiveStatus, STATUS_LABEL, STATUS_COLOR, initials, avatarGradient, personCamps, closedCampsOf, upcomingCampsOf, avgFeedback } from '@/features/fo/components/fo.ui'
 import { foMatchesSearch } from '@/features/fo/utils/foSearch'

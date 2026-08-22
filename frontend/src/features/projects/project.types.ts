@@ -5,7 +5,7 @@
 // lead picker's status=won restriction is a UX-only convention — create()
 // itself never checks lead.status.
 
-import type { DivisionTherapy, LeadPopulatedContact } from './crm.types'
+import type { DivisionTherapy, LeadPopulatedContact } from '@/features/crm/crm.types'
 
 // ---------------------------------------------------------------------------
 // Enums / constants

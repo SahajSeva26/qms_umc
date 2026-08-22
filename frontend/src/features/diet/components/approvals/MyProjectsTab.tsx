@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import { CLIENTS } from '@/types/client.types'
 import { PROJECTS } from '@/types/client.types'
 import { isTokenLocked, tokenHoursLeft } from '@/features/diet/services/dietCampWorkflow.service'

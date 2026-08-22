@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { FiPlus, FiCalendar, FiCheckCircle, FiClock, FiXCircle } from 'react-icons/fi'
 import type { Person } from '@/types/people.types'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { LeaveRequest, LeaveType } from '@/features/fo/fo.types'
 import KpiTile from '@/components/ui/KpiTile'
 import { Button } from '@/components/ui/button'

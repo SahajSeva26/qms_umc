@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { FiLayers } from 'react-icons/fi'
-import type { DoctorEntity, DoctorSpecialization } from '@/types/doctor.types'
+import type { DoctorEntity, DoctorSpecialization } from '@/features/doctors/doctor.types'
 
 const SPECIALIZATION_LABEL: Record<DoctorSpecialization, string> = {
   cp: 'CP',

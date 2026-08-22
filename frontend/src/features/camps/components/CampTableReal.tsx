@@ -1,4 +1,4 @@
-import type { CampEntity } from '@/types/campReal.types'
+import type { CampEntity } from '@/features/camps/campReal.types'
 import CampStatusPillReal from '@/features/camps/components/CampStatusPillReal'
 import { useCampRefNames } from '@/features/camps/hooks/useCampRefNames'
 

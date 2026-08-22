@@ -1,4 +1,4 @@
-import type { LeadStatus } from '@/types/crm.types'
+import type { LeadStatus } from '@/features/crm/crm.types'
 import StageMoveModal from '@/features/crm/components/StageMoveModal'
 import type { useLeads } from '@/features/crm/hooks/useLeads'
 

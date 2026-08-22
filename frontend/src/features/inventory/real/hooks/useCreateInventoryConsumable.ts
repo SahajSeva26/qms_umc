@@ -1,7 +1,7 @@
 import { useCreateEntity } from '@/hooks/useCreateEntity'
 import { inventoryConsumableService } from '@/features/inventory/real/inventoryConsumable.service'
 import { inventoryConsumableKeys } from '@/features/inventory/real/hooks/useInventoryConsumables'
-import type { CreateInventoryConsumablePayload } from '@/types/inventoryConsumable.types'
+import type { CreateInventoryConsumablePayload } from '@/features/inventory/real/inventoryConsumable.types'
 
 export const useCreateInventoryConsumable = () =>
   useCreateEntity(

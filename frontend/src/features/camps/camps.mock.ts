@@ -1,4 +1,4 @@
-import type { Doctor } from '@/types/camp.types'
+import type { Doctor } from '@/features/camps/camp.types'
 
 // TODO: entirely mock — no backend endpoints exist for camps yet.
 // Values copied from the vanilla-JS prototype's camps-data.js so they match
@@ -6,7 +6,7 @@ import type { Doctor } from '@/types/camp.types'
 
 // Promoted to types/camp.types.ts — Diet Camps/Inventory read these through
 // the shared types layer instead of reaching into this feature's internals.
-export { SLOTS, CAMPS } from '@/types/camp.types'
+export { SLOTS, CAMPS } from '@/features/camps/camp.types'
 
 export const DOCTORS: Doctor[] = [
   { id: 'doc-001', code: 'SUN-CP-2418', name: 'Dr Ramesh Sharma', specialty: 'Cardiologist', email: 'r.sharma@hotmail.com', phone: '+91 9820011111', city: 'Mumbai', state: 'MH', pincode: '400053', gmap: 'https://maps.google.com/?q=Andheri+W+Mumbai' },

@@ -5,7 +5,7 @@ import type {
   DoctorEntity,
   SearchDoctorQuery,
   UpdateDoctorPayload,
-} from '@/types/doctor.types'
+} from '@/features/doctors/doctor.types'
 
 // Real backend-integrated Doctor service. Follows the exact pattern of
 // `@/features/access-management/accessManagement.service.ts`: same shared

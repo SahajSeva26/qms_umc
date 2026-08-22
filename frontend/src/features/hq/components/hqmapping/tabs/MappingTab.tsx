@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { GeoFo } from '@/features/hq/hq.types'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import { CLIENTS, DIVISIONS, MRS } from '@/types/client.types'
 import CompaniesView from '@/features/hq/components/hqmapping/mapping/CompaniesView'
 import CompanyView from '@/features/hq/components/hqmapping/mapping/CompanyView'

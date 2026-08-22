@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { FiFileText, FiRefreshCw, FiDollarSign, FiPlus } from 'react-icons/fi'
-import type { ProjectStatus } from '@/types/project.types'
+import type { ProjectStatus } from '@/features/projects/project.types'
 import { useProjects } from '@/features/projects/hooks/useProjects'
 import ProjectTable from '@/features/projects/components/ProjectTable'
 import ProjectDetailDrawer from '@/features/projects/components/ProjectDetailDrawer'

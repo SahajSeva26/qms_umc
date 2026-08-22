@@ -1,5 +1,5 @@
 import { useAssigneeHoldings } from '@/features/inventory/real/hooks/useAssigneeHoldings'
-import type { InventoryAssignmentType } from '@/types/inventoryAssignment.types'
+import type { InventoryAssignmentType } from '@/features/inventory/real/inventoryAssignment.types'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 
 interface AssigneeHoldingPickerProps {

@@ -5,7 +5,7 @@ import type {
   CreateContactPayload,
   SearchContactQuery,
   UpdateContactPayload,
-} from '@/types/contact.types'
+} from '@/features/contacts/contact.types'
 
 // Follows the exact pattern of `@/features/doctors/doctors.service.ts`: same
 // shared `api` axios instance, same ApiResponse/PaginatedResponse envelope

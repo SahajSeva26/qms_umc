@@ -3,7 +3,7 @@ import { useDivisions } from '@/features/crm/divisions/hooks/useDivisions'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import { useProjects } from '@/features/projects/hooks/useProjects'
 import { campRefId, campRefName } from '@/features/camps/campsReal.utils'
-import type { CampPopulatedDivision, CampPopulatedDoctor, CampPopulatedProject, CampPopulatedRole } from '@/types/campReal.types'
+import type { CampPopulatedDivision, CampPopulatedDoctor, CampPopulatedProject, CampPopulatedRole } from '@/features/camps/campReal.types'
 
 type RefValue<T> = T | string | null | undefined
 

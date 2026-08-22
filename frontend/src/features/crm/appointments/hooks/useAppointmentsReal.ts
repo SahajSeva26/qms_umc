@@ -1,7 +1,7 @@
 import { useEntityQuery } from '@/hooks/useEntityQuery'
 import { createEntityKeys } from '@/hooks/entityQueryKeys'
 import { appointmentsRealService } from '@/features/crm/appointments/appointmentsReal.service'
-import type { SearchAppointmentQuery } from '@/types/appointment.types'
+import type { SearchAppointmentQuery } from '@/features/crm/appointments/appointment.types'
 
 export const appointmentRealKeys = createEntityKeys<SearchAppointmentQuery>('appointmentsReal', 'appointmentReal')
 

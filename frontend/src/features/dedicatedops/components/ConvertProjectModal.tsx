@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { toast } from '@/components/ui/sonner'
-import type { ProjectEntity } from '@/types/project.types'
+import type { ProjectEntity } from '@/features/projects/project.types'
 
 interface ConvertProjectModalProps {
   open: boolean

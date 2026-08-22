@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import type { GeoProfileEntity } from '@/types/geoProfile.types'
+import type { GeoProfileEntity } from '@/features/geo-profile/geoProfile.types'
 import { GEO_PROFILE_ROUTES, GEO_PROFILE_TYPE_LABEL } from '@/features/geo-profile/geoProfile.constants'
 import GeoProfileStatusPill from '@/features/geo-profile/components/GeoProfileStatusPill'
 

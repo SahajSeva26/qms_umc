@@ -1,7 +1,7 @@
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { Client, ClientInvoice, ClientProject } from '@/types/client.types'
-import type { LeadEntity } from '@/types/crm.types'
-import type { AnalyticsFilters } from '@/types/analytics.types'
+import type { LeadEntity } from '@/features/crm/crm.types'
+import type { AnalyticsFilters } from '@/features/analytics/analytics.types'
 import { formatINR } from '@/utils/formatters'
 import { tenantLabel } from '@/features/crm/crm.utils'
 

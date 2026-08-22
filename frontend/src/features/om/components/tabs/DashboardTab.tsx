@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { FiFilter, FiX, FiDownload, FiMapPin, FiUsers } from 'react-icons/fi'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { Person } from '@/types/people.types'
 import type { DeviceCatalogItem } from '@/types/device.types'
 import type { ExpenseStatus, FoEnrollment, DietitianEnrollment, DietitianRateEntry } from '@/features/om/om.types'
@@ -14,7 +14,7 @@ import KpiTile from '@/components/ui/KpiTile'
 import DoBar from '@/components/ui/DoBar'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
-import { clientName } from '@/types/campref.types'
+import { clientName } from '@/features/camps/camps.refs'
 import { formatINR } from '@/utils/formatters'
 
 interface DashboardTabProps {

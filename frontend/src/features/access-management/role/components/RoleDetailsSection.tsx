@@ -5,7 +5,7 @@ import { Textarea } from '@/components/ui/textarea'
 import FieldLabel from '@/components/ui/FieldLabel'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { RoleStatus, RoleTypeEntity, RoleEntity } from '@/types/accessManagement.types'
-import type { DivisionEntity } from '@/types/crm.types'
+import type { DivisionEntity } from '@/features/crm/crm.types'
 
 // Shared between CreateRoleEditor/EditRoleEditor, whose form-values types
 // differ (CreateRoleFormValues vs UpdateRoleFormValues) — generic over the

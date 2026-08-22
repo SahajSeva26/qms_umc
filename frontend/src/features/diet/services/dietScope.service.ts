@@ -4,7 +4,7 @@
 //
 // Pure functions over master data — owns no store.
 
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import { PEOPLE } from '@/types/people.mock'
 import { CLIENTS, PROJECTS } from '@/types/client.types'
 import type { ClientProject } from '@/types/client.types'

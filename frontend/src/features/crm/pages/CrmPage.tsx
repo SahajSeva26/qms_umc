@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { FiDownload, FiPlus } from 'react-icons/fi'
-import type { KpiTile, LeadStatus } from '@/types/crm.types'
+import type { KpiTile, LeadStatus } from '@/features/crm/crm.types'
 import { usePermission } from '@/hooks/usePermission'
 import { useLeads } from '@/features/crm/hooks/useLeads'
 import { useCrmFilters } from '@/features/crm/hooks/useCrmFilters'

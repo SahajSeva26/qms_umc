@@ -1,4 +1,4 @@
-import type { User } from '@/types/user.types'
+import type { User } from '@/features/admin/user.types'
 
 // TODO: remove this file once the backend returns avatarTone/createdAt.
 // The User model has no avatarTone. status is now real (see user.types.ts),

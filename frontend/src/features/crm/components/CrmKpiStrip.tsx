@@ -1,6 +1,6 @@
 import type { IconType } from 'react-icons'
 import { FiTrendingUp, FiBriefcase, FiCheckCircle, FiTarget, FiDollarSign, FiActivity } from 'react-icons/fi'
-import type { KpiTile } from '@/types/crm.types'
+import type { KpiTile } from '@/features/crm/crm.types'
 import { formatINR, formatPercent } from '@/utils/formatters'
 
 const ICON_MAP: Record<string, IconType> = {

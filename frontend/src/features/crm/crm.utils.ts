@@ -1,4 +1,4 @@
-import type { LeadPopulatedRole, LeadPopulatedContact, LeadPopulatedTenant, LeadPopulatedDivision } from '@/types/crm.types'
+import type { LeadPopulatedRole, LeadPopulatedContact, LeadPopulatedTenant, LeadPopulatedDivision } from '@/features/crm/crm.types'
 
 // salesPerson only ever arrives as the raw ObjectId string before a
 // follow-up GET (create/update echo) — search/get-by-id always populate it

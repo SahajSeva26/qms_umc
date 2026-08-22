@@ -1,7 +1,7 @@
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { ClientInvoice, ClientProject } from '@/types/client.types'
-import type { LeadEntity } from '@/types/crm.types'
-import type { FieldOfficer } from '@/types/analytics.types'
+import type { LeadEntity } from '@/features/crm/crm.types'
+import type { FieldOfficer } from '@/features/analytics/analytics.types'
 import { pct } from '@/features/analytics/analytics.utils'
 
 export interface AnalyticsKpiTile {

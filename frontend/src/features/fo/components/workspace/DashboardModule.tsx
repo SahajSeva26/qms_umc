@@ -4,7 +4,7 @@ import {
   FiCalendar, FiCheckCircle, FiActivity, FiStar, FiCpu, FiAward, FiDollarSign, FiUsers,
 } from 'react-icons/fi'
 import type { Person } from '@/types/people.types'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { FoClaim, Incident, ConsumableLot, TrainingRecord, TrainingStatus } from '@/features/fo/fo.types'
 import KpiTile from '@/components/ui/KpiTile'
 import { Button } from '@/components/ui/button'

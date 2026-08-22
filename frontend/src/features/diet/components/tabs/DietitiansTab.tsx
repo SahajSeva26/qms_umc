@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { initials } from '@/features/diet/utils/personDisplay'
 import { FiCheckCircle, FiXCircle, FiPlus } from 'react-icons/fi'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { Dietitian } from '@/features/diet/diet.types'
 import { Button } from '@/components/ui/button'
 import { useEnrollDietitian } from '@/features/diet/hooks/useDietitianRoster'

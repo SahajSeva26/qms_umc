@@ -1,6 +1,6 @@
 import { Fragment, useState } from 'react'
 import { FiFolder, FiArrowLeft, FiArrowRight, FiSave, FiX } from 'react-icons/fi'
-import type { CreateProjectPayload, ExecutionMode, ProjectEntity, ProjectTherapy, UpdateProjectPayload } from '@/types/project.types'
+import type { CreateProjectPayload, ExecutionMode, ProjectEntity, ProjectTherapy, UpdateProjectPayload } from '@/features/projects/project.types'
 import { DEFAULT_WIZARD_FORM, type WizardFormState } from '@/features/projects/wizard.types'
 import { useCreateProject } from '@/features/projects/hooks/useCreateProject'
 import { useUpdateProject } from '@/features/projects/hooks/useUpdateProject'

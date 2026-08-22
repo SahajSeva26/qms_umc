@@ -1,5 +1,5 @@
 import api from '@/lib/api/api'
-import type { LoginPayload, AuthUser } from '@/types/auth.types'
+import type { LoginPayload, AuthUser } from '@/features/auth/auth.types'
 import type { ApiResponse } from '@/types/common.types'
 
 const login = async (payload: LoginPayload) => {

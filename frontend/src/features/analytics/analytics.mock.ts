@@ -1,4 +1,4 @@
-import type { ArAgingBucket, FieldOfficer, PnlTrend } from '@/types/analytics.types'
+import type { ArAgingBucket, FieldOfficer, PnlTrend } from '@/features/analytics/analytics.types'
 
 // TODO: entirely mock — no backend endpoints exist for analytics yet.
 // PNL_TREND / AR_AGING mirror the vanilla-JS prototype's accounts-data.js

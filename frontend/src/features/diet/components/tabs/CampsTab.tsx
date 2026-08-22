@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { Dietitian, DietStage } from '@/features/diet/diet.types'
 import type { useDietCamps } from '@/features/diet/hooks/useDietCamps'
 import DietCampCard from '@/features/diet/components/DietCampCard'

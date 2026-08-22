@@ -12,7 +12,7 @@ import type {
   DashboardFilterState,
   CommandCenterData,
   HeadlineKpi,
-} from '@/types/dashboard.types'
+} from '@/features/dashboard/dashboard.types'
 import { QUARTER } from '@/types/salesdash.types'
 
 // ===========================================================================

@@ -1,4 +1,4 @@
-import type { CampEntity } from '@/types/campReal.types'
+import type { CampEntity } from '@/features/camps/campReal.types'
 
 interface CampStageHistoryListProps {
   camp: CampEntity

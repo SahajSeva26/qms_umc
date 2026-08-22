@@ -4,8 +4,8 @@
 // Mirrors fo-config-master.js's window.QMS_FO_CONFIG exactly.
 // TODO: entirely mock/frontend-only — no backend endpoints exist yet.
 
-import type { Camp } from '@/types/camp.types'
-import type { ProjectEntity } from '@/types/project.types'
+import type { Camp } from '@/features/camps/camp.types'
+import type { ProjectEntity } from '@/features/projects/project.types'
 import { projectTenantName } from '@/features/projects/projects.utils'
 import {
   type FoProjectConfig, type FoTestDef, type ConsumableMapEntry, type InterpretationResult,

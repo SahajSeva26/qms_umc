@@ -1,5 +1,5 @@
-import type { LeadEntity } from '@/types/crm.types'
-import { LEAD_PROJECT_TYPE_LABEL } from '@/types/crm.types'
+import type { LeadEntity } from '@/features/crm/crm.types'
+import { LEAD_PROJECT_TYPE_LABEL } from '@/features/crm/crm.types'
 import { roleLabel, contactPersonLabel, tenantLabel, divisionLabel } from '@/features/crm/crm.utils'
 import KeyValueGrid from '@/components/ui/KeyValueGrid'
 import UserAvatar from '@/components/ui/UserAvatar'

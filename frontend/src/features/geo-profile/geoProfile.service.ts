@@ -6,7 +6,7 @@ import type {
   NearestGeoProfileQuery,
   SearchGeoProfileQuery,
   UpdateGeoProfilePayload,
-} from '@/types/geoProfile.types'
+} from '@/features/geo-profile/geoProfile.types'
 
 const searchGeoProfiles = async (query: SearchGeoProfileQuery) => {
   const res = await api.get<PaginatedResponse<GeoProfileEntity>>('/geo-profiles', { params: query })

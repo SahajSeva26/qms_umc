@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { CAMP_TRANSITION_MAP } from '@/types/campReal.types'
-import type { CampEntity, CampStatus } from '@/types/campReal.types'
+import { CAMP_TRANSITION_MAP } from '@/features/camps/campReal.types'
+import type { CampEntity, CampStatus } from '@/features/camps/campReal.types'
 
 interface CampStageMovePanelProps {
   camp: CampEntity

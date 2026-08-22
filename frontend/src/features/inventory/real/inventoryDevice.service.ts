@@ -5,7 +5,7 @@ import type {
   InventoryDeviceEntity,
   SearchInventoryDeviceQuery,
   UpdateInventoryDevicePayload,
-} from '@/types/inventoryDevice.types'
+} from '@/features/inventory/real/inventoryDevice.types'
 
 const searchInventoryDevices = async (query: SearchInventoryDeviceQuery) => {
   const res = await api.get<PaginatedResponse<InventoryDeviceEntity>>('/inventory-devices', { params: query })

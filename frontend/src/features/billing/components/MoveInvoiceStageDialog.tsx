@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
-import type { InvoiceEntity, InvoiceStatus } from '@/types/invoice.types'
-import { INVOICE_TRANSITION_MAP, INVOICE_STATUS_LABEL } from '@/types/invoice.types'
+import type { InvoiceEntity, InvoiceStatus } from '@/features/billing/invoice.types'
+import { INVOICE_TRANSITION_MAP, INVOICE_STATUS_LABEL } from '@/features/billing/invoice.types'
 import { useMoveInvoiceStage } from '@/features/billing/hooks/useMoveInvoiceStage'
 import { moveInvoiceStageSchema } from '@/features/billing/schemas/invoice.schemas'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'

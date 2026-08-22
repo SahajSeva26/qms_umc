@@ -27,7 +27,7 @@
 // closes it) feeds any field below — invites deliberately stay in their own
 // `dietKeys.invites` query and are applied on top via applyInviteTierOrder().
 
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type {
   DietInvite, DietitianAverageRating, DietitianBcaEquipment, DietitianFeedback,
   DietitianRankResult, DietitianRateEntry, DietitianRosterEntry,

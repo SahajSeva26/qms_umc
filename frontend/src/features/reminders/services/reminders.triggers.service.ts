@@ -5,7 +5,7 @@
 // templates and dispatch, none of which depend back on this module.
 // TODO: replace with real API calls once backend endpoints exist.
 
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { Person } from '@/types/people.types'
 import { CLIENTS } from '@/types/client.types'
 import type {

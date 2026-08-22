@@ -1,5 +1,5 @@
 import { useFilterState } from '@/hooks/useFilterState'
-import { DEFAULT_DASHBOARD_FILTERS, type DashboardFilterState } from '@/types/dashboard.types'
+import { DEFAULT_DASHBOARD_FILTERS, type DashboardFilterState } from '@/features/dashboard/dashboard.types'
 
 // Lives in types/dashboard.types.ts since it's part of the service contract,
 // not private UI state of this hook.

@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
-import type { InventoryLedgerEntity } from '@/types/inventoryLedger.types'
-import type { InventoryMovementHistorySource } from '@/types/inventoryLedger.types'
+import type { InventoryLedgerEntity } from '@/features/inventory/real/inventoryLedger.types'
+import type { InventoryMovementHistorySource } from '@/features/inventory/real/inventoryLedger.types'
 
 const searchInventoryLedgers = vi.fn()
 

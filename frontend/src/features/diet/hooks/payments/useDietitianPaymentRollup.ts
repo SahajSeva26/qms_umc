@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { ScopedDietitianRollup } from '@/features/diet/dietitians.types'
-import { useCampsData } from '@/hooks/useCampsData'
+import { useCampsShared } from '@/features/camps/hooks/useCampsShared'
 import { useDietPayments } from '@/features/diet/hooks/useDietitianPayments'
 import { dietitianRoster } from '@/features/diet/services/dietitianRoster.service'
 import { dietitianExpenseFrom } from '@/features/diet/services/dietitianRates.service'
@@ -21,7 +21,7 @@ interface UseDietitianPaymentRollupArgs {
 // backing store is parsed once via DietitianRollupIndex; don't replace the
 // *From() helpers with per-item equivalents — that reintroduces the N+1.
 export const useDietitianPaymentRollup = ({ role, userName }: UseDietitianPaymentRollupArgs) => {
-  const { camps } = useCampsData()
+  const { camps } = useCampsShared()
   const { data: payments = [] } = useDietPayments()
 
   // Authorization goes through the feature seam, not a role list read inline.

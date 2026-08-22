@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import { fetchDietitianProfile } from '@/features/diet/services/dietitianProfile.service'
 import { dietKeys } from './dietQueryKeys'
 

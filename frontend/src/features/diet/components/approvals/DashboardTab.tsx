@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { FiDownload } from 'react-icons/fi'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import { fmtInrCompact } from '@/features/diet/diet.utils'
 import { campRequiresBca } from '@/features/diet/services/dietitianEquipment.service'
 import { dietitianExpense } from '@/features/diet/services/dietitianRates.service'

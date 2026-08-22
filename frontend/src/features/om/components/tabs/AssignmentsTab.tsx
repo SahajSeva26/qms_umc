@@ -4,11 +4,11 @@ import { FiLayers, FiUserCheck, FiCpu, FiRefreshCw, FiUserPlus } from 'react-ico
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { Person } from '@/types/people.types'
 import type { DeviceCatalogItem } from '@/types/device.types'
 import { campStatus, rankDietitiansForCamp } from '@/features/om/om.service'
-import { clientName } from '@/types/campref.types'
+import { clientName } from '@/features/camps/camps.refs'
 import { formatDate } from '@/utils/formatters'
 
 interface AssignmentsTabProps {

@@ -6,7 +6,7 @@
 // different sources by design; do not merge them.
 // TODO: mock/localStorage-backed — swap bodies for api.* when available.
 
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { DietitianFeedback, DietitianAverageRating } from '@/features/diet/dietitians.types'
 import { KEYS, load } from './dietStorage'
 

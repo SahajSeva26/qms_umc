@@ -6,7 +6,7 @@ import type {
   MoveCampStagePayload,
   SearchCampQuery,
   UpdateCampPayload,
-} from '@/types/campReal.types'
+} from '@/features/camps/campReal.types'
 
 // Real API calls against backend/src/modules/operations/camp/**. Deliberately
 // a separate file from `camps.service.ts` (the old, still-in-use mock/

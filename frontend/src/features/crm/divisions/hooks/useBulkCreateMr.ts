@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { divisionService } from '@/features/crm/divisions/division.service'
 import { roleKeys } from '@/features/access-management/role/hooks/useRoles'
-import type { BulkMrPayload } from '@/types/crm.types'
+import type { BulkMrPayload } from '@/features/crm/crm.types'
 
 // Invalidates roleKeys.all, not 'divisions' — a successful run creates
 // Role/User rows under this division, not a division itself.

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 
 interface MiniCalendarProps {
   camps: Camp[]

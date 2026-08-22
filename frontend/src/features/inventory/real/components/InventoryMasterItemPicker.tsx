@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { inventoryMasterService } from '@/features/inventory/real/inventoryMaster.service'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { useAsyncPickerState } from '@/hooks/useAsyncPickerState'
-import type { InventoryMasterEntity, InventoryMasterType } from '@/types/inventoryMaster.types'
+import type { InventoryMasterEntity, InventoryMasterType } from '@/features/inventory/real/inventoryMaster.types'
 import AsyncPicker from '@/components/ui/AsyncPicker'
 
 interface InventoryMasterItemPickerProps {

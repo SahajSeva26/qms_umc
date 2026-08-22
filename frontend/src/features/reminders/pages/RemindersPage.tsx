@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { FiGrid, FiList, FiZap, FiMessageSquare } from 'react-icons/fi'
-import { useCampsData } from '@/hooks/useCampsData'
+import { useCampsShared } from '@/features/camps/hooks/useCampsShared'
 import { usePeopleData } from '@/hooks/usePeopleData'
 import { useReminderThreads, useReminderConfig } from '@/features/reminders/hooks/useReminders'
 import DashboardTab from '@/features/reminders/components/DashboardTab'
@@ -25,7 +25,7 @@ const TABS: { id: TabId; label: string; icon: typeof FiGrid }[] = [
 // its tab components are pure rendering + user actions on top of it.
 const RemindersPage = () => {
   const [tab, setTab] = useState<TabId>('dashboard')
-  const { camps } = useCampsData()
+  const { camps } = useCampsShared()
   const { people } = usePeopleData()
   const { config } = useReminderConfig()
   const { threads, isLoading, manualTrigger, bulkTrigger, runTick, refresh } = useReminderThreads(camps, people)

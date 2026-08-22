@@ -7,7 +7,7 @@ import {
   GEO_PROFILE_STATUS_OPTIONS,
   GEO_PROFILE_STATUS_LABEL,
 } from '@/features/geo-profile/geoProfile.constants'
-import type { GeoProfileStatus, GeoProfileType } from '@/types/geoProfile.types'
+import type { GeoProfileStatus, GeoProfileType } from '@/features/geo-profile/geoProfile.types'
 
 interface GeoProfilesFilterBarProps {
   filters: GeoProfilesFilterState

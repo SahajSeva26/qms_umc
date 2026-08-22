@@ -5,12 +5,30 @@ import { registry } from '../../shared/config/swagger/swagger.registry';
 import {
     SearchUserQuerySchema,
     UpdateUserPayloadSchema,
+    UserReportQuerySchema,
 } from './user.validators';
 import { AuthMiddleware } from '../../shared/middlewares/authmiddleware';
 import { PERMISSIONS } from '../../shared/env/permissions';
 import { AuthorizeMiddleware } from '../../shared/middlewares/authorizeMiddleware';
+import { reportRateLimiter } from '../../shared/middlewares/rateLimiter';
 
 export const UserRouter = express.Router();
+
+// user report (aggregate stats for dashboards — status/gender breakdown, lockouts, registration trend)
+registry.registerPath({
+    method: 'get',
+    path: '/users/report',
+    tags: ['USER'],
+    summary: 'Get user statistics report',
+    request: {
+        query: UserReportQuerySchema,
+    },
+    responses: {
+        200: { description: 'User report generated successfully' },
+        400: { description: 'Validation error' },
+        403: { description: 'Forbidden' },
+    },
+});
 
 // get user
 registry.registerPath({
@@ -76,6 +94,14 @@ registry.registerPath({
     },
 });
 
+
+UserRouter.get(
+    '/report',
+    reportRateLimiter,
+    AuthMiddleware,
+    AuthorizeMiddleware([PERMISSIONS.USER.MANAGE.code]),
+    UserController.report,
+);
 UserRouter.get(
     '/:id',
     AuthMiddleware,

@@ -10,6 +10,7 @@ import {
 } from './lead.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
 import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { reportRateLimiter } from '../../../shared/middlewares/rateLimiter';
 import { LEAD_PERMISSIONS } from './lead.constants';
 import { TENANT_PERMISSIONS } from '../../access-management/tenant/tenant.constants';
 
@@ -136,6 +137,7 @@ const READ_GUARD = [LEAD_PERMISSIONS.SEARCH.code, ...GUARD]; // reps (lead:searc
 
 LeadRouter.get(
     '/report',
+    reportRateLimiter,
     AuthorizeMiddleware([
         LEAD_PERMISSIONS.MANAGE.code,
     ]),

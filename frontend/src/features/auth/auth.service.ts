@@ -1,7 +1,6 @@
 import api from '@/lib/api/api'
 import { validateApiResponse } from '@/lib/api/validateApiResponse'
-import { AuthMeResponseSchema } from '@/features/access-management/accessManagement.response-schemas'
-import { LoginResponseSchema } from '@/features/auth/auth.schemas'
+import { AuthMeResponseSchema, LoginResponseSchema } from '@/features/auth/auth.schemas'
 import type { LoginPayload, AuthUser } from '@/features/auth/auth.types'
 import type { ApiResponse } from '@/types/common.types'
 import type { SessionResponse } from '@/types/session.types'

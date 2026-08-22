@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { AuthMeResponseSchema } from '@/features/access-management/accessManagement.response-schemas'
+import { AuthMeResponseSchema } from '@/features/auth/auth.schemas'
 
 const VALID_SESSION_RESPONSE = {
   success: true,

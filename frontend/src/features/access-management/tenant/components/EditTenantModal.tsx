@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
-import type { Tenant, TenantStatus, TenantType } from '@/types/accessManagement.types'
+import type { Tenant, TenantStatus, TenantType, UpdateTenantPayload } from '@/types/accessManagement.types'
 import { useUpdateTenant } from '@/features/access-management/tenant/hooks/useUpdateTenant'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRoleTypes'
@@ -32,7 +32,7 @@ interface EditTenantFormValues {
 
 // '' (no selection) must be normalized to undefined — status/type are bare enums with no '' member.
 const useEditTenantFormResolver = () =>
-  useReshapingResolver<EditTenantFormValues>({
+  useReshapingResolver<EditTenantFormValues, UpdateTenantPayload>({
     schema: updateTenantSchema,
     toPayload: (values) => ({
       name: values.name,
@@ -47,7 +47,7 @@ const useEditTenantFormResolver = () =>
 // that would make them take effect server-side.
 const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: EditTenantModalProps) => {
   const updateTenant = useUpdateTenant(tenant.id)
-  const resolver = useEditTenantFormResolver()
+  const { resolver, parsePayload } = useEditTenantFormResolver()
 
   const {
     register,
@@ -89,10 +89,12 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
   const fieldError = (field: keyof EditTenantFormValues) =>
     (touchedFields[field] || isSubmitted) ? errors[field]?.message : undefined
 
-  const onSubmit = (values: EditTenantFormValues) => {
-    const payload: Record<string, unknown> = { name: values.name, description: values.description || undefined }
-    if (canManageTenant && values.status) payload.status = values.status
-    if (canManageSystem && values.type) payload.type = values.type
+  // Omit fields the caller lacks permission to change, rather than send them anyway.
+  const onSubmit = async (values: EditTenantFormValues) => {
+    const parsed = await parsePayload(values)
+    const payload: UpdateTenantPayload = { name: parsed.name, description: parsed.description }
+    if (canManageTenant && parsed.status) payload.status = parsed.status
+    if (canManageSystem && parsed.type) payload.type = parsed.type
     if (canManageSystem) payload.salesPerson = values.salesPerson || null
     updateTenant.mutate(payload)
   }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Controller, useForm } from 'react-hook-form'
+import { Controller, useForm, useWatch } from 'react-hook-form'
 import { FiArrowLeft } from 'react-icons/fi'
 import { usePermissionCodeSelection } from '@/hooks/usePermissionCodeSelection'
 import { useRoleType } from '@/features/access-management/role-type/hooks/useRoleType'
@@ -26,6 +26,16 @@ import { unwrapId } from '@/utils/unwrapId'
 import { useReshapingResolver } from '@/hooks/useReshapingResolver'
 import type { RoleTypeCode, RoleTypeStatus } from '@/types/accessManagement.types'
 
+// Covers both schemas' output; code stays `string` (createRoleTypeSchema's
+// enum widens at the type level) and is narrowed with `as` where consumed.
+interface RoleTypeSchemaPayload {
+  code?: string
+  name?: string
+  description?: string
+  tenant?: string
+  status?: RoleTypeStatus
+}
+
 // Maps every catalog permission code back to its resource key for grouping.
 const CODE_TO_RESOURCE_KEY: Record<string, keyof typeof PERMISSION_CATALOG> = Object.fromEntries(
   (Object.entries(PERMISSION_CATALOG) as [keyof typeof PERMISSION_CATALOG, Record<string, { code: string }>][]).flatMap(
@@ -44,7 +54,7 @@ interface RoleTypeFormValues {
 // '' (this form's "unset" sentinel) is normalized to undefined so whichever
 // schema applies to the current mode validates it correctly.
 const useRoleTypeFormResolver = (schema: typeof createRoleTypeSchema | typeof updateRoleTypeSchema) =>
-  useReshapingResolver<RoleTypeFormValues>({
+  useReshapingResolver<RoleTypeFormValues, RoleTypeSchemaPayload>({
     schema,
     toPayload: (values) => ({
       // name/tenant stay raw '' so Zod's .min(1) message fires instead of a type mismatch.
@@ -70,13 +80,12 @@ const RoleTypeDetailPage = () => {
   const { data: tenantsData } = useTenants({})
   const tenants = tenantsData?.data?.items ?? []
 
-  const resolver = useRoleTypeFormResolver(isCreateMode ? createRoleTypeSchema : updateRoleTypeSchema)
+  const { resolver, parsePayload } = useRoleTypeFormResolver(isCreateMode ? createRoleTypeSchema : updateRoleTypeSchema)
 
   const {
     register,
     handleSubmit,
     control,
-    watch,
     setValue,
     formState: { errors, touchedFields, isSubmitted },
   } = useForm<RoleTypeFormValues>({
@@ -91,7 +100,7 @@ const RoleTypeDetailPage = () => {
     },
   })
 
-  const tenant = watch('tenant')
+  const tenant = useWatch({ control, name: 'tenant' })
 
   useEffect(() => {
     if (roleType && !isCreateMode) {
@@ -154,16 +163,17 @@ const RoleTypeDetailPage = () => {
   const fieldError = (field: keyof RoleTypeFormValues) =>
     (touchedFields[field] || isSubmitted) ? errors[field]?.message : undefined
 
-  const onSubmit = (values: RoleTypeFormValues) => {
+  const onSubmit = async (values: RoleTypeFormValues) => {
+    const parsed = await parsePayload(values)
     const permissions = [...selectedCodes]
 
     if (isCreateMode) {
       createRoleType.mutate(
         {
-          code: values.code as RoleTypeCode,
-          name: values.name,
-          description: values.description || undefined,
-          tenant: values.tenant,
+          code: parsed.code as RoleTypeCode,
+          name: parsed.name as string,
+          description: parsed.description,
+          tenant: parsed.tenant as string,
           permissions,
         },
         {
@@ -178,9 +188,9 @@ const RoleTypeDetailPage = () => {
     }
 
     updateRoleType.mutate({
-      name: values.name,
-      description: values.description || undefined,
-      status: values.status || undefined,
+      name: parsed.name,
+      description: parsed.description,
+      status: parsed.status,
       permissions,
     })
   }

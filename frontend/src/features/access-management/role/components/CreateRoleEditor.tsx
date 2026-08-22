@@ -24,7 +24,7 @@ const RESTRICTED_ROLETYPE_CODES = ['admin', 'pharma-division-head']
 const CreateRoleEditor = () => {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const resolver = useCreateRoleFormResolver()
+  const { resolver, parsePayload } = useCreateRoleFormResolver()
 
   const {
     register,
@@ -80,8 +80,9 @@ const CreateRoleEditor = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roleType, tenant])
 
-  const onSubmit = (values: CreateRoleFormValues) => {
-    createRole.mutate(toCreateRolePayload(values, [...picker.effectiveSelectedCodes]), {
+  const onSubmit = async (values: CreateRoleFormValues) => {
+    const parsed = await parsePayload(values)
+    createRole.mutate(toCreateRolePayload(parsed, [...picker.effectiveSelectedCodes]), {
       onSuccess: (res) => {
         if (res.data?.id) navigate(ROLE_ROUTES.ROLE_DETAIL.replace(':id', res.data.id))
       },

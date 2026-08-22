@@ -13,6 +13,7 @@ import { useTenants } from '@/features/access-management/tenant/hooks/useTenants
 import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRoleTypes'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import { createTenantSchema } from '@/features/access-management/tenant/schemas/tenant.schemas'
+import type { CreateTenantPayload } from '@/types/accessManagement.types'
 import { useReshapingResolver } from '@/hooks/useReshapingResolver'
 import { TENANT_ROUTES } from '@/features/access-management/tenant/tenant.routes'
 import { PLATFORM_TENANT_CODE, PLATFORM_TENANT_FETCH_LIMIT } from '@/features/access-management/accessManagement.constants'
@@ -57,7 +58,7 @@ const OWNER_FIELD_TO_FORM_FIELD: Record<string, keyof TenantFormValues> = {
 }
 
 const useTenantFormResolver = () =>
-  useReshapingResolver<TenantFormValues>({
+  useReshapingResolver<TenantFormValues, CreateTenantPayload>({
     schema: createTenantSchema,
     toPayload: (values) => ({
       code: values.code,
@@ -84,7 +85,7 @@ const CreateTenantDialog = () => {
   const [step1Attempted, setStep1Attempted] = useState(false)
   const navigate = useNavigate()
   const createTenant = useCreateTenant()
-  const resolver = useTenantFormResolver()
+  const { resolver, parsePayload } = useTenantFormResolver()
 
   const {
     register,
@@ -137,21 +138,8 @@ const CreateTenantDialog = () => {
     if (valid) setStep(1)
   }
 
-  const onSubmit = (values: TenantFormValues) => {
-    const payload = {
-      code: values.code,
-      name: values.name,
-      description: values.description || undefined,
-      salesPerson: values.salesPerson,
-      owner: {
-        firstName: values.ownerFirstName,
-        lastName: values.ownerLastName || undefined,
-        email: values.ownerEmail,
-        password: values.ownerPassword,
-        phone: values.ownerPhone || undefined,
-        gender: values.ownerGender || undefined,
-      },
-    }
+  const onSubmit = async (values: TenantFormValues) => {
+    const payload = await parsePayload(values)
     createTenant.mutate(payload, {
       onSuccess: (res) => {
         resetAndClose()

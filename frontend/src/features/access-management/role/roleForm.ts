@@ -1,6 +1,10 @@
 import { createRoleSchema, updateRoleSchema } from '@/features/access-management/role/schemas/role.schemas'
 import { useReshapingResolver } from '@/hooks/useReshapingResolver'
-import type { RoleStatus } from '@/types/accessManagement.types'
+import type { RoleStatus, CreateRolePayload, UpdateRolePayload } from '@/types/accessManagement.types'
+
+// permissions comes from a separate picker, not the schema/resolver.
+type CreateRoleSchemaPayload = Omit<CreateRolePayload, 'permissions'>
+type UpdateRoleSchemaPayload = Omit<UpdateRolePayload, 'permissions'>
 
 export interface CreateRoleFormValues {
   code: string
@@ -66,7 +70,7 @@ const UPDATE_USER_FIELD_TO_FORM_FIELD: Record<string, keyof UpdateRoleFormValues
 }
 
 export const useCreateRoleFormResolver = () =>
-  useReshapingResolver<CreateRoleFormValues>({
+  useReshapingResolver<CreateRoleFormValues, CreateRoleSchemaPayload>({
     schema: createRoleSchema,
     toPayload: (values) => ({
       code: values.code,
@@ -90,7 +94,7 @@ export const useCreateRoleFormResolver = () =>
   })
 
 export const useEditRoleFormResolver = () =>
-  useReshapingResolver<UpdateRoleFormValues>({
+  useReshapingResolver<UpdateRoleFormValues, UpdateRoleSchemaPayload>({
     schema: updateRoleSchema,
     toPayload: (values) => ({
       name: values.name,
@@ -109,39 +113,11 @@ export const useEditRoleFormResolver = () =>
     topLevelFieldMap: UPDATE_TOP_LEVEL_TO_FORM_FIELD,
   })
 
-export function toCreateRolePayload(values: CreateRoleFormValues, permissions: string[]) {
-  return {
-    code: values.code,
-    name: values.name,
-    description: values.description || undefined,
-    type: values.roleType,
-    tenant: values.tenant,
-    division: values.division || undefined,
-    supervisor: values.supervisor || undefined,
-    permissions,
-    user: {
-      firstName: values.userFirstName,
-      lastName: values.userLastName || undefined,
-      email: values.userEmail,
-      password: values.userPassword,
-      phone: values.userPhone || undefined,
-      gender: values.userGender || undefined,
-    },
-  }
+// Takes the already schema-parsed payload plus permissions (picker-sourced).
+export function toCreateRolePayload(parsed: CreateRoleSchemaPayload, permissions: string[]): CreateRolePayload {
+  return { ...parsed, permissions }
 }
 
-export function toUpdateRolePayload(values: UpdateRoleFormValues, permissions: string[]) {
-  return {
-    name: values.name,
-    description: values.description || undefined,
-    status: values.status || undefined,
-    type: values.roleType || undefined,
-    permissions,
-    user: {
-      firstName: values.userFirstName || undefined,
-      lastName: values.userLastName || undefined,
-      status: values.userStatus || undefined,
-      gender: values.userGender || undefined,
-    },
-  }
+export function toUpdateRolePayload(parsed: UpdateRoleSchemaPayload, permissions: string[]): UpdateRolePayload {
+  return { ...parsed, permissions }
 }

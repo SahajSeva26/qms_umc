@@ -3,6 +3,7 @@ import { RoleController } from './role.controller';
 import { registry } from '../../../shared/config/swagger/swagger.registry';
 import {
     CreateRolePayloadSchema,
+    SearchDownlineMrQuerySchema,
     SearchRoleQuerySchema,
     UpdateRolePayloadSchema,
 } from './role.validators';
@@ -15,6 +16,22 @@ import { ROLE_PERMISSIONS } from './role.constants';
 export const RoleRouter = express.Router();
 
 RoleRouter.use(AuthMiddleware);
+
+// get the caller's downline MRs (pharma HO/RSM/ASM only — gated in the service by role type)
+registry.registerPath({
+    method: 'get',
+    path: '/roles/mrs',
+    tags: ['ROLE'],
+    summary: "List the caller's downline MRs (pharma HO/RSM/ASM)",
+    request: {
+        query: SearchDownlineMrQuerySchema,
+    },
+    responses: {
+        200: { description: 'MRs fetched successfully' },
+        403: { description: 'Only pharma division head, RSM, or ASM can access this' },
+    },
+});
+
 // get role
 registry.registerPath({
     method: 'get',
@@ -102,6 +119,9 @@ registry.registerPath({
     },
 });
 
+// login-only — the service authorizes by the caller's pharma role type, no permission needed.
+// MUST be declared before '/:id' or the param route captures '/mrs'.
+RoleRouter.get('/mrs', RoleController.searchMrs);
 RoleRouter.get(
     '/:id',
     AuthorizeMiddleware([

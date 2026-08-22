@@ -21,6 +21,12 @@ export const formatINR = (value: number): string => {
   return `₹${value}`
 }
 
+// Full-precision currency, unlike formatINR's Cr/L/K abbreviation — for
+// legal amounts (invoice lines/totals) where exact figures matter.
+export const formatINRFull = (value: number): string => {
+  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(value)
+}
+
 export const formatDate = (date: string | Date): string => {
   return new Intl.DateTimeFormat('en-IN', {
     day: '2-digit', month: 'short', year: 'numeric',

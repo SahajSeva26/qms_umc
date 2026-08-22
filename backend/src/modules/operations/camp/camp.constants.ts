@@ -60,6 +60,12 @@ export const CAMP_PERMISSIONS = {
         description: 'Create camps',
     } as const,
 
+    BOOK: {
+        code: 'camp:book',
+        name: 'Book Camp',
+        description: 'Book a camp for an MR (pharma field force — self or downline)',
+    } as const,
+
     UPDATE: {
         code: 'camp:update',
         name: 'Update Camp',

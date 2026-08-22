@@ -60,7 +60,7 @@ describe('InventoryConsumablesPanel', () => {
 
     expect(screen.queryByText(/status/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/ACTIVE/i)).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /new lot/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /new consumable lot/i })).not.toBeInTheDocument()
   })
 
   it('manager: status column and status filter are present', async () => {
@@ -81,6 +81,6 @@ describe('InventoryConsumablesPanel', () => {
 
     expect(screen.getByText('Status')).toBeInTheDocument()
     expect(screen.getByText('ACTIVE')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /new lot/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /new consumable lot/i })).toBeInTheDocument()
   })
 })

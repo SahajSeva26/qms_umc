@@ -21,6 +21,12 @@ import {
 // FULL_NAV_SECTIONS items whose route is wrapped in RequirePermission — used
 // to hide items the viewer would otherwise click into and get bounced from.
 const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
+  // Temporary, v1-only: 'system:manage' specifically, NOT the real invoice
+  // permission array. Sales Head already holds invoice:manage (separate
+  // hotfix) but has zero Project/Camp read permissions, so it would see
+  // this link and 403 inside the page's pickers. Revisit once real
+  // role-scoping for Finance/Sales is designed.
+  crminvoicing: ['system:manage'],
   crm: ['lead:search', 'lead:manage', 'tenant:manage'],
   tenants: ['tenant:get', 'tenant:search', 'tenant:manage'],
   permissiongroups: ['permission-group:get', 'permission-group:search', 'tenant:admin'],

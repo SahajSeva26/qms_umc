@@ -68,28 +68,30 @@ const InventoryMasterTab = () => {
             className="pl-8 text-[13px]"
           />
         </div>
-        <Select value={type} onValueChange={(v) => { setType(v as InventoryMasterType | 'ALL'); resetToFirstPage() }}>
-          <SelectTrigger className="w-40 text-[13px]">
-            <SelectValue>{() => (type === 'ALL' ? 'All types' : INVENTORY_MASTER_TYPE_LABEL[type])}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ALL">All types</SelectItem>
-            {INVENTORY_MASTER_TYPES.map((t) => (
-              <SelectItem key={t} value={t}>{INVENTORY_MASTER_TYPE_LABEL[t]}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {canManage && (
-          <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v as InventoryMasterStatus); resetToFirstPage() }}>
-            <SelectTrigger className="w-36 text-[13px]">
-              <SelectValue>{() => (statusFilter === 'active' ? 'Active' : 'Inactive')}</SelectValue>
+        <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+          <Select value={type} onValueChange={(v) => { setType(v as InventoryMasterType | 'ALL'); resetToFirstPage() }}>
+            <SelectTrigger className="w-40 text-[13px]">
+              <SelectValue>{() => (type === 'ALL' ? 'All types' : INVENTORY_MASTER_TYPE_LABEL[type])}</SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="inactive">Inactive</SelectItem>
+              <SelectItem value="ALL">All types</SelectItem>
+              {INVENTORY_MASTER_TYPES.map((t) => (
+                <SelectItem key={t} value={t}>{INVENTORY_MASTER_TYPE_LABEL[t]}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
-        )}
+          {canManage && (
+            <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v as InventoryMasterStatus); resetToFirstPage() }}>
+              <SelectTrigger className="w-36 text-[13px]">
+                <SelectValue>{() => (statusFilter === 'active' ? 'Active' : 'Inactive')}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+        </div>
       </div>
 
       <QueryStateBlock isLoading={isLoading} error={error} loadingLabel="Loading items…" errorLabel="Failed to load items. Please try again." onRetry={refetch}>

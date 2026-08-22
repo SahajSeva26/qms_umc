@@ -1,7 +1,13 @@
 // Camp Service
 import mongoose, { HydratedDocument } from 'mongoose';
 import { CampModel, ICamp } from './camp.model';
-import { ICreateCampPayload, IMoveStagePayload, ISearchCampQuery, IUpdateCampPayload } from './camp.validators';
+import {
+    IBookCampPayload,
+    ICreateCampPayload,
+    IMoveStagePayload,
+    ISearchCampQuery,
+    IUpdateCampPayload,
+} from './camp.validators';
 import { CAMP_COUNTER_ENTITY, CAMP_PERMISSIONS, CAMP_STATUSES, CAMP_TRANSITION_MAP } from './camp.constants';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
 import { CounterService } from '../../counter/counter.service';
@@ -18,6 +24,7 @@ import { ProjectService } from '../../crm/project/project.service';
 import { DoctorService } from '../../doctor/doctor.service';
 import { RoleService } from '../../access-management/role/role.service';
 import { DivisionService } from '../../crm/division/division.service';
+import { ALLOWED_ROLETYPE_CODES } from '../../access-management/role-type/roleType.constants';
 
 type CampDocument = HydratedDocument<ICamp> | null;
 
@@ -116,7 +123,8 @@ const set = async (model: any, entity: HydratedDocument<ICamp>, ctx: RequestCont
         }
     }
 
-    // doctor — global registry, validated for existence
+    // doctor — tenant-scoped registry; DoctorService.get runs under ctx.where(), so this also
+    // enforces that the doctor belongs to the actor's tenant (a foreign id 404s "Doctor not found")
     if (model.doctor) {
         const doctor = await DoctorService.get(model.doctor, ctx);
         if (!doctor) {
@@ -262,11 +270,20 @@ const create = async (model: ICreateCampPayload, ctx: RequestContext): Promise<H
     let camp = await set(model, entity, ctx);
 
     //5: auto-assign the nearest free FO when the caller didn't supply one, applied through set() so
-    // it takes the same validation path. NOT best-effort: resolveNearestFreeFoRole throws (no
-    // coverage / all booked) so a camp is never created without a staffable FO.
+    // it takes the same validation path. Best-effort: if no FO covers the location or all nearby FOs
+    // are booked, swallow the error and leave the camp with NO fo. The camp is still created in the
+    // `requested` state — moveStage (guard 3b) then prevents it leaving `requested` until an FO is
+    // assigned, so a no-FO camp can never be confirmed/go live (it can only be cancelled).
     if (!camp.fo) {
-        const foRole = await resolveNearestFreeFoRole(camp, ctx);
-        camp = await set({ fo: foRole.toString() }, camp, ctx);
+        try {
+            const foRole = await resolveNearestFreeFoRole(camp, ctx);
+            camp = await set({ fo: foRole.toString() }, camp, ctx);
+        } catch (error: any) {
+            ctx.logger.warn(
+                { err: error },
+                'No field officer could be auto-allocated; camp stays in requested with no FO',
+            );
+        }
     }
 
     //6: reserve the sequential camp code and persist. Wrapped in a transaction so a failed save
@@ -373,6 +390,120 @@ const allocateFo = async (id: string, ctx: RequestContext) => {
     return CampService.update(id, { fo: foRole.toString() }, ctx);
 };
 
+// authorize a pharma booker against the target MR, by the caller's OWN role type:
+//   - MR               → only themselves
+//   - ASM              → the MR must report directly to them
+//   - RSM              → the MR's ASM must report to them
+//   - division head/HO → the MR must be in their division
+//   - QMS staff with camp:manage / tenant:manage → any MR in the tenant
+// Anyone else is rejected 403. asm/rsm are the resolved chain of the target MR.
+const assertCanBook = (mr: any, asm: any, rsm: any, ctx: RequestContext) => {
+    const { CUSTOMER } = ALLOWED_ROLETYPE_CODES;
+    const callerCode: string | undefined = ctx.role?.type?.code;
+    const me = ctx.role?._id?.toString();
+
+    switch (callerCode) {
+        case CUSTOMER.PHARMA_MR: {
+            if (mr._id.toString() !== me) {
+                return throwAppError('An MR can only book a camp for themselves', StatusCodes.FORBIDDEN);
+            }
+            return;
+        }
+        case CUSTOMER.PHARMA_ASM: {
+            if (!asm || asm._id.toString() !== me) {
+                return throwAppError('You can only book for MRs that report to you', StatusCodes.FORBIDDEN);
+            }
+            return;
+        }
+        case CUSTOMER.PHARMA_RSM: {
+            if (!rsm || rsm._id.toString() !== me) {
+                return throwAppError('You can only book for MRs under your ASMs', StatusCodes.FORBIDDEN);
+            }
+            return;
+        }
+        case CUSTOMER.PHARMA_DIVISION_HEAD: {
+            if (mr.division?._id?.toString() !== ctx.role?.division?.toString()) {
+                return throwAppError('You can only book for MRs in your division', StatusCodes.FORBIDDEN);
+            }
+            return;
+        }
+        default: {
+            // only pharma field-force roles (HO/RSM/ASM/MR) may book
+            return throwAppError('You are not allowed to book camps', StatusCodes.FORBIDDEN);
+        }
+    }
+};
+
+// book is the pharma field-force entry point. It figures out WHO the camp is for (the MR),
+// authorizes the caller against that MR, derives the org chain + tenant/division, then hands off
+// to create() for all the real work (doctor/slot validation, best-effort FO, code, born requested).
+const book = async (model: IBookCampPayload, ctx: RequestContext): Promise<HydratedDocument<ICamp>> => {
+    const { CUSTOMER } = ALLOWED_ROLETYPE_CODES;
+    const callerCode: string | undefined = ctx.role?.type?.code;
+    const me = ctx.role?._id?.toString();
+
+    //1: resolve the target MR — an MR books for themselves (and may not name anyone else);
+    // a manager must name the downline MR the camp is for.
+    let targetMrId = model.mr;
+    if (callerCode === CUSTOMER.PHARMA_MR) {
+        if (model.mr && model.mr !== me) {
+            return throwAppError('An MR can only book a camp for themselves', StatusCodes.FORBIDDEN);
+        }
+        targetMrId = me;
+    }
+    if (!targetMrId) {
+        return throwAppError('mr is required', StatusCodes.BAD_REQUEST);
+    }
+
+    //2: load the MR — RoleService.get runs under ctx.where(), so an MR in another client (tenant)
+    // simply 404s here (no cross-tenant booking). populate gives us the supervisor (its ASM).
+    const mr: any = await RoleService.get(targetMrId, ctx, { populate: true });
+    if (!mr) {
+        return throwAppError('MR not found', StatusCodes.NOT_FOUND);
+    }
+    if (mr.type?.code !== CUSTOMER.PHARMA_MR) {
+        return throwAppError('The selected role is not an MR', StatusCodes.BAD_REQUEST);
+    }
+    // explicit same-tenant coherence check (also guaranteed by the scoped get above)
+    if (mr.tenant?._id?.toString() !== ctx.tenant?._id?.toString()) {
+        return throwAppError('The MR belongs to a different client', StatusCodes.BAD_REQUEST);
+    }
+    if (!mr.division) {
+        return throwAppError('The MR is not assigned to a division', StatusCodes.BAD_REQUEST);
+    }
+
+    //3: derive the reporting chain from the MR — asm = mr.supervisor, rsm = asm.supervisor.
+    // (load the ASM fully so its own supervisor, the RSM, is populated.)
+    const asm: any = mr.supervisor ? await RoleService.get(mr.supervisor._id.toString(), ctx, { populate: true }) : null;
+    const rsm: any = asm?.supervisor || null;
+
+    //4: authorize the caller against this MR + chain
+    assertCanBook(mr, asm, rsm, ctx);
+
+    //5: build the full create payload — tenant from ctx, division + chain derived from the MR,
+    // no fo (create() best-effort allocates; if none, the camp stays requested for QMS to staff).
+    const createPayload: ICreateCampPayload = {
+        tenant: ctx.tenant._id.toString(),
+        division: mr.division._id.toString(),
+        doctor: model.doctor,
+        mr: mr._id.toString(),
+        asm: asm?._id?.toString(),
+        rsm: rsm?._id?.toString(),
+        type: model.type,
+        patientExpectation: model.patientExpectation,
+        date: model.date,
+        timeSlot: model.timeSlot,
+        city: model.city,
+        state: model.state,
+        coordinates: model.coordinates,
+        devices: model.devices,
+        notes: model.notes,
+        conscentPath: model.conscentPath,
+    };
+
+    return CampService.create(createPayload, ctx);
+};
+
 export const CampService = {
     get,
     search,
@@ -380,4 +511,5 @@ export const CampService = {
     update,
     moveStage,
     allocateFo,
+    book,
 };

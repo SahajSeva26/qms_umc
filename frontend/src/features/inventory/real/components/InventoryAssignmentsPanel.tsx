@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { usePermission } from '@/hooks/usePermission'
 import { useInventoryAssignments } from '@/features/inventory/real/hooks/useInventoryAssignments'
 import { useFieldOfficerRoles } from '@/features/inventory/real/hooks/useFieldOfficerRoles'
 import { truncateIdentifier } from '@/features/inventory/real/utils/truncateIdentifier'
@@ -13,7 +14,10 @@ const PAGE_SIZE = 10
 // Read-only — rows only ever appear/disappear via the FO refill/return
 // request lifecycle (see inventory-request.service.ts's adjustHolding calls). No manual create/edit/delete path exists here by design.
 const InventoryAssignmentsPanel = () => {
-  const { roles: foRoles } = useFieldOfficerRoles()
+  // GET /role-types needs tenant:manage/tenant:admin, not an inventory-* code — a stock Inventory Manager holds neither.
+  const { hasAnyPermission } = usePermission()
+  const canViewFieldOfficers = hasAnyPermission(['tenant:manage', 'tenant:admin'])
+  const { roles: foRoles } = useFieldOfficerRoles(canViewFieldOfficers)
 
   const [assigneeFilter, setAssigneeFilter] = useState<string>('ALL')
   const [typeFilter, setTypeFilter] = useState<InventoryAssignmentType | 'ALL'>('ALL')
@@ -36,18 +40,20 @@ const InventoryAssignmentsPanel = () => {
         </p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 mb-3">
-        <Select value={assigneeFilter} onValueChange={(v) => { if (!v) return; setAssigneeFilter(v); resetToFirstPage() }}>
-          <SelectTrigger className="w-56 text-[13px]">
-            <SelectValue>{() => (assigneeFilter === 'ALL' ? 'All field officers' : foRoles.find((r) => r.id === assigneeFilter)?.name ?? assigneeFilter)}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ALL">All field officers</SelectItem>
-            {foRoles.map((r) => (
-              <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="flex flex-wrap items-center gap-2 mb-3 sm:justify-end">
+        {canViewFieldOfficers && (
+          <Select value={assigneeFilter} onValueChange={(v) => { if (!v) return; setAssigneeFilter(v); resetToFirstPage() }}>
+            <SelectTrigger className="w-56 text-[13px]">
+              <SelectValue>{() => (assigneeFilter === 'ALL' ? 'All field officers' : foRoles.find((r) => r.id === assigneeFilter)?.name ?? assigneeFilter)}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All field officers</SelectItem>
+              {foRoles.map((r) => (
+                <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <Select value={typeFilter} onValueChange={(v) => { setTypeFilter(v as InventoryAssignmentType | 'ALL'); resetToFirstPage() }}>
           <SelectTrigger className="w-40 text-[13px]">
             <SelectValue>{() => (typeFilter === 'ALL' ? 'All types' : typeFilter === 'InventoryDevice' ? 'Device' : 'Consumable')}</SelectValue>
@@ -66,7 +72,7 @@ const InventoryAssignmentsPanel = () => {
             <table className="w-full text-[13px]">
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--qms-border)' }}>
-                  {['Field officer', 'Type', 'Item', 'Qty'].map((h) => (
+                  {['Field officer', 'Item', 'Type', 'Qty'].map((h) => (
                     <th
                       key={h}
                       className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5"
@@ -85,8 +91,8 @@ const InventoryAssignmentsPanel = () => {
                       <td className="px-4 py-2.5 max-w-xs truncate" style={{ color: 'var(--qms-text)' }} title={assignment.assignee.name}>
                         {assignment.assignee.name ?? assignment.assignee.id}
                       </td>
-                      <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{assignment.inventoryType === 'InventoryDevice' ? 'Device' : 'Consumable'}</td>
                       <td className="px-4 py-2.5 font-mono" style={{ color: 'var(--qms-text)' }} title={identifier}>{truncateIdentifier(identifier)}</td>
+                      <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{assignment.inventoryType === 'InventoryDevice' ? 'Device' : 'Consumable'}</td>
                       <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>{assignment.quantity}</td>
                     </tr>
                   )

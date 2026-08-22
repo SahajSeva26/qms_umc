@@ -1,21 +1,14 @@
 import mongoose, { HydratedDocument } from 'mongoose';
 import { IUser, UserModel } from './user.model';
-import { ISearchUserQuery, IUpdateUserPayload, IUserReportQuery } from './user.validators';
+import { ISearchUserQuery, IUpdateUserPayload } from './user.validators';
 import bcrypt from 'bcrypt';
 import { throwAppError } from '../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
-import {
-    USER_PERMISSIONS,
-    USER_REPORT_DEFAULT_TREND_DAYS,
-    USER_REPORT_DEFAULT_TREND_MONTHS,
-    USER_REPORT_GRANULARITY,
-    USER_STATUS,
-} from './user.constants';
+import { USER_PERMISSIONS, USER_STATUS } from './user.constants';
 import { isValidEmail } from '../../shared/utils/strings';
 import { IRegisterUserPayload } from '../auth/auth.validators';
 import { RequestContext } from '../../shared/utils/contextBuilder';
 import { IServiceOptions } from '../../shared/types/service.types';
-import { endOfUTCDay, startOfUTCDay } from '../../shared/utils/dates';
 
 type UserDocument = HydratedDocument<IUser> | null;
 const populate: any[] = [];
@@ -246,7 +239,6 @@ export const UserService = {
     create,
     update,
     getUserWithPassword,
-    report,
 };
 
 // ========================================================================================

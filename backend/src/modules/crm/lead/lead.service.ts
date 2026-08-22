@@ -173,6 +173,17 @@ const create = async (model: ICreateLeadPayload, ctx: RequestContext): Promise<H
     //    (tenant.salesPerson). A manager may override with a different one; a non-manager may not.
     //    When the company has no assigned sales person, the payload sales person (any) is required.
     const tenant = await TenantService.get(division.tenant.toString(), ctx);
+    if (!tenant) {
+        return throwAppError('Tenant not found', StatusCodes.NOT_FOUND);
+    }
+
+    //2a: guard — a lead can only belong to a customer (pharma) company, never a platform tenant.
+    // Divisions are already customer-only in practice, but assert it here as defense-in-depth so a
+    // division that somehow exists under a platform tenant can never seed a platform-tenant lead.
+    if (tenant.type !== TENANT_TYPE.CUSTOMER) {
+        return throwAppError('Leads can only be created for customer (pharma) companies', StatusCodes.BAD_REQUEST);
+    }
+
     let salesPersonId: string | undefined;
     if (tenant?.salesPerson) {
         salesPersonId = tenant.salesPerson.toString();

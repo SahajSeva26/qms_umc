@@ -1,6 +1,7 @@
 import { SYSTEM_PERMISSIONS } from '../../shared/env/permissions';
 import { RequestContext } from '../../shared/utils/contextBuilder';
 import { USER_GENDERS, USER_STATUS } from './user.constants';
+import { USER_PERMISSIONS } from './user.constants';
 
 export const UserMapper = {
     toResponse: (user: any, ctx: RequestContext) => {

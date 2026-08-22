@@ -1,4 +1,4 @@
-import { useQuery, keepPreviousData, type QueryKey } from '@tanstack/react-query'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import type { EntityKeys } from '@/hooks/entityQueryKeys'
 
 interface UseEntityQueryOptions {
@@ -7,27 +7,14 @@ interface UseEntityQueryOptions {
 }
 
 // Shared "search/list" shape used across every entity: a thin useQuery
-// wrapper keyed on [entityKey, query]. The bare-string overload is a
-// temporary allowance for callers not yet migrated onto the EntityKeys factory.
+// wrapper keyed on [entityKey, query].
 export function useEntityQuery<TData, TQuery extends object>(
   entityKey: EntityKeys<TQuery>,
   fetchFn: (query: TQuery) => Promise<TData>,
   query: TQuery,
   options?: UseEntityQueryOptions,
-): ReturnType<typeof useQuery<TData>>
-export function useEntityQuery<TData, TQuery extends object>(
-  entityKey: string,
-  fetchFn: (query: TQuery) => Promise<TData>,
-  query: TQuery,
-  options?: UseEntityQueryOptions,
-): ReturnType<typeof useQuery<TData>>
-export function useEntityQuery<TData, TQuery extends object>(
-  entityKey: string | EntityKeys<TQuery>,
-  fetchFn: (query: TQuery) => Promise<TData>,
-  query: TQuery,
-  options?: UseEntityQueryOptions,
 ) {
-  const queryKey = typeof entityKey === 'string' ? ([entityKey, query] as QueryKey) : entityKey.list(query)
+  const queryKey = entityKey.list(query)
 
   return useQuery({
     queryKey,

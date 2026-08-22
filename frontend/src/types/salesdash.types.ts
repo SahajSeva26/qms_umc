@@ -159,14 +159,6 @@ export const ASSIGNMENTS: RepAssignment[] = [
   { repId: 'p-arjun', clientId: 'cli-drreddys', divisionIds: [] },
 ]
 
-// KAM (sales_rep) client-scoping — scoped only if role is sales_rep AND a
-// real repId is supplied; no current caller can satisfy both, so this is unused.
-export function scopedClientIds(role: string | undefined, repId?: string): Set<string> | null {
-  if (role !== 'sales_rep' || !repId) return null
-  const ids = ASSIGNMENTS.filter((a) => a.repId === repId).map((a) => a.clientId)
-  return ids.length ? new Set(ids) : null
-}
-
 export interface ApprovalRequest {
   id: string
   type: ApprovalType

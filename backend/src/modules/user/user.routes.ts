@@ -9,6 +9,7 @@ import {
 import { AuthMiddleware } from '../../shared/middlewares/authmiddleware';
 import { PERMISSIONS } from '../../shared/env/permissions';
 import { AuthorizeMiddleware } from '../../shared/middlewares/authorizeMiddleware';
+import { reportRateLimiter } from '../../shared/middlewares/rateLimiter';
 
 export const UserRouter = express.Router();
 
@@ -76,6 +77,14 @@ registry.registerPath({
     },
 });
 
+
+UserRouter.get(
+    '/report',
+    reportRateLimiter,
+    AuthMiddleware,
+    AuthorizeMiddleware([PERMISSIONS.USER.MANAGE.code]),
+    UserController.report,
+);
 UserRouter.get(
     '/:id',
     AuthMiddleware,

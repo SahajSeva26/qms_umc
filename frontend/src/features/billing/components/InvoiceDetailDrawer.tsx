@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useInvoice } from '@/features/billing/hooks/useInvoice'
 import { useBillingProject } from '@/features/billing/hooks/useBillingProject'
-import { useInvoiceLineItems } from '@/features/billing/hooks/useInvoiceLineItems'
+import { useInvoiceLineItems, invoiceLineItemKeys } from '@/features/billing/hooks/useInvoiceLineItems'
 import { useRemoveInvoiceLineItem } from '@/features/billing/hooks/useRemoveInvoiceLineItem'
 import InvoiceStatusPill from '@/features/billing/components/InvoiceStatusPill'
 import AddCampToInvoiceDialog from '@/features/billing/components/AddCampToInvoiceDialog'
@@ -37,6 +38,7 @@ interface InvoiceDetailDrawerProps {
 // own full ProjectEntity (needed for campCost) from whichever invoice it's
 // currently showing — get()/search() always populate invoice.project.
 const InvoiceDetailDrawer = ({ invoiceId, onClose }: InvoiceDetailDrawerProps) => {
+  const queryClient = useQueryClient()
   const { data, isLoading, error, refetch } = useInvoice(invoiceId ?? undefined)
   const invoice = data?.data ?? null
   const invoiceProjectId = invoice ? (typeof invoice.project === 'string' ? invoice.project : invoice.project._id) : undefined
@@ -170,6 +172,17 @@ const InvoiceDetailDrawer = ({ invoiceId, onClose }: InvoiceDetailDrawerProps) =
     // one page could still strand the user on a now-empty page 3.
     const lastValidPage = Math.max(1, Math.ceil(freshCount / pageSize))
     if (currentPage > lastValidPage) {
+      // refetchLineItems() above only refetches the CURRENT page's own
+      // React Query cache entry (each page is a distinct query key) — it
+      // does nothing to whatever page we're about to jump to. Without this,
+      // landing on a page whose own cache entry still holds its original,
+      // now-stale count/items (never invalidated by this or any prior
+      // remove) renders that stale snapshot instead of fetching fresh —
+      // confirmed live: jumping from an emptied page 2 back to page 1 kept
+      // showing page 1's original pre-deletion count and items. Invalidating
+      // the whole invoice-line-items scope forces the destination page to
+      // refetch for real once `page` state changes below.
+      queryClient.invalidateQueries({ queryKey: invoiceLineItemKeys.all })
       setPage(lastValidPage)
     }
   }
@@ -359,10 +372,21 @@ const InvoiceDetailDrawer = ({ invoiceId, onClose }: InvoiceDetailDrawerProps) =
         )}
       </QueryStateBlock>
 
+      {/* isDraft here reflects the drawer's OWN invoice query, which a failed
+          add's catch block explicitly invalidates (see AddCampToInvoiceDialog's
+          handleSubmit) — that same catch block also synchronously sets this
+          dialog's OWN error text (e.g. "may already be billed") before that
+          invalidation resolves, so unmounting the dialog outright the moment
+          isDraft flips false would yank that just-shown error out from under
+          the user mid-read. Passing isDraft through as a prop instead lets
+          the dialog disable further submission once the invoice is
+          confirmed no longer draft, without discarding whatever it was
+          already showing — the user dismisses it themselves via Cancel. */}
       {addCampOpen && invoice && project && (
         <AddCampToInvoiceDialog
           invoice={invoice}
           project={project}
+          isInvoiceDraft={isDraft}
           onClose={() => { setAddCampOpen(false); setAddSubmitting(false) }}
           onSubmittingChange={setAddSubmitting}
         />

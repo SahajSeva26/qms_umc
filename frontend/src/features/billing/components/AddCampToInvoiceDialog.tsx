@@ -15,6 +15,14 @@ import { getApiErrorMessage } from '@/utils/apiError'
 interface AddCampToInvoiceDialogProps {
   invoice: InvoiceEntity
   project: ProjectEntity
+  // The drawer's OWN, independently-refetched view of whether this invoice
+  // is still a draft — can flip to false while this dialog is still open
+  // (e.g. a failed add's own catch block below invalidates the invoice
+  // detail query, and that refetch confirms someone else approved it
+  // concurrently). Disables further submission rather than the parent
+  // unmounting this dialog outright, which would otherwise discard whatever
+  // error message is already showing.
+  isInvoiceDraft: boolean
   onClose: () => void
   // Reports whether an add is currently in flight, so the parent drawer can
   // disable stage changes for the same reason it disables them during a
@@ -27,7 +35,7 @@ interface AddCampToInvoiceDialogProps {
 // Single-select only, unlike GenerateInvoiceDialog — POST /invoice-line-items
 // adds one line per call, so a multi-add UI here would issue N sequential
 // requests that could partially fail, leaving an inconsistent draft.
-const AddCampToInvoiceDialog = ({ invoice, project, onClose, onSubmittingChange }: AddCampToInvoiceDialogProps) => {
+const AddCampToInvoiceDialog = ({ invoice, project, isInvoiceDraft, onClose, onSubmittingChange }: AddCampToInvoiceDialogProps) => {
   const queryClient = useQueryClient()
   const [selectedCampId, setSelectedCampId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -93,7 +101,7 @@ const AddCampToInvoiceDialog = ({ invoice, project, onClose, onSubmittingChange 
   }
 
   const handleSubmit = async () => {
-    if (submittingRef.current) return
+    if (submittingRef.current || !isInvoiceDraft) return
     if (!selectedCampId) {
       setError('Select a camp to add.')
       return
@@ -187,17 +195,27 @@ const AddCampToInvoiceDialog = ({ invoice, project, onClose, onSubmittingChange 
           </QueryStateBlock>
 
           {error && <p className="text-[12px] text-danger">{error}</p>}
+          {!isInvoiceDraft && (
+            <p className="text-[12px] text-danger">This invoice is no longer a draft — camps can't be added anymore.</p>
+          )}
         </div>
 
         <div className="flex gap-2 justify-end mt-2">
-          <Button variant="secondary" onClick={onClose} disabled={addLineItem.isPending}>Cancel</Button>
+          {/* Same submittingRef.current guard as onOpenChange above — this
+              is a separate click handler, not routed through onOpenChange,
+              so without this check it could still close in the tiny window
+              between handleSubmit starting and addLineItem.isPending's next
+              render actually reflecting it. */}
+          <Button variant="secondary" onClick={() => { if (!submittingRef.current) onClose() }} disabled={addLineItem.isPending}>Cancel</Button>
           <Button
             onClick={handleSubmit}
             // Disabled while settling (including a background refetch after
             // reopening this dialog) or erroring — a selection made before
             // that resolves would otherwise stay submittable even though
-            // `selectableCamps` can no longer be trusted as current.
-            disabled={addLineItem.isPending || !selectedCampId || isSettling || !!combinedError}
+            // `selectableCamps` can no longer be trusted as current. Also
+            // disabled once the drawer's own refetch confirms this invoice
+            // left draft concurrently — see isInvoiceDraft doc comment above.
+            disabled={addLineItem.isPending || !selectedCampId || isSettling || !!combinedError || !isInvoiceDraft}
             className="font-bold text-white"
             style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
           >

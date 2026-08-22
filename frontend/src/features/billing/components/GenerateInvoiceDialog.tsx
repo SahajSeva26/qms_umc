@@ -1,6 +1,8 @@
 import { useCallback, useRef, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ProjectEntity } from '@/types/project.types'
-import { useBillingProject } from '@/features/billing/hooks/useBillingProject'
+import type { ApiResponse } from '@/types/common.types'
+import { billingProjectsService } from '@/features/billing/billingProjects.service'
 import { useEligibleInvoiceCamps } from '@/features/billing/hooks/useEligibleInvoiceCamps'
 import { useCreateInvoice } from '@/features/billing/hooks/useCreateInvoice'
 import { createInvoiceSchema } from '@/features/billing/schemas/invoice.schemas'
@@ -20,13 +22,81 @@ interface GenerateInvoiceDialogProps {
 // list page's project filter is unrelated and may be empty or set to a
 // different project entirely), then pick camps to bill for that project.
 const GenerateInvoiceDialog = ({ onClose, onCreated }: GenerateInvoiceDialogProps) => {
+  const queryClient = useQueryClient()
   const [projectId, setProjectId] = useState('')
   const [projectLabel, setProjectLabel] = useState('')
-  const { data: projectData, isLoading: projectLoading, error: projectError, refetch: refetchProject } = useBillingProject(projectId || undefined)
-  const project = projectData?.data ?? null
+  // enabled: false — this dialog owns fetching entirely through
+  // confirmProject below; this query only ever passively READS whatever
+  // confirmProject wrote into ['billing','project',id] via setQueryData, and
+  // reactively re-renders when that write happens. Without enabled: false,
+  // useBillingProject's own auto-fetch-on-id-change would fire a SECOND,
+  // redundant GET for every pick alongside confirmProject's explicit one.
+  const { data: projectData } = useQuery<ApiResponse<ProjectEntity>>({
+    queryKey: ['billing', 'project', projectId],
+    queryFn: () => billingProjectsService.getProject(projectId),
+    enabled: false,
+  })
+  const project = projectId && projectData ? projectData.data : null
 
-  if (project) {
-    return <GenerateInvoiceCampStep project={project} onBack={() => { setProjectId(''); setProjectLabel('') }} onClose={onClose} onCreated={onCreated} />
+  // campCost is financially material to what a generated invoice bills.
+  // A project id can already be cached (e.g. re-picked after "Change
+  // project", or already warm from elsewhere in the app) — advancing to the
+  // camp step off cached data alone would skip confirming freshness and
+  // could display a stale campCost the backend no longer honors. Fetch
+  // explicitly by the exact id the picker just reported (a plain function
+  // argument, never a hook's refetch closure) and write the result straight
+  // into the cache entry the query above reads, so `project` picks it up
+  // reactively.
+  const [confirmedProjectId, setConfirmedProjectId] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState(false)
+  const [confirmError, setConfirmError] = useState(false)
+  // Detects a project switch that happens WHILE this fetch is still in
+  // flight — an operation token, bumped SYNCHRONOUSLY inside
+  // handleProjectChange (the same tick as setProjectId), not inside a
+  // useEffect. A passive effect commits strictly after React schedules and
+  // runs it — later than this same tick — so a fast-resolving fetch could
+  // reach confirmProject's `if` check before that effect had run, making a
+  // valid, current result look stale and leaving `confirming` stuck true
+  // forever. A plain ref written directly in the event handler has no such
+  // gap: by the time confirmProject's async body resumes after its await,
+  // the ref already reflects whichever pick is actually current.
+  const operationTokenRef = useRef(0)
+
+  const confirmProject = async (id: string, token: number) => {
+    setConfirming(true)
+    setConfirmedProjectId(null)
+    setConfirmError(false)
+    try {
+      const res = await billingProjectsService.getProject(id)
+      if (operationTokenRef.current !== token) return
+      queryClient.setQueryData<ApiResponse<ProjectEntity>>(['billing', 'project', id], res)
+      setConfirmedProjectId(id)
+    } catch {
+      if (operationTokenRef.current !== token) return
+      setConfirmError(true)
+    } finally {
+      if (operationTokenRef.current === token) setConfirming(false)
+    }
+  }
+
+  const handleProjectChange = (id: string, label: string) => {
+    operationTokenRef.current += 1
+    setProjectId(id)
+    setProjectLabel(label)
+    setConfirmedProjectId(null)
+    setConfirmError(false)
+    if (id) confirmProject(id, operationTokenRef.current)
+  }
+
+  // Retry also bumps the token — it's a new attempt superseding whatever
+  // the previous (failed) one was, same as any other pick.
+  const retryConfirmProject = () => {
+    operationTokenRef.current += 1
+    confirmProject(projectId, operationTokenRef.current)
+  }
+
+  if (project && confirmedProjectId === projectId) {
+    return <GenerateInvoiceCampStep project={project} onBack={() => { setProjectId(''); setProjectLabel(''); setConfirmedProjectId(null) }} onClose={onClose} onCreated={onCreated} />
   }
 
   return (
@@ -36,14 +106,14 @@ const GenerateInvoiceDialog = ({ onClose, onCreated }: GenerateInvoiceDialogProp
           <DialogTitle className="text-sm font-bold" style={{ color: 'var(--qms-text)' }}>Generate invoice</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
-          <BillingProjectPicker value={projectId} label={projectLabel} onChange={(id, label) => { setProjectId(id); setProjectLabel(label) }} />
-          {projectId && projectError && (
+          <BillingProjectPicker value={projectId} label={projectLabel} onChange={handleProjectChange} />
+          {projectId && confirmError && (
             <div className="flex items-center justify-between gap-3 text-[13px] rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
               <span>Couldn't load this project.</span>
-              <Button variant="outline" size="sm" onClick={() => refetchProject()} className="shrink-0">Retry</Button>
+              <Button variant="outline" size="sm" onClick={retryConfirmProject} className="shrink-0">Retry</Button>
             </div>
           )}
-          {projectId && !projectLoading && !projectError && !project && (
+          {projectId && !confirming && !confirmError && confirmedProjectId === projectId && !project && (
             <p className="text-[13px]" style={{ color: 'var(--qms-text-muted)' }}>This project could not be found.</p>
           )}
         </div>
@@ -186,8 +256,13 @@ const GenerateInvoiceCampStep = ({ project, onBack, onClose, onCreated }: Genera
         </div>
 
         <div className="flex gap-2 justify-end mt-2">
-          <Button variant="ghost" onClick={onBack} disabled={createInvoice.isPending} className="mr-auto">Change project</Button>
-          <Button variant="secondary" onClick={onClose} disabled={createInvoice.isPending}>Cancel</Button>
+          {/* Same submittingRef.current guard as onOpenChange above — these
+              are separate click handlers, not routed through onOpenChange,
+              so without this check they could still close/switch project in
+              the tiny window between handleSubmit starting and
+              createInvoice.isPending's next render actually reflecting it. */}
+          <Button variant="ghost" onClick={() => { if (!submittingRef.current) onBack() }} disabled={createInvoice.isPending} className="mr-auto">Change project</Button>
+          <Button variant="secondary" onClick={() => { if (!submittingRef.current) onClose() }} disabled={createInvoice.isPending}>Cancel</Button>
           <Button
             onClick={handleSubmit}
             disabled={createInvoice.isPending || selected.size === 0 || isSettling}

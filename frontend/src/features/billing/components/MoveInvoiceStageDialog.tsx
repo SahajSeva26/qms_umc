@@ -112,7 +112,12 @@ const MoveInvoiceStageDialog = ({ invoice, lineItemCount, onClose }: MoveInvoice
           {error && <p className="text-[12px] text-danger">{error}</p>}
         </div>
         <div className="flex gap-2 justify-end mt-2">
-          <Button variant="secondary" onClick={onClose} disabled={moveStage.isPending}>Cancel</Button>
+          {/* Same submittingRef.current guard as onOpenChange above — this
+              is a separate click handler, not routed through onOpenChange,
+              so without this check it could still close in the tiny window
+              between handleSave starting and moveStage.isPending's next
+              render actually reflecting it. */}
+          <Button variant="secondary" onClick={() => { if (!submittingRef.current) onClose() }} disabled={moveStage.isPending}>Cancel</Button>
           <Button onClick={handleSave} disabled={moveStage.isPending} className="font-bold text-white" style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}>
             {moveStage.isPending ? 'Saving…' : 'Save'}
           </Button>

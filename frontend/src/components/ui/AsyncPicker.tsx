@@ -2,6 +2,8 @@ import { FiX } from 'react-icons/fi'
 import { Input } from '@/components/ui/input'
 
 interface AsyncPickerProps<TResult> {
+  /** Associates a <label htmlFor> with the search input — omit for pickers with no such label. */
+  id?: string
   value: string
   label: string
   onChange: (id: string, label: string) => void
@@ -31,7 +33,7 @@ interface AsyncPickerProps<TResult> {
 
 // Shared shell for a single-select, search-as-you-type dropdown field. Query state stays with the caller.
 function AsyncPicker<TResult>({
-  value, label, onChange, query, onQueryChange, open, onOpenChange, containerRef,
+  id, value, label, onChange, query, onQueryChange, open, onOpenChange, containerRef,
   results, isFetching, getId, getLabel, renderResult, searchPlaceholder, clearAriaLabel,
   emptyQueryText, emptyResultsText, noResultsText, dropdownClassName,
   isError, errorText, onRetry,
@@ -52,6 +54,7 @@ function AsyncPicker<TResult>({
     <div ref={containerRef} className="relative">
       {value ? (
         <div
+          id={id}
           onClick={() => { clearSelection(); onOpenChange(true) }}
           className="flex items-center gap-2 h-8 min-w-0 rounded-lg border px-2.5 text-[13px] cursor-pointer"
           style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text)' }}
@@ -63,6 +66,7 @@ function AsyncPicker<TResult>({
         </div>
       ) : (
         <Input
+          id={id}
           placeholder={searchPlaceholder}
           value={query}
           onChange={(e) => { onQueryChange(e.target.value); onOpenChange(true) }}

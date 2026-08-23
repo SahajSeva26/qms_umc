@@ -23,7 +23,13 @@ const registerOwnerSchema = z.object({
   lastName: z.string().trim().optional(),
   email: z.string().trim().min(1, 'User email is required').email('Enter a valid email'),
   password: z.string().min(PASSWORD_MIN_LENGTH, `Password must be at least ${PASSWORD_MIN_LENGTH} characters`),
-  phone: z.string().trim().optional(),
+  // Frontend-only requirement for the New Role modal — the backend's own
+  // RegisterUserPayloadSchema still has phone as optional (min(10) only
+  // when supplied), so a role created any other way (e.g. directly against
+  // the API) is unaffected. This is a UI policy choice, not a real
+  // constraint change. The min(10) here matches the backend's own bound
+  // (auth.validators.ts) so a value that clears this check never 400s.
+  phone: z.string().trim().min(10, 'Phone number must be at least 10 characters'),
   gender: z.enum(['male', 'female', 'other']).optional(),
 })
 

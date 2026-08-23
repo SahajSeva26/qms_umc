@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { RoleStatus, RoleTypeEntity, RoleEntity } from '@/types/accessManagement.types'
 import type { DivisionEntity } from '@/types/crm.types'
 
-// Shared between CreateRoleEditor/EditRoleEditor, whose form-values types
+// Shared between CreateRoleModal/EditRoleEditor, whose form-values types
 // differ (CreateRoleFormValues vs UpdateRoleFormValues) — generic over the
 // caller's own type instead of widening to RHF's most-general FieldValues, so
 // no cast is needed at either call site and register()/control still

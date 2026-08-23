@@ -1,4 +1,5 @@
 import type { RouteObject } from 'react-router-dom'
+import { Navigate } from 'react-router-dom'
 import { lazyRoute } from '@/lib/router/lazyRoute'
 
 // This feature owns its own routes file per CLAUDE.md's routing convention
@@ -20,7 +21,6 @@ export const ACCESS_MANAGEMENT_ROUTES = {
   ROLE_TYPE_NEW:        '/admin/role-types/new',
   ROLE_TYPE_DETAIL:     '/admin/role-types/:id',
   ROLES:                '/admin/roles',
-  ROLE_NEW:             '/admin/roles/new',
   ROLE_DETAIL:          '/admin/roles/:id',
 }
 
@@ -99,9 +99,13 @@ export const accessManagementRoutes: RouteObject[] = [
     path: ACCESS_MANAGEMENT_ROUTES.ROLES,
     lazy: lazyRoute(() => import('@/features/access-management/role/pages/RolesListPage'), ROLES_VIEW_PERMISSIONS),
   },
+  // Stale bookmark/link to the old full-page create flow (removed — create
+  // is now CreateRoleModal, opened from the list) — send it back to the
+  // list instead of falling through to ROLE_DETAIL's :id route, which would
+  // try (and fail) to load a role literally named "new".
   {
-    path: ACCESS_MANAGEMENT_ROUTES.ROLE_NEW,
-    lazy: lazyRoute(() => import('@/features/access-management/role/pages/RoleDetailPage'), ROLES_VIEW_PERMISSIONS),
+    path: '/admin/roles/new',
+    element: <Navigate to={ACCESS_MANAGEMENT_ROUTES.ROLES} replace />,
   },
   {
     path: ACCESS_MANAGEMENT_ROUTES.ROLE_DETAIL,

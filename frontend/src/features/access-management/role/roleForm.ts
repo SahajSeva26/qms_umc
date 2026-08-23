@@ -78,13 +78,25 @@ export const useCreateRoleFormResolver = () =>
       description: values.description,
       type: values.roleType,
       tenant: values.tenant,
-      division: values.division,
-      supervisor: values.supervisor,
+      // Blank optional fields must be omitted, not sent as '' — the backend's
+      // Zod schema rejects an empty string against a min(1)/enum check (only
+      // gender was doing this correctly before; division/supervisor/phone
+      // were passing '' straight through, which 400'd any non-pharma role
+      // type with a blank phone number).
+      division: values.division || undefined,
+      supervisor: values.supervisor || undefined,
       user: {
         firstName: values.userFirstName,
         lastName: values.userLastName,
         email: values.userEmail,
         password: values.userPassword,
+        // Unlike division/supervisor/gender above, phone is now required by
+        // createRoleSchema (frontend-only policy — see role.schemas.ts), so
+        // the Next-button gate never lets '' reach here. Passing it through
+        // as-is (not `|| undefined`) means a blank value hits Zod's
+        // .min(1, 'Phone number is required') message instead of being
+        // masked into `undefined`, which would surface Zod's generic
+        // "expected string, received undefined" type error instead.
         phone: values.userPhone,
         gender: values.userGender || undefined,
       },

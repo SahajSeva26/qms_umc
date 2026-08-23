@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import PasswordInput from '@/components/ui/PasswordInput'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
@@ -178,14 +179,14 @@ const CreateTenantDialog = () => {
                 <div className="space-y-3">
                   <div>
                     <Label htmlFor="tenantCode" className="text-xs mb-1.5">
-                      Code
+                      Code *
                     </Label>
                     <Input id="tenantCode" type="text" placeholder="e.g. acme-pharma" {...register('code')} />
                     {fieldError('code') && <p className="text-[11px] mt-1 text-danger">{fieldError('code')}</p>}
                   </div>
                   <div>
                     <Label htmlFor="tenantName" className="text-xs mb-1.5">
-                      Name
+                      Name *
                     </Label>
                     <Input id="tenantName" type="text" placeholder="e.g. Acme Pharma" {...register('name')} />
                     {fieldError('name') && <p className="text-[11px] mt-1 text-danger">{fieldError('name')}</p>}
@@ -198,7 +199,7 @@ const CreateTenantDialog = () => {
                   </div>
                   <div>
                     <Label htmlFor="salesPerson" className="text-xs mb-1.5">
-                      Sales rep
+                      Sales rep *
                     </Label>
                     <Controller
                       control={control}
@@ -245,7 +246,7 @@ const CreateTenantDialog = () => {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <Label htmlFor="ownerFirstName" className="text-xs mb-1.5">
-                        First name
+                        First name *
                       </Label>
                       <Input id="ownerFirstName" type="text" {...register('ownerFirstName')} />
                       {fieldError('ownerFirstName') && <p className="text-[11px] mt-1 text-danger">{fieldError('ownerFirstName')}</p>}
@@ -259,16 +260,16 @@ const CreateTenantDialog = () => {
                   </div>
                   <div>
                     <Label htmlFor="ownerEmail" className="text-xs mb-1.5">
-                      Email
+                      Email *
                     </Label>
                     <Input id="ownerEmail" type="email" {...register('ownerEmail')} />
                     {fieldError('ownerEmail') && <p className="text-[11px] mt-1 text-danger">{fieldError('ownerEmail')}</p>}
                   </div>
                   <div>
                     <Label htmlFor="ownerPassword" className="text-xs mb-1.5">
-                      Password
+                      Password *
                     </Label>
-                    <Input id="ownerPassword" type="password" {...register('ownerPassword')} />
+                    <PasswordInput id="ownerPassword" {...register('ownerPassword')} />
                     {fieldError('ownerPassword') && <p className="text-[11px] mt-1 text-danger">{fieldError('ownerPassword')}</p>}
                   </div>
                   <div>

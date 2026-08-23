@@ -10,6 +10,7 @@ import { useReshapingResolver } from '@/hooks/useReshapingResolver'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import PasswordInput from '@/components/ui/PasswordInput'
 import { Label } from '@/components/ui/label'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import ChipPicker from '@/components/ui/ChipPicker'
@@ -267,7 +268,7 @@ const CreateDivisionModal = ({ onClose, defaultTenantId }: CreateDivisionModalPr
                   <Label className="block text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
                     Password *
                   </Label>
-                  <Input type="password" className="text-[13px]" {...register('headPassword')} />
+                  <PasswordInput className="text-[13px]" {...register('headPassword')} />
                   {fieldError('headPassword') && <p className="text-[11px] mt-1 text-danger">{fieldError('headPassword')}</p>}
                 </div>
 

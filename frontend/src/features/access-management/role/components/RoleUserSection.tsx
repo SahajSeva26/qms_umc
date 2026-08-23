@@ -1,10 +1,11 @@
 import { Controller } from 'react-hook-form'
 import type { Control, FieldErrors, FieldValues, Path, UseFormRegister } from 'react-hook-form'
 import { Input } from '@/components/ui/input'
+import PasswordInput from '@/components/ui/PasswordInput'
 import FieldLabel from '@/components/ui/FieldLabel'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
-// Shared between CreateRoleEditor/EditRoleEditor — see RoleDetailsSection.tsx's
+// Shared between CreateRoleModal/EditRoleEditor — see RoleDetailsSection.tsx's
 // own comment for why this is generic over the caller's form-values type
 // instead of widened to RHF's most-general FieldValues. userEmail/userPassword
 // (create-only) and userStatus (edit-only) are optional here since only ONE
@@ -80,7 +81,7 @@ const RoleUserSection = <TFormValues extends FieldValues & RoleUserFields>({
             </div>
             <div>
               <FieldLabel htmlFor="userPassword">Password</FieldLabel>
-              <Input id="userPassword" type="password" {...register(field('userPassword'))} />
+              <PasswordInput id="userPassword" {...register(field('userPassword'))} />
               {fieldTouched('userPassword') && fieldError('userPassword') && (
                 <p className="text-xs text-danger mt-1.5">{fieldError('userPassword')?.message as string}</p>
               )}
@@ -99,8 +100,17 @@ const RoleUserSection = <TFormValues extends FieldValues & RoleUserFields>({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <FieldLabel htmlFor="userPhone">Phone</FieldLabel>
-            <Input id="userPhone" type="text" placeholder="Optional" disabled={!isCreateMode} {...register(field('userPhone'))} />
+            <FieldLabel htmlFor="userPhone">{isCreateMode ? 'Phone *' : 'Phone'}</FieldLabel>
+            <Input
+              id="userPhone"
+              type="text"
+              placeholder={isCreateMode ? undefined : 'Optional'}
+              disabled={!isCreateMode}
+              {...register(field('userPhone'))}
+            />
+            {fieldTouched('userPhone') && fieldError('userPhone') && (
+              <p className="text-xs text-danger mt-1.5">{fieldError('userPhone')?.message as string}</p>
+            )}
           </div>
           <div>
             <FieldLabel htmlFor="userGender">Gender</FieldLabel>

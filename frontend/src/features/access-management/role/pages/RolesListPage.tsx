@@ -1,16 +1,14 @@
-import { useNavigate } from 'react-router-dom'
-import { FiPlus } from 'react-icons/fi'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import { useRolesFilters } from '@/features/access-management/role/hooks/useRolesFilters'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import RolesTable from '@/features/access-management/role/components/RolesTable'
 import RolesFilterBar from '@/features/access-management/role/components/RolesFilterBar'
+import CreateRoleModal from '@/features/access-management/role/components/CreateRoleModal'
 import PaginationControls from '@/components/ui/PaginationControls'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
-import { ROLE_ROUTES } from '@/features/access-management/role/role.routes'
-import { Button } from '@/components/ui/button'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { usePagination } from '@/hooks/usePagination'
+import { usePermission } from '@/hooks/usePermission'
 import type { RoleStatus } from '@/types/accessManagement.types'
 
 const PAGE_SIZE = 10
@@ -18,8 +16,12 @@ const PAGE_SIZE = 10
 // Shows every role across every tenant by default; Status/Tenant/Search
 // filters and pagination are all applied server-side.
 const RolesListPage = () => {
-  const navigate = useNavigate()
   const { filters, setFilter, reset } = useRolesFilters()
+  // This page is reachable by role:get/role:search alone, but POST /roles
+  // requires tenant:admin/tenant:manage — gate the "New Role" button so a
+  // read-only viewer can't 403 on click.
+  const { hasAnyPermission } = usePermission()
+  const canCreateRole = hasAnyPermission(['tenant:admin', 'tenant:manage'])
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
 
   const debouncedSearch = useDebouncedValue(filters.search, 300)
@@ -58,13 +60,7 @@ const RolesListPage = () => {
             {!isLoading && !error ? `${totalCount} total` : 'Manage roles across companies.'}
           </p>
         </div>
-        <Button
-          onClick={() => navigate(ROLE_ROUTES.ROLE_NEW)}
-          className="text-white shrink-0"
-          style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
-        >
-          <FiPlus size={14} /> New Role
-        </Button>
+        {canCreateRole && <CreateRoleModal />}
       </div>
 
       <RolesFilterBar filters={filters} setFilter={handleFilterChange} reset={handleReset} tenantOptions={tenantOptions} />

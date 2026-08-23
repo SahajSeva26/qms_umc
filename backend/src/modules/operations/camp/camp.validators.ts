@@ -62,6 +62,9 @@ export type ICreateCampPayload = z.infer<typeof CreateCampPayloadSchema>;
 // (QMS allocates it later). `mr` is optional only for an MR booking for themselves; a manager
 // (HO/RSM/ASM) must name the downline MR the camp is for.
 export const BookCampPayloadSchema = z.object({
+    // the project this camp is booked against — required. create() validates it (scoped to the
+    // booker's context), so a pharma booker can only pick a project in their own division.
+    project: objectId('Project').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
     mr: objectId('MR').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8d' }),
     doctor: objectId('Doctor').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8b' }),
 

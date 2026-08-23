@@ -17,7 +17,7 @@ import { canTransition } from '../../crm/lead/lead.validators';
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
-import { isValidObjectID } from '../../../shared/utils/strings';
+import { isValidObjectID, toObjectId } from '../../../shared/utils/strings';
 import { endOfUTCDay, utcDayRange } from '../../../shared/utils/dates';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { ProjectService } from '../../crm/project/project.service';
@@ -47,11 +47,21 @@ const populate: any[] = [
 // they fill one of these on it.
 const ASSIGNMENT_FIELDS = ['fo', 'mr', 'asm', 'rsm'] as const;
 
-// a search-only actor (camp:search, not camp:manage) is scoped to camps they are assigned to.
 const applyOwnScope = (where: any, ctx: RequestContext) => {
-    if (ctx.hasAnyPermissions([CAMP_PERMISSIONS.SEARCH.code]) && !ctx.hasAnyPermissions([CAMP_PERMISSIONS.MANAGE.code])) {
+    // A pharma division head sees every camp in their division.
+    if (ctx.role?.type?.code === ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_DIVISION_HEAD) {
+        where.division = toObjectId(ctx.role.division);
+        return where;
+    }
+
+    // Any other non-manage actor is scoped to camps they occupy a field-force slot on. For pharma
+    // MR/ASM/RSM this is exactly "camps that belong to them" (mr/asm/rsm === them); for a QMS field
+    // officer it's their own camps (fo === them).
+    if (!ctx.hasAnyPermissions([CAMP_PERMISSIONS.MANAGE.code])) {
         where.$or = ASSIGNMENT_FIELDS.map((field) => ({ [field]: ctx.role?._id }));
     }
+
+    return where;
 };
 
 // camp statuses that OCCUPY an FO for a date: a confirmed or live camp holds the FO. A merely

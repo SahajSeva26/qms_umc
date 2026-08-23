@@ -5,7 +5,8 @@ export const ROLE_TYPE_STATUSES = {
     INACTIVE: 'inactive',
 } as const;
 
-// pharma field force may book camps (self/downline). Booking only — no read perms granted here.
+// pharma field force hold only camp:book — it is their single capability, and it also unlocks the
+// camp + project read routes (which accept camp:book) so they can see what they need to book.
 const PHARMA_CAMP_PERMISSIONS = [CAMP_PERMISSIONS.BOOK.code];
 
 export const ALLOWED_ROLETYPE_CODES = {

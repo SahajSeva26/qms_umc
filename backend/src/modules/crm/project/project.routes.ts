@@ -11,6 +11,7 @@ import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
 import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
 import { PROJECT_PERMISSIONS } from './project.constants';
 import { TENANT_PERMISSIONS } from '../../access-management/tenant/tenant.constants';
+import { CAMP_PERMISSIONS } from '../../operations/camp/camp.constants';
 
 export const ProjectRouter = express.Router();
 
@@ -116,13 +117,16 @@ registry.registerPath({
 // ======================== EXPORT PROJECT ROUTES ========================
 // =======================================================================
 const GUARD = [PROJECT_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code];
-const READ_GUARD = [PROJECT_PERMISSIONS.SEARCH.code, ...GUARD]; // reps (project:search) may read; service scopes them to their own
+// reps (project:search) may read; service scopes them to their own. camp:book lets pharma field-force
+// read projects (the service scopes them to their division) so they can pick what to book against.
+const READ_GUARD = [PROJECT_PERMISSIONS.SEARCH.code, CAMP_PERMISSIONS.BOOK.code, ...GUARD];
 
 ProjectRouter.get(
     '/:id',
     AuthorizeMiddleware([
         PROJECT_PERMISSIONS.MANAGE.code,
         PROJECT_PERMISSIONS.SEARCH.code,
+        CAMP_PERMISSIONS.BOOK.code, // pharma field-force (book-only) may read projects; service scopes them to their division
         TENANT_PERMISSIONS.MANAGE.code,
     ]),
     ProjectController.get,

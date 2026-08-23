@@ -37,6 +37,12 @@ const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
   projects: ['project:search', 'project:manage', 'tenant:manage'],
   gantt: ['project:search', 'project:manage', 'tenant:manage'],
   camps: ['camp:search', 'camp:manage', 'tenant:manage'],
+  // All 4 pharma role types (HO/RSM/ASM/MR) hold only camp:book, never
+  // camp:search/manage — gating on those would hide this link from every
+  // pharma user it exists for. No tenant:manage fallback here (unlike other
+  // entries): a tenant manager holding that code but no pharma role would
+  // see the link and land on PharmaRedirectPage's "not applicable" state.
+  pharma: ['camp:book'],
   users: ['user:get', 'user:search', 'user:update'],
 }
 

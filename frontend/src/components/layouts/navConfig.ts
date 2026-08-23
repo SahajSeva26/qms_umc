@@ -104,16 +104,8 @@ const ALL_NAV_ITEMS: NavItem[] = [
 
   { id: 'remindauto',   label: 'AI Reminders',                icon: 'Cpu',           path: ADMIN_ROUTES.ADMIN_REMINDERS },
 
-  // Pharma Network
+  // Pharma Network — one link; PharmaRedirectPage sends the user to their own role's portal.
   { id: 'pharma',       label: 'Pharma Portal',               icon: 'Briefcase',     path: PHARMA_ROUTES.PHARMA },
-
-  { id: 'hoportal',     label: 'HO Portal',                   icon: 'Briefcase',     path: PHARMA_ROUTES.PHARMA_HO },
-
-  { id: 'rsmportal',    label: 'RSM Portal',                  icon: 'Globe',         path: PHARMA_ROUTES.PHARMA_RSM },
-
-  { id: 'asmportal',    label: 'ASM Portal',                  icon: 'Users',         path: PHARMA_ROUTES.PHARMA_ASM },
-
-  { id: 'mrportal',     label: 'MR Portal',                   icon: 'User',          path: PHARMA_ROUTES.PHARMA_MR },
 
   // Resources
   { id: 'inventory',    label: 'Inventory & Devices',         icon: 'Package',       path: ADMIN_ROUTES.ADMIN_INVENTORY },
@@ -183,7 +175,7 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
   {
     section: 'Pharma Network',
     subs: [
-      { title: '', items: ['pharma', 'hoportal', 'rsmportal', 'asmportal', 'mrportal'].map((id) => NAV_BY_ID[id]) },
+      { title: '', items: ['pharma'].map((id) => NAV_BY_ID[id]) },
     ],
   },
   {

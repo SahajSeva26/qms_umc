@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { FiClock, FiCheckCircle, FiMapPin, FiCamera, FiCheck, FiX } from 'react-icons/fi'
 import type { Person } from '@/types/people.types'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { Attendance } from '@/features/dedicatedops/dedicatedops.types'
 import { Button } from '@/components/ui/button'
 import CameraGeoCapture from '@/components/ui/CameraGeoCapture'

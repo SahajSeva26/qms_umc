@@ -1,5 +1,5 @@
 import { useSession } from '@/hooks/useSession'
-import type { SessionRole } from '@/types/accessManagement.types'
+import type { SessionRole } from '@/types/session.types'
 
 // Enforces the product rule "strictly one active Role per user" as a
 // FRONTEND-ENFORCED invariant. Confirmed against the real backend: there is

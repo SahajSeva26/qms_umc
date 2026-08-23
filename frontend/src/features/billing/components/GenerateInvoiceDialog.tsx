@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import type { ProjectEntity } from '@/types/project.types'
+import type { ProjectEntity } from '@/features/projects/project.types'
 import { useBillingProject } from '@/features/billing/hooks/useBillingProject'
 import { useEligibleInvoiceCamps } from '@/features/billing/hooks/useEligibleInvoiceCamps'
 import { useCreateInvoice } from '@/features/billing/hooks/useCreateInvoice'

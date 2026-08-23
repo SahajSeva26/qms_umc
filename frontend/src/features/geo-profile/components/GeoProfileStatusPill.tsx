@@ -1,4 +1,4 @@
-import type { GeoProfileStatus } from '@/types/geoProfile.types'
+import type { GeoProfileStatus } from '@/features/geo-profile/geoProfile.types'
 import { GEO_PROFILE_STATUS_LABEL } from '@/features/geo-profile/geoProfile.constants'
 import StatusPill from '@/components/ui/StatusPill'
 

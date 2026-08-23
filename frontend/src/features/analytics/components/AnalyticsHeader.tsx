@@ -2,7 +2,7 @@ import { FiDownload, FiClock } from 'react-icons/fi'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/sonner'
-import type { AnalyticsFilters } from '@/types/analytics.types'
+import type { AnalyticsFilters } from '@/features/analytics/analytics.types'
 import type { Client } from '@/types/client.types'
 
 interface AnalyticsHeaderProps {

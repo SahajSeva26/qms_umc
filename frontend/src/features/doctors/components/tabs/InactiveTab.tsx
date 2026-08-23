@@ -1,4 +1,4 @@
-import type { DoctorEntity } from '@/types/doctor.types'
+import type { DoctorEntity } from '@/features/doctors/doctor.types'
 import StatusPill from '@/features/doctors/components/StatusPill'
 
 interface InactiveTabProps {

@@ -6,7 +6,7 @@ import { useTenants } from '@/features/access-management/tenant/hooks/useTenants
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { useAsyncPickerState } from '@/hooks/useAsyncPickerState'
 import { PLATFORM_TENANT_CODE, PLATFORM_TENANT_FETCH_LIMIT } from '@/features/access-management/accessManagement.constants'
-import type { RoleEntity } from '@/types/accessManagement.types'
+import type { RoleEntity } from '@/features/access-management/accessManagement.types'
 
 interface SelectedMember {
   roleId: string

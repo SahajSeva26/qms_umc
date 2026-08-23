@@ -1,7 +1,7 @@
 import { useEntityQuery } from '@/hooks/useEntityQuery'
 import { createEntityKeys } from '@/hooks/entityQueryKeys'
 import { accessManagementService } from '@/features/access-management/accessManagement.service'
-import type { SearchTenantQuery } from '@/types/accessManagement.types'
+import type { SearchTenantQuery } from '@/features/access-management/accessManagement.types'
 
 export const tenantKeys = createEntityKeys<SearchTenantQuery>('tenants', 'tenant')
 

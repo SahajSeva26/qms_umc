@@ -1,4 +1,4 @@
-import type { Camp, CampStage } from '@/types/camp.types'
+import type { Camp, CampStage } from '@/features/camps/camp.types'
 import { DOCTORS } from '@/features/camps/camps.mock'
 
 // REQUESTED/UPCOMING are split by whether an FO is assigned, not by raw `status`.

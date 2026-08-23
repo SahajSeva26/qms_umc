@@ -1,13 +1,13 @@
 import api from '@/lib/api/api'
 import type { ApiResponse, PaginatedResponse } from '@/types/common.types'
-import type { LeadEntity, SearchLeadQuery } from '@/types/crm.types'
+import type { LeadEntity, SearchLeadQuery } from '@/features/crm/crm.types'
 import type {
   CreateProjectPayload,
   MoveProjectStagePayload,
   ProjectEntity,
   SearchProjectQuery,
   UpdateProjectPayload,
-} from '@/types/project.types'
+} from '@/features/projects/project.types'
 
 // Follows the exact pattern of accessManagementService: same shared `api`
 // axios instance, same ApiResponse/PaginatedResponse envelope typing, a plain

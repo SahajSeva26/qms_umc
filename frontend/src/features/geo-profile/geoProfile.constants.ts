@@ -1,4 +1,4 @@
-import type { GeoProfileStatus, GeoProfileType } from '@/types/geoProfile.types'
+import type { GeoProfileStatus, GeoProfileType } from '@/features/geo-profile/geoProfile.types'
 
 export const GEO_PROFILE_ROUTES = {
   GEO_PROFILES: '/geo-profiles',

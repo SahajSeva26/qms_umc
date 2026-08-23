@@ -3,7 +3,7 @@ import { Input } from '@/components/ui/input'
 import SearchInput from '@/components/ui/SearchInput'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { CampsRealFilterState } from '@/features/camps/hooks/useCampsRealFilters'
-import type { BillingType, CampStatus, CampType } from '@/types/campReal.types'
+import type { BillingType, CampStatus, CampType } from '@/features/camps/campReal.types'
 import { CAMP_STATUS_LABEL } from '@/features/camps/components/CampStatusPillReal'
 
 const STATUS_OPTIONS: CampStatus[] = ['requested', 'confirmed', 'live', 'closed', 'cancelled', 'cancelled_charged']

@@ -5,7 +5,7 @@ import { inventoryAssignmentKeys } from '@/features/inventory/real/hooks/useInve
 import { inventoryDeviceKeys } from '@/features/inventory/real/hooks/useInventoryDevices'
 import { inventoryConsumableKeys } from '@/features/inventory/real/hooks/useInventoryConsumables'
 import { inventoryLedgerKeys } from '@/features/inventory/real/hooks/useInventoryLedgers'
-import type { CreateInventoryRequestPayload } from '@/types/inventoryRequest.types'
+import type { CreateInventoryRequestPayload } from '@/features/inventory/real/inventoryRequest.types'
 
 // Not useCreateEntity (single-key only) — a fresh 'return' request withdraws
 // stock immediately on create() (resolveStockMovement runs at 'requested' for

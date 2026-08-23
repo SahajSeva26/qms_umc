@@ -1,8 +1,8 @@
 import { useCallback, useMemo } from 'react'
 import { useTenantPermissionGroup } from '@/features/access-management/role-type/hooks/useTenantPermissionGroup'
-import { usePermissionCodeSelection } from '@/hooks/usePermissionCodeSelection'
+import { usePermissionCodeSelection } from '@/features/access-management/hooks/usePermissionCodeSelection'
 import { ROLE_FORBIDDEN_PERMISSIONS } from '@/features/access-management/role/constants/roleForbiddenPermissions'
-import type { RoleTypeEntity } from '@/types/accessManagement.types'
+import type { RoleTypeEntity } from '@/features/access-management/accessManagement.types'
 
 // Choices are the intersection of the tenant's PermissionGroup ceiling and the
 // selected RoleType's own permissions, minus the forbidden codes.

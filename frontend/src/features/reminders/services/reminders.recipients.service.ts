@@ -7,7 +7,7 @@
 // templates (for renderTemplate/buildContext), that would create a cycle.
 // Keeping both facts in this shared, lower-level module avoids it.
 
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { Person } from '@/types/people.types'
 import type { EngineRecipient, RecipientType } from '@/features/reminders/reminders.types'
 import { seeded } from './reminders.utils'

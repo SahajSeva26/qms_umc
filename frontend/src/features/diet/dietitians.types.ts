@@ -204,13 +204,13 @@ export interface DietitianProfileBundle {
   dietitian: DietitianRosterEntry
   details: DietitianDetails
   equipment: { bca: DietitianBcaEquipment }
-  camps: import('@/types/camp.types').Camp[]
-  closed: import('@/types/camp.types').Camp[]
-  upcoming: import('@/types/camp.types').Camp[]
+  camps: import('@/features/camps/camp.types').Camp[]
+  closed: import('@/features/camps/camp.types').Camp[]
+  upcoming: import('@/features/camps/camp.types').Camp[]
   payments: DietPayment[]
   paymentRollup: DietitianPaymentRollup
   rateHistory: DietitianRateEntry[]
-  feedbacks: (DietitianFeedback & { camp: import('@/types/camp.types').Camp })[]
+  feedbacks: (DietitianFeedback & { camp: import('@/features/camps/camp.types').Camp })[]
   averageRating: DietitianAverageRating | null
   byProject: DietitianProjectBreakdown[]
 }

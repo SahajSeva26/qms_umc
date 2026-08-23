@@ -1,7 +1,7 @@
 import { useCreateEntity } from '@/hooks/useCreateEntity'
 import { projectsService } from '@/features/projects/projects.service'
 import { projectKeys } from '@/features/projects/hooks/useProjects'
-import type { CreateProjectPayload } from '@/types/project.types'
+import type { CreateProjectPayload } from '@/features/projects/project.types'
 
 // Consumer calls mutateAsync and awaits it (per EditLeadModal's consumption
 // convention), only closing the wizard on real success.

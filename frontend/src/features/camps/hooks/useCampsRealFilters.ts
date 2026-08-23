@@ -1,5 +1,5 @@
 import { useFilterState } from '@/hooks/useFilterState'
-import type { BillingType, CampStatus, CampType } from '@/types/campReal.types'
+import type { BillingType, CampStatus, CampType } from '@/features/camps/campReal.types'
 
 export interface CampsRealFilterState {
   status: CampStatus | 'ALL'

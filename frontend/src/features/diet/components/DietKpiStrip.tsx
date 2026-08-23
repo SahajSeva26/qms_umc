@@ -1,5 +1,5 @@
 import { FiClipboard, FiUserCheck, FiClock, FiCheckCircle, FiXCircle, FiAlertTriangle, FiUsers, FiImage } from 'react-icons/fi'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { Dietitian, MediaItem } from '@/features/diet/diet.types'
 import { dietStage } from '@/features/diet/diet.utils'
 import KpiTile from '@/components/ui/KpiTile'

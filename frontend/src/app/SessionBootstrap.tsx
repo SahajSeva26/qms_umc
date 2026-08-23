@@ -30,7 +30,7 @@ const SessionBootstrap = ({ children }: { children: ReactNode }) => {
 
     if (session && !user) {
       setAuth({
-        _id: session.user.id,
+        id: session.user.id,
         email: session.user.email,
         firstName: session.user.firstName,
         lastName: session.user.lastName,

@@ -1,4 +1,4 @@
-import type { AppointmentEntity } from '@/types/appointment.types'
+import type { AppointmentEntity } from '@/features/crm/appointments/appointment.types'
 import { addDays, dayKey, isSameDay, startOfWeek } from '@/features/crm/appointments/appointments.utils'
 import { appointmentChipColor, appointmentRefName } from '@/features/crm/appointments/appointmentsReal.utils'
 

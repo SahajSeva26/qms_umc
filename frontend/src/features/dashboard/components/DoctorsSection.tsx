@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { FiActivity } from 'react-icons/fi'
 import { useDashboardData } from '@/features/dashboard/hooks/useDashboardData'
-import type { DashboardFilterState } from '@/types/dashboard.types'
+import type { DashboardFilterState } from '@/features/dashboard/dashboard.types'
 import SectionCard from '@/features/dashboard/components/SectionCard'
 import MiniKpiCard from '@/features/dashboard/components/MiniKpiCard'
 import BarListRow from '@/features/dashboard/components/BarListRow'

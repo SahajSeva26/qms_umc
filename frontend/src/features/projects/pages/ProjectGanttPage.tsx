@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { FiPlus, FiClock } from 'react-icons/fi'
-import type { ProjectStatus } from '@/types/project.types'
+import type { ProjectStatus } from '@/features/projects/project.types'
 import { useProjects } from '@/features/projects/hooks/useProjects'
 import {
   computeGstBreakdown,

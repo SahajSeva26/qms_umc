@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { getDashboardData } from '@/features/dashboard/dashboard.service'
-import { DEFAULT_DASHBOARD_FILTERS } from '@/types/dashboard.types'
+import { DEFAULT_DASHBOARD_FILTERS } from '@/features/dashboard/dashboard.types'
 
 // Shared wrapper around the Dashboard feature's aggregate data — lets other
 // features (Analytics) read it without importing features/dashboard/

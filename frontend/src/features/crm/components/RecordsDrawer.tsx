@@ -1,5 +1,5 @@
 import { FiDownload } from 'react-icons/fi'
-import type { LeadEntity } from '@/types/crm.types'
+import type { LeadEntity } from '@/features/crm/crm.types'
 import SideDrawer from '@/components/ui/SideDrawer'
 import StagePill from '@/features/crm/components/StagePill'
 import { Button } from '@/components/ui/button'

@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { FiFolderPlus, FiActivity, FiCpu } from 'react-icons/fi'
-import { useProjectsDataShared } from '@/hooks/useProjectsDataShared'
+import { useProjectsDataShared } from '@/features/projects/hooks/useProjectsDataShared'
 import { usePeopleData } from '@/hooks/usePeopleData'
 import { isScreeningProject, projectTenantName } from '@/features/projects/projects.utils'
 import KpiTile from '@/components/ui/KpiTile'

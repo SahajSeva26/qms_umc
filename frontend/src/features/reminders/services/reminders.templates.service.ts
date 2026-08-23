@@ -3,7 +3,7 @@
 // substituting [Placeholder] values into it.
 // TODO: replace with real API calls once backend endpoints exist.
 
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type {
   ReminderTemplates, ReminderConfig, TemplateFamily, RecipientType, EngineRecipient,
 } from '@/features/reminders/reminders.types'

@@ -8,7 +8,7 @@ import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import { usePermission } from '@/hooks/usePermission'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { usePagination } from '@/hooks/usePagination'
-import type { TenantStatus } from '@/types/accessManagement.types'
+import type { TenantStatus } from '@/features/access-management/accessManagement.types'
 
 const PAGE_SIZE = 10
 

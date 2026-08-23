@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { FiPieChart, FiBarChart2, FiGrid, FiUsers, FiHeart } from 'react-icons/fi'
-import type { Camp, CampStatus } from '@/types/camp.types'
+import type { Camp, CampStatus } from '@/features/camps/camp.types'
 import AnalyticsSectionCard from '@/features/analytics/components/AnalyticsSectionCard'
 import Donut from '@/features/analytics/components/charts/Donut'
 import BarsVertical from '@/features/analytics/components/charts/BarsVertical'

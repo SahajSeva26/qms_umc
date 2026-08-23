@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { ProjectEntity } from '@/types/project.types'
+import type { ProjectEntity } from '@/features/projects/project.types'
 import type { DedicatedProjectConfig, ManpowerRoleKey, SopConfig } from '@/features/dedicatedops/dedicatedops.types'
 import { ROLE_LABELS } from '@/features/dedicatedops/dedicatedops.types'
 import { Button } from '@/components/ui/button'

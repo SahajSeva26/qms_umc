@@ -13,7 +13,7 @@ import { useTenants } from '@/features/access-management/tenant/hooks/useTenants
 import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRoleTypes'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import { createTenantSchema } from '@/features/access-management/tenant/schemas/tenant.schemas'
-import { useReshapingResolver } from '@/hooks/useReshapingResolver'
+import { useReshapingResolver } from '@/features/access-management/hooks/useReshapingResolver'
 import { TENANT_ROUTES } from '@/features/access-management/tenant/tenant.routes'
 import { PLATFORM_TENANT_CODE, PLATFORM_TENANT_FETCH_LIMIT } from '@/features/access-management/accessManagement.constants'
 

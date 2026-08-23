@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { FiGrid, FiBarChart2, FiFolderPlus, FiUserPlus, FiClipboard, FiDollarSign, FiCreditCard, FiRotateCcw, FiUsers, FiCheckSquare, FiExternalLink, FiShield, FiFileText, FiTrendingUp, FiDatabase, FiNavigation } from 'react-icons/fi'
 import { useAuth } from '@/hooks/useAuth'
 import { usePermission } from '@/hooks/usePermission'
-import { useCampsData } from '@/hooks/useCampsData'
+import { useCampsShared } from '@/features/camps/hooks/useCampsShared'
+import { useCampDoctors } from '@/features/camps/hooks/useCampDoctors'
 import { usePeopleData } from '@/hooks/usePeopleData'
-import { useProjectsDataShared } from '@/hooks/useProjectsDataShared'
+import { useProjectsDataShared } from '@/features/projects/hooks/useProjectsDataShared'
 import { useOm } from '@/features/om/hooks/useOm'
 import OmIdBar from '@/features/om/components/OmIdBar'
 import OverviewTab from '@/features/om/components/tabs/OverviewTab'
@@ -52,7 +53,8 @@ const OmPage = () => {
     setTab(next === 'Diet' ? 'dashboard' : 'overview')
   }
 
-  const { camps, doctors } = useCampsData()
+  const { camps } = useCampsShared()
+  const { doctors } = useCampDoctors()
   const { people: fos, devices } = usePeopleData('Field Officer')
   const { people: dietitians } = usePeopleData('Dietitian')
   // GET /projects can 403 for a caller without project:search/manage or tenant:manage; surface that so OverviewTab can show an honest message instead of a misleading "No projects" empty state.

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getAllowedStageActions } from '@/types/inventoryRequest.types'
+import { getAllowedStageActions } from '@/features/inventory/real/inventoryRequest.types'
 
 // A pure-function test over the exact transition-map mirror confirmed
 // against inventory-request.service.ts's moveStage. Table-driven over

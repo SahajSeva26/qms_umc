@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { FiAward } from 'react-icons/fi'
 import type { Person } from '@/types/people.types'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import FoFilterBar, { type FoFilters } from '@/features/fo/components/FoFilterBar'
 import { foLiveStatus, closedCampsOf, avgFeedback } from '@/features/fo/components/fo.ui'
 import { foMatchesSearch } from '@/features/fo/utils/foSearch'

@@ -1,4 +1,4 @@
-import type { UserStatus } from '@/types/user.types'
+import type { UserStatus } from '@/features/admin/user.types'
 import SharedStatusPill from '@/components/ui/StatusPill'
 
 const STATUS_CLASSES: Record<UserStatus, string> = {

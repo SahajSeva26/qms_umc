@@ -5,7 +5,7 @@ import type {
   InventoryMasterEntity,
   SearchInventoryMasterQuery,
   UpdateInventoryMasterPayload,
-} from '@/types/inventoryMaster.types'
+} from '@/features/inventory/real/inventoryMaster.types'
 
 const searchInventoryMasters = async (query: SearchInventoryMasterQuery) => {
   const res = await api.get<PaginatedResponse<InventoryMasterEntity>>('/inventory-masters', { params: query })

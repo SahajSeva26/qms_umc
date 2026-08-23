@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import type { PermissionGroupEntity } from '@/types/accessManagement.types'
+import type { PermissionGroupEntity } from '@/features/access-management/accessManagement.types'
 import { PERMISSION_GROUP_ROUTES } from '@/features/access-management/permission-group/permission-group.routes'
 import PermissionGroupStatusPill from '@/features/access-management/permission-group/components/PermissionGroupStatusPill'
 

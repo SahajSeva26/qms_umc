@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { getDashboardData } from '@/features/dashboard/dashboard.service'
-import type { DashboardFilterState } from '@/types/dashboard.types'
+import type { DashboardFilterState } from '@/features/dashboard/dashboard.types'
 
 /**
  * The dashboard's single data query.

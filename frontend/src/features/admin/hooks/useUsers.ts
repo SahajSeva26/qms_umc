@@ -1,7 +1,7 @@
 import { useEntityQuery } from '@/hooks/useEntityQuery'
 import { createEntityKeys } from '@/hooks/entityQueryKeys'
 import { adminService } from '@/features/admin/admin.service'
-import type { SearchUserQuery } from '@/types/user.types'
+import type { SearchUserQuery } from '@/features/admin/user.types'
 
 export const userKeys = createEntityKeys<SearchUserQuery>('users', 'user')
 

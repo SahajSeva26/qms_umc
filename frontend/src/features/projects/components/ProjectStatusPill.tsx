@@ -1,5 +1,5 @@
-import type { ProjectStatus } from '@/types/project.types'
-import { PROJECT_STATUS_COLOR, PROJECT_STATUS_LABEL } from '@/types/project.types'
+import type { ProjectStatus } from '@/features/projects/project.types'
+import { PROJECT_STATUS_COLOR, PROJECT_STATUS_LABEL } from '@/features/projects/projects.constants'
 import ColorPill from '@/components/ui/ColorPill'
 
 interface ProjectStatusPillProps {

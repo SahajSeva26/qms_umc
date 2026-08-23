@@ -5,8 +5,8 @@ import { Input } from '@/components/ui/input'
 import DatePicker from '@/components/ui/DatePicker'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { useClientsDataShared } from '@/hooks/useClientsDataShared'
-import { SLOTS } from '@/types/camp.types'
-import type { Camp } from '@/types/camp.types'
+import { SLOTS } from '@/features/camps/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 
 interface NewDietRequestModalProps {
   open: boolean

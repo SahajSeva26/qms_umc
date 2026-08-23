@@ -1,5 +1,5 @@
-import type { LeadEntity, LeadStatus } from '@/types/crm.types'
-import { LEAD_STATUS_LABEL, LEAD_STATUS_COLOR } from '@/types/crm.types'
+import type { LeadEntity, LeadStatus } from '@/features/crm/crm.types'
+import { LEAD_STATUS_LABEL, LEAD_STATUS_COLOR } from '@/features/crm/crm.constants'
 import { formatINR } from '@/utils/formatters'
 
 const COLUMNS = Object.keys(LEAD_STATUS_LABEL) as LeadStatus[]

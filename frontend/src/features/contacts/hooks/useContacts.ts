@@ -2,7 +2,7 @@ import { useEntityQuery } from '@/hooks/useEntityQuery'
 import { createEntityKeys } from '@/hooks/entityQueryKeys'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { contactsService } from '@/features/contacts/contacts.service'
-import type { SearchContactQuery } from '@/types/contact.types'
+import type { SearchContactQuery } from '@/features/contacts/contact.types'
 
 export const contactKeys = createEntityKeys<SearchContactQuery>('contacts', 'contact')
 

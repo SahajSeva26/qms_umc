@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRoleTypes'
 import { campRefId, campRefName } from '@/features/camps/campsReal.utils'
-import type { CampEntity, CampPopulatedRole } from '@/types/campReal.types'
+import type { CampEntity, CampPopulatedRole } from '@/features/camps/campReal.types'
 
 export const useCampCandidateRoles = (effectiveTenant: string, camp: CampEntity | null) => {
   // mr/asm/rsm lookups are lazy-gated on the dropdown opening; FO stays eager.

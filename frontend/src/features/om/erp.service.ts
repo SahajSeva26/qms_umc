@@ -1,5 +1,5 @@
-import type { Camp } from '@/types/camp.types'
-import type { ProjectEntity } from '@/types/project.types'
+import type { Camp } from '@/features/camps/camp.types'
+import type { ProjectEntity } from '@/features/projects/project.types'
 import { computeGstBreakdown, projectTenantName } from '@/features/projects/projects.utils'
 import { campStatus } from '@/features/om/om.service'
 import type {

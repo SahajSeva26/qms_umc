@@ -1,4 +1,4 @@
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { Person } from '@/types/people.types'
 import type {
   FoEnrollment, DietitianEnrollment, ExpenseStatus, ExpenseBreakdown, DietitianExpenseBreakdown,

@@ -1,4 +1,4 @@
-import type { LeadEntity, KpiTile } from '@/types/crm.types'
+import type { LeadEntity, KpiTile } from '@/features/crm/crm.types'
 
 // 'vel' (sales velocity) and 'top' (top rep) are omitted — no backend field exists to source them.
 const KPI_CONFIG: Omit<KpiTile, 'value' | 'delta'>[] = [

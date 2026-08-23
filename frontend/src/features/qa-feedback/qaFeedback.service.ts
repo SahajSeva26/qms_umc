@@ -5,7 +5,7 @@ import type {
   QaFeedbackEntity,
   SearchQaFeedbackQuery,
   UpdateQaFeedbackPayload,
-} from '@/types/qaFeedback.types'
+} from '@/features/qa-feedback/qaFeedback.types'
 
 // Follows the exact pattern of accessManagement.service.ts / crm.service.ts —
 // same shared `api` axios instance, same ApiResponse/PaginatedResponse

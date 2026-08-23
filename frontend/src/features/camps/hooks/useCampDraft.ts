@@ -1,6 +1,6 @@
 import { useReducer } from 'react'
 import { campRefId } from '@/features/camps/campsReal.utils'
-import type { BillingType, CampEntity, CampType } from '@/types/campReal.types'
+import type { BillingType, CampEntity, CampType } from '@/features/camps/campReal.types'
 
 export interface CampDraft {
   tenant: string

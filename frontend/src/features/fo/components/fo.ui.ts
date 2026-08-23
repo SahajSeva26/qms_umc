@@ -1,5 +1,5 @@
 import type { Person } from '@/types/people.types'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import { toast } from '@/components/ui/sonner'
 
 // Shared UI-layer helpers for the FO Management screen (fo-manager.js port).

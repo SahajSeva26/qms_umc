@@ -10,7 +10,7 @@ import { suggestDietitianRates, poCampCost, getDietitianRateHistory } from '@/fe
 import { dietitianApproved } from '@/features/diet/services/dietitianRoster.service'
 import { clientName } from '@/features/diet/services/dietScope.service'
 import { errorMessage } from '@/features/diet/utils/errorMessage'
-import { useCampsData } from '@/hooks/useCampsData'
+import { useCampsShared } from '@/features/camps/hooks/useCampsShared'
 import { useCampInvites } from '@/features/diet/hooks/useDietitianInvites'
 import { useDietitianCandidates } from '@/features/diet/hooks/useDietitianCandidates'
 import { useAssignDietitianWithRates } from '@/features/diet/hooks/useDietitianRates'
@@ -26,7 +26,7 @@ interface AssignDietitianModalProps {
 }
 
 const AssignDietitianModal = ({ open, onClose, campId, preSelectedDietitianId, onDone, userName }: AssignDietitianModalProps) => {
-  const { camps } = useCampsData()
+  const { camps } = useCampsShared()
   const camp = useMemo(() => camps.find((c) => c.id === campId) || null, [camps, campId])
   const assignDietitian = useAssignDietitianWithRates()
 

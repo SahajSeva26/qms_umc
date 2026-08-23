@@ -1,6 +1,6 @@
 import api from '@/lib/api/api'
 import type { ApiResponse, PaginatedResponse } from '@/types/common.types'
-import type { CreateInvoiceLineItemPayload, InvoiceLineItemEntity, SearchInvoiceLineItemQuery } from '@/types/invoiceLineItem.types'
+import type { CreateInvoiceLineItemPayload, InvoiceLineItemEntity, SearchInvoiceLineItemQuery } from '@/features/billing/invoiceLineItem.types'
 
 const DEFAULT_LIMIT = '10'
 

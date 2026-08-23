@@ -1,11 +1,11 @@
 import { FiAlertTriangle } from 'react-icons/fi'
-import type { Camp } from '@/types/camp.types'
-import { useProjectsDataShared } from '@/hooks/useProjectsDataShared'
+import type { Camp } from '@/features/camps/camp.types'
+import { useProjectsDataShared } from '@/features/projects/hooks/useProjectsDataShared'
 import { useErp } from '@/features/om/hooks/useErp'
 import { leakage } from '@/features/om/erp.service'
 import KpiTile from '@/components/ui/KpiTile'
 import { FiDollarSign, FiTrendingUp, FiXOctagon } from 'react-icons/fi'
-import { clientName } from '@/types/campref.types'
+import { clientName } from '@/features/camps/camps.refs'
 import { formatINR } from '@/utils/formatters'
 
 interface RevenueAssuranceTabProps {

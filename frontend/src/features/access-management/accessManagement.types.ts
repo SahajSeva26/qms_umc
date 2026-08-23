@@ -1,7 +1,7 @@
 // Shared types for the PBAC (permission-based access control) domain —
 // reflects the REAL backend permission model returned by GET /auth/me,
 // keyed on permission code strings like 'user:get', 'tenant:manage', etc.
-// Decoupled from `@/types/auth.types.ts`'s separate frontend-only UserRole system.
+// Decoupled from `@/features/auth/auth.types.ts`'s separate frontend-only UserRole system.
 
 // ---------------------------------------------------------------------------
 // Permission catalog
@@ -313,57 +313,3 @@ export interface UpdateRolePayload {
   user?: UpdateRoleUserPayload
 }
 
-// ---------------------------------------------------------------------------
-// Session (GET /auth/me)
-// ---------------------------------------------------------------------------
-
-export interface SessionUser {
-  id: string
-  email: string
-  firstName: string
-  lastName: string
-  avatar?: { url: string; id: string }
-}
-
-export interface SessionRole {
-  id: string
-  code: string
-  name: string
-}
-
-export interface SessionRoleType {
-  id: string
-  code: string
-  name: string
-}
-
-export interface SessionTenant {
-  id: string
-  code: string
-  name: string
-  type: TenantType
-}
-
-/** Raw shape of the `data` payload from GET /auth/me. */
-export interface SessionResponse {
-  user: SessionUser
-  role: SessionRole
-  roleType: SessionRoleType
-  tenant: SessionTenant
-  permissions: string[]
-}
-
-/**
- * Flattened, display-friendly projection of SessionResponse used by
- * usePermission()/useActiveRole(). Distinct from SessionResponse so callers
- * needing individual scalars don't have to reach into nested objects.
- */
-export interface SessionPermissions {
-  permissions: string[]
-  roleCode: string
-  roleTypeCode: string
-  roleTypeId: string
-  tenantCode: string
-  tenantType: 'platform' | 'customer'
-  tenantId: string
-}

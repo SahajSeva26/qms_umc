@@ -1,5 +1,5 @@
 import { FiMail, FiPhone, FiMapPin, FiExternalLink, FiEdit2, FiMessageCircle } from 'react-icons/fi'
-import type { DoctorEntity } from '@/types/doctor.types'
+import type { DoctorEntity } from '@/features/doctors/doctor.types'
 import SideDrawer from '@/components/ui/SideDrawer'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/sonner'

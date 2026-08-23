@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { FiPlus, FiCheckCircle, FiAlertTriangle } from 'react-icons/fi'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import type { RunCampScreeningResult } from '@/types/camp.types'
+import type { RunCampScreeningResult } from '@/features/camps/camp.types'
 import type { PatientFieldDef } from '@/features/fo/foConfig.types'
 import AddPatientSubWizard from '@/features/fo/components/runcamp/AddPatientSubWizard'
 

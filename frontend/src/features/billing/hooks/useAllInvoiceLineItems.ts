@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { invoiceLineItemService } from '@/features/billing/invoiceLineItem.service'
 import { invoiceLineItemKeys } from '@/features/billing/hooks/useInvoiceLineItems'
-import type { InvoiceLineItemEntity } from '@/types/invoiceLineItem.types'
+import type { InvoiceLineItemEntity } from '@/features/billing/invoiceLineItem.types'
 
 // Fetches every line item on an invoice, across all pages — used only where
 // the CALLER needs the complete set (e.g. AddCampToInvoiceDialog's

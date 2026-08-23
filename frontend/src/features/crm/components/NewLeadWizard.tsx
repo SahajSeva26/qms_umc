@@ -1,6 +1,6 @@
 import { Fragment, useState } from 'react'
 import { FiBriefcase, FiArrowLeft, FiArrowRight, FiSave, FiX } from 'react-icons/fi'
-import type { CreateLeadPayload } from '@/types/crm.types'
+import type { CreateLeadPayload } from '@/features/crm/crm.types'
 import { DEFAULT_WIZARD_FORM, type WizardFormState } from '@/features/crm/wizard.types'
 import { useLeads } from '@/features/crm/hooks/useLeads'
 import { Dialog, DialogContent } from '@/components/ui/dialog'

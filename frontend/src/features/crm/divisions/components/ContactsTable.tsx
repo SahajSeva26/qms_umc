@@ -1,4 +1,4 @@
-import type { ContactEntity } from '@/types/contact.types'
+import type { ContactEntity } from '@/features/contacts/contact.types'
 
 interface ContactsTableProps {
   contacts: ContactEntity[]

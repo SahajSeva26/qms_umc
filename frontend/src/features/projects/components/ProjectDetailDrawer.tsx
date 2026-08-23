@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
-import type { ProjectEntity } from '@/types/project.types'
-import { EXECUTION_MODE_LABEL, PAYMENT_TERMS_LABEL, PROJECT_THERAPY_LABEL } from '@/types/project.types'
+import type { ProjectEntity } from '@/features/projects/project.types'
+import { EXECUTION_MODE_LABEL, PAYMENT_TERMS_LABEL, PROJECT_THERAPY_LABEL } from '@/features/projects/projects.constants'
 import { computeGstBreakdown, projectDivisionName, projectTenantName } from '@/features/projects/projects.utils'
 import { formatDate, formatINR } from '@/utils/formatters'
 import SideDrawer from '@/components/ui/SideDrawer'

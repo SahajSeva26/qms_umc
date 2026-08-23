@@ -1,6 +1,6 @@
 import api from '@/lib/api/api'
 import type { ApiResponse, PaginatedResponse } from '@/types/common.types'
-import type { SearchUserQuery, UpdateUserPayload, User } from '@/types/user.types'
+import type { SearchUserQuery, UpdateUserPayload, User } from '@/features/admin/user.types'
 import { withMockFields } from '@/features/admin/admin.mock'
 
 // Backend returns real status (for callers with system:manage) but has no

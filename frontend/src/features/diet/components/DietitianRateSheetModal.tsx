@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { toast } from '@/components/ui/sonner'
 import { FiCheck, FiAlertOctagon, FiAlertCircle, FiArrowLeft, FiUserCheck, FiClock } from 'react-icons/fi'
 import { useAuth } from '@/hooks/useAuth'
-import { useCampsData } from '@/hooks/useCampsData'
+import { useCampsShared } from '@/features/camps/hooks/useCampsShared'
 import {
   suggestDietitianRates, getDietitianRateHistory, poCampCost,
 } from '@/features/diet/services/dietitianRates.service'
@@ -33,7 +33,7 @@ type Step = 'PICK' | 'RATES'
 // guess) and its Save button was a no-op toast; all of that is gone.
 const DietitianRateSheetModal = ({ open, onClose, campId }: DietitianRateSheetModalProps) => {
   const { user } = useAuth()
-  const { camps } = useCampsData()
+  const { camps } = useCampsShared()
   const userName = user ? `${user.firstName} ${user.lastName}`.trim() : 'QMS Ops'
   const assignDietitian = useAssignDietitianWithRates()
 

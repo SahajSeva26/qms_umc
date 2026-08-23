@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import type { RoleEntity, RolePopulatedRoleType, RolePopulatedTenant, RolePopulatedUser } from '@/types/accessManagement.types'
+import type { RoleEntity, RolePopulatedRoleType, RolePopulatedTenant, RolePopulatedUser } from '@/features/access-management/accessManagement.types'
 import { ROLE_ROUTES } from '@/features/access-management/role/role.routes'
 import RoleStatusPill from '@/features/access-management/role/components/RoleStatusPill'
 

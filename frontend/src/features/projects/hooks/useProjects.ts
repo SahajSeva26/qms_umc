@@ -1,7 +1,7 @@
 import { useEntityQuery } from '@/hooks/useEntityQuery'
 import { createEntityKeys } from '@/hooks/entityQueryKeys'
 import { projectsService } from '@/features/projects/projects.service'
-import type { SearchProjectQuery } from '@/types/project.types'
+import type { SearchProjectQuery } from '@/features/projects/project.types'
 
 export const projectKeys = createEntityKeys<SearchProjectQuery>('projects', 'project')
 

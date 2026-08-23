@@ -1,4 +1,4 @@
-import type { DoctorEntity } from '@/types/doctor.types'
+import type { DoctorEntity } from '@/features/doctors/doctor.types'
 import type { DoctorsFilterState } from '@/features/doctors/hooks/useDoctorsFilters'
 import DoctorFilterBar from '@/features/doctors/components/DoctorFilterBar'
 import StatusPill from '@/features/doctors/components/StatusPill'

@@ -5,7 +5,7 @@
 // Owns KEYS.EQUIPMENT.
 // TODO: mock/localStorage-backed — swap bodies for api.* when available.
 
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { DietitianBcaEquipment, DietitianRankResult } from '@/features/diet/dietitians.types'
 import { KEYS, load, persist, arr } from './dietStorage'
 

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { projectsService } from '@/features/projects/projects.service'
-import type { ProjectEntity } from '@/types/project.types'
+import type { ProjectEntity } from '@/features/projects/project.types'
 
 // Read-only shared wrapper around Project Management's data — lets other
 // features (Dedicated Ops, Camps' Project filter, FO Config, OM/ERP) read

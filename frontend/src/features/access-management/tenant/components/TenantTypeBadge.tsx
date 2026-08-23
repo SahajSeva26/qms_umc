@@ -1,4 +1,4 @@
-import type { TenantType } from '@/types/accessManagement.types'
+import type { TenantType } from '@/features/access-management/accessManagement.types'
 
 // Mirrors `@/features/admin/components/RoleBadge.tsx`'s dot+pill styling,
 // keyed on TenantType instead of UserRole. `type` is only present server-side

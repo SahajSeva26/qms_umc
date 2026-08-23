@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import {
   buildDietitianCandidates, loadCandidateIndex,
   type DietitianCandidateList,

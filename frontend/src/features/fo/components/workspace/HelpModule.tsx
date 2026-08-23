@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { FiPhone, FiMail, FiLifeBuoy, FiDownload } from 'react-icons/fi'
 import type { Person } from '@/types/people.types'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { DeviceCatalogItem } from '@/types/device.types'
 import type { Incident, IncidentSeverity } from '@/features/fo/fo.types'
 import { Button } from '@/components/ui/button'

@@ -5,7 +5,7 @@ import {
 } from 'react-icons/fi'
 import { useAuth } from '@/hooks/useAuth'
 import { usePeopleData } from '@/hooks/usePeopleData'
-import { useCampsData } from '@/hooks/useCampsData'
+import { useCampsShared } from '@/features/camps/hooks/useCampsShared'
 import { useFoClaims, useFoTraining, useFoLeaves } from '@/features/fo/hooks/useFo'
 import type { Person } from '@/types/people.types'
 import KpiTile from '@/components/ui/KpiTile'
@@ -53,7 +53,7 @@ const FoPage = () => {
   const isSalesView = false
 
   const { people: allPeopleRaw, devices } = usePeopleData()
-  const { camps } = useCampsData()
+  const { camps } = useCampsShared()
   const { claims, fileClaim, decideClaim } = useFoClaims()
   const { leaves } = useFoLeaves()
 
@@ -64,10 +64,10 @@ const FoPage = () => {
   const selfPerson: Person = useMemo(() => {
     if (!isPersonal || !user) return fos[0] ?? ({} as Person)
     const fullName = `${user.firstName} ${user.lastName}`.trim()
-    const match = fos.find((f) => f.name === fullName || f.email === user.email || f.id === user._id)
+    const match = fos.find((f) => f.name === fullName || f.email === user.email || f.id === user.id)
     if (match) return match
     return {
-      id: user._id,
+      id: user.id,
       name: fullName || 'Field Officer',
       role: 'Field Officer',
       phone: '',

@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { FiUpload, FiPlus, FiAlertCircle, FiVideo } from 'react-icons/fi'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { MediaItem } from '@/features/diet/diet.types'
-import { clientName } from '@/types/campref.types'
+import { clientName } from '@/features/camps/camps.refs'
 import { Button } from '@/components/ui/button'
 import AddMediaModal from '@/features/diet/components/AddMediaModal'
 

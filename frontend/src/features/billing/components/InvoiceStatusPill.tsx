@@ -1,5 +1,5 @@
-import type { InvoiceStatus } from '@/types/invoice.types'
-import { INVOICE_STATUS_COLOR, INVOICE_STATUS_LABEL } from '@/types/invoice.types'
+import type { InvoiceStatus } from '@/features/billing/invoice.types'
+import { INVOICE_STATUS_COLOR, INVOICE_STATUS_LABEL } from '@/features/billing/invoice.types'
 import ColorPill from '@/components/ui/ColorPill'
 
 interface InvoiceStatusPillProps {

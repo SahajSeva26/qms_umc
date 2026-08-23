@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import type { LeadEntity, LeadStatus } from '@/types/crm.types'
-import { LEAD_STATUS_LABEL, LEAD_STATUS_COLOR, LEAD_TRANSITION_MAP } from '@/types/crm.types'
+import type { LeadEntity, LeadStatus } from '@/features/crm/crm.types'
+import { LEAD_STATUS_LABEL, LEAD_STATUS_COLOR, LEAD_TRANSITION_MAP } from '@/features/crm/crm.constants'
 import { formatINR } from '@/utils/formatters'
 import LeadCard from '@/features/crm/components/LeadCard'
 import StageMoveModal from '@/features/crm/components/StageMoveModal'

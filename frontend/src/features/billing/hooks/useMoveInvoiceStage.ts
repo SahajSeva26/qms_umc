@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { invoiceService } from '@/features/billing/invoice.service'
 import { invoiceKeys } from '@/features/billing/hooks/useInvoices'
-import type { MoveInvoiceStagePayload } from '@/types/invoice.types'
+import type { MoveInvoiceStagePayload } from '@/features/billing/invoice.types'
 import { toast } from '@/components/ui/sonner'
 import { getApiErrorMessage } from '@/utils/apiError'
 

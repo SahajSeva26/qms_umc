@@ -1,6 +1,6 @@
 import api from '@/lib/api/api'
 import type { PaginatedResponse } from '@/types/common.types'
-import type { InventoryLedgerEntity, SearchInventoryLedgerQuery } from '@/types/inventoryLedger.types'
+import type { InventoryLedgerEntity, SearchInventoryLedgerQuery } from '@/features/inventory/real/inventoryLedger.types'
 
 const searchInventoryLedgers = async (query: SearchInventoryLedgerQuery) => {
   const res = await api.get<PaginatedResponse<InventoryLedgerEntity>>('/inventory-ledgers', { params: query })

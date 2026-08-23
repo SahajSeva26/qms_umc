@@ -1,8 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import { assignDietitianByCoordPatch } from '@/features/diet/services/dietCampWorkflow.service'
 import { recordDietitianRates } from '@/features/diet/services/dietitianRates.service'
-import { useCampsData } from '@/hooks/useCampsData'
+import { useCampsShared } from '@/features/camps/hooks/useCampsShared'
 import { dietKeys } from './dietQueryKeys'
 
 // Assign a dietitian to a camp and record the agreed rates.
@@ -57,7 +57,7 @@ export interface AssignDietitianVars {
 /** diet:manage — assign a dietitian to a camp and append the rate-history entry. */
 export const useAssignDietitianWithRates = () => {
   const queryClient = useQueryClient()
-  const { patchCamp } = useCampsData()
+  const { patchCamp } = useCampsShared()
 
   return useMutation({
     mutationFn: async ({ camp, dietitianId, by, rates }: AssignDietitianVars) => {

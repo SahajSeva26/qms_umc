@@ -9,7 +9,7 @@ import type {
   ProjectTherapy,
   ProjectType,
   WhoCanBookCampCode,
-} from '@/types/project.types'
+} from '@/features/projects/project.types'
 
 // Flat wizard form state across all 7 steps — mirrors crm/wizard.types.ts's
 // convention of one flat shape rather than nested per-step sub-objects.

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { ProjectEntity } from '@/types/project.types'
+import type { ProjectEntity } from '@/features/projects/project.types'
 import type { VerificationStatusId } from '@/features/om/erp.types'
 import * as erpService from '@/features/om/erp.service'
 

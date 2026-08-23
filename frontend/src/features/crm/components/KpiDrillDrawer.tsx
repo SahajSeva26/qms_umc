@@ -1,4 +1,4 @@
-import type { LeadEntity, KpiTile } from '@/types/crm.types'
+import type { LeadEntity, KpiTile } from '@/features/crm/crm.types'
 import RecordsDrawer from '@/features/crm/components/RecordsDrawer'
 
 function describeKpi(tile: KpiTile, leads: LeadEntity[]): LeadEntity[] {

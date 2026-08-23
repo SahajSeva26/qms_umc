@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as foConfigService from '@/features/fo/foConfig.service'
 import type { FoProjectConfig, FoTestDef, ConsumableMapEntry } from '@/features/fo/foConfig.types'
-import type { ProjectEntity } from '@/types/project.types'
+import type { ProjectEntity } from '@/features/projects/project.types'
 
 // React Query wrapper around foConfig.service.ts (the FO Config Master
 // engine). All CRUD/interpretation logic lives in the service — this hook

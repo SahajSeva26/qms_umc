@@ -1,16 +1,20 @@
 import { useMemo } from 'react'
-import { useCampsData } from '@/hooks/useCampsData'
-import { useLeadsData } from '@/hooks/useLeadsData'
-import { useDashboardDataShared } from '@/hooks/useDashboardDataShared'
-import { CLIENTS, PROJECTS, INVOICES } from '@/types/client.types'
+import { useCampsShared } from '@/features/camps/hooks/useCampsShared'
+import { useCampDoctors } from '@/features/camps/hooks/useCampDoctors'
+import { useLeadsData } from '@/features/crm/hooks/useLeadsData'
+import { useDashboardDataShared } from '@/features/dashboard/hooks/useDashboardDataShared'
+import { CLIENTS, PROJECTS, INVOICES } from '@/types/client.mock'
 import { PNL_TREND, AR_AGING, FIELD_OFFICERS } from '@/features/analytics/analytics.mock'
 import { scopedCamps, scopedInvoices, scopedLeads, scopedProjects } from '@/features/analytics/analytics.utils'
-import type { AnalyticsFilters } from '@/types/analytics.types'
+import type { AnalyticsFilters } from '@/features/analytics/analytics.types'
 
-// Clients/projects/invoices are hardcoded (types/client.types) pending a real
+// Clients/projects/invoices are hardcoded (types/client.mock) pending a real
 // backend reporting module; camps/leads use their real, backend-wired hooks.
 export const useAnalyticsData = (filters: AnalyticsFilters) => {
-  const { camps, doctors, isLoading: campsLoading, error: campsError } = useCampsData()
+  const { camps, isLoading: campsSharedLoading, error: campsSharedError } = useCampsShared()
+  const { doctors, isLoading: campDoctorsLoading, error: campDoctorsError } = useCampDoctors()
+  const campsLoading = campsSharedLoading || campDoctorsLoading
+  const campsError = campsSharedError || campDoctorsError
   const { leads, isLoading: leadsLoading, error: leadsError } = useLeadsData()
   const { data: dashboardData, isLoading: dashboardLoading, error: dashboardError } = useDashboardDataShared()
 

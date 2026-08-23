@@ -11,7 +11,7 @@ import { ROLE_TYPE_ROUTES } from '@/features/access-management/role-type/role-ty
 import { Button } from '@/components/ui/button'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { usePagination } from '@/hooks/usePagination'
-import type { RoleTypeStatus } from '@/types/accessManagement.types'
+import type { RoleTypeStatus } from '@/features/access-management/accessManagement.types'
 
 const PAGE_SIZE = 10
 

@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { updateUserSchema } from '@/features/admin/schemas/user.schemas'
 import { useScrollIntoViewOnChange } from '@/hooks/useScrollIntoViewOnChange'
-import type { User, UserStatus } from '@/types/user.types'
+import type { User, UserStatus } from '@/features/admin/user.types'
 
 const STATUS_OPTIONS: { value: UserStatus; label: string }[] = [
   { value: 'active', label: 'Active' },

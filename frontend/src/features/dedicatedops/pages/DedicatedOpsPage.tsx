@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
 import { FiBriefcase, FiRadio, FiClipboard, FiSliders } from 'react-icons/fi'
-import { useProjectsDataShared } from '@/hooks/useProjectsDataShared'
+import { useProjectsDataShared } from '@/features/projects/hooks/useProjectsDataShared'
 import { usePeopleData } from '@/hooks/usePeopleData'
-import { useCampsData } from '@/hooks/useCampsData'
+import { useCampDoctors } from '@/features/camps/hooks/useCampDoctors'
 import { useDedicatedOps } from '@/features/dedicatedops/hooks/useDedicatedOps'
 import { useDedicatedOpsCompliance } from '@/features/dedicatedops/hooks/useDedicatedOpsCompliance'
 import * as service from '@/features/dedicatedops/dedicatedops.service'
@@ -45,7 +45,7 @@ const DedicatedOpsPage = () => {
   // backend device endpoint exists).
   const { people: fos } = usePeopleData('Field Officer', { devices: false })
   const { people: allPeople } = usePeopleData(undefined, { devices: false })
-  const { doctors } = useCampsData()
+  const { doctors } = useCampDoctors()
   const {
     projectConfigs, assignments, attendance, screenings,
     isLoading: dedicatedOpsLoading, error: dedicatedOpsError,

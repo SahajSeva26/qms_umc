@@ -1,7 +1,7 @@
 import { useEntityQuery } from '@/hooks/useEntityQuery'
 import { createEntityKeys } from '@/hooks/entityQueryKeys'
 import { inventoryConsumableService } from '@/features/inventory/real/inventoryConsumable.service'
-import type { SearchInventoryConsumableQuery } from '@/types/inventoryConsumable.types'
+import type { SearchInventoryConsumableQuery } from '@/features/inventory/real/inventoryConsumable.types'
 
 export const inventoryConsumableKeys = createEntityKeys<SearchInventoryConsumableQuery>('inventory-consumables')
 

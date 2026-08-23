@@ -1,4 +1,4 @@
-import type { DashboardFilterState } from '@/types/dashboard.types'
+import type { DashboardFilterState } from '@/features/dashboard/dashboard.types'
 import { useDashboardData } from '@/features/dashboard/hooks/useDashboardData'
 import MiniKpiCard from '@/features/dashboard/components/MiniKpiCard'
 

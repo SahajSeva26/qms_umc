@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { FiColumns, FiList, FiCpu, FiAlertOctagon, FiAlertTriangle } from 'react-icons/fi'
 import { useAuth } from '@/hooks/useAuth'
-import { useCampsData } from '@/hooks/useCampsData'
+import { useCampsShared } from '@/features/camps/hooks/useCampsShared'
 import { usePeopleData } from '@/hooks/usePeopleData'
 import { useFoIncidents, useMachineFlags } from '@/features/fo/hooks/useFo'
 import type { Incident, MachineFlag } from '@/features/fo/fo.types'
@@ -39,7 +39,7 @@ const IncidentsPage = () => {
   const { user } = useAuth()
   const byName = user ? `${user.firstName} ${user.lastName}`.trim() : 'Operations Manager'
 
-  const { camps } = useCampsData()
+  const { camps } = useCampsShared()
   const { people, devices } = usePeopleData()
   const fos = people.filter((p) => p.role === 'Field Officer')
 
@@ -118,7 +118,7 @@ const IncidentsPage = () => {
       deviceId: payload.deviceId,
       title: payload.title,
       notes: payload.notes,
-      raisedById: user?._id ?? 'om',
+      raisedById: user?.id ?? 'om',
       raisedByName: byName,
       foId: payload.foId,
       foName: payload.foName,

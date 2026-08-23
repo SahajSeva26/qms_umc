@@ -12,7 +12,7 @@ import PaginationControls from '@/components/ui/PaginationControls'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import { Button } from '@/components/ui/button'
 import { usePagination } from '@/hooks/usePagination'
-import type { BillingType, CampStatus, CampType } from '@/types/campReal.types'
+import type { BillingType, CampStatus, CampType } from '@/features/camps/campReal.types'
 import { EMPTY_ARRAY } from '@/utils/emptyArray'
 
 // Hides "New camp" for camp:search-only actors (e.g. FOs) since the backend 403s any write.

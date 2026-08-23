@@ -8,7 +8,7 @@ import type {
   DashboardData,
   DashboardFilterOptions,
   DashboardFilterState,
-} from '@/types/dashboard.types'
+} from '@/features/dashboard/dashboard.types'
 
 // ===========================================================================
 // DASHBOARD DATA SOURCE BOUNDARY

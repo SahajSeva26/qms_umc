@@ -1,4 +1,4 @@
-import type { LeadOffer, LeadProjectType } from '@/types/crm.types'
+import type { LeadOffer, LeadProjectType } from '@/features/crm/crm.types'
 
 // Wizard form state shaped to build a real CreateLeadPayload (crm.types.ts)
 // directly — no client-only fields carried through to submit. Picker ids

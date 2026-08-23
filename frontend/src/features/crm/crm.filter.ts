@@ -1,4 +1,4 @@
-import type { LeadEntity } from '@/types/crm.types'
+import type { LeadEntity } from '@/features/crm/crm.types'
 import type { CrmFilterState } from '@/features/crm/hooks/useCrmFilters'
 
 // Search matches Title only — Company/Division have their own dedicated filters.

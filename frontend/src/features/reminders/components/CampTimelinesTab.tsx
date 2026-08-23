@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { toast } from '@/components/ui/sonner'
 import type { ReminderThread } from '@/features/reminders/reminders.types'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { Person } from '@/types/people.types'
 import { statusLabel, statusColor, fmtCampDate } from '@/features/reminders/reminders.ui'
 import CampTimelineDrawer from '@/features/reminders/components/CampTimelineDrawer'

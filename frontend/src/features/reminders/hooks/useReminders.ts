@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as service from '@/features/reminders/reminders.service'
 import type { ReminderTemplates, ReminderConfig, RecipientType } from '@/features/reminders/reminders.types'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { Person } from '@/types/people.types'
 
 export const useReminderThreads = (camps: Camp[], people: Person[]) => {

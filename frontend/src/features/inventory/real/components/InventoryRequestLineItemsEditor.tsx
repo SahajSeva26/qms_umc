@@ -5,7 +5,7 @@ import AssigneeHoldingPicker from '@/features/inventory/real/components/Assignee
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import FieldLabel from '@/components/ui/FieldLabel'
-import type { InventoryRequestType } from '@/types/inventoryRequest.types'
+import type { InventoryRequestType } from '@/features/inventory/real/inventoryRequest.types'
 import { createRequestLineDraft, type RequestLineDraft, type StockKind } from '@/features/inventory/real/utils/requestLineDraft'
 
 interface InventoryRequestLineItemsEditorProps {

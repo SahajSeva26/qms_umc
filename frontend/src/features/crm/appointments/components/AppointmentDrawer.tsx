@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import type { AppointmentEntity, AppointmentStatus } from '@/types/appointment.types'
+import type { AppointmentEntity, AppointmentStatus } from '@/features/crm/appointments/appointment.types'
 import {
   APPOINTMENT_MODE_LABEL,
   APPOINTMENT_STATUS_LABEL,
   APPOINTMENT_TRANSITION_MAP,
   APPOINTMENT_TYPE_LABEL,
-} from '@/types/appointment.types'
+} from '@/features/crm/appointments/appointment.types'
 import { usePermission } from '@/hooks/usePermission'
 import { useMoveAppointmentStage } from '@/features/crm/appointments/hooks/useMoveAppointmentStage'
 import { useRespondToAppointment } from '@/features/crm/appointments/hooks/useRespondToAppointment'

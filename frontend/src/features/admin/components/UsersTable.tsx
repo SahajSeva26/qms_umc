@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import type { User } from '@/types/user.types'
+import type { User } from '@/features/admin/user.types'
 import UserAvatar from '@/components/ui/UserAvatar'
 import StatusPill from '@/features/admin/components/StatusPill'
 

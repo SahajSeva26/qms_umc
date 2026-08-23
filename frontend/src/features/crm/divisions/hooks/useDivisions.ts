@@ -1,7 +1,7 @@
 import { useEntityQuery } from '@/hooks/useEntityQuery'
 import { createEntityKeys } from '@/hooks/entityQueryKeys'
 import { divisionService } from '@/features/crm/divisions/division.service'
-import type { SearchDivisionQuery } from '@/types/crm.types'
+import type { SearchDivisionQuery } from '@/features/crm/crm.types'
 
 export const divisionKeys = createEntityKeys<SearchDivisionQuery>('divisions', 'division')
 

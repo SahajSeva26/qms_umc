@@ -5,7 +5,7 @@
 // below is moved verbatim, no behavior change.
 
 import type { Person } from '@/types/people.types'
-import { CAMPS } from '@/types/camp.types'
+import { CAMPS } from '@/features/camps/camp.types'
 import type {
   InventoryItem, ForecastRow, CampReadinessScore, ReadinessBand, InventoryUnit,
 } from '@/features/inventory/inventory.types'

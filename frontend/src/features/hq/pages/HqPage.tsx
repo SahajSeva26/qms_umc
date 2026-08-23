@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { FiUpload, FiDownload, FiZap, FiShield, FiSearch, FiClipboard, FiSun, FiMap, FiMapPin, FiDatabase, FiUsers, FiList, FiFileText, FiActivity } from 'react-icons/fi'
 import { usePeopleData } from '@/hooks/usePeopleData'
-import { useCampsData } from '@/hooks/useCampsData'
+import { useCampsShared } from '@/features/camps/hooks/useCampsShared'
 import { useHqMaster } from '@/features/hq/hooks/useHq'
 import { activeFos, classifyAll, getConfig } from '@/features/hq/hq.service'
 import { toast } from '@/components/ui/sonner'
@@ -22,7 +22,7 @@ import FoMasterTab from '@/features/hq/components/hqmapping/tabs/FoMasterTab'
 import BulkCheckTab from '@/features/hq/components/hqmapping/tabs/BulkCheckTab'
 import ReportsTab from '@/features/hq/components/hqmapping/tabs/ReportsTab'
 import AiTab from '@/features/hq/components/hqmapping/tabs/AiTab'
-import { MRS, PROJECTS } from '@/types/client.types'
+import { MRS, PROJECTS } from '@/types/client.mock'
 
 const TAB_ICON: Record<HqTabId, typeof FiShield> = {
   admin: FiShield, sales: FiSearch, ops: FiClipboard, coord: FiSun, map: FiMap,
@@ -37,7 +37,7 @@ const TAB_ICON: Record<HqTabId, typeof FiShield> = {
 // QMS_initHqMapping() unchanged). Filters/classifyAll() drive every other tab.
 const HqPage = () => {
   const { people, devices } = usePeopleData()
-  const { camps, patchCamp } = useCampsData()
+  const { camps, patchCamp } = useCampsShared()
   const { hqs, isLoading: hqsLoading, error: hqsError, refetch: refetchHqs } = useHqMaster()
 
   const [filters, setFilters] = useState(EMPTY_HQ_FILTERS)

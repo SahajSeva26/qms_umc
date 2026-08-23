@@ -1,4 +1,4 @@
-import type { ProjectEntity, ProjectType } from '@/types/project.types'
+import type { ProjectEntity, ProjectType } from '@/features/projects/project.types'
 
 // Real backend ProjectType values that correspond to the app's older
 // "Screening"/"Diet" mode split (used by OM/Invoicing/PO-management/Masters

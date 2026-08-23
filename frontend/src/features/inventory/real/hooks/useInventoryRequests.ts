@@ -1,7 +1,7 @@
 import { useEntityQuery } from '@/hooks/useEntityQuery'
 import { createEntityKeys } from '@/hooks/entityQueryKeys'
 import { inventoryRequestService } from '@/features/inventory/real/inventoryRequest.service'
-import type { SearchInventoryRequestQuery } from '@/types/inventoryRequest.types'
+import type { SearchInventoryRequestQuery } from '@/features/inventory/real/inventoryRequest.types'
 
 export const inventoryRequestKeys = createEntityKeys<SearchInventoryRequestQuery>('inventory-requests')
 

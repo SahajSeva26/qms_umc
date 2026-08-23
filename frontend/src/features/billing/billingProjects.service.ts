@@ -1,6 +1,6 @@
 import api from '@/lib/api/api'
 import type { ApiResponse, PaginatedResponse } from '@/types/common.types'
-import type { ProjectEntity, SearchProjectQuery } from '@/types/project.types'
+import type { ProjectEntity, SearchProjectQuery } from '@/features/projects/project.types'
 
 // Deliberately NOT importing projects.service.ts from features/projects/ —
 // cross-feature import, same isolation reasoning as billingCamps.service.ts.

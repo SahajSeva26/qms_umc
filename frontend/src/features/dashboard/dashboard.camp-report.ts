@@ -1,4 +1,4 @@
-import type { Camp, CampType } from '@/types/camp.types'
+import type { Camp, CampType } from '@/features/camps/camp.types'
 
 export type CampReportType = 'ALL' | CampType
 export type CampReportView = 'month' | 'day'

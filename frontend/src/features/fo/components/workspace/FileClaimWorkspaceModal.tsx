@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { ClaimType } from '@/features/fo/fo.types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'

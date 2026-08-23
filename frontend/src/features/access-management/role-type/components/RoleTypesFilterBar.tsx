@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button'
 import SearchInput from '@/components/ui/SearchInput'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { RoleTypesFilterState } from '@/features/access-management/role-type/hooks/useRoleTypesFilters'
-import type { RoleTypeStatus } from '@/types/accessManagement.types'
+import type { RoleTypeStatus } from '@/features/access-management/accessManagement.types'
 
 const STATUS_OPTIONS: { value: RoleTypeStatus; label: string }[] = [
   { value: 'active', label: 'Active' },

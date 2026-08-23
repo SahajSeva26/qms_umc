@@ -11,7 +11,7 @@ import { useDivisions } from '@/features/crm/divisions/hooks/useDivisions'
 import { usePermission } from '@/hooks/usePermission'
 import { createContactSchema, updateContactSchema } from '@/features/contacts/schemas/contact.schemas'
 import { getApiErrorMessage } from '@/utils/apiError'
-import type { ContactEntity, ContactType, ContactStatus } from '@/types/contact.types'
+import type { ContactEntity, ContactType, ContactStatus } from '@/features/contacts/contact.types'
 
 const TYPE_OPTIONS: { value: ContactType; label: string }[] = [
   { value: 'customer', label: 'Customer' },

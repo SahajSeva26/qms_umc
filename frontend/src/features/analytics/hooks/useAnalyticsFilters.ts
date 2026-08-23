@@ -1,5 +1,5 @@
 import { useFilterState } from '@/hooks/useFilterState'
-import type { AnalyticsFilters } from '@/types/analytics.types'
+import type { AnalyticsFilters } from '@/features/analytics/analytics.types'
 
 const DEFAULT_FILTERS: AnalyticsFilters = {
   periodDays: 90,

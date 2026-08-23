@@ -1,4 +1,4 @@
-import type { CampStatus } from '@/types/campReal.types'
+import type { CampStatus } from '@/features/camps/campReal.types'
 import { CAMP_STATUS_COLOR, CAMP_STATUS_LABEL } from '@/features/camps/components/CampStatusPillReal'
 
 const TILE_STATUSES: CampStatus[] = ['requested', 'confirmed', 'live', 'closed', 'cancelled', 'cancelled_charged']

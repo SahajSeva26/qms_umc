@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { FiDownload, FiEdit2, FiList, FiPlus, FiTrash2, FiCheck, FiShield } from 'react-icons/fi'
 import type { Person } from '@/types/people.types'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { useOm } from '@/features/om/hooks/useOm'
 import { dietitianExpensesOfType, dietitianWisePayments, stateWisePayments, type DietitianPaymentRow, type StatePaymentRow } from '@/features/om/om.service'
 import { toCsv, downloadCsv } from '@/features/om/om.dietDashboard'

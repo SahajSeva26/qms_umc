@@ -1,8 +1,8 @@
 import { FiNavigation, FiUserCheck, FiCreditCard, FiBriefcase, FiFileText, FiDollarSign, FiClipboard as FiAudit, FiArrowRight, FiFilePlus, FiAward, FiFolder, FiHome } from 'react-icons/fi'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { Person } from '@/types/people.types'
-import type { ProjectEntity } from '@/types/project.types'
-import { PROJECT_STATUS_LABEL } from '@/types/project.types'
+import type { ProjectEntity } from '@/features/projects/project.types'
+import { PROJECT_STATUS_LABEL } from '@/features/projects/projects.constants'
 import { computeGstBreakdown, projectTenantName } from '@/features/projects/projects.utils'
 import type { ExpenseStatus } from '@/features/om/om.types'
 import {

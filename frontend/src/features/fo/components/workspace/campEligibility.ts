@@ -1,4 +1,4 @@
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 
 // Shared camp-eligibility helpers used by both DashboardModule.tsx and
 // ScheduleModule.tsx (Run/Finish button gating).

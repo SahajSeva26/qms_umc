@@ -6,7 +6,7 @@ import type {
   MoveInventoryRequestStagePayload,
   SearchInventoryRequestQuery,
   UpdateInventoryRequestPayload,
-} from '@/types/inventoryRequest.types'
+} from '@/features/inventory/real/inventoryRequest.types'
 
 const searchInventoryRequests = async (query: SearchInventoryRequestQuery) => {
   const res = await api.get<PaginatedResponse<InventoryRequestEntity>>('/inventory-requests', { params: query })

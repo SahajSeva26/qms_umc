@@ -1,4 +1,4 @@
-import type { InvoiceEntity } from '@/types/invoice.types'
+import type { InvoiceEntity } from '@/features/billing/invoice.types'
 import { formatDate, formatINRFull } from '@/utils/formatters'
 import InvoiceStatusPill from '@/features/billing/components/InvoiceStatusPill'
 

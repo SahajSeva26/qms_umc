@@ -1,7 +1,7 @@
 import { useEntityQuery } from '@/hooks/useEntityQuery'
 import { createEntityKeys } from '@/hooks/entityQueryKeys'
 import { campsRealService } from '@/features/camps/campsReal.service'
-import type { SearchCampQuery } from '@/types/campReal.types'
+import type { SearchCampQuery } from '@/features/camps/campReal.types'
 
 export const campRealKeys = createEntityKeys<SearchCampQuery>('campsReal', 'campReal')
 

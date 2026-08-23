@@ -1,5 +1,5 @@
-import type { AppointmentEntity } from '@/types/appointment.types'
-import { APPOINTMENT_STATUS_LABEL, APPOINTMENT_TYPE_LABEL } from '@/types/appointment.types'
+import type { AppointmentEntity } from '@/features/crm/appointments/appointment.types'
+import { APPOINTMENT_STATUS_LABEL, APPOINTMENT_TYPE_LABEL } from '@/features/crm/appointments/appointment.types'
 import { formatDate } from '@/utils/formatters'
 import { appointmentRefName, appointmentStatusColor, isMomOverdue } from '@/features/crm/appointments/appointmentsReal.utils'
 

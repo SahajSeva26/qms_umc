@@ -4,7 +4,7 @@ import type {
 } from '@/features/dedicatedops/dedicatedops.types'
 import { DEFAULT_MANPOWER, DEFAULT_SOP } from '@/features/dedicatedops/dedicatedops.types'
 import { SEED_PROJECT_CONFIG, SEED_ASSIGNMENTS, SEED_ATTENDANCE, SEED_SCREENINGS } from '@/features/dedicatedops/dedicatedops.mock'
-import type { ProjectEntity } from '@/types/project.types'
+import type { ProjectEntity } from '@/features/projects/project.types'
 
 // TODO: replace with real API calls once backend endpoints exist.
 // Storage keys mirror the prototype's dedicated-data.js exactly

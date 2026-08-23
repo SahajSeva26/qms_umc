@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { FiCheckCircle, FiUnlock, FiX } from 'react-icons/fi'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import { pendingReopenRequests } from '@/features/diet/services/dietCampWorkflow.service'
 import { isCoordCamp } from '@/features/diet/services/dietScope.service'
 import { errorMessage } from '@/features/diet/utils/errorMessage'

@@ -8,7 +8,7 @@ import { invitesByDietitianId } from '@/features/diet/services/dietitianCandidat
 import { useCampInvites, useAddCampInvites, useRecordInviteResponse } from '@/features/diet/hooks/useDietitianInvites'
 import { useDietitianCandidates } from '@/features/diet/hooks/useDietitianCandidates'
 import { errorMessage } from '@/features/diet/utils/errorMessage'
-import { useCampsData } from '@/hooks/useCampsData'
+import { useCampsShared } from '@/features/camps/hooks/useCampsShared'
 import { fmtDate } from './helpers'
 import AssignDietitianModal from './AssignDietitianModal'
 
@@ -20,7 +20,7 @@ interface InviteDietitianModalProps {
 }
 
 const InviteDietitianModal = ({ open, onClose, campId, userName }: InviteDietitianModalProps) => {
-  const { camps } = useCampsData()
+  const { camps } = useCampsShared()
   const camp = useMemo(() => camps.find((c) => c.id === campId) || null, [camps, campId])
   const [checked, setChecked] = useState<Set<string>>(new Set())
   const [assignFor, setAssignFor] = useState<string | null>(null)

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { FiAlertTriangle } from 'react-icons/fi'
-import type { Camp, Doctor } from '@/types/camp.types'
+import type { Camp, Doctor } from '@/features/camps/camp.types'
 import type { Person } from '@/types/people.types'
 import { useAuth } from '@/hooks/useAuth'
 import { usePermission } from '@/hooks/usePermission'
@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
-import { clientName } from '@/types/campref.types'
+import { clientName } from '@/features/camps/camps.refs'
 
 interface VerificationTabProps {
   camps: Camp[]

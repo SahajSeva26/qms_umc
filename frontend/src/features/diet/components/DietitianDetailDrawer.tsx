@@ -1,6 +1,6 @@
 import { FiPhone, FiMapPin, FiCheckCircle, FiEdit2, FiMessageCircle, FiCpu, FiExternalLink } from 'react-icons/fi'
 import { initials, stringToColor } from '@/features/diet/utils/personDisplay'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { Dietitian } from '@/features/diet/diet.types'
 import { dietStage } from '@/features/diet/diet.utils'
 import DietStatusPill from '@/features/diet/components/DietStatusPill'

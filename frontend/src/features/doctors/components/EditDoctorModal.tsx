@@ -7,7 +7,7 @@ import { toast } from '@/components/ui/sonner'
 import { useCreateDoctor } from '@/features/doctors/hooks/useCreateDoctor'
 import { useUpdateDoctor } from '@/features/doctors/hooks/useUpdateDoctor'
 import { getApiErrorMessage } from '@/utils/apiError'
-import type { DoctorEntity, DoctorSpecialization, DoctorStatus } from '@/types/doctor.types'
+import type { DoctorEntity, DoctorSpecialization, DoctorStatus } from '@/features/doctors/doctor.types'
 
 const SPECIALIZATION_OPTIONS: { value: DoctorSpecialization; label: string }[] = [
   { value: 'cp', label: 'CP' },

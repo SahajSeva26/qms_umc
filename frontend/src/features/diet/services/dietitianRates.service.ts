@@ -5,8 +5,8 @@
 // Owns KEYS.RATE_HISTORY.
 // TODO: mock/localStorage-backed — swap bodies for api.* when available.
 
-import type { Camp } from '@/types/camp.types'
-import { PROJECTS } from '@/types/client.types'
+import type { Camp } from '@/features/camps/camp.types'
+import { PROJECTS } from '@/types/client.mock'
 import type { DietitianRateEntry, DietitianExpense } from '@/features/diet/dietitians.types'
 import { KEYS, load, persist, num, seeded } from './dietStorage'
 import { dietitianById, dietitianDetails } from './dietitianRoster.service'

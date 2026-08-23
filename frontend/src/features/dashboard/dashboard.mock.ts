@@ -12,8 +12,8 @@ import type {
   DashboardFilterState,
   CommandCenterData,
   HeadlineKpi,
-} from '@/types/dashboard.types'
-import { QUARTER } from '@/types/salesdash.types'
+} from '@/features/dashboard/dashboard.types'
+import { QUARTER } from '@/types/salesdash.mock'
 
 // ===========================================================================
 // MOCK DATA SOURCE — the ONLY place fabricated dashboard numbers may live.

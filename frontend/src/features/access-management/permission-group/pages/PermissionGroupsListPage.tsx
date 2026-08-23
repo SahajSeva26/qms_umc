@@ -7,7 +7,7 @@ import PaginationControls from '@/components/ui/PaginationControls'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { usePagination } from '@/hooks/usePagination'
-import type { PermissionGroupStatus } from '@/types/accessManagement.types'
+import type { PermissionGroupStatus } from '@/features/access-management/accessManagement.types'
 
 const PAGE_SIZE = 10
 

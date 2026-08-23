@@ -1,4 +1,4 @@
-import type { DoctorStatus } from '@/types/doctor.types'
+import type { DoctorStatus } from '@/features/doctors/doctor.types'
 import SharedStatusPill from '@/components/ui/StatusPill'
 
 const STATUS_CLASSES: Record<DoctorStatus, string> = {

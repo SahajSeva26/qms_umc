@@ -1,4 +1,4 @@
-import type { RoleTypeCode } from '@/types/accessManagement.types'
+import type { RoleTypeCode } from '@/features/access-management/accessManagement.types'
 
 // Mirror of the backend's known/default RoleType codes
 // (`ALLOWED_ROLETYPE_CODES` in roleType.constants.ts) — drives the create

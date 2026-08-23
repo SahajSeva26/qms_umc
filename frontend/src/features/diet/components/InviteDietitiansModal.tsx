@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { FiSend, FiCheckCircle, FiXCircle, FiClock, FiUserCheck, FiMessageSquare } from 'react-icons/fi'
 import { toast } from '@/components/ui/sonner'
 import { useAuth } from '@/hooks/useAuth'
-import { useCampsData } from '@/hooks/useCampsData'
+import { useCampsShared } from '@/features/camps/hooks/useCampsShared'
 import { summarizeInvites } from '@/features/diet/services/dietitianInvite.service'
 import { invitesByDietitianId } from '@/features/diet/services/dietitianCandidates.service'
 import { useCampInvites, useAddCampInvites, useRecordInviteResponse } from '@/features/diet/hooks/useDietitianInvites'
@@ -58,7 +58,7 @@ function Tag({ tone, children }: { tone: keyof typeof TAG_STYLES; children: Reac
 // invite mutations, NOT held in component state.
 const InviteDietitiansModal = ({ open, onClose, campId, onProceedToRateSheet }: InviteDietitiansModalProps) => {
   const { user } = useAuth()
-  const { camps } = useCampsData()
+  const { camps } = useCampsShared()
   const userName = user ? `${user.firstName} ${user.lastName}`.trim() : 'QMS Ops'
 
   const camp = useMemo(() => camps.find((c) => c.id === campId) ?? null, [camps, campId])

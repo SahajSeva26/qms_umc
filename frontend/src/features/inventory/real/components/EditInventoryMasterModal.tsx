@@ -1,8 +1,8 @@
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import type { ReactNode } from 'react'
-import type { InventoryMasterEntity } from '@/types/inventoryMaster.types'
-import { INVENTORY_MASTER_TYPE_LABEL, INVENTORY_MASTER_TYPES } from '@/types/inventoryMaster.types'
+import type { InventoryMasterEntity } from '@/features/inventory/real/inventoryMaster.types'
+import { INVENTORY_MASTER_TYPE_LABEL, INVENTORY_MASTER_TYPES } from '@/features/inventory/real/inventoryMaster.types'
 import { useCreateInventoryMaster } from '@/features/inventory/real/hooks/useCreateInventoryMaster'
 import { useUpdateInventoryMaster } from '@/features/inventory/real/hooks/useUpdateInventoryMaster'
 import {

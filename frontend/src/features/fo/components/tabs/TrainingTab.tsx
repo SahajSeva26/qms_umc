@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { FiRefreshCw } from 'react-icons/fi'
 import type { Person } from '@/types/people.types'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { TrainingRecord, TrainingStatus } from '@/features/fo/fo.types'
 import { TRAINING_CATALOG } from '@/features/fo/fo.types'
 import * as foService from '@/features/fo/fo.service'

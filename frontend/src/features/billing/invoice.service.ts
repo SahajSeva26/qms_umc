@@ -5,7 +5,7 @@ import type {
   InvoiceEntity,
   MoveInvoiceStagePayload,
   SearchInvoiceQuery,
-} from '@/types/invoice.types'
+} from '@/features/billing/invoice.types'
 
 // Follows the exact pattern of projectsService — same shared `api` axios
 // instance, same ApiResponse/PaginatedResponse envelope typing, a plain

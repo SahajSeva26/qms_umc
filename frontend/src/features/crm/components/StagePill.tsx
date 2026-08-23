@@ -1,5 +1,5 @@
-import type { LeadStatus } from '@/types/crm.types'
-import { LEAD_STATUS_LABEL, LEAD_STATUS_COLOR } from '@/types/crm.types'
+import type { LeadStatus } from '@/features/crm/crm.types'
+import { LEAD_STATUS_LABEL, LEAD_STATUS_COLOR } from '@/features/crm/crm.constants'
 import ColorPill from '@/components/ui/ColorPill'
 
 interface StagePillProps {

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { FiCheckCircle, FiExternalLink } from 'react-icons/fi'
 import { useQaFeedback } from '@/features/qa-feedback/hooks/useQaFeedback'
-import type { QaFeedbackEntity, QaFeedbackStatus } from '@/types/qaFeedback.types'
+import type { QaFeedbackEntity, QaFeedbackStatus } from '@/features/qa-feedback/qaFeedback.types'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 

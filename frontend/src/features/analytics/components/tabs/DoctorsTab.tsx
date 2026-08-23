@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { FiAward, FiPieChart } from 'react-icons/fi'
-import type { Camp, Doctor } from '@/types/camp.types'
+import type { Camp, Doctor } from '@/features/camps/camp.types'
 import AnalyticsSectionCard from '@/features/analytics/components/AnalyticsSectionCard'
 import Donut from '@/features/analytics/components/charts/Donut'
 

@@ -1,5 +1,5 @@
 import { useFilterState } from '@/hooks/useFilterState'
-import type { DivisionStatus, DivisionTherapy } from '@/types/crm.types'
+import type { DivisionStatus, DivisionTherapy } from '@/features/crm/crm.types'
 
 // Default status is 'active', not an 'ALL' sentinel — the backend always
 // force-scopes to active unless the caller holds division:manage/tenant:manage.

@@ -7,9 +7,9 @@ import {
   INVENTORY_REQUEST_STATUS_LABEL,
   INVENTORY_REQUEST_TYPE_LABEL,
   getAllowedStageActions,
-} from '@/types/inventoryRequest.types'
-import type { InventoryRequestEntity, InventoryRequestStatus, InventoryRequestType } from '@/types/inventoryRequest.types'
-import type { InventoryMovementHistorySource } from '@/types/inventoryLedger.types'
+} from '@/features/inventory/real/inventoryRequest.types'
+import type { InventoryRequestEntity, InventoryRequestStatus, InventoryRequestType } from '@/features/inventory/real/inventoryRequest.types'
+import type { InventoryMovementHistorySource } from '@/features/inventory/real/inventoryLedger.types'
 import { Button } from '@/components/ui/button'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import PaginationControls from '@/components/ui/PaginationControls'

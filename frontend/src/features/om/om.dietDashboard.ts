@@ -1,9 +1,9 @@
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { Person } from '@/types/people.types'
 import type { DeviceCatalogItem } from '@/types/device.types'
 import type { DietitianRateEntry } from '@/features/om/om.types'
 import { dietitianExpense } from '@/features/om/om.service'
-import { clientName } from '@/types/campref.types'
+import { clientName } from '@/features/camps/camps.refs'
 
 // Mirrors renderDietDashboardSections() exactly (om-portal.js:581-743) — the
 // OM·Diet-only 6-panel sub-dashboard bolted onto the Dashboard tab. Unscoped

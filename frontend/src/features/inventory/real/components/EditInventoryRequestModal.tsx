@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { InventoryRequestEntity, InventoryRequestType } from '@/types/inventoryRequest.types'
+import type { InventoryRequestEntity, InventoryRequestType } from '@/features/inventory/real/inventoryRequest.types'
 import { useCreateInventoryRequest } from '@/features/inventory/real/hooks/useCreateInventoryRequest'
 import { useUpdateInventoryRequest } from '@/features/inventory/real/hooks/useUpdateInventoryRequest'
 import InventoryRequestLineItemsEditor from '@/features/inventory/real/components/InventoryRequestLineItemsEditor'

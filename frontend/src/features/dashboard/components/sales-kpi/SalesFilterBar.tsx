@@ -3,9 +3,9 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Button } from '@/components/ui/button'
 import type { SalesRep } from '@/types/salesdash.types'
 import type { Client, ClientProject, ClientProjectType } from '@/types/client.types'
-import { DIVISIONS } from '@/types/client.types'
-import type { SalesFilterState } from '@/components/widgets/sales-kpi/sales.kpis'
-import { DEFAULT_SALES_FILTER } from '@/components/widgets/sales-kpi/sales.kpis'
+import { DIVISIONS } from '@/types/client.mock'
+import type { SalesFilterState } from '@/features/dashboard/components/sales-kpi/sales.kpis'
+import { DEFAULT_SALES_FILTER } from '@/features/dashboard/components/sales-kpi/sales.kpis'
 
 const PROJECT_TYPES: ClientProjectType[] = ['Screening', 'Diet', 'Lab']
 

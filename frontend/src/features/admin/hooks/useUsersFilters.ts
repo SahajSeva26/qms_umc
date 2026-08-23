@@ -1,5 +1,5 @@
 import { useFilterState } from '@/hooks/useFilterState'
-import type { UserStatus } from '@/types/user.types'
+import type { UserStatus } from '@/features/admin/user.types'
 
 export interface UsersFilterState {
   search: string

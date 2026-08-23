@@ -2,7 +2,7 @@ import { useMutation } from '@tanstack/react-query'
 import { useAuthStore } from '@/features/auth/store'
 import { authService } from '@/features/auth/auth.service'
 import { useSession } from '@/hooks/useSession'
-import type { LoginPayload } from '@/types/auth.types'
+import type { LoginPayload } from '@/features/auth/auth.types'
 
 export const useLogin = () => {
   const { setAuth } = useAuthStore()

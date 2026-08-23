@@ -12,7 +12,7 @@ import DevicesTab from '@/features/diet/components/tabs/DevicesTab'
 import RemindersTab from '@/features/diet/components/tabs/RemindersTab'
 import MediaTab from '@/features/diet/components/tabs/MediaTab'
 import NewDietRequestModal from '@/features/diet/components/NewDietRequestModal'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { DietStage } from '@/features/diet/diet.types'
 
 type TabId = 'camps' | 'dietitians' | 'tele' | 'devices' | 'reminders' | 'media'

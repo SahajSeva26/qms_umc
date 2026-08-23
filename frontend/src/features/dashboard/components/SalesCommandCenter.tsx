@@ -4,7 +4,7 @@ import { FiCalendar, FiAlertTriangle, FiBriefcase, FiFileText, FiCheckSquare, Fi
 import { useCommandCenterData } from '@/features/dashboard/hooks/useCommandCenterData'
 import { useAuth } from '@/hooks/useAuth'
 import UserAvatar from '@/components/ui/UserAvatar'
-import type { DashboardTask } from '@/types/dashboard.types'
+import type { DashboardTask } from '@/features/dashboard/dashboard.types'
 
 const KIND_META: Record<DashboardTask['kind'], { color: string; icon: IconType }> = {
   MEETING: { color: 'var(--qms-role-sales-lead)', icon: FiCalendar },

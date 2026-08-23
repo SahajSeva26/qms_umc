@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { qaFeedbackService } from '@/features/qa-feedback/qaFeedback.service'
-import type { CreateQaFeedbackPayload, SearchQaFeedbackQuery, UpdateQaFeedbackPayload } from '@/types/qaFeedback.types'
+import type { CreateQaFeedbackPayload, SearchQaFeedbackQuery, UpdateQaFeedbackPayload } from '@/features/qa-feedback/qaFeedback.types'
 import { toast } from '@/components/ui/sonner'
 import { getApiErrorMessage } from '@/utils/apiError'
 

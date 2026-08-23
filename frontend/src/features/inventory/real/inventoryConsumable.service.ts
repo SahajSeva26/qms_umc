@@ -5,7 +5,7 @@ import type {
   InventoryConsumableEntity,
   SearchInventoryConsumableQuery,
   UpdateInventoryConsumablePayload,
-} from '@/types/inventoryConsumable.types'
+} from '@/features/inventory/real/inventoryConsumable.types'
 
 const searchInventoryConsumables = async (query: SearchInventoryConsumableQuery) => {
   const res = await api.get<PaginatedResponse<InventoryConsumableEntity>>('/inventory-consumables', { params: query })

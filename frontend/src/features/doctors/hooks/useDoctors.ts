@@ -1,7 +1,7 @@
 import { useEntityQuery } from '@/hooks/useEntityQuery'
 import { createEntityKeys } from '@/hooks/entityQueryKeys'
 import { doctorsService } from '@/features/doctors/doctors.service'
-import type { SearchDoctorQuery } from '@/types/doctor.types'
+import type { SearchDoctorQuery } from '@/features/doctors/doctor.types'
 
 // Distinct from useCampsData.ts's separate 'mockCampDoctors' key.
 export const doctorKeys = createEntityKeys<SearchDoctorQuery>('doctors', 'doctor')

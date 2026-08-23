@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { FiFolder, FiEye } from 'react-icons/fi'
 import { useDashboardData } from '@/features/dashboard/hooks/useDashboardData'
-import type { DashboardFilterState } from '@/types/dashboard.types'
+import type { DashboardFilterState } from '@/features/dashboard/dashboard.types'
 import { formatINR } from '@/utils/formatters'
 import SectionCard from '@/features/dashboard/components/SectionCard'
 import MiniKpiCard from '@/features/dashboard/components/MiniKpiCard'
 import BarListRow from '@/features/dashboard/components/BarListRow'
 import FilterChips from '@/features/dashboard/components/FilterChips'
-import type { ProjectRow } from '@/types/dashboard.types'
+import type { ProjectRow } from '@/features/dashboard/dashboard.types'
 
 const TYPE_FILTERS = ['ALL', 'Screening', 'Diet', 'Lab']
 

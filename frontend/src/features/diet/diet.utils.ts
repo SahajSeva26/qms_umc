@@ -1,4 +1,4 @@
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { DietStage } from '@/features/diet/diet.types'
 
 // Mirrors dietStage() exactly (diet-camps.js:423-436) — the derived UI-facing

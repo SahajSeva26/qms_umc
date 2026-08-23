@@ -1,5 +1,5 @@
 import { useFilterState } from '@/hooks/useFilterState'
-import type { RoleStatus } from '@/types/accessManagement.types'
+import type { RoleStatus } from '@/features/access-management/accessManagement.types'
 
 export interface RolesFilterState {
   search: string

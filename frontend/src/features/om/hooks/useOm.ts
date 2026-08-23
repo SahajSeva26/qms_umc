@@ -1,14 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as omService from '@/features/om/om.service'
 import type { FoEnrollment, DietitianEnrollment, ExpenseStatus, PaymentMode, DietitianPaymentDetails } from '@/features/om/om.types'
-import { useCampsData } from '@/hooks/useCampsData'
+import { useCampsShared } from '@/features/camps/hooks/useCampsShared'
 
 // Camp reads/writes go through the shared useCampsData hook — om.service.ts
 // itself never imports features/camps/ or touches qms.master.camps directly
 // (features/camps/ is the sole owner of that store, per CLAUDE.md §3).
 export const useOm = () => {
   const queryClient = useQueryClient()
-  const { camps, patchCamp } = useCampsData()
+  const { camps, patchCamp } = useCampsShared()
 
   const foEnrollQuery = useQuery({ queryKey: ['om-fo-enroll'], queryFn: omService.getFoEnrollments })
   const dietEnrollQuery = useQuery({ queryKey: ['om-diet-enroll'], queryFn: omService.getDietEnrollments })

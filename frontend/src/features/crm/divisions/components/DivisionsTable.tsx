@@ -1,5 +1,5 @@
-import type { DivisionEntity } from '@/types/crm.types'
-import { DIVISION_THERAPY_LABEL } from '@/types/crm.types'
+import type { DivisionEntity } from '@/features/crm/crm.types'
+import { DIVISION_THERAPY_LABEL } from '@/features/crm/crm.constants'
 
 // Hand-built table matching RoleTypesTable.tsx / PermissionGroupsTable.tsx
 // exactly: var(--qms-*) custom properties, no shadcn Table, inline empty

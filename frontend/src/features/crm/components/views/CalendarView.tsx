@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi'
-import type { LeadEntity } from '@/types/crm.types'
-import { LEAD_STATUS_COLOR, LEAD_STATUS_LABEL } from '@/types/crm.types'
+import type { LeadEntity } from '@/features/crm/crm.types'
+import { LEAD_STATUS_COLOR, LEAD_STATUS_LABEL } from '@/features/crm/crm.constants'
 import { formatINR } from '@/utils/formatters'
 import { addDays, dayKey, isSameDay, startOfWeek } from '@/features/crm/appointments/appointments.utils'
 

@@ -5,10 +5,10 @@ import PaginationControls from '@/components/ui/PaginationControls'
 import { usePagination } from '@/hooks/usePagination'
 import { useInventoryLedgers } from '@/features/inventory/real/hooks/useInventoryLedgers'
 import { truncateIdentifier } from '@/features/inventory/real/utils/truncateIdentifier'
-import { INVENTORY_REQUEST_TYPE_LABEL, INVENTORY_REQUEST_STATUS_LABEL } from '@/types/inventoryRequest.types'
-import { INVENTORY_DEVICE_STATUS_LABEL } from '@/types/inventoryDevice.types'
-import { movementEventLabel, INVENTORY_LEDGER_LOCATION_LABEL } from '@/types/inventoryLedger.types'
-import type { InventoryMovementHistorySource } from '@/types/inventoryLedger.types'
+import { INVENTORY_REQUEST_TYPE_LABEL, INVENTORY_REQUEST_STATUS_LABEL } from '@/features/inventory/real/inventoryRequest.types'
+import { INVENTORY_DEVICE_STATUS_LABEL } from '@/features/inventory/real/inventoryDevice.types'
+import { movementEventLabel, INVENTORY_LEDGER_LOCATION_LABEL } from '@/features/inventory/real/inventoryLedger.types'
+import type { InventoryMovementHistorySource } from '@/features/inventory/real/inventoryLedger.types'
 
 const PAGE_SIZE = 20
 

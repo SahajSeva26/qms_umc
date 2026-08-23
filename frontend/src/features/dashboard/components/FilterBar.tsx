@@ -1,4 +1,4 @@
-import type { DashboardFilterState } from '@/types/dashboard.types'
+import type { DashboardFilterState } from '@/features/dashboard/dashboard.types'
 import { useDashboardFilterOptions } from '@/features/dashboard/hooks/useDashboardFilterOptions'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'

@@ -1,5 +1,5 @@
 import { useFilterState } from '@/hooks/useFilterState'
-import type { LeadStatus } from '@/types/crm.types'
+import type { LeadStatus } from '@/features/crm/crm.types'
 
 export interface CrmFilterState {
   status: LeadStatus | ''

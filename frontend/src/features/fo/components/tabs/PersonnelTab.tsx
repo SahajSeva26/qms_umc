@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { FiSearch, FiDownload, FiPlus, FiUsers, FiCheckCircle, FiDollarSign, FiFileText } from 'react-icons/fi'
 import type { Person } from '@/types/people.types'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 import type { DeviceCatalogItem } from '@/types/device.types'
 import type { FoClaim, LeaveRequest } from '@/features/fo/fo.types'
 import { Input } from '@/components/ui/input'

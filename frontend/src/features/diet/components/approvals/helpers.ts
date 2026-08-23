@@ -5,7 +5,7 @@
 // initials()/stringToColor()/fmtDate()/fmtDt()/csvDownload() helpers.
 import { toast } from '@/components/ui/sonner'
 import { initials, stringToColor } from '@/features/diet/utils/personDisplay'
-import type { Camp } from '@/types/camp.types'
+import type { Camp } from '@/features/camps/camp.types'
 
 // initials()/stringToColor() now live in utils/personDisplay.ts — they were
 // duplicated across four Diet components. Re-exported here so this screen's

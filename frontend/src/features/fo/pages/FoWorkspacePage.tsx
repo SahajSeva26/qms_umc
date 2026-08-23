@@ -5,7 +5,7 @@ import {
 } from 'react-icons/fi'
 import { useAuth } from '@/hooks/useAuth'
 import { usePeopleData } from '@/hooks/usePeopleData'
-import { useCampsData } from '@/hooks/useCampsData'
+import { useCampsShared } from '@/features/camps/hooks/useCampsShared'
 import {
   useFoClaims, useFoTraining, useFoLeaves, useFoIncidents, useFoConsumables, useFoNotifications,
 } from '@/features/fo/hooks/useFo'
@@ -49,7 +49,7 @@ const TABS: { id: TabId; label: string; icon: typeof FiUser }[] = [
 const FoWorkspacePage = () => {
   const { user } = useAuth()
   const { people: allPeople, devices } = usePeopleData()
-  const { camps, patchCamp } = useCampsData()
+  const { camps, patchCamp } = useCampsShared()
 
   const fos = useMemo(() => allPeople.filter((p) => p.role === 'Field Officer'), [allPeople])
 
@@ -60,10 +60,10 @@ const FoWorkspacePage = () => {
   const me: Person = useMemo(() => {
     if (!user) return fos[0] ?? ({} as Person)
     const fullName = `${user.firstName} ${user.lastName}`.trim()
-    const match = fos.find((f) => f.name === fullName || f.email === user.email || f.id === user._id)
+    const match = fos.find((f) => f.name === fullName || f.email === user.email || f.id === user.id)
     if (match) return match
     return {
-      id: user._id,
+      id: user.id,
       name: fullName || 'Field Officer',
       role: 'Field Officer',
       phone: '',

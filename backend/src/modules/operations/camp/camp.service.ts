@@ -492,9 +492,12 @@ const book = async (model: IBookCampPayload, ctx: RequestContext): Promise<Hydra
 
     //5: build the full create payload — tenant from ctx, division + chain derived from the MR,
     // no fo (create() best-effort allocates; if none, the camp stays requested for QMS to staff).
+    // project is validated inside create() under the booker's scoped context: a project outside the
+    // booker's division 404s there, so the camp can only be booked against an in-division project.
     const createPayload: ICreateCampPayload = {
         tenant: ctx.tenant._id.toString(),
         division: mr.division._id.toString(),
+        project: model.project,
         doctor: model.doctor,
         mr: mr._id.toString(),
         asm: asm?._id?.toString(),

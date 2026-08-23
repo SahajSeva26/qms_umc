@@ -1,5 +1,9 @@
 import type { RouteObject } from 'react-router-dom'
-import PharmaPage from './pages/PharmaPage'
+import PharmaRedirectPage from './pages/PharmaRedirectPage'
+import HoPortalPage from './pages/HoPortalPage'
+import RsmPortalPage from './pages/RsmPortalPage'
+import AsmPortalPage from './pages/AsmPortalPage'
+import MrPortalPage from './pages/MrPortalPage'
 
 export const PHARMA_ROUTES = {
   PHARMA:     '/pharma',
@@ -10,9 +14,9 @@ export const PHARMA_ROUTES = {
 }
 
 export const pharmaRoutes: RouteObject[] = [
-  { path: PHARMA_ROUTES.PHARMA,     element: <PharmaPage /> },
-  { path: PHARMA_ROUTES.PHARMA_HO,  element: <PharmaPage /> },
-  { path: PHARMA_ROUTES.PHARMA_RSM, element: <PharmaPage /> },
-  { path: PHARMA_ROUTES.PHARMA_ASM, element: <PharmaPage /> },
-  { path: PHARMA_ROUTES.PHARMA_MR,  element: <PharmaPage /> },
+  { path: PHARMA_ROUTES.PHARMA,     element: <PharmaRedirectPage /> },
+  { path: PHARMA_ROUTES.PHARMA_HO,  element: <HoPortalPage /> },
+  { path: PHARMA_ROUTES.PHARMA_RSM, element: <RsmPortalPage /> },
+  { path: PHARMA_ROUTES.PHARMA_ASM, element: <AsmPortalPage /> },
+  { path: PHARMA_ROUTES.PHARMA_MR,  element: <MrPortalPage /> },
 ]

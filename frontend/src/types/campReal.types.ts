@@ -138,6 +138,26 @@ export interface CreateCampPayload {
   conscentPath?: string
 }
 
+/** Mirrors BookCampPayloadSchema (camp.validators.ts) exactly — the pharma
+ * field-force booking path. No project field (see backend TODO on
+ * whoCanBookCamp — not yet wired). tenant/division/asm/rsm are all
+ * server-derived from the target MR's own supervisor chain. */
+export interface BookCampPayload {
+  /** Omit entirely when the caller IS the MR — the backend defaults to self. */
+  mr?: string
+  doctor: string
+  type?: CampType
+  patientExpectation?: number
+  date: string
+  timeSlot: CampTimeSlot
+  city: string
+  state: string
+  coordinates: CampCoordinates
+  devices?: string[]
+  notes?: string
+  conscentPath?: string
+}
+
 export interface UpdateCampPayload {
   doctor?: string
   type?: CampType

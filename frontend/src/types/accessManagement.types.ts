@@ -276,6 +276,15 @@ export interface SearchRoleQuery {
   limit?: string
 }
 
+// GET /roles/mrs — the caller's own downline MRs (pharma HO/RSM/ASM only,
+// enforced server-side by the caller's role type, no permission needed).
+// `name` matches the MR's linked user's name/email, not the role's own name field.
+export interface SearchDownlineMrQuery {
+  name?: string
+  page?: string
+  limit?: string
+}
+
 export interface CreateRolePayload {
   code: string
   name: string

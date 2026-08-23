@@ -29,6 +29,11 @@ interface AsyncPickerProps<TResult> {
   isError?: boolean
   errorText?: string
   onRetry?: () => void
+  // Appends the next page's results to `results` rather than replacing them
+  // — the standard typeahead "load more" pattern, not a page-flip.
+  hasMore?: boolean
+  isLoadingMore?: boolean
+  onLoadMore?: () => void
 }
 
 // Shared shell for a single-select, search-as-you-type dropdown field. Query state stays with the caller.
@@ -37,6 +42,7 @@ function AsyncPicker<TResult>({
   results, isFetching, getId, getLabel, renderResult, searchPlaceholder, clearAriaLabel,
   emptyQueryText, emptyResultsText, noResultsText, dropdownClassName,
   isError, errorText, onRetry,
+  hasMore, isLoadingMore, onLoadMore,
 }: AsyncPickerProps<TResult>) {
   const pickResult = (result: TResult) => {
     onChange(getId(result), getLabel(result))
@@ -119,6 +125,17 @@ function AsyncPicker<TResult>({
               {renderResult(result)}
             </button>
           ))}
+          {!isError && hasMore && (
+            <button
+              type="button"
+              onClick={onLoadMore}
+              disabled={isLoadingMore}
+              className="w-full text-center text-[12px] font-semibold px-2 py-1.5 rounded-md transition-colors hover:bg-(--qms-surface-hover) disabled:opacity-60"
+              style={{ color: 'var(--qms-brand)' }}
+            >
+              {isLoadingMore ? 'Loading…' : 'Load more'}
+            </button>
+          )}
         </div>
       )}
     </div>

@@ -1,6 +1,7 @@
 import api from '@/lib/api/api'
 import type { ApiResponse, PaginatedResponse } from '@/types/common.types'
 import type {
+  BookCampPayload,
   CampEntity,
   CreateCampPayload,
   MoveCampStagePayload,
@@ -28,6 +29,14 @@ const createCamp = async (payload: CreateCampPayload) => {
   return res.data
 }
 
+// Pharma field-force booking path — POST /camps/book, not /camps. No
+// permission gate beyond camp:book; authorization (self vs downline) is
+// enforced server-side by the caller's own role type.
+const bookCamp = async (payload: BookCampPayload) => {
+  const res = await api.post<ApiResponse<CampEntity>>('/camps/book', payload)
+  return res.data
+}
+
 const updateCamp = async (id: string, payload: UpdateCampPayload) => {
   const res = await api.put<ApiResponse<CampEntity>>(`/camps/${id}`, payload)
   return res.data
@@ -47,6 +56,7 @@ export const campsRealService = {
   searchCamps,
   getCamp,
   createCamp,
+  bookCamp,
   updateCamp,
   moveCampStage,
   allocateFo,

@@ -113,6 +113,7 @@ export type IMoveStagePayload = z.infer<typeof MoveStagePayloadSchema>;
 
 //4: search ====================================>
 export const SearchCampQuerySchema = z.object({
+    tenant: objectId('Tenant').optional(),
     project: objectId('Project').optional(),
     division: objectId('Division').optional(),
     doctor: objectId('Doctor').optional(),

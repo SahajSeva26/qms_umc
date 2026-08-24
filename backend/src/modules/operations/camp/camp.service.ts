@@ -206,6 +206,11 @@ const search = async (filters: ISearchCampQuery, ctx: RequestContext, options?: 
     const where: mongoose.QueryFilter<ICamp> = { ...ctx.where() };
     applyOwnScope(where, ctx);
 
+    // tenant filter (switch tenants) is only honoured for a `camp:manage` actor not already
+    // tenant-pinned by ctx.where() — a customer actor stays locked to their own tenant.
+    if (filters.tenant && !where.tenant && ctx.hasAnyPermissions([CAMP_PERMISSIONS.MANAGE.code])) {
+        where.tenant = filters.tenant;
+    }
     if (filters.project) where.project = filters.project;
     if (filters.division) where.division = filters.division;
     if (filters.doctor) where.doctor = filters.doctor;

@@ -26,7 +26,7 @@ export const CampMapper = {
 
             // slot & location
             date: camp.date,
-            timeSlot: camp.timeSlot ? { start: camp.timeSlot.start, end: camp.timeSlot.end } : null,
+            timeSlot: camp.timeSlot || null,
             city: camp.city,
             state: camp.state,
             coordinates: camp.coordinates || null,

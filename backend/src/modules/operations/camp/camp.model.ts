@@ -1,7 +1,7 @@
 // Camp Model
 
 import mongoose, { InferSchemaType } from 'mongoose';
-import { CAMP_TYPES, BILLING_TYPES, CAMP_STATUSES } from './camp.constants';
+import { CAMP_TYPES, BILLING_TYPES, CAMP_STATUSES, CAMP_TIME_SLOTS } from './camp.constants';
 
 const stageHistorySchema = new mongoose.Schema(
     {
@@ -64,6 +64,7 @@ const campSchema = new mongoose.Schema(
         mr: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Role',
+            required:true
         },
         asm: {
             type: mongoose.Schema.Types.ObjectId,
@@ -94,14 +95,9 @@ const campSchema = new mongoose.Schema(
             required: [true, 'Date is required'],
         },
         timeSlot: {
-            start: {
-                type: String,
-                required: [true, 'Start time is required'],
-            },
-            end: {
-                type: String,
-                required: [true, 'End time is required'],
-            },
+            type: String,
+            enum: Object.values(CAMP_TIME_SLOTS),
+            required: [true, 'Time slot is required'],
         },
         city: {
             type: String,
@@ -125,10 +121,11 @@ const campSchema = new mongoose.Schema(
         },
 
         // 4: devices & cofirm
+        // each device is a reference to a catalog item (InventoryMaster), validated in the service.
         devices: [
             {
-                type: String,
-                default: [],
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'InventoryMaster',
             },
         ],
         notes: {

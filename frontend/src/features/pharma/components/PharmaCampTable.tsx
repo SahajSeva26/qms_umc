@@ -11,9 +11,6 @@ const doctorName = (doctor: CampEntity['doctor']) =>
 const mrName = (mr: CampEntity['mr']) =>
   mr && typeof mr !== 'string' ? (mr as CampPopulatedRole).name : (mr ?? '—')
 
-// Read-only, pharma-owned camp table — NOT a reuse of CampTableReal.tsx,
-// which renders camp:manage-gated actions (stage-move, FO allocation)
-// pharma never holds. Only what a pharma viewer actually needs to see.
 const PharmaCampTable = ({ camps }: PharmaCampTableProps) => (
   <div
     className="rounded-xl border overflow-hidden"

@@ -22,7 +22,7 @@ export interface NavItem {
   id:           string
   label:        string
   icon:         string   // react-icons/fi name without the "Fi" prefix
-  path:         string   // always imported from the feature's own routes file
+  path:         string
 }
 
 export interface NavSubsection {
@@ -53,7 +53,6 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { id: 'finanalytics', label: 'Financial Analytics',         icon: 'BarChart2',     path: ANALYTICS_ROUTES.ANALYTICS_FINANCIAL },
 
   // Sales & CRM — Pipeline
-  // Real visibility for this group is enforced by REAL_GATED_NAV_ITEMS in Sidebar.tsx.
   { id: 'appointments', label: 'Appointments',                icon: 'Calendar',      path: CRM_ROUTES.APPOINTMENTS },
 
   { id: 'crm',          label: 'CRM',                         icon: 'Users',         path: CRM_ROUTES.CRM },
@@ -68,7 +67,6 @@ const ALL_NAV_ITEMS: NavItem[] = [
   // Operations — Camps
   { id: 'omportal',     label: 'Ops Manager',                 icon: 'Clipboard',     path: OM_ROUTES.OM },
 
-  // Real visibility enforced by REAL_GATED_NAV_ITEMS in Sidebar.tsx.
   { id: 'camps',        label: 'Camp Management',             icon: 'Sun',           path: CAMPS_ROUTES.CAMPS },
 
   { id: 'telecamps',    label: 'Teleconsultation Camps',      icon: 'Video',         path: CAMPS_ROUTES.CAMPS_TELE },
@@ -130,12 +128,10 @@ const ALL_NAV_ITEMS: NavItem[] = [
   // System
   { id: 'admin',        label: 'Admin',                       icon: 'Shield',        path: ADMIN_ROUTES.ADMIN },
 
-  // Real visibility enforced by REAL_GATED_NAV_ITEMS in Sidebar.tsx.
   { id: 'users',        label: 'Users',                       icon: 'Users',         path: ADMIN_ROUTES.ADMIN_USERS },
 
   { id: 'settings',     label: 'Settings',                    icon: 'Settings',      path: ADMIN_ROUTES.ADMIN_SETTINGS },
 
-  // Access Management entities — real visibility enforced by REAL_GATED_NAV_ITEMS in Sidebar.tsx.
   { id: 'permissiongroups', label: 'Permission Groups',       icon: 'Shield',        path: ACCESS_MANAGEMENT_ROUTES.PERMISSION_GROUPS },
 
   { id: 'roletypes',        label: 'Role Types',              icon: 'Sliders',       path: ACCESS_MANAGEMENT_ROUTES.ROLE_TYPES },

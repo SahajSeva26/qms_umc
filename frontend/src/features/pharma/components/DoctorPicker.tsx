@@ -12,10 +12,8 @@ interface DoctorPickerProps {
   onChange: (doctorId: string, doctorLabel: string) => void
 }
 
-// GET /doctors search has no AuthorizeMiddleware beyond login — any pharma
-// role can search doctors without a specific permission (confirmed against
-// doctor.routes.ts). Debounced, paginated (limit:10) typeahead — never
-// loads the full doctor directory.
+// GET /doctors has no permission gate beyond login — debounced, paginated
+// (limit:10) typeahead, never loads the full doctor directory.
 const doctorLabel = (doctor: DoctorEntity) => `${doctor.name} (${doctor.pharmaCode})`
 
 const DoctorPicker = ({ value, label, onChange }: DoctorPickerProps) => {

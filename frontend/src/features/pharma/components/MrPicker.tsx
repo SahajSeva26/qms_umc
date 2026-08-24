@@ -10,9 +10,7 @@ interface MrPickerProps {
   onChange: (mrRoleId: string, mrLabel: string) => void
 }
 
-// Backs the "book on behalf of" MR picker for HO/RSM/ASM only — GET
-// /roles/mrs already scopes results to the caller's own downline server-
-// side (self/team/region/division per role type), so this never fetches
+// Server-scopes results to the caller's own downline — never fetches
 // more than the caller is actually allowed to book for.
 const mrLabel = (mr: RoleEntity) => `${mr.name} (${mr.code})`
 

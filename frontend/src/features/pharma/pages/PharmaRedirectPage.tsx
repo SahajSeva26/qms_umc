@@ -10,9 +10,7 @@ const ROLE_TYPE_TO_ROUTE: Record<string, string> = {
   'pharma-mr': '/pharma/mr',
 }
 
-// The single nav entry ('Pharma Portal') always points here — this page's
-// only job is figuring out which of the 4 role-specific portals to send the
-// logged-in user to, so the nav config never has to know role types.
+// The single nav entry always points here, so nav config never has to know role types.
 const PharmaRedirectPage = () => {
   const { isSettled, isConfirmedUnauthenticated, session } = useSession()
 

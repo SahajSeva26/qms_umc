@@ -19,9 +19,6 @@ import { useReshapingResolver } from '@/hooks/useReshapingResolver'
 import { TENANT_ROUTES } from '@/features/access-management/tenant/tenant.routes'
 import { PLATFORM_TENANT_CODE, PLATFORM_TENANT_FETCH_LIMIT } from '@/features/access-management/accessManagement.constants'
 
-// Two-step form: step 1 is the company's own details, step 2 is the owner
-// account — the tenant's initial admin user is created in the same call.
-
 interface TenantFormValues {
   code: string
   name: string
@@ -48,7 +45,6 @@ const EMPTY_FORM_VALUES: TenantFormValues = {
   ownerGender: '',
 }
 
-// Maps the resolver's nested owner.* error paths back to the form's flat ownerX fields.
 const OWNER_FIELD_TO_FORM_FIELD: Record<string, keyof TenantFormValues> = {
   firstName: 'ownerFirstName',
   lastName: 'ownerLastName',
@@ -81,8 +77,8 @@ const useTenantFormResolver = () =>
 const CreateTenantDialog = () => {
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState(0)
-  // trigger() doesn't mark fields "touched", so without this a blind Next
-  // click on a blank step 1 wouldn't show errors for untouched fields.
+  // trigger() doesn't mark fields "touched", so a blind Next click on a
+  // blank step 1 wouldn't otherwise show errors for untouched fields.
   const [step1Attempted, setStep1Attempted] = useState(false)
   const navigate = useNavigate()
   const createTenant = useCreateTenant()
@@ -101,8 +97,7 @@ const CreateTenantDialog = () => {
     defaultValues: EMPTY_FORM_VALUES,
   })
 
-  // Sales rep picker is scoped to the platform tenant; queries only fire
-  // once the dropdown has been opened, not just whenever the dialog is open.
+  // Queries only fire once the dropdown has been opened, not just whenever the dialog is open.
   const [salesRepPickerOpened, setSalesRepPickerOpened] = useState(false)
   const salesRepQueriesEnabled = open && salesRepPickerOpened
 
@@ -132,7 +127,6 @@ const CreateTenantDialog = () => {
     setOpen(false)
   }
 
-  // Only validates step-1 fields so step-2's still-empty owner fields don't block Next.
   const handleNext = async () => {
     setStep1Attempted(true)
     const valid = await trigger(['code', 'name', 'salesPerson'])

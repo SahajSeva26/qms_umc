@@ -20,13 +20,12 @@ interface TenantsFilterBarProps {
   filters: TenantsFilterState
   setFilter: <K extends keyof TenantsFilterState>(key: K, value: TenantsFilterState[K]) => void
   reset: () => void
-  // system:manage only — everyone else never even sees this control, let
-  // alone can change it away from the page's own customer-tenant scope.
+  // system:manage only — everyone else never sees this control.
   canFilterByType: boolean
 }
 
-// Status filtering here is only honored server-side for callers with
-// tenant:manage — others are hard-scoped to status=active regardless.
+// Status filter is only honored server-side for callers with tenant:manage;
+// others are hard-scoped to status=active regardless of this UI's state.
 const TenantsFilterBar = ({ filters, setFilter, reset, canFilterByType }: TenantsFilterBarProps) => {
   return (
     <div

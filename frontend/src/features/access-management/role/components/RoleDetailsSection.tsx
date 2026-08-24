@@ -7,14 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { RoleStatus, RoleTypeEntity, RoleEntity } from '@/types/accessManagement.types'
 import type { DivisionEntity } from '@/types/crm.types'
 
-// Shared between CreateRoleModal/EditRoleEditor, whose form-values types
-// differ (CreateRoleFormValues vs UpdateRoleFormValues) — generic over the
-// caller's own type instead of widening to RHF's most-general FieldValues, so
-// no cast is needed at either call site and register()/control still
-// type-check the field name literals. code/division/supervisor (create-only)
-// and status (edit-only) are optional here since only ONE of the two real
-// form-values types declares each — this section only actually registers
-// them behind the matching `mode`/`needsDivision`/`needsSupervisor` checks.
+// Generic over the caller's form-values type (rather than RHF's FieldValues)
+// so register()/control still type-check field name literals without casts.
 interface RoleDetailsFields {
   code?: string
   name: string
@@ -64,11 +58,8 @@ const RoleDetailsSection = <TFormValues extends FieldValues & RoleDetailsFields>
 }: RoleDetailsSectionProps<TFormValues>) => {
   const isCreateMode = mode === 'create'
 
-  // A field name of RoleDetailsFields is always a valid Path<TFormValues> —
-  // TFormValues is constrained to extend RoleDetailsFields — but TS can't
-  // verify a bare string literal against a still-abstract generic Path<T>.
-  // One narrow, single-purpose cast per field name here, rather than casting
-  // the whole register/control objects away from their real types.
+  // TS can't verify a bare string literal against abstract generic Path<T>,
+  // even though TFormValues extends RoleDetailsFields — narrow cast per field name.
   const field = <K extends keyof RoleDetailsFields>(name: K) => name as unknown as Path<TFormValues>
   const fieldError = (name: keyof RoleDetailsFields) => errors[field(name)]
   const fieldTouched = (name: keyof RoleDetailsFields) => touchedFields[field(name)]

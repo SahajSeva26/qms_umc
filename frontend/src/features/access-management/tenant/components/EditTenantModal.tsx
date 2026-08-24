@@ -30,7 +30,7 @@ interface EditTenantFormValues {
   salesPerson: string
 }
 
-// '' (no selection) must be normalized to undefined — status/type are bare enums with no '' member.
+// '' must be normalized to undefined — status/type are bare enums with no '' member.
 const useEditTenantFormResolver = () =>
   useReshapingResolver<EditTenantFormValues, UpdateTenantPayload>({
     schema: updateTenantSchema,
@@ -43,8 +43,6 @@ const useEditTenantFormResolver = () =>
     }),
   })
 
-// Fields are hidden (not disabled) when the caller lacks the permission
-// that would make them take effect server-side.
 const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: EditTenantModalProps) => {
   const updateTenant = useUpdateTenant(tenant.id)
   const { resolver, parsePayload } = useEditTenantFormResolver()
@@ -66,8 +64,8 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
     },
   })
 
-  // Loads eagerly when a sales rep is already assigned so the trigger can show that rep's name right away.
   const [salesRepPickerOpened, setSalesRepPickerOpened] = useState(false)
+  // Loads eagerly if a sales rep is already assigned, so the trigger shows that rep's name right away.
   const salesRepQueriesEnabled = canManageSystem && (salesRepPickerOpened || !!tenant.salesPerson)
 
   const { data: platformTenantData } = useTenants({ type: 'platform', status: 'active', limit: PLATFORM_TENANT_FETCH_LIMIT }, salesRepQueriesEnabled)
@@ -89,7 +87,6 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
   const fieldError = (field: keyof EditTenantFormValues) =>
     (touchedFields[field] || isSubmitted) ? errors[field]?.message : undefined
 
-  // Omit fields the caller lacks permission to change, rather than send them anyway.
   const onSubmit = async (values: EditTenantFormValues) => {
     const parsed = await parsePayload(values)
     const payload: UpdateTenantPayload = { name: parsed.name, description: parsed.description }

@@ -6,11 +6,8 @@ import { cn } from '@/lib/utils'
 
 type PasswordInputProps = Omit<React.ComponentProps<typeof Input>, 'type'>
 
-// Drop-in replacement for `<Input type="password" />` with a show/hide
-// toggle — same shadcn recipe as LoginForm.tsx's hand-rolled version
-// (FiEye/FiEyeOff, absolutely-positioned toggle button), just built on the
-// shared Input/Button so every non-auth password field gets it for free
-// instead of re-implementing local useState each time.
+// Drop-in replacement for `<Input type="password" />` with a show/hide toggle
+// — kept separate from LoginForm.tsx's hand-rolled version, which is locked.
 const PasswordInput = ({ className, ...props }: PasswordInputProps) => {
   const [visible, setVisible] = useState(false)
 

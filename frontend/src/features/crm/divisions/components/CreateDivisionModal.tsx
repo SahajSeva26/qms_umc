@@ -30,7 +30,7 @@ const GENDER_OPTIONS: { value: 'male' | 'female' | 'other'; label: string }[] = 
 ]
 
 // Create-only (editing is on DivisionDetailPage) — Division Head is
-// mandatory, the backend mints a new user + Role in the same transaction.
+// mandatory; the backend mints a new user + Role in the same transaction.
 interface DivisionFormValues {
   tenant: string
   code: string
@@ -97,7 +97,7 @@ const useDivisionFormResolver = () =>
 
 const CreateDivisionModal = ({ onClose, defaultTenantId }: CreateDivisionModalProps) => {
   const [step, setStep] = useState(0)
-  // trigger() doesn't mark fields "touched", so without this a blind Next
+  // trigger() doesn't mark fields "touched" — without this, a blind Next
   // click on a blank step 1 wouldn't show errors for untouched fields.
   const [step1Attempted, setStep1Attempted] = useState(false)
   const createDivision = useCreateDivision()

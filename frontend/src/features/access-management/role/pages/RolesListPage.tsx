@@ -13,13 +13,10 @@ import type { RoleStatus } from '@/types/accessManagement.types'
 
 const PAGE_SIZE = 10
 
-// Shows every role across every tenant by default; Status/Tenant/Search
-// filters and pagination are all applied server-side.
 const RolesListPage = () => {
   const { filters, setFilter, reset } = useRolesFilters()
-  // This page is reachable by role:get/role:search alone, but POST /roles
-  // requires tenant:admin/tenant:manage — gate the "New Role" button so a
-  // read-only viewer can't 403 on click.
+  // Page is reachable by role:get/role:search alone, but POST /roles requires
+  // tenant:admin/tenant:manage — gate the button so a read-only viewer can't 403.
   const { hasAnyPermission } = usePermission()
   const canCreateRole = hasAnyPermission(['tenant:admin', 'tenant:manage'])
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)

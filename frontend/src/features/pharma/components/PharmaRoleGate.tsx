@@ -15,9 +15,8 @@ const ROLE_LABELS: Record<string, string> = {
   'pharma-mr': 'MR',
 }
 
-// Shared by all 4 portal pages — never render a role decision before the
-// session has actually settled (isSettled), or a slow first /auth/me fetch
-// can flash the wrong portal's content for a moment.
+// Never render a role decision before the session has settled, or a slow
+// first /auth/me fetch can flash the wrong portal's content for a moment.
 const PharmaRoleGate = ({ roleTypeCode, children }: PharmaRoleGateProps) => {
   const { isSettled, isConfirmedUnauthenticated, session } = useSession()
 

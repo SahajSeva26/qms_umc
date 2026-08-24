@@ -3,7 +3,7 @@ import { renderHook } from '@testing-library/react'
 import { z } from 'zod'
 import { useReshapingResolver } from '@/hooks/useReshapingResolver'
 
-// Mirrors createDivisionSchema's real shape (trim/lowercase transforms, nested object, optional number).
+// Mirrors createDivisionSchema's shape (trim/lowercase, nested object, optional number).
 const testSchema = z.object({
   code: z.string().trim().min(3).regex(/^\S+$/, 'Code cannot contain spaces.').toLowerCase(),
   name: z.string().trim().min(1),
@@ -27,8 +27,8 @@ const HEAD_FIELD_TO_FORM_FIELD: Record<string, keyof TestFormValues> = {
   email: 'headEmail',
 }
 
-// z.infer, not ReturnType<typeof toTestPayload> — the two disagree on
-// whether mrCount is an optional key vs. a required key with optional value.
+// z.infer, not ReturnType<typeof toTestPayload> — they disagree on whether
+// mrCount is an optional key vs. a required key with optional value.
 type TestPayload = z.infer<typeof testSchema>
 
 const toTestPayload = (values: TestFormValues): TestPayload => ({

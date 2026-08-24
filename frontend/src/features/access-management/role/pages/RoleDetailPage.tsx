@@ -2,8 +2,7 @@ import { useParams } from 'react-router-dom'
 import { useRole } from '@/features/access-management/role/hooks/useRole'
 import EditRoleEditor from '@/features/access-management/role/components/EditRoleEditor'
 
-// Create now happens via CreateRoleModal (opened from RolesListPage) —
-// this page is edit-only, always reached with a real :id.
+// Create happens via CreateRoleModal — this page is edit-only, always reached with a real :id.
 const RoleDetailPage = () => {
   const { id } = useParams<{ id: string }>()
   const { data, isLoading } = useRole(id)

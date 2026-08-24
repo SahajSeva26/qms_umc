@@ -125,9 +125,8 @@ const updateRole = async (id: string, payload: UpdateRolePayload) => {
   return res.data
 }
 
-// Purpose-built for pharma HO/RSM/ASM booking-on-behalf pickers — never
-// touches /roles' own role:search-gated search endpoint. Route MUST be
-// '/roles/mrs', not '/roles/{id}' with id='mrs' — see role.routes.ts.
+// Purpose-built for pharma HO/RSM/ASM booking-on-behalf pickers. Route MUST
+// be '/roles/mrs', not '/roles/{id}' with id='mrs' — see role.routes.ts.
 const searchDownlineMrs = async (query: SearchDownlineMrQuery) => {
   const res = await api.get<PaginatedResponse<RoleEntity>>('/roles/mrs', { params: query })
   return res.data

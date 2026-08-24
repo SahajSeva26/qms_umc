@@ -11,15 +11,13 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 
 interface MoveInvoiceStageDialogProps {
   invoice: InvoiceEntity
-  // Line count at the parent invoice — an empty draft shouldn't be
-  // approvable, so 'approved' is excluded from the offered targets at zero.
+  // An empty draft shouldn't be approvable, so 'approved' is excluded at zero.
   lineItemCount: number
   onClose: () => void
 }
 
 // Backed by the single generic PATCH /invoices/:id/stage endpoint. draft →
-// approved gets an extra, stronger warning below — it's one-way and
-// permanently locks line-item editing, unlike every other transition here.
+// approved gets an extra warning — it's one-way and locks line-item editing.
 const MoveInvoiceStageDialog = ({ invoice, lineItemCount, onClose }: MoveInvoiceStageDialogProps) => {
   const legalTargets = INVOICE_TRANSITION_MAP[invoice.status].filter(
     (target) => target !== 'approved' || lineItemCount > 0,
@@ -28,8 +26,8 @@ const MoveInvoiceStageDialog = ({ invoice, lineItemCount, onClose }: MoveInvoice
   const [reason, setReason] = useState('')
   const [error, setError] = useState<string | null>(null)
   const moveStage = useMoveInvoiceStage()
-  // Synchronous guard against a fast double-click firing two overlapping
-  // stage moves before React re-renders moveStage.isPending onto the button.
+  // Synchronous guard against a double-click firing two stage moves before
+  // isPending re-renders onto the button.
   const submittingRef = useRef(false)
 
   const handleSave = async () => {
@@ -70,16 +68,8 @@ const MoveInvoiceStageDialog = ({ invoice, lineItemCount, onClose }: MoveInvoice
     )
   }
 
-  // onOpenChange fires for Escape, backdrop-click, AND the Cancel button —
-  // it must check submittingRef.current (set synchronously the instant
-  // handleSave starts), not moveStage.isPending. isPending only updates on
-  // React's NEXT render after mutateAsync begins; in the tiny window
-  // between the mutation starting and that render committing, isPending is
-  // still stale-false, so a dismissal attempt in that window would have
-  // closed the dialog while the stage move was still genuinely in flight.
-  // The Cancel button's visible `disabled` styling below still uses
-  // isPending — that's a rendered prop, so it only needs to be correct once
-  // React has actually re-rendered, unlike the dismissal guard here.
+  // Must check submittingRef.current, not isPending — isPending lags a
+  // render behind mutateAsync starting, leaving a dismissal race window.
   return (
     <Dialog open onOpenChange={(o) => { if (!o && !submittingRef.current) onClose() }}>
       <DialogContent className="sm:max-w-md">
@@ -112,11 +102,8 @@ const MoveInvoiceStageDialog = ({ invoice, lineItemCount, onClose }: MoveInvoice
           {error && <p className="text-[12px] text-danger">{error}</p>}
         </div>
         <div className="flex gap-2 justify-end mt-2">
-          {/* Same submittingRef.current guard as onOpenChange above — this
-              is a separate click handler, not routed through onOpenChange,
-              so without this check it could still close in the tiny window
-              between handleSave starting and moveStage.isPending's next
-              render actually reflecting it. */}
+          {/* Same submittingRef.current guard as onOpenChange — a separate
+              click handler not routed through it, same race window. */}
           <Button variant="secondary" onClick={() => { if (!submittingRef.current) onClose() }} disabled={moveStage.isPending}>Cancel</Button>
           <Button onClick={handleSave} disabled={moveStage.isPending} className="font-bold text-white" style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}>
             {moveStage.isPending ? 'Saving…' : 'Save'}

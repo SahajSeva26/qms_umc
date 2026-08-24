@@ -2,7 +2,6 @@ import { createRoleSchema, updateRoleSchema } from '@/features/access-management
 import { useReshapingResolver } from '@/hooks/useReshapingResolver'
 import type { RoleStatus, CreateRolePayload, UpdateRolePayload } from '@/types/accessManagement.types'
 
-// permissions comes from a separate picker, not the schema/resolver.
 type CreateRoleSchemaPayload = Omit<CreateRolePayload, 'permissions'>
 type UpdateRoleSchemaPayload = Omit<UpdateRolePayload, 'permissions'>
 
@@ -79,10 +78,7 @@ export const useCreateRoleFormResolver = () =>
       type: values.roleType,
       tenant: values.tenant,
       // Blank optional fields must be omitted, not sent as '' — the backend's
-      // Zod schema rejects an empty string against a min(1)/enum check (only
-      // gender was doing this correctly before; division/supervisor/phone
-      // were passing '' straight through, which 400'd any non-pharma role
-      // type with a blank phone number).
+      // Zod schema rejects '' against a min(1)/enum check.
       division: values.division || undefined,
       supervisor: values.supervisor || undefined,
       user: {
@@ -90,13 +86,9 @@ export const useCreateRoleFormResolver = () =>
         lastName: values.userLastName,
         email: values.userEmail,
         password: values.userPassword,
-        // Unlike division/supervisor/gender above, phone is now required by
-        // createRoleSchema (frontend-only policy — see role.schemas.ts), so
-        // the Next-button gate never lets '' reach here. Passing it through
-        // as-is (not `|| undefined`) means a blank value hits Zod's
-        // .min(1, 'Phone number is required') message instead of being
-        // masked into `undefined`, which would surface Zod's generic
-        // "expected string, received undefined" type error instead.
+        // Not `|| undefined` like the others: phone is required (see
+        // role.schemas.ts), so passing '' through surfaces Zod's real
+        // min-length message instead of a generic type error.
         phone: values.userPhone,
         gender: values.userGender || undefined,
       },
@@ -125,7 +117,6 @@ export const useEditRoleFormResolver = () =>
     topLevelFieldMap: UPDATE_TOP_LEVEL_TO_FORM_FIELD,
   })
 
-// Takes the already schema-parsed payload plus permissions (picker-sourced).
 export function toCreateRolePayload(parsed: CreateRoleSchemaPayload, permissions: string[]): CreateRolePayload {
   return { ...parsed, permissions }
 }

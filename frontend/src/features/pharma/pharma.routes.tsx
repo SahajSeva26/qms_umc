@@ -10,15 +10,8 @@ export const PHARMA_ROUTES = {
   PHARMA_PROJECT_CAMPS: '/pharma/projects/:id/camps',
 }
 
-// All 4 pharma role types share exactly one permission (camp:book) — no
-// permission array can distinguish HO/RSM/ASM/MR from each other, only
-// session.roleType.code can (PharmaRoleGate on the 4 role-landing pages,
-// AnyPharmaRoleGate on the deep-linkable camps route). This lazyRoute gate
-// answers a different question — "does this session have any business
-// under /pharma/* at all" — which the role-type gates can't answer on their
-// own (a non-pharma session with no camp:book previously reached a
-// 200-rendered "no pharma portal for your role" dead end here instead of a
-// real /unauthorized redirect, like every other ungated route in the app).
+// All 4 pharma role types share one permission (camp:book) — this gate only
+// answers "any business under /pharma/* at all"; role-type gates handle the rest.
 const PHARMA_VIEW_PERMISSIONS = ['camp:book']
 
 export const pharmaRoutes: RouteObject[] = [

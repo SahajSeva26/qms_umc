@@ -73,8 +73,8 @@ describe('AnyPharmaRoleGate', () => {
 
   it('blocks a camp:book-holding but non-pharma role type — the regression case a plain permission check would miss', async () => {
     const { useSession } = await import('@/hooks/useSession')
-    // Holds camp:book (would pass a route-level lazyRoute(['camp:book'])
-    // check) but isn't one of the 4 recognized pharma role types.
+    // Holds camp:book (passes a route-level permission check) but isn't
+    // one of the 4 recognized pharma role types.
     vi.mocked(useSession).mockReturnValue({
       isSettled: true,
       isConfirmedUnauthenticated: false,

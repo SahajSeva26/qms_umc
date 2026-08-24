@@ -18,19 +18,14 @@ interface GenerateInvoiceDialogProps {
   onCreated: (invoiceId: string) => void
 }
 
-// Two steps: pick a project first (this dialog owns its own picker — the
-// list page's project filter is unrelated and may be empty or set to a
-// different project entirely), then pick camps to bill for that project.
+// Two steps: pick a project first (this dialog owns its own picker,
+// independent of the list page's filter), then pick camps to bill.
 const GenerateInvoiceDialog = ({ onClose, onCreated }: GenerateInvoiceDialogProps) => {
   const queryClient = useQueryClient()
   const [projectId, setProjectId] = useState('')
   const [projectLabel, setProjectLabel] = useState('')
-  // enabled: false — this dialog owns fetching entirely through
-  // confirmProject below; this query only ever passively READS whatever
-  // confirmProject wrote into ['billing','project',id] via setQueryData, and
-  // reactively re-renders when that write happens. Without enabled: false,
-  // useBillingProject's own auto-fetch-on-id-change would fire a SECOND,
-  // redundant GET for every pick alongside confirmProject's explicit one.
+  // enabled: false — this query only passively reads what confirmProject
+  // writes via setQueryData; without this it'd fire a redundant second GET.
   const { data: projectData } = useQuery<ApiResponse<ProjectEntity>>({
     queryKey: ['billing', 'project', projectId],
     queryFn: () => billingProjectsService.getProject(projectId),
@@ -38,28 +33,13 @@ const GenerateInvoiceDialog = ({ onClose, onCreated }: GenerateInvoiceDialogProp
   })
   const project = projectId && projectData ? projectData.data : null
 
-  // campCost is financially material to what a generated invoice bills.
-  // A project id can already be cached (e.g. re-picked after "Change
-  // project", or already warm from elsewhere in the app) — advancing to the
-  // camp step off cached data alone would skip confirming freshness and
-  // could display a stale campCost the backend no longer honors. Fetch
-  // explicitly by the exact id the picker just reported (a plain function
-  // argument, never a hook's refetch closure) and write the result straight
-  // into the cache entry the query above reads, so `project` picks it up
-  // reactively.
+  // campCost is financially material — a cached project id must still be
+  // re-fetched explicitly before advancing, so a stale campCost is never displayed.
   const [confirmedProjectId, setConfirmedProjectId] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
   const [confirmError, setConfirmError] = useState(false)
-  // Detects a project switch that happens WHILE this fetch is still in
-  // flight — an operation token, bumped SYNCHRONOUSLY inside
-  // handleProjectChange (the same tick as setProjectId), not inside a
-  // useEffect. A passive effect commits strictly after React schedules and
-  // runs it — later than this same tick — so a fast-resolving fetch could
-  // reach confirmProject's `if` check before that effect had run, making a
-  // valid, current result look stale and leaving `confirming` stuck true
-  // forever. A plain ref written directly in the event handler has no such
-  // gap: by the time confirmProject's async body resumes after its await,
-  // the ref already reflects whichever pick is actually current.
+  // Bumped synchronously in handleProjectChange (not a useEffect, which
+  // would commit too late) so a fast-resolving fetch can detect a superseding pick.
   const operationTokenRef = useRef(0)
 
   const confirmProject = async (id: string, token: number) => {
@@ -88,8 +68,7 @@ const GenerateInvoiceDialog = ({ onClose, onCreated }: GenerateInvoiceDialogProp
     if (id) confirmProject(id, operationTokenRef.current)
   }
 
-  // Retry also bumps the token — it's a new attempt superseding whatever
-  // the previous (failed) one was, same as any other pick.
+  // Retry also bumps the token — a new attempt superseding the failed one.
   const retryConfirmProject = () => {
     operationTokenRef.current += 1
     confirmProject(projectId, operationTokenRef.current)
@@ -133,34 +112,22 @@ interface GenerateInvoiceCampStepProps {
 }
 
 // Create is one atomic backend call with N camps — multi-select is correct
-// here, unlike AddCampToInvoiceDialog (single-select, since that endpoint
-// adds one line per call).
+// here, unlike AddCampToInvoiceDialog's single-select (one line per call).
 const GenerateInvoiceCampStep = ({ project, onBack, onClose, onCreated }: GenerateInvoiceCampStepProps) => {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
   const { data: camps, isLoading, isFetching: campsFetching, error: campsError, refetch } = useEligibleInvoiceCamps(project.id)
   const createInvoice = useCreateInvoice()
-  // Synchronous guard against a fast double-click firing two overlapping
-  // creates before React re-renders createInvoice.isPending onto the button
-  // — mutateAsync itself doesn't block concurrent calls on the same hook.
+  // Synchronous guard against a double-click firing two creates before
+  // isPending re-renders onto the button.
   const submittingRef = useRef(false)
 
-  // Mirrors AddCampToInvoiceDialog's isSettling: a background refetch
-  // (isFetching) or an error leaves `camps` either stale or untrustworthy —
-  // the submit button must not allow a stale selection through in either case.
+  // Mirrors AddCampToInvoiceDialog's isSettling — a refetch or error leaves
+  // `camps` untrustworthy for submission.
   const isSettling = isLoading || campsFetching || !!campsError
 
-  // Prunes any previously-selected camp id that's no longer present once
-  // fresh data arrives (e.g. it became ineligible or was billed elsewhere in
-  // the meantime). Adjusted during render (React's documented pattern for
-  // state that must reset when a prop/query value changes — see "Storing
-  // information from previous renders" in the React docs) rather than in a
-  // useEffect, so there's no extra render pass after the fetch resolves.
-  // Comparing against state (not a ref, which this project's lint rules
-  // disallow reading/writing during render) is what makes this legal: the
-  // setState call below only actually happens when `camps` reference changes
-  // — React Query only produces a new reference when a fetch resolves with
-  // new data — so this does not loop or run on every render.
+  // Prunes a selected id no longer present in fresh data — adjusted during
+  // render, comparing against state per this repo's lint rules.
   const [lastCamps, setLastCamps] = useState<typeof camps>(undefined)
   if (camps && camps !== lastCamps) {
     setLastCamps(camps)
@@ -201,16 +168,8 @@ const GenerateInvoiceCampStep = ({ project, onBack, onClose, onCreated }: Genera
     }
   }
 
-  // onOpenChange fires for Escape, backdrop-click, AND the Cancel button —
-  // it must check submittingRef.current (set synchronously the instant
-  // handleSubmit starts), not createInvoice.isPending. isPending only
-  // updates on React's NEXT render after mutateAsync begins; in the tiny
-  // window between the mutation starting and that render committing,
-  // isPending is still stale-false, so a dismissal attempt in that window
-  // would have closed the dialog while the create was still genuinely in
-  // flight. The Cancel button's visible `disabled` styling below still uses
-  // isPending — that's a rendered prop, so it only needs to be correct once
-  // React has actually re-rendered, unlike the dismissal guard here.
+  // Must check submittingRef.current, not isPending — isPending lags a
+  // render behind mutateAsync starting, leaving a dismissal race window.
   return (
     <Dialog open onOpenChange={(o) => { if (!o && !submittingRef.current) onClose() }}>
       <DialogContent className="sm:max-w-lg">
@@ -256,11 +215,8 @@ const GenerateInvoiceCampStep = ({ project, onBack, onClose, onCreated }: Genera
         </div>
 
         <div className="flex gap-2 justify-end mt-2">
-          {/* Same submittingRef.current guard as onOpenChange above — these
-              are separate click handlers, not routed through onOpenChange,
-              so without this check they could still close/switch project in
-              the tiny window between handleSubmit starting and
-              createInvoice.isPending's next render actually reflecting it. */}
+          {/* Same submittingRef.current guard as onOpenChange — separate
+              click handlers not routed through it, same race window. */}
           <Button variant="ghost" onClick={() => { if (!submittingRef.current) onBack() }} disabled={createInvoice.isPending} className="mr-auto">Change project</Button>
           <Button variant="secondary" onClick={() => { if (!submittingRef.current) onClose() }} disabled={createInvoice.isPending}>Cancel</Button>
           <Button

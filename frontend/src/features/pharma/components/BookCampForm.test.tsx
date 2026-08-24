@@ -284,12 +284,8 @@ describe('BookCampForm', () => {
   })
 
   it('blocks a true rapid double-submit — two submit events fired before React re-renders isPending — to exactly one mutation call', async () => {
-    // parsePayload's own async Zod re-parse runs BEFORE bookCamp.isPending
-    // ever flips true, so a guard that only relies on the disabled button
-    // (the previous test) doesn't cover the real race: two submits fired
-    // back-to-back, with no await/waitFor letting React re-render in
-    // between, must still only reach the mutation once. This is what the
-    // synchronous submittingRef guard in BookCampForm exists for.
+    // parsePayload's async re-parse runs BEFORE isPending flips true, so a
+    // disabled-button guard alone misses this race; submittingRef covers it.
     const { campsRealService } = await import('@/features/camps/campsReal.service')
     let resolveBooking: (value: ApiResponse<CampEntity>) => void = () => {}
     vi.mocked(campsRealService.bookCamp).mockImplementation(
@@ -314,9 +310,7 @@ describe('BookCampForm', () => {
     const form = screen.getByRole('button', { name: /book camp/i }).closest('form')
     if (!form) throw new Error('form not found')
 
-    // Two submit events, no await between them — fires before isPending (or
-    // even submittingRef, on the very first) has had any chance to settle
-    // from the first call's own microtask queue.
+    // No await between submits — fires before isPending/submittingRef can settle.
     fireEvent.submit(form)
     fireEvent.submit(form)
 

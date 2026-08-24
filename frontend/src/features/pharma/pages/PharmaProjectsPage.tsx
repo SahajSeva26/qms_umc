@@ -12,14 +12,8 @@ import type { ProjectEntity } from '@/types/project.types'
 
 const PAGE_SIZE = 10
 
-// Shared landing body for all 4 pharma portal pages — the backend scopes
-// projects identically for every pharma role type (division-wide, via
-// applyOwnScope; project.service.ts), so this needs no role prop/branching.
 // No "New Project" affordance — pharma never holds project:manage. All
-// statuses are shown (with a pill), never silently filtered to `live` —
-// the backend itself doesn't enforce a lifecycle-stage restriction here, so
-// this page doesn't fabricate one either (see plan's "confirmed real
-// backend gaps" — whoCanBookCamp/status are stored but never enforced).
+// statuses are shown, never filtered to `live` — the backend itself doesn't enforce that restriction either.
 const PharmaProjectsPage = () => {
   const navigate = useNavigate()
   const [search, setSearch] = useState('')

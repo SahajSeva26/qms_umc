@@ -19,12 +19,8 @@ import { useSession } from '@/hooks/useSession'
 
 const PAGE_SIZE = 10
 
-// Same mapping as PharmaRedirectPage.tsx — literal here rather than
-// imported, for the same reason (avoids importing across sibling page
-// files just for one constant). Used for the back button: navigate to the
-// caller's own role-landing page explicitly, not navigate(-1) (matching
-// TenantDetailPage's convention — an explicit path survives a direct deep
-// link with no real "back" history entry to return to).
+// Back button navigates to an explicit route, not navigate(-1) — a direct
+// deep link may have no real "back" history entry to return to.
 const ROLE_TYPE_TO_ROUTE: Record<string, string> = {
   'pharma-division-head': PHARMA_ROUTES.PHARMA_HO,
   'pharma-rsm': PHARMA_ROUTES.PHARMA_RSM,
@@ -32,12 +28,8 @@ const ROLE_TYPE_TO_ROUTE: Record<string, string> = {
   'pharma-mr': PHARMA_ROUTES.PHARMA_MR,
 }
 
-// AnyPharmaRoleGate MUST wrap a separate content component, never sit beside
-// usePharmaProject/usePharmaCamps in the same component body gated by an
-// early return — React runs every hook (and the network request it fires)
-// on every render regardless of a later early return, so an unsupported-but-
-// camp:book-holding role type would still trigger both requests before the
-// gate's check ever had a chance to block anything. See the plan's Decision 7.
+// Must wrap a separate content component, never sit beside the data hooks
+// gated by an early return — React fires every hook's request on every render regardless.
 const PharmaProjectCampsPage = () => (
   <AnyPharmaRoleGate>
     <PharmaProjectCampsContent />
@@ -55,9 +47,8 @@ const PharmaProjectCampsContent = () => {
   const { data: projectData, isLoading: projectLoading, error: projectError } = usePharmaProject(id)
   const project = projectData?.data ?? null
 
-  // Both the camps query AND the "New camp" button wait on the RESOLVED
-  // project object, not just a truthy id param — an inaccessible/404'd
-  // project must never trigger a second, redundant camps request (Decision 6).
+  // Waits on the RESOLVED project object, not just a truthy id param — an
+  // inaccessible/404'd project must never trigger a redundant camps request.
   const { data: campsData, isLoading: campsLoading, error: campsError, refetch: refetchCamps } = usePharmaCamps(
     { project: project?.id, page: String(page), limit: String(PAGE_SIZE) },
     { enabled: !!project },
@@ -69,11 +60,8 @@ const PharmaProjectCampsContent = () => {
   // the session here, not threaded down as a prop through two route levels.
   const needsMrPicker = session?.roleType.code !== 'pharma-mr'
   const backRoute = session ? (ROLE_TYPE_TO_ROUTE[session.roleType.code] ?? PHARMA_ROUTES.PHARMA) : PHARMA_ROUTES.PHARMA
-  // Division-head's camp scoping (camp.service.ts's applyOwnScope) is
-  // division-wide, not assignment-scoped — an empty list for them genuinely
-  // means the project has no camps yet, unlike RSM/ASM/MR, who only ever
-  // see camps where they occupy their own rsm/asm/mr slot (the true
-  // project-wide count is unknowable from their own scoped response).
+  // Division-head's camp scoping is division-wide, not assignment-scoped —
+  // unlike RSM/ASM/MR, an empty list for them genuinely means no camps yet.
   const isDivisionHead = session?.roleType.code === 'pharma-division-head'
   const emptyCampsText = isDivisionHead
     ? 'No camps have been booked for this project yet.'

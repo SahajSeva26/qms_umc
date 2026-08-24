@@ -4,8 +4,7 @@ import type { TenantStatus, TenantType } from '@/types/accessManagement.types'
 export interface TenantsFilterState {
   search: string
   status: TenantStatus | 'ALL'
-  // Only ever shown/settable in the UI for system:manage — everyone else
-  // stays hard-defaulted to 'customer' regardless of this state's value.
+  // Only shown/settable for system:manage — others stay hard-defaulted to 'customer'.
   type: TenantType | 'ALL'
 }
 

@@ -15,13 +15,11 @@ const PAGE_SIZE = 10
 const TenantsListPage = () => {
   const { filters, setFilter, reset } = useTenantsFilters()
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
-  // Page is reachable by tenant:get/tenant:search alone, but only tenant:manage
-  // can actually submit — gate the "New Tenant" button so read-only viewers can't 403.
+  // tenant:manage (or the system:manage bypass) can submit — gate the button so read-only viewers can't 403.
   const { hasPermission } = usePermission()
   const canManageTenant = hasPermission('tenant:manage')
-  // The tenant-type filter (platform vs customer) is system:manage-only —
-  // everyone else stays hard-locked to customer tenants, matching this
-  // page's own "Client Management" scope, regardless of the filter state.
+  // Type filter (platform vs customer) is system:manage-only — everyone else
+  // stays hard-locked to customer tenants regardless of the filter state.
   const canFilterByType = hasPermission('system:manage')
 
   const debouncedSearch = useDebouncedValue(filters.search, 300)

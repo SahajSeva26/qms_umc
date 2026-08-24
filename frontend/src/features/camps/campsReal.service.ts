@@ -10,9 +10,7 @@ import type {
 } from '@/types/campReal.types'
 
 // Real API calls against backend/src/modules/operations/camp/**. Deliberately
-// a separate file from `camps.service.ts` (the old, still-in-use mock/
-// localStorage store ~100 files across the app depend on) — see
-// campReal.types.ts's header comment for why the two coexist.
+// separate from `camps.service.ts` (the old mock store ~100 files still depend on).
 
 const searchCamps = async (query: SearchCampQuery) => {
   const res = await api.get<PaginatedResponse<CampEntity>>('/camps', { params: query })
@@ -29,9 +27,8 @@ const createCamp = async (payload: CreateCampPayload) => {
   return res.data
 }
 
-// Pharma field-force booking path — POST /camps/book, not /camps. No
-// permission gate beyond camp:book; authorization (self vs downline) is
-// enforced server-side by the caller's own role type.
+// Pharma field-force booking path — POST /camps/book, not /camps. Self vs
+// downline authorization is enforced server-side by the caller's role type.
 const bookCamp = async (payload: BookCampPayload) => {
   const res = await api.post<ApiResponse<CampEntity>>('/camps/book', payload)
   return res.data

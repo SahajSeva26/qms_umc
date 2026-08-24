@@ -2,19 +2,9 @@ import { z } from 'zod'
 import { ROLE_FORBIDDEN_PERMISSIONS } from '@/features/access-management/role/constants/roleForbiddenPermissions'
 import { PASSWORD_MIN_LENGTH } from '@/features/access-management/accessManagement.constants'
 
-// Validation schemas for the role create/update forms. Follows the exact
-// pattern of `@/features/access-management/role-type/schemas/roleType.schemas.ts` — zod
-// objects run through safeParse, first issue message surfaced to the user.
-//
-// `permissions` here are the Role's own "elevated permissions" (conceptually
-// layered ON TOP of whatever the bound RoleType already grants, e.g. a
-// same-domain grant like 'sales.manage' for a single person) — NOT a
-// duplication of the RoleType's permission list. Per role.service.ts's
-// `ROLE_FORBIDDEN_PERMISSIONS` denylist, a Role may never directly hold
-// 'tenant:admin' / 'tenant:manage' / 'system:manage' — refined here with a
-// zod `.refine` so a hand-crafted payload can never even reach the request,
-// on top of the picker UI already excluding those three codes from its
-// choices entirely.
+// `permissions` are the Role's own elevated grants layered on top of the bound
+// RoleType's — role.service.ts's ROLE_FORBIDDEN_PERMISSIONS denylist blocks
+// 'tenant:admin'/'tenant:manage'/'system:manage', mirrored here via `.refine`.
 const forbidRoleForbiddenPermissions = (permissions: string[] | undefined) =>
   !permissions || permissions.every((code) => !ROLE_FORBIDDEN_PERMISSIONS.includes(code))
 
@@ -23,12 +13,8 @@ const registerOwnerSchema = z.object({
   lastName: z.string().trim().optional(),
   email: z.string().trim().min(1, 'User email is required').email('Enter a valid email'),
   password: z.string().min(PASSWORD_MIN_LENGTH, `Password must be at least ${PASSWORD_MIN_LENGTH} characters`),
-  // Frontend-only requirement for the New Role modal — the backend's own
-  // RegisterUserPayloadSchema still has phone as optional (min(10) only
-  // when supplied), so a role created any other way (e.g. directly against
-  // the API) is unaffected. This is a UI policy choice, not a real
-  // constraint change. The min(10) here matches the backend's own bound
-  // (auth.validators.ts) so a value that clears this check never 400s.
+  // Frontend-only requirement — backend's RegisterUserPayloadSchema keeps
+  // phone optional. min(10) matches the backend's own bound (auth.validators.ts).
   phone: z.string().trim().min(10, 'Phone number must be at least 10 characters'),
   gender: z.enum(['male', 'female', 'other']).optional(),
 })
@@ -39,9 +25,8 @@ export const createRoleSchema = z.object({
   description: z.string().trim().optional(),
   type: z.string().trim().min(1, 'Role type is required'),
   tenant: z.string().trim().min(1, 'Company is required'),
-  // Required-ness depends on RoleType/tenant type and is enforced server-side
-  // (role.service.ts's handleDivision/handleSupervisor) — kept optional here,
-  // the page itself blocks submission when its own picker says one is needed.
+  // Required-ness is enforced server-side (role.service.ts); the page's own
+  // picker blocks submission client-side when one is needed.
   division: z.string().trim().optional(),
   supervisor: z.string().trim().optional(),
   permissions: z

@@ -15,26 +15,17 @@ import { getApiErrorMessage } from '@/utils/apiError'
 interface AddCampToInvoiceDialogProps {
   invoice: InvoiceEntity
   project: ProjectEntity
-  // The drawer's OWN, independently-refetched view of whether this invoice
-  // is still a draft — can flip to false while this dialog is still open
-  // (e.g. a failed add's own catch block below invalidates the invoice
-  // detail query, and that refetch confirms someone else approved it
-  // concurrently). Disables further submission rather than the parent
-  // unmounting this dialog outright, which would otherwise discard whatever
-  // error message is already showing.
+  // Drawer's own refetched draft status — can flip false while this dialog
+  // is open; disables submission instead of unmounting, so an error stays visible.
   isInvoiceDraft: boolean
   onClose: () => void
-  // Reports whether an add is currently in flight, so the parent drawer can
-  // disable stage changes for the same reason it disables them during a
-  // remove — an in-flight line mutation makes the current line count stale,
-  // and approving mid-mutation could approve an invoice that's about to be
-  // (or was just) emptied.
+  // Lets the parent drawer disable stage changes while an add is in flight,
+  // since the current line count is stale until it settles.
   onSubmittingChange?: (submitting: boolean) => void
 }
 
 // Single-select only, unlike GenerateInvoiceDialog — POST /invoice-line-items
-// adds one line per call, so a multi-add UI here would issue N sequential
-// requests that could partially fail, leaving an inconsistent draft.
+// adds one line per call, so multi-add here would risk a partially-failed draft.
 const AddCampToInvoiceDialog = ({ invoice, project, isInvoiceDraft, onClose, onSubmittingChange }: AddCampToInvoiceDialogProps) => {
   const queryClient = useQueryClient()
   const [selectedCampId, setSelectedCampId] = useState<string | null>(null)
@@ -48,8 +39,8 @@ const AddCampToInvoiceDialog = ({ invoice, project, isInvoiceDraft, onClose, onS
     refetch: refetchLineItems,
   } = useAllInvoiceLineItems(invoice.id)
   const addLineItem = useAddInvoiceLineItem(invoice.id)
-  // Synchronous guard against a fast double-click firing two overlapping
-  // adds before React re-renders addLineItem.isPending onto the button.
+  // Synchronous guard against a double-click firing two adds before
+  // isPending re-renders onto the button.
   const submittingRef = useRef(false)
 
   const alreadyBilledCampIds = useMemo(() => {
@@ -61,13 +52,8 @@ const AddCampToInvoiceDialog = ({ invoice, project, isInvoiceDraft, onClose, onS
     return ids
   }, [allLineItems])
 
-  // If the existing-lines fetch failed, we can't safely know which camps are
-  // already billed — showing camps anyway would risk re-offering ones
-  // already on this invoice. The backend's own duplicate guard would still
-  // reject a resubmit, but the UI must not imply an empty, ready-to-add list.
-  // Memoized so its reference only changes when the underlying data actually
-  // changes — needed as a stable effect dependency below (recomputing fresh
-  // every render would otherwise fire that effect on every render).
+  // If the existing-lines fetch failed, we can't know which camps are
+  // already billed — show none rather than risk re-offering one already on this invoice.
   const selectableCamps = useMemo(
     () => (lineItemsError ? [] : (camps ?? []).filter((camp) => !alreadyBilledCampIds.has(camp.id))),
     [camps, alreadyBilledCampIds, lineItemsError],
@@ -82,16 +68,8 @@ const AddCampToInvoiceDialog = ({ invoice, project, isInvoiceDraft, onClose, onS
     setSelectedCampId((prev) => (prev === campId ? null : campId))
   }
 
-  // Clears a previously-selected camp if fresh data no longer contains it
-  // (e.g. it became ineligible or was billed elsewhere in the meantime).
-  // Adjusted during render (React's documented pattern for state that must
-  // reset when a prop/query value changes — see "Storing information from
-  // previous renders" in the React docs) rather than in a useEffect, so
-  // there's no extra render pass after the fetch resolves. Comparing against
-  // state (not a ref, which this project's lint rules disallow
-  // reading/writing during render) is what makes this legal: the setState
-  // calls below only actually run when the memoized `selectableCamps`
-  // reference changes, so this does not loop or run on every render.
+  // Clears a stale selection if fresh data drops it (ineligible/billed
+  // elsewhere) — adjusted during render, comparing against state per this repo's lint rules.
   const [lastSelectable, setLastSelectable] = useState<typeof selectableCamps | undefined>(undefined)
   if (selectableCamps !== lastSelectable) {
     setLastSelectable(selectableCamps)
@@ -116,43 +94,22 @@ const AddCampToInvoiceDialog = ({ invoice, project, isInvoiceDraft, onClose, onS
       setError(getApiErrorMessage(err, 'Could not add this camp — it may already be billed. Try another.'))
       submittingRef.current = false
       onSubmittingChange?.(false)
-      // Unlike a success (which useAddInvoiceLineItem's onSuccess already
-      // invalidates), a failure here leaves this dialog's own state stale —
-      // most commonly a 409 because the camp was billed elsewhere or the
-      // invoice left draft status concurrently. Refetch this dialog's own
-      // sources so the picker reflects reality (the just-failed camp may
-      // now need excluding), AND invalidate the invoice detail query the
-      // parent drawer reads — so if the invoice's status changed underneath
-      // this dialog, the drawer picks that up once this dialog closes,
-      // instead of continuing to show stale "still draft" controls.
+      // Unlike success (already invalidated via onSuccess), a failure here
+      // leaves this dialog's own sources and the parent drawer's invoice query stale — refresh both.
       refetchCamps()
       refetchLineItems()
       queryClient.invalidateQueries({ queryKey: invoiceKeys.detail(invoice.id) })
     }
   }
 
-  // Drives QueryStateBlock's full loading skeleton — only the real first
-  // load, so reopening the dialog with a warm cache doesn't flash the
-  // skeleton over already-valid data on every background refetch.
+  // Real first load only, so a warm-cache reopen doesn't flash the skeleton.
   const isLoading = campsLoading || lineItemsLoading
-  // Drives the submit button specifically. isLoading alone misses the case
-  // this dialog exists to prevent: reopening right after adding a camp, the
-  // OLD cached allLineItems renders immediately (isLoading is already false)
-  // while the fresh refetch is still in flight — a just-added camp could
-  // render as selectable again until that refetch lands. isFetching covers
-  // background refetches that isLoading doesn't.
+  // isLoading alone misses reopening right after an add: cached data renders
+  // before the refetch that would exclude it lands.
   const isSettling = isLoading || campsFetching || lineItemsFetching
 
-  // onOpenChange fires for Escape, backdrop-click, AND the Cancel button —
-  // it must check submittingRef.current (set synchronously the instant
-  // handleSubmit starts), not addLineItem.isPending. isPending only updates
-  // on React's NEXT render after mutateAsync begins; in the tiny window
-  // between the mutation starting and that render committing, isPending is
-  // still stale-false, so a dismissal attempt in that window would have
-  // closed the dialog while the add was still genuinely in flight. The
-  // Cancel button's visible `disabled` styling below still uses isPending —
-  // that's a rendered prop, so it only needs to be correct once React has
-  // actually re-rendered, unlike the dismissal guard here.
+  // Must check submittingRef.current, not isPending — isPending lags a
+  // render behind, leaving a window where dismissal could close mid-submit.
   return (
     <Dialog open onOpenChange={(o) => { if (!o && !submittingRef.current) onClose() }}>
       <DialogContent className="sm:max-w-lg">
@@ -201,20 +158,13 @@ const AddCampToInvoiceDialog = ({ invoice, project, isInvoiceDraft, onClose, onS
         </div>
 
         <div className="flex gap-2 justify-end mt-2">
-          {/* Same submittingRef.current guard as onOpenChange above — this
-              is a separate click handler, not routed through onOpenChange,
-              so without this check it could still close in the tiny window
-              between handleSubmit starting and addLineItem.isPending's next
-              render actually reflecting it. */}
+          {/* Same submittingRef.current guard as onOpenChange — a separate
+              click handler not routed through it, same race window. */}
           <Button variant="secondary" onClick={() => { if (!submittingRef.current) onClose() }} disabled={addLineItem.isPending}>Cancel</Button>
           <Button
             onClick={handleSubmit}
-            // Disabled while settling (including a background refetch after
-            // reopening this dialog) or erroring — a selection made before
-            // that resolves would otherwise stay submittable even though
-            // `selectableCamps` can no longer be trusted as current. Also
-            // disabled once the drawer's own refetch confirms this invoice
-            // left draft concurrently — see isInvoiceDraft doc comment above.
+            // Disabled while settling/erroring (selectableCamps untrustworthy)
+            // or once isInvoiceDraft flips false — see prop doc above.
             disabled={addLineItem.isPending || !selectedCampId || isSettling || !!combinedError || !isInvoiceDraft}
             className="font-bold text-white"
             style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}

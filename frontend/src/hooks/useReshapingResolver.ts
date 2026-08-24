@@ -9,20 +9,17 @@ interface ReshapingResolverOptions<TFormValues, TPayload> {
   // Output typed to TPayload so a schema/payload mismatch is a type error.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   schema: ZodType<TPayload, any>
-  // Builds the wire-shaped payload zodResolver actually validates against,
-  // from this form's own flat field values.
+  // Builds the wire-shaped payload zodResolver validates against, from this form's flat values.
   toPayload: (values: TFormValues) => TPayload
-  // Nested payload keys (e.g. 'user', 'owner') whose per-field errors need
-  // remapping back to this form's own (differently-named) flat fields.
+  // Nested payload keys (e.g. 'user') whose per-field errors need remapping
+  // back to this form's differently-named flat fields.
   nestedFieldMaps?: Record<string, Record<string, string>>
   // Top-level payload field renames (e.g. payload's `type` -> form's `roleType`).
   topLevelFieldMap?: Record<string, string>
 }
 
 // Shared "flat RHF form backs a differently-shaped Zod payload" resolver.
-// `resolver` drives useForm as normal; `parsePayload` re-parses on submit
-// and returns Zod's TRANSFORMED output (trim/lowercase/etc), so callers get
-// the real normalized payload instead of rebuilding one from raw values.
+// `parsePayload` returns Zod's TRANSFORMED output, not the raw form values.
 export function useReshapingResolver<TFormValues extends object, TPayload = TFormValues>({
   schema,
   toPayload,

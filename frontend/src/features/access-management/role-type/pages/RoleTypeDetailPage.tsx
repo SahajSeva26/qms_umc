@@ -26,8 +26,7 @@ import { unwrapId } from '@/utils/unwrapId'
 import { useReshapingResolver } from '@/hooks/useReshapingResolver'
 import type { RoleTypeCode, RoleTypeStatus } from '@/types/accessManagement.types'
 
-// Covers both schemas' output; code stays `string` (createRoleTypeSchema's
-// enum widens at the type level) and is narrowed with `as` where consumed.
+// Covers both schemas' output; code stays `string` and is narrowed with `as` where consumed.
 interface RoleTypeSchemaPayload {
   code?: string
   name?: string
@@ -36,7 +35,6 @@ interface RoleTypeSchemaPayload {
   status?: RoleTypeStatus
 }
 
-// Maps every catalog permission code back to its resource key for grouping.
 const CODE_TO_RESOURCE_KEY: Record<string, keyof typeof PERMISSION_CATALOG> = Object.fromEntries(
   (Object.entries(PERMISSION_CATALOG) as [keyof typeof PERMISSION_CATALOG, Record<string, { code: string }>][]).flatMap(
     ([resourceKey, actions]) => Object.values(actions).map((permission) => [permission.code, resourceKey]),
@@ -51,8 +49,6 @@ interface RoleTypeFormValues {
   status: RoleTypeStatus | ''
 }
 
-// '' (this form's "unset" sentinel) is normalized to undefined so whichever
-// schema applies to the current mode validates it correctly.
 const useRoleTypeFormResolver = (schema: typeof createRoleTypeSchema | typeof updateRoleTypeSchema) =>
   useReshapingResolver<RoleTypeFormValues, RoleTypeSchemaPayload>({
     schema,
@@ -66,7 +62,6 @@ const useRoleTypeFormResolver = (schema: typeof createRoleTypeSchema | typeof up
     }),
   })
 
-// Combined create-flow + edit page (no `:id` -> create, `:id` -> edit).
 // Pickable permissions are ceiling-scoped to the target tenant's own PermissionGroup.
 const RoleTypeDetailPage = () => {
   const { id } = useParams<{ id: string }>()
@@ -104,7 +99,6 @@ const RoleTypeDetailPage = () => {
 
   useEffect(() => {
     if (roleType && !isCreateMode) {
-      // roleType.tenant may be a raw id or a populated object depending on the endpoint.
       setValue('tenant', unwrapId(roleType.tenant))
     }
   }, [roleType, isCreateMode, setValue])
@@ -135,7 +129,6 @@ const RoleTypeDetailPage = () => {
   const createRoleType = useCreateRoleType()
 
   const { selectedCodes, setSelectedCodes, setSelection, toggleCode } = usePermissionCodeSelection()
-  // Codes dropped by a shrunken ceiling, surfaced as a visible notice instead of silently vanishing.
   const [prunedCodes, setPrunedCodes] = useState<string[]>([])
 
   useEffect(() => {
@@ -147,7 +140,7 @@ const RoleTypeDetailPage = () => {
     }
   }, [roleType, isCreateMode, setValue, setSelection])
 
-  // Drop any selected code outside the ceiling (backend would reject it anyway) and record it for the notice above.
+  // Drop any selected code outside the ceiling (backend would reject it anyway).
   useEffect(() => {
     if (!permissionGroup) return
     const allowed = new Set(ceilingPermissions.map((p) => p.code))
@@ -346,7 +339,7 @@ const RoleTypeDetailPage = () => {
                     control={control}
                     name="status"
                     render={({ field }) => (
-                      // key forces a remount once the async value loads, to work around base-ui's Select controlled/uncontrolled quirk.
+                      // Key forces remount on async value load — base-ui Select controlled/uncontrolled quirk.
                       <Select key={field.value || 'empty'} value={field.value || undefined} onValueChange={field.onChange}>
                         <SelectTrigger id="status" className="w-full">
                           <SelectValue placeholder="Select status">

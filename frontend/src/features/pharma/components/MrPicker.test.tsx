@@ -50,8 +50,7 @@ describe('MrPicker', () => {
 
     await user.type(screen.getByPlaceholderText(/search mr by name/i), 'MR')
 
-    // Labels render as "MR Number 0 (phr-mr-0)" — match by substring, and
-    // anchor "MR Number 10" so it doesn't also match "MR Number 1"/etc.
+    // Anchor "MR Number 10" so it doesn't also match "MR Number 1"/etc.
     await waitFor(() => expect(screen.getByText(/^MR Number 0 /)).toBeInTheDocument(), { timeout: 3000 })
     expect(screen.getByText(/^MR Number 9 /)).toBeInTheDocument()
     expect(screen.queryByText(/^MR Number 10 /)).not.toBeInTheDocument()
@@ -67,13 +66,8 @@ describe('MrPicker', () => {
   })
 
   it('does not duplicate rows when an already-loaded page is refetched (e.g. window-focus revalidation)', async () => {
-    // React Query's structural sharing means a refetch that returns
-    // BYTE-IDENTICAL content never even produces a new `data` reference, so
-    // testing with identical content would trivially pass regardless of the
-    // hook's own merge logic. Returning a genuinely different row for the
-    // same id on refetch (e.g. the MR's name/code changed server-side) is
-    // what actually forces a new `data` reference and exercises the
-    // merge/append code path this test targets.
+    // React Query's structural sharing means a byte-identical refetch never
+    // produces a new `data` reference — a changed row is needed to actually exercise the merge path.
     const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
     const page1 = Array.from({ length: 10 }, (_, i) => mrFixture(`mr-${i}`, `MR Number ${i}`))
     let page2RefetchCount = 0
@@ -104,23 +98,16 @@ describe('MrPicker', () => {
     await user.type(screen.getByPlaceholderText(/search mr by name/i), 'MR')
     await waitFor(() => expect(screen.getByText(/^MR Number 0 /)).toBeInTheDocument(), { timeout: 3000 })
 
-    // Let the 300ms debounce fully settle before proceeding — otherwise the
-    // debounced `name` filter can still land mid-test, which resets the
-    // hook's own page/accumulated state (a real, separate, correct code
-    // path) and would be mistaken here for the bug this test targets.
+    // Let the 300ms debounce fully settle — otherwise a late debounced
+    // filter update can reset the hook's page/accumulated state mid-test.
     await new Promise((r) => setTimeout(r, 400))
 
     const loadMoreButton = await screen.findByRole('button', { name: /load more/i })
     await user.click(loadMoreButton)
     await waitFor(() => expect(screen.getByText(/MR Number 10 v1/)).toBeInTheDocument())
 
-    // Force a real refetch of ONLY the page-2 query — the cache also still
-    // holds a stale page-1 entry from before "Load more" was clicked, so
-    // refetching everything under ['downline-mrs'] would refetch that too
-    // and not isolate the page-2-refetch path this test targets. Find page
-    // 2's own exact key from the live cache instead of constructing it by
-    // hand (the debounced `name` filter's presence in the key is timing-
-    // sensitive, so guessing its shape is fragile).
+    // Refetch only the page-2 query key (found live, not hand-built — the
+    // debounced `name` filter's presence in it is timing-sensitive) so a stale cached page-1 isn't refetched too.
     const page2Query = queryClient.getQueryCache().findAll({ queryKey: ['downline-mrs'] })
       .find((q) => (q.queryKey[1] as { page?: string } | undefined)?.page === '2')
     if (!page2Query) throw new Error('page 2 query not found in cache')

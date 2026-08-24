@@ -35,8 +35,7 @@ interface FormValues {
   lng: number
   lat: number
   notes: string
-  // Comma-separated free text, same convention as CampDetailPageReal.tsx —
-  // split/trimmed/filtered into a string[] in toPayload.
+  // Comma-separated free text, split/trimmed/filtered into a string[] in toPayload.
   devices: string
 }
 
@@ -61,7 +60,7 @@ const useBookCampFormResolver = (mrRequired: boolean) =>
       doctor: values.doctorId,
       type: values.type || undefined,
       // valueAsNumber turns a cleared field into NaN, not undefined — treat
-      // NaN as "omit this field" while still preserving a genuine 0.
+      // NaN as "omit" while preserving a genuine 0.
       patientExpectation: Number.isNaN(values.patientExpectation) ? undefined : values.patientExpectation,
       date: values.date,
       timeSlot: { start: values.startTime, end: values.endTime },
@@ -73,51 +72,34 @@ const useBookCampFormResolver = (mrRequired: boolean) =>
         const list = values.devices.split(',').map((d) => d.trim()).filter(Boolean)
         return list.length > 0 ? list : undefined
       })(),
-      // conscentPath deliberately omitted — it's a path to an already-
-      // uploaded consent file, and no upload UI/infra exists anywhere in
-      // this app to produce one yet. Revisit once that flow exists.
+      // conscentPath omitted — no consent-file upload UI/infra exists yet.
     }),
-    // timeSlot/coordinates are nested (object/tuple) in the payload but flat
-    // in the form — without these maps, a validation error would land on a
-    // form field ('timeSlot'/'coordinates') that doesn't exist and silently
-    // never render. zodResolver reports a tuple error as an array, keyed by
-    // numeric-string index ('0'/'1'), confirmed empirically.
+    // timeSlot/coordinates are nested in the payload but flat in the form —
+    // without these maps, a validation error lands on a nonexistent field and silently never renders.
     nestedFieldMaps: {
       timeSlot: { start: 'startTime', end: 'endTime' },
       coordinates: { '0': 'lng', '1': 'lat' },
     },
-    // Payload's `mr` (from the top-level .refine() conditional-required
-    // check) -> form's own `mrId` field.
+    // Payload's `mr` (from the top-level .refine()) -> form's `mrId`.
     topLevelFieldMap: { mr: 'mrId' },
   })
 
 interface BookCampFormProps {
   /** Whether this role books on behalf of someone else — shows the MR picker. MR itself never does. */
   needsMrPicker: boolean
-  /**
-   * The project this camp is booked against — locked context from the page
-   * the caller navigated in from (see PharmaProjectCampsPage.tsx), never a
-   * user-editable field. Spliced into the real BookCampPayload right before
-   * the mutation fires; the form/schema never even see it (see
-   * bookCamp.schemas.ts's BookCampFormPayload).
-   */
+  /** Locked context from the caller's page, never user-editable — spliced into the payload before the mutation fires; the form/schema never see it. */
   project: { id: string; name: string }
   /** Called once the mutation actually succeeds, with the created camp — the parent (a dialog over the project's camp list) closes and refetches. */
   onBooked: (camp: ApiResponse<CampEntity>) => void
 }
 
-// Shared across all 4 pharma portal pages — the only thing that differs per
-// role is whether the MR picker renders (MR books for self; HO/RSM/ASM name
-// a downline MR). The submitted payload is identical either way.
+// Shared across all 4 pharma portal pages — only whether the MR picker
+// renders differs per role; the submitted payload is identical either way.
 const BookCampForm = ({ needsMrPicker, project, onBooked }: BookCampFormProps) => {
   const { resolver, parsePayload } = useBookCampFormResolver(needsMrPicker)
   const bookCamp = useBookCamp()
-  // bookCamp.isPending only flips true once mutate/mutateAsync is actually
-  // called — but parsePayload's own async Zod re-parse runs BEFORE that, so
-  // two very fast clicks can both slip through isPending's guard and race
-  // each other into a live booking call. This ref is set synchronously at
-  // the top of onSubmit, before any await, closing that window — booking is
-  // operationally significant and the backend has no idempotency guard.
+  // isPending flips true only once mutate is called, but parsePayload's own
+  // re-parse runs before that — this ref closes that race window synchronously.
   const submittingRef = useRef(false)
 
   const {
@@ -150,12 +132,8 @@ const BookCampForm = ({ needsMrPicker, project, onBooked }: BookCampFormProps) =
     onBooked(res)
   }
 
-  // The React Compiler flags ANY function passed into RHF's handleSubmit()
-  // that reads a ref, wherever that call happens — it can't statically
-  // prove the read only happens from a real submit event. So the ref guard
-  // can't live inside handleSubmit's callback at all; it has to wrap the
-  // callback's INVOCATION instead. This plain (non-RHF) form submit handler
-  // checks the ref first, then hands off to RHF's own validated submit.
+  // React Compiler flags a ref read inside handleSubmit's callback, so the
+  // guard wraps the callback's invocation instead of living inside it.
   const onFormSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (submittingRef.current) return

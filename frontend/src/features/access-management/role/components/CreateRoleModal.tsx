@@ -23,10 +23,8 @@ const RESTRICTED_ROLETYPE_CODES = ['admin', 'pharma-division-head']
 
 const STEP_TITLES = ['Company & role', 'User account', 'Permissions']
 
-// Exactly the fields RoleDetailsSection/RoleUserSection register in create
-// mode, grouped by which step renders them — used to force "touched" only
-// for a step's own fields once its Next/Submit has been attempted, not
-// every field in the whole form.
+// Fields grouped by step, used to force "touched" only for a step's own
+// fields once its Next/Submit has been attempted.
 const STEP_FIELD_NAMES: (keyof CreateRoleFormValues)[][] = [
   ['code', 'name', 'roleType', 'division', 'supervisor'],
   ['userFirstName', 'userLastName', 'userEmail', 'userPassword', 'userPhone', 'userGender'],
@@ -42,19 +40,11 @@ const touchedOverrideFor = (
     ? { ...realTouched, ...Object.fromEntries(STEP_FIELD_NAMES[stepIndex].map((name) => [name, true])) }
     : realTouched
 
-// Create-role now happens entirely in this 3-step modal — the old full-page
-// flow (CreateRoleEditor.tsx, /admin/roles/new) has been removed. Edit stays
-// its own page (RoleDetailPage.tsx -> EditRoleEditor), unchanged. Same data
-// fetching, same resolver/schema, same shared section components as before,
-// just split into steps instead of one long scrolling page. Post-create
-// behavior (navigate to the new role's detail page vs. stay on the list) is
-// unchanged for now — revisit later.
 const CreateRoleModal = () => {
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState(0)
   // trigger() doesn't mark fields "touched", so without this a blind Next
-  // click on a blank step wouldn't show errors for untouched fields — same
-  // pattern as CreateTenantDialog.tsx.
+  // click on a blank step wouldn't show errors for untouched fields.
   const [stepAttempted, setStepAttempted] = useState([false, false, false])
   const navigate = useNavigate()
   const { resolver, parsePayload } = useCreateRoleFormResolver()
@@ -103,9 +93,7 @@ const CreateRoleModal = () => {
   const supervisorCandidates = supervisorCandidatesData?.data?.items ?? []
 
   // A division/supervisor picked under one company or role type is invalid
-  // under a different one (backend scopes both to the specific company +
-  // pharma-tree role type) — clear the ones that no longer apply whenever
-  // their upstream selection changes, same as CreateRoleEditor.tsx did.
+  // under a different one (backend scopes both to the specific company + pharma-tree role type).
   const handleTenantChange = () => {
     setValue('roleType', '')
     setValue('division', '')
@@ -129,8 +117,6 @@ const CreateRoleModal = () => {
     setStepAttempted((prev) => prev.map((v, i) => (i === index ? true : v)))
   }
 
-  // Only validates the current step's own fields, so later steps' still-empty
-  // fields don't block moving off an earlier one.
   const handleNext = async () => {
     markStepAttempted(step)
     if (step === 0) {

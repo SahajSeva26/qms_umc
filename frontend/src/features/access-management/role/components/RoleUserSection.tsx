@@ -5,12 +5,7 @@ import PasswordInput from '@/components/ui/PasswordInput'
 import FieldLabel from '@/components/ui/FieldLabel'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
-// Shared between CreateRoleModal/EditRoleEditor — see RoleDetailsSection.tsx's
-// own comment for why this is generic over the caller's form-values type
-// instead of widened to RHF's most-general FieldValues. userEmail/userPassword
-// (create-only) and userStatus (edit-only) are optional here since only ONE
-// of CreateRoleFormValues/UpdateRoleFormValues declares each — this section
-// only actually registers them behind the matching `mode` check at render time.
+// Generic over the caller's form-values type — see RoleDetailsSection.tsx.
 interface RoleUserFields {
   userFirstName: string
   userLastName: string

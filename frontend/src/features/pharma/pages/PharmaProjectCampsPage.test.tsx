@@ -9,16 +9,8 @@ import type { CampEntity } from '@/types/campReal.types'
 
 vi.mock('@/hooks/useSession')
 
-// Avoids a pre-existing circular-import ordering issue: pharma.routes.tsx
-// imports lazyRoute -> RequirePermission -> auth.routes -> ... ->
-// navConfig.ts, which imports pharma.routes.tsx right back for
-// PHARMA_ROUTES — a cycle every lazyRoute-using feature's routes file has
-// (confirmed the same failure reproduces for camps.routes.tsx too), just
-// never previously triggered by a test importing a routes file's constants
-// directly. Real production builds resolve this fine (Vite's live bindings
-// aren't evaluated this synchronously); only this test's import order hits
-// it. Mocking the route constants here sidesteps it without touching the
-// unrelated, pre-existing app-wide import-order issue.
+// Sidesteps a pre-existing circular-import ordering issue (pharma.routes.tsx
+// <-> navConfig.ts) that only this test's synchronous import order triggers, not real builds.
 vi.mock('@/features/pharma/pharma.routes', () => ({
   PHARMA_ROUTES: {
     PHARMA: '/pharma',
@@ -114,14 +106,8 @@ async function renderPage(projectId = 'proj-1') {
 
 describe('PharmaProjectCampsPage', () => {
   it('blocks a camp:book-holding but non-pharma role type from the real deep-linked page — neither project nor camps ever fetch', async () => {
-    // Regression test for Decision 7/AnyPharmaRoleGate: renders the REAL
-    // PharmaProjectCampsPage (not just the gate in isolation, which
-    // AnyPharmaRoleGate.test.tsx already covers) — proves the gate/content
-    // split actually prevents usePharmaProject/usePharmaCamps' underlying
-    // requests from firing at all for a session that holds camp:book but
-    // isn't one of the 4 recognized pharma role types. A route-level
-    // lazyRoute(['camp:book']) permission check alone would NOT catch this
-    // case — only the role-type check inside AnyPharmaRoleGate does.
+    // Renders the REAL page (not just the gate in isolation) to prove the
+    // gate/content split actually prevents the data hooks' requests from firing for this session.
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
       isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('some-other-custom-role'),
@@ -165,9 +151,8 @@ describe('PharmaProjectCampsPage', () => {
     const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
     const { pharmaCampsService } = await import('@/features/pharma/pharmaCamps.service')
     vi.mocked(pharmaProjectsService.getProject).mockResolvedValue({ success: true, message: '', data: projectFixture() })
-    // Scoped-empty response — division-head branch not taken (RSM sees only
-    // camps they occupy an assignment slot on; the true project-wide count
-    // is unknowable from this response).
+    // Scoped-empty response — RSM sees only camps they occupy an assignment
+    // slot on, so the true project-wide count is unknowable from it.
     vi.mocked(pharmaCampsService.searchScopedCamps).mockResolvedValue({ success: true, message: '', data: { items: [], count: 0 } })
 
     await renderPage()

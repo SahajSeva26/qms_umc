@@ -10,6 +10,7 @@ import type {
   ProjectType,
   WhoCanBookCampCode,
 } from '@/types/project.types'
+import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
 
 // Flat wizard form state across all 7 steps — mirrors crm/wizard.types.ts's
 // convention of one flat shape rather than nested per-step sub-objects.
@@ -51,7 +52,7 @@ export interface WizardFormState {
   additionalCost: number
 
   // Step 4 — Operations
-  campTimeSlots: { start: string; end: string }[]
+  campTimeSlots: CampTimeSlotValue[]
   freeCancelHours: number
   cancellationAllowed: number
   campCostDeductionOnChargableCancel: number

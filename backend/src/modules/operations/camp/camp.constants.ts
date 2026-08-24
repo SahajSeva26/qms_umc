@@ -16,6 +16,16 @@ export const BILLING_TYPES = {
 
 export type BillingType = (typeof BILLING_TYPES)[keyof typeof BILLING_TYPES];
 
+// the fixed set of bookable time slots — a camp occupies exactly one.
+export const CAMP_TIME_SLOTS = {
+    SLOT_9_1: '9am-1pm',
+    SLOT_10_2: '10am-2pm',
+    SLOT_11_3: '11am-3pm',
+    SLOT_6_10: '6pm-10pm',
+} as const;
+
+export type CampTimeSlot = (typeof CAMP_TIME_SLOTS)[keyof typeof CAMP_TIME_SLOTS];
+
 export const CAMP_STATUSES = {
     REQUESTED: 'requested',
     CONFIRMED: 'confirmed',

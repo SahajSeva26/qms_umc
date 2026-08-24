@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import PasswordInput from '@/components/ui/PasswordInput'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
@@ -13,12 +14,10 @@ import { useTenants } from '@/features/access-management/tenant/hooks/useTenants
 import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRoleTypes'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import { createTenantSchema } from '@/features/access-management/tenant/schemas/tenant.schemas'
+import type { CreateTenantPayload } from '@/types/accessManagement.types'
 import { useReshapingResolver } from '@/hooks/useReshapingResolver'
 import { TENANT_ROUTES } from '@/features/access-management/tenant/tenant.routes'
 import { PLATFORM_TENANT_CODE, PLATFORM_TENANT_FETCH_LIMIT } from '@/features/access-management/accessManagement.constants'
-
-// Two-step form: step 1 is the company's own details, step 2 is the owner
-// account — the tenant's initial admin user is created in the same call.
 
 interface TenantFormValues {
   code: string
@@ -46,7 +45,6 @@ const EMPTY_FORM_VALUES: TenantFormValues = {
   ownerGender: '',
 }
 
-// Maps the resolver's nested owner.* error paths back to the form's flat ownerX fields.
 const OWNER_FIELD_TO_FORM_FIELD: Record<string, keyof TenantFormValues> = {
   firstName: 'ownerFirstName',
   lastName: 'ownerLastName',
@@ -57,7 +55,7 @@ const OWNER_FIELD_TO_FORM_FIELD: Record<string, keyof TenantFormValues> = {
 }
 
 const useTenantFormResolver = () =>
-  useReshapingResolver<TenantFormValues>({
+  useReshapingResolver<TenantFormValues, CreateTenantPayload>({
     schema: createTenantSchema,
     toPayload: (values) => ({
       code: values.code,
@@ -79,12 +77,12 @@ const useTenantFormResolver = () =>
 const CreateTenantDialog = () => {
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState(0)
-  // trigger() doesn't mark fields "touched", so without this a blind Next
-  // click on a blank step 1 wouldn't show errors for untouched fields.
+  // trigger() doesn't mark fields "touched", so a blind Next click on a
+  // blank step 1 wouldn't otherwise show errors for untouched fields.
   const [step1Attempted, setStep1Attempted] = useState(false)
   const navigate = useNavigate()
   const createTenant = useCreateTenant()
-  const resolver = useTenantFormResolver()
+  const { resolver, parsePayload } = useTenantFormResolver()
 
   const {
     register,
@@ -99,8 +97,7 @@ const CreateTenantDialog = () => {
     defaultValues: EMPTY_FORM_VALUES,
   })
 
-  // Sales rep picker is scoped to the platform tenant; queries only fire
-  // once the dropdown has been opened, not just whenever the dialog is open.
+  // Queries only fire once the dropdown has been opened, not just whenever the dialog is open.
   const [salesRepPickerOpened, setSalesRepPickerOpened] = useState(false)
   const salesRepQueriesEnabled = open && salesRepPickerOpened
 
@@ -130,28 +127,14 @@ const CreateTenantDialog = () => {
     setOpen(false)
   }
 
-  // Only validates step-1 fields so step-2's still-empty owner fields don't block Next.
   const handleNext = async () => {
     setStep1Attempted(true)
     const valid = await trigger(['code', 'name', 'salesPerson'])
     if (valid) setStep(1)
   }
 
-  const onSubmit = (values: TenantFormValues) => {
-    const payload = {
-      code: values.code,
-      name: values.name,
-      description: values.description || undefined,
-      salesPerson: values.salesPerson,
-      owner: {
-        firstName: values.ownerFirstName,
-        lastName: values.ownerLastName || undefined,
-        email: values.ownerEmail,
-        password: values.ownerPassword,
-        phone: values.ownerPhone || undefined,
-        gender: values.ownerGender || undefined,
-      },
-    }
+  const onSubmit = async (values: TenantFormValues) => {
+    const payload = await parsePayload(values)
     createTenant.mutate(payload, {
       onSuccess: (res) => {
         resetAndClose()
@@ -190,14 +173,14 @@ const CreateTenantDialog = () => {
                 <div className="space-y-3">
                   <div>
                     <Label htmlFor="tenantCode" className="text-xs mb-1.5">
-                      Code
+                      Code *
                     </Label>
                     <Input id="tenantCode" type="text" placeholder="e.g. acme-pharma" {...register('code')} />
                     {fieldError('code') && <p className="text-[11px] mt-1 text-danger">{fieldError('code')}</p>}
                   </div>
                   <div>
                     <Label htmlFor="tenantName" className="text-xs mb-1.5">
-                      Name
+                      Name *
                     </Label>
                     <Input id="tenantName" type="text" placeholder="e.g. Acme Pharma" {...register('name')} />
                     {fieldError('name') && <p className="text-[11px] mt-1 text-danger">{fieldError('name')}</p>}
@@ -210,7 +193,7 @@ const CreateTenantDialog = () => {
                   </div>
                   <div>
                     <Label htmlFor="salesPerson" className="text-xs mb-1.5">
-                      Sales rep
+                      Sales rep *
                     </Label>
                     <Controller
                       control={control}
@@ -257,7 +240,7 @@ const CreateTenantDialog = () => {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <Label htmlFor="ownerFirstName" className="text-xs mb-1.5">
-                        First name
+                        First name *
                       </Label>
                       <Input id="ownerFirstName" type="text" {...register('ownerFirstName')} />
                       {fieldError('ownerFirstName') && <p className="text-[11px] mt-1 text-danger">{fieldError('ownerFirstName')}</p>}
@@ -271,16 +254,16 @@ const CreateTenantDialog = () => {
                   </div>
                   <div>
                     <Label htmlFor="ownerEmail" className="text-xs mb-1.5">
-                      Email
+                      Email *
                     </Label>
                     <Input id="ownerEmail" type="email" {...register('ownerEmail')} />
                     {fieldError('ownerEmail') && <p className="text-[11px] mt-1 text-danger">{fieldError('ownerEmail')}</p>}
                   </div>
                   <div>
                     <Label htmlFor="ownerPassword" className="text-xs mb-1.5">
-                      Password
+                      Password *
                     </Label>
-                    <Input id="ownerPassword" type="password" {...register('ownerPassword')} />
+                    <PasswordInput id="ownerPassword" {...register('ownerPassword')} />
                     {fieldError('ownerPassword') && <p className="text-[11px] mt-1 text-danger">{fieldError('ownerPassword')}</p>}
                   </div>
                   <div>

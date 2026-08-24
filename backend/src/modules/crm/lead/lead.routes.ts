@@ -3,18 +3,36 @@ import { LeadController } from './lead.controller';
 import { registry } from '../../../shared/config/swagger/swagger.registry';
 import {
     CreateLeadPayloadSchema,
+    LeadReportQuerySchema,
     MoveStagePayloadSchema,
     SearchLeadQuerySchema,
     UpdateLeadPayloadSchema,
 } from './lead.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
 import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { reportRateLimiter } from '../../../shared/middlewares/rateLimiter';
 import { LEAD_PERMISSIONS } from './lead.constants';
 import { TENANT_PERMISSIONS } from '../../access-management/tenant/tenant.constants';
 
 export const LeadRouter = express.Router();
 
 LeadRouter.use(AuthMiddleware);
+
+// lead report 
+registry.registerPath({
+    method: 'get',
+    path: '/leads/report',
+    tags: ['LEAD'],
+    summary: 'Get lead statistics report',
+    request: {
+        query: LeadReportQuerySchema,
+    },
+    responses: {
+        200: { description: 'Lead report generated successfully' },
+        400: { description: 'Validation error' },
+        403: { description: 'Forbidden' },
+    },
+});
 
 // get lead
 registry.registerPath({
@@ -116,6 +134,15 @@ registry.registerPath({
 // =======================================================================
 const GUARD = [LEAD_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code];
 const READ_GUARD = [LEAD_PERMISSIONS.SEARCH.code, ...GUARD]; // reps (lead:search) may read; service scopes them to their own
+
+LeadRouter.get(
+    '/report',
+    reportRateLimiter,
+    AuthorizeMiddleware([
+        LEAD_PERMISSIONS.MANAGE.code,
+    ]),
+    LeadController.report
+);
 
 LeadRouter.get(
     '/:id',

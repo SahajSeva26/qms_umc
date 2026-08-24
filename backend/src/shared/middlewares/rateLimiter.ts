@@ -25,3 +25,13 @@ export const authRateLimiter = rateLimit({
     legacyHeaders: false,
     handler: tooManyRequests('Too many authentication attempts, please try again later'),
 });
+
+// Report limiter — for report/aggregation endpoints, which tend to be heavier queries
+// than typical CRUD routes and are worth throttling separately from the global limit.
+export const reportRateLimiter = rateLimit({
+    windowMs: ENV.RateLimit.ReportWindowMs,
+    limit: ENV.RateLimit.ReportMax,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    handler: tooManyRequests('Too many report requests, please try again later'),
+});

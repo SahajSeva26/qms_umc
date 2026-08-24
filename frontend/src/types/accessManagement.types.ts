@@ -1,13 +1,12 @@
-// Shared types for the PBAC (permission-based access control) domain —
-// reflects the REAL backend permission model returned by GET /auth/me,
-// keyed on permission code strings like 'user:get', 'tenant:manage', etc.
-// Decoupled from `@/types/auth.types.ts`'s separate frontend-only UserRole system.
+// Shared types for the PBAC domain — reflects the real backend permission
+// model (GET /auth/me), decoupled from auth.types.ts's frontend-only UserRole system.
 
 // ---------------------------------------------------------------------------
 // Permission catalog
 // ---------------------------------------------------------------------------
 
-/** A single permission as it appears embedded inside a PermissionGroup/RoleType/Role's `permissions` array. */
+/** Shape of a permission inside PermissionGroup's `permissions` array only —
+ * RoleType/Role hold bare code strings instead (see their own comments). */
 export interface IPermission {
   code: string
   name: string
@@ -31,9 +30,8 @@ export interface Tenant {
   createdAt?: string
   updatedAt?: string
   type?: TenantType
-  // Raw Role id (never populated), same system:manage-only gate. Optional
-  // server-side (default null) — required on create here per direct
-  // instruction, pending a backend decision on sales-rep vs sales-head.
+  // Raw Role id, same system:manage-only gate. Optional server-side —
+  // required here per direct instruction, pending sales-rep vs sales-head decision.
   salesPerson?: string | null
 }
 
@@ -41,8 +39,7 @@ export interface SearchTenantQuery {
   name?: string
   code?: string
   // No permission gate on this filter (backend's own TODO to add one) —
-  // any caller can filter by type even though it's only visible in the
-  // response to a system:manage caller.
+  // any caller can filter by type even though only system:manage sees it in the response.
   type?: TenantType
   // TODO: only honored server-side if caller has `tenant:manage`; otherwise search is hard-scoped to status=active.
   status?: TenantStatus
@@ -65,8 +62,7 @@ export interface CreateTenantPayload {
   description?: string
   owner: RegisterOwnerPayload
   // Role id, must be type 'sales-rep'. Optional on the backend; required
-  // here per direct instruction — TODO: revisit once the backend settles
-  // on sales-rep vs sales-head.
+  // here per direct instruction — TODO: revisit once sales-rep vs sales-head settles.
   salesPerson: string
 }
 
@@ -75,7 +71,7 @@ export interface UpdateTenantPayload {
   description?: string
   // Only takes effect server-side if caller has `tenant:manage`; silently ignored otherwise.
   status?: TenantStatus
-  // Only takes effect server-side if caller has `system:manage`; silently ignored otherwise.
+  // Currently a no-op server-side — tenant.service.ts's set() has this update path commented out entirely.
   type?: TenantType
   // Role id, or null to unassign — same 'sales-rep' RoleType constraint as create.
   salesPerson?: string | null
@@ -110,9 +106,8 @@ export interface SearchPermissionGroupQuery {
   limit?: string
 }
 
-// TODO: backend POST /permission-groups route is currently commented out /
-// disabled (no live create endpoint) — this payload type documents the
-// schema (CreatePermissionGroupPayloadSchema) for when/if it's re-enabled.
+// TODO: backend POST /permission-groups route is currently disabled — this
+// type documents CreatePermissionGroupPayloadSchema for when it's re-enabled.
 export interface CreatePermissionGroupPayload {
   code: string
   name: string
@@ -134,8 +129,6 @@ export interface UpdatePermissionGroupPayload {
 
 export type RoleTypeStatus = 'active' | 'inactive'
 
-// Mirrors ALLOWED_ROLETYPE_CODES (roleType.constants.ts) — the backend's own
-// code field is a free-form regex, this type just lists the known set.
 export type RoleTypeCode =
   | 'system'
   | 'hr'
@@ -173,9 +166,8 @@ export interface RoleTypeEntity {
   tenant: RoleTypePopulatedTenant | string
   createdAt: string
   updatedAt: string
-  // TODO: gated on caller having `tenant:admin`/`tenant:manage` in the mapper;
-  // in practice always present through the current router since every route
-  // guard already requires one of those two permissions.
+  // TODO: gated on `tenant:admin`/`tenant:manage` in the mapper; in practice
+  // always present since every route guard already requires one of those two.
   status?: RoleTypeStatus
 }
 
@@ -209,9 +201,8 @@ export interface UpdateRoleTypePayload {
 
 export type RoleStatus = 'active' | 'inactive'
 
-// Nested populated relations (type/user/tenant below) pass through
-// Mongoose's raw .populate() output untouched, so they carry `_id`, not the
-// mapped `id` — only present on GET-by-id/search, not create/update.
+// Nested populated relations pass through Mongoose's raw .populate() output
+// untouched, so they carry `_id` (not mapped `id`) — GET-by-id/search only.
 
 /** Populated shape for `type` as returned by GET-by-id/search. */
 export interface RolePopulatedRoleType {
@@ -268,10 +259,17 @@ export interface SearchRoleQuery {
   division?: string
   /** Supervisor Role id */
   supervisor?: string
-  // Free-text keyword matched against the linked user's first/last name or
-  // email (role.service.ts's search(), 2026-07-27) — NOT a user id despite
-  // the field name. Built for a member-picker typeahead.
+  // Free-text keyword matched against the linked user's name/email — NOT a
+  // user id despite the field name. Built for a member-picker typeahead.
   user?: string
+  page?: string
+  limit?: string
+}
+
+// GET /roles/mrs — the caller's own downline MRs (pharma HO/RSM/ASM only,
+// enforced server-side). `name` matches the linked user's name/email, not the role's own name.
+export interface SearchDownlineMrQuery {
+  name?: string
   page?: string
   limit?: string
 }
@@ -353,11 +351,8 @@ export interface SessionResponse {
   permissions: string[]
 }
 
-/**
- * Flattened, display-friendly projection of SessionResponse used by
- * usePermission()/useActiveRole(). Distinct from SessionResponse so callers
- * needing individual scalars don't have to reach into nested objects.
- */
+/** Flattened, display-friendly projection of SessionResponse used by
+ * usePermission()/useActiveRole(), so callers don't reach into nested objects. */
 export interface SessionPermissions {
   permissions: string[]
   roleCode: string

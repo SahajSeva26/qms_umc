@@ -1,18 +1,7 @@
-// Real backend-integrated Camp types — mirrors the actual backend contract:
-// backend/src/modules/operations/camp/{camp.model,camp.constants,camp.validators,camp.mapper}.ts
-//
-// Deliberately a SEPARATE file from `camp.types.ts` (the old, much richer
-// mock/localStorage model still used by ~100 files across HQ/Analytics/Diet/
-// FO/OM/etc.) — those dependents are not part of this wiring pass and must
-// keep compiling against the old shape untouched. Only `features/camps/**`
-// (the Camp Management feature itself) is rebuilt against this file.
-//
-// The real backend model is much thinner than the old mock: no teleconsult,
-// no close-out capture, no reminders, no resource-assignment beyond fo/mr/
-// asm/rsm, no per-patient screening data. fo/mr/asm/rsm are real Role
-// references (not free-text name strings), tenant/division are server-
-// derived and immutable, and status only ever moves through a dedicated
-// stage-transition endpoint with a required reason — never via create/update.
+// Real backend-integrated Camp types — mirrors backend/src/modules/operations/camp/**.
+// Deliberately separate from `camp.types.ts`, the old mock model ~100 files still depend on.
+
+import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
 
 export type CampType = 'screening' | 'diet' | 'lab'
 export type BillingType = 'billable' | 'void'
@@ -26,11 +15,6 @@ export const CAMP_TRANSITION_MAP: Record<CampStatus, CampStatus[]> = {
   closed: [],
   cancelled: [],
   cancelled_charged: [],
-}
-
-export interface CampTimeSlot {
-  start: string
-  end: string
 }
 
 /** [longitude, latitude] — GeoJSON order, matches camp.validators.ts's CoordinatesSchema tuple. */
@@ -51,25 +35,15 @@ export interface CampStageHistoryEntry {
   createdAt: string
 }
 
-/**
- * CampMapper.toResponse itself never destructures nested relations — it just
- * assigns `camp.tenant`/`camp.division`/etc. straight through. But whether
- * that value is a bare ObjectId string or a populated object depends on
- * whether the SERVICE call populated the document before mapping:
- * camp.service.ts's get()/search() DO pass `{ populate: true }` and populate
- * tenant/division/project/doctor/fo/mr/asm/rsm — confirmed via a live API
- * round-trip, contrary to a first read of the mapper alone — while create()/
- * update()/moveStage()/allocateFo() never populate, so those responses echo
- * back bare ObjectId strings for the same fields. Every link field is
- * therefore a real populated-or-string union, same duality pattern as
- * Role/Division/Project's own entities elsewhere in this app.
- */
+/** Whether a field is populated or a bare ObjectId depends on the service call: get()/search() populate, create/update/moveStage/allocateFo don't. */
 export interface CampPopulatedTenant { _id?: string; code: string; name: string }
 export interface CampPopulatedDivision { _id?: string; code: string; name: string; therapy?: string }
 export interface CampPopulatedProject { _id?: string; name: string; status?: string }
 export interface CampPopulatedDoctor { _id?: string; name: string; specialization?: string; pharmaCode?: string }
 /** fo/mr/asm/rsm populate with NO field projection (`{ path: 'fo' }`, no `.select()`) — the full Role document comes back. */
 export interface CampPopulatedRole { _id?: string; code: string; name: string; status?: string; [key: string]: unknown }
+/** devices populates with a narrow projection (`select: 'name code type'`) — a fetched/searched camp's devices are these sub-docs, never bare id strings. */
+export interface CampPopulatedDevice { _id: string; name: string; code: string; type: string }
 
 export interface CampEntity {
   id: string
@@ -86,11 +60,12 @@ export interface CampEntity {
   asm: CampPopulatedRole | string | null
   rsm: CampPopulatedRole | string | null
   date: string
-  timeSlot: CampTimeSlot | null
+  timeSlot: CampTimeSlotValue | null
   city: string
   state: string
   coordinates: CampCoordinates | null
-  devices: string[]
+  /** Always populated sub-docs on a genuinely fetched camp — see CampMutationResponseEntity below for the mutation-response exception. */
+  devices: CampPopulatedDevice[]
   notes?: string
   conscentPath?: string
   status: CampStatus
@@ -98,6 +73,14 @@ export interface CampEntity {
   createdAt: string
   updatedAt: string
 }
+
+/**
+ * create()/bookCamp()/update()/moveStage()/allocateFo() return the unpopulated
+ * Mongoose document straight from `.save()` — only `devices` differs from
+ * CampEntity (bare ObjectId strings, not {_id,name,code,type} sub-docs);
+ * fetch/refetch for the real shape.
+ */
+export type CampMutationResponseEntity = Omit<CampEntity, 'devices'> & { devices: string[] }
 
 export interface SearchCampQuery {
   project?: string
@@ -123,13 +106,32 @@ export interface CreateCampPayload {
   type?: CampType
   billingType?: BillingType
   patientExpectation?: number
-  /** Optional — when omitted, the backend auto-assigns the nearest available FO from `coordinates`; creation fails (422/409) if none can be resolved. */
+  /** Optional — when omitted, the backend best-effort auto-assigns the nearest FO from `coordinates`; the camp still creates with no FO if none can be resolved. */
   fo?: string
-  mr?: string
-  asm?: string
-  rsm?: string
+  /** Required. asm/rsm are no longer accepted — the backend derives them server-side from this MR's own supervisor chain (resolveMrChain). */
+  mr: string
   date: string
-  timeSlot: CampTimeSlot
+  timeSlot: CampTimeSlotValue
+  city: string
+  state: string
+  coordinates: CampCoordinates
+  /** Each entry must be an existing InventoryMaster ObjectId — the backend 404s on any miss. */
+  devices?: string[]
+  notes?: string
+  conscentPath?: string
+}
+
+/** Mirrors BookCampPayloadSchema — the pharma field-force booking path.
+ * tenant/division/asm/rsm are all server-derived from the target MR's own supervisor chain. */
+export interface BookCampPayload {
+  project: string
+  /** Required — every booker (including an MR booking for themselves) must name the MR explicitly. */
+  mr: string
+  doctor: string
+  type?: CampType
+  patientExpectation?: number
+  date: string
+  timeSlot: CampTimeSlotValue
   city: string
   state: string
   coordinates: CampCoordinates
@@ -143,13 +145,12 @@ export interface UpdateCampPayload {
   type?: CampType
   billingType?: BillingType
   patientExpectation?: number
-  /** Locked once status !== 'requested' — changing fo (or date) on a non-requested camp throws 409. */
+  /** All fields here are locked once status !== 'requested' — the backend 409s the whole update, not just fo/date. */
   fo?: string
+  /** asm/rsm are no longer accepted — the backend re-derives them from this MR whenever it's set. */
   mr?: string
-  asm?: string
-  rsm?: string
   date?: string
-  timeSlot?: CampTimeSlot
+  timeSlot?: CampTimeSlotValue
   city?: string
   state?: string
   coordinates?: CampCoordinates

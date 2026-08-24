@@ -11,6 +11,7 @@ import {
     PROJECT_TYPES,
 } from './project.constants';
 import { ALLOWED_ROLETYPE_CODES } from '../../access-management/role-type/roleType.constants';
+import { CAMP_TIME_SLOTS } from '../../operations/camp/camp.constants';
 
 // exection mode schema
 const executionModeSchema = new mongoose.Schema(
@@ -176,16 +177,12 @@ const projectSchema = new mongoose.Schema(
         },
 
         // 4: Operations
+        // the fixed set of bookable slots this project offers — each must be one of the camp
+        // module's 4 canonical slots (CAMP_TIME_SLOTS); a camp then picks one of these.
         campTimeSlots: [
             {
-                start: {
-                    type: String,
-                    required: [true, 'Start time is required'],
-                },
-                end: {
-                    type: String,
-                    required: [true, 'End time is required'],
-                },
+                type: String,
+                enum: Object.values(CAMP_TIME_SLOTS),
             },
         ],
         freeCancelHours: {

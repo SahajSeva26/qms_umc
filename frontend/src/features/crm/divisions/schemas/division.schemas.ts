@@ -17,6 +17,8 @@ export const createDivisionSchema = z.object({
     .string()
     .trim()
     .min(3, 'Code must be at least 3 characters.')
+    .regex(/^\S+$/, 'Code cannot contain spaces.')
+    .toLowerCase()
     .refine((val) => !MONGO_OBJECT_ID_REGEX.test(val), {
       message: 'Code must not look like an ObjectId.',
     }),

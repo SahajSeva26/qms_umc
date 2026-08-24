@@ -1,8 +1,8 @@
 import { z } from 'zod'
+import { CAMP_TIME_SLOT_VALUES } from '@/types/campTimeSlot.constants'
 
-// Validation schemas for the Project wizard flows. Each wizard step schema is
-// run with safeParse against the full WizardFormState — unknown keys are
-// ignored by z.object, so partial-shape schemas are safe here.
+// Each wizard step schema runs with safeParse against the full WizardFormState —
+// unknown keys are ignored by z.object, so partial-shape schemas are safe here.
 
 // Step 0 (new) — pick the won Lead this Project is created from. Doesn't
 // exist on the old mock wizard; POST /projects requires an existing `lead`.
@@ -41,7 +41,7 @@ export const wizardStep3Schema = z.object({
 
 export const wizardStep4Schema = z
   .object({
-    campTimeSlots: z.array(z.object({ start: z.string(), end: z.string() })).min(1, 'Add at least one camp time slot.'),
+    campTimeSlots: z.array(z.enum(CAMP_TIME_SLOT_VALUES)).min(1, 'Add at least one camp time slot.'),
     goLiveScopeCode: z.enum(['states', 'cities', 'pan']),
     goLiveScopeValues: z.array(z.string()),
     whoCanBookCamp: z.array(z.string()).min(1, 'Select at least one booking role.'),
@@ -49,17 +49,6 @@ export const wizardStep4Schema = z
   .refine((v) => v.goLiveScopeCode === 'pan' || v.goLiveScopeValues.length > 0, {
     message: 'Select at least one state or city.',
     path: ['goLiveScopeValues'],
-  })
-  // Found live 2026-08-04: this step had zero time-order validation — a slot
-  // could be submitted with its end at/before its start (e.g. 13:56 to
-  // 09:56). "HH:MM" strings compare correctly with plain `<=`, same as
-  // NewAppointmentDialog.tsx's start/end check.
-  .superRefine((v, ctx) => {
-    v.campTimeSlots.forEach((slot, i) => {
-      if (slot.start && slot.end && slot.end <= slot.start) {
-        ctx.addIssue({ code: 'custom', message: 'End time must be after start time.', path: ['campTimeSlots', i, 'end'] })
-      }
-    })
   })
 
 export const wizardStep5Schema = z.object({
@@ -82,6 +71,7 @@ export const editProjectSchema = z.object({
   name: z.string().trim().min(1, 'Project name is required.'),
   therapy: z.string().min(1, 'Select a therapy.'),
   type: z.array(z.string()).min(1, 'Select at least one project type.'),
+  campTimeSlots: z.array(z.enum(CAMP_TIME_SLOT_VALUES)).min(1, 'Add at least one camp time slot.'),
   salesRep: z.string().min(1, 'Select the project sales rep.'),
   projectCoordinator: z.string().min(1, 'Select the project coordinator.'),
   marketingContact: z.string().min(1, 'Select the pharma marketing contact.'),

@@ -26,10 +26,7 @@ export const ProjectMapper = {
             additionalCost: project.additionalCost,
 
             // operations
-            campTimeSlots: (project.campTimeSlots || []).map((slot: any) => ({
-                start: slot.start,
-                end: slot.end,
-            })),
+            campTimeSlots: project.campTimeSlots || [],
             freeCancelHours: project.freeCancelHours,
             cancellationAllowed: project.cancellationAllowed,
             campCostDeductionOnChargableCancel: project.campCostDeductionOnChargableCancel,

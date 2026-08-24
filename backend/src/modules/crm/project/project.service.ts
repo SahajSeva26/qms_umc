@@ -8,7 +8,7 @@ import { CounterService } from '../../counter/counter.service';
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
-import { isValidObjectID } from '../../../shared/utils/strings';
+import { isValidObjectID, toObjectId } from '../../../shared/utils/strings';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { LeadService } from '../lead/lead.service';
 import { RoleService } from '../../access-management/role/role.service';
@@ -30,7 +30,7 @@ const populate: any[] = [
 // HELPERS
 // ========================================================================================
 
-// QMS-internal team members (salesRep/projectCoordinator) must exist and be platform staff —
+// QMS-internal team members (salesRep/projectCoordina tor) must exist and be platform staff —
 // QMS owns project execution in the two-sided model. (marketingContact is customer-side, checked separately.)
 const assertPlatformStaff = async (roleId: string, label: string, ctx: RequestContext) => {
     const role = await RoleService.get(roleId, ctx, { populate: true });
@@ -42,6 +42,20 @@ const assertPlatformStaff = async (roleId: string, label: string, ctx: RequestCo
     }
 };
 
+const applyOwnScope = (where: any, ctx: RequestContext) => {
+    // Customer (pharma) users can only see projects in their own division.
+    if (ctx.tenant?.type === TENANT_TYPE.CUSTOMER) {
+        where.division = toObjectId(ctx.role.division);
+        return where;
+    }
+
+    // Platform reps without project:manage can only see their own projects.
+    if (!ctx.hasAnyPermissions([PROJECT_PERMISSIONS.MANAGE.code])) {
+        where.salesRep = ctx.role?._id;
+    }
+
+    return where;
+};
 // ========================================================================================
 // CORE FUNCTIONS
 // ========================================================================================
@@ -116,13 +130,10 @@ const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): 
     if (isValidObjectID(id)) {
         where._id = id;
     } else {
-        where.code=id
+        where.code = id;
     }
 
-    // reps (project:search, not project:manage) can only see their own projects
-    if (ctx.hasAnyPermissions([PROJECT_PERMISSIONS.SEARCH.code]) && !ctx.hasAnyPermissions([PROJECT_PERMISSIONS.MANAGE.code])) {
-        where.salesRep = ctx.role?._id;
-    }
+    applyOwnScope(where, ctx);
 
     let query = Project.findOne(where);
 
@@ -139,12 +150,12 @@ const search = async (filters: ISearchProjectQuery, ctx: RequestContext, options
     //1: add default scoping
     const where: mongoose.QueryFilter<IProject> = { ...ctx.where() };
 
-    // reps (project:search, not project:manage) can only see their own projects
-    if (ctx.hasAnyPermissions([PROJECT_PERMISSIONS.SEARCH.code]) && !ctx.hasAnyPermissions([PROJECT_PERMISSIONS.MANAGE.code])) {
-        where.salesRep = ctx.role?._id;
-    }
-
     //2: add search filters
+    // tenant filter (switch tenants) is only honoured for a `project:manage` actor that isn't already
+    // tenant-pinned by ctx.where() — a customer actor stays locked to their own tenant regardless.
+    if (filters.tenant && !where.tenant && ctx.hasAnyPermissions([PROJECT_PERMISSIONS.MANAGE.code])) {
+        where.tenant = filters.tenant;
+    }
     if (filters.name) {
         where.name = { $regex: filters.name, $options: 'i' };
     }
@@ -164,7 +175,10 @@ const search = async (filters: ISearchProjectQuery, ctx: RequestContext, options
         where.salesRep = filters.salesRep;
     }
 
-    //3: execute queries
+    //3: apply own-scope LAST so a filter can't widen past the actor's own visibility
+    applyOwnScope(where, ctx);
+
+    //4: execute queries
     const countPromise = Project.countDocuments(where);
     const dataPromise = Project.find(where).populate(populate).limit(options?.pagination?.limit).skip(options?.pagination?.skip).sort(sort);
 

@@ -1,11 +1,8 @@
-// Real backend-integrated types for the Project module.
-//
-// A Project is created FROM a Lead (exactly one per Lead — backend 409s
-// otherwise); tenant/division are derived server-side from the Lead. The
-// lead picker's status=won restriction is a UX-only convention — create()
-// itself never checks lead.status.
+// A Project is created FROM a Lead (exactly one per Lead — backend 409s otherwise);
+// tenant/division are derived server-side from the Lead, not user-picked.
 
 import type { DivisionTherapy, LeadPopulatedContact } from './crm.types'
+import type { CampTimeSlotValue } from './campTimeSlot.constants'
 
 // ---------------------------------------------------------------------------
 // Enums / constants
@@ -70,9 +67,8 @@ export const EXECUTION_MODE_LABEL: Record<ExecutionModeType, string> = {
   mail_confirmation: 'Mail Confirmation',
 }
 
-// project.constants.ts's PROJECT_STATUS — 4 values (the old mock had only
-// LIVE/HOLD/CLOSED, no `new`). Every project starts at `new` server-side
-// (model default) and only moves via PATCH /projects/:id/stage.
+// Every project starts at `new` server-side (model default) and only moves
+// via PATCH /projects/:id/stage.
 export type ProjectStatus = 'new' | 'live' | 'hold' | 'closed'
 
 export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
@@ -120,7 +116,8 @@ export const CLIENT_REPORT_CADENCE_LABEL: Record<ClientReportCadence, string> = 
 }
 
 // Currently a single value — kept Record-driven so a future backend addition
-// doesn't require a UI rebuild.
+// only needs a new type member + label entry here, not a UI rebuild. Still
+// requires a frontend code change and deploy, just a localized one.
 export type AvailablePointer = 'camp_executed'
 
 export const AVAILABLE_POINTER_LABEL: Record<AvailablePointer, string> = {
@@ -136,8 +133,7 @@ export const GO_LIVE_SCOPE_LABEL: Record<GoLiveScopeCode, string> = {
 }
 
 // Must match role-type/constants/roleTypeCodes.ts's customer-side RoleTypeCode
-// values exactly — a previous typo here ('pharma-ms', 'pharms-asm') silently
-// submitted values the backend's Zod enum rejects.
+// values exactly — a mismatch here silently submits values the backend's Zod enum rejects.
 export type WhoCanBookCampCode = 'pharma-division-head' | 'pharma-asm' | 'pharma-rsm' | 'pharma-mr'
 
 // ---------------------------------------------------------------------------
@@ -163,12 +159,6 @@ export interface ExecutionMode {
   // mail_confirmation
   emailReference?: string
   emailDocument?: string
-}
-
-// Free-text HH:MM start/end pairs.
-export interface CampTimeSlot {
-  start: string
-  end: string
 }
 
 export interface GoLiveScope {
@@ -254,7 +244,7 @@ export interface ProjectEntity {
   gst: number
   valueBeforeGST: number
   additionalCost: number
-  campTimeSlots: CampTimeSlot[]
+  campTimeSlots: CampTimeSlotValue[]
   freeCancelHours: number
   cancellationAllowed: number
   campCostDeductionOnChargableCancel: number
@@ -283,6 +273,7 @@ export interface SearchProjectQuery {
   name?: string
   status?: ProjectStatus
   therapy?: ProjectTherapy
+  tenant?: string
   division?: string
   lead?: string
   salesRep?: string
@@ -304,7 +295,7 @@ export interface CreateProjectPayload {
   gst?: number
   valueBeforeGST?: number
   additionalCost?: number
-  campTimeSlots?: CampTimeSlot[]
+  campTimeSlots?: CampTimeSlotValue[]
   freeCancelHours?: number
   cancellationAllowed?: number
   campCostDeductionOnChargableCancel?: number
@@ -337,7 +328,7 @@ export interface UpdateProjectPayload {
   gst?: number
   valueBeforeGST?: number
   additionalCost?: number
-  campTimeSlots?: CampTimeSlot[]
+  campTimeSlots?: CampTimeSlotValue[]
   freeCancelHours?: number
   cancellationAllowed?: number
   campCostDeductionOnChargableCancel?: number

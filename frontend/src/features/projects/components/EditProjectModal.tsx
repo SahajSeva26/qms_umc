@@ -1,8 +1,11 @@
 import { useState } from 'react'
-import { FiSave, FiActivity, FiHeart, FiVideo, FiDroplet, FiShuffle } from 'react-icons/fi'
+import { toast } from 'sonner'
+import { FiSave, FiActivity, FiHeart, FiVideo, FiDroplet, FiShuffle, FiClock } from 'react-icons/fi'
 import type { PaymentTerms, ProjectEntity, ProjectTherapy, ProjectType } from '@/types/project.types'
 import { PAYMENT_TERMS_LABEL, PROJECT_THERAPY_LABEL, PROJECT_TYPE_LABEL } from '@/types/project.types'
 import type { UpdateProjectPayload } from '@/types/project.types'
+import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
+import { CAMP_TIME_SLOT_VALUES, CAMP_TIME_SLOT_LABEL } from '@/types/campTimeSlot.constants'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { PLATFORM_TENANT_CODE, PLATFORM_TENANT_FETCH_LIMIT } from '@/features/access-management/accessManagement.constants'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
@@ -17,8 +20,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import { ChipRow, ChipToggle } from '@/components/ui/ChipToggle'
 import { labelClasses, labelStyle, fieldClasses } from '@/features/projects/components/wizard/wizard.styles'
 import { unwrapId } from '@/utils/unwrapId'
+import { getApiErrorMessage } from '@/utils/apiError'
 
 interface EditProjectModalProps {
   project: ProjectEntity
@@ -31,6 +36,7 @@ interface EditFormState {
   name: string
   therapy: ProjectTherapy | ''
   type: ProjectType[]
+  campTimeSlots: CampTimeSlotValue[]
   salesRepId: string
   projectCoordinatorId: string
   marketingContactId: string
@@ -44,6 +50,7 @@ const toFormState = (project: ProjectEntity): EditFormState => ({
   name: project.name,
   therapy: project.therapy,
   type: project.type,
+  campTimeSlots: project.campTimeSlots,
   salesRepId: unwrapId(project.salesRep),
   projectCoordinatorId: unwrapId(project.projectCoordinator),
   marketingContactId: unwrapId(project.marketingContact),
@@ -75,6 +82,10 @@ const EditProjectModal = ({ project, onClose }: EditProjectModalProps) => {
 
   const toggleType = (t: ProjectType) => {
     setField('type', form.type.includes(t) ? form.type.filter((x) => x !== t) : [...form.type, t])
+  }
+
+  const toggleSlot = (slot: CampTimeSlotValue) => {
+    setField('campTimeSlots', form.campTimeSlots.includes(slot) ? form.campTimeSlots.filter((s) => s !== slot) : [...form.campTimeSlots, slot])
   }
 
   // marketingContact is sourced from Contacts scoped to the project's own
@@ -132,6 +143,7 @@ const EditProjectModal = ({ project, onClose }: EditProjectModalProps) => {
       name: form.name,
       therapy: form.therapy,
       type: form.type,
+      campTimeSlots: form.campTimeSlots,
       salesRep: form.salesRepId,
       projectCoordinator: form.projectCoordinatorId,
       marketingContact: form.marketingContactId,
@@ -147,6 +159,7 @@ const EditProjectModal = ({ project, onClose }: EditProjectModalProps) => {
       name: form.name,
       therapy: form.therapy as ProjectTherapy,
       type: form.type,
+      campTimeSlots: form.campTimeSlots,
       salesRep: form.salesRepId,
       projectCoordinator: form.projectCoordinatorId,
       marketingContact: form.marketingContactId,
@@ -156,8 +169,8 @@ const EditProjectModal = ({ project, onClose }: EditProjectModalProps) => {
     try {
       await updateProject.mutateAsync({ id: project.id, payload })
       onClose()
-    } catch {
-      // no-op: surface handled elsewhere; avoid a silent close-on-failure.
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'Could not save changes — try again.'))
     }
   }
 
@@ -195,6 +208,17 @@ const EditProjectModal = ({ project, onClose }: EditProjectModalProps) => {
                 <PickCard key={t} active={form.type.includes(t)} color={PROJECT_TYPE_COLOR[t]} label={PROJECT_TYPE_LABEL[t]} icon={TYPE_ICONS[t]} onClick={() => toggleType(t)} />
               ))}
             </PickGrid>
+          </div>
+
+          <div>
+            <Label className={labelClasses} style={labelStyle}><FiClock size={12} className="inline mr-1" />Camp time slots (multi-select) *</Label>
+            <ChipRow>
+              {CAMP_TIME_SLOT_VALUES.map((slot) => (
+                <ChipToggle key={slot} active={form.campTimeSlots.includes(slot)} onClick={() => toggleSlot(slot)}>
+                  {CAMP_TIME_SLOT_LABEL[slot]}
+                </ChipToggle>
+              ))}
+            </ChipRow>
           </div>
 
           <div>

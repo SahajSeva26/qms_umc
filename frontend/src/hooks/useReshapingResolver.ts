@@ -1,43 +1,42 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import type { Resolver } from 'react-hook-form'
+import type { ZodType } from 'zod'
 
 type FieldError = { message?: string; type?: string }
 type ResolverErrors = Record<string, FieldError | Record<string, FieldError>>
 
-interface ReshapingResolverOptions<TFormValues> {
+interface ReshapingResolverOptions<TFormValues, TPayload> {
+  // Output typed to TPayload so a schema/payload mismatch is a type error.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  schema: any
-  // Builds the wire-shaped payload zodResolver actually validates against,
-  // from this form's own flat field values.
-  toPayload: (values: TFormValues) => unknown
-  // Nested payload keys (e.g. 'user', 'owner') whose per-field errors need
-  // remapping back to this form's own (differently-named) flat fields.
+  schema: ZodType<TPayload, any>
+  // Builds the wire-shaped payload zodResolver validates against, from this form's flat values.
+  toPayload: (values: TFormValues) => TPayload
+  // Nested payload keys (e.g. 'user') whose per-field errors need remapping
+  // back to this form's differently-named flat fields.
   nestedFieldMaps?: Record<string, Record<string, string>>
   // Top-level payload field renames (e.g. payload's `type` -> form's `roleType`).
   topLevelFieldMap?: Record<string, string>
 }
 
-// Shared factory for the "flat RHF form backs a differently-shaped Zod
-// payload" resolver pattern used across Tenant/Role/RoleType create+edit
-// forms: reshape this form's values into the real payload, validate with
-// zodResolver, then map any errors back onto this form's own field names.
-export function useReshapingResolver<TFormValues extends object>({
+// Shared "flat RHF form backs a differently-shaped Zod payload" resolver.
+// `parsePayload` returns Zod's TRANSFORMED output, not the raw form values.
+export function useReshapingResolver<TFormValues extends object, TPayload = TFormValues>({
   schema,
   toPayload,
   nestedFieldMaps = {},
   topLevelFieldMap = {},
-}: ReshapingResolverOptions<TFormValues>): Resolver<TFormValues> {
+}: ReshapingResolverOptions<TFormValues, TPayload>): {
+  resolver: Resolver<TFormValues>
+  parsePayload: (values: TFormValues) => Promise<TPayload>
+} {
   const baseResolver = zodResolver(schema) as (payload: unknown, context: unknown, options: unknown) => Promise<{
-    values: Record<string, unknown>
+    values: TPayload
     errors: ResolverErrors
   }>
 
-  return (async (values: TFormValues, context: unknown, options: unknown) => {
-    const payload = toPayload(values)
-    const result = await baseResolver(payload, context, options)
-
+  const mapErrors = (errors: ResolverErrors) => {
     const mappedErrors: Record<string, unknown> = {}
-    for (const [path, err] of Object.entries(result.errors)) {
+    for (const [path, err] of Object.entries(errors)) {
       const nestedMap = nestedFieldMaps[path]
       if (nestedMap && err && typeof err === 'object' && !('message' in err)) {
         for (const [nestedField, nestedErr] of Object.entries(err)) {
@@ -47,8 +46,26 @@ export function useReshapingResolver<TFormValues extends object>({
       }
       mappedErrors[topLevelFieldMap[path] ?? path] = err
     }
+    return mappedErrors
+  }
 
+  const resolver: Resolver<TFormValues> = (async (values: TFormValues, context: unknown, options: unknown) => {
+    const payload = toPayload(values)
+    const result = await baseResolver(payload, context, options)
+    const mappedErrors = mapErrors(result.errors)
     const hasErrors = Object.keys(mappedErrors).length > 0
     return { values: hasErrors ? {} : values, errors: mappedErrors } as never
   }) as Resolver<TFormValues>
+
+  const parsePayload = async (values: TFormValues): Promise<TPayload> => {
+    const payload = toPayload(values)
+    const result = await baseResolver(payload, undefined, { shouldUseNativeValidation: false, fields: {} })
+    const mappedErrors = mapErrors(result.errors)
+    if (Object.keys(mappedErrors).length > 0) {
+      throw new Error('parsePayload called with an invalid payload — this should never happen once handleSubmit has already validated the form.')
+    }
+    return result.values
+  }
+
+  return { resolver, parsePayload }
 }

@@ -162,6 +162,7 @@ CampRouter.get(
     AuthorizeMiddleware([
         CAMP_PERMISSIONS.MANAGE.code,
         CAMP_PERMISSIONS.GET.code,
+        CAMP_PERMISSIONS.BOOK.code, // pharma field-force (book-only) may read camps; service scopes them to their division
         TENANT_PERMISSIONS.MANAGE.code,
     ]),
     CampController.get,
@@ -196,6 +197,7 @@ CampRouter.get(
     AuthorizeMiddleware([
         CAMP_PERMISSIONS.SEARCH.code,
         CAMP_PERMISSIONS.MANAGE.code,
+        CAMP_PERMISSIONS.BOOK.code, // pharma field-force (book-only) may read camps; service scopes them to their division
         TENANT_PERMISSIONS.MANAGE.code,
     ]),
     CampController.search,

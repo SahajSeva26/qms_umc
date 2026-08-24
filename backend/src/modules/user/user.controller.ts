@@ -1,6 +1,6 @@
 import { ResponseHandler } from '../../shared/utils/responseHandler';
 import { formatZodError, throwAppError } from '../../shared/utils/error';
-import { SearchUserQuerySchema, UpdateUserPayloadSchema } from './user.validators';
+import { SearchUserQuerySchema, UpdateUserPayloadSchema, UserReportQuerySchema } from './user.validators';
 import { StatusCodes } from 'http-status-codes';
 import { UserService } from './user.service';
 import { UserMapper } from './user.mapper';
@@ -98,8 +98,37 @@ const update = async (req: any, res: any) => {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }
 };
+const report = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+
+        //1: validate filters
+        const { data: filters, success, error } = UserReportQuerySchema.safeParse(req.query);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                fields: validationErrors,
+            });
+        }
+
+        //2: build report
+        const result = await UserService.report(filters, ctx);
+
+        return ResponseHandler.appResponse(
+            res,
+            StatusCodes.OK,
+            true,
+            'User report generated successfully',
+            UserMapper.toReportResponse(result),
+        );
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
 export const UserController = {
     get,
     search,
     update,
+    report,
 };

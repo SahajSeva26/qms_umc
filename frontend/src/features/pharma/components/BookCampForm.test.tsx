@@ -52,6 +52,8 @@ function makeQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } })
 }
 
+const TEST_PROJECT = { id: 'proj-1', name: 'Cardio Screening Drive' }
+
 async function fillCommonFields(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/date/i), '2026-09-15')
   await user.type(screen.getByLabelText(/start time/i), '10:00')
@@ -93,10 +95,11 @@ describe('BookCampForm', () => {
 
     const queryClient = makeQueryClient()
     const user = userEvent.setup()
+    const onBooked = vi.fn()
 
     render(
       <QueryClientProvider client={queryClient}>
-        <BookCampForm needsMrPicker />
+        <BookCampForm needsMrPicker project={TEST_PROJECT} onBooked={onBooked} />
       </QueryClientProvider>,
     )
 
@@ -115,10 +118,11 @@ describe('BookCampForm', () => {
 
     const queryClient = makeQueryClient()
     const user = userEvent.setup()
+    const onBooked = vi.fn()
 
     render(
       <QueryClientProvider client={queryClient}>
-        <BookCampForm needsMrPicker={false} />
+        <BookCampForm needsMrPicker={false} project={TEST_PROJECT} onBooked={onBooked} />
       </QueryClientProvider>,
     )
 
@@ -136,6 +140,11 @@ describe('BookCampForm', () => {
     // wire request, so the backend never sees an `mr` key at all.
     expect(payload.mr).toBeUndefined()
     expect(payload.doctor).toBe('doc-1')
+    // project is locked context, spliced in from the prop — never something
+    // the user filled in — and no such field/input exists in the form at all.
+    expect(payload.project).toBe(TEST_PROJECT.id)
+    expect(screen.queryByRole('textbox', { name: /project/i })).not.toBeInTheDocument()
+    expect(screen.getByText(TEST_PROJECT.name)).toBeInTheDocument()
   })
 
   it('submits the MR field when needsMrPicker is true and an MR is selected', async () => {
@@ -144,10 +153,11 @@ describe('BookCampForm', () => {
 
     const queryClient = makeQueryClient()
     const user = userEvent.setup()
+    const onBooked = vi.fn()
 
     render(
       <QueryClientProvider client={queryClient}>
-        <BookCampForm needsMrPicker />
+        <BookCampForm needsMrPicker project={TEST_PROJECT} onBooked={onBooked} />
       </QueryClientProvider>,
     )
 
@@ -168,10 +178,11 @@ describe('BookCampForm', () => {
 
     const queryClient = makeQueryClient()
     const user = userEvent.setup()
+    const onBooked = vi.fn()
 
     render(
       <QueryClientProvider client={queryClient}>
-        <BookCampForm needsMrPicker={false} />
+        <BookCampForm needsMrPicker={false} project={TEST_PROJECT} onBooked={onBooked} />
       </QueryClientProvider>,
     )
 
@@ -192,10 +203,11 @@ describe('BookCampForm', () => {
 
     const queryClient = makeQueryClient()
     const user = userEvent.setup()
+    const onBooked = vi.fn()
 
     render(
       <QueryClientProvider client={queryClient}>
-        <BookCampForm needsMrPicker={false} />
+        <BookCampForm needsMrPicker={false} project={TEST_PROJECT} onBooked={onBooked} />
       </QueryClientProvider>,
     )
 
@@ -210,15 +222,16 @@ describe('BookCampForm', () => {
     expect(payload.patientExpectation).toBe(0)
   })
 
-  it('shows a success receipt with the real camp code on success, and does not navigate away', async () => {
+  it('calls onBooked with the created camp on success, and resets the form — no in-place receipt', async () => {
     const BookCampForm = (await import('@/features/pharma/components/BookCampForm')).default
 
     const queryClient = makeQueryClient()
     const user = userEvent.setup()
+    const onBooked = vi.fn()
 
     render(
       <QueryClientProvider client={queryClient}>
-        <BookCampForm needsMrPicker={false} />
+        <BookCampForm needsMrPicker={false} project={TEST_PROJECT} onBooked={onBooked} />
       </QueryClientProvider>,
     )
 
@@ -227,9 +240,12 @@ describe('BookCampForm', () => {
 
     await user.click(screen.getByRole('button', { name: /book camp/i }))
 
-    expect(await screen.findByText(/camp requested/i)).toBeInTheDocument()
-    expect(await screen.findByText('cmp-000001')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /book another camp/i })).toBeInTheDocument()
+    await waitFor(() => expect(onBooked).toHaveBeenCalledTimes(1))
+    expect(onBooked.mock.calls[0][0].data.code).toBe('cmp-000001')
+    // No receipt screen — the parent (the booking dialog) owns what happens
+    // next; this component just resets and hands control back via onBooked.
+    expect(screen.queryByText(/camp requested/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /book camp/i })).toBeInTheDocument()
   })
 
   it('disables the submit button while a booking is in flight, preventing a duplicate submit', async () => {
@@ -243,10 +259,11 @@ describe('BookCampForm', () => {
 
     const queryClient = makeQueryClient()
     const user = userEvent.setup()
+    const onBooked = vi.fn()
 
     render(
       <QueryClientProvider client={queryClient}>
-        <BookCampForm needsMrPicker={false} />
+        <BookCampForm needsMrPicker={false} project={TEST_PROJECT} onBooked={onBooked} />
       </QueryClientProvider>,
     )
 
@@ -263,7 +280,7 @@ describe('BookCampForm', () => {
     expect(campsRealService.bookCamp).toHaveBeenCalledTimes(1)
 
     resolveBooking(bookCampResponseFixture())
-    expect(await screen.findByText(/camp requested/i)).toBeInTheDocument()
+    await waitFor(() => expect(onBooked).toHaveBeenCalledTimes(1))
   })
 
   it('blocks a true rapid double-submit — two submit events fired before React re-renders isPending — to exactly one mutation call', async () => {
@@ -283,10 +300,11 @@ describe('BookCampForm', () => {
 
     const queryClient = makeQueryClient()
     const user = userEvent.setup()
+    const onBooked = vi.fn()
 
     render(
       <QueryClientProvider client={queryClient}>
-        <BookCampForm needsMrPicker={false} />
+        <BookCampForm needsMrPicker={false} project={TEST_PROJECT} onBooked={onBooked} />
       </QueryClientProvider>,
     )
 
@@ -306,6 +324,6 @@ describe('BookCampForm', () => {
     expect(campsRealService.bookCamp).toHaveBeenCalledTimes(1)
 
     resolveBooking(bookCampResponseFixture())
-    expect(await screen.findByText(/camp requested/i)).toBeInTheDocument()
+    await waitFor(() => expect(onBooked).toHaveBeenCalledTimes(1))
   })
 })

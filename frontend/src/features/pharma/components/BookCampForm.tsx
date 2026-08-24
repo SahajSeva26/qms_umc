@@ -1,11 +1,11 @@
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
-import { FiCheckCircle } from 'react-icons/fi'
 import { useReshapingResolver } from '@/hooks/useReshapingResolver'
-import { bookCampPayloadSchema } from '@/features/pharma/schemas/bookCamp.schemas'
+import { bookCampPayloadSchema, type BookCampFormPayload } from '@/features/pharma/schemas/bookCamp.schemas'
 import { useBookCamp } from '@/features/camps/hooks/useBookCamp'
 import { getApiErrorMessage } from '@/utils/apiError'
-import type { BookCampPayload, CampType } from '@/types/campReal.types'
+import type { BookCampPayload, CampEntity, CampType } from '@/types/campReal.types'
+import type { ApiResponse } from '@/types/common.types'
 import DoctorPicker from '@/features/pharma/components/DoctorPicker'
 import MrPicker from '@/features/pharma/components/MrPicker'
 import { Button } from '@/components/ui/button'
@@ -54,7 +54,7 @@ const EMPTY_FORM_VALUES: FormValues = {
 }
 
 const useBookCampFormResolver = (mrRequired: boolean) =>
-  useReshapingResolver<FormValues, BookCampPayload>({
+  useReshapingResolver<FormValues, BookCampFormPayload>({
     schema: bookCampPayloadSchema(mrRequired),
     toPayload: (values) => ({
       mr: values.mrId || undefined,
@@ -94,15 +94,24 @@ const useBookCampFormResolver = (mrRequired: boolean) =>
 interface BookCampFormProps {
   /** Whether this role books on behalf of someone else — shows the MR picker. MR itself never does. */
   needsMrPicker: boolean
+  /**
+   * The project this camp is booked against — locked context from the page
+   * the caller navigated in from (see PharmaProjectCampsPage.tsx), never a
+   * user-editable field. Spliced into the real BookCampPayload right before
+   * the mutation fires; the form/schema never even see it (see
+   * bookCamp.schemas.ts's BookCampFormPayload).
+   */
+  project: { id: string; name: string }
+  /** Called once the mutation actually succeeds, with the created camp — the parent (a dialog over the project's camp list) closes and refetches. */
+  onBooked: (camp: ApiResponse<CampEntity>) => void
 }
 
 // Shared across all 4 pharma portal pages — the only thing that differs per
 // role is whether the MR picker renders (MR books for self; HO/RSM/ASM name
 // a downline MR). The submitted payload is identical either way.
-const BookCampForm = ({ needsMrPicker }: BookCampFormProps) => {
+const BookCampForm = ({ needsMrPicker, project, onBooked }: BookCampFormProps) => {
   const { resolver, parsePayload } = useBookCampFormResolver(needsMrPicker)
   const bookCamp = useBookCamp()
-  const [bookedCode, setBookedCode] = useState<string | null>(null)
   // bookCamp.isPending only flips true once mutate/mutateAsync is actually
   // called — but parsePayload's own async Zod re-parse runs BEFORE that, so
   // two very fast clicks can both slip through isPending's guard and race
@@ -132,10 +141,13 @@ const BookCampForm = ({ needsMrPicker }: BookCampFormProps) => {
     (touchedFields[field] || isSubmitted) ? errors[field]?.message : undefined
 
   const onSubmit = async (values: FormValues) => {
-    const payload = await parsePayload(values)
+    const formPayload = await parsePayload(values)
+    // project is context, not form state — assembled here, never claimed as
+    // the resolver's own output type (see BookCampFormPayload).
+    const payload: BookCampPayload = { ...formPayload, project: project.id }
     const res = await bookCamp.mutateAsync(payload)
-    setBookedCode(res.data?.code ?? null)
     reset(EMPTY_FORM_VALUES)
+    onBooked(res)
   }
 
   // The React Compiler flags ANY function passed into RHF's handleSubmit()
@@ -153,30 +165,12 @@ const BookCampForm = ({ needsMrPicker }: BookCampFormProps) => {
       .finally(() => { submittingRef.current = false })
   }
 
-  const bookAnother = () => {
-    setBookedCode(null)
-    bookCamp.reset()
-  }
-
-  // Pharma roles have no camp:search/camp:get today — never navigate to a
-  // camp detail/list page here, it would just 403. Show a receipt in place
-  // instead.
-  if (bookedCode) {
-    return (
-      <div className="text-center py-8">
-        <div className="bg-success-soft mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl">
-          <FiCheckCircle size={26} className="text-success" />
-        </div>
-        <h2 className="text-lg font-bold mb-2 text-qms-text">Camp requested</h2>
-        <p className="text-[13px] mb-1 text-qms-text-muted">Your camp has been submitted for confirmation.</p>
-        <p className="text-[13px] mb-6 font-mono font-semibold text-qms-text">{bookedCode}</p>
-        <Button onClick={bookAnother} className="w-full">Book another camp</Button>
-      </div>
-    )
-  }
-
   return (
     <form onSubmit={onFormSubmit} className="space-y-4" noValidate>
+      <div className="text-[12px] rounded-lg px-3 py-2 bg-muted/50" style={{ color: 'var(--qms-text-muted)' }}>
+        Booking for project: <span className="font-semibold" style={{ color: 'var(--qms-text)' }}>{project.name}</span>
+      </div>
+
       {needsMrPicker && (
         <div>
           <Label className="text-[10px] font-semibold tracking-widest uppercase mb-1.5 block text-qms-text-muted">MR *</Label>

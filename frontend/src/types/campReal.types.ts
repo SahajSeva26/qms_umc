@@ -139,10 +139,12 @@ export interface CreateCampPayload {
 }
 
 /** Mirrors BookCampPayloadSchema (camp.validators.ts) exactly — the pharma
- * field-force booking path. No project field (see backend TODO on
- * whoCanBookCamp — not yet wired). tenant/division/asm/rsm are all
- * server-derived from the target MR's own supervisor chain. */
+ * field-force booking path. `project` is required (validated server-side
+ * against the booker's own scoped division — see camp.service.ts's book()).
+ * tenant/division/asm/rsm are all server-derived from the target MR's own
+ * supervisor chain. */
 export interface BookCampPayload {
+  project: string
   /** Omit entirely when the caller IS the MR — the backend defaults to self. */
   mr?: string
   doctor: string

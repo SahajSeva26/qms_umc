@@ -1,12 +1,20 @@
 import { z } from 'zod'
+import type { BookCampPayload } from '@/types/campReal.types'
 
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/
 
-// Validates the REAL wire payload (BookCampPayload), not the form's own flat
-// field shape — used as useReshapingResolver's `schema`, so its Output type
-// must match BookCampPayload exactly. Mirrors BookCampPayloadSchema
-// (camp.validators.ts) field-for-field, including conscentPath's
-// misspelling, copied verbatim, not "fixed."
+// `project` is deliberately NOT part of this schema or the form — it's a
+// locked value the caller already chose by navigating into that project's
+// camp list (see BookCampForm.tsx), spliced into the real BookCampPayload
+// right before the mutation fires, never user-editable. This schema/its
+// resolver only ever validates+returns what the form actually collects.
+export type BookCampFormPayload = Omit<BookCampPayload, 'project'>
+
+// Validates everything BookCampPayload needs EXCEPT `project` — used as
+// useReshapingResolver's `schema`, so its Output type must match
+// BookCampFormPayload exactly (BookCampPayload minus project). Mirrors
+// BookCampPayloadSchema (camp.validators.ts) field-for-field otherwise,
+// including conscentPath's misspelling, copied verbatim, not "fixed."
 //
 // A function, not a static export: `mr` is required only when the caller
 // books on behalf of someone else (HO/RSM/ASM) — an MR booking for

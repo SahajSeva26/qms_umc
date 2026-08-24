@@ -1,15 +1,10 @@
 // Camp Validators
 import { z } from 'zod';
-import { BILLING_TYPES, CAMP_STATUSES, CAMP_TYPES } from './camp.constants';
+import { BILLING_TYPES, CAMP_STATUSES, CAMP_TIME_SLOTS, CAMP_TYPES } from './camp.constants';
 import { isValidObjectID } from '../../../shared/utils/strings';
 
 const objectId = (label: string) =>
     z.string().refine((val) => isValidObjectID(val), { message: `${label} must be a valid id` });
-
-const TimeSlotSchema = z.object({
-    start: z.string().min(1).openapi({ example: '09:00' }),
-    end: z.string().min(1).openapi({ example: '13:00' }),
-});
 
 // coordinates are stored GeoJSON-style: [longitude, latitude] (lng first) — matches geoProfile.
 const CoordinatesSchema = z
@@ -35,22 +30,24 @@ export const CreateCampPayloadSchema = z.object({
     patientExpectation: z.number().int().nonnegative().optional().openapi({ example: 50 }),
 
     // field-force assignment — `fo` is optional: when omitted, the nearest available FO is
-    // auto-assigned in create() from `coordinates`. Supply it to override the auto-pick. The
-    // pharma chain stays optional.
+    // auto-assigned in create() from `coordinates`. Supply it to override the auto-pick.
+    // `mr` is REQUIRED and is the ONLY pharma-chain reference a caller supplies; its supervisor
+    // chain (asm → rsm) is DERIVED from the MR in the service, never accepted from the payload.
     fo: objectId('FO').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8c' }),
-    mr: objectId('MR').optional(),
-    asm: objectId('ASM').optional(),
-    rsm: objectId('RSM').optional(),
+    mr: objectId('MR').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8d' }),
 
     // slot & location — coordinates [lng, lat] are the point the FO allocation searches around
     date: z.coerce.date().openapi({ example: '2026-08-15' }),
-    timeSlot: TimeSlotSchema,
+    timeSlot: z.enum(Object.values(CAMP_TIME_SLOTS)).openapi({ example: '9am-1pm' }),
     city: z.string().min(1).openapi({ example: 'Mumbai' }),
     state: z.string().min(1).openapi({ example: 'Maharashtra' }),
     coordinates: CoordinatesSchema,
 
-    // devices & confirmation
-    devices: z.array(z.string()).optional().openapi({ example: ['bp-monitor', 'glucometer'] }),
+    // devices & confirmation — each device references a catalog item (InventoryMaster)
+    devices: z
+        .array(objectId('Device'))
+        .optional()
+        .openapi({ example: ['665f0c3a1a2b3c4d5e6f7a90', '665f0c3a1a2b3c4d5e6f7a91'] }),
     notes: z.string().optional().openapi({ example: 'Society clubhouse, ground floor' }),
     conscentPath: z.string().optional().openapi({ example: 'https://cdn/consent-123.pdf' }),
 });
@@ -59,25 +56,28 @@ export type ICreateCampPayload = z.infer<typeof CreateCampPayloadSchema>;
 //1b: book ====================================>
 // Slim payload for a pharma field-force booking (POST /camps/book). tenant is taken from ctx,
 // division + asm + rsm are DERIVED from the target MR's supervisor chain, and fo is left unset
-// (QMS allocates it later). `mr` is optional only for an MR booking for themselves; a manager
-// (HO/RSM/ASM) must name the downline MR the camp is for.
+// (QMS allocates it later). `mr` is REQUIRED — every booker names the MR the camp is for; an MR
+// must name themselves (booking for anyone else is rejected).
 export const BookCampPayloadSchema = z.object({
     // the project this camp is booked against — required. create() validates it (scoped to the
     // booker's context), so a pharma booker can only pick a project in their own division.
     project: objectId('Project').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
-    mr: objectId('MR').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8d' }),
+    mr: objectId('MR').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8d' }),
     doctor: objectId('Doctor').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8b' }),
 
     type: z.enum(Object.values(CAMP_TYPES)).optional().openapi({ example: 'screening' }),
     patientExpectation: z.number().int().nonnegative().optional().openapi({ example: 50 }),
 
     date: z.coerce.date().openapi({ example: '2026-08-15' }),
-    timeSlot: TimeSlotSchema,
+    timeSlot: z.enum(Object.values(CAMP_TIME_SLOTS)).openapi({ example: '9am-1pm' }),
     city: z.string().min(1).openapi({ example: 'Mumbai' }),
     state: z.string().min(1).openapi({ example: 'Maharashtra' }),
     coordinates: CoordinatesSchema,
 
-    devices: z.array(z.string()).optional().openapi({ example: ['bp-monitor', 'glucometer'] }),
+    devices: z
+        .array(objectId('Device'))
+        .optional()
+        .openapi({ example: ['665f0c3a1a2b3c4d5e6f7a90', '665f0c3a1a2b3c4d5e6f7a91'] }),
     notes: z.string().optional().openapi({ example: 'Society clubhouse, ground floor' }),
     conscentPath: z.string().optional().openapi({ example: 'https://cdn/consent-123.pdf' }),
 });
@@ -91,15 +91,14 @@ export const UpdateCampPayloadSchema = z.object({
     billingType: z.enum(Object.values(BILLING_TYPES)).optional(),
     patientExpectation: z.number().int().nonnegative().optional(),
     fo: objectId('FO').optional(),
+    // like create: only `mr` is accepted; asm/rsm are derived from it in the service.
     mr: objectId('MR').optional(),
-    asm: objectId('ASM').optional(),
-    rsm: objectId('RSM').optional(),
     date: z.coerce.date().optional(),
-    timeSlot: TimeSlotSchema.optional(),
+    timeSlot: z.enum(Object.values(CAMP_TIME_SLOTS)).optional(),
     city: z.string().min(1).optional(),
     state: z.string().min(1).optional(),
     coordinates: CoordinatesSchema.optional(),
-    devices: z.array(z.string()).optional(),
+    devices: z.array(objectId('Device')).optional(),
     notes: z.string().optional(),
     conscentPath: z.string().optional(),
 });

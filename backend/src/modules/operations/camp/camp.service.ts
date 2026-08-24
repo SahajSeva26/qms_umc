@@ -25,6 +25,7 @@ import { DoctorService } from '../../doctor/doctor.service';
 import { RoleService } from '../../access-management/role/role.service';
 import { DivisionService } from '../../crm/division/division.service';
 import { ALLOWED_ROLETYPE_CODES } from '../../access-management/role-type/roleType.constants';
+import { InventoryMasterService } from '../../inventory/inventory-master/inventory-master.service';
 
 type CampDocument = HydratedDocument<ICamp> | null;
 
@@ -37,6 +38,7 @@ const populate: any[] = [
     { path: 'mr' },
     { path: 'asm' },
     { path: 'rsm' },
+    { path: 'devices', select: 'name code type' },
 ];
 
 // ========================================================================================
@@ -114,6 +116,27 @@ const resolveNearestFreeFoRole = async (camp: HydratedDocument<ICamp>, ctx: Requ
     return free.role;
 };
 
+// resolve an MR's reporting chain: the MR itself, plus asm = mr.supervisor and rsm = asm.supervisor.
+// Loaded under ctx.where() (a foreign-tenant MR simply 404s). The MR is loaded populated so its
+// supervisor (the ASM) is available; the ASM is then loaded populated so its own supervisor (the
+// RSM) is available. asm/rsm may each be null. Validates the role is actually an MR.
+const resolveMrChain = async (mrId: string, ctx: RequestContext): Promise<{ mr: any; asm: any; rsm: any }> => {
+    const mr: any = await RoleService.get(mrId, ctx, { populate: true });
+    if (!mr) {
+        return throwAppError('MR not found', StatusCodes.NOT_FOUND);
+    }
+    if (mr.type?.code !== ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR) {
+        return throwAppError('The selected role is not an MR', StatusCodes.BAD_REQUEST);
+    }
+
+    const asm: any = mr.supervisor
+        ? await RoleService.get(mr.supervisor._id.toString(), ctx, { populate: true })
+        : null;
+    const rsm: any = asm?.supervisor || null;
+
+    return { mr, asm, rsm };
+};
+
 // ========================================================================================
 // CORE FUNCTIONS
 // ========================================================================================
@@ -149,21 +172,14 @@ const set = async (model: any, entity: HydratedDocument<ICamp>, ctx: RequestCont
         if (!fo) return throwAppError('FO not found', StatusCodes.NOT_FOUND);
         entity.fo = model.fo;
     }
+    // mr is the ONLY pharma-chain reference accepted — asm/rsm are DERIVED from the MR's supervisor
+    // chain, never taken from the payload. Setting a new MR resets the whole chain (null when the MR
+    // has no supervisor above it).
     if (model.mr) {
-        // FIXME:here when getting mr, its supervisors asm and rsm shoudl be populated to save queryies(optimization)
-        const mr = await RoleService.get(model.mr, ctx);
-        if (!mr) return throwAppError('MR not found', StatusCodes.NOT_FOUND);
-        entity.mr = model.mr;
-    }
-    if (model.asm) {
-        const asm = await RoleService.get(model.asm, ctx);
-        if (!asm) return throwAppError('ASM not found', StatusCodes.NOT_FOUND);
-        entity.asm = model.asm;
-    }
-    if (model.rsm) {
-        const rsm = await RoleService.get(model.rsm, ctx);
-        if (!rsm) return throwAppError('RSM not found', StatusCodes.NOT_FOUND);
-        entity.rsm = model.rsm;
+        const { mr, asm, rsm } = await resolveMrChain(model.mr, ctx);
+        entity.mr = mr._id;
+        entity.asm = asm?._id ?? null;
+        entity.rsm = rsm?._id ?? null;
     }
 
     // classification
@@ -178,8 +194,16 @@ const set = async (model: any, entity: HydratedDocument<ICamp>, ctx: RequestCont
     if (model.state) entity.state = model.state;
     if (model.coordinates) entity.coordinates = model.coordinates;
 
-    // devices & confirmation
-    if (model.devices) entity.devices = model.devices;
+    // devices & confirmation — each device must reference an existing catalog item (InventoryMaster)
+    if (model.devices) {
+        for (const deviceId of model.devices) {
+            const device = await InventoryMasterService.get(deviceId, ctx);
+            if (!device) {
+                return throwAppError(`Device '${deviceId}' not found`, StatusCodes.NOT_FOUND);
+            }
+        }
+        entity.devices = model.devices;
+    }
     if (model.notes !== undefined) entity.notes = model.notes;
     if (model.conscentPath !== undefined) entity.conscentPath = model.conscentPath;
 
@@ -465,15 +489,11 @@ const book = async (model: IBookCampPayload, ctx: RequestContext): Promise<Hydra
         return throwAppError('mr is required', StatusCodes.BAD_REQUEST);
     }
 
-    //2: load the MR — RoleService.get runs under ctx.where(), so an MR in another client (tenant)
-    // simply 404s here (no cross-tenant booking). populate gives us the supervisor (its ASM).
-    const mr: any = await RoleService.get(targetMrId, ctx, { populate: true });
-    if (!mr) {
-        return throwAppError('MR not found', StatusCodes.NOT_FOUND);
-    }
-    if (mr.type?.code !== CUSTOMER.PHARMA_MR) {
-        return throwAppError('The selected role is not an MR', StatusCodes.BAD_REQUEST);
-    }
+    //2: load the MR + derive its reporting chain (asm = mr.supervisor, rsm = asm.supervisor).
+    // resolveMrChain runs under ctx.where(), so an MR in another client (tenant) simply 404s here
+    // (no cross-tenant booking); it also validates the role is an MR.
+    const { mr, asm, rsm } = await resolveMrChain(targetMrId, ctx);
+
     // explicit same-tenant coherence check (also guaranteed by the scoped get above)
     if (mr.tenant?._id?.toString() !== ctx.tenant?._id?.toString()) {
         return throwAppError('The MR belongs to a different client', StatusCodes.BAD_REQUEST);
@@ -482,26 +502,20 @@ const book = async (model: IBookCampPayload, ctx: RequestContext): Promise<Hydra
         return throwAppError('The MR is not assigned to a division', StatusCodes.BAD_REQUEST);
     }
 
-    //3: derive the reporting chain from the MR — asm = mr.supervisor, rsm = asm.supervisor.
-    // (load the ASM fully so its own supervisor, the RSM, is populated.)
-    const asm: any = mr.supervisor ? await RoleService.get(mr.supervisor._id.toString(), ctx, { populate: true }) : null;
-    const rsm: any = asm?.supervisor || null;
-
-    //4: authorize the caller against this MR + chain
+    //3: authorize the caller against this MR + chain
     assertCanBook(mr, asm, rsm, ctx);
 
-    //5: build the full create payload — tenant from ctx, division + chain derived from the MR,
-    // no fo (create() best-effort allocates; if none, the camp stays requested for QMS to staff).
-    // project is validated inside create() under the booker's scoped context: a project outside the
-    // booker's division 404s there, so the camp can only be booked against an in-division project.
+    //4: build the full create payload — tenant from ctx, division derived from the MR, and only the
+    // MR passed through (create() re-derives asm/rsm from it). No fo (create() best-effort allocates;
+    // if none, the camp stays requested for QMS to staff). project is validated inside create() under
+    // the booker's scoped context: a project outside the booker's division 404s there, so the camp
+    // can only be booked against an in-division project.
     const createPayload: ICreateCampPayload = {
         tenant: ctx.tenant._id.toString(),
         division: mr.division._id.toString(),
         project: model.project,
         doctor: model.doctor,
         mr: mr._id.toString(),
-        asm: asm?._id?.toString(),
-        rsm: rsm?._id?.toString(),
         type: model.type,
         patientExpectation: model.patientExpectation,
         date: model.date,

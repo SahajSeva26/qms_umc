@@ -21,7 +21,7 @@ interface EditRoleEditorProps {
 
 const EditRoleEditor = ({ role }: EditRoleEditorProps) => {
   const navigate = useNavigate()
-  const resolver = useEditRoleFormResolver()
+  const { resolver, parsePayload } = useEditRoleFormResolver()
   const userValue = role.user as RolePopulatedUser | string
 
   const {
@@ -55,8 +55,9 @@ const EditRoleEditor = ({ role }: EditRoleEditorProps) => {
 
   const updateRole = useUpdateRole(role.id)
 
-  const onSubmit = (values: UpdateRoleFormValues) => {
-    updateRole.mutate(toUpdateRolePayload(values, [...picker.effectiveSelectedCodes]))
+  const onSubmit = async (values: UpdateRoleFormValues) => {
+    const parsed = await parsePayload(values)
+    updateRole.mutate(toUpdateRolePayload(parsed, [...picker.effectiveSelectedCodes]))
   }
 
   const roleTypeName = (role.type as RolePopulatedRoleType)?.name

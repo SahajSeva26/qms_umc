@@ -1,6 +1,9 @@
 import { createRoleSchema, updateRoleSchema } from '@/features/access-management/role/schemas/role.schemas'
 import { useReshapingResolver } from '@/hooks/useReshapingResolver'
-import type { RoleStatus } from '@/types/accessManagement.types'
+import type { RoleStatus, CreateRolePayload, UpdateRolePayload } from '@/types/accessManagement.types'
+
+type CreateRoleSchemaPayload = Omit<CreateRolePayload, 'permissions'>
+type UpdateRoleSchemaPayload = Omit<UpdateRolePayload, 'permissions'>
 
 export interface CreateRoleFormValues {
   code: string
@@ -66,7 +69,7 @@ const UPDATE_USER_FIELD_TO_FORM_FIELD: Record<string, keyof UpdateRoleFormValues
 }
 
 export const useCreateRoleFormResolver = () =>
-  useReshapingResolver<CreateRoleFormValues>({
+  useReshapingResolver<CreateRoleFormValues, CreateRoleSchemaPayload>({
     schema: createRoleSchema,
     toPayload: (values) => ({
       code: values.code,
@@ -74,13 +77,18 @@ export const useCreateRoleFormResolver = () =>
       description: values.description,
       type: values.roleType,
       tenant: values.tenant,
-      division: values.division,
-      supervisor: values.supervisor,
+      // Blank optional fields must be omitted, not sent as '' — the backend's
+      // Zod schema rejects '' against a min(1)/enum check.
+      division: values.division || undefined,
+      supervisor: values.supervisor || undefined,
       user: {
         firstName: values.userFirstName,
         lastName: values.userLastName,
         email: values.userEmail,
         password: values.userPassword,
+        // Not `|| undefined` like the others: phone is required (see
+        // role.schemas.ts), so passing '' through surfaces Zod's real
+        // min-length message instead of a generic type error.
         phone: values.userPhone,
         gender: values.userGender || undefined,
       },
@@ -90,7 +98,7 @@ export const useCreateRoleFormResolver = () =>
   })
 
 export const useEditRoleFormResolver = () =>
-  useReshapingResolver<UpdateRoleFormValues>({
+  useReshapingResolver<UpdateRoleFormValues, UpdateRoleSchemaPayload>({
     schema: updateRoleSchema,
     toPayload: (values) => ({
       name: values.name,
@@ -109,39 +117,10 @@ export const useEditRoleFormResolver = () =>
     topLevelFieldMap: UPDATE_TOP_LEVEL_TO_FORM_FIELD,
   })
 
-export function toCreateRolePayload(values: CreateRoleFormValues, permissions: string[]) {
-  return {
-    code: values.code,
-    name: values.name,
-    description: values.description || undefined,
-    type: values.roleType,
-    tenant: values.tenant,
-    division: values.division || undefined,
-    supervisor: values.supervisor || undefined,
-    permissions,
-    user: {
-      firstName: values.userFirstName,
-      lastName: values.userLastName || undefined,
-      email: values.userEmail,
-      password: values.userPassword,
-      phone: values.userPhone || undefined,
-      gender: values.userGender || undefined,
-    },
-  }
+export function toCreateRolePayload(parsed: CreateRoleSchemaPayload, permissions: string[]): CreateRolePayload {
+  return { ...parsed, permissions }
 }
 
-export function toUpdateRolePayload(values: UpdateRoleFormValues, permissions: string[]) {
-  return {
-    name: values.name,
-    description: values.description || undefined,
-    status: values.status || undefined,
-    type: values.roleType || undefined,
-    permissions,
-    user: {
-      firstName: values.userFirstName || undefined,
-      lastName: values.userLastName || undefined,
-      status: values.userStatus || undefined,
-      gender: values.userGender || undefined,
-    },
-  }
+export function toUpdateRolePayload(parsed: UpdateRoleSchemaPayload, permissions: string[]): UpdateRolePayload {
+  return { ...parsed, permissions }
 }

@@ -22,7 +22,7 @@ export interface NavItem {
   id:           string
   label:        string
   icon:         string   // react-icons/fi name without the "Fi" prefix
-  path:         string   // always imported from the feature's own routes file
+  path:         string
 }
 
 export interface NavSubsection {
@@ -53,7 +53,6 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { id: 'finanalytics', label: 'Financial Analytics',         icon: 'BarChart2',     path: ANALYTICS_ROUTES.ANALYTICS_FINANCIAL },
 
   // Sales & CRM — Pipeline
-  // Real visibility for this group is enforced by REAL_GATED_NAV_ITEMS in Sidebar.tsx.
   { id: 'appointments', label: 'Appointments',                icon: 'Calendar',      path: CRM_ROUTES.APPOINTMENTS },
 
   { id: 'crm',          label: 'CRM',                         icon: 'Users',         path: CRM_ROUTES.CRM },
@@ -68,7 +67,6 @@ const ALL_NAV_ITEMS: NavItem[] = [
   // Operations — Camps
   { id: 'omportal',     label: 'Ops Manager',                 icon: 'Clipboard',     path: OM_ROUTES.OM },
 
-  // Real visibility enforced by REAL_GATED_NAV_ITEMS in Sidebar.tsx.
   { id: 'camps',        label: 'Camp Management',             icon: 'Sun',           path: CAMPS_ROUTES.CAMPS },
 
   { id: 'telecamps',    label: 'Teleconsultation Camps',      icon: 'Video',         path: CAMPS_ROUTES.CAMPS_TELE },
@@ -104,16 +102,8 @@ const ALL_NAV_ITEMS: NavItem[] = [
 
   { id: 'remindauto',   label: 'AI Reminders',                icon: 'Cpu',           path: ADMIN_ROUTES.ADMIN_REMINDERS },
 
-  // Pharma Network
+  // Pharma Network — one link; PharmaRedirectPage sends the user to their own role's portal.
   { id: 'pharma',       label: 'Pharma Portal',               icon: 'Briefcase',     path: PHARMA_ROUTES.PHARMA },
-
-  { id: 'hoportal',     label: 'HO Portal',                   icon: 'Briefcase',     path: PHARMA_ROUTES.PHARMA_HO },
-
-  { id: 'rsmportal',    label: 'RSM Portal',                  icon: 'Globe',         path: PHARMA_ROUTES.PHARMA_RSM },
-
-  { id: 'asmportal',    label: 'ASM Portal',                  icon: 'Users',         path: PHARMA_ROUTES.PHARMA_ASM },
-
-  { id: 'mrportal',     label: 'MR Portal',                   icon: 'User',          path: PHARMA_ROUTES.PHARMA_MR },
 
   // Resources
   { id: 'inventory',    label: 'Inventory & Devices',         icon: 'Package',       path: ADMIN_ROUTES.ADMIN_INVENTORY },
@@ -138,12 +128,10 @@ const ALL_NAV_ITEMS: NavItem[] = [
   // System
   { id: 'admin',        label: 'Admin',                       icon: 'Shield',        path: ADMIN_ROUTES.ADMIN },
 
-  // Real visibility enforced by REAL_GATED_NAV_ITEMS in Sidebar.tsx.
   { id: 'users',        label: 'Users',                       icon: 'Users',         path: ADMIN_ROUTES.ADMIN_USERS },
 
   { id: 'settings',     label: 'Settings',                    icon: 'Settings',      path: ADMIN_ROUTES.ADMIN_SETTINGS },
 
-  // Access Management entities — real visibility enforced by REAL_GATED_NAV_ITEMS in Sidebar.tsx.
   { id: 'permissiongroups', label: 'Permission Groups',       icon: 'Shield',        path: ACCESS_MANAGEMENT_ROUTES.PERMISSION_GROUPS },
 
   { id: 'roletypes',        label: 'Role Types',              icon: 'Sliders',       path: ACCESS_MANAGEMENT_ROUTES.ROLE_TYPES },
@@ -183,7 +171,7 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
   {
     section: 'Pharma Network',
     subs: [
-      { title: '', items: ['pharma', 'hoportal', 'rsmportal', 'asmportal', 'mrportal'].map((id) => NAV_BY_ID[id]) },
+      { title: '', items: ['pharma'].map((id) => NAV_BY_ID[id]) },
     ],
   },
   {

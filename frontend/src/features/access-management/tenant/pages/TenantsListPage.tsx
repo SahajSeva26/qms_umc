@@ -15,16 +15,19 @@ const PAGE_SIZE = 10
 const TenantsListPage = () => {
   const { filters, setFilter, reset } = useTenantsFilters()
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
-  // Page is reachable by tenant:get/tenant:search alone, but only tenant:manage
-  // can actually submit — gate the "New Tenant" button so read-only viewers can't 403.
+  // tenant:manage (or the system:manage bypass) can submit — gate the button so read-only viewers can't 403.
   const { hasPermission } = usePermission()
   const canManageTenant = hasPermission('tenant:manage')
+  // Type filter (platform vs customer) is system:manage-only — everyone else
+  // stays hard-locked to customer tenants regardless of the filter state.
+  const canFilterByType = hasPermission('system:manage')
 
   const debouncedSearch = useDebouncedValue(filters.search, 300)
 
   const { data, isLoading, error, refetch } = useTenants({
     name: debouncedSearch || undefined,
     status: filters.status === 'ALL' ? undefined : (filters.status as TenantStatus),
+    type: canFilterByType ? (filters.type === 'ALL' ? undefined : filters.type) : 'customer',
     page: String(page),
     limit: String(PAGE_SIZE),
   })
@@ -55,7 +58,7 @@ const TenantsListPage = () => {
         {canManageTenant && <CreateTenantDialog />}
       </div>
 
-      <TenantsFilterBar filters={filters} setFilter={handleFilterChange} reset={handleReset} />
+      <TenantsFilterBar filters={filters} setFilter={handleFilterChange} reset={handleReset} canFilterByType={canFilterByType} />
 
       <QueryStateBlock isLoading={isLoading} error={error} loadingLabel="Loading clients…" errorLabel="Failed to load clients. Please try again." onRetry={refetch}>
         <TenantsTable tenants={tenants} />

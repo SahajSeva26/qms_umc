@@ -21,11 +21,8 @@ import {
 // FULL_NAV_SECTIONS items whose route is wrapped in RequirePermission — used
 // to hide items the viewer would otherwise click into and get bounced from.
 const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
-  // Temporary, v1-only: 'system:manage' specifically, NOT the real invoice
-  // permission array. Sales Head already holds invoice:manage (separate
-  // hotfix) but has zero Project/Camp read permissions, so it would see
-  // this link and 403 inside the page's pickers. Revisit once real
-  // role-scoping for Finance/Sales is designed.
+  // Temporary v1 gate on system:manage, not invoice:manage: Finance Manager
+  // (the role that actually holds invoice:manage) lacks Project/Camp read perms the page's pickers need.
   crminvoicing: ['system:manage'],
   crm: ['lead:search', 'lead:manage', 'tenant:manage'],
   tenants: ['tenant:get', 'tenant:search', 'tenant:manage'],
@@ -37,6 +34,9 @@ const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
   projects: ['project:search', 'project:manage', 'tenant:manage'],
   gantt: ['project:search', 'project:manage', 'tenant:manage'],
   camps: ['camp:search', 'camp:manage', 'tenant:manage'],
+  // Pharma role types hold only camp:book, never camp:search/manage. No
+  // tenant:manage fallback: that'd show non-pharma managers a dead-end link.
+  pharma: ['camp:book'],
   users: ['user:get', 'user:search', 'user:update'],
 }
 
@@ -45,7 +45,6 @@ interface SidebarProps {
   onToggle: () => void
 }
 
-// Static map: navConfig icon string → Feather component
 const ICON_MAP: Record<string, IconType> = {
   Grid:          FiGrid,
   TrendingUp:    FiTrendingUp,
@@ -87,7 +86,7 @@ function readCollapsedSections(): Set<string> {
 
 function saveCollapsedSections(set: Set<string>) {
   try { localStorage.setItem(SECTIONS_KEY, JSON.stringify([...set])) }
-  catch { /* localStorage can fail (quota, private browsing) — sidebar collapse state is cosmetic, ok to silently skip */ }
+  catch { /* cosmetic state — ok to silently skip on quota/private-browsing failure */ }
 }
 
 const NavIcon = ({ name, size = 16 }: { name: string; size?: number }) => {
@@ -95,8 +94,8 @@ const NavIcon = ({ name, size = 16 }: { name: string; size?: number }) => {
   return <Icon size={size} />
 }
 
-// Flattened once from FULL_NAV_SECTIONS so the single MOST SPECIFIC path match
-// highlights, since several routes (e.g. '/admin/...') are prefixes of others.
+// Flattened so the single MOST SPECIFIC path match highlights — several
+// routes (e.g. '/admin/...') are prefixes of others.
 const ALL_NAV_PATHS: string[] = FULL_NAV_SECTIONS.flatMap((section) =>
   section.subs.flatMap((sub) => sub.items.map((item) => item.path)),
 )
@@ -136,7 +135,6 @@ const NavItemRow = ({ item, collapsed }: { item: NavItem; collapsed: boolean }) 
           : { color: 'var(--qms-text-muted)' }
       }
     >
-      {/* Active left accent bar */}
       {isActive && (
         <span
           className="absolute -left-2.5 top-1.5 bottom-1.5 w-0.75 rounded-full"
@@ -154,7 +152,6 @@ const NavItemRow = ({ item, collapsed }: { item: NavItem; collapsed: boolean }) 
         </>
       )}
 
-      {/* Collapsed tooltip */}
       {collapsed && (
         <span
           className="pointer-events-none absolute left-full ml-2.5 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-lg text-white text-xs font-semibold px-2.5 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg"
@@ -235,13 +232,11 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
   }
 
   useEffect(() => {
-    // Re-read on user change: collapse state is per-browser, not per-account.
+    // Collapse state is per-browser, not per-account — re-read on user change.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setCollapsedSections(readCollapsedSections())
   }, [user])
 
-  // Two gates: the "System" section is hidden unless system:manage, and
-  // individual items elsewhere in the tree are hidden per REAL_GATED_NAV_ITEMS.
   const isNavItemVisible = (item: NavItem): boolean => {
     const requiredCodes = REAL_GATED_NAV_ITEMS[item.id]
     if (!requiredCodes) return true
@@ -270,7 +265,6 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
         borderColor: 'var(--qms-border)',
       }}
     >
-      {/* Brand */}
       <div
         className={cn('flex items-center gap-2 px-3 py-3.5 border-b', collapsed && 'justify-center')}
         style={{ borderColor: 'var(--qms-border)' }}
@@ -301,7 +295,6 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
         )}
       </div>
 
-      {/* Nav */}
       <div className="flex-1 overflow-y-auto hide-scrollbar px-2 py-2">
         {visibleFullNavSections.map((section) => (
           <SectionBlock
@@ -314,7 +307,6 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
         ))}
       </div>
 
-      {/* AI Copilot card */}
       {!collapsed && (
         <div className="p-3 border-t" style={{ borderColor: 'var(--qms-border)' }}>
           <div

@@ -16,11 +16,13 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { usePagination } from '@/hooks/usePagination'
 import { useSession } from '@/hooks/useSession'
+import type { WhoCanBookCampCode } from '@/types/project.types'
 
 const PAGE_SIZE = 10
 
 // Must wrap a separate content component, never sit beside the data hooks
-// gated by an early return — React fires every hook's request on every render regardless.
+// gated by an early return — that would still mount usePharmaProject/usePharmaCamps
+// (and their queries) for a role the gate is about to reject.
 const PharmaProjectCampsPage = () => (
   <AnyPharmaRoleGate>
     <PharmaProjectCampsContent />
@@ -57,6 +59,15 @@ const PharmaProjectCampsContent = () => {
   const emptyCampsText = isDivisionHead
     ? 'No camps have been booked for this project yet.'
     : 'No camps assigned to you on this project yet.'
+
+  const roleCanBook = !project || project.whoCanBookCamp.length === 0 || project.whoCanBookCamp.includes((session?.roleType?.code ?? '') as WhoCanBookCampCode)
+  const hasSlots = !!project && project.campTimeSlots.length > 0
+  const canBook = roleCanBook && hasSlots
+  const cannotBookReason = !roleCanBook
+    ? 'Your role cannot book camps on this project.'
+    : !hasSlots
+      ? 'This project has no configured time slots.'
+      : null
 
   const handleBooked = () => {
     setBookOpen(false)
@@ -98,13 +109,19 @@ const PharmaProjectCampsContent = () => {
               <div className="text-[13px] truncate mb-2" style={{ color: 'var(--qms-text-muted)' }}>{project.code}</div>
               <ProjectStatusPill status={project.status} />
             </div>
-            <Button
-              onClick={() => setBookOpen(true)}
-              className="text-white shrink-0"
-              style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
-            >
-              <FiPlus size={14} /> New camp
-            </Button>
+            <div className="text-right shrink-0">
+              <Button
+                onClick={() => setBookOpen(true)}
+                disabled={!canBook}
+                className="text-white"
+                style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
+              >
+                <FiPlus size={14} /> New camp
+              </Button>
+              {cannotBookReason && (
+                <p className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>{cannotBookReason}</p>
+              )}
+            </div>
           </div>
 
           <QueryStateBlock
@@ -132,7 +149,7 @@ const PharmaProjectCampsContent = () => {
               </DialogHeader>
               <BookCampForm
                 needsMrPicker={needsMrPicker}
-                project={{ id: project.id, name: project.name }}
+                project={{ id: project.id, name: project.name, campTimeSlots: project.campTimeSlots }}
                 onBooked={handleBooked}
               />
             </DialogContent>

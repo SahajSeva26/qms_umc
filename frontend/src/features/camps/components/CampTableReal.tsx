@@ -1,6 +1,7 @@
 import type { CampEntity } from '@/types/campReal.types'
 import CampStatusPillReal from '@/features/camps/components/CampStatusPillReal'
 import { useCampRefNames } from '@/features/camps/hooks/useCampRefNames'
+import { CAMP_TIME_SLOT_LABEL } from '@/types/campTimeSlot.constants'
 
 interface CampTableRealProps {
   camps: CampEntity[]
@@ -14,10 +15,8 @@ const TYPE_LABEL: Record<CampEntity['type'], string> = {
 }
 
 const CampTableReal = ({ camps, onOpen }: CampTableRealProps) => {
-  // camps here always come from search() (CampsPageReal.tsx's useCampsReal),
-  // which unconditionally populates division/doctor/fo — campRefName() always
-  // resolves directly, the id->name fallback tables are never actually
-  // consulted on this table. No options passed = none of the 4 fetch.
+  // camps come from search(), which always populates division/doctor/fo, so
+  // the id->name fallback tables below are never actually consulted.
   const { doctorName, divisionName, roleName } = useCampRefNames()
 
   return (
@@ -46,7 +45,7 @@ const CampTableReal = ({ camps, onOpen }: CampTableRealProps) => {
               >
                 <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>{new Date(camp.date).toLocaleDateString()}</td>
                 <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                  {camp.timeSlot ? `${camp.timeSlot.start}–${camp.timeSlot.end}` : '—'}
+                  {camp.timeSlot ? CAMP_TIME_SLOT_LABEL[camp.timeSlot] : '—'}
                 </td>
                 <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>{TYPE_LABEL[camp.type]}</td>
                 <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{divisionName(camp.division)}</td>

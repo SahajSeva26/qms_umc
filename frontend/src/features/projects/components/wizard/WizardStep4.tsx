@@ -2,6 +2,8 @@ import { FiClock, FiXCircle, FiMap, FiMapPin, FiGlobe, FiUsers } from 'react-ico
 import type { WizardFormState } from '@/features/projects/wizard.types'
 import type { GoLiveScopeCode, WhoCanBookCampCode } from '@/types/project.types'
 import { GO_LIVE_SCOPE_LABEL } from '@/types/project.types'
+import { CAMP_TIME_SLOT_VALUES, CAMP_TIME_SLOT_LABEL } from '@/types/campTimeSlot.constants'
+import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
 import { STATES_INDIA } from '@/features/projects/projects.states'
 import { ROLE_TYPE_CODE_GROUPS } from '@/features/access-management/role-type/constants/roleTypeCodes'
 import { PickCard, PickGrid } from '@/components/ui/PickCard'
@@ -15,21 +17,8 @@ import { labelClasses, labelStyle, fieldClasses } from '@/features/projects/comp
 const SCOPE_ICONS: Record<GoLiveScopeCode, typeof FiMap> = { states: FiMap, cities: FiMapPin, pan: FiGlobe }
 const SCOPE_OPTIONS: GoLiveScopeCode[] = ['states', 'cities', 'pan']
 
-// Fixed preset slots, not a free-typed range — kept separate from camp.types.ts's SLOTS since that also drives Diet Camps.
-const CAMP_SLOT_PRESETS: { start: string; end: string; label: string }[] = [
-  { start: '08:00', end: '09:00', label: '8 AM – 9 AM' },
-  { start: '09:00', end: '13:00', label: '9 AM – 1 PM' },
-  { start: '10:00', end: '14:00', label: '10 AM – 2 PM' },
-  { start: '11:00', end: '15:00', label: '11 AM – 3 PM' },
-  { start: '16:00', end: '17:00', label: '4 PM – 5 PM' },
-  { start: '18:00', end: '22:00', label: '6 PM – 10 PM' },
-]
-
-// Real customer-side RoleType codes (backend's whoCanBookCamp enum is
-// ALLOWED_ROLETYPE_CODES.CUSTOMER) — replaces the old mock's invented
-// MR/ASM/RM/HO booking-hierarchy vocabulary entirely. ROLE_TYPE_CODE_GROUPS'
-// own type spans all 9 platform+customer codes; the "Customer" group is
-// always exactly the 4-code WhoCanBookCampCode subset, so this cast is safe.
+// Backend's whoCanBookCamp enum is ALLOWED_ROLETYPE_CODES.CUSTOMER. The
+// "Customer" group here is always exactly that 4-code subset, so this cast is safe.
 const BOOKING_ROLE_OPTIONS = (ROLE_TYPE_CODE_GROUPS.find((g) => g.label === 'Customer')?.codes ?? []) as WhoCanBookCampCode[]
 
 interface WizardStep4Props {
@@ -38,15 +27,12 @@ interface WizardStep4Props {
 }
 
 const WizardStep4 = ({ form, setField }: WizardStep4Props) => {
-  const isSlotSelected = (preset: { start: string; end: string }) =>
-    form.campTimeSlots.some((s) => s.start === preset.start && s.end === preset.end)
-
-  const toggleSlot = (preset: { start: string; end: string }) => {
+  const toggleSlot = (slot: CampTimeSlotValue) => {
     setField(
       'campTimeSlots',
-      isSlotSelected(preset)
-        ? form.campTimeSlots.filter((s) => !(s.start === preset.start && s.end === preset.end))
-        : [...form.campTimeSlots, { start: preset.start, end: preset.end }],
+      form.campTimeSlots.includes(slot)
+        ? form.campTimeSlots.filter((s) => s !== slot)
+        : [...form.campTimeSlots, slot],
     )
   }
 
@@ -62,9 +48,9 @@ const WizardStep4 = ({ form, setField }: WizardStep4Props) => {
     <div className="space-y-1">
       <SectionHeader icon={FiClock} spaced={false}>Camp time slots (multi-select) *</SectionHeader>
       <ChipRow>
-        {CAMP_SLOT_PRESETS.map((preset) => (
-          <ChipToggle key={preset.label} active={isSlotSelected(preset)} onClick={() => toggleSlot(preset)}>
-            {preset.label}
+        {CAMP_TIME_SLOT_VALUES.map((slot) => (
+          <ChipToggle key={slot} active={form.campTimeSlots.includes(slot)} onClick={() => toggleSlot(slot)}>
+            {CAMP_TIME_SLOT_LABEL[slot]}
           </ChipToggle>
         ))}
       </ChipRow>

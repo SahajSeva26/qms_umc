@@ -1,6 +1,8 @@
 import { useReducer } from 'react'
 import { campRefId } from '@/features/camps/campsReal.utils'
 import type { BillingType, CampEntity, CampType } from '@/types/campReal.types'
+import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
+import { CAMP_TIME_SLOT_VALUES } from '@/types/campTimeSlot.constants'
 
 export interface CampDraft {
   tenant: string
@@ -12,20 +14,20 @@ export interface CampDraft {
   patientExpectation: string
   fo: string
   mr: string
-  asm: string
-  rsm: string
   date: string
-  slotStart: string
-  slotEnd: string
+  timeSlot: CampTimeSlotValue | ''
   city: string
   state: string
   latitude: string
   longitude: string
+  /** Selected InventoryMaster device ObjectIds — comma-joined for the shared SET_FIELD string reducer, split back into an array at submit time. */
   devices: string
   notes: string
 }
 
-type CampDraftAction = { type: 'SET_FIELD'; field: keyof CampDraft; value: string }
+type CampDraftField = keyof CampDraft
+type CampDraftFieldValue<F extends CampDraftField> = CampDraft[F]
+type CampDraftAction = { [F in CampDraftField]: { type: 'SET_FIELD'; field: F; value: CampDraftFieldValue<F> } }[CampDraftField]
 
 function buildInitialDraft(camp: CampEntity | null): CampDraft {
   return {
@@ -38,16 +40,15 @@ function buildInitialDraft(camp: CampEntity | null): CampDraft {
     patientExpectation: camp ? String(camp.patientExpectation ?? '') : '',
     fo: campRefId(camp?.fo) ?? '',
     mr: campRefId(camp?.mr) ?? '',
-    asm: campRefId(camp?.asm) ?? '',
-    rsm: campRefId(camp?.rsm) ?? '',
     date: camp?.date ? camp.date.slice(0, 10) : '',
-    slotStart: camp?.timeSlot?.start ?? '',
-    slotEnd: camp?.timeSlot?.end ?? '',
+    timeSlot: camp?.timeSlot && (CAMP_TIME_SLOT_VALUES as string[]).includes(camp.timeSlot) ? camp.timeSlot : '',
     city: camp?.city ?? '',
     state: camp?.state ?? '',
     latitude: camp?.coordinates && camp.coordinates.length === 2 ? String(camp.coordinates[1]) : '',
     longitude: camp?.coordinates && camp.coordinates.length === 2 ? String(camp.coordinates[0]) : '',
-    devices: (camp?.devices ?? []).join(', '),
+    // camp.devices is always populated sub-docs on a fetched camp, never bare
+    // id strings — .join() alone would have produced "[object Object]" here.
+    devices: (camp?.devices ?? []).map((d) => d._id).join(', '),
     notes: camp?.notes ?? '',
   }
 }
@@ -65,7 +66,8 @@ function campDraftReducer(state: CampDraft, action: CampDraftAction): CampDraft 
 export const useCampDraft = (camp: CampEntity | null) => {
   const [draft, dispatch] = useReducer(campDraftReducer, camp, buildInitialDraft)
 
-  const setField = (field: keyof CampDraft, value: string) => dispatch({ type: 'SET_FIELD', field, value })
+  const setField = <F extends CampDraftField>(field: F, value: CampDraftFieldValue<F>) =>
+    dispatch({ type: 'SET_FIELD', field, value } as CampDraftAction)
 
   return { draft, setField }
 }

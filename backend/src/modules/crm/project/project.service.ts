@@ -151,6 +151,11 @@ const search = async (filters: ISearchProjectQuery, ctx: RequestContext, options
     const where: mongoose.QueryFilter<IProject> = { ...ctx.where() };
 
     //2: add search filters
+    // tenant filter (switch tenants) is only honoured for a `project:manage` actor that isn't already
+    // tenant-pinned by ctx.where() — a customer actor stays locked to their own tenant regardless.
+    if (filters.tenant && !where.tenant && ctx.hasAnyPermissions([PROJECT_PERMISSIONS.MANAGE.code])) {
+        where.tenant = filters.tenant;
+    }
     if (filters.name) {
         where.name = { $regex: filters.name, $options: 'i' };
     }

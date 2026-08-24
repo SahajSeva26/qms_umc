@@ -12,6 +12,7 @@ import {
     PROJECT_TYPES,
 } from './project.constants';
 import { ALLOWED_ROLETYPE_CODES } from '../../access-management/role-type/roleType.constants';
+import { CAMP_TIME_SLOTS } from '../../operations/camp/camp.constants';
 import { isValidObjectID } from '../../../shared/utils/strings';
 
 const objectId = (label: string) =>
@@ -30,11 +31,6 @@ const ExecutionModeSchema = z.object({
     agreementDocument: z.string().optional().openapi({ example: 'https://cdn/agr-88.pdf' }),
     emailReference: z.string().optional().openapi({ example: 'RE: Camp confirmation' }),
     emailDocument: z.string().optional().openapi({ example: 'https://cdn/mail.eml' }),
-});
-
-const CampTimeSlotSchema = z.object({
-    start: z.string().openapi({ example: '09:00' }),
-    end: z.string().openapi({ example: '13:00' }),
 });
 
 const GoLiveScopeSchema = z.object({
@@ -67,7 +63,7 @@ export const CreateProjectPayloadSchema = z.object({
     additionalCost: z.number().nonnegative().optional().openapi({ example: 25000 }),
 
     // operations
-    campTimeSlots: z.array(CampTimeSlotSchema).optional(),
+    campTimeSlots: z.array(z.enum(Object.values(CAMP_TIME_SLOTS))).optional().openapi({ example: ['9am-1pm', '10am-2pm'] }),
     freeCancelHours: z.number().int().nonnegative().optional().openapi({ example: 24 }),
     cancellationAllowed: z.number().min(0).max(100).optional().openapi({ example: 10 }),
     campCostDeductionOnChargableCancel: z.number().min(0).max(100).optional().openapi({ example: 50 }),
@@ -111,7 +107,7 @@ export const UpdateProjectPayloadSchema = z.object({
     gst: z.number().min(0).max(100).optional(),
     valueBeforeGST: z.number().nonnegative().optional(),
     additionalCost: z.number().nonnegative().optional(),
-    campTimeSlots: z.array(CampTimeSlotSchema).optional(),
+    campTimeSlots: z.array(z.enum(Object.values(CAMP_TIME_SLOTS))).optional().openapi({ example: ['9am-1pm', '10am-2pm'] }),
     freeCancelHours: z.number().int().nonnegative().optional(),
     cancellationAllowed: z.number().min(0).max(100).optional(),
     campCostDeductionOnChargableCancel: z.number().min(0).max(100).optional(),
@@ -144,6 +140,7 @@ export const SearchProjectQuerySchema = z.object({
     name: z.string().optional().openapi({ example: 'Cardio' }),
     status: z.enum(Object.values(PROJECT_STATUS)).optional().openapi({ example: 'live' }),
     therapy: z.enum(Object.values(PROJECT_THERAPY_TYPES)).optional().openapi({ example: 'cardiology' }),
+    tenant: objectId('Tenant').optional(),
     division: objectId('Division').optional(),
     lead: objectId('Lead').optional(),
     salesRep: objectId('Sales rep').optional(),

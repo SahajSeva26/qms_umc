@@ -30,9 +30,12 @@ function mergeById(existing: RoleEntity[], incoming: RoleEntity[]): RoleEntity[]
 }
 
 // Server-scoped/searched downline MRs — debounced name search + real
-// "load more" pagination. `enabled` defers fetching until a dropdown opens.
+// "load more" pagination. `enabled` gates on the dropdown being open AND a
+// non-empty query — mirrors DoctorPicker/WizardStep0's "type to search"
+// pattern rather than eagerly fetching an unfiltered page on open.
 export const useEligibleMrs = (name: string, enabled: boolean) => {
   const debouncedName = useDebouncedValue(name, 300)
+  const hasQuery = debouncedName.trim().length > 0
   const [page, setPage] = useState(1)
   // `items`/`count` are always read from the same accumulated snapshot —
   // never a fresh `data.count` against a stale `items`, which briefly made hasMore true with an empty list.
@@ -55,7 +58,7 @@ export const useEligibleMrs = (name: string, enabled: boolean) => {
     downlineMrKeys,
     (q) => accessManagementService.searchDownlineMrs(q),
     query,
-    { enabled },
+    { enabled: enabled && hasQuery },
   )
 
   if (data && accumulated.query === debouncedName && accumulated.consumedResponse !== data) {

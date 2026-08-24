@@ -21,7 +21,7 @@ interface AsyncPickerProps<TResult> {
   clearAriaLabel: string
   // Shown when the query is empty and the caller never fetches on an empty query.
   emptyQueryText?: string
-  // Shown when the query is empty but the fetch ran anyway and found nothing; falls back to noResultsText.
+  /** Shown when the query is empty but the fetch ran anyway and found nothing; falls back to noResultsText. */
   emptyResultsText?: string
   noResultsText: string
   dropdownClassName?: string
@@ -29,11 +29,11 @@ interface AsyncPickerProps<TResult> {
   isError?: boolean
   errorText?: string
   onRetry?: () => void
-  // Appends the next page's results to `results` rather than replacing them
-  // — the standard typeahead "load more" pattern, not a page-flip.
+  /** Appends the next page's results to `results` rather than replacing them (typeahead "load more", not a page-flip). */
   hasMore?: boolean
   isLoadingMore?: boolean
   onLoadMore?: () => void
+  disabled?: boolean
 }
 
 // Shared shell for a single-select, search-as-you-type dropdown field. Query state stays with the caller.
@@ -43,6 +43,7 @@ function AsyncPicker<TResult>({
   emptyQueryText, emptyResultsText, noResultsText, dropdownClassName,
   isError, errorText, onRetry,
   hasMore, isLoadingMore, onLoadMore,
+  disabled,
 }: AsyncPickerProps<TResult>) {
   const pickResult = (result: TResult) => {
     onChange(getId(result), getLabel(result))
@@ -61,12 +62,17 @@ function AsyncPicker<TResult>({
       {value ? (
         <div
           id={id}
-          onClick={() => { clearSelection(); onOpenChange(true) }}
-          className="flex items-center gap-2 h-8 min-w-0 rounded-lg border px-2.5 text-[13px] cursor-pointer"
-          style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text)' }}
+          onClick={() => { if (disabled) return; clearSelection(); onOpenChange(true) }}
+          className="flex items-center gap-2 h-8 min-w-0 rounded-lg border px-2.5 text-[13px]"
+          style={{
+            borderColor: 'var(--qms-border)',
+            color: 'var(--qms-text)',
+            cursor: disabled ? 'not-allowed' : 'pointer',
+            opacity: disabled ? 0.6 : 1,
+          }}
         >
           <span className="flex-1 min-w-0 truncate">{label || value}</span>
-          <button type="button" onClick={clearSelection} aria-label={clearAriaLabel}>
+          <button type="button" onClick={clearSelection} aria-label={clearAriaLabel} disabled={disabled}>
             <FiX size={13} style={{ color: 'var(--qms-text-muted)' }} />
           </button>
         </div>
@@ -78,10 +84,11 @@ function AsyncPicker<TResult>({
           onChange={(e) => { onQueryChange(e.target.value); onOpenChange(true) }}
           onFocus={() => onOpenChange(true)}
           className="text-[13px]"
+          disabled={disabled}
         />
       )}
 
-      {open && !value && (
+      {open && !value && !disabled && (
         <div
           className={
             dropdownClassName ??

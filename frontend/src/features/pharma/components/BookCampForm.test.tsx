@@ -2,10 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { RoleEntity } from '@/types/accessManagement.types'
+import type { RoleEntity, SessionResponse } from '@/types/accessManagement.types'
 import type { DoctorEntity } from '@/types/doctor.types'
 import type { ApiResponse } from '@/types/common.types'
-import type { CampEntity } from '@/types/campReal.types'
+import type { CampMutationResponseEntity } from '@/types/campReal.types'
+import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
+
+vi.mock('@/hooks/useSession')
 
 vi.mock('@/features/access-management/accessManagement.service', () => ({
   accessManagementService: {
@@ -25,6 +28,16 @@ vi.mock('@/features/camps/campsReal.service', () => ({
   },
 }))
 
+function sessionFixture(roleId = 'self-role-1'): SessionResponse {
+  return {
+    user: { id: 'u-1', email: 'a@example.com', firstName: 'a', lastName: 'b' },
+    role: { id: roleId, code: 'pharma-mr', name: 'MR' },
+    roleType: { id: 'rt-1', code: 'pharma-mr', name: 'pharma-mr' },
+    tenant: { id: 't-1', code: 'tenant-1', name: 'Tenant', type: 'customer' },
+    permissions: ['camp:book'],
+  } as unknown as SessionResponse
+}
+
 function mrFixture(overrides: Partial<RoleEntity> = {}): RoleEntity {
   return { id: 'mr-1', code: 'phr-000001', name: 'Cardio MR Mona', permissions: [], status: 'active', type: 'rt-mr', user: 'u-1', tenant: 't-1', createdAt: '', updatedAt: '', ...overrides } as RoleEntity
 }
@@ -33,31 +46,38 @@ function doctorFixture(overrides: Partial<DoctorEntity> = {}): DoctorEntity {
   return { id: 'doc-1', pharmaCode: 'DOC-1', name: 'Dr. Priya Sharma', specialization: 'cp', mobile: '9876543210', email: 'p@example.com', city: 'Pune', state: 'Maharashtra', pincode: '411001', googleMapLink: '', createdAt: '', updatedAt: '', ...overrides } as DoctorEntity
 }
 
-function bookCampResponseFixture(overrides: Partial<CampEntity> = {}): ApiResponse<CampEntity> {
+function bookCampResponseFixture(overrides: Partial<CampMutationResponseEntity> = {}): ApiResponse<CampMutationResponseEntity> {
   return {
     success: true,
     message: '',
     data: {
       id: 'camp-1', code: 'cmp-000001', tenant: 't-1', division: 'div-1', project: null,
       doctor: 'doc-1', type: 'screening', billingType: 'billable', patientExpectation: 0,
-      fo: null, mr: null, asm: null, rsm: null, date: '2026-09-15',
-      timeSlot: { start: '10:00', end: '13:00' }, city: 'Pune', state: 'Maharashtra',
+      fo: null, mr: null, date: '2026-09-15',
+      timeSlot: '9am-1pm', city: 'Pune', state: 'Maharashtra',
       coordinates: [73.8567, 18.5204], devices: [], status: 'requested', stageHistory: [],
       createdAt: '', updatedAt: '', ...overrides,
     },
-  } as ApiResponse<CampEntity>
+  } as ApiResponse<CampMutationResponseEntity>
 }
 
 function makeQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } })
 }
 
-const TEST_PROJECT = { id: 'proj-1', name: 'Cardio Screening Drive' }
+const TEST_PROJECT: { id: string; name: string; campTimeSlots: CampTimeSlotValue[] } = { id: 'proj-1', name: 'Cardio Screening Drive', campTimeSlots: ['9am-1pm', '10am-2pm'] }
+
+async function mockSession(roleId?: string) {
+  const { useSession } = await import('@/hooks/useSession')
+  vi.mocked(useSession).mockReturnValue({
+    session: sessionFixture(roleId),
+  } as unknown as ReturnType<typeof useSession>)
+}
 
 async function fillCommonFields(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/date/i), '2026-09-15')
-  await user.type(screen.getByLabelText(/start time/i), '10:00')
-  await user.type(screen.getByLabelText(/end time/i), '13:00')
+  await user.click(screen.getByText(/select time slot/i))
+  await user.click(await screen.findByText(/9 AM – 1 PM/i))
   await user.type(screen.getByLabelText(/city/i), 'Pune')
   await user.type(screen.getByLabelText(/state/i), 'Maharashtra')
   await user.type(screen.getByLabelText(/longitude/i), '73.8567')
@@ -89,7 +109,47 @@ describe('BookCampForm', () => {
     vi.resetAllMocks()
   })
 
+  it('renders only the project\'s own configured slots, not all 4', async () => {
+    await mockSession()
+    const BookCampForm = (await import('@/features/pharma/components/BookCampForm')).default
+
+    const queryClient = makeQueryClient()
+    const onBooked = vi.fn()
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <BookCampForm needsMrPicker={false} project={TEST_PROJECT} onBooked={onBooked} />
+      </QueryClientProvider>,
+    )
+
+    const user = userEvent.setup()
+    await user.click(screen.getByText(/select time slot/i))
+
+    expect(await screen.findByText(/9 AM – 1 PM/i)).toBeInTheDocument()
+    expect(screen.getByText(/10 AM – 2 PM/i)).toBeInTheDocument()
+    expect(screen.queryByText(/11 AM – 3 PM/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/6 PM – 10 PM/i)).not.toBeInTheDocument()
+  })
+
+  it('blocks booking and shows a clear message when the project has zero configured slots', async () => {
+    await mockSession()
+    const BookCampForm = (await import('@/features/pharma/components/BookCampForm')).default
+
+    const queryClient = makeQueryClient()
+    const onBooked = vi.fn()
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <BookCampForm needsMrPicker={false} project={{ id: 'proj-2', name: 'Empty Project', campTimeSlots: [] }} onBooked={onBooked} />
+      </QueryClientProvider>,
+    )
+
+    expect(screen.getByText(/no configured time slots/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /book camp/i })).not.toBeInTheDocument()
+  })
+
   it('blocks submit with no MR selected when needsMrPicker is true, and never calls bookCamp', async () => {
+    await mockSession()
     const { campsRealService } = await import('@/features/camps/campsReal.service')
     const BookCampForm = (await import('@/features/pharma/components/BookCampForm')).default
 
@@ -112,7 +172,8 @@ describe('BookCampForm', () => {
     expect(campsRealService.bookCamp).not.toHaveBeenCalled()
   })
 
-  it('submits without an mr field when needsMrPicker is false (MR booking for themselves)', async () => {
+  it('submits the session\'s own role id as mr when needsMrPicker is false (MR booking for themselves)', async () => {
+    await mockSession('self-role-42')
     const { campsRealService } = await import('@/features/camps/campsReal.service')
     const BookCampForm = (await import('@/features/pharma/components/BookCampForm')).default
 
@@ -136,9 +197,7 @@ describe('BookCampForm', () => {
 
     await waitFor(() => expect(campsRealService.bookCamp).toHaveBeenCalledTimes(1))
     const payload = vi.mocked(campsRealService.bookCamp).mock.calls[0][0]
-    // undefined, not a real id — JSON.stringify drops it from the actual
-    // wire request, so the backend never sees an `mr` key at all.
-    expect(payload.mr).toBeUndefined()
+    expect(payload.mr).toBe('self-role-42')
     expect(payload.doctor).toBe('doc-1')
     // project is locked context, spliced in from the prop — never something
     // the user filled in — and no such field/input exists in the form at all.
@@ -148,6 +207,7 @@ describe('BookCampForm', () => {
   })
 
   it('submits the MR field when needsMrPicker is true and an MR is selected', async () => {
+    await mockSession()
     const { campsRealService } = await import('@/features/camps/campsReal.service')
     const BookCampForm = (await import('@/features/pharma/components/BookCampForm')).default
 
@@ -173,6 +233,7 @@ describe('BookCampForm', () => {
   })
 
   it('submits patientExpectation as omitted when left blank, but preserves a genuine 0', async () => {
+    await mockSession()
     const { campsRealService } = await import('@/features/camps/campsReal.service')
     const BookCampForm = (await import('@/features/pharma/components/BookCampForm')).default
 
@@ -198,6 +259,7 @@ describe('BookCampForm', () => {
   })
 
   it('preserves patientExpectation: 0 rather than treating it as blank', async () => {
+    await mockSession()
     const { campsRealService } = await import('@/features/camps/campsReal.service')
     const BookCampForm = (await import('@/features/pharma/components/BookCampForm')).default
 
@@ -223,6 +285,7 @@ describe('BookCampForm', () => {
   })
 
   it('calls onBooked with the created camp on success, and resets the form — no in-place receipt', async () => {
+    await mockSession()
     const BookCampForm = (await import('@/features/pharma/components/BookCampForm')).default
 
     const queryClient = makeQueryClient()
@@ -249,8 +312,9 @@ describe('BookCampForm', () => {
   })
 
   it('disables the submit button while a booking is in flight, preventing a duplicate submit', async () => {
+    await mockSession()
     const { campsRealService } = await import('@/features/camps/campsReal.service')
-    let resolveBooking: (value: ApiResponse<CampEntity>) => void = () => {}
+    let resolveBooking: (value: ApiResponse<CampMutationResponseEntity>) => void = () => {}
     vi.mocked(campsRealService.bookCamp).mockImplementation(
       () => new Promise((resolve) => { resolveBooking = resolve }),
     )
@@ -286,8 +350,9 @@ describe('BookCampForm', () => {
   it('blocks a true rapid double-submit — two submit events fired before React re-renders isPending — to exactly one mutation call', async () => {
     // parsePayload's async re-parse runs BEFORE isPending flips true, so a
     // disabled-button guard alone misses this race; submittingRef covers it.
+    await mockSession()
     const { campsRealService } = await import('@/features/camps/campsReal.service')
-    let resolveBooking: (value: ApiResponse<CampEntity>) => void = () => {}
+    let resolveBooking: (value: ApiResponse<CampMutationResponseEntity>) => void = () => {}
     vi.mocked(campsRealService.bookCamp).mockImplementation(
       () => new Promise((resolve) => { resolveBooking = resolve }),
     )

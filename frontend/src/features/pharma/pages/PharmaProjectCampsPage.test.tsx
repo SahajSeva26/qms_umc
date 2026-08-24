@@ -9,19 +9,6 @@ import type { CampEntity } from '@/types/campReal.types'
 
 vi.mock('@/hooks/useSession')
 
-// Sidesteps a pre-existing circular-import ordering issue (pharma.routes.tsx
-// <-> navConfig.ts) that only this test's synchronous import order triggers, not real builds.
-vi.mock('@/features/pharma/pharma.routes', () => ({
-  PHARMA_ROUTES: {
-    PHARMA: '/pharma',
-    PHARMA_HO: '/pharma/ho',
-    PHARMA_RSM: '/pharma/rsm',
-    PHARMA_ASM: '/pharma/asm',
-    PHARMA_MR: '/pharma/mr',
-    PHARMA_PROJECT_CAMPS: '/pharma/projects/:id/camps',
-  },
-}))
-
 vi.mock('@/features/pharma/pharmaProjects.service', () => ({
   pharmaProjectsService: {
     getProject: vi.fn(),
@@ -67,7 +54,7 @@ function projectFixture(overrides: Partial<ProjectEntity> = {}): ProjectEntity {
   return {
     id: 'proj-1', code: 'PRJ-1', name: 'Cardio Screening Drive', tenant: 't-1', division: 'div-1',
     therapy: 'cardiology', type: [], tests: [], lead: null, mode: null, campCost: 0, totalCamps: 0,
-    gst: 0, valueBeforeGST: 0, additionalCost: 0, campTimeSlots: [], freeCancelHours: 0,
+    gst: 0, valueBeforeGST: 0, additionalCost: 0, campTimeSlots: ['9am-1pm', '10am-2pm'], freeCancelHours: 0,
     cancellationAllowed: 0, campCostDeductionOnChargableCancel: 0, goLiveScope: null,
     whoCanBookCamp: [], salesRep: null, projectCoordinator: null, status: 'live',
     createdAt: '', updatedAt: '', ...overrides,
@@ -78,8 +65,8 @@ function campFixture(overrides: Partial<CampEntity> = {}): CampEntity {
   return {
     id: 'camp-1', code: 'cmp-000001', tenant: 't-1', division: 'div-1', project: 'proj-1',
     doctor: 'doc-1', type: 'screening', billingType: 'billable', patientExpectation: 0,
-    fo: null, mr: null, asm: null, rsm: null, date: '2026-09-15',
-    timeSlot: { start: '10:00', end: '13:00' }, city: 'Pune', state: 'Maharashtra',
+    fo: null, mr: null, date: '2026-09-15',
+    timeSlot: '9am-1pm', city: 'Pune', state: 'Maharashtra',
     coordinates: [73.8567, 18.5204], devices: [], status: 'requested', stageHistory: [],
     createdAt: '', updatedAt: '', ...overrides,
   } as CampEntity
@@ -210,8 +197,8 @@ describe('PharmaProjectCampsPage', () => {
     await user.click(doctorOption)
 
     await user.type(screen.getByLabelText(/date/i), '2026-09-15')
-    await user.type(screen.getByLabelText(/start time/i), '10:00')
-    await user.type(screen.getByLabelText(/end time/i), '13:00')
+    await user.click(screen.getByText(/select time slot/i))
+    await user.click(await screen.findByText(/9 AM – 1 PM/i))
     await user.type(screen.getByLabelText(/city/i), 'Pune')
     await user.type(screen.getByLabelText(/state/i), 'Maharashtra')
     await user.type(screen.getByLabelText(/longitude/i), '73.8567')

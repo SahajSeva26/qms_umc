@@ -1,14 +1,6 @@
 import type { RouteObject } from 'react-router-dom'
 import { lazyRoute } from '@/lib/router/lazyRoute'
-
-export const PHARMA_ROUTES = {
-  PHARMA:              '/pharma',
-  PHARMA_HO:            '/pharma/ho',
-  PHARMA_RSM:           '/pharma/rsm',
-  PHARMA_ASM:           '/pharma/asm',
-  PHARMA_MR:            '/pharma/mr',
-  PHARMA_PROJECT_CAMPS: '/pharma/projects/:id/camps',
-}
+import { PHARMA_ROUTES } from './pharma.constants'
 
 // All 4 pharma role types share one permission (camp:book) — this gate only
 // answers "any business under /pharma/* at all"; role-type gates handle the rest.

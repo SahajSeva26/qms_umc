@@ -26,6 +26,7 @@ async function renderAt(path: string) {
         <Route path="/pharma/asm" element={<div>ASM Portal</div>} />
         <Route path="/pharma/mr" element={<div>MR Portal</div>} />
         <Route path="/login" element={<div>Login Page</div>} />
+        <Route path="/unauthorized" element={<div>Unauthorized Page</div>} />
       </Routes>
     </MemoryRouter>,
   )
@@ -43,7 +44,7 @@ describe('PharmaRedirectPage', () => {
     await renderAt('/pharma')
 
     expect(screen.queryByText('HO Portal')).not.toBeInTheDocument()
-    expect(screen.queryByText('No pharma portal for your role')).not.toBeInTheDocument()
+    expect(screen.queryByText('Unauthorized Page')).not.toBeInTheDocument()
   })
 
   it('redirects to /login when confirmed unauthenticated', async () => {
@@ -77,7 +78,7 @@ describe('PharmaRedirectPage', () => {
     expect(await screen.findByText(expectedText)).toBeInTheDocument()
   })
 
-  it('shows a not-applicable message for a non-pharma role, without redirecting anywhere', async () => {
+  it('redirects a non-pharma role to /unauthorized, never rendering pharma content', async () => {
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
       isSettled: true,
@@ -87,7 +88,7 @@ describe('PharmaRedirectPage', () => {
 
     await renderAt('/pharma')
 
-    expect(await screen.findByText('No pharma portal for your role')).toBeInTheDocument()
+    expect(await screen.findByText('Unauthorized Page')).toBeInTheDocument()
     expect(screen.queryByText('HO Portal')).not.toBeInTheDocument()
   })
 })

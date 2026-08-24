@@ -3,15 +3,18 @@ import { Controller, useForm, useWatch } from 'react-hook-form'
 import { useReshapingResolver } from '@/hooks/useReshapingResolver'
 import { bookCampPayloadSchema, type BookCampFormPayload } from '@/features/pharma/schemas/bookCamp.schemas'
 import { useBookCamp } from '@/features/camps/hooks/useBookCamp'
+import { useSession } from '@/hooks/useSession'
 import { getApiErrorMessage } from '@/utils/apiError'
-import type { BookCampPayload, CampEntity, CampType } from '@/types/campReal.types'
+import type { BookCampPayload, CampMutationResponseEntity, CampType } from '@/types/campReal.types'
 import type { ApiResponse } from '@/types/common.types'
+import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
+import { CAMP_TIME_SLOT_LABEL } from '@/types/campTimeSlot.constants'
 import DoctorPicker from '@/features/pharma/components/DoctorPicker'
 import MrPicker from '@/features/pharma/components/MrPicker'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
+// import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 
 const CAMP_TYPE_OPTIONS: { value: CampType; label: string }[] = [
@@ -28,15 +31,13 @@ interface FormValues {
   type: CampType | ''
   patientExpectation: number
   date: string
-  startTime: string
-  endTime: string
+  timeSlot: CampTimeSlotValue | ''
   city: string
   state: string
   lng: number
   lat: number
-  notes: string
-  // Comma-separated free text, split/trimmed/filtered into a string[] in toPayload.
-  devices: string
+  // notes: string
+  // devices: string
 }
 
 const EMPTY_FORM_VALUES: FormValues = {
@@ -45,41 +46,37 @@ const EMPTY_FORM_VALUES: FormValues = {
   type: '',
   patientExpectation: NaN,
   date: '',
-  startTime: '', endTime: '',
+  timeSlot: '',
   city: '', state: '',
   lng: NaN, lat: NaN,
-  notes: '',
-  devices: '',
+  // notes: '',
+  // devices: '',
 }
 
-const useBookCampFormResolver = (mrRequired: boolean) =>
+// selfMrId: the booking session's own role id — spliced in as `mr` when the
+// caller IS the MR (needsMrPicker false), since the schema requires `mr`
+// unconditionally but an MR's form never shows/populates the mrId field.
+const useBookCampFormResolver = (needsMrPicker: boolean, selfMrId: string | undefined) =>
   useReshapingResolver<FormValues, BookCampFormPayload>({
-    schema: bookCampPayloadSchema(mrRequired),
+    schema: bookCampPayloadSchema,
     toPayload: (values) => ({
-      mr: values.mrId || undefined,
+      // Sent as '' when unresolved, never undefined, so Zod's min(1)/enum
+      // checks produce a friendly required message instead of a generic type error.
+      mr: ((needsMrPicker ? values.mrId : selfMrId) || '') as string,
       doctor: values.doctorId,
       type: values.type || undefined,
       // valueAsNumber turns a cleared field into NaN, not undefined — treat
       // NaN as "omit" while preserving a genuine 0.
       patientExpectation: Number.isNaN(values.patientExpectation) ? undefined : values.patientExpectation,
       date: values.date,
-      timeSlot: { start: values.startTime, end: values.endTime },
+      timeSlot: (values.timeSlot || '') as CampTimeSlotValue,
       city: values.city,
       state: values.state,
       coordinates: [values.lng, values.lat],
-      notes: values.notes || undefined,
-      devices: (() => {
-        const list = values.devices.split(',').map((d) => d.trim()).filter(Boolean)
-        return list.length > 0 ? list : undefined
-      })(),
+      notes: undefined,
+      devices: undefined,
       // conscentPath omitted — no consent-file upload UI/infra exists yet.
     }),
-    // timeSlot/coordinates are nested in the payload but flat in the form —
-    // without these maps, a validation error lands on a nonexistent field and silently never renders.
-    nestedFieldMaps: {
-      timeSlot: { start: 'startTime', end: 'endTime' },
-      coordinates: { '0': 'lng', '1': 'lat' },
-    },
     // Payload's `mr` (from the top-level .refine()) -> form's `mrId`.
     topLevelFieldMap: { mr: 'mrId' },
   })
@@ -88,15 +85,18 @@ interface BookCampFormProps {
   /** Whether this role books on behalf of someone else — shows the MR picker. MR itself never does. */
   needsMrPicker: boolean
   /** Locked context from the caller's page, never user-editable — spliced into the payload before the mutation fires; the form/schema never see it. */
-  project: { id: string; name: string }
-  /** Called once the mutation actually succeeds, with the created camp — the parent (a dialog over the project's camp list) closes and refetches. */
-  onBooked: (camp: ApiResponse<CampEntity>) => void
+  project: { id: string; name: string; campTimeSlots: CampTimeSlotValue[] }
+  /** Called once the mutation succeeds, with the created camp — the parent (a
+   * dialog over the project's camp list) closes and refetches. */
+  onBooked: (camp: ApiResponse<CampMutationResponseEntity>) => void
 }
 
 // Shared across all 4 pharma portal pages — only whether the MR picker
 // renders differs per role; the submitted payload is identical either way.
 const BookCampForm = ({ needsMrPicker, project, onBooked }: BookCampFormProps) => {
-  const { resolver, parsePayload } = useBookCampFormResolver(needsMrPicker)
+  const { session } = useSession()
+  const selfMrId = session?.role.id
+  const { resolver, parsePayload } = useBookCampFormResolver(needsMrPicker, selfMrId)
   const bookCamp = useBookCamp()
   // isPending flips true only once mutate is called, but parsePayload's own
   // re-parse runs before that — this ref closes that race window synchronously.
@@ -122,6 +122,11 @@ const BookCampForm = ({ needsMrPicker, project, onBooked }: BookCampFormProps) =
   const fieldError = (field: keyof FormValues) =>
     (touchedFields[field] || isSubmitted) ? errors[field]?.message : undefined
 
+  // A real MR booking for themselves needs no picker, but the schema still
+  // requires `mr` — this state should be unreachable for a genuine pharma MR
+  // session; if it happens anyway, fail safely instead of submitting `mr: undefined`.
+  const missingSelfMrId = !needsMrPicker && !selfMrId
+
   const onSubmit = async (values: FormValues) => {
     const formPayload = await parsePayload(values)
     // project is context, not form state — assembled here, never claimed as
@@ -143,6 +148,14 @@ const BookCampForm = ({ needsMrPicker, project, onBooked }: BookCampFormProps) =
       .finally(() => { submittingRef.current = false })
   }
 
+  if (project.campTimeSlots.length === 0) {
+    return (
+      <div className="text-[13px] rounded-lg px-3 py-2 bg-danger-soft border border-danger text-danger">
+        This project has no configured time slots — add one in the project's settings before booking.
+      </div>
+    )
+  }
+
   return (
     <form onSubmit={onFormSubmit} className="space-y-4" noValidate>
       <div className="text-[12px] rounded-lg px-3 py-2 bg-muted/50" style={{ color: 'var(--qms-text-muted)' }}>
@@ -160,6 +173,12 @@ const BookCampForm = ({ needsMrPicker, project, onBooked }: BookCampFormProps) =
             )}
           />
           {fieldError('mrId') && <p className="text-[11px] mt-1 text-danger">{fieldError('mrId')}</p>}
+        </div>
+      )}
+
+      {missingSelfMrId && (
+        <div className="text-[12px] rounded-lg px-3 py-2 bg-danger-soft border border-danger text-danger">
+          Couldn't resolve your MR identity from the session — try reloading the page.
         </div>
       )}
 
@@ -204,17 +223,21 @@ const BookCampForm = ({ needsMrPicker, project, onBooked }: BookCampFormProps) =
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Label htmlFor="bookCampStartTime" className="text-[10px] font-semibold tracking-widest uppercase mb-1.5 block text-qms-text-muted">Start time *</Label>
-          <Input id="bookCampStartTime" type="time" className="text-[13px]" {...register('startTime')} />
-          {fieldError('startTime') && <p className="text-[11px] mt-1 text-danger">{fieldError('startTime')}</p>}
-        </div>
-        <div>
-          <Label htmlFor="bookCampEndTime" className="text-[10px] font-semibold tracking-widest uppercase mb-1.5 block text-qms-text-muted">End time *</Label>
-          <Input id="bookCampEndTime" type="time" className="text-[13px]" {...register('endTime')} />
-          {fieldError('endTime') && <p className="text-[11px] mt-1 text-danger">{fieldError('endTime')}</p>}
-        </div>
+      <div>
+        <Label className="text-[10px] font-semibold tracking-widest uppercase mb-1.5 block text-qms-text-muted">Time slot *</Label>
+        <Controller
+          control={control}
+          name="timeSlot"
+          render={({ field }) => (
+            <Select value={field.value || undefined} onValueChange={field.onChange}>
+              <SelectTrigger className="w-full text-[13px]"><SelectValue placeholder="Select time slot…" /></SelectTrigger>
+              <SelectContent>
+                {project.campTimeSlots.map((slot) => <SelectItem key={slot} value={slot}>{CAMP_TIME_SLOT_LABEL[slot]}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
+        />
+        {fieldError('timeSlot') && <p className="text-[11px] mt-1 text-danger">{fieldError('timeSlot')}</p>}
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -243,6 +266,8 @@ const BookCampForm = ({ needsMrPicker, project, onBooked }: BookCampFormProps) =
         </div>
       </div>
 
+      {/* Hidden pending an integrate-or-remove decision — devices now requires InventoryMaster
+          ObjectIds, not free text, and neither field is re-approved for this form yet.
       <div>
         <Label htmlFor="bookCampDevices" className="text-[10px] font-semibold tracking-widest uppercase mb-1.5 block text-qms-text-muted">Devices</Label>
         <Input id="bookCampDevices" className="text-[13px]" placeholder="e.g. bp-monitor, glucometer" {...register('devices')} />
@@ -252,6 +277,7 @@ const BookCampForm = ({ needsMrPicker, project, onBooked }: BookCampFormProps) =
         <Label htmlFor="bookCampNotes" className="text-[10px] font-semibold tracking-widest uppercase mb-1.5 block text-qms-text-muted">Notes</Label>
         <Textarea id="bookCampNotes" className="text-[13px]" placeholder="Optional" {...register('notes')} />
       </div>
+      */}
 
       {bookCamp.isError && (
         <div className="text-[12px] rounded-lg px-3 py-2 bg-danger-soft border border-danger text-danger">
@@ -261,7 +287,7 @@ const BookCampForm = ({ needsMrPicker, project, onBooked }: BookCampFormProps) =
 
       <Button
         type="submit"
-        disabled={bookCamp.isPending}
+        disabled={bookCamp.isPending || missingSelfMrId}
         className="w-full font-bold text-white"
         style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
       >

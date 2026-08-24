@@ -12,6 +12,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { useSession } from '@/hooks/useSession'
+import { getPharmaRoleMeta } from '@/features/pharma/pharma.constants'
 import {
   FULL_NAV_SECTIONS,
   type NavItem,
@@ -20,6 +21,9 @@ import {
 
 // FULL_NAV_SECTIONS items whose route is wrapped in RequirePermission — used
 // to hide items the viewer would otherwise click into and get bounced from.
+// 'pharma' is deliberately NOT listed here — its visibility is identity-based
+// (see isPharmaRoleType in Sidebar), not permission-based, since system:manage
+// must NOT bypass it the way it bypasses every other check in this map.
 const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
   // Temporary v1 gate on system:manage, not invoice:manage: Finance Manager
   // (the role that actually holds invoice:manage) lacks Project/Camp read perms the page's pickers need.
@@ -34,9 +38,6 @@ const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
   projects: ['project:search', 'project:manage', 'tenant:manage'],
   gantt: ['project:search', 'project:manage', 'tenant:manage'],
   camps: ['camp:search', 'camp:manage', 'tenant:manage'],
-  // Pharma role types hold only camp:book, never camp:search/manage. No
-  // tenant:manage fallback: that'd show non-pharma managers a dead-end link.
-  pharma: ['camp:book'],
   users: ['user:get', 'user:search', 'user:update'],
 }
 
@@ -111,9 +112,52 @@ function findBestMatchingNavPath(pathname: string): string | null {
   return best
 }
 
-const NavItemRow = ({ item, collapsed }: { item: NavItem; collapsed: boolean }) => {
+const NavItemRow = ({
+  item,
+  collapsed,
+  labelOverride,
+  disabledReason,
+}: {
+  item: NavItem
+  collapsed: boolean
+  labelOverride?: string
+  disabledReason?: string
+}) => {
   const location = useLocation()
   const isActive = item.path === findBestMatchingNavPath(location.pathname)
+  const label = labelOverride ?? item.label
+
+  if (disabledReason) {
+    return (
+      <div
+        aria-disabled="true"
+        title={disabledReason}
+        className={cn(
+          'flex items-center gap-2.5 px-2.5 py-1.75 rounded-lg text-[13px] font-medium relative group cursor-not-allowed opacity-60',
+          collapsed ? 'justify-center px-2' : '',
+        )}
+        style={{ color: 'var(--qms-text-muted)' }}
+      >
+        <span className="shrink-0 text-current">
+          <NavIcon name={item.icon} />
+        </span>
+        {!collapsed && (
+          <div className="flex-1 min-w-0">
+            <div className="truncate">{label}</div>
+            <div className="text-[10px] truncate">{disabledReason}</div>
+          </div>
+        )}
+        {collapsed && (
+          <span
+            className="pointer-events-none absolute left-full ml-2.5 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-lg text-white text-xs font-semibold px-2.5 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg"
+            style={{ background: 'var(--popover)', color: 'var(--qms-text)' }}
+          >
+            {label} — {disabledReason}
+          </span>
+        )}
+      </div>
+    )
+  }
 
   return (
     <NavLink
@@ -148,7 +192,7 @@ const NavItemRow = ({ item, collapsed }: { item: NavItem; collapsed: boolean }) 
 
       {!collapsed && (
         <>
-          <span className="flex-1 truncate">{item.label}</span>
+          <span className="flex-1 truncate">{label}</span>
         </>
       )}
 
@@ -157,11 +201,16 @@ const NavItemRow = ({ item, collapsed }: { item: NavItem; collapsed: boolean }) 
           className="pointer-events-none absolute left-full ml-2.5 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-lg text-white text-xs font-semibold px-2.5 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg"
           style={{ background: 'var(--popover)', color: 'var(--qms-text)' }}
         >
-          {item.label}
+          {label}
         </span>
       )}
     </NavLink>
   )
+}
+
+interface NavItemOverride {
+  label?: string
+  disabledReason?: string
 }
 
 const SectionBlock = ({
@@ -169,11 +218,13 @@ const SectionBlock = ({
   collapsed,
   collapsedSections,
   onToggleSection,
+  itemOverrides,
 }: {
   section: NavSection
   collapsed: boolean
   collapsedSections: Set<string>
   onToggleSection: (s: string) => void
+  itemOverrides?: Record<string, NavItemOverride>
 }) => {
   const isSectionCollapsed = collapsedSections.has(section.section)
 
@@ -204,7 +255,13 @@ const SectionBlock = ({
                 </div>
               )}
               {sub.items.map((item) => (
-                <NavItemRow key={item.id} item={item} collapsed={collapsed} />
+                <NavItemRow
+                  key={item.id}
+                  item={item}
+                  collapsed={collapsed}
+                  labelOverride={itemOverrides?.[item.id]?.label}
+                  disabledReason={itemOverrides?.[item.id]?.disabledReason}
+                />
               ))}
             </div>
           ))}
@@ -216,10 +273,16 @@ const SectionBlock = ({
 
 const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
   const { user } = useAuth()
-  const { permissions, isSettled } = useSession()
+  const { permissions, isSettled, session } = useSession()
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(readCollapsedSections)
 
   const isRealSystemManage = isSettled && permissions.includes('system:manage')
+
+  // Identity, not capability — system:manage must NOT bypass this. A pharma
+  // session must never see any QMS nav, regardless of permission bundle.
+  const pharmaMeta = getPharmaRoleMeta(session?.roleType?.code)
+  const isPharmaRoleType = pharmaMeta !== null
+  const hasCampBook = permissions.includes('camp:book')
 
   const toggleSection = (section: string) => {
     setCollapsedSections((prev) => {
@@ -238,6 +301,7 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
   }, [user])
 
   const isNavItemVisible = (item: NavItem): boolean => {
+    if (item.id === 'pharma') return isPharmaRoleType
     const requiredCodes = REAL_GATED_NAV_ITEMS[item.id]
     if (!requiredCodes) return true
     if (!isSettled) return false
@@ -246,6 +310,7 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
 
   const visibleFullNavSections = FULL_NAV_SECTIONS
     .filter((section) => section.section !== 'System' || isRealSystemManage)
+    .filter((section) => section.section === 'Pharma Portal' || !isPharmaRoleType)
     .map((section) => ({
       ...section,
       subs: section.subs
@@ -253,6 +318,14 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
         .filter((sub) => sub.items.length > 0),
     }))
     .filter((section) => section.subs.length > 0)
+
+  const itemOverrides: Record<string, NavItemOverride> = isPharmaRoleType
+    ? {
+        pharma: hasCampBook
+          ? { label: `Pharma Portal ${pharmaMeta.label}` }
+          : { label: `Pharma Portal ${pharmaMeta.label}`, disabledReason: 'Access not configured — contact an administrator' },
+      }
+    : {}
 
   return (
     <aside
@@ -303,6 +376,7 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
             collapsed={collapsed}
             collapsedSections={collapsedSections}
             onToggleSection={toggleSection}
+            itemOverrides={itemOverrides}
           />
         ))}
       </div>

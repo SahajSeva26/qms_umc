@@ -6,7 +6,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import AnyPharmaRoleGate from '@/features/pharma/components/AnyPharmaRoleGate'
 import { usePharmaProject } from '@/features/pharma/hooks/usePharmaProject'
 import { usePharmaCamps, pharmaCampKeys } from '@/features/pharma/hooks/usePharmaCamps'
-import { PHARMA_ROUTES } from '@/features/pharma/pharma.routes'
+import { PHARMA_ROUTES, getPharmaRoleMeta } from '@/features/pharma/pharma.constants'
 import PharmaCampTable from '@/features/pharma/components/PharmaCampTable'
 import BookCampForm from '@/features/pharma/components/BookCampForm'
 import ProjectStatusPill from '@/features/projects/components/ProjectStatusPill'
@@ -16,20 +16,13 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { usePagination } from '@/hooks/usePagination'
 import { useSession } from '@/hooks/useSession'
+import type { WhoCanBookCampCode } from '@/types/project.types'
 
 const PAGE_SIZE = 10
 
-// Back button navigates to an explicit route, not navigate(-1) — a direct
-// deep link may have no real "back" history entry to return to.
-const ROLE_TYPE_TO_ROUTE: Record<string, string> = {
-  'pharma-division-head': PHARMA_ROUTES.PHARMA_HO,
-  'pharma-rsm': PHARMA_ROUTES.PHARMA_RSM,
-  'pharma-asm': PHARMA_ROUTES.PHARMA_ASM,
-  'pharma-mr': PHARMA_ROUTES.PHARMA_MR,
-}
-
 // Must wrap a separate content component, never sit beside the data hooks
-// gated by an early return — React fires every hook's request on every render regardless.
+// gated by an early return — that would still mount usePharmaProject/usePharmaCamps
+// (and their queries) for a role the gate is about to reject.
 const PharmaProjectCampsPage = () => (
   <AnyPharmaRoleGate>
     <PharmaProjectCampsContent />
@@ -58,14 +51,23 @@ const PharmaProjectCampsContent = () => {
 
   // Only HO/RSM/ASM book on behalf of a downline MR — derived directly from
   // the session here, not threaded down as a prop through two route levels.
-  const needsMrPicker = session?.roleType.code !== 'pharma-mr'
-  const backRoute = session ? (ROLE_TYPE_TO_ROUTE[session.roleType.code] ?? PHARMA_ROUTES.PHARMA) : PHARMA_ROUTES.PHARMA
+  const needsMrPicker = session?.roleType?.code !== 'pharma-mr'
+  const backRoute = getPharmaRoleMeta(session?.roleType?.code)?.portalPath ?? PHARMA_ROUTES.PHARMA
   // Division-head's camp scoping is division-wide, not assignment-scoped —
   // unlike RSM/ASM/MR, an empty list for them genuinely means no camps yet.
-  const isDivisionHead = session?.roleType.code === 'pharma-division-head'
+  const isDivisionHead = session?.roleType?.code === 'pharma-division-head'
   const emptyCampsText = isDivisionHead
     ? 'No camps have been booked for this project yet.'
     : 'No camps assigned to you on this project yet.'
+
+  const roleCanBook = !project || project.whoCanBookCamp.length === 0 || project.whoCanBookCamp.includes((session?.roleType?.code ?? '') as WhoCanBookCampCode)
+  const hasSlots = !!project && project.campTimeSlots.length > 0
+  const canBook = roleCanBook && hasSlots
+  const cannotBookReason = !roleCanBook
+    ? 'Your role cannot book camps on this project.'
+    : !hasSlots
+      ? 'This project has no configured time slots.'
+      : null
 
   const handleBooked = () => {
     setBookOpen(false)
@@ -107,13 +109,19 @@ const PharmaProjectCampsContent = () => {
               <div className="text-[13px] truncate mb-2" style={{ color: 'var(--qms-text-muted)' }}>{project.code}</div>
               <ProjectStatusPill status={project.status} />
             </div>
-            <Button
-              onClick={() => setBookOpen(true)}
-              className="text-white shrink-0"
-              style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
-            >
-              <FiPlus size={14} /> New camp
-            </Button>
+            <div className="text-right shrink-0">
+              <Button
+                onClick={() => setBookOpen(true)}
+                disabled={!canBook}
+                className="text-white"
+                style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
+              >
+                <FiPlus size={14} /> New camp
+              </Button>
+              {cannotBookReason && (
+                <p className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>{cannotBookReason}</p>
+              )}
+            </div>
           </div>
 
           <QueryStateBlock
@@ -141,7 +149,7 @@ const PharmaProjectCampsContent = () => {
               </DialogHeader>
               <BookCampForm
                 needsMrPicker={needsMrPicker}
-                project={{ id: project.id, name: project.name }}
+                project={{ id: project.id, name: project.name, campTimeSlots: project.campTimeSlots }}
                 onBooked={handleBooked}
               />
             </DialogContent>

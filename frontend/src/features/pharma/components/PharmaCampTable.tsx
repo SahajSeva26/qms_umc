@@ -1,5 +1,6 @@
 import CampStatusPillReal from '@/features/camps/components/CampStatusPillReal'
 import type { CampEntity, CampPopulatedDoctor, CampPopulatedRole } from '@/types/campReal.types'
+import { CAMP_TIME_SLOT_LABEL } from '@/types/campTimeSlot.constants'
 
 interface PharmaCampTableProps {
   camps: CampEntity[]
@@ -36,7 +37,7 @@ const PharmaCampTable = ({ camps }: PharmaCampTableProps) => (
               <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>{doctorName(camp.doctor)}</td>
               <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>{new Date(camp.date).toLocaleDateString()}</td>
               <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                {camp.timeSlot ? `${camp.timeSlot.start}–${camp.timeSlot.end}` : '—'}
+                {camp.timeSlot ? CAMP_TIME_SLOT_LABEL[camp.timeSlot] : '—'}
               </td>
               <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{camp.city}, {camp.state}</td>
               <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{mrName(camp.mr)}</td>

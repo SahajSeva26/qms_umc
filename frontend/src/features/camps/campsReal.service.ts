@@ -3,6 +3,7 @@ import type { ApiResponse, PaginatedResponse } from '@/types/common.types'
 import type {
   BookCampPayload,
   CampEntity,
+  CampMutationResponseEntity,
   CreateCampPayload,
   MoveCampStagePayload,
   SearchCampQuery,
@@ -22,30 +23,33 @@ const getCamp = async (id: string) => {
   return res.data
 }
 
+// create/bookCamp/update/moveStage/allocateFo return the unpopulated in-memory
+// document (CampMutationResponseEntity, not CampEntity — see its doc comment).
+// Never read `.devices` off these as populated; fetch/refetch the camp instead.
 const createCamp = async (payload: CreateCampPayload) => {
-  const res = await api.post<ApiResponse<CampEntity>>('/camps', payload)
+  const res = await api.post<ApiResponse<CampMutationResponseEntity>>('/camps', payload)
   return res.data
 }
 
-// Pharma field-force booking path — POST /camps/book, not /camps. Self vs
-// downline authorization is enforced server-side by the caller's role type.
+// Pharma field-force booking path — POST /camps/book, not /camps. Uses the
+// same create path server-side, so it returns the same unpopulated shape.
 const bookCamp = async (payload: BookCampPayload) => {
-  const res = await api.post<ApiResponse<CampEntity>>('/camps/book', payload)
+  const res = await api.post<ApiResponse<CampMutationResponseEntity>>('/camps/book', payload)
   return res.data
 }
 
 const updateCamp = async (id: string, payload: UpdateCampPayload) => {
-  const res = await api.put<ApiResponse<CampEntity>>(`/camps/${id}`, payload)
+  const res = await api.put<ApiResponse<CampMutationResponseEntity>>(`/camps/${id}`, payload)
   return res.data
 }
 
 const moveCampStage = async (id: string, payload: MoveCampStagePayload) => {
-  const res = await api.patch<ApiResponse<CampEntity>>(`/camps/${id}/stage`, payload)
+  const res = await api.patch<ApiResponse<CampMutationResponseEntity>>(`/camps/${id}/stage`, payload)
   return res.data
 }
 
 const allocateFo = async (id: string) => {
-  const res = await api.post<ApiResponse<CampEntity>>(`/camps/${id}/allocate`)
+  const res = await api.post<ApiResponse<CampMutationResponseEntity>>(`/camps/${id}/allocate`)
   return res.data
 }
 

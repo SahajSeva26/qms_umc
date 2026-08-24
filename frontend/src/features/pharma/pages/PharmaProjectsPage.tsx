@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usePharmaProjects } from '@/features/pharma/hooks/usePharmaProjects'
-import { PHARMA_ROUTES } from '@/features/pharma/pharma.routes'
+import { PHARMA_ROUTES } from '@/features/pharma/pharma.constants'
 import ProjectStatusPill from '@/features/projects/components/ProjectStatusPill'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import PaginationControls from '@/components/ui/PaginationControls'

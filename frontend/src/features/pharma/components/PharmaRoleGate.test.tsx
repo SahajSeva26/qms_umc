@@ -21,6 +21,7 @@ async function renderGate(roleTypeCode: string) {
     <MemoryRouter initialEntries={['/pharma/rsm']}>
       <Routes>
         <Route path="/pharma/rsm" element={<PharmaRoleGate roleTypeCode={roleTypeCode}><div>Protected Content</div></PharmaRoleGate>} />
+        <Route path="/pharma/mr" element={<div>MR Portal</div>} />
         <Route path="/login" element={<div>Login Page</div>} />
       </Routes>
     </MemoryRouter>,
@@ -68,12 +69,27 @@ describe('PharmaRoleGate', () => {
     expect(await screen.findByText('Protected Content')).toBeInTheDocument()
   })
 
-  it('shows a role-mismatch message, not the protected content, when the session role differs', async () => {
+  it('redirects to the session\'s own portal, not the protected content, on a cross-role pharma mismatch', async () => {
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
       isSettled: true,
       isConfirmedUnauthenticated: false,
       session: sessionFixture('pharma-mr'),
+    } as unknown as ReturnType<typeof useSession>)
+
+    await renderGate('pharma-rsm')
+
+    expect(await screen.findByText('MR Portal')).toBeInTheDocument()
+    expect(screen.queryByText('Protected Content')).not.toBeInTheDocument()
+    expect(screen.queryByText('Not available for your role')).not.toBeInTheDocument()
+  })
+
+  it('shows a role-mismatch message (not a redirect) when the session is not a real pharma role at all', async () => {
+    const { useSession } = await import('@/hooks/useSession')
+    vi.mocked(useSession).mockReturnValue({
+      isSettled: true,
+      isConfirmedUnauthenticated: false,
+      session: sessionFixture('sales-rep'),
     } as unknown as ReturnType<typeof useSession>)
 
     await renderGate('pharma-rsm')

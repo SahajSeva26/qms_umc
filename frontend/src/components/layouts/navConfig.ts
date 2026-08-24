@@ -6,7 +6,7 @@ import { CAMPS_ROUTES }     from '@/features/camps/camps.routes'
 import { DIET_ROUTES }      from '@/features/diet/diet.routes'
 import { FO_ROUTES }        from '@/features/fo/fo.routes'
 import { DEDICATEDOPS_ROUTES } from '@/features/dedicatedops/dedicatedops.routes'
-import { PHARMA_ROUTES }    from '@/features/pharma/pharma.routes'
+import { PHARMA_ROUTES }    from '@/features/pharma/pharma.constants'
 import { PROJECTS_ROUTES }  from '@/features/projects/projects.routes'
 import { OM_ROUTES }        from '@/features/om/om.routes'
 import { DOCTORS_ROUTES }   from '@/features/doctors/doctors.routes'
@@ -102,7 +102,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
 
   { id: 'remindauto',   label: 'AI Reminders',                icon: 'Cpu',           path: ADMIN_ROUTES.ADMIN_REMINDERS },
 
-  // Pharma Network — one link; PharmaRedirectPage sends the user to their own role's portal.
+  // Pharma Portal — one link; Sidebar.tsx overrides this label per-role at render time.
   { id: 'pharma',       label: 'Pharma Portal',               icon: 'Briefcase',     path: PHARMA_ROUTES.PHARMA },
 
   // Resources
@@ -169,7 +169,7 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    section: 'Pharma Network',
+    section: 'Pharma Portal',
     subs: [
       { title: '', items: ['pharma'].map((id) => NAV_BY_ID[id]) },
     ],

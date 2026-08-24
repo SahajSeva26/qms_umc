@@ -1,18 +1,12 @@
 import type { ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useSession } from '@/hooks/useSession'
+import { getPharmaRoleMeta } from '@/features/pharma/pharma.constants'
 
 interface PharmaRoleGateProps {
   /** The one pharma role-type code this page is for (see roleType.constants.ts). */
   roleTypeCode: string
   children: ReactNode
-}
-
-const ROLE_LABELS: Record<string, string> = {
-  'pharma-division-head': 'HO',
-  'pharma-rsm': 'RSM',
-  'pharma-asm': 'ASM',
-  'pharma-mr': 'MR',
 }
 
 // Never render a role decision before the session has settled, or a slow
@@ -25,13 +19,17 @@ const PharmaRoleGate = ({ roleTypeCode, children }: PharmaRoleGateProps) => {
   }
   if (isConfirmedUnauthenticated) return <Navigate to="/login" replace />
 
-  if (session?.roleType.code !== roleTypeCode) {
+  if (session?.roleType?.code !== roleTypeCode) {
+    const meta = getPharmaRoleMeta(session?.roleType?.code)
+    // A real cross-role deep link (e.g. RSM opening /pharma/ho) — send them to their own portal instead of a dead end.
+    if (meta) return <Navigate to={meta.portalPath} replace />
+
     return (
       <div className="w-full">
         <div className="rounded-lg border p-6 text-center" style={{ borderColor: 'var(--qms-border)' }}>
           <h2 className="text-lg font-bold mb-1" style={{ color: 'var(--qms-text)' }}>Not available for your role</h2>
           <p className="text-[13px]" style={{ color: 'var(--qms-text-muted)' }}>
-            This portal is only for {ROLE_LABELS[roleTypeCode] ?? roleTypeCode}. Use the Pharma Portal link to reach your own team's page.
+            This portal is only for pharma HO, RSM, ASM, and MR roles.
           </p>
         </div>
       </div>

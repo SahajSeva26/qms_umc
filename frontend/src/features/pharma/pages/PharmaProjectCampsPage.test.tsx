@@ -9,19 +9,6 @@ import type { CampEntity } from '@/types/campReal.types'
 
 vi.mock('@/hooks/useSession')
 
-// Sidesteps a pre-existing circular-import ordering issue (pharma.routes.tsx
-// <-> navConfig.ts) that only this test's synchronous import order triggers, not real builds.
-vi.mock('@/features/pharma/pharma.routes', () => ({
-  PHARMA_ROUTES: {
-    PHARMA: '/pharma',
-    PHARMA_HO: '/pharma/ho',
-    PHARMA_RSM: '/pharma/rsm',
-    PHARMA_ASM: '/pharma/asm',
-    PHARMA_MR: '/pharma/mr',
-    PHARMA_PROJECT_CAMPS: '/pharma/projects/:id/camps',
-  },
-}))
-
 vi.mock('@/features/pharma/pharmaProjects.service', () => ({
   pharmaProjectsService: {
     getProject: vi.fn(),

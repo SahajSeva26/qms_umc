@@ -6,7 +6,6 @@ import {
     PROJECT_EXECUTION_MODES,
     PROJECT_GO_LIVE_SCOPE,
     PROJECT_STATUS,
-    PROJECT_TEST_TYPES,
     PROJECT_THERAPY_TYPES,
     PROJECT_TYPES,
 } from './project.constants';
@@ -136,10 +135,11 @@ const projectSchema = new mongoose.Schema(
                 required: [true, 'Project type is required'],
             },
         ],
+        // references to the global Test catalog — actual Test._id values (existence enforced in the service)
         tests: [
             {
-                type: String,
-                enum: Object.values(PROJECT_TEST_TYPES),
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'Test',
             },
         ],
         lead: {

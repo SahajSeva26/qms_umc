@@ -1,4 +1,5 @@
 import { CAMP_PERMISSIONS } from '../../operations/camp/camp.constants';
+import { DOCTOR_PERMISSIONS } from '../../doctor/doctor.constants';
 
 export const ROLE_TYPE_STATUSES = {
     ACTIVE: 'active',
@@ -62,7 +63,8 @@ export const DEFAULT_PHARMA_ROLE_TYPES = [
         code: ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_DIVISION_HEAD,
         name: 'Pharma Division Head',
         description: 'Pharma division head',
-        permissions: [...PHARMA_CAMP_PERMISSIONS] as string[],
+        // division head manages its own tenant's doctor registry (tenant-scoped via ctx.where())
+        permissions: [...PHARMA_CAMP_PERMISSIONS, DOCTOR_PERMISSIONS.MANAGE.code] as string[],
     },
     {
         code: ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_RSM,

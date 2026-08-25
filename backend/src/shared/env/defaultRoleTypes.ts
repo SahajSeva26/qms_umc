@@ -3,6 +3,7 @@ import { LEAD_PERMISSIONS } from '../../modules/crm/lead/lead.constants';
 import { APPOINTMENT_PERMISSIONS } from '../../modules/crm/appointment/appointment.constants';
 import { DOCTOR_PERMISSIONS } from '../../modules/doctor/doctor.constants';
 import { CAMP_PERMISSIONS } from '../../modules/operations/camp/camp.constants';
+import { TEST_PERMISSIONS } from '../../modules/operations/test/test.constants';
 import { TENANT_PERMISSIONS } from '../../modules/access-management/tenant/tenant.constants';
 import { DIVISION_PERMISSIONS } from '../../modules/crm/division/division.constants';
 import { CONTACT_PERMISSIONS } from '../../modules/crm/contact/contact.constants';
@@ -110,6 +111,7 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
             TENANT_PERMISSIONS.GET.code,
 
             CAMP_PERMISSIONS.MANAGE.code,
+            TEST_PERMISSIONS.MANAGE.code,
             APPOINTMENT_PERMISSIONS.SEARCH.code,
             APPOINTMENT_PERMISSIONS.GET.code,
             APPOINTMENT_PERMISSIONS.RSVP.code,
@@ -124,6 +126,7 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
             TENANT_PERMISSIONS.GET.code,
 
             CAMP_PERMISSIONS.MANAGE.code,
+            TEST_PERMISSIONS.MANAGE.code,
             APPOINTMENT_PERMISSIONS.SEARCH.code,
             APPOINTMENT_PERMISSIONS.GET.code,
             APPOINTMENT_PERMISSIONS.RSVP.code,

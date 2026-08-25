@@ -12,6 +12,7 @@ import { QA_FEEDBACK_PERMISSIONS } from '../../modules/qa-feedback/qaFeedback.co
 import { DOCTOR_PERMISSIONS } from '../../modules/doctor/doctor.constants';
 import { GEO_PROFILE_PERMISSIONS } from '../../modules/operations/geoProfile/geoProfile.constants';
 import { CAMP_PERMISSIONS } from '../../modules/operations/camp/camp.constants';
+import { TEST_PERMISSIONS } from '../../modules/operations/test/test.constants';
 import { COUNTER_PERMISSIONS } from '../../modules/counter/counter.constants';
 import { INVENTORY_MASTER_PERMISSIONS } from '../../modules/inventory/inventory-master/inventory-master.constants';
 import { INVENTORY_CONSUMABLE_PERMISSIONS } from '../../modules/inventory/inventory-consumable/inventory-consumable.constants';
@@ -45,6 +46,7 @@ export const PERMISSIONS = {
     DOCTOR: DOCTOR_PERMISSIONS,
     GEO_PROFILE: GEO_PROFILE_PERMISSIONS,
     CAMP: CAMP_PERMISSIONS,
+    TEST: TEST_PERMISSIONS,
     COUNTER: COUNTER_PERMISSIONS,
     INVENTORY_MASTER: INVENTORY_MASTER_PERMISSIONS,
     INVENTORY_CONSUMABLE: INVENTORY_CONSUMABLE_PERMISSIONS,

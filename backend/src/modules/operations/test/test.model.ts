@@ -1,0 +1,63 @@
+// Test Model
+import { TEST_STATUS } from './test.constants';
+import mongoose from 'mongoose';
+
+const testSchema = new mongoose.Schema(
+    {
+        code: {
+            type: String,
+            required: true,
+            trim: true,
+            lowercase: true,
+            unique: true,
+        },
+        name: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        description: {
+            type: String,
+            trim: true,
+        },
+        status: {
+            type: String,
+            default: TEST_STATUS.ACTIVE,
+            enum: Object.values(TEST_STATUS),
+            required: true,
+            trim: true,
+        },
+
+        config: {},
+
+        resourceRequired: [
+            {
+                item: {
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: 'InventoryMaster',
+                },
+                quantity: {
+                    type: Number,
+                    default: 1,
+                    //for device only 1
+                },
+            },
+        ],
+        resourceConsumption: [
+            {
+                item: {
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: 'InventoryMaster',
+                },
+                quantity: {
+                    type: Number,
+                    default: 1,
+                },
+            },
+        ],
+    },
+    { timestamps: true },
+);
+
+export const TestModel = mongoose.model('Test', testSchema);
+export type ITest = mongoose.InferSchemaType<typeof testSchema>;

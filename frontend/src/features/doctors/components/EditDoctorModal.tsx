@@ -3,9 +3,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import TenantAsyncPicker from '@/components/ui/TenantAsyncPicker'
 import { toast } from '@/components/ui/sonner'
 import { useCreateDoctor } from '@/features/doctors/hooks/useCreateDoctor'
 import { useUpdateDoctor } from '@/features/doctors/hooks/useUpdateDoctor'
+import { useSession } from '@/hooks/useSession'
 import { getApiErrorMessage } from '@/utils/apiError'
 import type { DoctorEntity, DoctorSpecialization, DoctorStatus } from '@/types/doctor.types'
 
@@ -30,9 +32,11 @@ interface DoctorDraft {
   email: string
   googleMapLink: string
   status: DoctorStatus
+  tenantId: string
+  tenantLabel: string
 }
 
-const emptyDraft: DoctorDraft = { pharmaCode: '', name: '', specialization: 'cp', mobile: '', city: '', state: '', pincode: '', email: '', googleMapLink: '', status: 'active' }
+const emptyDraft: DoctorDraft = { pharmaCode: '', name: '', specialization: 'cp', mobile: '', city: '', state: '', pincode: '', email: '', googleMapLink: '', status: 'active', tenantId: '', tenantLabel: '' }
 
 function draftFromDoctor(d: DoctorEntity): DoctorDraft {
   return {
@@ -46,6 +50,9 @@ function draftFromDoctor(d: DoctorEntity): DoctorDraft {
     email: d.email,
     googleMapLink: d.googleMapLink || '',
     status: d.status ?? 'active',
+    // tenant is immutable post-create — Edit never renders or submits this field.
+    tenantId: '',
+    tenantLabel: '',
   }
 }
 
@@ -70,6 +77,11 @@ interface EditDoctorModalFormProps {
 const EditDoctorModalForm = ({ doctor, onClose }: EditDoctorModalFormProps) => {
   const isEdit = !!doctor
   const [draft, setDraft] = useState<DoctorDraft>(doctor ? draftFromDoctor(doctor) : emptyDraft)
+  const { session } = useSession()
+  // A platform caller has no single "home" tenant, so they must pick the
+  // target company explicitly — a customer caller is always pinned to their
+  // own tenant server-side and never sees or sends this field.
+  const needsTenantPicker = !isEdit && session?.tenant?.type === 'platform'
 
   const createDoctor = useCreateDoctor()
   const updateDoctor = useUpdateDoctor(doctor?.id ?? '')
@@ -103,6 +115,10 @@ const EditDoctorModalForm = ({ doctor, onClose }: EditDoctorModalFormProps) => {
           toast.error('Pharma doctor code is required')
           return
         }
+        if (needsTenantPicker && !draft.tenantId) {
+          toast.error('Company is required')
+          return
+        }
         await createDoctor.mutateAsync({
           pharmaCode: draft.pharmaCode,
           name: draft.name,
@@ -113,6 +129,7 @@ const EditDoctorModalForm = ({ doctor, onClose }: EditDoctorModalFormProps) => {
           pincode: draft.pincode,
           email: draft.email,
           googleMapLink: draft.googleMapLink || undefined,
+          tenant: needsTenantPicker ? draft.tenantId : undefined,
         })
         toast.success('Doctor added')
       }
@@ -132,6 +149,16 @@ const EditDoctorModalForm = ({ doctor, onClose }: EditDoctorModalFormProps) => {
         </DialogHeader>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {needsTenantPicker && (
+            <div className="sm:col-span-2">
+              <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Company *</label>
+              <TenantAsyncPicker
+                value={draft.tenantId}
+                label={draft.tenantLabel}
+                onChange={(tenantId, tenantLabel) => setDraft((p) => ({ ...p, tenantId, tenantLabel }))}
+              />
+            </div>
+          )}
           <div>
             <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Pharma doctor code</label>
             <Input

@@ -14,6 +14,7 @@ import { LeadService } from '../lead/lead.service';
 import { RoleService } from '../../access-management/role/role.service';
 import { ContactService } from '../contact/contact.service';
 import { TENANT_TYPE } from '../../access-management/tenant/tenant.constants';
+import { TestService } from '../../operations/test/test.service';
 
 type ProjectDocument = HydratedDocument<IProject> | null;
 
@@ -39,6 +40,17 @@ const assertPlatformStaff = async (roleId: string, label: string, ctx: RequestCo
     }
     if ((role.tenant as any)?.type !== TENANT_TYPE.PLATFORM) {
         return throwAppError(`${label} must be QMS internal staff`, StatusCodes.BAD_REQUEST);
+    }
+};
+
+// tests reference the global Test catalog — every supplied id must resolve to a real test.
+const assertTestsExist = async (testIds: string[], ctx: RequestContext) => {
+    const uniqueIds = [...new Set(testIds)];
+    for (const id of uniqueIds) {
+        const test = await TestService.get(id, ctx);
+        if (!test) {
+            return throwAppError(`Test not found: ${id}`, StatusCodes.BAD_REQUEST);
+        }
     }
 };
 
@@ -87,7 +99,10 @@ const set = async (model: any, entity: HydratedDocument<IProject>, ctx: RequestC
     if (model.name) entity.name = model.name;
     if (model.therapy) entity.therapy = model.therapy;
     if (model.type) entity.type = model.type;
-    if (model.tests) entity.tests = model.tests;
+    if (model.tests) {
+        await assertTestsExist(model.tests, ctx);
+        entity.tests = model.tests;
+    }
 
     // execution — `mode` is a nested sub-schema; InferSchemaType doesn't surface it, so cast
     if (model.mode) (entity as any).mode = model.mode;

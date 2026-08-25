@@ -1,5 +1,6 @@
 // Test Model
 import { TEST_STATUS } from './test.constants';
+import { PROJECT_THERAPY_TYPES } from '../../crm/project/project.constants';
 import mongoose from 'mongoose';
 
 const testSchema = new mongoose.Schema(
@@ -18,6 +19,13 @@ const testSchema = new mongoose.Schema(
         },
         description: {
             type: String,
+            trim: true,
+        },
+        // the therapy area this test belongs to
+        therapy: {
+            type: String,
+            enum: Object.values(PROJECT_THERAPY_TYPES),
+            required: true,
             trim: true,
         },
         status: {

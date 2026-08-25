@@ -24,6 +24,7 @@ const populate: any[] = [{ path: 'resourceRequired.item' }, { path: 'resourceCon
 const set = async (model: any, entity: HydratedDocument<ITest>, ctx: RequestContext) => {
     if (model.name) entity.name = model.name;
     if (model.description) entity.description = model.description;
+    if (model.therapy) entity.therapy = model.therapy;
     if (model.config !== undefined) entity.config = model.config;
     if (model.resourceRequired !== undefined) entity.resourceRequired = model.resourceRequired;
     if (model.resourceConsumption !== undefined) entity.resourceConsumption = model.resourceConsumption;
@@ -57,6 +58,11 @@ const search = async (filters: ISearchTestQuery, ctx: RequestContext, options?: 
     }
     if (filters.code) {
         where.code = { $regex: filters.code, $options: 'i' };
+    }
+    if (filters.therapy) {
+        // accept a single therapy or a list of therapies (→ $in) so a caller can show every test
+        // belonging to a group of therapies in one query.
+        where.therapy = Array.isArray(filters.therapy) ? { $in: filters.therapy } : filters.therapy;
     }
     // only a manage-level actor may look past active (see inactive tests)
     if (filters.status && ctx.hasAnyPermissions([TEST_PERMISSIONS.MANAGE.code])) {

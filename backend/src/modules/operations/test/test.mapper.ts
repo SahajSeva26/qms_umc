@@ -16,6 +16,7 @@ export const TestMapper = {
             code: test.code,
             name: test.name,
             description: test.description,
+            therapy: test.therapy,
 
             config: test.config,
             resourceRequired: (test.resourceRequired || []).map(mapResourceLine),

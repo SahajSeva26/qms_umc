@@ -72,6 +72,26 @@ async function renderModal(doctor: DoctorEntity | null, onClose = vi.fn()) {
   )
 }
 
+async function renderModalWithCaller(opts: {
+  onClose?: () => void
+  onCreated?: (doctor: DoctorEntity) => void
+  forcedTenant?: { id: string; label: string }
+}) {
+  const EditDoctorModal = (await import('./EditDoctorModal')).default
+  const queryClient = makeQueryClient()
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <EditDoctorModal
+        open
+        doctor={null}
+        onClose={opts.onClose ?? vi.fn()}
+        onCreated={opts.onCreated}
+        forcedTenant={opts.forcedTenant}
+      />
+    </QueryClientProvider>,
+  )
+}
+
 describe('EditDoctorModal — tenant field', () => {
   beforeEach(() => {
     vi.resetAllMocks()
@@ -137,5 +157,87 @@ describe('EditDoctorModal — tenant field', () => {
     await renderModal(doctorFixture())
 
     expect(screen.queryByText(/company \*/i)).not.toBeInTheDocument()
+  })
+})
+
+describe('EditDoctorModal — forcedTenant + onCreated (inline-from-camp-form callers)', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  it('renders forcedTenant as locked read-only text, never an editable picker, even for a platform caller', async () => {
+    await mockSession('platform')
+    await renderModalWithCaller({ forcedTenant: { id: 't-forced', label: 'Forced Co (forced)' } })
+
+    expect(screen.getByText(/forced co \(forced\)/i)).toBeInTheDocument()
+    expect(screen.getByText(/locked to the camp being booked/i)).toBeInTheDocument()
+    expect(screen.queryByPlaceholderText(/search company by name/i)).not.toBeInTheDocument()
+    // The picker's own "Company *" label (required-picker case) is absent too.
+    expect(screen.queryByText(/^Company \*/i)).not.toBeInTheDocument()
+  })
+
+  it('submits forcedTenant.id regardless of session type, ignoring any picker state', async () => {
+    await mockSession('customer')
+    const { doctorsService } = await import('@/features/doctors/doctors.service')
+    const user = userEvent.setup()
+    await renderModalWithCaller({ forcedTenant: { id: 't-forced', label: 'Forced Co (forced)' } })
+
+    await user.type(inputForLabel(/pharma doctor code/i), 'DOC-2')
+    await user.type(inputForLabel(/doctor name/i), 'Dr. New Doc')
+    await user.click(screen.getByRole('button', { name: /add doctor/i }))
+
+    await waitFor(() => expect(doctorsService.createDoctor).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(doctorsService.createDoctor).mock.calls[0][0].tenant).toBe('t-forced')
+  })
+
+  it('fires onCreated with the created doctor only on a genuine create success', async () => {
+    await mockSession('customer')
+    const { doctorsService } = await import('@/features/doctors/doctors.service')
+    const created = doctorFixture({ id: 'doc-new', name: 'Dr. New' })
+    vi.mocked(doctorsService.createDoctor).mockResolvedValue({ success: true, message: '', data: created })
+
+    const onCreated = vi.fn()
+    const user = userEvent.setup()
+    await renderModalWithCaller({ onCreated, forcedTenant: { id: 't-forced', label: 'Forced Co' } })
+
+    await user.type(inputForLabel(/pharma doctor code/i), 'DOC-2')
+    await user.type(inputForLabel(/doctor name/i), 'Dr. New Doc')
+    await user.click(screen.getByRole('button', { name: /add doctor/i }))
+
+    await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1))
+    expect(onCreated).toHaveBeenCalledWith(created)
+  })
+
+  it('never fires onCreated on Cancel/dismiss', async () => {
+    await mockSession('customer')
+    const onCreated = vi.fn()
+    const onClose = vi.fn()
+    const user = userEvent.setup()
+    await renderModalWithCaller({ onCreated, onClose, forcedTenant: { id: 't-forced', label: 'Forced Co' } })
+
+    await user.click(screen.getByRole('button', { name: /cancel/i }))
+
+    expect(onCreated).not.toHaveBeenCalled()
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('never fires onCreated on an edit/update, even when the prop is supplied', async () => {
+    await mockSession('customer')
+    const { doctorsService } = await import('@/features/doctors/doctors.service')
+    vi.mocked(doctorsService.updateDoctor).mockResolvedValue({ success: true, message: '', data: doctorFixture() })
+
+    const onCreated = vi.fn()
+    const EditDoctorModal = (await import('./EditDoctorModal')).default
+    const user = userEvent.setup()
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <EditDoctorModal open doctor={doctorFixture()} onClose={vi.fn()} onCreated={onCreated} />
+      </QueryClientProvider>,
+    )
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => expect(doctorsService.updateDoctor).toHaveBeenCalledTimes(1))
+    expect(onCreated).not.toHaveBeenCalled()
   })
 })

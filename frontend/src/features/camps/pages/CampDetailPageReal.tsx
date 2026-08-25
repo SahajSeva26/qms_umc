@@ -17,6 +17,7 @@ import CampStageHistoryList from '@/features/camps/components/CampStageHistoryLi
 import ProjectPicker from '@/features/camps/components/ProjectPicker'
 import CampMrPicker from '@/features/camps/components/CampMrPicker'
 import InventoryMasterMultiPicker from '@/features/inventory/real/components/InventoryMasterMultiPicker'
+import EditDoctorModal from '@/features/doctors/components/EditDoctorModal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -24,6 +25,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import TenantPicker from '@/components/ui/TenantPicker'
 import type { BillingType, CampEntity, CampType } from '@/types/campReal.types'
+import type { DoctorEntity } from '@/types/doctor.types'
 import { CAMP_TIME_SLOT_LABEL } from '@/types/campTimeSlot.constants'
 import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
 import type { ProjectEntity } from '@/types/project.types'
@@ -157,18 +159,31 @@ const CampForm = ({ camp, isCreateMode, canWrite }: CampFormProps) => {
     setDeviceLabels(labels)
   }
 
-  const { tenants, doctors } = useCampPickerData(isCreateMode)
+  // Scopes FO/MR/Doctor candidates: create mode's picked Company, or edit mode's loaded camp.tenant.
+  const effectiveTenant = tenant || campRefId(camp?.tenant) || ''
+
+  const { tenants, doctors: fetchedDoctors } = useCampPickerData(isCreateMode, effectiveTenant)
+  // Locally merges a just-created doctor in immediately — a query invalidation
+  // could still land on a limit:10 page that doesn't include it.
+  const [localDoctors, setLocalDoctors] = useState<DoctorEntity[]>([])
+  const doctors = [...fetchedDoctors, ...localDoctors.filter((d) => !fetchedDoctors.some((f) => f.id === d.id))]
+  const [showNewDoctor, setShowNewDoctor] = useState(false)
+  const { hasPermission } = usePermission()
+  const canManageDoctors = hasPermission('doctor:manage')
 
   // The backend rejects the ENTIRE update once a camp leaves `requested`
   // (409, camp.service.ts's update()) — not just fo/date, so every field is locked.
   const isLocked = !isCreateMode && !!camp && camp.status !== 'requested'
 
-  // Scopes FO/MR candidates: create mode's picked Company, or edit mode's loaded camp.tenant.
-  const effectiveTenant = tenant || campRefId(camp?.tenant) || ''
-
   const { foRoles, roleLabel } = useCampCandidateRoles(camp)
 
-  const doctorLabel = (id: string) => doctors.find((d) => d.id === id)?.name ?? id
+  // base-ui's SelectValue always calls a function child, even with no value —
+  // it never falls through to the `placeholder` prop in that case, so the
+  // right empty-state text has to come from here instead.
+  const doctorLabel = (id: string) => {
+    if (id) return doctors.find((d) => d.id === id)?.name ?? id
+    return effectiveTenant ? 'Select doctor' : 'Select company first'
+  }
 
   // A camp's own `project` populate is slim ({_id,name,status}, no division/campTimeSlots) —
   // edit mode fetches the full project separately so the time-slot Select and Division can be scoped.
@@ -285,7 +300,20 @@ const CampForm = ({ camp, isCreateMode, canWrite }: CampFormProps) => {
           <>
             <div>
               <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Company *</Label>
-              <TenantPicker tenants={tenants} value={tenant} onValueChange={(v) => { setTenant(v); setField('project', ''); setProjectLabelState(''); setPickedProject(null); setDivision('') }} />
+              <TenantPicker
+                tenants={tenants}
+                value={tenant}
+                onValueChange={(v) => {
+                  setTenant(v)
+                  setField('project', '')
+                  setProjectLabelState('')
+                  setPickedProject(null)
+                  setDivision('')
+                  // A doctor (fetched or just-created) scoped to the old company is no longer valid.
+                  setDoctor('')
+                  setLocalDoctors([])
+                }}
+              />
             </div>
             <div>
               <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Project *</Label>
@@ -308,17 +336,37 @@ const CampForm = ({ camp, isCreateMode, canWrite }: CampFormProps) => {
 
         <div>
           <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Doctor *</Label>
-          {/* key forces a remount on undefined->defined transitions — base-ui's Select
-              otherwise keeps treating it as uncontrolled after the first render. */}
-          <Select key={doctor || 'empty'} value={doctor || undefined} onValueChange={(v) => setDoctor(v ?? '')} disabled={isLocked}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select doctor">{(v) => doctorLabel(v as string)}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {doctors.map((d) => <SelectItem key={d.id} value={d.id}>{d.name} ({d.pharmaCode})</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            {/* key forces a remount on undefined->defined transitions — base-ui's Select
+                otherwise keeps treating it as uncontrolled after the first render. */}
+            <Select key={doctor || 'empty'} value={doctor || undefined} onValueChange={(v) => setDoctor(v ?? '')} disabled={isLocked || !effectiveTenant}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder={effectiveTenant ? 'Select doctor' : 'Select company first'}>{(v) => doctorLabel(v as string)}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {doctors.map((d) => <SelectItem key={d.id} value={d.id}>{d.name} ({d.pharmaCode})</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {isCreateMode && canManageDoctors && (
+              <Button type="button" variant="outline" disabled={isLocked || !effectiveTenant} onClick={() => setShowNewDoctor(true)}>
+                New doctor
+              </Button>
+            )}
+          </div>
         </div>
+
+        {showNewDoctor && (
+          <EditDoctorModal
+            open
+            doctor={null}
+            forcedTenant={{ id: effectiveTenant, label: tenants.find((t) => t.id === effectiveTenant)?.name ?? effectiveTenant }}
+            onCreated={(created) => {
+              setLocalDoctors((prev) => [...prev, created])
+              setDoctor(created.id)
+            }}
+            onClose={() => setShowNewDoctor(false)}
+          />
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>

@@ -1,5 +1,10 @@
 import type { ProjectEntity, ProjectType } from '@/types/project.types'
 
+// Frontend-only UI business rule — the backend's daysToBookBefore validator
+// is nonnegative-only, no upper bound (project.validators.ts). Not yet a
+// true system-wide constraint: a direct API caller can still submit more.
+export const MAX_DAYS_TO_BOOK_BEFORE = 120
+
 // Real backend ProjectType values that correspond to the app's older
 // "Screening"/"Diet" mode split (used by OM/Invoicing/PO-management/Masters
 // tabs) — `mixed` shows under both, matching the old mock's intent (a mixed
@@ -138,4 +143,74 @@ export function projectHealthScore(project: ProjectEntity): number | null {
   const daysLeft = Math.ceil((new Date(range.end).getTime() - Date.now()) / 86_400_000)
   if (daysLeft <= 0) return 0
   return Math.min(100, Math.round((daysLeft / HEALTH_SCORE_FULL_RUNWAY_DAYS) * 100))
+}
+
+// `new Date('YYYY-MM-DD')` parses as UTC midnight, which can land on the
+// previous local calendar day outside UTC+ zones — parse into local
+// year/month/day explicitly instead, and reject impossible dates (e.g.
+// 2026-02-30) rather than letting them silently roll into the next month.
+function parseIsoDateLocal(iso: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso)
+  if (!match) return null
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(year, month - 1, day)
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null
+  return date
+}
+
+// Exported for createDefaultWizardForm() (wizard.types.ts) — the one other
+// place in the app needing "format a Date as a local-calendar YYYY-MM-DD
+// string," e.g. today's date for a fresh wizard's PO date default.
+export function formatIsoDateLocal(date: Date): string {
+  const year = String(date.getFullYear()).padStart(4, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+// Used by WizardStep2's Agreement mode (PO expiry / agreement end date
+// auto-fill). Returns null (never throws) on an unparseable/empty/impossible
+// `iso`, or when `months` isn't a non-negative safe integer — a fractional
+// value would silently truncate (Date.setMonth(1.5) behaves like 1) and a
+// negative value would produce a real date in the past, neither of which
+// matches the "duration in months, backend requires nonnegative integer"
+// contract — callers must skip the dependent setField entirely rather than
+// write a garbage value into form state.
+export function addMonthsIso(iso: string, months: number): string | null {
+  const date = parseIsoDateLocal(iso)
+  if (!date || !Number.isSafeInteger(months) || months < 0) return null
+  date.setMonth(date.getMonth() + months)
+  if (Number.isNaN(date.getTime())) return null
+  return formatIsoDateLocal(date)
+}
+
+// Used by WizardStep2's Agreement mode (start/end date -> duration in
+// months). Returns null (never NaN) on either date being
+// unparseable/empty/impossible.
+export function monthsBetween(startIso: string, endIso: string): number | null {
+  const s = parseIsoDateLocal(startIso)
+  const e = parseIsoDateLocal(endIso)
+  if (!s || !e) return null
+  if (e < s) return 0
+  return Math.round((e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth()))
+}
+
+// Used by WizardStep6's "effective earliest slot" preview. Client-side
+// display-only preview — not a server-derived value. The backend's
+// effectiveEarliestSlot field is only ever accepted/stored/mapped back as-is
+// (project.service.ts), never computed there, and the frontend doesn't submit
+// it — so there's no server semantic to match. Computed via local calendar-day
+// arithmetic (not `now + days * 86400000` + toISOString, which is UTC-based
+// and can show the wrong calendar date near midnight or outside UTC+ zones).
+// Never throws: returns '—' for any non-finite, negative, or out-of-range
+// `days` value rather than attempting a Date computation that could produce
+// an Invalid Date.
+export function computeBookingPreview(days: number, now: number): string {
+  if (!Number.isFinite(days) || !Number.isInteger(days) || days < 0 || days > MAX_DAYS_TO_BOOK_BEFORE) return '—'
+  const date = new Date(now)
+  date.setDate(date.getDate() + days)
+  if (Number.isNaN(date.getTime())) return '—'
+  return formatIsoDateLocal(date)
 }

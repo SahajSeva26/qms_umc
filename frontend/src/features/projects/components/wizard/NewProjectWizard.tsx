@@ -1,7 +1,8 @@
 import { Fragment, useState } from 'react'
 import { FiFolder, FiArrowLeft, FiArrowRight, FiSave, FiX } from 'react-icons/fi'
 import type { CreateProjectPayload, ExecutionMode, ProjectEntity, ProjectTherapy, UpdateProjectPayload } from '@/types/project.types'
-import { DEFAULT_WIZARD_FORM, type WizardFormState } from '@/features/projects/wizard.types'
+import { createDefaultWizardForm, type WizardFormState } from '@/features/projects/wizard.types'
+import { formatIsoDateLocal } from '@/features/projects/projects.utils'
 import { useCreateProject } from '@/features/projects/hooks/useCreateProject'
 import { useUpdateProject } from '@/features/projects/hooks/useUpdateProject'
 import { toast } from '@/components/ui/sonner'
@@ -78,7 +79,7 @@ function projectToForm(p: ProjectEntity): WizardFormState {
 
     mode: p.mode?.mode ?? 'po',
     poNumber: p.mode?.poNumber ?? '',
-    poDate: p.mode?.poDate ?? new Date().toISOString().slice(0, 10),
+    poDate: p.mode?.poDate ?? formatIsoDateLocal(new Date()),
     poExpiry: p.mode?.poExpiry ?? '',
     agreementNumber: p.mode?.agreementNumber ?? '',
     agreementStartDate: p.mode?.agreementStartDate ?? '',
@@ -130,7 +131,7 @@ const NewProjectWizard = ({ editProject, onClose, onSaved }: NewProjectWizardPro
   const STEP_SCHEMAS = isEdit ? EDIT_STEP_SCHEMAS : CREATE_STEP_SCHEMAS
 
   const [step, setStep] = useState(0)
-  const [form, setForm] = useState<WizardFormState>(editProject ? projectToForm(editProject) : DEFAULT_WIZARD_FORM)
+  const [form, setForm] = useState<WizardFormState>(() => (editProject ? projectToForm(editProject) : createDefaultWizardForm()))
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 

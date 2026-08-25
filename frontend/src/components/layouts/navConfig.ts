@@ -177,7 +177,11 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
   {
     section: 'Resources',
     subs: [
-      { title: '', items: ['inventory', 'itemmaster', 'inventoryitems', 'inventoryops', 'assets', 'kpi'].map((id) => NAV_BY_ID[id]) },
+      // 'inventory' (mock/localStorage-only), 'assets' and 'kpi' (both still the
+      // AdminPage stub) are deliberately hidden from nav, not deleted — only
+      // itemmaster/inventoryitems/inventoryops are backend-wired today. Their
+      // NAV_BY_ID entries and routes stay intact for a future re-add.
+      { title: '', items: ['itemmaster', 'inventoryitems', 'inventoryops'].map((id) => NAV_BY_ID[id]) },
     ],
   },
   {

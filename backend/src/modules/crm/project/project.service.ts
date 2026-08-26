@@ -1,6 +1,12 @@
 import mongoose, { HydratedDocument } from 'mongoose';
 import { IProject, Project } from './project.model';
-import { ICreateProjectPayload, IMoveStagePayload, ISearchProjectQuery, IUpdateProjectPayload } from './project.validators';
+import {
+    ICreateProjectPayload,
+    IMoveStagePayload,
+    IProjectReportQuery,
+    ISearchProjectQuery,
+    IUpdateProjectPayload,
+} from './project.validators';
 import { PROJECT_COUNTER_ENTITY, PROJECT_PERMISSIONS, PROJECT_TRANSITION_MAP } from './project.constants';
 import { canTransition } from '../lead/lead.validators';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
@@ -290,12 +296,30 @@ const moveStage = async (id: string, model: IMoveStagePayload, ctx: RequestConte
     return project;
 };
 
+
+const report = async (filters: IProjectReportQuery, ctx: RequestContext) => {
+    const [result] = await Project.aggregate([
+        { $match: ctx.where() },
+        { $addFields: { estimatedRevenue: { $multiply: ['$campCost', '$totalCamps'] } } },
+        {
+            $facet: {
+                totalProjects: [{ $count: 'count' }],
+                statusStats: [{ $group: { _id: '$status', count: { $sum: 1 }, revenue: { $sum: '$estimatedRevenue' } } }],
+                therapyStats: [{ $group: { _id: '$therapy', count: { $sum: 1 }, revenue: { $sum: '$estimatedRevenue' } } }],
+            },
+        },
+    ]);
+
+    return { ...result };
+};
+
 export const ProjectService = {
     get,
     search,
     create,
     update,
     moveStage,
+    report,
 };
 
 // ========================================================================================

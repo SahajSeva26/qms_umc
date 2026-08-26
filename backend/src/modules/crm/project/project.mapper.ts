@@ -1,4 +1,5 @@
 import { RequestContext } from '../../../shared/utils/contextBuilder';
+import { PROJECT_STATUS, PROJECT_THERAPY_TYPES } from './project.constants';
 
 export const ProjectMapper = {
     toResponse: (project: any, ctx: RequestContext) => {
@@ -76,5 +77,29 @@ export const ProjectMapper = {
             result.items.push(ProjectMapper.toResponse(project, ctx));
         }
         return result;
+    },
+    toReportResponse: (report: any) => {
+        const statusStats = new Map<string, { count: number; revenue: number }>(
+            (report?.statusStats || []).map((s: any) => [s._id, { count: s.count, revenue: s.revenue }]),
+        );
+        const therapyStats = new Map<string, { count: number; revenue: number }>(
+            (report?.therapyStats || []).map((t: any) => [t._id, { count: t.count, revenue: t.revenue }]),
+        );
+
+        return {
+            summary: {
+                totalProjects: report?.totalProjects?.[0]?.count || 0,
+            },
+            byStatus: Object.values(PROJECT_STATUS).map((status) => ({
+                status,
+                count: statusStats.get(status)?.count || 0,
+                revenue: statusStats.get(status)?.revenue || 0,
+            })),
+            byTherapy: Object.values(PROJECT_THERAPY_TYPES).map((therapy) => ({
+                therapy,
+                count: therapyStats.get(therapy)?.count || 0,
+                revenue: therapyStats.get(therapy)?.revenue || 0,
+            })),
+        };
     },
 };

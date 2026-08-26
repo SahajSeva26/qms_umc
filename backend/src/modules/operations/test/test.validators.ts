@@ -7,11 +7,11 @@ import { isValidObjectID } from '../../../shared/utils/strings';
 const objectId = (label: string) =>
     z.string().refine((val) => isValidObjectID(val), { message: `${label} must be a valid id` });
 
-// One resource line: a catalog item (InventoryMaster) + quantity.
-// For a device the quantity is a single unit (1); a consumable carries an explicit amount.
-const ResourceLineSchema = z.object({
+// One consumption line: a catalog item (InventoryMaster) + the rate at which running
+// this test reduces that item from the field officer's stock.
+const ConsumptionLineSchema = z.object({
     item: objectId('Item').openapi({ example: '665f1a2b3c4d5e6f70819293' }),
-    quantity: z.number().min(1).optional().openapi({ example: 1 }),
+    rate: z.number().min(1).optional().openapi({ example: 1 }),
 });
 
 //1: create ====================================>
@@ -23,8 +23,7 @@ export const CreateTestPayloadSchema = z.object({
     therapy: z.enum(Object.values(PROJECT_THERAPY_TYPES)).openapi({ example: 'diabetes' }),
     status: z.enum(Object.values(TEST_STATUS)).optional().openapi({ example: 'active' }),
     config: z.record(z.string(), z.unknown()).optional().openapi({ example: { unit: 'mg/dL' } }),
-    resourceRequired: z.array(ResourceLineSchema).optional(),
-    resourceConsumption: z.array(ResourceLineSchema).optional(),
+    consumption: z.array(ConsumptionLineSchema).optional(),
 });
 export type ICreateTestPayload = z.infer<typeof CreateTestPayloadSchema>;
 
@@ -36,8 +35,7 @@ export const UpdateTestPayloadSchema = z.object({
     therapy: z.enum(Object.values(PROJECT_THERAPY_TYPES)).optional(),
     status: z.enum(Object.values(TEST_STATUS)).optional(),
     config: z.record(z.string(), z.unknown()).optional(),
-    resourceRequired: z.array(ResourceLineSchema).optional(),
-    resourceConsumption: z.array(ResourceLineSchema).optional(),
+    consumption: z.array(ConsumptionLineSchema).optional(),
 });
 export type IUpdateTestPayload = z.infer<typeof UpdateTestPayloadSchema>;
 

@@ -1,13 +1,13 @@
-// Test Mapper
+// TestMaster Mapper
 import { RequestContext } from '../../../shared/utils/contextBuilder';
-import { TEST_PERMISSIONS } from './test.constants';
+import { TEST_MASTER_PERMISSIONS } from './testMaster.constants';
 
 const mapConsumptionLine = (line: any) => ({
     item: line?.item?._id ? line.item._id.toString() : line?.item?.toString(),
     rate: line?.rate,
 });
 
-export const TestMapper = {
+export const TestMasterMapper = {
     toResponse: (test: any, ctx: RequestContext) => {
         const result: any = {
             id: test._id?.toString(),
@@ -17,6 +17,8 @@ export const TestMapper = {
             name: test.name,
             description: test.description,
             therapy: test.therapy,
+            duration: test.duration,
+            price: test.price,
 
             config: test.config,
             consumption: (test.consumption || []).map(mapConsumptionLine),
@@ -25,7 +27,7 @@ export const TestMapper = {
             updatedAt: test.updatedAt,
         };
         // status (incl. inactive tests) is only exposed to a manage-level actor
-        if (ctx.hasAnyPermissions([TEST_PERMISSIONS.MANAGE.code])) {
+        if (ctx.hasAnyPermissions([TEST_MASTER_PERMISSIONS.MANAGE.code])) {
             result.status = test.status;
         }
         return result;
@@ -36,7 +38,7 @@ export const TestMapper = {
             items: [] as any[],
         };
         for (const test of data?.items || []) {
-            result.items.push(TestMapper.toResponse(test, ctx));
+            result.items.push(TestMasterMapper.toResponse(test, ctx));
         }
         return result;
     },

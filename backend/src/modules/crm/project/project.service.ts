@@ -14,7 +14,7 @@ import { LeadService } from '../lead/lead.service';
 import { RoleService } from '../../access-management/role/role.service';
 import { ContactService } from '../contact/contact.service';
 import { TENANT_TYPE } from '../../access-management/tenant/tenant.constants';
-import { TestService } from '../../operations/test/test.service';
+import { TestMasterService } from '../../operations/testMaster/testMaster.service';
 
 type ProjectDocument = HydratedDocument<IProject> | null;
 
@@ -44,11 +44,11 @@ const assertPlatformStaff = async (roleId: string, label: string, ctx: RequestCo
     }
 };
 
-// tests reference the global Test catalog — every supplied id must resolve to a real test.
+// tests reference the global TestMaster catalog — every supplied id must resolve to a real test.
 const assertTestsExist = async (testIds: string[], ctx: RequestContext) => {
     const uniqueIds = [...new Set(testIds)];
     for (const id of uniqueIds) {
-        const test = await TestService.get(id, ctx);
+        const test = await TestMasterService.get(id, ctx);
         if (!test) {
             return throwAppError(`Test not found: ${id}`, StatusCodes.BAD_REQUEST);
         }

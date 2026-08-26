@@ -135,11 +135,11 @@ const projectSchema = new mongoose.Schema(
                 required: [true, 'Project type is required'],
             },
         ],
-        // references to the global Test catalog — actual Test._id values (existence enforced in the service)
+        // references to the global TestMaster catalog — actual TestMaster._id values (existence enforced in the service)
         tests: [
             {
                 type: mongoose.Schema.Types.ObjectId,
-                ref: 'Test',
+                ref: 'TestMaster',
             },
         ],
         lead: {

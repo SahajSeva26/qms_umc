@@ -8,8 +8,30 @@ import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
 import { isValidObjectID } from '../../../shared/utils/strings';
 import { IServiceOptions } from '../../../shared/types/service.types';
+import { InventoryMasterService } from '../../inventory/inventory-master/inventory-master.service';
+import { ITEM_TYPES } from '../../inventory/inventory-master/inventory-master.constants';
 
 type TestDocument = HydratedDocument<ITest> | null;
+
+// A device is reusable equipment — it is not depleted per test, so its consumption rate
+// defaults to 0. Resolve each line's catalog item; every referenced item must exist (a bad
+// id rejects the whole create/update). When the item is a device and no rate is explicitly
+// supplied, set the rate to 0 (consumables keep their supplied/default rate).
+const normalizeConsumption = async (lines: any[], ctx: RequestContext) => {
+    const normalized: any[] = [];
+    for (const line of lines) {
+        const item = await InventoryMasterService.get(String(line.item), ctx);
+        if (!item) {
+            return throwAppError(`Inventory item not found: ${line.item}`, StatusCodes.BAD_REQUEST);
+        }
+        if (item.type === ITEM_TYPES.DEVICE && line.rate === undefined) {
+            normalized.push({ ...line, rate: 0 });
+        } else {
+            normalized.push(line);
+        }
+    }
+    return normalized;
+};
 
 // Test is a global/system catalog record — it belongs to no tenant, so there is
 // no ctx.where() scoping. It only references InventoryMaster (via consumption lines).
@@ -22,12 +44,24 @@ const populate: any[] = [{ path: 'consumption.item' }];
 // code is the immutable natural key — it is seeded at construction in create()
 // and never handled here, so update() can never reassign it.
 const set = async (model: any, entity: HydratedDocument<ITest>, ctx: RequestContext) => {
-    if (model.name) entity.name = model.name;
-    if (model.description) entity.description = model.description;
-    if (model.therapy) entity.therapy = model.therapy;
-    if (model.config !== undefined) entity.config = model.config;
-    if (model.consumption !== undefined) entity.consumption = model.consumption;
-    if (model.status && ctx.hasAnyPermissions([TEST_PERMISSIONS.MANAGE.code])) entity.status = model.status;
+    if (model.name) {
+        entity.name = model.name;
+    }
+    if (model.description) {
+        entity.description = model.description;
+    }
+    if (model.therapy) {
+        entity.therapy = model.therapy;
+    }
+    if (model.config !== undefined) {
+        entity.config = model.config;
+    }
+    if (model.consumption !== undefined) {
+        entity.consumption = (await normalizeConsumption(model.consumption, ctx)) as any;
+    }
+    if (model.status && ctx.hasAnyPermissions([TEST_PERMISSIONS.MANAGE.code])) {
+        entity.status = model.status;
+    }
 
     return entity;
 };

@@ -2,9 +2,9 @@
 import { RequestContext } from '../../../shared/utils/contextBuilder';
 import { TEST_PERMISSIONS } from './test.constants';
 
-const mapResourceLine = (line: any) => ({
+const mapConsumptionLine = (line: any) => ({
     item: line?.item?._id ? line.item._id.toString() : line?.item?.toString(),
-    quantity: line?.quantity,
+    rate: line?.rate,
 });
 
 export const TestMapper = {
@@ -19,8 +19,7 @@ export const TestMapper = {
             therapy: test.therapy,
 
             config: test.config,
-            resourceRequired: (test.resourceRequired || []).map(mapResourceLine),
-            resourceConsumption: (test.resourceConsumption || []).map(mapResourceLine),
+            consumption: (test.consumption || []).map(mapConsumptionLine),
 
             createdAt: test.createdAt,
             updatedAt: test.updatedAt,

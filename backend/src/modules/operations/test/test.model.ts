@@ -38,26 +38,13 @@ const testSchema = new mongoose.Schema(
 
         config: {},
 
-        resourceRequired: [
+        consumption: [
             {
                 item: {
                     type: mongoose.Schema.Types.ObjectId,
                     ref: 'InventoryMaster',
                 },
-                quantity: {
-                    type: Number,
-                    default: 1,
-                    //for device only 1
-                },
-            },
-        ],
-        resourceConsumption: [
-            {
-                item: {
-                    type: mongoose.Schema.Types.ObjectId,
-                    ref: 'InventoryMaster',
-                },
-                quantity: {
+                rate: {
                     type: Number,
                     default: 1,
                 },

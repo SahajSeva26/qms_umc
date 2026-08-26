@@ -12,8 +12,8 @@ import { IServiceOptions } from '../../../shared/types/service.types';
 type TestDocument = HydratedDocument<ITest> | null;
 
 // Test is a global/system catalog record — it belongs to no tenant, so there is
-// no ctx.where() scoping. It only references InventoryMaster (via resource lines).
-const populate: any[] = [{ path: 'resourceRequired.item' }, { path: 'resourceConsumption.item' }];
+// no ctx.where() scoping. It only references InventoryMaster (via consumption lines).
+const populate: any[] = [{ path: 'consumption.item' }];
 
 // ========================================================================================
 // CORE FUNCTIONS
@@ -26,8 +26,7 @@ const set = async (model: any, entity: HydratedDocument<ITest>, ctx: RequestCont
     if (model.description) entity.description = model.description;
     if (model.therapy) entity.therapy = model.therapy;
     if (model.config !== undefined) entity.config = model.config;
-    if (model.resourceRequired !== undefined) entity.resourceRequired = model.resourceRequired;
-    if (model.resourceConsumption !== undefined) entity.resourceConsumption = model.resourceConsumption;
+    if (model.consumption !== undefined) entity.consumption = model.consumption;
     if (model.status && ctx.hasAnyPermissions([TEST_PERMISSIONS.MANAGE.code])) entity.status = model.status;
 
     return entity;

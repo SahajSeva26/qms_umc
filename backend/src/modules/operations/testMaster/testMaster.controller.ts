@@ -1,10 +1,10 @@
-// Test Controller
+// TestMaster Controller
 import { ResponseHandler } from '../../../shared/utils/responseHandler';
 import { formatZodError } from '../../../shared/utils/error';
-import { CreateTestPayloadSchema, SearchTestQuerySchema, UpdateTestPayloadSchema } from './test.validators';
+import { CreateTestMasterPayloadSchema, SearchTestMasterQuerySchema, UpdateTestMasterPayloadSchema } from './testMaster.validators';
 import { StatusCodes } from 'http-status-codes';
-import { TestService } from './test.service';
-import { TestMapper } from './test.mapper';
+import { TestMasterService } from './testMaster.service';
+import { TestMasterMapper } from './testMaster.mapper';
 import { RequestHandler } from '../../../shared/utils/requestHandler';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
 
@@ -13,16 +13,16 @@ const get = async (req: any, res: any) => {
         const ctx: RequestContext = req.context;
         const { id } = req?.params;
         if (!id) {
-            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Test ID is required', null);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Test master ID is required', null);
         }
 
-        const test = await TestService.get(id, ctx, { populate: true });
+        const test = await TestMasterService.get(id, ctx, { populate: true });
 
         if (!test) {
-            return ResponseHandler.appResponse(res, StatusCodes.NOT_FOUND, false, 'Test not found', null);
+            return ResponseHandler.appResponse(res, StatusCodes.NOT_FOUND, false, 'Test master not found', null);
         }
 
-        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Test fetched successfully', TestMapper.toResponse(test, ctx));
+        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Test master fetched successfully', TestMasterMapper.toResponse(test, ctx));
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }
@@ -32,7 +32,7 @@ const search = async (req: any, res: any) => {
     try {
         const ctx: RequestContext = req.context;
 
-        const { data: filters, success, error } = SearchTestQuerySchema.safeParse(req.query);
+        const { data: filters, success, error } = SearchTestMasterQuerySchema.safeParse(req.query);
         if (!success) {
             const validationErrors = formatZodError(error);
             return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
@@ -42,9 +42,9 @@ const search = async (req: any, res: any) => {
 
         const pagination = RequestHandler.getPagination(filters);
 
-        const result = await TestService.search(filters, ctx, { pagination });
+        const result = await TestMasterService.search(filters, ctx, { pagination });
 
-        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Tests fetched successfully', TestMapper.toSearchResponse(result, ctx));
+        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Test masters fetched successfully', TestMasterMapper.toSearchResponse(result, ctx));
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }
@@ -54,7 +54,7 @@ const create = async (req: any, res: any) => {
     try {
         const ctx: RequestContext = req.context;
 
-        const { data, success, error } = CreateTestPayloadSchema.safeParse(req.body);
+        const { data, success, error } = CreateTestMasterPayloadSchema.safeParse(req.body);
         if (!success) {
             const validationErrors = formatZodError(error);
             return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
@@ -62,9 +62,9 @@ const create = async (req: any, res: any) => {
             });
         }
 
-        const test = await TestService.create(data, ctx);
+        const test = await TestMasterService.create(data, ctx);
 
-        return ResponseHandler.appResponse(res, StatusCodes.CREATED, true, 'Test created successfully', TestMapper.toResponse(test, ctx));
+        return ResponseHandler.appResponse(res, StatusCodes.CREATED, true, 'Test master created successfully', TestMasterMapper.toResponse(test, ctx));
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }
@@ -75,10 +75,10 @@ const update = async (req: any, res: any) => {
         const ctx: RequestContext = req.context;
         const { id } = req?.params;
         if (!id) {
-            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Test ID is required', null);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Test master ID is required', null);
         }
 
-        const { data, success, error } = UpdateTestPayloadSchema.safeParse(req.body);
+        const { data, success, error } = UpdateTestMasterPayloadSchema.safeParse(req.body);
         if (!success) {
             const validationErrors = formatZodError(error);
             return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
@@ -86,15 +86,15 @@ const update = async (req: any, res: any) => {
             });
         }
 
-        const test = await TestService.update(id, data, ctx);
+        const test = await TestMasterService.update(id, data, ctx);
 
-        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Test updated successfully', TestMapper.toResponse(test, ctx));
+        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Test master updated successfully', TestMasterMapper.toResponse(test, ctx));
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }
 };
 
-export const TestController = {
+export const TestMasterController = {
     get,
     search,
     create,

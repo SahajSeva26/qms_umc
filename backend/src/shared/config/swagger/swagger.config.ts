@@ -18,7 +18,7 @@ import '../../../modules/qa-feedback/qaFeedback.routes';
 import '../../../modules/doctor/doctor.routes';
 import '../../../modules/operations/geoProfile/geoProfile.routes';
 import '../../../modules/operations/camp/camp.routes';
-import '../../../modules/operations/test/test.routes';
+import '../../../modules/operations/testMaster/testMaster.routes';
 import '../../../modules/counter/counter.routes';
 import '../../../modules/inventory/inventory-master/inventory-master.routes';
 import '../../../modules/inventory/inventory-consumable/inventory-consumable.routes';

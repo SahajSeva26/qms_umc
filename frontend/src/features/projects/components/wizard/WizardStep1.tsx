@@ -1,8 +1,9 @@
 import { FiActivity, FiHeart, FiVideo, FiDroplet, FiShuffle, FiTag, FiInfo } from 'react-icons/fi'
 import type { WizardFormState } from '@/features/projects/wizard.types'
-import type { ProjectTest, ProjectTherapy, ProjectType } from '@/types/project.types'
-import { PROJECT_TEST_LABEL, PROJECT_THERAPY_LABEL, PROJECT_TYPE_LABEL } from '@/types/project.types'
+import type { ProjectTherapy, ProjectType } from '@/types/project.types'
+import { PROJECT_THERAPY_LABEL, PROJECT_TYPE_LABEL } from '@/types/project.types'
 import { PROJECT_TYPE_COLOR } from '@/features/projects/projects.utils'
+import { useTests } from '@/features/tests/hooks/useTests'
 import { PickCard, PickGrid } from '@/components/ui/PickCard'
 import SectionHeader from '@/components/ui/SectionHeader'
 import { ChipRow, ChipToggle } from '@/components/ui/ChipToggle'
@@ -21,7 +22,6 @@ const TYPE_ICONS: Record<ProjectType, typeof FiActivity> = {
 
 const THERAPY_OPTIONS = Object.keys(PROJECT_THERAPY_LABEL) as ProjectTherapy[]
 const TYPE_OPTIONS = Object.keys(PROJECT_TYPE_LABEL) as ProjectType[]
-const TEST_OPTIONS = Object.keys(PROJECT_TEST_LABEL) as ProjectTest[]
 
 interface WizardStep1Props {
   form: WizardFormState
@@ -38,9 +38,26 @@ const WizardStep1 = ({ form, setField }: WizardStep1Props) => {
     setField('type', form.type.includes(id) ? form.type.filter((t) => t !== id) : [...form.type, id])
   }
 
-  const toggleTest = (id: ProjectTest) => {
+  const toggleTest = (id: string) => {
     setField('tests', form.tests.includes(id) ? form.tests.filter((t) => t !== id) : [...form.tests, id])
   }
+
+  // Changing therapy invalidates the shown test list — clear any
+  // already-selected tests in the same update so a stale id from the
+  // previous therapy can never silently ride along in the submitted payload.
+  const handleTherapyChange = (v: string | null) => {
+    setField('therapy', (v ?? '') as ProjectTherapy)
+    setField('tests', [])
+  }
+
+  // Disabled (not merely hidden) until a therapy is picked — showing an
+  // unfiltered list first would let a test be selected that then vanishes
+  // once a therapy is chosen, contradicting the therapy-scoped intent.
+  const { data: testsData, isLoading: isLoadingTests, error: testsError, refetch: refetchTests } = useTests(
+    { therapy: form.therapy || undefined, status: 'active' },
+    !!form.therapy,
+  )
+  const tests = testsData?.data?.items ?? []
 
   return (
     <div className="space-y-4">
@@ -60,7 +77,7 @@ const WizardStep1 = ({ form, setField }: WizardStep1Props) => {
 
       <div>
         <Label className={labelClasses} style={labelStyle}>Therapy *</Label>
-        <Select value={form.therapy} onValueChange={(v) => setField('therapy', v as ProjectTherapy)}>
+        <Select value={form.therapy} onValueChange={handleTherapyChange}>
           <SelectTrigger className={`w-full ${fieldClasses}`}><SelectValue placeholder="— therapy —" /></SelectTrigger>
           <SelectContent>
             {THERAPY_OPTIONS.map((t) => (
@@ -88,13 +105,32 @@ const WizardStep1 = ({ form, setField }: WizardStep1Props) => {
 
       <div>
         <SectionHeader icon={FiDroplet}>Tests to be conducted</SectionHeader>
-        <ChipRow>
-          {TEST_OPTIONS.map((t) => (
-            <ChipToggle key={t} active={form.tests.includes(t)} onClick={() => toggleTest(t)}>
-              {PROJECT_TEST_LABEL[t]}
-            </ChipToggle>
-          ))}
-        </ChipRow>
+        {!form.therapy ? (
+          <p className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>Select a therapy to see available tests.</p>
+        ) : isLoadingTests ? (
+          <p className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>Loading tests…</p>
+        ) : testsError ? (
+          <div className="text-[12px] rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger flex items-center justify-between gap-2">
+            <span>Couldn't load tests for this therapy.</span>
+            <button
+              type="button"
+              className="font-semibold underline decoration-dotted underline-offset-2 hover:no-underline shrink-0"
+              onClick={() => refetchTests()}
+            >
+              Retry
+            </button>
+          </div>
+        ) : tests.length === 0 ? (
+          <p className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>No tests configured for this therapy yet.</p>
+        ) : (
+          <ChipRow>
+            {tests.map((t) => (
+              <ChipToggle key={t.id} active={form.tests.includes(t.id)} onClick={() => toggleTest(t.id)}>
+                {t.name}
+              </ChipToggle>
+            ))}
+          </ChipRow>
+        )}
       </div>
     </div>
   )

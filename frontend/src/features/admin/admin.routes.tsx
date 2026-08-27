@@ -14,6 +14,7 @@ export const ADMIN_ROUTES = {
   ADMIN_SETTINGS:     '/admin/settings',
   ADMIN_USERS:        '/admin/users',
   ADMIN_USER_DETAIL:  '/admin/users/:id',
+  ADMIN_TESTS:        '/admin/tests',
 }
 
 // Matches GET/PUT /users's real backend guards exactly (user.routes.ts).
@@ -41,5 +42,12 @@ export const adminRoutes: RouteObject[] = [
   {
     path: ADMIN_ROUTES.ADMIN_USER_DETAIL,
     lazy: lazyRoute(() => import('./pages/UserDetailPage'), USERS_VIEW_PERMISSIONS),
+  },
+  {
+    // Temporary system-admin-only phase: GET /tests is open to any
+    // authenticated user server-side, so this route guard (not just a
+    // hidden nav item) is the real boundary keeping a non-system user out.
+    path: ADMIN_ROUTES.ADMIN_TESTS,
+    lazy: lazyRoute(() => import('@/features/tests/pages/TestsPage'), ['system:manage']),
   },
 ]

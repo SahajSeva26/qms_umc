@@ -139,6 +139,10 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { id: 'roles',            label: 'Roles',                   icon: 'UserCheck',     path: ACCESS_MANAGEMENT_ROUTES.ROLES },
 
   { id: 'qafeedback',       label: 'QA Feedback',             icon: 'MessageSquare', path: QA_FEEDBACK_ROUTES.QA_FEEDBACK_REVIEW },
+
+  // Temporary system-admin-only phase — route itself is guarded on
+  // system:manage (admin.routes.tsx), not just this section's own gate.
+  { id: 'testmaster',       label: 'Test Master',             icon: 'BookOpen',      path: ADMIN_ROUTES.ADMIN_TESTS },
 ]
 
 const NAV_BY_ID = Object.fromEntries(ALL_NAV_ITEMS.map((n) => [n.id, n]))
@@ -193,7 +197,7 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
   {
     section: 'System',
     subs: [
-      { title: '', items: ['admin', 'users', 'settings', 'permissiongroups', 'roletypes', 'roles', 'qafeedback'].map((id) => NAV_BY_ID[id]) },
+      { title: '', items: ['admin', 'users', 'settings', 'permissiongroups', 'roletypes', 'roles', 'qafeedback', 'testmaster'].map((id) => NAV_BY_ID[id]) },
     ],
   },
 ]

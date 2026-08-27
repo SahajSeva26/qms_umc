@@ -5,7 +5,6 @@ import type {
   ExecutionModeType,
   GoLiveScopeCode,
   PaymentTerms,
-  ProjectTest,
   ProjectTherapy,
   ProjectType,
   WhoCanBookCampCode,
@@ -29,7 +28,8 @@ export interface WizardFormState {
   name: string
   therapy: ProjectTherapy | ''
   type: ProjectType[]
-  tests: ProjectTest[]
+  // Test._id references, filtered by the selected therapy.
+  tests: string[]
 
   // Step 2 — Execution
   mode: ExecutionModeType

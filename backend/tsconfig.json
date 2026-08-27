@@ -41,5 +41,12 @@
     "moduleDetection": "force",
     "skipLibCheck": true,
     "esModuleInterop": true
-  }
+  },
+  // dist/ (stale prior build output) was being picked up by the default
+  // **/* include alongside src/ — every declare global augmentation (e.g.
+  // Express.Request.context in contextBuilder.ts) then appeared twice,
+  // causing spurious "subsequent property declarations" errors. scripts/
+  // holds standalone one-off scripts run directly via tsx, not part of the
+  // app build — excluded so they don't need to live under rootDir.
+  "exclude": ["dist", "node_modules", "scripts"]
 }

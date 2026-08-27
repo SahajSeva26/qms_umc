@@ -25,7 +25,6 @@ const populate: any[] = [
     { path: 'salesRep' },
     { path: 'projectCoordinator' },
     { path: 'marketingContact' },
-    { path: 'tests', select: 'name code therapy' },
 ];
 
 // ========================================================================================

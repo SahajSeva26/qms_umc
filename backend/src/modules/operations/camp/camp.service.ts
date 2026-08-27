@@ -1,7 +1,14 @@
 // Camp Service
 import mongoose, { HydratedDocument } from 'mongoose';
 import { CampModel, ICamp } from './camp.model';
-import { IBookCampPayload, ICreateCampPayload, IMoveStagePayload, ISearchCampQuery, IUpdateCampPayload } from './camp.validators';
+import {
+    IBookCampPayload,
+    ICampReportQuery,
+    ICreateCampPayload,
+    IMoveStagePayload,
+    ISearchCampQuery,
+    IUpdateCampPayload,
+} from './camp.validators';
 import { CAMP_COUNTER_ENTITY, CAMP_PERMISSIONS, CAMP_STATUSES, CAMP_TRANSITION_MAP } from './camp.constants';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
 import { CounterService } from '../../counter/counter.service';
@@ -492,6 +499,24 @@ const book = async (model: IBookCampPayload, ctx: RequestContext): Promise<Hydra
     return CampService.create(createPayload, ctx);
 };
 
+const report = async (filters: ICampReportQuery, ctx: RequestContext) => {
+    //1: single aggregation, single collection scan — every branch is independent, computed off the
+    // same scoped input set.
+    const [result] = await CampModel.aggregate([
+        { $match: ctx.where() },
+        {
+            $facet: {
+                totalCamps: [{ $count: 'count' }],
+                statusCounts: [{ $group: { _id: '$status', count: { $sum: 1 } } }],
+                typeCounts: [{ $group: { _id: '$type', count: { $sum: 1 } } }],
+                billingTypeCounts: [{ $group: { _id: '$billingType', count: { $sum: 1 } } }],
+            },
+        },
+    ]);
+
+    return { ...result };
+};
+
 export const CampService = {
     get,
     search,
@@ -500,4 +525,5 @@ export const CampService = {
     moveStage,
     allocateFo,
     book,
+    report,
 };

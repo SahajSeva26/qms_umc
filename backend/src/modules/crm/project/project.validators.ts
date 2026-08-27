@@ -49,7 +49,7 @@ export const CreateProjectPayloadSchema = z.object({
     name: z.string().min(1).openapi({ example: 'Cardio screening drive Q3' }),
     therapy: z.enum(Object.values(PROJECT_THERAPY_TYPES)).openapi({ example: 'cardiology' }),
     type: z.array(z.enum(Object.values(PROJECT_TYPES))).min(1).openapi({ example: ['screening_camp'] }),
-    tests: z.array(objectId('Test')).optional().openapi({ example: ['665f0c3a1a2b3c4d5e6f7a8a'] }),
+    tests: z.array(objectId('TestMaster')).optional().openapi({ example: ['665f0c3a1a2b3c4d5e6f7a8a'] }),
 
     // execution
     mode: ExecutionModeSchema.optional(),
@@ -99,7 +99,7 @@ export const UpdateProjectPayloadSchema = z.object({
     name: z.string().min(1).optional(),
     therapy: z.enum(Object.values(PROJECT_THERAPY_TYPES)).optional(),
     type: z.array(z.enum(Object.values(PROJECT_TYPES))).min(1).optional(),
-    tests: z.array(objectId('Test')).optional(),
+    tests: z.array(objectId('TestMaster')).optional(),
     mode: ExecutionModeSchema.optional(),
     campCost: z.number().nonnegative().optional(),
     totalCamps: z.number().int().nonnegative().optional(),

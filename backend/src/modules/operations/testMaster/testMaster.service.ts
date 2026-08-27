@@ -1,8 +1,8 @@
-// Test Service
+// TestMaster Service
 import { HydratedDocument } from 'mongoose';
-import { TestModel, ITest } from './test.model';
-import { ICreateTestPayload, ISearchTestQuery, IUpdateTestPayload } from './test.validators';
-import { TEST_PERMISSIONS, TEST_STATUS } from './test.constants';
+import { TestMasterModel, ITestMaster } from './testMaster.model';
+import { ICreateTestMasterPayload, ISearchTestMasterQuery, IUpdateTestMasterPayload } from './testMaster.validators';
+import { TEST_MASTER_PERMISSIONS, TEST_MASTER_STATUS } from './testMaster.constants';
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
@@ -11,7 +11,7 @@ import { IServiceOptions } from '../../../shared/types/service.types';
 import { InventoryMasterService } from '../../inventory/inventory-master/inventory-master.service';
 import { ITEM_TYPES } from '../../inventory/inventory-master/inventory-master.constants';
 
-type TestDocument = HydratedDocument<ITest> | null;
+type TestMasterDocument = HydratedDocument<ITestMaster> | null;
 
 // A device is reusable equipment — it is not depleted per test, so its consumption rate
 // defaults to 0. Resolve each line's catalog item; every referenced item must exist (a bad
@@ -33,7 +33,7 @@ const normalizeConsumption = async (lines: any[], ctx: RequestContext) => {
     return normalized;
 };
 
-// Test is a global/system catalog record — it belongs to no tenant, so there is
+// TestMaster is a global/system catalog record — it belongs to no tenant, so there is
 // no ctx.where() scoping. It only references InventoryMaster (via consumption lines).
 const populate: any[] = [{ path: 'consumption.item' }];
 
@@ -43,7 +43,7 @@ const populate: any[] = [{ path: 'consumption.item' }];
 
 // code is the immutable natural key — it is seeded at construction in create()
 // and never handled here, so update() can never reassign it.
-const set = async (model: any, entity: HydratedDocument<ITest>, ctx: RequestContext) => {
+const set = async (model: any, entity: HydratedDocument<ITestMaster>, ctx: RequestContext) => {
     if (model.name) {
         entity.name = model.name;
     }
@@ -53,24 +53,30 @@ const set = async (model: any, entity: HydratedDocument<ITest>, ctx: RequestCont
     if (model.therapy) {
         entity.therapy = model.therapy;
     }
+    if (model.duration !== undefined) {
+        entity.duration = model.duration;
+    }
+    if (model.price !== undefined) {
+        entity.price = model.price;
+    }
     if (model.config !== undefined) {
         entity.config = model.config;
     }
     if (model.consumption !== undefined) {
         entity.consumption = (await normalizeConsumption(model.consumption, ctx)) as any;
     }
-    if (model.status && ctx.hasAnyPermissions([TEST_PERMISSIONS.MANAGE.code])) {
+    if (model.status && ctx.hasAnyPermissions([TEST_MASTER_PERMISSIONS.MANAGE.code])) {
         entity.status = model.status;
     }
 
     return entity;
 };
 
-// get accepts either an ObjectId or the test's code (natural key).
-const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): Promise<TestDocument> => {
+// get accepts either an ObjectId or the test master's code (natural key).
+const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): Promise<TestMasterDocument> => {
     const where: any = isValidObjectID(id) ? { _id: id } : { code: id };
 
-    const query = TestModel.findOne(where);
+    const query = TestMasterModel.findOne(where);
     if (options?.populate) {
         query.populate(populate);
     }
@@ -78,12 +84,12 @@ const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): 
     return await query;
 };
 
-const search = async (filters: ISearchTestQuery, ctx: RequestContext, options?: IServiceOptions) => {
+const search = async (filters: ISearchTestMasterQuery, ctx: RequestContext, options?: IServiceOptions) => {
     const sort: any = { name: 1 };
 
     //1: default visibility — only active tests are visible (no tenant scoping, catalog is global)
     const where: any = {};
-    where.status = TEST_STATUS.ACTIVE;
+    where.status = TEST_MASTER_STATUS.ACTIVE;
 
     //2: add search filters
     if (filters.name) {
@@ -98,39 +104,39 @@ const search = async (filters: ISearchTestQuery, ctx: RequestContext, options?: 
         where.therapy = Array.isArray(filters.therapy) ? { $in: filters.therapy } : filters.therapy;
     }
     // only a manage-level actor may look past active (see inactive tests)
-    if (filters.status && ctx.hasAnyPermissions([TEST_PERMISSIONS.MANAGE.code])) {
+    if (filters.status && ctx.hasAnyPermissions([TEST_MASTER_PERMISSIONS.MANAGE.code])) {
         where.status = filters.status;
     }
 
     //3: execute count + data together
-    const countPromise = TestModel.countDocuments(where);
-    const dataPromise = TestModel.find(where).limit(options?.pagination?.limit).skip(options?.pagination?.skip).sort(sort);
+    const countPromise = TestMasterModel.countDocuments(where);
+    const dataPromise = TestMasterModel.find(where).limit(options?.pagination?.limit).skip(options?.pagination?.skip).sort(sort);
 
     const [count, items] = await Promise.all([countPromise, dataPromise]);
 
     return { count, items };
 };
 
-const create = async (model: ICreateTestPayload, ctx: RequestContext): Promise<HydratedDocument<ITest>> => {
+const create = async (model: ICreateTestMasterPayload, ctx: RequestContext): Promise<HydratedDocument<ITestMaster>> => {
     //1: guard — code must be free (reuse get on the natural key)
-    const existing = await TestService.get(model.code, ctx);
+    const existing = await TestMasterService.get(model.code, ctx);
     if (existing) {
-        return throwAppError('A test with this code already exists', StatusCodes.CONFLICT);
+        return throwAppError('A test master with this code already exists', StatusCodes.CONFLICT);
     }
 
     //2: build entity — code (immutable natural key) is seeded here, never in set()
-    let entity = new TestModel({ code: model.code });
+    let entity = new TestMasterModel({ code: model.code });
     entity = await set(model, entity, ctx);
     entity = await entity.save();
 
     return entity;
 };
 
-const update = async (id: string, model: IUpdateTestPayload, ctx: RequestContext) => {
+const update = async (id: string, model: IUpdateTestMasterPayload, ctx: RequestContext) => {
     //1: get first
-    let entity = await TestService.get(id, ctx);
+    let entity = await TestMasterService.get(id, ctx);
     if (!entity) {
-        return throwAppError('Test not found', StatusCodes.NOT_FOUND);
+        return throwAppError('Test master not found', StatusCodes.NOT_FOUND);
     }
 
     //2: apply editable fields (code is immutable — set() ignores it on an existing doc)
@@ -140,7 +146,7 @@ const update = async (id: string, model: IUpdateTestPayload, ctx: RequestContext
     return entity;
 };
 
-export const TestService = {
+export const TestMasterService = {
     get,
     search,
     create,

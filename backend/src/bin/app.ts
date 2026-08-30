@@ -20,6 +20,7 @@ import { GeoProfileRouter } from '../modules/operations/geoProfile/geoProfile.ro
 import { CampRouter } from '../modules/operations/camp/camp.routes';
 import { TestMasterRouter } from '../modules/operations/testMaster/testMaster.routes';
 import { PatientRouter } from '../modules/operations/patient/patient.routes';
+import { ScreeningRouter } from '../modules/operations/screening/screening.routes';
 import { CounterRouter } from '../modules/counter/counter.routes';
 import { InventoryMasterRouter } from '../modules/inventory/inventory-master/inventory-master.routes';
 import { InventoryConsumableRouter } from '../modules/inventory/inventory-consumable/inventory-consumable.routes';
@@ -91,6 +92,7 @@ app.use('/api/v1/geo-profiles', GeoProfileRouter);
 app.use('/api/v1/camps', CampRouter);
 app.use('/api/v1/test-masters', TestMasterRouter);
 app.use('/api/v1/patients', PatientRouter);
+app.use('/api/v1/screenings', ScreeningRouter);
 app.use('/api/v1/counters', CounterRouter);
 app.use('/api/v1/inventory-masters', InventoryMasterRouter);
 app.use('/api/v1/inventory-consumables', InventoryConsumableRouter);

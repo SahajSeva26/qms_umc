@@ -13,6 +13,7 @@ import { DOCTOR_PERMISSIONS } from '../../modules/doctor/doctor.constants';
 import { GEO_PROFILE_PERMISSIONS } from '../../modules/operations/geoProfile/geoProfile.constants';
 import { CAMP_PERMISSIONS } from '../../modules/operations/camp/camp.constants';
 import { TEST_MASTER_PERMISSIONS } from '../../modules/operations/testMaster/testMaster.constants';
+import { PATIENT_PERMISSIONS } from '../../modules/operations/patient/patient.constants';
 import { COUNTER_PERMISSIONS } from '../../modules/counter/counter.constants';
 import { INVENTORY_MASTER_PERMISSIONS } from '../../modules/inventory/inventory-master/inventory-master.constants';
 import { INVENTORY_CONSUMABLE_PERMISSIONS } from '../../modules/inventory/inventory-consumable/inventory-consumable.constants';
@@ -47,6 +48,7 @@ export const PERMISSIONS = {
     GEO_PROFILE: GEO_PROFILE_PERMISSIONS,
     CAMP: CAMP_PERMISSIONS,
     TEST_MASTER: TEST_MASTER_PERMISSIONS,
+    PATIENT: PATIENT_PERMISSIONS,
     COUNTER: COUNTER_PERMISSIONS,
     INVENTORY_MASTER: INVENTORY_MASTER_PERMISSIONS,
     INVENTORY_CONSUMABLE: INVENTORY_CONSUMABLE_PERMISSIONS,

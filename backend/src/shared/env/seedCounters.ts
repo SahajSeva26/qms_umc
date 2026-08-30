@@ -5,6 +5,7 @@ import { CAMP_COUNTER_ENTITY } from '../../modules/operations/camp/camp.constant
 import { APPOINTMENT_COUNTER_ENTITY } from '../../modules/crm/appointment/appointment.constants';
 import { PHARMA_ROLE_COUNTER_ENTITY } from '../../modules/access-management/role/role.constants';
 import { INVOICE_COUNTER_ENTITY } from '../../modules/finance/invoice/invoice.constants';
+import { TEST_MASTER_COUNTER_ENTITY } from '../../modules/operations/testMaster/testMaster.constants';
 import logger from '../utils/logger';
 import { throwAppError } from '../utils/error';
 
@@ -56,6 +57,13 @@ const COUNTERS = [
         separator: '-',
         padding: 6,
         description: 'Sequential code for invoices (inv-000001)',
+    },
+    {
+        entity: TEST_MASTER_COUNTER_ENTITY,
+        prefix: 'tst',
+        separator: '-',
+        padding: 6,
+        description: 'Sequential code for test master records (tst-000001)',
     },
 ];
 

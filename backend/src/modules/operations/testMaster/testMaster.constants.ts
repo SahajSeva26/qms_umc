@@ -1,30 +1,21 @@
 // TestMaster Constants
 
+// feeds the sequential test master code (tst-000001) via the global counter module
+export const TEST_MASTER_COUNTER_ENTITY = 'test-master';
+
 export const TEST_MASTER_STATUS = {
     ACTIVE: 'active',
     INACTIVE: 'inactive',
 } as const;
 
 export const TEST_MASTER_CONFIG_INPUT_TYPE = {
-    INT: 'int',
-    FLOAT: 'float',
+    NUMBER:'number',
     STRING: 'string',
     BOOLEAN: 'boolean',
+    SELECT: 'select',
 } as const;
-export const TEST_MASTER_CONFIG_RESULT_LEVEL = {
-    PASS: 'pass',
-    WARNING: 'warning',
-    FAIL: 'fail',
-} as const;
-export const TEST_MASTER_CONFIG_OPERATORS = {
-    EQ: 'eq',
-    NE: 'ne',
-    GT: 'gt',
-    GTE: 'gte',
-    LT: 'lt',
-    LTE: 'lte',
-    BTW: 'btw',
-} as const;
+
+
 // ================= TEST MASTER PERMISSIONS CONSTANTS ===============
 
 export const TEST_MASTER_PERMISSIONS = {
@@ -32,5 +23,17 @@ export const TEST_MASTER_PERMISSIONS = {
         code: 'test-master:manage',
         name: 'Manage Test Master',
         description: 'Manage test master catalog records (full visibility, incl. inactive)',
+    } as const,
+
+    SEARCH: {
+        code: 'test-master:search',
+        name: 'Search Test Master',
+        description: 'Search test master catalog records',
+    } as const,
+
+    GET: {
+        code: 'test-master:get',
+        name: 'Get Test Master',
+        description: 'Get a test master catalog record',
     } as const,
 };

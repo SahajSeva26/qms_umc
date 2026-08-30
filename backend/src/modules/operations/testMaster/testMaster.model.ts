@@ -1,53 +1,41 @@
 // TestMaster Model
-import { TEST_MASTER_STATUS, TEST_MASTER_CONFIG_INPUT_TYPE, TEST_MASTER_CONFIG_OPERATORS } from './testMaster.constants';
+import { TEST_MASTER_STATUS, TEST_MASTER_CONFIG_INPUT_TYPE } from './testMaster.constants';
 import { PROJECT_THERAPY_TYPES } from '../../crm/project/project.constants';
 import mongoose from 'mongoose';
 
 const testMasterConfigSchema = new mongoose.Schema(
     {
-        input: {
-            type: String,
-            enum: Object.values(TEST_MASTER_CONFIG_INPUT_TYPE),
-            required: true,
-            trim: true,
-            lowercase: true,
-        },
-        options: [
+        inputs: [
             {
                 label: {
                     type: String,
-                    trim: true,
-                },
-                value: {
-                    type: String,
-                    trim: true,
-                    lowercase: true,
-                },
-            },
-        ],
-        mapper: [
-            {
-                operator: {
-                    type: String,
-                    enum: Object.values(TEST_MASTER_CONFIG_OPERATORS),
-                    required: true,
-                    lowercase: true,
-                    trim: true,
-                },
-                value: {
-                    type: mongoose.Schema.Types.Mixed,
-                    required: true,
-                },
-                result: {
-                    type: String,
                     required: true,
                     trim: true,
                 },
-                level: {
+
+                type: {
                     type: String,
+                    enum: Object.values(TEST_MASTER_CONFIG_INPUT_TYPE),
                     required: true,
+                },
+
+                unit: {
+                    type: String,
                     trim: true,
                 },
+
+                options: [
+                    {
+                        label: {
+                            type: String,
+                            required: true,
+                        },
+                        value: {
+                            type: String,
+                            required: true,
+                        },
+                    },
+                ],
             },
         ],
     },

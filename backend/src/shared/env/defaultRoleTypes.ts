@@ -156,6 +156,9 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
             APPOINTMENT_PERMISSIONS.SEARCH.code,
             APPOINTMENT_PERMISSIONS.GET.code,
             APPOINTMENT_PERMISSIONS.RSVP.code,
+            // read the test catalog (needed to run camp tests) — read-only, no manage
+            TEST_MASTER_PERMISSIONS.SEARCH.code,
+            TEST_MASTER_PERMISSIONS.GET.code,
             // raise and manage their own refill/return requests (progressing the stage is manage-only)
             INVENTORY_REQUEST_PERMISSIONS.CREATE.code,
             INVENTORY_REQUEST_PERMISSIONS.GET.code,

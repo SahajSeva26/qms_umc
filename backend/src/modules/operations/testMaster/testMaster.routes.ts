@@ -86,10 +86,9 @@ registry.registerPath({
 // =======================================================================
 // ===================== EXPORT TEST MASTER ROUTES =======================
 // =======================================================================
-// reads are open to any authenticated user — the catalog is a global reference registry.
-// only writes (create/update) are permission-guarded.
-TestMasterRouter.get('/:id', TestMasterController.get);
-TestMasterRouter.get('/', TestMasterController.search);
+// reads require the matching read permission (or manage); writes require manage.
+TestMasterRouter.get('/:id', AuthorizeMiddleware([TEST_MASTER_PERMISSIONS.GET.code, TEST_MASTER_PERMISSIONS.MANAGE.code], 'OR'), TestMasterController.get);
+TestMasterRouter.get('/', AuthorizeMiddleware([TEST_MASTER_PERMISSIONS.SEARCH.code, TEST_MASTER_PERMISSIONS.MANAGE.code], 'OR'), TestMasterController.search);
 
 TestMasterRouter.post('/', AuthorizeMiddleware([TEST_MASTER_PERMISSIONS.MANAGE.code]), TestMasterController.create);
 TestMasterRouter.put('/:id', AuthorizeMiddleware([TEST_MASTER_PERMISSIONS.MANAGE.code]), TestMasterController.update);

@@ -181,23 +181,23 @@ const create = async (model: ICreateScreeningPayload, ctx: RequestContext): Prom
 };
 
 const update = async (id: string, model: IUpdateScreeningPayload, ctx: RequestContext) => {
-    let screening = await ScreeningService.get(id, ctx);
-    if (!screening) {
+    let entity = await ScreeningService.get(id, ctx);
+    if (!entity) {
         return throwAppError('Screening not found', StatusCodes.NOT_FOUND);
     }
 
     // only the FO assigned to this screening's camp (or a manage actor) may mutate it
-    await loadCampForAction(screening.camp, ctx);
+    await loadCampForAction(entity.camp, ctx);
 
     // a screening is only editable while pending; once completed/cancelled it is locked
-    if (screening.status !== SCREENING_STATUS.PENDING) {
+    if (entity.status !== SCREENING_STATUS.PENDING) {
         return throwAppError('A screening can only be edited while it is pending', StatusCodes.CONFLICT);
     }
 
-    screening = await set(model, screening, ctx);
-    screening = await screening.save();
+    entity = await set(model, entity, ctx);
+    entity = await entity.save();
 
-    return screening;
+    return entity;
 };
 
 // moveStage is the ONLY path allowed to change a screening's status.

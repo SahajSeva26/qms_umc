@@ -13,6 +13,7 @@ export const USER_GENDERS = {
     OTHER: 'other',
 };
 
+
 // USER REPORT — registration trend bucket size
 export const USER_REPORT_GRANULARITY = {
     DAY: 'day',

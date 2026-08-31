@@ -9,6 +9,8 @@ export const COUNTER_ENTITY_TYPES = {
     PHARMA_ROLE: 'pharma-role',
     // sequential code for test master catalog records (tst-000001)
     TEST_MASTER: 'test-master',
+    // sequential code for patient registry records (pat-000001)
+    PATIENT: 'patient',
 };
 export const COUNTER_RESET_POLICIES = {
     NEVER: 'never',

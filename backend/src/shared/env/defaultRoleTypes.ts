@@ -4,6 +4,9 @@ import { APPOINTMENT_PERMISSIONS } from '../../modules/crm/appointment/appointme
 import { DOCTOR_PERMISSIONS } from '../../modules/doctor/doctor.constants';
 import { CAMP_PERMISSIONS } from '../../modules/operations/camp/camp.constants';
 import { TEST_MASTER_PERMISSIONS } from '../../modules/operations/testMaster/testMaster.constants';
+import { PATIENT_PERMISSIONS } from '../../modules/operations/patient/patient.constants';
+import { SCREENING_PERMISSIONS } from '../../modules/operations/screening/screening.constants';
+import { TEST_PERMISSIONS } from '../../modules/operations/test/test.constants';
 import { TENANT_PERMISSIONS } from '../../modules/access-management/tenant/tenant.constants';
 import { DIVISION_PERMISSIONS } from '../../modules/crm/division/division.constants';
 import { CONTACT_PERMISSIONS } from '../../modules/crm/contact/contact.constants';
@@ -81,6 +84,7 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
             APPOINTMENT_PERMISSIONS.SEARCH.code,
             APPOINTMENT_PERMISSIONS.GET.code,
             APPOINTMENT_PERMISSIONS.RSVP.code,
+            PATIENT_PERMISSIONS.CREATE.code,
         ],
     },
     {
@@ -100,6 +104,7 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
             APPOINTMENT_PERMISSIONS.SEARCH.code,
             APPOINTMENT_PERMISSIONS.GET.code,
             APPOINTMENT_PERMISSIONS.RSVP.code,
+            PATIENT_PERMISSIONS.CREATE.code,
         ],
     },
     {
@@ -159,6 +164,14 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
             // read the test catalog (needed to run camp tests) — read-only, no manage
             TEST_MASTER_PERMISSIONS.SEARCH.code,
             TEST_MASTER_PERMISSIONS.GET.code,
+            // register patients at the camp
+            PATIENT_PERMISSIONS.CREATE.code,
+            // start + progress screenings at a live camp they are assigned to
+            SCREENING_PERMISSIONS.CREATE.code,
+            SCREENING_PERMISSIONS.UPDATE.code,
+            // record + correct patient test results after the screening is completed
+            TEST_PERMISSIONS.CREATE.code,
+            TEST_PERMISSIONS.UPDATE.code,
             // raise and manage their own refill/return requests (progressing the stage is manage-only)
             INVENTORY_REQUEST_PERMISSIONS.CREATE.code,
             INVENTORY_REQUEST_PERMISSIONS.GET.code,

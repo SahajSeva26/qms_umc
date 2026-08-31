@@ -42,7 +42,7 @@ describe('WizardStep1 — therapy-filtered tests', () => {
     vi.mocked(testService.searchTests).mockResolvedValue({
       success: true,
       message: '',
-      data: { items: [{ id: 't-1', code: 'ecg', name: 'ECG', therapy: 'cardiology', consumption: [] }], count: 1 },
+      data: { items: [{ id: 't-1', code: 'tst-000001', name: 'ECG', therapy: 'cardiology', duration: 15, price: 250, consumption: [] }], count: 1 },
     } as never)
 
     await renderStep({ ...DEFAULT_WIZARD_FORM, therapy: 'cardiology' })
@@ -56,7 +56,7 @@ describe('WizardStep1 — therapy-filtered tests', () => {
     vi.mocked(testService.searchTests).mockResolvedValue({
       success: true,
       message: '',
-      data: { items: [{ id: 't-1', code: 'ecg', name: 'ECG', therapy: 'cardiology', consumption: [] }], count: 1 },
+      data: { items: [{ id: 't-1', code: 'tst-000001', name: 'ECG', therapy: 'cardiology', duration: 15, price: 250, consumption: [] }], count: 1 },
     } as never)
 
     const user = userEvent.setup()
@@ -100,7 +100,7 @@ describe('WizardStep1 — therapy-filtered tests', () => {
       .mockResolvedValueOnce({
         success: true,
         message: '',
-        data: { items: [{ id: 't-1', code: 'ecg', name: 'ECG', therapy: 'cardiology', consumption: [] }], count: 1 },
+        data: { items: [{ id: 't-1', code: 'tst-000001', name: 'ECG', therapy: 'cardiology', duration: 15, price: 250, consumption: [] }], count: 1 },
       } as never)
 
     const user = userEvent.setup()

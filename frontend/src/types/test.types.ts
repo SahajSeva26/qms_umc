@@ -1,5 +1,6 @@
-// Matches backend/operations/test exactly. Test is a global, admin-managed
-// catalog of screening tests — no tenant scoping, no delete (status only).
+// Matches backend/operations/testMaster exactly. TestMaster is a global,
+// admin-managed catalog of screening tests — no tenant scoping, no delete
+// (status only).
 
 import type { ProjectTherapy } from '@/types/project.types'
 
@@ -12,7 +13,7 @@ export const TEST_STATUS_LABEL: Record<TestStatus, string> = {
   inactive: 'Inactive',
 }
 
-// Matches test.mapper.ts's mapConsumptionLine exactly — it never returns
+// Matches testMaster.mapper.ts's mapConsumptionLine exactly — it never returns
 // itemName/itemCode/itemType even when the underlying InventoryMaster is
 // populated server-side, so this type only ever carries a bare id + rate.
 // Do not add optional name/code fields here — they would always be undefined
@@ -24,12 +25,18 @@ export interface TestConsumptionLine {
 
 export interface TestEntity {
   id: string
+  // Server-generated via the global counter sequence (tst-000001 format) —
+  // never supplied or editable by the caller at all, not just immutable
+  // post-create. See CreateTestPayload.
   code: string
   name: string
   description?: string
   therapy: ProjectTherapy
+  duration: number
+  price: number
   // Key is ABSENT (not null/undefined-but-present) unless the caller holds
-  // `test:manage` — test.mapper.ts only sets this field conditionally.
+  // `test-master:manage` — testMaster.mapper.ts only sets this field
+  // conditionally.
   status?: TestStatus
   // A device and a consumable both live in this one array — the backend
   // distinguishes them only server-side (via each item's resolved
@@ -54,18 +61,22 @@ interface TestConsumptionLinePayload {
   rate?: number
 }
 
+// code is intentionally absent — the backend generates it via the global
+// counter sequence (tst-000001 format); there is nothing for the caller to
+// populate it with, and the value is only known once the server responds.
 export interface CreateTestPayload {
-  code: string
   name: string
   description?: string
   therapy: ProjectTherapy
+  duration: number
+  price: number
   status?: TestStatus
   consumption?: TestConsumptionLinePayload[]
 }
 
-// code is intentionally absent — immutable post-create, same as the backend
-// enforces. therapy is also treated as immutable here (frontend decision,
-// not a backend restriction): existing Projects can already reference this
+// code is intentionally absent — server-generated, never editable at all.
+// therapy is also treated as immutable here (frontend decision, not a
+// backend restriction): existing Projects can already reference this
 // Test's id, and the backend never validates a Project's selected tests
 // against its own therapy, so changing a Test's therapy post-creation could
 // silently make an already-linked Project's test selection nonsensical.
@@ -77,5 +88,7 @@ export interface CreateTestPayload {
 export interface UpdateTestPayload {
   name?: string
   description?: string
+  duration?: number
+  price?: number
   status?: TestStatus
 }

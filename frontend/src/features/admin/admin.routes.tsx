@@ -44,9 +44,11 @@ export const adminRoutes: RouteObject[] = [
     lazy: lazyRoute(() => import('./pages/UserDetailPage'), USERS_VIEW_PERMISSIONS),
   },
   {
-    // Temporary system-admin-only phase: GET /tests is open to any
-    // authenticated user server-side, so this route guard (not just a
-    // hidden nav item) is the real boundary keeping a non-system user out.
+    // Temporary system-admin-only phase: the backend permission-gates
+    // GET/POST/PUT /test-masters via test-master:search/get/manage, which
+    // OPERATION_MANAGER_SCREENING/DIET also hold — the API would let them in.
+    // This route guard intentionally restricts the UI further, to system:manage
+    // only, until the Test Master admin page is ready for non-system roles.
     path: ADMIN_ROUTES.ADMIN_TESTS,
     lazy: lazyRoute(() => import('@/features/tests/pages/TestsPage'), ['system:manage']),
   },

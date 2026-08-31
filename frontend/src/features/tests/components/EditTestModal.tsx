@@ -9,7 +9,7 @@ interface EditTestModalProps {
   onClose: () => void
 }
 
-// A data-fetching wrapper, not the form itself — GET /tests/:id is the only
+// A data-fetching wrapper, not the form itself — GET /test-masters/:id is the only
 // endpoint that carries a test's resource lines at all, so an existing
 // test's full record must be fetched before TestForm can mount with real
 // defaultValues. useTest is always called (never conditionally), with

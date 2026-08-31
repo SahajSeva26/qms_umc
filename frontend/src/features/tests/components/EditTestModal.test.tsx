@@ -29,7 +29,7 @@ describe('EditTestModal', () => {
     vi.resetAllMocks()
   })
 
-  it('fires zero GET /tests/:id calls and renders the form immediately in create mode', async () => {
+  it('fires zero GET /test-masters/:id calls and renders the form immediately in create mode', async () => {
     const { testService } = await import('@/features/tests/test.service')
 
     await renderModal(null)
@@ -43,7 +43,7 @@ describe('EditTestModal', () => {
     vi.mocked(testService.getTest).mockResolvedValue({
       success: true,
       message: '',
-      data: { id: 't-1', code: 'ecg', name: 'ECG', therapy: 'cardiology', status: 'active', consumption: [] },
+      data: { id: 't-1', code: 'tst-000001', name: 'ECG', therapy: 'cardiology', duration: 15, price: 250, status: 'active', consumption: [] },
     } as never)
 
     await renderModal('t-1')

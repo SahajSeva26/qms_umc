@@ -27,10 +27,12 @@ async function renderForm(test: TestEntity | null, onClose = vi.fn()) {
 
 const baseTest: TestEntity = {
   id: 't-1',
-  code: 'ecg',
+  code: 'tst-000001',
   name: 'ECG',
   description: 'Electrocardiogram screening',
   therapy: 'cardiology',
+  duration: 15,
+  price: 250,
   status: 'active',
   consumption: [{ item: 'd-1', rate: 0 }, { item: 'd-2', rate: 0 }, { item: 'c-1', rate: 1 }],
 }
@@ -40,23 +42,26 @@ describe('TestForm — create mode', () => {
     vi.resetAllMocks()
   })
 
-  it('validates code/name/therapy/status and submits a create payload with an empty consumption array when nothing is picked', async () => {
+  it('validates name/therapy/duration/price/status and submits a create payload with no code key and an empty consumption array when nothing is picked', async () => {
     const { testService } = await import('@/features/tests/test.service')
     vi.mocked(testService.createTest).mockResolvedValue({ success: true, message: '', data: baseTest } as never)
 
     const user = userEvent.setup()
     const { onClose } = await renderForm(null)
 
-    await user.type(screen.getByLabelText(/code/i), 'ECG')
     await user.type(screen.getByLabelText(/^name/i), 'ECG Test')
     await user.click(screen.getByLabelText(/therapy/i))
     await user.click(await screen.findByRole('option', { name: /cardiology/i }))
+    await user.type(screen.getByLabelText(/duration/i), '15')
+    await user.type(screen.getByLabelText(/price/i), '250')
     await user.click(screen.getByRole('button', { name: /create test/i }))
 
     await waitFor(() => expect(testService.createTest).toHaveBeenCalledTimes(1))
     const payload = vi.mocked(testService.createTest).mock.calls[0][0]
-    expect(payload.code).toBe('ecg')
+    expect(payload).not.toHaveProperty('code')
     expect(payload.therapy).toBe('cardiology')
+    expect(payload.duration).toBe(15)
+    expect(payload.price).toBe(250)
     expect(payload.status).toBe('active')
     expect(payload.consumption).toEqual([])
     await waitFor(() => expect(onClose).toHaveBeenCalled())
@@ -67,12 +72,34 @@ describe('TestForm — create mode', () => {
     const user = userEvent.setup()
     await renderForm(null)
 
-    await user.type(screen.getByLabelText(/code/i), 'ECG')
     await user.type(screen.getByLabelText(/^name/i), 'ECG Test')
+    await user.type(screen.getByLabelText(/duration/i), '15')
+    await user.type(screen.getByLabelText(/price/i), '250')
     await user.click(screen.getByRole('button', { name: /create test/i }))
 
     expect(testService.createTest).not.toHaveBeenCalled()
     expect(screen.getByText(/select therapy/i)).toBeInTheDocument()
+  })
+
+  it('blocks submission when duration/price are left blank instead of silently defaulting to 0', async () => {
+    const { testService } = await import('@/features/tests/test.service')
+    const user = userEvent.setup()
+    await renderForm(null)
+
+    await user.type(screen.getByLabelText(/^name/i), 'ECG Test')
+    await user.click(screen.getByLabelText(/therapy/i))
+    await user.click(await screen.findByRole('option', { name: /cardiology/i }))
+    await user.click(screen.getByRole('button', { name: /create test/i }))
+
+    expect(testService.createTest).not.toHaveBeenCalled()
+    expect(screen.getByText(/duration is required/i)).toBeInTheDocument()
+    expect(screen.getByText(/price is required/i)).toBeInTheDocument()
+  })
+
+  it('renders no Code input at all in create mode', async () => {
+    await renderForm(null)
+
+    expect(screen.queryByLabelText(/code/i)).not.toBeInTheDocument()
   })
 
   it('renders real, editable device/consumable pickers', async () => {
@@ -105,10 +132,11 @@ describe('TestForm — create mode', () => {
     const user = userEvent.setup()
     await renderForm(null)
 
-    await user.type(screen.getByLabelText(/code/i), 'ECG')
     await user.type(screen.getByLabelText(/^name/i), 'ECG Test')
     await user.click(screen.getByLabelText(/therapy/i))
     await user.click(await screen.findByRole('option', { name: /cardiology/i }))
+    await user.type(screen.getByLabelText(/duration/i), '15')
+    await user.type(screen.getByLabelText(/price/i), '250')
 
     const [deviceSearch, consumableSearch] = screen.getAllByPlaceholderText(/search devices/i)
     await user.type(deviceSearch, 'Gluco')
@@ -130,10 +158,11 @@ describe('TestForm — create mode', () => {
     const user = userEvent.setup()
     await renderForm(null)
 
-    await user.type(screen.getByLabelText(/code/i), 'ECG')
     await user.type(screen.getByLabelText(/^name/i), 'ECG Test')
     await user.click(screen.getByLabelText(/therapy/i))
     await user.click(await screen.findByRole('option', { name: /cardiology/i }))
+    await user.type(screen.getByLabelText(/duration/i), '15')
+    await user.type(screen.getByLabelText(/price/i), '250')
 
     await user.click(screen.getByLabelText(/status/i))
     await user.click(await screen.findByRole('option', { name: /inactive/i }))
@@ -150,17 +179,27 @@ describe('TestForm — edit mode', () => {
     vi.resetAllMocks()
   })
 
-  it('disables code and therapy, and shows a single merged resource count, not a picker or per-item labels', async () => {
+  it('shows the code as plain read-only text (not a form input), disables therapy, and shows a single merged resource count, not a picker or per-item labels', async () => {
     await renderForm(baseTest)
 
-    expect(screen.getByLabelText(/code/i)).toBeDisabled()
+    expect(screen.queryByLabelText(/code/i)).not.toBeInTheDocument()
+    expect(screen.getByText('tst-000001')).toBeInTheDocument()
     expect(screen.getByLabelText(/therapy/i)).toBeDisabled()
     expect(screen.getByText(/3 resources/i)).toBeInTheDocument()
     expect(screen.queryByPlaceholderText(/search devices/i)).not.toBeInTheDocument()
     expect(screen.queryByText('d-1')).not.toBeInTheDocument()
   })
 
-  it('constructs an update payload with no code/therapy/consumption keys', async () => {
+  it('renders duration and price as editable inputs, seeded with the existing values', async () => {
+    await renderForm(baseTest)
+
+    expect(screen.getByLabelText(/duration/i)).not.toBeDisabled()
+    expect(screen.getByLabelText(/price/i)).not.toBeDisabled()
+    expect(screen.getByDisplayValue('15')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('250')).toBeInTheDocument()
+  })
+
+  it('constructs an update payload with duration/price included and no code/therapy/consumption keys', async () => {
     const { testService } = await import('@/features/tests/test.service')
     vi.mocked(testService.updateTest).mockResolvedValue({ success: true, message: '', data: baseTest } as never)
 
@@ -174,6 +213,8 @@ describe('TestForm — edit mode', () => {
     expect(payload).not.toHaveProperty('consumption')
     expect(payload).not.toHaveProperty('code')
     expect(payload).not.toHaveProperty('therapy')
+    expect(payload.duration).toBe(15)
+    expect(payload.price).toBe(250)
   })
 
   it('blocks blanking a previously-set description, and does not submit', async () => {

@@ -23,7 +23,7 @@ interface ModalState {
 
 const TestMasterTab = () => {
   const { hasAnyPermission } = usePermission()
-  const canManage = hasAnyPermission(['test:manage'])
+  const canManage = hasAnyPermission(['test-master:manage'])
 
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search, 300)

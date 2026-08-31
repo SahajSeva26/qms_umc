@@ -221,7 +221,7 @@ export interface ProjectEntity {
   division: ProjectPopulatedDivision | string | null
   therapy: ProjectTherapy
   type: ProjectType[]
-  // Test._id references — resolve against GET /tests to display names.
+  // Test._id references — resolve against GET /test-masters to display names.
   tests: string[]
   lead: ProjectPopulatedLead | string | null
   mode: ExecutionMode | null

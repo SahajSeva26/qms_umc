@@ -62,7 +62,6 @@ const TestForm = ({ test, onClose }: TestFormProps) => {
     resolver: zodResolver(buildTestFormSchema(test?.description)),
     mode: 'onChange',
     defaultValues: {
-      code: test?.code ?? '',
       name: test?.name ?? '',
       description: test?.description ?? '',
       // Blank in create mode — therapy decides which Projects can see this
@@ -70,6 +69,13 @@ const TestForm = ({ test, onClose }: TestFormProps) => {
       // first-enum-value default. z.enum on the schema rejects '', so
       // submitting without picking one surfaces a real validation error.
       therapy: test?.therapy ?? ('' as ProjectTherapy),
+      // No `?? 0` fallback — 0 is a schema-valid value, so defaulting to it
+      // would let a blank field silently save as "0 minutes / ₹0" instead of
+      // surfacing a required-field error. Left genuinely undefined in create
+      // mode; valueAsNumber then parses an untouched input to NaN, which
+      // z.number() correctly rejects.
+      duration: test?.duration,
+      price: test?.price,
       status: test?.status ?? 'active',
       // Edit mode never renders a picker for these (resource sections are
       // read-only there — see below), so there's nothing real to seed from
@@ -96,17 +102,24 @@ const TestForm = ({ test, onClose }: TestFormProps) => {
       // Pulmonology). Treat therapy as immutable, like code, until the
       // backend can validate/migrate affected Project relationships.
       updateMutation.mutate(
-        { name: values.name, ...(values.description ? { description: values.description } : {}), status: values.status },
+        {
+          name: values.name,
+          ...(values.description ? { description: values.description } : {}),
+          duration: values.duration,
+          price: values.price,
+          status: values.status,
+        },
         { onSuccess: onClose },
       )
       return
     }
     createMutation.mutate(
       {
-        code: values.code,
         name: values.name,
         description: values.description || undefined,
         therapy: values.therapy,
+        duration: values.duration,
+        price: values.price,
         status: values.status,
         consumption: [
           // No rate key — the backend's own normalizeConsumption() force-sets
@@ -123,12 +136,11 @@ const TestForm = ({ test, onClose }: TestFormProps) => {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 min-w-0" noValidate>
-      <Field label="Code *" htmlFor="test-form-code" error={fieldError('code')}>
-        <Input id="test-form-code" type="text" disabled={isEdit} className="text-[13px]" {...register('code')} />
-        {isEdit && (
-          <p className="text-[11px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>Code can't be changed after creation.</p>
-        )}
-      </Field>
+      {isEdit && (
+        <p className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>
+          Code: <span className="font-medium" style={{ color: 'var(--qms-text)' }}>{test.code}</span>
+        </p>
+      )}
 
       <Field label="Name *" htmlFor="test-form-name" error={fieldError('name')}>
         <Input id="test-form-name" type="text" className="text-[13px]" {...register('name')} />
@@ -176,6 +188,29 @@ const TestForm = ({ test, onClose }: TestFormProps) => {
                 </SelectContent>
               </Select>
             )}
+          />
+        </Field>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2.5">
+        <Field label="Duration (minutes) *" htmlFor="test-form-duration" error={fieldError('duration')}>
+          <Input
+            id="test-form-duration"
+            type="number"
+            min={0}
+            step="any"
+            className="text-[13px]"
+            {...register('duration', { valueAsNumber: true })}
+          />
+        </Field>
+        <Field label="Price *" htmlFor="test-form-price" error={fieldError('price')}>
+          <Input
+            id="test-form-price"
+            type="number"
+            min={0}
+            step="any"
+            className="text-[13px]"
+            {...register('price', { valueAsNumber: true })}
           />
         </Field>
       </div>

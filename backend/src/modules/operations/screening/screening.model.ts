@@ -68,6 +68,14 @@ const ScreeningSchema = new mongoose.Schema(
             ref: 'Camp',
             required: true,
         },
+        // the field officer who performs this screening — pinned at create from the camp's assigned
+        // FO (`camp.fo`). Required: a screening only starts on a `live` camp, and a camp cannot go
+        // live without an FO, so an assigned FO is always present at create.
+        performedBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Role',
+            required: true,
+        },
         consent: {
             type: consentSchema,
             required: true,

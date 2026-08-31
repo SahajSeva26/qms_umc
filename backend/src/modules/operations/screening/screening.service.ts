@@ -26,6 +26,7 @@ const populate: any[] = [
     { path: 'tenant', select: 'name code' },
     { path: 'patient', select: 'code firstName middleName lastName mobile' },
     { path: 'camp', select: 'code date status city state' },
+    { path: 'performedBy', select: 'name code' },
 ];
 
 // ================================ HELPERS ================================
@@ -58,6 +59,14 @@ const loadCampForAction = async (campId: any, ctx: RequestContext) => {
     return camp;
 };
 
+// A non-manage actor (e.g. the assigned field officer) sees only the screenings they performed.
+// A manage actor (screening:manage / system) sees them all.
+const applyOwnScope = (where: any, ctx: RequestContext) => {
+    if (!ctx.hasAnyPermissions([SCREENING_PERMISSIONS.MANAGE.code])) {
+        where.performedBy = ctx.role?._id;
+    }
+};
+
 // frozen snapshot of the acting role at the moment of a transition (mirrors camp/lead/etc.)
 const actorSnapshot = (ctx: RequestContext) => {
     const name = `${ctx.user?.firstName || ''} ${ctx.user?.lastName || ''}`.trim();
@@ -85,6 +94,7 @@ const set = async (model: any, entity: HydratedDocument<IScreening>, ctx: Reques
 const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): Promise<ScreeningDoc> => {
     const where: mongoose.QueryFilter<IScreening> = ctx.where();
     where._id = id;
+    applyOwnScope(where, ctx);
 
     let query = ScreeningModel.findOne(where);
     if (options?.populate) {
@@ -98,6 +108,9 @@ const search = async (filters: ISearchScreeningQuery, ctx: RequestContext, optio
     const sort: any = { createdAt: -1 };
 
     const where: mongoose.QueryFilter<IScreening> = { ...ctx.where() };
+    // own-scope up-front — a non-manage actor is pinned to their own screenings. Safe here (not at
+    // the end) because every actor-widening filter below (tenant/performedBy) is itself manage-gated.
+    applyOwnScope(where, ctx);
 
     // tenant filter (switch tenants) is only honoured for a screening:manage actor not already
     // tenant-pinned by ctx.where() — a scoped actor stays locked to their own tenant.
@@ -109,6 +122,11 @@ const search = async (filters: ISearchScreeningQuery, ctx: RequestContext, optio
     }
     if (filters.camp) {
         where.camp = filters.camp;
+    }
+    // performedBy filter (see other FOs' screenings) is only honoured for a screening:manage actor —
+    // a non-manage actor is pinned to their own by applyOwnScope below regardless.
+    if (filters.performedBy && ctx.hasAnyPermissions([SCREENING_PERMISSIONS.MANAGE.code])) {
+        where.performedBy = filters.performedBy;
     }
     if (filters.status) {
         where.status = filters.status;
@@ -139,6 +157,13 @@ const create = async (model: ICreateScreeningPayload, ctx: RequestContext): Prom
         return throwAppError('Screenings can only be created for a camp that is live', StatusCodes.CONFLICT);
     }
 
+    // the performing FO is the camp's assigned FO. A live camp always has one (a camp cannot go
+    // live without an FO) — guard anyway so a bad state fails clearly, not as a Mongoose error.
+    const performedBy = camp.fo?._id ?? camp.fo;
+    if (!performedBy) {
+        return throwAppError('The camp has no assigned field officer', StatusCodes.CONFLICT);
+    }
+
     //2: patient must exist (global registry)
     const patient = await PatientService.get(model.patient, ctx);
     if (!patient) {
@@ -154,11 +179,13 @@ const create = async (model: ICreateScreeningPayload, ctx: RequestContext): Prom
         return throwAppError('This patient has already been screened at this camp', StatusCodes.CONFLICT);
     }
 
-    //4: build entity — tenant from camp, consent OTP generated server-side, seed the created entry
+    //4: build entity — tenant from camp, performedBy = the camp's assigned FO, consent OTP
+    // generated server-side, seed the created entry
     const entity = new ScreeningModel({
         tenant: camp.tenant?._id ?? camp.tenant,
         patient: patient._id,
         camp: camp._id,
+        performedBy,
         consent: {
             otp: OtpHandler.generate(),
             signature: model.signature,

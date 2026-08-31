@@ -12,6 +12,11 @@ import { SCREENING_STATUS } from '../screening/screening.constants';
 import { CampService } from '../camp/camp.service';
 import { TestMasterService } from '../testMaster/testMaster.service';
 import { ALLOWED_ROLETYPE_CODES } from '../../access-management/role-type/roleType.constants';
+import { withTransaction } from '../../../shared/helpers/transactionHelper';
+import { InventoryAssignmentService } from '../../inventory/inventory-assignment/inventory-assignment.service';
+import { INVENTORY_ASSIGNMENT_TYPES } from '../../inventory/inventory-assignment/inventory-assignment.constants';
+import { InventoryAssignmentModel } from '../../inventory/inventory-assignment/inventory-assignment.model';
+import { InventoryConsumableModel } from '../../inventory/inventory-consumable/inventory-consumable.model';
 
 type TestDoc = HydratedDocument<ITest> | null;
 
@@ -42,7 +47,7 @@ const assertAssignedFoOrManage = (camp: any, ctx: RequestContext) => {
 
 // Load the screening for a test action and authorize the actor. Reuses ScreeningService.get (tenant
 // scope) then CampService.get (populated fo) to assert the actor is the assigned FO (or manage).
-// Shared by create + update so the rule lives in one place.
+// Returns both the screening and its (fo-populated) camp so the caller can bill the assigned FO's stock.
 const loadScreeningForAction = async (screeningId: any, ctx: RequestContext) => {
     const screening: any = await ScreeningService.get(screeningId.toString(), ctx, { populate: true });
     if (!screening) {
@@ -56,7 +61,64 @@ const loadScreeningForAction = async (screeningId: any, ctx: RequestContext) => 
     }
     assertAssignedFoOrManage(camp, ctx);
 
-    return screening;
+    return { screening, camp };
+};
+
+// Reduce the assigned field officer's stock for a completed test, per the TestMaster consumption
+// recipe: subtract each line's `rate` from what the FO holds of that catalog item. Blocks (throws
+// 409, rolling back the create() txn) if the FO is short. Runs inside the create() transaction.
+const reduceFoStock = async (foId: any, consumption: any[], ctx: RequestContext) => {
+    if (!foId || !consumption?.length) {
+        return;
+    }
+    for (const line of consumption) {
+        const rate = line.rate ?? 1;
+        // devices carry rate 0 (reusable, not depleted) — nothing to subtract
+        if (rate <= 0) {
+            continue;
+        }
+        await reduceFoHoldingForItem(foId, line.item, rate, ctx);
+    }
+};
+
+// A consumption line's `item` is a catalog item (InventoryMaster), but the FO holds its stock as
+// specific lots (InventoryConsumable). Bridge item → the FO's lots of it (read-only lookup), then
+// subtract `rate` across those holdings, erroring (409) if the total held is less than required.
+// The subtraction only ever touches the FO's assignment rows (via adjustHolding), never the lots.
+const reduceFoHoldingForItem = async (foId: any, item: any, rate: number, ctx: RequestContext) => {
+    //1: the catalog item's lots — the bridge from the master to what the FO can actually hold
+    const lots = await InventoryConsumableModel.find({ item }).select('_id');
+    const lotIds = lots.map((lot) => lot._id);
+
+    //2: what the FO actually holds of those lots
+    const holdings = await InventoryAssignmentModel.find({
+        assignee: foId,
+        inventoryType: INVENTORY_ASSIGNMENT_TYPES.CONSUMABLE,
+        inventory: { $in: lotIds },
+    });
+
+    //3: block up-front if the FO can't cover the required rate across all their lots of this item
+    const totalHeld = holdings.reduce((sum, row) => sum + row.quantity, 0);
+    if (totalHeld < rate) {
+        return throwAppError('The field officer does not hold enough stock to record this test', StatusCodes.CONFLICT);
+    }
+
+    //4: subtract lot by lot until the rate is covered
+    let remaining = rate;
+    for (const row of holdings) {
+        if (remaining <= 0) {
+            break;
+        }
+        const take = Math.min(row.quantity, remaining);
+        await InventoryAssignmentService.adjustHolding(
+            foId.toString(),
+            INVENTORY_ASSIGNMENT_TYPES.CONSUMABLE,
+            row.inventory.toString(),
+            -take,
+            ctx,
+        );
+        remaining -= take;
+    }
 };
 
 // A non-manage actor (e.g. the assigned field officer) sees only the tests they performed.
@@ -123,9 +185,9 @@ const search = async (filters: ISearchTestQuery, ctx: RequestContext, options?: 
 };
 
 const create = async (model: ICreateTestPayload, ctx: RequestContext): Promise<HydratedDocument<ITest>> => {
-    //1: load the screening (scope) + authorize the actor as the assigned FO (or manage). The test
-    // inherits its tenant from the screening.
-    const screening: any = await loadScreeningForAction(model.screening, ctx);
+    //1: load the screening (scope) + the camp, and authorize the actor as the assigned FO (or manage).
+    // The test inherits its tenant from the screening; the assigned FO (camp.fo) owns the stock used.
+    const { screening, camp } = await loadScreeningForAction(model.screening, ctx);
 
     //2: tests are performed only after the screening itself is completed
     if (screening.status !== SCREENING_STATUS.COMPLETED) {
@@ -138,7 +200,8 @@ const create = async (model: ICreateTestPayload, ctx: RequestContext): Promise<H
         return throwAppError('Test master not found', StatusCodes.NOT_FOUND);
     }
 
-    //4: one result per catalog test per screening
+    //4: one result per catalog test per screening. Runs before the txn below — search fires
+    // count+find in parallel, which MongoDB forbids inside a transaction.
     const { count } = await TestService.search(
         { screening: screening._id.toString(), type: testMaster._id.toString() },
         ctx,
@@ -155,10 +218,17 @@ const create = async (model: ICreateTestPayload, ctx: RequestContext): Promise<H
         performedBy: ctx.role?._id,
     });
 
-    let test = await set(model, entity, ctx);
-    test = await test.save();
+    //6: save the test and reduce the assigned FO's stock atomically — if the FO is short on any
+    // consumable, the deduction throws and the whole create rolls back (no orphan test recorded).
+    const foId = camp.fo?._id ?? camp.fo;
+    return await withTransaction(async () => {
+        let test = await set(model, entity, ctx);
+        test = await test.save();
 
-    return test;
+        await reduceFoStock(foId, testMaster.consumption as any[], ctx);
+
+        return test;
+    });
 };
 
 const update = async (id: string, model: IUpdateTestPayload, ctx: RequestContext) => {

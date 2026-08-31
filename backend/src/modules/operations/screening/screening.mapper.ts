@@ -45,6 +45,7 @@ export const ScreeningMapper = {
                 mobile: p.mobile,
             })),
             camp: mapRef(screening.camp, (c) => ({ code: c.code, date: c.date, status: c.status })),
+            performedBy: mapRef(screening.performedBy, (r) => ({ name: r.name, code: r.code })),
 
             symptoms: screening.symptoms || [],
             referral: screening.referral,

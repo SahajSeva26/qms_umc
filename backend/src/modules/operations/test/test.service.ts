@@ -10,6 +10,7 @@ import { IServiceOptions } from '../../../shared/types/service.types';
 import { ScreeningService } from '../screening/screening.service';
 import { SCREENING_STATUS } from '../screening/screening.constants';
 import { CampService } from '../camp/camp.service';
+import { CAMP_STATUSES } from '../camp/camp.constants';
 import { TestMasterService } from '../testMaster/testMaster.service';
 import { ALLOWED_ROLETYPE_CODES } from '../../access-management/role-type/roleType.constants';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
@@ -25,6 +26,13 @@ const populate: any[] = [
     { path: 'screening', select: 'status patient camp' },
     { path: 'type', select: 'code name therapy' },
     { path: 'performedBy', select: 'name code' },
+];
+
+// camp states past which no more tests may be recorded — the camp is over.
+const TERMINAL_CAMP_STATUSES: string[] = [
+    CAMP_STATUSES.CLOSED,
+    CAMP_STATUSES.CANCELLED,
+    CAMP_STATUSES.CANCELLED_CHARGED,
 ];
 
 // ================================ HELPERS ================================
@@ -156,6 +164,9 @@ const search = async (filters: ISearchTestQuery, ctx: RequestContext, options?: 
     const sort: any = { createdAt: -1 };
 
     const where: mongoose.QueryFilter<ITest> = { ...ctx.where() };
+    // own-scope up-front — a non-manage actor is pinned to their own tests. Safe here (not at the
+    // end) because the only actor-widening filter below (tenant) is itself manage-gated.
+    applyOwnScope(where, ctx);
 
     // tenant filter (switch tenants) is only honoured for a test:manage actor not already
     // tenant-pinned by ctx.where() — a scoped actor stays locked to their own tenant.
@@ -168,9 +179,6 @@ const search = async (filters: ISearchTestQuery, ctx: RequestContext, options?: 
     if (filters.type) {
         where.type = filters.type;
     }
-
-    // own-scope LAST so it always wins — a non-manage actor can never widen past their own tests
-    applyOwnScope(where, ctx);
 
     const countPromise = TestModel.countDocuments(where);
     const dataPromise = TestModel.find(where)
@@ -189,7 +197,12 @@ const create = async (model: ICreateTestPayload, ctx: RequestContext): Promise<H
     // The test inherits its tenant from the screening; the assigned FO (camp.fo) owns the stock used.
     const { screening, camp } = await loadScreeningForAction(model.screening, ctx);
 
-    //2: tests are performed only after the screening itself is completed
+    //2: no tests once the camp is closed/cancelled — results are captured while the camp is running
+    if (TERMINAL_CAMP_STATUSES.includes(camp.status)) {
+        return throwAppError('Tests cannot be recorded once the camp is closed', StatusCodes.CONFLICT);
+    }
+
+    //3: tests are performed only after the screening itself is completed
     if (screening.status !== SCREENING_STATUS.COMPLETED) {
         return throwAppError('Tests can only be recorded once the screening is completed', StatusCodes.CONFLICT);
     }

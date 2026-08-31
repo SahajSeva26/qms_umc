@@ -1,6 +1,7 @@
 // TestMaster Model
 import { TEST_MASTER_STATUS, TEST_MASTER_CONFIG_INPUT_TYPE } from './testMaster.constants';
 import { PROJECT_THERAPY_TYPES } from '../../crm/project/project.constants';
+import { CAMP_TYPES } from '../camp/camp.constants';
 import mongoose from 'mongoose';
 
 const testMasterConfigSchema = new mongoose.Schema(
@@ -66,6 +67,12 @@ const testMasterSchema = new mongoose.Schema(
             enum: Object.values(PROJECT_THERAPY_TYPES),
             required: true,
             trim: true,
+        },
+        // the camp type this test belongs to (screening / diet / lab) — immutable after create
+        campType: {
+            type: String,
+            enum: Object.values(CAMP_TYPES),
+            required: true,
         },
         // time taken to perform the test, in minutes
         duration: {

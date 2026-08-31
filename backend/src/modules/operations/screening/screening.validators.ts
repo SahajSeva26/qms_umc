@@ -30,6 +30,9 @@ export type IUpdateScreeningPayload = z.infer<typeof UpdateScreeningPayloadSchem
 export const SearchScreeningQuerySchema = z.object({
     patient: z.string().optional().openapi({ example: '665f1a2b3c4d5e6f70819293' }),
     camp: z.string().optional().openapi({ example: '665f1a2b3c4d5e6f70819294' }),
+    // the field officer who performed the screening (its `camp.fo`) — only honoured for a
+    // screening:manage actor; a non-manage actor stays pinned to their own via own-scope.
+    performedBy: z.string().optional().openapi({ example: '665f1a2b3c4d5e6f70819295' }),
     status: z.enum(Object.values(SCREENING_STATUS)).optional().openapi({ example: 'pending' }),
     referral: z.coerce.boolean().optional().openapi({ example: true }),
     // only honoured for a screening:manage actor not already tenant-pinned

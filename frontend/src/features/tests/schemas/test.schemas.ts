@@ -8,7 +8,7 @@ export const testFormSchema = z.object({
   // form field backs it in either create or edit mode. See TestForm.
   name: z.string().trim().min(1, 'Name is required'),
   description: z.string().trim().optional(),
-  therapy: z.enum(THERAPY_VALUES),
+  therapy: z.enum(THERAPY_VALUES, { error: 'Therapy is required' }),
   duration: z.number({ error: 'Duration is required' }).min(0, 'Duration must be 0 or more'),
   price: z.number({ error: 'Price is required' }).min(0, 'Price must be 0 or more'),
   status: z.enum(['active', 'inactive']),

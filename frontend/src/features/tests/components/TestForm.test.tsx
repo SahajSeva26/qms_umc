@@ -79,6 +79,7 @@ describe('TestForm — create mode', () => {
 
     expect(testService.createTest).not.toHaveBeenCalled()
     expect(screen.getByText(/select therapy/i)).toBeInTheDocument()
+    expect(screen.getByText('Therapy is required')).toBeInTheDocument()
   })
 
   it('blocks submission when duration/price are left blank instead of silently defaulting to 0', async () => {
@@ -107,7 +108,8 @@ describe('TestForm — create mode', () => {
 
     expect(screen.getByText(/devices required/i)).toBeInTheDocument()
     expect(screen.getByText(/consumables required/i)).toBeInTheDocument()
-    expect(screen.getAllByPlaceholderText(/search devices/i)).toHaveLength(2)
+    expect(screen.getByPlaceholderText(/search devices/i)).toBeInTheDocument()
+    expect(screen.getByPlaceholderText(/search consumables/i)).toBeInTheDocument()
   })
 
   it('merges picked devices and consumables into one consumption array — device lines omit rate, consumable lines send rate:1', async () => {
@@ -138,7 +140,8 @@ describe('TestForm — create mode', () => {
     await user.type(screen.getByLabelText(/duration/i), '15')
     await user.type(screen.getByLabelText(/price/i), '250')
 
-    const [deviceSearch, consumableSearch] = screen.getAllByPlaceholderText(/search devices/i)
+    const deviceSearch = screen.getByPlaceholderText(/search devices/i)
+    const consumableSearch = screen.getByPlaceholderText(/search consumables/i)
     await user.type(deviceSearch, 'Gluco')
     await user.click(await screen.findByText(/Glucometer \(DEV-01\)/i))
     await user.type(consumableSearch, 'Glove')

@@ -164,14 +164,21 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
             // read the test catalog (needed to run camp tests) — read-only, no manage
             TEST_MASTER_PERMISSIONS.SEARCH.code,
             TEST_MASTER_PERMISSIONS.GET.code,
-            // register patients at the camp
+            // register + look up + amend patients at the camp (own-scoped reads)
             PATIENT_PERMISSIONS.CREATE.code,
-            // start + progress screenings at a live camp they are assigned to
+            PATIENT_PERMISSIONS.GET.code,
+            PATIENT_PERMISSIONS.SEARCH.code,
+            PATIENT_PERMISSIONS.UPDATE.code,
+            // start + progress + read back screenings at a live camp they are assigned to
             SCREENING_PERMISSIONS.CREATE.code,
             SCREENING_PERMISSIONS.UPDATE.code,
-            // record + correct patient test results after the screening is completed
+            SCREENING_PERMISSIONS.GET.code,
+            SCREENING_PERMISSIONS.SEARCH.code,
+            // record + correct + read back patient test results after the screening is completed
             TEST_PERMISSIONS.CREATE.code,
             TEST_PERMISSIONS.UPDATE.code,
+            TEST_PERMISSIONS.GET.code,
+            TEST_PERMISSIONS.SEARCH.code,
             // raise and manage their own refill/return requests (progressing the stage is manage-only)
             INVENTORY_REQUEST_PERMISSIONS.CREATE.code,
             INVENTORY_REQUEST_PERMISSIONS.GET.code,

@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import { TEST_MASTER_STATUS, TEST_MASTER_CONFIG_INPUT_TYPE } from './testMaster.constants';
 import { PROJECT_THERAPY_TYPES } from '../../crm/project/project.constants';
+import { CAMP_TYPES } from '../camp/camp.constants';
 import { isValidObjectID } from '../../../shared/utils/strings';
 
 const objectId = (label: string) =>
@@ -39,6 +40,8 @@ export const CreateTestMasterPayloadSchema = z.object({
     name: z.string().min(1).openapi({ example: 'Blood Sugar (Fasting)' }),
     description: z.string().min(1).optional().openapi({ example: 'Fasting blood glucose screening' }),
     therapy: z.enum(Object.values(PROJECT_THERAPY_TYPES)).openapi({ example: 'diabetes' }),
+    // the camp type this test belongs to — immutable after create
+    campType: z.enum(Object.values(CAMP_TYPES)).openapi({ example: 'screening' }),
     // time taken to perform the test, in minutes
     duration: z.number().min(0).openapi({ example: 15 }),
     // price of the test
@@ -50,7 +53,7 @@ export const CreateTestMasterPayloadSchema = z.object({
 export type ICreateTestMasterPayload = z.infer<typeof CreateTestMasterPayloadSchema>;
 
 //2: update ====================================>
-// code is intentionally omitted — it is immutable after create.
+// code and campType are intentionally omitted — both are immutable after create.
 export const UpdateTestMasterPayloadSchema = z.object({
     name: z.string().min(1).optional(),
     description: z.string().min(1).optional(),
@@ -73,6 +76,7 @@ export const SearchTestMasterQuerySchema = z.object({
         .union([z.enum(Object.values(PROJECT_THERAPY_TYPES)), z.array(z.enum(Object.values(PROJECT_THERAPY_TYPES)))])
         .optional()
         .openapi({ example: ['cardiology', 'diabetes'] }),
+    campType: z.enum(Object.values(CAMP_TYPES)).optional().openapi({ example: 'screening' }),
     status: z.enum(Object.values(TEST_MASTER_STATUS)).optional().openapi({ example: 'active' }),
     page: z.string().optional().openapi({ example: '1' }),
     limit: z.string().optional().openapi({ example: '10' }),

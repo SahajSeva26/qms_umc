@@ -55,6 +55,10 @@ const set = async (model: any, entity: HydratedDocument<ITestMaster>, ctx: Reque
     if (model.therapy) {
         entity.therapy = model.therapy;
     }
+    // campType is immutable — the update schema strips it, so this only ever fires on create
+    if (model.campType) {
+        entity.campType = model.campType;
+    }
     if (model.duration !== undefined) {
         entity.duration = model.duration;
     }
@@ -104,6 +108,9 @@ const search = async (filters: ISearchTestMasterQuery, ctx: RequestContext, opti
         // accept a single therapy or a list of therapies (→ $in) so a caller can show every test
         // belonging to a group of therapies in one query.
         where.therapy = Array.isArray(filters.therapy) ? { $in: filters.therapy } : filters.therapy;
+    }
+    if (filters.campType) {
+        where.campType = filters.campType;
     }
     // only a manage-level actor may look past active (see inactive tests)
     if (filters.status && ctx.hasAnyPermissions([TEST_MASTER_PERMISSIONS.MANAGE.code])) {

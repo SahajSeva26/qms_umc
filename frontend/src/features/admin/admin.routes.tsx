@@ -50,6 +50,6 @@ export const adminRoutes: RouteObject[] = [
     // This route guard intentionally restricts the UI further, to system:manage
     // only, until the Test Master admin page is ready for non-system roles.
     path: ADMIN_ROUTES.ADMIN_TESTS,
-    lazy: lazyRoute(() => import('@/features/tests/pages/TestsPage'), ['system:manage']),
+    lazy: lazyRoute(() => import('@/features/test-master/pages/TestsPage'), ['system:manage']),
   },
 ]

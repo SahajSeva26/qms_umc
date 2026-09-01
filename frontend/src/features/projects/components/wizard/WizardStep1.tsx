@@ -1,12 +1,15 @@
+import { useEffect } from 'react'
 import { FiActivity, FiHeart, FiVideo, FiDroplet, FiShuffle, FiTag, FiInfo } from 'react-icons/fi'
 import type { WizardFormState } from '@/features/projects/wizard.types'
 import type { ProjectTherapy, ProjectType } from '@/types/project.types'
 import { PROJECT_THERAPY_LABEL, PROJECT_TYPE_LABEL } from '@/types/project.types'
-import { PROJECT_TYPE_COLOR } from '@/features/projects/projects.utils'
-import { useTests } from '@/features/tests/hooks/useTests'
+import { PROJECT_TYPE_COLOR, allowedCampTypesForProjectTypes } from '@/features/projects/projects.utils'
+import { useTestsForProjectWizard } from '@/features/test-master/hooks/useTestsForProjectWizard'
+import { usePermission } from '@/hooks/usePermission'
 import { PickCard, PickGrid } from '@/components/ui/PickCard'
 import SectionHeader from '@/components/ui/SectionHeader'
 import { ChipRow, ChipToggle } from '@/components/ui/ChipToggle'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
@@ -31,11 +34,25 @@ interface WizardStep1Props {
 // Client/division no longer picked here — they're derived server-side from
 // the Step 0-selected lead's own tenant/division (never sent in the create
 // payload). `type` is now a real multi-select array (backend model field),
-// not a single-select — this also removes the old "Mixed" special case
-// entirely: a project can just be `type: ['diet', 'lab_test']` directly.
+// not a single-select — `mixed` is still one of the selectable values
+// (ProjectType includes it, PROJECT_TYPE_LABEL/PROJECT_TYPE_COLOR both map
+// it), it's simply no longer a mutually-exclusive alternative to the other
+// four the way the old mock's single-select modeled it; a project can pick
+// `mixed` alongside (or instead of) any other type in the same array, e.g.
+// `type: ['diet', 'lab_test']` or `type: ['mixed']`. Because `mixed` stays
+// real and selectable, its own camp-type mapping must be explicit rather
+// than assumed removed — see PROJECT_TYPE_CAMP_TYPES in projects.utils.ts.
 const WizardStep1 = ({ form, setField }: WizardStep1Props) => {
   const toggleType = (id: ProjectType) => {
-    setField('type', form.type.includes(id) ? form.type.filter((t) => t !== id) : [...form.type, id])
+    const nextType = form.type.includes(id) ? form.type.filter((t) => t !== id) : [...form.type, id]
+    setField('type', nextType)
+    // The test picker below is scoped to camp types compatible with the
+    // selected project type(s) (allowedCampTypesForProjectTypes) — changing
+    // that selection can shrink or shift which tests are even shown, so any
+    // already-selected test must be cleared here, same reasoning as
+    // handleTherapyChange below, or a now-incompatible test id could
+    // silently ride along in the submitted payload.
+    setField('tests', [])
   }
 
   const toggleTest = (id: string) => {
@@ -50,14 +67,53 @@ const WizardStep1 = ({ form, setField }: WizardStep1Props) => {
     setField('tests', [])
   }
 
-  // Disabled (not merely hidden) until a therapy is picked — showing an
-  // unfiltered list first would let a test be selected that then vanishes
-  // once a therapy is chosen, contradicting the therapy-scoped intent.
-  const { data: testsData, isLoading: isLoadingTests, error: testsError, refetch: refetchTests } = useTests(
-    { therapy: form.therapy || undefined, status: 'active' },
-    !!form.therapy,
-  )
-  const tests = testsData?.data?.items ?? []
+  const allowedCampTypes = allowedCampTypesForProjectTypes(form.type)
+
+  // GET /test-masters requires test-master:search/manage — not every actor
+  // who can create a project necessarily holds it (only Field Officer and
+  // the two Ops Manager role types do by default; a project creator reaches
+  // this wizard via project:manage/tenant:manage, an unrelated permission
+  // namespace). Gate the query itself so it never fires and 403s for an
+  // actor who genuinely lacks it — mirrors EditTestModal.tsx's
+  // canViewResults pattern. Currently unreachable in practice (no default
+  // role type both creates projects and lacks test-master access — only
+  // system:manage, which holds every permission, or a custom role reaches
+  // project creation at all today) — if that combination becomes real, the
+  // actual fix is a role-policy decision (grant project creators
+  // test-master:search by default) or building real post-create
+  // test-editing into EditProjectModal.tsx (it has none today — its
+  // EditFormState carries no `tests` field even though
+  // UpdateProjectPayload.tests exists on the type), not a frontend
+  // workaround here.
+  const { hasAnyPermission } = usePermission()
+  const canBrowseTests = hasAnyPermission(['test-master:search', 'test-master:manage'])
+
+  // Disabled (not merely hidden) until BOTH a therapy AND at least one
+  // project type are picked — showing an unfiltered (or type-unscoped) list
+  // first would let a test be selected that then vanishes once a therapy or
+  // project type is chosen/changed, contradicting the scoped intent.
+  const {
+    tests,
+    isLoading: isLoadingTests,
+    isFetching: isFetchingMoreTests,
+    error: testsError,
+    hasMore: hasMoreTests,
+    loadMore: loadMoreTests,
+    refetch: refetchTests,
+  } = useTestsForProjectWizard(form.therapy, allowedCampTypes, canBrowseTests)
+
+  // If canBrowseTests transitions to false while the wizard is open (e.g. a
+  // session refetch revokes the permission mid-flow), clear any
+  // already-selected tests — otherwise the "created with no tests selected"
+  // message below could become false, with a stale test id still riding
+  // along in the submit payload. No discrete user action causes this
+  // transition (unlike toggleType/handleTherapyChange below, which fire
+  // directly from a click), so an effect is the correct mechanism here.
+  useEffect(() => {
+    if (!canBrowseTests && form.tests.length > 0) {
+      setField('tests', [])
+    }
+  }, [canBrowseTests, form.tests.length, setField])
 
   return (
     <div className="space-y-4">
@@ -105,8 +161,15 @@ const WizardStep1 = ({ form, setField }: WizardStep1Props) => {
 
       <div>
         <SectionHeader icon={FiDroplet}>Tests to be conducted</SectionHeader>
-        {!form.therapy ? (
+        {!canBrowseTests ? (
+          <p className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>
+            You don't have permission to browse the test catalog. This project will be created with
+            no tests selected.
+          </p>
+        ) : !form.therapy ? (
           <p className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>Select a therapy to see available tests.</p>
+        ) : allowedCampTypes.length === 0 ? (
+          <p className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>Select a project type to see available tests.</p>
         ) : isLoadingTests ? (
           <p className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>Loading tests…</p>
         ) : testsError ? (
@@ -121,15 +184,22 @@ const WizardStep1 = ({ form, setField }: WizardStep1Props) => {
             </button>
           </div>
         ) : tests.length === 0 ? (
-          <p className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>No tests configured for this therapy yet.</p>
+          <p className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>No tests configured for this therapy and project type yet.</p>
         ) : (
-          <ChipRow>
-            {tests.map((t) => (
-              <ChipToggle key={t.id} active={form.tests.includes(t.id)} onClick={() => toggleTest(t.id)}>
-                {t.name}
-              </ChipToggle>
-            ))}
-          </ChipRow>
+          <>
+            <ChipRow>
+              {tests.map((t) => (
+                <ChipToggle key={t.id} active={form.tests.includes(t.id)} onClick={() => toggleTest(t.id)}>
+                  {t.name}
+                </ChipToggle>
+              ))}
+            </ChipRow>
+            {hasMoreTests && (
+              <Button type="button" variant="outline" size="xs" className="mt-2" onClick={loadMoreTests} disabled={isFetchingMoreTests}>
+                {isFetchingMoreTests ? 'Loading…' : 'Load more tests'}
+              </Button>
+            )}
+          </>
         )}
       </div>
     </div>

@@ -1,4 +1,5 @@
 import type { ProjectEntity, ProjectType } from '@/types/project.types'
+import { CAMP_TYPE_VALUES, type CampType } from '@/types/campReal.types'
 
 // Frontend-only UI business rule — the backend's daysToBookBefore validator
 // is nonnegative-only, no upper bound (project.validators.ts). Not yet a
@@ -18,6 +19,14 @@ export function isScreeningProject(project: ProjectEntity): boolean {
   return project.type.some((t) => SCREENING_MODE_TYPES.includes(t))
 }
 
+// Mirrors project.routes.ts's real create/update guard exactly
+// (`[PROJECT_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]`) —
+// deliberately excludes `project:create`, which is defined in
+// project.constants.ts but never referenced by any route guard (dead
+// permission). No default role type holds project:manage today; only
+// system:manage or a custom role reaches project create/edit/status-change.
+export const PROJECT_WRITE_PERMISSIONS = ['project:manage', 'tenant:manage']
+
 // Single source of truth for per-type accent colors — previously duplicated
 // verbatim in WizardStep1.tsx, EditProjectModal.tsx, and ProjectTypePill.tsx
 // (a real drift risk, and the direct cause of a bug found in live testing:
@@ -29,6 +38,32 @@ export const PROJECT_TYPE_COLOR: Record<ProjectType, string> = {
   teleconsultation_diet: '#7c3aed',
   lab_test: '#a855f7',
   mixed: '#f59e0b',
+}
+
+// Which Camp Type(s) (screening/diet/lab — TestMaster.campType's own enum,
+// campReal.types.ts) a project of each type could plausibly run camps
+// against. There is no backend rule linking the two — Camp.type is an
+// independent, freely-chosen field on the Camp model, not derived from its
+// Project — so this is a frontend-only, advisory mapping, used solely to
+// narrow the Project wizard's test picker (WizardStep1.tsx) to tests whose
+// own campType is compatible with what this project could plausibly run.
+// `mixed` maps to all three: it's explicitly a project that spans more than
+// one mode, so it should see the union of every type's tests, not a subset.
+export const PROJECT_TYPE_CAMP_TYPES: Record<ProjectType, CampType[]> = {
+  screening_camp: ['screening'],
+  diet: ['diet'],
+  teleconsultation_diet: ['diet'],
+  lab_test: ['lab'],
+  mixed: [...CAMP_TYPE_VALUES],
+}
+
+// Deduped union of allowed camp types across every selected project type —
+// empty until at least one project type is picked (WizardStep1.tsx disables
+// the test picker entirely until then, mirroring the existing
+// therapy-gating rule, rather than showing an unfiltered or empty list that
+// would misrepresent "no project type chosen yet" as "no tests available").
+export function allowedCampTypesForProjectTypes(types: ProjectType[]): CampType[] {
+  return [...new Set(types.flatMap((t) => PROJECT_TYPE_CAMP_TYPES[t]))]
 }
 
 // GST math, shared by WizardStep3 (live calculator), WizardStep6 (review

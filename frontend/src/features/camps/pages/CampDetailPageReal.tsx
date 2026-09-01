@@ -6,16 +6,16 @@ import { useCreateCamp } from '@/features/camps/hooks/useCreateCamp'
 import { useUpdateCamp } from '@/features/camps/hooks/useUpdateCamp'
 import { useCampRefNames } from '@/features/camps/hooks/useCampRefNames'
 import { useCampPickerData } from '@/features/camps/hooks/useCampPickerData'
-import { useCampCandidateRoles } from '@/features/camps/hooks/useCampCandidateRoles'
 import { useCampDraft } from '@/features/camps/hooks/useCampDraft'
 import { useProject } from '@/features/projects/hooks/useProject'
-import { campRefId, campRefName, saveErrorMessage } from '@/features/camps/campsReal.utils'
+import { campRefId, campRefName, canRunScreening, saveErrorMessage } from '@/features/camps/campsReal.utils'
 import { usePermission } from '@/hooks/usePermission'
 import CampSummaryHeader from '@/features/camps/components/CampSummaryHeader'
 import CampStageMovePanel from '@/features/camps/components/CampStageMovePanel'
 import CampStageHistoryList from '@/features/camps/components/CampStageHistoryList'
 import ProjectPicker from '@/features/camps/components/ProjectPicker'
 import CampMrPicker from '@/features/camps/components/CampMrPicker'
+import CampFoPicker from '@/features/camps/components/CampFoPicker'
 import InventoryMasterMultiPicker from '@/features/inventory/real/components/InventoryMasterMultiPicker'
 import EditDoctorModal from '@/features/doctors/components/EditDoctorModal'
 import { Button } from '@/components/ui/button'
@@ -24,17 +24,14 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import TenantPicker from '@/components/ui/TenantPicker'
+import { CAMP_TYPE_LABEL, CAMP_TYPE_VALUES } from '@/types/campReal.types'
 import type { BillingType, CampEntity, CampType } from '@/types/campReal.types'
 import type { DoctorEntity } from '@/types/doctor.types'
 import { CAMP_TIME_SLOT_LABEL } from '@/types/campTimeSlot.constants'
 import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
 import type { ProjectEntity } from '@/types/project.types'
 
-const TYPE_OPTIONS: { value: CampType; label: string }[] = [
-  { value: 'screening', label: 'Screening' },
-  { value: 'diet', label: 'Diet' },
-  { value: 'lab', label: 'Lab' },
-]
+const TYPE_OPTIONS: { value: CampType; label: string }[] = CAMP_TYPE_VALUES.map((value) => ({ value, label: CAMP_TYPE_LABEL[value] }))
 
 const BILLING_OPTIONS: { value: BillingType; label: string }[] = [
   { value: 'billable', label: 'Billable' },
@@ -52,11 +49,12 @@ const CampDetailPageReal = () => {
   const { id } = useParams<{ id: string }>()
   const isCreateMode = !id
   const navigate = useNavigate()
-  const { hasAnyPermission } = usePermission()
+  const { hasAnyPermission, session } = usePermission()
   const canCreate = hasAnyPermission(CAMP_CREATE_PERMISSIONS)
   const canUpdate = hasAnyPermission(CAMP_UPDATE_PERMISSIONS)
   const canWrite = isCreateMode ? canCreate : canUpdate
   const canMoveStage = hasAnyPermission(CAMP_STAGE_PERMISSIONS)
+  const canManageScreening = hasAnyPermission(['screening:manage', 'system:manage'])
 
   const { data, isLoading, error } = useCampReal(id)
   const camp = data?.data ?? null
@@ -100,6 +98,14 @@ const CampDetailPageReal = () => {
             projectName={projectName}
           />
 
+          {!isCreateMode && camp && camp.status === 'live' && canRunScreening(camp, session?.role.id, session?.roleType.code, canManageScreening) && (
+            <div className="mb-5">
+              <Button variant="outline" onClick={() => navigate(`/camps/${camp.id}/screening`)}>
+                Run screening
+              </Button>
+            </div>
+          )}
+
           {!isCreateMode && camp && (
             <CampStageMovePanel camp={camp} canWrite={canWrite} canMoveStage={canMoveStage} />
           )}
@@ -128,9 +134,11 @@ const CampForm = ({ camp, isCreateMode, canWrite }: CampFormProps) => {
   const { draft, setField } = useCampDraft(camp)
   const { tenant, division, project, doctor, type, billingType, patientExpectation, fo, mr, date, timeSlot, city, state, latitude, longitude, devices, notes } = draft
 
-  // mr/project/devices' human labels aren't part of the string-only CampDraft
-  // reducer — tracked locally. Lazy initializers, not an effect: CampForm remounts per record.
+  // mr/fo/project/devices' human labels aren't part of the string-only
+  // CampDraft reducer — tracked locally. Lazy initializers, not an effect:
+  // CampForm remounts per record.
   const [mrLabel, setMrLabel] = useState(() => campRefName(camp?.mr) ?? '')
+  const [foLabel, setFoLabel] = useState(() => campRefName(camp?.fo) ?? '')
   const [projectLabel, setProjectLabelState] = useState(() =>
     !isCreateMode && camp?.project && typeof camp.project !== 'string' ? camp.project.name : '',
   )
@@ -174,8 +182,6 @@ const CampForm = ({ camp, isCreateMode, canWrite }: CampFormProps) => {
   // The backend rejects the ENTIRE update once a camp leaves `requested`
   // (409, camp.service.ts's update()) — not just fo/date, so every field is locked.
   const isLocked = !isCreateMode && !!camp && camp.status !== 'requested'
-
-  const { foRoles, roleLabel } = useCampCandidateRoles(camp)
 
   // base-ui's SelectValue always calls a function child, even with no value —
   // it never falls through to the `placeholder` prop in that case, so the
@@ -312,6 +318,12 @@ const CampForm = ({ camp, isCreateMode, canWrite }: CampFormProps) => {
                   // A doctor (fetched or just-created) scoped to the old company is no longer valid.
                   setDoctor('')
                   setLocalDoctors([])
+                  // An MR/FO scoped to the old company is no longer valid either — same
+                  // reasoning as doctor above.
+                  setMr('')
+                  setMrLabel('')
+                  setFo('')
+                  setFoLabel('')
                 }}
               />
             </div>
@@ -449,14 +461,13 @@ const CampForm = ({ camp, isCreateMode, canWrite }: CampFormProps) => {
             <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
               Field Officer (optional — auto-assigned if blank)
             </Label>
-            <Select key={fo || 'empty'} value={fo || undefined} onValueChange={(v) => setFo(v ?? '')} disabled={isLocked}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Auto-assign nearest FO">{(v) => roleLabel(v as string)}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {foRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <CampFoPicker
+              value={fo}
+              label={foLabel}
+              tenant={effectiveTenant || undefined}
+              onChange={(id, l) => { setFo(id); setFoLabel(l) }}
+              disabled={isLocked || !effectiveTenant}
+            />
           </div>
           <div>
             <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>MR *</Label>
@@ -466,7 +477,7 @@ const CampForm = ({ camp, isCreateMode, canWrite }: CampFormProps) => {
               label={mrLabel}
               tenant={effectiveTenant || undefined}
               onChange={(id, l) => { setMr(id); setMrLabel(l) }}
-              disabled={isLocked}
+              disabled={isLocked || !effectiveTenant}
             />
           </div>
         </div>

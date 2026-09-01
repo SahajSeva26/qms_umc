@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useCallback, useState } from 'react'
 import { FiFolder, FiArrowLeft, FiArrowRight, FiSave, FiX } from 'react-icons/fi'
 import type { CreateProjectPayload, ExecutionMode, ProjectEntity, ProjectTherapy, UpdateProjectPayload } from '@/types/project.types'
 import { createDefaultWizardForm, type WizardFormState } from '@/features/projects/wizard.types'
@@ -138,9 +138,12 @@ const NewProjectWizard = ({ editProject, onClose, onSaved }: NewProjectWizardPro
   const createProject = useCreateProject()
   const updateProject = useUpdateProject()
 
-  const setField = <K extends keyof WizardFormState>(key: K, value: WizardFormState[K]) => {
+  // Stable across renders (setForm's own setter identity never changes) —
+  // WizardStep1.tsx relies on this to safely list setField in a useEffect's
+  // dependency array without refiring on every parent render.
+  const setField = useCallback(<K extends keyof WizardFormState>(key: K, value: WizardFormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }))
-  }
+  }, [])
 
   const lastStep = STEPS.length - 1
 

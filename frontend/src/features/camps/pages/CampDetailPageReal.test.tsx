@@ -182,22 +182,17 @@ describe('CampDetailPageReal — edit mode MR field', () => {
   })
 })
 
-describe('CampDetailPageReal — create mode, inline doctor creation', () => {
-  beforeEach(() => {
-    vi.resetAllMocks()
-  })
-
-  async function mockSessionWithPermission(hasDoctorManage: boolean) {
-    const { useSession } = await import('@/hooks/useSession')
-    vi.mocked(useSession).mockReturnValue({
-      session: { role: { id: 'r-1', code: 'admin', name: 'Admin' }, roleType: { id: 'rt-1', code: 'admin', name: 'admin' }, tenant: { id: 't-1', code: 'qms', name: 'QMS', type: 'platform' }, permissions: ['camp:create'] },
-      isLoading: false, isFetching: false, isSettled: true, isError: false, error: null,
-      isAuthenticated: true, isConfirmedUnauthenticated: false,
-      hasPermission: (code: string) => (code === 'doctor:manage' ? hasDoctorManage : true),
-      hasAnyPermission: () => true, hasAllPermissions: () => true,
-      refetchSession: vi.fn(), clearSession: vi.fn(),
-    } as unknown as ReturnType<typeof useSession>)
-  }
+async function mockSessionWithPermission(hasDoctorManage: boolean) {
+  const { useSession } = await import('@/hooks/useSession')
+  vi.mocked(useSession).mockReturnValue({
+    session: { role: { id: 'r-1', code: 'admin', name: 'Admin' }, roleType: { id: 'rt-1', code: 'admin', name: 'admin' }, tenant: { id: 't-1', code: 'qms', name: 'QMS', type: 'platform' }, permissions: ['camp:create'] },
+    isLoading: false, isFetching: false, isSettled: true, isError: false, error: null,
+    isAuthenticated: true, isConfirmedUnauthenticated: false,
+    hasPermission: (code: string) => (code === 'doctor:manage' ? hasDoctorManage : true),
+    hasAnyPermission: () => true, hasAllPermissions: () => true,
+    refetchSession: vi.fn(), clearSession: vi.fn(),
+  } as unknown as ReturnType<typeof useSession>)
+}
 
 async function mockTenants(items: { id: string; name: string; code: string; type?: string }[]) {
   const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
@@ -213,6 +208,11 @@ async function pickCompany(user: ReturnType<typeof userEvent.setup>, name: strin
   const option = await screen.findByRole('option', { name: new RegExp(name, 'i') })
   await user.click(option)
 }
+
+describe('CampDetailPageReal — create mode, inline doctor creation', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
 
 // Fills the "Add doctor" modal's required create fields (pharma code, name)
 // by locating each input via its own label text's sibling, matching this
@@ -338,5 +338,89 @@ async function fillNewDoctorRequiredFields(user: ReturnType<typeof userEvent.set
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(doctorsService.createDoctor).not.toHaveBeenCalled()
+  })
+})
+
+describe('CampDetailPageReal — create mode, MR/FO pickers', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  async function mockRoleTypesAndRoles(rolesByCode: Record<string, RoleEntity[]>) {
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    vi.mocked(accessManagementService.searchRoleTypes).mockImplementation(async (q) => ({
+      success: true, message: '', data: { items: [{ id: `rt-${q.code}`, code: q.code }], count: 1 },
+    }) as never)
+    vi.mocked(accessManagementService.searchRoles).mockImplementation(async (q) => {
+      const roleTypeCode = q.type === 'rt-pharma-mr' ? 'pharma-mr' : q.type === 'rt-field-officer' ? 'field-officer' : undefined
+      const items = roleTypeCode ? rolesByCode[roleTypeCode] ?? [] : []
+      return { success: true, message: '', data: { items, count: items.length } } as never
+    })
+  }
+
+  it('changing Company clears MR, MR label, FO, and FO label together', async () => {
+    await mockSessionWithPermission(true)
+    await mockTenants([
+      { id: 't-cipla', name: 'Cipla', code: 'cipla', type: 'customer' },
+      { id: 't-sun', name: 'Sun Pharma', code: 'sunpharma', type: 'customer' },
+    ])
+    await mockRoleTypesAndRoles({
+      'pharma-mr': [mrRoleFixture({ id: 'mr-cipla', name: 'Cipla MR' })],
+      'field-officer': [{ id: 'fo-cipla', code: 'fo-001', name: 'Cipla FO', permissions: [], status: 'active', type: 'rt-field-officer', user: 'u-3', tenant: 't-cipla', createdAt: '', updatedAt: '' } as RoleEntity],
+    })
+
+    const user = userEvent.setup()
+    await renderCreatePage()
+    await pickCompany(user, 'Cipla')
+
+    const mrSearchInput = await screen.findByPlaceholderText(/search mr by name/i)
+    await user.type(mrSearchInput, 'Cipla')
+    await user.click(await screen.findByText(/cipla mr/i, {}, { timeout: 3000 }))
+
+    const foSearchInput = await screen.findByPlaceholderText(/search fo by name/i)
+    await user.type(foSearchInput, 'Cipla')
+    await user.click(await screen.findByText(/cipla fo/i, {}, { timeout: 3000 }))
+
+    expect(screen.getByText(/cipla mr/i)).toBeInTheDocument()
+    expect(screen.getByText(/cipla fo/i)).toBeInTheDocument()
+
+    // Switch Company.
+    const companyLabel = screen.getByText(/^Company \*/i)
+    const trigger = companyLabel.parentElement!.querySelector('[role="combobox"]')!
+    await user.click(trigger)
+    const otherOption = await screen.findByRole('option', { name: /sun pharma/i })
+    await user.click(otherOption)
+
+    expect(screen.queryByText(/cipla mr/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/cipla fo/i)).not.toBeInTheDocument()
+    expect(await screen.findByPlaceholderText(/search mr by name/i)).toBeInTheDocument()
+    expect(await screen.findByPlaceholderText(/search fo by name/i)).toBeInTheDocument()
+  })
+
+  it('the FO picker is disabled until a Company is selected', async () => {
+    await mockSessionWithPermission(true)
+    await renderCreatePage()
+
+    const foLabel = await screen.findByText(/field officer \(optional/i)
+    const foInput = foLabel.parentElement!.querySelector('input')!
+    expect(foInput).toBeDisabled()
+  })
+
+  it('FO search sends both the selected tenant and the field-officer role type', async () => {
+    await mockSessionWithPermission(true)
+    await mockTenants([{ id: 't-cipla', name: 'Cipla', code: 'cipla', type: 'customer' }])
+    await mockRoleTypesAndRoles({ 'field-officer': [] })
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+
+    const user = userEvent.setup()
+    await renderCreatePage()
+    await pickCompany(user, 'Cipla')
+
+    const foSearchInput = await screen.findByPlaceholderText(/search fo by name/i)
+    await user.type(foSearchInput, 'Ramesh')
+
+    await waitFor(() => expect(accessManagementService.searchRoles).toHaveBeenCalledWith(
+      expect.objectContaining({ tenant: 't-cipla', type: 'rt-field-officer' }),
+    ))
   })
 })

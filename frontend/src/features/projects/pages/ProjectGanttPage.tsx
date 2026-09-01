@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { FiPlus, FiClock } from 'react-icons/fi'
 import type { ProjectStatus } from '@/types/project.types'
 import { useProjects } from '@/features/projects/hooks/useProjects'
+import { usePermission } from '@/hooks/usePermission'
 import {
   computeGstBreakdown,
   computeProjectKpis,
@@ -9,6 +10,7 @@ import {
   projectHealthScore,
   projectNearestExpiry,
   projectTenantName,
+  PROJECT_WRITE_PERMISSIONS,
 } from '@/features/projects/projects.utils'
 import { formatDate, formatINR } from '@/utils/formatters'
 import GanttKpiStrip from '@/features/projects/components/GanttKpiStrip'
@@ -32,6 +34,9 @@ function healthColor(score: number): string {
 }
 
 const ProjectGanttPage = () => {
+  const { hasAnyPermission } = usePermission()
+  const canWrite = hasAnyPermission(PROJECT_WRITE_PERMISSIONS)
+
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [wizardOpen, setWizardOpen] = useState(false)
 
@@ -73,13 +78,15 @@ const ProjectGanttPage = () => {
             mail-confirmation projects (no date fields) are listed separately below.
           </p>
         </div>
-        <button
-          onClick={() => setWizardOpen(true)}
-          className="flex items-center gap-1.5 text-[13px] font-bold px-3.5 py-2 rounded-xl text-white shrink-0"
-          style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
-        >
-          <FiPlus size={14} /> New project
-        </button>
+        {canWrite && (
+          <button
+            onClick={() => setWizardOpen(true)}
+            className="flex items-center gap-1.5 text-[13px] font-bold px-3.5 py-2 rounded-xl text-white shrink-0"
+            style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
+          >
+            <FiPlus size={14} /> New project
+          </button>
+        )}
       </div>
 
       <GanttKpiStrip kpis={kpis} />

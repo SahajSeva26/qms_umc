@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import type { ScreeningEntity, ScreeningStatus } from '@/features/clinical/screening/screening.types'
+import { getApiErrorMessage } from '@/utils/apiError'
 
 interface ScreeningMoveStagePanelProps {
   screening: ScreeningEntity
@@ -77,7 +78,7 @@ const ScreeningMoveStagePanel = ({ screening, canMoveStage }: ScreeningMoveStage
           )}
           {moveStage.isError && (
             <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
-              {(moveStage.error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Could not update this screening.'}
+              {getApiErrorMessage(moveStage.error, 'Could not update this screening.')}
             </div>
           )}
           <div className="flex gap-2">

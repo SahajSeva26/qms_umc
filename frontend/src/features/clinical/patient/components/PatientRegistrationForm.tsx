@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -37,7 +36,6 @@ interface PatientRegistrationFormProps {
 // the backend; can be added via a full edit later if ever needed).
 const PatientRegistrationForm = ({ open, onClose, onCreated }: PatientRegistrationFormProps) => {
   const createMutation = useCreatePatient()
-  const [dob, setDob] = useState('')
 
   const {
     register,
@@ -55,7 +53,6 @@ const PatientRegistrationForm = ({ open, onClose, onCreated }: PatientRegistrati
 
   const handleClose = () => {
     reset()
-    setDob('')
     onClose()
   }
 
@@ -107,8 +104,8 @@ const PatientRegistrationForm = ({ open, onClose, onCreated }: PatientRegistrati
                 name="dateOfBirth"
                 render={({ field }) => (
                   <DatePicker
-                    value={dob}
-                    onChange={(v) => { setDob(v); field.onChange(v) }}
+                    value={field.value}
+                    onChange={field.onChange}
                     className="w-full"
                   />
                 )}

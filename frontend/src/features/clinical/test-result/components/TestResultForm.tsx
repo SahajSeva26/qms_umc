@@ -6,6 +6,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { useCreateTestResult } from '@/features/clinical/test-result/hooks/useCreateTestResult'
 import type { TestEntity, TestMasterConfigInput } from '@/features/test-master/testMaster.types'
 import type { TestResultInterpretation } from '@/features/clinical/test-result/testResult.types'
+import { getApiErrorMessage } from '@/utils/apiError'
 
 const INTERPRETATION_OPTIONS: TestResultInterpretation[] = ['NORMAL', 'LOW', 'HIGH', 'CRITICAL', 'INVALID']
 
@@ -111,7 +112,7 @@ const TestResultForm = ({ screeningId, testMaster }: TestResultFormProps) => {
 
       {createMutation.isError && (
         <div className="text-[11px] rounded-lg px-2.5 py-1.5 bg-danger-soft border border-danger text-danger">
-          {(createMutation.error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Could not record this test.'}
+          {getApiErrorMessage(createMutation.error, 'Could not record this test.')}
         </div>
       )}
 

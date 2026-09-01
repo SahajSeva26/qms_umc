@@ -9,6 +9,7 @@ import { useCreateScreening } from '@/features/clinical/screening/hooks/useCreat
 import { screeningService } from '@/features/clinical/screening/screening.service'
 import PatientPicker from '@/features/clinical/patient/components/PatientPicker'
 import { SCREENING_STATUS_LABEL, type ScreeningEntity } from '@/features/clinical/screening/screening.types'
+import { getApiErrorMessage } from '@/utils/apiError'
 
 const PAGE_SIZE = 20
 
@@ -73,8 +74,7 @@ const ScreeningList = ({ campId, canWrite, onOpen }: ScreeningListProps) => {
           resetToFirstPage()
         },
         onError: (err) => {
-          const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-          setCreateError(message || 'Could not create this screening.')
+          setCreateError(getApiErrorMessage(err, 'Could not create this screening.'))
         },
       },
     )

@@ -1,32 +1,16 @@
-import { useState, type ReactNode } from 'react'
-import { Controller, FormProvider, useForm } from 'react-hook-form'
+import { FormProvider, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import type { TestEntity } from '@/features/test-master/testMaster.types'
-import { TEST_STATUS_LABEL } from '@/features/test-master/testMaster.types'
-import { PROJECT_THERAPY_LABEL, type ProjectTherapy } from '@/types/project.types'
-import { CAMP_TYPE_LABEL, CAMP_TYPE_VALUES, type CampType } from '@/types/campReal.types'
+import type { ProjectTherapy } from '@/types/project.types'
+import type { CampType } from '@/types/campReal.types'
 import { useCreateTest } from '@/features/test-master/hooks/useCreateTest'
 import { useUpdateTest } from '@/features/test-master/hooks/useUpdateTest'
 import { buildTestFormSchema, type TestFormValues } from '@/features/test-master/schemas/test.schemas'
-import InventoryMasterMultiPicker from '@/features/inventory/real/components/InventoryMasterMultiPicker'
 import TestConfigInputsEditor from '@/features/test-master/components/TestConfigInputsEditor'
+import TestMetadataFields from '@/features/test-master/components/TestMetadataFields'
+import TestResourcePicker from '@/features/test-master/components/TestResourcePicker'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import FieldLabel from '@/components/ui/FieldLabel'
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import MutationStatusBanner from '@/components/ui/MutationStatusBanner'
-
-const THERAPY_OPTIONS = Object.keys(PROJECT_THERAPY_LABEL) as ProjectTherapy[]
-const STATUS_OPTIONS = ['active', 'inactive'] as const
-
-const Field = ({ label, htmlFor, error, children }: { label: string; htmlFor: string; error?: string; children: ReactNode }) => (
-  <div>
-    <FieldLabel htmlFor={htmlFor}>{label}</FieldLabel>
-    {children}
-    {error && <p className="text-[11px] mt-1 text-danger">{error}</p>}
-  </div>
-)
 
 interface TestFormProps {
   // null = create mode. Never a testId — the wrapper (EditTestModal) fetches
@@ -40,25 +24,11 @@ interface TestFormProps {
   hasRecordedResults?: boolean
 }
 
-// The resource sections are genuinely different UIs by mode, not the same
-// component with a disabled flag: creating a test lets you pick real
-// devices/consumables by name (InventoryMasterMultiPicker, live search, no
-// display gap since nothing has round-tripped through the backend yet).
-// Editing an existing test shows a read-only count instead — the backend's
-// mapper never returns resource-line item names even when populated, so
-// showing raw ids as if they were labels, or fetching each one individually
-// to fake names, are both ruled out. Editing an existing test's resource
-// list is out of scope until that backend gap is fixed.
 const TestForm = ({ test, onClose, hasRecordedResults = false }: TestFormProps) => {
   const isEdit = !!test
   const createMutation = useCreateTest()
   const updateMutation = useUpdateTest(test?.id ?? '')
   const mutation = isEdit ? updateMutation : createMutation
-
-  // Display-only labels for the create-mode pickers — never submitted.
-  // Empty in create mode by construction (nothing is pre-selected yet).
-  const [deviceLabels, setDeviceLabels] = useState<Record<string, string>>({})
-  const [consumableLabels, setConsumableLabels] = useState<Record<string, string>>({})
 
   const form = useForm<TestFormValues>({
     resolver: zodResolver(buildTestFormSchema(test?.description, isEdit)),
@@ -93,9 +63,7 @@ const TestForm = ({ test, onClose, hasRecordedResults = false }: TestFormProps) 
       consumableIds: [],
     },
   })
-  const { register, handleSubmit, control, formState: { errors, touchedFields, isSubmitted } } = form
-
-  const fieldError = (field: keyof TestFormValues) => (touchedFields[field] || isSubmitted ? errors[field]?.message : undefined)
+  const { handleSubmit } = form
 
   const onSubmit = (values: TestFormValues) => {
     if (isEdit) {
@@ -160,144 +128,11 @@ const TestForm = ({ test, onClose, hasRecordedResults = false }: TestFormProps) 
         </p>
       )}
 
-      <Field label="Name *" htmlFor="test-form-name" error={fieldError('name')}>
-        <Input id="test-form-name" type="text" className="text-[13px]" {...register('name')} />
-      </Field>
-
-      <Field label="Description" htmlFor="test-form-description" error={fieldError('description')}>
-        <Textarea id="test-form-description" rows={2} className="text-[13px] max-h-40 overflow-y-auto" {...register('description')} />
-      </Field>
-
-      <div className="grid grid-cols-2 gap-2.5">
-        <Field label="Therapy *" htmlFor="test-form-therapy" error={fieldError('therapy')}>
-          <Controller
-            control={control}
-            name="therapy"
-            render={({ field }) => (
-              <Select value={field.value} onValueChange={field.onChange} disabled={isEdit}>
-                <SelectTrigger id="test-form-therapy" className="w-full text-[13px]">
-                  <SelectValue>{() => (field.value ? PROJECT_THERAPY_LABEL[field.value] : 'Select therapy')}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {THERAPY_OPTIONS.map((t) => (
-                    <SelectItem key={t} value={t}>{PROJECT_THERAPY_LABEL[t]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          />
-          {isEdit && (
-            <p className="text-[11px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>
-              Therapy can't be changed after creation — existing Projects may already reference this test.
-            </p>
-          )}
-        </Field>
-        <Field label="Camp type *" htmlFor="test-form-camp-type" error={fieldError('campType')}>
-          <Controller
-            control={control}
-            name="campType"
-            render={({ field }) => (
-              <Select value={field.value} onValueChange={field.onChange} disabled={isEdit}>
-                <SelectTrigger id="test-form-camp-type" className="w-full text-[13px]">
-                  <SelectValue>{() => (field.value ? CAMP_TYPE_LABEL[field.value] : 'Select camp type')}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {CAMP_TYPE_VALUES.map((t) => (
-                    <SelectItem key={t} value={t}>{CAMP_TYPE_LABEL[t]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          />
-          {isEdit && (
-            <p className="text-[11px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>
-              Camp type can't be changed after creation.
-            </p>
-          )}
-        </Field>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2.5">
-        <Field label="Duration (minutes) *" htmlFor="test-form-duration" error={fieldError('duration')}>
-          <Input
-            id="test-form-duration"
-            type="number"
-            min={0}
-            step="any"
-            className="text-[13px]"
-            {...register('duration', { valueAsNumber: true })}
-          />
-        </Field>
-        <Field label="Price *" htmlFor="test-form-price" error={fieldError('price')}>
-          <Input
-            id="test-form-price"
-            type="number"
-            min={0}
-            step="any"
-            className="text-[13px]"
-            {...register('price', { valueAsNumber: true })}
-          />
-        </Field>
-      </div>
-
-      <Field label="Status" htmlFor="test-form-status">
-        <Controller
-          control={control}
-          name="status"
-          render={({ field }) => (
-            <Select value={field.value} onValueChange={field.onChange}>
-              <SelectTrigger id="test-form-status" className="w-full text-[13px]">
-                <SelectValue>{() => TEST_STATUS_LABEL[field.value]}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {STATUS_OPTIONS.map((s) => <SelectItem key={s} value={s}>{TEST_STATUS_LABEL[s]}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          )}
-        />
-      </Field>
+      <TestMetadataFields isEdit={isEdit} />
 
       <TestConfigInputsEditor hasRecordedResults={hasRecordedResults} />
 
-      {isEdit ? (
-        <div className="rounded-xl border p-3 space-y-1 text-[12px]" style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }}>
-          <div>{test.consumption.length} resource{test.consumption.length === 1 ? '' : 's'}</div>
-          <p className="mt-1">Devices/consumables can be set when a test is created; editing an existing test's resource list isn't supported yet.</p>
-        </div>
-      ) : (
-        <>
-          <div>
-            <FieldLabel>Devices required</FieldLabel>
-            <Controller
-              control={control}
-              name="requiredDeviceIds"
-              render={({ field }) => (
-                <InventoryMasterMultiPicker
-                  value={field.value}
-                  labels={deviceLabels}
-                  onChange={(ids, labels) => { field.onChange(ids); setDeviceLabels(labels) }}
-                  type="device"
-                />
-              )}
-            />
-          </div>
-          <div>
-            <FieldLabel>Consumables required</FieldLabel>
-            <Controller
-              control={control}
-              name="consumableIds"
-              render={({ field }) => (
-                <InventoryMasterMultiPicker
-                  value={field.value}
-                  labels={consumableLabels}
-                  onChange={(ids, labels) => { field.onChange(ids); setConsumableLabels(labels) }}
-                  type="consumable"
-                />
-              )}
-            />
-          </div>
-        </>
-      )}
+      <TestResourcePicker isEdit={isEdit} resourceCount={test?.consumption.length ?? 0} />
 
       <MutationStatusBanner mutation={mutation} errorFallback="Could not save this test — try again." showSuccess={false} />
 

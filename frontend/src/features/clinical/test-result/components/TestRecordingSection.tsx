@@ -8,25 +8,14 @@ interface TestRecordingSectionProps {
   screeningId: string
 }
 
-// Derives "which TestMaster catalog tests are configured for this camp's
-// project" from Project.tests[] (the same field the Project wizard's own
-// test-chip picker writes to) — no separate Project fetch. camp.project now
-// arrives already populated with `tests` (camp.service.ts's
-// `select: 'name status tests'`), so this reads it directly off the Camp
-// record the caller already has. Camp.project.tests is only a list of ids —
-// the backend doesn't include each test's name/config/campType — so
-// useTestMastersByIds still resolves those ids into full records for
-// rendering. A test's own campType is then checked against this camp's own
-// type before it's shown, mirroring the backend's own save-time rejection.
+// Configured tests come from camp.project.tests[] (ids only) — resolved into
+// full records via useTestMastersByIds, then filtered to this camp's type.
 const TestRecordingSection = ({ camp, screeningId }: TestRecordingSectionProps) => {
-  // Only the populated form of camp.project carries `tests` — a raw string
-  // id would mean this component was reached with un-populated camp data.
+  // A raw string id here means camp.project arrived un-populated.
   const campProject = typeof camp.project === 'object' ? camp.project : undefined
   const testMasterIds = campProject?.tests ?? []
 
-  // Every hook call stays unconditional, same as before this change —
-  // "no populated project" / "no ids yet" are expressed via `enabled`, never
-  // by returning early before this call.
+  // Hook call stays unconditional; "nothing to fetch yet" is expressed via `enabled`.
   const { items: testMasters, isLoading: isTestMastersLoading, isError: isTestMastersError } = useTestMastersByIds(
     testMasterIds,
     !!campProject && testMasterIds.length > 0,

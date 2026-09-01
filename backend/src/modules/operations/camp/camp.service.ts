@@ -26,7 +26,7 @@ type CampDocument = HydratedDocument<ICamp> | null;
 const populate: any[] = [
     { path: 'tenant', select: 'name code' },
     { path: 'division', select: 'name code therapy' },
-    { path: 'project', select: 'name status' },
+    { path: 'project', select: 'name status tests' },
     { path: 'doctor', select: 'name specialization pharmaCode' },
     { path: 'fo' },
     { path: 'mr' },

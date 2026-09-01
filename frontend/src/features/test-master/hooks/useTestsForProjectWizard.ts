@@ -45,9 +45,11 @@ function useCampTypeSlot(therapy: ProjectTherapy | undefined, campType: CampType
     isFetching: active && isFetching,
     error: active ? error : null,
     // Always-present guarded functions, not conditionally-undefined
-    // references — the outer hook's slots.forEach calls these unconditionally
-    // for every slot, and React Query's fetchNextPage/refetch ignore
-    // `enabled` and fire regardless, so the guard must live here.
+    // references — the outer hook's slots.forEach already guards its own
+    // calls (s.hasMore / s.active below), but that guard only decides
+    // whether to call these at all; it doesn't stop React Query's own
+    // fetchNextPage/refetch from ignoring `enabled` and firing regardless
+    // once called, so each slot still needs its own internal guard too.
     loadMore: () => {
       if (active && hasNextPage) return fetchNextPage()
     },

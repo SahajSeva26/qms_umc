@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -25,6 +25,14 @@ async function renderForm() {
 describe('PatientRegistrationForm — date of birth single source of truth', () => {
   beforeEach(() => {
     vi.resetAllMocks()
+    // Frozen so the calendar's default displayed month is deterministic —
+    // otherwise "September 15th, 2026" only stays clickable on first render
+    // while the real system clock happens to be in September 2026.
+    vi.setSystemTime(new Date('2026-09-01T00:00:00.000Z'))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('submits the date picked via the DatePicker as dateOfBirth', async () => {
@@ -35,7 +43,7 @@ describe('PatientRegistrationForm — date of birth single source of truth', () 
     vi.mocked(patientService.createPatient).mockResolvedValue({
       success: true,
       message: '',
-      data: { id: 'p-1', code: 'pat-000001', firstName: 'Rahul', dateOfBirth: '2026-01-15', gender: 'male', mobile: '9876543210', createdBy: null, createdAt: '', updatedAt: '' },
+      data: { id: 'p-1', code: 'pat-000001', firstName: 'Rahul', dateOfBirth: '2026-09-15', gender: 'male', mobile: '9876543210', createdBy: null, createdAt: '', updatedAt: '' },
     })
     const user = userEvent.setup()
     await renderForm()
@@ -52,7 +60,7 @@ describe('PatientRegistrationForm — date of birth single source of truth', () 
     await user.click(screen.getByRole('button', { name: /register patient/i }))
 
     expect(patientService.createPatient).toHaveBeenCalledWith(
-      expect.objectContaining({ dateOfBirth: expect.stringMatching(/^\d{4}-\d{2}-15$/) }),
+      expect.objectContaining({ dateOfBirth: '2026-09-15' }),
     )
   }, 15000)
 })

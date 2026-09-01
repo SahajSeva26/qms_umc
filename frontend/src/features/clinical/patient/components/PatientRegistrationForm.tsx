@@ -118,7 +118,7 @@ const PatientRegistrationForm = ({ open, onClose, onCreated }: PatientRegistrati
                 control={control}
                 name="gender"
                 render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
+                  <Select value={field.value ?? ''} onValueChange={field.onChange}>
                     <SelectTrigger id="patient-reg-gender" className="w-full text-[13px]">
                       <SelectValue>{() => (field.value ? PATIENT_GENDER_LABEL[field.value] : 'Select gender')}</SelectValue>
                     </SelectTrigger>

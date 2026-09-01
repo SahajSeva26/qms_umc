@@ -1,26 +1,12 @@
-import { useState } from 'react'
-import { useEntityQuery } from '@/hooks/useEntityQuery'
+import { useInfiniteQuery, type InfiniteData, type QueryKey } from '@tanstack/react-query'
 import { testKeys } from '@/features/test-master/hooks/useTests'
 import { testService } from '@/features/test-master/test.service'
 import type { ProjectTherapy } from '@/types/project.types'
-import type { TestEntity, SearchTestQuery } from '@/features/test-master/testMaster.types'
+import type { TestEntity } from '@/features/test-master/testMaster.types'
 import type { CampType } from '@/types/campReal.types'
 import type { PaginatedResponse } from '@/types/common.types'
 
 const PAGE_SIZE = 20
-
-interface Accumulated {
-  key: string
-  page: number
-  items: TestEntity[]
-  count: number
-  // Tells a page-1 response apart from "no response consumed yet" — both
-  // would otherwise show `page === 1`. Same idiom as useProjectPicker.ts /
-  // useInventoryMasterPicker.ts.
-  consumedResponse: PaginatedResponse<TestEntity> | undefined
-}
-
-const EMPTY_ACCUMULATED = (key: string): Accumulated => ({ key, page: 1, items: [], count: 0, consumedResponse: undefined })
 
 // One accumulating, paginated slot for a single fixed campType. Always
 // called — never conditionally — so the hook obeys the Rules of Hooks
@@ -28,61 +14,46 @@ const EMPTY_ACCUMULATED = (key: string): Accumulated => ({ key, page: 1, items: 
 // (whether this specific campType is currently relevant) is what actually
 // gates the network request via `enabled`.
 function useCampTypeSlot(therapy: ProjectTherapy | undefined, campType: CampType, active: boolean) {
-  const [page, setPage] = useState(1)
-  const key = `${therapy ?? ''}::${campType}::${active}`
-  const [accumulated, setAccumulated] = useState<Accumulated>(() => EMPTY_ACCUMULATED(key))
+  const enabled = active && !!therapy
 
-  if (accumulated.key !== key) {
-    setAccumulated(EMPTY_ACCUMULATED(key))
-    if (page !== 1) setPage(1)
-  }
+  const { data, isLoading, isFetching, error, hasNextPage, fetchNextPage, refetch } = useInfiniteQuery<
+    PaginatedResponse<TestEntity>,
+    Error,
+    InfiniteData<PaginatedResponse<TestEntity>>,
+    QueryKey,
+    number
+  >({
+    queryKey: [...testKeys.list({ therapy, campType, status: 'active' })],
+    queryFn: ({ pageParam }) =>
+      testService.searchTests({ therapy, campType, status: 'active', page: String(pageParam), limit: String(PAGE_SIZE) }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, allPages) =>
+      allPages.flatMap((p) => p.data?.items ?? []).length < (lastPage.data?.count ?? 0) ? allPages.length + 1 : undefined,
+    enabled,
+  })
 
-  const query: SearchTestQuery = {
-    therapy,
-    campType,
-    status: 'active',
-    page: String(page),
-    limit: String(PAGE_SIZE),
-  }
-
-  const { data, isLoading, isFetching, error, refetch } = useEntityQuery(
-    testKeys,
-    (q) => testService.searchTests(q),
-    query,
-    { enabled: active && !!therapy },
-  )
-
-  if (data && accumulated.key === key && accumulated.consumedResponse !== data) {
-    const freshItems = data.data?.items ?? []
-    const freshCount = data.data?.count ?? 0
-    setAccumulated((prev) => ({
-      key,
-      page,
-      items: page === 1 ? freshItems : [...prev.items, ...freshItems],
-      count: freshCount,
-      consumedResponse: data,
-    }))
-  }
-
-  const isCurrent = accumulated.key === key
-  const count = isCurrent ? accumulated.count : 0
+  // useInfiniteQuery's `enabled: false` stops new fetches but, like
+  // useQuery, still returns the last-cached data.pages for a slot that's
+  // gone inactive — so `active` must still gate the read here explicitly.
+  const items = active ? data?.pages.flatMap((p) => p.data?.items ?? []) ?? [] : []
 
   return {
-    // Never surface accumulated items for an inactive slot — a forced
-    // refetch() (see the outer hook's refetch, and React Query's own
-    // documented behavior that a manual refetch() ignores `enabled`) can
-    // still resolve and repopulate `accumulated` for a slot whose `key`
-    // happens to already match (nothing else about the key changed except
-    // `active` itself flipping earlier), which would otherwise let a
-    // now-irrelevant camp type's tests silently reappear in the merged list.
-    items: active && isCurrent ? accumulated.items : [],
+    items,
     active,
-    hasMore: active && isCurrent && accumulated.items.length < count,
+    hasMore: active && !!hasNextPage,
     isLoading: active && isLoading,
     isFetching: active && isFetching,
     error: active ? error : null,
-    refetch,
-    loadMore: () => setPage((p) => p + 1),
+    // Always-present guarded functions, not conditionally-undefined
+    // references — the outer hook's slots.forEach calls these unconditionally
+    // for every slot, and React Query's fetchNextPage/refetch ignore
+    // `enabled` and fire regardless, so the guard must live here.
+    loadMore: () => {
+      if (active && hasNextPage) return fetchNextPage()
+    },
+    refetch: () => {
+      if (active) return refetch()
+    },
   }
 }
 
@@ -129,9 +100,8 @@ export function useTestsForProjectWizard(therapy: ProjectTherapy | '', allowedCa
     loadMore: () => slots.forEach((s) => { if (s.hasMore) s.loadMore() }),
     // Only active slots — React Query's refetch() ignores `enabled` and
     // fires regardless, so calling it unconditionally on every slot would
-    // force a network request (and risk repopulating accumulated state, see
-    // useCampTypeSlot's own `active` guard above) for a camp type the
-    // current project type selection no longer includes.
+    // force a network request for a camp type the current project type
+    // selection no longer includes.
     refetch: () => slots.forEach((s) => { if (s.active) s.refetch() }),
   }
 }

@@ -47,7 +47,11 @@ export interface TestEntity {
   code: string
   name: string
   description?: string
-  therapy: ProjectTherapy
+  // Optional because some legacy records predate/lack this field entirely —
+  // the frontend keeps it immutable after create and never sends it on
+  // update, so this must stay honestly optional rather than asserting every
+  // record has a real value.
+  therapy?: ProjectTherapy
   // Optional because 12 pre-existing records predate this field and have it
   // absent entirely; immutable after create with no backfill path (the
   // update payload schema omits it), so this must stay honestly optional.

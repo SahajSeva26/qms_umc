@@ -131,7 +131,7 @@ const TestMasterTab = () => {
                   <tr key={test.id} style={{ borderBottom: '1px solid var(--qms-border)' }}>
                     <td className="px-4 py-2.5 font-mono font-semibold" style={{ color: 'var(--qms-text)' }}>{test.code}</td>
                     <td className="px-4 py-2.5 max-w-xs truncate" style={{ color: 'var(--qms-text)' }} title={test.name}>{test.name}</td>
-                    <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{PROJECT_THERAPY_LABEL[test.therapy]}</td>
+                    <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{test.therapy ? PROJECT_THERAPY_LABEL[test.therapy] : '—'}</td>
                     <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{test.campType ? CAMP_TYPE_LABEL[test.campType] : '—'}</td>
                     <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{test.consumption.length}</td>
                     {canManage && (

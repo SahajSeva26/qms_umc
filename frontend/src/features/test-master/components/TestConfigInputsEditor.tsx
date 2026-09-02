@@ -141,9 +141,25 @@ const TestConfigInputRow = ({ index, onRemove }: { index: number; onRemove: () =
 }
 
 const TestConfigOptionsEditor = ({ index }: { index: number }) => {
-  const { control, register, formState: { errors } } = useFormContext<TestFormValues>()
+  const { control, register, trigger, formState: { errors } } = useFormContext<TestFormValues>()
   const { fields, append, remove } = useFieldArray({ control, name: `config.inputs.${index}.options` as const })
   const optionsError = errors.config?.inputs?.[index]?.options
+  // Array-level error (e.g. "add at least one option") lives at .options.root
+  // once useFieldArray has mutated the array at least once (e.g. via
+  // remove()); before any such mutation, RHF instead reports the identical
+  // error directly on .options itself, with no .root wrapper. A specific
+  // row's error (e.g. a duplicate value) lives at .options[i].value.
+  const optionsRoot = (optionsError as { root?: { message?: string } } | undefined)?.root
+  const optionsArrayError = optionsRoot ?? (Array.isArray(optionsError) ? undefined : optionsError)
+
+  const removeOption = async (optionIndex: number) => {
+    remove(optionIndex)
+    // useFieldArray's remove() is a structural mutation, not a registered
+    // field onChange — it doesn't re-run the parent superRefine on its own,
+    // so removing the last option would otherwise leave the "add at least
+    // one option" check silently stale instead of firing.
+    await trigger(`config.inputs.${index}.options` as const)
+  }
 
   return (
     <div className="space-y-1.5">
@@ -153,27 +169,33 @@ const TestConfigOptionsEditor = ({ index }: { index: number }) => {
           <FiPlus size={11} /> Add option
         </Button>
       </div>
-      {fields.map((field, optionIndex) => (
-        <div key={field.id} className="flex items-center gap-1.5">
-          <Input
-            type="text"
-            placeholder="Label, e.g. Positive"
-            className="text-[12px]"
-            {...register(`config.inputs.${index}.options.${optionIndex}.label` as const)}
-          />
-          <Input
-            type="text"
-            placeholder="Value, e.g. positive"
-            className="text-[12px]"
-            {...register(`config.inputs.${index}.options.${optionIndex}.value` as const)}
-          />
-          <Button type="button" variant="ghost" size="icon-sm" aria-label="Remove option" onClick={() => remove(optionIndex)}>
-            <FiX size={12} />
-          </Button>
-        </div>
-      ))}
-      {optionsError?.message && (
-        <p className="text-[11px] text-danger">{typeof optionsError.message === 'string' ? optionsError.message : 'Add at least one option'}</p>
+      {fields.map((field, optionIndex) => {
+        const rowValueError = Array.isArray(optionsError) ? optionsError[optionIndex]?.value : undefined
+        return (
+          <div key={field.id}>
+            <div className="flex items-center gap-1.5">
+              <Input
+                type="text"
+                placeholder="Label, e.g. Positive"
+                className="text-[12px]"
+                {...register(`config.inputs.${index}.options.${optionIndex}.label` as const)}
+              />
+              <Input
+                type="text"
+                placeholder="Value, e.g. positive"
+                className="text-[12px]"
+                {...register(`config.inputs.${index}.options.${optionIndex}.value` as const)}
+              />
+              <Button type="button" variant="ghost" size="icon-sm" aria-label="Remove option" onClick={() => removeOption(optionIndex)}>
+                <FiX size={12} />
+              </Button>
+            </div>
+            {rowValueError?.message && <p className="text-[11px] mt-1 text-danger">{rowValueError.message}</p>}
+          </div>
+        )
+      })}
+      {optionsArrayError?.message && (
+        <p className="text-[11px] text-danger">{typeof optionsArrayError.message === 'string' ? optionsArrayError.message : 'Add at least one option'}</p>
       )}
     </div>
   )

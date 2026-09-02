@@ -25,13 +25,30 @@ const configInputSchema = z
         message: 'Add at least one option for a select field',
       })
     }
+    if (value.type === 'select' && value.options) {
+      const seen = new Set<string>()
+      value.options.forEach((opt, i) => {
+        const v = opt.value.trim()
+        if (seen.has(v)) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['options', i, 'value'],
+            message: 'Option values must be unique',
+          })
+        }
+        seen.add(v)
+      })
+    }
   })
 
 export const testFormSchema = z.object({
   // code is intentionally absent — server-generated (tst-000001 format).
   name: z.string().trim().min(1, 'Name is required'),
   description: z.string().trim().optional(),
-  therapy: z.enum(THERAPY_VALUES, { error: 'Therapy is required' }),
+  // Not a plain z.enum: some legacy records predate/lack this field and load
+  // with therapy === '' in edit mode. buildTestFormSchema requires a real
+  // value only in create mode so those legacy records stay saveable.
+  therapy: z.union([z.enum(THERAPY_VALUES), z.literal('')]),
   // Not a plain z.enum: 12 pre-existing records predate this field and load
   // with campType === '' in edit mode. buildTestFormSchema requires a real
   // value only in create mode so those legacy records stay saveable.
@@ -67,6 +84,13 @@ export const buildTestFormSchema = (previousDescription: string | undefined, isE
         code: 'custom',
         path: ['description'],
         message: "Clearing a description isn't supported yet — replace it with different text instead.",
+      })
+    }
+    if (!isEdit && !values.therapy) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['therapy'],
+        message: 'Therapy is required',
       })
     }
     if (!isEdit && !values.campType) {

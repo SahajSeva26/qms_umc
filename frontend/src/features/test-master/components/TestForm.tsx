@@ -35,7 +35,8 @@ const TestForm = ({ test, onClose, hasRecordedResults = false }: TestFormProps) 
       name: test?.name ?? '',
       description: test?.description ?? '',
       // Blank (not first-enum-value) in create mode — must be a conscious
-      // choice; z.enum rejects '' so an unpicked value surfaces a real error.
+      // choice; buildTestFormSchema's superRefine requires a real value only
+      // in create mode, so an unpicked value surfaces a real error there.
       therapy: test?.therapy ?? ('' as ProjectTherapy),
       campType: test?.campType ?? ('' as CampType),
       // No `?? 0` fallback — 0 is schema-valid, so defaulting to it would let
@@ -50,28 +51,33 @@ const TestForm = ({ test, onClose, hasRecordedResults = false }: TestFormProps) 
       consumableIds: [],
     },
   })
-  const { handleSubmit } = form
+  const { handleSubmit, formState: { dirtyFields } } = form
 
   const onSubmit = (values: TestFormValues) => {
     if (isEdit) {
-      // description omitted when blank — backend's falsy check on set()
-      // can't tell '' from "unchanged". therapy never sent: changing it
-      // post-creation could desync already-linked Projects' test selections.
+      // Only send fields the user actually touched (RHF's dirtyFields) —
+      // otherwise two tabs editing the same test concurrently can silently
+      // revert each other's saved changes, since an untouched field's stale
+      // form value would otherwise always be resent. description also keeps
+      // its existing truthy check: backend's falsy check on set() can't tell
+      // '' from "unchanged", so a blank value must still never be sent.
       updateMutation.mutate(
         {
-          name: values.name,
-          ...(values.description ? { description: values.description } : {}),
-          duration: values.duration,
-          price: values.price,
-          status: values.status,
-          config: values.config,
+          ...(dirtyFields.name ? { name: values.name } : {}),
+          ...(dirtyFields.description && values.description ? { description: values.description } : {}),
+          ...(dirtyFields.duration ? { duration: values.duration } : {}),
+          ...(dirtyFields.price ? { price: values.price } : {}),
+          ...(dirtyFields.status ? { status: values.status } : {}),
+          ...(dirtyFields.config ? { config: values.config } : {}),
         },
         { onSuccess: onClose },
       )
       return
     }
-    // Unreachable once validation passes (schema already requires campType
-    // in create mode) — narrows the type from `CampType | ''` for the payload.
+    // Unreachable once validation passes (schema already requires
+    // therapy/campType in create mode) — narrows both from their
+    // `X | ''` form-value type down to the real enum the payload needs.
+    if (!values.therapy) return
     if (!values.campType) return
     createMutation.mutate(
       {

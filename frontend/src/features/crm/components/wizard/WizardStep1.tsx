@@ -4,7 +4,7 @@ import { useContacts } from '@/features/contacts/hooks/useContacts'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import ChipPicker from '@/features/crm/components/wizard/ChipPicker'
-import TenantIdPicker from '@/features/crm/components/wizard/TenantIdPicker'
+import TenantAsyncPicker from '@/components/ui/TenantAsyncPicker'
 import { labelClasses, labelStyle, fieldClasses } from '@/features/crm/components/wizard/wizard.styles'
 import { THERAPIES, SPECIALTIES } from '@/features/crm/crm.constants'
 
@@ -50,7 +50,7 @@ const WizardStep1 = ({ form, setField }: WizardStep1Props) => {
     <div className="space-y-4">
       <div>
         <Label className={labelClasses} style={labelStyle}>Pharma company *</Label>
-        <TenantIdPicker value={form.tenantId} label={form.tenantLabel} onChange={selectTenant} />
+        <TenantAsyncPicker value={form.tenantId} label={form.tenantLabel} onChange={selectTenant} />
       </div>
 
       <div>

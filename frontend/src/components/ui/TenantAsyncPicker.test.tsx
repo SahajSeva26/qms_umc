@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import TenantIdPicker from './TenantIdPicker'
+import TenantAsyncPicker from './TenantAsyncPicker'
 
 const searchTenants = vi.fn<(query: unknown) => Promise<{ success: boolean; message: string; data: { items: unknown[]; count: number } }>>()
 
@@ -14,20 +14,34 @@ function makeQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } })
 }
 
-// A customer tenant (e.g. "Cipla") should be a selectable New Lead pharma
-// company; the platform's own tenant ("Qms", type: 'platform') never should be —
-// this picker is scoped to real client companies only.
-describe('TenantIdPicker', () => {
+// A customer tenant (e.g. "Cipla") should be selectable; the platform's own
+// tenant ("Qms", type: 'platform') never should be — this picker is scoped
+// to real customer companies only.
+describe('TenantAsyncPicker', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     searchTenants.mockResolvedValue({ success: true, message: '', data: { items: [], count: 0 } })
+  })
+
+  it('does not fetch on open with an empty query, and shows a prompt to type instead', async () => {
+    const user = userEvent.setup()
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <TenantAsyncPicker value="" label="" onChange={vi.fn()} />
+      </QueryClientProvider>,
+    )
+
+    await user.click(screen.getByPlaceholderText(/search company by name/i))
+
+    expect(await screen.findByText(/type a company name to search/i)).toBeInTheDocument()
+    expect(searchTenants).not.toHaveBeenCalled()
   })
 
   it('searches tenants scoped to type=customer, excluding the platform tenant', async () => {
     const user = userEvent.setup()
     render(
       <QueryClientProvider client={makeQueryClient()}>
-        <TenantIdPicker value="" label="" onChange={vi.fn()} />
+        <TenantAsyncPicker value="" label="" onChange={vi.fn()} />
       </QueryClientProvider>,
     )
 
@@ -49,7 +63,7 @@ describe('TenantIdPicker', () => {
     const onChange = vi.fn()
     render(
       <QueryClientProvider client={makeQueryClient()}>
-        <TenantIdPicker value="" label="" onChange={onChange} />
+        <TenantAsyncPicker value="" label="" onChange={onChange} />
       </QueryClientProvider>,
     )
 

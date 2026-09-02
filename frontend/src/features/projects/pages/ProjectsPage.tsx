@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react'
 import { FiFileText, FiRefreshCw, FiDollarSign, FiPlus } from 'react-icons/fi'
 import type { ProjectStatus } from '@/types/project.types'
 import { useProjects } from '@/features/projects/hooks/useProjects'
+import { PROJECT_WRITE_PERMISSIONS } from '@/features/projects/projects.utils'
+import { usePermission } from '@/hooks/usePermission'
 import ProjectTable from '@/features/projects/components/ProjectTable'
 import ProjectDetailDrawer from '@/features/projects/components/ProjectDetailDrawer'
 import StatusChangeDialog from '@/features/projects/components/StatusChangeDialog'
@@ -31,6 +33,9 @@ const HEADER_CHIPS = [
 // (name/status), matching the real search endpoint's actual filter support,
 // rather than the old mock's client-side filter over a fully-loaded array.
 const ProjectsPage = () => {
+  const { hasAnyPermission } = usePermission()
+  const canWrite = hasAnyPermission(PROJECT_WRITE_PERMISSIONS)
+
   const [tab, setTab] = useState<Tab>('all')
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search, 300)
@@ -101,13 +106,15 @@ const ProjectsPage = () => {
             placeholder="Search by project name..."
             className="text-[13px] w-72"
           />
-          <button
-            onClick={() => setWizardOpen(true)}
-            className="flex items-center gap-1.5 text-[13px] font-bold px-3.5 py-2 rounded-xl text-white shrink-0"
-            style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
-          >
-            <FiPlus size={14} /> New project
-          </button>
+          {canWrite && (
+            <button
+              onClick={() => setWizardOpen(true)}
+              className="flex items-center gap-1.5 text-[13px] font-bold px-3.5 py-2 rounded-xl text-white shrink-0"
+              style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
+            >
+              <FiPlus size={14} /> New project
+            </button>
+          )}
         </div>
       </div>
 
@@ -128,6 +135,7 @@ const ProjectsPage = () => {
       {!isLoading && !error && (
         <ProjectTable
           projects={projects}
+          canWrite={canWrite}
           onOpenDetail={setOpenDetailId}
           onEdit={setEditId}
           onChangeStatus={setStatusChangeId}

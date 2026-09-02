@@ -13,14 +13,12 @@ import { Button } from '@/components/ui/button'
 import MutationStatusBanner from '@/components/ui/MutationStatusBanner'
 
 interface TestFormProps {
-  // null = create mode. Never a testId — the wrapper (EditTestModal) fetches
-  // the full record before this component ever mounts.
+  // null = create mode; the wrapper (EditTestModal) fetches the full record
+  // before this component ever mounts.
   test: TestEntity | null
   onClose: () => void
-  // Whether any real Test (result) has been recorded against this catalog
-  // entry — always false in create mode (nothing could reference it yet).
-  // Informs the config.inputs[] editor's edit-mode note; never restricts
-  // editing (results are immutable snapshots, editing config is always safe).
+  // Informational only, for the config.inputs[] edit-mode note — always
+  // false in create mode.
   hasRecordedResults?: boolean
 }
 
@@ -36,29 +34,18 @@ const TestForm = ({ test, onClose, hasRecordedResults = false }: TestFormProps) 
     defaultValues: {
       name: test?.name ?? '',
       description: test?.description ?? '',
-      // Blank in create mode — therapy decides which Projects can see this
-      // test, so it must be a conscious choice, not a silently-applied
-      // first-enum-value default. z.enum on the schema rejects '', so
-      // submitting without picking one surfaces a real validation error.
+      // Blank (not first-enum-value) in create mode — must be a conscious
+      // choice; z.enum rejects '' so an unpicked value surfaces a real error.
       therapy: test?.therapy ?? ('' as ProjectTherapy),
-      // Blank in create mode, same "conscious choice" reasoning as therapy —
-      // z.enum on the schema rejects '', surfacing a real validation error.
       campType: test?.campType ?? ('' as CampType),
-      // No `?? 0` fallback — 0 is a schema-valid value, so defaulting to it
-      // would let a blank field silently save as "0 minutes / ₹0" instead of
-      // surfacing a required-field error. Left genuinely undefined in create
-      // mode; valueAsNumber then parses an untouched input to NaN, which
-      // z.number() correctly rejects.
+      // No `?? 0` fallback — 0 is schema-valid, so defaulting to it would let
+      // a blank field silently save as "0 minutes / ₹0" instead of erroring.
       duration: test?.duration,
       price: test?.price,
       status: test?.status ?? 'active',
-      // Editable in both modes — seeded from the existing test's config in
-      // edit mode, empty in create mode (no result fields authored yet).
       config: { inputs: test?.config?.inputs ?? [] },
-      // Edit mode never renders a picker for these (resource sections are
-      // read-only there — see below), so there's nothing real to seed from
-      // test.consumption; these two fields are only ever form-relevant in
-      // create mode, where test is always null.
+      // Edit mode's resource section is read-only, so nothing seeds from
+      // test.consumption; only relevant in create mode, where test is null.
       requiredDeviceIds: [],
       consumableIds: [],
     },
@@ -67,17 +54,9 @@ const TestForm = ({ test, onClose, hasRecordedResults = false }: TestFormProps) 
 
   const onSubmit = (values: TestFormValues) => {
     if (isEdit) {
-      // description is only ever included when non-blank — the backend's
-      // falsy check on set() means an explicit '' would be indistinguishable
-      // from "unchanged," but omitting the key entirely keeps this update
-      // payload from asserting a description that doesn't exist. therapy is
-      // never sent at all: existing Projects can already reference this
-      // Test's id, and the backend never validates a Project's tests against
-      // its own therapy, so changing a Test's therapy post-creation could
-      // silently make an already-linked Project's test selection nonsensical
-      // (e.g. a Cardiology Project referencing a Test that's now
-      // Pulmonology). Treat therapy as immutable, like code, until the
-      // backend can validate/migrate affected Project relationships.
+      // description omitted when blank — backend's falsy check on set()
+      // can't tell '' from "unchanged". therapy never sent: changing it
+      // post-creation could desync already-linked Projects' test selections.
       updateMutation.mutate(
         {
           name: values.name,
@@ -91,10 +70,8 @@ const TestForm = ({ test, onClose, hasRecordedResults = false }: TestFormProps) 
       )
       return
     }
-    // The schema's superRefine already rejects a blank campType in create
-    // mode (see buildTestFormSchema) — this can't actually fire once
-    // handleSubmit has let validation pass, it's here only to narrow
-    // campType's type from `CampType | ''` down to `CampType` for the payload.
+    // Unreachable once validation passes (schema already requires campType
+    // in create mode) — narrows the type from `CampType | ''` for the payload.
     if (!values.campType) return
     createMutation.mutate(
       {
@@ -107,12 +84,10 @@ const TestForm = ({ test, onClose, hasRecordedResults = false }: TestFormProps) 
         status: values.status,
         config: values.config,
         consumption: [
-          // No rate key — the backend's own normalizeConsumption() force-sets
-          // rate: 0 for a device when the caller omits it (a device isn't
-          // depleted per test run).
+          // No rate key — backend's normalizeConsumption() force-sets rate: 0
+          // for a device (not depleted per test run) when omitted.
           ...values.requiredDeviceIds.map((item) => ({ item })),
-          // Always exactly 1 — still no user-facing quantity control.
-          ...values.consumableIds.map((item) => ({ item, rate: 1 })),
+          ...values.consumableIds.map((c) => ({ item: c.id, rate: c.quantity })),
         ],
       },
       { onSuccess: onClose },

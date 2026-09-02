@@ -15,22 +15,14 @@ interface TestResultFormProps {
   testMaster: TestEntity
 }
 
-// One dynamic field per TestMaster.config.inputs[] entry — currently this
-// only ever renders ONE field per test (config.inputs[] is a list, but the
-// backend's Test.result is a single {key,value,unit}, not an array — so if a
-// TestMaster ever has more than one config input, only the first drives the
-// recorded result). Flagged rather than silently picking one: most catalog
-// tests will have exactly one input (e.g. "Blood Sugar Level"), and the
-// backend's own result shape doesn't support recording more than one value
-// per Test row today.
+// config.inputs[] is a list, but backend Test.result is a single {key,value,unit} —
+// only the first input ever drives the recorded result if more than one exists.
 const TestResultForm = ({ screeningId, testMaster }: TestResultFormProps) => {
   const input: TestMasterConfigInput | undefined = testMaster.config?.inputs?.[0]
   const [value, setValue] = useState('')
   const [interpretation, setInterpretation] = useState<TestResultInterpretation | ''>('')
   const createMutation = useCreateTestResult()
-  // Unique per rendered instance — TestRecordingSection renders one
-  // TestResultForm per applicable test side by side, so a hardcoded id would
-  // collide across cards.
+  // useId avoids collisions across the multiple TestResultForm cards rendered side by side.
   const valueFieldId = useId()
   const interpretationFieldId = useId()
 
@@ -51,17 +43,8 @@ const TestResultForm = ({ screeningId, testMaster }: TestResultFormProps) => {
       result: {
         key: input.label,
         value,
-        // KNOWN BACKEND GAP, not a real fix (see md-files/TODO.md): the
-        // backend's result.unit is unconditionally z.string().min(1) — there
-        // is no way to omit or null it, even though a config input's own
-        // unit is genuinely optional and Boolean fields never collect one at
-        // all. Sending '' 400s, so this writes a literal "N/A" into the
-        // saved record instead. That's a real, if latent, data-integrity
-        // compromise: nothing renders result.unit verbatim today, but any
-        // future report/export that does would print "Yes N/A" for a
-        // Boolean result. The correct fix is backend (make ResultSchema's
-        // unit optional and have the mapper omit it when absent) — revert
-        // this fallback once that ships.
+        // Backend result.unit is required (z.string().min(1)) with no way to omit it;
+        // '' 400s, so unit-less/boolean inputs fall back to this literal instead.
         unit: input.unit || 'N/A',
         ...(interpretation ? { interpretation } : {}),
       },

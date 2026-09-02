@@ -4,18 +4,22 @@ import AsyncPicker from '@/components/ui/AsyncPicker'
 import { useAsyncPickerState } from '@/hooks/useAsyncPickerState'
 import { usePatientPicker } from '@/features/clinical/patient/hooks/usePatientPicker'
 import PatientRegistrationForm from '@/features/clinical/patient/components/PatientRegistrationForm'
-import type { PatientEntity } from '@/features/clinical/patient/patient.types'
+import { ReviewCard, ReviewGrid, ReviewField } from '@/components/ui/ReviewCard'
+import UserAvatar from '@/components/ui/UserAvatar'
+import { Button } from '@/components/ui/button'
+import { formatPatientDob, maskedMobile } from '@/features/clinical/patient/patient.utils'
+import { PATIENT_GENDER_LABEL, type PatientEntity } from '@/features/clinical/patient/patient.types'
 
-// Sentinel for the inline "+ Register new patient" option — never a real
-// patient id, non-empty as AsyncPicker's results-are-rendered-as-buttons
-// contract requires. Same convention as NewAppointmentDialog.tsx's
-// ADD_NEW_CONTACT_VALUE.
+// Never a real patient id — must stay non-empty, since AsyncPicker renders
+// results as buttons and needs a truthy value for each.
 const REGISTER_NEW_PATIENT = '__register_new_patient__'
 
 const patientLabel = (p: PatientEntity) => {
   const name = [p.firstName, p.middleName, p.lastName].filter(Boolean).join(' ')
   return `${name} · ${p.code} · ${p.mobile}`
 }
+
+const patientFullName = (p: PatientEntity) => [p.firstName, p.middleName, p.lastName].filter(Boolean).join(' ')
 
 interface PatientPickerProps {
   value: string
@@ -26,41 +30,116 @@ interface PatientPickerProps {
   disabled?: boolean
 }
 
-// Debounced search-as-you-type over the global patient registry, with an
-// inline "+ Register new patient" affordance for the not-found case — mirrors
-// NewAppointmentDialog.tsx's contact-picker pattern, but async-search-backed
-// (AsyncPicker/InventoryMasterMultiPicker's shape) since the patient set is
-// unbounded, unlike a short preloaded contact list.
+// Every pick routes through a confirmation card before the caller is
+// notified, so a mis-click or same-named person can be caught first.
 const PatientPicker = ({ value, label, onChange, excludeIds = [], disabled }: PatientPickerProps) => {
   const { open, setOpen, containerRef } = useAsyncPickerState()
   const [query, setQuery] = useState('')
   const [registering, setRegistering] = useState(false)
-  const { items, isFetching, error, refetch } = usePatientPicker(query, open)
+  const [pendingPatient, setPendingPatient] = useState<PatientEntity | null>(null)
+  const {
+    items,
+    isFetching,
+    isFetchingNextPage,
+    error,
+    hasNextPage,
+    fetchNextPage,
+    isFetched,
+    isDebouncing,
+    hasSearchableQuery,
+    isNameQuery,
+    refetch,
+  } = usePatientPicker(query, open)
 
   const results = items.filter((p) => !excludeIds.includes(p.id))
-  // Only offer "register new" once a search has actually run and found no
-  // matching patient AT ALL — never before typing, never while still
-  // loading. Deliberately checks `items` (the raw search results), not
-  // `results` (items with excludeIds filtered out): a patient excluded here
-  // (e.g. already screened at this camp) still exists globally, so offering
-  // "register new" in that case would create a genuine duplicate patient
-  // record. excludeIds only controls what's selectable, never whether the
-  // real-world person is a known match. Patient.mobile has no backend
-  // uniqueness constraint, so this distinction is the only thing preventing
-  // duplicate patient records for the same person.
-  const showRegisterOption = query.trim().length > 0 && !isFetching && !error && items.length === 0
+
+  // Checks `items` (raw results), not `results` (excludeIds filtered out): a
+  // patient excluded here still exists globally, and mobile has no backend
+  // uniqueness constraint — offering "register new" here would dupe them.
+  const showRegisterOption =
+    hasSearchableQuery && !isDebouncing && isFetched && !isFetching && !error && items.length === 0
+
+  // Name searches only — mobile/code searches are already specific enough.
+  const duplicateNameWarning = (() => {
+    if (!isNameQuery) return null
+    const seen = new Set<string>()
+    for (const p of results) {
+      const normalized = patientFullName(p).trim().replace(/\s+/g, ' ').toLowerCase()
+      if (seen.has(normalized)) return true
+      seen.add(normalized)
+    }
+    return false
+  })()
+
+  const resultsBanner = (duplicateNameWarning || hasNextPage) ? (
+    <div className="px-2 py-1.5 space-y-1">
+      {duplicateNameWarning && (
+        <p className="text-[11px]" style={{ color: 'var(--danger)' }}>
+          Multiple patients match this name. Confirm date of birth and mobile number before selecting.
+        </p>
+      )}
+      {hasNextPage && (
+        <p className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>
+          More matches exist — enter mobile number or patient ID to narrow results.
+        </p>
+      )}
+    </div>
+  ) : undefined
+
+  // Reacts to the raw (non-debounced) query so guidance appears instantly.
+  const noResultsText = hasSearchableQuery
+    ? 'No matching patients.'
+    : 'Type at least 3 letters, a 6+ digit mobile number, or a full patient ID to search.'
 
   const handleChange = (id: string, resultLabel: string) => {
     if (id === REGISTER_NEW_PATIENT) {
       setRegistering(true)
       return
     }
-    onChange(id, resultLabel)
+    const picked = results.find((p) => p.id === id)
+    if (picked) setPendingPatient(picked)
+    else onChange(id, resultLabel)
   }
 
   const handlePatientCreated = (patient: PatientEntity) => {
     setRegistering(false)
-    onChange(patient.id, patientLabel(patient))
+    setPendingPatient(patient)
+  }
+
+  const handleChangePatient = () => {
+    if (disabled) return
+    onChange('', '')
+    setPendingPatient(null)
+    setOpen(true)
+  }
+
+  const handleConfirm = () => {
+    if (!pendingPatient || disabled) return
+    onChange(pendingPatient.id, patientLabel(pendingPatient))
+  }
+
+  if (pendingPatient) {
+    return (
+      <ReviewCard>
+        <div className="flex items-center gap-2.5 mb-2.5">
+          <UserAvatar firstName={pendingPatient.firstName} lastName={pendingPatient.lastName} size="sm" />
+          <div className="text-[13px] font-bold" style={{ color: 'var(--qms-text)' }}>{patientFullName(pendingPatient)}</div>
+        </div>
+        <ReviewGrid>
+          <ReviewField label="Date of birth" value={formatPatientDob(pendingPatient.dateOfBirth)} />
+          <ReviewField label="Patient ID" value={pendingPatient.code} />
+          <ReviewField label="Mobile" value={maskedMobile(pendingPatient.mobile)} />
+        </ReviewGrid>
+        <div className="flex gap-2 mt-3">
+          <Button type="button" variant="secondary" size="sm" onClick={handleChangePatient} disabled={disabled}>
+            Change patient
+          </Button>
+          <Button type="button" size="sm" onClick={handleConfirm} disabled={disabled}>
+            Start screening
+          </Button>
+        </div>
+      </ReviewCard>
+    )
   }
 
   return (
@@ -75,16 +154,22 @@ const PatientPicker = ({ value, label, onChange, excludeIds = [], disabled }: Pa
         onOpenChange={setOpen}
         containerRef={containerRef}
         results={showRegisterOption ? [...results, { id: REGISTER_NEW_PATIENT }] : results}
-        isFetching={isFetching}
+        isFetching={hasSearchableQuery && (isDebouncing || (isFetching && !isFetchingNextPage))}
         getId={(item) => item.id}
         getLabel={(item) => ('firstName' in item ? patientLabel(item) : 'Register new patient')}
-        searchPlaceholder="Search by mobile or name…"
+        searchPlaceholder="Search by mobile, patient ID, or name"
         clearAriaLabel="Clear"
-        emptyQueryText="Start typing a mobile number or name to search."
-        noResultsText="No matching patients."
+        emptyQueryText="Start typing a mobile number, patient ID, or name to search."
+        noResultsText={noResultsText}
+        resultsBanner={resultsBanner}
         renderResult={(item) =>
           'firstName' in item ? (
-            <span>{patientLabel(item)}</span>
+            <span className="flex flex-col">
+              <span>{patientFullName(item)}</span>
+              <span className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>
+                DOB: {formatPatientDob(item.dateOfBirth)} · {PATIENT_GENDER_LABEL[item.gender]} · {maskedMobile(item.mobile)} · {item.code}
+              </span>
+            </span>
           ) : (
             <span className="flex items-center gap-1.5" style={{ color: 'var(--qms-brand)' }}>
               <FiUserPlus size={12} /> Register new patient…
@@ -94,6 +179,9 @@ const PatientPicker = ({ value, label, onChange, excludeIds = [], disabled }: Pa
         isError={!!error}
         errorText="Couldn't search patients. Try again."
         onRetry={() => refetch()}
+        hasMore={hasNextPage}
+        isLoadingMore={isFetchingNextPage}
+        onLoadMore={fetchNextPage}
         disabled={disabled}
       />
 

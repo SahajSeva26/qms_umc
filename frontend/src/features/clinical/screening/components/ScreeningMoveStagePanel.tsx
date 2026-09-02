@@ -11,10 +11,8 @@ interface ScreeningMoveStagePanelProps {
   canMoveStage: boolean
 }
 
-// Two explicit actions, not a generic "pick any legal next stage" dropdown
-// (unlike CampStageMovePanel.tsx) — Screening only ever has two real outcomes
-// from pending, and "Mark completed" needs its own disabled-until-consent
-// guard that a generic dropdown would obscure.
+// Two explicit actions rather than a generic dropdown (unlike CampStageMovePanel) —
+// "Mark completed" needs its own disabled-until-consent guard a dropdown would obscure.
 const ScreeningMoveStagePanel = ({ screening, canMoveStage }: ScreeningMoveStagePanelProps) => {
   const moveStage = useMoveScreeningStage()
   const [pendingAction, setPendingAction] = useState<ScreeningStatus | null>(null)

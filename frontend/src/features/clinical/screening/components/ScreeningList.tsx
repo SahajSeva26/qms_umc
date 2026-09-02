@@ -39,17 +39,20 @@ const ScreeningList = ({ campId, canWrite, onOpen }: ScreeningListProps) => {
   const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false)
 
   const handlePick = async (id: string, label: string) => {
+    // A cleared selection must not reach the duplicate-check/create logic below.
+    if (!id) {
+      setPatientId('')
+      setPatientLabel('')
+      setCreateError(null)
+      return
+    }
+
     setPatientId(id)
     setPatientLabel(label)
     setCreateError(null)
 
-    // Point-check this one patient against this one camp instead of
-    // prefetching every screening at this camp just to build an exclusion
-    // list — that scaled with camp size on every page load regardless of
-    // whether "New screening" was even open. camp+patient is an always-on,
-    // unconditional backend filter (screening.service.ts's search()), so a
-    // single limit=1 lookup is enough to know whether this patient is
-    // already screened here.
+    // A single limit=1 camp+patient lookup avoids prefetching every screening
+    // at this camp just to build an exclusion list.
     setIsCheckingDuplicate(true)
     try {
       const existing = await screeningService.searchScreenings({ camp: campId, patient: id, limit: '1' })

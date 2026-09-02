@@ -33,9 +33,8 @@ const moveScreeningStage = async (id: string, payload: MoveScreeningStagePayload
   return res.data
 }
 
-// verifyConsent is deliberately not wired — the backend never returns the
-// OTP in any response, so no UI can ever populate the form this would back.
-// Add it once real OTP delivery (SMS/email) exists — see md-files/TODO.md.
+// verifyConsent is deliberately not wired — the backend never returns the OTP
+// in any response, so no UI can populate the form this would back.
 
 export const screeningService = {
   searchScreenings,

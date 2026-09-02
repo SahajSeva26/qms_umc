@@ -8,11 +8,8 @@ import type { PaginatedResponse } from '@/types/common.types'
 
 const PAGE_SIZE = 20
 
-// One accumulating, paginated slot for a single fixed campType. Always
-// called — never conditionally — so the hook obeys the Rules of Hooks
-// regardless of how many camp types are actually active at once; `active`
-// (whether this specific campType is currently relevant) is what actually
-// gates the network request via `enabled`.
+// Always called (never conditionally) to satisfy the Rules of Hooks; `active`
+// gates the actual network request via `enabled` instead.
 function useCampTypeSlot(therapy: ProjectTherapy | undefined, campType: CampType, active: boolean) {
   const enabled = active && !!therapy
 
@@ -32,9 +29,8 @@ function useCampTypeSlot(therapy: ProjectTherapy | undefined, campType: CampType
     enabled,
   })
 
-  // useInfiniteQuery's `enabled: false` stops new fetches but, like
-  // useQuery, still returns the last-cached data.pages for a slot that's
-  // gone inactive — so `active` must still gate the read here explicitly.
+  // `enabled: false` stops new fetches but still returns stale cached pages,
+  // so `active` must gate the read here explicitly too.
   const items = active ? data?.pages.flatMap((p) => p.data?.items ?? []) ?? [] : []
 
   return {
@@ -44,12 +40,8 @@ function useCampTypeSlot(therapy: ProjectTherapy | undefined, campType: CampType
     isLoading: active && isLoading,
     isFetching: active && isFetching,
     error: active ? error : null,
-    // Always-present guarded functions, not conditionally-undefined
-    // references — the outer hook's slots.forEach already guards its own
-    // calls (s.hasMore / s.active below), but that guard only decides
-    // whether to call these at all; it doesn't stop React Query's own
-    // fetchNextPage/refetch from ignoring `enabled` and firing regardless
-    // once called, so each slot still needs its own internal guard too.
+    // React Query's fetchNextPage/refetch ignore `enabled` and fire
+    // regardless once called, so each needs its own guard here too.
     loadMore: () => {
       if (active && hasNextPage) return fetchNextPage()
     },
@@ -59,29 +51,17 @@ function useCampTypeSlot(therapy: ProjectTherapy | undefined, campType: CampType
   }
 }
 
-// Real, bounded pagination (PAGE_SIZE=20 per page, "load more" accumulates
-// further pages) across every camp type currently allowed for the wizard's
-// selected project type(s) — never a single `limit: '10'` call that silently
-// truncates the catalog, and never an unbounded `limit: '0'` blast either.
-// The backend's own campType search filter only accepts one value at a
-// time (testMaster.service.ts), so a project spanning more than one
-// compatible camp type (or `mixed`, which spans all three) needs one
-// parallel, independently-paginated request per camp type rather than a
-// single query — merged and deduped here into one flat, name-sorted list.
-// `canBrowseTests` gates the query itself (never firing a request the
-// backend would 403) — GET /test-masters requires test-master:search/manage,
-// which not every actor who can create a project necessarily holds (only
-// Field Officer and the two Ops Manager role types hold it by default).
-// Mirrors EditTestModal.tsx's canViewResults pattern for the same reason.
+// Backend's campType search filter accepts only one value at a time, so a
+// project spanning multiple camp types (or `mixed`) needs one parallel,
+// independently-paginated request per type, merged/deduped into one list.
+// `canBrowseTests` gates the query since not every project-creating actor
+// holds test-master:search/manage (mirrors EditTestModal's canViewResults).
 export function useTestsForProjectWizard(therapy: ProjectTherapy | '', allowedCampTypes: CampType[], canBrowseTests: boolean) {
   const enabled = canBrowseTests && !!therapy && allowedCampTypes.length > 0
   const therapyArg = therapy || undefined
 
-  // Exactly 3 fixed slots (screening/diet/lab), always called in this same
-  // order on every render — never a variable-length loop over
-  // allowedCampTypes, which could change the number of hook calls between
-  // renders. `active` (not whether the hook itself runs) is what actually
-  // turns each slot's network request on or off.
+  // Fixed 3 slots, always called in the same order — never a variable-length
+  // loop over allowedCampTypes, which would change hook-call count per render.
   const screening = useCampTypeSlot(therapyArg, 'screening', enabled && allowedCampTypes.includes('screening'))
   const diet = useCampTypeSlot(therapyArg, 'diet', enabled && allowedCampTypes.includes('diet'))
   const lab = useCampTypeSlot(therapyArg, 'lab', enabled && allowedCampTypes.includes('lab'))
@@ -100,10 +80,8 @@ export function useTestsForProjectWizard(therapy: ProjectTherapy | '', allowedCa
     error: slots.find((s) => s.error)?.error ?? null,
     hasMore: slots.some((s) => s.hasMore),
     loadMore: () => slots.forEach((s) => { if (s.hasMore) s.loadMore() }),
-    // Only active slots — React Query's refetch() ignores `enabled` and
-    // fires regardless, so calling it unconditionally on every slot would
-    // force a network request for a camp type the current project type
-    // selection no longer includes.
+    // Only active slots — refetch() ignores `enabled` and fires regardless,
+    // which would hit a camp type no longer in the current selection.
     refetch: () => slots.forEach((s) => { if (s.active) s.refetch() }),
   }
 }

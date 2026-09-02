@@ -1,6 +1,5 @@
-// Matches backend/operations/screening exactly. Screening is the Camp<->Patient
-// join, tenant-scoped (tenant derived from the camp). One-way workflow:
-// pending -> completed | cancelled, changed only via moveStage.
+// Screening is the Camp<->Patient join, tenant derived from the camp. One-way
+// workflow: pending -> completed | cancelled, changed only via moveStage.
 
 export type ScreeningStatus = 'pending' | 'completed' | 'cancelled'
 
@@ -38,9 +37,8 @@ export interface ScreeningPopulatedTenant extends ScreeningPopulatedRef {
   code: string
 }
 
-// The OTP itself is deliberately absent from this type — the backend never
-// returns it in any response (see md-files/TODO.md's OTP-delivery entry).
-// There is no interactive OTP entry UI in this feature until that's resolved.
+// The OTP is deliberately absent from this type — the backend never returns
+// it in any response, so there is no interactive OTP entry UI.
 export interface ScreeningConsent {
   verified: boolean
   signature?: string

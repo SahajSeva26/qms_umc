@@ -16,19 +16,13 @@ const INPUT_TYPE_LABEL: Record<TestMasterConfigInputType, string> = {
 const INPUT_TYPE_OPTIONS = Object.keys(INPUT_TYPE_LABEL) as TestMasterConfigInputType[]
 
 interface TestConfigInputsEditorProps {
-  // Recorded Test results snapshot key/value/unit at record-time, so editing
-  // config.inputs[] afterwards can never corrupt them — this note is purely
-  // informational, never a restriction on editing.
+  // Informational only — recorded results snapshot key/value/unit at
+  // record-time, so editing config.inputs[] later can't corrupt them.
   hasRecordedResults?: boolean
 }
 
-// The result field a field officer fills in when recording this test — e.g.
-// "Blood Sugar Level" (number, mg/dL). Editable in both create and edit mode
-// (unlike Devices/Consumables below it in TestForm, which are create-only).
-// Capped to exactly one entry: the backend's Test.result is a single
-// {key,value,unit} object, not an array, so TestResultForm can only ever
-// record inputs[0] — letting an admin configure more than one field here
-// would silently make every input after the first unrecordable.
+// Capped at 1: the backend's Test.result is a single {key,value,unit}
+// object, so TestResultForm can only ever record inputs[0].
 const MAX_CONFIG_INPUTS = 1
 
 const TestConfigInputsEditor = ({ hasRecordedResults = false }: TestConfigInputsEditorProps) => {
@@ -38,7 +32,7 @@ const TestConfigInputsEditor = ({ hasRecordedResults = false }: TestConfigInputs
   return (
     <div>
       <div className="flex items-center justify-between mb-1.5">
-        <FieldLabel>Result field</FieldLabel>
+        <FieldLabel>Input field</FieldLabel>
         {fields.length < MAX_CONFIG_INPUTS && (
           <Button
             type="button"
@@ -101,11 +95,8 @@ const TestConfigInputRow = ({ index, onRemove }: { index: number; onRemove: () =
               value={field.value}
               onValueChange={(nextType) => {
                 field.onChange(nextType)
-                // RHF retains an unregistered field's value (shouldUnregister
-                // defaults false), so switching away from a type that
-                // collected unit/options would otherwise leave that stale
-                // value riding along in the submitted payload even though
-                // its own input is no longer shown. Normalize both here.
+                // RHF keeps an unregistered field's value (shouldUnregister
+                // defaults false), so clear stale unit/options on type switch.
                 if (nextType === 'boolean') {
                   setValue(`config.inputs.${index}.unit` as const, undefined, { shouldDirty: true, shouldValidate: true })
                 }

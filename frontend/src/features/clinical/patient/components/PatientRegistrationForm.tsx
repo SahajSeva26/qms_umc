@@ -31,9 +31,8 @@ interface PatientRegistrationFormProps {
   onCreated: (patient: PatientEntity) => void
 }
 
-// Only the fields patient.validators.ts requires/accepts most commonly —
-// address is deliberately left out of this quick-register flow (optional on
-// the backend; can be added via a full edit later if ever needed).
+// Address is deliberately omitted from this quick-register flow — optional
+// on the backend, can be added later via a full edit.
 const PatientRegistrationForm = ({ open, onClose, onCreated }: PatientRegistrationFormProps) => {
   const createMutation = useCreatePatient()
 

@@ -20,10 +20,8 @@ const patientName = (screening: ScreeningEntity) => {
   return [patient.firstName, patient.middleName, patient.lastName].filter(Boolean).join(' ')
 }
 
-// Symptoms are open-ended free text (e.g. "fatigue", "frequent thirst") — no
-// fixed vocabulary to pick from, so a comma-separated textarea is the
-// simplest honest editor rather than inventing a free-text tag-chip
-// component for this one consumer.
+// Symptoms have no fixed vocabulary, so a comma-separated textarea is used
+// instead of a dedicated tag-chip editor for this one consumer.
 const ScreeningDetail = ({ screening, canWrite, canMoveStage, onClose }: ScreeningDetailProps) => {
   const isPending = screening.status === 'pending'
   const [symptomsText, setSymptomsText] = useState(screening.symptoms.join(', '))

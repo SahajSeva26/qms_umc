@@ -1,7 +1,5 @@
-// Matches backend/operations/patient exactly. Patient is a global, tenantless
-// registry — any FO/coordinator can find any patient across camps to avoid
-// duplicate registration. No delete (status only, manage-gated).
-
+// Patient is a global, tenantless registry — any FO/coordinator can find any
+// patient across camps to avoid duplicate registration. No delete, status only.
 export type PatientGender = 'male' | 'female' | 'other'
 export type PatientStatus = 'active' | 'inactive'
 
@@ -27,8 +25,7 @@ interface PatientCreatedBy {
 
 export interface PatientEntity {
   id: string
-  // Server-generated via the global `patient` counter (pat-000001 format) —
-  // never supplied or editable by the caller. Immutable.
+  // Server-generated (pat-000001 format), never supplied by the caller. Immutable.
   code: string
   firstName: string
   middleName?: string
@@ -41,8 +38,7 @@ export interface PatientEntity {
   createdBy: PatientCreatedBy | null
   createdAt: string
   updatedAt: string
-  // Key is ABSENT (not null/undefined-but-present) unless the caller holds
-  // `patient:manage` — patient.mapper.ts only sets this field conditionally.
+  // Key is absent entirely unless the caller holds `patient:manage`.
   status?: PatientStatus
 }
 

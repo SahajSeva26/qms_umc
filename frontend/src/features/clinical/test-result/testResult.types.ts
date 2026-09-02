@@ -1,7 +1,5 @@
-// Matches backend/operations/test exactly. This is the RESULT/INSTANCE of one
-// TestMaster catalog entry performed during one Screening — not to be
-// confused with @/features/test-master/testMaster.types.ts's TestEntity, which is the catalog
-// (TestMaster) itself. Never cross-import the two.
+// This is the RESULT of a TestMaster performed during a Screening — distinct from
+// testMaster.types.ts's TestEntity (the catalog itself). Do not cross-import.
 
 export type TestResultInterpretation = 'NORMAL' | 'LOW' | 'HIGH' | 'CRITICAL' | 'INVALID'
 
@@ -42,7 +40,6 @@ export interface TestResultEntity {
   id: string
   tenant: TestResultPopulatedTenant | null
   screening: TestResultPopulatedScreening | null
-  // The catalog TestMaster this result is for.
   type: TestResultPopulatedType | null
   performedBy: TestResultPopulatedRole | null
   result: TestResultValue
@@ -54,14 +51,13 @@ export interface SearchTestResultQuery {
   screening?: string
   type?: string
   interpretation?: TestResultInterpretation
-  // manage-only — a non-manage actor is always own-scoped regardless
+  // manage-only; a non-manage actor is always own-scoped regardless of this param
   tenant?: string
   page?: string
   limit?: string
 }
 
-// screening/type/tenant/performedBy are all pinned server-side — never
-// supplied by the caller.
+// tenant/performedBy are pinned server-side, never supplied by the caller.
 export interface CreateTestResultPayload {
   screening: string
   type: string

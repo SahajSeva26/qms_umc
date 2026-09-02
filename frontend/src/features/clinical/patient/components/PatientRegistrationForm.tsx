@@ -19,7 +19,10 @@ const registrationSchema = z.object({
   lastName: z.string().trim().optional(),
   dateOfBirth: z.string().trim().min(1, 'Date of birth is required'),
   gender: z.enum(GENDER_OPTIONS as [PatientGender, ...PatientGender[]], { error: 'Gender is required' }),
-  mobile: z.string().trim().min(10, 'Mobile must be at least 10 characters'),
+  // Digits-only, not just length: a non-numeric value would pass a bare
+  // .min(10) but then become permanently unsearchable by mobile (the picker's
+  // search only routes a purely-numeric string to mobile search).
+  mobile: z.string().trim().min(10, 'Mobile must be at least 10 digits').regex(/^\d+$/, 'Mobile must contain only digits'),
   email: z.string().trim().email('Enter a valid email').optional().or(z.literal('')),
 })
 

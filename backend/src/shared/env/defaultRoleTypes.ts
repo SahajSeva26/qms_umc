@@ -1,7 +1,7 @@
 import { ALLOWED_ROLETYPE_CODES } from '../../modules/access-management/role-type/roleType.constants';
 import { LEAD_PERMISSIONS } from '../../modules/crm/lead/lead.constants';
 import { APPOINTMENT_PERMISSIONS } from '../../modules/crm/appointment/appointment.constants';
-import { DOCTOR_PERMISSIONS } from '../../modules/doctor/doctor.constants';
+import { DOCTOR_PERMISSIONS } from '../../modules/crm/doctor/doctor.constants';
 import { CAMP_PERMISSIONS } from '../../modules/operations/camp/camp.constants';
 import { TEST_MASTER_PERMISSIONS } from '../../modules/operations/testMaster/testMaster.constants';
 import { PATIENT_PERMISSIONS } from '../../modules/operations/patient/patient.constants';

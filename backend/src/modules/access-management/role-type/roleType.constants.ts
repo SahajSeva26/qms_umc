@@ -1,5 +1,5 @@
 import { CAMP_PERMISSIONS } from '../../operations/camp/camp.constants';
-import { DOCTOR_PERMISSIONS } from '../../doctor/doctor.constants';
+import { DOCTOR_PERMISSIONS } from '../../crm/doctor/doctor.constants';
 
 export const ROLE_TYPE_STATUSES = {
     ACTIVE: 'active',

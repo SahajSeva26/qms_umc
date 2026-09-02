@@ -1,12 +1,12 @@
 // Doctor Controller
-import { ResponseHandler } from '../../shared/utils/responseHandler';
-import { formatZodError } from '../../shared/utils/error';
+import { ResponseHandler } from '../../../shared/utils/responseHandler';
+import { formatZodError } from '../../../shared/utils/error';
 import { CreateDoctorPayloadSchema, SearchDoctorQuerySchema, UpdateDoctorPayloadSchema } from './doctor.validators';
 import { StatusCodes } from 'http-status-codes';
 import { DoctorService } from './doctor.service';
 import { DoctorMapper } from './doctor.mapper';
-import { RequestHandler } from '../../shared/utils/requestHandler';
-import { RequestContext } from '../../shared/utils/contextBuilder';
+import { RequestHandler } from '../../../shared/utils/requestHandler';
+import { RequestContext } from '../../../shared/utils/contextBuilder';
 
 const get = async (req: any, res: any) => {
     try {

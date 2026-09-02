@@ -15,7 +15,7 @@ import { ContactRouter } from '../modules/crm/contact/contact.routes';
 import { AppointmentRouter } from '../modules/crm/appointment/appointment.routes';
 import { ProjectRouter } from '../modules/crm/project/project.routes';
 import { QaFeedbackRouter } from '../modules/qa-feedback/qaFeedback.routes';
-import { DoctorRouter } from '../modules/doctor/doctor.routes';
+import { DoctorRouter } from '../modules/crm/doctor/doctor.routes';
 import { GeoProfileRouter } from '../modules/operations/geoProfile/geoProfile.routes';
 import { CampRouter } from '../modules/operations/camp/camp.routes';
 import { TestMasterRouter } from '../modules/operations/testMaster/testMaster.routes';

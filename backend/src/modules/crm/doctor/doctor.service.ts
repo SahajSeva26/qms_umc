@@ -3,13 +3,13 @@ import { HydratedDocument } from 'mongoose';
 import { DoctorModel, IDoctor } from './doctor.model';
 import { ICreateDoctorPayload, ISearchDoctorQuery, IUpdateDoctorPayload } from './doctor.validators';
 import { DOCTOR_PERMISSIONS, DOCTOR_STATUS } from './doctor.constants';
-import { throwAppError } from '../../shared/utils/error';
+import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
-import { RequestContext } from '../../shared/utils/contextBuilder';
-import { isValidObjectID } from '../../shared/utils/strings';
-import { IServiceOptions } from '../../shared/types/service.types';
-import { TENANT_TYPE } from '../access-management/tenant/tenant.constants';
-import { TenantService } from '../access-management/tenant/tenant.service';
+import { RequestContext } from '../../../shared/utils/contextBuilder';
+import { isValidObjectID } from '../../../shared/utils/strings';
+import { IServiceOptions } from '../../../shared/types/service.types';
+import { TENANT_TYPE } from '../../access-management/tenant/tenant.constants';
+import { TenantService } from '../../access-management/tenant/tenant.service';
 
 type DoctorDocument = HydratedDocument<IDoctor> | null;
 

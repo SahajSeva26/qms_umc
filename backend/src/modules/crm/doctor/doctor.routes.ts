@@ -1,14 +1,14 @@
 // Doctor Routes
 import express from 'express';
 import { DoctorController } from './doctor.controller';
-import { registry } from '../../shared/config/swagger/swagger.registry';
+import { registry } from '../../../shared/config/swagger/swagger.registry';
 import {
     CreateDoctorPayloadSchema,
     SearchDoctorQuerySchema,
     UpdateDoctorPayloadSchema,
 } from './doctor.validators';
-import { AuthMiddleware } from '../../shared/middlewares/authmiddleware';
-import { AuthorizeMiddleware } from '../../shared/middlewares/authorizeMiddleware';
+import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
+import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
 import { DOCTOR_PERMISSIONS } from './doctor.constants';
 
 export const DoctorRouter = express.Router();

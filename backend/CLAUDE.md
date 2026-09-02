@@ -14,10 +14,9 @@ src/modules/
   auth/                     user login / refresh / password reset
   user/                     user records (linked 1:1 to a Role)
   counter/                  global atomic per-entity sequence (feeds LEAD-/PROJECT-/CAMP- codes)
-  doctor/                   tenant-scoped doctor registry
   qa-feedback/              QA feedback
   access-management/        tenant, role, role-type, permission-group (RBAC)
-  crm/                      division, lead, project, appointment, contact
+  crm/                      division, lead, project, appointment, contact, doctor (tenant-scoped registry)
   operations/               camp, geoProfile (field-staff geo + camp allocation),
                             testMaster (global test catalog), patient (global patient registry),
                             screening (per-patient camp screening + consent OTP),
@@ -426,7 +425,6 @@ All modules follow the layered convention above; all are wired in `src/bin/app.t
 | — | auth | `/auth` | login, logout, refresh-token, reset-password (self), forgot-password (tenant:admin) |
 | — | user | `/users` | linked 1:1 to a Role; registers inactive by default |
 | — | counter | `/counters` | global atomic `$inc` sequence → prefixed padded codes (ld-/prj-/cmp-/mtg-/phr-/inv-/**tst-**/**pat-**). Entity must be in BOTH `COUNTER_ENTITY_TYPES` (model enum) AND `seedCounters` — a missing enum entry fails boot |
-| — | doctor | `/doctors` | tenant-scoped registry (`ctx.where()`); `pharmaCode` immutable natural key, unique per tenant `{tenant, pharmaCode}` (email also unique per tenant); tenant pinned on create (platform supplies, customer own-tenant), open reads / manage-guarded writes |
 | — | qa-feedback | `/qa-feedback` | QA feedback |
 | access-management | tenant | `/tenants` | types: `platform` / `customer`; owner auto-activated on create; optional updatable `salesPerson` (Role ref) — assign on create, reassign/unassign (null) on update, validated to exist AND be a `sales-rep` role type |
 | access-management | permission-group | `/permission-groups` | per-tenant permission ceiling |
@@ -437,6 +435,7 @@ All modules follow the layered convention above; all are wired in `src/bin/app.t
 | crm | project | `/projects` | one-project-per-lead; tenant/division derived from lead; `campTimeSlots` restricted to the 4 fixed `CAMP_TIME_SLOTS` (imported from camp module); **own-scoping** in get/search — customer-tenant actor → own division (`role.division`), platform rep without `project:manage` → own projects (`salesRep`); optional `tenant` search filter honoured only for a not-tenant-pinned `project:manage` actor |
 | crm | appointment | `/appointments` | stageHistory + moveStage (each move records its own `nextSteps`); parent self-ref for follow-ups; statuses = planned/done/cancelled/released (no `blocked`) |
 | crm | contact | `/contacts` | tenant(+optional division)-scoped people registry, optional user/login link; division required for pharma (customer-type) contacts & validated against tenant; `type` immutable after create |
+| crm | doctor | `/doctors` | tenant-scoped registry (`ctx.where()`); `pharmaCode` immutable natural key, unique per tenant `{tenant, pharmaCode}` (email also unique per tenant); tenant pinned on create (platform supplies, customer own-tenant), open reads / manage-guarded writes |
 | operations | camp | `/camps` | stageHistory + moveStage; tenant+division required, project optional; optional `tenant` search filter honoured only for a not-tenant-pinned `camp:manage` actor |
 | operations | geoProfile | `/geo-profiles` | field-staff geo (2dsphere); `findNearest` ($geoNear) feeds camp allocation |
 | operations | testMaster | `/test-masters` | **global catalog** (no tenant); `code` auto-generated from `test-master` counter (`tst-`), immutable natural key; `therapy` (project therapy enum), `duration`/`price`, `config.inputs[]` (validator mirrors the model exactly — `type` enum from `TEST_MASTER_CONFIG_INPUT_TYPE`), `consumption[]` (InventoryMaster + rate; device rate defaults 0); `active`/`inactive` (manage-gated). Reads guarded `test-master:get`/`search` (or manage); writes `manage`. FO granted read; ops-managers granted manage |

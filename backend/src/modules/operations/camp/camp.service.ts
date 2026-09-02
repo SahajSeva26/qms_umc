@@ -15,7 +15,7 @@ import { isValidObjectID, toObjectId } from '../../../shared/utils/strings';
 import { endOfUTCDay, utcDayRange } from '../../../shared/utils/dates';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { ProjectService } from '../../crm/project/project.service';
-import { DoctorService } from '../../doctor/doctor.service';
+import { DoctorService } from '../../crm/doctor/doctor.service';
 import { RoleService } from '../../access-management/role/role.service';
 import { DivisionService } from '../../crm/division/division.service';
 import { ALLOWED_ROLETYPE_CODES } from '../../access-management/role-type/roleType.constants';

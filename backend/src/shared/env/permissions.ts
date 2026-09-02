@@ -9,7 +9,7 @@ import { CONTACT_PERMISSIONS } from '../../modules/crm/contact/contact.constants
 import { APPOINTMENT_PERMISSIONS } from '../../modules/crm/appointment/appointment.constants';
 import { PROJECT_PERMISSIONS } from '../../modules/crm/project/project.constants';
 import { QA_FEEDBACK_PERMISSIONS } from '../../modules/qa-feedback/qaFeedback.constants';
-import { DOCTOR_PERMISSIONS } from '../../modules/doctor/doctor.constants';
+import { DOCTOR_PERMISSIONS } from '../../modules/crm/doctor/doctor.constants';
 import { GEO_PROFILE_PERMISSIONS } from '../../modules/operations/geoProfile/geoProfile.constants';
 import { CAMP_PERMISSIONS } from '../../modules/operations/camp/camp.constants';
 import { TEST_MASTER_PERMISSIONS } from '../../modules/operations/testMaster/testMaster.constants';

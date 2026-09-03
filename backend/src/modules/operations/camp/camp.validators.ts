@@ -130,3 +130,15 @@ export const SearchCampQuerySchema = z.object({
     limit: z.string().optional().openapi({ example: '10' }),
 });
 export type ISearchCampQuery = z.infer<typeof SearchCampQuerySchema>;
+
+//5: report ====================================>
+export const CampReportQuerySchema = z
+    .object({
+        from: z.coerce.date().optional().openapi({ example: '2026-03-01' }),
+        to: z.coerce.date().optional().openapi({ example: '2026-12-01' }),
+    })
+    .refine((q) => !q.from || !q.to || q.from <= q.to, {
+        message: 'from must be earlier than or equal to to',
+        path: ['from'],
+    });
+export type ICampReportQuery = z.infer<typeof CampReportQuerySchema>;

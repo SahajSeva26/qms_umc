@@ -14,6 +14,20 @@ const CoordinatesSchema = z
     ])
     .openapi({ example: [79.513, 29.2183] });
 
+// full postal address for the camp venue; coordinates [lng, lat] are the point FO allocation
+// searches around (feeds $geoNear via geoProfile.findNearest).
+const LocationSchema = z.object({
+    addressLine1: z.string().min(1).openapi({ example: '12 MG Road' }),
+    addressLine2: z.string().optional().openapi({ example: 'Near City Mall' }),
+    locality: z.string().optional().openapi({ example: 'Andheri West' }),
+    city: z.string().min(1).openapi({ example: 'Mumbai' }),
+    state: z.string().min(1).openapi({ example: 'Maharashtra' }),
+    country: z.string().min(1).optional().openapi({ example: 'India' }),
+    pincode: z.string().min(1).openapi({ example: '400058' }),
+    googlePlaceId: z.string().optional().openapi({ example: 'ChIJ...' }),
+    coordinates: CoordinatesSchema,
+});
+
 //1: create ====================================>
 // tenant (client) + division are always required — a camp always belongs to a client. `project`
 // is optional: a camp may be booked standalone (no won-deal project behind it). tenant is
@@ -36,12 +50,10 @@ export const CreateCampPayloadSchema = z.object({
     fo: objectId('FO').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8c' }),
     mr: objectId('MR').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8d' }),
 
-    // slot & location — coordinates [lng, lat] are the point the FO allocation searches around
+    // slot & location — location.coordinates [lng, lat] is the point FO allocation searches around
     date: z.coerce.date().openapi({ example: '2026-08-15' }),
     timeSlot: z.enum(Object.values(CAMP_TIME_SLOTS)).openapi({ example: '9am-1pm' }),
-    city: z.string().min(1).openapi({ example: 'Mumbai' }),
-    state: z.string().min(1).openapi({ example: 'Maharashtra' }),
-    coordinates: CoordinatesSchema,
+    location: LocationSchema,
 
     // devices & confirmation — each device references a catalog item (InventoryMaster)
     devices: z
@@ -70,9 +82,7 @@ export const BookCampPayloadSchema = z.object({
 
     date: z.coerce.date().openapi({ example: '2026-08-15' }),
     timeSlot: z.enum(Object.values(CAMP_TIME_SLOTS)).openapi({ example: '9am-1pm' }),
-    city: z.string().min(1).openapi({ example: 'Mumbai' }),
-    state: z.string().min(1).openapi({ example: 'Maharashtra' }),
-    coordinates: CoordinatesSchema,
+    location: LocationSchema,
 
     devices: z
         .array(objectId('Device'))
@@ -95,9 +105,8 @@ export const UpdateCampPayloadSchema = z.object({
     mr: objectId('MR').optional(),
     date: z.coerce.date().optional(),
     timeSlot: z.enum(Object.values(CAMP_TIME_SLOTS)).optional(),
-    city: z.string().min(1).optional(),
-    state: z.string().min(1).optional(),
-    coordinates: CoordinatesSchema.optional(),
+    // location is replaced wholesale — supply the full object to change any part of it
+    location: LocationSchema.optional(),
     devices: z.array(objectId('Device')).optional(),
     notes: z.string().optional(),
     conscentPath: z.string().optional(),

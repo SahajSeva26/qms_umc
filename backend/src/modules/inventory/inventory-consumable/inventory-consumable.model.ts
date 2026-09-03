@@ -11,6 +11,13 @@ const inventoryConsumableSchema = new mongoose.Schema(
             required: true,
             index: true,
         },
+        // the vendor this lot was purchased from — a procurement fact fixed at intake.
+        vendor: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'VendorMaster',
+            required: true,
+            index: true,
+        },
         batch: {
             type: String,
             required: true,

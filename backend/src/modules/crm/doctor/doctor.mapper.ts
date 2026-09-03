@@ -1,5 +1,5 @@
 // Doctor Mapper
-import { RequestContext } from '../../shared/utils/contextBuilder';
+import { RequestContext } from '../../../shared/utils/contextBuilder';
 import { DOCTOR_PERMISSIONS } from './doctor.constants';
 
 export const DoctorMapper = {
@@ -24,7 +24,6 @@ export const DoctorMapper = {
             state: doctor.state,
             pincode: doctor.pincode,
             googleMapLink: doctor.googleMapLink || '',
-
 
             createdAt: doctor.createdAt,
             updatedAt: doctor.updatedAt,

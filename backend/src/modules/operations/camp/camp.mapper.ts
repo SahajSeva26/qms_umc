@@ -27,9 +27,7 @@ export const CampMapper = {
             // slot & location
             date: camp.date,
             timeSlot: camp.timeSlot || null,
-            city: camp.city,
-            state: camp.state,
-            coordinates: camp.coordinates || null,
+            location: camp.location || null,
 
             // devices & confirmation
             devices: camp.devices || [],

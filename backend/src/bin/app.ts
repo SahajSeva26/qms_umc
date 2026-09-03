@@ -29,6 +29,7 @@ import { InventoryDeviceRouter } from '../modules/inventory/inventory-device/inv
 import { InventoryAssignmentRouter } from '../modules/inventory/inventory-assignment/inventory-assignment.routes';
 import { InventoryRequestRouter } from '../modules/inventory/inventory-request/inventory-request.routes';
 import { InventoryLedgerRouter } from '../modules/inventory/inventory-ledger/inventory-ledger.routes';
+import { InventoryReportRouter } from '../modules/inventory/inventory-report/inventory-report.routes';
 import { InvoiceRouter } from '../modules/finance/invoice/invoice.routes';
 import { InvoiceLineItemRouter } from '../modules/finance/invoiceLineItem/invoiceLineItem.routes';
 import { VendorMasterRouter } from '../modules/vendor-master/vendor-master.routes';
@@ -97,6 +98,7 @@ app.use('/api/v1/patients', PatientRouter);
 app.use('/api/v1/screenings', ScreeningRouter);
 app.use('/api/v1/tests', TestRouter);
 app.use('/api/v1/counters', CounterRouter);
+app.use('/api/v1/inventory', InventoryReportRouter);
 app.use('/api/v1/inventory-masters', InventoryMasterRouter);
 app.use('/api/v1/inventory-consumables', InventoryConsumableRouter);
 app.use('/api/v1/inventory-devices', InventoryDeviceRouter);

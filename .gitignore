@@ -23,7 +23,7 @@ dist/
 build/
 out/
 dist-ssr/
-
+docs/db-learning
 # ======================
 # TypeScript
 # ======================

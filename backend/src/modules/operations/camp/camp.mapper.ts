@@ -1,5 +1,6 @@
 // Camp Mapper
 import { RequestContext } from '../../../shared/utils/contextBuilder';
+import { BILLING_TYPES, CAMP_STATUSES, CAMP_TYPES } from './camp.constants';
 
 export const CampMapper = {
     toResponse: (camp: any, ctx: RequestContext) => {
@@ -58,5 +59,30 @@ export const CampMapper = {
             result.items.push(CampMapper.toResponse(camp, ctx));
         }
         return result;
+    },
+    toReportResponse: (report: any) => {
+        const statusCounts = new Map<string, number>((report?.statusCounts || []).map((s: any) => [s._id, s.count]));
+        const typeCounts = new Map<string, number>((report?.typeCounts || []).map((t: any) => [t._id, t.count]));
+        const billingTypeCounts = new Map<string, number>(
+            (report?.billingTypeCounts || []).map((b: any) => [b._id, b.count]),
+        );
+
+        return {
+            summary: {
+                totalCamps: report?.totalCamps?.[0]?.count || 0,
+            },
+            byStatus: Object.values(CAMP_STATUSES).map((status) => ({
+                status,
+                count: statusCounts.get(status) || 0,
+            })),
+            byType: Object.values(CAMP_TYPES).map((type) => ({
+                type,
+                count: typeCounts.get(type) || 0,
+            })),
+            byBillingType: Object.values(BILLING_TYPES).map((billingType) => ({
+                billingType,
+                count: billingTypeCounts.get(billingType) || 0,
+            })),
+        };
     },
 };

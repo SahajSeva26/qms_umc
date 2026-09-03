@@ -139,3 +139,9 @@ export const SearchCampQuerySchema = z.object({
     limit: z.string().optional().openapi({ example: '10' }),
 });
 export type ISearchCampQuery = z.infer<typeof SearchCampQuerySchema>;
+
+//5: report ====================================>
+// no filters required by the current reporting requirement — scoping is handled entirely by
+// ctx.where() in the service, same as get()/search().
+export const CampReportQuerySchema = z.object({});
+export type ICampReportQuery = z.infer<typeof CampReportQuerySchema>;

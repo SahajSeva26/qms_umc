@@ -1,6 +1,55 @@
 import mongoose from 'mongoose';
 import { TENANT_STATUS, TENANT_TYPE } from './tenant.constants';
 
+const addressSchema = new mongoose.Schema(
+    {
+        addressLine1: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        addressLine2: {
+            type: String,
+            trim: true,
+        },
+        locality: {
+            type: String,
+            trim: true,
+        },
+        city: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        state: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        country: {
+            type: String,
+            required: true,
+            default: 'India',
+            trim: true,
+        },
+        pincode: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        googlePlaceId: {
+            type: String,
+            trim: true,
+        },
+        // GeoJSON-style point [longitude, latitude]
+        coordinates: {
+            type: [Number],
+            index: '2dsphere',
+        },
+    },
+    { _id: false },
+);
+
 const tenantSchema = new mongoose.Schema(
     {
         code: {
@@ -39,6 +88,10 @@ const tenantSchema = new mongoose.Schema(
             type: String,
             enum: [TENANT_STATUS.ACTIVE, TENANT_STATUS.INACTIVE],
             default: TENANT_STATUS.ACTIVE,
+        },
+        // optional — the tenant's registered/office address. Supply on create or update.
+        address: {
+            type: addressSchema,
         },
     },
     {

@@ -3,6 +3,7 @@ import express from 'express';
 import { DoctorController } from './doctor.controller';
 import { registry } from '../../../shared/config/swagger/swagger.registry';
 import {
+    BulkDoctorOpenApiSchema,
     CreateDoctorPayloadSchema,
     SearchDoctorQuerySchema,
     UpdateDoctorPayloadSchema,
@@ -10,6 +11,7 @@ import {
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
 import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
 import { DOCTOR_PERMISSIONS } from './doctor.constants';
+import { csvUploader } from '../../../shared/middlewares/upload/csvUploader';
 
 export const DoctorRouter = express.Router();
 
@@ -87,11 +89,32 @@ registry.registerPath({
     },
 });
 
+// bulk create doctors (CSV upload)
+registry.registerPath({
+    method: 'post',
+    path: '/doctors/bulk',
+    tags: ['DOCTOR'],
+    summary: 'Bulk create doctors from a CSV upload',
+    request: {
+        body: {
+            content: {
+                'multipart/form-data': {
+                    schema: BulkDoctorOpenApiSchema,
+                },
+            },
+        },
+    },
+    responses: {
+        200: { description: 'Doctors created successfully' },
+        400: { description: 'Validation error / doctors created with errors' },
+    },
+});
+
 // =======================================================================
 // ======================== EXPORT DOCTOR ROUTES =========================
 // =======================================================================
-// reads are open to any authenticated user — doctor is a global reference registry.
-// only writes (create/update) are permission-guarded.
+// reads are tenant-scoped but open to any authenticated user; writes (create/update/bulk)
+// are guarded by doctor:manage.
 DoctorRouter.get('/:id', DoctorController.get);
 DoctorRouter.get('/', DoctorController.search);
 
@@ -99,6 +122,14 @@ DoctorRouter.post(
     '/',
     AuthorizeMiddleware([DOCTOR_PERMISSIONS.MANAGE.code]),
     DoctorController.create,
+);
+
+// bulk create — guarded by doctor:manage; CSV file field name is `file`
+DoctorRouter.post(
+    '/bulk',
+    AuthorizeMiddleware([DOCTOR_PERMISSIONS.MANAGE.code]),
+    csvUploader.single('file'),
+    DoctorController.bulkCreate,
 );
 DoctorRouter.put(
     '/:id',

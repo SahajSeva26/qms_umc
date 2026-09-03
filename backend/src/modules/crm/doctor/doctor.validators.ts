@@ -76,3 +76,24 @@ export const SearchDoctorQuerySchema = z.object({
     limit: z.string().optional().openapi({ example: '10' }),
 });
 export type ISearchDoctorQuery = z.infer<typeof SearchDoctorQuerySchema>;
+
+//4: bulk create (CSV upload) ====================================>
+// The non-file fields carried in the multipart/form-data body. Per-row doctor fields
+// (pharmaCode, name, specialization, mobile, city, state, pincode, email, googleMapLink, status)
+// come from the CSV rows and are validated per-row against CreateDoctorPayloadSchema in the service.
+export const BulkDoctorPayloadSchema = z.object({
+    // required only for platform (QMS) staff — which tenant these doctors belong to.
+    // ignored for customer users: the service pins each row to their own tenant.
+    tenant: objectId('Tenant')
+        .optional()
+        .openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
+});
+export type IBulkDoctorPayload = z.infer<typeof BulkDoctorPayloadSchema>;
+
+// Swagger-only shape: adds the binary file field so the docs render a file picker.
+export const BulkDoctorOpenApiSchema = BulkDoctorPayloadSchema.extend({
+    file: z.any().openapi({
+        type: 'string',
+        format: 'binary',
+    }),
+});

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { CAMP_TIME_SLOT_VALUES } from '@/types/campTimeSlot.constants'
+import { MAX_DAYS_TO_BOOK_BEFORE } from '@/features/projects/projects.utils'
 
 // Each wizard step schema runs with safeParse against the full WizardFormState —
 // unknown keys are ignored by z.object, so partial-shape schemas are safe here.
@@ -21,6 +22,7 @@ export const wizardStep2Schema = z
     mode: z.enum(['po', 'agreement', 'mail_confirmation']),
     poNumber: z.string(),
     agreementStartDate: z.string(),
+    duration: z.number().int('Duration must be a whole number of months.').nonnegative('Duration cannot be negative.'),
     emailReference: z.string(),
   })
   .superRefine((v, ctx) => {
@@ -37,11 +39,15 @@ export const wizardStep2Schema = z
 
 export const wizardStep3Schema = z.object({
   valueBeforeGST: z.number().gt(0, 'Set camp cost × total camps or value before GST.'),
+  gst: z.number().min(0, 'GST must be between 0 and 100%.').max(100, 'GST must be between 0 and 100%.'),
 })
 
 export const wizardStep4Schema = z
   .object({
     campTimeSlots: z.array(z.enum(CAMP_TIME_SLOT_VALUES)).min(1, 'Add at least one camp time slot.'),
+    freeCancelHours: z.number().int('Free-cancel hours must be a whole number.').nonnegative('Free-cancel hours cannot be negative.'),
+    cancellationAllowed: z.number().min(0, 'Cancellations allowed must be between 0 and 100%.').max(100, 'Cancellations allowed must be between 0 and 100%.'),
+    campCostDeductionOnChargableCancel: z.number().min(0, 'Deduction must be between 0 and 100%.').max(100, 'Deduction must be between 0 and 100%.'),
     goLiveScopeCode: z.enum(['states', 'cities', 'pan']),
     goLiveScopeValues: z.array(z.string()),
     whoCanBookCamp: z.array(z.string()).min(1, 'Select at least one booking role.'),
@@ -59,7 +65,8 @@ export const wizardStep5Schema = z.object({
 })
 
 export const wizardStep6Schema = z.object({
-  daysToBookBefore: z.number().int().nonnegative(),
+  daysToBookBefore: z.number().int('Days to book before must be a whole number.').nonnegative('Days to book before cannot be negative.').max(MAX_DAYS_TO_BOOK_BEFORE, `Days to book before cannot exceed ${MAX_DAYS_TO_BOOK_BEFORE}.`),
+  poRenewalReminder: z.number().min(0, 'PO renewal reminder must be between 0 and 100%.').max(100, 'PO renewal reminder must be between 0 and 100%.'),
 })
 
 export const moveStageSchema = z.object({

@@ -12,6 +12,13 @@ const inventoryDeviceSchema = new mongoose.Schema(
             required: true,
             index: true,
         },
+        // the vendor this unit was purchased from — a procurement fact fixed at intake.
+        vendor: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'VendorMaster',
+            required: true,
+            index: true,
+        },
         serialNumber: {
             type: String,
             required: true,

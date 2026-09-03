@@ -3,9 +3,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import TenantAsyncPicker from '@/components/ui/TenantAsyncPicker'
 import { toast } from '@/components/ui/sonner'
 import { useCreateDoctor } from '@/features/doctors/hooks/useCreateDoctor'
 import { useUpdateDoctor } from '@/features/doctors/hooks/useUpdateDoctor'
+import { useSession } from '@/hooks/useSession'
 import { getApiErrorMessage } from '@/utils/apiError'
 import type { DoctorEntity, DoctorSpecialization, DoctorStatus } from '@/types/doctor.types'
 
@@ -30,9 +32,11 @@ interface DoctorDraft {
   email: string
   googleMapLink: string
   status: DoctorStatus
+  tenantId: string
+  tenantLabel: string
 }
 
-const emptyDraft: DoctorDraft = { pharmaCode: '', name: '', specialization: 'cp', mobile: '', city: '', state: '', pincode: '', email: '', googleMapLink: '', status: 'active' }
+const emptyDraft: DoctorDraft = { pharmaCode: '', name: '', specialization: 'cp', mobile: '', city: '', state: '', pincode: '', email: '', googleMapLink: '', status: 'active', tenantId: '', tenantLabel: '' }
 
 function draftFromDoctor(d: DoctorEntity): DoctorDraft {
   return {
@@ -46,6 +50,9 @@ function draftFromDoctor(d: DoctorEntity): DoctorDraft {
     email: d.email,
     googleMapLink: d.googleMapLink || '',
     status: d.status ?? 'active',
+    // tenant is immutable post-create — Edit never renders or submits this field.
+    tenantId: '',
+    tenantLabel: '',
   }
 }
 
@@ -53,23 +60,42 @@ interface EditDoctorModalProps {
   open: boolean
   doctor: DoctorEntity | null
   onClose: () => void
+  /** Fires only on a genuine create success, in addition to onClose — lets a
+   * caller (e.g. a camp-booking form) auto-select the new doctor without
+   * overloading onClose's "the modal was dismissed" meaning. Never fires for
+   * an edit/update or for Cancel/dismiss. */
+  onCreated?: (doctor: DoctorEntity) => void
+  /** Locks create mode to a specific company, e.g. the camp/booking form's
+   * own already-selected tenant — the Company picker is replaced with
+   * read-only context text and this id is what's actually submitted,
+   * regardless of session type. Ignored in edit mode. */
+  forcedTenant?: { id: string; label: string }
 }
 
 // Keyed on doctor id so the inner form remounts (resetting draft state)
 // per doctor without needing a useEffect to re-sync from props.
-const EditDoctorModal = ({ open, doctor, onClose }: EditDoctorModalProps) => {
+const EditDoctorModal = ({ open, doctor, onClose, onCreated, forcedTenant }: EditDoctorModalProps) => {
   if (!open) return null
-  return <EditDoctorModalForm key={doctor?.id ?? '__new__'} doctor={doctor} onClose={onClose} />
+  return <EditDoctorModalForm key={doctor?.id ?? '__new__'} doctor={doctor} onClose={onClose} onCreated={onCreated} forcedTenant={forcedTenant} />
 }
 
 interface EditDoctorModalFormProps {
   doctor: DoctorEntity | null
   onClose: () => void
+  onCreated?: (doctor: DoctorEntity) => void
+  forcedTenant?: { id: string; label: string }
 }
 
-const EditDoctorModalForm = ({ doctor, onClose }: EditDoctorModalFormProps) => {
+const EditDoctorModalForm = ({ doctor, onClose, onCreated, forcedTenant }: EditDoctorModalFormProps) => {
   const isEdit = !!doctor
   const [draft, setDraft] = useState<DoctorDraft>(doctor ? draftFromDoctor(doctor) : emptyDraft)
+  const { session } = useSession()
+  // A platform caller has no single "home" tenant, so they must pick the
+  // target company explicitly — a customer caller is always pinned to their
+  // own tenant server-side and never sees or sends this field. A forced
+  // tenant (from a caller like the camp form) always wins over this — no
+  // picker either way, the company is already decided by the caller.
+  const needsTenantPicker = !isEdit && !forcedTenant && session?.tenant?.type === 'platform'
 
   const createDoctor = useCreateDoctor()
   const updateDoctor = useUpdateDoctor(doctor?.id ?? '')
@@ -103,7 +129,11 @@ const EditDoctorModalForm = ({ doctor, onClose }: EditDoctorModalFormProps) => {
           toast.error('Pharma doctor code is required')
           return
         }
-        await createDoctor.mutateAsync({
+        if (needsTenantPicker && !draft.tenantId) {
+          toast.error('Company is required')
+          return
+        }
+        const created = await createDoctor.mutateAsync({
           pharmaCode: draft.pharmaCode,
           name: draft.name,
           specialization: draft.specialization,
@@ -113,8 +143,10 @@ const EditDoctorModalForm = ({ doctor, onClose }: EditDoctorModalFormProps) => {
           pincode: draft.pincode,
           email: draft.email,
           googleMapLink: draft.googleMapLink || undefined,
+          tenant: forcedTenant ? forcedTenant.id : needsTenantPicker ? draft.tenantId : undefined,
         })
         toast.success('Doctor added')
+        if (created.data) onCreated?.(created.data)
       }
       handleClose()
     } catch (err) {
@@ -132,6 +164,22 @@ const EditDoctorModalForm = ({ doctor, onClose }: EditDoctorModalFormProps) => {
         </DialogHeader>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {!isEdit && forcedTenant && (
+            <div className="sm:col-span-2">
+              <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Company</label>
+              <p className="text-[13px]" style={{ color: 'var(--qms-text)' }}>{forcedTenant.label} <span style={{ color: 'var(--qms-text-muted)' }}>(locked to the camp being booked)</span></p>
+            </div>
+          )}
+          {needsTenantPicker && (
+            <div className="sm:col-span-2">
+              <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Company *</label>
+              <TenantAsyncPicker
+                value={draft.tenantId}
+                label={draft.tenantLabel}
+                onChange={(tenantId, tenantLabel) => setDraft((p) => ({ ...p, tenantId, tenantLabel }))}
+              />
+            </div>
+          )}
           <div>
             <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Pharma doctor code</label>
             <Input

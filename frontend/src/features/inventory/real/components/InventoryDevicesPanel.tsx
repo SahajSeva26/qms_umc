@@ -99,7 +99,7 @@ const InventoryDevicesPanel = () => {
             <table className="w-full text-[13px]">
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--qms-border)' }}>
-                  {['Serial number', 'Item', 'Status', 'Mfg date', 'Warranty', 'Next calibration', ...(canViewLedger ? [''] : [])].map((h) => (
+                  {['Serial number', 'Item Type', 'Status', 'Mfg date', 'Warranty', 'Next calibration', ...(canViewLedger ? [''] : [])].map((h) => (
                     <th
                       key={h}
                       className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5"

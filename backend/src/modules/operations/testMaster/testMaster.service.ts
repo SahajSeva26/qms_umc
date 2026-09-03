@@ -2,12 +2,14 @@
 import { HydratedDocument } from 'mongoose';
 import { TestMasterModel, ITestMaster } from './testMaster.model';
 import { ICreateTestMasterPayload, ISearchTestMasterQuery, IUpdateTestMasterPayload } from './testMaster.validators';
-import { TEST_MASTER_PERMISSIONS, TEST_MASTER_STATUS } from './testMaster.constants';
+import { TEST_MASTER_COUNTER_ENTITY, TEST_MASTER_PERMISSIONS, TEST_MASTER_STATUS } from './testMaster.constants';
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
 import { isValidObjectID } from '../../../shared/utils/strings';
 import { IServiceOptions } from '../../../shared/types/service.types';
+import { CounterService } from '../../counter/counter.service';
+import { withTransaction } from '../../../shared/helpers/transactionHelper';
 import { InventoryMasterService } from '../../inventory/inventory-master/inventory-master.service';
 import { ITEM_TYPES } from '../../inventory/inventory-master/inventory-master.constants';
 
@@ -52,6 +54,10 @@ const set = async (model: any, entity: HydratedDocument<ITestMaster>, ctx: Reque
     }
     if (model.therapy) {
         entity.therapy = model.therapy;
+    }
+    // campType is immutable — the update schema strips it, so this only ever fires on create
+    if (model.campType) {
+        entity.campType = model.campType;
     }
     if (model.duration !== undefined) {
         entity.duration = model.duration;
@@ -103,6 +109,9 @@ const search = async (filters: ISearchTestMasterQuery, ctx: RequestContext, opti
         // belonging to a group of therapies in one query.
         where.therapy = Array.isArray(filters.therapy) ? { $in: filters.therapy } : filters.therapy;
     }
+    if (filters.campType) {
+        where.campType = filters.campType;
+    }
     // only a manage-level actor may look past active (see inactive tests)
     if (filters.status && ctx.hasAnyPermissions([TEST_MASTER_PERMISSIONS.MANAGE.code])) {
         where.status = filters.status;
@@ -118,16 +127,18 @@ const search = async (filters: ISearchTestMasterQuery, ctx: RequestContext, opti
 };
 
 const create = async (model: ICreateTestMasterPayload, ctx: RequestContext): Promise<HydratedDocument<ITestMaster>> => {
-    //1: guard — code must be free (reuse get on the natural key)
-    const existing = await TestMasterService.get(model.code, ctx);
-    if (existing) {
-        return throwAppError('A test master with this code already exists', StatusCodes.CONFLICT);
-    }
+    // code is the immutable natural key — auto-generated from the global `test-master` counter
+    // (tst-000001), never supplied by the caller. The counter increment auto-joins this
+    // transaction, so if the save fails the code is rolled back and never burned.
+    const entity = await withTransaction(async () => {
+        const code: string = await CounterService.next(TEST_MASTER_COUNTER_ENTITY, ctx);
 
-    //2: build entity — code (immutable natural key) is seeded here, never in set()
-    let entity = new TestMasterModel({ code: model.code });
-    entity = await set(model, entity, ctx);
-    entity = await entity.save();
+        let entity = new TestMasterModel({ code });
+        entity = await set(model, entity, ctx);
+        entity = await entity.save();
+
+        return entity;
+    });
 
     return entity;
 };

@@ -1,7 +1,8 @@
 // TestMaster Validators
 import { z } from 'zod';
-import { TEST_MASTER_STATUS } from './testMaster.constants';
+import { TEST_MASTER_STATUS, TEST_MASTER_CONFIG_INPUT_TYPE } from './testMaster.constants';
 import { PROJECT_THERAPY_TYPES } from '../../crm/project/project.constants';
+import { CAMP_TYPES } from '../camp/camp.constants';
 import { isValidObjectID } from '../../../shared/utils/strings';
 
 const objectId = (label: string) =>
@@ -14,25 +15,45 @@ const ConsumptionLineSchema = z.object({
     rate: z.number().min(1).optional().openapi({ example: 1 }),
 });
 
+// config mirrors the model's `config.inputs[]` shape exactly — a list of input fields the
+// field officer fills in when running the test. `options` only matter for a `select` input.
+const ConfigOptionSchema = z.object({
+    label: z.string().min(1).openapi({ example: 'Positive' }),
+    value: z.string().min(1).openapi({ example: 'positive' }),
+});
+
+const ConfigInputSchema = z.object({
+    label: z.string().min(1).openapi({ example: 'Blood Sugar Level' }),
+    type: z.enum(Object.values(TEST_MASTER_CONFIG_INPUT_TYPE)).openapi({ example: 'number' }),
+    unit: z.string().optional().openapi({ example: 'mg/dL' }),
+    options: z.array(ConfigOptionSchema).optional(),
+});
+
+const TestMasterConfigSchema = z.object({
+    inputs: z.array(ConfigInputSchema).optional(),
+});
+
 //1: create ====================================>
-// code is the natural key — required here, and never editable afterwards.
+// code is auto-generated from the global `test-master` counter (tst-000001) — never supplied
+// by the caller, and never editable afterwards.
 export const CreateTestMasterPayloadSchema = z.object({
-    code: z.string().min(1).openapi({ example: 'TST-BSL-01' }),
     name: z.string().min(1).openapi({ example: 'Blood Sugar (Fasting)' }),
     description: z.string().min(1).optional().openapi({ example: 'Fasting blood glucose screening' }),
     therapy: z.enum(Object.values(PROJECT_THERAPY_TYPES)).openapi({ example: 'diabetes' }),
+    // the camp type this test belongs to — immutable after create
+    campType: z.enum(Object.values(CAMP_TYPES)).openapi({ example: 'screening' }),
     // time taken to perform the test, in minutes
     duration: z.number().min(0).openapi({ example: 15 }),
     // price of the test
     price: z.number().min(0).openapi({ example: 250 }),
     status: z.enum(Object.values(TEST_MASTER_STATUS)).optional().openapi({ example: 'active' }),
-    config: z.record(z.string(), z.unknown()).optional().openapi({ example: { unit: 'mg/dL' } }),
+    config: TestMasterConfigSchema.optional(),
     consumption: z.array(ConsumptionLineSchema).optional(),
 });
 export type ICreateTestMasterPayload = z.infer<typeof CreateTestMasterPayloadSchema>;
 
 //2: update ====================================>
-// code is intentionally omitted — it is immutable after create.
+// code and campType are intentionally omitted — both are immutable after create.
 export const UpdateTestMasterPayloadSchema = z.object({
     name: z.string().min(1).optional(),
     description: z.string().min(1).optional(),
@@ -40,7 +61,7 @@ export const UpdateTestMasterPayloadSchema = z.object({
     duration: z.number().min(0).optional(),
     price: z.number().min(0).optional(),
     status: z.enum(Object.values(TEST_MASTER_STATUS)).optional(),
-    config: z.record(z.string(), z.unknown()).optional(),
+    config: TestMasterConfigSchema.optional(),
     consumption: z.array(ConsumptionLineSchema).optional(),
 });
 export type IUpdateTestMasterPayload = z.infer<typeof UpdateTestMasterPayloadSchema>;
@@ -55,6 +76,7 @@ export const SearchTestMasterQuerySchema = z.object({
         .union([z.enum(Object.values(PROJECT_THERAPY_TYPES)), z.array(z.enum(Object.values(PROJECT_THERAPY_TYPES)))])
         .optional()
         .openapi({ example: ['cardiology', 'diabetes'] }),
+    campType: z.enum(Object.values(CAMP_TYPES)).optional().openapi({ example: 'screening' }),
     status: z.enum(Object.values(TEST_MASTER_STATUS)).optional().openapi({ example: 'active' }),
     page: z.string().optional().openapi({ example: '1' }),
     limit: z.string().optional().openapi({ example: '10' }),

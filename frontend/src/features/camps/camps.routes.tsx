@@ -3,10 +3,11 @@ import { lazyRoute } from '@/lib/router/lazyRoute'
 import TeleconsultationCampsStubPage from './pages/TeleconsultationCampsStubPage'
 
 export const CAMPS_ROUTES = {
-  CAMPS:        '/camps',
-  CAMPS_TELE:   '/camps/tele',
-  CAMP_NEW:     '/camps/new',
-  CAMP_DETAIL:  '/camps/:id',
+  CAMPS:            '/camps',
+  CAMPS_TELE:       '/camps/tele',
+  CAMP_NEW:         '/camps/new',
+  CAMP_DETAIL:      '/camps/:id',
+  CAMP_SCREENING:   '/camps/:id/screening',
 }
 
 // Only the NEW route is gated on write perms — CAMP_DETAIL doubles as view+edit,
@@ -22,6 +23,13 @@ const CAMP_READ_PERMISSIONS = ['camp:search', 'camp:manage', 'tenant:manage']
 // alone — list access isn't detail access; camp:search-only 403s on GET /camps/:id.
 const CAMP_DETAIL_PERMISSIONS = ['camp:get', 'camp:manage', 'tenant:manage']
 
+// Router-level gate only checks "can this role touch Screening at all" — the
+// precise "is this viewer the camp's assigned FO, or a manage-level actor"
+// check needs the camp's own `fo` field, which only exists once the page has
+// loaded the camp, so that check lives inside CampScreeningPage itself
+// (same pattern CAMP_DETAIL uses for its write/move-stage actions).
+const CAMP_SCREENING_PERMISSIONS = ['screening:create', 'screening:manage', 'system:manage']
+
 export const campsRoutes: RouteObject[] = [
   {
     path: CAMPS_ROUTES.CAMPS,
@@ -35,5 +43,9 @@ export const campsRoutes: RouteObject[] = [
   {
     path: CAMPS_ROUTES.CAMP_DETAIL,
     lazy: lazyRoute(() => import('./pages/CampDetailPageReal'), CAMP_DETAIL_PERMISSIONS),
+  },
+  {
+    path: CAMPS_ROUTES.CAMP_SCREENING,
+    lazy: lazyRoute(() => import('@/features/clinical/camp-screening/pages/CampScreeningPage'), CAMP_SCREENING_PERMISSIONS),
   },
 ]

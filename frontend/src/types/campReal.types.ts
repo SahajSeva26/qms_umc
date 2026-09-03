@@ -3,7 +3,15 @@
 
 import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
 
-export type CampType = 'screening' | 'diet' | 'lab'
+export const CAMP_TYPE_VALUES = ['screening', 'diet', 'lab'] as const
+export type CampType = (typeof CAMP_TYPE_VALUES)[number]
+
+export const CAMP_TYPE_LABEL: Record<CampType, string> = {
+  screening: 'Screening',
+  diet: 'Diet',
+  lab: 'Lab',
+}
+
 export type BillingType = 'billable' | 'void'
 export type CampStatus = 'requested' | 'confirmed' | 'live' | 'closed' | 'cancelled' | 'cancelled_charged'
 
@@ -38,7 +46,10 @@ export interface CampStageHistoryEntry {
 /** Whether a field is populated or a bare ObjectId depends on the service call: get()/search() populate, create/update/moveStage/allocateFo don't. */
 export interface CampPopulatedTenant { _id?: string; code: string; name: string }
 export interface CampPopulatedDivision { _id?: string; code: string; name: string; therapy?: string }
-export interface CampPopulatedProject { _id?: string; name: string; status?: string }
+// tests is the Project's configured Test Master id list — not automatically
+// "relevant to this camp" on its own, see TestRecordingSection.tsx's
+// campType-compatibility filter for what makes it so.
+export interface CampPopulatedProject { _id?: string; name: string; status?: string; tests?: string[] }
 export interface CampPopulatedDoctor { _id?: string; name: string; specialization?: string; pharmaCode?: string }
 /** fo/mr/asm/rsm populate with NO field projection (`{ path: 'fo' }`, no `.select()`) — the full Role document comes back. */
 export interface CampPopulatedRole { _id?: string; code: string; name: string; status?: string; [key: string]: unknown }

@@ -1,9 +1,12 @@
 import { ALLOWED_ROLETYPE_CODES } from '../../modules/access-management/role-type/roleType.constants';
 import { LEAD_PERMISSIONS } from '../../modules/crm/lead/lead.constants';
 import { APPOINTMENT_PERMISSIONS } from '../../modules/crm/appointment/appointment.constants';
-import { DOCTOR_PERMISSIONS } from '../../modules/doctor/doctor.constants';
+import { DOCTOR_PERMISSIONS } from '../../modules/crm/doctor/doctor.constants';
 import { CAMP_PERMISSIONS } from '../../modules/operations/camp/camp.constants';
 import { TEST_MASTER_PERMISSIONS } from '../../modules/operations/testMaster/testMaster.constants';
+import { PATIENT_PERMISSIONS } from '../../modules/operations/patient/patient.constants';
+import { SCREENING_PERMISSIONS } from '../../modules/operations/screening/screening.constants';
+import { TEST_PERMISSIONS } from '../../modules/operations/test/test.constants';
 import { TENANT_PERMISSIONS } from '../../modules/access-management/tenant/tenant.constants';
 import { DIVISION_PERMISSIONS } from '../../modules/crm/division/division.constants';
 import { CONTACT_PERMISSIONS } from '../../modules/crm/contact/contact.constants';
@@ -14,6 +17,7 @@ import { INVENTORY_CONSUMABLE_PERMISSIONS } from '../../modules/inventory/invent
 import { INVENTORY_DEVICE_PERMISSIONS } from '../../modules/inventory/inventory-device/inventory-device.constants';
 import { INVENTORY_ASSIGNMENT_PERMISSIONS } from '../../modules/inventory/inventory-assignment/inventory-assignment.constants';
 import { INVENTORY_LEDGER_PERMISSIONS } from '../../modules/inventory/inventory-ledger/inventory-ledger.constants';
+import { VENDOR_MASTER_PERMISSIONS } from '../../modules/vendor-master/vendor-master.constants';
 import { INVOICE_PERMISSIONS } from '../../modules/finance/invoice/invoice.constants';
 import { INVOICE_LINE_ITEM_PERMISSIONS } from '../../modules/finance/invoiceLineItem/invoiceLineItem.constants';
 
@@ -81,6 +85,7 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
             APPOINTMENT_PERMISSIONS.SEARCH.code,
             APPOINTMENT_PERMISSIONS.GET.code,
             APPOINTMENT_PERMISSIONS.RSVP.code,
+            PATIENT_PERMISSIONS.CREATE.code,
         ],
     },
     {
@@ -100,6 +105,7 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
             APPOINTMENT_PERMISSIONS.SEARCH.code,
             APPOINTMENT_PERMISSIONS.GET.code,
             APPOINTMENT_PERMISSIONS.RSVP.code,
+            PATIENT_PERMISSIONS.CREATE.code,
         ],
     },
     {
@@ -144,6 +150,7 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
             INVENTORY_ASSIGNMENT_PERMISSIONS.MANAGE.code,
             INVENTORY_REQUEST_PERMISSIONS.MANAGE.code,
             INVENTORY_LEDGER_PERMISSIONS.MANAGE.code,
+            VENDOR_MASTER_PERMISSIONS.MANAGE.code,
         ],
     },
     {
@@ -156,6 +163,24 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
             APPOINTMENT_PERMISSIONS.SEARCH.code,
             APPOINTMENT_PERMISSIONS.GET.code,
             APPOINTMENT_PERMISSIONS.RSVP.code,
+            // read the test catalog (needed to run camp tests) — read-only, no manage
+            TEST_MASTER_PERMISSIONS.SEARCH.code,
+            TEST_MASTER_PERMISSIONS.GET.code,
+            // register + look up + amend patients at the camp (own-scoped reads)
+            PATIENT_PERMISSIONS.CREATE.code,
+            PATIENT_PERMISSIONS.GET.code,
+            PATIENT_PERMISSIONS.SEARCH.code,
+            PATIENT_PERMISSIONS.UPDATE.code,
+            // start + progress + read back screenings at a live camp they are assigned to
+            SCREENING_PERMISSIONS.CREATE.code,
+            SCREENING_PERMISSIONS.UPDATE.code,
+            SCREENING_PERMISSIONS.GET.code,
+            SCREENING_PERMISSIONS.SEARCH.code,
+            // record + correct + read back patient test results after the screening is completed
+            TEST_PERMISSIONS.CREATE.code,
+            TEST_PERMISSIONS.UPDATE.code,
+            TEST_PERMISSIONS.GET.code,
+            TEST_PERMISSIONS.SEARCH.code,
             // raise and manage their own refill/return requests (progressing the stage is manage-only)
             INVENTORY_REQUEST_PERMISSIONS.CREATE.code,
             INVENTORY_REQUEST_PERMISSIONS.GET.code,

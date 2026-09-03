@@ -6,6 +6,27 @@ import {
 } from '../../../shared/utils/strings';
 import { RegisterUserPayloadSchema } from '../../auth/auth.validators';
 
+// coordinates are stored GeoJSON-style: [longitude, latitude] (lng first)
+const CoordinatesSchema = z
+    .tuple([
+        z.number().min(-180).max(180), // longitude
+        z.number().min(-90).max(90), // latitude
+    ])
+    .openapi({ example: [72.8296, 19.1197] });
+
+// the tenant's registered/office address
+const AddressSchema = z.object({
+    addressLine1: z.string().min(1).openapi({ example: '12 MG Road' }),
+    addressLine2: z.string().optional().openapi({ example: 'Near City Mall' }),
+    locality: z.string().optional().openapi({ example: 'Andheri West' }),
+    city: z.string().min(1).openapi({ example: 'Mumbai' }),
+    state: z.string().min(1).openapi({ example: 'Maharashtra' }),
+    country: z.string().min(1).optional().openapi({ example: 'India' }),
+    pincode: z.string().min(1).openapi({ example: '400058' }),
+    googlePlaceId: z.string().optional().openapi({ example: 'ChIJ...' }),
+    coordinates: CoordinatesSchema.optional(),
+});
+
 //1: create ====================================>
 export const CreateTenantPayloadSchema = z.object({
     code: z
@@ -32,6 +53,8 @@ export const CreateTenantPayloadSchema = z.object({
         .refine((val) => isValidObjectID(val), { message: 'salesPerson must be a valid ObjectId' })
         .optional()
         .openapi({ example: '64f0c2a1b3d4e5f6a7b8c9d0' }),
+    // optional — the tenant's registered/office address
+    address: AddressSchema.optional(),
 });
 export type ICreateTenantPayload = z.infer<typeof CreateTenantPayloadSchema>;
 
@@ -54,6 +77,8 @@ export const UpdateTenantPayloadSchema = z.object({
         .nullable()
         .optional()
         .openapi({ example: '64f0c2a1b3d4e5f6a7b8c9d0' }),
+    // replaced wholesale when supplied — pass the full address object to change any part of it
+    address: AddressSchema.optional(),
 });
 export type IUpdateTenantPayload = z.infer<typeof UpdateTenantPayloadSchema>;
 

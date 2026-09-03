@@ -4,8 +4,10 @@ import { INVENTORY_DEVICE_STATUS } from './inventory-device.constants';
 
 //1: create ====================================>
 // item (catalog ref) and serialNumber (natural key) are immutable after create.
+// vendor is the immutable ref to the VendorMaster this unit was purchased from.
 export const CreateInventoryDevicePayloadSchema = z.object({
     item: z.string().min(1).openapi({ example: '665f1a2b3c4d5e6f70819293' }),
+    vendor: z.string().min(1).openapi({ example: '665f1a2b3c4d5e6f70810001' }),
     serialNumber: z.string().min(1).openapi({ example: 'SN-ACGLU-000142' }),
     manufacturingDate: z.coerce.date().optional().openapi({ example: '2026-01-15' }),
     warrantyExpiryDate: z.coerce.date().optional().openapi({ example: '2028-01-15' }),
@@ -28,6 +30,7 @@ export type IUpdateInventoryDevicePayload = z.infer<typeof UpdateInventoryDevice
 //3: search ====================================>
 export const SearchInventoryDeviceQuerySchema = z.object({
     item: z.string().optional().openapi({ example: '665f1a2b3c4d5e6f70819293' }),
+    vendor: z.string().optional().openapi({ example: '665f1a2b3c4d5e6f70810001' }),
     serialNumber: z.string().optional().openapi({ example: 'SN-ACGLU-000142' }),
     status: z.enum(Object.values(INVENTORY_DEVICE_STATUS)).optional().openapi({ example: 'available' }),
     page: z.string().optional().openapi({ example: '1' }),

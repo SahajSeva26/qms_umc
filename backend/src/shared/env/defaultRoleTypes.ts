@@ -17,6 +17,7 @@ import { INVENTORY_CONSUMABLE_PERMISSIONS } from '../../modules/inventory/invent
 import { INVENTORY_DEVICE_PERMISSIONS } from '../../modules/inventory/inventory-device/inventory-device.constants';
 import { INVENTORY_ASSIGNMENT_PERMISSIONS } from '../../modules/inventory/inventory-assignment/inventory-assignment.constants';
 import { INVENTORY_LEDGER_PERMISSIONS } from '../../modules/inventory/inventory-ledger/inventory-ledger.constants';
+import { VENDOR_MASTER_PERMISSIONS } from '../../modules/vendor-master/vendor-master.constants';
 import { INVOICE_PERMISSIONS } from '../../modules/finance/invoice/invoice.constants';
 import { INVOICE_LINE_ITEM_PERMISSIONS } from '../../modules/finance/invoiceLineItem/invoiceLineItem.constants';
 
@@ -149,6 +150,7 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
             INVENTORY_ASSIGNMENT_PERMISSIONS.MANAGE.code,
             INVENTORY_REQUEST_PERMISSIONS.MANAGE.code,
             INVENTORY_LEDGER_PERMISSIONS.MANAGE.code,
+            VENDOR_MASTER_PERMISSIONS.MANAGE.code,
         ],
     },
     {

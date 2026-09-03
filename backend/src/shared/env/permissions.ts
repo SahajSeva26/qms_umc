@@ -25,6 +25,7 @@ import { INVENTORY_REQUEST_PERMISSIONS } from '../../modules/inventory/inventory
 import { INVENTORY_LEDGER_PERMISSIONS } from '../../modules/inventory/inventory-ledger/inventory-ledger.constants';
 import { INVOICE_PERMISSIONS } from '../../modules/finance/invoice/invoice.constants';
 import { INVOICE_LINE_ITEM_PERMISSIONS } from '../../modules/finance/invoiceLineItem/invoiceLineItem.constants';
+import { VENDOR_MASTER_PERMISSIONS } from '../../modules/vendor-master/vendor-master.constants';
 
 export const SYSTEM_PERMISSIONS = {
     MANAGE: {
@@ -62,6 +63,7 @@ export const PERMISSIONS = {
     INVENTORY_LEDGER: INVENTORY_LEDGER_PERMISSIONS,
     INVOICE: INVOICE_PERMISSIONS,
     INVOICE_LINE_ITEM: INVOICE_LINE_ITEM_PERMISSIONS,
+    VENDOR_MASTER: VENDOR_MASTER_PERMISSIONS,
 };
 
 export const PERMISSIONS_ARRAY = Object.values(PERMISSIONS)

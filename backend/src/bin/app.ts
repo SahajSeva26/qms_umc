@@ -31,6 +31,7 @@ import { InventoryRequestRouter } from '../modules/inventory/inventory-request/i
 import { InventoryLedgerRouter } from '../modules/inventory/inventory-ledger/inventory-ledger.routes';
 import { InvoiceRouter } from '../modules/finance/invoice/invoice.routes';
 import { InvoiceLineItemRouter } from '../modules/finance/invoiceLineItem/invoiceLineItem.routes';
+import { VendorMasterRouter } from '../modules/vendor-master/vendor-master.routes';
 import { buildContext } from '../shared/utils/contextBuilder';
 import { httpLogger } from '../shared/logger/httpLogger';
 import ENV from '../shared/config/app.config';
@@ -104,6 +105,7 @@ app.use('/api/v1/inventory-requests', InventoryRequestRouter);
 app.use('/api/v1/inventory-ledgers', InventoryLedgerRouter);
 app.use('/api/v1/invoices', InvoiceRouter);
 app.use('/api/v1/invoice-line-items', InvoiceLineItemRouter);
+app.use('/api/v1/vendor-masters', VendorMasterRouter);
 
 // Captured once at boot — lets /health-check report how long the current deploy has been up.
 const startedAt = new Date().toISOString();

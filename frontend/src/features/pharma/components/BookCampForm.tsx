@@ -1,9 +1,9 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { useReshapingResolver } from '@/hooks/useReshapingResolver'
 import { bookCampPayloadSchema, type BookCampFormPayload } from '@/features/pharma/schemas/bookCamp.schemas'
 import { useBookCamp } from '@/features/camps/hooks/useBookCamp'
-import { useSession } from '@/hooks/useSession'
+import { usePermission } from '@/hooks/usePermission'
 import { getApiErrorMessage } from '@/utils/apiError'
 import type { BookCampPayload, CampMutationResponseEntity, CampType } from '@/types/campReal.types'
 import type { ApiResponse } from '@/types/common.types'
@@ -11,6 +11,7 @@ import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
 import { CAMP_TIME_SLOT_LABEL } from '@/types/campTimeSlot.constants'
 import DoctorPicker from '@/features/pharma/components/DoctorPicker'
 import MrPicker from '@/features/pharma/components/MrPicker'
+import EditDoctorModal from '@/features/doctors/components/EditDoctorModal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -77,8 +78,9 @@ const useBookCampFormResolver = (needsMrPicker: boolean, selfMrId: string | unde
       devices: undefined,
       // conscentPath omitted — no consent-file upload UI/infra exists yet.
     }),
-    // Payload's `mr` (from the top-level .refine()) -> form's `mrId`.
-    topLevelFieldMap: { mr: 'mrId' },
+    // Payload keys -> this form's differently-named fields, so a Zod error
+    // lands on the field that's actually rendered.
+    topLevelFieldMap: { mr: 'mrId', doctor: 'doctorId' },
   })
 
 interface BookCampFormProps {
@@ -94,8 +96,13 @@ interface BookCampFormProps {
 // Shared across all 4 pharma portal pages — only whether the MR picker
 // renders differs per role; the submitted payload is identical either way.
 const BookCampForm = ({ needsMrPicker, project, onBooked }: BookCampFormProps) => {
-  const { session } = useSession()
+  const { session, hasPermission } = usePermission()
   const selfMrId = session?.role.id
+  // Dormant until a pharma role type is granted doctor:manage (backend
+  // follow-up, HO/pharma-division-head only) — no seeded pharma role holds
+  // it today, so this stays false/hidden for every real pharma session.
+  const canManageDoctors = hasPermission('doctor:manage')
+  const [showNewDoctor, setShowNewDoctor] = useState(false)
   const { resolver, parsePayload } = useBookCampFormResolver(needsMrPicker, selfMrId)
   const bookCamp = useBookCamp()
   // isPending flips true only once mutate is called, but parsePayload's own
@@ -184,15 +191,37 @@ const BookCampForm = ({ needsMrPicker, project, onBooked }: BookCampFormProps) =
 
       <div>
         <Label className="text-[10px] font-semibold tracking-widest uppercase mb-1.5 block text-qms-text-muted">Doctor *</Label>
-        <Controller
-          control={control}
-          name="doctorId"
-          render={({ field }) => (
-            <DoctorPicker value={field.value} label={doctorLabel} onChange={(id, l) => { field.onChange(id); setValue('doctorLabel', l) }} />
+        <div className="flex items-center gap-2">
+          <div className="flex-1 min-w-0">
+            <Controller
+              control={control}
+              name="doctorId"
+              render={({ field }) => (
+                <DoctorPicker value={field.value} label={doctorLabel} onChange={(id, l) => { field.onChange(id); setValue('doctorLabel', l) }} />
+              )}
+            />
+          </div>
+          {canManageDoctors && session && (
+            <Button type="button" variant="outline" onClick={() => setShowNewDoctor(true)}>
+              New doctor
+            </Button>
           )}
-        />
+        </div>
         {fieldError('doctorId') && <p className="text-[11px] mt-1 text-danger">{fieldError('doctorId')}</p>}
       </div>
+
+      {showNewDoctor && session && (
+        <EditDoctorModal
+          open
+          doctor={null}
+          forcedTenant={{ id: session.tenant.id, label: session.tenant.name }}
+          onCreated={(created) => {
+            setValue('doctorId', created.id, { shouldDirty: true, shouldTouch: true, shouldValidate: true })
+            setValue('doctorLabel', `${created.name} (${created.pharmaCode})`)
+          }}
+          onClose={() => setShowNewDoctor(false)}
+        />
+      )}
 
       <div>
         <Label className="text-[10px] font-semibold tracking-widest uppercase mb-1.5 block text-qms-text-muted">Camp type</Label>

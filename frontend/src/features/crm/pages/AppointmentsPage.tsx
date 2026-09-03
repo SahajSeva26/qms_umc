@@ -10,23 +10,15 @@ import AppointmentList from '@/features/crm/appointments/components/AppointmentL
 import AppointmentDrawer from '@/features/crm/appointments/components/AppointmentDrawer'
 import NewAppointmentDialog from '@/features/crm/appointments/components/NewAppointmentDialog'
 
-// Real backend-integrated Appointments calendar. Per the 2026-07-27
-// decisions documented in PROGRESS.md's Known Issues:
-// - No "peer overlay" toggle — the backend's own applyOwnScope already
-//   limits search() to appointments the caller owns or is invited to, so
-//   every appointment fetched here is one the viewer can legitimately see.
-// - No Outcome picker, no reschedule-history trail, no Leads-view/Weekly-
-//   planning-panel — all dropped, no backend field/entity to back them.
-// - "24-hr MOM auto-block" badge removed from the header chips — confirmed
-//   via source read that no such automatic transition exists anywhere in
-//   the real backend (see PROGRESS.md); mom.submissionDeadline is computed
-//   but nothing ever acts on it. Only a real, honest badge is kept.
+// Deliberately no peer-overlay toggle, Outcome picker, or MOM auto-block badge — see PROGRESS.md's Known Issues.
 const AppointmentsPage = () => {
   const [cursor, setCursor] = useState(new Date())
   const [view, setView] = useState<CalendarViewMode>('week')
   const [openAppointmentId, setOpenAppointmentId] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [dialogPrefill, setDialogPrefill] = useState<{ date: string; hour: number } | undefined>(undefined)
+  // Forces NewAppointmentDialog to remount on every open, even a repeat click on the same slot.
+  const [dialogSession, setDialogSession] = useState(0)
 
   const weekStart = startOfWeek(cursor)
   const weekEnd = addDays(weekStart, 6)
@@ -57,11 +49,13 @@ const AppointmentsPage = () => {
 
   const handleSlotClick = (day: Date, hour: number) => {
     setDialogPrefill({ date: dayKey(day), hour })
+    setDialogSession((s) => s + 1)
     setDialogOpen(true)
   }
 
   const handleNewAppointment = () => {
     setDialogPrefill(undefined)
+    setDialogSession((s) => s + 1)
     setDialogOpen(true)
   }
 
@@ -123,6 +117,7 @@ const AppointmentsPage = () => {
       <AppointmentDrawer appointment={openAppointment} onClose={() => setOpenAppointmentId(null)} />
 
       <NewAppointmentDialog
+        key={dialogSession}
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
         onCreated={(id) => {

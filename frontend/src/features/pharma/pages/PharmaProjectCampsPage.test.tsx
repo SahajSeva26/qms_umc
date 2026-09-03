@@ -97,7 +97,7 @@ describe('PharmaProjectCampsPage', () => {
     // gate/content split actually prevents the data hooks' requests from firing for this session.
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
-      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('some-other-custom-role'),
+      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('some-other-custom-role'), hasPermission: () => false,
     } as unknown as ReturnType<typeof useSession>)
 
     const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
@@ -114,7 +114,7 @@ describe('PharmaProjectCampsPage', () => {
   it('never fetches camps and never renders "New camp" when the project is inaccessible (404)', async () => {
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
-      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-rsm'),
+      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-rsm'), hasPermission: () => false,
     } as unknown as ReturnType<typeof useSession>)
 
     const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
@@ -132,7 +132,7 @@ describe('PharmaProjectCampsPage', () => {
   it('RSM/ASM/MR empty state never claims the whole project has no camps', async () => {
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
-      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-rsm'),
+      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-rsm'), hasPermission: () => false,
     } as unknown as ReturnType<typeof useSession>)
 
     const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
@@ -151,7 +151,7 @@ describe('PharmaProjectCampsPage', () => {
   it('division-head empty state correctly says the project has no camps yet (their scoping IS project-wide, unlike RSM/ASM/MR)', async () => {
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
-      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-division-head'),
+      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-division-head'), hasPermission: () => false,
     } as unknown as ReturnType<typeof useSession>)
 
     const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
@@ -168,7 +168,7 @@ describe('PharmaProjectCampsPage', () => {
   it('post-booking: closes the dialog and shows the newly booked camp in the refreshed list', async () => {
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
-      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-mr'),
+      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-mr'), hasPermission: () => false,
     } as unknown as ReturnType<typeof useSession>)
 
     const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')

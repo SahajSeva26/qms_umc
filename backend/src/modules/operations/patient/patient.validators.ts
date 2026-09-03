@@ -21,7 +21,9 @@ export const CreatePatientPayloadSchema = z.object({
     lastName: z.string().min(1).optional().openapi({ example: 'Sharma' }),
     dateOfBirth: z.coerce.date().openapi({ example: '1985-06-15' }),
     gender: z.enum(Object.values(PATIENT_GENDERS)).openapi({ example: 'male' }),
-    mobile: z.string().min(10).openapi({ example: '9876543210' }),
+    // Digits only, not just length — a non-numeric value would otherwise
+    // become unsearchable by mobile (search routes on /^\d+$/ before hitting the DB).
+    mobile: z.string().regex(/^\d{10,}$/, 'Mobile must be at least 10 digits, numbers only').openapi({ example: '9876543210' }),
     email: z.email().optional().openapi({ example: 'rahul@example.com' }),
     address: AddressSchema.optional(),
     status: z.enum(Object.values(PATIENT_STATUS)).optional().openapi({ example: 'active' }),
@@ -36,7 +38,7 @@ export const UpdatePatientPayloadSchema = z.object({
     lastName: z.string().min(1).optional(),
     dateOfBirth: z.coerce.date().optional(),
     gender: z.enum(Object.values(PATIENT_GENDERS)).optional(),
-    mobile: z.string().min(10).optional(),
+    mobile: z.string().regex(/^\d{10,}$/, 'Mobile must be at least 10 digits, numbers only').optional(),
     email: z.email().optional(),
     address: AddressSchema.optional(),
     status: z.enum(Object.values(PATIENT_STATUS)).optional(),

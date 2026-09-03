@@ -45,3 +45,22 @@ export const updateDivisionSchema = z.object({
   mrCount: z.number().int('Must be a whole number.').nonnegative('Must be 0 or more.').optional(),
   status: z.enum(['active', 'inactive']).optional(),
 })
+
+// Mirrors RegisterUserPayloadSchema (auth.validators.ts) exactly — phone is
+// genuinely optional server-side, min(10) only when supplied. Deliberately
+// NOT reusing the `head` shape above (which makes phone frontend-optional
+// with no length check) — this single-MR form matches the CSV bulk-import
+// path's own looser convention instead.
+export const singleMrSchema = z.object({
+  firstName: z.string().trim().min(1, 'First name is required'),
+  lastName: z.string().trim().optional(),
+  email: z.string().trim().min(1, 'Email is required').email('Enter a valid email'),
+  password: z.string().min(PASSWORD_MIN_LENGTH, `Password must be at least ${PASSWORD_MIN_LENGTH} characters`),
+  phone: z
+    .string()
+    .trim()
+    .optional()
+    .refine((v) => !v || v.length >= 10, { message: 'Phone number must be at least 10 characters if provided' }),
+})
+
+export type SingleMrFormValues = z.infer<typeof singleMrSchema>

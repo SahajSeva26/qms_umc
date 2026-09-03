@@ -14,6 +14,7 @@ export const ADMIN_ROUTES = {
   ADMIN_SETTINGS:     '/admin/settings',
   ADMIN_USERS:        '/admin/users',
   ADMIN_USER_DETAIL:  '/admin/users/:id',
+  ADMIN_TESTS:        '/admin/tests',
 }
 
 // Matches GET/PUT /users's real backend guards exactly (user.routes.ts).
@@ -41,5 +42,14 @@ export const adminRoutes: RouteObject[] = [
   {
     path: ADMIN_ROUTES.ADMIN_USER_DETAIL,
     lazy: lazyRoute(() => import('./pages/UserDetailPage'), USERS_VIEW_PERMISSIONS),
+  },
+  {
+    // Temporary system-admin-only phase: the backend permission-gates
+    // GET/POST/PUT /test-masters via test-master:search/get/manage, which
+    // OPERATION_MANAGER_SCREENING/DIET also hold — the API would let them in.
+    // This route guard intentionally restricts the UI further, to system:manage
+    // only, until the Test Master admin page is ready for non-system roles.
+    path: ADMIN_ROUTES.ADMIN_TESTS,
+    lazy: lazyRoute(() => import('@/features/test-master/pages/TestsPage'), ['system:manage']),
   },
 ]

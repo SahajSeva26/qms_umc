@@ -9,7 +9,7 @@ import { CONTACT_PERMISSIONS } from '../../modules/crm/contact/contact.constants
 import { APPOINTMENT_PERMISSIONS } from '../../modules/crm/appointment/appointment.constants';
 import { PROJECT_PERMISSIONS } from '../../modules/crm/project/project.constants';
 import { QA_FEEDBACK_PERMISSIONS } from '../../modules/qa-feedback/qaFeedback.constants';
-import { DOCTOR_PERMISSIONS } from '../../modules/doctor/doctor.constants';
+import { DOCTOR_PERMISSIONS } from '../../modules/crm/doctor/doctor.constants';
 import { GEO_PROFILE_PERMISSIONS } from '../../modules/operations/geoProfile/geoProfile.constants';
 import { CAMP_PERMISSIONS } from '../../modules/operations/camp/camp.constants';
 import { TEST_MASTER_PERMISSIONS } from '../../modules/operations/testMaster/testMaster.constants';
@@ -25,6 +25,7 @@ import { INVENTORY_REQUEST_PERMISSIONS } from '../../modules/inventory/inventory
 import { INVENTORY_LEDGER_PERMISSIONS } from '../../modules/inventory/inventory-ledger/inventory-ledger.constants';
 import { INVOICE_PERMISSIONS } from '../../modules/finance/invoice/invoice.constants';
 import { INVOICE_LINE_ITEM_PERMISSIONS } from '../../modules/finance/invoiceLineItem/invoiceLineItem.constants';
+import { VENDOR_MASTER_PERMISSIONS } from '../../modules/vendor-master/vendor-master.constants';
 
 export const SYSTEM_PERMISSIONS = {
     MANAGE: {
@@ -62,6 +63,7 @@ export const PERMISSIONS = {
     INVENTORY_LEDGER: INVENTORY_LEDGER_PERMISSIONS,
     INVOICE: INVOICE_PERMISSIONS,
     INVOICE_LINE_ITEM: INVOICE_LINE_ITEM_PERMISSIONS,
+    VENDOR_MASTER: VENDOR_MASTER_PERMISSIONS,
 };
 
 export const PERMISSIONS_ARRAY = Object.values(PERMISSIONS)

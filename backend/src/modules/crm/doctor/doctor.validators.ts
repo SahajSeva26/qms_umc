@@ -1,27 +1,41 @@
 // Doctor Validators
 import { z } from 'zod';
 import { DOCTOR_SPECIALIZATION, DOCTOR_STATUS } from './doctor.constants';
-import { isValidObjectID } from '../../shared/utils/strings';
+import { isValidObjectID } from '../../../shared/utils/strings';
 
 const objectId = (label: string) =>
-    z.string().refine((val) => isValidObjectID(val), { message: `${label} must be a valid id` });
+    z
+        .string()
+        .refine((val) => isValidObjectID(val), {
+            message: `${label} must be a valid id`,
+        });
 
 //1: create ====================================>
 // pharmaCode is the natural key — required here, and never editable afterwards.
 export const CreateDoctorPayloadSchema = z.object({
     // required only for platform (QMS) staff — which tenant this doctor belongs to.
     // ignored for customer users: the service pins it to their own tenant.
-    tenant: objectId('Tenant').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
+    tenant: objectId('Tenant')
+        .optional()
+        .openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
     pharmaCode: z.string().min(1).openapi({ example: 'DOC-0012' }),
     name: z.string().min(1).openapi({ example: 'Dr. Anil Kumar' }),
-    specialization: z.enum(Object.values(DOCTOR_SPECIALIZATION)).openapi({ example: 'cp' }),
+    specialization: z
+        .enum(Object.values(DOCTOR_SPECIALIZATION))
+        .openapi({ example: 'cp' }),
     mobile: z.string().min(10).openapi({ example: '9876543210' }),
     city: z.string().min(1).openapi({ example: 'Haldwani' }),
     state: z.string().min(1).openapi({ example: 'Uttarakhand' }),
     pincode: z.string().min(6).openapi({ example: '263139' }),
     email: z.email().openapi({ example: 'anil.kumar@example.com' }),
-    googleMapLink: z.string().optional().openapi({ example: 'https://maps.app.goo.gl/xyz' }),
-    status: z.enum(Object.values(DOCTOR_STATUS)).optional().openapi({ example: 'active' }),
+    googleMapLink: z
+        .string()
+        .optional()
+        .openapi({ example: 'https://maps.app.goo.gl/xyz' }),
+    status: z
+        .enum(Object.values(DOCTOR_STATUS))
+        .optional()
+        .openapi({ example: 'active' }),
 });
 export type ICreateDoctorPayload = z.infer<typeof CreateDoctorPayloadSchema>;
 
@@ -43,10 +57,18 @@ export type IUpdateDoctorPayload = z.infer<typeof UpdateDoctorPayloadSchema>;
 //3: search ====================================>
 export const SearchDoctorQuerySchema = z.object({
     // only honoured for platform staff; customer users stay pinned to their own tenant
-    tenant: objectId('Tenant').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
+    tenant: objectId('Tenant')
+        .optional()
+        .openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
     name: z.string().optional().openapi({ example: 'Anil' }),
-    specialization: z.enum(Object.values(DOCTOR_SPECIALIZATION)).optional().openapi({ example: 'cp' }),
-    status: z.enum(Object.values(DOCTOR_STATUS)).optional().openapi({ example: 'active' }),
+    specialization: z
+        .enum(Object.values(DOCTOR_SPECIALIZATION))
+        .optional()
+        .openapi({ example: 'cp' }),
+    status: z
+        .enum(Object.values(DOCTOR_STATUS))
+        .optional()
+        .openapi({ example: 'active' }),
     city: z.string().optional().openapi({ example: 'Haldwani' }),
     state: z.string().optional().openapi({ example: 'Uttarakhand' }),
     pharmaCode: z.string().optional().openapi({ example: 'DOC-0012' }),
@@ -54,3 +76,24 @@ export const SearchDoctorQuerySchema = z.object({
     limit: z.string().optional().openapi({ example: '10' }),
 });
 export type ISearchDoctorQuery = z.infer<typeof SearchDoctorQuerySchema>;
+
+//4: bulk create (CSV upload) ====================================>
+// The non-file fields carried in the multipart/form-data body. Per-row doctor fields
+// (pharmaCode, name, specialization, mobile, city, state, pincode, email, googleMapLink, status)
+// come from the CSV rows and are validated per-row against CreateDoctorPayloadSchema in the service.
+export const BulkDoctorPayloadSchema = z.object({
+    // required only for platform (QMS) staff — which tenant these doctors belong to.
+    // ignored for customer users: the service pins each row to their own tenant.
+    tenant: objectId('Tenant')
+        .optional()
+        .openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
+});
+export type IBulkDoctorPayload = z.infer<typeof BulkDoctorPayloadSchema>;
+
+// Swagger-only shape: adds the binary file field so the docs render a file picker.
+export const BulkDoctorOpenApiSchema = BulkDoctorPayloadSchema.extend({
+    file: z.any().openapi({
+        type: 'string',
+        format: 'binary',
+    }),
+});

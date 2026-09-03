@@ -15,12 +15,28 @@ const mapItem = (item: any) => {
     return { id: item.toString() };
 };
 
+// vendor may be a populated VendorMaster doc or a raw ObjectId ref — surface a shallow shape either way.
+const mapVendor = (vendor: any) => {
+    if (!vendor) return null;
+    if (typeof vendor === 'object' && vendor._id) {
+        return {
+            id: vendor._id.toString(),
+            code: vendor.code,
+            name: vendor.name,
+        };
+    }
+    return { id: vendor.toString() };
+};
+
 export const InventoryDeviceMapper = {
     toResponse: (device: any) => ({
         id: device._id?.toString(),
 
         // catalog item this unit is an instance of
         item: mapItem(device.item),
+
+        // vendor this unit was purchased from
+        vendor: mapVendor(device.vendor),
 
         // unit identity + lifecycle
         serialNumber: device.serialNumber,

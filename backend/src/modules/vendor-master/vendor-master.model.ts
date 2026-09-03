@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
-import { TENANT_STATUS, TENANT_TYPE } from './tenant.constants';
+import { VENDOR_STATUS } from './vendor-master.constants';
 
+// Vendor-master Model
 const addressSchema = new mongoose.Schema(
     {
         addressLine1: {
@@ -41,57 +42,72 @@ const addressSchema = new mongoose.Schema(
             type: String,
             trim: true,
         },
-        // GeoJSON-style point [longitude, latitude]
+        // GeoJSON-style point [longitude, latitude] — optional; when present it can feed
+        // $geoNear-style location lookups.
         coordinates: {
-            type: [Number],
+            type: [Number], // [longitude, latitude]
             index: '2dsphere',
         },
     },
     { _id: false },
 );
 
-const tenantSchema = new mongoose.Schema(
+// A vendor can have multiple points of contact.
+const contactSchema = new mongoose.Schema(
     {
+        name: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        number: {
+            type: String,
+            trim: true,
+        },
+        email: {
+            type: String,
+            trim: true,
+            lowercase: true,
+        },
+        designation: {
+            type: String,
+            trim: true,
+        },
+    },
+    { _id: false },
+);
+
+const vendorMasterSchema = new mongoose.Schema(
+    {
+        name: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+
         code: {
             type: String,
             required: true,
             unique: true,
-            index: true,
+            uppercase: true,
+            trim: true,
         },
-        name: {
-            type: String,
-            required: true,
+
+        contacts: {
+            type: [contactSchema],
+            default: [],
         },
-        description: {
-            type: String,
-            default: '',
-        },
-        type: {
-            type: String,
-            enum: [TENANT_TYPE.PLATFORM, TENANT_TYPE.CUSTOMER],
-            default: TENANT_TYPE.CUSTOMER,
-        },
-        owner: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'Role',
-            default: null,
-            // required: true
-        },
-        // optional — the (platform) sales person assigned to this tenant account. Updatable;
-        // null when unassigned.
-        salesPerson: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'Role',
-            default: null,
-        },
-        status: {
-            type: String,
-            enum: [TENANT_STATUS.ACTIVE, TENANT_STATUS.INACTIVE],
-            default: TENANT_STATUS.ACTIVE,
-        },
-        // optional — the tenant's registered/office address. Supply on create or update.
+
         address: {
             type: addressSchema,
+        },
+
+        status: {
+            type: String,
+            enum: Object.values(VENDOR_STATUS),
+            default: VENDOR_STATUS.ACTIVE,
+            required: true,
+            trim: true,
         },
     },
     {
@@ -99,5 +115,5 @@ const tenantSchema = new mongoose.Schema(
     },
 );
 
-export const TenantModel = mongoose.model('Tenant', tenantSchema);
-export type ITenant = mongoose.InferSchemaType<typeof tenantSchema>;
+export const VendorMasterModel = mongoose.model('VendorMaster', vendorMasterSchema);
+export type IVendorMaster = mongoose.InferSchemaType<typeof vendorMasterSchema>;

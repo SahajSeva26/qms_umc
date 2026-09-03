@@ -32,6 +32,57 @@ const stageHistorySchema = new mongoose.Schema(
     },
 );
 
+const locationSchema = new mongoose.Schema(
+    {
+        addressLine1: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        addressLine2: {
+            type: String,
+            trim: true,
+        },
+        locality: {
+            type: String,
+            trim: true,
+        },
+        city: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        state: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        country: {
+            type: String,
+            required: true,
+            default: 'India',
+            trim: true,
+        },
+        pincode: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        googlePlaceId: {
+            type: String,
+            trim: true,
+        },
+        // GeoJSON-style point [longitude, latitude] — the target the nearest-FO allocation
+        // searches around. Supplied at request time; feeds $geoNear via geoProfile.findNearest.
+        coordinates: {
+            type: [Number], // [longitude, latitude]
+            required: true,
+            index: '2dsphere',
+        },
+    },
+    { _id: false },
+);
+
 const campSchema = new mongoose.Schema(
     {
         code: {
@@ -99,20 +150,6 @@ const campSchema = new mongoose.Schema(
             enum: Object.values(CAMP_TIME_SLOTS),
             required: [true, 'Time slot is required'],
         },
-        city: {
-            type: String,
-            required: [true, 'City is required'],
-        },
-        state: {
-            type: String,
-            required: [true, 'State is required'],
-        },
-        // GeoJSON-style point [longitude, latitude] — the target the nearest-FO allocation
-        // searches around. Supplied at request time; feeds $geoNear via geoProfile.findNearest.
-        coordinates: {
-            type: [Number],
-            index: '2dsphere',
-        },
         // fo is NOT set at creation — a camp is born `requested` with no field officer.
         // It is filled by the allocate step (nearest-FO), which in turn gates confirmation.
         fo: {
@@ -142,6 +179,10 @@ const campSchema = new mongoose.Schema(
             type: String,
             enum: Object.values(CAMP_STATUSES),
             default: CAMP_STATUSES.REQUESTED,
+        },
+        location: {
+            type: locationSchema,
+            required: true,
         },
         stageHistory: [stageHistorySchema],
     },

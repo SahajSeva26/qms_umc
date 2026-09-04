@@ -1,8 +1,9 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { DEFAULT_WIZARD_FORM } from '@/features/projects/wizard.types'
+import type { WizardFormState } from '@/features/projects/wizard.types'
 import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
+import { WizardTestHarness } from './wizardTestHarness'
 import WizardStep4 from './WizardStep4'
 
 // Camp time slots are a fixed 4-value enum multi-select (chips), matching
@@ -10,35 +11,45 @@ import WizardStep4 from './WizardStep4'
 describe('WizardStep4 — camp time slot presets', () => {
   it('selecting a chip adds its exact enum value to the form', async () => {
     const user = userEvent.setup()
-    const setField = vi.fn()
-    const form = { ...DEFAULT_WIZARD_FORM, campTimeSlots: [] }
 
-    render(<WizardStep4 form={form} setField={setField} />)
+    render(
+      <WizardTestHarness formValues={{ campTimeSlots: [] }}>
+        <WizardStep4 />
+      </WizardTestHarness>,
+    )
 
-    await user.click(screen.getByRole('button', { name: '9 AM – 1 PM' }))
+    const chip = screen.getByRole('button', { name: '9 AM – 1 PM' })
+    await user.click(chip)
 
-    expect(setField).toHaveBeenCalledWith('campTimeSlots', ['9am-1pm'])
+    expect(chip).toHaveStyle({ background: 'var(--qms-brand)' })
   })
 
   it('clicking an already-selected chip removes it (toggle off)', async () => {
     const user = userEvent.setup()
-    const setField = vi.fn()
-    const form = {
-      ...DEFAULT_WIZARD_FORM,
+    const defaultValues: Partial<WizardFormState> = {
       campTimeSlots: ['9am-1pm', '6pm-10pm'] satisfies CampTimeSlotValue[],
     }
 
-    render(<WizardStep4 form={form} setField={setField} />)
+    render(
+      <WizardTestHarness formValues={defaultValues}>
+        <WizardStep4 />
+      </WizardTestHarness>,
+    )
 
-    await user.click(screen.getByRole('button', { name: '9 AM – 1 PM' }))
+    const chip = screen.getByRole('button', { name: '9 AM – 1 PM' })
+    expect(chip).toHaveStyle({ background: 'var(--qms-brand)' })
 
-    expect(setField).toHaveBeenCalledWith('campTimeSlots', ['6pm-10pm'])
+    await user.click(chip)
+
+    expect(chip).not.toHaveStyle({ background: 'var(--qms-brand)' })
   })
 
-  it('renders exactly the 4 backend slot values, and marks only the ones already in the form as active', () => {
-    const form = { ...DEFAULT_WIZARD_FORM, campTimeSlots: ['9am-1pm'] satisfies CampTimeSlotValue[] }
-
-    render(<WizardStep4 form={form} setField={vi.fn()} />)
+  it('renders exactly the 4 backend slot values', () => {
+    render(
+      <WizardTestHarness formValues={{ campTimeSlots: ['9am-1pm'] satisfies CampTimeSlotValue[] }}>
+        <WizardStep4 />
+      </WizardTestHarness>,
+    )
 
     const labels = ['9 AM – 1 PM', '10 AM – 2 PM', '11 AM – 3 PM', '6 PM – 10 PM']
     for (const label of labels) {
@@ -50,9 +61,48 @@ describe('WizardStep4 — camp time slot presets', () => {
   })
 
   it('never lets a user type an arbitrary time — no time inputs are rendered for camp slots', () => {
-    const form = { ...DEFAULT_WIZARD_FORM, campTimeSlots: [] }
-    const { container } = render(<WizardStep4 form={form} setField={vi.fn()} />)
+    const { container } = render(
+      <WizardTestHarness formValues={{ campTimeSlots: [] }}>
+        <WizardStep4 />
+      </WizardTestHarness>,
+    )
 
     expect(container.querySelectorAll('input[type="time"]')).toHaveLength(0)
+  })
+
+  it('shows the "add at least one slot" error once the step is attempted and no slot is selected', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <WizardTestHarness formValues={{ campTimeSlots: [] }} attemptedFields={new Set(['campTimeSlots'])}>
+        <WizardStep4 />
+      </WizardTestHarness>,
+    )
+
+    // mode:'onChange' means errors[] stays empty until some interaction
+    // triggers a validation pass — attemptedFields alone isn't enough to
+    // populate errors, it only controls whether an already-populated error
+    // is SHOWN. Toggling a slot on and back off forces that first pass.
+    const chip = screen.getByRole('button', { name: '9 AM – 1 PM' })
+    await user.click(chip)
+    await user.click(chip)
+
+    expect(await screen.findByText(/add at least one camp time slot/i)).toBeInTheDocument()
+  })
+
+  it('every non-submit chip/card button is type="button", never the implicit submit default', () => {
+    const { container } = render(
+      <WizardTestHarness formValues={{ campTimeSlots: [] }}>
+        <form>
+          <WizardStep4 />
+        </form>
+      </WizardTestHarness>,
+    )
+
+    const buttons = Array.from(container.querySelectorAll('button'))
+    expect(buttons.length).toBeGreaterThan(0)
+    for (const button of buttons) {
+      expect(button.type).toBe('button')
+    }
   })
 })

@@ -14,6 +14,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import type { LocationValue } from '@/types/location.types'
+import LocationPicker from '@/components/widgets/location-picker/LocationPicker'
+import LocationAddressFields from '@/components/widgets/location-picker/LocationAddressFields'
+import FieldErrorText from '@/components/ui/FieldErrorText'
 
 interface EditTenantModalProps {
   tenant: Tenant
@@ -28,6 +32,13 @@ interface EditTenantFormValues {
   status: TenantStatus | ''
   type: TenantType | ''
   salesPerson: string
+  address: LocationValue | null
+}
+
+const ADDRESS_FIELD_TO_FORM_FIELD: Record<string, keyof EditTenantFormValues> = {
+  addressLine1: 'address', addressLine2: 'address', locality: 'address',
+  city: 'address', state: 'address', country: 'address', pincode: 'address',
+  googlePlaceId: 'address', coordinates: 'address',
 }
 
 // '' must be normalized to undefined — status/type are bare enums with no '' member.
@@ -40,7 +51,12 @@ const useEditTenantFormResolver = () =>
       status: values.status || undefined,
       type: values.type || undefined,
       salesPerson: values.salesPerson || undefined,
+      // Omitted (not sent) when unset, so the backend's replace-wholesale
+      // update semantics leave an untouched address alone — same pattern as
+      // Camp's UpdateCampPayload.location.
+      address: values.address ?? undefined,
     }),
+    nestedFieldMaps: { address: ADDRESS_FIELD_TO_FORM_FIELD },
   })
 
 const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: EditTenantModalProps) => {
@@ -51,7 +67,7 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
     register,
     handleSubmit,
     control,
-    formState: { errors, touchedFields, isSubmitted },
+    formState: { errors, touchedFields, isSubmitted, dirtyFields },
   } = useForm<EditTenantFormValues>({
     resolver,
     mode: 'onChange',
@@ -61,6 +77,7 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
       status: tenant.status ?? '',
       type: tenant.type ?? '',
       salesPerson: tenant.salesPerson ?? '',
+      address: tenant.address,
     },
   })
 
@@ -90,6 +107,13 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
   const onSubmit = async (values: EditTenantFormValues) => {
     const parsed = await parsePayload(values)
     const payload: UpdateTenantPayload = { name: parsed.name, description: parsed.description }
+    // address isn't permission-gated (unlike status/type/salesPerson, whose
+    // inputs are conditionally rendered) — but it IS a replace-wholesale
+    // field server-side (no partial merge), so it must only be sent when the
+    // user actually touched it here. Sending the stale defaultValues snapshot
+    // unconditionally would silently overwrite a newer address someone else
+    // saved between this modal opening and this submit.
+    if (dirtyFields.address) payload.address = parsed.address
     if (canManageTenant && parsed.status) payload.status = parsed.status
     if (canManageSystem && parsed.type) payload.type = parsed.type
     if (canManageSystem) payload.salesPerson = values.salesPerson || null
@@ -121,6 +145,23 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
               placeholder="Leave blank to keep unchanged (not returned by GET, so it can't be pre-filled)"
               {...register('description')}
             />
+          </div>
+
+          <div>
+            <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+              Address (optional)
+            </Label>
+            <Controller
+              control={control}
+              name="address"
+              render={({ field }) => (
+                <div className="space-y-2">
+                  <LocationPicker value={field.value} onChange={field.onChange} defaultCountry="India" countryCode="IN" />
+                  <LocationAddressFields value={field.value} onChange={field.onChange} defaultCountry="India" />
+                </div>
+              )}
+            />
+            {fieldError('address') && <FieldErrorText message={fieldError('address')!} />}
           </div>
 
           {canManageTenant && (

@@ -9,12 +9,16 @@ import type { BookCampPayload, CampMutationResponseEntity, CampType } from '@/ty
 import type { ApiResponse } from '@/types/common.types'
 import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
 import { CAMP_TIME_SLOT_LABEL } from '@/types/campTimeSlot.constants'
+import type { LocationValue } from '@/types/location.types'
 import DoctorPicker from '@/features/pharma/components/DoctorPicker'
 import MrPicker from '@/features/pharma/components/MrPicker'
 import EditDoctorModal from '@/features/doctors/components/EditDoctorModal'
+import LocationPicker from '@/components/widgets/location-picker/LocationPicker'
+import LocationAddressFields from '@/components/widgets/location-picker/LocationAddressFields'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import FieldErrorText from '@/components/ui/FieldErrorText'
 // import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 
@@ -33,10 +37,7 @@ interface FormValues {
   patientExpectation: number
   date: string
   timeSlot: CampTimeSlotValue | ''
-  city: string
-  state: string
-  lng: number
-  lat: number
+  location: LocationValue | null
   // notes: string
   // devices: string
 }
@@ -48,8 +49,7 @@ const EMPTY_FORM_VALUES: FormValues = {
   patientExpectation: NaN,
   date: '',
   timeSlot: '',
-  city: '', state: '',
-  lng: NaN, lat: NaN,
+  location: null,
   // notes: '',
   // devices: '',
 }
@@ -71,16 +71,25 @@ const useBookCampFormResolver = (needsMrPicker: boolean, selfMrId: string | unde
       patientExpectation: Number.isNaN(values.patientExpectation) ? undefined : values.patientExpectation,
       date: values.date,
       timeSlot: (values.timeSlot || '') as CampTimeSlotValue,
-      city: values.city,
-      state: values.state,
-      coordinates: [values.lng, values.lat],
+      location: values.location as LocationValue,
       notes: undefined,
       devices: undefined,
       // conscentPath omitted — no consent-file upload UI/infra exists yet.
     }),
     // Payload keys -> this form's differently-named fields, so a Zod error
-    // lands on the field that's actually rendered.
+    // lands on the field that's actually rendered. `location`'s every nested
+    // key maps to the single `location` form field (one LocationPicker +
+    // LocationAddressFields pair renders the whole object, not per-field
+    // inputs) — findFirstLeaf inside useReshapingResolver flattens a nested
+    // tuple error (location.coordinates.0) down to a displayable message.
     topLevelFieldMap: { mr: 'mrId', doctor: 'doctorId' },
+    nestedFieldMaps: {
+      location: {
+        addressLine1: 'location', addressLine2: 'location', locality: 'location',
+        city: 'location', state: 'location', country: 'location', pincode: 'location',
+        googlePlaceId: 'location', coordinates: 'location',
+      },
+    },
   })
 
 interface BookCampFormProps {
@@ -269,30 +278,19 @@ const BookCampForm = ({ needsMrPicker, project, onBooked }: BookCampFormProps) =
         {fieldError('timeSlot') && <p className="text-[11px] mt-1 text-danger">{fieldError('timeSlot')}</p>}
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Label htmlFor="bookCampCity" className="text-[10px] font-semibold tracking-widest uppercase mb-1.5 block text-qms-text-muted">City *</Label>
-          <Input id="bookCampCity" type="text" className="text-[13px]" {...register('city')} />
-          {fieldError('city') && <p className="text-[11px] mt-1 text-danger">{fieldError('city')}</p>}
-        </div>
-        <div>
-          <Label htmlFor="bookCampState" className="text-[10px] font-semibold tracking-widest uppercase mb-1.5 block text-qms-text-muted">State *</Label>
-          <Input id="bookCampState" type="text" className="text-[13px]" {...register('state')} />
-          {fieldError('state') && <p className="text-[11px] mt-1 text-danger">{fieldError('state')}</p>}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Label htmlFor="bookCampLng" className="text-[10px] font-semibold tracking-widest uppercase mb-1.5 block text-qms-text-muted">Longitude *</Label>
-          <Input id="bookCampLng" type="number" step="any" className="text-[13px]" {...register('lng', { valueAsNumber: true })} />
-          {fieldError('lng') && <p className="text-[11px] mt-1 text-danger">{fieldError('lng')}</p>}
-        </div>
-        <div>
-          <Label htmlFor="bookCampLat" className="text-[10px] font-semibold tracking-widest uppercase mb-1.5 block text-qms-text-muted">Latitude *</Label>
-          <Input id="bookCampLat" type="number" step="any" className="text-[13px]" {...register('lat', { valueAsNumber: true })} />
-          {fieldError('lat') && <p className="text-[11px] mt-1 text-danger">{fieldError('lat')}</p>}
-        </div>
+      <div>
+        <Label className="text-[10px] font-semibold tracking-widest uppercase mb-1.5 block text-qms-text-muted">Location *</Label>
+        <Controller
+          control={control}
+          name="location"
+          render={({ field }) => (
+            <div className="space-y-2">
+              <LocationPicker value={field.value} onChange={field.onChange} defaultCountry="India" countryCode="IN" />
+              <LocationAddressFields value={field.value} onChange={field.onChange} defaultCountry="India" />
+            </div>
+          )}
+        />
+        {fieldError('location') && <FieldErrorText message={fieldError('location')!} />}
       </div>
 
       {/* Hidden pending an integrate-or-remove decision — devices now requires InventoryMaster

@@ -39,7 +39,7 @@ const CampSelectionRow = memo(({ camp, checked, onToggle, campCost, disabled }: 
           {camp.code}
         </span>
         <span className="block text-[11px] truncate" style={{ color: 'var(--qms-text-muted)' }}>
-          {formatDate(camp.date)} · {camp.type} · {camp.city}, {camp.state}
+          {formatDate(camp.date)} · {camp.type} · {camp.location ? `${camp.location.city}, ${camp.location.state}` : 'Location unavailable'}
         </span>
       </span>
       <span className="text-[13px] font-bold shrink-0" style={{ color: 'var(--qms-text)' }}>

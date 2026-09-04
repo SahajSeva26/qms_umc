@@ -30,6 +30,9 @@ import type { DoctorEntity } from '@/types/doctor.types'
 import { CAMP_TIME_SLOT_LABEL } from '@/types/campTimeSlot.constants'
 import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
 import type { ProjectEntity } from '@/types/project.types'
+import type { LocationValue } from '@/types/location.types'
+import LocationPicker from '@/components/widgets/location-picker/LocationPicker'
+import LocationAddressFields from '@/components/widgets/location-picker/LocationAddressFields'
 
 const TYPE_OPTIONS: { value: CampType; label: string }[] = CAMP_TYPE_VALUES.map((value) => ({ value, label: CAMP_TYPE_LABEL[value] }))
 
@@ -132,7 +135,7 @@ const CampForm = ({ camp, isCreateMode, canWrite }: CampFormProps) => {
   const { id } = useParams<{ id: string }>()
 
   const { draft, setField } = useCampDraft(camp)
-  const { tenant, division, project, doctor, type, billingType, patientExpectation, fo, mr, date, timeSlot, city, state, latitude, longitude, devices, notes } = draft
+  const { tenant, division, project, doctor, type, billingType, patientExpectation, fo, mr, date, timeSlot, location, devices, notes } = draft
 
   // mr/fo/project/devices' human labels aren't part of the string-only
   // CampDraft reducer — tracked locally. Lazy initializers, not an effect:
@@ -156,10 +159,7 @@ const CampForm = ({ camp, isCreateMode, canWrite }: CampFormProps) => {
   const setMr = (v: string) => setField('mr', v)
   const setDate = (v: string) => setField('date', v)
   const setTimeSlot = (v: CampTimeSlotValue | '') => setField('timeSlot', v)
-  const setCity = (v: string) => setField('city', v)
-  const setState = (v: string) => setField('state', v)
-  const setLatitude = (v: string) => setField('latitude', v)
-  const setLongitude = (v: string) => setField('longitude', v)
+  const setLocation = (v: LocationValue) => setField('location', v)
   const setNotes = (v: string) => setField('notes', v)
   const deviceIds = devices ? devices.split(',').map((d) => d.trim()).filter(Boolean) : []
   const setDeviceIds = (ids: string[], labels: Record<string, string>) => {
@@ -217,8 +217,6 @@ const CampForm = ({ camp, isCreateMode, canWrite }: CampFormProps) => {
   const [formError, setFormErrorState] = useState<string | null>(null)
 
   const handleSave = () => {
-    const lat = Number(latitude)
-    const lng = Number(longitude)
     const patientExpectationNum = patientExpectation ? Number(patientExpectation) : undefined
 
     if (isCreateMode) {
@@ -229,10 +227,11 @@ const CampForm = ({ camp, isCreateMode, canWrite }: CampFormProps) => {
       if (!mr) { setFormErrorState('MR is required'); return }
       if (!date) { setFormErrorState('Date is required'); return }
       if (!timeSlot) { setFormErrorState('Time slot is required'); return }
-      if (!city.trim()) { setFormErrorState('City is required'); return }
-      if (!state.trim()) { setFormErrorState('State is required'); return }
-      if (!Number.isFinite(lat) || lat < -90 || lat > 90) { setFormErrorState('Latitude must be a number between -90 and 90'); return }
-      if (!Number.isFinite(lng) || lng < -180 || lng > 180) { setFormErrorState('Longitude must be a number between -180 and 180'); return }
+      if (!location) { setFormErrorState('Location is required'); return }
+      if (!location.addressLine1.trim() || !location.city.trim() || !location.state.trim() || !location.pincode.trim()) {
+        setFormErrorState('Complete the address (street, city, state, pincode)'); return
+      }
+      if (!location.coordinates) { setFormErrorState('Pick a location on the map'); return }
 
       setFormErrorState(null)
       createCamp.mutate(
@@ -248,9 +247,7 @@ const CampForm = ({ camp, isCreateMode, canWrite }: CampFormProps) => {
           mr,
           date,
           timeSlot: timeSlot as CampTimeSlotValue,
-          city,
-          state,
-          coordinates: [lng, lat],
+          location: location as LocationValue,
           devices: deviceIds,
           notes: notes || undefined,
         },
@@ -268,8 +265,11 @@ const CampForm = ({ camp, isCreateMode, canWrite }: CampFormProps) => {
     // The backend treats an absent mr as "leave unchanged," not "clear" — block
     // an empty picker here instead of silently keeping the old MR.
     if (!mr) { setFormErrorState('MR is required'); return }
-    if (latitude && (!Number.isFinite(lat) || lat < -90 || lat > 90)) { setFormErrorState('Latitude must be a number between -90 and 90'); return }
-    if (longitude && (!Number.isFinite(lng) || lng < -180 || lng > 180)) { setFormErrorState('Longitude must be a number between -180 and 180'); return }
+    // Only validated when the user has actually set a location — a legacy
+    // camp's location may load as null and must be allowed to stay that way.
+    if (location && (!location.coordinates || !location.addressLine1.trim() || !location.city.trim() || !location.state.trim() || !location.pincode.trim())) {
+      setFormErrorState('Complete the address (street, city, state, pincode) or leave it unset'); return
+    }
 
     setFormErrorState(null)
     updateCamp.mutate({
@@ -281,9 +281,9 @@ const CampForm = ({ camp, isCreateMode, canWrite }: CampFormProps) => {
       mr: mr || undefined,
       date: date || undefined,
       timeSlot: timeSlot || undefined,
-      city: city || undefined,
-      state: state || undefined,
-      coordinates: latitude && longitude ? [lng, lat] : undefined,
+      // Omitted (not sent as null) when unset, so the backend's replace-wholesale
+      // update semantics leave an untouched legacy-null location alone.
+      location: location ?? undefined,
       devices: deviceIds,
       // Send raw string (not `notes || undefined`) so clearing the textarea to '' actually clears it.
       notes,
@@ -431,26 +431,10 @@ const CampForm = ({ camp, isCreateMode, canWrite }: CampFormProps) => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>City</Label>
-            <Input value={city} onChange={(e) => setCity(e.target.value)} disabled={isLocked} />
-          </div>
-          <div>
-            <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>State</Label>
-            <Input value={state} onChange={(e) => setState(e.target.value)} disabled={isLocked} />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Latitude</Label>
-            <Input type="text" inputMode="decimal" value={latitude} onChange={(e) => setLatitude(e.target.value)} placeholder="e.g. 29.2183" disabled={isLocked} />
-          </div>
-          <div>
-            <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Longitude</Label>
-            <Input type="text" inputMode="decimal" value={longitude} onChange={(e) => setLongitude(e.target.value)} placeholder="e.g. 79.5130" disabled={isLocked} />
-          </div>
+        <div className="space-y-2">
+          <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Location</Label>
+          <LocationPicker value={location} onChange={setLocation} disabled={isLocked} defaultCountry="India" countryCode="IN" />
+          <LocationAddressFields value={location} onChange={setLocation} disabled={isLocked} defaultCountry="India" />
         </div>
         <p className="text-[11px] -mt-2" style={{ color: 'var(--qms-text-muted)' }}>
           Used to auto-allocate the nearest available field officer if none is picked below.

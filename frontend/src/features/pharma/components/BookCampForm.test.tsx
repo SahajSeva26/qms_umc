@@ -10,6 +10,22 @@ import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
 
 vi.mock('@/hooks/useSession')
 
+// LocationPicker needs real Google Maps credentials to render anything beyond
+// its "not configured" fallback — unavailable in this test environment. Mock
+// it down to a single button that supplies coordinates via the same
+// `onChange(LocationValue)` contract a real pin-drop would use, so tests can
+// still exercise the rest of the form (LocationAddressFields stays real/unmocked).
+vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
+  default: ({ value, onChange }: { value: unknown; onChange: (v: unknown) => void }) => (
+    <button
+      type="button"
+      onClick={() => onChange({ ...(value as object ?? {}), coordinates: [73.8567, 18.5204] })}
+    >
+      Set test coordinates
+    </button>
+  ),
+}))
+
 vi.mock('@/features/access-management/accessManagement.service', () => ({
   accessManagementService: {
     searchDownlineMrs: vi.fn(async () => ({ success: true, message: '', data: { items: [], count: 0 } })),
@@ -56,8 +72,12 @@ function bookCampResponseFixture(overrides: Partial<CampMutationResponseEntity> 
       id: 'camp-1', code: 'cmp-000001', tenant: 't-1', division: 'div-1', project: null,
       doctor: 'doc-1', type: 'screening', billingType: 'billable', patientExpectation: 0,
       fo: null, mr: null, date: '2026-09-15',
-      timeSlot: '9am-1pm', city: 'Pune', state: 'Maharashtra',
-      coordinates: [73.8567, 18.5204], devices: [], status: 'requested', stageHistory: [],
+      timeSlot: '9am-1pm',
+      location: {
+        addressLine1: '221 Baker Street', city: 'Pune', state: 'Maharashtra',
+        pincode: '411001', coordinates: [73.8567, 18.5204],
+      },
+      devices: [], status: 'requested', stageHistory: [],
       createdAt: '', updatedAt: '', ...overrides,
     },
   } as ApiResponse<CampMutationResponseEntity>
@@ -83,10 +103,13 @@ async function fillCommonFields(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/date/i), '2026-09-15')
   await user.click(screen.getByText(/select time slot/i))
   await user.click(await screen.findByText(/9 AM – 1 PM/i))
-  await user.type(screen.getByLabelText(/city/i), 'Pune')
-  await user.type(screen.getByLabelText(/state/i), 'Maharashtra')
-  await user.type(screen.getByLabelText(/longitude/i), '73.8567')
-  await user.type(screen.getByLabelText(/latitude/i), '18.5204')
+  await user.type(screen.getByLabelText(/^address line 1$/i), '221 Baker Street')
+  await user.type(screen.getByLabelText(/^city$/i), 'Pune')
+  await user.type(screen.getByLabelText(/^state$/i), 'Maharashtra')
+  await user.type(screen.getByLabelText(/^pincode$/i), '411001')
+  // LocationPicker is mocked to a single button (see the module mock above) —
+  // the real map/search can't run without Google Maps credentials in tests.
+  await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
 }
 
 async function pickDoctor(user: ReturnType<typeof userEvent.setup>) {
@@ -134,6 +157,47 @@ describe('BookCampForm', () => {
     expect(screen.getByText(/10 AM – 2 PM/i)).toBeInTheDocument()
     expect(screen.queryByText(/11 AM – 3 PM/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/6 PM – 10 PM/i)).not.toBeInTheDocument()
+  })
+
+  it('leaving both State and Pincode blank surfaces BOTH error messages, not just the last one', async () => {
+    await mockSession()
+    const { campsRealService } = await import('@/features/camps/campsReal.service')
+    const BookCampForm = (await import('@/features/pharma/components/BookCampForm')).default
+
+    const queryClient = makeQueryClient()
+    const user = userEvent.setup()
+    const onBooked = vi.fn()
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <BookCampForm needsMrPicker={false} project={TEST_PROJECT} onBooked={onBooked} />
+      </QueryClientProvider>,
+    )
+
+    await pickDoctor(user)
+    await user.type(screen.getByLabelText(/date/i), '2026-09-15')
+    await user.click(screen.getByText(/select time slot/i))
+    await user.click(await screen.findByText(/9 AM – 1 PM/i))
+    // Address and City filled; State and Pincode deliberately left blank.
+    await user.type(screen.getByLabelText(/^address line 1$/i), '221 Baker Street')
+    await user.type(screen.getByLabelText(/^city$/i), 'Pune')
+    await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
+
+    await user.click(screen.getByRole('button', { name: /book camp/i }))
+
+    // Exact match, in schema-declaration order (addressLine1, city, state,
+    // pincode) — not two separate .toMatch() checks, which can't tell
+    // correctly-ordered accumulation apart from a scrambled-order regression.
+    // FieldErrorText renders each accumulated sentence as its own block-level
+    // <span> (no joining whitespace in the DOM text — each sentence reads on
+    // its own visual line instead), so match each sentence individually,
+    // in order, rather than asserting one joined string.
+    const stateSpan = await screen.findByText('State is required.')
+    const pincodeSpan = await screen.findByText('Pincode is required.')
+    expect(stateSpan.tagName).toBe('SPAN')
+    expect(pincodeSpan.tagName).toBe('SPAN')
+    expect(stateSpan.compareDocumentPosition(pincodeSpan) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(campsRealService.bookCamp).not.toHaveBeenCalled()
   })
 
   it('blocks booking and shows a clear message when the project has zero configured slots', async () => {
@@ -204,6 +268,14 @@ describe('BookCampForm', () => {
     const payload = vi.mocked(campsRealService.bookCamp).mock.calls[0][0]
     expect(payload.mr).toBe('self-role-42')
     expect(payload.doctor).toBe('doc-1')
+    // The migrated nested contract — no top-level city/state/coordinates.
+    expect(payload.location).toEqual(expect.objectContaining({
+      addressLine1: '221 Baker Street', city: 'Pune', state: 'Maharashtra',
+      pincode: '411001', coordinates: [73.8567, 18.5204],
+    }))
+    expect(payload).not.toHaveProperty('city')
+    expect(payload).not.toHaveProperty('state')
+    expect(payload).not.toHaveProperty('coordinates')
     // project is locked context, spliced in from the prop — never something
     // the user filled in — and no such field/input exists in the form at all.
     expect(payload.project).toBe(TEST_PROJECT.id)

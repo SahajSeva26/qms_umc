@@ -9,6 +9,20 @@ import type { CampEntity } from '@/types/campReal.types'
 
 vi.mock('@/hooks/useSession')
 
+// LocationPicker needs real Google Maps credentials, unavailable in tests —
+// mock it to a button that supplies coordinates via the same onChange(LocationValue)
+// contract a real pin-drop would use (mirrors the same mock in BookCampForm.test.tsx).
+vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
+  default: ({ value, onChange }: { value: unknown; onChange: (v: unknown) => void }) => (
+    <button
+      type="button"
+      onClick={() => onChange({ ...(value as object ?? {}), coordinates: [73.8567, 18.5204] })}
+    >
+      Set test coordinates
+    </button>
+  ),
+}))
+
 vi.mock('@/features/pharma/pharmaProjects.service', () => ({
   pharmaProjectsService: {
     getProject: vi.fn(),
@@ -66,8 +80,12 @@ function campFixture(overrides: Partial<CampEntity> = {}): CampEntity {
     id: 'camp-1', code: 'cmp-000001', tenant: 't-1', division: 'div-1', project: 'proj-1',
     doctor: 'doc-1', type: 'screening', billingType: 'billable', patientExpectation: 0,
     fo: null, mr: null, date: '2026-09-15',
-    timeSlot: '9am-1pm', city: 'Pune', state: 'Maharashtra',
-    coordinates: [73.8567, 18.5204], devices: [], status: 'requested', stageHistory: [],
+    timeSlot: '9am-1pm',
+    location: {
+      addressLine1: '221 Baker Street', city: 'Pune', state: 'Maharashtra',
+      pincode: '411001', coordinates: [73.8567, 18.5204],
+    },
+    devices: [], status: 'requested', stageHistory: [],
     createdAt: '', updatedAt: '', ...overrides,
   } as CampEntity
 }
@@ -199,10 +217,11 @@ describe('PharmaProjectCampsPage', () => {
     await user.type(screen.getByLabelText(/date/i), '2026-09-15')
     await user.click(screen.getByText(/select time slot/i))
     await user.click(await screen.findByText(/9 AM – 1 PM/i))
-    await user.type(screen.getByLabelText(/city/i), 'Pune')
-    await user.type(screen.getByLabelText(/state/i), 'Maharashtra')
-    await user.type(screen.getByLabelText(/longitude/i), '73.8567')
-    await user.type(screen.getByLabelText(/latitude/i), '18.5204')
+    await user.type(screen.getByLabelText(/^address line 1$/i), '221 Baker Street')
+    await user.type(screen.getByLabelText(/^city$/i), 'Pune')
+    await user.type(screen.getByLabelText(/^state$/i), 'Maharashtra')
+    await user.type(screen.getByLabelText(/^pincode$/i), '411001')
+    await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
 
     await user.click(screen.getByRole('button', { name: /^book camp$/i }))
 

@@ -1,6 +1,8 @@
 // Shared types for the PBAC domain — reflects the real backend permission
 // model (GET /auth/me), decoupled from auth.types.ts's frontend-only UserRole system.
 
+import type { LocationValue } from '@/types/location.types'
+
 // ---------------------------------------------------------------------------
 // Permission catalog
 // ---------------------------------------------------------------------------
@@ -20,11 +22,14 @@ export interface IPermission {
 export type TenantType = 'platform' | 'customer'
 export type TenantStatus = 'active' | 'inactive'
 
-// Fields below `name` are optional: only present when the caller holds `system:manage`.
+// Fields below `name` (except `address`) are optional: only present when the
+// caller holds `system:manage`. `address` is NOT gated — tenant.mapper.ts
+// returns it unconditionally as `tenant.address ?? null` for every caller.
 export interface Tenant {
   id: string
   code: string
   name: string
+  address: LocationValue | null
   status?: TenantStatus
   owner?: string
   createdAt?: string
@@ -64,6 +69,7 @@ export interface CreateTenantPayload {
   // Role id, must be type 'sales-rep'. Optional on the backend; required
   // here per direct instruction — TODO: revisit once sales-rep vs sales-head settles.
   salesPerson: string
+  address?: LocationValue
 }
 
 export interface UpdateTenantPayload {
@@ -75,6 +81,8 @@ export interface UpdateTenantPayload {
   type?: TenantType
   // Role id, or null to unassign — same 'sales-rep' RoleType constraint as create.
   salesPerson?: string | null
+  // Optional, replace-wholesale — omitting it preserves whatever address the tenant already has.
+  address?: LocationValue
 }
 
 // ---------------------------------------------------------------------------

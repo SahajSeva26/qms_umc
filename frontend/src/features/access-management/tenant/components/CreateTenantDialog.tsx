@@ -15,9 +15,13 @@ import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRo
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import { createTenantSchema } from '@/features/access-management/tenant/schemas/tenant.schemas'
 import type { CreateTenantPayload } from '@/types/accessManagement.types'
+import type { LocationValue } from '@/types/location.types'
 import { useReshapingResolver } from '@/hooks/useReshapingResolver'
 import { TENANT_ROUTES } from '@/features/access-management/tenant/tenant.routes'
 import { PLATFORM_TENANT_CODE, PLATFORM_TENANT_FETCH_LIMIT } from '@/features/access-management/accessManagement.constants'
+import LocationPicker from '@/components/widgets/location-picker/LocationPicker'
+import LocationAddressFields from '@/components/widgets/location-picker/LocationAddressFields'
+import FieldErrorText from '@/components/ui/FieldErrorText'
 
 interface TenantFormValues {
   code: string
@@ -30,6 +34,7 @@ interface TenantFormValues {
   ownerPassword: string
   ownerPhone: string
   ownerGender: '' | 'male' | 'female' | 'other'
+  address: LocationValue | null
 }
 
 const EMPTY_FORM_VALUES: TenantFormValues = {
@@ -43,6 +48,7 @@ const EMPTY_FORM_VALUES: TenantFormValues = {
   ownerPassword: '',
   ownerPhone: '',
   ownerGender: '',
+  address: null,
 }
 
 const OWNER_FIELD_TO_FORM_FIELD: Record<string, keyof TenantFormValues> = {
@@ -52,6 +58,15 @@ const OWNER_FIELD_TO_FORM_FIELD: Record<string, keyof TenantFormValues> = {
   password: 'ownerPassword',
   phone: 'ownerPhone',
   gender: 'ownerGender',
+}
+
+// address is optional end-to-end (backend model, Zod schema, and this form)
+// — a company can be created with no address at all, unlike Camp where a
+// location is operationally required for FO auto-allocation.
+const ADDRESS_FIELD_TO_FORM_FIELD: Record<string, keyof TenantFormValues> = {
+  addressLine1: 'address', addressLine2: 'address', locality: 'address',
+  city: 'address', state: 'address', country: 'address', pincode: 'address',
+  googlePlaceId: 'address', coordinates: 'address',
 }
 
 const useTenantFormResolver = () =>
@@ -70,8 +85,9 @@ const useTenantFormResolver = () =>
         phone: values.ownerPhone || undefined,
         gender: values.ownerGender || undefined,
       },
+      address: values.address ?? undefined,
     }),
-    nestedFieldMaps: { owner: OWNER_FIELD_TO_FORM_FIELD },
+    nestedFieldMaps: { owner: OWNER_FIELD_TO_FORM_FIELD, address: ADDRESS_FIELD_TO_FORM_FIELD },
   })
 
 const CreateTenantDialog = () => {
@@ -129,7 +145,15 @@ const CreateTenantDialog = () => {
 
   const handleNext = async () => {
     setStep1Attempted(true)
-    const valid = await trigger(['code', 'name', 'salesPerson'])
+    // address is included even though it's optional — its own required
+    // sub-fields (addressLine1/city/state/pincode) are only enforced once the
+    // object is non-null, but if the user typed into even one address input,
+    // LocationAddressFields' setField always produces a non-null object, so
+    // an incomplete address must be caught HERE, on step 0, where its error
+    // UI actually renders — step 1 has no address UI at all, so surfacing
+    // this error only on final submit would leave the user with a silently
+    // stuck "Create company" button and no visible explanation.
+    const valid = await trigger(['code', 'name', 'salesPerson', 'address'])
     if (valid) setStep(1)
   }
 
@@ -226,6 +250,22 @@ const CreateTenantDialog = () => {
                     {salesRepPickerOpened && !salesRepsErroredOut && !salesRepsBusy && !platformTenant && (
                       <p className="text-[11px] mt-1 text-danger">No QMS internal (platform) company found — a sales rep must belong to one.</p>
                     )}
+                  </div>
+                  <div>
+                    <Label className="text-xs mb-1.5">
+                      Address (optional)
+                    </Label>
+                    <Controller
+                      control={control}
+                      name="address"
+                      render={({ field }) => (
+                        <div className="space-y-2">
+                          <LocationPicker value={field.value} onChange={field.onChange} defaultCountry="India" countryCode="IN" />
+                          <LocationAddressFields value={field.value} onChange={field.onChange} defaultCountry="India" />
+                        </div>
+                      )}
+                    />
+                    {fieldError('address') && <FieldErrorText message={fieldError('address')!} />}
                   </div>
                 </div>
               </div>

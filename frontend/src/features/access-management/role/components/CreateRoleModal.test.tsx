@@ -8,7 +8,7 @@ import type { DivisionEntity } from '@/types/crm.types'
 
 vi.mock('@/features/access-management/accessManagement.service', () => ({
   accessManagementService: {
-    searchTenants: vi.fn(async () => ({ success: true, message: '', data: { items: [{ id: 't-1', name: 'Acme', code: 'acme' }], count: 1 } })),
+    searchTenants: vi.fn(async () => ({ success: true, message: '', data: { items: [{ id: 't-1', name: 'Acme', code: 'acme', address: null }], count: 1 } })),
     searchRoleTypes: vi.fn(async () => ({ success: true, message: '', data: { items: [], count: 0 } })),
     searchRoles: vi.fn(async () => ({ success: true, message: '', data: { items: [], count: 0 } })),
     searchPermissionGroups: vi.fn(async () => ({ success: true, message: '', data: { items: [], count: 0 } })),
@@ -116,7 +116,7 @@ describe('CreateRoleModal', () => {
     const { divisionService } = await import('@/features/crm/divisions/division.service')
 
     vi.mocked(accessManagementService.searchTenants).mockResolvedValue({
-      success: true, message: '', data: { items: [{ id: 't-1', name: 'Acme', code: 'acme' }], count: 1 },
+      success: true, message: '', data: { items: [{ id: 't-1', name: 'Acme', code: 'acme', address: null }], count: 1 },
     })
     vi.mocked(accessManagementService.searchRoleTypes).mockResolvedValue({
       success: true,
@@ -177,7 +177,7 @@ describe('CreateRoleModal', () => {
     vi.mocked(accessManagementService.searchTenants).mockResolvedValue({
       success: true,
       message: '',
-      data: { items: [{ id: 't-1', name: 'Acme', code: 'acme' }, { id: 't-2', name: 'Beta Co', code: 'beta' }], count: 2 },
+      data: { items: [{ id: 't-1', name: 'Acme', code: 'acme', address: null }, { id: 't-2', name: 'Beta Co', code: 'beta', address: null }], count: 2 },
     })
     vi.mocked(accessManagementService.searchRoleTypes).mockResolvedValue({
       success: true,
@@ -234,7 +234,7 @@ describe('CreateRoleModal', () => {
     const { divisionService } = await import('@/features/crm/divisions/division.service')
 
     vi.mocked(accessManagementService.searchTenants).mockResolvedValue({
-      success: true, message: '', data: { items: [{ id: 't-1', name: 'Acme', code: 'acme' }], count: 1 },
+      success: true, message: '', data: { items: [{ id: 't-1', name: 'Acme', code: 'acme', address: null }], count: 1 },
     })
     vi.mocked(accessManagementService.searchRoleTypes).mockResolvedValue({
       success: true,
@@ -286,7 +286,7 @@ describe('CreateRoleModal', () => {
     const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
 
     vi.mocked(accessManagementService.searchTenants).mockResolvedValue({
-      success: true, message: '', data: { items: [{ id: 't-1', name: 'Acme', code: 'acme' }], count: 1 },
+      success: true, message: '', data: { items: [{ id: 't-1', name: 'Acme', code: 'acme', address: null }], count: 1 },
     })
     vi.mocked(accessManagementService.searchRoleTypes).mockResolvedValue({
       success: true,
@@ -347,7 +347,7 @@ describe('CreateRoleModal', () => {
     const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
 
     vi.mocked(accessManagementService.searchTenants).mockResolvedValue({
-      success: true, message: '', data: { items: [{ id: 't-1', name: 'Acme', code: 'acme' }], count: 1 },
+      success: true, message: '', data: { items: [{ id: 't-1', name: 'Acme', code: 'acme', address: null }], count: 1 },
     })
     vi.mocked(accessManagementService.searchRoleTypes).mockResolvedValue({
       success: true,

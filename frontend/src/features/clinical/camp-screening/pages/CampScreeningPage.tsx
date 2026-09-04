@@ -59,7 +59,7 @@ const CampScreeningPage = () => {
       {camp && !isLoading && (
         <>
           <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--qms-text)' }}>{camp.code} — Screening</h1>
-          <p className="text-[12px] mb-5" style={{ color: 'var(--qms-text-muted)' }}>{camp.city}, {camp.state} · {camp.date}</p>
+          <p className="text-[12px] mb-5" style={{ color: 'var(--qms-text-muted)' }}>{camp.location ? `${camp.location.city}, ${camp.location.state}` : 'Location unavailable'} · {camp.date}</p>
 
           {camp.status !== 'live' ? (
             <div className="text-[13px] rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">

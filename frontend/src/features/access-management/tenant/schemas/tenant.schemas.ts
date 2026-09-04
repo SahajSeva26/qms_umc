@@ -1,6 +1,24 @@
 import { z } from 'zod'
 import { PASSWORD_MIN_LENGTH } from '@/features/access-management/accessManagement.constants'
 
+// Mirrors tenant.validators.ts's AddressSchema field-for-field. country is
+// genuinely optional there (not required-with-default — that default is
+// Mongoose-level, applied at persistence, not part of the incoming payload).
+const addressSchema = z.object({
+  addressLine1: z.string().trim().min(1, 'Address is required.'),
+  addressLine2: z.string().optional(),
+  locality: z.string().optional(),
+  city: z.string().trim().min(1, 'City is required.'),
+  state: z.string().trim().min(1, 'State is required.'),
+  country: z.string().trim().min(1).optional(),
+  pincode: z.string().trim().min(1, 'Pincode is required.'),
+  googlePlaceId: z.string().optional(),
+  coordinates: z.tuple([
+    z.number('Longitude is required.').min(-180).max(180),
+    z.number('Latitude is required.').min(-90).max(90),
+  ]).optional(),
+})
+
 export const updateTenantSchema = z.object({
   name: z.string().trim().min(1, 'Name is required'),
   description: z.string().trim().optional(),
@@ -10,6 +28,7 @@ export const updateTenantSchema = z.object({
   // commented out server-side) regardless of caller permissions — a known no-op.
   type: z.enum(['platform', 'customer']).optional(),
   salesPerson: z.string().optional().nullable(),
+  address: addressSchema.optional(),
 })
 
 // Backend rejects a tenant code shaped like a Mongo ObjectId (24 hex chars).
@@ -36,4 +55,5 @@ export const createTenantSchema = z.object({
     phone: z.string().trim().optional(),
     gender: z.enum(['male', 'female', 'other']).optional(),
   }),
+  address: addressSchema.optional(),
 })

@@ -34,13 +34,39 @@ export function useReshapingResolver<TFormValues extends object, TPayload = TFor
     errors: ResolverErrors
   }>
 
+  // A Zod issue on a nested object OR a nested array/tuple both produce
+  // {key: {...}} wrappers, but a tuple index adds one extra level a single
+  // unwrap doesn't reach (e.g. `location.coordinates.0` -> {coordinates: {0:
+  // {message}}}). Walk down until an actual {message} leaf turns up, so any
+  // depth of nesting maps correctly, not just a fixed one level.
+  const findFirstLeaf = (err: unknown): FieldError | undefined => {
+    if (!err || typeof err !== 'object') return undefined
+    if ('message' in err) return err as FieldError
+    for (const value of Object.values(err)) {
+      const leaf = findFirstLeaf(value)
+      if (leaf) return leaf
+    }
+    return undefined
+  }
+
   const mapErrors = (errors: ResolverErrors) => {
     const mappedErrors: Record<string, unknown> = {}
     for (const [path, err] of Object.entries(errors)) {
       const nestedMap = nestedFieldMaps[path]
       if (nestedMap && err && typeof err === 'object' && !('message' in err)) {
         for (const [nestedField, nestedErr] of Object.entries(err)) {
-          mappedErrors[nestedMap[nestedField] ?? nestedField] = nestedErr
+          const target = nestedMap[nestedField] ?? nestedField
+          const leaf = findFirstLeaf(nestedErr) ?? nestedErr
+          // Multiple sibling nested fields (e.g. location.state AND
+          // location.pincode) can map to the SAME target form field when a
+          // single widget represents the whole nested object — accumulate
+          // their messages instead of the last one silently overwriting an
+          // earlier sibling's, which would drop real validation feedback.
+          const existing = mappedErrors[target] as FieldError | undefined
+          mappedErrors[target] =
+            existing?.message && leaf && typeof leaf === 'object' && 'message' in leaf && leaf.message
+              ? { ...leaf, message: `${existing.message} ${leaf.message}` }
+              : leaf
         }
         continue
       }

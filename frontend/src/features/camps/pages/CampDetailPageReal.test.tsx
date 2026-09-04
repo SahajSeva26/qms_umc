@@ -62,8 +62,12 @@ function campFixture(overrides: Partial<CampEntity> = {}): CampEntity {
     id: 'camp-1', code: 'cmp-000001', tenant: 't-1', division: 'div-1', project: null,
     doctor: 'doc-1', type: 'screening', billingType: 'billable', patientExpectation: 0,
     fo: null, mr: mrFixture, date: '2026-09-15',
-    timeSlot: '9am-1pm', city: 'Pune', state: 'Maharashtra',
-    coordinates: [73.8567, 18.5204], devices: [], status: 'requested', stageHistory: [],
+    timeSlot: '9am-1pm',
+    location: {
+      addressLine1: '221 Baker Street', city: 'Pune', state: 'Maharashtra',
+      pincode: '411001', coordinates: [73.8567, 18.5204],
+    },
+    devices: [], status: 'requested', stageHistory: [],
     createdAt: '', updatedAt: '', ...overrides,
   } as CampEntity
 }

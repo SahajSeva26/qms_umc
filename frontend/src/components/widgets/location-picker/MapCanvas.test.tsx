@@ -167,3 +167,55 @@ describe('MapCanvas — disabled blocks every interaction path, not just gesture
     expect(capturedMarkerProps.draggable).toBe(true)
   })
 })
+
+describe('MapCanvas — onResolutionStateChange reports geocode status changes', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    ;(globalThis as unknown as { google: unknown }).google = {
+      maps: {
+        Geocoder: vi.fn(function (this: { geocode: typeof geocode }) {
+          this.geocode = geocode
+        }),
+      },
+    }
+  })
+
+  it('reports idle on mount, loading while a geocode is in flight, then idle again on success', async () => {
+    // This is the mechanism a consumer (e.g. GeoProfileDetailPage) relies on
+    // to block Save during the window between "pin visibly moved" and
+    // "onChange fired with the resolved value" — a real, previously-unguarded
+    // silent-no-op-save bug.
+    let resolveGeocode!: (v: unknown) => void
+    geocode.mockReturnValue(new Promise((resolve) => { resolveGeocode = resolve }))
+    const onResolutionStateChange = vi.fn()
+    render(
+      <MapCanvas value={null} onChange={vi.fn()} onResolutionStateChange={onResolutionStateChange} height={300} defaultCenter={{ lat: 0, lng: 0 }} />,
+    )
+    expect(onResolutionStateChange).toHaveBeenCalledWith('idle')
+
+    await act(async () => {
+      capturedMapOnClick?.({ detail: { latLng: { lat: 10, lng: 20 } } })
+    })
+    expect(onResolutionStateChange).toHaveBeenLastCalledWith('loading')
+
+    await act(async () => {
+      resolveGeocode(geocoderResult('dropped-pin-place'))
+      await new Promise((r) => setTimeout(r, 0))
+    })
+    expect(onResolutionStateChange).toHaveBeenLastCalledWith('idle')
+  })
+
+  it('reports error when reverse-geocoding fails, staying non-idle until retried', async () => {
+    geocode.mockRejectedValue(new Error('ZERO_RESULTS'))
+    const onResolutionStateChange = vi.fn()
+    render(
+      <MapCanvas value={null} onChange={vi.fn()} onResolutionStateChange={onResolutionStateChange} height={300} defaultCenter={{ lat: 0, lng: 0 }} />,
+    )
+
+    await act(async () => {
+      capturedMapOnClick?.({ detail: { latLng: { lat: 10, lng: 20 } } })
+      await new Promise((r) => setTimeout(r, 0))
+    })
+    expect(onResolutionStateChange).toHaveBeenLastCalledWith('error')
+  })
+})

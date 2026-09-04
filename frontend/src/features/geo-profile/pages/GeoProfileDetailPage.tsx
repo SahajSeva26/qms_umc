@@ -2,18 +2,21 @@ import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { FiArrowLeft, FiLock } from 'react-icons/fi'
 import { GEO_PROFILE_ROUTES, GEO_PROFILE_TYPE_OPTIONS, GEO_PROFILE_STATUS_LABEL, GEO_PROFILE_STATUS_OPTIONS } from '@/features/geo-profile/geoProfile.constants'
-import { isValidLatitude, isValidLongitude } from '@/features/geo-profile/utils/geoProfile.utils'
+import { coordinatesToLocationValue, locationValueToCoordinates } from '@/features/geo-profile/utils/geoProfileLocationAdapter'
 import { useGeoProfile } from '@/features/geo-profile/hooks/useGeoProfile'
 import { useCreateGeoProfile } from '@/features/geo-profile/hooks/useCreateGeoProfile'
 import { useUpdateGeoProfile } from '@/features/geo-profile/hooks/useUpdateGeoProfile'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import { usePermission } from '@/hooks/usePermission'
 import GeoProfileStatusPill from '@/features/geo-profile/components/GeoProfileStatusPill'
+import LocationPicker from '@/components/widgets/location-picker/LocationPicker'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { GeoProfileEntity, GeoProfileStatus, GeoProfileType } from '@/types/geoProfile.types'
+import type { LocationValue } from '@/types/location.types'
+import type { LocationResolutionState } from '@/components/widgets/location-picker/location.types'
 import type { RoleEntity } from '@/types/accessManagement.types'
 
 // `role` is required on create and immutable afterward (1:1 link, unique).
@@ -139,27 +142,31 @@ const CreateGeoProfileForm = ({ roles, roleName }: RoleNameLookupProps) => {
 
   const [role, setRole] = useState('')
   const [type, setType] = useState<GeoProfileType | ''>('')
-  const [latitude, setLatitude] = useState('')
-  const [longitude, setLongitude] = useState('')
+  const [location, setLocation] = useState<LocationValue | null>(null)
+  // Whether a pin drop/drag's reverse-geocode is still resolving (or failed
+  // and hasn't been retried/dismissed) — a caller must not treat `location`
+  // as authoritative while this is anything but 'idle', since the pin can
+  // visibly move well before (or without ever) producing a matching
+  // onChange call. See LocationPicker.tsx's onResolutionStateChange comment.
+  const [locationResolution, setLocationResolution] = useState<LocationResolutionState>('idle')
   const [coverageRadiusKm, setCoverageRadiusKm] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
 
   const handleSave = () => {
-    const lat = Number(latitude)
-    const lng = Number(longitude)
     const radiusKm = Number(coverageRadiusKm)
 
     if (!role) { setFormError('Role is required'); return }
     if (!type) { setFormError('Type is required'); return }
-    if (latitude.trim() === '' || !isValidLatitude(lat)) { setFormError('Latitude must be a number between -90 and 90'); return }
-    if (longitude.trim() === '' || !isValidLongitude(lng)) { setFormError('Longitude must be a number between -180 and 180'); return }
+    if (locationResolution === 'loading') { setFormError('Still resolving the picked location — wait a moment and try again'); return }
+    if (locationResolution === 'error') { setFormError('Retry or choose "Use this pin" for the location before saving'); return }
+    if (!location?.coordinates) { setFormError('Pick a location on the map'); return }
 
     setFormError(null)
     createGeoProfile.mutate(
       {
         role,
         type,
-        coordinates: [lng, lat],
+        coordinates: locationValueToCoordinates(location)!,
         coverageRadius: coverageRadiusKm ? radiusKm * 1000 : undefined,
       },
       {
@@ -241,41 +248,25 @@ const CreateGeoProfileForm = ({ roles, roleName }: RoleNameLookupProps) => {
             </Select>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <Label
-                htmlFor="latitude"
-                className="text-[10px] font-semibold tracking-widest uppercase mb-2"
-                style={{ color: 'var(--qms-text-muted)' }}
-              >
-                Latitude
-              </Label>
-              <Input
-                id="latitude"
-                type="text"
-                inputMode="decimal"
-                value={latitude}
-                onChange={(e) => setLatitude(e.target.value)}
-                placeholder="e.g. 29.2183"
-              />
-            </div>
-            <div>
-              <Label
-                htmlFor="longitude"
-                className="text-[10px] font-semibold tracking-widest uppercase mb-2"
-                style={{ color: 'var(--qms-text-muted)' }}
-              >
-                Longitude
-              </Label>
-              <Input
-                id="longitude"
-                type="text"
-                inputMode="decimal"
-                value={longitude}
-                onChange={(e) => setLongitude(e.target.value)}
-                placeholder="e.g. 79.5130"
-              />
-            </div>
+          <div>
+            <Label
+              className="text-[10px] font-semibold tracking-widest uppercase mb-2"
+              style={{ color: 'var(--qms-text-muted)' }}
+            >
+              Location
+            </Label>
+            <LocationPicker
+              value={location}
+              onChange={setLocation}
+              onResolutionStateChange={setLocationResolution}
+              defaultCountry="India"
+              countryCode="IN"
+            />
+            {location?.coordinates && (
+              <p className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
+                Latitude: {location.coordinates[1]} · Longitude: {location.coordinates[0]}
+              </p>
+            )}
           </div>
 
           <div>
@@ -310,8 +301,8 @@ const CreateGeoProfileForm = ({ roles, roleName }: RoleNameLookupProps) => {
           </div>
         )}
 
-        <Button onClick={handleSave} disabled={createGeoProfile.isPending} className="mt-4">
-          {createGeoProfile.isPending ? 'Saving…' : 'Create geo profile'}
+        <Button onClick={handleSave} disabled={createGeoProfile.isPending || locationResolution === 'loading'} className="mt-4">
+          {createGeoProfile.isPending ? 'Saving…' : locationResolution === 'loading' ? 'Resolving location…' : 'Create geo profile'}
         </Button>
       </div>
     </>
@@ -327,24 +318,43 @@ const EditGeoProfileForm = ({ geoProfile, roleName }: EditGeoProfileFormProps) =
   const updateGeoProfile = useUpdateGeoProfile(geoProfile.id)
 
   const [type, setType] = useState<GeoProfileType>(geoProfile.type)
-  const [latitude, setLatitude] = useState(geoProfile.coordinates.length === 2 ? String(geoProfile.coordinates[1]) : '')
-  const [longitude, setLongitude] = useState(geoProfile.coordinates.length === 2 ? String(geoProfile.coordinates[0]) : '')
+  const [location, setLocation] = useState<LocationValue | null>(coordinatesToLocationValue(geoProfile.coordinates))
+  // Seeding `location` from the loaded profile makes the picker show the
+  // existing pin, but that alone would make every save resend those same
+  // coordinates even if the user never touched the map. The OLD
+  // latitude/longitude-string version actually had this exact bug too — it
+  // seeded both fields from geoProfile.coordinates at mount, so `latitude &&
+  // longitude` was truthy from the start and every save resent the
+  // unchanged tuple. Track whether the picker was actually interacted with,
+  // and only include coordinates in the payload when it was — a genuine
+  // behavioral fix, not a preservation of prior behavior — same shape as
+  // EditTenantModal.tsx's dirtyFields.address guard.
+  const [locationDirty, setLocationDirty] = useState(false)
+  // Same "pin can visibly move before onChange fires" concern as create mode
+  // — but here it's higher-stakes: a save that runs mid-resolution wouldn't
+  // just fail to submit coordinates, it would submit NOTHING for
+  // coordinates (locationDirty still false) while showing a plain "Saved."
+  // success, silently leaving the OLD coordinates in place.
+  const [locationResolution, setLocationResolution] = useState<LocationResolutionState>('idle')
   const [coverageRadiusKm, setCoverageRadiusKm] = useState(String(geoProfile.coverageRadius / 1000))
   const [status, setStatus] = useState<GeoProfileStatus>(geoProfile.status)
   const [formError, setFormError] = useState<string | null>(null)
 
+  const handleLocationChange = (value: LocationValue) => {
+    setLocation(value)
+    setLocationDirty(true)
+  }
+
   const handleSave = () => {
-    const lat = Number(latitude)
-    const lng = Number(longitude)
     const radiusKm = Number(coverageRadiusKm)
 
-    if (latitude && (latitude.trim() === '' || !isValidLatitude(lat))) { setFormError('Latitude must be a number between -90 and 90'); return }
-    if (longitude && (longitude.trim() === '' || !isValidLongitude(lng))) { setFormError('Longitude must be a number between -180 and 180'); return }
+    if (locationResolution === 'loading') { setFormError('Still resolving the picked location — wait a moment and try again'); return }
+    if (locationResolution === 'error') { setFormError('Retry or choose "Use this pin" for the location before saving'); return }
 
     setFormError(null)
     updateGeoProfile.mutate({
       type: type || undefined,
-      coordinates: latitude && longitude ? [lng, lat] : undefined,
+      coordinates: locationDirty ? locationValueToCoordinates(location) : undefined,
       coverageRadius: coverageRadiusKm ? radiusKm * 1000 : undefined,
       status: status || undefined,
     })
@@ -400,41 +410,25 @@ const EditGeoProfileForm = ({ geoProfile, roleName }: EditGeoProfileFormProps) =
             </Select>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <Label
-                htmlFor="latitude"
-                className="text-[10px] font-semibold tracking-widest uppercase mb-2"
-                style={{ color: 'var(--qms-text-muted)' }}
-              >
-                Latitude
-              </Label>
-              <Input
-                id="latitude"
-                type="text"
-                inputMode="decimal"
-                value={latitude}
-                onChange={(e) => setLatitude(e.target.value)}
-                placeholder="e.g. 29.2183"
-              />
-            </div>
-            <div>
-              <Label
-                htmlFor="longitude"
-                className="text-[10px] font-semibold tracking-widest uppercase mb-2"
-                style={{ color: 'var(--qms-text-muted)' }}
-              >
-                Longitude
-              </Label>
-              <Input
-                id="longitude"
-                type="text"
-                inputMode="decimal"
-                value={longitude}
-                onChange={(e) => setLongitude(e.target.value)}
-                placeholder="e.g. 79.5130"
-              />
-            </div>
+          <div>
+            <Label
+              className="text-[10px] font-semibold tracking-widest uppercase mb-2"
+              style={{ color: 'var(--qms-text-muted)' }}
+            >
+              Location
+            </Label>
+            <LocationPicker
+              value={location}
+              onChange={handleLocationChange}
+              onResolutionStateChange={setLocationResolution}
+              defaultCountry="India"
+              countryCode="IN"
+            />
+            {location?.coordinates && (
+              <p className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
+                Latitude: {location.coordinates[1]} · Longitude: {location.coordinates[0]}
+              </p>
+            )}
           </div>
 
           <div>
@@ -496,8 +490,8 @@ const EditGeoProfileForm = ({ geoProfile, roleName }: EditGeoProfileFormProps) =
           </div>
         )}
 
-        <Button onClick={handleSave} disabled={updateGeoProfile.isPending} className="mt-4">
-          {updateGeoProfile.isPending ? 'Saving…' : 'Save changes'}
+        <Button onClick={handleSave} disabled={updateGeoProfile.isPending || locationResolution === 'loading'} className="mt-4">
+          {updateGeoProfile.isPending ? 'Saving…' : locationResolution === 'loading' ? 'Resolving location…' : 'Save changes'}
         </Button>
       </div>
     </>

@@ -1,16 +1,38 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import LocationPicker from './LocationPicker'
 import ENV from '@/config/env'
+import type { LocationValue } from '@/types/location.types'
 
 // LocationPicker's own no-credentials check must short-circuit BEFORE ever
 // touching @vis.gl/react-google-maps — mock it anyway so a regression that
 // removes the guard fails loudly (an unmocked APIProvider would throw
 // immediately without a real API key) rather than silently rendering blank.
+//
+// The credentials-present-but-load-failed path (APILoadingStatus.FAILED /
+// AUTH_FAILURE) DOES need APIProvider/useApiLoadingStatus to actually run,
+// so the mock supports both: APIProvider renders children normally (no
+// throw) once `mockLoadingStatus` has been set for that test, and
+// useApiLoadingStatus reads the mutable box `vi.hoisted` gives us (a plain
+// module-scope `let` would be reset by hoisting before the mock factory runs).
+const { mockLoadingStatus, setMockLoadingStatus } = vi.hoisted(() => {
+  let status: string | null = null
+  return {
+    mockLoadingStatus: () => status,
+    setMockLoadingStatus: (next: string | null) => { status = next },
+  }
+})
+
 vi.mock('@vis.gl/react-google-maps', () => ({
-  APIProvider: () => {
-    throw new Error('APIProvider must never mount when credentials are missing')
+  APIProvider: ({ children }: { children: React.ReactNode }) => {
+    if (mockLoadingStatus() === null) {
+      throw new Error('APIProvider must never mount when credentials are missing')
+    }
+    return <>{children}</>
   },
+  useApiLoadingStatus: () => mockLoadingStatus(),
+  APILoadingStatus: { FAILED: 'FAILED', AUTH_FAILURE: 'AUTH_FAILURE', LOADED: 'LOADED', LOADING: 'LOADING', NONE: 'NONE' },
 }))
 
 describe('LocationPicker — no-credentials mode', () => {
@@ -54,5 +76,143 @@ describe('LocationPicker — disabled prop', () => {
     render(<LocationPicker value={null} onChange={vi.fn()} disabled />)
     expect(screen.getByText(/map search is not configured/i)).toBeInTheDocument()
     ;(ENV.Maps as { ApiKey: string }).ApiKey = originalApiKey
+  })
+})
+
+describe('LocationPicker — no-credentials fallback, manual coordinate entry', () => {
+  const originalApiKey = ENV.Maps.ApiKey
+  const originalMapId = ENV.Maps.MapId
+
+  beforeEach(() => {
+    ;(ENV.Maps as { ApiKey: string }).ApiKey = ''
+    ;(ENV.Maps as { MapId: string }).MapId = ''
+  })
+
+  afterEach(() => {
+    ;(ENV.Maps as { ApiKey: string }).ApiKey = originalApiKey
+    ;(ENV.Maps as { MapId: string }).MapId = originalMapId
+  })
+
+  it('produces a LocationValue with the correct [lng, lat] tuple once both fields are filled with valid numbers', async () => {
+    const onChange = vi.fn()
+    const user = userEvent.setup()
+    render(<LocationPicker value={null} onChange={onChange} />)
+
+    await user.type(screen.getByLabelText(/^latitude$/i), '29.2183')
+    await user.type(screen.getByLabelText(/^longitude$/i), '79.5130')
+
+    const lastCall = onChange.mock.calls.at(-1)?.[0] as LocationValue
+    expect(lastCall.coordinates).toEqual([79.513, 29.2183])
+  })
+
+  it('does not call onChange while only one of the two fields is filled', async () => {
+    const onChange = vi.fn()
+    const user = userEvent.setup()
+    render(<LocationPicker value={null} onChange={onChange} />)
+
+    await user.type(screen.getByLabelText(/^latitude$/i), '29.2183')
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('shows a validation error and does not call onChange for an out-of-range latitude', async () => {
+    const onChange = vi.fn()
+    const user = userEvent.setup()
+    render(<LocationPicker value={null} onChange={onChange} />)
+
+    await user.type(screen.getByLabelText(/^latitude$/i), '200')
+    await user.type(screen.getByLabelText(/^longitude$/i), '79.5130')
+
+    expect(await screen.findByText(/latitude must be a number between -90 and 90/i)).toBeInTheDocument()
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('preserves the rest of the existing LocationValue (e.g. address fields set elsewhere) when only updating coordinates', async () => {
+    const onChange = vi.fn()
+    const user = userEvent.setup()
+    const existing: LocationValue = {
+      addressLine1: '221 Baker Street', city: 'Pune', state: 'Maharashtra', pincode: '411001',
+    }
+    render(<LocationPicker value={existing} onChange={onChange} />)
+
+    await user.type(screen.getByLabelText(/^latitude$/i), '29.2183')
+    await user.type(screen.getByLabelText(/^longitude$/i), '79.5130')
+
+    const lastCall = onChange.mock.calls.at(-1)?.[0] as LocationValue
+    expect(lastCall.addressLine1).toBe('221 Baker Street')
+    expect(lastCall.city).toBe('Pune')
+    expect(lastCall.coordinates).toEqual([79.513, 29.2183])
+  })
+
+  it('pre-fills the fields from an existing value\'s coordinates', () => {
+    const existing: LocationValue = {
+      addressLine1: '', city: '', state: '', pincode: '',
+      coordinates: [79.513, 29.2183],
+    }
+    render(<LocationPicker value={existing} onChange={vi.fn()} />)
+
+    expect(screen.getByLabelText(/^latitude$/i)).toHaveValue('29.2183')
+    expect(screen.getByLabelText(/^longitude$/i)).toHaveValue('79.513')
+  })
+
+  it('re-syncs the fields when the parent replaces `value` from outside (e.g. a form reset), not just on first mount', () => {
+    // A shared controlled component must track external value changes, not
+    // only seed from `value` once at mount — otherwise a parent-driven reset
+    // (or loading a different record into the same open picker) leaves stale
+    // digits in the fields that don't match the real current `value`.
+    const onChange = vi.fn()
+    const { rerender } = render(<LocationPicker value={null} onChange={onChange} />)
+    expect(screen.getByLabelText(/^latitude$/i)).toHaveValue('')
+
+    const externallySet: LocationValue = {
+      addressLine1: '', city: '', state: '', pincode: '',
+      coordinates: [79.513, 29.2183],
+    }
+    rerender(<LocationPicker value={externallySet} onChange={onChange} />)
+    expect(screen.getByLabelText(/^latitude$/i)).toHaveValue('29.2183')
+    expect(screen.getByLabelText(/^longitude$/i)).toHaveValue('79.513')
+
+    // Reset back to null (e.g. the parent form was cleared) — fields must
+    // clear too, not keep showing the stale coordinates.
+    rerender(<LocationPicker value={null} onChange={onChange} />)
+    expect(screen.getByLabelText(/^latitude$/i)).toHaveValue('')
+    expect(screen.getByLabelText(/^longitude$/i)).toHaveValue('')
+  })
+})
+
+describe('LocationPicker — map failed to load (credentials present but rejected/unavailable)', () => {
+  const originalApiKey = ENV.Maps.ApiKey
+  const originalMapId = ENV.Maps.MapId
+
+  beforeEach(() => {
+    ;(ENV.Maps as { ApiKey: string }).ApiKey = 'test-api-key'
+    ;(ENV.Maps as { MapId: string }).MapId = 'test-map-id'
+  })
+
+  afterEach(() => {
+    ;(ENV.Maps as { ApiKey: string }).ApiKey = originalApiKey
+    ;(ENV.Maps as { MapId: string }).MapId = originalMapId
+    setMockLoadingStatus(null)
+  })
+
+  it('offers manual coordinate entry (not a dead-end message) when the SDK reports FAILED', () => {
+    setMockLoadingStatus('FAILED')
+    render(<LocationPicker value={null} onChange={vi.fn()} />)
+
+    expect(screen.getByText(/map failed to load/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/^latitude$/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/^longitude$/i)).toBeInTheDocument()
+  })
+
+  it('offers manual coordinate entry when the SDK reports AUTH_FAILURE (e.g. a rejected key)', async () => {
+    setMockLoadingStatus('AUTH_FAILURE')
+    const onChange = vi.fn()
+    const user = userEvent.setup()
+    render(<LocationPicker value={null} onChange={onChange} />)
+
+    await user.type(screen.getByLabelText(/^latitude$/i), '29.2183')
+    await user.type(screen.getByLabelText(/^longitude$/i), '79.5130')
+
+    const lastCall = onChange.mock.calls.at(-1)?.[0] as LocationValue
+    expect(lastCall.coordinates).toEqual([79.513, 29.2183])
   })
 })

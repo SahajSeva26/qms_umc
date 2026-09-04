@@ -5,6 +5,7 @@ import ENV from '@/config/env'
 import { useReverseGeocode } from './useReverseGeocode'
 import { toLatLngLiteral } from './location.utils'
 import type { LocationValue } from '@/types/location.types'
+import type { LocationResolutionState } from './location.types'
 
 type MapTypeView = 'roadmap' | 'satellite'
 
@@ -19,6 +20,7 @@ interface MapCanvasProps {
   height: number
   defaultCenter: { lat: number; lng: number }
   defaultCountry?: string
+  onResolutionStateChange?: (status: LocationResolutionState) => void
 }
 
 // Imperatively pans/zooms the map to a genuinely new coordinate (a search
@@ -42,11 +44,19 @@ function CameraFocus({ coordinates }: { coordinates: [number, number] | undefine
   return null
 }
 
-const MapCanvas = ({ value, onChange, disabled, height, defaultCenter, defaultCountry }: MapCanvasProps) => {
+const MapCanvas = ({ value, onChange, disabled, height, defaultCenter, defaultCountry, onResolutionStateChange }: MapCanvasProps) => {
   const [mapType, setMapType] = useState<MapTypeView>('roadmap')
 
   const { status: geocodeStatus, provisionalPosition, runGeocode, retry, useProvisionalPinWithoutAddress } =
     useReverseGeocode({ defaultCountry, onResolved: onChange })
+
+  // Reports 'loading'/'error' the instant they happen (not just on the next
+  // onChange) — a caller gating Save on this needs to know the pin has
+  // moved/failed well before (if ever) a matching onChange arrives.
+  useEffect(() => {
+    onResolutionStateChange?.(geocodeStatus)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- onResolutionStateChange intentionally excluded: an inline arrow from the caller would otherwise re-fire this on every parent render, not just on a real status change
+  }, [geocodeStatus])
 
   // Left to the React Compiler's own memoization rather than a manual
   // useMemo — a manual dep array here ([value?.coordinates]) is coarser than

@@ -3,8 +3,12 @@ import { FiBriefcase, FiArrowLeft, FiArrowRight, FiSave, FiX } from 'react-icons
 import type { CreateLeadPayload } from '@/types/crm.types'
 import { DEFAULT_WIZARD_FORM, type WizardFormState } from '@/features/crm/wizard.types'
 import { useLeads } from '@/features/crm/hooks/useLeads'
+import { useLeadDraftStore } from '@/features/crm/leadDraft.store'
+import { useDebouncedDraftSync } from '@/hooks/useDebouncedDraftSync'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import DraftLoadingPlaceholder from '@/components/ui/DraftLoadingPlaceholder'
+import DraftResumeDecision from '@/components/ui/DraftResumeDecision'
 import {
   wizardStep1Schema,
   wizardStep2Schema,
@@ -35,6 +39,8 @@ function validateStep(step: number, form: WizardFormState): string | null {
   return result.error.issues[0]?.message ?? 'Please complete the required fields.'
 }
 
+type DraftMode = 'disabled' | 'loading' | 'pending-decision' | 'active'
+
 interface NewLeadWizardProps {
   onClose: () => void
   onCreated: () => void
@@ -52,8 +58,55 @@ const NewLeadWizard = ({ onClose, onCreated, prefill }: NewLeadWizardProps) => {
   const [form, setForm] = useState<WizardFormState>({ ...DEFAULT_WIZARD_FORM, ...prefill })
   const [error, setError] = useState<string | null>(null)
 
+  // A prefilled open (from AppointmentDrawer) is a deliberate fresh start
+  // from specific context, not an "accidentally closed" recovery scenario —
+  // it must never read, write, or clear the normal flow's draft, so the
+  // hook itself never looks up a store for this instance at all.
+  const { status: draftStatus, store: draftStore } = useLeadDraftStore({ enabled: !prefill })
+  const [draftMode, setDraftMode] = useState<DraftMode>('loading')
+  // Tracks "a real edit was made" for this plain-state wizard, since there's
+  // no RHF isDirty to read — setField flips this on any call. Real state
+  // (not a ref) since it's read during render to compute `active` below.
+  const [hasEdited, setHasEdited] = useState(false)
+
+  // Adjusting state during render (React's documented pattern for deriving
+  // state once a value becomes available) — guarded by draftMode itself so
+  // it only ever fires once per instance and can't regress an already-
+  // active session (post-Resume/Discard) back to a decision view.
+  if (draftMode === 'loading') {
+    if (draftStatus === 'disabled') {
+      setDraftMode('disabled')
+    } else if (draftStatus === 'ready') {
+      setDraftMode(draftStore.getState().draft ? 'pending-decision' : 'active')
+    }
+  }
+
+  const stopSync = useDebouncedDraftSync(
+    form,
+    draftMode === 'active' && hasEdited,
+    (v) => draftStore?.getState().setDraft(v),
+  )
+
   const setField = <K extends keyof WizardFormState>(key: K, value: WizardFormState[K]) => {
+    if (!hasEdited) setHasEdited(true)
     setForm((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const handleResumeDraft = () => {
+    const draft = draftStore?.getState().draft
+    // Merged against defaults, not a raw replacement — a same-version draft
+    // saved by an older running tab (before a field was added to
+    // WizardFormState) could otherwise resume with a field genuinely
+    // undefined, crashing a step that assumes it's always at least `[]`/`''`.
+    if (draft) setForm({ ...DEFAULT_WIZARD_FORM, ...prefill, ...draft })
+    setDraftMode('active')
+  }
+
+  const handleDiscardDraft = () => {
+    draftStore?.getState().clearDraft()
+    setForm({ ...DEFAULT_WIZARD_FORM, ...prefill })
+    setHasEdited(false)
+    setDraftMode('active')
   }
 
   const handleNext = () => {
@@ -95,6 +148,11 @@ const NewLeadWizard = ({ onClose, onCreated, prefill }: NewLeadWizardProps) => {
     // filled-in form on failure so the user can retry.
     try {
       await createLead(payload)
+      // Stop the sync BEFORE clearing — otherwise its own flush-on-unmount
+      // (fired when onCreated()/onClose() unmounts this wizard moments
+      // later) could re-write the draft right after it's cleared.
+      stopSync()
+      draftStore?.getState().clearDraft()
       onCreated()
     } catch {
       // no-op: useLeads' createLeadMutation.onError already toasted
@@ -128,72 +186,81 @@ const NewLeadWizard = ({ onClose, onCreated, prefill }: NewLeadWizardProps) => {
           </button>
         </div>
 
-        <div className="px-5 pt-4">
-          <div className="flex items-center gap-1.5 flex-wrap mb-4">
-            {STEPS.map((s, i) => (
-              <Fragment key={s.label}>
-                {i > 0 && <span className="w-2.5 h-px shrink-0" style={{ background: 'var(--qms-border)' }} />}
-                <div
-                  className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-full border text-[11px] font-bold whitespace-nowrap"
-                  style={
-                    i === step
-                      ? { borderColor: 'var(--qms-brand)', color: 'var(--qms-brand)', background: 'color-mix(in oklab, var(--qms-brand) 8%, transparent)' }
-                      : i < step
-                      ? { borderColor: 'color-mix(in oklab, var(--success) 40%, transparent)', color: 'var(--success)', background: 'transparent' }
-                      : { borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)', background: 'var(--qms-surface-strong)' }
-                  }
-                >
-                  <span
-                    className="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full text-[11px] font-extrabold shrink-0"
-                    style={
-                      i === step
-                        ? { background: 'var(--qms-brand)', color: '#fff' }
-                        : i < step
-                        ? { background: 'var(--success)', color: '#fff' }
-                        : { background: 'rgba(0,0,0,.05)', color: 'var(--qms-text-muted)' }
-                    }
-                  >
-                    {i + 1}
-                  </span>
-                  {s.label}
-                </div>
-              </Fragment>
-            ))}
-          </div>
-        </div>
+        {draftMode === 'loading' && <DraftLoadingPlaceholder />}
+        {draftMode === 'pending-decision' && (
+          <DraftResumeDecision itemLabel="lead" onResume={handleResumeDraft} onDiscard={handleDiscardDraft} />
+        )}
 
-        <div className="flex-1 overflow-y-auto px-5">
-          {currentStep.heading && <div className="text-[15px] font-bold mt-1 mb-0.5" style={{ color: 'var(--qms-text)' }}>{currentStep.heading}</div>}
-          {currentStep.sub && <p className="text-[12px] mb-3.5" style={{ color: 'var(--qms-text-muted)' }}>{currentStep.sub}</p>}
-
-          {step === 0 && <WizardStep1 form={form} setField={setField} />}
-          {step === 1 && <WizardStep2 form={form} setField={setField} />}
-          {step === 2 && <WizardStep3 form={form} setField={setField} />}
-          {step === 3 && <WizardStep4 form={form} setField={setField} />}
-        </div>
-
-        <div className="flex items-center justify-between gap-3 px-5 pb-5 pt-3" style={{ borderTop: '1px solid var(--qms-border)' }}>
-          <div className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>
-            New lead · {form.tenantLabel || '(no company)'}
-          </div>
-          <div className="flex flex-col items-end gap-1.5">
-            {error && <p className="text-[12px] text-danger">{error}</p>}
-            <div className="flex gap-2">
-              {step > 0
-                ? <Button variant="ghost" onClick={() => setStep(step - 1)} style={{ border: '1px solid var(--qms-border)', color: 'var(--qms-text-soft)' }}><FiArrowLeft size={14} /> Back</Button>
-                : <Button variant="ghost" onClick={onClose} style={{ border: '1px solid var(--qms-border)', color: 'var(--qms-text-soft)' }}>Cancel</Button>}
-              {step < 3 ? (
-                <Button onClick={handleNext} className="font-bold text-white" style={{ background: 'linear-gradient(135deg, var(--qms-brand), #3b6dff 60%, var(--qms-teal))' }}>
-                  Next <FiArrowRight size={14} />
-                </Button>
-              ) : (
-                <Button onClick={handleSave} disabled={isCreating} className="font-bold text-white" style={{ background: 'linear-gradient(135deg, var(--qms-brand), #3b6dff 60%, var(--qms-teal))' }}>
-                  <FiSave size={14} /> {isCreating ? 'Creating…' : 'Create lead'}
-                </Button>
-              )}
+        {(draftMode === 'active' || draftMode === 'disabled') && (
+          <>
+            <div className="px-5 pt-4">
+              <div className="flex items-center gap-1.5 flex-wrap mb-4">
+                {STEPS.map((s, i) => (
+                  <Fragment key={s.label}>
+                    {i > 0 && <span className="w-2.5 h-px shrink-0" style={{ background: 'var(--qms-border)' }} />}
+                    <div
+                      className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-full border text-[11px] font-bold whitespace-nowrap"
+                      style={
+                        i === step
+                          ? { borderColor: 'var(--qms-brand)', color: 'var(--qms-brand)', background: 'color-mix(in oklab, var(--qms-brand) 8%, transparent)' }
+                          : i < step
+                          ? { borderColor: 'color-mix(in oklab, var(--success) 40%, transparent)', color: 'var(--success)', background: 'transparent' }
+                          : { borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)', background: 'var(--qms-surface-strong)' }
+                      }
+                    >
+                      <span
+                        className="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full text-[11px] font-extrabold shrink-0"
+                        style={
+                          i === step
+                            ? { background: 'var(--qms-brand)', color: '#fff' }
+                            : i < step
+                            ? { background: 'var(--success)', color: '#fff' }
+                            : { background: 'rgba(0,0,0,.05)', color: 'var(--qms-text-muted)' }
+                        }
+                      >
+                        {i + 1}
+                      </span>
+                      {s.label}
+                    </div>
+                  </Fragment>
+                ))}
+              </div>
             </div>
-          </div>
-        </div>
+
+            <div className="flex-1 overflow-y-auto px-5">
+              {currentStep.heading && <div className="text-[15px] font-bold mt-1 mb-0.5" style={{ color: 'var(--qms-text)' }}>{currentStep.heading}</div>}
+              {currentStep.sub && <p className="text-[12px] mb-3.5" style={{ color: 'var(--qms-text-muted)' }}>{currentStep.sub}</p>}
+
+              {step === 0 && <WizardStep1 form={form} setField={setField} />}
+              {step === 1 && <WizardStep2 form={form} setField={setField} />}
+              {step === 2 && <WizardStep3 form={form} setField={setField} />}
+              {step === 3 && <WizardStep4 form={form} setField={setField} />}
+            </div>
+
+            <div className="flex items-center justify-between gap-3 px-5 pb-5 pt-3" style={{ borderTop: '1px solid var(--qms-border)' }}>
+              <div className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>
+                New lead · {form.tenantLabel || '(no company)'}
+              </div>
+              <div className="flex flex-col items-end gap-1.5">
+                {error && <p className="text-[12px] text-danger">{error}</p>}
+                <div className="flex gap-2">
+                  {step > 0
+                    ? <Button variant="ghost" onClick={() => setStep(step - 1)} style={{ border: '1px solid var(--qms-border)', color: 'var(--qms-text-soft)' }}><FiArrowLeft size={14} /> Back</Button>
+                    : <Button variant="ghost" onClick={onClose} style={{ border: '1px solid var(--qms-border)', color: 'var(--qms-text-soft)' }}>Cancel</Button>}
+                  {step < 3 ? (
+                    <Button onClick={handleNext} className="font-bold text-white" style={{ background: 'linear-gradient(135deg, var(--qms-brand), #3b6dff 60%, var(--qms-teal))' }}>
+                      Next <FiArrowRight size={14} />
+                    </Button>
+                  ) : (
+                    <Button onClick={handleSave} disabled={isCreating} className="font-bold text-white" style={{ background: 'linear-gradient(135deg, var(--qms-brand), #3b6dff 60%, var(--qms-teal))' }}>
+                      <FiSave size={14} /> {isCreating ? 'Creating…' : 'Create lead'}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   )

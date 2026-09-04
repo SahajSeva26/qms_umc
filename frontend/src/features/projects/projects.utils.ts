@@ -6,6 +6,19 @@ import { CAMP_TYPE_VALUES, type CampType } from '@/types/campReal.types'
 // true system-wide constraint: a direct API caller can still submit more.
 export const MAX_DAYS_TO_BOOK_BEFORE = 120
 
+// react-hook-form's own `valueAsNumber` turns a cleared/malformed numeric
+// input into NaN in the form's LIVE state (not just at submit), which then
+// propagates into any cross-field math reading that value — e.g. the wizard's
+// live GST preview would show "₹NaN" the instant a field is cleared. Use as
+// `register(field, { setValueAs: asZeroWhenBlank })` instead: it normalizes
+// at the moment RHF stores the value, so the live state never holds NaN.
+// Matches this codebase's existing behavior for these fields (Number('') is
+// already 0 in JS), not a new "blank means 0" rule.
+export function asZeroWhenBlank(value: unknown): number {
+  const parsed = Number(value)
+  return value === '' || !Number.isFinite(parsed) ? 0 : parsed
+}
+
 // Real backend ProjectType values that correspond to the app's older
 // "Screening"/"Diet" mode split (used by OM/Invoicing/PO-management/Masters
 // tabs) — `mixed` shows under both, matching the old mock's intent (a mixed

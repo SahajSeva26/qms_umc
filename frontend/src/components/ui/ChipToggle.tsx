@@ -23,6 +23,7 @@ interface ChipToggleProps {
 
 export const ChipToggle = ({ active, onClick, children }: ChipToggleProps) => (
   <button
+    type="button"
     onClick={onClick}
     className="px-2.5 py-1 rounded-full border text-[11px] font-bold transition-colors"
     style={

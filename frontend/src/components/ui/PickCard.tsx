@@ -41,6 +41,7 @@ export const PickCard = ({ active, color, label, desc, icon: Icon, tileColor, ti
   const activeColor = color ?? ACTIVE_DEFAULT
   return (
     <button
+      type="button"
       onClick={onClick}
       className="flex items-start gap-2 p-2.5 rounded-xl border text-left transition-colors"
       style={

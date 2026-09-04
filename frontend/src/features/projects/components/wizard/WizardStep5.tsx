@@ -1,3 +1,4 @@
+import { Controller, useFormContext, useWatch } from 'react-hook-form'
 import { FiUsers, FiDollarSign } from 'react-icons/fi'
 import type { WizardFormState } from '@/features/projects/wizard.types'
 import type { PaymentTerms } from '@/types/project.types'
@@ -11,18 +12,17 @@ import SectionHeader from '@/components/ui/SectionHeader'
 import { Label } from '@/components/ui/label'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { labelClasses, labelStyle, fieldClasses } from '@/features/projects/components/wizard/wizard.styles'
+import { useWizardFieldError } from '@/features/projects/components/wizard/WizardValidationContext'
 
 const PAYMENT_TERMS_OPTIONS: PaymentTerms[] = ['net_30', 'net_60', 'net_90']
-
-interface WizardStep5Props {
-  form: WizardFormState
-  setField: <K extends keyof WizardFormState>(key: K, value: WizardFormState[K]) => void
-}
 
 // salesRep/projectCoordinator both must be QMS platform-tenant Roles (the
 // only thing the backend checks — no job-type rule). marketingContact must
 // belong to the project's own tenant and is sourced from Contacts, not Roles.
-const WizardStep5 = ({ form, setField }: WizardStep5Props) => {
+const WizardStep5 = () => {
+  const { control } = useFormContext<WizardFormState>()
+  const fieldError = useWizardFieldError()
+  const leadDivisionId = useWatch({ control, name: 'leadDivisionId' })
   // limit: PLATFORM_TENANT_FETCH_LIMIT — the backend defaults to 10 results;
   // the `qms` platform tenant can sort past that window and never resolve.
   // Kept the .find()+code fallback since `type` comes back empty on the wire
@@ -69,8 +69,8 @@ const WizardStep5 = ({ form, setField }: WizardStep5Props) => {
 
   // Scoped to the source lead's own division.
   const { data: marketingContactData, isLoading: marketingContactsLoading, isError: marketingContactsErrored } =
-    useContacts({ division: form.leadDivisionId, status: 'active' }, { enabled: !!form.leadDivisionId })
-  const marketingContacts = form.leadDivisionId ? marketingContactData?.data?.items ?? [] : []
+    useContacts({ division: leadDivisionId, status: 'active' }, { enabled: !!leadDivisionId })
+  const marketingContacts = leadDivisionId ? marketingContactData?.data?.items ?? [] : []
 
   return (
     <div className="space-y-1">
@@ -78,19 +78,26 @@ const WizardStep5 = ({ form, setField }: WizardStep5Props) => {
       <div className="space-y-4">
         <div>
           <Label className={labelClasses} style={labelStyle}>Project sales rep (QMS internal) *</Label>
-          <Select value={form.salesRep} onValueChange={(v) => setField('salesRep', v as string)}>
-            <SelectTrigger className={`w-full ${fieldClasses}`}>
-              <SelectValue placeholder={salesRolesLoading ? 'Loading...' : 'Select sales rep...'}>
-                {(v: string) => {
-                  const r = salesRoles.find((role) => role.id === v)
-                  return r ? `${r.name} (${r.code})` : salesRolesLoading ? 'Loading...' : 'Select sales rep...'
-                }}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {salesRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <Controller
+            control={control}
+            name="salesRep"
+            render={({ field }) => (
+              <Select value={field.value} onValueChange={field.onChange}>
+                <SelectTrigger className={`w-full ${fieldClasses}`}>
+                  <SelectValue placeholder={salesRolesLoading ? 'Loading...' : 'Select sales rep...'}>
+                    {(v: string) => {
+                      const r = salesRoles.find((role) => role.id === v)
+                      return r ? `${r.name} (${r.code})` : salesRolesLoading ? 'Loading...' : 'Select sales rep...'
+                    }}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {salesRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+          />
+          {fieldError('salesRep') && <p className="text-[11px] mt-1 text-danger">{fieldError('salesRep')}</p>}
           {salesRolesErrored && (
             <p className="text-[11px] mt-1 text-danger">Couldn't load sales reps — try again.</p>
           )}
@@ -101,19 +108,26 @@ const WizardStep5 = ({ form, setField }: WizardStep5Props) => {
 
         <div>
           <Label className={labelClasses} style={labelStyle}>Project coordinator (QMS internal) *</Label>
-          <Select value={form.projectCoordinator} onValueChange={(v) => setField('projectCoordinator', v as string)}>
-            <SelectTrigger className={`w-full ${fieldClasses}`}>
-              <SelectValue placeholder={platformRolesLoading ? 'Loading...' : 'Select coordinator...'}>
-                {(v: string) => {
-                  const r = platformRoles.find((role) => role.id === v)
-                  return r ? `${r.name} (${r.code})` : platformRolesLoading ? 'Loading...' : 'Select coordinator...'
-                }}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {platformRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <Controller
+            control={control}
+            name="projectCoordinator"
+            render={({ field }) => (
+              <Select value={field.value} onValueChange={field.onChange}>
+                <SelectTrigger className={`w-full ${fieldClasses}`}>
+                  <SelectValue placeholder={platformRolesLoading ? 'Loading...' : 'Select coordinator...'}>
+                    {(v: string) => {
+                      const r = platformRoles.find((role) => role.id === v)
+                      return r ? `${r.name} (${r.code})` : platformRolesLoading ? 'Loading...' : 'Select coordinator...'
+                    }}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {platformRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+          />
+          {fieldError('projectCoordinator') && <p className="text-[11px] mt-1 text-danger">{fieldError('projectCoordinator')}</p>}
           {platformRolesErrored && (
             <p className="text-[11px] mt-1 text-danger">Couldn't load coordinators — try again.</p>
           )}
@@ -124,16 +138,23 @@ const WizardStep5 = ({ form, setField }: WizardStep5Props) => {
 
         <div>
           <Label className={labelClasses} style={labelStyle}>Marketing contact from pharma *</Label>
-          <Select value={form.marketingContact} onValueChange={(v) => setField('marketingContact', v as string)}>
-            <SelectTrigger className={`w-full ${fieldClasses}`}>
-              <SelectValue placeholder={marketingContactsLoading ? 'Loading...' : 'Select marketing contact...'}>
-                {(v: string) => marketingContacts.find((c) => c.id === v)?.name ?? (marketingContactsLoading ? 'Loading...' : 'Select marketing contact...')}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {marketingContacts.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <Controller
+            control={control}
+            name="marketingContact"
+            render={({ field }) => (
+              <Select value={field.value} onValueChange={field.onChange}>
+                <SelectTrigger className={`w-full ${fieldClasses}`}>
+                  <SelectValue placeholder={marketingContactsLoading ? 'Loading...' : 'Select marketing contact...'}>
+                    {(v: string) => marketingContacts.find((c) => c.id === v)?.name ?? (marketingContactsLoading ? 'Loading...' : 'Select marketing contact...')}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {marketingContacts.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+          />
+          {fieldError('marketingContact') && <p className="text-[11px] mt-1 text-danger">{fieldError('marketingContact')}</p>}
           {marketingContactsErrored && (
             <p className="text-[11px] mt-1 text-danger">Couldn't load marketing contacts — try again.</p>
           )}
@@ -143,12 +164,18 @@ const WizardStep5 = ({ form, setField }: WizardStep5Props) => {
       <SectionHeader icon={FiDollarSign}>Payment terms</SectionHeader>
       <div>
         <Label className={labelClasses} style={labelStyle}>Payment terms *</Label>
-        <Select value={form.paymentTerms} onValueChange={(v) => setField('paymentTerms', v as PaymentTerms)}>
-          <SelectTrigger className={`w-full ${fieldClasses}`}><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {PAYMENT_TERMS_OPTIONS.map((t) => <SelectItem key={t} value={t}>{PAYMENT_TERMS_LABEL[t]}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <Controller
+          control={control}
+          name="paymentTerms"
+          render={({ field }) => (
+            <Select value={field.value} onValueChange={field.onChange}>
+              <SelectTrigger className={`w-full ${fieldClasses}`}><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {PAYMENT_TERMS_OPTIONS.map((t) => <SelectItem key={t} value={t}>{PAYMENT_TERMS_LABEL[t]}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
+        />
       </div>
 
       <p className="text-[12px] mt-2" style={{ color: 'var(--qms-text-muted)' }}>

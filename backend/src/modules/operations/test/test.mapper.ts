@@ -1,5 +1,12 @@
 // Test Mapper
 import { RequestContext } from '../../../shared/utils/contextBuilder';
+import { ITestReportCountOnly, ITestReportResponse, ITestReportServiceResult } from './test.types';
+
+// ========================================================================================
+// REPORT HELPERS
+// ========================================================================================
+
+const countOf = (branch?: ITestReportCountOnly[]): number => branch?.[0]?.count || 0;
 
 // resolve a possibly-populated ref to a plain response shape
 const mapRef = (ref: any, extra: (r: any) => object = () => ({})) => {
@@ -49,5 +56,26 @@ export const TestMapper = {
             result.items.push(TestMapper.toResponse(test, ctx));
         }
         return result;
+    },
+
+    // Report response shaping. Aggregate counts only — no clinical field (result key/value/unit/
+    // interpretation) and no identifier (test, screening, patient, performedBy, tenant, TestMaster
+    // id) is read or exposed.
+    toReportResponse: (report: ITestReportServiceResult): ITestReportResponse => {
+        return {
+            meta: {
+                generatedAt: report.generatedAt.toISOString(),
+            },
+
+            summary: {
+                totalTests: countOf(report?.total),
+            },
+
+            byTestType: (report?.typeCounts || []).map((bucket) => ({
+                code: bucket.code ?? null,
+                name: bucket.name ?? null,
+                count: bucket.count,
+            })),
+        };
     },
 };

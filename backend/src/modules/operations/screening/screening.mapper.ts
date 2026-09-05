@@ -1,5 +1,21 @@
 // Screening Mapper
 import { RequestContext } from '../../../shared/utils/contextBuilder';
+import { SCREENING_REPORT_EXCEPTIONS, SCREENING_STATUS } from './screening.constants';
+import {
+    IScreeningReportCountBucket,
+    IScreeningReportCountOnly,
+    IScreeningReportResponse,
+    IScreeningReportServiceResult,
+} from './screening.types';
+
+// ========================================================================================
+// REPORT HELPERS
+// ========================================================================================
+
+const countOf = (branch?: IScreeningReportCountOnly[]): number => branch?.[0]?.count || 0;
+
+const toCountMap = (buckets?: IScreeningReportCountBucket[]): Map<string | null, number> =>
+    new Map((buckets || []).map((b) => [b._id, b.count]));
 
 // resolve a possibly-populated ref to a plain response shape
 const mapRef = (ref: any, extra: (r: any) => object = () => ({})) => {
@@ -66,5 +82,41 @@ export const ScreeningMapper = {
             result.items.push(ScreeningMapper.toResponse(screening, ctx));
         }
         return result;
+    },
+
+    toReportResponse: (report: IScreeningReportServiceResult): IScreeningReportResponse => {
+        const statusCounts = toCountMap(report?.statusCounts);
+
+        // count lookup for the fixed exception set, keyed to the constant's declaration order
+        const exceptionCounts: Record<string, number> = {
+            SCREENING_AWAITING_CONSENT_VERIFICATION: countOf(report?.awaitingConsent),
+        };
+
+        return {
+            meta: {
+                generatedAt: report.generatedAt.toISOString(),
+            },
+
+            summary: {
+                totalScreenings: countOf(report?.total),
+                pendingScreenings: statusCounts.get(SCREENING_STATUS.PENDING) || 0,
+                completedScreenings: statusCounts.get(SCREENING_STATUS.COMPLETED) || 0,
+                cancelledScreenings: statusCounts.get(SCREENING_STATUS.CANCELLED) || 0,
+            },
+
+            // zero-filled from the constant — MongoDB only returns statuses that actually occur,
+            // so absent enum values must be materialised as 0 here
+            byStatus: Object.values(SCREENING_STATUS).map((status) => ({
+                status,
+                count: statusCounts.get(status) || 0,
+            })),
+
+            exceptions: SCREENING_REPORT_EXCEPTIONS.map((exception) => ({
+                code: exception.code,
+                severity: exception.severity,
+                count: exceptionCounts[exception.code] || 0,
+                label: exception.label,
+            })),
+        };
     },
 };

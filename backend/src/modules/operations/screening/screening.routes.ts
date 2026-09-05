@@ -12,10 +12,36 @@ import {
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
 import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
 import { SCREENING_PERMISSIONS } from './screening.constants';
+import { ScreeningReportQuerySchema } from './screening.validators';
 
 export const ScreeningRouter = express.Router();
 
 ScreeningRouter.use(AuthMiddleware);
+
+// screening report
+registry.registerPath({
+    method: 'get',
+    path: '/screenings/report',
+    tags: ['SCREENING'],
+    summary: 'Get screening report',
+    description:
+        'Current-state snapshot of screenings in the actor\'s tenant scope — there is no date window, ' +
+        'nothing is time-filtered. Returns total/pending/completed/cancelled counts, the status ' +
+        'distribution, and one actionable exception (pending screenings blocked from completion by ' +
+        'unverified consent, which moveStage rejects with a 422). Aggregate counts only; no patient, ' +
+        'consent, symptom or other clinical detail is exposed. `completed` is a lifecycle state, not a ' +
+        'treatment or medical outcome; `cancelled` records no cause. Guarded by screening:manage alone ' +
+        '— screening:search would trigger the module\'s own-scope, returning only the caller\'s own ' +
+        'screenings and making a tenant-level report misleading.',
+    request: {
+        query: ScreeningReportQuerySchema,
+    },
+    responses: {
+        200: { description: 'Screening report generated successfully' },
+        400: { description: 'Validation error' },
+        403: { description: 'Forbidden' },
+    },
+});
 
 // get screening
 registry.registerPath({
@@ -115,6 +141,7 @@ registry.registerPath({
 // =======================================================================
 // reads require the matching read permission (or manage); writes/stage/consent require the
 // matching write permission (or manage).
+ScreeningRouter.get('/report', AuthorizeMiddleware([SCREENING_PERMISSIONS.MANAGE.code]), ScreeningController.report);
 ScreeningRouter.get('/:id', AuthorizeMiddleware([SCREENING_PERMISSIONS.GET.code, SCREENING_PERMISSIONS.MANAGE.code], 'OR'), ScreeningController.get);
 ScreeningRouter.get('/', AuthorizeMiddleware([SCREENING_PERMISSIONS.SEARCH.code, SCREENING_PERMISSIONS.MANAGE.code], 'OR'), ScreeningController.search);
 

@@ -19,6 +19,9 @@ import { CampService } from '../camp/camp.service';
 import { CAMP_STATUSES } from '../camp/camp.constants';
 import { PatientService } from '../patient/patient.service';
 import { ALLOWED_ROLETYPE_CODES } from '../../access-management/role-type/roleType.constants';
+// report-only imports — kept separate so the existing import lines above stay untouched
+import { IScreeningReportQuery } from './screening.validators';
+import { IScreeningReportRaw, IScreeningReportServiceResult } from './screening.types';
 
 type ScreeningDoc = HydratedDocument<IScreening> | null;
 
@@ -290,6 +293,41 @@ const verifyConsent = async (id: string, model: IVerifyConsentPayload, ctx: Requ
     return await screening.save();
 };
 
+// ========================================================================================
+// REPORT
+// ========================================================================================
+
+const EMPTY_REPORT_RAW: IScreeningReportRaw = {
+    total: [],
+    statusCounts: [],
+    awaitingConsent: [],
+};
+
+const report = async (
+    filters: IScreeningReportQuery,
+    ctx: RequestContext,
+): Promise<IScreeningReportServiceResult> => {
+    const generatedAt = new Date();
+
+    const [raw] = await ScreeningModel.aggregate<IScreeningReportRaw>([
+        // tenant isolation — applied ONCE, before all branches
+        { $match: { ...ctx.where() } },
+        {
+            $facet: {
+                total: [{ $count: 'count' }],
+                // statusCounts is the SINGLE source for both the summary status counts and byStatus 
+                statusCounts: [{ $group: { _id: '$status', count: { $sum: 1 } } }],
+                awaitingConsent: [
+                    { $match: { status: SCREENING_STATUS.PENDING, 'consent.verified': false } },
+                    { $count: 'count' },
+                ],
+            },
+        },
+    ]);
+
+    return { ...(raw ?? EMPTY_REPORT_RAW), generatedAt };
+};
+
 export const ScreeningService = {
     get,
     search,
@@ -297,4 +335,5 @@ export const ScreeningService = {
     update,
     moveStage,
     verifyConsent,
+    report,
 };

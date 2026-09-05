@@ -13,6 +13,7 @@ import { ScreeningService } from './screening.service';
 import { ScreeningMapper } from './screening.mapper';
 import { RequestHandler } from '../../../shared/utils/requestHandler';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
+import { ScreeningReportQuerySchema } from './screening.validators';
 
 const get = async (req: any, res: any) => {
     try {
@@ -147,6 +148,32 @@ const verifyConsent = async (req: any, res: any) => {
     }
 };
 
+const report = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+
+        const { data: filters, success, error } = ScreeningReportQuerySchema.safeParse(req.query);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                fields: validationErrors,
+            });
+        }
+
+        const result = await ScreeningService.report(filters, ctx);
+
+        return ResponseHandler.appResponse(
+            res,
+            StatusCodes.OK,
+            true,
+            'Screening report generated successfully',
+            ScreeningMapper.toReportResponse(result),
+        );
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
 export const ScreeningController = {
     get,
     search,
@@ -154,4 +181,5 @@ export const ScreeningController = {
     update,
     moveStage,
     verifyConsent,
+    report,
 };

@@ -1,12 +1,15 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { FiUpload, FiCheckCircle, FiAlertTriangle, FiX } from 'react-icons/fi'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import TenantAsyncPicker from '@/components/ui/TenantAsyncPicker'
 import { toast } from '@/components/ui/sonner'
 import { useCreateDoctor } from '@/features/doctors/hooks/useCreateDoctor'
 import { useUpdateDoctor } from '@/features/doctors/hooks/useUpdateDoctor'
+import { useBulkCreateDoctors } from '@/features/doctors/hooks/useBulkCreateDoctors'
 import { useSession } from '@/hooks/useSession'
 import { getApiErrorMessage } from '@/utils/apiError'
 import type { DoctorEntity, DoctorSpecialization, DoctorStatus } from '@/types/doctor.types'
@@ -20,6 +23,23 @@ const STATUS_OPTIONS: { value: DoctorStatus; label: string }[] = [
   { value: 'active', label: 'Active' },
   { value: 'inactive', label: 'Inactive' },
 ]
+
+// A bulk-import row error is either a plain string (a DB-layer create
+// failure) or a field-name -> message map (a Zod schema-validation failure,
+// e.g. { specialization: "Invalid option...", mobile: "Too small..." }) —
+// there is no `.message` key to fall back on, so that shape must be
+// flattened field-by-field or the real validation detail is silently lost.
+function formatBulkDoctorRowError(error: string | Record<string, unknown>): string {
+  if (typeof error === 'string') return error
+  return Object.entries(error)
+    .map(([field, message]) => `${field}: ${message}`)
+    .join('; ')
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  return `${Math.round(bytes / 1024)} KB`
+}
 
 interface DoctorDraft {
   pharmaCode: string
@@ -97,8 +117,63 @@ const EditDoctorModalForm = ({ doctor, onClose, onCreated, forcedTenant }: EditD
   // picker either way, the company is already decided by the caller.
   const needsTenantPicker = !isEdit && !forcedTenant && session?.tenant?.type === 'platform'
 
+  // CSV bulk-import only makes sense for the standalone "Add doctor" flow —
+  // edit mode has nothing to import, and the forced-tenant inline callers
+  // (BookCampForm, CampDetailPageReal) rely on onCreated firing synchronously
+  // with ONE created doctor to auto-select, which a bulk import can't do.
+  const showToggle = !isEdit && !forcedTenant
+  const [mode, setMode] = useState<'single' | 'csv'>('single')
+  const activeMode = showToggle ? mode : 'single'
+  const switchMode = (next: 'single' | 'csv') => setMode(next)
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [file, setFile] = useState<File | null>(null)
+
   const createDoctor = useCreateDoctor()
   const updateDoctor = useUpdateDoctor(doctor?.id ?? '')
+  const bulkCreateDoctors = useBulkCreateDoctors()
+
+  const handlePickFile = (picked: File | null) => {
+    setFile(picked)
+    bulkCreateDoctors.reset()
+  }
+
+  // Clears the picked file (and the native input's own value, so re-picking
+  // the exact same file afterwards still fires onChange) without touching any
+  // in-flight result/error — used after a clean import success, where the
+  // result summary must stay visible.
+  const clearSelection = () => {
+    setFile(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  // An explicit user-driven Remove additionally drops any stale error/result
+  // from a previous attempt, unlike the success-driven auto-clear above.
+  const removeFile = () => {
+    clearSelection()
+    bulkCreateDoctors.reset()
+  }
+
+  // Resets the native input's value before opening it — without this,
+  // choosing the same file again (e.g. after editing it in place and
+  // re-saving under the same name) would not fire onChange at all, since the
+  // input's value never actually changed from the browser's perspective.
+  const openFilePicker = () => {
+    if (fileInputRef.current) fileInputRef.current.value = ''
+    fileInputRef.current?.click()
+  }
+
+  const handleImport = () => {
+    if (!file) return
+    if (needsTenantPicker && !draft.tenantId) return
+    bulkCreateDoctors.mutate(
+      { tenant: needsTenantPicker ? draft.tenantId : undefined, file },
+      { onSuccess: (result) => { if (result.failed === 0 && result.invalidRows === 0) clearSelection() } },
+    )
+  }
+
+  const bulkResult = bulkCreateDoctors.data
+  const canImport = !!file && !(needsTenantPicker && !draft.tenantId) && !bulkCreateDoctors.isPending
 
   const handleClose = () => onClose()
 
@@ -163,84 +238,230 @@ const EditDoctorModalForm = ({ doctor, onClose, onCreated, forcedTenant }: EditD
           <DialogTitle>{isEdit ? 'Edit doctor' : 'Add doctor'}</DialogTitle>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {!isEdit && forcedTenant && (
-            <div className="sm:col-span-2">
-              <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Company</label>
-              <p className="text-[13px]" style={{ color: 'var(--qms-text)' }}>{forcedTenant.label} <span style={{ color: 'var(--qms-text-muted)' }}>(locked to the camp being booked)</span></p>
-            </div>
-          )}
-          {needsTenantPicker && (
-            <div className="sm:col-span-2">
-              <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Company *</label>
-              <TenantAsyncPicker
-                value={draft.tenantId}
-                label={draft.tenantLabel}
-                onChange={(tenantId, tenantLabel) => setDraft((p) => ({ ...p, tenantId, tenantLabel }))}
+        {showToggle && (
+          <div
+            className="inline-flex gap-1 p-1 rounded-[10px] mb-1"
+            style={{ background: 'var(--qms-surface-strong, rgba(0,0,0,.04))' }}
+          >
+            <button
+              type="button"
+              aria-pressed={activeMode === 'single'}
+              onClick={() => switchMode('single')}
+              className="rounded-lg text-xs font-bold border-0"
+              style={{
+                padding: '6px 14px',
+                background: activeMode === 'single' ? 'var(--qms-card)' : 'transparent',
+                color: activeMode === 'single' ? 'var(--qms-text)' : 'var(--qms-text-muted)',
+                boxShadow: activeMode === 'single' ? '0 1px 4px rgba(0,0,0,.08)' : 'none',
+              }}
+            >
+              Single
+            </button>
+            <button
+              type="button"
+              aria-pressed={activeMode === 'csv'}
+              onClick={() => switchMode('csv')}
+              className="rounded-lg text-xs font-bold border-0"
+              style={{
+                padding: '6px 14px',
+                background: activeMode === 'csv' ? 'var(--qms-card)' : 'transparent',
+                color: activeMode === 'csv' ? 'var(--qms-text)' : 'var(--qms-text-muted)',
+                boxShadow: activeMode === 'csv' ? '0 1px 4px rgba(0,0,0,.08)' : 'none',
+              }}
+            >
+              CSV
+            </button>
+          </div>
+        )}
+
+        {activeMode === 'single' ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {!isEdit && forcedTenant && (
+              <div className="sm:col-span-2">
+                <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Company</label>
+                <p className="text-[13px]" style={{ color: 'var(--qms-text)' }}>{forcedTenant.label} <span style={{ color: 'var(--qms-text-muted)' }}>(locked to the camp being booked)</span></p>
+              </div>
+            )}
+            {needsTenantPicker && (
+              <div className="sm:col-span-2">
+                <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Company *</label>
+                <TenantAsyncPicker
+                  value={draft.tenantId}
+                  label={draft.tenantLabel}
+                  onChange={(tenantId, tenantLabel) => setDraft((p) => ({ ...p, tenantId, tenantLabel }))}
+                />
+              </div>
+            )}
+            <div>
+              <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Pharma doctor code</label>
+              <Input
+                value={draft.pharmaCode}
+                onChange={(e) => setDraft((p) => ({ ...p, pharmaCode: e.target.value }))}
+                disabled={isEdit}
               />
             </div>
-          )}
-          <div>
-            <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Pharma doctor code</label>
-            <Input
-              value={draft.pharmaCode}
-              onChange={(e) => setDraft((p) => ({ ...p, pharmaCode: e.target.value }))}
-              disabled={isEdit}
-            />
-          </div>
-          <div>
-            <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Doctor name</label>
-            <Input value={draft.name} onChange={(e) => setDraft((p) => ({ ...p, name: e.target.value }))} />
-          </div>
-          <div>
-            <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Specialization</label>
-            <Select value={draft.specialization} onValueChange={(v) => setDraft((p) => ({ ...p, specialization: v as DoctorSpecialization }))}>
-              <SelectTrigger className="w-full text-[13px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {SPECIALIZATION_OPTIONS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Mobile</label>
-            <Input value={draft.mobile} onChange={(e) => setDraft((p) => ({ ...p, mobile: e.target.value }))} />
-          </div>
-          <div>
-            <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>City</label>
-            <Input value={draft.city} onChange={(e) => setDraft((p) => ({ ...p, city: e.target.value }))} />
-          </div>
-          <div>
-            <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>State</label>
-            <Input value={draft.state} onChange={(e) => setDraft((p) => ({ ...p, state: e.target.value }))} />
-          </div>
-          <div>
-            <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Pincode</label>
-            <Input value={draft.pincode} onChange={(e) => setDraft((p) => ({ ...p, pincode: e.target.value }))} />
-          </div>
-          <div>
-            <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Email</label>
-            <Input value={draft.email} onChange={(e) => setDraft((p) => ({ ...p, email: e.target.value }))} />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Google Maps link</label>
-            <Input value={draft.googleMapLink} onChange={(e) => setDraft((p) => ({ ...p, googleMapLink: e.target.value }))} />
-          </div>
-          {isEdit && (
             <div>
-              <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Status</label>
-              <Select value={draft.status} onValueChange={(v) => setDraft((p) => ({ ...p, status: v as DoctorStatus }))}>
+              <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Doctor name</label>
+              <Input value={draft.name} onChange={(e) => setDraft((p) => ({ ...p, name: e.target.value }))} />
+            </div>
+            <div>
+              <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Specialization</label>
+              <Select value={draft.specialization} onValueChange={(v) => setDraft((p) => ({ ...p, specialization: v as DoctorSpecialization }))}>
                 <SelectTrigger className="w-full text-[13px]"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {STATUS_OPTIONS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                  {SPECIALIZATION_OPTIONS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-          )}
-        </div>
+            <div>
+              <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Mobile</label>
+              <Input value={draft.mobile} onChange={(e) => setDraft((p) => ({ ...p, mobile: e.target.value }))} />
+            </div>
+            <div>
+              <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>City</label>
+              <Input value={draft.city} onChange={(e) => setDraft((p) => ({ ...p, city: e.target.value }))} />
+            </div>
+            <div>
+              <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>State</label>
+              <Input value={draft.state} onChange={(e) => setDraft((p) => ({ ...p, state: e.target.value }))} />
+            </div>
+            <div>
+              <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Pincode</label>
+              <Input value={draft.pincode} onChange={(e) => setDraft((p) => ({ ...p, pincode: e.target.value }))} />
+            </div>
+            <div>
+              <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Email</label>
+              <Input value={draft.email} onChange={(e) => setDraft((p) => ({ ...p, email: e.target.value }))} />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Google Maps link</label>
+              <Input value={draft.googleMapLink} onChange={(e) => setDraft((p) => ({ ...p, googleMapLink: e.target.value }))} />
+            </div>
+            {isEdit && (
+              <div>
+                <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Status</label>
+                <Select value={draft.status} onValueChange={(v) => setDraft((p) => ({ ...p, status: v as DoctorStatus }))}>
+                  <SelectTrigger className="w-full text-[13px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPTIONS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {needsTenantPicker && (
+              <div>
+                <Label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Company *</Label>
+                <TenantAsyncPicker
+                  value={draft.tenantId}
+                  label={draft.tenantLabel}
+                  onChange={(tenantId, tenantLabel) => setDraft((p) => ({ ...p, tenantId, tenantLabel }))}
+                />
+              </div>
+            )}
+
+            <div>
+              <Label htmlFor="doctor-bulk-csv" className="block text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+                CSV file *
+              </Label>
+              {file ? (
+                <div className="rounded-xl border border-success bg-success-soft px-4 py-3 flex items-center gap-3 text-success">
+                  <FiCheckCircle size={18} className="shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] font-semibold truncate" title={file.name}>{file.name}</p>
+                    <p className="text-[11px] opacity-80">{formatFileSize(file.size)}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={openFilePicker}
+                    className="text-[12px] font-semibold underline decoration-dotted underline-offset-2 hover:no-underline shrink-0"
+                  >
+                    Change file
+                  </button>
+                  <button
+                    type="button"
+                    onClick={removeFile}
+                    aria-label="Remove selected file"
+                    className="shrink-0 rounded-full p-1 hover:bg-black/5"
+                  >
+                    <FiX size={16} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={openFilePicker}
+                  className="w-full rounded-xl border-2 border-dashed p-6 text-center cursor-pointer transition-colors hover:bg-(--qms-surface-hover)"
+                  style={{ borderColor: 'var(--qms-border)' }}
+                >
+                  <FiUpload size={20} className="mx-auto mb-1.5" style={{ color: 'var(--qms-text-muted)' }} />
+                  <p className="text-[13px] font-semibold" style={{ color: 'var(--qms-text)' }}>
+                    Click to choose a CSV file
+                  </p>
+                </button>
+              )}
+              <input
+                id="doctor-bulk-csv"
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={(e) => handlePickFile(e.target.files?.[0] ?? null)}
+              />
+              <p className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
+                Required columns: pharmaCode, name, specialization, mobile, city, state, pincode, email. Optional: googleMapLink, status.
+              </p>
+            </div>
+
+            {bulkCreateDoctors.isError && (
+              <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
+                {getApiErrorMessage(bulkCreateDoctors.error, 'Could not import doctors — try again.')}
+              </div>
+            )}
+
+            {bulkResult && (
+              <div
+                className="text-[12px] rounded-xl px-3 py-2.5 space-y-1.5"
+                style={{ background: 'var(--qms-surface-strong)' }}
+              >
+                <div className="flex items-center gap-2 font-semibold" style={{ color: 'var(--qms-text)' }}>
+                  {bulkResult.failed === 0 && bulkResult.invalidRows === 0 ? (
+                    <FiCheckCircle style={{ color: 'var(--success)' }} />
+                  ) : (
+                    <FiAlertTriangle className="text-danger" />
+                  )}
+                  <span>{bulkResult.created} of {bulkResult.totalRows} rows imported successfully</span>
+                </div>
+                {bulkResult.invalidRows > 0 && (
+                  <div style={{ color: 'var(--qms-text-muted)' }}>
+                    {bulkResult.invalidRows} row{bulkResult.invalidRows === 1 ? '' : 's'} skipped for invalid/missing data.
+                  </div>
+                )}
+                {bulkResult.errors.length > 0 && (
+                  <div className="space-y-0.5 text-danger">
+                    {bulkResult.errors.map((e, i) => (
+                      <div key={i}>
+                        Row {e.row}: {formatBulkDoctorRowError(e.error)}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         <DialogFooter>
           <Button variant="outline" onClick={handleClose}>Cancel</Button>
-          <Button onClick={handleSave} disabled={isSaving}>{isEdit ? 'Save changes' : 'Add doctor'}</Button>
+          {activeMode === 'single' ? (
+            <Button onClick={handleSave} disabled={isSaving}>{isEdit ? 'Save changes' : 'Add doctor'}</Button>
+          ) : (
+            <Button onClick={handleImport} disabled={!canImport}>
+              <FiUpload size={14} /> {bulkCreateDoctors.isPending ? 'Importing…' : 'Import doctors'}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

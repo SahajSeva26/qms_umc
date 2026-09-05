@@ -80,3 +80,32 @@ export interface UpdateDoctorPayload {
   googleMapLink?: string
   status?: DoctorStatus
 }
+
+// Batch-level fields for POST /doctors/bulk, sent as multipart form fields
+// alongside the CSV `file`. `tenant` is only sent/needed for a PLATFORM-type
+// session — a customer session is always pinned to its own tenant server-side.
+export interface BulkDoctorPayload {
+  tenant?: string
+  file: File
+}
+
+// One entry in the bulk-import `errors` array — covers BOTH schema-invalid
+// rows (error is a ZodError-shaped object) and DB-layer create failures
+// (error is a plain string), unlike MR-bulk's errors array which only ever
+// covers DB-layer failures.
+export interface BulkDoctorRowError {
+  row: number
+  error: string | Record<string, unknown>
+}
+
+// Unlike BulkMrResult, doctor bulk's 400 (partial-failure) response returns
+// this FULL shape, not just a bare errors array — so every count field here
+// is always a real number, never undefined, on either the 200 or 400 path.
+export interface BulkDoctorResult {
+  totalRows: number
+  validRows: number
+  invalidRows: number
+  created: number
+  failed: number
+  errors: BulkDoctorRowError[]
+}

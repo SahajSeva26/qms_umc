@@ -16,6 +16,9 @@ vi.mock('@/features/doctors/doctors.service', () => ({
   doctorsService: {
     createDoctor: vi.fn(async () => ({ success: true, message: '', data: {} })),
     updateDoctor: vi.fn(async () => ({ success: true, message: '', data: {} })),
+    bulkCreateDoctors: vi.fn(async () => ({
+      totalRows: 1, validRows: 1, invalidRows: 0, created: 1, failed: 0, errors: [],
+    })),
   },
 }))
 
@@ -91,6 +94,28 @@ async function renderModalWithCaller(opts: {
     </QueryClientProvider>,
   )
 }
+
+describe('EditDoctorModal — dialog title', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  it('shows "Add doctor" when creating', async () => {
+    await mockSession('customer')
+    await renderModal(null)
+
+    expect(screen.getByRole('heading', { name: /^add doctor$/i })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /^edit doctor$/i })).not.toBeInTheDocument()
+  })
+
+  it('shows "Edit doctor" when editing an existing doctor', async () => {
+    await mockSession('customer')
+    await renderModal(doctorFixture())
+
+    expect(screen.getByRole('heading', { name: /^edit doctor$/i })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /^add doctor$/i })).not.toBeInTheDocument()
+  })
+})
 
 describe('EditDoctorModal — tenant field', () => {
   beforeEach(() => {
@@ -239,5 +264,265 @@ describe('EditDoctorModal — forcedTenant + onCreated (inline-from-camp-form ca
 
     await waitFor(() => expect(doctorsService.updateDoctor).toHaveBeenCalledTimes(1))
     expect(onCreated).not.toHaveBeenCalled()
+  })
+})
+
+describe('EditDoctorModal — Single/CSV toggle', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  it('shows the Single/CSV toggle only for the standalone create flow (no forcedTenant, not editing)', async () => {
+    await mockSession('customer')
+    await renderModal(null)
+
+    expect(screen.getByRole('button', { name: /^single$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^csv$/i })).toBeInTheDocument()
+  })
+
+  it('hides the toggle in edit mode', async () => {
+    await mockSession('customer')
+    await renderModal(doctorFixture())
+
+    expect(screen.queryByRole('button', { name: /^single$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^csv$/i })).not.toBeInTheDocument()
+  })
+
+  it('hides the toggle for forcedTenant callers (BookCampForm/CampDetailPageReal inline usage)', async () => {
+    await mockSession('customer')
+    await renderModalWithCaller({ forcedTenant: { id: 't-forced', label: 'Forced Co' } })
+
+    expect(screen.queryByRole('button', { name: /^single$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^csv$/i })).not.toBeInTheDocument()
+  })
+
+  it('switches to CSV mode and calls bulkCreateDoctors with the chosen file on Import, without a Company for a customer session', async () => {
+    await mockSession('customer')
+    const { doctorsService } = await import('@/features/doctors/doctors.service')
+    const user = userEvent.setup()
+    await renderModal(null)
+
+    await user.click(screen.getByRole('button', { name: /^csv$/i }))
+
+    const file = new File(['pharmaCode,name\nD1,Dr A'], 'doctors.csv', { type: 'text/csv' })
+    const fileInput = document.getElementById('doctor-bulk-csv') as HTMLInputElement
+    await user.upload(fileInput, file)
+
+    const importButton = screen.getByRole('button', { name: /import doctors/i })
+    expect(importButton).toBeEnabled()
+    await user.click(importButton)
+
+    await waitFor(() => expect(doctorsService.bulkCreateDoctors).toHaveBeenCalledTimes(1))
+    const payload = vi.mocked(doctorsService.bulkCreateDoctors).mock.calls[0][0]
+    expect(payload.file).toBe(file)
+    expect(payload.tenant).toBeUndefined()
+  })
+
+  it('disables Import in CSV mode until a file is chosen', async () => {
+    await mockSession('customer')
+    const user = userEvent.setup()
+    await renderModal(null)
+
+    await user.click(screen.getByRole('button', { name: /^csv$/i }))
+
+    expect(screen.getByRole('button', { name: /import doctors/i })).toBeDisabled()
+  })
+
+  it('disables Import in CSV mode for a platform session until a Company is picked, even with a file chosen', async () => {
+    await mockSession('platform')
+    const user = userEvent.setup()
+    await renderModal(null)
+
+    await user.click(screen.getByRole('button', { name: /^csv$/i }))
+
+    const file = new File(['pharmaCode,name\nD1,Dr A'], 'doctors.csv', { type: 'text/csv' })
+    const fileInput = document.getElementById('doctor-bulk-csv') as HTMLInputElement
+    await user.upload(fileInput, file)
+
+    expect(screen.getByRole('button', { name: /import doctors/i })).toBeDisabled()
+
+    await user.type(screen.getByPlaceholderText(/search company by name/i), 'Cipla')
+    const option = await screen.findByText('Cipla (cipla)')
+    await user.click(option)
+
+    expect(screen.getByRole('button', { name: /import doctors/i })).toBeEnabled()
+  })
+
+  // Confirmed against the real backend: a schema-invalid row's error comes
+  // back as a field-name -> message map (e.g. { specialization: "...",
+  // mobile: "..." }), not a { message } object — the summary must surface
+  // that detail, not fall back to a generic "Failed to create."
+  it('renders a per-field validation error object as field: message pairs, not a generic fallback', async () => {
+    await mockSession('customer')
+    const { doctorsService } = await import('@/features/doctors/doctors.service')
+    vi.mocked(doctorsService.bulkCreateDoctors).mockResolvedValue({
+      totalRows: 1, validRows: 0, invalidRows: 1, created: 0, failed: 1,
+      errors: [{ row: 2, error: { specialization: 'Invalid option: expected one of "cp"|"gp"', mobile: 'Too small: expected string to have >=10 characters' } }],
+    })
+
+    const user = userEvent.setup()
+    await renderModal(null)
+
+    await user.click(screen.getByRole('button', { name: /^csv$/i }))
+    const file = new File(['pharmaCode,name\nD1,Dr A'], 'doctors.csv', { type: 'text/csv' })
+    const fileInput = document.getElementById('doctor-bulk-csv') as HTMLInputElement
+    await user.upload(fileInput, file)
+    await user.click(screen.getByRole('button', { name: /import doctors/i }))
+
+    expect(await screen.findByText(/row 2:.*specialization: invalid option.*mobile: too small/i)).toBeInTheDocument()
+    expect(screen.queryByText(/failed to create/i)).not.toBeInTheDocument()
+  })
+
+  it('does not call onCreated and does not close the dialog on a successful CSV import', async () => {
+    await mockSession('customer')
+    const onCreated = vi.fn()
+    const onClose = vi.fn()
+    const user = userEvent.setup()
+    await renderModalWithCaller({ onCreated, onClose })
+
+    await user.click(screen.getByRole('button', { name: /^csv$/i }))
+    const file = new File(['pharmaCode,name\nD1,Dr A'], 'doctors.csv', { type: 'text/csv' })
+    const fileInput = document.getElementById('doctor-bulk-csv') as HTMLInputElement
+    await user.upload(fileInput, file)
+    await user.click(screen.getByRole('button', { name: /import doctors/i }))
+
+    await waitFor(() => expect(screen.getByText(/1 of 1 rows imported successfully/i)).toBeInTheDocument())
+    expect(onCreated).not.toHaveBeenCalled()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+})
+
+describe('EditDoctorModal — CSV file-picker UX', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  async function openCsvModeAndPick(fileName = 'doctors.csv') {
+    await mockSession('customer')
+    const user = userEvent.setup()
+    await renderModal(null)
+    await user.click(screen.getByRole('button', { name: /^csv$/i }))
+    const file = new File(['pharmaCode,name\nD1,Dr A'], fileName, { type: 'text/csv' })
+    const fileInput = document.getElementById('doctor-bulk-csv') as HTMLInputElement
+    await user.upload(fileInput, file)
+    return { user, file, fileInput }
+  }
+
+  it('shows a filename + size confirmation after picking a file, and hides the empty dropzone button', async () => {
+    const { file } = await openCsvModeAndPick()
+
+    expect(screen.getByText(file.name)).toBeInTheDocument()
+    expect(screen.getByText(/\d+ (KB|MB)/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /click to choose a csv file/i })).not.toBeInTheDocument()
+  })
+
+  it('the empty-state dropzone is a real, keyboard-focusable button', async () => {
+    await mockSession('customer')
+    const user = userEvent.setup()
+    await renderModal(null)
+    await user.click(screen.getByRole('button', { name: /^csv$/i }))
+
+    const dropzone = screen.getByRole('button', { name: /click to choose a csv file/i })
+    expect(dropzone.tagName).toBe('BUTTON')
+    expect(dropzone).toHaveAttribute('type', 'button')
+  })
+
+  it('clicking Remove clears the file, restores the dropzone, and resets bulkCreateDoctors (drops a stale result)', async () => {
+    const { doctorsService } = await import('@/features/doctors/doctors.service')
+    vi.mocked(doctorsService.bulkCreateDoctors).mockResolvedValue({
+      totalRows: 1, validRows: 0, invalidRows: 1, created: 0, failed: 1, errors: [{ row: 1, error: 'boom' }],
+    })
+    const { user } = await openCsvModeAndPick()
+    await user.click(screen.getByRole('button', { name: /import doctors/i }))
+    expect(await screen.findByText(/0 of 1 rows imported successfully/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /remove selected file/i }))
+
+    expect(screen.getByRole('button', { name: /click to choose a csv file/i })).toBeInTheDocument()
+    expect(screen.queryByText(/rows imported successfully/i)).not.toBeInTheDocument()
+  })
+
+  // jsdom fires onChange even when userEvent.upload sets the same File object
+  // on an input whose value wasn't reset — unlike real browsers, which skip
+  // onChange in that case. So the meaningful assertion here is the input's
+  // OWN .value, not whether a follow-up upload still updates the UI.
+  it('Remove resets the native input value (not just React state), so a real browser would still fire onChange on re-pick', async () => {
+    const { user, fileInput } = await openCsvModeAndPick('repick-me.csv')
+    expect(fileInput.value).not.toBe('')
+
+    await user.click(screen.getByRole('button', { name: /remove selected file/i }))
+
+    expect(fileInput.value).toBe('')
+  })
+
+  it('clicking "Change file" resets the input value before opening it, so re-selecting the exact same file still updates the state', async () => {
+    const { user, fileInput } = await openCsvModeAndPick('same-name.csv')
+    expect(screen.getByText('same-name.csv')).toBeInTheDocument()
+    expect(fileInput.value).not.toBe('')
+
+    await user.click(screen.getByRole('button', { name: /change file/i }))
+    // openFilePicker resets the input's value synchronously before invoking
+    // .click() — assert that reset actually happened, since without it a
+    // real browser would not fire onChange for the identical file below.
+    expect(fileInput.value).toBe('')
+
+    const sameFileAgain = new File(['pharmaCode,name\nD1,Dr A'], 'same-name.csv', { type: 'text/csv' })
+    await user.upload(fileInput, sameFileAgain)
+
+    expect(screen.getByText('same-name.csv')).toBeInTheDocument()
+  })
+
+  it('keeps the hidden file input mounted while a file is selected, so a replacement can be uploaded through it directly', async () => {
+    const { fileInput } = await openCsvModeAndPick('first.csv')
+    expect(screen.getByText('first.csv')).toBeInTheDocument()
+
+    const user = userEvent.setup()
+    const replacement = new File(['pharmaCode,name\nD2,Dr B'], 'second.csv', { type: 'text/csv' })
+    await user.upload(fileInput, replacement)
+
+    expect(screen.getByText('second.csv')).toBeInTheDocument()
+  })
+
+  it('clears the file automatically after a clean success (failed === 0), leaving the result summary visible', async () => {
+    const { doctorsService } = await import('@/features/doctors/doctors.service')
+    vi.mocked(doctorsService.bulkCreateDoctors).mockResolvedValue({
+      totalRows: 1, validRows: 1, invalidRows: 0, created: 1, failed: 0, errors: [],
+    })
+    const { user } = await openCsvModeAndPick()
+    await user.click(screen.getByRole('button', { name: /import doctors/i }))
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /click to choose a csv file/i })).toBeInTheDocument())
+    expect(screen.getByText(/1 of 1 rows imported successfully/i)).toBeInTheDocument()
+  })
+
+  it('does NOT clear the file after a partial-failure result (failed > 0)', async () => {
+    const { doctorsService } = await import('@/features/doctors/doctors.service')
+    vi.mocked(doctorsService.bulkCreateDoctors).mockResolvedValue({
+      totalRows: 2, validRows: 1, invalidRows: 1, created: 1, failed: 1, errors: [{ row: 2, error: 'boom' }],
+    })
+    const { user, file } = await openCsvModeAndPick()
+    await user.click(screen.getByRole('button', { name: /import doctors/i }))
+
+    await waitFor(() => expect(screen.getByText(/1 of 2 rows imported successfully/i)).toBeInTheDocument())
+    expect(screen.getByText(file.name)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /click to choose a csv file/i })).not.toBeInTheDocument()
+  })
+
+  // failed === 0 alone is NOT "clean" — some rows can still have been
+  // skipped for invalid/missing data (invalidRows > 0) without any row
+  // reaching the DB-layer create step at all. That must not be shown or
+  // treated as a full success.
+  it('does NOT clear the file, and does not show a success icon, when invalidRows > 0 even though failed === 0', async () => {
+    const { doctorsService } = await import('@/features/doctors/doctors.service')
+    vi.mocked(doctorsService.bulkCreateDoctors).mockResolvedValue({
+      totalRows: 2, validRows: 1, invalidRows: 1, created: 1, failed: 0, errors: [{ row: 2, error: 'Invalid option' }],
+    })
+    const { user, file } = await openCsvModeAndPick()
+    await user.click(screen.getByRole('button', { name: /import doctors/i }))
+
+    await waitFor(() => expect(screen.getByText(/1 of 2 rows imported successfully/i)).toBeInTheDocument())
+    expect(screen.getByText(file.name)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /click to choose a csv file/i })).not.toBeInTheDocument()
+    expect(screen.getByText(/1 row skipped for invalid\/missing data/i)).toBeInTheDocument()
   })
 })

@@ -356,6 +356,137 @@ describe('MrProvisioningCard — ASM candidate list', () => {
   })
 })
 
+describe('MrProvisioningCard — CSV file-picker UX', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  async function pickCsvFile(fileName = 'mrs.csv') {
+    await mockPermissions(['tenant:admin'])
+    await mockRoleTypesSuccess()
+    const user = userEvent.setup()
+    await renderCard()
+    // CSV is the default tab when both are available — no tab switch needed.
+    const file = new File(['firstName,lastName,email,phone,password\nAlice,Smith,alice@example.com,9999999999,password1'], fileName, { type: 'text/csv' })
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
+    await user.upload(fileInput, file)
+    return { user, file, fileInput }
+  }
+
+  it('shows a filename + size confirmation after picking a file, and hides the empty dropzone button', async () => {
+    const { file } = await pickCsvFile()
+
+    expect(screen.getByText(file.name)).toBeInTheDocument()
+    expect(screen.getByText(/\d+ (KB|MB)/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /click to choose a csv file/i })).not.toBeInTheDocument()
+  })
+
+  it('the empty-state dropzone is a real, keyboard-focusable button', async () => {
+    await mockPermissions(['tenant:admin'])
+    await mockRoleTypesSuccess()
+    await renderCard()
+
+    const dropzone = await screen.findByRole('button', { name: /click to choose a csv file/i })
+    expect(dropzone.tagName).toBe('BUTTON')
+    expect(dropzone).toHaveAttribute('type', 'button')
+  })
+
+  it('clicking Remove clears the file, restores the dropzone, and resets bulkCreateMr (drops a stale result)', async () => {
+    const { divisionService } = await import('@/features/crm/divisions/division.service')
+    vi.mocked(divisionService.bulkCreateMr).mockResolvedValue({ totalRows: 1, created: 0, failed: 1, errors: [{ index: 0, error: 'boom' }] })
+
+    const { user } = await pickCsvFile()
+    await pickAsm(user)
+    await user.click(screen.getByRole('button', { name: /import mrs/i }))
+    expect(await screen.findByText(/0 of 1 rows imported successfully/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /remove selected file/i }))
+
+    expect(screen.getByRole('button', { name: /click to choose a csv file/i })).toBeInTheDocument()
+    expect(screen.queryByText(/rows imported successfully/i)).not.toBeInTheDocument()
+  })
+
+  it('Remove resets the native input value (not just React state), so a real browser would still fire onChange on re-pick', async () => {
+    const { user, fileInput } = await pickCsvFile('repick-me.csv')
+    expect(fileInput.value).not.toBe('')
+
+    await user.click(screen.getByRole('button', { name: /remove selected file/i }))
+
+    expect(fileInput.value).toBe('')
+  })
+
+  it('clicking "Change file" resets the input value before opening it, so re-selecting the exact same file still updates the state', async () => {
+    const { user, fileInput } = await pickCsvFile('same-name.csv')
+    expect(screen.getByText('same-name.csv')).toBeInTheDocument()
+    expect(fileInput.value).not.toBe('')
+
+    await user.click(screen.getByRole('button', { name: /change file/i }))
+    // openFilePicker resets the input's value synchronously before invoking
+    // .click() — assert that reset actually happened, since without it a
+    // real browser would not fire onChange for the identical file below.
+    expect(fileInput.value).toBe('')
+
+    const sameFileAgain = new File(['firstName,lastName,email,phone,password\nAlice,Smith,alice@example.com,9999999999,password1'], 'same-name.csv', { type: 'text/csv' })
+    await user.upload(fileInput, sameFileAgain)
+
+    expect(screen.getByText('same-name.csv')).toBeInTheDocument()
+  })
+
+  it('keeps the hidden file input mounted while a file is selected, so a replacement can be uploaded through it directly', async () => {
+    const { fileInput } = await pickCsvFile('first.csv')
+    expect(screen.getByText('first.csv')).toBeInTheDocument()
+
+    const user = userEvent.setup()
+    const replacement = new File(['firstName,lastName,email,phone,password\nBob,Jones,bob@example.com,9999999999,password1'], 'second.csv', { type: 'text/csv' })
+    await user.upload(fileInput, replacement)
+
+    expect(screen.getByText('second.csv')).toBeInTheDocument()
+  })
+
+  it('clears the file automatically after a clean success (failed === 0), leaving the result summary visible', async () => {
+    const { divisionService } = await import('@/features/crm/divisions/division.service')
+    vi.mocked(divisionService.bulkCreateMr).mockResolvedValue({ totalRows: 1, created: 1, failed: 0, errors: [] })
+
+    const { user } = await pickCsvFile()
+    await pickAsm(user)
+    await user.click(screen.getByRole('button', { name: /import mrs/i }))
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /click to choose a csv file/i })).toBeInTheDocument())
+    expect(screen.getByText(/1 of 1 rows imported successfully/i)).toBeInTheDocument()
+  })
+
+  it('does NOT clear the file after a partial-failure result (failed > 0)', async () => {
+    const { divisionService } = await import('@/features/crm/divisions/division.service')
+    vi.mocked(divisionService.bulkCreateMr).mockResolvedValue({ totalRows: 2, created: 1, failed: 1, errors: [{ index: 1, error: 'boom' }] })
+
+    const { user, file } = await pickCsvFile()
+    await pickAsm(user)
+    await user.click(screen.getByRole('button', { name: /import mrs/i }))
+
+    await waitFor(() => expect(screen.getByText(/1 of 2 rows imported successfully/i)).toBeInTheDocument())
+    expect(screen.getByText(file.name)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /click to choose a csv file/i })).not.toBeInTheDocument()
+  })
+
+  // failed === 0 alone is NOT "clean" — some rows can still have been
+  // skipped for invalid/missing data (invalidRows > 0) without any row
+  // reaching the DB-layer create step at all. That must not be shown or
+  // treated as a full success.
+  it('does NOT clear the file when invalidRows > 0 even though failed === 0', async () => {
+    const { divisionService } = await import('@/features/crm/divisions/division.service')
+    vi.mocked(divisionService.bulkCreateMr).mockResolvedValue({ totalRows: 2, created: 1, failed: 0, invalidRows: 1, errors: [] })
+
+    const { user, file } = await pickCsvFile()
+    await pickAsm(user)
+    await user.click(screen.getByRole('button', { name: /import mrs/i }))
+
+    await waitFor(() => expect(screen.getByText(/1 of 2 rows imported successfully/i)).toBeInTheDocument())
+    expect(screen.getByText(file.name)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /click to choose a csv file/i })).not.toBeInTheDocument()
+    expect(screen.getByText(/1 row skipped for invalid\/missing data/i)).toBeInTheDocument()
+  })
+})
+
 describe('MrProvisioningCard — accessibility', () => {
   beforeEach(() => {
     vi.resetAllMocks()

@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { FiUpload, FiCheckCircle, FiAlertTriangle } from 'react-icons/fi'
+import { FiUpload, FiCheckCircle, FiAlertTriangle, FiX } from 'react-icons/fi'
 import { usePermission } from '@/hooks/usePermission'
 import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRoleTypes'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
@@ -25,6 +25,11 @@ interface MrProvisioningCardProps {
 }
 
 const EMPTY_SINGLE_MR_VALUES: SingleMrFormValues = { firstName: '', lastName: '', email: '', password: '', phone: '' }
+
+function formatFileSize(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  return `${Math.round(bytes / 1024)} KB`
+}
 
 // Provisions MRs for this division two ways: one at a time (POST /roles) or
 // in bulk via CSV (POST /divisions/bulk-mr, division.service.ts's
@@ -124,6 +129,31 @@ const MrProvisioningCard = ({ tenantId, divisionId, onSingleCreated }: MrProvisi
     bulkCreateMr.reset()
   }
 
+  // Clears the picked file (and the native input's own value, so re-picking
+  // the exact same file afterwards still fires onChange) without touching any
+  // in-flight result/error — used after a clean import success, where the
+  // result summary must stay visible.
+  const clearSelection = () => {
+    setFile(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  // An explicit user-driven Remove additionally drops any stale error/result
+  // from a previous attempt, unlike the success-driven auto-clear above.
+  const removeFile = () => {
+    clearSelection()
+    bulkCreateMr.reset()
+  }
+
+  // Resets the native input's value before opening it — without this,
+  // choosing the same file again (e.g. after editing it in place and
+  // re-saving under the same name) would not fire onChange at all, since the
+  // input's value never actually changed from the browser's perspective.
+  const openFilePicker = () => {
+    if (fileInputRef.current) fileInputRef.current.value = ''
+    fileInputRef.current?.click()
+  }
+
   const handleImport = () => {
     if (roleDataBlocked) return
     if (!supervisor) {
@@ -135,7 +165,10 @@ const MrProvisioningCard = ({ tenantId, divisionId, onSingleCreated }: MrProvisi
       return
     }
     setFormError(null)
-    bulkCreateMr.mutate({ tenant: tenantId, division: divisionId, supervisor, file })
+    bulkCreateMr.mutate(
+      { tenant: tenantId, division: divisionId, supervisor, file },
+      { onSuccess: (result) => { if (result.failed === 0 && (result.invalidRows ?? 0) === 0) clearSelection() } },
+    )
   }
 
   const onSubmitSingle = async (values: SingleMrFormValues) => {
@@ -334,24 +367,50 @@ const MrProvisioningCard = ({ tenantId, divisionId, onSingleCreated }: MrProvisi
               <Label htmlFor="mr-provisioning-csv" className="block text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
                 CSV file *
               </Label>
-              <div
-                className="rounded-xl border-2 border-dashed p-6 text-center cursor-pointer transition-colors hover:bg-(--qms-surface-hover)"
-                style={{ borderColor: 'var(--qms-border)' }}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <FiUpload size={20} className="mx-auto mb-1.5" style={{ color: 'var(--qms-text-muted)' }} />
-                <p className="text-[13px] font-semibold" style={{ color: 'var(--qms-text)' }}>
-                  {file ? file.name : 'Click to choose a CSV file'}
-                </p>
-                <input
-                  id="mr-provisioning-csv"
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".csv,text/csv"
-                  className="hidden"
-                  onChange={(e) => handlePickFile(e.target.files?.[0] ?? null)}
-                />
-              </div>
+              {file ? (
+                <div className="rounded-xl border border-success bg-success-soft px-4 py-3 flex items-center gap-3 text-success">
+                  <FiCheckCircle size={18} className="shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] font-semibold truncate" title={file.name}>{file.name}</p>
+                    <p className="text-[11px] opacity-80">{formatFileSize(file.size)}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={openFilePicker}
+                    className="text-[12px] font-semibold underline decoration-dotted underline-offset-2 hover:no-underline shrink-0"
+                  >
+                    Change file
+                  </button>
+                  <button
+                    type="button"
+                    onClick={removeFile}
+                    aria-label="Remove selected file"
+                    className="shrink-0 rounded-full p-1 hover:bg-black/5"
+                  >
+                    <FiX size={16} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={openFilePicker}
+                  className="w-full rounded-xl border-2 border-dashed p-6 text-center cursor-pointer transition-colors hover:bg-(--qms-surface-hover)"
+                  style={{ borderColor: 'var(--qms-border)' }}
+                >
+                  <FiUpload size={20} className="mx-auto mb-1.5" style={{ color: 'var(--qms-text-muted)' }} />
+                  <p className="text-[13px] font-semibold" style={{ color: 'var(--qms-text)' }}>
+                    Click to choose a CSV file
+                  </p>
+                </button>
+              )}
+              <input
+                id="mr-provisioning-csv"
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={(e) => handlePickFile(e.target.files?.[0] ?? null)}
+              />
               <p className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
                 Required columns: firstName, lastName, email, phone, password. Max file size 10MB.
               </p>
@@ -371,7 +430,7 @@ const MrProvisioningCard = ({ tenantId, divisionId, onSingleCreated }: MrProvisi
                 style={{ background: 'var(--qms-surface-strong)' }}
               >
                 <div className="flex items-center gap-2 font-semibold" style={{ color: 'var(--qms-text)' }}>
-                  {result.failed === 0 ? (
+                  {result.failed === 0 && (result.invalidRows ?? 0) === 0 ? (
                     <FiCheckCircle style={{ color: 'var(--success)' }} />
                   ) : (
                     <FiAlertTriangle className="text-danger" />

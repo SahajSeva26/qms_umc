@@ -4,7 +4,7 @@ import { FiArrowLeft, FiEdit2 } from 'react-icons/fi'
 import { useDivision } from '@/features/crm/divisions/hooks/useDivision'
 import { TENANT_ROUTES } from '@/features/access-management/tenant/tenant.routes'
 import { DIVISION_THERAPY_LABEL } from '@/types/crm.types'
-import MrProvisioningCard from '@/features/crm/divisions/components/MrProvisioningCard'
+import DivisionMrsSection from '@/features/crm/divisions/components/DivisionMrsSection'
 import DivisionContactsSection from '@/features/crm/divisions/components/DivisionContactsSection'
 import EditDivisionModal from '@/features/crm/divisions/components/EditDivisionModal'
 import { Button } from '@/components/ui/button'
@@ -82,7 +82,9 @@ const DivisionDetailPage = () => {
             </Button>
           </div>
 
-          {tenantId && <MrProvisioningCard tenantId={tenantId} divisionId={division.id} />}
+          <div className="mt-5">
+            {tenantId && <DivisionMrsSection tenantId={tenantId} divisionId={division.id} />}
+          </div>
 
           <div className="mt-5">
             {tenantId && <DivisionContactsSection tenantId={tenantId} divisionId={division.id} />}

@@ -18,6 +18,10 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 interface MrProvisioningCardProps {
   tenantId: string
   divisionId: string
+  // Called after a successful single-MR add (not CSV import — a bulk import's
+  // result summary needs to stay visible for the user to read). The caller
+  // (DivisionMrsSection) uses this to close the drawer this card renders in.
+  onSingleCreated?: () => void
 }
 
 const EMPTY_SINGLE_MR_VALUES: SingleMrFormValues = { firstName: '', lastName: '', email: '', password: '', phone: '' }
@@ -25,8 +29,9 @@ const EMPTY_SINGLE_MR_VALUES: SingleMrFormValues = { firstName: '', lastName: ''
 // Provisions MRs for this division two ways: one at a time (POST /roles) or
 // in bulk via CSV (POST /divisions/bulk-mr, division.service.ts's
 // bulkCreateMr) — every MR, either way, reports to the single ASM selected
-// below. Since this card only ever renders inside DivisionDetailPage, tenant
-// and division are already fixed and known.
+// below. Renders as the body of DivisionMrsSection's "Add MRs" drawer, so
+// tenant and division are already fixed and known; visibility (whether to
+// mount this at all) is the caller's decision, not this component's.
 //
 // Permission model — the two write paths have genuinely different backend
 // guards, and populating the ASM/MR role-type pickers has its own guard too:
@@ -38,13 +43,11 @@ const EMPTY_SINGLE_MR_VALUES: SingleMrFormValues = { firstName: '', lastName: ''
 // backend permission-policy gap (logged, not routed around here). So CSV is
 // only ever shown when the caller ALSO holds tenant:admin/tenant:manage,
 // not merely when they hold a bulk-import-capable permission.
-const MrProvisioningCard = ({ tenantId, divisionId }: MrProvisioningCardProps) => {
+const MrProvisioningCard = ({ tenantId, divisionId, onSingleCreated }: MrProvisioningCardProps) => {
   const { hasAnyPermission } = usePermission()
   const canLookupRoleData = hasAnyPermission(['tenant:admin', 'tenant:manage'])
-  const canSingleAdd = canLookupRoleData
   const canAttemptBulkImport = hasAnyPermission(['tenant:admin', 'division:manage'])
   const canShowCsv = canAttemptBulkImport && canLookupRoleData
-  const canSeeCard = canSingleAdd || canShowCsv
 
   // Default to CSV when both are available (preserves the existing
   // workflow); if only Single is permitted, there's nothing to toggle.
@@ -165,6 +168,7 @@ const MrProvisioningCard = ({ tenantId, divisionId }: MrProvisioningCardProps) =
       // Keep the selected ASM — only the person fields reset, so adding
       // several MRs in a row to the same supervisor doesn't re-prompt for it.
       reset(EMPTY_SINGLE_MR_VALUES)
+      onSingleCreated?.()
     } catch (err) {
       toast.error(getApiErrorMessage(err, 'Could not add this MR — try again.'))
     }
@@ -172,13 +176,14 @@ const MrProvisioningCard = ({ tenantId, divisionId }: MrProvisioningCardProps) =
 
   const result = bulkCreateMr.data
 
-  if (!canSeeCard) return null
+  // Note: `canSeeCard`'s no-visibility case is handled by the caller
+  // (DivisionMrsSection only mounts this component when its own `canAdd` gate
+  // passes) — this component no longer early-returns null itself. The
+  // internal query `enabled` guards above (canLookupRoleData) are unchanged
+  // and still independently protect every network call regardless of caller.
 
   return (
-    <div
-      className="rounded-xl border p-5 mt-5"
-      style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}
-    >
+    <div>
       <h2 className="text-sm font-bold mb-1" style={{ color: 'var(--qms-text)' }}>
         Add MRs
       </h2>

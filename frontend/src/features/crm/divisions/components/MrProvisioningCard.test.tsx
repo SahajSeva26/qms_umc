@@ -94,24 +94,30 @@ describe('MrProvisioningCard — permissions', () => {
     expect(screen.queryByText(/csv file/i)).not.toBeInTheDocument()
   })
 
-  it('division:manage-only sees nothing — cannot populate the required ASM picker', async () => {
+  // Whether this component renders AT ALL is now the caller's decision
+  // (DivisionMrsSection only mounts it behind its own canAdd gate) — this
+  // component no longer self-gates its own visibility. What it MUST still do
+  // regardless of caller is protect its own network calls: the internal
+  // canLookupRoleData-gated `enabled` conditions on every useRoleTypes/useRoles
+  // call must never fire for a caller lacking tenant:admin/tenant:manage, even
+  // if something renders it anyway.
+
+  it('division:manage-only cannot populate the required ASM picker — fires no role/role-type queries', async () => {
     await mockPermissions(['division:manage'])
     const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
 
-    const { container } = await renderCard()
+    await renderCard()
 
-    expect(container).toBeEmptyDOMElement()
     expect(accessManagementService.searchRoleTypes).not.toHaveBeenCalled()
     expect(accessManagementService.searchRoles).not.toHaveBeenCalled()
   })
 
-  it('no applicable permission renders nothing and fires no role/role-type queries', async () => {
+  it('no applicable permission fires no role/role-type queries', async () => {
     await mockPermissions([])
     const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
 
-    const { container } = await renderCard()
+    await renderCard()
 
-    expect(container).toBeEmptyDOMElement()
     expect(accessManagementService.searchRoleTypes).not.toHaveBeenCalled()
     expect(accessManagementService.searchRoles).not.toHaveBeenCalled()
   })

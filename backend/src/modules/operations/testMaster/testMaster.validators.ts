@@ -82,3 +82,7 @@ export const SearchTestMasterQuerySchema = z.object({
     limit: z.string().optional().openapi({ example: '10' }),
 });
 export type ISearchTestMasterQuery = z.infer<typeof SearchTestMasterQuerySchema>;
+
+//4: report ====================================>
+export const TestMasterReportQuerySchema = z.object({});
+export type ITestMasterReportQuery = z.infer<typeof TestMasterReportQuerySchema>;

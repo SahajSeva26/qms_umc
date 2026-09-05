@@ -14,6 +14,9 @@ import { isValidObjectID } from '../../../shared/utils/strings';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { RoleService } from '../../access-management/role/role.service';
 import { GEO_ALLOCATION_MAX_DISTANCE, GEO_PROFILE_PERMISSIONS, GEO_PROFILE_STATUS } from './geoProfile.constants';
+// report-only imports — kept separate so the existing import lines above stay untouched
+import { IGeoProfileReportQuery } from './geoProfile.validators';
+import { IGeoProfileReportRaw, IGeoProfileReportServiceResult } from './geoProfile.types';
 
 type GeoProfileDocument = HydratedDocument<IGeoProfile> | null;
 
@@ -156,10 +159,65 @@ const findNearest = async (filters: INearestGeoProfileQuery, ctx: RequestContext
     return { count: items.length, items };
 };
 
+// ========================================================================================
+// REPORT
+// ========================================================================================
+
+const EMPTY_REPORT_RAW: IGeoProfileReportRaw = {
+    total: [],
+    statusCounts: [],
+    typeCounts: [],
+    activeWithoutCoordinates: [],
+    coverageRadiusAboveCap: [],
+};
+
+// Current-state snapshot of the geo profiles visible to the actor. There is no date window:
+// every metric is a count of what exists right now, so nothing here is time-filtered.
+const report = async (
+    filters: IGeoProfileReportQuery,
+    ctx: RequestContext,
+): Promise<IGeoProfileReportServiceResult> => {
+    const generatedAt = new Date();
+
+    const [raw] = await geoProfileModel.aggregate<IGeoProfileReportRaw>([
+        { $match: { ...ctx.where() } },
+        {
+            $facet: {
+                total: [{ $count: 'count' }],
+                statusCounts: [{ $group: { _id: '$status', count: { $sum: 1 } } }],
+                typeCounts: [{ $group: { _id: '$type', count: { $sum: 1 } } }],
+
+                activeWithoutCoordinates: [
+                    {
+                        $match: {
+                            status: GEO_PROFILE_STATUS.ACTIVE,
+                            $expr: {
+                                $ne: [{ $cond: [{ $isArray: '$coordinates' }, { $size: '$coordinates' }, 0] }, 2],
+                            },
+                        },
+                    },
+                    { $count: 'count' },
+                ],
+
+                // findNearest caps its $geoNear at GEO_ALLOCATION_MAX_DISTANCE, so a larger
+                // configured radius is silently clamped. This counts that misconfiguration — it says
+                // nothing about actual geographic coverage.
+                coverageRadiusAboveCap: [
+                    { $match: { coverageRadius: { $gt: GEO_ALLOCATION_MAX_DISTANCE } } },
+                    { $count: 'count' },
+                ],
+            },
+        },
+    ]);
+
+    return { ...(raw ?? EMPTY_REPORT_RAW), generatedAt };
+};
+
 export const GeoProfileService = {
     get,
     search,
     create,
     update,
     findNearest,
+    report,
 };

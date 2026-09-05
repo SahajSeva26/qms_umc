@@ -4,6 +4,7 @@ import { GeoProfileController } from './geoProfile.controller';
 import { registry } from '../../../shared/config/swagger/swagger.registry';
 import {
     CreateGeoProfilePayloadSchema,
+    GeoProfileReportQuerySchema,
     NearestGeoProfileQuerySchema,
     SearchGeoProfileQuerySchema,
     UpdateGeoProfilePayloadSchema,
@@ -15,6 +16,29 @@ import { GEO_PROFILE_PERMISSIONS } from './geoProfile.constants';
 export const GeoProfileRouter = express.Router();
 
 GeoProfileRouter.use(AuthMiddleware);
+
+// geo profile report
+registry.registerPath({
+    method: 'get',
+    path: '/geo-profiles/report',
+    tags: ['GEO_PROFILE'],
+    summary: 'Get geo profile report',
+    description:
+        'Current-state snapshot of field-staff geo profiles in the actor\'s tenant scope — there is no ' +
+        'date window, nothing is time-filtered. Returns total/active/inactive counts, the declared-type ' +
+        'and status distributions, and two allocation exceptions. byType counts profiles by their ' +
+        'DECLARED type; create() does not cross-validate it against the linked Role\'s role type, so it ' +
+        'is not a verified headcount. Manage-guarded because it exposes inactive-profile counts, which ' +
+        'search() already restricts to a geo-profile:manage actor.',
+    request: {
+        query: GeoProfileReportQuerySchema,
+    },
+    responses: {
+        200: { description: 'Geo profile report generated successfully' },
+        400: { description: 'Validation error' },
+        403: { description: 'Forbidden' },
+    },
+});
 
 // nearest field staff (allocation)
 registry.registerPath({
@@ -108,6 +132,11 @@ registry.registerPath({
 // =======================================================================
 // reads (incl. allocation) are open to any authenticated user; writes are manage-guarded.
 // NOTE: /nearest is declared before /:id so the literal path is not swallowed by the param route.
+GeoProfileRouter.get(
+    '/report',
+    AuthorizeMiddleware([GEO_PROFILE_PERMISSIONS.MANAGE.code]),
+    GeoProfileController.report,
+);
 GeoProfileRouter.get('/nearest', GeoProfileController.nearest);
 GeoProfileRouter.get('/:id', GeoProfileController.get);
 GeoProfileRouter.get('/', GeoProfileController.search);

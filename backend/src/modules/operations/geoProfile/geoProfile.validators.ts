@@ -54,3 +54,10 @@ export const NearestGeoProfileQuerySchema = z.object({
     limit: z.string().optional().openapi({ example: '10' }),
 });
 export type INearestGeoProfileQuery = z.infer<typeof NearestGeoProfileQuerySchema>;
+
+//5: report ====================================>
+// No filters: the report is a current-state snapshot of the profiles already visible to the actor
+// (tenant scope is applied in the service). Deliberately empty — a date window would imply the
+// counts are time-filtered, which they are not.
+export const GeoProfileReportQuerySchema = z.object({});
+export type IGeoProfileReportQuery = z.infer<typeof GeoProfileReportQuerySchema>;

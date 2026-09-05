@@ -59,15 +59,15 @@ const WizardStep4 = ({ form, setField }: WizardStep4Props) => {
       <div className="grid grid-cols-3 gap-2.5">
         <div>
           <Label className={labelClasses} style={labelStyle}>Free-cancel hours prior</Label>
-          <Input type="number" value={form.freeCancelHours} onChange={(e) => setField('freeCancelHours', Number(e.target.value))} className={fieldClasses} />
+          <Input type="number" value={String(form.freeCancelHours)} onChange={(e) => setField('freeCancelHours', Number(e.target.value))} className={fieldClasses} />
         </div>
         <div>
           <Label className={labelClasses} style={labelStyle}>% cancellations allowed</Label>
-          <Input type="number" min={0} max={100} value={form.cancellationAllowed} onChange={(e) => setField('cancellationAllowed', Number(e.target.value))} className={fieldClasses} />
+          <Input type="number" min={0} max={100} value={String(form.cancellationAllowed)} onChange={(e) => setField('cancellationAllowed', Number(e.target.value))} className={fieldClasses} />
         </div>
         <div>
           <Label className={labelClasses} style={labelStyle}>% deducted on chargeable cancel</Label>
-          <Input type="number" min={0} max={100} value={form.campCostDeductionOnChargableCancel} onChange={(e) => setField('campCostDeductionOnChargableCancel', Number(e.target.value))} className={fieldClasses} />
+          <Input type="number" min={0} max={100} value={String(form.campCostDeductionOnChargableCancel)} onChange={(e) => setField('campCostDeductionOnChargableCancel', Number(e.target.value))} className={fieldClasses} />
         </div>
       </div>
 

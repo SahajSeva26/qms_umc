@@ -10,10 +10,11 @@ import { IServiceOptions } from '../../../shared/types/service.types';
 import { InventoryMasterService } from '../inventory-master/inventory-master.service';
 import { ITEM_TYPES } from '../inventory-master/inventory-master.constants';
 import { INVENTORY_DEVICE_STATUS } from './inventory-device.constants';
+import { VendorMasterService } from '../../vendor-master/vendor-master.service';
 
 type InventoryDeviceDocument = HydratedDocument<IInventoryDevice> | null;
 
-const populate: any[] = [{ path: 'item' }];
+const populate: any[] = [{ path: 'item' }, { path: 'vendor' }];
 
 // A device is an individual physical unit of an InventoryMaster catalog item, identified by its
 // unique serialNumber. Like the catalog it belongs to no tenant, so there is no ctx.where()
@@ -68,6 +69,9 @@ const search = async (filters: ISearchInventoryDeviceQuery, ctx: RequestContext,
     if (filters.item) {
         where.item = filters.item;
     }
+    if (filters.vendor) {
+        where.vendor = filters.vendor;
+    }
     if (filters.serialNumber) {
         where.serialNumber = { $regex: filters.serialNumber, $options: 'i' };
     }
@@ -100,16 +104,23 @@ const create = async (model: ICreateInventoryDevicePayload, ctx: RequestContext)
         return throwAppError('The referenced inventory item is not a device', StatusCodes.BAD_REQUEST);
     }
 
+    //1c: the referenced vendor (supplier) must exist
+    const vendor = await VendorMasterService.get(model.vendor, ctx);
+    if (!vendor) {
+        return throwAppError('The referenced vendor does not exist', StatusCodes.NOT_FOUND);
+    }
+
     //2: guard — serialNumber is the unique natural key (reuse get on it)
     const existing = await InventoryDeviceService.get(model.serialNumber, ctx);
     if (existing) {
         return throwAppError('A device with this serial number already exists', StatusCodes.CONFLICT);
     }
 
-    //3: build entity — item + serialNumber (immutable) are seeded here, never in set().
+    //3: build entity — item + vendor + serialNumber (immutable) are seeded here, never in set().
     // status is not accepted at create — a new device always starts available.
     let entity = new InventoryDeviceModel({
         item: model.item,
+        vendor: model.vendor,
         serialNumber: model.serialNumber,
         status: INVENTORY_DEVICE_STATUS.AVAILABLE,
     });

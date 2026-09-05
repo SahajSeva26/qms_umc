@@ -34,6 +34,8 @@ interface AsyncPickerProps<TResult> {
   isLoadingMore?: boolean
   onLoadMore?: () => void
   disabled?: boolean
+  /** Rendered above the results list, only once results are actually present and ready (never during fetching/error/empty). */
+  resultsBanner?: React.ReactNode
 }
 
 // Shared shell for a single-select, search-as-you-type dropdown field. Query state stays with the caller.
@@ -44,6 +46,7 @@ function AsyncPicker<TResult>({
   isError, errorText, onRetry,
   hasMore, isLoadingMore, onLoadMore,
   disabled,
+  resultsBanner,
 }: AsyncPickerProps<TResult>) {
   const pickResult = (result: TResult) => {
     onChange(getId(result), getLabel(result))
@@ -121,6 +124,7 @@ function AsyncPicker<TResult>({
           {!isFetching && !isError && !query.trim() && !emptyQueryText && results.length === 0 && (
             <div className="text-[12px] px-2 py-2" style={{ color: 'var(--qms-text-muted)' }}>{emptyResultsText ?? noResultsText}</div>
           )}
+          {!isFetching && !isError && results.length > 0 && resultsBanner}
           {!isError && results.map((result) => (
             <button
               key={getId(result)}

@@ -61,7 +61,7 @@ const WizardStep3 = ({ form, setField }: WizardStep3Props) => {
       <div className="grid grid-cols-2 gap-2.5">
         <div>
           <Label className={labelClasses} style={labelStyle}>GST %</Label>
-          <Input type="number" min={0} max={100} step={0.5} value={form.gst} onChange={(e) => setField('gst', Number(e.target.value))} className={fieldClasses} />
+          <Input type="number" min={0} max={100} step={0.5} value={String(form.gst)} onChange={(e) => setField('gst', Number(e.target.value))} className={fieldClasses} />
         </div>
         <div>
           <Label className={labelClasses} style={labelStyle}>Additional cost (₹ per patient)</Label>

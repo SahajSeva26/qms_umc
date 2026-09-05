@@ -6,9 +6,9 @@ import type { InventoryMasterEntity, InventoryMasterType } from '@/types/invento
 import AsyncPicker from '@/components/ui/AsyncPicker'
 
 interface InventoryMasterMultiPickerProps {
-  /** Selected device ids. */
+  /** Selected inventory-item ids. */
   value: string[]
-  /** Selected devices' own labels, keyed by id — needed to render chips for a selection that fell off the current search results. */
+  /** Selected items' own labels, keyed by id — needed to render chips for a selection that fell off the current search results. */
   labels: Record<string, string>
   onChange: (value: string[], labels: Record<string, string>) => void
   type: InventoryMasterType
@@ -17,11 +17,12 @@ interface InventoryMasterMultiPickerProps {
 
 const itemLabel = (item: InventoryMasterEntity) => `${item.name} (${item.code})`
 
-// Multi-select devices picker over the InventoryMaster catalog — the backend
-// requires devices as real catalog ObjectIds, not free text.
+// Multi-select inventory-item picker over the InventoryMaster catalog — the
+// backend requires devices/consumables as real catalog ObjectIds, not free text.
 const InventoryMasterMultiPicker = ({ value, labels, onChange, type, disabled }: InventoryMasterMultiPickerProps) => {
   const [query, setQuery] = useState('')
   const { open, setOpen, containerRef } = useAsyncPickerState()
+  const noun = type === 'consumable' ? 'consumables' : 'devices'
 
   const { items, isFetching, error, hasMore, loadMore, refetch } = useInventoryMasterPicker(query, type, open)
 
@@ -65,13 +66,13 @@ const InventoryMasterMultiPicker = ({ value, labels, onChange, type, disabled }:
         isFetching={isFetching && items.length === 0}
         getId={(item) => item.id}
         getLabel={itemLabel}
-        searchPlaceholder="Search devices to add…"
+        searchPlaceholder={`Search ${noun} to add…`}
         clearAriaLabel="Clear"
-        emptyQueryText="Start typing to search devices."
-        noResultsText="No matching devices found."
+        emptyQueryText={`Start typing to search ${noun}.`}
+        noResultsText={`No matching ${noun} found.`}
         renderResult={(item) => <>{itemLabel(item)}</>}
         isError={!!error}
-        errorText="Couldn't search devices. Try again."
+        errorText={`Couldn't search ${noun}. Try again.`}
         onRetry={() => refetch()}
         hasMore={hasMore}
         isLoadingMore={isFetching && items.length > 0}

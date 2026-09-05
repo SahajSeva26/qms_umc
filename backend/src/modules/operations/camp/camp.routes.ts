@@ -4,6 +4,7 @@ import { CampController } from './camp.controller';
 import { registry } from '../../../shared/config/swagger/swagger.registry';
 import {
     BookCampPayloadSchema,
+    CampReportQuerySchema,
     CreateCampPayloadSchema,
     MoveStagePayloadSchema,
     SearchCampQuerySchema,
@@ -11,12 +12,29 @@ import {
 } from './camp.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
 import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { reportRateLimiter } from '../../../shared/middlewares/rateLimiter';
 import { CAMP_PERMISSIONS } from './camp.constants';
 import { TENANT_PERMISSIONS } from '../../access-management/tenant/tenant.constants';
 
 export const CampRouter = express.Router();
 
 CampRouter.use(AuthMiddleware);
+
+// camp report
+registry.registerPath({
+    method: 'get',
+    path: '/camps/report',
+    tags: ['CAMP'],
+    summary: 'Get camp statistics report (total count, status/type/billing-type counts)',
+    request: {
+        query: CampReportQuerySchema,
+    },
+    responses: {
+        200: { description: 'Camp report generated successfully' },
+        400: { description: 'Validation error' },
+        403: { description: 'Forbidden' },
+    },
+});
 
 // get camp
 registry.registerPath({
@@ -156,6 +174,13 @@ registry.registerPath({
 // =======================================================================
 const GUARD = [CAMP_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code];
 const READ_GUARD = [CAMP_PERMISSIONS.SEARCH.code, ...GUARD]; // assigned field-force (camp:search) may read; service scopes them to their own camps
+
+CampRouter.get(
+    '/report',
+    reportRateLimiter,
+    AuthorizeMiddleware(GUARD),
+    CampController.report
+);
 
 CampRouter.get(
     '/:id',

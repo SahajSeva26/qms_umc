@@ -2,6 +2,7 @@ import { FiFile, FiFileText, FiMail } from 'react-icons/fi'
 import type { WizardFormState } from '@/features/projects/wizard.types'
 import type { ExecutionModeType } from '@/types/project.types'
 import { EXECUTION_MODE_LABEL } from '@/types/project.types'
+import { addMonthsIso, monthsBetween } from '@/features/projects/projects.utils'
 import { PickCard, PickGrid } from '@/components/ui/PickCard'
 import SectionHeader from '@/components/ui/SectionHeader'
 import { Input } from '@/components/ui/input'
@@ -10,19 +11,6 @@ import { labelClasses, labelStyle, fieldClasses } from '@/features/projects/comp
 
 const MODE_ICONS: Record<ExecutionModeType, typeof FiFile> = { po: FiFile, agreement: FiFileText, mail_confirmation: FiMail }
 const MODE_OPTIONS: ExecutionModeType[] = ['po', 'agreement', 'mail_confirmation']
-
-export function addMonthsIso(iso: string, months: number): string {
-  const d = new Date(iso)
-  d.setMonth(d.getMonth() + months)
-  return d.toISOString().slice(0, 10)
-}
-
-export function monthsBetween(startIso: string, endIso: string): number {
-  const s = new Date(startIso)
-  const e = new Date(endIso)
-  if (e < s) return 0
-  return Math.round((e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth()))
-}
 
 interface WizardStep2Props {
   form: WizardFormState
@@ -67,7 +55,10 @@ const WizardStep2 = ({ form, setField }: WizardStep2Props) => {
                 value={form.poDate}
                 onChange={(e) => {
                   setField('poDate', e.target.value)
-                  if (!form.poExpiry) setField('poExpiry', addMonthsIso(e.target.value, 12))
+                  if (!form.poExpiry) {
+                    const expiry = addMonthsIso(e.target.value, 12)
+                    if (expiry) setField('poExpiry', expiry)
+                  }
                 }}
                 className={fieldClasses}
               />
@@ -95,8 +86,13 @@ const WizardStep2 = ({ form, setField }: WizardStep2Props) => {
                 value={form.agreementStartDate}
                 onChange={(e) => {
                   setField('agreementStartDate', e.target.value)
-                  if (form.agreementEndDate) setField('duration', monthsBetween(e.target.value, form.agreementEndDate))
-                  else if (form.duration) setField('agreementEndDate', addMonthsIso(e.target.value, form.duration))
+                  if (form.agreementEndDate) {
+                    const months = monthsBetween(e.target.value, form.agreementEndDate)
+                    if (months !== null) setField('duration', months)
+                  } else if (form.duration) {
+                    const endDate = addMonthsIso(e.target.value, form.duration)
+                    if (endDate) setField('agreementEndDate', endDate)
+                  }
                 }}
                 className={fieldClasses}
               />
@@ -108,7 +104,10 @@ const WizardStep2 = ({ form, setField }: WizardStep2Props) => {
                 value={form.agreementEndDate}
                 onChange={(e) => {
                   setField('agreementEndDate', e.target.value)
-                  if (form.agreementStartDate) setField('duration', monthsBetween(form.agreementStartDate, e.target.value))
+                  if (form.agreementStartDate) {
+                    const months = monthsBetween(form.agreementStartDate, e.target.value)
+                    if (months !== null) setField('duration', months)
+                  }
                 }}
                 className={fieldClasses}
               />
@@ -117,11 +116,16 @@ const WizardStep2 = ({ form, setField }: WizardStep2Props) => {
               <Label className={labelClasses} style={labelStyle}>Duration (months) *</Label>
               <Input
                 type="number"
+                min={0}
+                step={1}
                 value={form.duration || ''}
                 onChange={(e) => {
                   const months = Number(e.target.value)
                   setField('duration', months)
-                  if (form.agreementStartDate) setField('agreementEndDate', addMonthsIso(form.agreementStartDate, months))
+                  if (form.agreementStartDate) {
+                    const endDate = addMonthsIso(form.agreementStartDate, months)
+                    if (endDate) setField('agreementEndDate', endDate)
+                  }
                 }}
                 className={fieldClasses}
               />

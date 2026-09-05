@@ -19,6 +19,8 @@ vi.mock('@/features/access-management/accessManagement.service', () => ({
 vi.mock('@/features/doctors/doctors.service', () => ({
   doctorsService: {
     searchDoctors: vi.fn(async () => ({ success: true, message: '', data: { items: [], count: 0 } })),
+    createDoctor: vi.fn(),
+    updateDoctor: vi.fn(),
   },
 }))
 
@@ -67,10 +69,13 @@ function makeQueryClient() {
 
 const TEST_PROJECT: { id: string; name: string; campTimeSlots: CampTimeSlotValue[] } = { id: 'proj-1', name: 'Cardio Screening Drive', campTimeSlots: ['9am-1pm', '10am-2pm'] }
 
-async function mockSession(roleId?: string) {
+async function mockSession(roleId?: string, hasDoctorManage = false) {
   const { useSession } = await import('@/hooks/useSession')
   vi.mocked(useSession).mockReturnValue({
     session: sessionFixture(roleId),
+    // usePermission() (used for the dormant "New doctor" gate) wraps
+    // useSession() directly — hasPermission must be present on the mock.
+    hasPermission: (code: string) => (code === 'doctor:manage' ? hasDoctorManage : false),
   } as unknown as ReturnType<typeof useSession>)
 }
 
@@ -384,5 +389,114 @@ describe('BookCampForm', () => {
 
     resolveBooking(bookCampResponseFixture())
     await waitFor(() => expect(onBooked).toHaveBeenCalledTimes(1))
+  })
+})
+
+describe('BookCampForm — inline doctor creation (dormant until doctor:manage is granted)', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  it('hides the "New doctor" trigger without doctor:manage — the real state for every pharma role today', async () => {
+    await mockSession(undefined, false)
+    const BookCampForm = (await import('@/features/pharma/components/BookCampForm')).default
+
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <BookCampForm needsMrPicker={false} project={TEST_PROJECT} onBooked={vi.fn()} />
+      </QueryClientProvider>,
+    )
+
+    expect(screen.queryByRole('button', { name: /new doctor/i })).not.toBeInTheDocument()
+  })
+
+  it('creating a doctor auto-selects it via the same field.onChange/doctorLabel pipe as a normal search pick', async () => {
+    await mockSession('self-role-42', true)
+    const { doctorsService } = await import('@/features/doctors/doctors.service')
+    vi.mocked(doctorsService.createDoctor).mockResolvedValue({
+      success: true, message: '',
+      data: { id: 'doc-new', pharmaCode: 'DOC-NEW', name: 'Dr. New', specialization: 'cp', mobile: '', email: '', city: '', state: '', pincode: '', googleMapLink: '', createdAt: '', updatedAt: '', tenant: 't-1' },
+    })
+    const BookCampForm = (await import('@/features/pharma/components/BookCampForm')).default
+
+    const user = userEvent.setup()
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <BookCampForm needsMrPicker={false} project={TEST_PROJECT} onBooked={vi.fn()} />
+      </QueryClientProvider>,
+    )
+
+    await user.click(screen.getByRole('button', { name: /new doctor/i }))
+    await screen.findByRole('dialog')
+    // Locked to the session's own tenant — no company picker/second fetch needed.
+    expect(screen.getByText(/locked to the camp being booked/i)).toBeInTheDocument()
+
+    const codeLabel = screen.getByText(/pharma doctor code/i)
+    await user.type(codeLabel.parentElement!.querySelector('input')!, 'DOC-NEW')
+    const nameLabel = screen.getByText(/^doctor name$/i)
+    await user.type(nameLabel.parentElement!.querySelector('input')!, 'Dr. New')
+    await user.click(screen.getByRole('button', { name: /^add doctor$/i }))
+
+    await waitFor(() => expect(doctorsService.createDoctor).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(doctorsService.createDoctor).mock.calls[0][0].tenant).toBe('t-1')
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.getByText(/dr\. new \(doc-new\)/i)).toBeInTheDocument()
+  })
+
+  it('clears a stale "Doctor is required" error once a doctor is created inline', async () => {
+    await mockSession('self-role-42', true)
+    const { doctorsService } = await import('@/features/doctors/doctors.service')
+    vi.mocked(doctorsService.createDoctor).mockResolvedValue({
+      success: true, message: '',
+      data: { id: 'doc-new', pharmaCode: 'DOC-NEW', name: 'Dr. New', specialization: 'cp', mobile: '', email: '', city: '', state: '', pincode: '', googleMapLink: '', createdAt: '', updatedAt: '', tenant: 't-1' },
+    })
+    const BookCampForm = (await import('@/features/pharma/components/BookCampForm')).default
+
+    const user = userEvent.setup()
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <BookCampForm needsMrPicker={false} project={TEST_PROJECT} onBooked={vi.fn()} />
+      </QueryClientProvider>,
+    )
+
+    // Trigger the field-level "Doctor is required" error the normal way, by
+    // touching the doctor field then leaving it empty (mode: 'onChange').
+    await fillCommonFields(user)
+    await user.click(screen.getByRole('button', { name: /book camp/i }))
+    await waitFor(() => expect(screen.getByText(/doctor is required/i)).toBeInTheDocument())
+
+    await user.click(screen.getByRole('button', { name: /new doctor/i }))
+    await screen.findByRole('dialog')
+    const codeLabel = screen.getByText(/pharma doctor code/i)
+    await user.type(codeLabel.parentElement!.querySelector('input')!, 'DOC-NEW')
+    const nameLabel = screen.getByText(/^doctor name$/i)
+    await user.type(nameLabel.parentElement!.querySelector('input')!, 'Dr. New')
+    await user.click(screen.getByRole('button', { name: /^add doctor$/i }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    // setValue with shouldValidate:true re-runs validation immediately —
+    // the stale error must not survive the doctor now being set.
+    expect(screen.queryByText(/doctor is required/i)).not.toBeInTheDocument()
+  })
+
+  it('Cancel creates no doctor', async () => {
+    await mockSession(undefined, true)
+    const { doctorsService } = await import('@/features/doctors/doctors.service')
+    const BookCampForm = (await import('@/features/pharma/components/BookCampForm')).default
+
+    const user = userEvent.setup()
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <BookCampForm needsMrPicker={false} project={TEST_PROJECT} onBooked={vi.fn()} />
+      </QueryClientProvider>,
+    )
+
+    await user.click(screen.getByRole('button', { name: /new doctor/i }))
+    await screen.findByRole('dialog')
+    await user.click(screen.getByRole('button', { name: /^cancel$/i }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(doctorsService.createDoctor).not.toHaveBeenCalled()
   })
 })

@@ -9,6 +9,7 @@ import type {
   SearchCampQuery,
   UpdateCampPayload,
 } from '@/types/campReal.types'
+import type { CampReport } from '@/types/campReport.types'
 
 // Real API calls against backend/src/modules/operations/camp/**. Deliberately
 // separate from `camps.service.ts` (the old mock store ~100 files still depend on).
@@ -53,6 +54,11 @@ const allocateFo = async (id: string) => {
   return res.data
 }
 
+const getCampReport = async () => {
+  const res = await api.get<ApiResponse<CampReport>>('/camps/report')
+  return res.data
+}
+
 export const campsRealService = {
   searchCamps,
   getCamp,
@@ -61,4 +67,5 @@ export const campsRealService = {
   updateCamp,
   moveCampStage,
   allocateFo,
+  getCampReport,
 }

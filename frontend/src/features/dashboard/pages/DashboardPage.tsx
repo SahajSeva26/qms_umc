@@ -11,7 +11,7 @@ import SalesFilterBar from '@/components/widgets/sales-kpi/SalesFilterBar'
 import SalesKpiGrid from '@/components/widgets/sales-kpi/SalesKpiGrid'
 import FilterBar from '@/features/dashboard/components/FilterBar'
 import TopKpiStrip from '@/features/dashboard/components/TopKpiStrip'
-import CampReportSection from '@/features/dashboard/components/CampReportSection'
+import CampOverviewSection from '@/features/dashboard/components/CampOverviewSection'
 import CompanySection from '@/features/dashboard/components/CompanySection'
 import ProjectsSection from '@/features/dashboard/components/ProjectsSection'
 import FoSection from '@/features/dashboard/components/FoSection'
@@ -25,7 +25,7 @@ import { getGreeting } from '@/utils/formatters'
 
 const DashboardPage = () => {
   const { user } = useAuth()
-  const { hasPermission } = usePermission()
+  const { hasPermission, hasAnyPermission } = usePermission()
   const { filters, setFilter, reset } = useDashboardFilters()
   const [drill, setDrill] = useState<{ title: string; content: string } | null>(null)
   const [salesFilter, setSalesFilter] = useState<SalesFilterState>(DEFAULT_SALES_FILTER)
@@ -39,6 +39,8 @@ const DashboardPage = () => {
   // everyone in practice. Real replacement: system:manage, the actual
   // backend permission that denotes full administrative access.
   const isSuperAdmin = hasPermission('system:manage')
+  // GET /camps/report requires this exact set — stricter than camp:search.
+  const canViewCampReport = hasAnyPermission(['camp:manage', 'tenant:manage'])
 
   // Owns the loading/error gate for the shared dashboard query. Every section
   // below calls useDashboardData(filters) with this same object, so they all
@@ -91,7 +93,7 @@ const DashboardPage = () => {
 
           {isSuperAdmin && <SalesKpiGrid tiles={salesKpiTiles} />}
 
-          <CampReportSection />
+          {canViewCampReport && <CampOverviewSection />}
 
           <CompanySection filters={filters} onDrill={onDrill} />
           <ProjectsSection filters={filters} onDrill={onDrill} />

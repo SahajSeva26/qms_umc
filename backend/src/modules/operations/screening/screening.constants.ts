@@ -48,3 +48,13 @@ export const SCREENING_PERMISSIONS = {
         description: 'Update screenings, move stage, and verify consent',
     } as const,
 };
+
+// ================= SCREENING REPORT CONSTANTS ===============
+
+export const SCREENING_REPORT_EXCEPTIONS = [
+    {
+        code: 'SCREENING_AWAITING_CONSENT_VERIFICATION',
+        severity: 'high',
+        label: 'Pending screenings that cannot be completed until patient consent is verified',
+    },
+] as const;

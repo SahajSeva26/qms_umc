@@ -42,3 +42,7 @@ export const SearchTestQuerySchema = z.object({
     limit: z.string().optional().openapi({ example: '10' }),
 });
 export type ISearchTestQuery = z.infer<typeof SearchTestQuerySchema>;
+
+//4: report ====================================>
+export const TestReportQuerySchema = z.object({});
+export type ITestReportQuery = z.infer<typeof TestReportQuerySchema>;

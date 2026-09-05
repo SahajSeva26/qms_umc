@@ -12,6 +12,8 @@ import { CounterService } from '../../counter/counter.service';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
 import { InventoryMasterService } from '../../inventory/inventory-master/inventory-master.service';
 import { ITEM_TYPES } from '../../inventory/inventory-master/inventory-master.constants';
+import { ITestMasterReportQuery } from './testMaster.validators';
+import { ITestMasterReportRaw, ITestMasterReportServiceResult } from './testMaster.types';
 
 type TestMasterDocument = HydratedDocument<ITestMaster> | null;
 
@@ -157,9 +159,38 @@ const update = async (id: string, model: IUpdateTestMasterPayload, ctx: RequestC
     return entity;
 };
 
+// ========================================================================================
+// REPORT
+// ========================================================================================
+
+const EMPTY_REPORT_RAW: ITestMasterReportRaw = {
+    total: [],
+    statusCounts: [],
+    campTypeCounts: [],
+    therapyCounts: [],
+};
+
+// Current-state snapshot of the ENTIRE global test catalog — there is no date window and no filter.
+const report = async (filters: ITestMasterReportQuery, ctx: RequestContext): Promise<ITestMasterReportServiceResult> => {
+    const generatedAt = new Date();
+    const [raw] = await TestMasterModel.aggregate<ITestMasterReportRaw>([
+        {
+            $facet: {
+                total: [{ $count: 'count' }],
+                statusCounts: [{ $group: { _id: '$status', count: { $sum: 1 } } }],
+                campTypeCounts: [{ $group: { _id: '$campType', count: { $sum: 1 } } }],
+                therapyCounts: [{ $group: { _id: '$therapy', count: { $sum: 1 } } }],
+            },
+        },
+    ]);
+
+    return { ...(raw ?? EMPTY_REPORT_RAW), generatedAt };
+};
+
 export const TestMasterService = {
     get,
     search,
     create,
     update,
+    report,
 };

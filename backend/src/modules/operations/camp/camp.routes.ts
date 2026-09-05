@@ -25,7 +25,18 @@ registry.registerPath({
     method: 'get',
     path: '/camps/report',
     tags: ['CAMP'],
-    summary: 'Get camp statistics report (total count, status/type/billing-type counts)',
+    summary: 'Get camp operational report',
+    description:
+        'Tenant-scoped camp report. Window-scoped sections (status/type/billing/time-slot/state ' +
+        'distributions, FO workload, scheduled-month trend, requested-to-confirmed turnaround) honour ' +
+        'from/to on the SCHEDULED date (camp.date, default 180d back / 90d forward). Current-state ' +
+        'sections (live, scheduled today/7d/30d, unallocated, exceptions) ignore the window by design. ' +
+        'byFieldOfficer is WORKLOAD (camp counts), not performance; its null row = camps in the window ' +
+        'with no FO across ANY status, which is deliberately a different metric from ' +
+        'summary.unallocatedCamps (current state, requested only). trend.closed/cancelled are the ' +
+        'CURRENT status of camps SCHEDULED in that month, not closures/cancellations that occurred in ' +
+        'it. turnaround is system workflow time (creation to the confirmed transition), not real-world ' +
+        'response time and not camp duration; it reports avg + sampleSize only (no median).',
     request: {
         query: CampReportQuerySchema,
     },

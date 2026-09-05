@@ -56,3 +56,10 @@ export const VerifyConsentPayloadSchema = z.object({
     signature: z.string().min(1).optional().openapi({ example: 'data:image/png;base64,...' }),
 });
 export type IVerifyConsentPayload = z.infer<typeof VerifyConsentPayloadSchema>;
+
+//6: report ====================================>
+// No filters: the report is a current-state snapshot of the screenings already visible to the
+// actor (tenant scope is applied in the service). Deliberately empty — a date window would imply
+// the counts are time-filtered, which they are not.
+export const ScreeningReportQuerySchema = z.object({});
+export type IScreeningReportQuery = z.infer<typeof ScreeningReportQuerySchema>;

@@ -27,6 +27,16 @@ import { RoleService } from '../../access-management/role/role.service';
 import { DivisionService } from '../../crm/division/division.service';
 import { ALLOWED_ROLETYPE_CODES } from '../../access-management/role-type/roleType.constants';
 import { InventoryMasterService } from '../../inventory/inventory-master/inventory-master.service';
+import {
+    CAMP_CANCELLED_STATUSES,
+    CAMP_NON_TERMINAL_STATUSES,
+    CAMP_REPORT_DEFAULT_FUTURE_DAYS,
+    CAMP_REPORT_DEFAULT_PAST_DAYS,
+    CAMP_REPORT_IMMINENT_DAYS,
+    CAMP_REPORT_STALE_LIVE_GRACE_DAYS,
+} from './camp.constants';
+import { ICampReportServiceResult, ICampReportWindow } from './camp.types';
+import { startOfUTCDay } from '../../../shared/utils/dates';
 
 type CampDocument = HydratedDocument<ICamp> | null;
 
@@ -496,22 +506,169 @@ const book = async (model: IBookCampPayload, ctx: RequestContext): Promise<Hydra
     return CampService.create(createPayload, ctx);
 };
 
-const report = async (filters: ICampReportQuery, ctx: RequestContext) => {
-    //1: single aggregation, single collection scan — every branch is independent, computed off the
-    // same scoped input set.
-    const [result] = await CampModel.aggregate([
-        { $match: ctx.where() },
+// ================================ REPORT ================================
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
+const ROLE_COLLECTION = 'roles'; // mongoose lowercase-pluralizes 'Role'; only used for the FO name/code lookup
+
+const addDays = (date: Date, days: number): Date => new Date(date.getTime() + days * DAY_MS);
+
+// Resolve the report window: caller bounds win, documented defaults otherwise. Both ends snap to
+// whole UTC days so the window is stable regardless of server timezone — same convention as search().
+const resolveReportWindow = (filters: ICampReportQuery, now: Date): ICampReportWindow => {
+    const from = startOfUTCDay(filters.from ?? addDays(now, -CAMP_REPORT_DEFAULT_PAST_DAYS));
+    const to = endOfUTCDay(filters.to ?? addDays(now, CAMP_REPORT_DEFAULT_FUTURE_DAYS));
+
+    return { from, to, basis: 'date' };
+};
+
+const report = async (filters: ICampReportQuery, ctx: RequestContext): Promise<ICampReportServiceResult> => {
+    const generatedAt = new Date();
+    const window = resolveReportWindow(filters, generatedAt);
+
+    const todayStart = startOfUTCDay(generatedAt);
+    const todayEnd = endOfUTCDay(generatedAt);
+    const next7End = endOfUTCDay(addDays(generatedAt, CAMP_REPORT_IMMINENT_DAYS));
+    const next30End = endOfUTCDay(addDays(generatedAt, 30));
+    // one day of grace: a camp scheduled yesterday is not yet stale, the day before that is
+    const staleLiveCutoff = startOfUTCDay(addDays(generatedAt, -CAMP_REPORT_STALE_LIVE_GRACE_DAYS));
+
+    // reused by every window-scoped branch as its first stage
+    const inWindow = { $match: { date: { $gte: window.from, $lte: window.to } } };
+
+    const [raw] = await CampModel.aggregate([
+        // tenant isolation — applied ONCE, before all branches
+        { $match: { ...ctx.where() } },
         {
             $facet: {
-                totalCamps: [{ $count: 'count' }],
-                statusCounts: [{ $group: { _id: '$status', count: { $sum: 1 } } }],
-                typeCounts: [{ $group: { _id: '$type', count: { $sum: 1 } } }],
-                billingTypeCounts: [{ $group: { _id: '$billingType', count: { $sum: 1 } } }],
+                // ── WINDOW-SCOPED ─────────────────────────────────────────────────
+                total: [inWindow, { $count: 'count' }],
+                statusCounts: [inWindow, { $group: { _id: '$status', count: { $sum: 1 } } }],
+                typeCounts: [inWindow, { $group: { _id: '$type', count: { $sum: 1 } } }],
+                billingTypeCounts: [inWindow, { $group: { _id: '$billingType', count: { $sum: 1 } } }],
+                timeSlotCounts: [inWindow, { $group: { _id: '$timeSlot', count: { $sum: 1 } } }],
+                stateCounts: [inWindow, { $group: { _id: '$state', count: { $sum: 1 } } }, { $sort: { count: -1, _id: 1 } }],
+
+                byFieldOfficer: [
+                    inWindow,
+                    {
+                        $group: {
+                            _id: '$fo', // null groups every unallocated camp into one bucket, on purpose
+                            total: { $sum: 1 },
+                            upcoming: {
+                                $sum: {
+                                    $cond: [
+                                        { $and: [{ $in: ['$status', CAMP_NON_TERMINAL_STATUSES] }, { $gte: ['$date', todayStart] }] },
+                                        1,
+                                        0,
+                                    ],
+                                },
+                            },
+                            closed: { $sum: { $cond: [{ $eq: ['$status', CAMP_STATUSES.CLOSED] }, 1, 0] } },
+                            cancelled: { $sum: { $cond: [{ $in: ['$status', CAMP_CANCELLED_STATUSES] }, 1, 0] } },
+                        },
+                    },
+                    {
+                        // pipeline form so only name/code cross the wire — a Role also carries a
+                        // permissions array this report has no use for
+                        $lookup: {
+                            from: ROLE_COLLECTION,
+                            let: { foId: '$_id' },
+                            pipeline: [{ $match: { $expr: { $eq: ['$_id', '$$foId'] } } }, { $project: { name: 1, code: 1 } }],
+                            as: 'foDoc',
+                        },
+                    },
+                    { $sort: { total: -1, _id: 1 } },
+                ],
+
+                // scheduled-date trend — grouped on `date`, never createdAt: this answers "how much
+                // work is scheduled and how much of it landed", not "when were bookings taken"
+                trend: [
+                    inWindow,
+                    {
+                        $group: {
+                            _id: { $dateToString: { format: '%Y-%m', date: '$date', timezone: 'UTC' } },
+                            scheduled: { $sum: 1 },
+                            closed: { $sum: { $cond: [{ $eq: ['$status', CAMP_STATUSES.CLOSED] }, 1, 0] } },
+                            cancelled: { $sum: { $cond: [{ $in: ['$status', CAMP_CANCELLED_STATUSES] }, 1, 0] } },
+                        },
+                    },
+                    { $sort: { _id: 1 } },
+                ],
+
+                turnaround: [
+                    inWindow,
+                    { $match: { 'stageHistory.to': CAMP_STATUSES.CONFIRMED } },
+                    {
+                        $addFields: {
+                            confirmedEntry: {
+                                $arrayElemAt: [
+                                    {
+                                        $filter: {
+                                            input: { $ifNull: ['$stageHistory', []] },
+                                            cond: { $eq: ['$$this.to', CAMP_STATUSES.CONFIRMED] },
+                                        },
+                                    },
+                                    0,
+                                ],
+                            },
+                        },
+                    },
+                    // both endpoints must be real dates before any arithmetic
+                    { $match: { 'confirmedEntry.createdAt': { $type: 'date' }, createdAt: { $type: 'date' } } },
+                    { $addFields: { hours: { $divide: [{ $subtract: ['$confirmedEntry.createdAt', '$createdAt'] }, HOUR_MS] } } },
+                    // drop nonsensical negatives (clock skew / back-dated writes) rather than letting
+                    // them drag the average down
+                    { $match: { hours: { $gte: 0 } } },
+                    {
+                        $group: {
+                            _id: null,
+                            avg: { $avg: '$hours' },
+                            sampleSize: { $sum: 1 },
+                        },
+                    },
+                ],
+
+                // ── CURRENT STATE (window-independent, by design) ─────────────────
+                liveNow: [{ $match: { status: CAMP_STATUSES.LIVE } }, { $count: 'count' }],
+                scheduledToday: [
+                    { $match: { status: { $in: CAMP_NON_TERMINAL_STATUSES }, date: { $gte: todayStart, $lte: todayEnd } } },
+                    { $count: 'count' },
+                ],
+                scheduledNext7Days: [
+                    { $match: { status: { $in: CAMP_NON_TERMINAL_STATUSES }, date: { $gte: todayStart, $lte: next7End } } },
+                    { $count: 'count' },
+                ],
+                scheduledNext30Days: [
+                    { $match: { status: { $in: CAMP_NON_TERMINAL_STATUSES }, date: { $gte: todayStart, $lte: next30End } } },
+                    { $count: 'count' },
+                ],
+
+                // ── EXCEPTIONS (current state) ────────────────────────────────────
+                unallocated: [{ $match: { status: CAMP_STATUSES.REQUESTED, fo: null } }, { $count: 'count' }],
+                unallocatedImminent: [
+                    { $match: { status: CAMP_STATUSES.REQUESTED, fo: null, date: { $gte: todayStart, $lte: next7End } } },
+                    { $count: 'count' },
+                ],
+                staleLive: [{ $match: { status: CAMP_STATUSES.LIVE, date: { $lt: staleLiveCutoff } } }, { $count: 'count' }],
+                staleConfirmed: [{ $match: { status: CAMP_STATUSES.CONFIRMED, date: { $lt: todayStart } } }, { $count: 'count' }],
+                noProject: [{ $match: { project: null } }, { $count: 'count' }],
+                noCoordinates: [
+                    {
+                        $match: {
+                            $expr: {
+                                $ne: [{ $cond: [{ $isArray: '$coordinates' }, { $size: '$coordinates' }, 0] }, 2],
+                            },
+                        },
+                    },
+                    { $count: 'count' },
+                ],
             },
         },
     ]);
 
-    return { ...result };
+    return { ...(raw as ICampReportServiceResult), generatedAt, window };
 };
 
 export const CampService = {

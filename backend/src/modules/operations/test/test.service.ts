@@ -18,6 +18,8 @@ import { InventoryAssignmentService } from '../../inventory/inventory-assignment
 import { INVENTORY_ASSIGNMENT_TYPES } from '../../inventory/inventory-assignment/inventory-assignment.constants';
 import { InventoryAssignmentModel } from '../../inventory/inventory-assignment/inventory-assignment.model';
 import { InventoryConsumableModel } from '../../inventory/inventory-consumable/inventory-consumable.model';
+import { ITestReportQuery } from './test.validators';
+import { ITestReportRaw, ITestReportServiceResult } from './test.types';
 
 type TestDoc = HydratedDocument<ITest> | null;
 
@@ -267,9 +269,68 @@ const update = async (id: string, model: IUpdateTestPayload, ctx: RequestContext
     return entity;
 };
 
+// ========================================================================================
+// REPORT
+// ========================================================================================
+
+
+const TEST_MASTER_COLLECTION = 'testmasters';
+const EMPTY_REPORT_RAW: ITestReportRaw = {
+    total: [],
+    typeCounts: [],
+};
+
+// A Test document is a RECORDED RESULT — the model has no status field and no lifecycle, so there
+// is deliberately no byStatus section and no exception section (no code-permitted problem state
+// exists: every invariant is hard-enforced at create and every structural field is required).
+//
+// applyOwnScope is deliberately NOT reused here: it pins a non-manage actor to their own `performedBy`. 
+//
+// NO clinical aggregation
+const report = async (filters: ITestReportQuery, ctx: RequestContext): Promise<ITestReportServiceResult> => {
+    const generatedAt = new Date();
+
+    const [raw] = await TestModel.aggregate<ITestReportRaw>([
+        { $match: { ...ctx.where() } },
+        {
+            $facet: {
+                total: [{ $count: 'count' }],
+
+                typeCounts: [
+                    { $group: { _id: '$type', count: { $sum: 1 } } },
+                    {
+                        $lookup: {
+                            from: TEST_MASTER_COLLECTION,
+                            let: { typeId: '$_id' },
+                            pipeline: [
+                                { $match: { $expr: { $eq: ['$_id', '$$typeId'] } } },
+                                { $project: { _id: 0, code: 1, name: 1 } },
+                            ],
+                            as: 'master',
+                        },
+                    },
+                    {
+                        $addFields: {
+                            code: { $arrayElemAt: ['$master.code', 0] },
+                            name: { $arrayElemAt: ['$master.name', 0] },
+                        },
+                    },
+                    { $sort: { count: -1, code: 1 } },
+                    // drop the grouping key (the TestMaster ObjectId) and the raw lookup array at
+                    // the DB level, so the id never leaves the database at all
+                    { $project: { _id: 0, code: 1, name: 1, count: 1 } },
+                ],
+            },
+        },
+    ]);
+
+    return { ...(raw ?? EMPTY_REPORT_RAW), generatedAt };
+};
+
 export const TestService = {
     get,
     search,
     create,
     update,
+    report,
 };

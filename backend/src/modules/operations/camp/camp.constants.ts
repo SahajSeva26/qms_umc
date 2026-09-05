@@ -92,3 +92,52 @@ export const CAMP_PERMISSIONS = {
 //============================================================
 // CAMP BUSINESS ROLE TYPES
 //============================================================
+
+// ================= CAMP REPORT CONSTANTS ===============
+
+
+export const CAMP_REPORT_DEFAULT_PAST_DAYS = 180;
+export const CAMP_REPORT_DEFAULT_FUTURE_DAYS = 90;
+export const CAMP_REPORT_STALE_LIVE_GRACE_DAYS = 1;
+export const CAMP_REPORT_IMMINENT_DAYS = 7;
+
+export const CAMP_NON_TERMINAL_STATUSES: string[] = [
+    CAMP_STATUSES.REQUESTED,
+    CAMP_STATUSES.CONFIRMED,
+    CAMP_STATUSES.LIVE,
+];
+
+export const CAMP_CANCELLED_STATUSES: string[] = [CAMP_STATUSES.CANCELLED, CAMP_STATUSES.CANCELLED_CHARGED];
+
+export const CAMP_REPORT_EXCEPTIONS = [
+    {
+        code: 'CAMP_UNALLOCATED_IMMINENT',
+        severity: 'critical',
+        label: 'Unallocated camps scheduled within 7 days',
+    },
+    {
+        code: 'CAMP_STALE_LIVE',
+        severity: 'critical',
+        label: 'Camps still live after their scheduled date',
+    },
+    {
+        code: 'CAMP_STALE_CONFIRMED',
+        severity: 'high',
+        label: 'Confirmed camps whose scheduled date has passed without going live',
+    },
+    {
+        code: 'CAMP_UNALLOCATED',
+        severity: 'high',
+        label: 'Camps with no field officer assigned',
+    },
+    {
+        code: 'CAMP_NO_PROJECT',
+        severity: 'medium',
+        label: 'Camps not linked to a project',
+    },
+    {
+        code: 'CAMP_NO_COORDINATES',
+        severity: 'medium',
+        label: 'Camps with no coordinates',
+    },
+] as const;

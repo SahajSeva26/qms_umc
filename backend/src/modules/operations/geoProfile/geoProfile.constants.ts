@@ -29,3 +29,26 @@ export const GEO_PROFILE_PERMISSIONS = {
         description: 'Manage geo profiles (field-staff location + coverage used for camp allocation)',
     } as const,
 };
+
+// ================= GEO PROFILE REPORT CONSTANTS ===============
+
+// Fixed set of actionable report exceptions. Each is a state the module permits but which silently
+// breaks allocation, so nothing else surfaces it:
+//   • an ACTIVE profile whose coordinates are not a usable [lng, lat] pair can never be matched by
+//     findNearest's $geoNear — the worker looks deployable and is permanently unallocatable.
+//   • a coverageRadius above GEO_ALLOCATION_MAX_DISTANCE is silently clamped by findNearest, so the
+//     configured value does not mean what whoever set it thinks it means.
+// Severity: high = blocks allocation now, medium = configuration is misleading.
+// The label describes the CONFIGURED value only — it makes no claim about real geographic coverage.
+export const GEO_PROFILE_REPORT_EXCEPTIONS = [
+    {
+        code: 'GEO_ACTIVE_WITHOUT_COORDINATES',
+        severity: 'high',
+        label: 'Active profiles with no usable coordinates (cannot be allocated to camps)',
+    },
+    {
+        code: 'GEO_COVERAGE_RADIUS_ABOVE_CAP',
+        severity: 'medium',
+        label: 'Profiles whose configured coverage radius exceeds the allocation distance limit',
+    },
+] as const;

@@ -10,6 +10,9 @@ import { isValidObjectID } from '../../../shared/utils/strings';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { CounterService } from '../../counter/counter.service';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
+// report-only imports — kept separate so the existing import lines above stay untouched
+import { IPatientReportQuery } from './patient.validators';
+import { IPatientReportRaw, IPatientReportServiceResult } from './patient.types';
 
 type PatientDocument = HydratedDocument<PatientType> | null;
 
@@ -160,9 +163,37 @@ const update = async (id: string, model: IUpdatePatientPayload, ctx: RequestCont
     return entity;
 };
 
+// ========================================================================================
+// REPORT
+// ========================================================================================
+
+const EMPTY_REPORT_RAW: IPatientReportRaw = {
+    total: [],
+    statusCounts: [],
+    genderCounts: [],
+};
+
+// GLOBAL BY DESIGN
+const report = async (filters: IPatientReportQuery, ctx: RequestContext): Promise<IPatientReportServiceResult> => {
+    const generatedAt = new Date();
+
+    const [raw] = await PatientModel.aggregate<IPatientReportRaw>([
+        {
+            $facet: {
+                total: [{ $count: 'count' }],
+                statusCounts: [{ $group: { _id: '$status', count: { $sum: 1 } } }],
+                genderCounts: [{ $group: { _id: '$gender', count: { $sum: 1 } } }],
+            },
+        },
+    ]);
+
+    return { ...(raw ?? EMPTY_REPORT_RAW), generatedAt };
+};
+
 export const PatientService = {
     get,
     search,
     create,
     update,
+    report,
 };

@@ -2,6 +2,7 @@
 import { ResponseHandler } from '../../../shared/utils/responseHandler';
 import { formatZodError } from '../../../shared/utils/error';
 import { CreatePatientPayloadSchema, SearchPatientQuerySchema, UpdatePatientPayloadSchema } from './patient.validators';
+import { PatientReportQuerySchema } from './patient.validators';
 import { StatusCodes } from 'http-status-codes';
 import { PatientService } from './patient.service';
 import { PatientMapper } from './patient.mapper';
@@ -94,9 +95,36 @@ const update = async (req: any, res: any) => {
     }
 };
 
+const report = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+
+        const { data: filters, success, error } = PatientReportQuerySchema.safeParse(req.query);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                fields: validationErrors,
+            });
+        }
+
+        const result = await PatientService.report(filters, ctx);
+
+        return ResponseHandler.appResponse(
+            res,
+            StatusCodes.OK,
+            true,
+            'Patient report generated successfully',
+            PatientMapper.toReportResponse(result),
+        );
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
 export const PatientController = {
     get,
     search,
     create,
     update,
+    report,
 };

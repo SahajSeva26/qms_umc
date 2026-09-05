@@ -58,3 +58,7 @@ export const SearchPatientQuerySchema = z.object({
     limit: z.string().optional().openapi({ example: '10' }),
 });
 export type ISearchPatientQuery = z.infer<typeof SearchPatientQuerySchema>;
+
+//4: report ====================================>
+export const PatientReportQuerySchema = z.object({});
+export type IPatientReportQuery = z.infer<typeof PatientReportQuerySchema>;

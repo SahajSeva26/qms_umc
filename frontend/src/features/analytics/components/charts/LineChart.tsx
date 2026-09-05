@@ -11,6 +11,13 @@ interface LineChartProps {
   labels: string[]
   formatY: (value: number) => string
   height?: number
+  // Optional: transforms each axis label for DISPLAY only (hover tooltips
+  // and the aria-label still use the raw `labels` values). Existing callers
+  // that omit this render exactly as before. Added for callers whose labels
+  // are long (e.g. full 'YYYY-MM-DD' dates) — the existing hide-every-other
+  // logic below only reduces label COUNT, not width, so a long label still
+  // overcrowds the chart's fixed WIDTH even at half density.
+  formatLabel?: (label: string) => string
 }
 
 const WIDTH = 640
@@ -20,7 +27,7 @@ const PADDING_TOP = 12
 
 // One axis only — both series share the same y-scale (dataviz skill rule:
 // never a dual-axis chart). Legend + direct hover tooltip per point.
-const LineChart = ({ series, labels, formatY, height = 220 }: LineChartProps) => {
+const LineChart = ({ series, labels, formatY, height = 220, formatLabel }: LineChartProps) => {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null)
 
   const allValues = series.flatMap((s) => s.data)
@@ -104,7 +111,7 @@ const LineChart = ({ series, labels, formatY, height = 220 }: LineChartProps) =>
             fill="var(--qms-text-muted)"
             style={{ display: i % 2 === 0 ? undefined : 'none' }}
           >
-            {label}
+            {formatLabel ? formatLabel(label) : label}
           </text>
         ))}
       </svg>

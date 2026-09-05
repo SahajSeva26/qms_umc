@@ -1,13 +1,16 @@
 import { useMemo, useState } from 'react'
 import { useUsers } from '@/features/admin/hooks/useUsers'
+import { useUserReport } from '@/features/admin/hooks/useUserReport'
 import { adminService } from '@/features/admin/admin.service'
 import UsersTable from '@/features/admin/components/UsersTable'
 import UsersFilterBar from '@/features/admin/components/UsersFilterBar'
+import UsersKpiStrip from '@/features/admin/components/UsersKpiStrip'
 import { useUsersFilters } from '@/features/admin/hooks/useUsersFilters'
 import PaginationControls from '@/components/ui/PaginationControls'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
+import { usePermission } from '@/hooks/usePermission'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { usePagination } from '@/hooks/usePagination'
 import { useQuery } from '@tanstack/react-query'
@@ -19,6 +22,10 @@ const PAGE_SIZE = 10
 const CLIENT_SIDE_FETCH_LIMIT = 200
 
 const UsersPage = () => {
+  const { hasPermission } = usePermission()
+  const canViewReport = hasPermission('user:manage')
+  const reportQuery = useUserReport({}, canViewReport)
+
   const { filters, setFilter, reset } = useUsersFilters()
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
 
@@ -104,6 +111,18 @@ const UsersPage = () => {
           {!isLoading && !isError ? `${totalCount} total` : 'Manage platform users and their roles.'}
         </p>
       </div>
+
+      {canViewReport && (
+        <QueryStateBlock
+          isLoading={reportQuery.isLoading}
+          error={reportQuery.isError}
+          loadingLabel="Loading report…"
+          errorLabel="Failed to load user report."
+          onRetry={reportQuery.refetch}
+        >
+          {reportQuery.data?.data && <UsersKpiStrip report={reportQuery.data.data} />}
+        </QueryStateBlock>
+      )}
 
       <UsersFilterBar
         filters={filters}

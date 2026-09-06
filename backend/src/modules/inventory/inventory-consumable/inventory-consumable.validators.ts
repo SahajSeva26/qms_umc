@@ -36,3 +36,8 @@ export const SearchInventoryConsumableQuerySchema = z.object({
     limit: z.string().optional().openapi({ example: '10' }),
 });
 export type ISearchInventoryConsumableQuery = z.infer<typeof SearchInventoryConsumableQuerySchema>;
+
+//4: report ====================================>
+// Phase 3 consumable report — no query parameters (matches the centralized report's empty-query contract).
+export const InventoryConsumableReportQuerySchema = z.object({});
+export type IInventoryConsumableReportQuery = z.infer<typeof InventoryConsumableReportQuerySchema>;

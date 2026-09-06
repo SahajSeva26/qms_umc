@@ -3,6 +3,7 @@ import { HydratedDocument } from 'mongoose';
 import { InventoryRequestModel, IInventoryRequest } from './inventory-request.model';
 import {
     ICreateInventoryRequestPayload,
+    IInventoryRequestReportQuery,
     IMoveStagePayload,
     ISearchInventoryRequestQuery,
     IUpdateInventoryRequestPayload,
@@ -507,10 +508,50 @@ const moveStage = async (id: string, model: IMoveStagePayload, ctx: RequestConte
     return saved;
 };
 
+// ========================================================================================
+// REPORT (Phase 4 — request lifecycle only)
+// ========================================================================================
+// Additive migration of the centralized inventory-report's request metrics (totalRequests,
+// requestByStatus, requestByType, and the derived pendingRequests) into the feature that owns the
+// request lifecycle. Single-collection and GLOBALLY UNSCOPED — mirrors the centralized report, which
+// reads the entire inventoryrequests collection.
+//
+// IMPORTANT: this deliberately does NOT call applyOwnScope() and does NOT set where.requestedBy — the
+// report counts EVERY request across all requesters, not just the caller's own. That is safe because
+// the route is gated on inventory-request:manage (managers only). It queries InventoryRequestModel
+// directly rather than reusing search() (which applies the own-scope + pagination + filters).
+const report = async (_filters: IInventoryRequestReportQuery, _ctx: RequestContext) => {
+    const [result] = await InventoryRequestModel.aggregate([
+        {
+            $facet: {
+                // total requests (== old summary.totalRequests) — every document, no status filter
+                total: [{ $count: 'count' }],
+                // requests grouped by status (== old requestByStatus)
+                byStatus: [{ $group: { _id: '$status', count: { $sum: 1 } } }],
+                // requests grouped by type (== old requestByType)
+                byType: [{ $group: { _id: '$type', count: { $sum: 1 } } }],
+            },
+        },
+    ]);
+
+    const byStatus = result?.byStatus || [];
+    // pendingRequests is DERIVED from the status counts — exactly the count of 'requested'
+    // (matches the centralized report's JS post-processing; not requested+approved, not a new status).
+    const pendingRequests = byStatus.find((r: any) => r._id === INVENTORY_REQUEST_STATUS.REQUESTED)?.count || 0;
+
+    return {
+        totalRequests: result?.total?.[0]?.count || 0,
+        requestByStatus: byStatus,
+        requestByType: result?.byType || [],
+        pendingRequests,
+    };
+};
+
 export const InventoryRequestService = {
     get,
     search,
     create,
     update,
     moveStage,
+    report,
 };

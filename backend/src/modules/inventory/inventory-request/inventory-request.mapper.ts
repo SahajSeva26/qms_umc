@@ -1,5 +1,5 @@
 // Inventory-request Mapper
-import { INVENTORY_REQUEST_ITEM_TYPE } from './inventory-request.constants';
+import { INVENTORY_REQUEST_ITEM_TYPE, INVENTORY_REQUEST_STATUS, INVENTORY_REQUEST_TYPE } from './inventory-request.constants';
 
 // a Role ref (requestedBy/processedBy) may be a populated doc or a raw ObjectId — surface a shallow shape either way.
 const mapRole = (role: any) => {
@@ -72,4 +72,24 @@ export const InventoryRequestMapper = {
         count: data?.count || 0,
         items: (data?.items || []).map(InventoryRequestMapper.toResponse),
     }),
+
+    // Phase 4 request report. Preserves the centralized inventory-report's enum-space zero-fill:
+    // every INVENTORY_REQUEST_STATUS / INVENTORY_REQUEST_TYPE value always appears (in constant
+    // order), defaulting to 0. pendingRequests is the pre-derived count of 'requested'. Exposes no
+    // _id / unrelated fields.
+    toReportResponse: (report: any) => {
+        const byStatus = new Map<string, number>((report?.requestByStatus || []).map((r: any) => [r._id, r.count]));
+        const byType = new Map<string, number>((report?.requestByType || []).map((r: any) => [r._id, r.count]));
+
+        return {
+            summary: {
+                totalRequests: report?.totalRequests || 0,
+                pendingRequests: report?.pendingRequests || 0,
+            },
+            requests: {
+                byStatus: Object.values(INVENTORY_REQUEST_STATUS).map((status) => ({ status, count: byStatus.get(status) || 0 })),
+                byType: Object.values(INVENTORY_REQUEST_TYPE).map((type) => ({ type, count: byType.get(type) || 0 })),
+            },
+        };
+    },
 };

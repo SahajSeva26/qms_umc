@@ -7,9 +7,8 @@ interface UsersKpiStripProps {
   report: UserReport
 }
 
-// Day-granularity periods are 'YYYY-MM-DD' (10 chars) — too wide for the
-// chart's fixed width even with every-other-label hidden. Month-granularity
-// periods ('YYYY-MM', 7 chars) are already short, left unchanged.
+// Day-granularity periods ('YYYY-MM-DD') are too wide for the chart's fixed
+// width even with every-other-label hidden; month periods are left as-is.
 const formatTrendLabel = (period: string) => (period.length === 10 ? period.slice(5) : period)
 
 const UsersKpiStrip = ({ report }: UsersKpiStripProps) => {

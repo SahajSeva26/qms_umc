@@ -35,7 +35,6 @@ describe('useCampReport — query key shares campRealKeys.all so real-camp mutat
     const { wrapper } = makeWrapper()
     const { result } = renderHook(() => useCampReport(), { wrapper })
     expect(result.current).toBeDefined()
-    // Sanity: the key constant itself resolves to what the hook is documented to use.
     expect([...campRealKeys.all, 'report']).toEqual(['campsReal', 'report'])
   })
 
@@ -51,9 +50,8 @@ describe('useCampReport — query key shares campRealKeys.all so real-camp mutat
       await createResult.current.mutateAsync({} as CreateCampPayload)
     })
 
-    // invalidateQueries marks the report query stale and (since it's actively
-    // observed by the still-mounted reportResult hook) triggers a real refetch —
-    // the strongest possible proof the two keys actually share a namespace.
+    // invalidateQueries marks the report query stale and, since it's still
+    // observed by reportResult, triggers a real refetch.
     await waitFor(() => expect(campsRealService.getCampReport).toHaveBeenCalledTimes(2))
     expect(queryClient.getQueryData([...campRealKeys.all, 'report'])).toBeDefined()
   })

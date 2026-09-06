@@ -11,18 +11,14 @@ import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRo
 vi.mock('@/hooks/usePermission')
 vi.mock('@/features/access-management/role/hooks/useRoles')
 vi.mock('@/features/access-management/role-type/hooks/useRoleTypes')
-// MrProvisioningCard's own internals (single/csv form, ASM lookup, mutations)
-// are fully covered by MrProvisioningCard.test.tsx — stub it here so this
-// file only exercises DivisionMrsSection's own list/gating/drawer logic.
+// MrProvisioningCard's own internals are covered by its own test file —
+// stub it here so this file only exercises this component's own logic.
 vi.mock('@/features/crm/divisions/components/MrProvisioningCard', () => ({
   default: ({ onSingleCreated }: { onSingleCreated?: () => void }) => (
     <div>
       <p>MrProvisioningCard stub</p>
       <button type="button" onClick={() => onSingleCreated?.()}>Simulate single MR created</button>
-      {/* MrProvisioningCard's real CSV path never calls onSingleCreated —
-          this button simulates "a CSV import just completed successfully"
-          by deliberately calling nothing, so the drawer's open state is only
-          ever driven by onSingleCreated, never by a bare render/interaction. */}
+      {/* Deliberately calls nothing — the real CSV path never calls onSingleCreated. */}
       <button type="button">Simulate CSV import completed (does not close)</button>
     </div>
   ),
@@ -35,8 +31,7 @@ function mockPermission(canView: boolean) {
 }
 
 // Pass `null` (not omitted) to simulate a tenant with no pharma-mr role type
-// configured — a plain default param would treat an explicit `undefined` the
-// same as "not provided," which is not what most call sites here mean.
+// configured — omitting it would fall back to the default instead.
 function mockRoleType(id: string | null = 'rt-mr') {
   vi.mocked(useRoleTypes).mockReturnValue({
     data: { success: true, message: '', data: { items: id ? [{ id, code: 'pharma-mr' }] : [], count: id ? 1 : 0 } },
@@ -125,10 +120,8 @@ describe('DivisionMrsSection', () => {
     renderSection()
 
     await user.type(screen.getByPlaceholderText(/search by name or email/i), 'ravi')
-    // Immediately after typing, the debounced value hasn't flushed yet — no
-    // call so far should have been issued with any partial term (r/ra/rav),
-    // only ever the initial undefined `user` and (once the debounce settles)
-    // the final 'ravi'.
+    // No call so far should carry any partial term (r/ra/rav) — only the
+    // initial undefined `user` or the final debounced 'ravi'.
     const partialTerms = vi.mocked(useRoles).mock.calls
       .map((call) => call[0].user)
       .filter((term): term is string => typeof term === 'string' && term !== 'ravi')
@@ -240,9 +233,8 @@ describe('DivisionMrsSection', () => {
     renderSection()
 
     expect(screen.getByText(/missing a required role type/i)).toBeInTheDocument()
-    // MRs were never queried (mrRoleTypeId never resolved) — the table/
-    // pagination must not render alongside the config-error message, since
-    // "No MRs found." would falsely imply a real, empty query result.
+    // Must not render alongside "No MRs found." — that would falsely imply
+    // a real, empty query result rather than an unresolved config error.
     expect(screen.queryByText(/no mrs found/i)).not.toBeInTheDocument()
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
   })

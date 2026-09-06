@@ -34,10 +34,8 @@ describe('LocationAddressFields', () => {
     const city = screen.getByDisplayValue('Mumbai')
     await user.type(city, 'X')
 
-    // The component is a controlled display of the `value` prop, which this
-    // test never re-renders with the merged result — so only the FIRST
-    // onChange call (built from the still-original `current`) is meaningful
-    // to assert against; later calls compound against the same stale prop.
+    // Controlled by `value`, which this test never re-renders with the merged
+    // result, so only the first onChange call reflects the original `current`.
     const firstCall = onChange.mock.calls[0]?.[0]
     expect(firstCall).toEqual(expect.objectContaining({ city: 'MumbaiX', addressLine1: '221 Baker Street', state: 'Maharashtra' }))
   })
@@ -71,8 +69,6 @@ describe('LocationAddressFields', () => {
 
     const country = screen.getByDisplayValue('India')
     await user.clear(country)
-    // Blur commits the trim-and-normalize — the component reads e.target.value on each keystroke,
-    // so the last keystroke of clearing already produces ''.
     const lastCall = onChange.mock.calls.at(-1)?.[0]
     expect(lastCall.country).toBeUndefined()
     expect(lastCall.country).not.toBe('')

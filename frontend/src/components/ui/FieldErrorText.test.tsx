@@ -28,4 +28,12 @@ describe('FieldErrorText', () => {
     render(<FieldErrorText message="Enter a valid email" />)
     expect(screen.getByText('Enter a valid email')).toBeInTheDocument()
   })
+
+  // Documents a real limitation: useReshapingResolver joins sibling messages
+  // with a plain space, not a period — a message missing its trailing period
+  // stays fused to its neighbor instead of splitting onto its own line.
+  it('fails to split two joined messages when the first one is missing its trailing period', () => {
+    render(<FieldErrorText message="City is required State is required." />)
+    expect(screen.getByText('City is required State is required.')).toBeInTheDocument()
+  })
 })

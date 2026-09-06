@@ -35,17 +35,13 @@ const LocationSearchBox = ({ disabled, countryCode, defaultCountry, onSelected }
     },
   })
 
-  // Keyed off the raw query, not debouncedQuery — otherwise clearing the box
-  // leaves the dropdown open (showing stale suggestions or "No matching
-  // places found") for up to the debounce window, since debouncedQuery still
-  // holds the pre-clear text during that gap.
+  // Raw query, not debouncedQuery — otherwise clearing the box leaves the
+  // dropdown open (stale suggestions) until the debounce window elapses.
   const hasQuery = query.trim().length > 0
   const showDropdown = open && !disabled && (hasQuery || isFetching)
 
-  // Clamped at read-time (not "corrected" via an effect) — the suggestion
-  // list can shrink out from under a stored index (e.g. a stale-response
-  // guard dropping results), and this keeps the highlighted option in range
-  // without ever storing/reading an invalid one.
+  // Clamped at read-time rather than via an effect — the suggestion list can
+  // shrink out from under a stored index (e.g. a stale-response guard).
   const clampedHighlightedIndex = suggestions.length === 0 ? -1 : Math.min(highlightedIndex, suggestions.length - 1)
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -79,7 +75,7 @@ const LocationSearchBox = ({ disabled, countryCode, defaultCountry, onSelected }
           aria-activedescendant={clampedHighlightedIndex >= 0 ? `${listboxId}-option-${clampedHighlightedIndex}` : undefined}
           value={query}
           onChange={(e) => {
-            if (isSelecting) return // a selection is still being fetched — ignore edits rather than starting new autocomplete calls mid-flight
+            if (isSelecting) return // ignore edits while a selection is still being fetched
             setQuery(e.target.value)
             setOpen(true)
             setHighlightedIndex(-1)

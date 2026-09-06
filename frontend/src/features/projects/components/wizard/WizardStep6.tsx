@@ -40,11 +40,8 @@ const WizardStep6 = () => {
   const campTimeSlots = useWatch({ control, name: 'campTimeSlots' })
   const paymentTerms = useWatch({ control, name: 'paymentTerms' })
 
-  // Lazy initializer so "now" is captured once, not on every render.
   const [now] = useState(() => Date.now())
-  // Preview only — never submitted in the outgoing payload (see
-  // computeBookingPreview's own comment for why: this has no server semantic
-  // to match).
+  // Preview only — never submitted in the outgoing payload.
   const effectiveEarliestSlotPreview = useMemo(
     () => computeBookingPreview(daysToBookBefore, now),
     [daysToBookBefore, now],

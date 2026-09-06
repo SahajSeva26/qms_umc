@@ -94,9 +94,8 @@ describe('CampScreeningPage — gating', () => {
   }, 15000)
 
   it('blocks a matching role id whose roleType is not field-officer — id equality alone must never be enough', async () => {
-    // Same role id as camp.fo ('r-fo'), but a non-FO roleType — mirrors the
-    // backend's assertAssignedFoOrManage, which requires isFoType AND
-    // isAssigned together, not id equality alone (see canRunScreening).
+    // Mirrors the backend's assertAssignedFoOrManage, which requires isFoType
+    // AND isAssigned together, not id equality alone.
     await mockSession('r-fo', ['screening:create', 'screening:get', 'screening:search', 'screening:update'], 'sales-rep')
     await renderPage(campFixture())
 

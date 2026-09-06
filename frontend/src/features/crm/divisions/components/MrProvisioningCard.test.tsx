@@ -94,14 +94,6 @@ describe('MrProvisioningCard — permissions', () => {
     expect(screen.queryByText(/csv file/i)).not.toBeInTheDocument()
   })
 
-  // Whether this component renders AT ALL is now the caller's decision
-  // (DivisionMrsSection only mounts it behind its own canAdd gate) — this
-  // component no longer self-gates its own visibility. What it MUST still do
-  // regardless of caller is protect its own network calls: the internal
-  // canLookupRoleData-gated `enabled` conditions on every useRoleTypes/useRoles
-  // call must never fire for a caller lacking tenant:admin/tenant:manage, even
-  // if something renders it anyway.
-
   it('division:manage-only cannot populate the required ASM picker — fires no role/role-type queries', async () => {
     await mockPermissions(['division:manage'])
     const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
@@ -421,9 +413,8 @@ describe('MrProvisioningCard — CSV file-picker UX', () => {
     expect(fileInput.value).not.toBe('')
 
     await user.click(screen.getByRole('button', { name: /change file/i }))
-    // openFilePicker resets the input's value synchronously before invoking
-    // .click() — assert that reset actually happened, since without it a
-    // real browser would not fire onChange for the identical file below.
+    // Without this reset, a real browser would not fire onChange for the
+    // identical file re-selected below.
     expect(fileInput.value).toBe('')
 
     const sameFileAgain = new File(['firstName,lastName,email,phone,password\nAlice,Smith,alice@example.com,9999999999,password1'], 'same-name.csv', { type: 'text/csv' })
@@ -468,10 +459,8 @@ describe('MrProvisioningCard — CSV file-picker UX', () => {
     expect(screen.queryByRole('button', { name: /click to choose a csv file/i })).not.toBeInTheDocument()
   })
 
-  // failed === 0 alone is NOT "clean" — some rows can still have been
-  // skipped for invalid/missing data (invalidRows > 0) without any row
-  // reaching the DB-layer create step at all. That must not be shown or
-  // treated as a full success.
+  // failed === 0 alone is NOT "clean" — invalidRows > 0 means some rows never
+  // reached the DB-layer create step at all, and must not read as full success.
   it('does NOT clear the file when invalidRows > 0 even though failed === 0', async () => {
     const { divisionService } = await import('@/features/crm/divisions/division.service')
     vi.mocked(divisionService.bulkCreateMr).mockResolvedValue({ totalRows: 2, created: 1, failed: 0, invalidRows: 1, errors: [] })

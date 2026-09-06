@@ -35,10 +35,8 @@ vi.mock('@/features/access-management/role-type/hooks/useRoleTypes', () => ({
   useRoleTypes: vi.fn(() => ({ data: { data: { items: [{ id: 'rt-sales-rep', code: 'sales-rep', name: 'Sales Rep' }], count: 1 } }, isLoading: false, isError: false })),
 }))
 vi.mock('@/features/access-management/role/hooks/useRoles', () => ({
-  // args-aware (not a static return) — WizardStep4 makes two useRoles() calls
-  // (sales-rep type, sales-head type) and only enables the one whose
-  // RoleType lookup actually resolved; a static mock would return the same
-  // role for both regardless of `enabled`, producing a duplicate React key.
+  // Args-aware, not a static return — WizardStep4 makes two useRoles() calls
+  // and a static mock would produce a duplicate React key for both.
   useRoles: vi.fn((_query: unknown, enabled?: boolean) =>
     enabled === false
       ? { data: { data: { items: [], count: 0 } }, isLoading: false, isError: false }
@@ -50,10 +48,8 @@ function makeQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } })
 }
 
-// projectDraft.store.ts's sibling leadDraft.store.ts caches one store
-// instance per userId for the page's real lifetime — giving every test its
-// own userId keeps each test's draft/sessionStorage entry fully independent,
-// with no cross-test reset trickery needed.
+// leadDraft.store.ts caches one store instance per userId — giving every
+// test its own userId keeps each test's draft entry fully independent.
 let draftTestUserCounter = 0
 function nextDraftTestUserId() {
   draftTestUserCounter += 1
@@ -138,11 +134,9 @@ describe('NewLeadWizard — draft persistence', () => {
 
     await renderWizard(userId, { prefill: { tenantId: 'tenant-9', tenantLabel: 'Appointment Tenant' } })
 
-    // Prefill wins immediately — real Step 1 content, no decision view.
     expect(await screen.findByText(/pharma company/i)).toBeInTheDocument()
     expect(screen.queryByText(/unsaved lead from earlier/i)).not.toBeInTheDocument()
 
-    // The unrelated normal-flow draft is completely untouched.
     const raw = sessionStorage.getItem(draftStorageKey(userId))
     expect(JSON.parse(raw as string).state.draft).toEqual({ tenantId: 'tenant-1', tenantLabel: 'Untouched Normal Draft' })
   })
@@ -153,19 +147,11 @@ describe('NewLeadWizard — draft persistence', () => {
     const { unmount } = await renderWizard(userId)
     await screen.findByText(/pharma company/i)
 
-    // Drives the real UI — no sessionStorage seeding — through Step 1's
-    // Focus therapy chip picker (a real Select, not free text; WizardStep1's
-    // other fields all depend on an async tenant/division pick this test's
-    // mocks don't support, so this is the simplest genuinely-real field).
-    // Comboboxes on this step, in DOM order: company, division, focus
-    // therapy, focus doctor specialty — company/division are disabled
-    // (blocked on an async tenant pick this test doesn't mock), so focus
-    // therapy (index 2) is the simplest genuinely-interactive real field.
+    // Company/division comboboxes stay disabled without an async tenant pick
+    // this test doesn't mock, so focus therapy (index 2) is the simplest real field.
     await user.click(screen.getAllByRole('combobox')[2])
     await user.click(await screen.findByRole('option', { name: 'Cardiology' }))
 
-    // Let the 400ms debounce actually elapse and write to sessionStorage
-    // before unmounting — the real timing path, not a seeded draft.
     await waitFor(
       () => {
         const raw = sessionStorage.getItem(draftStorageKey(userId))
@@ -189,12 +175,8 @@ describe('NewLeadWizard — draft persistence', () => {
     const user = userEvent.setup()
     const onCreated = vi.fn()
 
-    // WizardStep1's tenant/division/contact pickers all need async data this
-    // file doesn't mock (TenantAsyncPicker, useDivisions, useContacts) — seed
-    // a draft with Step 1 already filled in (Resume merges it into the live
-    // form, same mechanism the "Resume restores exact saved values" test
-    // above already proves works) so this test can drive Steps 2-4 for real
-    // through the UI and reach an actual, real submit.
+    // WizardStep1's pickers all need async data this file doesn't mock, so
+    // Step 1 is seeded via draft/Resume instead, letting Steps 2-4 run for real.
     seedDraft(userId, {
       tenantId: 'tenant-1', tenantLabel: 'Sun Cardio (SC)', divisionId: 'div-1', divisionLabel: 'Cardiology',
       contactPersonId: 'contact-1', contactPersonLabel: 'Dr. Contact', focusTherapy: ['Cardiology'], focusTherapyDoctor: ['Cardiologist'],
@@ -206,20 +188,18 @@ describe('NewLeadWizard — draft persistence', () => {
       </QueryClientProvider>,
     )
     await user.click(await screen.findByRole('button', { name: /^Resume$/i }))
-    // Resume lands back on Step 1 (Pharma) — the restored tenant/division/
-    // contact/therapy fields make Next valid immediately.
-    await user.click(screen.getByRole('button', { name: /^Next/i })) // -> Opportunity
+    await user.click(screen.getByRole('button', { name: /^Next/i }))
 
     await user.type(screen.getByPlaceholderText(/cardiology screening expansion/i), 'Test Lead Title')
     await user.type(screen.getByPlaceholderText(/describe the client/i), 'A real problem statement.')
     await user.click(screen.getByRole('button', { name: 'Doctor meets' }))
     await waitFor(() => expect(sessionStorage.getItem(draftStorageKey(userId))).not.toBeNull(), { timeout: 2000 })
 
-    await user.click(screen.getByRole('button', { name: /^Next/i })) // -> QMS offer
-    await user.click(await screen.findByRole('button', { name: 'Screening' })) // project type
-    await user.click(screen.getByRole('button', { name: 'Screening Camp' })) // QMS offering
+    await user.click(screen.getByRole('button', { name: /^Next/i }))
+    await user.click(await screen.findByRole('button', { name: 'Screening' }))
+    await user.click(screen.getByRole('button', { name: 'Screening Camp' }))
     await user.type(screen.getByPlaceholderText(/reason for this offering/i), 'A real reason.')
-    await user.click(screen.getByRole('button', { name: /^Next/i })) // -> Review
+    await user.click(screen.getByRole('button', { name: /^Next/i }))
 
     await user.click(await screen.findByRole('combobox'))
     await user.click(await screen.findByRole('option'))

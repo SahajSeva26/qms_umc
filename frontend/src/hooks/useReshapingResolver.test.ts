@@ -3,8 +3,7 @@ import { renderHook } from '@testing-library/react'
 import { z } from 'zod'
 import { useReshapingResolver } from '@/hooks/useReshapingResolver'
 
-// Mirrors createDivisionSchema's shape (trim/lowercase, nested object, optional number),
-// plus a nested tuple field (mirrors bookCampPayloadSchema's location.coordinates) to
+// Mirrors createDivisionSchema's shape, plus a nested tuple field, to
 // exercise the resolver's recursive nested-error flattening at more than one level deep.
 const testSchema = z.object({
   code: z.string().trim().min(3).regex(/^\S+$/, 'Code cannot contain spaces.').toLowerCase(),
@@ -37,7 +36,7 @@ const HEAD_FIELD_TO_FORM_FIELD: Record<string, keyof TestFormValues> = {
 }
 
 // z.infer, not ReturnType<typeof toTestPayload> — they disagree on whether
-// mrCount is an optional key vs. a required key with optional value.
+// mrCount is optional-key vs. required-key-with-optional-value.
 type TestPayload = z.infer<typeof testSchema>
 
 const toTestPayload = (values: TestFormValues): TestPayload => ({
@@ -161,13 +160,8 @@ describe('useReshapingResolver', () => {
   })
 })
 
-// Mirrors BookCampForm.tsx's real nestedFieldMaps.location shape: EVERY
-// nested key maps to the SAME single target form field, because one widget
-// (LocationPicker + LocationAddressFields) represents the whole nested
-// object rather than one input per nested field. THREE fields (not two) so
-// the accumulation test can distinguish correct ordered chaining from a
-// scrambled-order or dropped-message regression — a 2-field .toContain()
-// check can't tell those apart.
+// Mirrors BookCampForm.tsx's nestedFieldMaps.location shape: every nested key
+// maps to the SAME target form field, since one widget represents the whole object.
 const manyToOneSchema = z.object({
   location: z.object({
     city: z.string().trim().min(1, 'City is required.'),
@@ -202,9 +196,8 @@ describe('useReshapingResolver — many nested keys mapped to one target field',
     )
 
     const message = (result.errors as Record<string, { message?: string }>).location?.message
-    // Exact equality, not .toContain() twice — a swapped order or an extra
-    // inserted junk string would fail this but could slip past two separate
-    // .toContain() checks.
+    // Exact equality, not .toContain() twice — a swapped order or extra text
+    // would fail this but could slip past two separate .toContain() checks.
     expect(message).toBe('City is required. State is required.')
   })
 

@@ -61,13 +61,6 @@ describe('MapCanvas — marker position after a successful pin-drop', () => {
   })
 
   it('a later search selection (a new `value` prop) moves the marker — a resolved pin-drop must not leave the marker stuck at the old position forever', async () => {
-    // This is the real regression: MapCanvas computes
-    // `pinPosition = provisionalPosition ?? committedPosition`. Before the
-    // fix, a SUCCESSFUL pin-drop resolution never cleared
-    // provisionalPosition, so it permanently shadowed committedPosition —
-    // any later `value` prop change (e.g. from an unrelated search
-    // selection) would update the camera/form but the marker would stay
-    // stuck at the old dropped-pin position.
     geocode.mockResolvedValue(geocoderResult('dropped-pin-place'))
     const onChange = vi.fn()
     const { rerender } = render(
@@ -80,9 +73,6 @@ describe('MapCanvas — marker position after a successful pin-drop', () => {
     })
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ coordinates: [20, 10] }))
 
-    // The consuming form applies onChange's result as its new `value` (as a
-    // real form would), simulating the resolved pin-drop being committed —
-    // then a completely unrelated search selection changes `value` again.
     rerender(
       <MapCanvas value={makeValue([20, 10])} onChange={onChange} height={300} defaultCenter={{ lat: 0, lng: 0 }} />,
     )
@@ -126,10 +116,6 @@ describe('MapCanvas — disabled blocks every interaction path, not just gesture
   })
 
   it('a click on a disabled map does not drop a pin or trigger reverse-geocoding', async () => {
-    // handleMapClick's own `if (disabled || !point) return` guard is a
-    // SEPARATE code path from gestureHandling — a regression here would let
-    // a click still fire runGeocode even while gestureHandling correctly
-    // reports 'none'.
     render(<MapCanvas value={null} onChange={vi.fn()} disabled height={300} defaultCenter={{ lat: 0, lng: 0 }} />)
 
     await act(async () => {
@@ -140,9 +126,6 @@ describe('MapCanvas — disabled blocks every interaction path, not just gesture
   })
 
   it('the marker is not draggable when disabled', () => {
-    // AdvancedMarker's `draggable={!disabled}` is a THIRD independent code
-    // path gated on the same `disabled` prop — untested by the
-    // gestureHandling-only checks above.
     render(
       <MapCanvas
         value={{ addressLine1: '1', city: 'City', state: 'State', country: 'India', pincode: '000000', coordinates: [20, 10] }}
@@ -181,10 +164,6 @@ describe('MapCanvas — onResolutionStateChange reports geocode status changes',
   })
 
   it('reports idle on mount, loading while a geocode is in flight, then idle again on success', async () => {
-    // This is the mechanism a consumer (e.g. GeoProfileDetailPage) relies on
-    // to block Save during the window between "pin visibly moved" and
-    // "onChange fired with the resolved value" — a real, previously-unguarded
-    // silent-no-op-save bug.
     let resolveGeocode!: (v: unknown) => void
     geocode.mockReturnValue(new Promise((resolve) => { resolveGeocode = resolve }))
     const onResolutionStateChange = vi.fn()

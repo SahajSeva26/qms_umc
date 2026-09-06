@@ -116,10 +116,6 @@ describe('LocationSearchBox', () => {
   })
 
   it('clearing the query closes a stale dropdown immediately, before the debounce window elapses', async () => {
-    // A slow response for the pre-clear query, deliberately never resolved in
-    // this test — if the dropdown/listbox is still driven by the debounced
-    // value, it stays open (and could later repopulate) for up to 300ms after
-    // the user clears the box.
     fetchAutocompleteSuggestions.mockReturnValue(new Promise(() => {}))
     const user = userEvent.setup()
     render(<LocationSearchBox onSelected={vi.fn()} />)
@@ -150,8 +146,6 @@ describe('LocationSearchBox', () => {
     await user.click(screen.getByRole('option'))
     expect(input).toBeDisabled()
 
-    // Real DOM `disabled` inputs reject typed input, so this is a faithful
-    // check that no further autocomplete calls fire mid-selection.
     await user.type(input, 'x')
     expect(input.value).toBe('Mumbai')
     expect(fetchAutocompleteSuggestions).toHaveBeenCalledTimes(1)

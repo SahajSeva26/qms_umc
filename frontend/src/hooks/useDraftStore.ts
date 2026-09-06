@@ -9,10 +9,7 @@ interface DraftState<T> {
 }
 
 // `migrate` always returns the clean empty shape on any version mismatch —
-// without it, zustand's persist only resets in-memory state and leaves the
-// stale entry sitting in storage untouched (confirmed by reading persist's
-// own middleware source); returning a fresh shape here makes it write that
-// clean state back out immediately instead.
+// without it, zustand's persist resets in-memory state but leaves the stale entry in storage untouched.
 export function createDraftStore<T>(key: string, version: number) {
   const store = create<DraftState<T>>()(
     persist(
@@ -20,10 +17,8 @@ export function createDraftStore<T>(key: string, version: number) {
         draft: null,
         savedAt: null,
         setDraft: (value) => set({ draft: value, savedAt: Date.now() }),
-        // set() alone only persists an empty-but-present entry — persist's
-        // own setItem still writes {state: {draft: null, ...}, version}.
-        // clearStorage() is the only call that actually removes the
-        // sessionStorage key (confirmed by reading persist's source).
+        // set() alone only persists an empty-but-present entry — clearStorage()
+        // is the only call that actually removes the sessionStorage key.
         clearDraft: () => {
           set({ draft: null, savedAt: null })
           store.persist.clearStorage()

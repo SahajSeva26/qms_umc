@@ -50,10 +50,6 @@ describe('useReverseGeocode', () => {
       }),
     )
     expect(result.current.status).toBe('idle')
-    // Regression: provisionalPosition must be cleared on success so
-    // MapCanvas's `provisionalPosition ?? committedPosition` falls through
-    // to the freshly-committed value instead of pinning the marker to this
-    // now-resolved drag/click position forever.
     expect(result.current.provisionalPosition).toBeNull()
   })
 

@@ -53,9 +53,8 @@ const PatientPicker = ({ value, label, onChange, excludeIds = [], disabled }: Pa
 
   const results = items.filter((p) => !excludeIds.includes(p.id))
 
-  // Checks `items` (raw results), not `results` (excludeIds filtered out): a
-  // patient excluded here still exists globally, and mobile has no backend
-  // uniqueness constraint — offering "register new" here would dupe them.
+  // Checks `items`, not `results` (excludeIds filtered out) — a patient
+  // excluded here still exists globally, so "register new" must stay hidden.
   const showRegisterOption =
     hasSearchableQuery && !isDebouncing && isFetched && !isFetching && !error && items.length === 0
 
@@ -162,10 +161,8 @@ const PatientPicker = ({ value, label, onChange, excludeIds = [], disabled }: Pa
         emptyQueryText="Start typing a mobile number, patient ID, or name to search."
         noResultsText={noResultsText}
         resultsBanner={resultsBanner}
-        // Taller than AsyncPicker's own default (max-h-64) — this picker's
-        // rows are two lines each (name + DOB/gender/mobile/code) and can
-        // also show a duplicate-name/pagination banner above the list, both
-        // of which make the default height cramped for comfortable scanning.
+        // Taller than AsyncPicker's default (max-h-64) — this picker's two-line
+        // rows plus an optional banner make the default height feel cramped.
         dropdownClassName="absolute left-0 right-0 top-full mt-1 z-50 p-1.5 rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10 max-h-96 overflow-y-auto"
         renderResult={(item) =>
           'firstName' in item ? (

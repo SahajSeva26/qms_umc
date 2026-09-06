@@ -13,28 +13,19 @@ import {
 } from '@/types/project.types'
 import { ROLE_TYPE_CODE_GROUPS } from '@/features/access-management/role-type/constants/roleTypeCodes'
 
-// Derived from the same source-of-truth *_LABEL records the UI already uses
-// (matches test.schemas.ts's THERAPY_VALUES convention) — never hand-listed,
-// so this can't silently drift from project.types.ts's own enums.
+// Derived from the same source-of-truth *_LABEL records the UI uses — never
+// hand-listed, so this can't silently drift from project.types.ts's own enums.
 const THERAPY_VALUES = Object.keys(PROJECT_THERAPY_LABEL) as [ProjectTherapy, ...ProjectTherapy[]]
 const TYPE_VALUES = Object.keys(PROJECT_TYPE_LABEL) as [ProjectType, ...ProjectType[]]
 const POINTER_VALUES = Object.keys(AVAILABLE_POINTER_LABEL) as [AvailablePointer, ...AvailablePointer[]]
 // Same "Customer" role-type-code subset WizardStep4.tsx derives whoCanBookCamp options from.
 const BOOKING_ROLE_VALUES = (ROLE_TYPE_CODE_GROUPS.find((g) => g.label === 'Customer')?.codes ?? []) as [WhoCanBookCampCode, ...WhoCanBookCampCode[]]
 
-// Base shape shared by both wizard modes — used as the permanent RHF resolver
-// (never swapped per step: z.object() silently drops fields it doesn't
-// declare, so a per-step resolver would make the final handleSubmit
-// validate/receive only the LAST step's fields, not the full project).
-// Per-step-only validation UX is still achieved via
-// trigger(CREATE_STEP_FIELD_NAMES[step]), which validates a named subset of
-// whichever full schema is active without swapping resolvers.
+// Never swapped per step — z.object() silently drops undeclared fields, so a
+// per-step resolver would make handleSubmit see only the last step's fields.
 const wizardFormBaseSchema = z.object({
-  // Step 0 — Lead. POST /projects requires an existing `lead` id in create
-  // mode. In edit mode this step is skipped entirely and leadId is NOT
-  // required — ProjectEntity.lead is explicitly `... | string | null`
-  // (a pre-existing project can have a stale/deleted lead reference), so
-  // requiring it unconditionally would block editing such a project.
+  // Step 0 — Lead. In edit mode leadId is NOT required — ProjectEntity.lead
+  // allows `string | null`, so a stale/deleted reference stays editable.
   leadId: z.string(),
   leadTitle: z.string(),
   leadTenantId: z.string(),
@@ -61,12 +52,8 @@ const wizardFormBaseSchema = z.object({
   emailReference: z.string(),
   emailDocument: z.string(),
 
-  // Step 3 — Financials. campCost/totalCamps/additionalCost had zero
-  // validation before this schema existed — .nonnegative() here mirrors
-  // the backend's own already-live rule (project.validators.ts), it isn't
-  // a new restriction the backend didn't already enforce. totalCamps also
-  // matches the backend's z.number().int() — a fractional camp count would
-  // otherwise pass here and only fail with a 400 at submit time.
+  // Step 3 — Financials. .nonnegative() mirrors the backend's own already-live
+  // rule (project.validators.ts); totalCamps also matches its z.number().int().
   campCost: z.number().nonnegative('Camp cost cannot be negative.'),
   totalCamps: z.number().int('Total camps must be a whole number.').nonnegative('Total camps cannot be negative.'),
   valueBeforeGST: z.number().gt(0, 'Set camp cost × total camps or value before GST.'),
@@ -99,10 +86,8 @@ const wizardFormBaseSchema = z.object({
   sops: z.string(),
 })
 
-// Rules shared by both create and edit modes — everything except the
-// lead-required check, which only makes sense in create mode (edit mode
-// skips Step 0 and must stay saveable even when the project's stored lead
-// reference is null/stale).
+// Rules shared by both create and edit modes — excludes the lead-required
+// check, which only makes sense in create mode.
 function applySharedWizardRefinements<T extends typeof wizardFormBaseSchema>(schema: T) {
   return schema
     // Step 1
@@ -141,18 +126,13 @@ export const createProjectWizardSchema = applySharedWizardRefinements(wizardForm
   }
 })
 
-// Edit mode — Step 0 is skipped entirely and leadId is never required, so a
-// pre-existing project with a null/stale lead reference stays saveable.
+// Edit mode — leadId is never required, so a stale lead reference stays saveable.
 export const editProjectWizardSchema = applySharedWizardRefinements(wizardFormBaseSchema)
 
 export type WizardFormValues = z.infer<typeof wizardFormBaseSchema>
 
-// Fields grouped by CREATE-mode step, used both to scope trigger() to the
-// active step and to seed attemptedFields on Next/Back. Edit mode drops Step
-// 0 ("Lead") — NewProjectWizard.tsx must index via
-// `isEdit ? CREATE_STEP_FIELD_NAMES.slice(1) : CREATE_STEP_FIELD_NAMES`,
-// never this array directly, or edit-mode step 0 would wrongly validate
-// leadId instead of Basics' own fields.
+// Fields grouped by CREATE-mode step. Edit mode drops Step 0 ("Lead") —
+// callers must index via `.slice(1)` in edit mode, never this array directly.
 export const CREATE_STEP_FIELD_NAMES: (keyof WizardFormState)[][] = [
   ['leadId'],
   ['name', 'therapy', 'type'],

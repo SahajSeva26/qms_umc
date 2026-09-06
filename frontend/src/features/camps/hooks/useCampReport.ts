@@ -4,11 +4,8 @@ import { campRealKeys } from '@/features/camps/hooks/useCampsReal'
 
 const STALE_TIME_MS = 60_000
 
-// Keyed under campRealKeys.all (['campsReal']) rather than a standalone root —
-// every real-camp mutation (create/update/moveStage/allocateFo) already
-// invalidates campRealKeys.all, and React Query's prefix-match means that
-// invalidation cascades to ['campsReal', 'report'] automatically. A separate
-// key here would miss those invalidations and only refresh after staleTime.
+// Keyed under campRealKeys.all rather than a standalone root — React Query's
+// prefix-match means every real-camp mutation's invalidation cascades here too.
 export const useCampReport = (enabled = true) =>
   useQuery({
     queryKey: [...campRealKeys.all, 'report'],

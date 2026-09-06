@@ -10,8 +10,7 @@ import type { CampEntity } from '@/types/campReal.types'
 vi.mock('@/hooks/useSession')
 
 // LocationPicker needs real Google Maps credentials, unavailable in tests —
-// mock it to a button that supplies coordinates via the same onChange(LocationValue)
-// contract a real pin-drop would use (mirrors the same mock in BookCampForm.test.tsx).
+// mock it to a button supplying coordinates via the same onChange(LocationValue) contract.
 vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
   default: ({ value, onChange }: { value: unknown; onChange: (v: unknown) => void }) => (
     <button
@@ -111,8 +110,6 @@ async function renderPage(projectId = 'proj-1') {
 
 describe('PharmaProjectCampsPage', () => {
   it('blocks a camp:book-holding but non-pharma role type from the real deep-linked page — neither project nor camps ever fetch', async () => {
-    // Renders the REAL page (not just the gate in isolation) to prove the
-    // gate/content split actually prevents the data hooks' requests from firing for this session.
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
       isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('some-other-custom-role'), hasPermission: () => false,
@@ -156,8 +153,6 @@ describe('PharmaProjectCampsPage', () => {
     const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
     const { pharmaCampsService } = await import('@/features/pharma/pharmaCamps.service')
     vi.mocked(pharmaProjectsService.getProject).mockResolvedValue({ success: true, message: '', data: projectFixture() })
-    // Scoped-empty response — RSM sees only camps they occupy an assignment
-    // slot on, so the true project-wide count is unknowable from it.
     vi.mocked(pharmaCampsService.searchScopedCamps).mockResolvedValue({ success: true, message: '', data: { items: [], count: 0 } })
 
     await renderPage()
@@ -228,7 +223,6 @@ describe('PharmaProjectCampsPage', () => {
     await waitFor(() => expect(campsRealService.bookCamp).toHaveBeenCalledTimes(1))
     expect(vi.mocked(campsRealService.bookCamp).mock.calls[0][0].project).toBe('proj-1')
 
-    // Dialog closes and the refetched, now-populated list renders.
     await waitFor(() => expect(screen.queryByText(/booking for project/i)).not.toBeInTheDocument())
     expect(await screen.findByText('cmp-000002')).toBeInTheDocument()
   })

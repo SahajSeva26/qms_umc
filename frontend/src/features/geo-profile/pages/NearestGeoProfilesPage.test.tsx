@@ -102,9 +102,7 @@ describe('NearestGeoProfilesPage', () => {
   })
 
   it('disables Find nearest (relabeled "Resolving location…") while the picked pin is still resolving, so no search fires', async () => {
-    // Mirrors GeoProfileDetailPage's Save guard: a pin can visibly move
-    // before `location` itself updates. The button is disabled outright
-    // during 'loading', same belt-and-braces UI affordance as Save.
+    // Mirrors GeoProfileDetailPage's Save guard — disabled outright during 'loading'.
     const { useNearestGeoProfiles } = await import('@/features/geo-profile/hooks/useNearestGeoProfiles')
     const user = userEvent.setup()
     await renderPage()

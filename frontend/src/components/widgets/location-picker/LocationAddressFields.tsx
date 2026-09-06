@@ -18,13 +18,8 @@ const REQUIRED_FIELDS: { key: 'addressLine1' | 'city' | 'state' | 'pincode'; lab
   { key: 'pincode', label: 'pincode' },
 ]
 
-/**
- * Editable text inputs for exactly what LocationPicker (search + map + pin)
- * can't complete on its own — an incomplete Google result, or a failed
- * reverse-geocode resolved via "Use this pin," leaves required fields blank
- * with no way to type them in otherwise. Shared/reusable on purpose: Vendor
- * Master and Tenant need the identical fields next.
- */
+// Covers what LocationPicker can't complete on its own — an incomplete Google
+// result, or "Use this pin," can leave required fields blank.
 const LocationAddressFields = ({ value, onChange, disabled, defaultCountry }: LocationAddressFieldsProps) => {
   const idPrefix = useId()
   const current = value ?? createEmptyLocationValue(defaultCountry)

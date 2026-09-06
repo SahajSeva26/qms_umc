@@ -29,9 +29,8 @@ describe('doctorsService.bulkCreateDoctors', () => {
     expect(out).toEqual(result)
   })
 
-  // Doctor bulk's 400 partial-failure path returns the FULL result object
-  // (unlike MR bulk, which only returns a bare errors array on 400) — so a
-  // genuine partial failure must still surface accurate counts, not just errors.
+  // Doctor bulk's 400 path returns the FULL result object, unlike MR bulk
+  // (which only returns a bare errors array on 400).
   it('returns the full result object (not just errors) on a genuine partial-failure 400', async () => {
     const api = (await import('@/lib/api/api')).default
     const result = { totalRows: 5, validRows: 3, invalidRows: 2, created: 3, failed: 2, errors: [{ row: 2, error: 'Duplicate pharmaCode' }] }

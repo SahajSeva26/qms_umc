@@ -5,8 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 
 // LocationPicker needs real Google Maps credentials, unavailable in tests —
-// mock it to a button that supplies coordinates via the same onChange(LocationValue)
-// contract a real pin-drop would use, matching the pattern used for Camp's forms.
+// mock it to a button using the same onChange(LocationValue) contract a real pin-drop would use.
 vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
   default: ({ value, onChange }: { value: unknown; onChange: (v: unknown) => void }) => (
     <button
@@ -128,10 +127,8 @@ describe('CreateTenantDialog — address', () => {
     await user.click(screen.getByRole('combobox', { name: /sales rep/i }))
     await user.click(await screen.findByText(/sales rep one/i))
 
-    // Only City typed — addressLine1/state/pincode left blank, which
-    // LocationAddressFields still turns into a non-null, individually-invalid
-    // LocationValue object (this is the real trigger for the bug, not a
-    // contrived edge case).
+    // Only City typed — LocationAddressFields still turns this into a
+    // non-null, individually-invalid LocationValue object.
     await user.type(screen.getByLabelText(/^city$/i), 'Pune')
 
     await user.click(screen.getByRole('button', { name: /^next$/i }))

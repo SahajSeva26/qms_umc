@@ -24,11 +24,8 @@ const STATUS_OPTIONS: { value: DoctorStatus; label: string }[] = [
   { value: 'inactive', label: 'Inactive' },
 ]
 
-// A bulk-import row error is either a plain string (a DB-layer create
-// failure) or a field-name -> message map (a Zod schema-validation failure,
-// e.g. { specialization: "Invalid option...", mobile: "Too small..." }) —
-// there is no `.message` key to fall back on, so that shape must be
-// flattened field-by-field or the real validation detail is silently lost.
+// A bulk-import row error is either a plain string (DB-layer failure) or a
+// field-name -> message map (Zod validation failure) — no `.message` to fall back on.
 function formatBulkDoctorRowError(error: string | Record<string, unknown>): string {
   if (typeof error === 'string') return error
   return Object.entries(error)
@@ -110,17 +107,12 @@ const EditDoctorModalForm = ({ doctor, onClose, onCreated, forcedTenant }: EditD
   const isEdit = !!doctor
   const [draft, setDraft] = useState<DoctorDraft>(doctor ? draftFromDoctor(doctor) : emptyDraft)
   const { session } = useSession()
-  // A platform caller has no single "home" tenant, so they must pick the
-  // target company explicitly — a customer caller is always pinned to their
-  // own tenant server-side and never sees or sends this field. A forced
-  // tenant (from a caller like the camp form) always wins over this — no
-  // picker either way, the company is already decided by the caller.
+  // A platform caller has no single "home" tenant and must pick one; a
+  // customer caller's submitted tenant is ignored server-side either way.
   const needsTenantPicker = !isEdit && !forcedTenant && session?.tenant?.type === 'platform'
 
-  // CSV bulk-import only makes sense for the standalone "Add doctor" flow —
-  // edit mode has nothing to import, and the forced-tenant inline callers
-  // (BookCampForm, CampDetailPageReal) rely on onCreated firing synchronously
-  // with ONE created doctor to auto-select, which a bulk import can't do.
+  // Forced-tenant inline callers rely on onCreated firing with ONE created
+  // doctor to auto-select — a bulk import can't satisfy that.
   const showToggle = !isEdit && !forcedTenant
   const [mode, setMode] = useState<'single' | 'csv'>('single')
   const activeMode = showToggle ? mode : 'single'
@@ -138,10 +130,8 @@ const EditDoctorModalForm = ({ doctor, onClose, onCreated, forcedTenant }: EditD
     bulkCreateDoctors.reset()
   }
 
-  // Clears the picked file (and the native input's own value, so re-picking
-  // the exact same file afterwards still fires onChange) without touching any
-  // in-flight result/error — used after a clean import success, where the
-  // result summary must stay visible.
+  // Also resets the native input's value so re-picking the same file still
+  // fires onChange; leaves any in-flight result/error untouched.
   const clearSelection = () => {
     setFile(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
@@ -154,10 +144,8 @@ const EditDoctorModalForm = ({ doctor, onClose, onCreated, forcedTenant }: EditD
     bulkCreateDoctors.reset()
   }
 
-  // Resets the native input's value before opening it — without this,
-  // choosing the same file again (e.g. after editing it in place and
-  // re-saving under the same name) would not fire onChange at all, since the
-  // input's value never actually changed from the browser's perspective.
+  // Without this reset, re-picking the same file wouldn't fire onChange —
+  // the input's value never actually changed from the browser's perspective.
   const openFilePicker = () => {
     if (fileInputRef.current) fileInputRef.current.value = ''
     fileInputRef.current?.click()

@@ -51,8 +51,6 @@ const CampsPageReal = () => {
   const camps = data?.data?.items ?? EMPTY_ARRAY
   const totalCount = data?.data?.count ?? 0
 
-  // Real backend aggregate — replaces a prior client-side reduction over a
-  // limit=10 fetch that silently undercounted any tenant with >10 camps.
   const reportQuery = useCampReport(canViewReport)
   const counts = useMemo(() => {
     const result: Record<CampStatus, number> = {

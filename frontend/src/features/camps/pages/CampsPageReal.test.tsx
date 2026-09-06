@@ -84,8 +84,8 @@ describe('CampsPageReal — KPI strip backed by GET /camps/report', () => {
 
     expect(useCampReport).toHaveBeenCalledWith(true)
     expect(screen.getByText('23')).toBeInTheDocument()
-    expect(screen.getByText('8')).toBeInTheDocument() // live
-    expect(screen.getByText('5')).toBeInTheDocument() // confirmed
+    expect(screen.getByText('8')).toBeInTheDocument()
+    expect(screen.getByText('5')).toBeInTheDocument()
   })
 
   it('never enables the report query and never renders the strip when lacking camp:manage/tenant:manage', async () => {
@@ -101,12 +101,8 @@ describe('CampsPageReal — KPI strip backed by GET /camps/report', () => {
   })
 
   it('shows its own "Loading camp report…" state independently while the camp table below is already loaded', async () => {
-    // The report and the camp list are two independent queries with no shared
-    // gating — this proves that intentionally, rather than leaving it an
-    // undocumented side effect: the table can finish first and render fully
-    // while the KPI strip above it is still resolving its own fetch.
     mockPermission(true)
-    mockCampsRealList() // isLoading: false, already resolved
+    mockCampsRealList()
     vi.mocked(useCampReport).mockReturnValue({
       data: undefined, isLoading: true, isError: false, refetch: vi.fn(),
     } as unknown as ReturnType<typeof useCampReport>)
@@ -114,8 +110,6 @@ describe('CampsPageReal — KPI strip backed by GET /camps/report', () => {
     await renderPage()
 
     expect(screen.getByText(/loading camp report/i)).toBeInTheDocument()
-    // The filter bar (part of the already-resolved camps list section) is
-    // present and not blocked by the KPI strip's own separate loading state.
     expect(document.querySelector('input')).toBeInTheDocument()
   })
 

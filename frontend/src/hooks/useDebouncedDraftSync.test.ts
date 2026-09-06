@@ -63,9 +63,8 @@ describe('useDebouncedDraftSync', () => {
     const { rerender, unmount } = renderHook(({ active }) => useDebouncedDraftSync('v1', active, setDraft), {
       initialProps: { active: false },
     })
-    // Flips active AFTER the first render — a []-deps unmount cleanup that
-    // captured the stale initial `false` would never see this change, and
-    // would wrongly skip the flush below.
+    // Flips active AFTER the first render — a []-deps cleanup that captured
+    // the stale initial `false` would wrongly skip the flush below.
     rerender({ active: true })
     unmount()
     expect(setDraft).toHaveBeenCalledTimes(1)
@@ -101,11 +100,8 @@ describe('useDebouncedDraftSync', () => {
   })
 
   it('a render that changes value and unmounts before passive effects can run still flushes the FINAL value — the useLayoutEffect regression', () => {
-    // Passive (useEffect) ref-mirroring runs asynchronously after commit; a
-    // synchronous rerender()-then-unmount() in the same tick, with no await
-    // in between, can skip that passive effect entirely and go straight to
-    // the unmount cleanup. Only a LAYOUT effect is guaranteed to have
-    // mirrored the new value by the time that cleanup runs.
+    // A synchronous rerender()-then-unmount() can skip a passive useEffect
+    // mirror entirely; only a LAYOUT effect is guaranteed to have run first.
     const setDraft = vi.fn()
     const { rerender, unmount } = renderHook(({ value }) => useDebouncedDraftSync(value, true, setDraft), {
       initialProps: { value: 'first' },

@@ -10,11 +10,8 @@ import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
 
 vi.mock('@/hooks/useSession')
 
-// LocationPicker needs real Google Maps credentials to render anything beyond
-// its "not configured" fallback — unavailable in this test environment. Mock
-// it down to a single button that supplies coordinates via the same
-// `onChange(LocationValue)` contract a real pin-drop would use, so tests can
-// still exercise the rest of the form (LocationAddressFields stays real/unmocked).
+// LocationPicker needs real Google Maps credentials unavailable in tests —
+// mocked to a button using the same onChange(LocationValue) contract.
 vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
   default: ({ value, onChange }: { value: unknown; onChange: (v: unknown) => void }) => (
     <button
@@ -185,13 +182,8 @@ describe('BookCampForm', () => {
 
     await user.click(screen.getByRole('button', { name: /book camp/i }))
 
-    // Exact match, in schema-declaration order (addressLine1, city, state,
-    // pincode) — not two separate .toMatch() checks, which can't tell
-    // correctly-ordered accumulation apart from a scrambled-order regression.
-    // FieldErrorText renders each accumulated sentence as its own block-level
-    // <span> (no joining whitespace in the DOM text — each sentence reads on
-    // its own visual line instead), so match each sentence individually,
-    // in order, rather than asserting one joined string.
+    // FieldErrorText renders each sentence as its own <span> — match them
+    // individually, in order, rather than asserting one joined string.
     const stateSpan = await screen.findByText('State is required.')
     const pincodeSpan = await screen.findByText('Pincode is required.')
     expect(stateSpan.tagName).toBe('SPAN')

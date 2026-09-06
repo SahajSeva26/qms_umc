@@ -31,8 +31,8 @@ const GeoProfileDetailPage = () => {
   const { data, isLoading, error } = useGeoProfile(id)
   const geoProfile = data?.data ?? null
 
-  // GET /roles requires role:get/search/manage; a caller without it gets a 403 here,
-  // surfaced below as "Restricted" instead of a raw ObjectId.
+  // A caller lacking permission for this lookup gets a 403, surfaced below
+  // as "Restricted" instead of a raw ObjectId.
   const { data: rolesData, error: rolesError } = useRoles({ status: 'active', limit: '500' })
   const roles = rolesData?.data?.items ?? []
   const roleName = (r: string) => roles.find((x) => x.id === r)?.name ?? (rolesError ? 'Restricted' : r)
@@ -143,11 +143,8 @@ const CreateGeoProfileForm = ({ roles, roleName }: RoleNameLookupProps) => {
   const [role, setRole] = useState('')
   const [type, setType] = useState<GeoProfileType | ''>('')
   const [location, setLocation] = useState<LocationValue | null>(null)
-  // Whether a pin drop/drag's reverse-geocode is still resolving (or failed
-  // and hasn't been retried/dismissed) — a caller must not treat `location`
-  // as authoritative while this is anything but 'idle', since the pin can
-  // visibly move well before (or without ever) producing a matching
-  // onChange call. See LocationPicker.tsx's onResolutionStateChange comment.
+  // `location` isn't authoritative while this is anything but 'idle' — the
+  // pin can visibly move well before (or without ever) firing onChange.
   const [locationResolution, setLocationResolution] = useState<LocationResolutionState>('idle')
   const [coverageRadiusKm, setCoverageRadiusKm] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
@@ -319,22 +316,11 @@ const EditGeoProfileForm = ({ geoProfile, roleName }: EditGeoProfileFormProps) =
 
   const [type, setType] = useState<GeoProfileType>(geoProfile.type)
   const [location, setLocation] = useState<LocationValue | null>(coordinatesToLocationValue(geoProfile.coordinates))
-  // Seeding `location` from the loaded profile makes the picker show the
-  // existing pin, but that alone would make every save resend those same
-  // coordinates even if the user never touched the map. The OLD
-  // latitude/longitude-string version actually had this exact bug too — it
-  // seeded both fields from geoProfile.coordinates at mount, so `latitude &&
-  // longitude` was truthy from the start and every save resent the
-  // unchanged tuple. Track whether the picker was actually interacted with,
-  // and only include coordinates in the payload when it was — a genuine
-  // behavioral fix, not a preservation of prior behavior — same shape as
-  // EditTenantModal.tsx's dirtyFields.address guard.
+  // Seeding `location` from the loaded profile alone would resend those same
+  // coordinates on every save — only include them when actually touched.
   const [locationDirty, setLocationDirty] = useState(false)
-  // Same "pin can visibly move before onChange fires" concern as create mode
-  // — but here it's higher-stakes: a save that runs mid-resolution wouldn't
-  // just fail to submit coordinates, it would submit NOTHING for
-  // coordinates (locationDirty still false) while showing a plain "Saved."
-  // success, silently leaving the OLD coordinates in place.
+  // Higher-stakes than create mode: a save mid-resolution would submit
+  // NOTHING for coordinates while showing a plain "Saved." success.
   const [locationResolution, setLocationResolution] = useState<LocationResolutionState>('idle')
   const [coverageRadiusKm, setCoverageRadiusKm] = useState(String(geoProfile.coverageRadius / 1000))
   const [status, setStatus] = useState<GeoProfileStatus>(geoProfile.status)

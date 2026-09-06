@@ -2,9 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { createDefaultWizardForm } from '@/features/projects/wizard.types'
 import { createProjectWizardSchema, editProjectWizardSchema, CREATE_STEP_FIELD_NAMES } from './project.schemas'
 
-// A minimally-valid full wizard form, used as a baseline every test mutates
-// from — keeps each test focused on the one field/rule it's actually
-// exercising instead of re-declaring the whole shape every time.
+// A minimally-valid full wizard form, used as a baseline every test mutates from.
 function validForm() {
   return {
     ...createDefaultWizardForm(),

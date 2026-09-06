@@ -27,11 +27,8 @@ describe('DivisionMrsTable', () => {
     expect(screen.getByText('Active')).toBeInTheDocument()
   })
 
-  // Deliberately no navigation from this table — the only detail page that
-  // exists today (the global Role editor) is the wrong destination from a
-  // Division context (its "back" goes to Roles, not this Division, and it
-  // can't even edit the MR's division/ASM supervisor). Rows are plain text
-  // until a dedicated, Division-scoped "Manage MR" action is built.
+  // Deliberately no navigation — the only detail page today (the global Role
+  // editor) is the wrong destination from a Division context.
   it('renders the MR name as plain, non-interactive text — no link, nothing focusable', () => {
     render(<DivisionMrsTable mrs={[mrFixture()]} />)
 

@@ -23,9 +23,8 @@ interface MapCanvasProps {
   onResolutionStateChange?: (status: LocationResolutionState) => void
 }
 
-// Imperatively pans/zooms the map to a genuinely new coordinate (a search
-// selection or a successful reverse-geocode) — never a controlled center/zoom
-// prop re-asserted on every render, which would fight the user's own pan/zoom.
+// Imperative pan/zoom only, never a controlled center/zoom prop re-asserted
+// on every render — that would fight the user's own pan/zoom.
 function CameraFocus({ coordinates }: { coordinates: [number, number] | undefined }) {
   const map = useMap()
   const lastFocusedRef = useRef<string | null>(null)
@@ -50,17 +49,13 @@ const MapCanvas = ({ value, onChange, disabled, height, defaultCenter, defaultCo
   const { status: geocodeStatus, provisionalPosition, runGeocode, retry, useProvisionalPinWithoutAddress } =
     useReverseGeocode({ defaultCountry, onResolved: onChange })
 
-  // Reports 'loading'/'error' the instant they happen (not just on the next
-  // onChange) — a caller gating Save on this needs to know the pin has
-  // moved/failed well before (if ever) a matching onChange arrives.
+  // Reports 'loading'/'error' immediately, not just on the next onChange —
+  // a caller gating Save needs to know before a matching onChange arrives.
   useEffect(() => {
     onResolutionStateChange?.(geocodeStatus)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- onResolutionStateChange intentionally excluded: an inline arrow from the caller would otherwise re-fire this on every parent render, not just on a real status change
   }, [geocodeStatus])
 
-  // Left to the React Compiler's own memoization rather than a manual
-  // useMemo — a manual dep array here ([value?.coordinates]) is coarser than
-  // what the compiler infers, which it flags as unpreservable.
   const committedPosition = value?.coordinates ? toLatLngLiteral(value.coordinates) : null
   const pinPosition = provisionalPosition ?? committedPosition
 
@@ -99,7 +94,7 @@ const MapCanvas = ({ value, onChange, disabled, height, defaultCenter, defaultCo
         )}
       </Map>
 
-      {/* Own roadmap/satellite toggle — Google's built-in control is hidden (mapTypeControl: false) so this matches the app's own styling. */}
+      {/* Custom toggle since mapTypeControl is disabled to match app styling. */}
       <div className="absolute top-2 right-2 flex gap-1 p-1 rounded-lg bg-popover shadow-md ring-1 ring-foreground/10">
         {(['roadmap', 'satellite'] as const).map((type) => (
           <button

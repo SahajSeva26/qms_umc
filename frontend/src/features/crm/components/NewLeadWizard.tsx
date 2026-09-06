@@ -50,29 +50,23 @@ interface NewLeadWizardProps {
 }
 
 const NewLeadWizard = ({ onClose, onCreated, prefill }: NewLeadWizardProps) => {
-  // fetchList=false — this wizard only ever creates a new lead, it never
-  // displays the existing list, so there's no reason to fetch all ~1000
-  // leads company-wide every time it opens.
+  // This wizard only ever creates a lead, never displays the list, so the
+  // list query is skipped entirely.
   const { createLead, isCreating } = useLeads({}, false)
   const [step, setStep] = useState(0)
   const [form, setForm] = useState<WizardFormState>({ ...DEFAULT_WIZARD_FORM, ...prefill })
   const [error, setError] = useState<string | null>(null)
 
-  // A prefilled open (from AppointmentDrawer) is a deliberate fresh start
-  // from specific context, not an "accidentally closed" recovery scenario —
-  // it must never read, write, or clear the normal flow's draft, so the
-  // hook itself never looks up a store for this instance at all.
+  // A prefilled open must never read, write, or clear the normal flow's
+  // draft, so the hook never looks up a store for this instance at all.
   const { status: draftStatus, store: draftStore } = useLeadDraftStore({ enabled: !prefill })
   const [draftMode, setDraftMode] = useState<DraftMode>('loading')
-  // Tracks "a real edit was made" for this plain-state wizard, since there's
-  // no RHF isDirty to read — setField flips this on any call. Real state
-  // (not a ref) since it's read during render to compute `active` below.
+  // Tracks "a real edit was made" since there's no RHF isDirty to read here —
+  // real state, not a ref, since it's read during render to compute `active` below.
   const [hasEdited, setHasEdited] = useState(false)
 
-  // Adjusting state during render (React's documented pattern for deriving
-  // state once a value becomes available) — guarded by draftMode itself so
-  // it only ever fires once per instance and can't regress an already-
-  // active session (post-Resume/Discard) back to a decision view.
+  // Adjusting state during render, guarded by draftMode so it only fires once
+  // and can't regress an already-active session back to a decision view.
   if (draftMode === 'loading') {
     if (draftStatus === 'disabled') {
       setDraftMode('disabled')
@@ -94,10 +88,8 @@ const NewLeadWizard = ({ onClose, onCreated, prefill }: NewLeadWizardProps) => {
 
   const handleResumeDraft = () => {
     const draft = draftStore?.getState().draft
-    // Merged against defaults, not a raw replacement — a same-version draft
-    // saved by an older running tab (before a field was added to
-    // WizardFormState) could otherwise resume with a field genuinely
-    // undefined, crashing a step that assumes it's always at least `[]`/`''`.
+    // Merged against defaults, not a raw replacement — an older saved draft
+    // could be missing a field a step assumes is always at least `[]`/`''`.
     if (draft) setForm({ ...DEFAULT_WIZARD_FORM, ...prefill, ...draft })
     setDraftMode('active')
   }
@@ -148,9 +140,8 @@ const NewLeadWizard = ({ onClose, onCreated, prefill }: NewLeadWizardProps) => {
     // filled-in form on failure so the user can retry.
     try {
       await createLead(payload)
-      // Stop the sync BEFORE clearing — otherwise its own flush-on-unmount
-      // (fired when onCreated()/onClose() unmounts this wizard moments
-      // later) could re-write the draft right after it's cleared.
+      // Stop before clearing — otherwise the sync's flush-on-unmount could
+      // re-write the draft right after it's cleared.
       stopSync()
       draftStore?.getState().clearDraft()
       onCreated()

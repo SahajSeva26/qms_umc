@@ -18,9 +18,8 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 interface MrProvisioningCardProps {
   tenantId: string
   divisionId: string
-  // Called after a successful single-MR add (not CSV import — a bulk import's
-  // result summary needs to stay visible for the user to read). The caller
-  // (DivisionMrsSection) uses this to close the drawer this card renders in.
+  // Called after a successful single-MR add only — a bulk import's result
+  // summary needs to stay visible instead of closing the drawer.
   onSingleCreated?: () => void
 }
 
@@ -31,23 +30,8 @@ function formatFileSize(bytes: number): string {
   return `${Math.round(bytes / 1024)} KB`
 }
 
-// Provisions MRs for this division two ways: one at a time (POST /roles) or
-// in bulk via CSV (POST /divisions/bulk-mr, division.service.ts's
-// bulkCreateMr) — every MR, either way, reports to the single ASM selected
-// below. Renders as the body of DivisionMrsSection's "Add MRs" drawer, so
-// tenant and division are already fixed and known; visibility (whether to
-// mount this at all) is the caller's decision, not this component's.
-//
-// Permission model — the two write paths have genuinely different backend
-// guards, and populating the ASM/MR role-type pickers has its own guard too:
-//   - POST /roles (single add):        tenant:admin OR tenant:manage
-//   - POST /divisions/bulk-mr (CSV):   tenant:admin OR division:manage
-//   - GET /role-types (ASM/MR lookup): tenant:admin OR tenant:manage
-// A division:manage-only user can call the bulk-import endpoint but can't
-// call role-type search to populate the required ASM picker — a real
-// backend permission-policy gap (logged, not routed around here). So CSV is
-// only ever shown when the caller ALSO holds tenant:admin/tenant:manage,
-// not merely when they hold a bulk-import-capable permission.
+// CSV is only shown when the caller also holds tenant:admin/tenant:manage —
+// division:manage alone can bulk-import but can't populate the ASM picker.
 const MrProvisioningCard = ({ tenantId, divisionId, onSingleCreated }: MrProvisioningCardProps) => {
   const { hasAnyPermission } = usePermission()
   const canLookupRoleData = hasAnyPermission(['tenant:admin', 'tenant:manage'])
@@ -89,9 +73,8 @@ const MrProvisioningCard = ({ tenantId, divisionId, onSingleCreated }: MrProvisi
     refetch: refetchAsmRoles,
   } = useRoles(
     { tenant: tenantId, division: divisionId, type: asmRoleTypeId, status: 'active' },
-    // Explicitly gated, not just incidentally prevented by asmRoleTypeId
-    // being unresolved for an unauthorized caller — protects against stale
-    // cached role-type data surviving a session/permission change.
+    // Explicitly gated (not just incidentally blocked by asmRoleTypeId being
+    // unresolved) — protects against stale cached data surviving a permission change.
     !!tenantId && !!divisionId && !!asmRoleTypeId && canLookupRoleData,
   )
   const asmCandidates = asmRolesData?.data?.items ?? []
@@ -101,16 +84,12 @@ const MrProvisioningCard = ({ tenantId, divisionId, onSingleCreated }: MrProvisi
   // Only "missing" once both queries genuinely succeeded with no result —
   // an error must show a retry state, not be reported as bad tenant setup.
   const roleTypeMissing = roleTypeLookupSettled && !roleTypeLookupErrored && (!asmRoleTypeId || !mrRoleTypeId)
-  // Blocks BOTH write paths, not just Single — an unresolved/failed/missing
-  // role type means neither POST /roles nor POST /divisions/bulk-mr can
-  // succeed (both need a real MR/ASM role type id server-side).
+  // Blocks BOTH write paths, not just Single — both need a real MR/ASM role
+  // type id server-side.
   const roleDataBlocked = !roleTypeLookupSettled || roleTypeLookupErrored || roleTypeMissing
 
-  // "No active ASM" is only meaningful once the ASM role type itself
-  // resolved AND the roles search for it actually succeeded — otherwise the
-  // roles query is either still disabled (asmRoleTypeId unresolved, or
-  // blocked by role-type error/missing above) or has itself failed, and
-  // either state would make "no active ASM" a misleading thing to claim.
+  // "No active ASM" is only meaningful once the roles search actually
+  // succeeded — otherwise it's still loading, blocked, or itself failed.
   const asmListReady = !roleDataBlocked && !isLoadingAsms && !isAsmRolesError
   const noActiveAsm = asmListReady && asmCandidates.length === 0
 
@@ -129,10 +108,8 @@ const MrProvisioningCard = ({ tenantId, divisionId, onSingleCreated }: MrProvisi
     bulkCreateMr.reset()
   }
 
-  // Clears the picked file (and the native input's own value, so re-picking
-  // the exact same file afterwards still fires onChange) without touching any
-  // in-flight result/error — used after a clean import success, where the
-  // result summary must stay visible.
+  // Also resets the native input's value so re-picking the same file still
+  // fires onChange; leaves any in-flight result/error untouched.
   const clearSelection = () => {
     setFile(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
@@ -145,10 +122,8 @@ const MrProvisioningCard = ({ tenantId, divisionId, onSingleCreated }: MrProvisi
     bulkCreateMr.reset()
   }
 
-  // Resets the native input's value before opening it — without this,
-  // choosing the same file again (e.g. after editing it in place and
-  // re-saving under the same name) would not fire onChange at all, since the
-  // input's value never actually changed from the browser's perspective.
+  // Without this reset, re-picking the same file wouldn't fire onChange —
+  // the input's value never actually changed from the browser's perspective.
   const openFilePicker = () => {
     if (fileInputRef.current) fileInputRef.current.value = ''
     fileInputRef.current?.click()
@@ -208,12 +183,6 @@ const MrProvisioningCard = ({ tenantId, divisionId, onSingleCreated }: MrProvisi
   }
 
   const result = bulkCreateMr.data
-
-  // Note: `canSeeCard`'s no-visibility case is handled by the caller
-  // (DivisionMrsSection only mounts this component when its own `canAdd` gate
-  // passes) — this component no longer early-returns null itself. The
-  // internal query `enabled` guards above (canLookupRoleData) are unchanged
-  // and still independently protect every network call regardless of caller.
 
   return (
     <div>

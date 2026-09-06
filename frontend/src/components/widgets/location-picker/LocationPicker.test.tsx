@@ -5,17 +5,8 @@ import LocationPicker from './LocationPicker'
 import ENV from '@/config/env'
 import type { LocationValue } from '@/types/location.types'
 
-// LocationPicker's own no-credentials check must short-circuit BEFORE ever
-// touching @vis.gl/react-google-maps — mock it anyway so a regression that
-// removes the guard fails loudly (an unmocked APIProvider would throw
-// immediately without a real API key) rather than silently rendering blank.
-//
-// The credentials-present-but-load-failed path (APILoadingStatus.FAILED /
-// AUTH_FAILURE) DOES need APIProvider/useApiLoadingStatus to actually run,
-// so the mock supports both: APIProvider renders children normally (no
-// throw) once `mockLoadingStatus` has been set for that test, and
-// useApiLoadingStatus reads the mutable box `vi.hoisted` gives us (a plain
-// module-scope `let` would be reset by hoisting before the mock factory runs).
+// APIProvider throws if mounted with no credentials, so a regression removing
+// the no-credentials guard fails loudly here instead of rendering blank.
 const { mockLoadingStatus, setMockLoadingStatus } = vi.hoisted(() => {
   let status: string | null = null
   return {
@@ -40,8 +31,7 @@ describe('LocationPicker — no-credentials mode', () => {
   const originalMapId = ENV.Maps.MapId
 
   beforeEach(() => {
-    // ENV.Maps.* is a readonly-typed `as const` object at the type level
-    // only — reassigning at runtime for this test, restored after each.
+    // ENV.Maps.* is readonly only at the type level — reassignable at runtime.
     ;(ENV.Maps as { ApiKey: string }).ApiKey = ''
     ;(ENV.Maps as { MapId: string }).MapId = ''
   })
@@ -155,10 +145,6 @@ describe('LocationPicker — no-credentials fallback, manual coordinate entry', 
   })
 
   it('re-syncs the fields when the parent replaces `value` from outside (e.g. a form reset), not just on first mount', () => {
-    // A shared controlled component must track external value changes, not
-    // only seed from `value` once at mount — otherwise a parent-driven reset
-    // (or loading a different record into the same open picker) leaves stale
-    // digits in the fields that don't match the real current `value`.
     const onChange = vi.fn()
     const { rerender } = render(<LocationPicker value={null} onChange={onChange} />)
     expect(screen.getByLabelText(/^latitude$/i)).toHaveValue('')
@@ -171,8 +157,6 @@ describe('LocationPicker — no-credentials fallback, manual coordinate entry', 
     expect(screen.getByLabelText(/^latitude$/i)).toHaveValue('29.2183')
     expect(screen.getByLabelText(/^longitude$/i)).toHaveValue('79.513')
 
-    // Reset back to null (e.g. the parent form was cleared) — fields must
-    // clear too, not keep showing the stale coordinates.
     rerender(<LocationPicker value={null} onChange={onChange} />)
     expect(screen.getByLabelText(/^latitude$/i)).toHaveValue('')
     expect(screen.getByLabelText(/^longitude$/i)).toHaveValue('')

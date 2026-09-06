@@ -29,16 +29,12 @@ const STATUS_OPTIONS: { value: RoleStatus | 'all'; label: string }[] = [
   { value: 'inactive', label: 'Inactive' },
 ]
 
-// Merges "see the MRs that exist" (a real list) with "add one" (the
-// single/CSV form, moved into a drawer) into one section — same shape as
-// DivisionContactsSection.tsx: icon badge + heading + live count + action
-// button, search, QueryStateBlock-wrapped table, pagination.
+// Merges "see the MRs that exist" with "add one" (the single/CSV form,
+// moved into a drawer) — same shape as DivisionContactsSection.tsx.
 const DivisionMrsSection = ({ tenantId, divisionId }: DivisionMrsSectionProps) => {
   const { hasAnyPermission } = usePermission()
-  // Deliberately NOT including role:search, even though GET /roles itself
-  // accepts it — the dependent GET /role-types lookup below (needed to
-  // resolve the MR role-type id) has no role:search fallback at all, so a
-  // role:search-only caller would reach a section that can never load.
+  // Deliberately excludes role:search — the dependent GET /role-types lookup
+  // below has no role:search fallback, so that caller could never load anyway.
   const canView = hasAnyPermission(['tenant:admin', 'tenant:manage'])
   const canAdd = canView
 
@@ -59,8 +55,7 @@ const DivisionMrsSection = ({ tenantId, divisionId }: DivisionMrsSectionProps) =
   )
   const mrRoleTypeId = mrRoleTypeData?.data?.items?.[0]?.id
   // "Missing" only once the lookup itself genuinely succeeded with no result —
-  // an error must show a retry state, not be reported as bad tenant setup
-  // (same distinction MrProvisioningCard's own roleTypeMissing check makes).
+  // an error must show a retry state, not be reported as bad tenant setup.
   const mrTypeMissing = !isLoadingMrType && !isMrTypeError && !mrRoleTypeId
 
   const { data, isLoading, error, refetch } = useRoles(

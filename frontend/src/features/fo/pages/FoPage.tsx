@@ -42,13 +42,8 @@ const ALL_TABS: { id: TabId; label: string; icon: typeof FiUsers }[] = [
 
 const FoPage = () => {
   const { user } = useAuth()
-  // Old placeholder UserRole checks (role === 'fo' / 'sales_lead' /
-  // 'sales_rep') never once fired for a real user — every AuthUser was
-  // hardcoded to 'super_admin' regardless of who was logged in, so this
-  // page has always shown the full "FO Management" admin view (never "My
-  // Workspace" or the sales-scoped tab set). No real backend concept
-  // exists yet to replace this with; this keeps the actual, historical
-  // behavior.
+  // No real backend permission exists yet to distinguish personal/sales-scoped
+  // views, so this always renders the full "FO Management" admin view.
   const isPersonal = false
   const isSalesView = false
 
@@ -81,17 +76,12 @@ const FoPage = () => {
 
   const scopedFos = isPersonal ? [selfPerson] : fos
 
-  // Training-due-across-all-FOs KPI needs each FO's records — reuse the
-  // hook per-FO would violate hooks rules in a loop, so read the service
-  // layer synchronously isn't possible; approximate via useFoTraining for
-  // the currently-scoped single FO in personal mode, and compute manager
-  // KPI from a lazily-loaded aggregate below.
+  // useFoTraining is per-FO and calling it in a loop would violate hooks
+  // rules — the manager-view KPI is instead computed from a separate aggregate below.
   const { training: selfTraining } = useFoTraining(isPersonal ? selfPerson.id : '')
 
   const todayIso = new Date().toISOString().slice(0, 10)
 
-  // Personal-mode KPI strip — mirrors fo-manager.js:452-461's `personal` branch exactly
-  // (myToday/myUpcoming/myClosed/validCerts/pendingClaims all scoped to this one FO).
   const myCamps = useMemo(() => camps.filter((c) => c.foId === selfPerson.id), [camps, selfPerson.id])
   const myTodayCamps = useMemo(() => myCamps.filter((c) => c.date?.slice(0, 10) === todayIso && c.status !== 'CANCELLED' && c.status !== 'CANCELLED_CHARGED'), [myCamps, todayIso])
   const myUpcomingCamps = useMemo(() => myCamps.filter((c) => (c.date?.slice(0, 10) ?? '') > todayIso && c.status !== 'CANCELLED' && c.status !== 'CANCELLED_CHARGED' && c.status !== 'CLOSED'), [myCamps, todayIso])
@@ -137,9 +127,8 @@ const FoPage = () => {
   const pendingClaims = claims.filter((c) => c.status === 'PENDING' || c.status === 'SUBMITTED')
   const pendingClaimsSum = pendingClaims.reduce((s, c) => s + c.amount, 0)
 
-  // Manager-view "Training due" KPI aggregates each FO's seeded/persisted
-  // training rows via the service layer directly (read-only snapshot from
-  // localStorage, not a live subscription) since useFoTraining is per-FO.
+  // Reads localStorage directly as a snapshot, not a live subscription —
+  // useFoTraining is per-FO and can't be reused in a loop here.
   const trainingDueCount = useMemo(() => {
     let all: { foId: string; expiresOn: string }[] = []
     try {

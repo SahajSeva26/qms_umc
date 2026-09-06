@@ -22,9 +22,6 @@ function testsResponse(items: typeof ecgTest[]) {
   return { success: true, message: '', data: { items, count: items.length } } as never
 }
 
-// Every existing test in this file assumes the actor CAN browse the test
-// catalog (the norm for every default role type that reaches this wizard
-// today) — canBrowseTests=false is exercised separately, by its own tests.
 async function mockPermission(canBrowseTests = true) {
   const { usePermission } = await import('@/hooks/usePermission')
   vi.mocked(usePermission).mockReturnValue({
@@ -42,10 +39,8 @@ async function renderStep(defaultValues: Partial<WizardFormState>, canBrowseTest
       </WizardTestHarness>
     </QueryClientProvider>,
   )
-  // Lets a test simulate a form-state change (e.g. after a real project-type
-  // change) by remounting a fresh harness instance with new defaultValues —
-  // WizardStep1 itself has no props to vary, so this is the equivalent of the
-  // old prop-drilled rerenderWithForm helper for this context-driven version.
+  // Simulates a form-state change by remounting a fresh harness instance
+  // with new defaultValues, since WizardStep1 itself has no props to vary.
   const rerenderWithForm = (nextDefaultValues: Partial<WizardFormState>) =>
     rerender(
       <QueryClientProvider client={client}>
@@ -134,9 +129,6 @@ describe('WizardStep1 — therapy + project-type-filtered tests', () => {
 
   it('clears already-selected tests when therapy changes, in the same update', async () => {
     const { testService } = await import('@/features/test-master/test.service')
-    // Static across calls (real filtering isn't modeled here) — resolving a
-    // real test lets the chip itself be observed active, then inactive,
-    // rather than asserting on a chip id string that's never a real label.
     vi.mocked(testService.searchTests).mockResolvedValue(testsResponse([ecgTest]))
 
     const user = userEvent.setup()
@@ -149,10 +141,6 @@ describe('WizardStep1 — therapy + project-type-filtered tests', () => {
     const option = await screen.findByRole('option', { name: /pulmonology/i })
     await user.click(option)
 
-    // Therapy switched away from cardiology — tests[] must have been cleared
-    // in the same update, not carried over stale. The mocked catalog is
-    // static, so ECG re-renders from the same response; only its active
-    // styling should change once the field is actually cleared.
     await waitFor(() => expect(testService.searchTests).toHaveBeenCalledWith(expect.objectContaining({ therapy: 'pulmonology' })))
     const ecgChipAfter = await screen.findByRole('button', { name: 'ECG' })
     expect(ecgChipAfter).not.toHaveStyle({ background: 'var(--qms-brand)' })
@@ -166,15 +154,11 @@ describe('WizardStep1 — therapy + project-type-filtered tests', () => {
     await renderStep({ therapy: 'cardiology', type: ['screening_camp'], tests: [ecgTest.id] })
 
     const ecgChipBefore = await screen.findByRole('button', { name: 'ECG' })
-    // Pre-existing selection (from defaultValues) shows as active before the type change.
     expect(ecgChipBefore).toHaveStyle({ background: 'var(--qms-brand)' })
 
     await user.click(screen.getByRole('button', { name: /^Diet$/i }))
 
     await waitFor(() => expect(testService.searchTests).toHaveBeenCalledWith(expect.objectContaining({ campType: 'diet' })))
-    // The mocked catalog is static, so ECG re-renders from the same
-    // response; only its active styling should change once tests[] is
-    // actually cleared by the type change.
     const ecgChipAfter = await screen.findByRole('button', { name: 'ECG' })
     expect(ecgChipAfter).not.toHaveStyle({ background: 'var(--qms-brand)' })
   })

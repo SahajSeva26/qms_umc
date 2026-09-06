@@ -42,8 +42,7 @@ const BILLING_OPTIONS: { value: BillingType; label: string }[] = [
 ]
 
 // create (camp:create) and update (camp:update) are two distinct backend
-// permission codes, not one shared "write" — a create-only actor can't edit.
-// Move-stage requires camp:manage/tenant:manage only; camp:update alone can't change status.
+// permission codes — a create-only actor can't edit, and camp:update alone can't move stage.
 const CAMP_CREATE_PERMISSIONS = ['camp:create', 'camp:manage', 'tenant:manage']
 const CAMP_UPDATE_PERMISSIONS = ['camp:update', 'camp:manage', 'tenant:manage']
 const CAMP_STAGE_PERMISSIONS = ['camp:manage', 'tenant:manage']
@@ -138,8 +137,7 @@ const CampForm = ({ camp, isCreateMode, canWrite }: CampFormProps) => {
   const { tenant, division, project, doctor, type, billingType, patientExpectation, fo, mr, date, timeSlot, location, devices, notes } = draft
 
   // mr/fo/project/devices' human labels aren't part of the string-only
-  // CampDraft reducer — tracked locally. Lazy initializers, not an effect:
-  // CampForm remounts per record.
+  // CampDraft reducer, so they're tracked locally instead.
   const [mrLabel, setMrLabel] = useState(() => campRefName(camp?.mr) ?? '')
   const [foLabel, setFoLabel] = useState(() => campRefName(camp?.fo) ?? '')
   const [projectLabel, setProjectLabelState] = useState(() =>
@@ -183,9 +181,8 @@ const CampForm = ({ camp, isCreateMode, canWrite }: CampFormProps) => {
   // (409, camp.service.ts's update()) — not just fo/date, so every field is locked.
   const isLocked = !isCreateMode && !!camp && camp.status !== 'requested'
 
-  // base-ui's SelectValue always calls a function child, even with no value —
-  // it never falls through to the `placeholder` prop in that case, so the
-  // right empty-state text has to come from here instead.
+  // base-ui's SelectValue always calls a function child, even with no value,
+  // so the empty-state text has to come from here instead of `placeholder`.
   const doctorLabel = (id: string) => {
     if (id) return doctors.find((d) => d.id === id)?.name ?? id
     return effectiveTenant ? 'Select doctor' : 'Select company first'

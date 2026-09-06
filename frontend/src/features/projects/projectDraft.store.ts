@@ -15,8 +15,7 @@ function getProjectDraftStore(userId: string) {
   return store
 }
 
-// See leadDraft.store.ts for the full rationale — identical shape, keyed to
-// a separate sessionStorage entry so the two wizards' drafts never collide.
+// Keyed to a separate sessionStorage entry so the two wizards' drafts never collide.
 type ProjectDraftStoreResult =
   | { status: 'disabled'; store: null }
   | { status: 'loading'; store: null }

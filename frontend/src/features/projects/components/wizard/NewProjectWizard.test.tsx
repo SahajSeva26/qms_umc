@@ -8,8 +8,7 @@ import NewProjectWizard from './NewProjectWizard'
 const emptyList = { success: true, message: '', data: { items: [], count: 0 } } as never
 
 // The wizard's draft-persistence layer waits on useSession() (GET /auth/me)
-// before deciding whether to show the real editable form — every test here
-// needs that to resolve immediately to "no draft, proceed."
+// before deciding whether to show the real editable form.
 const sessionResponse = {
   success: true,
   message: '',
@@ -27,9 +26,7 @@ vi.mock('@/features/projects/projects.service', () => ({
     searchWonLeads: vi.fn(async () => ({
       success: true,
       message: '',
-      // tenant/division use `_id`, matching real populated backend documents
-      // — unwrapId() (WizardStep0.tsx) reads `_id`, not `id`, off a populated
-      // relation object.
+      // tenant/division use `_id`, matching real populated backend documents.
       data: { items: [{ id: 'lead-1', title: 'Sun Cardio Screening', tenant: { _id: 'tenant-1', name: 'Sun Cardio' }, division: { _id: 'div-1', name: 'Cardiology' } }], count: 1 },
     })),
     createProject: vi.fn(async () => ({ success: true, message: '', data: { id: 'new-project-id' } })),
@@ -59,16 +56,7 @@ function makeQueryClient() {
 }
 
 // projectDraft.store.ts caches one Zustand store instance per userId in a
-// module-level Map, for the page's real lifetime — correct in production,
-// but it means two tests sharing a userId would share that cached (already-
-// hydrated, possibly already-cleared) store instance regardless of what's
-// freshly written to sessionStorage. Giving every test its own userId keeps
-// each test's store cache entry — and its resulting sessionStorage key —
-// completely independent, with no reset/isolation trickery needed. This
-// matters even for tests that never seed/assert on a draft directly: once a
-// real edit's debounced sync genuinely persists (as it must), two tests
-// sharing a userId would otherwise leak an in-memory draft from one into the
-// other's mount, wrongly landing it on the 'pending-decision' view.
+// module-level Map — a fresh userId per test keeps store/sessionStorage state isolated.
 let draftTestUserCounter = 0
 function nextDraftTestUserId() {
   draftTestUserCounter += 1
@@ -84,31 +72,20 @@ function seedDraft(userId: string, draft: Record<string, unknown>) {
 }
 
 async function renderWizard(onClose = vi.fn(), onSaved = vi.fn()) {
-  // The draft-store hooks read the logged-in user's id from useAuthStore —
-  // SessionBootstrap.tsx (which normally populates this) isn't part of this
-  // render tree, so it's set directly here, matching what a real logged-in
-  // session provides. A fresh userId per call (not a fixed 'user-1') keeps
-  // this helper's callers from sharing a cached draft-store instance — see
-  // nextDraftTestUserId's comment above.
+  // SessionBootstrap.tsx normally populates useAuthStore; it isn't part of
+  // this render tree, so it's set directly here instead.
   useAuthStore.getState().setAuth({ id: nextDraftTestUserId(), email: 'system@gmail.com', firstName: 'System', lastName: 'User' })
   render(
     <QueryClientProvider client={makeQueryClient()}>
       <NewProjectWizard editProject={null} onClose={onClose} onSaved={onSaved} />
     </QueryClientProvider>,
   )
-  // Wait past the brief 'loading' draftMode (session settling + no existing
-  // draft) so every existing test can keep asserting on the real, editable
-  // Step 0 content without needing to know about the draft-persistence layer.
   await screen.findByText(/pick the source lead/i)
   return { onClose, onSaved }
 }
 
-// Several wizard inputs (PO number, camp cost, etc.) predate this migration
-// and were never given an htmlFor/id label association — a pre-existing
-// accessibility gap, out of scope for this RHF/Zod structural migration to
-// fix. Query by RHF's own `name` attribute instead of getByLabelText there.
-// Queries `document.body`, not the RTL `container` — Dialog renders its
-// content into a portal attached to document.body, outside that container.
+// Several wizard inputs have no htmlFor/id label association — query by RHF's
+// `name` attribute instead. Queries document.body since Dialog portals there.
 function fieldByName(name: string): HTMLInputElement {
   const el = document.body.querySelector<HTMLInputElement>(`input[name="${name}"]`)
   if (!el) throw new Error(`No input[name="${name}"] found`)
@@ -119,8 +96,6 @@ function queryFieldByName(name: string): HTMLInputElement | null {
   return document.body.querySelector<HTMLInputElement>(`input[name="${name}"]`)
 }
 
-// Advances from Step 0 (Lead) through to Step 1 (Basics) by picking the one
-// mocked lead, then fills Step 1's required fields and advances to Step 2.
 async function advanceThroughLeadAndBasics(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByPlaceholderText(/search by lead title/i), 'Sun Cardio')
   await user.click(await screen.findByRole('button', { name: /Sun Cardio Screening/i }))
@@ -232,10 +207,8 @@ describe('NewProjectWizard — step-scoped validation actually blocks Next', () 
     await user.type(fieldByName('poNumber'), 'PO-1')
     await user.click(screen.getByRole('button', { name: /^Next/i })) // Step 2 -> Step 3 (Financials)
 
-    // First make valueBeforeGST genuinely valid (it starts at 0, which fails
-    // its own .gt(0) rule regardless of campCost) by setting it directly —
-    // isolating the test to prove campCost's OWN validation blocks Next, not
-    // a coincidental pre-existing valueBeforeGST=0 failure.
+    // Sets valueBeforeGST directly so this isolates campCost's OWN validation,
+    // not a coincidental pre-existing valueBeforeGST=0 failure.
     const valueBeforeGSTInput = await waitFor(() => fieldByName('valueBeforeGST'))
     await user.clear(valueBeforeGSTInput)
     await user.type(valueBeforeGSTInput, '10000')
@@ -245,10 +218,8 @@ describe('NewProjectWizard — step-scoped validation actually blocks Next', () 
     await user.type(campCostInput, '-5')
     await user.click(screen.getByRole('button', { name: /^Next/i }))
 
-    // Still on Financials — a real Operations-only field must never appear.
-    // queryFieldByName (not fieldByName) so a regression that wrongly
-    // advances to Operations fails this assertion cleanly, rather than
-    // throwing out of a later fieldByName('campCost') call.
+    // queryFieldByName (not fieldByName) so a wrongful advance to Operations
+    // fails this assertion cleanly instead of throwing.
     expect(queryFieldByName('campCost')).toBeInTheDocument()
     expect(queryFieldByName('freeCancelHours')).not.toBeInTheDocument()
     expect(await screen.findByText(/camp cost cannot be negative/i)).toBeInTheDocument()
@@ -263,9 +234,7 @@ describe('NewProjectWizard — step-scoped validation actually blocks Next', () 
     await user.clear(fieldByName('poDate'))
     await user.click(screen.getByRole('button', { name: /^Next/i }))
 
-    // Still on Execution — a real Financials-only field must never appear.
-    // queryFieldByName (not fieldByName) so a regression that wrongly
-    // advances to Financials fails this assertion cleanly.
+    // queryFieldByName (not fieldByName) so a wrongful advance fails cleanly.
     expect(queryFieldByName('poNumber')).toBeInTheDocument()
     expect(queryFieldByName('campCost')).not.toBeInTheDocument()
     expect(await screen.findByText(/po date is required/i)).toBeInTheDocument()
@@ -290,16 +259,6 @@ describe('NewProjectWizard — draft persistence', () => {
   }
 
   it('a fresh login (real POST /auth/login response shape) never leaves the wizard stuck on "Checking for a saved draft…"', async () => {
-    // Regression test for a real bug: POST /auth/login's response is typed
-    // AuthUser (auth.service.ts) and spread directly into setAuth() by
-    // useLogin.ts's onSuccess, with NO field renaming. If AuthUser's `id`
-    // field name here doesn't match what useProjectDraftStore/useLeadDraftStore
-    // actually read off useAuthStore, userId silently resolves to undefined
-    // forever, draftMode never leaves 'loading', and the wizard hangs on the
-    // loading placeholder with no error, no timeout, and no way out short of
-    // a hard page reload (which coincidentally "fixes" it via
-    // SessionBootstrap's separate, correctly-mapped restore path — masking
-    // the bug rather than proving its absence).
     const userId = nextDraftTestUserId()
     const realLoginResponseShape: import('@/types/auth.types').AuthUser = {
       id: userId,
@@ -327,18 +286,11 @@ describe('NewProjectWizard — draft persistence', () => {
     expect(screen.queryByText(/pick the source lead/i)).not.toBeInTheDocument()
     expect(screen.queryByPlaceholderText(/search by lead title/i)).not.toBeInTheDocument()
 
-    // Still there, byte-for-byte — nothing overwrote it just by mounting.
     const raw = sessionStorage.getItem(draftStorageKey(userId))
     expect(JSON.parse(raw as string).state.draft).toEqual({ name: 'My Saved Draft', leadId: 'lead-1' })
   })
 
   it('Resume restores the exact saved values into the live form, with the picked lead visible immediately — no re-search required', async () => {
-    // Regression test: a real Resume with leadId/leadTitle/leadTenantName
-    // already set previously showed NOTHING on Step 0 until the user
-    // re-searched for the same lead — the restored selection was invisible.
-    // Seeding leadTitle/leadTenantName/leadDivisionName here (not just
-    // leadId) proves WizardStep0's "currently selected" banner reads them
-    // directly off the resumed form, with zero interaction with the search box.
     const userId = nextDraftTestUserId()
     seedDraft(userId, {
       name: 'My Saved Draft',
@@ -351,13 +303,10 @@ describe('NewProjectWizard — draft persistence', () => {
 
     await userEvent.setup().click(await screen.findByRole('button', { name: /^Resume$/i }))
 
-    // No typing into the search box at all — the banner must appear on its own.
     expect(await screen.findByText('Sun Cardio Screening')).toBeInTheDocument()
     expect(screen.getByText(/Sun Cardio · Cardiology/)).toBeInTheDocument()
     expect(screen.queryByPlaceholderText(/search by lead title/i)).toBeInTheDocument()
 
-    // Next must succeed immediately too — proving leadId itself (not just
-    // the display fields) survived the resume, matching what the banner claims.
     await userEvent.setup().click(screen.getByRole('button', { name: /^Next/i }))
     expect(await screen.findByText(/project basics/i)).toBeInTheDocument()
   })
@@ -408,12 +357,9 @@ describe('NewProjectWizard — draft persistence', () => {
       </QueryClientProvider>,
     )
 
-    // Edit mode's own real content (Basics, not Lead) renders immediately —
-    // no loading placeholder, no decision view, ever, for this instance.
     expect(await screen.findByText(/project basics/i)).toBeInTheDocument()
     expect(screen.queryByText(/unsaved project from earlier/i)).not.toBeInTheDocument()
 
-    // The seeded draft from the unrelated New Project flow is untouched.
     const raw = sessionStorage.getItem(draftStorageKey(userId))
     expect(JSON.parse(raw as string).state.draft).toEqual({ name: 'Untouched Draft', leadId: 'lead-1' })
   })
@@ -424,15 +370,12 @@ describe('NewProjectWizard — draft persistence', () => {
     const { unmount } = await renderWizardRaw(userId)
     await screen.findByText(/pick the source lead/i)
 
-    // Drives the real UI — no sessionStorage seeding — through the actual
-    // Step0->Step1 flow, then types into the real "name" field.
     await user.type(screen.getByPlaceholderText(/search by lead title/i), 'Sun Cardio')
     await user.click(await screen.findByRole('button', { name: /Sun Cardio Screening/i }))
     await user.click(screen.getByRole('button', { name: /^Next/i }))
     await user.type(await screen.findByPlaceholderText(/Sun Cardio/i), 'Typed Before Close')
 
-    // Let the 400ms debounce actually elapse and write to sessionStorage
-    // before unmounting — this is the real timing path, not a seeded draft.
+    // Let the 400ms debounce actually elapse and write to sessionStorage.
     await waitFor(
       () => {
         const raw = sessionStorage.getItem(draftStorageKey(userId))
@@ -444,12 +387,10 @@ describe('NewProjectWizard — draft persistence', () => {
 
     unmount()
 
-    // Remount fresh, same userId — hits the same cached store/sessionStorage entry.
     await renderWizardRaw(userId)
     expect(await screen.findByText(/unsaved project from earlier/i)).toBeInTheDocument()
 
-    // Resume always lands back on Step 0 (the wizard's own `step` state isn't
-    // itself persisted) — advance to Step 1 again to see the restored name.
+    // Resume always lands back on Step 0 — advance to Step 1 again to see the restored name.
     const resumeUser = userEvent.setup()
     await resumeUser.click(screen.getByRole('button', { name: /^Resume$/i }))
     await resumeUser.click(screen.getByRole('button', { name: /^Next/i }))
@@ -468,8 +409,8 @@ describe('NewProjectWizard — draft persistence', () => {
     await user.type(fieldByName('poNumber'), 'PO-1')
     await user.click(screen.getByRole('button', { name: /^Next/i })) // -> Financials
 
-    // Wait for the debounced sync to actually persist a draft first, so this
-    // test proves removal, not merely "a key that was never written is absent."
+    // Wait for a draft to actually persist first, so this proves removal,
+    // not merely "a key that was never written is absent."
     await waitFor(() => expect(sessionStorage.getItem(draftStorageKey(userId))).not.toBeNull(), { timeout: 2000 })
 
     const campCostInput = await waitFor(() => fieldByName('campCost'))
@@ -487,10 +428,8 @@ describe('NewProjectWizard — draft persistence', () => {
     await user.click(screen.getByRole('button', { name: 'PHpharma-division-head' }))
     await user.click(screen.getByRole('button', { name: /^Next/i })) // -> Team & Pay
 
-    // salesRep, projectCoordinator, marketingContact — all three combobox
-    // selects on this step must resolve to a value before Next validates.
-    // Re-queries fresh each iteration (not a single captured array) since
-    // picking an option can re-render/replace earlier trigger elements.
+    // Re-queries fresh each iteration since picking an option can
+    // re-render/replace earlier trigger elements.
     await waitFor(() => expect(screen.getAllByRole('combobox').length).toBeGreaterThanOrEqual(3))
     const comboCount = screen.getAllByRole('combobox').length
     for (let i = 0; i < comboCount; i++) {

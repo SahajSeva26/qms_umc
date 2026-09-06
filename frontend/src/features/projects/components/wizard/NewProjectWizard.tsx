@@ -39,9 +39,8 @@ const CREATE_STEPS = [
 ]
 const EDIT_STEPS = CREATE_STEPS.slice(1)
 
-// Guards against null even though lead/tenant/salesRep/projectCoordinator/
-// marketingContact are all `required: true` in project.model.ts — that only
-// enforces new saves, not a populate() that resolved to null.
+// Guards against null even though these fields are `required: true` in
+// project.model.ts — that only enforces new saves, not a populate() that resolved to null.
 function projectToForm(p: ProjectEntity): WizardFormState {
   const leadId = unwrapId(p.lead)
   const leadTitle = !p.lead || typeof p.lead === 'string' ? '' : p.lead.title
@@ -110,15 +109,8 @@ function projectToForm(p: ProjectEntity): WizardFormState {
 
 type DraftMode = 'disabled' | 'loading' | 'pending-decision' | 'active'
 
-// Isolated under FormProvider so the whole-form useWatch()'s re-renders stay
-// scoped to this tiny component instead of re-rendering the entire modal on
-// every keystroke. Only ever mounted while draftMode === 'active' (see
-// render site below) — isDirty still gates the actual write so a freshly-
-// activated, untouched form doesn't persist a no-op draft immediately.
-// `stop` is reported up via a state setter (not a ref) — onSubmit needs to
-// call it, and reading a ref's .current inside a function passed to
-// handleSubmit(...) (itself invoked during render) trips this codebase's
-// react-hooks/refs rule; state read normally in onSubmit's closure does not.
+// Isolated so useWatch() only re-renders this. `stop` is a state setter, not
+// a ref — reading ref.current in handleSubmit's closure trips the lint rule.
 function ProjectDraftSync({
   store,
   onStopChange,
@@ -130,11 +122,8 @@ function ProjectDraftSync({
   const values = useWatch({ control })
   const stop = useDebouncedDraftSync(values as WizardFormState, isDirty, (v) => store.getState().setDraft(v))
   useEffect(() => {
-    // Passed as a updater-style callback, NOT onStopChange(stop) directly —
-    // useState's setter special-cases a function argument as "compute the
-    // next state from the previous," so setStopSync(stop) would actually
-    // CALL stop() immediately (stopping the sync on every render) and store
-    // its `undefined` return value instead of the function itself.
+    // Passed as an updater callback, not onStopChange(stop) directly — a
+    // bare function argument to useState's setter is invoked immediately.
     onStopChange(() => stop)
   }, [onStopChange, stop])
   return null
@@ -149,29 +138,21 @@ interface NewProjectWizardProps {
 const NewProjectWizard = ({ editProject, onClose, onSaved }: NewProjectWizardProps) => {
   const isEdit = !!editProject
   const STEPS = isEdit ? EDIT_STEPS : CREATE_STEPS
-  // Edit mode drops Step 0 ("Lead") — its step 0 is really CREATE step 1
-  // ("Basics"). Indexing CREATE_STEP_FIELD_NAMES directly in edit mode would
-  // wrongly validate leadId instead of Basics' own fields.
+  // Edit mode drops Step 0 ("Lead") — indexing CREATE_STEP_FIELD_NAMES
+  // directly would wrongly validate leadId instead of Basics' own fields.
   const activeStepFieldNames = isEdit ? CREATE_STEP_FIELD_NAMES.slice(1) : CREATE_STEP_FIELD_NAMES
 
   const [step, setStep] = useState(0)
   const [attemptedFields, setAttemptedFields] = useState<Set<keyof WizardFormState>>(new Set())
 
-  // Edit mode never enables draft persistence at all — no store lookup, no
-  // reads, no writes, no clears, so an unfinished New Project draft can
-  // never be disturbed by opening/saving an unrelated existing project.
+  // Edit mode never enables draft persistence — an unfinished New Project
+  // draft can never be disturbed by opening/saving an existing project.
   const { status: draftStatus, store: draftStore } = useProjectDraftStore({ enabled: !isEdit })
   const [draftMode, setDraftMode] = useState<DraftMode>('loading')
   const [stopSync, setStopSync] = useState<(() => void) | null>(null)
 
-  // Derives draftMode from the store hook's own status the first time it
-  // settles into 'disabled' or 'ready' — adjusting state directly during
-  // render (React's documented pattern for deriving state once from a value
-  // that becomes available), guarded by draftMode itself so it only ever
-  // fires once per instance and can never regress an already-active session
-  // (post-Resume/Discard) back to a decision view. React discards this
-  // render and immediately re-renders with the new state, so no effect (and
-  // no extra commit of the stale 'loading' render) is involved.
+  // Derives draftMode once the store hook settles — guarded by draftMode so
+  // it never regresses an already-active session back to a decision view.
   if (draftMode === 'loading') {
     if (draftStatus === 'disabled') {
       setDraftMode('disabled')
@@ -181,15 +162,11 @@ const NewProjectWizard = ({ editProject, onClose, onSaved }: NewProjectWizardPro
   }
 
   const form = useForm<WizardFormState>({
-    // leadId is required only in create mode — a pre-existing project can
-    // have a null/stale lead reference (ProjectEntity.lead allows it), and
-    // edit mode never shows Step 0 to fix that, so it must not be a hard
-    // validation gate there.
+    // leadId is required only in create mode — edit mode never shows Step 0,
+    // and a pre-existing project can have a null/stale lead reference.
     resolver: zodResolver(isEdit ? editProjectWizardSchema : createProjectWizardSchema),
     mode: 'onChange',
-    // Switching execution mode (po/agreement/mail_confirmation) must not
-    // erase the other modes' already-entered fields — matches today's real
-    // behavior, where the old useState object never dropped fields on mode change.
+    // Switching execution mode must not erase the other modes' entered fields.
     shouldUnregister: false,
     defaultValues: editProject ? projectToForm(editProject) : createDefaultWizardForm(),
   })
@@ -204,12 +181,8 @@ const NewProjectWizard = ({ editProject, onClose, onSaved }: NewProjectWizardPro
   const handleResumeDraft = () => {
     if (!draftStore) return
     const draft = draftStore.getState().draft
-    // Merged against fresh defaults, not a raw reset(draft) — RHF's reset()
-    // fully replaces form values with exactly what's given (it does not
-    // merge against defaultValues for omitted keys), so a same-version draft
-    // saved by an older running tab (before a field was added to
-    // WizardFormState) could otherwise resume with a field genuinely
-    // undefined, crashing a step that assumes it's always at least `[]`/`''`.
+    // Merged against fresh defaults — RHF's reset() fully replaces form
+    // values, so a draft missing a newer field would resume it as undefined.
     if (draft) reset({ ...createDefaultWizardForm(), ...draft })
     setDraftMode('active')
   }
@@ -239,8 +212,7 @@ const NewProjectWizard = ({ editProject, onClose, onSaved }: NewProjectWizardPro
       ...(values.mode === 'mail_confirmation' ? { emailReference: values.emailReference, emailDocument: values.emailDocument || undefined } : {}),
     }
 
-    // Every field common to both Create and Update — required on Create,
-    // optional on Update.
+    // Every field common to both Create and Update.
     const commonFields = {
       name: values.name,
       therapy: values.therapy as ProjectTherapy,
@@ -279,9 +251,8 @@ const NewProjectWizard = ({ editProject, onClose, onSaved }: NewProjectWizardPro
       } else {
         const createPayload: CreateProjectPayload = { lead: values.leadId, ...commonFields }
         const res = await createProject.mutateAsync(createPayload)
-        // Stop the sync BEFORE clearing — otherwise ProjectDraftSync's own
-        // flush-on-unmount (fired when onClose() below unmounts it moments
-        // later) could re-write the draft right after it's cleared.
+        // Stop the sync BEFORE clearing — otherwise ProjectDraftSync's
+        // flush-on-unmount could re-write the draft right after it's cleared.
         stopSync?.()
         draftStore?.getState().clearDraft()
         toast.success('Project created')
@@ -293,9 +264,8 @@ const NewProjectWizard = ({ editProject, onClose, onSaved }: NewProjectWizardPro
     }
   }
 
-  // Final submit still needs its own attempted-fields flush so the last
-  // step's errors show even if the user never clicked Next from it (e.g.
-  // hitting Enter, or the submit button, directly on the last step).
+  // Flushes the last step's attempted-fields even when the user never
+  // clicked Next from it (e.g. hitting Enter or Submit directly).
   const guardedSubmit = handleSubmit((values) => {
     setAttemptedFields((prev) => new Set([...prev, ...activeStepFieldNames[lastStep]]))
     return onSubmit(values)

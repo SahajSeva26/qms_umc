@@ -15,8 +15,7 @@ vi.mock('@/features/camps/hooks/useCampRefNames', () => ({
 }))
 
 // A legacy camp predating the backend's location-nesting migration —
-// camp.mapper.ts's `location: camp.location || null` means this is a real,
-// reachable shape, not a hypothetical.
+// camp.mapper.ts's `location: camp.location || null` makes this a reachable shape.
 function legacyCampFixture(): CampEntity {
   return {
     id: 'camp-legacy', code: 'cmp-000001', tenant: 't-1', division: 'div-1', project: null,

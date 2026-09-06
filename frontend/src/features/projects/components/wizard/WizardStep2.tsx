@@ -14,11 +14,8 @@ import { useWizardFieldError } from '@/features/projects/components/wizard/Wizar
 const MODE_ICONS: Record<ExecutionModeType, typeof FiFile> = { po: FiFile, agreement: FiFileText, mail_confirmation: FiMail }
 const MODE_OPTIONS: ExecutionModeType[] = ['po', 'agreement', 'mail_confirmation']
 
-// No confirmed real file-upload endpoint exists for agreementDocument/
-// emailDocument yet — both are plain URL text fields on the backend schema
-// (`type: String`), so these are simple "paste a URL" inputs rather than the
-// old mock's FileReader-to-base64 upload flow, which never round-tripped
-// through any real endpoint anyway.
+// agreementDocument/emailDocument are plain URL text fields on the backend
+// schema — no file-upload endpoint exists for them yet.
 const WizardStep2 = () => {
   const { register, control, setValue } = useFormContext<WizardFormState>()
   const fieldError = useWizardFieldError()

@@ -54,9 +54,8 @@ const EMPTY_FORM_VALUES: FormValues = {
   // devices: '',
 }
 
-// selfMrId: the booking session's own role id — spliced in as `mr` when the
-// caller IS the MR (needsMrPicker false), since the schema requires `mr`
-// unconditionally but an MR's form never shows/populates the mrId field.
+// selfMrId is spliced in as `mr` when the caller IS the MR — the schema
+// requires `mr` unconditionally but an MR's form never shows the mrId field.
 const useBookCampFormResolver = (needsMrPicker: boolean, selfMrId: string | undefined) =>
   useReshapingResolver<FormValues, BookCampFormPayload>({
     schema: bookCampPayloadSchema,
@@ -76,12 +75,8 @@ const useBookCampFormResolver = (needsMrPicker: boolean, selfMrId: string | unde
       devices: undefined,
       // conscentPath omitted — no consent-file upload UI/infra exists yet.
     }),
-    // Payload keys -> this form's differently-named fields, so a Zod error
-    // lands on the field that's actually rendered. `location`'s every nested
-    // key maps to the single `location` form field (one LocationPicker +
-    // LocationAddressFields pair renders the whole object, not per-field
-    // inputs) — findFirstLeaf inside useReshapingResolver flattens a nested
-    // tuple error (location.coordinates.0) down to a displayable message.
+    // Maps payload keys to this form's differently-named fields, so a Zod
+    // error lands on the field actually rendered.
     topLevelFieldMap: { mr: 'mrId', doctor: 'doctorId' },
     nestedFieldMaps: {
       location: {
@@ -107,9 +102,6 @@ interface BookCampFormProps {
 const BookCampForm = ({ needsMrPicker, project, onBooked }: BookCampFormProps) => {
   const { session, hasPermission } = usePermission()
   const selfMrId = session?.role.id
-  // Dormant until a pharma role type is granted doctor:manage (backend
-  // follow-up, HO/pharma-division-head only) — no seeded pharma role holds
-  // it today, so this stays false/hidden for every real pharma session.
   const canManageDoctors = hasPermission('doctor:manage')
   const [showNewDoctor, setShowNewDoctor] = useState(false)
   const { resolver, parsePayload } = useBookCampFormResolver(needsMrPicker, selfMrId)
@@ -138,9 +130,8 @@ const BookCampForm = ({ needsMrPicker, project, onBooked }: BookCampFormProps) =
   const fieldError = (field: keyof FormValues) =>
     (touchedFields[field] || isSubmitted) ? errors[field]?.message : undefined
 
-  // A real MR booking for themselves needs no picker, but the schema still
-  // requires `mr` — this state should be unreachable for a genuine pharma MR
-  // session; if it happens anyway, fail safely instead of submitting `mr: undefined`.
+  // Should be unreachable for a genuine pharma MR session — fails safely
+  // instead of submitting `mr: undefined` if it happens anyway.
   const missingSelfMrId = !needsMrPicker && !selfMrId
 
   const onSubmit = async (values: FormValues) => {

@@ -1,16 +1,7 @@
 import type { ReactNode } from 'react'
 
-// Matches the prototype's .chip-row / .chip-toggle / .chip-toggle.on exactly
-// (projects-manager.js / crm-sales-leads.js injectCss()):
-//   .chip-row { display:flex; flex-wrap:wrap; gap:6px; }
-//   .chip-toggle { padding:5px 10px; border-radius:999px; border:1px solid var(--border);
-//                  background:var(--surface); color:var(--text-soft); font-size:11px; font-weight:700; }
-//   .chip-toggle.on { background:var(--brand-500); color:#fff; border-color:var(--brand-500); }
-//
 // Unlike ChipPicker (a Select-to-add combobox), every chip here is always
 // visible and independently toggleable by clicking it — no dropdown step.
-// This is the pattern the prototype actually uses for Tests, Camp time
-// slots, States/Cities, and the report-pointers "available pool".
 export const ChipRow = ({ children }: { children: ReactNode }) => (
   <div className="flex flex-wrap gap-1.5">{children}</div>
 )

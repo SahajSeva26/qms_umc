@@ -34,11 +34,8 @@ export function useReshapingResolver<TFormValues extends object, TPayload = TFor
     errors: ResolverErrors
   }>
 
-  // A Zod issue on a nested object OR a nested array/tuple both produce
-  // {key: {...}} wrappers, but a tuple index adds one extra level a single
-  // unwrap doesn't reach (e.g. `location.coordinates.0` -> {coordinates: {0:
-  // {message}}}). Walk down until an actual {message} leaf turns up, so any
-  // depth of nesting maps correctly, not just a fixed one level.
+  // A nested tuple error adds one extra level (e.g. `coordinates.0` ->
+  // {coordinates: {0: {message}}}) — walk down until a {message} leaf turns up.
   const findFirstLeaf = (err: unknown): FieldError | undefined => {
     if (!err || typeof err !== 'object') return undefined
     if ('message' in err) return err as FieldError
@@ -57,11 +54,8 @@ export function useReshapingResolver<TFormValues extends object, TPayload = TFor
         for (const [nestedField, nestedErr] of Object.entries(err)) {
           const target = nestedMap[nestedField] ?? nestedField
           const leaf = findFirstLeaf(nestedErr) ?? nestedErr
-          // Multiple sibling nested fields (e.g. location.state AND
-          // location.pincode) can map to the SAME target form field when a
-          // single widget represents the whole nested object — accumulate
-          // their messages instead of the last one silently overwriting an
-          // earlier sibling's, which would drop real validation feedback.
+          // Sibling nested fields can map to the SAME target form field —
+          // accumulate their messages instead of the last one overwriting an earlier sibling's.
           const existing = mappedErrors[target] as FieldError | undefined
           mappedErrors[target] =
             existing?.message && leaf && typeof leaf === 'object' && 'message' in leaf && leaf.message

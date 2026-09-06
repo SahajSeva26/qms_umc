@@ -7,10 +7,8 @@ interface DraftResumeDecisionProps {
   onDiscard: () => void
 }
 
-// Shown instead of any editable step content whenever a saved draft exists
-// and hasn't been resumed or discarded yet — no form field renders alongside
-// this, so nothing typed here can be silently overwritten by whichever
-// choice the user makes next.
+// No form field renders alongside this, so nothing typed can be silently
+// overwritten by whichever choice the user makes next.
 const DraftResumeDecision = ({ itemLabel, onResume, onDiscard }: DraftResumeDecisionProps) => (
   <div className="flex flex-col items-center justify-center gap-3 py-14 text-center px-6">
     <span

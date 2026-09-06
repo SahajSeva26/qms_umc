@@ -11,12 +11,8 @@ interface LineChartProps {
   labels: string[]
   formatY: (value: number) => string
   height?: number
-  // Optional: transforms each axis label for DISPLAY only (hover tooltips
-  // and the aria-label still use the raw `labels` values). Existing callers
-  // that omit this render exactly as before. Added for callers whose labels
-  // are long (e.g. full 'YYYY-MM-DD' dates) — the existing hide-every-other
-  // logic below only reduces label COUNT, not width, so a long label still
-  // overcrowds the chart's fixed WIDTH even at half density.
+  // Transforms each axis label for DISPLAY only — hover tooltips and the
+  // aria-label still use the raw `labels` values.
   formatLabel?: (label: string) => string
 }
 

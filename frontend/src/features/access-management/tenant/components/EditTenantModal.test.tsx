@@ -75,11 +75,8 @@ describe('EditTenantModal — address', () => {
   })
 
   it('saving WITHOUT touching the address omits it from the payload entirely — never resends a stale snapshot', async () => {
-    // address is replace-wholesale server-side (no partial merge). If this
-    // modal resent the address it loaded WITH even when the user never
-    // touched it, an open-but-idle modal could silently clobber a newer
-    // address someone else saved in the meantime. Omitting the key (letting
-    // the backend leave the current value untouched) is the only safe option.
+    // Address is replace-wholesale server-side (no partial merge), so an
+    // unsent key is the only way to leave it untouched.
     const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
     const user = userEvent.setup()
     await renderModal(tenantFixture({
@@ -89,7 +86,6 @@ describe('EditTenantModal — address', () => {
       },
     }))
 
-    // Edits an unrelated field, never touches the address section.
     await user.type(screen.getByLabelText(/^name$/i), ' Updated')
     await user.click(screen.getByRole('button', { name: /save changes/i }))
 
@@ -107,9 +103,6 @@ describe('EditTenantModal — address', () => {
     }
     await renderModal(tenantFixture({ address: existingAddress }))
 
-    // Touches the address field (re-runs setField), even though the net
-    // result matches what was already loaded — this SHOULD mark it dirty
-    // and include it, since the user did interact with it.
     await user.type(screen.getByLabelText(/^address line 2 \(optional\)$/i), 'x')
     await user.click(screen.getByRole('button', { name: /save changes/i }))
 

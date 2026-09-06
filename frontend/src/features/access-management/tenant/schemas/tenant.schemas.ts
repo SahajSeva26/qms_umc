@@ -1,9 +1,8 @@
 import { z } from 'zod'
 import { PASSWORD_MIN_LENGTH } from '@/features/access-management/accessManagement.constants'
 
-// Mirrors tenant.validators.ts's AddressSchema field-for-field. country is
-// genuinely optional there (not required-with-default — that default is
-// Mongoose-level, applied at persistence, not part of the incoming payload).
+// Mirrors tenant.validators.ts's AddressSchema field-for-field — country is
+// genuinely optional there, not required-with-a-default.
 const addressSchema = z.object({
   addressLine1: z.string().trim().min(1, 'Address is required.'),
   addressLine2: z.string().optional(),

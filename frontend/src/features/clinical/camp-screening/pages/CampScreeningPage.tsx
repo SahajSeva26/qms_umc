@@ -9,12 +9,8 @@ import ScreeningDetail from '@/features/clinical/screening/components/ScreeningD
 import TestRecordingSection from '@/features/clinical/test-result/components/TestRecordingSection'
 import { useScreening } from '@/features/clinical/screening/hooks/useScreening'
 
-// Reachable only once a camp is `live` and the viewer is either the camp's
-// assigned FO or a screening:manage/system:manage holder — mirrors the
-// backend's own assertAssignedFoOrManage rule (see canRunScreening). The
-// route itself only checks "can this role touch Screening at all"
-// (screening:create/manage/system:manage); this page does the precise check,
-// since it needs the camp's own `fo` field, only known once loaded.
+// The route only checks "can this role touch Screening at all" — this page
+// does the precise assigned-FO check, since it needs the camp's own `fo` field.
 const CampScreeningPage = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -25,9 +21,7 @@ const CampScreeningPage = () => {
   const camp = data?.data ?? null
 
   const [openScreeningId, setOpenScreeningId] = useState<string | null>(null)
-  // Re-fetches live, rather than trusting the row snapshot from the list
-  // click — after a moveStage action, this stays current via the same
-  // query-invalidation useMoveScreeningStage already performs.
+  // Re-fetches live rather than trusting the row snapshot from the list click.
   const { data: openScreeningData } = useScreening(openScreeningId ?? undefined)
   const openScreening = openScreeningData?.data ?? null
 

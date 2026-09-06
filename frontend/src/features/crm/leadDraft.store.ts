@@ -15,24 +15,15 @@ function getLeadDraftStore(userId: string) {
   return store
 }
 
-// `disabled`: the caller (a prefill instance) doesn't want persistence at
-// all — no store lookup/creation happens, and any existing draft is left
-// completely untouched. `loading` distinguishes "we don't know who's logged
-// in YET" from "definitely no user," so a wizard mounted mid-session-restore
-// waits instead of wrongly concluding no draft exists. `ready` is the only
-// state with a usable `store`.
+// `loading` distinguishes "don't know who's logged in yet" from "no user" —
+// a wizard mounted mid-session-restore waits instead of assuming no draft.
 type LeadDraftStoreResult =
   | { status: 'disabled'; store: null }
   | { status: 'loading'; store: null }
   | { status: 'ready'; store: ReturnType<typeof createDraftStore<WizardFormState>> }
 
-// `enabled` defaults true; a prefill instance passes `enabled: false` so no
-// per-user store is ever looked up or created for it — not merely "resolves
-// normally, then gets ignored by the wizard." useSession()/useAuthStore are
-// still subscribed to unconditionally (Rules of Hooks), but that costs
-// nothing extra — useSession() shares the same React Query cache every other
-// session consumer already reads from; the real cost this avoids is creating/
-// rehydrating the Zustand+persist store itself.
+// `enabled: false` (a prefill instance) skips creating/rehydrating the
+// Zustand+persist store entirely, not merely ignoring its result.
 export function useLeadDraftStore({ enabled = true }: { enabled?: boolean } = {}): LeadDraftStoreResult {
   const { isSettled } = useSession()
   const userId = useAuthStore((s) => s.user?.id)

@@ -44,9 +44,8 @@ export interface CampStageHistoryEntry {
 /** Whether a field is populated or a bare ObjectId depends on the service call: get()/search() populate, create/update/moveStage/allocateFo don't. */
 export interface CampPopulatedTenant { _id?: string; code: string; name: string }
 export interface CampPopulatedDivision { _id?: string; code: string; name: string; therapy?: string }
-// tests is the Project's configured Test Master id list — not automatically
-// "relevant to this camp" on its own, see TestRecordingSection.tsx's
-// campType-compatibility filter for what makes it so.
+// tests is the Project's configured Test Master id list, not automatically
+// "relevant to this camp" — see TestRecordingSection.tsx's campType filter.
 export interface CampPopulatedProject { _id?: string; name: string; status?: string; tests?: string[] }
 export interface CampPopulatedDoctor { _id?: string; name: string; specialization?: string; pharmaCode?: string }
 /** fo/mr/asm/rsm populate with NO field projection (`{ path: 'fo' }`, no `.select()`) — the full Role document comes back. */
@@ -82,12 +81,8 @@ export interface CampEntity {
   updatedAt: string
 }
 
-/**
- * create()/bookCamp()/update()/moveStage()/allocateFo() return the unpopulated
- * Mongoose document straight from `.save()` — only `devices` differs from
- * CampEntity (bare ObjectId strings, not {_id,name,code,type} sub-docs);
- * fetch/refetch for the real shape.
- */
+/** create/update/moveStage/allocateFo return the unpopulated document — only
+ * `devices` differs from CampEntity (bare ObjectId strings, not sub-docs). */
 export type CampMutationResponseEntity = Omit<CampEntity, 'devices'> & { devices: string[] }
 
 export interface SearchCampQuery {

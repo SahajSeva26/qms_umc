@@ -55,7 +55,7 @@ const UsersPage = () => {
   const [companyFilterTouched, setCompanyFilterTouched] = useState(false)
 
   // Only way to resolve a user's tenant (User itself has no tenant field).
-  // Requires tenant:admin/tenant:manage; a 403 here is handled as "unknown, show nothing".
+  // A 403 here (lacking role search access) is handled as "unknown, show nothing".
   const { data: rolesData } = useRoles({ limit: String(CLIENT_SIDE_FETCH_LIMIT) }, companyFilterTouched)
   const roles = rolesData?.data?.items ?? EMPTY_ARRAY
 

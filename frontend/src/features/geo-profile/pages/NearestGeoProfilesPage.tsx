@@ -27,11 +27,8 @@ const NearestGeoProfilesPage = () => {
   const [limit, setLimit] = useState('10')
   const [query, setQuery] = useState<NearestGeoProfileQuery | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
-  // Same race as GeoProfileDetailPage's Save: a pin can visibly move (or
-  // fail to resolve) before `location` itself updates. Searching from a
-  // stale `location` here doesn't silently lose data the way a no-op save
-  // would, but it does run a real allocation lookup from the wrong point —
-  // block "Find nearest" the same way Save is blocked.
+  // Same race as GeoProfileDetailPage's Save — a stale `location` here would
+  // run a real allocation lookup from the wrong point, so block the same way.
   const [locationResolution, setLocationResolution] = useState<LocationResolutionState>('idle')
 
   const { data, isLoading, isFetching, error } = useNearestGeoProfiles(query)
@@ -51,9 +48,8 @@ const NearestGeoProfilesPage = () => {
     })),
   })
 
-  // useQueries returns a fresh array every render, so `missingRoleQueries`
-  // itself is never a stable dep — key the memo on a plain identifier that
-  // actually changes only when the underlying data does.
+  // useQueries returns a fresh array every render, so key the memo on a
+  // stable identifier instead of `missingRoleQueries` itself.
   const missingRoleDataVersion = missingRoleQueries.map((q) => q.dataUpdatedAt).join(',')
   const roleLabelById = useMemo(() => {
     const map = new Map(activeRoles.map((r) => [r.id, r.name]))

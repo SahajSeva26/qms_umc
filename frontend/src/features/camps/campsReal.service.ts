@@ -12,7 +12,7 @@ import type {
 import type { CampReport } from '@/types/campReport.types'
 
 // Real API calls against backend/src/modules/operations/camp/**. Deliberately
-// separate from `camps.service.ts` (the old mock store ~100 files still depend on).
+// separate from `camps.service.ts`, the old mock store other files still depend on.
 
 const searchCamps = async (query: SearchCampQuery) => {
   const res = await api.get<PaginatedResponse<CampEntity>>('/camps', { params: query })

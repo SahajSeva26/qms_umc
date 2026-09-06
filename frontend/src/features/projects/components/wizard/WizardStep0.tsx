@@ -12,9 +12,8 @@ import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { unwrapId } from '@/utils/unwrapId'
 import { useWizardFieldError } from '@/features/projects/components/wizard/WizardValidationContext'
 
-// POST /projects requires an existing `lead` id; tenant/division are derived
-// server-side from it. Restricted to status=won leads as a UX-only
-// convention — the backend never actually checks the source lead's status.
+// Restricted to status=won leads as a UX-only convention — the backend never
+// actually checks the source lead's status.
 const WizardStep0 = () => {
   const { control, setValue } = useFormContext<WizardFormState>()
   const leadId = useWatch({ control, name: 'leadId' })
@@ -26,15 +25,11 @@ const WizardStep0 = () => {
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search, 300)
   const hasSearch = debouncedSearch.trim().length > 0
-  // A lead picked in an earlier session (e.g. resumed from a saved draft)
-  // is fully present in the form the moment this step mounts, but the
-  // search box below starts empty — with no indicator here, that pick is
-  // otherwise invisible until the user either re-searches for it or clicks
-  // Next and sees it reflected downstream.
+  // A lead restored from a saved draft is present in form state immediately,
+  // but the search box starts empty — this banner makes that pick visible.
   const hasRestoredSelection = !!leadId && !hasSearch
 
-  // Search-only, no default/browse-all list — nothing fetches until the
-  // user types a title.
+  // Search-only — nothing fetches until the user types a title.
   const { data, isLoading, isError } = useQuery({
     queryKey: ['project-wizard-won-leads', debouncedSearch],
     queryFn: () => projectsService.searchWonLeads({ title: debouncedSearch }),

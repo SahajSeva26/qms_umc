@@ -11,24 +11,16 @@ export function toCoordinatesTuple(point: { lat: number; lng: number }): [number
   return [point.lng, point.lat]
 }
 
-// The Places API (New) uses camelCase field names (longText/shortText) on
-// `google.maps.places.AddressComponent` — confirmed genuinely different from
-// the legacy Geocoding API's snake_case GeocoderAddressComponent below. Do
-// not merge these into one function assuming a shared shape.
+// Places API (New) uses camelCase (longText/shortText); the legacy Geocoding
+// API below uses snake_case — do not merge these into one shared-shape function.
 interface PlacesAddressComponentLike {
   longText: string | null | undefined
   shortText: string | null | undefined
   types: string[]
 }
 
-/**
- * Maps a Places API (New) `Place.addressComponents` array + optional place id
- * into a LocationValue. Required string fields default to '' when Google
- * doesn't supply them (never undefined/omitted) — a selected place can
- * genuinely lack a street number or postal code (e.g. a locality-level
- * result); the consuming form's own required-field validation is what
- * actually blocks saving on an incomplete result, not this mapper.
- */
+// Required string fields default to '' (never undefined) when Google omits
+// them — validating an incomplete result is the consuming form's job, not this mapper's.
 export function fromPlacesAddressComponents(
   components: PlacesAddressComponentLike[],
   placeId: string | null | undefined,
@@ -58,17 +50,14 @@ export function fromPlacesAddressComponents(
   }
 }
 
-// The legacy Geocoding API uses snake_case field names (long_name/short_name)
-// on `google.maps.GeocoderAddressComponent` — genuinely different naming
-// from the Places API's AddressComponent above, confirmed via Google's own
-// reference docs for each API. A separate mapper on purpose.
+// Legacy Geocoding API — snake_case fields, separate mapper on purpose (see PlacesAddressComponentLike above).
 interface GeocoderAddressComponentLike {
   long_name: string
   short_name: string
   types: string[]
 }
 
-/** Maps a Geocoding API `GeocoderResult` into a LocationValue. Same '' contract as fromPlacesAddressComponents. */
+// Same ''-default contract as fromPlacesAddressComponents above.
 export function fromGeocoderAddressComponents(
   components: GeocoderAddressComponentLike[],
   placeId: string | null | undefined,

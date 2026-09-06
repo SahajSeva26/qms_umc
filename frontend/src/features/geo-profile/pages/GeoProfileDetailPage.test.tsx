@@ -151,11 +151,8 @@ describe('GeoProfileDetailPage — create mode', () => {
   })
 
   it('disables Save (relabeled "Resolving location…") while the picked pin is still resolving, so createGeoProfile is never called', async () => {
-    // The button itself is disabled during 'loading' (belt-and-braces UI
-    // affordance) — the handleSave 'loading' guard is defense-in-depth for
-    // this state, not the primary block. The 'error' state (next test) is
-    // the one that actually exercises handleSave's guard via a real click,
-    // since Save stays enabled there.
+    // The button is disabled outright here; the next test (error state,
+    // where Save stays enabled) is what actually exercises handleSave's guard.
     await mockPermission(true)
     const { geoProfileService } = await import('@/features/geo-profile/geoProfile.service')
     const user = userEvent.setup()
@@ -256,9 +253,7 @@ describe('GeoProfileDetailPage — edit mode', () => {
   })
 
   it('disables Save (relabeled "Resolving location…") while the picked pin is still resolving, so updateGeoProfile is never called', async () => {
-    // Save is disabled outright during 'loading' — the handleSave 'loading'
-    // guard is defense-in-depth, not the primary block here (mirrors the
-    // create-mode test above).
+    // Mirrors the create-mode test above — Save is disabled outright here.
     await mockPermission(true)
     const { geoProfileService } = await import('@/features/geo-profile/geoProfile.service')
     const user = userEvent.setup()

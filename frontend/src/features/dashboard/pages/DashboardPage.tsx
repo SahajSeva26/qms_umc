@@ -30,25 +30,15 @@ const DashboardPage = () => {
   const [drill, setDrill] = useState<{ title: string; content: string } | null>(null)
   const [salesFilter, setSalesFilter] = useState<SalesFilterState>(DEFAULT_SALES_FILTER)
 
-  // The prototype's dashboard.html merges the Sales Command Center's filter
-  // bar + KPI strip directly into this page, super_admin-only (dashboard.js:
-  // "isSuper = sess.roleId === 'super_admin'"). The placeholder UserRole
-  // system that used to gate this (user?.role === 'super_admin') never
-  // actually worked — every real login was hardcoded to that same string
-  // regardless of who was logged in, so this block has always rendered for
-  // everyone in practice. Real replacement: system:manage, the actual
-  // backend permission that denotes full administrative access.
   const isSuperAdmin = hasPermission('system:manage')
   // GET /camps/report requires this exact set — stricter than camp:search.
   const canViewCampReport = hasAnyPermission(['camp:manage', 'tenant:manage'])
 
-  // Owns the loading/error gate for the shared dashboard query. Every section
-  // below calls useDashboardData(filters) with this same object, so they all
-  // read the one deduped cache entry rather than firing their own request.
+  // Every section below calls useDashboardData(filters) with this same
+  // object, so they all read one deduped cache entry, not separate requests.
   const { isLoading, error } = useDashboardData(filters)
 
-  // Gated with `enabled` — these two feed super_admin-only blocks, so every
-  // other role used to fetch both payloads and render none of them.
+  // Gated with `enabled` — these two only feed super_admin-only blocks below.
   const { reps, targets } = useSalesDataShared({ enabled: isSuperAdmin })
   const { clients, projects, invoices } = useClientsDataShared({ enabled: isSuperAdmin })
   const salesKpiTiles = useMemo(

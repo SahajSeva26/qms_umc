@@ -1,7 +1,5 @@
-// Matches the backend's actual API boundary shape (AuthMapper.toResponse,
-// used by both POST /auth/login and GET /auth/me) — `id`, not Mongoose's
-// internal `_id`. The backend intentionally converts `_id.toString()` to
-// `id` at that boundary, so frontend code follows the API contract here.
+// Matches the backend's API boundary shape (AuthMapper.toResponse) — `id`,
+// not Mongoose's internal `_id`.
 export interface AuthUser {
   id: string
   email: string

@@ -37,15 +37,8 @@ const CountPill = ({ label, count, color }: CountPillProps) => (
   </div>
 )
 
-// Only what GET /camps/report actually provides — no month/day trend, no
-// forecast, no Diet/Screening-only filtering. The prior CampReportSection
-// read from the separate mock localStorage camps layer and did client-side
-// run-rate projection math with no backend equivalent; both are gone, not
-// ported, per the explicit decision to show only real backend data.
-// Gates its own fetch on camp:manage/tenant:manage independently of whatever
-// gate the caller applies — DashboardPage.tsx already conditionally mounts
-// this component, but re-checking here means this component stays safe even
-// if it's ever reused in a spot that isn't already permission-gated.
+// Re-checks its own permission gate independently of the caller, so this
+// stays safe if reused somewhere not already permission-gated.
 const CampOverviewSection = () => {
   const { hasAnyPermission } = usePermission()
   const canViewReport = hasAnyPermission(CAMP_REPORT_PERMISSIONS)

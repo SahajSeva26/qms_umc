@@ -1,16 +1,8 @@
 import type { RoleEntity, RolePopulatedUser } from '@/types/accessManagement.types'
 import RoleStatusPill from '@/features/access-management/role/components/RoleStatusPill'
 
-// Trimmed columns vs. RolesTable.tsx (Code/Company/Role Type omitted — tenant,
-// division, and role type are already fixed/implied by being on this page).
-//
-// Deliberately no click-through to /admin/roles/:id (the global Role editor):
-// that page's "back" always returns to Roles, not this Division; it exposes
-// broad role-management fields irrelevant to just viewing MRs here; and it
-// can't even edit the MR's division/ASM supervisor despite being the reason
-// you'd manage an MR from a Division context. Rows are plain, read-only text
-// until a dedicated "Manage MR" action (a Division-context drawer/modal with
-// only account-status/supervisor fields) is built.
+// Deliberately no click-through to the global Role editor — its "back"
+// returns to Roles, not this Division, and it can't edit the MR's supervisor.
 
 interface DivisionMrsTableProps {
   mrs: RoleEntity[]

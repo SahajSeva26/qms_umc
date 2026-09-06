@@ -60,9 +60,7 @@ const OWNER_FIELD_TO_FORM_FIELD: Record<string, keyof TenantFormValues> = {
   gender: 'ownerGender',
 }
 
-// address is optional end-to-end (backend model, Zod schema, and this form)
-// — a company can be created with no address at all, unlike Camp where a
-// location is operationally required for FO auto-allocation.
+// Optional end-to-end, unlike Camp where location is required for FO auto-allocation.
 const ADDRESS_FIELD_TO_FORM_FIELD: Record<string, keyof TenantFormValues> = {
   addressLine1: 'address', addressLine2: 'address', locality: 'address',
   city: 'address', state: 'address', country: 'address', pincode: 'address',
@@ -145,14 +143,8 @@ const CreateTenantDialog = () => {
 
   const handleNext = async () => {
     setStep1Attempted(true)
-    // address is included even though it's optional — its own required
-    // sub-fields (addressLine1/city/state/pincode) are only enforced once the
-    // object is non-null, but if the user typed into even one address input,
-    // LocationAddressFields' setField always produces a non-null object, so
-    // an incomplete address must be caught HERE, on step 0, where its error
-    // UI actually renders — step 1 has no address UI at all, so surfacing
-    // this error only on final submit would leave the user with a silently
-    // stuck "Create company" button and no visible explanation.
+    // address must validate here on step 0, where its error UI renders — step 1
+    // has no address UI, so an incomplete address would otherwise silently block submit.
     const valid = await trigger(['code', 'name', 'salesPerson', 'address'])
     if (valid) setStep(1)
   }

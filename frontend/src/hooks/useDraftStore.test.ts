@@ -42,16 +42,12 @@ describe('createDraftStore', () => {
 
     store.getState().clearDraft()
 
-    // The exact bug caught in review: set({draft: null}) alone still writes
-    // a present-but-empty entry via persist's own setItem. clearStorage()
-    // is what actually calls sessionStorage.removeItem — assert the key is
-    // gone entirely, not merely holding a null draft.
+    // set({draft: null}) alone still writes a present-but-empty entry via
+    // persist's setItem — assert the key is gone entirely, not just null.
     expect(sessionStorage.getItem('test:draft:d')).toBeNull()
   })
 
   it('a version-mismatched stored entry is replaced with the clean default, not left stale', () => {
-    // Simulate an old, incompatible shape already sitting in storage from a
-    // previous schema version.
     sessionStorage.setItem('test:draft:e', JSON.stringify({ state: { draft: { legacyField: 'stale' } }, version: 0 }))
 
     const store = createDraftStore<TestDraft>('test:draft:e', 1)

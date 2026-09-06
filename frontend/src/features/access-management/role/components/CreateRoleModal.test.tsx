@@ -220,9 +220,8 @@ describe('CreateRoleModal', () => {
     await selectCompany(user, 'Beta', /Beta Co/i)
 
     await waitFor(() => expect(screen.getByText(/select a company first|select role type/i)).toBeInTheDocument())
-    // Checking the division/supervisor UI is merely absent wouldn't catch a
-    // stale-value bug, since a cleared field looks the same either way — instead
-    // re-select RSM under the NEW company and confirm the OLD selections don't reappear.
+    // A cleared field looks the same as absent, so re-select RSM and confirm
+    // the OLD division/supervisor selections don't reappear.
     await selectByLabel(user, /role type/i, /RSM/i)
     await waitFor(() => expect(screen.queryByText(/Cardiology Division/i)).not.toBeInTheDocument())
     expect(screen.getByText(/^select division$/i)).toBeInTheDocument()

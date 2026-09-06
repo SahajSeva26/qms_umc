@@ -9,33 +9,15 @@ export interface Suggestion {
 
 interface UsePlacesAutocompleteOptions {
   input: string
-  /**
-   * The raw, un-debounced query — used only to detect "the user cleared the
-   * box" the instant it happens. `input` (debounced) still drives the actual
-   * fetch. Without this, clearing the box leaves the stale debounced `input`
-   * in place for up to the debounce window, during which a slow in-flight
-   * response for the old query can still repopulate/reopen the dropdown.
-   * Falls back to `input` itself when omitted, so existing callers/tests that
-   * don't distinguish the two keep working unchanged.
-   */
+  /** Raw, un-debounced query, used only to detect a cleared box instantly. Falls back to `input` when omitted. */
   rawInput?: string
   countryCode?: string
   defaultCountry?: string
   onSelected: (value: LocationValue) => void
 }
 
-/**
- * Session-token lifecycle + fetchAutocompleteSuggestions wrapper around the
- * new, programmatic Places API (AutocompleteSuggestion + AutocompleteSessionToken)
- * — deliberately not the PlaceAutocompleteElement widget or the legacy
- * Autocomplete class, per this component's own design decision.
- *
- * Guards against two real races:
- * - a slower response for an earlier, now-stale query overwriting the
- *   suggestion list after the user kept typing (or cleared the box entirely)
- * - two place-selection attempts racing each other, which would also mint
- *   the next session token for the wrong attempt
- */
+// Uses the programmatic Places API (AutocompleteSuggestion + AutocompleteSessionToken),
+// not the PlaceAutocompleteElement widget or the legacy Autocomplete class.
 export function usePlacesAutocomplete({ input, rawInput, countryCode, defaultCountry, onSelected }: UsePlacesAutocompleteOptions) {
   const clearWatchInput = rawInput ?? input
   const placesLibrary = useMapsLibrary('places')
@@ -56,11 +38,8 @@ export function usePlacesAutocomplete({ input, rawInput, countryCode, defaultCou
     return sessionTokenRef.current
   }, [placesLibrary])
 
-  // Query cleared -> invalidate anything in flight immediately, don't wait
-  // for a pending fetch to resolve first (a slow earlier result must not
-  // reopen the dropdown after the user already cleared the box). Watches the
-  // RAW query, not the debounced one, so this fires the instant the user
-  // clears the box rather than up to `debounce`ms later.
+  // Watches the raw query, not debounced, so a clear invalidates in-flight
+  // requests instantly rather than up to `debounce`ms later.
   useEffect(() => {
     if (clearWatchInput.trim().length > 0) return
     latestRequestId.current += 1
@@ -76,7 +55,7 @@ export function usePlacesAutocomplete({ input, rawInput, countryCode, defaultCou
 
     const requestId = ++latestRequestId.current
     const sessionToken = ensureSessionToken()
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- kicking off a new async fetch cycle in response to a real dependency change, same shape as CameraGeoCapture.tsx's acquisition-cycle reset
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- new fetch cycle in response to a real dependency change
     setIsFetching(true)
     setError(null)
 

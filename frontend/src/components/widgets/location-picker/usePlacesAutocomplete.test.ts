@@ -46,10 +46,8 @@ function makePlacesLibrary() {
 describe('usePlacesAutocomplete', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    // A stable reference across renders — the real useMapsLibrary caches the
-    // loaded library and returns the SAME object every render (it only
-    // changes if the library genuinely reloads), so a fresh object literal
-    // per call here would be an unrealistic mock, not a faithful stand-in.
+    // Stable reference across renders — the real useMapsLibrary caches the
+    // loaded library rather than returning a fresh object each render.
     const stableLibrary = makePlacesLibrary()
     useMapsLibraryMock = vi.fn(() => stableLibrary)
   })
@@ -158,9 +156,7 @@ describe('usePlacesAutocomplete', () => {
     })
     expect(result.current.error).toBeTruthy()
 
-    // Triggering a new search (as if the user kept typing) must mint a FRESH
-    // token — proving the old one was discarded in `finally` despite the
-    // rejection, not left lingering for reuse (which would invalidate billing).
+    // A fresh token here proves the old one was discarded in `finally` despite the rejection.
     rerender({ input: 'Mumbai Central' })
     await waitFor(() => expect(sessionTokenCtor).toHaveBeenCalledTimes(2))
   })

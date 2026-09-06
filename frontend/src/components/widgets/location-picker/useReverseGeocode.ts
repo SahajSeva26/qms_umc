@@ -9,17 +9,8 @@ interface UseReverseGeocodeOptions {
   onResolved: (value: LocationValue) => void
 }
 
-/**
- * Coordinates -> address, via the (legacy-named but current) Geocoding API's
- * `Geocoder.geocode()` — genuinely different API from Places Autocomplete,
- * which has no "given coordinates, give me an address" operation.
- *
- * Guards against a real race: dragging the pin twice in quick succession can
- * let the FIRST drag's response resolve after the SECOND drag's, which must
- * never win. A monotonically-increasing request id (not an AbortController —
- * these calls aren't fetch-backed in a way AbortController can cancel) is
- * the guard; a superseded response is discarded silently.
- */
+// A monotonically-increasing request id (not AbortController — these calls
+// aren't fetch-backed) guards against a stale drag's response winning over a later one.
 export function useReverseGeocode({ defaultCountry, onResolved }: UseReverseGeocodeOptions) {
   const [status, setStatus] = useState<ReverseGeocodeStatus>('idle')
   const [provisionalPosition, setProvisionalPosition] = useState<{ lat: number; lng: number } | null>(null)
@@ -47,10 +38,8 @@ export function useReverseGeocode({ defaultCountry, onResolved }: UseReverseGeoc
         const addressFields = fromGeocoderAddressComponents(result.address_components, result.place_id, defaultCountry)
         setStatus('idle')
         onResolved({ ...addressFields, coordinates: toCoordinatesTuple(point) })
-        // Cleared on success so MapCanvas's `provisionalPosition ?? committedPosition`
-        // falls through to the freshly-committed `value.coordinates` — otherwise a
-        // later search selection updates the camera/form but the marker stays
-        // pinned to this now-stale drag/click position forever.
+        // Cleared on success so MapCanvas falls through to the freshly-committed
+        // position instead of staying pinned to this now-stale one.
         setProvisionalPosition(null)
       } catch {
         if (requestId !== latestRequestId.current) return
@@ -64,14 +53,8 @@ export function useReverseGeocode({ defaultCountry, onResolved }: UseReverseGeoc
     if (provisionalPosition) void runGeocode(provisionalPosition)
   }, [provisionalPosition, runGeocode])
 
-  /**
-   * "Use this pin / enter address manually" — commits ONLY the new
-   * coordinates, clearing every address-derived field (not just the
-   * required ones): the previous addressLine2/locality/googlePlaceId
-   * belonged to the OLD location and must not silently ride along attached
-   * to the NEW coordinates. country falls back to defaultCountry, since
-   * that's the one field with a sensible non-empty default to keep.
-   */
+  // Clears every address-derived field, not just the required ones — the old
+  // addressLine2/locality/googlePlaceId must not ride along with new coordinates.
   const useProvisionalPinWithoutAddress = useCallback(() => {
     if (!provisionalPosition) return
     setStatus('idle')

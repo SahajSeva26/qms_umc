@@ -144,10 +144,8 @@ describe('CampDetailPageReal — edit mode MR field', () => {
 
     await screen.findByText(/edit camp/i)
 
-    // Existing MR shows as the current selection.
     expect(await screen.findByText(/original mr/i)).toBeInTheDocument()
 
-    // Click the chip to reopen the picker and search for a replacement.
     await user.click(screen.getByText(/original mr/i))
     const mrSearchInput = await screen.findByPlaceholderText(/search mr by name/i)
     await user.type(mrSearchInput, 'Replacement')
@@ -171,9 +169,7 @@ describe('CampDetailPageReal — edit mode MR field', () => {
     await screen.findByText(/edit camp/i)
     expect(await screen.findByText(/original mr/i)).toBeInTheDocument()
 
-    // Clicking the chip itself clears the selection and reopens the search
-    // input (AsyncPicker's own chip-click behavior — same as the explicit X
-    // button, both call the same clearSelection()).
+    // Clicking the chip itself clears the selection, same as the explicit X button.
     await user.click(screen.getByText(/original mr/i))
 
     expect(screen.queryByText(/original mr/i)).not.toBeInTheDocument()
@@ -218,9 +214,8 @@ describe('CampDetailPageReal — create mode, inline doctor creation', () => {
     vi.resetAllMocks()
   })
 
-// Fills the "Add doctor" modal's required create fields (pharma code, name)
-// by locating each input via its own label text's sibling, matching this
-// modal's markup (labels aren't htmlFor-associated with their inputs).
+// Locates each input via its own label text's sibling — this modal's labels
+// aren't htmlFor-associated with their inputs.
 async function fillNewDoctorRequiredFields(user: ReturnType<typeof userEvent.setup>) {
   const codeLabel = screen.getByText(/pharma doctor code/i)
   const codeInput = codeLabel.parentElement!.querySelector('input')!
@@ -282,7 +277,6 @@ async function fillNewDoctorRequiredFields(user: ReturnType<typeof userEvent.set
     const payload = vi.mocked(doctorsService.createDoctor).mock.calls[0][0]
     expect(payload.tenant).toBe('t-cipla')
 
-    // Modal closes, new doctor is selected, and City (set earlier) is untouched.
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(screen.getByText(/dr\. new/i)).toBeInTheDocument()
     expect(screen.getByDisplayValue('Pune')).toBeInTheDocument()
@@ -312,16 +306,13 @@ async function fillNewDoctorRequiredFields(user: ReturnType<typeof userEvent.set
 
     await waitFor(() => expect(screen.getByText(/dr\. new/i)).toBeInTheDocument())
 
-    // Change company to a different one.
     const companyLabel = screen.getByText(/^Company \*/i)
     const trigger = companyLabel.parentElement!.querySelector('[role="combobox"]')!
     await user.click(trigger)
     const otherOption = await screen.findByRole('option', { name: /sun pharma/i })
     await user.click(otherOption)
 
-    // The previously-created/selected doctor is gone, but a new company IS
-    // selected, so the doctor selector reads "Select doctor," not the
-    // no-company placeholder.
+    // Doctor selector should read "Select doctor," not the no-company placeholder.
     expect(screen.queryByText(/dr\. new/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/select company first/i)).not.toBeInTheDocument()
   })
@@ -388,7 +379,6 @@ describe('CampDetailPageReal — create mode, MR/FO pickers', () => {
     expect(screen.getByText(/cipla mr/i)).toBeInTheDocument()
     expect(screen.getByText(/cipla fo/i)).toBeInTheDocument()
 
-    // Switch Company.
     const companyLabel = screen.getByText(/^Company \*/i)
     const trigger = companyLabel.parentElement!.querySelector('[role="combobox"]')!
     await user.click(trigger)

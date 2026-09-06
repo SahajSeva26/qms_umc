@@ -1,14 +1,5 @@
-// Matches every backend module's address sub-schema exactly (Vendor Master,
-// Tenant, Camp) — coordinates in GeoJSON [lng, lat] order, NOT [lat, lng].
-// Required string fields are never omitted/undefined — a value Google didn't
-// return is represented as '', never a missing key (see useReverseGeocode.ts
-// and LocationSearchBox.tsx's incomplete-place/failed-geocode handling for
-// where this contract actually gets exercised). `country` is the one
-// exception: the backend Zod schema treats it as genuinely optional (a
-// persisted default like 'India' is applied server-side, not assumed here),
-// so it's `undefined` when absent — never `''`, since `.optional()` on a
-// `z.string().min(1)` permits the key to be missing but still rejects an
-// empty string if present.
+// Coordinates are GeoJSON [lng, lat], NOT [lat, lng]. Required string fields
+// are never omitted — a missing Google value is `''`; `country` alone is genuinely optional (`undefined`).
 export interface LocationValue {
   addressLine1: string
   addressLine2?: string

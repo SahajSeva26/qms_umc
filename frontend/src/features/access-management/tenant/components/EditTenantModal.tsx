@@ -51,9 +51,7 @@ const useEditTenantFormResolver = () =>
       status: values.status || undefined,
       type: values.type || undefined,
       salesPerson: values.salesPerson || undefined,
-      // Omitted (not sent) when unset, so the backend's replace-wholesale
-      // update semantics leave an untouched address alone — same pattern as
-      // Camp's UpdateCampPayload.location.
+      // Omitted when unset so the backend's replace-wholesale address update leaves it alone.
       address: values.address ?? undefined,
     }),
     nestedFieldMaps: { address: ADDRESS_FIELD_TO_FORM_FIELD },
@@ -107,12 +105,8 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
   const onSubmit = async (values: EditTenantFormValues) => {
     const parsed = await parsePayload(values)
     const payload: UpdateTenantPayload = { name: parsed.name, description: parsed.description }
-    // address isn't permission-gated (unlike status/type/salesPerson, whose
-    // inputs are conditionally rendered) — but it IS a replace-wholesale
-    // field server-side (no partial merge), so it must only be sent when the
-    // user actually touched it here. Sending the stale defaultValues snapshot
-    // unconditionally would silently overwrite a newer address someone else
-    // saved between this modal opening and this submit.
+    // Sent only when touched — address is replace-wholesale server-side, so
+    // resending the stale defaultValues snapshot could clobber a newer save.
     if (dirtyFields.address) payload.address = parsed.address
     if (canManageTenant && parsed.status) payload.status = parsed.status
     if (canManageSystem && parsed.type) payload.type = parsed.type

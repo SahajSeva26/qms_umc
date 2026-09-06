@@ -8,12 +8,8 @@ const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/
 // locked value spliced into the real payload right before the mutation fires.
 export type BookCampFormPayload = Omit<BookCampPayload, 'project'>
 
-// Mirrors BookCampPayloadSchema (camp.validators.ts), including conscentPath's
-// misspelling, copied verbatim — except conscentPath/devices/notes are all
-// optional here too. mr is required even for self-booking. `location` mirrors
-// camp.validators.ts's LocationSchema field-for-field (country intentionally
-// optional there, not required-with-default — that default is Mongoose-level,
-// applied at persistence, not part of the incoming payload contract).
+// Mirrors BookCampPayloadSchema (camp.validators.ts) including conscentPath's
+// misspelling; mr is required even for self-booking.
 export const bookCampPayloadSchema = z.object({
   mr: z.string().min(1, 'MR is required.'),
   doctor: z.string().min(1, 'Doctor is required.'),

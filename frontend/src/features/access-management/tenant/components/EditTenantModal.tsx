@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
-import type { Tenant, TenantStatus, TenantType, UpdateTenantPayload } from '@/types/accessManagement.types'
+import type { Tenant, TenantStatus, UpdateTenantPayload } from '@/types/accessManagement.types'
 import { useUpdateTenant } from '@/features/access-management/tenant/hooks/useUpdateTenant'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRoleTypes'
@@ -30,7 +30,6 @@ interface EditTenantFormValues {
   name: string
   description: string
   status: TenantStatus | ''
-  type: TenantType | ''
   salesPerson: string
   address: LocationValue | null
 }
@@ -41,7 +40,7 @@ const ADDRESS_FIELD_TO_FORM_FIELD: Record<string, keyof EditTenantFormValues> = 
   googlePlaceId: 'address', coordinates: 'address',
 }
 
-// '' must be normalized to undefined — status/type are bare enums with no '' member.
+// '' must be normalized to undefined — status is a bare enum with no '' member.
 const useEditTenantFormResolver = () =>
   useReshapingResolver<EditTenantFormValues, UpdateTenantPayload>({
     schema: updateTenantSchema,
@@ -49,7 +48,6 @@ const useEditTenantFormResolver = () =>
       name: values.name,
       description: values.description || undefined,
       status: values.status || undefined,
-      type: values.type || undefined,
       salesPerson: values.salesPerson || undefined,
       // Omitted when unset so the backend's replace-wholesale address update leaves it alone.
       address: values.address ?? undefined,
@@ -73,7 +71,6 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
       name: tenant.name,
       description: '',
       status: tenant.status ?? '',
-      type: tenant.type ?? '',
       salesPerson: tenant.salesPerson ?? '',
       address: tenant.address,
     },
@@ -109,7 +106,6 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
     // resending the stale defaultValues snapshot could clobber a newer save.
     if (dirtyFields.address) payload.address = parsed.address
     if (canManageTenant && parsed.status) payload.status = parsed.status
-    if (canManageSystem && parsed.type) payload.type = parsed.type
     if (canManageSystem) payload.salesPerson = values.salesPerson || null
     updateTenant.mutate(payload)
   }
@@ -185,31 +181,6 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
 
           {canManageSystem && (
             <div>
-              <Label htmlFor="type" className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-                Type
-              </Label>
-              <Controller
-                control={control}
-                name="type"
-                render={({ field }) => (
-                  <Select key={field.value || 'empty'} value={field.value || undefined} onValueChange={field.onChange}>
-                    <SelectTrigger id="type" className="w-full">
-                      <SelectValue placeholder="Select type">
-                        {(v) => (v === 'platform' ? 'Platform' : v === 'customer' ? 'Customer' : 'Select type')}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="platform">Platform</SelectItem>
-                      <SelectItem value="customer">Customer</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-            </div>
-          )}
-
-          {canManageSystem && (
-            <div>
               <Label htmlFor="salesPerson" className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
                 Sales rep
               </Label>
@@ -254,7 +225,7 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
 
           {!canManageTenant && !canManageSystem && (
             <p className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>
-              Status and type are only editable by users with company or system management permissions.
+              Status is only editable by users with company or system management permissions.
             </p>
           )}
 

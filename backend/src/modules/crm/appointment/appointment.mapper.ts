@@ -1,6 +1,7 @@
 // Appointment Mapper
 
 import { RequestContext } from '../../../shared/utils/contextBuilder';
+import { APPOINTMENT_REPORT_STATUSES, APPOINTMENT_STATUSES, APPOINTMENT_TYPES } from './appointment.constants';
 
 export const AppointmentMapper = {
     toResponse: (appointment: any, ctx: RequestContext) => {
@@ -59,5 +60,35 @@ export const AppointmentMapper = {
             result.items.push(AppointmentMapper.toResponse(appointment, ctx));
         }
         return result;
+    },
+    toReportResponse: (report: any) => {
+        const statusCounts = new Map<string, number>((report?.statusCounts || []).map((s: any) => [s._id, s.count]));
+        const typeCounts = new Map<string, number>((report?.typeCounts || []).map((t: any) => [t._id, t.count]));
+
+        // total is the sum of every matched document's status bucket — the aggregation never runs
+        // a separate $count, and every appointment has a status (schema default), so this is exact.
+        let total = 0;
+        for (const count of statusCounts.values()) {
+            total += count;
+        }
+
+        return {
+            summary: {
+                total,
+                planned: statusCounts.get(APPOINTMENT_STATUSES.PLANNED) || 0,
+                done: statusCounts.get(APPOINTMENT_STATUSES.DONE) || 0,
+                cancelled: statusCounts.get(APPOINTMENT_STATUSES.CANCELLED) || 0,
+            },
+            // densified against the reachable statuses (see APPOINTMENT_REPORT_STATUSES), not the
+            // raw enum — so a bucket that can never be non-zero is never emitted.
+            byStatus: APPOINTMENT_REPORT_STATUSES.map((status) => ({
+                status,
+                count: statusCounts.get(status) || 0,
+            })),
+            byType: Object.values(APPOINTMENT_TYPES).map((type) => ({
+                type,
+                count: typeCounts.get(type) || 0,
+            })),
+        };
     },
 };

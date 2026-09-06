@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useSession } from '@/hooks/useSession'
 import { getGreeting, formatClockDisplay } from '@/utils/formatters'
 import ThemeToggle from '@/components/ui/ThemeToggle'
+import MyProfileModal from '@/components/layouts/MyProfileModal'
 
 interface TopbarProps {
   onMobileMenuToggle: () => void
@@ -18,6 +19,7 @@ const Topbar = ({ onMobileMenuToggle }: TopbarProps) => {
   const { session } = useSession()
   const [clock, setClock] = useState(formatClockDisplay)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [profileModalOpen, setProfileModalOpen] = useState(false)
 
   useEffect(() => {
     const interval = setInterval(() => setClock(formatClockDisplay()), 60_000)
@@ -29,7 +31,9 @@ const Topbar = ({ onMobileMenuToggle }: TopbarProps) => {
   // Real role-type name from the backend session (e.g. "Pharma MR", "System")
   // — replaces the old placeholder UserRole label, which was always
   // "Super Admin" for every account regardless of who was actually logged in.
-  const roleLabel = session?.roleType.name ?? ''
+  // The type marks roleType required, but the backend session mapper
+  // genuinely emits null for an orphaned/malformed role reference.
+  const roleLabel = session?.roleType?.name ?? ''
   const roleColor = 'var(--qms-brand)'
 
   return (
@@ -150,6 +154,7 @@ const Topbar = ({ onMobileMenuToggle }: TopbarProps) => {
                 </div>
                 <div className="py-1">
                   <button
+                    onClick={() => { setProfileModalOpen(true); setUserMenuOpen(false) }}
                     className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] transition-all hover:bg-(--qms-surface-hover)"
                     style={{ color: 'var(--qms-text-soft)' }}
                   >
@@ -170,6 +175,10 @@ const Topbar = ({ onMobileMenuToggle }: TopbarProps) => {
           )}
         </div>
       </div>
+
+      {profileModalOpen && (
+        <MyProfileModal user={user} session={session} onClose={() => setProfileModalOpen(false)} />
+      )}
     </header>
   )
 }

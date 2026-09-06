@@ -1,7 +1,12 @@
 // Inventory-device Service
 import { HydratedDocument } from 'mongoose';
 import { InventoryDeviceModel, IInventoryDevice } from './inventory-device.model';
-import { ICreateInventoryDevicePayload, ISearchInventoryDeviceQuery, IUpdateInventoryDevicePayload } from './inventory-device.validators';
+import {
+    ICreateInventoryDevicePayload,
+    IInventoryDeviceReportQuery,
+    ISearchInventoryDeviceQuery,
+    IUpdateInventoryDevicePayload,
+} from './inventory-device.validators';
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
@@ -150,10 +155,36 @@ const findAvailable = async (item: string, limit: number, ctx: RequestContext): 
     return await InventoryDeviceModel.find({ item, status: INVENTORY_DEVICE_STATUS.AVAILABLE }).limit(limit);
 };
 
+// ========================================================================================
+// REPORT (Phase 2 — device fleet only)
+// ========================================================================================
+// Additive migration of the centralized inventory-report's device metrics (totalDevices,
+// deviceByStatus) into the feature that owns the device fleet. Single-collection and global (no
+// tenant scoping) — mirrors the centralized report's semantics exactly. Dedicated reporting
+// aggregation, deliberately NOT search() (whose pagination would change the counts).
+const report = async (_filters: IInventoryDeviceReportQuery, _ctx: RequestContext) => {
+    const [result] = await InventoryDeviceModel.aggregate([
+        {
+            $facet: {
+                // total device units (== old summary.totalDevices)
+                total: [{ $count: 'count' }],
+                // devices grouped by lifecycle status (== old deviceByStatus)
+                byStatus: [{ $group: { _id: '$status', count: { $sum: 1 } } }],
+            },
+        },
+    ]);
+
+    return {
+        totalDevices: result?.total?.[0]?.count || 0,
+        deviceByStatus: result?.byStatus || [],
+    };
+};
+
 export const InventoryDeviceService = {
     get,
     search,
     create,
     update,
     findAvailable,
+    report,
 };

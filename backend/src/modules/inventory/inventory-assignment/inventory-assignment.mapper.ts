@@ -45,4 +45,23 @@ export const InventoryAssignmentMapper = {
         count: data?.count || 0,
         items: (data?.items || []).map(InventoryAssignmentMapper.toResponse),
     }),
+
+    // Phase 5 FO roster report. Shapes the aggregation result into the exact centralized contract:
+    // each FO's _id becomes `role` (string id), name/code passed through untouched, every count
+    // defaulting to 0. Order (name asc) is already applied in the aggregation — preserved here.
+    toReportResponse: (report: any) => ({
+        summary: {
+            totalFieldOfficers: report?.totalFieldOfficers || 0,
+            fieldOfficersHoldingInventory: report?.fieldOfficersHoldingInventory || 0,
+        },
+        fieldOfficers: (report?.fieldOfficers || []).map((fo: any) => ({
+            role: fo._id?.toString(),
+            name: fo.name,
+            code: fo.code,
+            devicesHeld: fo.devicesHeld || 0,
+            consumableUnitsHeld: fo.consumableUnitsHeld || 0,
+            awaitingApproval: fo.awaitingApproval || 0,
+            awaitingReceipt: fo.awaitingReceipt || 0,
+        })),
+    }),
 };

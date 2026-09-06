@@ -39,3 +39,8 @@ export const SearchInventoryAssignmentQuerySchema = z.object({
     limit: z.string().optional().openapi({ example: '10' }),
 });
 export type ISearchInventoryAssignmentQuery = z.infer<typeof SearchInventoryAssignmentQuerySchema>;
+
+//4: report ====================================>
+// Phase 5 FO roster report — no query parameters (matches the centralized report's empty-query contract).
+export const InventoryAssignmentReportQuerySchema = z.object({});
+export type IInventoryAssignmentReportQuery = z.infer<typeof InventoryAssignmentReportQuerySchema>;

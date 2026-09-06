@@ -8,6 +8,7 @@ import PaginationControls from '@/components/ui/PaginationControls'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import EditContactModal from '@/features/contacts/components/EditContactModal'
 import ContactsTable from '@/features/crm/divisions/components/ContactsTable'
+import ContactDrawer from '@/features/crm/divisions/components/ContactDrawer'
 import { usePagination } from '@/hooks/usePagination'
 import type { ContactEntity } from '@/types/contact.types'
 
@@ -25,6 +26,7 @@ const DivisionContactsSection = ({ tenantId, divisionId }: DivisionContactsSecti
   const [search, setSearch] = useState('')
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
   const [editModal, setEditModal] = useState<{ open: boolean; contact: ContactEntity | null }>({ open: false, contact: null })
+  const [viewContact, setViewContact] = useState<ContactEntity | null>(null)
 
   const { data, isLoading, error, refetch } = useContacts({
     division: divisionId,
@@ -80,10 +82,17 @@ const DivisionContactsSection = ({ tenantId, divisionId }: DivisionContactsSecti
       <QueryStateBlock isLoading={isLoading} error={error} loadingLabel="Loading contacts…" errorLabel="Failed to load contacts. Please try again." onRetry={refetch}>
         <ContactsTable
           contacts={contacts}
-          onRowClick={(contact) => canManage && setEditModal({ open: true, contact })}
+          onView={(contact) => setViewContact(contact)}
         />
         <PaginationControls page={page} totalPages={totalPages(totalCount)} onPageChange={setPage} />
       </QueryStateBlock>
+
+      <ContactDrawer
+        contact={viewContact}
+        canEdit={canManage}
+        onClose={() => setViewContact(null)}
+        onEdit={() => { setEditModal({ open: true, contact: viewContact }); setViewContact(null) }}
+      />
 
       <EditContactModal
         open={editModal.open}

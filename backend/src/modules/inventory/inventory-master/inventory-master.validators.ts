@@ -42,3 +42,8 @@ export const SearchInventoryMasterQuerySchema = z.object({
     limit: z.string().optional().openapi({ example: '10' }),
 });
 export type ISearchInventoryMasterQuery = z.infer<typeof SearchInventoryMasterQuerySchema>;
+
+//4: report ====================================>
+// Phase 1 catalog report — no query parameters (matches the centralized report's empty-query contract).
+export const InventoryMasterReportQuerySchema = z.object({});
+export type IInventoryMasterReportQuery = z.infer<typeof InventoryMasterReportQuerySchema>;

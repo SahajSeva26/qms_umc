@@ -4,6 +4,7 @@ import { InventoryMasterController } from './inventory-master.controller';
 import { registry } from '../../../shared/config/swagger/swagger.registry';
 import {
     CreateInventoryMasterPayloadSchema,
+    InventoryMasterReportQuerySchema,
     SearchInventoryMasterQuerySchema,
     UpdateInventoryMasterPayloadSchema,
 } from './inventory-master.validators';
@@ -14,6 +15,24 @@ import { INVENTORY_MASTER_PERMISSIONS } from './inventory-master.constants';
 export const InventoryMasterRouter = express.Router();
 
 InventoryMasterRouter.use(AuthMiddleware);
+
+// inventory master catalog report (Phase 1)
+registry.registerPath({
+    method: 'get',
+    path: '/inventory-masters/report',
+    tags: ['INVENTORY MASTER'],
+    summary: 'Inventory master catalog report — catalog counts by type and status',
+    description:
+        'Catalog snapshot: item counts grouped by type and by status (every type/status appears, ' +
+        'defaulting to 0). Requires inventory-master:manage.',
+    request: {
+        query: InventoryMasterReportQuerySchema,
+    },
+    responses: {
+        200: { description: 'Inventory master report generated successfully' },
+        403: { description: 'Forbidden — inventory-master:manage permission required' },
+    },
+});
 
 // get inventory item
 registry.registerPath({
@@ -92,6 +111,12 @@ registry.registerPath({
 // =======================================================================
 // reads are open to any authenticated user — the catalog is a global reference registry.
 // only writes (create/update) are permission-guarded.
+// the report is manager-only; it MUST be registered before '/:id' so 'report' is not read as an id.
+InventoryMasterRouter.get(
+    '/report',
+    AuthorizeMiddleware([INVENTORY_MASTER_PERMISSIONS.MANAGE.code]),
+    InventoryMasterController.report,
+);
 InventoryMasterRouter.get('/:id', InventoryMasterController.get);
 InventoryMasterRouter.get('/', InventoryMasterController.search);
 

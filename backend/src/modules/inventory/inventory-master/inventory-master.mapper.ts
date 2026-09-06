@@ -1,6 +1,6 @@
 // Inventory-master Mapper
 import { RequestContext } from '../../../shared/utils/contextBuilder';
-import { INVENTORY_MASTER_PERMISSIONS } from './inventory-master.constants';
+import { INVENTORY_MASTER_PERMISSIONS, ITEM_STATUS, ITEM_TYPES } from './inventory-master.constants';
 
 export const InventoryMasterMapper = {
     toResponse: (item: any, ctx: RequestContext) => {
@@ -37,5 +37,24 @@ export const InventoryMasterMapper = {
             result.items.push(InventoryMasterMapper.toResponse(item, ctx));
         }
         return result;
+    },
+
+    // Phase 1 catalog report. Preserves the centralized inventory-report's enum-space zero-fill:
+    // every ITEM_TYPES / ITEM_STATUS value always appears, defaulting to 0 when the aggregation
+    // produced no row for it. Exposes no _id and no unrelated catalog fields.
+    toReportResponse: (report: any) => {
+        const byType = new Map<string, number>((report?.catalogByType || []).map((r: any) => [r._id, r.count]));
+        const byStatus = new Map<string, number>((report?.catalogByStatus || []).map((r: any) => [r._id, r.count]));
+
+        return {
+            summary: {
+                // == old centralized summary.catalogItems (total InventoryMaster documents)
+                catalogItems: report?.totalMaster || 0,
+            },
+            catalog: {
+                byType: Object.values(ITEM_TYPES).map((type) => ({ type, count: byType.get(type) || 0 })),
+                byStatus: Object.values(ITEM_STATUS).map((status) => ({ status, count: byStatus.get(status) || 0 })),
+            },
+        };
     },
 };

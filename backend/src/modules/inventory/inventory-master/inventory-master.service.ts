@@ -1,7 +1,12 @@
 // Inventory-master Service
 import { HydratedDocument } from 'mongoose';
 import { InventoryMasterModel, IInventoryMaster } from './inventory-master.model';
-import { ICreateInventoryMasterPayload, ISearchInventoryMasterQuery, IUpdateInventoryMasterPayload } from './inventory-master.validators';
+import {
+    ICreateInventoryMasterPayload,
+    IInventoryMasterReportQuery,
+    ISearchInventoryMasterQuery,
+    IUpdateInventoryMasterPayload,
+} from './inventory-master.validators';
 import { INVENTORY_MASTER_PERMISSIONS, ITEM_STATUS } from './inventory-master.constants';
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
@@ -103,9 +108,39 @@ const update = async (id: string, model: IUpdateInventoryMasterPayload, ctx: Req
     return entity;
 };
 
+// ========================================================================================
+// REPORT (Phase 1 — catalog only)
+// ========================================================================================
+// Additive migration of the centralized inventory-report's catalog metrics (totalMaster,
+// catalogByType, catalogByStatus) into the feature that owns the catalog. Single-collection and
+// global (no tenant scoping) — it mirrors the centralized report's grouping semantics exactly.
+// This is a dedicated reporting aggregation, deliberately NOT search() (whose pagination + active-
+// only visibility filter would change the counts).
+const report = async (_filters: IInventoryMasterReportQuery, _ctx: RequestContext) => {
+    const [result] = await InventoryMasterModel.aggregate([
+        {
+            $facet: {
+                // total catalog items (== old summary.catalogItems)
+                total: [{ $count: 'count' }],
+                // catalog grouped by type (== old catalogByType)
+                byType: [{ $group: { _id: '$type', count: { $sum: 1 } } }],
+                // catalog grouped by status (== old catalogByStatus)
+                byStatus: [{ $group: { _id: '$status', count: { $sum: 1 } } }],
+            },
+        },
+    ]);
+
+    return {
+        totalMaster: result?.total?.[0]?.count || 0,
+        catalogByType: result?.byType || [],
+        catalogByStatus: result?.byStatus || [],
+    };
+};
+
 export const InventoryMasterService = {
     get,
     search,
     create,
     update,
+    report,
 };

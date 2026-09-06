@@ -17,8 +17,7 @@ interface InventoryMasterMultiPickerProps {
 
 const itemLabel = (item: InventoryMasterEntity) => `${item.name} (${item.code})`
 
-// Multi-select inventory-item picker over the InventoryMaster catalog — the
-// backend requires devices/consumables as real catalog ObjectIds, not free text.
+// Backend requires devices/consumables as real catalog ObjectIds, not free text.
 const InventoryMasterMultiPicker = ({ value, labels, onChange, type, disabled }: InventoryMasterMultiPickerProps) => {
   const [query, setQuery] = useState('')
   const { open, setOpen, containerRef } = useAsyncPickerState()

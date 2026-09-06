@@ -6,8 +6,6 @@ import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
 import { WizardTestHarness } from './wizardTestHarness'
 import WizardStep4 from './WizardStep4'
 
-// Camp time slots are a fixed 4-value enum multi-select, matching the
-// backend's CAMP_TIME_SLOTS exactly — not a free-typed range.
 describe('WizardStep4 — camp time slot presets', () => {
   it('selecting a chip adds its exact enum value to the form', async () => {
     const user = userEvent.setup()
@@ -55,7 +53,6 @@ describe('WizardStep4 — camp time slot presets', () => {
     for (const label of labels) {
       expect(screen.getByRole('button', { name: label })).toBeInTheDocument()
     }
-    // The old presets are gone entirely.
     expect(screen.queryByRole('button', { name: '8 AM – 9 AM' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '4 PM – 5 PM' })).not.toBeInTheDocument()
   })
@@ -79,8 +76,6 @@ describe('WizardStep4 — camp time slot presets', () => {
       </WizardTestHarness>,
     )
 
-    // mode:'onChange' means errors[] stays empty until a validation pass —
-    // toggling a slot on and back off forces that first pass.
     const chip = screen.getByRole('button', { name: '9 AM – 1 PM' })
     await user.click(chip)
     await user.click(chip)

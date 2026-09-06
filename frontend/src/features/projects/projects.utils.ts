@@ -12,8 +12,7 @@ export function asZeroWhenBlank(value: unknown): number {
   return value === '' || !Number.isFinite(parsed) ? 0 : parsed
 }
 
-// Corresponds to the app's Screening/Diet mode split used by OM/Invoicing/
-// PO-management/Masters tabs — `mixed` shows under both.
+// `mixed` deliberately appears in both lists.
 export const SCREENING_MODE_TYPES: ProjectType[] = ['screening_camp', 'mixed']
 export const DIET_MODE_TYPES: ProjectType[] = ['diet', 'teleconsultation_diet', 'mixed']
 
@@ -45,8 +44,6 @@ export const PROJECT_TYPE_CAMP_TYPES: Record<ProjectType, CampType[]> = {
   mixed: [...CAMP_TYPE_VALUES],
 }
 
-// Deduped union of allowed camp types across every selected project type —
-// empty until at least one project type is picked.
 export function allowedCampTypesForProjectTypes(types: ProjectType[]): CampType[] {
   return [...new Set(types.flatMap((t) => PROJECT_TYPE_CAMP_TYPES[t]))]
 }

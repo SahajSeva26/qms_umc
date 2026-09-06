@@ -104,8 +104,6 @@ async function fillCommonFields(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/^city$/i), 'Pune')
   await user.type(screen.getByLabelText(/^state$/i), 'Maharashtra')
   await user.type(screen.getByLabelText(/^pincode$/i), '411001')
-  // LocationPicker is mocked to a single button (see the module mock above) —
-  // the real map/search can't run without Google Maps credentials in tests.
   await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
 }
 
@@ -175,7 +173,6 @@ describe('BookCampForm', () => {
     await user.type(screen.getByLabelText(/date/i), '2026-09-15')
     await user.click(screen.getByText(/select time slot/i))
     await user.click(await screen.findByText(/9 AM – 1 PM/i))
-    // Address and City filled; State and Pincode deliberately left blank.
     await user.type(screen.getByLabelText(/^address line 1$/i), '221 Baker Street')
     await user.type(screen.getByLabelText(/^city$/i), 'Pune')
     await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
@@ -524,8 +521,6 @@ describe('BookCampForm — inline doctor creation (dormant until doctor:manage i
       </QueryClientProvider>,
     )
 
-    // Trigger the field-level "Doctor is required" error the normal way, by
-    // touching the doctor field then leaving it empty (mode: 'onChange').
     await fillCommonFields(user)
     await user.click(screen.getByRole('button', { name: /book camp/i }))
     await waitFor(() => expect(screen.getByText(/doctor is required/i)).toBeInTheDocument())

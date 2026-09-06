@@ -44,8 +44,7 @@ interface EditFormState {
 }
 
 // unwrapId guards against null even though these 3 fields are `required: true`
-// in project.model.ts — that only enforces new saves, not a populate() that
-// resolved to null (stale reference, deleted doc, etc).
+// in project.model.ts — that doesn't cover a populate() resolving to null.
 const toFormState = (project: ProjectEntity): EditFormState => ({
   name: project.name,
   therapy: project.therapy,

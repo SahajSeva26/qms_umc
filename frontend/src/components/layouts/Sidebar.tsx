@@ -19,11 +19,8 @@ import {
   type NavSection,
 } from './navConfig'
 
-// FULL_NAV_SECTIONS items whose route is wrapped in RequirePermission — used
-// to hide items the viewer would otherwise click into and get bounced from.
-// 'pharma' is deliberately NOT listed here — its visibility is identity-based
-// (see isPharmaRoleType in Sidebar), not permission-based, since system:manage
-// must NOT bypass it the way it bypasses every other check in this map.
+// Hides nav items the viewer would otherwise click into and get bounced from.
+// 'pharma' is deliberately excluded — its visibility is identity-based, not permission-based; system:manage must not bypass it.
 const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
   // Temporary v1 gate on system:manage, not invoice:manage: Finance Manager
   // (the role that actually holds invoice:manage) lacks Project/Camp read perms the page's pickers need.

@@ -29,9 +29,8 @@ const STATUS_STYLE: Record<InventoryDeviceStatus, { bg: string; fg: string }> = 
   damaged: { bg: 'rgba(244,63,94,.15)', fg: '#e11d48' },
 }
 
-// Real backend-wired Devices panel. Device status is never permission-gated
-// — every authenticated reader sees the real status, so unlike the
-// Consumables panel there is no canManage-based column hiding here.
+// Device status is never permission-gated — every authenticated reader sees
+// it, unlike the Consumables panel's canManage-based Status column hiding.
 const InventoryDevicesPanel = () => {
   const { hasAnyPermission } = usePermission()
   const canManage = hasAnyPermission(['inventory-device:manage'])

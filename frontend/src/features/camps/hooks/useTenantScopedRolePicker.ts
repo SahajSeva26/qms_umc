@@ -25,13 +25,7 @@ function mergeById(existing: RoleEntity[], incoming: RoleEntity[]): RoleEntity[]
   return Array.from(byId.values())
 }
 
-// Debounced, tenant-scoped, server-searched "load more" role picker for QMS
-// staff — shared by CampMrPicker (roleTypeCode: 'pharma-mr') and
-// CampFoPicker (roleTypeCode: 'field-officer'). Scopes by tenant only, not
-// downline, unlike the pharma portal's useEligibleMrs. The two callers
-// differ only in which RoleType they resolve first; everything else
-// (debounce, pagination, accumulation) is identical, so this lives in one
-// place rather than being copy-pasted per role type.
+// Scopes by tenant only, not downline, unlike the pharma portal's useEligibleMrs.
 export const useTenantScopedRolePicker = (
   name: string,
   tenant: string | undefined,

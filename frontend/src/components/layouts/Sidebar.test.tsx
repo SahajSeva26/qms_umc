@@ -4,9 +4,8 @@ import { MemoryRouter } from 'react-router-dom'
 import type { SessionResponse } from '@/types/accessManagement.types'
 
 vi.mock('@/hooks/useSession')
-// A stable reference matters: Sidebar.tsx's useEffect depends on `user` by
-// reference — a fresh object on every mock call would re-fire the effect
-// every render and infinite-loop the test.
+// Stable reference required: Sidebar.tsx's effect depends on `user` by
+// reference; a fresh object per call would re-fire it every render and infinite-loop the test.
 const MOCK_AUTH_USER = { id: 'u-1' }
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: MOCK_AUTH_USER }) }))
 

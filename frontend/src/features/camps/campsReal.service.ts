@@ -24,9 +24,8 @@ const getCamp = async (id: string) => {
   return res.data
 }
 
-// create/bookCamp/update/moveStage/allocateFo return the unpopulated in-memory
-// document (CampMutationResponseEntity, not CampEntity — see its doc comment).
-// Never read `.devices` off these as populated; fetch/refetch the camp instead.
+// Mutations return the unpopulated in-memory document (CampMutationResponseEntity,
+// not CampEntity) — never read `.devices` off these as populated; fetch/refetch the camp instead.
 const createCamp = async (payload: CreateCampPayload) => {
   const res = await api.post<ApiResponse<CampMutationResponseEntity>>('/camps', payload)
   return res.data

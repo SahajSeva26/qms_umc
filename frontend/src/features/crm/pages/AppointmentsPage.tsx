@@ -10,7 +10,6 @@ import AppointmentList from '@/features/crm/appointments/components/AppointmentL
 import AppointmentDrawer from '@/features/crm/appointments/components/AppointmentDrawer'
 import NewAppointmentDialog from '@/features/crm/appointments/components/NewAppointmentDialog'
 
-// Deliberately no peer-overlay toggle, Outcome picker, or MOM auto-block badge — see PROGRESS.md's Known Issues.
 const AppointmentsPage = () => {
   const [cursor, setCursor] = useState(new Date())
   const [view, setView] = useState<CalendarViewMode>('week')

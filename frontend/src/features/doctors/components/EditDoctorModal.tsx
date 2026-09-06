@@ -77,15 +77,11 @@ interface EditDoctorModalProps {
   open: boolean
   doctor: DoctorEntity | null
   onClose: () => void
-  /** Fires only on a genuine create success, in addition to onClose — lets a
-   * caller (e.g. a camp-booking form) auto-select the new doctor without
-   * overloading onClose's "the modal was dismissed" meaning. Never fires for
-   * an edit/update or for Cancel/dismiss. */
+  /** Fires only on a genuine create success — lets a caller auto-select the
+   * new doctor without overloading onClose's "dismissed" meaning. */
   onCreated?: (doctor: DoctorEntity) => void
-  /** Locks create mode to a specific company, e.g. the camp/booking form's
-   * own already-selected tenant — the Company picker is replaced with
-   * read-only context text and this id is what's actually submitted,
-   * regardless of session type. Ignored in edit mode. */
+  /** Locks create mode to a specific company: the picker becomes read-only
+   * context text, and this id is submitted regardless of session type. */
   forcedTenant?: { id: string; label: string }
 }
 

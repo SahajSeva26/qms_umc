@@ -198,37 +198,27 @@ const adjustQuantity = async (id: string, delta: number, ctx: RequestContext): P
 };
 
 // ========================================================================================
-// REPORT (Phase 3 — consumable stock only)
+// REPORT
 // ========================================================================================
-// Additive migration of the centralized inventory-report's consumable metrics (totalConsumableLots,
-// consumableByStatus, warehouseConsumableQty, expiredByDate) into the feature that owns the stock.
-// Single-collection and global (no tenant scoping) — mirrors the centralized report's semantics
-// exactly. Dedicated reporting aggregation, deliberately NOT search() (whose active-only visibility
-// default + pagination would change the counts).
-//
-// Two semantics preserved verbatim from the centralized report (do NOT "correct" them):
-//  • warehouseConsumableQuantity = SUM(quantity) over status:active lots ONLY. The model has no
-//    `location` field — despite the name this is NOT a warehouse-location filter. This single value
-//    feeds both summary.warehouseConsumableQuantity and consumables.warehouseQuantity.
-//  • expiredByDate = COUNT of lots with expiryDate < now (now captured at execution time), which is
-//    date-based and INDEPENDENT of the stored `expired` status — an active lot past its expiry still
-//    counts. Uses $lt (not $lte), exactly like the centralized report.
+// A dedicated aggregation, not search(): search()'s active-only default and pagination would change
+// the counts. Two non-obvious semantics (do NOT "correct" them):
+//  • warehouseConsumableQuantity = SUM(quantity) over status:active lots ONLY. There is no `location`
+//    field — despite the name this is NOT a warehouse-location filter. This single value feeds both
+//    summary.warehouseConsumableQuantity and consumables.warehouseQuantity.
+//  • expiredByDate = COUNT of lots with expiryDate < now (captured at execution time) — date-based,
+//    INDEPENDENT of the stored `expired` status, so an active lot past its expiry still counts. $lt (not $lte).
 const report = async (_filters: IInventoryConsumableReportQuery, _ctx: RequestContext) => {
     const now = new Date();
 
     const [result] = await InventoryConsumableModel.aggregate([
         {
             $facet: {
-                // total consumable lots (== old summary.consumableLots)
                 total: [{ $count: 'count' }],
-                // lots grouped by status (== old consumableByStatus)
                 byStatus: [{ $group: { _id: '$status', count: { $sum: 1 } } }],
-                // active-lot quantity (== old warehouseConsumableQty) — active status only, no location filter
                 activeQuantity: [
                     { $match: { status: INVENTORY_CONSUMABLE_STATUS.ACTIVE } },
                     { $group: { _id: null, total: { $sum: '$quantity' } } },
                 ],
-                // lots expired by date (== old expiredByDate) — expiryDate < now, NOT status-based
                 expiredByDate: [{ $match: { expiryDate: { $lt: now } } }, { $count: 'count' }],
             },
         },

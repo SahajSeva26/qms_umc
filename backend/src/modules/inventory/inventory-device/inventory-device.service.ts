@@ -156,19 +156,14 @@ const findAvailable = async (item: string, limit: number, ctx: RequestContext): 
 };
 
 // ========================================================================================
-// REPORT (Phase 2 — device fleet only)
+// REPORT
 // ========================================================================================
-// Additive migration of the centralized inventory-report's device metrics (totalDevices,
-// deviceByStatus) into the feature that owns the device fleet. Single-collection and global (no
-// tenant scoping) — mirrors the centralized report's semantics exactly. Dedicated reporting
-// aggregation, deliberately NOT search() (whose pagination would change the counts).
+// A dedicated aggregation, not search(): search()'s pagination would change the counts.
 const report = async (_filters: IInventoryDeviceReportQuery, _ctx: RequestContext) => {
     const [result] = await InventoryDeviceModel.aggregate([
         {
             $facet: {
-                // total device units (== old summary.totalDevices)
                 total: [{ $count: 'count' }],
-                // devices grouped by lifecycle status (== old deviceByStatus)
                 byStatus: [{ $group: { _id: '$status', count: { $sum: 1 } } }],
             },
         },

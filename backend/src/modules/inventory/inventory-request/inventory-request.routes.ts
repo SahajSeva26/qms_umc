@@ -17,7 +17,7 @@ export const InventoryRequestRouter = express.Router();
 
 InventoryRequestRouter.use(AuthMiddleware);
 
-// inventory request lifecycle report (Phase 4)
+// inventory request lifecycle report
 registry.registerPath({
     method: 'get',
     path: '/inventory-requests/report',
@@ -138,9 +138,6 @@ registry.registerPath({
 // =======================================================================
 // each route accepts its own CRUD permission OR manage (the domain superset). progressing the
 // request's stage (approve/reject/receive) is a manage-only action.
-// the report is manager-only (single manage guard, NOT the CRUD OR-pattern — deliberate tightening,
-// and it lets the report read all requests unscoped). It MUST be registered before '/:id' so
-// 'report' is not read as an id.
 InventoryRequestRouter.get(
     '/report',
     AuthorizeMiddleware([INVENTORY_REQUEST_PERMISSIONS.MANAGE.code]),

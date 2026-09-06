@@ -39,16 +39,12 @@ export const InventoryMasterMapper = {
         return result;
     },
 
-    // Phase 1 catalog report. Preserves the centralized inventory-report's enum-space zero-fill:
-    // every ITEM_TYPES / ITEM_STATUS value always appears, defaulting to 0 when the aggregation
-    // produced no row for it. Exposes no _id and no unrelated catalog fields.
     toReportResponse: (report: any) => {
         const byType = new Map<string, number>((report?.catalogByType || []).map((r: any) => [r._id, r.count]));
         const byStatus = new Map<string, number>((report?.catalogByStatus || []).map((r: any) => [r._id, r.count]));
 
         return {
             summary: {
-                // == old centralized summary.catalogItems (total InventoryMaster documents)
                 catalogItems: report?.totalMaster || 0,
             },
             catalog: {

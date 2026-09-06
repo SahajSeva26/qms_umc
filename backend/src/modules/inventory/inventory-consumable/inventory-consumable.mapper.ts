@@ -67,10 +67,7 @@ export const InventoryConsumableMapper = {
         return result;
     },
 
-    // Phase 3 consumable report. Preserves the centralized inventory-report's enum-space zero-fill:
-    // every INVENTORY_CONSUMABLE_STATUS value always appears (in constant order), defaulting to 0.
-    // The single active-lot quantity feeds BOTH summary.warehouseConsumableQuantity and
-    // consumables.warehouseQuantity (same calculation, not two). Exposes no _id / unrelated fields.
+    // warehouseConsumableQuantity and consumables.warehouseQuantity are the same value surfaced twice.
     toReportResponse: (report: any) => {
         const byStatus = new Map<string, number>((report?.consumableByStatus || []).map((r: any) => [r._id, r.count]));
         const warehouseQuantity = report?.warehouseConsumableQuantity || 0;

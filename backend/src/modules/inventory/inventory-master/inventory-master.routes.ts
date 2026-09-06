@@ -16,7 +16,7 @@ export const InventoryMasterRouter = express.Router();
 
 InventoryMasterRouter.use(AuthMiddleware);
 
-// inventory master catalog report (Phase 1)
+// inventory master catalog report
 registry.registerPath({
     method: 'get',
     path: '/inventory-masters/report',

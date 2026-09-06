@@ -16,7 +16,7 @@ export const InventoryConsumableRouter = express.Router();
 
 InventoryConsumableRouter.use(AuthMiddleware);
 
-// inventory consumable stock report (Phase 3)
+// inventory consumable stock report
 registry.registerPath({
     method: 'get',
     path: '/inventory-consumables/report',

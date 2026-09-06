@@ -16,7 +16,7 @@ export const InventoryAssignmentRouter = express.Router();
 
 InventoryAssignmentRouter.use(AuthMiddleware);
 
-// inventory assignment field-officer roster report (Phase 5)
+// inventory assignment field-officer roster report
 registry.registerPath({
     method: 'get',
     path: '/inventory-assignments/report',
@@ -126,8 +126,6 @@ registry.registerPath({
 // ================ EXPORT INVENTORY ASSIGNMENT ROUTES ===================
 // =======================================================================
 // reads are open to any authenticated user; only writes (create/update/remove) are permission-guarded.
-// the report is manager-only (its own manage permission — NOT the centralized OR-of-five) and reads
-// all field officers globally. It MUST be registered before '/:id' so 'report' is not read as an id.
 InventoryAssignmentRouter.get(
     '/report',
     AuthorizeMiddleware([INVENTORY_ASSIGNMENT_PERMISSIONS.MANAGE.code]),

@@ -73,10 +73,6 @@ export const InventoryRequestMapper = {
         items: (data?.items || []).map(InventoryRequestMapper.toResponse),
     }),
 
-    // Phase 4 request report. Preserves the centralized inventory-report's enum-space zero-fill:
-    // every INVENTORY_REQUEST_STATUS / INVENTORY_REQUEST_TYPE value always appears (in constant
-    // order), defaulting to 0. pendingRequests is the pre-derived count of 'requested'. Exposes no
-    // _id / unrelated fields.
     toReportResponse: (report: any) => {
         const byStatus = new Map<string, number>((report?.requestByStatus || []).map((r: any) => [r._id, r.count]));
         const byType = new Map<string, number>((report?.requestByType || []).map((r: any) => [r._id, r.count]));

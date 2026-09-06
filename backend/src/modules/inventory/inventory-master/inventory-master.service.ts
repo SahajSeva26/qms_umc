@@ -109,22 +109,16 @@ const update = async (id: string, model: IUpdateInventoryMasterPayload, ctx: Req
 };
 
 // ========================================================================================
-// REPORT (Phase 1 — catalog only)
+// REPORT
 // ========================================================================================
-// Additive migration of the centralized inventory-report's catalog metrics (totalMaster,
-// catalogByType, catalogByStatus) into the feature that owns the catalog. Single-collection and
-// global (no tenant scoping) — it mirrors the centralized report's grouping semantics exactly.
-// This is a dedicated reporting aggregation, deliberately NOT search() (whose pagination + active-
-// only visibility filter would change the counts).
+// A dedicated aggregation, not search(): search()'s pagination and active-only default would
+// change the counts.
 const report = async (_filters: IInventoryMasterReportQuery, _ctx: RequestContext) => {
     const [result] = await InventoryMasterModel.aggregate([
         {
             $facet: {
-                // total catalog items (== old summary.catalogItems)
                 total: [{ $count: 'count' }],
-                // catalog grouped by type (== old catalogByType)
                 byType: [{ $group: { _id: '$type', count: { $sum: 1 } } }],
-                // catalog grouped by status (== old catalogByStatus)
                 byStatus: [{ $group: { _id: '$status', count: { $sum: 1 } } }],
             },
         },

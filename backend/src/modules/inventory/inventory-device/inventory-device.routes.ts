@@ -16,7 +16,7 @@ export const InventoryDeviceRouter = express.Router();
 
 InventoryDeviceRouter.use(AuthMiddleware);
 
-// inventory device fleet report (Phase 2)
+// inventory device fleet report
 registry.registerPath({
     method: 'get',
     path: '/inventory-devices/report',

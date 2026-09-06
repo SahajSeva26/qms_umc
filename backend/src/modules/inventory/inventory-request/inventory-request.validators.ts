@@ -55,6 +55,5 @@ export const SearchInventoryRequestQuerySchema = z.object({
 export type ISearchInventoryRequestQuery = z.infer<typeof SearchInventoryRequestQuerySchema>;
 
 //5: report ====================================>
-// Phase 4 request report — no query parameters (matches the centralized report's empty-query contract).
 export const InventoryRequestReportQuerySchema = z.object({});
 export type IInventoryRequestReportQuery = z.infer<typeof InventoryRequestReportQuerySchema>;

@@ -221,25 +221,18 @@ const adjustHolding = async (
 };
 
 // ========================================================================================
-// REPORT (Phase 5 — field-officer roster, cross-feature)
+// REPORT — field-officer roster (cross-feature)
 // ========================================================================================
-// Additive migration of the centralized inventory-report's FO-roster branch (fieldOfficers[],
-// totalFieldOfficers, fieldOfficersHoldingInventory) into the feature that owns "who holds what".
-//
-// This is a genuinely cross-feature report and is a FAITHFUL PORT of the centralized report's
-// facet-13 pipeline — same operators and projection math:
-//  • BASE = roles (NOT inventoryassignments), so every active field officer appears, INCLUDING those
-//    with zero holdings. Starting from assignments would drop zero-holding FOs.
-//  • lookup #1 (roles → roletypes): active roles whose role type code is 'field-officer'.
-//  • lookup #2 (roles → inventoryassignments, correlated on assignee): holdings grouped by
-//    inventoryType — devicesHeld = grouped device-row COUNT (device qty is 1 by model invariant, so
-//    count == device count — NOT sum(quantity)); consumableUnitsHeld = SUM(quantity) of consumable rows.
-//  • lookup #3 (roles → inventoryrequests, correlated on requestedBy, status ∈ {requested,approved}):
-//    awaitingApproval = count(requested), awaitingReceipt = count(approved). This correlated join is
-//    per-FO (requestedBy === the FO being rendered) — it is NOT caller own-scope; applyOwnScope() is
-//    never used. The endpoint is manager-gated (inventory-assignment:manage), so the report is global.
-//  • sort by name ascending.
-// No tenant filter / no ctx.where() — matches the centralized report's global behavior.
+// Base is `roles` (NOT inventoryassignments), so every active field officer appears, INCLUDING those
+// with zero holdings — starting from assignments would drop zero-holding FOs. Three correlated lookups
+// build each row:
+//  • roles → roletypes: keep only active roles whose role type code is 'field-officer'.
+//  • roles → inventoryassignments (on assignee): devicesHeld = device-row COUNT (device qty is 1 by
+//    model invariant, so count == device count — NOT sum(quantity)); consumableUnitsHeld = SUM(quantity).
+//  • roles → inventoryrequests (on requestedBy, status ∈ {requested,approved}): awaitingApproval =
+//    count(requested), awaitingReceipt = count(approved). This per-FO join is NOT caller own-scope
+//    (applyOwnScope() is never used) — the endpoint is manager-gated, so the roster is global.
+// Sorted by name ascending.
 const report = async (_filters: IInventoryAssignmentReportQuery, _ctx: RequestContext) => {
     const DEVICE_TYPE = INVENTORY_ASSIGNMENT_TYPES.DEVICE;
     const CONSUMABLE_TYPE = INVENTORY_ASSIGNMENT_TYPES.CONSUMABLE;
@@ -361,8 +354,7 @@ const report = async (_filters: IInventoryAssignmentReportQuery, _ctx: RequestCo
         { $sort: { name: 1 } },
     ]);
 
-    // derived summary — matches the centralized report's JS post-processing exactly.
-    // "holding inventory" is decided ONLY by devicesHeld/consumableUnitsHeld — NOT by pending requests.
+    // "holding inventory" counts only devicesHeld/consumableUnitsHeld — NOT pending requests.
     const fieldOfficersHoldingInventory = fieldOfficers.filter(
         (fo: any) => fo.devicesHeld > 0 || fo.consumableUnitsHeld > 0,
     ).length;

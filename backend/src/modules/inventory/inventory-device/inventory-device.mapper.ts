@@ -59,16 +59,11 @@ export const InventoryDeviceMapper = {
         items: (data?.items || []).map(InventoryDeviceMapper.toResponse),
     }),
 
-    // Phase 2 device report. Preserves the centralized inventory-report's enum-space zero-fill:
-    // every INVENTORY_DEVICE_STATUS value always appears (in constant order), defaulting to 0 when
-    // the aggregation produced no row for it. Status spellings (incl. 'maintainance'/'damaged') are
-    // taken verbatim from the constants — not normalized. Exposes no _id and no unrelated fields.
     toReportResponse: (report: any) => {
         const byStatus = new Map<string, number>((report?.deviceByStatus || []).map((r: any) => [r._id, r.count]));
 
         return {
             summary: {
-                // == old centralized summary.totalDevices (total InventoryDevice documents)
                 totalDevices: report?.totalDevices || 0,
             },
             devices: {

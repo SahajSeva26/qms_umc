@@ -39,6 +39,5 @@ export const SearchInventoryDeviceQuerySchema = z.object({
 export type ISearchInventoryDeviceQuery = z.infer<typeof SearchInventoryDeviceQuerySchema>;
 
 //4: report ====================================>
-// Phase 2 device report — no query parameters (matches the centralized report's empty-query contract).
 export const InventoryDeviceReportQuerySchema = z.object({});
 export type IInventoryDeviceReportQuery = z.infer<typeof InventoryDeviceReportQuerySchema>;

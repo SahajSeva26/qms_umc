@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi'
 import type { LeadEntity } from '@/types/crm.types'
-import { LEAD_STATUS_COLOR, LEAD_STATUS_LABEL } from '@/types/crm.types'
+import { LEAD_STATUS_COLOR, LEAD_STATUS_LABEL, LEAD_STATUS_TEXT_COLOR } from '@/types/crm.types'
 import { formatINR } from '@/utils/formatters'
 import { addDays, dayKey, isSameDay, startOfWeek } from '@/features/crm/appointments/appointments.utils'
 
@@ -107,7 +107,7 @@ const CalendarView = ({ leads, onOpen }: CalendarViewProps) => {
                     <div
                       key={lead.id}
                       className="text-[9px] font-semibold truncate rounded px-1 py-0.5"
-                      style={{ background: `${LEAD_STATUS_COLOR[lead.status]}22`, color: LEAD_STATUS_COLOR[lead.status] }}
+                      style={{ background: `color-mix(in srgb, ${LEAD_STATUS_COLOR[lead.status]} 13%, transparent)`, color: LEAD_STATUS_TEXT_COLOR[lead.status] }}
                       title={`${lead.title} · ${LEAD_STATUS_LABEL[lead.status]}`}
                     >
                       {lead.title}
@@ -132,10 +132,10 @@ const CalendarView = ({ leads, onOpen }: CalendarViewProps) => {
       )}
 
       {pickedDay && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,.4)' }} onClick={() => setPickedDay(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 supports-backdrop-filter:backdrop-blur-sm" style={{ background: 'rgba(0,0,0,.4)' }} onClick={() => setPickedDay(null)}>
           <div
             className="w-full max-w-md rounded-2xl border p-4 max-h-[70vh] overflow-y-auto"
-            style={{ background: 'var(--qms-surface-card)', borderColor: 'var(--qms-border)' }}
+            style={{ background: 'var(--qms-surface-strong)', borderColor: 'var(--qms-border)' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-3">
@@ -165,7 +165,7 @@ const CalendarView = ({ leads, onOpen }: CalendarViewProps) => {
                       <span className="text-[13px] font-semibold truncate" style={{ color: 'var(--qms-text)' }}>{lead.title}</span>
                       <span
                         className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0"
-                        style={{ background: `${LEAD_STATUS_COLOR[lead.status]}22`, color: LEAD_STATUS_COLOR[lead.status] }}
+                        style={{ background: `color-mix(in srgb, ${LEAD_STATUS_COLOR[lead.status]} 13%, transparent)`, color: LEAD_STATUS_TEXT_COLOR[lead.status] }}
                       >
                         {LEAD_STATUS_LABEL[lead.status]}
                       </span>

@@ -185,6 +185,27 @@
   --qms-text-soft:       #475089;
   --qms-text-muted:      #6e77a8;
 
+  /* ── QMS lead stage colors (light) ── */
+  /* Ordinal ramp — funnel position, not identity — so lightness itself shows
+     progress toward closing. Values generated as evenly-spaced OKLCH steps on
+     one hue, validated against this app's real surfaces via the dataviz
+     skill's validate_palette.js (all ordinal + WCAG checks PASS). */
+  --qms-lead-stage-new:          #589cff;
+  --qms-lead-stage-qualified:    #3b7bff;
+  --qms-lead-stage-proposal:     #1d5ae2;
+  --qms-lead-stage-pilot:        #0038bf;
+  --qms-lead-stage-negotiation:  #000a9d;
+  /* One shared pill-text ink (the ramp's own darkest step) — using each
+     stage's own color as pill text fails contrast for the lighter 2 steps. */
+  --qms-lead-stage-text:         #000a9d;
+  /* Per-stage text color for solid-fill contexts (e.g. a funnel bar) —
+     whichever of white/dark-ink clears 4.5:1 against that stage's own fill. */
+  --qms-lead-stage-new-on:         #0b1020;
+  --qms-lead-stage-qualified-on:   #0b1020;
+  --qms-lead-stage-proposal-on:    #ffffff;
+  --qms-lead-stage-pilot-on:       #ffffff;
+  --qms-lead-stage-negotiation-on: #ffffff;
+
   /* ── QMS page background (light) ── */
   --qms-page-bg:         linear-gradient(135deg, #eef3ff 0%, #f6f8ff 35%, #ecfeff 100%);
 
@@ -293,6 +314,19 @@
   --qms-text:            #e8ebff;
   --qms-text-soft:       #aab2dc;
   --qms-text-muted:      #7b85b8;
+
+  /* ── QMS lead stage colors (dark) ── */
+  --qms-lead-stage-new:          #80c7ff;
+  --qms-lead-stage-qualified:    #64a8ff;
+  --qms-lead-stage-proposal:     #488aff;
+  --qms-lead-stage-pilot:        #2d6cf4;
+  --qms-lead-stage-negotiation:  #104dd4;
+  --qms-lead-stage-text:         #80c7ff;
+  --qms-lead-stage-new-on:         #0b1020;
+  --qms-lead-stage-qualified-on:   #0b1020;
+  --qms-lead-stage-proposal-on:    #0b1020;
+  --qms-lead-stage-pilot-on:       #ffffff;
+  --qms-lead-stage-negotiation-on: #ffffff;
 
   /* ── QMS page background (dark) ── */
   --qms-page-bg:

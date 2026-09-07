@@ -5,6 +5,9 @@ export interface FunnelRow {
   count: number
   value: number
   color: string
+  /** Text color for the label rendered inside the bar (on top of `color`).
+   * Defaults to white — this component's original behavior. */
+  onColor?: string
 }
 
 interface FunnelChartProps {
@@ -35,7 +38,7 @@ const FunnelChart = ({ rows }: FunnelChartProps) => {
             </span>
             <div className="flex-1 h-7 rounded-lg overflow-hidden relative flex items-center" style={{ background: 'var(--qms-surface-strong)' }}>
               <div className="h-full rounded-lg flex items-center px-2" style={{ width: `${widthPct}%`, background: row.color }}>
-                {labelFits && <span className="text-[11px] font-bold text-white truncate">{valueLabel}</span>}
+                {labelFits && <span className="text-[11px] font-bold truncate" style={{ color: row.onColor ?? '#ffffff' }}>{valueLabel}</span>}
               </div>
               {!labelFits && (
                 <span className="text-[11px] font-bold ml-2 whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>

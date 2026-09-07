@@ -179,15 +179,48 @@ export const LEAD_STATUS_LABEL: Record<LeadStatus, string> = {
   lost: 'Lost',
 }
 
-// Not backend-defined — one consistent swatch per status for the UI.
+// Not backend-defined — one consistent swatch per status for the UI. A lead's
+// stage is a funnel position (ordinal), not an identity — new..negotiation
+// share one hue in a monotone light->dark ramp so the color itself shows
+// progress toward closing; won/lost use this app's real success/danger
+// tokens. Every value is a CSS var so light/dark mode resolve automatically
+// — see the --qms-lead-stage-* tokens in index.css for the validated hex.
 export const LEAD_STATUS_COLOR: Record<LeadStatus, string> = {
-  new: '#3b6dff',
-  qualified: '#0ea5e9',
-  proposal: '#f59e0b',
-  pilot: '#8b5cf6',
-  negotiation: '#ec4899',
-  won: '#10b981',
-  lost: '#f43f5e',
+  new: 'var(--qms-lead-stage-new)',
+  qualified: 'var(--qms-lead-stage-qualified)',
+  proposal: 'var(--qms-lead-stage-proposal)',
+  pilot: 'var(--qms-lead-stage-pilot)',
+  negotiation: 'var(--qms-lead-stage-negotiation)',
+  won: 'var(--success)',
+  lost: 'var(--danger)',
+}
+
+// Text color for a status pill's label (text on a pale, color-mix-tinted
+// background of LEAD_STATUS_COLOR). Using each ordinal stage's own color as
+// its own pill text fails contrast for the 2 lightest steps, so all 5 share
+// one fixed, always-legible ink instead; won/lost use their own color, which
+// already clears contrast as pill text.
+export const LEAD_STATUS_TEXT_COLOR: Record<LeadStatus, string> = {
+  new: 'var(--qms-lead-stage-text)',
+  qualified: 'var(--qms-lead-stage-text)',
+  proposal: 'var(--qms-lead-stage-text)',
+  pilot: 'var(--qms-lead-stage-text)',
+  negotiation: 'var(--qms-lead-stage-text)',
+  won: 'var(--success)',
+  lost: 'var(--danger)',
+}
+
+// Text color for text drawn ON TOP of a LEAD_STATUS_COLOR solid fill (e.g. a
+// funnel bar's inline label) — white or dark ink, whichever clears 4.5:1
+// against that stage's specific fill in the active theme.
+export const LEAD_STATUS_ON_COLOR: Record<LeadStatus, string> = {
+  new: 'var(--qms-lead-stage-new-on)',
+  qualified: 'var(--qms-lead-stage-qualified-on)',
+  proposal: 'var(--qms-lead-stage-proposal-on)',
+  pilot: 'var(--qms-lead-stage-pilot-on)',
+  negotiation: 'var(--qms-lead-stage-negotiation-on)',
+  won: 'var(--success-foreground)',
+  lost: 'var(--danger-foreground)',
 }
 
 export type LeadProjectType = 'screening' | 'diet' | 'tele_diet' | 'lab' | 'mixed'

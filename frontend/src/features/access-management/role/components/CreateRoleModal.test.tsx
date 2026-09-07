@@ -132,9 +132,7 @@ describe('CreateRoleModal', () => {
     vi.mocked(divisionService.searchDivisions).mockResolvedValue({
       success: true, message: '', data: { items: [divisionFixture()], count: 1 },
     } as never)
-    // No eligible supervisor exists yet — this is the only candidate count
-    // that still leaves the field genuinely empty (a single candidate is
-    // now auto-filled, see the dedicated auto-fill test below).
+    // Zero candidates — a single one now auto-fills (see the test below).
     vi.mocked(accessManagementService.searchRoles).mockResolvedValue({
       success: true, message: '', data: { items: [], count: 0 },
     } as never)

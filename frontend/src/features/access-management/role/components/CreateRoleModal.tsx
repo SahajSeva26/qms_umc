@@ -92,12 +92,8 @@ const CreateRoleModal = () => {
   )
   const supervisorCandidates = supervisorCandidatesData?.data?.items ?? []
 
-  // A division has exactly one active parent-tree role in the common case
-  // (e.g. one division head) — auto-fill it so the user doesn't have to pick
-  // from a list of one. Only fires when the field is still empty; doesn't
-  // override a value the user already chose or one still matching after refetch.
-  // Depends on the id itself (not the array reference, which is a fresh
-  // `?? []` literal every render) so the effect doesn't re-run on every render.
+  // Auto-fill the common case of exactly one eligible supervisor (e.g. one division head).
+  // Depends on the id, not the array (a fresh `?? []` reference every render).
   const onlySupervisorCandidateId = supervisorCandidates.length === 1 ? supervisorCandidates[0].id : undefined
   useEffect(() => {
     if (needsSupervisor && !supervisor && onlySupervisorCandidateId) {

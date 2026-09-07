@@ -147,9 +147,8 @@ describe('NewLeadWizard — draft persistence', () => {
     const { unmount } = await renderWizard(userId)
     await screen.findByText(/pharma company/i)
 
-    // Company/division comboboxes stay disabled without an async tenant pick
-    // this test doesn't mock, so focus therapy is the simplest real field.
-    // ChipPicker is a searchable popover (not a native combobox/option pair).
+    // Division/Contact stay disabled without an async tenant pick this test
+    // doesn't mock — ChipPicker's searchable popover is the simplest real field.
     await user.click(screen.getByText('Add a therapy area...'))
     await user.click(await screen.findByRole('button', { name: 'Cardiology' }))
 

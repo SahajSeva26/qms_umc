@@ -28,11 +28,7 @@ const Topbar = ({ onMobileMenuToggle }: TopbarProps) => {
 
   const initials  = getInitials(user?.firstName, user?.lastName)
   const firstName = user?.firstName ?? 'there'
-  // Real role-type name from the backend session (e.g. "Pharma MR", "System")
-  // — replaces the old placeholder UserRole label, which was always
-  // "Super Admin" for every account regardless of who was actually logged in.
-  // The type marks roleType required, but the backend session mapper
-  // genuinely emits null for an orphaned/malformed role reference.
+  // roleType is typed required, but the backend session mapper can emit null.
   const roleLabel = session?.roleType?.name ?? ''
   const roleColor = 'var(--qms-brand)'
 

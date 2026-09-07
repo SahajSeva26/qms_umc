@@ -4,19 +4,13 @@ interface ColorPillProps<S extends string> {
   labelMap: Record<S, string>
   onClick?: () => void
   fallbackColor?: string
-  /** Text color, if it must differ from the dot/tint source color (e.g. a
-   * pale-tint background needs a fixed, always-legible ink rather than
-   * reusing a light source color that would fail contrast as its own text).
-   * Defaults to `colorMap[status]`, this component's original behavior. */
+  /** Defaults to the resolved status swatch (or fallback) — override when that color would fail contrast as its own text. */
   textColor?: string
   showDot?: boolean
   className?: string
 }
 
-// Shared color-blended-background status pill — used where the entity has
-// more statuses than the fixed success/warning/danger utility classes can
-// distinguish. Background uses color-mix() (not string-concatenated hex
-// alpha) so `color` may be a plain hex OR a CSS var() reference.
+// color-mix(), not string-concatenated hex alpha, since `color` may be a var() reference.
 function ColorPill<S extends string>({
   status,
   colorMap,

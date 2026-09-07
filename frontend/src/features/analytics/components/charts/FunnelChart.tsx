@@ -5,8 +5,7 @@ export interface FunnelRow {
   count: number
   value: number
   color: string
-  /** Text color for the label rendered inside the bar (on top of `color`).
-   * Defaults to white — this component's original behavior. */
+  /** Text color for the bar's inline label — defaults to white. */
   onColor?: string
 }
 
@@ -14,10 +13,7 @@ interface FunnelChartProps {
   rows: FunnelRow[]
 }
 
-// Bespoke pipeline funnel — one row per stage, bar width proportional to the
-// largest stage's count. The count/value label sits inside the bar when
-// there's room, otherwise after it — a narrow bar (e.g. the Won/Loss stages
-// with few leads) must never clip or hide the label.
+// Bar width is proportional to the largest stage's count.
 const FunnelChart = ({ rows }: FunnelChartProps) => {
   const maxCount = Math.max(1, ...rows.map((r) => r.count))
   const totalCount = rows.reduce((sum, r) => sum + r.count, 0)

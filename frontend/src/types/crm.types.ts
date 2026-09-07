@@ -179,12 +179,7 @@ export const LEAD_STATUS_LABEL: Record<LeadStatus, string> = {
   lost: 'Lost',
 }
 
-// Not backend-defined — one consistent swatch per status for the UI. A lead's
-// stage is a funnel position (ordinal), not an identity — new..negotiation
-// share one hue in a monotone light->dark ramp so the color itself shows
-// progress toward closing; won/lost use this app's real success/danger
-// tokens. Every value is a CSS var so light/dark mode resolve automatically
-// — see the --qms-lead-stage-* tokens in index.css for the validated hex.
+// Not backend-defined. Dot/solid-fill color — see --qms-lead-stage-* in index.css for the ramp.
 export const LEAD_STATUS_COLOR: Record<LeadStatus, string> = {
   new: 'var(--qms-lead-stage-new)',
   qualified: 'var(--qms-lead-stage-qualified)',
@@ -195,11 +190,7 @@ export const LEAD_STATUS_COLOR: Record<LeadStatus, string> = {
   lost: 'var(--danger)',
 }
 
-// Text color for a status pill's label (text on a pale, color-mix-tinted
-// background of LEAD_STATUS_COLOR). Using each ordinal stage's own color as
-// its own pill text fails contrast for the 2 lightest steps, so all 5 share
-// one fixed, always-legible ink instead; won/lost use their own color, which
-// already clears contrast as pill text.
+// Text color for a pill label on a pale LEAD_STATUS_COLOR tint — the ordinal ramp's lighter steps fail as their own text; won/lost pass and keep their own color.
 export const LEAD_STATUS_TEXT_COLOR: Record<LeadStatus, string> = {
   new: 'var(--qms-lead-stage-text)',
   qualified: 'var(--qms-lead-stage-text)',
@@ -210,9 +201,7 @@ export const LEAD_STATUS_TEXT_COLOR: Record<LeadStatus, string> = {
   lost: 'var(--danger)',
 }
 
-// Text color for text drawn ON TOP of a LEAD_STATUS_COLOR solid fill (e.g. a
-// funnel bar's inline label) — white or dark ink, whichever clears 4.5:1
-// against that stage's specific fill in the active theme.
+// Text color drawn on top of a LEAD_STATUS_COLOR solid fill (e.g. a funnel bar's label).
 export const LEAD_STATUS_ON_COLOR: Record<LeadStatus, string> = {
   new: 'var(--qms-lead-stage-new-on)',
   qualified: 'var(--qms-lead-stage-qualified-on)',

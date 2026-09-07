@@ -19,8 +19,7 @@ function getInitials(firstName?: string, lastName?: string): string {
 // no mocked Phone/Department/Designation/HQ/Location/Reports To/Joined/About.
 const MyProfileModal = ({ user, session, onClose }: MyProfileModalProps) => {
   const fullName = user ? `${user.firstName} ${user.lastName}` : '—'
-  // The type marks these required, but the backend session mapper genuinely
-  // emits null for an orphaned/malformed role or tenant reference.
+  // roleType/tenant are typed required, but the backend session mapper can emit null.
   const roleLabel = session?.roleType?.name ?? '—'
   const tenantName = session?.tenant?.name ?? '—'
 

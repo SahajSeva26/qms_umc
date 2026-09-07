@@ -186,20 +186,15 @@
   --qms-text-muted:      #6e77a8;
 
   /* ── QMS lead stage colors (light) ── */
-  /* Ordinal ramp — funnel position, not identity — so lightness itself shows
-     progress toward closing. Values generated as evenly-spaced OKLCH steps on
-     one hue, validated against this app's real surfaces via the dataviz
-     skill's validate_palette.js (all ordinal + WCAG checks PASS). */
+  /* Ordinal ramp, one hue, monotone light->dark — a lead's stage is a funnel position, not an identity. */
   --qms-lead-stage-new:          #589cff;
   --qms-lead-stage-qualified:    #3b7bff;
   --qms-lead-stage-proposal:     #1d5ae2;
   --qms-lead-stage-pilot:        #0038bf;
   --qms-lead-stage-negotiation:  #000a9d;
-  /* One shared pill-text ink (the ramp's own darkest step) — using each
-     stage's own color as pill text fails contrast for the lighter 2 steps. */
+  /* Shared pill-text ink — each stage's own color fails contrast as its own text for the lighter steps. */
   --qms-lead-stage-text:         #000a9d;
-  /* Per-stage text color for solid-fill contexts (e.g. a funnel bar) —
-     whichever of white/dark-ink clears 4.5:1 against that stage's own fill. */
+  /* Per-stage text for solid-fill contexts — whichever of white/dark-ink clears 4.5:1 against that fill. */
   --qms-lead-stage-new-on:         #0b1020;
   --qms-lead-stage-qualified-on:   #0b1020;
   --qms-lead-stage-proposal-on:    #ffffff;

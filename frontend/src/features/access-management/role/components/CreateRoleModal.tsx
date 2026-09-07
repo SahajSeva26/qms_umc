@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { FiArrowLeft, FiPlus } from 'react-icons/fi'
@@ -91,6 +91,19 @@ const CreateRoleModal = () => {
     open && needsSupervisor && !!tenant && !!division && !!parentTypeId,
   )
   const supervisorCandidates = supervisorCandidatesData?.data?.items ?? []
+
+  // A division has exactly one active parent-tree role in the common case
+  // (e.g. one division head) — auto-fill it so the user doesn't have to pick
+  // from a list of one. Only fires when the field is still empty; doesn't
+  // override a value the user already chose or one still matching after refetch.
+  // Depends on the id itself (not the array reference, which is a fresh
+  // `?? []` literal every render) so the effect doesn't re-run on every render.
+  const onlySupervisorCandidateId = supervisorCandidates.length === 1 ? supervisorCandidates[0].id : undefined
+  useEffect(() => {
+    if (needsSupervisor && !supervisor && onlySupervisorCandidateId) {
+      setValue('supervisor', onlySupervisorCandidateId)
+    }
+  }, [needsSupervisor, supervisor, onlySupervisorCandidateId, setValue])
 
   // A division/supervisor picked under one company or role type is invalid
   // under a different one (backend scopes both to the specific company + pharma-tree role type).

@@ -288,14 +288,14 @@ const CreateTenantDialog = () => {
                     <Label htmlFor="ownerEmail" className="text-xs mb-1.5">
                       Email *
                     </Label>
-                    <Input id="ownerEmail" type="email" {...register('ownerEmail')} />
+                    <Input id="ownerEmail" type="email" autoComplete="off" {...register('ownerEmail')} />
                     {fieldError('ownerEmail') && <p className="text-[11px] mt-1 text-danger">{fieldError('ownerEmail')}</p>}
                   </div>
                   <div>
                     <Label htmlFor="ownerPassword" className="text-xs mb-1.5">
                       Password *
                     </Label>
-                    <PasswordInput id="ownerPassword" {...register('ownerPassword')} />
+                    <PasswordInput id="ownerPassword" autoComplete="new-password" {...register('ownerPassword')} />
                     {fieldError('ownerPassword') && <p className="text-[11px] mt-1 text-danger">{fieldError('ownerPassword')}</p>}
                   </div>
                   <div>

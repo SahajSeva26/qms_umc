@@ -260,7 +260,7 @@ const CreateDivisionModal = ({ onClose, defaultTenantId }: CreateDivisionModalPr
                   <Label className="block text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
                     Email *
                   </Label>
-                  <Input type="email" className="text-[13px]" {...register('headEmail')} />
+                  <Input type="email" autoComplete="off" className="text-[13px]" {...register('headEmail')} />
                   {fieldError('headEmail') && <p className="text-[11px] mt-1 text-danger">{fieldError('headEmail')}</p>}
                 </div>
 
@@ -268,7 +268,7 @@ const CreateDivisionModal = ({ onClose, defaultTenantId }: CreateDivisionModalPr
                   <Label className="block text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
                     Password *
                   </Label>
-                  <PasswordInput className="text-[13px]" {...register('headPassword')} />
+                  <PasswordInput autoComplete="new-password" className="text-[13px]" {...register('headPassword')} />
                   {fieldError('headPassword') && <p className="text-[11px] mt-1 text-danger">{fieldError('headPassword')}</p>}
                 </div>
 

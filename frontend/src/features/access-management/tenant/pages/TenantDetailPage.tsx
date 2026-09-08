@@ -19,7 +19,14 @@ import TenantStatusPill from '@/features/access-management/tenant/components/Ten
 import { Button } from '@/components/ui/button'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import type { DivisionEntity } from '@/types/crm.types'
-import type { RolePopulatedUser } from '@/types/accessManagement.types'
+import type { RolePopulatedUser, Tenant } from '@/types/accessManagement.types'
+
+function formatTenantAddress(address: Tenant['address']): string | null {
+  if (!address) return null
+  const line1 = [address.addressLine1, address.addressLine2, address.locality].filter(Boolean).join(', ')
+  const line2 = [address.city, address.state, address.pincode].filter(Boolean).join(', ')
+  return [line1, line2].filter(Boolean).join(' — ') || null
+}
 
 const TenantDetailPage = () => {
   const { id } = useParams<{ id: string }>()
@@ -40,6 +47,7 @@ const TenantDetailPage = () => {
   const ownerUser = ownerRole && typeof ownerRole.user !== 'string' ? (ownerRole.user as RolePopulatedUser) : null
   const ownerName = ownerUser?.firstName ? `${ownerUser.firstName} ${ownerUser.lastName ?? ''}`.trim() : null
   const ownerEmailSuffix = ownerName && ownerUser?.email ? ownerUser.email : null
+  const tenantAddress = tenant ? formatTenantAddress(tenant.address) : null
 
   const [editOpen, setEditOpen] = useState(false)
   const [createDivisionOpen, setCreateDivisionOpen] = useState(false)
@@ -62,6 +70,25 @@ const TenantDetailPage = () => {
   )
   const divisions = divisionsData?.data?.items ?? []
   const totalDivisions = divisionsData?.data?.count ?? 0
+
+  // Independent of the filtered/paginated list above (whose own `count` shifts with
+  // whatever status filter the table's own dropdown is set to) — count-only, `limit:
+  // '1'`, so this never fetches the actual rows twice. Only division:manage/tenant:admin
+  // can even see the inactive count at all, so the metric is gated the same way.
+  const { data: activeDivisionsData } = useDivisions(
+    { tenant: tenant?.id, status: 'active', limit: '1' },
+    canSeeInactiveDivisions && !!tenant?.id,
+  )
+  const { data: inactiveDivisionsData } = useDivisions(
+    { tenant: tenant?.id, status: 'inactive', limit: '1' },
+    canSeeInactiveDivisions && !!tenant?.id,
+  )
+  const activeDivisionCount = activeDivisionsData?.data?.count
+  const inactiveDivisionCount = inactiveDivisionsData?.data?.count
+  const divisionPenetrationPct =
+    activeDivisionCount !== undefined && inactiveDivisionCount !== undefined && (activeDivisionCount + inactiveDivisionCount) > 0
+      ? Math.round((activeDivisionCount / (activeDivisionCount + inactiveDivisionCount)) * 100)
+      : null
 
   return (
     <div className="w-full">
@@ -122,6 +149,16 @@ const TenantDetailPage = () => {
                   {ownerEmailSuffix && <span className="ml-1.5">({ownerEmailSuffix})</span>}
                 </div>
               )}
+              {tenantAddress && (
+                <div className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
+                  Address: <span className="font-semibold" style={{ color: 'var(--qms-text-soft)' }}>{tenantAddress}</span>
+                </div>
+              )}
+              {divisionPenetrationPct !== null && (
+                <div className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
+                  Division Penetration: <span className="font-semibold" style={{ color: 'var(--qms-text-soft)' }}>{divisionPenetrationPct}%</span>
+                </div>
+              )}
             </div>
 
             <Button variant="outline" size="sm" className="shrink-0" onClick={() => setEditOpen(true)}>
@@ -136,6 +173,9 @@ const TenantDetailPage = () => {
                   <h2 className="text-base font-bold" style={{ color: 'var(--qms-text)' }}>Divisions</h2>
                   <p className="text-[12px] mt-0.5" style={{ color: 'var(--qms-text-muted)' }}>
                     {!divisionsLoading && !divisionsError ? `${totalDivisions} total` : 'Divisions under this company.'}
+                    {divisionPenetrationPct !== null && (
+                      <span> · Penetration: <span className="font-semibold" style={{ color: 'var(--qms-text-soft)' }}>{divisionPenetrationPct}%</span></span>
+                    )}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">

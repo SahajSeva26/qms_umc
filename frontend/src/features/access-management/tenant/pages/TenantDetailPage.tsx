@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { FiArrowLeft, FiEdit2, FiPlus } from 'react-icons/fi'
+import { FiArrowLeft, FiDownload, FiEdit2, FiPlus } from 'react-icons/fi'
 import { useTenant } from '@/features/access-management/tenant/hooks/useTenant'
 import { useRole } from '@/features/access-management/role/hooks/useRole'
 import { ROLE_ROUTES } from '@/features/access-management/role/role.routes'
@@ -12,12 +12,16 @@ import CreateDivisionModal from '@/features/crm/divisions/components/CreateDivis
 import EditTenantModal from '@/features/access-management/tenant/components/EditTenantModal'
 import EditContactModal from '@/features/contacts/components/EditContactModal'
 import { DIVISION_ROUTES } from '@/features/crm/divisions/divisions.routes'
+import { divisionService } from '@/features/crm/divisions/division.service'
+import { downloadDivisionsCsv } from '@/features/crm/divisions/division.export'
 import { usePermission } from '@/hooks/usePermission'
 import { TENANT_ROUTES } from '@/features/access-management/tenant/tenant.routes'
 import TenantTypeBadge from '@/features/access-management/tenant/components/TenantTypeBadge'
 import TenantStatusPill from '@/features/access-management/tenant/components/TenantStatusPill'
 import { Button } from '@/components/ui/button'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { toast } from '@/components/ui/sonner'
+import { getApiErrorMessage } from '@/utils/apiError'
 import type { DivisionEntity } from '@/types/crm.types'
 import type { RolePopulatedUser, Tenant } from '@/types/accessManagement.types'
 
@@ -89,6 +93,22 @@ const TenantDetailPage = () => {
     activeDivisionCount !== undefined && inactiveDivisionCount !== undefined && (activeDivisionCount + inactiveDivisionCount) > 0
       ? Math.round((activeDivisionCount / (activeDivisionCount + inactiveDivisionCount)) * 100)
       : null
+
+  const [exportingDivisions, setExportingDivisions] = useState(false)
+  // Exports the whole tenant's division set, not just the current filtered/paginated
+  // page — the table itself caps at limit:'10' with no page control.
+  const handleExportDivisions = async () => {
+    if (!tenant) return
+    setExportingDivisions(true)
+    try {
+      const res = await divisionService.searchDivisions({ tenant: tenant.id, limit: '1000' })
+      downloadDivisionsCsv(res.data.items, `${tenant.code}-divisions-${new Date().toISOString().slice(0, 10)}.csv`)
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'Failed to export divisions.'))
+    } finally {
+      setExportingDivisions(false)
+    }
+  }
 
   return (
     <div className="w-full">
@@ -179,6 +199,14 @@ const TenantDetailPage = () => {
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleExportDivisions}
+                    disabled={exportingDivisions || totalDivisions === 0}
+                  >
+                    <FiDownload size={14} /> {exportingDivisions ? 'Exporting…' : 'Export'}
+                  </Button>
                   {canManageContacts && (
                     <Button
                       onClick={() => setAddContactOpen(true)}

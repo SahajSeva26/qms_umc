@@ -1,6 +1,8 @@
 import { useState } from 'react'
-import { FiPlus, FiUser, FiSearch } from 'react-icons/fi'
+import { FiDownload, FiPlus, FiUser, FiSearch } from 'react-icons/fi'
 import { useContacts } from '@/features/contacts/hooks/useContacts'
+import { contactsService } from '@/features/contacts/contacts.service'
+import { downloadContactsCsv } from '@/features/contacts/contact.export'
 import { usePermission } from '@/hooks/usePermission'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -10,6 +12,8 @@ import EditContactModal from '@/features/contacts/components/EditContactModal'
 import ContactsTable from '@/features/crm/divisions/components/ContactsTable'
 import ContactDrawer from '@/features/crm/divisions/components/ContactDrawer'
 import { usePagination } from '@/hooks/usePagination'
+import { toast } from '@/components/ui/sonner'
+import { getApiErrorMessage } from '@/utils/apiError'
 import type { ContactEntity } from '@/types/contact.types'
 
 interface DivisionContactsSectionProps {
@@ -37,6 +41,21 @@ const DivisionContactsSection = ({ tenantId, divisionId }: DivisionContactsSecti
   const contacts = data?.data?.items ?? []
   const totalCount = data?.data?.count ?? 0
 
+  const [exporting, setExporting] = useState(false)
+  // Exports the whole division's contact set, not just the current search/paginated
+  // page — the table itself caps at PAGE_SIZE with no "show all" option.
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const res = await contactsService.searchContacts({ division: divisionId, limit: '1000' })
+      downloadContactsCsv(res.data.items, `division-contacts-${new Date().toISOString().slice(0, 10)}.csv`)
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'Failed to export contacts.'))
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return (
     <div>
       <div className="mb-3 flex items-start justify-between gap-4">
@@ -54,15 +73,20 @@ const DivisionContactsSection = ({ tenantId, divisionId }: DivisionContactsSecti
             </p>
           </div>
         </div>
-        {canManage && (
-          <Button
-            onClick={() => setEditModal({ open: true, contact: null })}
-            className="text-white shrink-0"
-            style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
-          >
-            <FiPlus size={14} /> New Contact
+        <div className="flex items-center gap-2 shrink-0">
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting || totalCount === 0}>
+            <FiDownload size={14} /> {exporting ? 'Exporting…' : 'Export'}
           </Button>
-        )}
+          {canManage && (
+            <Button
+              onClick={() => setEditModal({ open: true, contact: null })}
+              className="text-white"
+              style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
+            >
+              <FiPlus size={14} /> New Contact
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="relative mb-3">

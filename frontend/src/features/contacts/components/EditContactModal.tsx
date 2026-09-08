@@ -33,6 +33,10 @@ const DESIGNATION_OPTIONS = [
   'Medical Affairs Lead',
   'Procurement Officer',
 ]
+// Sentinel for the "—" (no designation) option — base-ui Select values must be
+// unique; this shape can't collide with a real free-typed legacy designation
+// the way a plain word like "NONE" could.
+const DESIGNATION_NONE = '__qms_no_designation__'
 
 interface ContactDraft {
   name: string
@@ -145,7 +149,11 @@ const EditContactModalForm = ({ contact, onClose, fixedTenantId, fixedDivisionId
         }
         await updateContact.mutateAsync({
           name: result.data.name,
-          designation: result.data.designation || undefined,
+          // '' (the "—" dropdown option) must be sent as-is, not folded into
+          // undefined — the backend only clears the field when the key is
+          // PRESENT (`model.designation !== undefined`); an omitted key
+          // leaves the old value untouched, silently no-oping the clear.
+          designation: result.data.designation,
           email: result.data.email || undefined,
           phone: result.data.phone || undefined,
           location: result.data.location || undefined,
@@ -241,14 +249,14 @@ const EditContactModalForm = ({ contact, onClose, fixedTenantId, fixedDivisionId
           </div>
           <div>
             <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Designation</label>
-            <Select value={draft.designation || 'NONE'} onValueChange={(v) => { if (!v) return; setDraft((p) => ({ ...p, designation: v === 'NONE' ? '' : v })) }}>
+            <Select value={draft.designation || DESIGNATION_NONE} onValueChange={(v) => { if (!v) return; setDraft((p) => ({ ...p, designation: v === DESIGNATION_NONE ? '' : v })) }}>
               <SelectTrigger className="w-full text-[13px]">
-                <SelectValue>{(v: string) => (v === 'NONE' ? 'Select designation' : v)}</SelectValue>
+                <SelectValue>{(v: string) => (v === DESIGNATION_NONE ? 'Select designation' : v)}</SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="NONE">—</SelectItem>
+                <SelectItem value={DESIGNATION_NONE}>—</SelectItem>
                 {/* An existing contact's designation may predate this fixed list — keep it selectable rather than silently drop it. */}
-                {draft.designation && !DESIGNATION_OPTIONS.includes(draft.designation) && (
+                {draft.designation && draft.designation !== DESIGNATION_NONE && !DESIGNATION_OPTIONS.includes(draft.designation) && (
                   <SelectItem value={draft.designation}>{draft.designation}</SelectItem>
                 )}
                 {DESIGNATION_OPTIONS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}

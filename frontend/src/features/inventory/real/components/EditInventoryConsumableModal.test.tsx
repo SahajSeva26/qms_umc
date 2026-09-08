@@ -65,6 +65,21 @@ describe('EditInventoryConsumableModal', () => {
     expect(screen.getByText(/Acme Medical Supplies \(VEN-ACME\)/i)).toBeInTheDocument()
   })
 
+  it('edit mode: a lot with no vendor reference (pre-migration record) renders without crashing', async () => {
+    const EditInventoryConsumableModal = (await import('@/features/inventory/real/components/EditInventoryConsumableModal')).default
+
+    const queryClient = makeQueryClient()
+    const lot = consumableFixture({ vendor: null })
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <EditInventoryConsumableModal lot={lot} onClose={vi.fn()} canManageStatus={false} />
+      </QueryClientProvider>,
+    )
+
+    expect(screen.getByText('—')).toBeInTheDocument()
+  })
+
   it('create mode: blocks submit without a vendor, and includes vendor in the POST body once picked', async () => {
     const { inventoryConsumableService } = await import('@/features/inventory/real/inventoryConsumable.service')
     const { inventoryMasterService } = await import('@/features/inventory/real/inventoryMaster.service')

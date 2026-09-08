@@ -73,6 +73,21 @@ describe('EditInventoryDeviceModal', () => {
     expect(payload).not.toHaveProperty('serialNumber')
   })
 
+  it('edit mode: a device with no vendor reference (pre-migration record) renders without crashing', async () => {
+    const EditInventoryDeviceModal = (await import('@/features/inventory/real/components/EditInventoryDeviceModal')).default
+
+    const queryClient = makeQueryClient()
+    const device = deviceFixture({ vendor: null })
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <EditInventoryDeviceModal device={device} onClose={vi.fn()} />
+      </QueryClientProvider>,
+    )
+
+    expect(screen.getByText('—')).toBeInTheDocument()
+  })
+
   it('create mode: shows the item picker and an editable serial field, POST body omits status', async () => {
     const { inventoryDeviceService } = await import('@/features/inventory/real/inventoryDevice.service')
     const EditInventoryDeviceModal = (await import('@/features/inventory/real/components/EditInventoryDeviceModal')).default

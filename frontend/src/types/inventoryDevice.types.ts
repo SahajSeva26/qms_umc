@@ -29,7 +29,9 @@ export interface InventoryDeviceItemRef {
 }
 
 // vendor is populated to {id, code, name} when hydrated, {id} only when not
-// (inventory-device.mapper.ts's mapVendor()).
+// (inventory-device.mapper.ts's mapVendor()). null on any device created
+// before `vendor` became a required field — the backend only enforces
+// required-ness on save, not retroactively on existing documents.
 export interface InventoryDeviceVendorRef {
   id: string
   code?: string
@@ -39,7 +41,7 @@ export interface InventoryDeviceVendorRef {
 export interface InventoryDeviceEntity {
   id: string
   item: InventoryDeviceItemRef
-  vendor: InventoryDeviceVendorRef
+  vendor: InventoryDeviceVendorRef | null
   serialNumber: string
   // Never permission-gated — every authenticated reader sees the real status.
   status: InventoryDeviceStatus

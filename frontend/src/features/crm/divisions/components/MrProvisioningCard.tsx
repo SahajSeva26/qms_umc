@@ -12,6 +12,7 @@ import { getApiErrorMessage } from '@/utils/apiError'
 import { toast } from '@/components/ui/sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import PasswordInput from '@/components/ui/PasswordInput'
 import { Label } from '@/components/ui/label'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 
@@ -303,13 +304,13 @@ const MrProvisioningCard = ({ tenantId, divisionId, onSingleCreated }: MrProvisi
             </div>
             <div>
               <Label htmlFor="mr-provisioning-email" className="block text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Email *</Label>
-              <Input id="mr-provisioning-email" type="email" {...register('email')} />
+              <Input id="mr-provisioning-email" type="email" autoComplete="off" {...register('email')} />
               {errors.email && <p className="text-[11px] mt-1 text-danger">{errors.email.message}</p>}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label htmlFor="mr-provisioning-password" className="block text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Password *</Label>
-                <Input id="mr-provisioning-password" type="password" {...register('password')} />
+                <PasswordInput id="mr-provisioning-password" autoComplete="new-password" {...register('password')} />
                 {errors.password && <p className="text-[11px] mt-1 text-danger">{errors.password.message}</p>}
               </div>
               <div>

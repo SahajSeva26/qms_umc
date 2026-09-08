@@ -14,6 +14,7 @@ import EditContactModal from '@/features/contacts/components/EditContactModal'
 import { DIVISION_ROUTES } from '@/features/crm/divisions/divisions.routes'
 import { divisionService } from '@/features/crm/divisions/division.service'
 import { downloadDivisionsCsv } from '@/features/crm/divisions/division.export'
+import { warnIfExportTruncated } from '@/utils/csvExport'
 import { usePermission } from '@/hooks/usePermission'
 import { TENANT_ROUTES } from '@/features/access-management/tenant/tenant.routes'
 import TenantTypeBadge from '@/features/access-management/tenant/components/TenantTypeBadge'
@@ -95,14 +96,26 @@ const TenantDetailPage = () => {
       : null
 
   const [exportingDivisions, setExportingDivisions] = useState(false)
-  // Exports the whole tenant's division set, not just the current filtered/paginated
-  // page — the table itself caps at limit:'10' with no page control.
+  // Exports the whole tenant's division set — both statuses, not just whatever
+  // the on-screen filter happens to show, and not just the current
+  // filtered/paginated page (the table itself caps at limit:'10' with no page
+  // control). The backend defaults an unfiltered search to active-only
+  // (division.service.ts), so "the whole set" needs an explicit fetch per
+  // status; canSeeInactiveDivisions gates whether the inactive half is even
+  // visible to this caller (matches the same gate already used for the
+  // Divisions table's own status filter/penetration metric on this page).
   const handleExportDivisions = async () => {
     if (!tenant) return
     setExportingDivisions(true)
     try {
-      const res = await divisionService.searchDivisions({ tenant: tenant.id, limit: '1000' })
-      downloadDivisionsCsv(res.data.items, `${tenant.code}-divisions-${new Date().toISOString().slice(0, 10)}.csv`)
+      const statuses = canSeeInactiveDivisions ? (['active', 'inactive'] as const) : (['active'] as const)
+      const results = await Promise.all(
+        statuses.map((status) => divisionService.searchDivisions({ tenant: tenant.id, status, limit: '1000' })),
+      )
+      const divisions = results.flatMap((res) => res.data.items)
+      const realTotal = results.reduce((sum, res) => sum + res.data.count, 0)
+      warnIfExportTruncated(divisions.length, realTotal)
+      downloadDivisionsCsv(divisions, `${tenant.code}-divisions-${new Date().toISOString().slice(0, 10)}.csv`)
     } catch (err) {
       toast.error(getApiErrorMessage(err, 'Failed to export divisions.'))
     } finally {

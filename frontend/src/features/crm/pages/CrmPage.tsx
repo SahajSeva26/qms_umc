@@ -41,10 +41,15 @@ const CrmPage = () => {
   const canManageLeads = hasAnyPermission(['lead:manage', 'tenant:manage'])
   const { filters, setFilter, reset } = useCrmFilters()
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
-  // fyFrom/fyTo are sent to the backend ahead of it accepting them (see
-  // SearchLeadQuery's own note) — harmless no-op server-side today;
-  // matchesFilters below also filters client-side so the picker works now.
+  // status/title are real, backend-supported filters — sending them server-side
+  // is what makes pagination correct while filtered (count/totalPages must
+  // reflect the FILTERED total, not the whole tenant's leads). fyFrom/fyTo are
+  // sent ahead of the backend accepting them (see SearchLeadQuery's own note)
+  // — harmless no-op server-side today; matchesFilters below still applies
+  // them client-side so the picker works now.
   const { leads, count, isLoading, error, moveStage, updateLead } = useLeads({
+    status: filters.status || undefined,
+    title: filters.q || undefined,
     fyFrom: filters.fyFrom || undefined,
     fyTo: filters.fyTo || undefined,
     page: String(page),

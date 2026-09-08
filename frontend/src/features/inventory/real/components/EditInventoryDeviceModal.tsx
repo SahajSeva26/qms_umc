@@ -230,7 +230,7 @@ const EditForm = ({
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 min-w-0" noValidate>
           <ReadOnlyField label="Catalog item" value={device.item.name ? `${device.item.name} (${device.item.code})` : device.item.id} />
-          <ReadOnlyField label="Vendor" value={device.vendor.name ? `${device.vendor.name} (${device.vendor.code})` : device.vendor.id} />
+          <ReadOnlyField label="Vendor" value={device.vendor ? (device.vendor.name ? `${device.vendor.name} (${device.vendor.code})` : device.vendor.id) : '—'} />
           <ReadOnlyField label="Serial number" value={device.serialNumber} />
 
           <Field label="Status">

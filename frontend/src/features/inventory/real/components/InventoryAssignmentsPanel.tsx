@@ -7,6 +7,7 @@ import { truncateIdentifier } from '@/features/inventory/real/utils/truncateIden
 import { inventoryAssignmentService } from '@/features/inventory/real/inventoryAssignment.service'
 import { inventoryDeviceService } from '@/features/inventory/real/inventoryDevice.service'
 import { downloadAssignedDevicesCsv, type AssignedDeviceRow } from '@/features/inventory/real/inventoryAssignment.export'
+import { warnIfExportTruncated } from '@/utils/csvExport'
 import type { InventoryAssignmentType } from '@/types/inventoryAssignment.types'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
@@ -60,6 +61,7 @@ const InventoryAssignmentsPanel = () => {
         assignment,
         device: deviceById.get(assignment.inventory.id) ?? null,
       }))
+      warnIfExportTruncated(assignmentsRes.data.items.length, assignmentsRes.data.count)
       downloadAssignedDevicesCsv(rows, `device-assignments-${new Date().toISOString().slice(0, 10)}.csv`)
     } catch (err) {
       toast.error(getApiErrorMessage(err, 'Failed to export assignments.'))

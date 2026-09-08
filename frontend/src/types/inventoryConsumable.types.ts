@@ -15,7 +15,9 @@ export interface InventoryConsumableItemRef {
 }
 
 // vendor is populated to {id, code, name} when hydrated, {id} only when not
-// (same mapVendor() shape inventory-device.mapper.ts uses).
+// (same mapVendor() shape inventory-device.mapper.ts uses). null on any
+// consumable created before `vendor` became a required field — the backend
+// only enforces required-ness on save, not retroactively on existing documents.
 export interface InventoryConsumableVendorRef {
   id: string
   code?: string
@@ -25,7 +27,7 @@ export interface InventoryConsumableVendorRef {
 export interface InventoryConsumableEntity {
   id: string
   item: InventoryConsumableItemRef
-  vendor: InventoryConsumableVendorRef
+  vendor: InventoryConsumableVendorRef | null
   batch: string
   manufacturingDate: string
   expiryDate: string

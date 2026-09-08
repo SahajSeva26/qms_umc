@@ -232,7 +232,7 @@ const EditForm = ({
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 min-w-0" noValidate>
           <ReadOnlyField label="Catalog item" value={lot.item.name ? `${lot.item.name} (${lot.item.code})` : lot.item.id} />
-          <ReadOnlyField label="Vendor" value={lot.vendor.name ? `${lot.vendor.name} (${lot.vendor.code})` : lot.vendor.id} />
+          <ReadOnlyField label="Vendor" value={lot.vendor ? (lot.vendor.name ? `${lot.vendor.name} (${lot.vendor.code})` : lot.vendor.id) : '—'} />
 
           <Field label="Batch *" error={fieldError('batch')}>
             <Input type="text" className="text-[13px]" {...register('batch')} />

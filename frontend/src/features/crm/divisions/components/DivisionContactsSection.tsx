@@ -3,6 +3,7 @@ import { FiDownload, FiPlus, FiUser, FiSearch } from 'react-icons/fi'
 import { useContacts } from '@/features/contacts/hooks/useContacts'
 import { contactsService } from '@/features/contacts/contacts.service'
 import { downloadContactsCsv } from '@/features/contacts/contact.export'
+import { warnIfExportTruncated } from '@/utils/csvExport'
 import { usePermission } from '@/hooks/usePermission'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -48,6 +49,7 @@ const DivisionContactsSection = ({ tenantId, divisionId }: DivisionContactsSecti
     setExporting(true)
     try {
       const res = await contactsService.searchContacts({ division: divisionId, limit: '1000' })
+      warnIfExportTruncated(res.data.items.length, res.data.count)
       downloadContactsCsv(res.data.items, `division-contacts-${new Date().toISOString().slice(0, 10)}.csv`)
     } catch (err) {
       toast.error(getApiErrorMessage(err, 'Failed to export contacts.'))

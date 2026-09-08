@@ -5,9 +5,9 @@ import { z } from 'zod'
 const INVENTORY_MASTER_TYPE_VALUES = ['device', 'consumable'] as const
 const INVENTORY_MASTER_STATUS_VALUES = ['active', 'inactive'] as const
 
-// No upper bound existed before — an unbounded number saved silently.
-// 10M is generous headroom while still catching an obvious fat-finger entry.
-const stockNumber = z.number('Must be a number.').int('Must be a whole number.').nonnegative('Must be 0 or more.').max(10_000_000, 'Must be 10,000,000 or less.')
+// No upper bound — matches the backend, which only enforces min(0). A
+// warehouse's real stock range isn't bounded by an arbitrary ceiling.
+const stockNumber = z.number('Must be a number.').int('Must be a whole number.').nonnegative('Must be 0 or more.')
 
 // Neither frontend nor backend validates minStock against maxStock —
 // without this, minStock:100/maxStock:5 saves cleanly with no warning.

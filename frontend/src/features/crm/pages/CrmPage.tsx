@@ -7,7 +7,9 @@ import { useCrmFilters } from '@/features/crm/hooks/useCrmFilters'
 import { matchesFilters } from '@/features/crm/crm.filter'
 import { computeKpis } from '@/features/crm/crm.kpis'
 import { downloadLeadsCsv } from '@/features/crm/crm.export'
+import { usePagination } from '@/hooks/usePagination'
 import { Button } from '@/components/ui/button'
+import PaginationControls from '@/components/ui/PaginationControls'
 import CrmKpiStrip from '@/features/crm/components/CrmKpiStrip'
 import CrmFilterBar from '@/features/crm/components/CrmFilterBar'
 import CompactView from '@/features/crm/components/views/CompactView'
@@ -19,6 +21,8 @@ import NewLeadWizard from '@/features/crm/components/NewLeadWizard'
 import BottomInsightsRow from '@/features/crm/components/BottomInsightsRow'
 import KpiDrillDrawer from '@/features/crm/components/KpiDrillDrawer'
 import StageDrawer from '@/features/crm/components/StageDrawer'
+
+const PAGE_SIZE = 10
 
 type ViewMode = 'compact' | 'kanban' | 'list' | 'calendar'
 
@@ -36,12 +40,15 @@ const CrmPage = () => {
   // would only 403 rather than showing them and letting them fail.
   const canManageLeads = hasAnyPermission(['lead:manage', 'tenant:manage'])
   const { filters, setFilter, reset } = useCrmFilters()
+  const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
   // fyFrom/fyTo are sent to the backend ahead of it accepting them (see
   // SearchLeadQuery's own note) — harmless no-op server-side today;
   // matchesFilters below also filters client-side so the picker works now.
-  const { leads, isLoading, error, moveStage, updateLead } = useLeads({
+  const { leads, count, isLoading, error, moveStage, updateLead } = useLeads({
     fyFrom: filters.fyFrom || undefined,
     fyTo: filters.fyTo || undefined,
+    page: String(page),
+    limit: String(PAGE_SIZE),
   })
 
   const [view, setView] = useState<ViewMode>('list')
@@ -51,6 +58,8 @@ const CrmPage = () => {
   const [statusDrill, setStatusDrill] = useState<LeadStatus | null>(null)
 
   const filtered = useMemo(() => leads.filter((l) => matchesFilters(l, filters)), [leads, filters])
+  // KPIs/insights are computed over only the current page, same known
+  // limitation as the rest of this page — see the pagination TODO.
   const kpis = useMemo(() => computeKpis(leads), [leads])
 
   const openLead = leads.find((l) => l.id === openLeadId) ?? null
@@ -113,7 +122,11 @@ const CrmPage = () => {
       {!isLoading && !error && (
         <>
           <CrmKpiStrip tiles={kpis} onDrill={setKpiDrill} />
-          <CrmFilterBar filters={filters} setFilter={setFilter} reset={reset} />
+          <CrmFilterBar
+            filters={filters}
+            setFilter={(key, value) => { setFilter(key, value); resetToFirstPage() }}
+            reset={() => { reset(); resetToFirstPage() }}
+          />
 
           <div className="mb-4">
             {view === 'compact' && (
@@ -125,6 +138,8 @@ const CrmPage = () => {
             {view === 'list' && <ListView leads={filtered} onOpen={setOpenLeadId} onMoveStage={moveStage} canManage={canManageLeads} />}
             {view === 'calendar' && <CalendarView leads={filtered} onOpen={setOpenLeadId} />}
           </div>
+
+          <PaginationControls page={page} totalPages={totalPages(count)} onPageChange={setPage} />
 
           <BottomInsightsRow leads={leads} />
         </>

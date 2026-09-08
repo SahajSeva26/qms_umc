@@ -30,13 +30,19 @@ const VIEW_LABELS: { id: ViewMode; label: string }[] = [
 ]
 
 const CrmPage = () => {
-  const { leads, isLoading, error, moveStage, updateLead } = useLeads()
   const { hasAnyPermission } = usePermission()
   // A lead:search-only caller can view their own leads but create/update/
   // move-stage still require lead:manage/tenant:manage — hide controls that
   // would only 403 rather than showing them and letting them fail.
   const canManageLeads = hasAnyPermission(['lead:manage', 'tenant:manage'])
   const { filters, setFilter, reset } = useCrmFilters()
+  // fyFrom/fyTo are sent to the backend ahead of it accepting them (see
+  // SearchLeadQuery's own note) — harmless no-op server-side today;
+  // matchesFilters below also filters client-side so the picker works now.
+  const { leads, isLoading, error, moveStage, updateLead } = useLeads({
+    fyFrom: filters.fyFrom || undefined,
+    fyTo: filters.fyTo || undefined,
+  })
 
   const [view, setView] = useState<ViewMode>('list')
   const [openLeadId, setOpenLeadId] = useState<string | null>(null)

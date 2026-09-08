@@ -334,6 +334,11 @@ export interface SearchLeadQuery {
   projectType?: LeadProjectType
   division?: string
   salesPerson?: string
+  // ISO date strings (YYYY-MM-DD). Not yet read by the backend's
+  // SearchLeadQuerySchema — sent ahead of that support so the frontend needs
+  // no further change once it's added. See TODO.md.
+  fyFrom?: string
+  fyTo?: string
   page?: string
   limit?: string
 }

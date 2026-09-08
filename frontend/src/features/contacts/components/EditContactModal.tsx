@@ -23,6 +23,17 @@ const STATUS_OPTIONS: { value: ContactStatus; label: string }[] = [
   { value: 'inactive', label: 'Inactive' },
 ]
 
+// Frontend-only — `designation` stays a free string on the backend
+// (CreateContactPayload/UpdateContactPayload), this just constrains the
+// picker to a fixed list of real-world pharma-company contact roles.
+const DESIGNATION_OPTIONS = [
+  'Division Head',
+  'Marketing Manager',
+  'Regional Sales Manager',
+  'Medical Affairs Lead',
+  'Procurement Officer',
+]
+
 interface ContactDraft {
   name: string
   designation: string
@@ -230,7 +241,19 @@ const EditContactModalForm = ({ contact, onClose, fixedTenantId, fixedDivisionId
           </div>
           <div>
             <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Designation</label>
-            <Input value={draft.designation} onChange={(e) => setDraft((p) => ({ ...p, designation: e.target.value }))} />
+            <Select value={draft.designation || 'NONE'} onValueChange={(v) => { if (!v) return; setDraft((p) => ({ ...p, designation: v === 'NONE' ? '' : v })) }}>
+              <SelectTrigger className="w-full text-[13px]">
+                <SelectValue>{(v: string) => (v === 'NONE' ? 'Select designation' : v)}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="NONE">—</SelectItem>
+                {/* An existing contact's designation may predate this fixed list — keep it selectable rather than silently drop it. */}
+                {draft.designation && !DESIGNATION_OPTIONS.includes(draft.designation) && (
+                  <SelectItem value={draft.designation}>{draft.designation}</SelectItem>
+                )}
+                {DESIGNATION_OPTIONS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
           {isEdit && (
             <div>

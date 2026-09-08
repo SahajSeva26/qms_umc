@@ -56,3 +56,13 @@ export const ENTITY_RELATION = {
 export const ENTITY_RELATION_ARRAY = Object.values(ENTITY_RELATION).flatMap((categories) =>
     Object.values(categories),
 );
+
+// ================= FILE PERMISSIONS CONSTANTS ===============
+
+export const FILE_PERMISSIONS = {
+    MANAGE: {
+        code: 'file:manage',
+        name: 'Manage File',
+        description: 'Manage files (full visibility, incl. discarded)',
+    } as const,
+};

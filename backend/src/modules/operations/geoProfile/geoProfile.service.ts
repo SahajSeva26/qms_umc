@@ -35,6 +35,16 @@ const set = async (model: any, entity: HydratedDocument<IGeoProfile>, ctx: Reque
     if (model.coverageRadius !== undefined) entity.coverageRadius = model.coverageRadius;
     if (model.meta !== undefined) entity.meta = model.meta;
 
+    // address fields — spread flat; each applied individually when supplied
+    if (model.addressLine1 !== undefined) entity.addressLine1 = model.addressLine1;
+    if (model.addressLine2 !== undefined) entity.addressLine2 = model.addressLine2;
+    if (model.locality !== undefined) entity.locality = model.locality;
+    if (model.city !== undefined) entity.city = model.city;
+    if (model.state !== undefined) entity.state = model.state;
+    if (model.country !== undefined) entity.country = model.country;
+    if (model.pincode !== undefined) entity.pincode = model.pincode;
+    if (model.googlePlaceId !== undefined) entity.googlePlaceId = model.googlePlaceId;
+
     return entity;
 };
 

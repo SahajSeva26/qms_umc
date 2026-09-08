@@ -10,6 +10,19 @@ const CoordinatesSchema = z
     ])
     .openapi({ example: [79.5130, 29.2183] });
 
+// registered/base address fields — spread flat onto the profile (not nested). All optional;
+// the profile's top-level `coordinates` doubles as the address geo point (no separate field).
+const AddressFieldsSchema = {
+    addressLine1: z.string().min(1).optional().openapi({ example: '12 MG Road' }),
+    addressLine2: z.string().optional().openapi({ example: 'Near City Mall' }),
+    locality: z.string().optional().openapi({ example: 'Andheri West' }),
+    city: z.string().min(1).optional().openapi({ example: 'Mumbai' }),
+    state: z.string().min(1).optional().openapi({ example: 'Maharashtra' }),
+    country: z.string().min(1).optional().openapi({ example: 'India' }),
+    pincode: z.string().min(1).optional().openapi({ example: '400058' }),
+    googlePlaceId: z.string().optional().openapi({ example: 'ChIJ...' }),
+};
+
 //1: create ====================================>
 // role is the 1:1 natural link — required here, and never editable afterwards.
 // tenant is NOT accepted: it is derived from the linked role on the server.
@@ -20,6 +33,7 @@ export const CreateGeoProfilePayloadSchema = z.object({
     coverageRadius: z.number().positive().optional().openapi({ example: 30000 }),
     status: z.enum(Object.values(GEO_PROFILE_STATUS)).optional().openapi({ example: 'active' }),
     meta: z.record(z.string(), z.any()).optional().openapi({ example: { vehicle: 'bike' } }),
+    ...AddressFieldsSchema,
 });
 export type ICreateGeoProfilePayload = z.infer<typeof CreateGeoProfilePayloadSchema>;
 
@@ -31,6 +45,7 @@ export const UpdateGeoProfilePayloadSchema = z.object({
     coverageRadius: z.number().positive().optional(),
     status: z.enum(Object.values(GEO_PROFILE_STATUS)).optional(),
     meta: z.record(z.string(), z.any()).optional(),
+    ...AddressFieldsSchema,
 });
 export type IUpdateGeoProfilePayload = z.infer<typeof UpdateGeoProfilePayloadSchema>;
 

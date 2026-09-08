@@ -57,17 +57,6 @@ const search = async (filters: ISearchVendorMasterQuery, ctx: RequestContext, op
     if (filters.city) {
         where['address.city'] = { $regex: filters.city, $options: 'i' };
     }
-    // fyFrom / fyTo — bound the vendor's creation date (financial-year range). Dates are already
-    // parsed + validated (fyFrom <= fyTo) in the validators.
-    if (filters.fyFrom || filters.fyTo) {
-        where.createdAt = {};
-        if (filters.fyFrom) {
-            where.createdAt.$gte = filters.fyFrom;
-        }
-        if (filters.fyTo) {
-            where.createdAt.$lte = filters.fyTo;
-        }
-    }
     // only a manage-level actor may look past active (see inactive vendors)
     if (filters.status && ctx.hasAnyPermissions([VENDOR_MASTER_PERMISSIONS.MANAGE.code])) {
         where.status = filters.status;

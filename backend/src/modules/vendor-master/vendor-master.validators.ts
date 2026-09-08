@@ -56,22 +56,12 @@ export const UpdateVendorMasterPayloadSchema = z.object({
 export type IUpdateVendorMasterPayload = z.infer<typeof UpdateVendorMasterPayloadSchema>;
 
 //3: search ====================================>
-// fyFrom / fyTo bound the vendor's creation date (financial-year range). They come in as query
-// strings; z.coerce.date() parses + validates them (an unparseable date → 400), and the refine
-// guards that fyFrom is not after fyTo when both are supplied.
-export const SearchVendorMasterQuerySchema = z
-    .object({
-        code: z.string().optional().openapi({ example: 'VEN-ACME-01' }),
-        name: z.string().optional().openapi({ example: 'Acme' }),
-        city: z.string().optional().openapi({ example: 'Mumbai' }),
-        status: z.enum(Object.values(VENDOR_STATUS)).optional().openapi({ example: 'active' }),
-        fyFrom: z.coerce.date().optional().openapi({ example: '2024-04-01' }),
-        fyTo: z.coerce.date().optional().openapi({ example: '2025-03-31' }),
-        page: z.string().optional().openapi({ example: '1' }),
-        limit: z.string().optional().openapi({ example: '10' }),
-    })
-    .refine((q) => !(q.fyFrom && q.fyTo) || q.fyFrom <= q.fyTo, {
-        message: 'fyFrom must be on or before fyTo',
-        path: ['fyFrom'],
-    });
+export const SearchVendorMasterQuerySchema = z.object({
+    code: z.string().optional().openapi({ example: 'VEN-ACME-01' }),
+    name: z.string().optional().openapi({ example: 'Acme' }),
+    city: z.string().optional().openapi({ example: 'Mumbai' }),
+    status: z.enum(Object.values(VENDOR_STATUS)).optional().openapi({ example: 'active' }),
+    page: z.string().optional().openapi({ example: '1' }),
+    limit: z.string().optional().openapi({ example: '10' }),
+});
 export type ISearchVendorMasterQuery = z.infer<typeof SearchVendorMasterQuerySchema>;

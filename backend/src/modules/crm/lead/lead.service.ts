@@ -139,6 +139,17 @@ const search = async (filters: ISearchLeadQuery, ctx: RequestContext, options?: 
     if (filters.salesPerson) {
         where.salesPerson = filters.salesPerson;
     }
+    // fyFrom / fyTo — bound the lead's creation date (financial-year range). Dates are already
+    // parsed + validated (fyFrom <= fyTo) in the validators; normalize to inclusive UTC day bounds.
+    if (filters.fyFrom || filters.fyTo) {
+        where.createdAt = {};
+        if (filters.fyFrom) {
+            where.createdAt.$gte = startOfUTCDay(filters.fyFrom);
+        }
+        if (filters.fyTo) {
+            where.createdAt.$lte = endOfUTCDay(filters.fyTo);
+        }
+    }
 
     //3: own-scope LAST so it always wins — a non-manage actor can never widen past their own leads
     //   by passing a salesPerson filter

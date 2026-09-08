@@ -1,4 +1,4 @@
-import multer, { Multer } from 'multer';
+import multer from 'multer';
 
 export const createUploader = (mimeTypes: string[], fileSize: number = 10 * 1024 * 1024) => {
     return multer({

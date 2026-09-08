@@ -74,7 +74,11 @@ const CalendarView = ({ leads, onOpen }: CalendarViewProps) => {
       <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--qms-surface-card)', borderColor: 'var(--qms-border)' }}>
         <div className="grid grid-cols-7" style={{ borderBottom: '1px solid var(--qms-border)' }}>
           {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
-            <div key={d} className="py-2 text-center text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--qms-text-muted)' }}>
+            <div
+              key={d}
+              className="py-2 text-center text-[10px] font-semibold uppercase tracking-wider"
+              style={{ color: d === 'Sat' ? 'var(--warning)' : d === 'Sun' ? 'var(--danger)' : 'var(--qms-text-muted)' }}
+            >
               {d}
             </div>
           ))}
@@ -84,16 +88,31 @@ const CalendarView = ({ leads, onOpen }: CalendarViewProps) => {
           {cells.map((day) => {
             const inMonth = day.getMonth() === cursor.getMonth()
             const today = isSameDay(day, now)
+            const weekday = day.getDay()
+            const isSaturday = weekday === 6
+            const isSunday = weekday === 0
             const dayLeads = (byDay.get(dayKey(day)) ?? []).slice().sort((a, b) => (a.followUpDate ?? '').localeCompare(b.followUpDate ?? ''))
             return (
               <button
                 key={day.toISOString()}
                 onClick={() => setPickedDay(day)}
                 className={`min-h-[92px] p-1.5 text-left border-b border-r transition-colors hover:bg-(--qms-surface-hover) ${inMonth ? '' : 'opacity-45'}`}
-                style={{ borderColor: 'var(--qms-border)', ...(today ? { background: 'rgba(59,109,255,.08)' } : {}) }}
+                style={{
+                  borderColor: 'var(--qms-border)',
+                  background: today
+                    ? 'rgba(59,109,255,.08)'
+                    : isSaturday
+                      ? 'color-mix(in srgb, var(--warning) 6%, transparent)'
+                      : isSunday
+                        ? 'color-mix(in srgb, var(--danger) 6%, transparent)'
+                        : undefined,
+                }}
               >
                 <div className="flex items-center justify-between gap-1">
-                  <span className="text-[12px] font-bold" style={{ color: today ? 'var(--qms-brand)' : 'var(--qms-text)' }}>
+                  <span
+                    className="text-[12px] font-bold"
+                    style={{ color: today ? 'var(--qms-brand)' : isSaturday ? 'var(--warning)' : isSunday ? 'var(--danger)' : 'var(--qms-text)' }}
+                  >
                     {day.getDate()}
                   </span>
                   {dayLeads.length > 0 && (

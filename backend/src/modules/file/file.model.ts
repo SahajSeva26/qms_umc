@@ -1,7 +1,7 @@
 // File Model
 
 import mongoose from 'mongoose';
-import { ENTITY_TYPE, ENTITY_TYPE_CATEGORIES_ARRAY, FILE_STATUS, FILE_TYPE } from './file.constants';
+import { ENTITY_TYPE, ENTITY_RELATION_ARRAY, FILE_STATUS, FILE_TYPE } from './file.constants';
 
 const contentSchema = new mongoose.Schema({
     provider: {
@@ -55,9 +55,9 @@ const fileSchema = new mongoose.Schema(
                 enum: Object.values(ENTITY_TYPE),
                 required: true,
             },
-            category: {
+            relation: {
                 type: String,
-                enum: ENTITY_TYPE_CATEGORIES_ARRAY,
+                enum: ENTITY_RELATION_ARRAY,
                 required: true,
             },
         },

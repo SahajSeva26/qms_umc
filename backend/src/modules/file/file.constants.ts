@@ -1,9 +1,12 @@
 // File Constants
 
 export const FILE_STATUS = {
-    DRAFT: 'draft',
-    ACTIVE: 'active',
-    INACTIVE: 'inactive',
+    DRAFT: 'draft', // signed URL issued / record created, upload not confirmed
+    UPLOADED: 'uploaded', // bytes received, not yet validated/processed
+    PROCESSING: 'processing', // async pipeline running (scan, validate, generate variants)
+    ACTIVE: 'active', // passed all checks, safe and available for use
+    INACTIVE: 'inactive', // exists, not current (superseded/archived), still retrievable
+    FAILED: 'failed', // upload never completed, or processing rejected it
     DISCARDED: 'discarded',
 } as const;
 
@@ -12,17 +15,14 @@ export const FILE_TYPE = {
     IMAGE: 'image',
 } as const;
 
-export const FILE_SCOPE = {
-    TENANT: 'tenant',
-    INTERNAL: 'internal',
-    PRIVATE: 'private',
-    PUBLIC: 'public',
-} as const;
 
 export const FILE_TRANSITION_MAP = {
-    [FILE_STATUS.DRAFT]: [FILE_STATUS.ACTIVE, FILE_STATUS.INACTIVE, FILE_STATUS.DISCARDED],
+    [FILE_STATUS.DRAFT]: [FILE_STATUS.UPLOADED, FILE_STATUS.PROCESSING, FILE_STATUS.ACTIVE, FILE_STATUS.INACTIVE, FILE_STATUS.FAILED, FILE_STATUS.DISCARDED],
+    [FILE_STATUS.UPLOADED]: [FILE_STATUS.PROCESSING, FILE_STATUS.ACTIVE, FILE_STATUS.INACTIVE, FILE_STATUS.FAILED, FILE_STATUS.DISCARDED],
+    [FILE_STATUS.PROCESSING]: [FILE_STATUS.ACTIVE, FILE_STATUS.INACTIVE, FILE_STATUS.FAILED, FILE_STATUS.DISCARDED],
     [FILE_STATUS.ACTIVE]: [FILE_STATUS.INACTIVE, FILE_STATUS.DISCARDED],
     [FILE_STATUS.INACTIVE]: [FILE_STATUS.ACTIVE, FILE_STATUS.DISCARDED],
+    [FILE_STATUS.FAILED]: [FILE_STATUS.DISCARDED],
     [FILE_STATUS.DISCARDED]: [],
 } as const;
 
@@ -39,7 +39,7 @@ export const ENTITY_TYPE = {
     TEST: 'test',
 } as const;
 
-export const ENTITY_TYPE_CATEGORIES = {
+export const ENTITY_RELATION = {
     //user
     [ENTITY_TYPE.USER]: {
         PROFILE_PICTURE: 'profile_picture',
@@ -53,6 +53,6 @@ export const ENTITY_TYPE_CATEGORIES = {
     // Add more entity types and their categories here
 } as const;
 
-export const ENTITY_TYPE_CATEGORIES_ARRAY = Object.values(ENTITY_TYPE_CATEGORIES).flatMap((categories) =>
+export const ENTITY_RELATION_ARRAY = Object.values(ENTITY_RELATION).flatMap((categories) =>
     Object.values(categories),
 );

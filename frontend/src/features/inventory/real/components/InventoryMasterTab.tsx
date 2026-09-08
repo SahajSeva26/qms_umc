@@ -121,11 +121,11 @@ const InventoryMasterTab = () => {
                   >
                     <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>
                       <div className="flex items-center gap-1.5">
-                        <span className="font-mono" title={item.code}>{truncateIdentifier(item.code)}</span>
+                        <span className="font-mono font-semibold" title={item.code}>{truncateIdentifier(item.code)}</span>
                         <CopyButton value={item.code} label="Code" />
                       </div>
                     </td>
-                    <td className="px-4 py-2.5 font-semibold max-w-xs truncate" style={{ color: 'var(--qms-text)' }} title={item.name}>{item.name}</td>
+                    <td className="px-4 py-2.5 max-w-xs truncate" style={{ color: 'var(--qms-text)' }} title={item.name}>{item.name}</td>
                     <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{INVENTORY_MASTER_TYPE_LABEL[item.type]}</td>
                     <td className="px-4 py-2.5 max-w-xs truncate" style={{ color: 'var(--qms-text-muted)' }} title={item.sku}>{item.sku}</td>
                     <td className="px-4 py-2.5 max-w-xs truncate" style={{ color: 'var(--qms-text-muted)' }} title={item.unit}>{item.unit}</td>

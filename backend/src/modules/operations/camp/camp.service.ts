@@ -1,7 +1,14 @@
 // Camp Service
 import mongoose, { HydratedDocument } from 'mongoose';
 import { CampModel, ICamp } from './camp.model';
-import { IBookCampPayload, ICreateCampPayload, IMoveStagePayload, ISearchCampQuery, IUpdateCampPayload } from './camp.validators';
+import {
+    IBookCampPayload,
+    ICampReportQuery,
+    ICreateCampPayload,
+    IMoveStagePayload,
+    ISearchCampQuery,
+    IUpdateCampPayload,
+} from './camp.validators';
 import { CAMP_COUNTER_ENTITY, CAMP_PERMISSIONS, CAMP_STATUSES, CAMP_TRANSITION_MAP } from './camp.constants';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
 import { CounterService } from '../../counter/counter.service';
@@ -15,7 +22,7 @@ import { isValidObjectID, toObjectId } from '../../../shared/utils/strings';
 import { endOfUTCDay, utcDayRange } from '../../../shared/utils/dates';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { ProjectService } from '../../crm/project/project.service';
-import { DoctorService } from '../../doctor/doctor.service';
+import { DoctorService } from '../../crm/doctor/doctor.service';
 import { RoleService } from '../../access-management/role/role.service';
 import { DivisionService } from '../../crm/division/division.service';
 import { ALLOWED_ROLETYPE_CODES } from '../../access-management/role-type/roleType.constants';
@@ -26,7 +33,7 @@ type CampDocument = HydratedDocument<ICamp> | null;
 const populate: any[] = [
     { path: 'tenant', select: 'name code' },
     { path: 'division', select: 'name code therapy' },
-    { path: 'project', select: 'name status' },
+    { path: 'project', select: 'name status tests' },
     { path: 'doctor', select: 'name specialization pharmaCode' },
     { path: 'fo' },
     { path: 'mr' },
@@ -76,7 +83,7 @@ const bookedFoRoleIdsOnDate = async (date: Date, ctx: RequestContext, excludeCam
 // nearest FO within their own coverage who is not already booked that day. 422 (no coordinates /
 // nobody covers) or 409 (everyone nearby booked) on failure.
 const resolveNearestFreeFoRole = async (camp: HydratedDocument<ICamp>, ctx: RequestContext): Promise<any> => {
-    const coordinates = camp.coordinates as number[] | undefined;
+    const coordinates = (camp.location as any)?.coordinates as number[] | undefined;
     if (!coordinates || coordinates.length !== 2) {
         return throwAppError('Camp has no location coordinates to allocate from', StatusCodes.UNPROCESSABLE_ENTITY);
     }
@@ -159,9 +166,8 @@ const set = async (model: any, entity: HydratedDocument<ICamp>, ctx: RequestCont
 
     if (model.date) entity.date = model.date;
     if (model.timeSlot) (entity as any).timeSlot = model.timeSlot;
-    if (model.city) entity.city = model.city;
-    if (model.state) entity.state = model.state;
-    if (model.coordinates) entity.coordinates = model.coordinates;
+    // location is replaced wholesale (validated as a full object in the validators)
+    if (model.location) entity.location = model.location;
 
     // each device must reference an existing catalog item (InventoryMaster)
     if (model.devices) {
@@ -218,8 +224,8 @@ const search = async (filters: ISearchCampQuery, ctx: RequestContext, options?: 
     if (filters.status) where.status = filters.status;
     if (filters.type) where.type = filters.type;
     if (filters.billingType) where.billingType = filters.billingType;
-    if (filters.city) where.city = { $regex: filters.city, $options: 'i' };
-    if (filters.state) where.state = { $regex: filters.state, $options: 'i' };
+    if (filters.city) where['location.city'] = { $regex: filters.city, $options: 'i' };
+    if (filters.state) where['location.state'] = { $regex: filters.state, $options: 'i' };
     // date range — dateTo is snapped to end-of-day (UTC) so the whole end day is included
     if (filters.dateFrom || filters.dateTo) {
         where.date = {};
@@ -481,15 +487,31 @@ const book = async (model: IBookCampPayload, ctx: RequestContext): Promise<Hydra
         patientExpectation: model.patientExpectation,
         date: model.date,
         timeSlot: model.timeSlot,
-        city: model.city,
-        state: model.state,
-        coordinates: model.coordinates,
+        location: model.location,
         devices: model.devices,
         notes: model.notes,
         conscentPath: model.conscentPath,
     };
 
     return CampService.create(createPayload, ctx);
+};
+
+const report = async (filters: ICampReportQuery, ctx: RequestContext) => {
+    //1: single aggregation, single collection scan — every branch is independent, computed off the
+    // same scoped input set.
+    const [result] = await CampModel.aggregate([
+        { $match: ctx.where() },
+        {
+            $facet: {
+                totalCamps: [{ $count: 'count' }],
+                statusCounts: [{ $group: { _id: '$status', count: { $sum: 1 } } }],
+                typeCounts: [{ $group: { _id: '$type', count: { $sum: 1 } } }],
+                billingTypeCounts: [{ $group: { _id: '$billingType', count: { $sum: 1 } } }],
+            },
+        },
+    ]);
+
+    return { ...result };
 };
 
 export const CampService = {
@@ -500,4 +522,5 @@ export const CampService = {
     moveStage,
     allocateFo,
     book,
+    report,
 };

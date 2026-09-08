@@ -17,6 +17,7 @@ export const TestMasterMapper = {
             name: test.name,
             description: test.description,
             therapy: test.therapy,
+            campType: test.campType,
             duration: test.duration,
             price: test.price,
 

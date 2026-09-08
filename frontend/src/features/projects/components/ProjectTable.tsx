@@ -11,12 +11,17 @@ const CENTERED_COLUMNS = new Set(['Type', 'Execution', 'Total camps', 'Value'])
 
 interface ProjectTableProps {
   projects: ProjectEntity[]
+  // Required, not optional — a future caller must explicitly decide this
+  // rather than silently rendering write controls by omitting the prop.
+  // Mirrors backend's real project:manage/tenant:manage guard on
+  // PUT/PATCH /projects (edit + change-status share this same guard).
+  canWrite: boolean
   onOpenDetail: (id: string) => void
   onEdit: (id: string) => void
   onChangeStatus: (id: string) => void
 }
 
-const ProjectTable = ({ projects, onOpenDetail, onEdit, onChangeStatus }: ProjectTableProps) => (
+const ProjectTable = ({ projects, canWrite, onOpenDetail, onEdit, onChangeStatus }: ProjectTableProps) => (
   <div className="overflow-x-auto rounded-xl border backdrop-blur-xl" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface)' }}>
     <table className="w-full text-[13px]">
       <thead>
@@ -57,13 +62,14 @@ const ProjectTable = ({ projects, onOpenDetail, onEdit, onChangeStatus }: Projec
                 {formatINR(valueAfterGST)}
               </td>
               <td className="px-3 py-2.5 align-top whitespace-nowrap">
-                <ProjectStatusPill status={project.status} onClick={() => { onChangeStatus(project.id) }} />
+                <ProjectStatusPill status={project.status} onClick={canWrite ? () => { onChangeStatus(project.id) } : undefined} />
               </td>
               <td className="px-3 py-2.5 align-top whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>
                 {projectSalesRepName(project).split(' ')[0]}
               </td>
               <td className="px-1 py-2.5 align-top whitespace-nowrap">
                 <ProjectRowMenu
+                  canWrite={canWrite}
                   onViewDetail={() => onOpenDetail(project.id)}
                   onEdit={() => onEdit(project.id)}
                   onChangeStatus={() => onChangeStatus(project.id)}

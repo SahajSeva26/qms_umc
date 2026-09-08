@@ -4,11 +4,13 @@ import { registry } from '../../../shared/config/swagger/swagger.registry';
 import {
     CreateProjectPayloadSchema,
     MoveStagePayloadSchema,
+    ProjectReportQuerySchema,
     SearchProjectQuerySchema,
     UpdateProjectPayloadSchema,
 } from './project.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
 import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { reportRateLimiter } from '../../../shared/middlewares/rateLimiter';
 import { PROJECT_PERMISSIONS } from './project.constants';
 import { TENANT_PERMISSIONS } from '../../access-management/tenant/tenant.constants';
 import { CAMP_PERMISSIONS } from '../../operations/camp/camp.constants';
@@ -16,6 +18,22 @@ import { CAMP_PERMISSIONS } from '../../operations/camp/camp.constants';
 export const ProjectRouter = express.Router();
 
 ProjectRouter.use(AuthMiddleware);
+
+// project report
+registry.registerPath({
+    method: 'get',
+    path: '/projects/report',
+    tags: ['PROJECT'],
+    summary: 'Get project statistics report (total count, status-wise and therapy-wise counts + revenue)',
+    request: {
+        query: ProjectReportQuerySchema,
+    },
+    responses: {
+        200: { description: 'Project report generated successfully' },
+        400: { description: 'Validation error' },
+        403: { description: 'Forbidden' },
+    },
+});
 
 // get project
 registry.registerPath({
@@ -120,6 +138,13 @@ const GUARD = [PROJECT_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code];
 // reps (project:search) may read; service scopes them to their own. camp:book lets pharma field-force
 // read projects (the service scopes them to their division) so they can pick what to book against.
 const READ_GUARD = [PROJECT_PERMISSIONS.SEARCH.code, CAMP_PERMISSIONS.BOOK.code, ...GUARD];
+
+ProjectRouter.get(
+    '/report',
+    reportRateLimiter,
+    AuthorizeMiddleware(GUARD),
+    ProjectController.report
+);
 
 ProjectRouter.get(
     '/:id',

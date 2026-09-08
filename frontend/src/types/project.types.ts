@@ -43,21 +43,6 @@ export const PROJECT_TYPE_LABEL: Record<ProjectType, string> = {
   mixed: 'Mixed',
 }
 
-// A closed backend enum, not an Admin-master-driven dynamic list.
-export type ProjectTest = 'fbs' | 'ppbs' | 'rbs' | 'bp' | 'spo2' | 'ecg' | 'lipid' | 'hba1c' | 'spiro' | 'bca'
-
-export const PROJECT_TEST_LABEL: Record<ProjectTest, string> = {
-  fbs: 'FBS',
-  ppbs: 'PPBS',
-  rbs: 'RBS',
-  bp: 'BP',
-  spo2: 'SPO2',
-  ecg: 'ECG',
-  lipid: 'Lipid',
-  hba1c: 'HbA1c',
-  spiro: 'Spiro',
-  bca: 'BCA',
-}
 
 export type ExecutionModeType = 'po' | 'agreement' | 'mail_confirmation'
 
@@ -236,7 +221,8 @@ export interface ProjectEntity {
   division: ProjectPopulatedDivision | string | null
   therapy: ProjectTherapy
   type: ProjectType[]
-  tests: ProjectTest[]
+  // Test._id references — resolve against GET /test-masters to display names.
+  tests: string[]
   lead: ProjectPopulatedLead | string | null
   mode: ExecutionMode | null
   campCost: number
@@ -288,7 +274,7 @@ export interface CreateProjectPayload {
   name: string
   therapy: ProjectTherapy
   type: ProjectType[]
-  tests?: ProjectTest[]
+  tests?: string[]
   mode?: ExecutionMode
   campCost?: number
   totalCamps?: number
@@ -321,7 +307,7 @@ export interface UpdateProjectPayload {
   name?: string
   therapy?: ProjectTherapy
   type?: ProjectType[]
-  tests?: ProjectTest[]
+  tests?: string[]
   mode?: ExecutionMode
   campCost?: number
   totalCamps?: number

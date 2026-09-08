@@ -275,7 +275,9 @@ export interface SearchDownlineMrQuery {
 }
 
 export interface CreateRolePayload {
-  code: string
+  /** Optional — the backend auto-generates one for pharma field-force roles
+   * (MR/ASM/RSM) when omitted; every other role type still requires it. */
+  code?: string
   name: string
   description?: string
   permissions?: string[]

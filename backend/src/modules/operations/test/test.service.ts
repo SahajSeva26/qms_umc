@@ -213,7 +213,16 @@ const create = async (model: ICreateTestPayload, ctx: RequestContext): Promise<H
         return throwAppError('Test master not found', StatusCodes.NOT_FOUND);
     }
 
-    //4: one result per catalog test per screening. Runs before the txn below — search fires
+    //4: the catalog test must belong to this camp's type — a screening-camp test cannot be run
+    // in a diet camp, etc.
+    if (testMaster.campType !== camp.type) {
+        return throwAppError(
+            `This test belongs to a ${testMaster.campType} camp and cannot be recorded in a ${camp.type} camp`,
+            StatusCodes.CONFLICT,
+        );
+    }
+
+    //5: one result per catalog test per screening. Runs before the txn below — search fires
     // count+find in parallel, which MongoDB forbids inside a transaction.
     const { count } = await TestService.search(
         { screening: screening._id.toString(), type: testMaster._id.toString() },
@@ -223,7 +232,7 @@ const create = async (model: ICreateTestPayload, ctx: RequestContext): Promise<H
         return throwAppError('This test has already been recorded for this screening', StatusCodes.CONFLICT);
     }
 
-    //5: build entity — tenant from screening, performedBy = the acting role
+    //6: build entity — tenant from screening, performedBy = the acting role
     const entity = new TestModel({
         tenant: screening.tenant?._id ?? screening.tenant,
         screening: screening._id,
@@ -231,7 +240,7 @@ const create = async (model: ICreateTestPayload, ctx: RequestContext): Promise<H
         performedBy: ctx.role?._id,
     });
 
-    //6: save the test and reduce the assigned FO's stock atomically — if the FO is short on any
+    //7: save the test and reduce the assigned FO's stock atomically — if the FO is short on any
     // consumable, the deduction throws and the whole create rolls back (no orphan test recorded).
     const foId = camp.fo?._id ?? camp.fo;
     return await withTransaction(async () => {

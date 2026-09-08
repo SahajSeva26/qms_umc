@@ -3,7 +3,7 @@ import { FiX, FiPlus, FiCalendar, FiClipboard, FiRefreshCw, FiList, FiClock, FiB
 import type { WizardFormState } from '@/features/projects/wizard.types'
 import type { AvailablePointer, ClientReportCadence } from '@/types/project.types'
 import { AVAILABLE_POINTER_LABEL, CLIENT_REPORT_CADENCE_LABEL, PAYMENT_TERMS_LABEL, PROJECT_THERAPY_LABEL, PROJECT_TYPE_LABEL } from '@/types/project.types'
-import { computeGstBreakdown } from '@/features/projects/projects.utils'
+import { computeGstBreakdown, computeBookingPreview, MAX_DAYS_TO_BOOK_BEFORE } from '@/features/projects/projects.utils'
 import { formatINR } from '@/utils/formatters'
 import SectionHeader from '@/components/ui/SectionHeader'
 import { ReviewCard, ReviewGrid, ReviewField } from '@/components/ui/ReviewCard'
@@ -25,10 +25,11 @@ interface WizardStep6Props {
 const WizardStep6 = ({ form, setField }: WizardStep6Props) => {
   // Lazy initializer so "now" is captured once, not on every render.
   const [now] = useState(() => Date.now())
-  // Preview only — the exact server recompute rule isn't confirmed, so this
-  // is NOT included in the outgoing payload.
+  // Preview only — never submitted in the outgoing payload (see
+  // computeBookingPreview's own comment for why: this has no server semantic
+  // to match).
   const effectiveEarliestSlotPreview = useMemo(
-    () => new Date(now + form.daysToBookBefore * 86400000).toISOString().slice(0, 10),
+    () => computeBookingPreview(form.daysToBookBefore, now),
     [form.daysToBookBefore, now],
   )
   const { valueAfterGST } = computeGstBreakdown(form.valueBeforeGST, form.gst)
@@ -48,7 +49,7 @@ const WizardStep6 = ({ form, setField }: WizardStep6Props) => {
       <div className="grid grid-cols-2 gap-2.5">
         <div>
           <Label className={labelClasses} style={labelStyle}>Days the pharma must book ahead</Label>
-          <Input type="number" min={0} max={120} value={form.daysToBookBefore} onChange={(e) => setField('daysToBookBefore', Number(e.target.value))} className={fieldClasses} />
+          <Input type="number" min={0} max={MAX_DAYS_TO_BOOK_BEFORE} value={String(form.daysToBookBefore)} onChange={(e) => setField('daysToBookBefore', Number(e.target.value))} className={fieldClasses} />
         </div>
         <div>
           <Label className={labelClasses} style={labelStyle}>Effective earliest slot (preview)</Label>
@@ -73,7 +74,7 @@ const WizardStep6 = ({ form, setField }: WizardStep6Props) => {
       </button>
 
       <SectionHeader icon={FiRefreshCw}>Auto PO renewal reminder</SectionHeader>
-      <Input type="number" min={0} max={100} value={form.poRenewalReminder} onChange={(e) => setField('poRenewalReminder', Number(e.target.value))} className={fieldClasses} />
+      <Input type="number" min={0} max={100} value={String(form.poRenewalReminder)} onChange={(e) => setField('poRenewalReminder', Number(e.target.value))} className={fieldClasses} />
       <p className="text-[11px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>Send reminder at % of billable camps consumed</p>
 
       <SectionHeader icon={FiCalendar}>Client report cadence</SectionHeader>

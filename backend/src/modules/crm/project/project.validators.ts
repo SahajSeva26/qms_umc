@@ -147,3 +147,7 @@ export const SearchProjectQuerySchema = z.object({
     limit: z.string().optional().openapi({ example: '10' }),
 });
 export type ISearchProjectQuery = z.infer<typeof SearchProjectQuerySchema>;
+
+//5: report ====================================>
+export const ProjectReportQuerySchema = z.object({});
+export type IProjectReportQuery = z.infer<typeof ProjectReportQuerySchema>;

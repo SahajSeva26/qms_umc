@@ -200,7 +200,7 @@ const CreateGeoProfileForm = ({ roles, roleName }: RoleNameLookupProps) => {
             >
               Role
             </Label>
-            <Select value={role || undefined} onValueChange={(v) => setRole(v ?? '')}>
+            <Select value={role} onValueChange={(v) => setRole(v ?? '')}>
               <SelectTrigger id="role" className="w-full">
                 <SelectValue placeholder="Select role">
                   {(v) => roleName(v as string)}
@@ -227,7 +227,7 @@ const CreateGeoProfileForm = ({ roles, roleName }: RoleNameLookupProps) => {
             >
               Type
             </Label>
-            <Select value={type || undefined} onValueChange={(v) => setType(v as GeoProfileType)}>
+            <Select value={type} onValueChange={(v) => setType(v as GeoProfileType)}>
               <SelectTrigger id="type" className="w-full">
                 <SelectValue placeholder="Select type">
                   {(v) => GEO_PROFILE_TYPE_OPTIONS.find((t) => t.value === v)?.label ?? 'Select type'}

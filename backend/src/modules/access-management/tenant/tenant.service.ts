@@ -40,6 +40,14 @@ const set = async (model: any, entity: HydratedDocument<ITenant>, ctx: RequestCo
         entity.address = model.address;
     }
 
+    if (model.businessLifetime !== undefined) {
+        entity.businessLifetime = model.businessLifetime;
+    }
+
+    if (model.gst !== undefined) {
+        entity.gst = model.gst;
+    }
+
     // salesPerson — assign/reassign the (platform) sales person owning this tenant account.
     // A supplied id must resolve to an existing role (scoped to the actor) whose role type is
     // sales-rep; an explicit null unassigns. Populate so the role's type.code is available to check.

@@ -13,7 +13,6 @@ export const CreateInventoryMasterPayloadSchema = z.object({
     unit: z.string().min(1).openapi({ example: 'piece' }),
     status: z.enum(Object.values(ITEM_STATUS)).optional().openapi({ example: 'active' }),
     minStock: z.number().min(0).optional().openapi({ example: 10 }),
-    maxStock: z.number().min(0).optional().openapi({ example: 100 }),
 });
 export type ICreateInventoryMasterPayload = z.infer<typeof CreateInventoryMasterPayloadSchema>;
 
@@ -27,7 +26,6 @@ export const UpdateInventoryMasterPayloadSchema = z.object({
     unit: z.string().min(1).optional(),
     status: z.enum(Object.values(ITEM_STATUS)).optional(),
     minStock: z.number().min(0).optional(),
-    maxStock: z.number().min(0).optional(),
 });
 export type IUpdateInventoryMasterPayload = z.infer<typeof UpdateInventoryMasterPayloadSchema>;
 

@@ -37,6 +37,43 @@ const geoProfileSchema = new mongoose.Schema(
             type: Number,
             default: 35000,
         },
+        // registered/base address of the field worker. Spread flat (not nested) so no second
+        // 2dsphere index is created — the top-level `coordinates` above doubles as the address
+        // geo point and keeps findNearest's $geoNear working (a single geo index per collection).
+        // All optional: an address is supplementary; supply on create or update.
+        addressLine1: {
+            type: String,
+            trim: true,
+        },
+        addressLine2: {
+            type: String,
+            trim: true,
+        },
+        locality: {
+            type: String,
+            trim: true,
+        },
+        city: {
+            type: String,
+            trim: true,
+        },
+        state: {
+            type: String,
+            trim: true,
+        },
+        country: {
+            type: String,
+            default: 'India',
+            trim: true,
+        },
+        pincode: {
+            type: String,
+            trim: true,
+        },
+        googlePlaceId: {
+            type: String,
+            trim: true,
+        },
         meta: {
             type: mongoose.Schema.Types.Mixed,
 

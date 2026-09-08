@@ -10,8 +10,8 @@ interface LeadAdvanceModalProps {
   onClose: () => void
 }
 
-// Wraps StageMoveModal for the "Move to {next} →" quick-action path (optional
-// reason), as distinct from the Kanban drag-drop path (mandatory reason).
+// Wraps StageMoveModal for the LEAD_ADVANCE_ACTION_LABEL quick-action path
+// (optional reason), as distinct from the Kanban drag-drop path (mandatory reason).
 // `toStatus` is picked by the caller — when a status has more than one legal
 // next value (e.g. proposal -> pilot/negotiation/lost), the caller renders one
 // quick-action per legal target rather than guessing a single path, so this

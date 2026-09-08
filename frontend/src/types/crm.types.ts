@@ -179,6 +179,19 @@ export const LEAD_STATUS_LABEL: Record<LeadStatus, string> = {
   lost: 'Lost',
 }
 
+// Verb phrasing for a "move lead to this stage" action button. Won/Lost use
+// "Mark as" (they're terminal — "Move to Won" misreads as Won being a
+// waypoint); everything else uses "Move to" since more stages follow.
+export const LEAD_ADVANCE_ACTION_LABEL: Record<LeadStatus, string> = {
+  new: 'Move to New',
+  qualified: 'Move to Qualified',
+  proposal: 'Move to Proposal',
+  pilot: 'Move to Pilot',
+  negotiation: 'Move to Negotiation',
+  won: 'Mark as Won',
+  lost: 'Mark as Lost',
+}
+
 // Not backend-defined. Dot/solid-fill color — see --qms-lead-stage-* in index.css for the ramp.
 export const LEAD_STATUS_COLOR: Record<LeadStatus, string> = {
   new: 'var(--qms-lead-stage-new)',

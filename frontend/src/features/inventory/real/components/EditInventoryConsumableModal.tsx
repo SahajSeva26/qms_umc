@@ -12,6 +12,7 @@ import {
   type InventoryConsumableUpdateFormValues,
 } from '@/features/inventory/real/schemas/inventoryConsumable.schemas'
 import InventoryMasterItemPicker from '@/features/inventory/real/components/InventoryMasterItemPicker'
+import VendorMasterPicker from '@/features/inventory/real/components/VendorMasterPicker'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -73,6 +74,7 @@ const CreateForm = ({ onClose, mutation }: { onClose: () => void; mutation: Retu
   // label of what it resolved the id to, so the selected item's display text
   // has to be held here alongside the form's own `item` id field.
   const [itemLabel, setItemLabel] = useState('')
+  const [vendorLabel, setVendorLabel] = useState('')
 
   const {
     register,
@@ -84,6 +86,7 @@ const CreateForm = ({ onClose, mutation }: { onClose: () => void; mutation: Retu
     mode: 'onChange',
     defaultValues: {
       item: '',
+      vendor: '',
       batch: '',
       manufacturingDate: '',
       expiryDate: '',
@@ -98,6 +101,7 @@ const CreateForm = ({ onClose, mutation }: { onClose: () => void; mutation: Retu
     mutation.mutate(
       {
         item: values.item,
+        vendor: values.vendor,
         batch: values.batch,
         manufacturingDate: values.manufacturingDate,
         expiryDate: values.expiryDate,
@@ -125,6 +129,20 @@ const CreateForm = ({ onClose, mutation }: { onClose: () => void; mutation: Retu
                   value={field.value}
                   label={itemLabel}
                   onChange={(id, label) => { field.onChange(id); setItemLabel(label) }}
+                />
+              )}
+            />
+          </Field>
+
+          <Field label="Vendor *" error={fieldError('vendor')}>
+            <Controller
+              control={control}
+              name="vendor"
+              render={({ field }) => (
+                <VendorMasterPicker
+                  value={field.value}
+                  label={vendorLabel}
+                  onChange={(id, label) => { field.onChange(id); setVendorLabel(label) }}
                 />
               )}
             />
@@ -214,6 +232,7 @@ const EditForm = ({
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 min-w-0" noValidate>
           <ReadOnlyField label="Catalog item" value={lot.item.name ? `${lot.item.name} (${lot.item.code})` : lot.item.id} />
+          <ReadOnlyField label="Vendor" value={lot.vendor.name ? `${lot.vendor.name} (${lot.vendor.code})` : lot.vendor.id} />
 
           <Field label="Batch *" error={fieldError('batch')}>
             <Input type="text" className="text-[13px]" {...register('batch')} />

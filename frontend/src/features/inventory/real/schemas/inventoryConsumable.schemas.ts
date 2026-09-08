@@ -18,10 +18,11 @@ const noExpiryBeforeManufacturing = <T extends { manufacturingDate: string; expi
   }
 }
 
-// Create-only field (item) — immutable post-create, so this resolver is
-// only ever used for the create-mode form.
+// Create-only fields (item/vendor) — immutable post-create, so this resolver
+// is only ever used for the create-mode form.
 export const createInventoryConsumableSchema = z.object({
   item: z.string().trim().min(1, 'Item is required.'),
+  vendor: z.string().trim().min(1, 'Vendor is required.'),
   // No upper bound existed before — batch is editable (unlike device's
   // serialNumber), so an oversized value here would hit the same
   // create/edit-modal overflow risk as Item Master's Name field did.

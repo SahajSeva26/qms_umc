@@ -14,9 +14,18 @@ export interface InventoryConsumableItemRef {
   unit?: string
 }
 
+// vendor is populated to {id, code, name} when hydrated, {id} only when not
+// (same mapVendor() shape inventory-device.mapper.ts uses).
+export interface InventoryConsumableVendorRef {
+  id: string
+  code?: string
+  name?: string
+}
+
 export interface InventoryConsumableEntity {
   id: string
   item: InventoryConsumableItemRef
+  vendor: InventoryConsumableVendorRef
   batch: string
   manufacturingDate: string
   expiryDate: string
@@ -39,6 +48,7 @@ export interface SearchInventoryConsumableQuery {
 
 export interface CreateInventoryConsumablePayload {
   item: string
+  vendor: string
   batch: string
   manufacturingDate: string
   expiryDate: string
@@ -46,7 +56,7 @@ export interface CreateInventoryConsumablePayload {
 }
 
 export interface UpdateInventoryConsumablePayload {
-  // item intentionally absent — immutable post-create.
+  // item/vendor intentionally absent — immutable post-create.
   batch?: string
   manufacturingDate?: string
   expiryDate?: string

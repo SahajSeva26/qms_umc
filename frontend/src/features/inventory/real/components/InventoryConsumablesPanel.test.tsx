@@ -16,6 +16,7 @@ vi.mock('@/features/inventory/real/inventoryConsumable.service', () => ({
           {
             id: 'lot-1',
             item: { id: 'item-1', code: 'syr-01', name: 'Syringe 5ml' },
+            vendor: { id: 'ven-1', code: 'VEN-ACME', name: 'Acme Medical Supplies' },
             batch: 'BATCH-2026-014',
             manufacturingDate: '2026-01-01T00:00:00.000Z',
             expiryDate: '2027-01-01T00:00:00.000Z',

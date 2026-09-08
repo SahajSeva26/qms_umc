@@ -28,9 +28,18 @@ export interface InventoryDeviceItemRef {
   unit?: string
 }
 
+// vendor is populated to {id, code, name} when hydrated, {id} only when not
+// (inventory-device.mapper.ts's mapVendor()).
+export interface InventoryDeviceVendorRef {
+  id: string
+  code?: string
+  name?: string
+}
+
 export interface InventoryDeviceEntity {
   id: string
   item: InventoryDeviceItemRef
+  vendor: InventoryDeviceVendorRef
   serialNumber: string
   // Never permission-gated — every authenticated reader sees the real status.
   status: InventoryDeviceStatus
@@ -52,6 +61,7 @@ export interface SearchInventoryDeviceQuery {
 
 export interface CreateInventoryDevicePayload {
   item: string
+  vendor: string
   serialNumber: string
   manufacturingDate?: string
   warrantyExpiryDate?: string
@@ -60,7 +70,7 @@ export interface CreateInventoryDevicePayload {
 }
 
 export interface UpdateInventoryDevicePayload {
-  // item/serialNumber intentionally absent — immutable post-create.
+  // item/vendor/serialNumber intentionally absent — immutable post-create.
   manufacturingDate?: string
   warrantyExpiryDate?: string
   status?: InventoryDeviceStatus

@@ -114,6 +114,8 @@ const ALL_NAV_ITEMS: NavItem[] = [
 
   { id: 'inventoryops', label: 'Inventory Operations',        icon: 'UserCheck',     path: ADMIN_ROUTES.ADMIN_INVENTORY_OPERATIONS },
 
+  { id: 'vendormasters', label: 'Vendor Master',              icon: 'Truck',         path: ADMIN_ROUTES.ADMIN_VENDOR_MASTERS },
+
   { id: 'assets',       label: 'Asset Management',            icon: 'Box',           path: ADMIN_ROUTES.ADMIN_ASSETS },
 
   { id: 'kpi',          label: 'Order & KPI Engine',          icon: 'Activity',      path: ADMIN_ROUTES.ADMIN_KPI },
@@ -182,8 +184,8 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
     section: 'Resources',
     subs: [
       // 'inventory'/'assets'/'kpi' are deliberately hidden from nav, not deleted —
-      // only these three are backend-wired today.
-      { title: '', items: ['itemmaster', 'inventoryitems', 'inventoryops'].map((id) => NAV_BY_ID[id]) },
+      // only these four are backend-wired today.
+      { title: '', items: ['itemmaster', 'inventoryitems', 'inventoryops', 'vendormasters'].map((id) => NAV_BY_ID[id]) },
     ],
   },
   {

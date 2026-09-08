@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi'
 import type { LeadEntity } from '@/types/crm.types'
 import { LEAD_STATUS_COLOR, LEAD_STATUS_LABEL, LEAD_STATUS_TEXT_COLOR } from '@/types/crm.types'
 import { formatINR } from '@/utils/formatters'
-import { addDays, dayKey, isSameDay, startOfWeek } from '@/features/crm/appointments/appointments.utils'
+import MonthCalendarGrid from '@/components/widgets/month-calendar-grid/MonthCalendarGrid'
 
 interface CalendarViewProps {
   leads: LeadEntity[]
@@ -12,31 +12,16 @@ interface CalendarViewProps {
 
 const MONTH_LABEL = new Intl.DateTimeFormat('en-IN', { month: 'long', year: 'numeric' })
 
-// Mirrors appointments/components/MonthGrid.tsx's month-grid pattern (42-cell
-// Monday-first grid, today highlight, per-day item stacking with a "+N more"
-// overflow) — adapted to bucket Leads by `followUpDate` instead of Meetings
-// by `startAt`, since Lead has no start/end time, just a single follow-up date.
+// Stable references — required for MonthCalendarGrid's internal bucketing
+// memoization to actually skip recomputation across renders.
+const leadDate = (l: LeadEntity) => l.followUpDate ?? null
+const leadSortKey = (l: LeadEntity) => l.followUpDate ?? ''
+const formatLeadCountBadge = (n: number) => `${n} lead${n === 1 ? '' : 's'}`
+
 const CalendarView = ({ leads, onOpen }: CalendarViewProps) => {
   const [cursor, setCursor] = useState(() => new Date())
   const [pickedDay, setPickedDay] = useState<Date | null>(null)
-
-  const now = new Date()
-  const monthStart = new Date(cursor.getFullYear(), cursor.getMonth(), 1)
-  const gridStart = startOfWeek(monthStart)
-  const cells = Array.from({ length: 42 }, (_, i) => addDays(gridStart, i))
-
-  const byDay = useMemo(() => {
-    const map = new Map<string, LeadEntity[]>()
-    for (const lead of leads) {
-      if (!lead.followUpDate) continue
-      const key = dayKey(new Date(lead.followUpDate))
-      map.set(key, [...(map.get(key) ?? []), lead])
-    }
-    return map
-  }, [leads])
-
-  const undated = leads.filter((l) => !l.followUpDate)
-  const pickedLeads = pickedDay ? (byDay.get(dayKey(pickedDay)) ?? []) : []
+  const [pickedLeads, setPickedLeads] = useState<LeadEntity[]>([])
 
   return (
     <div className="space-y-3">
@@ -71,84 +56,36 @@ const CalendarView = ({ leads, onOpen }: CalendarViewProps) => {
         </div>
       </div>
 
-      <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--qms-surface-card)', borderColor: 'var(--qms-border)' }}>
-        <div className="grid grid-cols-7" style={{ borderBottom: '1px solid var(--qms-border)' }}>
-          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
-            <div
-              key={d}
-              className="py-2 text-center text-[10px] font-semibold uppercase tracking-wider"
-              style={{ color: d === 'Sat' ? 'var(--warning)' : d === 'Sun' ? 'var(--danger)' : 'var(--qms-text-muted)' }}
-            >
-              {d}
-            </div>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-7">
-          {cells.map((day) => {
-            const inMonth = day.getMonth() === cursor.getMonth()
-            const today = isSameDay(day, now)
-            const weekday = day.getDay()
-            const isSaturday = weekday === 6
-            const isSunday = weekday === 0
-            const dayLeads = (byDay.get(dayKey(day)) ?? []).slice().sort((a, b) => (a.followUpDate ?? '').localeCompare(b.followUpDate ?? ''))
-            return (
-              <button
-                key={day.toISOString()}
-                onClick={() => setPickedDay(day)}
-                className={`min-h-[92px] p-1.5 text-left border-b border-r transition-colors hover:bg-(--qms-surface-hover) ${inMonth ? '' : 'opacity-45'}`}
-                style={{
-                  borderColor: 'var(--qms-border)',
-                  background: today
-                    ? 'rgba(59,109,255,.08)'
-                    : isSaturday
-                      ? 'color-mix(in srgb, var(--warning) 6%, transparent)'
-                      : isSunday
-                        ? 'color-mix(in srgb, var(--danger) 6%, transparent)'
-                        : undefined,
-                }}
+      <MonthCalendarGrid<LeadEntity>
+        cursor={cursor}
+        items={leads}
+        getDate={leadDate}
+        sortKey={leadSortKey}
+        formatCountBadge={formatLeadCountBadge}
+        onDayClick={(day, dayLeads) => {
+          setPickedDay(day)
+          setPickedLeads(dayLeads)
+        }}
+        renderDayItems={(dayLeads) => (
+          <>
+            {dayLeads.map((lead) => (
+              <div
+                key={lead.id}
+                className="text-[9px] font-semibold truncate rounded px-1 py-0.5"
+                style={{ background: `color-mix(in srgb, ${LEAD_STATUS_COLOR[lead.status]} 13%, transparent)`, color: LEAD_STATUS_TEXT_COLOR[lead.status] }}
+                title={`${lead.title} · ${LEAD_STATUS_LABEL[lead.status]}`}
               >
-                <div className="flex items-center justify-between gap-1">
-                  <span
-                    className="text-[12px] font-bold"
-                    style={{ color: today ? 'var(--qms-brand)' : isSaturday ? 'var(--warning)' : isSunday ? 'var(--danger)' : 'var(--qms-text)' }}
-                  >
-                    {day.getDate()}
-                  </span>
-                  {dayLeads.length > 0 && (
-                    <span className="text-[9px] font-semibold" style={{ color: 'var(--qms-text-muted)' }}>
-                      {dayLeads.length} lead{dayLeads.length === 1 ? '' : 's'}
-                    </span>
-                  )}
-                </div>
-                <div className="mt-1.5 space-y-1">
-                  {dayLeads.slice(0, 3).map((lead) => (
-                    <div
-                      key={lead.id}
-                      className="text-[9px] font-semibold truncate rounded px-1 py-0.5"
-                      style={{ background: `color-mix(in srgb, ${LEAD_STATUS_COLOR[lead.status]} 13%, transparent)`, color: LEAD_STATUS_TEXT_COLOR[lead.status] }}
-                      title={`${lead.title} · ${LEAD_STATUS_LABEL[lead.status]}`}
-                    >
-                      {lead.title}
-                    </div>
-                  ))}
-                  {dayLeads.length > 3 && (
-                    <div className="text-[9px] font-semibold" style={{ color: 'var(--qms-text-muted)' }}>
-                      +{dayLeads.length - 3} more
-                    </div>
-                  )}
-                </div>
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
-      {undated.length > 0 && (
-        <p className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>
-          {undated.length} lead{undated.length === 1 ? '' : 's'} with no follow-up date set — not shown on the calendar.
-        </p>
-      )}
+                {lead.title}
+              </div>
+            ))}
+          </>
+        )}
+        renderUndatedFooter={(undatedLeads) => (
+          <p className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>
+            {undatedLeads.length} lead{undatedLeads.length === 1 ? '' : 's'} with no follow-up date set — not shown on the calendar.
+          </p>
+        )}
+      />
 
       {pickedDay && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 supports-backdrop-filter:backdrop-blur-sm" style={{ background: 'rgba(0,0,0,.4)' }} onClick={() => setPickedDay(null)}>

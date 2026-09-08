@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { addDays, dayKey, startOfWeek } from '@/features/crm/appointments/appointments.utils'
+import { addDays, dayKey, startOfWeek } from '@/utils/calendarDate'
 import { useAppointmentsReal } from '@/features/crm/appointments/hooks/useAppointmentsReal'
 import { useAppointmentReal } from '@/features/crm/appointments/hooks/useAppointmentReal'
 import type { CalendarViewMode } from '@/features/crm/appointments/components/AppointmentCalendarToolbar'
@@ -12,7 +12,7 @@ import NewAppointmentDialog from '@/features/crm/appointments/components/NewAppo
 
 const AppointmentsPage = () => {
   const [cursor, setCursor] = useState(new Date())
-  const [view, setView] = useState<CalendarViewMode>('week')
+  const [view, setView] = useState<CalendarViewMode>('month')
   const [openAppointmentId, setOpenAppointmentId] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [dialogPrefill, setDialogPrefill] = useState<{ date: string; hour: number } | undefined>(undefined)

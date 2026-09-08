@@ -93,6 +93,15 @@ const tenantSchema = new mongoose.Schema(
         address: {
             type: addressSchema,
         },
+        // optional — business age/lifetime (e.g. years in operation)
+        businessLifetime: {
+            type: Number,
+        },
+        // optional — GST registration number. Format validation lives in the validators only.
+        gst: {
+            type: String,
+            trim: true,
+        },
     },
     {
         timestamps: true,

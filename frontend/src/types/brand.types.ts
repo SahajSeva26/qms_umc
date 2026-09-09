@@ -58,9 +58,9 @@ export interface CreateBrandPayload {
   color?: string
 }
 
-// division/tenant are immutable post-create, so absent here.
+// division/tenant/name are immutable post-create, so absent here — the backend
+// derives `code` from `name` once at create and never recomputes it on update.
 export interface UpdateBrandPayload {
-  name?: string
   description?: string
   molecule?: string
   notes?: string

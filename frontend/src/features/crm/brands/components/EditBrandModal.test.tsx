@@ -83,10 +83,18 @@ describe('EditBrandModal — edit mode', () => {
     vi.clearAllMocks()
   })
 
-  it('saving without touching any field omits name/status entirely — never resends a stale snapshot', async () => {
+  it('shows name as read-only text, not an editable input — renaming would desync the backend-derived code', async () => {
+    await renderModal({ brand: brandFixture({ name: 'Cardiostat' }) })
+
+    expect(screen.getByText('Cardiostat')).toBeInTheDocument()
+    expect(screen.queryByDisplayValue('Cardiostat')).not.toBeInTheDocument()
+    expect(document.querySelector('input[type="text"]')).not.toBeInTheDocument()
+  })
+
+  it('saving without touching status omits it entirely — never resends a stale snapshot', async () => {
     const { brandService } = await import('@/features/crm/brands/brand.service')
     const user = userEvent.setup()
-    await renderModal({ brand: brandFixture({ name: 'STALE-NAME', status: 'active' }) })
+    await renderModal({ brand: brandFixture({ status: 'active' }) })
 
     await user.click(screen.getByRole('button', { name: /save changes/i }))
 
@@ -95,18 +103,16 @@ describe('EditBrandModal — edit mode', () => {
       if (!call) throw new Error('not called yet')
       return call[1]
     })
-    expect(payload).not.toHaveProperty('name')
     expect(payload).not.toHaveProperty('status')
   })
 
-  it('editing name directly includes only name in the payload', async () => {
+  it('changing status directly includes only status in the payload', async () => {
     const { brandService } = await import('@/features/crm/brands/brand.service')
     const user = userEvent.setup()
-    await renderModal({ brand: brandFixture({ name: 'OLD-NAME' }) })
+    await renderModal({ brand: brandFixture({ status: 'active' }) })
 
-    const nameInput = screen.getByDisplayValue('OLD-NAME')
-    await user.clear(nameInput)
-    await user.type(nameInput, 'NEW-NAME')
+    await user.click(screen.getByRole('combobox'))
+    await user.click(await screen.findByText('Inactive'))
     await user.click(screen.getByRole('button', { name: /save changes/i }))
 
     const payload = await vi.waitFor(() => {
@@ -114,34 +120,32 @@ describe('EditBrandModal — edit mode', () => {
       if (!call) throw new Error('not called yet')
       return call[1]
     })
-    expect(payload.name).toBe('NEW-NAME')
+    expect(payload).toEqual({ status: 'inactive' })
+  })
+
+  it('changing status then reverting it to its exact original value omits it from the payload', async () => {
+    const { brandService } = await import('@/features/crm/brands/brand.service')
+    const user = userEvent.setup()
+    await renderModal({ brand: brandFixture({ status: 'active' }) })
+
+    await user.click(screen.getByRole('combobox'))
+    await user.click(await screen.findByText('Inactive'))
+    await user.click(screen.getByRole('combobox'))
+    await user.click(await screen.findByText('Active'))
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    const payload = await vi.waitFor(() => {
+      const call = vi.mocked(brandService.updateBrand).mock.calls[0]
+      if (!call) throw new Error('not called yet')
+      return call[1]
+    })
     expect(payload).not.toHaveProperty('status')
   })
 
-  it('editing a field then reverting it to its exact original value omits it from the payload', async () => {
-    const { brandService } = await import('@/features/crm/brands/brand.service')
-    const user = userEvent.setup()
-    await renderModal({ brand: brandFixture({ name: 'ORIGINAL-NAME' }) })
-
-    const nameInput = screen.getByDisplayValue('ORIGINAL-NAME')
-    await user.clear(nameInput)
-    await user.type(nameInput, 'TEMP-NAME')
-    await user.clear(nameInput)
-    await user.type(nameInput, 'ORIGINAL-NAME')
-    await user.click(screen.getByRole('button', { name: /save changes/i }))
-
-    const payload = await vi.waitFor(() => {
-      const call = vi.mocked(brandService.updateBrand).mock.calls[0]
-      if (!call) throw new Error('not called yet')
-      return call[1]
-    })
-    expect(payload).not.toHaveProperty('name')
-  })
-
-  it('a caller without manage permission cannot edit the name and has no Save button', async () => {
+  it('a caller without manage permission has no Status control or Save button', async () => {
     await renderModal({ brand: brandFixture(), canManage: false })
 
-    expect(screen.getByDisplayValue('Cardiostat')).toBeDisabled()
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /save changes/i })).not.toBeInTheDocument()
     expect(screen.getByText(/don't have permission/i)).toBeInTheDocument()
   })

@@ -53,6 +53,15 @@ export function useReverseGeocode({ defaultCountry, onResolved }: UseReverseGeoc
     if (provisionalPosition) void runGeocode(provisionalPosition)
   }, [provisionalPosition, runGeocode])
 
+  // Invalidates any in-flight request (an earlier drag/click's geocode response
+  // must not land after this and overwrite a location committed some other way,
+  // e.g. a search-box pick) and clears the stale provisional pin/error.
+  const reset = useCallback(() => {
+    latestRequestId.current += 1
+    setStatus('idle')
+    setProvisionalPosition(null)
+  }, [])
+
   // Clears every address-derived field, not just the required ones — the old
   // addressLine2/locality/googlePlaceId must not ride along with new coordinates.
   const useProvisionalPinWithoutAddress = useCallback(() => {
@@ -72,5 +81,5 @@ export function useReverseGeocode({ defaultCountry, onResolved }: UseReverseGeoc
     setProvisionalPosition(null)
   }, [provisionalPosition, defaultCountry, onResolved])
 
-  return { status, provisionalPosition, runGeocode, retry, useProvisionalPinWithoutAddress }
+  return { status, provisionalPosition, runGeocode, retry, useProvisionalPinWithoutAddress, reset }
 }

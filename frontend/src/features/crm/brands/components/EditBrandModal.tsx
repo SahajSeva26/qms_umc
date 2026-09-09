@@ -87,12 +87,11 @@ const CreateForm = ({ divisionId, onClose }: { divisionId: string; onClose: () =
 
 const EditForm = ({ brand, canManage, onClose }: { brand: BrandEntity; canManage: boolean; onClose: () => void }) => {
   const updateBrand = useUpdateBrand(brand.id)
-  const [name, setName] = useState(brand.name)
   const [status, setStatus] = useState<BrandStatus>(brand.status)
   const [formError, setFormError] = useState<string | null>(null)
 
   const handleSave = () => {
-    const result = updateBrandSchema.safeParse({ name, status })
+    const result = updateBrandSchema.safeParse({ status })
     if (!result.success) {
       setFormError(result.error.issues[0]?.message ?? 'Please complete the required fields.')
       return
@@ -102,7 +101,6 @@ const EditForm = ({ brand, canManage, onClose }: { brand: BrandEntity; canManage
     // Diff against the original snapshot (not "was ever touched") so a
     // reverted edit is never resent — same pattern as EditDivisionModal.tsx.
     const payload: typeof data = {
-      ...(data.name !== undefined && data.name !== brand.name ? { name: data.name } : {}),
       ...(data.status !== undefined && data.status !== brand.status ? { status: data.status } : {}),
     }
     updateBrand.mutate(payload, { onSuccess: onClose })
@@ -118,15 +116,17 @@ const EditForm = ({ brand, canManage, onClose }: { brand: BrandEntity; canManage
         <div className="space-y-4">
           <div>
             <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-              Name *
+              Name
             </Label>
-            <Input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              disabled={!canManage}
-              className="text-[13px]"
-            />
+            {/* Immutable — the backend derives `code` from `name` once at create and
+                never recomputes it, so a rename here would silently desync the two. */}
+            <div
+              className="h-8 min-w-0 flex items-center rounded-lg border px-2.5 text-[13px]"
+              style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)', background: 'var(--qms-surface-strong)' }}
+              title={brand.name}
+            >
+              <span className="truncate">{brand.name}</span>
+            </div>
           </div>
 
           {canManage && (

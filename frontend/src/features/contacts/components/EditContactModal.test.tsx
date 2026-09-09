@@ -12,7 +12,9 @@ vi.mock('@/features/contacts/contacts.service', () => ({
 
 // usePermission -> useSession fetches GET /auth/me unconditionally; a
 // customer-tenant session keeps needsTenantPicker/needsDivision both false
-// in edit mode, matching this modal's edit-only test scope.
+// in edit mode, matching this modal's edit-only test scope. Overridden to a
+// platform-tenant session in the create-mode describe block below, which
+// needs both pickers to reach the tenant-change reset path.
 vi.mock('@/features/access-management/accessManagement.service', () => ({
   accessManagementService: {
     getMe: vi.fn(async () => ({
@@ -25,6 +27,19 @@ vi.mock('@/features/access-management/accessManagement.service', () => ({
         tenant: { id: 't-1', code: 'acme', name: 'Acme', type: 'customer' },
         permissions: ['contact:manage'],
       },
+    })),
+    searchTenants: vi.fn(async () => ({
+      success: true, message: '',
+      data: { items: [{ id: 'tenant-a', name: 'Tenant A', type: 'customer' }, { id: 'tenant-b', name: 'Tenant B', type: 'customer' }], count: 2 },
+    })),
+  },
+}))
+
+vi.mock('@/features/crm/divisions/division.service', () => ({
+  divisionService: {
+    searchDivisions: vi.fn(async () => ({
+      success: true, message: '',
+      data: { items: [{ id: 'div-x', name: 'Division X' }], count: 1 },
     })),
   },
 }))
@@ -167,5 +182,59 @@ describe('EditContactModal — partial update payload', () => {
       return call[1]
     })
     expect(payload).toHaveProperty('designation', '')
+  })
+})
+
+describe('EditContactModal — create mode, platform session (tenant + division pickers both shown)', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    vi.mocked(accessManagementService.getMe).mockResolvedValue({
+      success: true, message: '',
+      data: {
+        user: { id: 'u-1', email: 'a@example.com', firstName: 'a', lastName: 'b' },
+        role: { id: 'r-1', code: 'admin', name: 'Admin' },
+        roleType: { id: 'rt-1', code: 'admin', name: 'admin' },
+        tenant: { id: 'platform-1', code: 'platform', name: 'Platform', type: 'platform' },
+        permissions: ['contact:manage'],
+      },
+    } as never)
+    vi.mocked(accessManagementService.searchTenants).mockResolvedValue({
+      success: true, message: '',
+      data: { items: [{ id: 'tenant-a', name: 'Tenant A', type: 'customer' }, { id: 'tenant-b', name: 'Tenant B', type: 'customer' }], count: 2 },
+    } as never)
+  })
+
+  async function renderCreateModal() {
+    const EditContactModal = (await import('./EditContactModal')).default
+    const queryClient = makeQueryClient()
+    render(
+      <QueryClientProvider client={queryClient}>
+        <EditContactModal open contact={null} onClose={vi.fn()} />
+      </QueryClientProvider>,
+    )
+    await screen.findByRole('heading', { name: /add contact/i })
+  }
+
+  it('picking a division, then changing the company, resets the division — a stale pick from the old company is never submitted', async () => {
+    const user = userEvent.setup()
+    await renderCreateModal()
+
+    await screen.findByText('Select company')
+    const companyCombobox = () => screen.getByText('Company').parentElement!.querySelector('[role="combobox"]') as HTMLElement
+    const divisionCombobox = () => screen.getByText('Division').parentElement!.querySelector('[role="combobox"]') as HTMLElement
+
+    await user.click(companyCombobox())
+    await user.click(await screen.findByText('Tenant A'))
+
+    await user.click(divisionCombobox())
+    await user.click(await screen.findByText('Division X'))
+    expect(screen.getByText('Division X')).toBeInTheDocument()
+
+    await user.click(companyCombobox())
+    await user.click(await screen.findByText('Tenant B'))
+
+    expect(screen.queryByText('Division X')).not.toBeInTheDocument()
+    expect(screen.getByText(/select division/i)).toBeInTheDocument()
   })
 })

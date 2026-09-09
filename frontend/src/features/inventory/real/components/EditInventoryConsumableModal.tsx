@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Controller, useForm } from 'react-hook-form'
+import { Controller, useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import type { ReactNode } from 'react'
 import type { InventoryConsumableEntity } from '@/types/inventoryConsumable.types'
@@ -192,7 +192,6 @@ const EditForm = ({
     register,
     handleSubmit,
     control,
-    watch,
     formState: { errors, touchedFields, isSubmitted, dirtyFields },
   } = useForm<InventoryConsumableUpdateFormValues>({
     resolver: zodResolver(updateInventoryConsumableSchema),
@@ -209,10 +208,13 @@ const EditForm = ({
   const fieldError = (field: keyof InventoryConsumableUpdateFormValues) =>
     (touchedFields[field] || isSubmitted) ? errors[field]?.message : undefined
 
+  // useWatch (not the plain watch() function) so React Compiler can track this
+  // subscription properly — watch() reads outside React's render tracking.
+  const expiryDateValue = useWatch({ control, name: 'expiryDate' })
   // Backend can't clear an already-set expiry (server only writes it when truthy),
   // so blanking the input here would silently revert on save — block instead.
   const hadExpiry = !!lot.expiryDate
-  const expiryBlanked = hadExpiry && watch('expiryDate') === ''
+  const expiryBlanked = hadExpiry && expiryDateValue === ''
 
   const onSubmit = (values: InventoryConsumableUpdateFormValues) => {
     mutation.mutate(

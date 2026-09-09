@@ -21,7 +21,11 @@ interface MapCanvasProps {
   defaultCenter: { lat: number; lng: number }
   defaultCountry?: string
   onResolutionStateChange?: (status: LocationResolutionState) => void
+  /** Bump this counter to cancel any in-flight/stale reverse-geocode — a location
+   *  committed some other way (e.g. search) must win over a late response. */
+  resetToken?: number
 }
+
 
 // Imperative pan/zoom only, never a controlled center/zoom prop re-asserted
 // on every render — that would fight the user's own pan/zoom.
@@ -43,10 +47,10 @@ function CameraFocus({ coordinates }: { coordinates: [number, number] | undefine
   return null
 }
 
-const MapCanvas = ({ value, onChange, disabled, height, defaultCenter, defaultCountry, onResolutionStateChange }: MapCanvasProps) => {
+const MapCanvas = ({ value, onChange, disabled, height, defaultCenter, defaultCountry, onResolutionStateChange, resetToken }: MapCanvasProps) => {
   const [mapType, setMapType] = useState<MapTypeView>('roadmap')
 
-  const { status: geocodeStatus, provisionalPosition, runGeocode, retry, useProvisionalPinWithoutAddress } =
+  const { status: geocodeStatus, provisionalPosition, runGeocode, retry, useProvisionalPinWithoutAddress, reset } =
     useReverseGeocode({ defaultCountry, onResolved: onChange })
 
   // Reports 'loading'/'error' immediately, not just on the next onChange —
@@ -55,6 +59,14 @@ const MapCanvas = ({ value, onChange, disabled, height, defaultCenter, defaultCo
     onResolutionStateChange?.(geocodeStatus)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- onResolutionStateChange intentionally excluded: an inline arrow from the caller would otherwise re-fire this on every parent render, not just on a real status change
   }, [geocodeStatus])
+
+  const isFirstResetRender = useRef(true)
+  useEffect(() => {
+    if (isFirstResetRender.current) { isFirstResetRender.current = false; return }
+    reset()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fires only when the caller bumps resetToken, not on every `reset` identity change
+  }, [resetToken])
+
 
   const committedPosition = value?.coordinates ? toLatLngLiteral(value.coordinates) : null
   const pinPosition = provisionalPosition ?? committedPosition

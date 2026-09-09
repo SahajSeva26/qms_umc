@@ -198,3 +198,60 @@ describe('MapCanvas — onResolutionStateChange reports geocode status changes',
     expect(onResolutionStateChange).toHaveBeenLastCalledWith('error')
   })
 })
+
+describe('MapCanvas — resetToken cancels an in-flight/stale reverse-geocode', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    ;(globalThis as unknown as { google: unknown }).google = {
+      maps: {
+        Geocoder: vi.fn(function (this: { geocode: typeof geocode }) {
+          this.geocode = geocode
+        }),
+      },
+    }
+  })
+
+  it('a pending pin-drop geocode that resolves AFTER resetToken bumps must not call onChange — a search selection must win', async () => {
+    let resolveGeocode!: (v: unknown) => void
+    geocode.mockReturnValue(new Promise((resolve) => { resolveGeocode = resolve }))
+    const onChange = vi.fn()
+    const { rerender } = render(
+      <MapCanvas value={null} onChange={onChange} height={300} defaultCenter={{ lat: 0, lng: 0 }} resetToken={0} />,
+    )
+
+    // A pin drop starts a slow, still-pending reverse-geocode.
+    await act(async () => {
+      capturedMapOnClick?.({ detail: { latLng: { lat: 10, lng: 20 } } })
+    })
+    expect(onChange).not.toHaveBeenCalled()
+
+    // Meanwhile, the user picks a search result — the caller bumps resetToken.
+    rerender(<MapCanvas value={null} onChange={onChange} height={300} defaultCenter={{ lat: 0, lng: 0 }} resetToken={1} />)
+
+    // The old, now-cancelled pin-drop geocode finally resolves.
+    await act(async () => {
+      resolveGeocode(geocoderResult('dropped-pin-place'))
+      await new Promise((r) => setTimeout(r, 0))
+    })
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('clears a stale error state on reset, so a caller gating Save on it is unblocked', async () => {
+    geocode.mockRejectedValue(new Error('ZERO_RESULTS'))
+    const onResolutionStateChange = vi.fn()
+    const { rerender } = render(
+      <MapCanvas value={null} onChange={vi.fn()} onResolutionStateChange={onResolutionStateChange} height={300} defaultCenter={{ lat: 0, lng: 0 }} resetToken={0} />,
+    )
+
+    await act(async () => {
+      capturedMapOnClick?.({ detail: { latLng: { lat: 10, lng: 20 } } })
+      await new Promise((r) => setTimeout(r, 0))
+    })
+    expect(onResolutionStateChange).toHaveBeenLastCalledWith('error')
+
+    rerender(
+      <MapCanvas value={null} onChange={vi.fn()} onResolutionStateChange={onResolutionStateChange} height={300} defaultCenter={{ lat: 0, lng: 0 }} resetToken={1} />,
+    )
+    expect(onResolutionStateChange).toHaveBeenLastCalledWith('idle')
+  })
+})

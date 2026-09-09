@@ -5,8 +5,8 @@ export const createBrandSchema = z.object({
   name: z.string().trim().min(1, 'Name is required.'),
 })
 
-// division is immutable post-create, so excluded here.
+// division AND name are immutable post-create — the backend derives `code` from
+// `name` once and never recomputes it, so a rename would desync name vs. code.
 export const updateBrandSchema = z.object({
-  name: z.string().trim().min(1, 'Name is required.').optional(),
   status: z.enum(['active', 'inactive']).optional(),
 })

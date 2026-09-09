@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -133,11 +133,6 @@ const EditContactModalForm = ({ contact, onClose, fixedTenantId, fixedDivisionId
   )
   const divisions = divisionsData?.data?.items ?? []
 
-  // Skip when fixedDivisionId is set, else this wipes the fixed value on mount.
-  useEffect(() => {
-    if (!fixedDivisionId) setDivision('')
-  }, [effectiveTenantId, fixedDivisionId])
-
   const createContact = useCreateContact()
   const updateContact = useUpdateContact(contact?.id ?? '')
 
@@ -214,7 +209,16 @@ const EditContactModalForm = ({ contact, onClose, fixedTenantId, fixedDivisionId
           {needsTenantPicker && (
             <div className="sm:col-span-2">
               <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Company</label>
-              <Select value={tenant} onValueChange={(v) => setTenant(v ?? '')}>
+              <Select
+                value={tenant}
+                onValueChange={(v) => {
+                  setTenant(v ?? '')
+                  // Reset here, in the handler that changes the tenant — not an
+                  // effect reacting after the fact — so a stale division from the
+                  // old company can never be submitted alongside the new one.
+                  if (!fixedDivisionId) setDivision('')
+                }}
+              >
                 <SelectTrigger className="w-full text-[13px]">
                   <SelectValue placeholder="Select company">
                     {(v: string) => tenants.find((t) => t.id === v)?.name ?? 'Select company'}

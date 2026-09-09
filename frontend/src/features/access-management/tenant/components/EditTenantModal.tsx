@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Controller, useForm } from 'react-hook-form'
+import { Controller, useForm, useWatch } from 'react-hook-form'
 import type { Tenant, TenantStatus, UpdateTenantPayload } from '@/types/accessManagement.types'
 import { useUpdateTenant } from '@/features/access-management/tenant/hooks/useUpdateTenant'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
@@ -68,7 +68,6 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
     register,
     handleSubmit,
     control,
-    watch,
     formState: { errors, touchedFields, isSubmitted, dirtyFields },
   } = useForm<EditTenantFormValues>({
     resolver,
@@ -84,10 +83,14 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
     },
   })
 
+  // useWatch (not the plain watch() function) so React Compiler can track this
+  // subscription properly — watch() reads outside React's render tracking.
+  const businessLifetimeValue = useWatch({ control, name: 'businessLifetime' })
+  const gstValue = useWatch({ control, name: 'gst' })
   // Backend rejects null/'' for both (no .nullable() in the validator), so an
   // already-set value can't be cleared — blanking the input would silently revert on save.
-  const businessLifetimeBlanked = tenant.businessLifetime != null && watch('businessLifetime') === ''
-  const gstBlanked = !!tenant.gst && watch('gst') === ''
+  const businessLifetimeBlanked = tenant.businessLifetime != null && businessLifetimeValue === ''
+  const gstBlanked = !!tenant.gst && gstValue === ''
 
   // `address` (RHF field value) isn't authoritative while this is anything but
   // 'idle' — the pin can visibly move well before (or without ever) firing onChange.

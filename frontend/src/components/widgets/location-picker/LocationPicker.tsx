@@ -105,6 +105,7 @@ function LocationPickerInner({ value, onChange, disabled, height = DEFAULT_HEIGH
   // `value` isn't final yet, same hazard as the map's own reverse-geocode 'loading'.
   const [isSelecting, setIsSelecting] = useState(false)
   const [mapResolution, setMapResolution] = useState<LocationResolutionState>('idle')
+  const [mapResetToken, setMapResetToken] = useState(0)
 
   useEffect(() => {
     onResolutionStateChange?.(isSelecting ? 'loading' : mapResolution)
@@ -125,9 +126,11 @@ function LocationPickerInner({ value, onChange, disabled, height = DEFAULT_HEIGH
   }
 
   const handleSearchSelected = (selected: LocationValue) => {
-    // A search pick replaces whatever the map was doing — a stale 'error' from
-    // an earlier failed pin-drop must not keep blocking Save after this succeeds.
+    // A search pick replaces whatever the map was doing — cancel any in-flight/stale
+    // reverse-geocode so a late response can't overwrite this selection, and clear
+    // the stale 'error' state that would otherwise keep blocking Save.
     setMapResolution('idle')
+    setMapResetToken((t) => t + 1)
     onChange(selected)
   }
 
@@ -148,6 +151,7 @@ function LocationPickerInner({ value, onChange, disabled, height = DEFAULT_HEIGH
         defaultCenter={defaultCenter ?? INDIA_CENTER}
         defaultCountry={defaultCountry}
         onResolutionStateChange={setMapResolution}
+        resetToken={mapResetToken}
       />
     </div>
   )

@@ -1,14 +1,13 @@
 import type { IconType } from 'react-icons'
-import { FiTrendingUp, FiBriefcase, FiCheckCircle, FiTarget, FiDollarSign, FiActivity } from 'react-icons/fi'
+import { FiBriefcase, FiCheckCircle, FiXCircle, FiTarget, FiActivity } from 'react-icons/fi'
 import type { KpiTile } from '@/types/crm.types'
 import { formatINR, formatPercent } from '@/utils/formatters'
 
 const ICON_MAP: Record<string, IconType> = {
-  TrendingUp: FiTrendingUp,
   Briefcase: FiBriefcase,
   CheckCircle: FiCheckCircle,
+  XCircle: FiXCircle,
   Target: FiTarget,
-  DollarSign: FiDollarSign,
 }
 
 function formatValue(tile: KpiTile): string {
@@ -19,21 +18,18 @@ function formatValue(tile: KpiTile): string {
 
 interface CrmKpiStripProps {
   tiles: KpiTile[]
-  onDrill: (tile: KpiTile) => void
 }
 
-// No delta/trend badge — there's no previous-period comparison available
-// from the real backend (the old mock strip's +/-% deltas were fabricated
-// numbers with no data source), so tiles show the live value only.
-const CrmKpiStrip = ({ tiles, onDrill }: CrmKpiStripProps) => (
+// No delta badge (no period-over-period comparison exists) and not
+// clickable (a tenant-wide aggregate has no matching page-scoped drill-down).
+const CrmKpiStrip = ({ tiles }: CrmKpiStripProps) => (
   <div className="grid gap-2.5 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
     {tiles.map((tile) => {
       const Icon = ICON_MAP[tile.icon] ?? FiActivity
       return (
-        <button
+        <div
           key={tile.id}
-          onClick={() => onDrill(tile)}
-          className="text-left rounded-xl border p-3 transition-all hover:-translate-y-0.5"
+          className="rounded-xl border p-3"
           style={{ background: 'var(--qms-surface-strong)', borderColor: 'var(--qms-border)' }}
         >
           <div className="flex items-center justify-between mb-1.5">
@@ -45,7 +41,7 @@ const CrmKpiStrip = ({ tiles, onDrill }: CrmKpiStripProps) => (
           <div className="text-[20px] font-extrabold tracking-tight" style={{ color: 'var(--qms-text)' }}>
             {formatValue(tile)}
           </div>
-        </button>
+        </div>
       )
     })}
   </div>

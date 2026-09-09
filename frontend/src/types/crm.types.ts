@@ -385,8 +385,8 @@ export interface MoveLeadStagePayload {
   reason: string
 }
 
-// Generic UI shape for CrmKpiStrip — no backend KPI endpoint; computed
-// client-side from the real LeadEntity[] already in cache.
+// Generic UI shape for CrmKpiStrip — populated from GET /leads/report (see
+// LeadReportResponse below), one tile per summary/derived stat.
 export interface KpiTile {
   id: string
   label: string
@@ -396,4 +396,45 @@ export interface KpiTile {
   value: number | string
   delta: number
   sub?: string
+}
+
+// GET /leads/report — division/salesPerson/projectType/from/to all optional;
+// from/to only bound the newLeads trend, NOT summary/byStatus/byProjectType.
+export interface LeadReportQuery {
+  division?: string
+  salesPerson?: string
+  projectType?: LeadProjectType
+  from?: string
+  to?: string
+}
+
+export interface LeadReportSummary {
+  totalLeads: number
+  converted: number
+  lost: number
+  open: number
+}
+
+export interface LeadReportByStatus {
+  status: LeadStatus
+  count: number
+}
+
+export interface LeadReportByProjectType {
+  projectType: LeadProjectType
+  count: number
+}
+
+export interface LeadReportTrendPoint {
+  period: string
+  count: number
+}
+
+export interface LeadReportResponse {
+  summary: LeadReportSummary
+  byStatus: LeadReportByStatus[]
+  byProjectType: LeadReportByProjectType[]
+  trends: {
+    newLeads: { from: string; to: string; data: LeadReportTrendPoint[] }
+  }
 }

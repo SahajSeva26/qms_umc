@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
 import { FiDownload, FiPlus } from 'react-icons/fi'
-import type { KpiTile, LeadStatus } from '@/types/crm.types'
+import type { LeadStatus } from '@/types/crm.types'
 import { usePermission } from '@/hooks/usePermission'
 import { useLeads } from '@/features/crm/hooks/useLeads'
+import { useLeadReport } from '@/features/crm/hooks/useLeadReport'
 import { useCrmFilters } from '@/features/crm/hooks/useCrmFilters'
 import { matchesFilters } from '@/features/crm/crm.filter'
 import { computeKpis } from '@/features/crm/crm.kpis'
@@ -19,7 +20,6 @@ import CalendarView from '@/features/crm/components/views/CalendarView'
 import LeadDrawer from '@/features/crm/components/LeadDrawer'
 import NewLeadWizard from '@/features/crm/components/NewLeadWizard'
 import BottomInsightsRow from '@/features/crm/components/BottomInsightsRow'
-import KpiDrillDrawer from '@/features/crm/components/KpiDrillDrawer'
 import StageDrawer from '@/features/crm/components/StageDrawer'
 
 const PAGE_SIZE = 10
@@ -55,17 +55,16 @@ const CrmPage = () => {
     page: String(page),
     limit: String(PAGE_SIZE),
   })
+  // Unfiltered — always whole-tenant, independent of the table's own filters below.
+  const { report, isLoading: reportLoading, error: reportError } = useLeadReport({}, canManageLeads)
 
   const [view, setView] = useState<ViewMode>('list')
   const [openLeadId, setOpenLeadId] = useState<string | null>(null)
   const [wizardOpen, setWizardOpen] = useState(false)
-  const [kpiDrill, setKpiDrill] = useState<KpiTile | null>(null)
   const [statusDrill, setStatusDrill] = useState<LeadStatus | null>(null)
 
   const filtered = useMemo(() => leads.filter((l) => matchesFilters(l, filters)), [leads, filters])
-  // KPIs/insights are computed over only the current page, same known
-  // limitation as the rest of this page — see the pagination TODO.
-  const kpis = useMemo(() => computeKpis(leads), [leads])
+  const kpis = useMemo(() => computeKpis(report), [report])
 
   const openLead = leads.find((l) => l.id === openLeadId) ?? null
 
@@ -126,7 +125,39 @@ const CrmPage = () => {
 
       {!isLoading && !error && (
         <>
-          <CrmKpiStrip tiles={kpis} onDrill={setKpiDrill} />
+          {!canManageLeads && (
+            <p className="text-[13px] mb-4" style={{ color: 'var(--qms-text-muted)' }}>
+              Statistics are available to lead managers.
+            </p>
+          )}
+
+          {canManageLeads && reportLoading && (
+            <div className="grid gap-2.5 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="rounded-xl border p-3 h-18 animate-pulse"
+                  style={{ background: 'var(--qms-surface-strong)', borderColor: 'var(--qms-border)' }}
+                />
+              ))}
+            </div>
+          )}
+
+          {canManageLeads && !reportLoading && reportError && (
+            <p className="text-[13px] mb-4" style={{ color: 'var(--qms-text-muted)' }}>
+              Couldn't load stats.
+            </p>
+          )}
+
+          {canManageLeads && !reportLoading && !reportError && report && (
+            <>
+              <p className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+                All lead statistics
+              </p>
+              <CrmKpiStrip tiles={kpis} />
+            </>
+          )}
+
           <CrmFilterBar
             filters={filters}
             setFilter={(key, value) => { setFilter(key, value); resetToFirstPage() }}
@@ -157,10 +188,6 @@ const CrmPage = () => {
           onClose={() => setWizardOpen(false)}
           onCreated={() => setWizardOpen(false)}
         />
-      )}
-
-      {kpiDrill && (
-        <KpiDrillDrawer tile={kpiDrill} leads={leads} onClose={() => setKpiDrill(null)} />
       )}
 
       <StageDrawer

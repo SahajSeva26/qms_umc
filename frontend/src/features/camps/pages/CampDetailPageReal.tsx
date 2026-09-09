@@ -1,212 +1,63 @@
 import { useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { FiArrowLeft } from 'react-icons/fi'
-import { useCampReal } from '@/features/camps/hooks/useCampReal'
 import { useCreateCamp } from '@/features/camps/hooks/useCreateCamp'
-import { useUpdateCamp } from '@/features/camps/hooks/useUpdateCamp'
-import { useCampRefNames } from '@/features/camps/hooks/useCampRefNames'
 import { useCampPickerData } from '@/features/camps/hooks/useCampPickerData'
 import { useCampDraft } from '@/features/camps/hooks/useCampDraft'
-import { useProject } from '@/features/projects/hooks/useProject'
-import { campRefId, campRefName, canRunScreening, saveErrorMessage } from '@/features/camps/campsReal.utils'
+import { campRefId, saveErrorMessage } from '@/features/camps/campsReal.utils'
 import { usePermission } from '@/hooks/usePermission'
-import CampSummaryHeader from '@/features/camps/components/CampSummaryHeader'
-import CampStageMovePanel from '@/features/camps/components/CampStageMovePanel'
-import CampStageHistoryList from '@/features/camps/components/CampStageHistoryList'
 import ProjectPicker from '@/features/camps/components/ProjectPicker'
-import CampMrPicker from '@/features/camps/components/CampMrPicker'
-import CampFoPicker from '@/features/camps/components/CampFoPicker'
-import InventoryMasterMultiPicker from '@/features/inventory/real/components/InventoryMasterMultiPicker'
+import CampFormFields from '@/features/camps/components/CampFormFields'
 import EditDoctorModal from '@/features/doctors/components/EditDoctorModal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import TenantPicker from '@/components/ui/TenantPicker'
-import { CAMP_TYPE_LABEL, CAMP_TYPE_VALUES } from '@/types/campReal.types'
-import type { BillingType, CampEntity, CampType } from '@/types/campReal.types'
-import type { DoctorEntity } from '@/types/doctor.types'
-import { CAMP_TIME_SLOT_LABEL } from '@/types/campTimeSlot.constants'
 import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
 import type { ProjectEntity } from '@/types/project.types'
+import type { DoctorEntity } from '@/types/doctor.types'
 import type { LocationValue } from '@/types/location.types'
-import LocationPicker from '@/components/widgets/location-picker/LocationPicker'
-import LocationAddressFields from '@/components/widgets/location-picker/LocationAddressFields'
 import type { LocationResolutionState } from '@/components/widgets/location-picker/location.types'
 
-const TYPE_OPTIONS: { value: CampType; label: string }[] = CAMP_TYPE_VALUES.map((value) => ({ value, label: CAMP_TYPE_LABEL[value] }))
-
-const BILLING_OPTIONS: { value: BillingType; label: string }[] = [
-  { value: 'billable', label: 'Billable' },
-  { value: 'void', label: 'Void' },
-]
-
-// create (camp:create) and update (camp:update) are two distinct backend
-// permission codes — a create-only actor can't edit, and camp:update alone can't move stage.
+// create (camp:create) is a distinct backend permission from update — this
+// page only ever handles creation, so only the create code is checked here.
 const CAMP_CREATE_PERMISSIONS = ['camp:create', 'camp:manage', 'tenant:manage']
-const CAMP_UPDATE_PERMISSIONS = ['camp:update', 'camp:manage', 'tenant:manage']
-const CAMP_STAGE_PERMISSIONS = ['camp:manage', 'tenant:manage']
 
 const CampDetailPageReal = () => {
-  const { id } = useParams<{ id: string }>()
-  const isCreateMode = !id
   const navigate = useNavigate()
-  const { hasAnyPermission, session } = usePermission()
-  const canCreate = hasAnyPermission(CAMP_CREATE_PERMISSIONS)
-  const canUpdate = hasAnyPermission(CAMP_UPDATE_PERMISSIONS)
-  const canWrite = isCreateMode ? canCreate : canUpdate
-  const canMoveStage = hasAnyPermission(CAMP_STAGE_PERMISSIONS)
-  const canManageScreening = hasAnyPermission(['screening:manage', 'system:manage'])
+  const { hasAnyPermission, hasPermission } = usePermission()
+  const canWrite = hasAnyPermission(CAMP_CREATE_PERMISSIONS)
+  const canManageDoctors = hasPermission('doctor:manage')
 
-  const { data, isLoading, error } = useCampReal(id)
-  const camp = data?.data ?? null
-
-  const { doctorName, divisionName, projectName } = useCampRefNames({
-    doctors: !isCreateMode,
-    divisions: !isCreateMode,
-    projects: !isCreateMode,
-  })
-
-  return (
-    <div className="max-w-3xl">
-      <button
-        onClick={() => navigate('/camps')}
-        className="flex items-center gap-1.5 text-[13px] font-semibold mb-5 transition-colors hover:opacity-80"
-        style={{ color: 'var(--qms-text-soft)' }}
-      >
-        <FiArrowLeft size={14} />
-        Back to camps
-      </button>
-
-      {!isCreateMode && isLoading && (
-        <div className="text-[13px] py-10 text-center" style={{ color: 'var(--qms-text-muted)' }}>
-          Loading camp…
-        </div>
-      )}
-
-      {!isCreateMode && error && !isLoading && (
-        <div className="text-[13px] rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
-          Failed to load camp. Please try again.
-        </div>
-      )}
-
-      {(isCreateMode || (camp && !isLoading)) && (
-        <>
-          <CampSummaryHeader
-            camp={camp}
-            isCreateMode={isCreateMode}
-            doctorName={doctorName}
-            divisionName={divisionName}
-            projectName={projectName}
-          />
-
-          {!isCreateMode && camp && camp.status === 'live' && canRunScreening(camp, session?.role.id, session?.roleType.code, canManageScreening) && (
-            <div className="mb-5">
-              <Button variant="outline" onClick={() => navigate(`/camps/${camp.id}/screening`)}>
-                Run screening
-              </Button>
-            </div>
-          )}
-
-          {!isCreateMode && camp && (
-            <CampStageMovePanel camp={camp} canWrite={canWrite} canMoveStage={canMoveStage} />
-          )}
-
-          {!isCreateMode && camp && <CampStageHistoryList camp={camp} />}
-
-          {/* key={camp?.id ?? 'create'} forces a fresh draft per record so a background
-              refetch (e.g. from Move Stage above) never clobbers an in-progress edit. */}
-          <CampForm key={camp?.id ?? 'create'} camp={camp} isCreateMode={isCreateMode} canWrite={canWrite} />
-        </>
-      )}
-    </div>
-  )
-}
-
-interface CampFormProps {
-  camp: CampEntity | null
-  isCreateMode: boolean
-  canWrite: boolean
-}
-
-const CampForm = ({ camp, isCreateMode, canWrite }: CampFormProps) => {
-  const navigate = useNavigate()
-  const { id } = useParams<{ id: string }>()
-
-  const { draft, setField } = useCampDraft(camp)
-  const { tenant, division, project, doctor, type, billingType, patientExpectation, fo, mr, date, timeSlot, location, devices, notes } = draft
+  const { draft, setField } = useCampDraft(null)
+  const { tenant, division, project, doctor, mr, date, timeSlot, location, devices, notes, type, billingType, patientExpectation, fo } = draft
 
   // A caller-facing pin can visibly move well before (or without ever) firing
   // onChange — Save must block until the picker settles, same as GeoProfileDetailPage.
   const [locationResolution, setLocationResolution] = useState<LocationResolutionState>('idle')
 
-  // mr/fo/project/devices' human labels aren't part of the string-only
-  // CampDraft reducer, so they're tracked locally instead.
-  const [mrLabel, setMrLabel] = useState(() => campRefName(camp?.mr) ?? '')
-  const [foLabel, setFoLabel] = useState(() => campRefName(camp?.fo) ?? '')
-  const [projectLabel, setProjectLabelState] = useState(() =>
-    !isCreateMode && camp?.project && typeof camp.project !== 'string' ? camp.project.name : '',
-  )
-  const [deviceLabels, setDeviceLabels] = useState<Record<string, string>>(() =>
-    Object.fromEntries((camp?.devices ?? []).map((d) => [d._id, `${d.name} (${d.code})`])),
-  )
+  const [mrLabel, setMrLabel] = useState('')
+  const [foLabel, setFoLabel] = useState('')
+  const [projectLabel, setProjectLabelState] = useState('')
+  const [deviceLabels, setDeviceLabels] = useState<Record<string, string>>({})
+  const [pickedProject, setPickedProject] = useState<ProjectEntity | null>(null)
+  const [localDoctors, setLocalDoctors] = useState<DoctorEntity[]>([])
+  const [showNewDoctor, setShowNewDoctor] = useState(false)
 
-  const setTenant = (v: string) => setField('tenant', v)
-  const setDivision = (v: string) => setField('division', v)
-  const setDoctor = (v: string) => setField('doctor', v)
-  const setType = (v: CampType) => setField('type', v)
-  const setBillingType = (v: BillingType) => setField('billingType', v)
-  const setPatientExpectation = (v: string) => setField('patientExpectation', v)
-  const setFo = (v: string) => setField('fo', v)
-  const setMr = (v: string) => setField('mr', v)
-  const setDate = (v: string) => setField('date', v)
-  const setTimeSlot = (v: CampTimeSlotValue | '') => setField('timeSlot', v)
-  const setLocation = (v: LocationValue) => setField('location', v)
-  const setNotes = (v: string) => setField('notes', v)
-  const deviceIds = devices ? devices.split(',').map((d) => d.trim()).filter(Boolean) : []
-  const setDeviceIds = (ids: string[], labels: Record<string, string>) => {
-    setField('devices', ids.join(', '))
-    setDeviceLabels(labels)
-  }
+  const effectiveTenant = tenant
 
-  // Sorted-and-joined so membership (not order or a revert-then-reselect) is
-  // what counts as a change — same technique as EditDivisionModal's therapy array.
-  const sortedIds = (ids: string[]) => [...ids].sort().join(',')
-  const originalDeviceIds = sortedIds((camp?.devices ?? []).map((d) => d._id))
-
-  // Scopes FO/MR/Doctor candidates: create mode's picked Company, or edit mode's loaded camp.tenant.
-  const effectiveTenant = tenant || campRefId(camp?.tenant) || ''
-
-  const { tenants, doctors: fetchedDoctors } = useCampPickerData(isCreateMode, effectiveTenant)
+  const { tenants, doctors: fetchedDoctors } = useCampPickerData(true, effectiveTenant)
   // Locally merges a just-created doctor in immediately — a query invalidation
   // could still land on a limit:10 page that doesn't include it.
-  const [localDoctors, setLocalDoctors] = useState<DoctorEntity[]>([])
   const doctors = [...fetchedDoctors, ...localDoctors.filter((d) => !fetchedDoctors.some((f) => f.id === d.id))]
-  const [showNewDoctor, setShowNewDoctor] = useState(false)
-  const { hasPermission } = usePermission()
-  const canManageDoctors = hasPermission('doctor:manage')
 
-  // The backend rejects the ENTIRE update once a camp leaves `requested`
-  // (409, camp.service.ts's update()) — not just fo/date, so every field is locked.
-  const isLocked = !isCreateMode && !!camp && camp.status !== 'requested'
-
-  // base-ui's SelectValue always calls a function child, even with no value,
-  // so the empty-state text has to come from here instead of `placeholder`.
   const doctorLabel = (id: string) => {
     if (id) return doctors.find((d) => d.id === id)?.name ?? id
     return effectiveTenant ? 'Select doctor' : 'Select company first'
   }
 
-  // A camp's own `project` populate is slim ({_id,name,status}, no division/campTimeSlots) —
-  // edit mode fetches the full project separately so the time-slot Select and Division can be scoped.
-  const { data: editProjectData } = useProject(!isCreateMode && project ? project : undefined)
-  const editProject = editProjectData?.data ?? null
-
-  const [pickedProject, setPickedProject] = useState<ProjectEntity | null>(null)
-  const activeProject = isCreateMode ? pickedProject : editProject
-  const bookableSlots = activeProject?.campTimeSlots ?? []
-  const lockedDivisionName = activeProject ? campRefName(activeProject.division) : null
+  const bookableSlots = pickedProject?.campTimeSlots ?? []
+  const lockedDivisionName = pickedProject ? pickedProject.division && typeof pickedProject.division !== 'string' ? (pickedProject.division as { name?: string }).name ?? null : null : null
 
   const handleProjectChange = (p: ProjectEntity) => {
     setField('project', p.id)
@@ -219,310 +70,166 @@ const CampForm = ({ camp, isCreateMode, canWrite }: CampFormProps) => {
   }
 
   const createCamp = useCreateCamp()
-  const updateCamp = useUpdateCamp(id ?? '')
-
-  const [formError, setFormErrorState] = useState<string | null>(null)
+  const [formError, setFormError] = useState<string | null>(null)
 
   const handleSave = () => {
+    if (locationResolution === 'loading') { setFormError('Still resolving the picked location — wait a moment and try again'); return }
+    if (locationResolution === 'error') { setFormError('Retry or choose "Use this pin" for the location before saving'); return }
+
+    if (!tenant) { setFormError('Company is required'); return }
+    if (!project) { setFormError('Project is required'); return }
+    if (!division) { setFormError('Division is required'); return }
+    if (!doctor) { setFormError('Doctor is required'); return }
+    if (!mr) { setFormError('MR is required'); return }
+    if (!date) { setFormError('Date is required'); return }
+    if (!timeSlot) { setFormError('Time slot is required'); return }
+    if (!location) { setFormError('Location is required'); return }
+    if (!location.addressLine1.trim() || !location.city.trim() || !location.state.trim() || !location.pincode.trim()) {
+      setFormError('Complete the address (street, city, state, pincode)'); return
+    }
+    if (!location.coordinates) { setFormError('Pick a location on the map'); return }
+
+    setFormError(null)
+    const deviceIds = devices ? devices.split(',').map((d) => d.trim()).filter(Boolean) : []
     const patientExpectationNum = patientExpectation ? Number(patientExpectation) : undefined
-
-    // Applies to both branches — a save mid-resolution would submit a stale/incomplete pin.
-    if (locationResolution === 'loading') { setFormErrorState('Still resolving the picked location — wait a moment and try again'); return }
-    if (locationResolution === 'error') { setFormErrorState('Retry or choose "Use this pin" for the location before saving'); return }
-
-    if (isCreateMode) {
-      if (!tenant) { setFormErrorState('Company is required'); return }
-      if (!project) { setFormErrorState('Project is required'); return }
-      if (!division) { setFormErrorState('Division is required'); return }
-      if (!doctor) { setFormErrorState('Doctor is required'); return }
-      if (!mr) { setFormErrorState('MR is required'); return }
-      if (!date) { setFormErrorState('Date is required'); return }
-      if (!timeSlot) { setFormErrorState('Time slot is required'); return }
-      if (!location) { setFormErrorState('Location is required'); return }
-      if (!location.addressLine1.trim() || !location.city.trim() || !location.state.trim() || !location.pincode.trim()) {
-        setFormErrorState('Complete the address (street, city, state, pincode)'); return
-      }
-      if (!location.coordinates) { setFormErrorState('Pick a location on the map'); return }
-
-      setFormErrorState(null)
-      createCamp.mutate(
-        {
-          tenant,
-          division,
-          project: project || undefined,
-          doctor,
-          type,
-          billingType,
-          patientExpectation: patientExpectationNum,
-          fo: fo || undefined,
-          mr,
-          date,
-          timeSlot: timeSlot as CampTimeSlotValue,
-          location: location as LocationValue,
-          devices: deviceIds,
-          notes: notes || undefined,
+    createCamp.mutate(
+      {
+        tenant,
+        division,
+        project: project || undefined,
+        doctor,
+        type,
+        billingType,
+        patientExpectation: patientExpectationNum,
+        fo: fo || undefined,
+        mr,
+        date,
+        timeSlot: timeSlot as CampTimeSlotValue,
+        location: location as LocationValue,
+        devices: deviceIds,
+        notes: notes || undefined,
+      },
+      {
+        onSuccess: (res) => {
+          if (res.data?.id) {
+            navigate(`/camps?camp=${res.data.id}`)
+          }
         },
-        {
-          onSuccess: (res) => {
-            if (res.data?.id) {
-              navigate(`/camps/${res.data.id}`)
-            }
-          },
-        },
-      )
-      return
-    }
-
-    // The backend treats an absent mr as "leave unchanged," not "clear" — block
-    // an empty picker here instead of silently keeping the old MR.
-    if (!mr) { setFormErrorState('MR is required'); return }
-    // Only validated when the user has actually set a location — a legacy
-    // camp's location may load as null and must be allowed to stay that way.
-    if (location && (!location.coordinates || !location.addressLine1.trim() || !location.city.trim() || !location.state.trim() || !location.pincode.trim())) {
-      setFormErrorState('Complete the address (street, city, state, pincode) or leave it unset'); return
-    }
-
-    setFormErrorState(null)
-    updateCamp.mutate({
-      doctor: doctor || undefined,
-      fo: fo || undefined,
-      mr: mr || undefined,
-      date: date || undefined,
-      timeSlot: timeSlot || undefined,
-      // Omitted (not sent as null) when unset, so the backend's replace-wholesale
-      // update semantics leave an untouched legacy-null location alone.
-      location: location ?? undefined,
-      // Send raw string (not `notes || undefined`) so clearing the textarea to '' actually clears it.
-      notes,
-      // Backend leaves an absent key unchanged — omit (not just `undefined`, an
-      // actual missing key) unless the final value actually differs from the original.
-      ...(camp && type !== camp.type ? { type } : {}),
-      ...(camp && billingType !== camp.billingType ? { billingType } : {}),
-      ...(camp && patientExpectationNum !== camp.patientExpectation ? { patientExpectation: patientExpectationNum } : {}),
-      ...(sortedIds(deviceIds) !== originalDeviceIds ? { devices: deviceIds } : {}),
-    })
+      },
+    )
   }
 
-  const mutation = isCreateMode ? createCamp : updateCamp
-
   return (
-    <div
-      className="rounded-xl border p-5 mb-5"
-      style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}
-    >
-      <h2 className="text-sm font-bold mb-4" style={{ color: 'var(--qms-text)' }}>
-        {isCreateMode ? 'Details' : 'Edit camp'}
-      </h2>
+    <div className="max-w-3xl">
+      <button
+        onClick={() => navigate('/camps')}
+        className="flex items-center gap-1.5 text-[13px] font-semibold mb-5 transition-colors hover:opacity-80"
+        style={{ color: 'var(--qms-text-soft)' }}
+      >
+        <FiArrowLeft size={14} />
+        Back to camps
+      </button>
 
-      <div className="space-y-4">
-        {isCreateMode && (
-          <>
-            <div>
-              <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Company *</Label>
-              <TenantPicker
-                tenants={tenants}
-                value={tenant}
-                onValueChange={(v) => {
-                  setTenant(v)
-                  setField('project', '')
-                  setProjectLabelState('')
-                  setPickedProject(null)
-                  setDivision('')
-                  // A doctor (fetched or just-created) scoped to the old company is no longer valid.
-                  setDoctor('')
-                  setLocalDoctors([])
-                  // An MR/FO scoped to the old company is no longer valid either — same
-                  // reasoning as doctor above.
-                  setMr('')
-                  setMrLabel('')
-                  setFo('')
-                  setFoLabel('')
-                }}
-              />
-            </div>
-            <div>
-              <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Project *</Label>
-              <ProjectPicker
-                value={project}
-                label={projectLabel}
-                tenant={tenant || undefined}
-                onChange={handleProjectChange}
-                onClear={() => { setField('project', ''); setProjectLabelState(''); setPickedProject(null); setDivision(''); setField('timeSlot', '') }}
-              />
-            </div>
-            <div>
-              <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Division</Label>
-              {/* Locked/derived from the picked Project — the backend silently overrides any
-                  submitted division with the project's own, so an editable dropdown here is pointless. */}
-              <Input value={lockedDivisionName ?? (project ? 'Loading…' : '')} disabled placeholder="Select a project first" />
-            </div>
-          </>
-        )}
+      <div
+        className="rounded-xl border p-5 mb-5"
+        style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}
+      >
+        <h2 className="text-sm font-bold mb-4" style={{ color: 'var(--qms-text)' }}>New camp</h2>
 
-        <div>
-          <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Doctor *</Label>
-          <div className="flex items-center gap-2">
-            {/* key forces a remount on undefined->defined transitions — base-ui's Select
-                otherwise keeps treating it as uncontrolled after the first render. */}
-            <Select key={doctor || 'empty'} value={doctor || undefined} onValueChange={(v) => setDoctor(v ?? '')} disabled={isLocked || !effectiveTenant}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder={effectiveTenant ? 'Select doctor' : 'Select company first'}>{(v) => doctorLabel(v as string)}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {doctors.map((d) => <SelectItem key={d.id} value={d.id}>{d.name} ({d.pharmaCode})</SelectItem>)}
-              </SelectContent>
-            </Select>
-            {isCreateMode && canManageDoctors && (
-              <Button type="button" variant="outline" disabled={isLocked || !effectiveTenant} onClick={() => setShowNewDoctor(true)}>
-                New doctor
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {showNewDoctor && (
-          <EditDoctorModal
-            open
-            doctor={null}
-            forcedTenant={{ id: effectiveTenant, label: tenants.find((t) => t.id === effectiveTenant)?.name ?? effectiveTenant }}
-            onCreated={(created) => {
-              setLocalDoctors((prev) => [...prev, created])
-              setDoctor(created.id)
-            }}
-            onClose={() => setShowNewDoctor(false)}
-          />
-        )}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-4">
           <div>
-            <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Type</Label>
-            <Select value={type} onValueChange={(v) => setType(v as CampType)} disabled={isLocked}>
-              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {TYPE_OPTIONS.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Billing</Label>
-            <Select value={billingType} onValueChange={(v) => setBillingType(v as BillingType)} disabled={isLocked}>
-              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {BILLING_OPTIONS.map((b) => <SelectItem key={b.value} value={b.value}>{b.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        <div>
-          <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Patient expectation</Label>
-          <Input type="text" inputMode="numeric" value={patientExpectation} onChange={(e) => setPatientExpectation(e.target.value)} placeholder="e.g. 50" disabled={isLocked} />
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Date</Label>
-            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={isLocked} />
-          </div>
-          <div>
-            <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Time slot *</Label>
-            <Select
-              key={timeSlot || 'empty'}
-              value={timeSlot || undefined}
-              onValueChange={(v) => setTimeSlot(v as CampTimeSlotValue)}
-              disabled={isLocked || bookableSlots.length === 0}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder={bookableSlots.length === 0 ? 'Select a project first' : 'Select time slot'}>
-                  {(v) => CAMP_TIME_SLOT_LABEL[v as CampTimeSlotValue]}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {bookableSlots.map((slot) => <SelectItem key={slot} value={slot}>{CAMP_TIME_SLOT_LABEL[slot]}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Location</Label>
-          <LocationPicker
-            value={location}
-            onChange={setLocation}
-            onResolutionStateChange={setLocationResolution}
-            disabled={isLocked}
-            defaultCountry="India"
-            countryCode="IN"
-          />
-          <LocationAddressFields value={location} onChange={setLocation} disabled={isLocked} defaultCountry="India" />
-        </div>
-        <p className="text-[11px] -mt-2" style={{ color: 'var(--qms-text-muted)' }}>
-          Used to auto-allocate the nearest available field officer if none is picked below.
-        </p>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-              Field Officer (optional — auto-assigned if blank)
-            </Label>
-            <CampFoPicker
-              value={fo}
-              label={foLabel}
-              tenant={effectiveTenant || undefined}
-              onChange={(id, l) => { setFo(id); setFoLabel(l) }}
-              disabled={isLocked || !effectiveTenant}
+            <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Company *</Label>
+            <TenantPicker
+              tenants={tenants}
+              value={tenant}
+              onValueChange={(v) => {
+                setField('tenant', v)
+                setField('project', '')
+                setProjectLabelState('')
+                setPickedProject(null)
+                setField('division', '')
+                // A doctor (fetched or just-created) scoped to the old company is no longer valid.
+                setField('doctor', '')
+                setLocalDoctors([])
+                // An MR/FO scoped to the old company is no longer valid either — same
+                // reasoning as doctor above.
+                setField('mr', '')
+                setMrLabel('')
+                setField('fo', '')
+                setFoLabel('')
+              }}
             />
           </div>
           <div>
-            <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>MR *</Label>
-            {/* Clearing this picker and saving is blocked by handleSave's validation — see its comment. */}
-            <CampMrPicker
-              value={mr}
-              label={mrLabel}
-              tenant={effectiveTenant || undefined}
-              onChange={(id, l) => { setMr(id); setMrLabel(l) }}
-              disabled={isLocked || !effectiveTenant}
+            <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Project *</Label>
+            <ProjectPicker
+              value={project}
+              label={projectLabel}
+              tenant={tenant || undefined}
+              onChange={handleProjectChange}
+              onClear={() => { setField('project', ''); setProjectLabelState(''); setPickedProject(null); setField('division', ''); setField('timeSlot', '') }}
             />
           </div>
+          <div>
+            <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Division</Label>
+            {/* Locked/derived from the picked Project — the backend silently overrides any
+                submitted division with the project's own, so an editable dropdown here is pointless. */}
+            <Input value={lockedDivisionName ?? (project ? 'Loading…' : '')} disabled placeholder="Select a project first" />
+          </div>
+
+          {showNewDoctor && (
+            <EditDoctorModal
+              open
+              doctor={null}
+              forcedTenant={{ id: effectiveTenant, label: tenants.find((t) => t.id === effectiveTenant)?.name ?? effectiveTenant }}
+              onCreated={(created) => {
+                setLocalDoctors((prev) => [...prev, created])
+                setField('doctor', created.id)
+              }}
+              onClose={() => setShowNewDoctor(false)}
+            />
+          )}
+
+          <CampFormFields
+            draft={draft}
+            setField={setField}
+            effectiveTenant={effectiveTenant}
+            isLocked={false}
+            doctors={doctors}
+            doctorLabel={doctorLabel}
+            showNewDoctorButton={canManageDoctors}
+            onNewDoctor={() => setShowNewDoctor(true)}
+            bookableSlots={bookableSlots}
+            timeSlotDisabledPlaceholder="Select a project first"
+            mrLabel={mrLabel}
+            setMrLabel={setMrLabel}
+            foLabel={foLabel}
+            setFoLabel={setFoLabel}
+            deviceLabels={deviceLabels}
+            onDevicesChange={(ids, labels) => { setField('devices', ids.join(', ')); setDeviceLabels(labels) }}
+            onLocationResolutionChange={setLocationResolution}
+          />
         </div>
 
-        <div>
-          <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Devices</Label>
-          <InventoryMasterMultiPicker value={deviceIds} labels={deviceLabels} onChange={setDeviceIds} type="device" disabled={isLocked} />
-        </div>
+        {createCamp.isError && (
+          <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger mt-4">
+            {saveErrorMessage(createCamp.error)}
+          </div>
+        )}
+        {formError && (
+          <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger mt-4">{formError}</div>
+        )}
 
-        <div>
-          <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Notes</Label>
-          <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" disabled={isLocked} />
-        </div>
+        {canWrite ? (
+          <Button onClick={handleSave} disabled={createCamp.isPending || locationResolution === 'loading'} className="mt-4">
+            {createCamp.isPending ? 'Saving…' : locationResolution === 'loading' ? 'Resolving location…' : 'Create camp'}
+          </Button>
+        ) : (
+          <p className="text-[12px] mt-4" style={{ color: 'var(--qms-text-muted)' }}>
+            You don't have permission to create a camp.
+          </p>
+        )}
       </div>
-
-      {mutation.isError && (
-        <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger mt-4">
-          {saveErrorMessage(mutation.error)}
-        </div>
-      )}
-      {mutation.isSuccess && !isCreateMode && (
-        <div className="text-xs rounded-xl px-3 py-2 bg-success-soft text-success mt-4">Saved.</div>
-      )}
-      {formError && (
-        <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger mt-4">{formError}</div>
-      )}
-
-      {isLocked ? (
-        <p className="text-[12px] mt-4" style={{ color: 'var(--qms-text-muted)' }}>
-          This camp can only be edited while it's in the "requested" stage. Move it back to make
-          changes, or use Move Stage above to change its status.
-        </p>
-      ) : canWrite ? (
-        <Button onClick={handleSave} disabled={mutation.isPending || locationResolution === 'loading'} className="mt-4">
-          {mutation.isPending ? 'Saving…' : locationResolution === 'loading' ? 'Resolving location…' : isCreateMode ? 'Create camp' : 'Save changes'}
-        </Button>
-      ) : (
-        <p className="text-[12px] mt-4" style={{ color: 'var(--qms-text-muted)' }}>
-          You have read-only access to this camp.
-        </p>
-      )}
     </div>
   )
 }

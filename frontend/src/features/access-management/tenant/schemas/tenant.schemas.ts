@@ -1,6 +1,33 @@
 import { z } from 'zod'
 import { PASSWORD_MIN_LENGTH } from '@/features/access-management/accessManagement.constants'
 
+// Mirrors tenant.validators.ts's AddressSchema field-for-field — country is
+// genuinely optional there, not required-with-a-default.
+const addressSchema = z.object({
+  addressLine1: z.string().trim().min(1, 'Address is required.'),
+  addressLine2: z.string().optional(),
+  locality: z.string().optional(),
+  city: z.string().trim().min(1, 'City is required.'),
+  state: z.string().trim().min(1, 'State is required.'),
+  country: z.string().trim().min(1).optional(),
+  pincode: z.string().trim().min(1, 'Pincode is required.'),
+  googlePlaceId: z.string().optional(),
+  coordinates: z.tuple([
+    z.number('Longitude is required.').min(-180).max(180),
+    z.number('Latitude is required.').min(-90).max(90),
+  ]).optional(),
+})
+
+// Matches tenant.validators.ts's GstSchema; empty string passes through as "not provided".
+const gstSchema = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .refine((v) => v === '' || /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(v), {
+    message: 'Enter a valid 15-character GSTIN.',
+  })
+  .optional()
+
 export const updateTenantSchema = z.object({
   name: z.string().trim().min(1, 'Name is required'),
   description: z.string().trim().optional(),
@@ -10,6 +37,9 @@ export const updateTenantSchema = z.object({
   // commented out server-side) regardless of caller permissions — a known no-op.
   type: z.enum(['platform', 'customer']).optional(),
   salesPerson: z.string().optional().nullable(),
+  address: addressSchema.optional(),
+  businessLifetime: z.number('Must be a number.').int('Must be a whole number.').nonnegative('Must be 0 or more.').optional(),
+  gst: gstSchema,
 })
 
 // Backend rejects a tenant code shaped like a Mongo ObjectId (24 hex chars).
@@ -36,4 +66,7 @@ export const createTenantSchema = z.object({
     phone: z.string().trim().optional(),
     gender: z.enum(['male', 'female', 'other']).optional(),
   }),
+  address: addressSchema.optional(),
+  businessLifetime: z.number('Must be a number.').int('Must be a whole number.').nonnegative('Must be 0 or more.').optional(),
+  gst: gstSchema,
 })

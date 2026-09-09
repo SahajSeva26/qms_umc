@@ -14,9 +14,8 @@ export const CAMPS_ROUTES = {
 // so its Save/Move-stage actions are conditionally shown inside CampDetailPageReal instead.
 const CAMP_WRITE_PERMISSIONS = ['camp:create', 'camp:manage', 'tenant:manage']
 
-// NOTE: camp.routes.ts's real GET / guard also accepts camp:book (pharma field-force
-// read access), missing here — a book-only actor gets redirected to /unauthorized
-// by this frontend gate before ever reaching the backend.
+// The real backend guard also accepts camp:book (pharma field-force read
+// access), missing here — a book-only actor gets redirected before ever reaching the backend.
 const CAMP_READ_PERMISSIONS = ['camp:search', 'camp:manage', 'tenant:manage']
 
 // Same camp:book gap as CAMP_READ_PERMISSIONS. Deliberately excludes camp:search
@@ -24,10 +23,7 @@ const CAMP_READ_PERMISSIONS = ['camp:search', 'camp:manage', 'tenant:manage']
 const CAMP_DETAIL_PERMISSIONS = ['camp:get', 'camp:manage', 'tenant:manage']
 
 // Router-level gate only checks "can this role touch Screening at all" — the
-// precise "is this viewer the camp's assigned FO, or a manage-level actor"
-// check needs the camp's own `fo` field, which only exists once the page has
-// loaded the camp, so that check lives inside CampScreeningPage itself
-// (same pattern CAMP_DETAIL uses for its write/move-stage actions).
+// precise assigned-FO check needs the camp's own `fo` field, so it lives inside CampScreeningPage itself.
 const CAMP_SCREENING_PERMISSIONS = ['screening:create', 'screening:manage', 'system:manage']
 
 export const campsRoutes: RouteObject[] = [

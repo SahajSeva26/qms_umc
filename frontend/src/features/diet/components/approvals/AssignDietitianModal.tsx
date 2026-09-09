@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { FiUserCheck } from 'react-icons/fi'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -70,13 +70,23 @@ const AssignDietitianModal = ({ open, onClose, campId, preSelectedDietitianId, o
   const selectedDietitian = selected?.dietitian
   const sug = useMemo(() => (camp && selectedId ? suggestDietitianRates(selectedId, camp) : null), [camp, selectedId])
 
+  // A background camps refetch gives `camp` (and therefore `sug`) a new object
+  // reference even with identical data — reacting to `sug` itself would re-seed
+  // the fields and silently discard whatever the user has already typed. Seed
+  // only when the modal opens on a genuinely new camp/dietitian; read the
+  // latest suggestion through a ref so this doesn't need `sug` as a dependency.
+  const latestSug = useRef(sug)
   useEffect(() => {
-    if (!open || !sug) return
-    setRem(String(sug.remuneration))
-    setTa(String(sug.ta))
-    setPrinting(String(sug.printing))
-    setTargetCost(String(sug.targetCost))
-  }, [open, sug, selectedId])
+    latestSug.current = sug
+  })
+  useEffect(() => {
+    if (!open || !latestSug.current) return
+    const s = latestSug.current
+    setRem(String(s.remuneration))
+    setTa(String(s.ta))
+    setPrinting(String(s.printing))
+    setTargetCost(String(s.targetCost))
+  }, [open, campId, selectedId])
 
   if (!camp) return null
 

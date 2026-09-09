@@ -165,8 +165,11 @@ export function mrWiseCampCount(dietCamps: Camp[]): MrRow[] {
 export function toCsv<T extends object>(rows: T[]): string {
   if (rows.length === 0) return ''
   const cols = Object.keys(rows[0])
+  // A leading =/+/-/@ is executed as a formula by Excel/Sheets on open —
+  // prefix with a quote to force plain-text (OWASP's CSV-injection mitigation).
   const enc = (v: unknown) => {
-    const s = v == null ? '' : String(v)
+    let s = v == null ? '' : String(v)
+    if (/^[=+\-@]/.test(s)) s = `'${s}`
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
   }
   return [cols.join(','), ...rows.map((r) => cols.map((c) => enc((r as Record<string, unknown>)[c])).join(','))].join('\n')

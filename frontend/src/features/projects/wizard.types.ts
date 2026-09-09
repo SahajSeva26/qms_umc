@@ -77,12 +77,8 @@ export interface WizardFormState {
   sops: string
 }
 
-// Static baseline for tests/spreads — `poDate` here is a fixed placeholder,
-// NOT "today," since a module-level `new Date()` would freeze at whatever
-// moment the JS bundle first loaded (stale after midnight/a long-open tab)
-// and `.toISOString()` is UTC, which can show the wrong local calendar day.
-// Real form initialization must go through createDefaultWizardForm() below
-// instead, called fresh each time the wizard mounts.
+// `poDate` is a fixed placeholder here, not "today" — a module-level `new
+// Date()` would freeze stale. Use createDefaultWizardForm() to init a real form.
 export const DEFAULT_WIZARD_FORM: WizardFormState = {
   leadId: '',
   leadTitle: '',
@@ -137,11 +133,6 @@ export const DEFAULT_WIZARD_FORM: WizardFormState = {
   sops: '',
 }
 
-// The real initializer for a fresh (non-edit) wizard — call this, not
-// DEFAULT_WIZARD_FORM directly, whenever the wizard actually mounts. Computes
-// `poDate` fresh (today's real local-calendar date, not a UTC string frozen
-// at module-load time) rather than baking a stale/wrong date into a
-// module-level constant.
 export function createDefaultWizardForm(): WizardFormState {
   return { ...DEFAULT_WIZARD_FORM, poDate: formatIsoDateLocal(new Date()) }
 }

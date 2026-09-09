@@ -11,8 +11,6 @@ interface EditTestModalProps {
   onClose: () => void
 }
 
-// GET /test-masters/:id is the only endpoint carrying resource lines, so the
-// full record must be fetched before TestForm can mount with real defaults.
 const EditTestModal = ({ testId, onClose }: EditTestModalProps) => {
   const isEdit = !!testId
   const { data, isLoading, error, refetch } = useTest(testId ?? undefined)

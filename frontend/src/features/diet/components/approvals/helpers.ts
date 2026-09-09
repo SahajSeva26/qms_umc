@@ -35,8 +35,11 @@ export function csvDownload(filename: string, rows: Record<string, unknown>[]) {
     return
   }
   const headers = Object.keys(rows[0])
+  // A leading =/+/-/@ is executed as a formula by Excel/Sheets on open —
+  // prefix with a quote to force plain-text (OWASP's CSV-injection mitigation).
   const escape = (v: unknown) => {
-    const s = v == null ? '' : String(v)
+    let s = v == null ? '' : String(v)
+    if (/^[=+\-@]/.test(s)) s = `'${s}`
     if (/[",\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"'
     return s
   }

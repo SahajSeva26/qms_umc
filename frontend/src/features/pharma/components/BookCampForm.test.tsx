@@ -10,6 +10,33 @@ import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
 
 vi.mock('@/hooks/useSession')
 
+// LocationPicker needs real Google Maps credentials unavailable in tests —
+// mocked to buttons using the same onChange(LocationValue)/onResolutionStateChange contract.
+vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
+  default: ({ value, onChange, onResolutionStateChange }: {
+    value: unknown
+    onChange: (v: unknown) => void
+    onResolutionStateChange?: (status: 'idle' | 'loading' | 'error') => void
+  }) => (
+    <>
+      <button
+        type="button"
+        onClick={() => onChange({ ...(value as object ?? {}), coordinates: [73.8567, 18.5204] })}
+      >
+        Set test coordinates
+      </button>
+      {/* Simulates the real widget's "pin moved / search result picked, still
+          resolving" window — the gap between a pick and onChange actually firing. */}
+      <button type="button" onClick={() => onResolutionStateChange?.('loading')}>
+        Simulate location resolving
+      </button>
+      <button type="button" onClick={() => onResolutionStateChange?.('idle')}>
+        Simulate location resolved
+      </button>
+    </>
+  ),
+}))
+
 vi.mock('@/features/access-management/accessManagement.service', () => ({
   accessManagementService: {
     searchDownlineMrs: vi.fn(async () => ({ success: true, message: '', data: { items: [], count: 0 } })),
@@ -56,8 +83,12 @@ function bookCampResponseFixture(overrides: Partial<CampMutationResponseEntity> 
       id: 'camp-1', code: 'cmp-000001', tenant: 't-1', division: 'div-1', project: null,
       doctor: 'doc-1', type: 'screening', billingType: 'billable', patientExpectation: 0,
       fo: null, mr: null, date: '2026-09-15',
-      timeSlot: '9am-1pm', city: 'Pune', state: 'Maharashtra',
-      coordinates: [73.8567, 18.5204], devices: [], status: 'requested', stageHistory: [],
+      timeSlot: '9am-1pm',
+      location: {
+        addressLine1: '221 Baker Street', city: 'Pune', state: 'Maharashtra',
+        pincode: '411001', coordinates: [73.8567, 18.5204],
+      },
+      devices: [], status: 'requested', stageHistory: [],
       createdAt: '', updatedAt: '', ...overrides,
     },
   } as ApiResponse<CampMutationResponseEntity>
@@ -83,10 +114,11 @@ async function fillCommonFields(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/date/i), '2026-09-15')
   await user.click(screen.getByText(/select time slot/i))
   await user.click(await screen.findByText(/9 AM – 1 PM/i))
-  await user.type(screen.getByLabelText(/city/i), 'Pune')
-  await user.type(screen.getByLabelText(/state/i), 'Maharashtra')
-  await user.type(screen.getByLabelText(/longitude/i), '73.8567')
-  await user.type(screen.getByLabelText(/latitude/i), '18.5204')
+  await user.type(screen.getByLabelText(/^address line 1$/i), '221 Baker Street')
+  await user.type(screen.getByLabelText(/^city$/i), 'Pune')
+  await user.type(screen.getByLabelText(/^state$/i), 'Maharashtra')
+  await user.type(screen.getByLabelText(/^pincode$/i), '411001')
+  await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
 }
 
 async function pickDoctor(user: ReturnType<typeof userEvent.setup>) {
@@ -134,6 +166,41 @@ describe('BookCampForm', () => {
     expect(screen.getByText(/10 AM – 2 PM/i)).toBeInTheDocument()
     expect(screen.queryByText(/11 AM – 3 PM/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/6 PM – 10 PM/i)).not.toBeInTheDocument()
+  })
+
+  it('leaving both State and Pincode blank surfaces BOTH error messages, not just the last one', async () => {
+    await mockSession()
+    const { campsRealService } = await import('@/features/camps/campsReal.service')
+    const BookCampForm = (await import('@/features/pharma/components/BookCampForm')).default
+
+    const queryClient = makeQueryClient()
+    const user = userEvent.setup()
+    const onBooked = vi.fn()
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <BookCampForm needsMrPicker={false} project={TEST_PROJECT} onBooked={onBooked} />
+      </QueryClientProvider>,
+    )
+
+    await pickDoctor(user)
+    await user.type(screen.getByLabelText(/date/i), '2026-09-15')
+    await user.click(screen.getByText(/select time slot/i))
+    await user.click(await screen.findByText(/9 AM – 1 PM/i))
+    await user.type(screen.getByLabelText(/^address line 1$/i), '221 Baker Street')
+    await user.type(screen.getByLabelText(/^city$/i), 'Pune')
+    await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
+
+    await user.click(screen.getByRole('button', { name: /book camp/i }))
+
+    // FieldErrorText renders each sentence as its own <span> — match them
+    // individually, in order, rather than asserting one joined string.
+    const stateSpan = await screen.findByText('State is required.')
+    const pincodeSpan = await screen.findByText('Pincode is required.')
+    expect(stateSpan.tagName).toBe('SPAN')
+    expect(pincodeSpan.tagName).toBe('SPAN')
+    expect(stateSpan.compareDocumentPosition(pincodeSpan) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(campsRealService.bookCamp).not.toHaveBeenCalled()
   })
 
   it('blocks booking and shows a clear message when the project has zero configured slots', async () => {
@@ -204,6 +271,14 @@ describe('BookCampForm', () => {
     const payload = vi.mocked(campsRealService.bookCamp).mock.calls[0][0]
     expect(payload.mr).toBe('self-role-42')
     expect(payload.doctor).toBe('doc-1')
+    // The migrated nested contract — no top-level city/state/coordinates.
+    expect(payload.location).toEqual(expect.objectContaining({
+      addressLine1: '221 Baker Street', city: 'Pune', state: 'Maharashtra',
+      pincode: '411001', coordinates: [73.8567, 18.5204],
+    }))
+    expect(payload).not.toHaveProperty('city')
+    expect(payload).not.toHaveProperty('state')
+    expect(payload).not.toHaveProperty('coordinates')
     // project is locked context, spliced in from the prop — never something
     // the user filled in — and no such field/input exists in the form at all.
     expect(payload.project).toBe(TEST_PROJECT.id)
@@ -352,6 +427,32 @@ describe('BookCampForm', () => {
     await waitFor(() => expect(onBooked).toHaveBeenCalledTimes(1))
   })
 
+  it('blocks submit while the picked location is still resolving, and never calls bookCamp', async () => {
+    await mockSession()
+    const { campsRealService } = await import('@/features/camps/campsReal.service')
+    const BookCampForm = (await import('@/features/pharma/components/BookCampForm')).default
+
+    const queryClient = makeQueryClient()
+    const user = userEvent.setup()
+    const onBooked = vi.fn()
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <BookCampForm needsMrPicker={false} project={TEST_PROJECT} onBooked={onBooked} />
+      </QueryClientProvider>,
+    )
+
+    await pickDoctor(user)
+    await fillCommonFields(user)
+    await user.click(screen.getByRole('button', { name: /simulate location resolving/i }))
+
+    const submitButton = await screen.findByRole('button', { name: /resolving location/i })
+    expect(submitButton).toBeDisabled()
+
+    expect(campsRealService.bookCamp).not.toHaveBeenCalled()
+    expect(onBooked).not.toHaveBeenCalled()
+  })
+
   it('blocks a true rapid double-submit — two submit events fired before React re-renders isPending — to exactly one mutation call', async () => {
     // parsePayload's async re-parse runs BEFORE isPending flips true, so a
     // disabled-button guard alone misses this race; submittingRef covers it.
@@ -460,8 +561,6 @@ describe('BookCampForm — inline doctor creation (dormant until doctor:manage i
       </QueryClientProvider>,
     )
 
-    // Trigger the field-level "Doctor is required" error the normal way, by
-    // touching the doctor field then leaving it empty (mode: 'onChange').
     await fillCommonFields(user)
     await user.click(screen.getByRole('button', { name: /book camp/i }))
     await waitFor(() => expect(screen.getByText(/doctor is required/i)).toBeInTheDocument())

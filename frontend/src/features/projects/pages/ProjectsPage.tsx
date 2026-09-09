@@ -29,9 +29,6 @@ const HEADER_CHIPS = [
   { icon: FiDollarSign, label: 'Invoice → Tally → GRN → Payment' },
 ]
 
-// Filters/search now flow into the real server-side SearchProjectQuery
-// (name/status), matching the real search endpoint's actual filter support,
-// rather than the old mock's client-side filter over a fully-loaded array.
 const ProjectsPage = () => {
   const { hasAnyPermission } = usePermission()
   const canWrite = hasAnyPermission(PROJECT_WRITE_PERMISSIONS)

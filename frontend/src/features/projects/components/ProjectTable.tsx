@@ -11,10 +11,8 @@ const CENTERED_COLUMNS = new Set(['Type', 'Execution', 'Total camps', 'Value'])
 
 interface ProjectTableProps {
   projects: ProjectEntity[]
-  // Required, not optional — a future caller must explicitly decide this
-  // rather than silently rendering write controls by omitting the prop.
-  // Mirrors backend's real project:manage/tenant:manage guard on
-  // PUT/PATCH /projects (edit + change-status share this same guard).
+  // Required, not optional, so a future caller can't silently render write
+  // controls by omitting it. Mirrors the backend's project:manage/tenant:manage guard.
   canWrite: boolean
   onOpenDetail: (id: string) => void
   onEdit: (id: string) => void

@@ -2,10 +2,10 @@ import type { ContactEntity } from '@/types/contact.types'
 
 interface ContactsTableProps {
   contacts: ContactEntity[]
-  onRowClick: (contact: ContactEntity) => void
+  onView: (contact: ContactEntity) => void
 }
 
-const ContactsTable = ({ contacts, onRowClick }: ContactsTableProps) => {
+const ContactsTable = ({ contacts, onView }: ContactsTableProps) => {
   return (
     <div
       className="rounded-xl border overflow-hidden"
@@ -36,9 +36,12 @@ const ContactsTable = ({ contacts, onRowClick }: ContactsTableProps) => {
             {contacts.map((contact) => (
               <tr
                 key={contact.id}
-                onClick={() => onRowClick(contact)}
-                className="cursor-pointer transition-colors hover:bg-(--qms-surface-hover)"
-                style={{ borderBottom: '1px solid var(--qms-border)' }}
+                tabIndex={0}
+                role="button"
+                onClick={() => onView(contact)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onView(contact) } }}
+                className="cursor-pointer transition-colors hover:bg-(--qms-surface-hover) focus-visible:outline-2 focus-visible:-outline-offset-2"
+                style={{ borderBottom: '1px solid var(--qms-border)', outlineColor: 'var(--qms-brand)' }}
               >
                 <td className="px-4 py-2.5 font-semibold" style={{ color: 'var(--qms-text)' }}>
                   {contact.name}

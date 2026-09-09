@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { FiArrowLeft, FiPlus } from 'react-icons/fi'
@@ -91,6 +91,15 @@ const CreateRoleModal = () => {
     open && needsSupervisor && !!tenant && !!division && !!parentTypeId,
   )
   const supervisorCandidates = supervisorCandidatesData?.data?.items ?? []
+
+  // Auto-fill the common case of exactly one eligible supervisor (e.g. one division head).
+  // Depends on the id, not the array (a fresh `?? []` reference every render).
+  const onlySupervisorCandidateId = supervisorCandidates.length === 1 ? supervisorCandidates[0].id : undefined
+  useEffect(() => {
+    if (needsSupervisor && !supervisor && onlySupervisorCandidateId) {
+      setValue('supervisor', onlySupervisorCandidateId)
+    }
+  }, [needsSupervisor, supervisor, onlySupervisorCandidateId, setValue])
 
   // A division/supervisor picked under one company or role type is invalid
   // under a different one (backend scopes both to the specific company + pharma-tree role type).

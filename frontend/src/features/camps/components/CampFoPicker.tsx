@@ -14,12 +14,8 @@ interface CampFoPickerProps {
 
 const foLabel = (fo: RoleEntity) => `${fo.name} (${fo.code})`
 
-// QMS-side Field Officer picker for CampDetailPageReal — debounced,
-// tenant-scoped, paginated search. Thin UI wrapper over
-// useTenantScopedRolePicker, shared with CampMrPicker. Unlike MR (required),
-// this field is optional — an empty selection (value='') is a genuine,
-// valid state meaning "auto-assign the nearest FO," which AsyncPicker's own
-// empty-value rendering already handles with no special-casing needed here.
+// Unlike MR (required), an empty selection is valid — but only means
+// "auto-assign nearest FO" on create; on edit it just leaves the FO unchanged.
 const CampFoPicker = ({ value, label, tenant, onChange, disabled }: CampFoPickerProps) => {
   const [query, setQuery] = useState('')
   const { open, setOpen, containerRef } = useAsyncPickerState()

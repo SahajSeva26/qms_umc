@@ -95,7 +95,7 @@ function AsyncPicker<TResult>({
         <div
           className={
             dropdownClassName ??
-            'absolute left-0 right-0 top-full mt-1 z-50 p-1.5 rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10'
+            'absolute left-0 right-0 top-full mt-1 z-50 p-1.5 rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10 max-h-64 overflow-y-auto'
           }
         >
           {isFetching && (

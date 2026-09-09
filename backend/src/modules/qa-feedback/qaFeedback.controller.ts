@@ -126,12 +126,27 @@ const update = async (req: any, res: any) => {
 // TODO: verify the Jira webhook signature/secret, then update the feedback status by issueKey.
 const jiraWebhook = async (req: any, res: any) => {
     try {
-        // console.log('webhook data=> ', req.body);
-        // empty for now — acknowledge receipt so Jira does not retry.
-        const currentStatus = req.body.payload.issue.fields.status.name;
+        const log = req.context.logger;
 
-        // console.log('webhook log', currentStatus);
-        // "In Dev"
+
+        const issue = req.body?.issue || {};
+
+        const issueKey = issue?.key || '';
+        const status = issue?.fields?.status?.name || '';
+
+
+        if (!issueKey || !status) {
+            return ResponseHandler.appResponse(
+                res,
+                StatusCodes.BAD_REQUEST,
+                false,
+                'Webhook payload missing issue key or status',
+                null,
+            );
+        }
+
+        await QaFeedbackService.jiraWebhook(issueKey, status);
+
         return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Webhook received', null);
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);

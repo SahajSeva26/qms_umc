@@ -55,7 +55,6 @@ const qaFeedbackSchema = new mongoose.Schema(
         },
         status: {
             type: String,
-            enum: Object.values(QA_FEEDBACK_STATUS),
             default: QA_FEEDBACK_STATUS.OPEN,
             index: true,
         },

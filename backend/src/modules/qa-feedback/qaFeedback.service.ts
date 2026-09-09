@@ -109,11 +109,26 @@ const update = async (id: string, model: IUpdateQaFeedbackPayload): Promise<Hydr
     return await feedback.save();
 };
 
+// Jira webhook sync — looks up the feedback row by its Jira issue key (`id`, the stable
+// identifier Jira sends on an issue change) and updates its status to mirror Jira. Unlike
+// update(), the lookup is by issueKey, not _id.
+const jiraWebhook = async (id: string, status: string): Promise<HydratedDocument<IQaFeedback>> => {
+    const feedback = await QaFeedbackModel.findOne({ issueKey: id });
+    if (!feedback) {
+        return throwAppError('QA feedback not found', StatusCodes.NOT_FOUND);
+    }
+
+    feedback.status = status;
+
+    return await feedback.save();
+};
+
 export const QaFeedbackService = {
     get,
     search,
     create,
     update,
+    jiraWebhook,
 };
 
 // ========================================================================================

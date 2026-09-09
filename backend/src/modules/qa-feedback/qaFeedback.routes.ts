@@ -15,7 +15,7 @@ export const QaFeedbackRouter = express.Router();
 // jira webhook (documented here, mounted below BEFORE AuthMiddleware — it's an
 // external server-to-server call from Jira, not a logged-in user)
 registry.registerPath({
-    method: 'put',
+    method: 'post',
     path: '/qa-feedback/webhook/jira',
     tags: ['QA_FEEDBACK'],
     summary: 'Jira webhook receiver — sync an issue change back to its feedback row',
@@ -102,7 +102,7 @@ registry.registerPath({
 // ========================= EXPORT QA FEEDBACK ROUTES ===================
 // =======================================================================
 
-QaFeedbackRouter.put('/webhook/jira', QaFeedbackController.jiraWebhook);
+QaFeedbackRouter.post('/webhook/jira', QaFeedbackController.jiraWebhook);
 QaFeedbackRouter.use(AuthMiddleware);
 
 // Deliberately no AuthorizeMiddleware here

@@ -8,6 +8,36 @@ import type { RoleEntity } from '@/types/accessManagement.types'
 
 vi.mock('@/hooks/useSession')
 
+vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
+  default: ({ onResolutionStateChange }: {
+    onResolutionStateChange?: (status: 'idle' | 'loading' | 'error') => void
+  }) => (
+    <>
+      {/* Simulates the real widget's "pin moved, reverse-geocode still resolving"
+          window — the gap between a drag/click and onChange actually firing. */}
+      <button type="button" onClick={() => onResolutionStateChange?.('loading')}>
+        Simulate location resolving
+      </button>
+      <button type="button" onClick={() => onResolutionStateChange?.('idle')}>
+        Simulate location resolved
+      </button>
+    </>
+  ),
+}))
+
+vi.mock('@/features/inventory/real/components/InventoryMasterMultiPicker', () => ({
+  default: ({ onChange }: { onChange: (ids: string[], labels: Record<string, string>) => void }) => (
+    <>
+      <button type="button" onClick={() => onChange(['dev-new'], { 'dev-new': 'New Device (DEV-1)' })}>
+        Pick a device
+      </button>
+      <button type="button" onClick={() => onChange([], {})}>
+        Clear devices
+      </button>
+    </>
+  ),
+}))
+
 vi.mock('@/features/camps/campsReal.service', () => ({
   campsRealService: {
     getCamp: vi.fn(),
@@ -62,8 +92,12 @@ function campFixture(overrides: Partial<CampEntity> = {}): CampEntity {
     id: 'camp-1', code: 'cmp-000001', tenant: 't-1', division: 'div-1', project: null,
     doctor: 'doc-1', type: 'screening', billingType: 'billable', patientExpectation: 0,
     fo: null, mr: mrFixture, date: '2026-09-15',
-    timeSlot: '9am-1pm', city: 'Pune', state: 'Maharashtra',
-    coordinates: [73.8567, 18.5204], devices: [], status: 'requested', stageHistory: [],
+    timeSlot: '9am-1pm',
+    location: {
+      addressLine1: '221 Baker Street', city: 'Pune', state: 'Maharashtra',
+      pincode: '411001', coordinates: [73.8567, 18.5204],
+    },
+    devices: [], status: 'requested', stageHistory: [],
     createdAt: '', updatedAt: '', ...overrides,
   } as CampEntity
 }
@@ -140,10 +174,8 @@ describe('CampDetailPageReal — edit mode MR field', () => {
 
     await screen.findByText(/edit camp/i)
 
-    // Existing MR shows as the current selection.
     expect(await screen.findByText(/original mr/i)).toBeInTheDocument()
 
-    // Click the chip to reopen the picker and search for a replacement.
     await user.click(screen.getByText(/original mr/i))
     const mrSearchInput = await screen.findByPlaceholderText(/search mr by name/i)
     await user.type(mrSearchInput, 'Replacement')
@@ -167,9 +199,7 @@ describe('CampDetailPageReal — edit mode MR field', () => {
     await screen.findByText(/edit camp/i)
     expect(await screen.findByText(/original mr/i)).toBeInTheDocument()
 
-    // Clicking the chip itself clears the selection and reopens the search
-    // input (AsyncPicker's own chip-click behavior — same as the explicit X
-    // button, both call the same clearSelection()).
+    // Clicking the chip itself clears the selection, same as the explicit X button.
     await user.click(screen.getByText(/original mr/i))
 
     expect(screen.queryByText(/original mr/i)).not.toBeInTheDocument()
@@ -214,9 +244,8 @@ describe('CampDetailPageReal — create mode, inline doctor creation', () => {
     vi.resetAllMocks()
   })
 
-// Fills the "Add doctor" modal's required create fields (pharma code, name)
-// by locating each input via its own label text's sibling, matching this
-// modal's markup (labels aren't htmlFor-associated with their inputs).
+// Locates each input via its own label text's sibling — this modal's labels
+// aren't htmlFor-associated with their inputs.
 async function fillNewDoctorRequiredFields(user: ReturnType<typeof userEvent.setup>) {
   const codeLabel = screen.getByText(/pharma doctor code/i)
   const codeInput = codeLabel.parentElement!.querySelector('input')!
@@ -278,7 +307,6 @@ async function fillNewDoctorRequiredFields(user: ReturnType<typeof userEvent.set
     const payload = vi.mocked(doctorsService.createDoctor).mock.calls[0][0]
     expect(payload.tenant).toBe('t-cipla')
 
-    // Modal closes, new doctor is selected, and City (set earlier) is untouched.
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(screen.getByText(/dr\. new/i)).toBeInTheDocument()
     expect(screen.getByDisplayValue('Pune')).toBeInTheDocument()
@@ -308,16 +336,13 @@ async function fillNewDoctorRequiredFields(user: ReturnType<typeof userEvent.set
 
     await waitFor(() => expect(screen.getByText(/dr\. new/i)).toBeInTheDocument())
 
-    // Change company to a different one.
     const companyLabel = screen.getByText(/^Company \*/i)
     const trigger = companyLabel.parentElement!.querySelector('[role="combobox"]')!
     await user.click(trigger)
     const otherOption = await screen.findByRole('option', { name: /sun pharma/i })
     await user.click(otherOption)
 
-    // The previously-created/selected doctor is gone, but a new company IS
-    // selected, so the doctor selector reads "Select doctor," not the
-    // no-company placeholder.
+    // Doctor selector should read "Select doctor," not the no-company placeholder.
     expect(screen.queryByText(/dr\. new/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/select company first/i)).not.toBeInTheDocument()
   })
@@ -384,7 +409,6 @@ describe('CampDetailPageReal — create mode, MR/FO pickers', () => {
     expect(screen.getByText(/cipla mr/i)).toBeInTheDocument()
     expect(screen.getByText(/cipla fo/i)).toBeInTheDocument()
 
-    // Switch Company.
     const companyLabel = screen.getByText(/^Company \*/i)
     const trigger = companyLabel.parentElement!.querySelector('[role="combobox"]')!
     await user.click(trigger)
@@ -422,5 +446,124 @@ describe('CampDetailPageReal — create mode, MR/FO pickers', () => {
     await waitFor(() => expect(accessManagementService.searchRoles).toHaveBeenCalledWith(
       expect.objectContaining({ tenant: 't-cipla', type: 'rt-field-officer' }),
     ))
+  })
+})
+
+describe('CampDetailPageReal — edit mode, location resolution guard', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  it('disables Save (relabeled "Resolving location…") while the picked pin is still resolving, so updateCamp is never called', async () => {
+    await mockSessionAndPermission()
+    const { campsRealService } = await import('@/features/camps/campsReal.service')
+
+    const user = userEvent.setup()
+    await renderEditPage(campFixture())
+    await screen.findByText(/edit camp/i)
+
+    await user.click(screen.getByRole('button', { name: /simulate location resolving/i }))
+
+    const saveButton = await screen.findByRole('button', { name: /resolving location/i })
+    expect(saveButton).toBeDisabled()
+    expect(campsRealService.updateCamp).not.toHaveBeenCalled()
+  })
+})
+
+describe('CampDetailPageReal — edit mode, snapshot-vs-final dirty gating', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  it('saving with no edits omits type/billingType/patientExpectation/devices from the update payload', async () => {
+    await mockSessionAndPermission()
+    const { campsRealService } = await import('@/features/camps/campsReal.service')
+
+    const user = userEvent.setup()
+    await renderEditPage(campFixture())
+    await screen.findByText(/edit camp/i)
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => expect(campsRealService.updateCamp).toHaveBeenCalledTimes(1))
+    const [, payload] = vi.mocked(campsRealService.updateCamp).mock.calls[0]
+    expect(payload).not.toHaveProperty('type')
+    expect(payload).not.toHaveProperty('billingType')
+    expect(payload).not.toHaveProperty('patientExpectation')
+    expect(payload).not.toHaveProperty('devices')
+  })
+
+  it('picking a device then clearing it back to the original empty set omits devices, but a genuine change to Type is still included', async () => {
+    await mockSessionAndPermission()
+    const { campsRealService } = await import('@/features/camps/campsReal.service')
+
+    const user = userEvent.setup()
+    // camp starts with devices: [] — add then remove nets back to the original set.
+    await renderEditPage(campFixture({ type: 'screening' }))
+    await screen.findByText(/edit camp/i)
+
+    await user.click(screen.getByRole('button', { name: /pick a device/i }))
+    await user.click(screen.getByRole('button', { name: /clear devices/i }))
+
+    const typeLabel = screen.getByText(/^Type$/i)
+    const typeTrigger = typeLabel.parentElement!.querySelector('[role="combobox"]')!
+    await user.click(typeTrigger)
+    await user.click(await screen.findByRole('option', { name: /^Diet$/i }))
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => expect(campsRealService.updateCamp).toHaveBeenCalledTimes(1))
+    const [, payload] = vi.mocked(campsRealService.updateCamp).mock.calls[0]
+    expect(payload).not.toHaveProperty('devices')
+    expect(payload).toHaveProperty('type', 'diet')
+    expect(payload).not.toHaveProperty('billingType')
+    expect(payload).not.toHaveProperty('patientExpectation')
+  })
+
+  it('picking a device and leaving it selected includes devices in the payload', async () => {
+    await mockSessionAndPermission()
+    const { campsRealService } = await import('@/features/camps/campsReal.service')
+
+    const user = userEvent.setup()
+    await renderEditPage(campFixture())
+    await screen.findByText(/edit camp/i)
+
+    await user.click(screen.getByRole('button', { name: /pick a device/i }))
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => expect(campsRealService.updateCamp).toHaveBeenCalledTimes(1))
+    const [, payload] = vi.mocked(campsRealService.updateCamp).mock.calls[0]
+    expect(payload).toHaveProperty('devices')
+    expect(payload.devices).toEqual(['dev-new'])
+    expect(payload).not.toHaveProperty('type')
+    expect(payload).not.toHaveProperty('billingType')
+    expect(payload).not.toHaveProperty('patientExpectation')
+  })
+
+  it('changing Type then reverting it back to the original value omits type from the payload', async () => {
+    await mockSessionAndPermission()
+    const { campsRealService } = await import('@/features/camps/campsReal.service')
+
+    const user = userEvent.setup()
+    await renderEditPage(campFixture({ type: 'screening' }))
+    await screen.findByText(/edit camp/i)
+
+    const typeLabel = screen.getByText(/^Type$/i)
+    const typeTrigger = typeLabel.parentElement!.querySelector('[role="combobox"]')!
+
+    await user.click(typeTrigger)
+    await user.click(await screen.findByRole('option', { name: /^Diet$/i }))
+
+    await user.click(typeTrigger)
+    await user.click(await screen.findByRole('option', { name: /^Screening$/i }))
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => expect(campsRealService.updateCamp).toHaveBeenCalledTimes(1))
+    const [, payload] = vi.mocked(campsRealService.updateCamp).mock.calls[0]
+    expect(payload).not.toHaveProperty('type')
+    expect(payload).not.toHaveProperty('billingType')
+    expect(payload).not.toHaveProperty('patientExpectation')
+    expect(payload).not.toHaveProperty('devices')
   })
 })

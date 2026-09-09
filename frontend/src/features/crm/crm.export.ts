@@ -2,12 +2,13 @@ import type { LeadEntity } from '@/types/crm.types'
 import { LEAD_STATUS_LABEL } from '@/types/crm.types'
 import { roleLabel, contactPersonLabel, divisionLabel, tenantLabel } from '@/features/crm/crm.utils'
 import { toast } from '@/components/ui/sonner'
+import { toCsv, downloadCsv, type CsvColumn } from '@/utils/csvExport'
 
 // Matches the prototype's crmExportLeads()/QMS_EXPORT.openMaster() behavior:
 // export the currently visible/filtered lead set as a single CSV, no
 // selection/bulk-checkbox model exists in the source we ported from.
 
-const COLUMNS: { header: string; get: (lead: LeadEntity) => string | number }[] = [
+const COLUMNS: CsvColumn<LeadEntity>[] = [
   { header: 'Lead ID', get: (l) => l.id },
   { header: 'Title', get: (l) => l.title },
   { header: 'Company', get: (l) => tenantLabel(l.tenant) },
@@ -20,27 +21,11 @@ const COLUMNS: { header: string; get: (lead: LeadEntity) => string | number }[] 
   { header: 'Created', get: (l) => l.createdAt },
 ]
 
-function escapeCsvCell(value: string | number): string {
-  const str = String(value ?? '')
-  return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str
-}
-
 export function leadsToCsv(leads: LeadEntity[]): string {
-  const header = COLUMNS.map((c) => escapeCsvCell(c.header)).join(',')
-  const rows = leads.map((lead) => COLUMNS.map((c) => escapeCsvCell(c.get(lead))).join(','))
-  return [header, ...rows].join('\n')
+  return toCsv(leads, COLUMNS)
 }
 
 export function downloadLeadsCsv(leads: LeadEntity[], filename: string): void {
-  const csv = leadsToCsv(leads)
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = filename
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
+  downloadCsv(leadsToCsv(leads), filename)
   toast.success(`Exported ${leads.length} lead${leads.length === 1 ? '' : 's'}`)
 }

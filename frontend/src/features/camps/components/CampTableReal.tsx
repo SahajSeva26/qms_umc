@@ -50,7 +50,7 @@ const CampTableReal = ({ camps, onOpen }: CampTableRealProps) => {
                 <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>{TYPE_LABEL[camp.type]}</td>
                 <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{divisionName(camp.division)}</td>
                 <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>{doctorName(camp.doctor)}</td>
-                <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{camp.city}, {camp.state}</td>
+                <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{camp.location ? `${camp.location.city}, ${camp.location.state}` : 'Location unavailable'}</td>
                 <td className="px-4 py-2.5">
                   {camp.fo ? (
                     <span style={{ color: 'var(--qms-text)' }}>{roleName(camp.fo)}</span>

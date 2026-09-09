@@ -34,10 +34,8 @@ const AppLayout = () => {
   const [collapsed, setCollapsed] = useState(getInitialCollapsed)
   const [mobileOpen, setMobileOpen] = useState(false)
 
-  // Latches isSessionError because React Query resets it to false the instant
-  // a retry starts. Gated on !session (not the looser Zustand-or-session
-  // isAuthenticated) so a login-time 429/5xx is never masked by Zustand
-  // already claiming authenticated before /auth/me has actually resolved.
+  // Latches isSessionError since React Query resets it the instant a retry
+  // starts; gated on !session so Zustand's looser isAuthenticated can't mask a login-time 429/5xx.
   const [sawSessionError, setSawSessionError] = useState(false)
   if (isSessionError && !session && !sawSessionError) setSawSessionError(true)
   if (session && sawSessionError) setSawSessionError(false)
@@ -50,30 +48,21 @@ const AppLayout = () => {
     })
   }
 
-  // Full session lifecycle, all keyed off `session` itself — never the looser
-  // Zustand-or-session `isAuthenticated`, which can be true while `session`
-  // is still null (fresh login, /auth/me not yet resolved). Nothing below
-  // this block may run a pharma-vs-QMS routing decision without a real session.
+  // Keyed off `session` itself, never Zustand's looser `isAuthenticated`,
+  // which can be true while `session` is still null right after a fresh login.
   if (!session) {
-    // Only redirect on a confirmed 401 — GET /auth/me shares a rate limiter
-    // with login/refresh, so a 429 does not mean the session is invalid.
+    // GET /auth/me shares a rate limiter with login/refresh, so a 429 must not read as an invalid session.
     if (isConfirmedUnauthenticated) return <Navigate to={AUTH_ROUTES.LOGIN} replace />
 
-    // Settled but inconclusive (429, network blip, 5xx) — show retry UI
-    // rather than rendering null forever.
     if (sawSessionError) return <SessionRecovery onRetry={refetchSession} pending={isSessionFetching} />
 
-    // Only relevant on the very first render after a hard reload.
     if (isSessionFetching) return <SessionLoading />
 
-    // Settled, no session, none of the above matched — never fall through to
-    // a blank screen or into the routing decision below with a null session.
     return <SessionRecovery onRetry={refetchSession} pending={isSessionFetching} />
   }
 
-  // session is guaranteed non-null below this point. roleType itself is
-  // typed as required but the backend mapper can emit roleType: null for a
-  // role with no type — optional-chain past the frontend type here.
+  // roleType is typed as required, but the backend mapper can emit roleType:
+  // null for a role with no type — optional-chain past the frontend type here.
   const pharmaMeta = getPharmaRoleMeta(session.roleType?.code)
   const onPharmaPath = location.pathname === '/pharma' || location.pathname.startsWith('/pharma/')
   if (pharmaMeta && !onPharmaPath) {
@@ -85,12 +74,10 @@ const AppLayout = () => {
 
   return (
     <div className="app-bg flex h-dvh overflow-hidden">
-      {/* Desktop sidebar */}
       <div className="hidden lg:flex shrink-0">
         <Sidebar collapsed={collapsed} onToggle={handleToggle} />
       </div>
 
-      {/* Mobile sidebar overlay */}
       {mobileOpen && (
         <>
           <div
@@ -103,7 +90,6 @@ const AppLayout = () => {
         </>
       )}
 
-      {/* Main column */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <Topbar onMobileMenuToggle={() => setMobileOpen((v) => !v)} />
         <main className="flex-1 overflow-auto p-6">

@@ -34,9 +34,8 @@ const TestForm = ({ test, onClose, hasRecordedResults = false }: TestFormProps) 
     defaultValues: {
       name: test?.name ?? '',
       description: test?.description ?? '',
-      // Blank (not first-enum-value) in create mode — must be a conscious
-      // choice; buildTestFormSchema's superRefine requires a real value only
-      // in create mode, so an unpicked value surfaces a real error there.
+      // Blank, not a first-enum-value default — a real choice is required
+      // only in create mode (buildTestFormSchema's superRefine).
       therapy: test?.therapy ?? ('' as ProjectTherapy),
       campType: test?.campType ?? ('' as CampType),
       // No `?? 0` fallback — 0 is schema-valid, so defaulting to it would let
@@ -55,15 +54,12 @@ const TestForm = ({ test, onClose, hasRecordedResults = false }: TestFormProps) 
 
   const onSubmit = (values: TestFormValues) => {
     if (isEdit) {
-      // Only send fields the user actually touched (RHF's dirtyFields) —
-      // otherwise two tabs editing the same test concurrently can silently
-      // revert each other's saved changes, since an untouched field's stale
-      // form value would otherwise always be resent. description also keeps
-      // its existing truthy check: backend's falsy check on set() can't tell
-      // '' from "unchanged", so a blank value must still never be sent.
+      // Only send touched fields (dirtyFields) — otherwise concurrent edits in
+      // two tabs can revert each other via resent stale values.
       updateMutation.mutate(
         {
           ...(dirtyFields.name ? { name: values.name } : {}),
+          // Also requires a truthy value — backend's set() can't tell '' from "unchanged".
           ...(dirtyFields.description && values.description ? { description: values.description } : {}),
           ...(dirtyFields.duration ? { duration: values.duration } : {}),
           ...(dirtyFields.price ? { price: values.price } : {}),
@@ -74,9 +70,7 @@ const TestForm = ({ test, onClose, hasRecordedResults = false }: TestFormProps) 
       )
       return
     }
-    // Unreachable once validation passes (schema already requires
-    // therapy/campType in create mode) — narrows both from their
-    // `X | ''` form-value type down to the real enum the payload needs.
+    // Unreachable once validation passes — narrows from `X | ''` to the real enum.
     if (!values.therapy) return
     if (!values.campType) return
     createMutation.mutate(

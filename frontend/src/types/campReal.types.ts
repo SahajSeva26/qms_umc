@@ -2,6 +2,7 @@
 // Deliberately separate from `camp.types.ts`, the old mock model ~100 files still depend on.
 
 import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
+import type { LocationValue } from '@/types/location.types'
 
 export const CAMP_TYPE_VALUES = ['screening', 'diet', 'lab'] as const
 export type CampType = (typeof CAMP_TYPE_VALUES)[number]
@@ -25,9 +26,6 @@ export const CAMP_TRANSITION_MAP: Record<CampStatus, CampStatus[]> = {
   cancelled_charged: [],
 }
 
-/** [longitude, latitude] — GeoJSON order, matches camp.validators.ts's CoordinatesSchema tuple. */
-export type CampCoordinates = [number, number]
-
 /** Frozen snapshot of who made this transition, captured at the moment it happened — stays accurate even if that person's name/role later changes. */
 export interface CampStageActor {
   roleId?: string
@@ -46,9 +44,8 @@ export interface CampStageHistoryEntry {
 /** Whether a field is populated or a bare ObjectId depends on the service call: get()/search() populate, create/update/moveStage/allocateFo don't. */
 export interface CampPopulatedTenant { _id?: string; code: string; name: string }
 export interface CampPopulatedDivision { _id?: string; code: string; name: string; therapy?: string }
-// tests is the Project's configured Test Master id list — not automatically
-// "relevant to this camp" on its own, see TestRecordingSection.tsx's
-// campType-compatibility filter for what makes it so.
+// tests is the Project's configured Test Master id list, not automatically
+// "relevant to this camp" — see TestRecordingSection.tsx's campType filter.
 export interface CampPopulatedProject { _id?: string; name: string; status?: string; tests?: string[] }
 export interface CampPopulatedDoctor { _id?: string; name: string; specialization?: string; pharmaCode?: string }
 /** fo/mr/asm/rsm populate with NO field projection (`{ path: 'fo' }`, no `.select()`) — the full Role document comes back. */
@@ -72,9 +69,8 @@ export interface CampEntity {
   rsm: CampPopulatedRole | string | null
   date: string
   timeSlot: CampTimeSlotValue | null
-  city: string
-  state: string
-  coordinates: CampCoordinates | null
+  /** Nullable — the backend mapper returns `camp.location || null`; legacy camps predating the location migration have none. */
+  location: LocationValue | null
   /** Always populated sub-docs on a genuinely fetched camp — see CampMutationResponseEntity below for the mutation-response exception. */
   devices: CampPopulatedDevice[]
   notes?: string
@@ -85,12 +81,8 @@ export interface CampEntity {
   updatedAt: string
 }
 
-/**
- * create()/bookCamp()/update()/moveStage()/allocateFo() return the unpopulated
- * Mongoose document straight from `.save()` — only `devices` differs from
- * CampEntity (bare ObjectId strings, not {_id,name,code,type} sub-docs);
- * fetch/refetch for the real shape.
- */
+/** create/update/moveStage/allocateFo return the unpopulated document — only
+ * `devices` differs from CampEntity (bare ObjectId strings, not sub-docs). */
 export type CampMutationResponseEntity = Omit<CampEntity, 'devices'> & { devices: string[] }
 
 export interface SearchCampQuery {
@@ -123,9 +115,7 @@ export interface CreateCampPayload {
   mr: string
   date: string
   timeSlot: CampTimeSlotValue
-  city: string
-  state: string
-  coordinates: CampCoordinates
+  location: LocationValue
   /** Each entry must be an existing InventoryMaster ObjectId — the backend 404s on any miss. */
   devices?: string[]
   notes?: string
@@ -143,9 +133,7 @@ export interface BookCampPayload {
   patientExpectation?: number
   date: string
   timeSlot: CampTimeSlotValue
-  city: string
-  state: string
-  coordinates: CampCoordinates
+  location: LocationValue
   devices?: string[]
   notes?: string
   conscentPath?: string
@@ -162,9 +150,8 @@ export interface UpdateCampPayload {
   mr?: string
   date?: string
   timeSlot?: CampTimeSlotValue
-  city?: string
-  state?: string
-  coordinates?: CampCoordinates
+  /** Optional, replace-wholesale — omitting it preserves whatever location the camp already has (including a legacy null). */
+  location?: LocationValue
   devices?: string[]
   notes?: string
   conscentPath?: string

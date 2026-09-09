@@ -5,9 +5,13 @@ const BASE_PAYLOAD = {
   doctor: 'doctor-1',
   date: '2026-09-15',
   timeSlot: '9am-1pm' as const,
-  city: 'Pune',
-  state: 'Maharashtra',
-  coordinates: [73.8567, 18.5204] as [number, number],
+  location: {
+    addressLine1: '221 Baker Street',
+    city: 'Pune',
+    state: 'Maharashtra',
+    pincode: '411001',
+    coordinates: [73.8567, 18.5204] as [number, number],
+  },
 }
 
 describe('bookCampPayloadSchema', () => {
@@ -74,9 +78,42 @@ describe('bookCampPayloadSchema', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       expect(Object.keys(result.data).sort()).toEqual(
-        ['mr', 'doctor', 'type', 'patientExpectation', 'date', 'timeSlot', 'city', 'state', 'coordinates', 'devices', 'notes', 'conscentPath'].sort(),
+        ['mr', 'doctor', 'type', 'patientExpectation', 'date', 'timeSlot', 'location', 'devices', 'notes', 'conscentPath'].sort(),
+      )
+      expect(Object.keys(result.data.location).sort()).toEqual(
+        ['addressLine1', 'city', 'state', 'pincode', 'coordinates'].sort(),
       )
     }
+  })
+
+  it('rejects a location missing required fields (city)', () => {
+    const result = bookCampPayloadSchema.safeParse({
+      ...BASE_PAYLOAD,
+      mr: 'mr-role-1',
+      location: { ...BASE_PAYLOAD.location, city: '' },
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      const cityIssue = result.error.issues.find((i) => i.path.join('.') === 'location.city')
+      expect(cityIssue).toBeDefined()
+    }
+  })
+
+  it('accepts a location with no country — country is genuinely optional, not required-with-default', () => {
+    const result = bookCampPayloadSchema.safeParse({ ...BASE_PAYLOAD, mr: 'mr-role-1' })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.location.country).toBeUndefined()
+    }
+  })
+
+  it('rejects a location with an out-of-range coordinate', () => {
+    const result = bookCampPayloadSchema.safeParse({
+      ...BASE_PAYLOAD,
+      mr: 'mr-role-1',
+      location: { ...BASE_PAYLOAD.location, coordinates: [200, 18.5204] },
+    })
+    expect(result.success).toBe(false)
   })
 
   it('accepts patientExpectation: 0 as a genuine value, distinct from omitting it', () => {

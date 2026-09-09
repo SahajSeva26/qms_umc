@@ -4,10 +4,11 @@ const INVENTORY_DEVICE_STATUS_VALUES = ['available', 'in-transit', 'assigned', '
 
 const optionalDateInput = z.string().trim().optional()
 
-// Create-only fields (item/serialNumber) — immutable post-create, so this
-// resolver is only ever used for the create-mode form.
+// Create-only fields (item/vendor/serialNumber) — immutable post-create, so
+// this resolver is only ever used for the create-mode form.
 export const createInventoryDeviceSchema = z.object({
   item: z.string().trim().min(1, 'Item is required.'),
+  vendor: z.string().trim().min(1, 'Vendor is required.'),
   // No upper bound existed before — matches the same cap applied to Item
   // Master's identifier fields (name/code/sku/unit).
   serialNumber: z.string().trim().min(1, 'Serial number is required.').max(200, 'Serial number must be 200 characters or fewer.'),

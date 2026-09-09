@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FiPlus } from 'react-icons/fi'
 import { useCampsReal } from '@/features/camps/hooks/useCampsReal'
+import { useCampReport } from '@/features/camps/hooks/useCampReport'
 import { useCampsRealFilters } from '@/features/camps/hooks/useCampsRealFilters'
 import { usePermission } from '@/hooks/usePermission'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
@@ -17,15 +18,18 @@ import { EMPTY_ARRAY } from '@/utils/emptyArray'
 
 // Hides "New camp" for camp:search-only actors (e.g. FOs) since the backend 403s any write.
 const CAMP_WRITE_PERMISSIONS = ['camp:manage', 'tenant:manage']
+// GET /camps/report requires this exact set — stricter than camp:search, which
+// can view/list camps but 403s on the report endpoint.
+const CAMP_REPORT_PERMISSIONS = ['camp:manage', 'tenant:manage']
 
 const PAGE_SIZE = 20
-const AGGREGATE_LIMIT = 10
 const ALL_STATUSES: CampStatus[] = ['requested', 'confirmed', 'live', 'closed', 'cancelled', 'cancelled_charged']
 
 const CampsPageReal = () => {
   const navigate = useNavigate()
   const { hasAnyPermission } = usePermission()
   const canWrite = hasAnyPermission(CAMP_WRITE_PERMISSIONS)
+  const canViewReport = hasAnyPermission(CAMP_REPORT_PERMISSIONS)
   const { filters, setFilter, reset } = useCampsRealFilters()
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
   const debouncedCity = useDebouncedValue(filters.city, 300)
@@ -47,18 +51,17 @@ const CampsPageReal = () => {
   const camps = data?.data?.items ?? EMPTY_ARRAY
   const totalCount = data?.data?.count ?? 0
 
-  // Separate unpaginated fetch so the KPI strip's per-status counts reflect the whole dataset.
-  const { data: allData } = useCampsReal({ limit: String(AGGREGATE_LIMIT) })
-  const allCamps = allData?.data?.items ?? EMPTY_ARRAY
+  const reportQuery = useCampReport(canViewReport)
   const counts = useMemo(() => {
     const result: Record<CampStatus, number> = {
       requested: 0, confirmed: 0, live: 0, closed: 0, cancelled: 0, cancelled_charged: 0,
     }
-    for (const c of allCamps) {
-      if (ALL_STATUSES.includes(c.status)) result[c.status] += 1
+    for (const entry of reportQuery.data?.data?.byStatus ?? EMPTY_ARRAY) {
+      if (ALL_STATUSES.includes(entry.status)) result[entry.status] = entry.count
     }
     return result
-  }, [allCamps])
+  }, [reportQuery.data])
+  const totalCamps = reportQuery.data?.data?.summary.totalCamps ?? 0
 
   const handleFilterChange = <K extends keyof typeof filters>(key: K, value: (typeof filters)[K]) => {
     setFilter(key, value)
@@ -92,12 +95,22 @@ const CampsPageReal = () => {
         )}
       </div>
 
-      <CampsKpiStripReal
-        counts={counts}
-        total={allCamps.length}
-        activeStatus={activeStatus}
-        onSelectStatus={(s) => handleFilterChange('status', s)}
-      />
+      {canViewReport && (
+        <QueryStateBlock
+          isLoading={reportQuery.isLoading}
+          error={reportQuery.isError}
+          loadingLabel="Loading camp report…"
+          errorLabel="Failed to load camp report."
+          onRetry={reportQuery.refetch}
+        >
+          <CampsKpiStripReal
+            counts={counts}
+            total={totalCamps}
+            activeStatus={activeStatus}
+            onSelectStatus={(s) => handleFilterChange('status', s)}
+          />
+        </QueryStateBlock>
+      )}
 
       <CampsFilterBarReal filters={filters} setFilter={handleFilterChange} reset={handleReset} />
 

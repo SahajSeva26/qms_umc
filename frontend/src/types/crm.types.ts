@@ -72,7 +72,6 @@ export interface DivisionEntity {
   name: string
   // A division may span multiple therapy areas — never empty.
   therapy: DivisionTherapy[]
-  brandFocus: string
   mrCount: number
   tenant: DivisionPopulatedTenant | string
   createdAt: string
@@ -106,7 +105,6 @@ export interface CreateDivisionPayload {
   name: string
   // Non-empty array — a division may span multiple therapy areas.
   therapy: DivisionTherapy[]
-  brandFocus?: string
   mrCount?: number
   // Every division has a head — the backend mints a new user + Role for them
   // in the same transaction as the division itself.
@@ -117,7 +115,6 @@ export interface UpdateDivisionPayload {
   name?: string
   // Replaces the therapy list wholesale when supplied.
   therapy?: DivisionTherapy[]
-  brandFocus?: string
   mrCount?: number
   status?: DivisionStatus
 }
@@ -179,15 +176,50 @@ export const LEAD_STATUS_LABEL: Record<LeadStatus, string> = {
   lost: 'Lost',
 }
 
-// Not backend-defined — one consistent swatch per status for the UI.
+// Verb phrasing for a "move lead to this stage" action button. Won/Lost use
+// "Mark as" (they're terminal — "Move to Won" misreads as Won being a
+// waypoint); everything else uses "Move to" since more stages follow.
+export const LEAD_ADVANCE_ACTION_LABEL: Record<LeadStatus, string> = {
+  new: 'Move to New',
+  qualified: 'Move to Qualified',
+  proposal: 'Move to Proposal',
+  pilot: 'Move to Pilot',
+  negotiation: 'Move to Negotiation',
+  won: 'Mark as Won',
+  lost: 'Mark as Lost',
+}
+
+// Not backend-defined. Dot/solid-fill color — see --qms-lead-stage-* in index.css for the ramp.
 export const LEAD_STATUS_COLOR: Record<LeadStatus, string> = {
-  new: '#3b6dff',
-  qualified: '#0ea5e9',
-  proposal: '#f59e0b',
-  pilot: '#8b5cf6',
-  negotiation: '#ec4899',
-  won: '#10b981',
-  lost: '#f43f5e',
+  new: 'var(--qms-lead-stage-new)',
+  qualified: 'var(--qms-lead-stage-qualified)',
+  proposal: 'var(--qms-lead-stage-proposal)',
+  pilot: 'var(--qms-lead-stage-pilot)',
+  negotiation: 'var(--qms-lead-stage-negotiation)',
+  won: 'var(--success)',
+  lost: 'var(--danger)',
+}
+
+// Text color for a pill label on a pale LEAD_STATUS_COLOR tint — the ordinal ramp's lighter steps fail as their own text; won/lost pass and keep their own color.
+export const LEAD_STATUS_TEXT_COLOR: Record<LeadStatus, string> = {
+  new: 'var(--qms-lead-stage-text)',
+  qualified: 'var(--qms-lead-stage-text)',
+  proposal: 'var(--qms-lead-stage-text)',
+  pilot: 'var(--qms-lead-stage-text)',
+  negotiation: 'var(--qms-lead-stage-text)',
+  won: 'var(--success)',
+  lost: 'var(--danger)',
+}
+
+// Text color drawn on top of a LEAD_STATUS_COLOR solid fill (e.g. a funnel bar's label).
+export const LEAD_STATUS_ON_COLOR: Record<LeadStatus, string> = {
+  new: 'var(--qms-lead-stage-new-on)',
+  qualified: 'var(--qms-lead-stage-qualified-on)',
+  proposal: 'var(--qms-lead-stage-proposal-on)',
+  pilot: 'var(--qms-lead-stage-pilot-on)',
+  negotiation: 'var(--qms-lead-stage-negotiation-on)',
+  won: 'var(--success-foreground)',
+  lost: 'var(--danger-foreground)',
 }
 
 export type LeadProjectType = 'screening' | 'diet' | 'tele_diet' | 'lab' | 'mixed'
@@ -299,6 +331,11 @@ export interface SearchLeadQuery {
   projectType?: LeadProjectType
   division?: string
   salesPerson?: string
+  // ISO date strings (YYYY-MM-DD). Not yet read by the backend's
+  // SearchLeadQuerySchema — sent ahead of that support so the frontend needs
+  // no further change once it's added. See TODO.md.
+  fyFrom?: string
+  fyTo?: string
   page?: string
   limit?: string
 }
@@ -348,8 +385,8 @@ export interface MoveLeadStagePayload {
   reason: string
 }
 
-// Generic UI shape for CrmKpiStrip — no backend KPI endpoint; computed
-// client-side from the real LeadEntity[] already in cache.
+// Generic UI shape for CrmKpiStrip — populated from GET /leads/report (see
+// LeadReportResponse below), one tile per summary/derived stat.
 export interface KpiTile {
   id: string
   label: string
@@ -359,4 +396,45 @@ export interface KpiTile {
   value: number | string
   delta: number
   sub?: string
+}
+
+// GET /leads/report — division/salesPerson/projectType/from/to all optional;
+// from/to only bound the newLeads trend, NOT summary/byStatus/byProjectType.
+export interface LeadReportQuery {
+  division?: string
+  salesPerson?: string
+  projectType?: LeadProjectType
+  from?: string
+  to?: string
+}
+
+export interface LeadReportSummary {
+  totalLeads: number
+  converted: number
+  lost: number
+  open: number
+}
+
+export interface LeadReportByStatus {
+  status: LeadStatus
+  count: number
+}
+
+export interface LeadReportByProjectType {
+  projectType: LeadProjectType
+  count: number
+}
+
+export interface LeadReportTrendPoint {
+  period: string
+  count: number
+}
+
+export interface LeadReportResponse {
+  summary: LeadReportSummary
+  byStatus: LeadReportByStatus[]
+  byProjectType: LeadReportByProjectType[]
+  trends: {
+    newLeads: { from: string; to: string; data: LeadReportTrendPoint[] }
+  }
 }

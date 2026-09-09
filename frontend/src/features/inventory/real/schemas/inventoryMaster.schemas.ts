@@ -5,17 +5,9 @@ import { z } from 'zod'
 const INVENTORY_MASTER_TYPE_VALUES = ['device', 'consumable'] as const
 const INVENTORY_MASTER_STATUS_VALUES = ['active', 'inactive'] as const
 
-// No upper bound existed before — an unbounded number saved silently.
-// 10M is generous headroom while still catching an obvious fat-finger entry.
-const stockNumber = z.number('Must be a number.').int('Must be a whole number.').nonnegative('Must be 0 or more.').max(10_000_000, 'Must be 10,000,000 or less.')
-
-// Neither frontend nor backend validates minStock against maxStock —
-// without this, minStock:100/maxStock:5 saves cleanly with no warning.
-const noMinAboveMax = <T extends { minStock: number; maxStock: number }>(values: T, ctx: z.RefinementCtx) => {
-  if (values.minStock > values.maxStock) {
-    ctx.addIssue({ code: 'custom', message: 'Min stock cannot exceed max stock.', path: ['maxStock'] })
-  }
-}
+// No upper bound — matches the backend, which only enforces min(0). A
+// warehouse's real stock range isn't bounded by an arbitrary ceiling.
+const stockNumber = z.number('Must be a number.').int('Must be a whole number.').nonnegative('Must be 0 or more.')
 
 // No upper bound existed before — an unbounded value could stretch the edit
 // form past the viewport. 200 matches other identifier fields; description gets 2000 as free-form prose.
@@ -32,13 +24,12 @@ const baseInventoryMasterSchema = z.object({
   type: z.enum(INVENTORY_MASTER_TYPE_VALUES),
   status: z.enum(INVENTORY_MASTER_STATUS_VALUES),
   minStock: stockNumber,
-  maxStock: stockNumber,
 })
 
-export const createInventoryMasterSchema = baseInventoryMasterSchema.superRefine(noMinAboveMax)
+export const createInventoryMasterSchema = baseInventoryMasterSchema
 
 // code is excluded — immutable post-create (backend silently ignores it on update).
-export const updateInventoryMasterSchema = baseInventoryMasterSchema.omit({ code: true }).superRefine(noMinAboveMax)
+export const updateInventoryMasterSchema = baseInventoryMasterSchema.omit({ code: true })
 
 // One shared shape for the RHF form itself (superset of both payloads, code
 // always present in the form even though the update payload strips it before

@@ -27,10 +27,6 @@ const divisionSchema = new mongoose.Schema(
                 message: 'At least one therapy is required',
             },
         },
-        brandFocus: {
-            type: String,
-            default: '',
-        },
         mrCount: {
             type: Number,
             default: 0,

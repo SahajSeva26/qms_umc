@@ -66,8 +66,8 @@ export const CreateTenantPayloadSchema = z.object({
         .openapi({ example: '64f0c2a1b3d4e5f6a7b8c9d0' }),
     // optional — the tenant's registered/office address
     address: AddressSchema.optional(),
-    // optional — business age/lifetime (e.g. years in operation)
-    businessLifetime: z.number().optional().openapi({ example: 12 }),
+    // optional — business age/lifetime (e.g. years in operation); never negative
+    businessLifetime: z.number().nonnegative().optional().openapi({ example: 12 }),
     // optional — GST registration number
     gst: GstSchema.optional(),
 });
@@ -94,8 +94,8 @@ export const UpdateTenantPayloadSchema = z.object({
         .openapi({ example: '64f0c2a1b3d4e5f6a7b8c9d0' }),
     // replaced wholesale when supplied — pass the full address object to change any part of it
     address: AddressSchema.optional(),
-    // optional — business age/lifetime (e.g. years in operation)
-    businessLifetime: z.number().optional().openapi({ example: 12 }),
+    // optional — business age/lifetime (e.g. years in operation); never negative
+    businessLifetime: z.number().nonnegative().optional().openapi({ example: 12 }),
     // optional — GST registration number
     gst: GstSchema.optional(),
 });

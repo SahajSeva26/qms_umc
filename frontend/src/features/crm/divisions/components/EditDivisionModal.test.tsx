@@ -20,7 +20,6 @@ function divisionFixture(overrides: Partial<DivisionEntity> = {}): DivisionEntit
     code: 'div-000001',
     name: 'Cardiology North',
     therapy: ['cardiology'],
-    brandFocus: 'Statins',
     mrCount: 5,
     tenant: 't-1',
     status: 'active',
@@ -45,10 +44,10 @@ describe('EditDivisionModal — partial update payload', () => {
     vi.clearAllMocks()
   })
 
-  it('saving without touching any field omits name/brandFocus/mrCount — never resends a stale snapshot to clobber a concurrent edit', async () => {
+  it('saving without touching any field omits name/mrCount — never resends a stale snapshot to clobber a concurrent edit', async () => {
     const { divisionService } = await import('@/features/crm/divisions/division.service')
     const user = userEvent.setup()
-    await renderModal(divisionFixture({ name: 'STALE-NAME', brandFocus: 'STALE-FOCUS', mrCount: 42 }))
+    await renderModal(divisionFixture({ name: 'STALE-NAME', mrCount: 42 }))
 
     await user.click(screen.getByRole('button', { name: /save changes/i }))
 
@@ -58,7 +57,6 @@ describe('EditDivisionModal — partial update payload', () => {
       return call[1]
     })
     expect(payload).not.toHaveProperty('name')
-    expect(payload).not.toHaveProperty('brandFocus')
     expect(payload).not.toHaveProperty('mrCount')
   })
 
@@ -78,17 +76,13 @@ describe('EditDivisionModal — partial update payload', () => {
       return call[1]
     })
     expect(payload.name).toBe('NEW-NAME')
-    expect(payload).not.toHaveProperty('brandFocus')
     expect(payload).not.toHaveProperty('mrCount')
   })
 
-  // brandFocus already has an `|| undefined` guard in handleSave's zod parse —
-  // that only helps an emptied field, it does not by itself prevent a
-  // populated-but-untouched brandFocus from being resent. Proves the gate covers it too.
-  it('editing mrCount directly includes only mrCount, leaving the untouched brandFocus (which has a misleading || undefined guard) out', async () => {
+  it('editing mrCount directly includes only mrCount, leaving the untouched name out', async () => {
     const { divisionService } = await import('@/features/crm/divisions/division.service')
     const user = userEvent.setup()
-    await renderModal(divisionFixture({ brandFocus: 'STALE-FOCUS', mrCount: 5 }))
+    await renderModal(divisionFixture({ name: 'STALE-NAME', mrCount: 5 }))
 
     const mrCountInput = screen.getByDisplayValue('5')
     await user.clear(mrCountInput)
@@ -101,7 +95,7 @@ describe('EditDivisionModal — partial update payload', () => {
       return call[1]
     })
     expect(payload.mrCount).toBe(9)
-    expect(payload).not.toHaveProperty('brandFocus')
+    expect(payload).not.toHaveProperty('name')
   })
 
   it('editing a field then reverting it to its exact original value omits it — dirty-gating compares final vs. original, not "was ever touched"', async () => {

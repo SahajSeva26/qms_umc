@@ -27,7 +27,6 @@ const EditDivisionModal = ({ division, onClose }: EditDivisionModalProps) => {
   const updateDivision = useUpdateDivision(division.id)
   const [name, setName] = useState(division.name)
   const [therapy, setTherapy] = useState<DivisionTherapy[]>(division.therapy)
-  const [brandFocus, setBrandFocus] = useState(division.brandFocus ?? '')
   const [mrCount, setMrCount] = useState(division.mrCount ?? 0)
   const [status, setStatus] = useState<DivisionStatus | ''>(division.status ?? '')
   const [formError, setFormError] = useState<string | null>(null)
@@ -39,7 +38,6 @@ const EditDivisionModal = ({ division, onClose }: EditDivisionModalProps) => {
     const result = updateDivisionSchema.safeParse({
       name,
       therapy,
-      brandFocus: brandFocus || undefined,
       mrCount,
       status: status || undefined,
     })
@@ -54,7 +52,6 @@ const EditDivisionModal = ({ division, onClose }: EditDivisionModalProps) => {
     const payload: typeof data = {
       ...(data.name !== undefined && data.name !== division.name ? { name: data.name } : {}),
       ...(data.therapy !== undefined && !sameTherapy(data.therapy, division.therapy) ? { therapy: data.therapy } : {}),
-      ...(data.brandFocus !== (division.brandFocus ?? undefined) ? { brandFocus: data.brandFocus } : {}),
       ...(data.mrCount !== undefined && data.mrCount !== (division.mrCount ?? 0) ? { mrCount: data.mrCount } : {}),
       ...(data.status !== undefined && data.status !== (division.status ?? '') ? { status: data.status } : {}),
     }
@@ -89,24 +86,16 @@ const EditDivisionModal = ({ division, onClose }: EditDivisionModalProps) => {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-2.5">
-            <div>
-              <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-                Brand focus
-              </Label>
-              <Input type="text" value={brandFocus} onChange={(e) => setBrandFocus(e.target.value)} className="text-[13px]" />
-            </div>
-            <div>
-              <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-                MR count
-              </Label>
-              <Input
-                type="number"
-                value={mrCount || ''}
-                onChange={(e) => setMrCount(Number(e.target.value))}
-                className="text-[13px]"
-              />
-            </div>
+          <div>
+            <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+              MR count
+            </Label>
+            <Input
+              type="number"
+              value={mrCount || ''}
+              onChange={(e) => setMrCount(Number(e.target.value))}
+              className="text-[13px]"
+            />
           </div>
 
           <div>

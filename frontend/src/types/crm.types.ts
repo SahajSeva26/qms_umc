@@ -72,7 +72,6 @@ export interface DivisionEntity {
   name: string
   // A division may span multiple therapy areas — never empty.
   therapy: DivisionTherapy[]
-  brandFocus: string
   mrCount: number
   tenant: DivisionPopulatedTenant | string
   createdAt: string
@@ -106,7 +105,6 @@ export interface CreateDivisionPayload {
   name: string
   // Non-empty array — a division may span multiple therapy areas.
   therapy: DivisionTherapy[]
-  brandFocus?: string
   mrCount?: number
   // Every division has a head — the backend mints a new user + Role for them
   // in the same transaction as the division itself.
@@ -117,7 +115,6 @@ export interface UpdateDivisionPayload {
   name?: string
   // Replaces the therapy list wholesale when supplied.
   therapy?: DivisionTherapy[]
-  brandFocus?: string
   mrCount?: number
   status?: DivisionStatus
 }

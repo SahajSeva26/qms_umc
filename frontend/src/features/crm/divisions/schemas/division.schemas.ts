@@ -24,7 +24,6 @@ export const createDivisionSchema = z.object({
     }),
   name: z.string().trim().min(1, 'Name is required.'),
   therapy: therapyListSchema,
-  brandFocus: z.string().optional(),
   mrCount: z.number().int('Must be a whole number.').nonnegative('Must be 0 or more.').optional(),
   // Every division has a head — the backend mints a new user for them.
   head: z.object({
@@ -41,7 +40,6 @@ export const createDivisionSchema = z.object({
 export const updateDivisionSchema = z.object({
   name: z.string().trim().min(1, 'Name is required.').optional(),
   therapy: therapyListSchema.optional(),
-  brandFocus: z.string().optional(),
   mrCount: z.number().int('Must be a whole number.').nonnegative('Must be 0 or more.').optional(),
   status: z.enum(['active', 'inactive']).optional(),
 })

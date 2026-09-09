@@ -5,6 +5,7 @@ import { useDivision } from '@/features/crm/divisions/hooks/useDivision'
 import { TENANT_ROUTES } from '@/features/access-management/tenant/tenant.routes'
 import { DIVISION_THERAPY_LABEL } from '@/types/crm.types'
 import DivisionMrsSection from '@/features/crm/divisions/components/DivisionMrsSection'
+import DivisionBrandsSection from '@/features/crm/brands/components/DivisionBrandsSection'
 import DivisionContactsSection from '@/features/crm/divisions/components/DivisionContactsSection'
 import EditDivisionModal from '@/features/crm/divisions/components/EditDivisionModal'
 import { Button } from '@/components/ui/button'
@@ -84,6 +85,10 @@ const DivisionDetailPage = () => {
 
           <div className="mt-5">
             {tenantId && <DivisionMrsSection tenantId={tenantId} divisionId={division.id} />}
+          </div>
+
+          <div className="mt-5">
+            {tenantId && <DivisionBrandsSection tenantId={tenantId} divisionId={division.id} />}
           </div>
 
           <div className="mt-5">

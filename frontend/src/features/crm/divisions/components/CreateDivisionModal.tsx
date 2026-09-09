@@ -36,7 +36,6 @@ interface DivisionFormValues {
   code: string
   name: string
   therapy: DivisionTherapy[]
-  brandFocus: string
   mrCount: number
   headFirstName: string
   headLastName: string
@@ -51,7 +50,6 @@ const EMPTY_FORM_VALUES: DivisionFormValues = {
   code: '',
   name: '',
   therapy: [],
-  brandFocus: '',
   mrCount: 0,
   headFirstName: '',
   headLastName: '',
@@ -81,7 +79,6 @@ const useDivisionFormResolver = () =>
       code: values.code,
       name: values.name,
       therapy: values.therapy,
-      brandFocus: values.brandFocus || undefined,
       mrCount: Number.isNaN(values.mrCount) ? undefined : values.mrCount,
       head: {
         firstName: values.headFirstName,
@@ -220,20 +217,12 @@ const CreateDivisionModal = ({ onClose, defaultTenantId }: CreateDivisionModalPr
                   {fieldError('therapy') && <p className="text-[11px] mt-1 text-danger">{fieldError('therapy')}</p>}
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div>
-                    <Label className="block text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-                      Brand focus
-                    </Label>
-                    <Input type="text" className="text-[13px]" {...register('brandFocus')} />
-                  </div>
-                  <div>
-                    <Label className="block text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-                      MR count
-                    </Label>
-                    <Input type="number" className="text-[13px]" {...register('mrCount', { valueAsNumber: true })} />
-                    {fieldError('mrCount') && <p className="text-[11px] mt-1 text-danger">{fieldError('mrCount')}</p>}
-                  </div>
+                <div>
+                  <Label className="block text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+                    MR count
+                  </Label>
+                  <Input type="number" className="text-[13px]" {...register('mrCount', { valueAsNumber: true })} />
+                  {fieldError('mrCount') && <p className="text-[11px] mt-1 text-danger">{fieldError('mrCount')}</p>}
                 </div>
               </>
             )}

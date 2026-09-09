@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { QA_FEEDBACK_STATUS } from './qaFeedback.constants';
 import { isValidObjectID } from '../../shared/utils/strings';
 
 //1: create ====================================>
@@ -14,14 +13,16 @@ export type ICreateQaFeedbackPayload = z.infer<typeof CreateQaFeedbackPayloadSch
 
 //2: update (resolve) ====================================>
 export const UpdateQaFeedbackPayloadSchema = z.object({
-    status: z.enum(Object.values(QA_FEEDBACK_STATUS)).optional().openapi({ example: 'resolved' }),
+    status: z.string().min(1).optional().openapi({ example: 'resolved' }),
     resolutionNote: z.string().optional().openapi({ example: 'Fixed in commit abc123' }),
 });
 export type IUpdateQaFeedbackPayload = z.infer<typeof UpdateQaFeedbackPayloadSchema>;
 
 //3: search ====================================>
 export const SearchQaFeedbackQuerySchema = z.object({
-    status: z.enum(Object.values(QA_FEEDBACK_STATUS)).optional().openapi({ example: 'open' }),
+    status: z.string().min(1).optional().openapi({ example: 'open' }),
+    // exact-match on the Jira issue key — the lookup a webhook uses to find a row
+    issueKey: z.string().optional().openapi({ example: 'QF-123' }),
     pageRoute: z.string().optional().openapi({ example: '/crm' }),
     reportedBy: z
         .string()

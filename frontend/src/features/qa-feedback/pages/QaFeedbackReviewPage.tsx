@@ -1,13 +1,18 @@
 import { useState } from 'react'
-import { FiCheckCircle, FiExternalLink } from 'react-icons/fi'
+import { FiExternalLink } from 'react-icons/fi'
 import { useQaFeedback } from '@/features/qa-feedback/hooks/useQaFeedback'
-import type { QaFeedbackEntity, QaFeedbackStatus } from '@/types/qaFeedback.types'
+import type { QaFeedbackEntity } from '@/types/qaFeedback.types'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 
-const STATUS_TABS: { id: QaFeedbackStatus | 'all'; label: string }[] = [
+// Jira Cloud base — not a secret, matches backend/src/shared/config/app.config.ts's default.
+const JIRA_BASE_URL = 'https://sahajseva.atlassian.net'
+
+// 'open' is the only status the app itself ever sets and the only one the backend's
+// exact-match filter is worth offering as a tab — everything else is an arbitrary Jira
+// workflow status (e.g. "In Progress", "Done"), shown via each card's own badge instead.
+const STATUS_TABS: { id: 'open' | 'all'; label: string }[] = [
   { id: 'open', label: 'Open' },
-  { id: 'resolved', label: 'Resolved' },
   { id: 'all', label: 'All' },
 ]
 
@@ -27,12 +32,10 @@ const FeedbackCard = ({ report }: { report: QaFeedbackEntity }) => {
   const [note, setNote] = useState(report.resolutionNote)
   const [noteOpen, setNoteOpen] = useState(false)
 
-  const toggleResolved = () => {
-    updateFeedback(report.id, {
-      status: report.status === 'open' ? 'resolved' : 'open',
-      resolutionNote: note,
-    })
-  }
+  // Status is owned elsewhere now — the Jira webhook overwrites it from Jira's own
+  // workflow, so this page never mutates `status` itself. resolutionNote is a genuinely
+  // independent field the backend still supports editing directly.
+  const saveNote = () => updateFeedback(report.id, { resolutionNote: note })
 
   return (
     <div className="rounded-xl border p-4" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}>
@@ -66,16 +69,26 @@ const FeedbackCard = ({ report }: { report: QaFeedbackEntity }) => {
             <span
               className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0"
               style={{
-                background: report.status === 'resolved' ? 'var(--qms-surface-strong)' : 'color-mix(in oklch, var(--qms-brand), transparent 88%)',
-                color: report.status === 'resolved' ? 'var(--qms-text-muted)' : 'var(--qms-brand)',
+                background: report.status === 'open' ? 'color-mix(in oklch, var(--qms-brand), transparent 88%)' : 'var(--qms-surface-strong)',
+                color: report.status === 'open' ? 'var(--qms-brand)' : 'var(--qms-text-muted)',
               }}
             >
-              {report.status === 'resolved' ? 'RESOLVED' : 'OPEN'}
+              {report.status.toUpperCase()}
             </span>
           </div>
 
-          <div className="text-[11px] mt-2" style={{ color: 'var(--qms-text-muted)' }}>
-            Reported by {reporterLabel(report.reportedBy)} · {new Date(report.createdAt).toLocaleString('en-IN')}
+          <div className="text-[11px] mt-2 flex items-center gap-2" style={{ color: 'var(--qms-text-muted)' }}>
+            <span>Reported by {reporterLabel(report.reportedBy)} · {new Date(report.createdAt).toLocaleString('en-IN')}</span>
+            <a
+              href={`${JIRA_BASE_URL}/browse/${report.issueKey}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 font-semibold hover:underline"
+              style={{ color: 'var(--qms-brand)' }}
+            >
+              <FiExternalLink size={11} />
+              {report.issueKey}
+            </a>
           </div>
 
           {report.resolutionNote && !noteOpen && (
@@ -98,10 +111,11 @@ const FeedbackCard = ({ report }: { report: QaFeedbackEntity }) => {
             <Button size="sm" variant="ghost" onClick={() => setNoteOpen((v) => !v)}>
               {noteOpen ? 'Hide note' : 'Add note'}
             </Button>
-            <Button size="sm" onClick={toggleResolved} disabled={isUpdating}>
-              <FiCheckCircle size={13} />
-              {report.status === 'open' ? 'Mark resolved' : 'Reopen'}
-            </Button>
+            {noteOpen && (
+              <Button size="sm" onClick={saveNote} disabled={isUpdating}>
+                {isUpdating ? 'Saving…' : 'Save note'}
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -110,7 +124,7 @@ const FeedbackCard = ({ report }: { report: QaFeedbackEntity }) => {
 }
 
 const QaFeedbackReviewPage = () => {
-  const [tab, setTab] = useState<QaFeedbackStatus | 'all'>('open')
+  const [tab, setTab] = useState<'open' | 'all'>('open')
   const { items, count, isLoading, error } = useQaFeedback(tab === 'all' ? {} : { status: tab })
 
   return (

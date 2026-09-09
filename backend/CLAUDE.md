@@ -17,7 +17,7 @@ src/modules/
   qa-feedback/              QA feedback
   vendor-master/            global platform-only vendor/supplier registry
   access-management/        tenant, role, role-type, permission-group (RBAC)
-  crm/                      division, lead, project, appointment, contact, doctor (tenant-scoped registry)
+  crm/                      division, brand, lead, project, appointment, contact, doctor (tenant-scoped registry)
   operations/               camp, geoProfile (field-staff geo + camp allocation),
                             testMaster (global test catalog), patient (global patient registry),
                             screening (per-patient camp screening + consent OTP),
@@ -431,7 +431,8 @@ All modules follow the layered convention above; all are wired in `src/bin/app.t
 | access-management | permission-group | `/permission-groups` | per-tenant permission ceiling |
 | access-management | role-type | `/role-types` | `isSystem` defaults seeded per tenant; reserved-code guard |
 | access-management | role | `/roles` | 1:1 with User; optional `division` (customer-only) + `supervisor` self-ref |
-| crm | division | `/divisions` | therapy/brand division (`therapy` is a **non-empty, duplicate-free array** — multiple therapy areas per division; validated in validators + model); create also mints a pharma-division-head role + user |
+| crm | division | `/divisions` | therapy/brand division (`therapy` is a **non-empty, duplicate-free array** — multiple therapy areas per division; validated in validators + model); create also mints a pharma-division-head role + user. (`brandFocus` field **removed 2026-09-09** — brands are now their own entity) |
+| crm | brand | `/brands` | pharma **brands per division**; tenant-scoped, **tenant DERIVED from the division** (never from payload). `name` (lowercase+trim); **`code`** = name lowercased + ALL whitespace stripped (`toCode()`), **derived by service, set ONLY on create, immutable** (update never touches it → name editable but code frozen); `description`/`molecule`/`notes`/`color`; `active`/`inactive`. **Unique index `{tenant,division,code}`** (same code allowed in a different division). Create dedup **reuses `BrandService.search({division,code})`** (added an exact-match `code` search filter; the `name` filter stays partial regex). Route guards mirror `contact` (writes `brand:manage`/`tenant:manage`/`tenant:admin`; reads add `brand:search`). Perms `brand:manage/search/create/update/get` — granted read to `sales-rep` + all 4 pharma role types; manage to `sales-head` + both ops-managers |
 | crm | lead | `/leads` | stageHistory + moveStage; tenant from division. Search supports **`fyFrom`/`fyTo`** date filters (2026-09-08) bounding the lead's `createdAt` (financial-year range; `z.coerce.date` + `fyFrom<=fyTo` refine in validators; service normalizes to inclusive UTC-day bounds via `startOfUTCDay`/`endOfUTCDay`, placed before own-scope) |
 | crm | project | `/projects` | one-project-per-lead; tenant/division derived from lead; `campTimeSlots` restricted to the 4 fixed `CAMP_TIME_SLOTS` (imported from camp module); **own-scoping** in get/search — customer-tenant actor → own division (`role.division`), platform rep without `project:manage` → own projects (`salesRep`); optional `tenant` search filter honoured only for a not-tenant-pinned `project:manage` actor |
 | crm | appointment | `/appointments` | stageHistory + moveStage (each move records its own `nextSteps`); parent self-ref for follow-ups; statuses = planned/done/cancelled/released (no `blocked`) |

@@ -12,6 +12,7 @@ import '../../../modules/access-management/role/role.routes';
 import '../../../modules/crm/division/division.routes';
 import '../../../modules/crm/lead/lead.routes';
 import '../../../modules/crm/contact/contact.routes';
+import '../../../modules/crm/brand/brand.routes';
 import '../../../modules/crm/appointment/appointment.routes';
 import '../../../modules/crm/project/project.routes';
 import '../../../modules/qa-feedback/qaFeedback.routes';

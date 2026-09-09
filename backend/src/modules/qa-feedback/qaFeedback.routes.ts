@@ -12,7 +12,20 @@ import { QA_FEEDBACK_PERMISSIONS } from './qaFeedback.constants';
 
 export const QaFeedbackRouter = express.Router();
 
-QaFeedbackRouter.use(AuthMiddleware);
+// jira webhook (documented here, mounted below BEFORE AuthMiddleware — it's an
+// external server-to-server call from Jira, not a logged-in user)
+registry.registerPath({
+    method: 'put',
+    path: '/qa-feedback/webhook/jira',
+    tags: ['QA_FEEDBACK'],
+    summary: 'Jira webhook receiver — sync an issue change back to its feedback row',
+    responses: {
+        200: { description: 'Webhook received' },
+    },
+});
+
+// PUBLIC — no AuthMiddleware: a Jira webhook carries no user session. Mounted before the
+// router-wide auth guard below. TODO: gate it with Jira signature/secret verification.
 
 // get qa feedback
 registry.registerPath({
@@ -89,14 +102,23 @@ registry.registerPath({
 // ========================= EXPORT QA FEEDBACK ROUTES ===================
 // =======================================================================
 
-// Deliberately no AuthorizeMiddleware here — being logged in is the whole
-// gate. A tester's own EXISTING permissions already define what screens
-// they can reach in the first place (they can only report on what they can
-// actually see), so this route doesn't need its own separate permission
-// code on top of that — the first route in this app without one, by
-// explicit product decision, not an oversight.
-QaFeedbackRouter.post('/', QaFeedbackController.create);
+QaFeedbackRouter.put('/webhook/jira', QaFeedbackController.jiraWebhook);
+QaFeedbackRouter.use(AuthMiddleware);
 
-QaFeedbackRouter.get('/:id', AuthorizeMiddleware([QA_FEEDBACK_PERMISSIONS.MANAGE.code]), QaFeedbackController.get);
-QaFeedbackRouter.get('/', AuthorizeMiddleware([QA_FEEDBACK_PERMISSIONS.MANAGE.code]), QaFeedbackController.search);
-QaFeedbackRouter.put('/:id', AuthorizeMiddleware([QA_FEEDBACK_PERMISSIONS.MANAGE.code]), QaFeedbackController.update);
+// Deliberately no AuthorizeMiddleware here
+QaFeedbackRouter.post('/', QaFeedbackController.create);
+QaFeedbackRouter.get(
+    '/:id',
+    AuthorizeMiddleware([QA_FEEDBACK_PERMISSIONS.MANAGE.code]),
+    QaFeedbackController.get,
+);
+QaFeedbackRouter.get(
+    '/',
+    AuthorizeMiddleware([QA_FEEDBACK_PERMISSIONS.MANAGE.code]),
+    QaFeedbackController.search,
+);
+QaFeedbackRouter.put(
+    '/:id',
+    AuthorizeMiddleware([QA_FEEDBACK_PERMISSIONS.MANAGE.code]),
+    QaFeedbackController.update,
+);

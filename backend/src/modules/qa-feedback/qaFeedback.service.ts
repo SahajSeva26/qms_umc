@@ -40,6 +40,9 @@ const search = async (filters: ISearchQaFeedbackQuery, options?: IServiceOptions
     if (filters.status) {
         where.status = filters.status;
     }
+    if (filters.issueKey) {
+        where.issueKey = filters.issueKey;
+    }
     if (filters.pageRoute) {
         where.pageRoute = { $regex: filters.pageRoute, $options: 'i' };
     }
@@ -69,19 +72,27 @@ const create = async (model: ICreateQaFeedbackPayload, ctx: RequestContext): Pro
         reportedBy: ctx.user?._id,
     });
 
-    // entity = await entity.save();
-
-    // The feedback is already persisted above — a Jira outage must NOT fail the
-    // request. Log and swallow any integration error instead of propagating it.
+    // A feedback row REQUIRES its Jira ticket (issueKey is required + unique — the key a
+    // webhook later uses to find this row). So create the ticket FIRST; if Jira is
+    // unreachable or returns no key, fail the request rather than persist a ticketless row.
+    let result: any;
     try {
-        const result = await JiraProvider.createTicket({
+        result = await JiraProvider.createTicket({
             summary: `${model.pageTitle}-(${model.pageRoute})`,
             description: model.comment,
         });
-        ctx.logger.info({ issueKey: result?.key }, 'Jira ticket created');
     } catch (err) {
-        ctx.logger.error({ err }, 'Jira ticket creation failed; feedback saved without a ticket');
+        ctx.logger.error({ err }, 'Jira ticket creation failed');
+        return throwAppError('Failed to create the Jira ticket for this feedback', StatusCodes.BAD_GATEWAY);
     }
+    if (!result?.key) {
+        return throwAppError('Jira did not return an issue key', StatusCodes.BAD_GATEWAY);
+    }
+    entity.issueKey = result.key;
+    ctx.logger.info({ issueKey: result.key }, 'Jira ticket created');
+
+    // persist only after the ticket exists — issueKey is now populated for the required+unique field
+    entity = await entity.save();
 
     return entity;
 };

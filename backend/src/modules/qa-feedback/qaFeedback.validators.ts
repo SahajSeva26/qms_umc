@@ -22,6 +22,8 @@ export type IUpdateQaFeedbackPayload = z.infer<typeof UpdateQaFeedbackPayloadSch
 //3: search ====================================>
 export const SearchQaFeedbackQuerySchema = z.object({
     status: z.enum(Object.values(QA_FEEDBACK_STATUS)).optional().openapi({ example: 'open' }),
+    // exact-match on the Jira issue key — the lookup a webhook uses to find a row
+    issueKey: z.string().optional().openapi({ example: 'QF-123' }),
     pageRoute: z.string().optional().openapi({ example: '/crm' }),
     reportedBy: z
         .string()

@@ -121,9 +121,23 @@ const update = async (req: any, res: any) => {
     }
 };
 
+// Jira webhook receiver — Jira calls this when an issue changes, so we can sync the
+// matching feedback (looked up by its unique issueKey) back to the row.
+// TODO: verify the Jira webhook signature/secret, then update the feedback status by issueKey.
+const jiraWebhook = async (req: any, res: any) => {
+    try {
+        console.log('webhook data=> ', req.body);
+        // empty for now — acknowledge receipt so Jira does not retry.
+        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Webhook received', null);
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
 export const QaFeedbackController = {
     get,
     search,
     create,
     update,
+    jiraWebhook,
 };

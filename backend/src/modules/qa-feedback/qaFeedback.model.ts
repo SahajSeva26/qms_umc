@@ -39,6 +39,14 @@ const qaFeedbackSchema = new mongoose.Schema(
             type: String,
             required: true,
         },
+        // The Jira issue key returned when the ticket is created (e.g. 'QF-123')
+        // — ties this feedback row to its Jira ticket. Required + unique: it is the
+        // stable identifier a Jira webhook uses to find and update this exact row.
+        issueKey: {
+            type: String,
+            required: true,
+            unique: true,
+        },
         reportedBy: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',

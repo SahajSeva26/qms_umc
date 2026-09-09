@@ -349,7 +349,7 @@ describe('TestForm — edit mode', () => {
     expect(screen.getByDisplayValue('250')).toBeInTheDocument()
   })
 
-  it('constructs an update payload with duration/price included and no code/therapy/campType/consumption keys', async () => {
+  it('constructs an update payload with no code/therapy/campType/consumption keys, and omits duration/price when untouched', async () => {
     const { testService } = await import('@/features/test-master/test.service')
     vi.mocked(testService.updateTest).mockResolvedValue({ success: true, message: '', data: baseTest } as never)
 
@@ -364,8 +364,27 @@ describe('TestForm — edit mode', () => {
     expect(payload).not.toHaveProperty('code')
     expect(payload).not.toHaveProperty('therapy')
     expect(payload).not.toHaveProperty('campType')
-    expect(payload.duration).toBe(15)
-    expect(payload.price).toBe(250)
+    // Never touched this session — dirty-gated, so must be omitted, not resent stale.
+    expect(payload).not.toHaveProperty('duration')
+    expect(payload).not.toHaveProperty('price')
+  })
+
+  it('touching duration directly includes only duration, still omitting untouched price', async () => {
+    const { testService } = await import('@/features/test-master/test.service')
+    vi.mocked(testService.updateTest).mockResolvedValue({ success: true, message: '', data: baseTest } as never)
+
+    const user = userEvent.setup()
+    await renderForm(baseTest)
+
+    const durationInput = screen.getByLabelText(/duration/i)
+    await user.clear(durationInput)
+    await user.type(durationInput, '30')
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => expect(testService.updateTest).toHaveBeenCalledTimes(1))
+    const [, payload] = vi.mocked(testService.updateTest).mock.calls[0]
+    expect(payload.duration).toBe(30)
+    expect(payload).not.toHaveProperty('price')
   })
 
   it('blocks blanking a previously-set description, and does not submit', async () => {

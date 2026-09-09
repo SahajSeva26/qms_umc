@@ -11,15 +11,29 @@ import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
 vi.mock('@/hooks/useSession')
 
 // LocationPicker needs real Google Maps credentials unavailable in tests —
-// mocked to a button using the same onChange(LocationValue) contract.
+// mocked to buttons using the same onChange(LocationValue)/onResolutionStateChange contract.
 vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
-  default: ({ value, onChange }: { value: unknown; onChange: (v: unknown) => void }) => (
-    <button
-      type="button"
-      onClick={() => onChange({ ...(value as object ?? {}), coordinates: [73.8567, 18.5204] })}
-    >
-      Set test coordinates
-    </button>
+  default: ({ value, onChange, onResolutionStateChange }: {
+    value: unknown
+    onChange: (v: unknown) => void
+    onResolutionStateChange?: (status: 'idle' | 'loading' | 'error') => void
+  }) => (
+    <>
+      <button
+        type="button"
+        onClick={() => onChange({ ...(value as object ?? {}), coordinates: [73.8567, 18.5204] })}
+      >
+        Set test coordinates
+      </button>
+      {/* Simulates the real widget's "pin moved / search result picked, still
+          resolving" window — the gap between a pick and onChange actually firing. */}
+      <button type="button" onClick={() => onResolutionStateChange?.('loading')}>
+        Simulate location resolving
+      </button>
+      <button type="button" onClick={() => onResolutionStateChange?.('idle')}>
+        Simulate location resolved
+      </button>
+    </>
   ),
 }))
 
@@ -411,6 +425,32 @@ describe('BookCampForm', () => {
 
     resolveBooking(bookCampResponseFixture())
     await waitFor(() => expect(onBooked).toHaveBeenCalledTimes(1))
+  })
+
+  it('blocks submit while the picked location is still resolving, and never calls bookCamp', async () => {
+    await mockSession()
+    const { campsRealService } = await import('@/features/camps/campsReal.service')
+    const BookCampForm = (await import('@/features/pharma/components/BookCampForm')).default
+
+    const queryClient = makeQueryClient()
+    const user = userEvent.setup()
+    const onBooked = vi.fn()
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <BookCampForm needsMrPicker={false} project={TEST_PROJECT} onBooked={onBooked} />
+      </QueryClientProvider>,
+    )
+
+    await pickDoctor(user)
+    await fillCommonFields(user)
+    await user.click(screen.getByRole('button', { name: /simulate location resolving/i }))
+
+    const submitButton = await screen.findByRole('button', { name: /resolving location/i })
+    expect(submitButton).toBeDisabled()
+
+    expect(campsRealService.bookCamp).not.toHaveBeenCalled()
+    expect(onBooked).not.toHaveBeenCalled()
   })
 
   it('blocks a true rapid double-submit — two submit events fired before React re-renders isPending — to exactly one mutation call', async () => {

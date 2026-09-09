@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { FiArrowLeft, FiLock } from 'react-icons/fi'
 import { GEO_PROFILE_ROUTES, GEO_PROFILE_TYPE_OPTIONS, GEO_PROFILE_STATUS_LABEL, GEO_PROFILE_STATUS_OPTIONS } from '@/features/geo-profile/geoProfile.constants'
-import { coordinatesToLocationValue, locationValueToCoordinates } from '@/features/geo-profile/utils/geoProfileLocationAdapter'
+import { profileToLocationValue, locationValueToCoordinates, locationValueToAddressPayload } from '@/features/geo-profile/utils/geoProfileLocationAdapter'
 import { useGeoProfile } from '@/features/geo-profile/hooks/useGeoProfile'
 import { useCreateGeoProfile } from '@/features/geo-profile/hooks/useCreateGeoProfile'
 import { useUpdateGeoProfile } from '@/features/geo-profile/hooks/useUpdateGeoProfile'
@@ -10,14 +10,36 @@ import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import { usePermission } from '@/hooks/usePermission'
 import GeoProfileStatusPill from '@/features/geo-profile/components/GeoProfileStatusPill'
 import LocationPicker from '@/components/widgets/location-picker/LocationPicker'
+import LocationAddressFields from '@/components/widgets/location-picker/LocationAddressFields'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { GeoProfileEntity, GeoProfileStatus, GeoProfileType } from '@/types/geoProfile.types'
 import type { LocationValue } from '@/types/location.types'
-import type { LocationResolutionState } from '@/components/widgets/location-picker/location.types'
+import { REQUIRED_ADDRESS_FIELDS, type LocationResolutionState } from '@/components/widgets/location-picker/location.types'
 import type { RoleEntity } from '@/types/accessManagement.types'
+
+interface AddressLikeFields {
+  addressLine1?: string | null
+  addressLine2?: string | null
+  locality?: string | null
+  city?: string | null
+  state?: string | null
+  pincode?: string | null
+}
+
+// Accepts both the persisted (`| null`) and LocationPicker (`| undefined`) address shapes.
+function formatGeoProfileAddress(profile: AddressLikeFields): string | null {
+  const line1 = [profile.addressLine1, profile.addressLine2, profile.locality].filter(Boolean).join(', ')
+  const line2 = [profile.city, profile.state, profile.pincode].filter(Boolean).join(', ')
+  return [line1, line2].filter(Boolean).join(' — ') || null
+}
+
+function locationMissingRequiredAddress(location: LocationValue | null): boolean {
+  if (!location?.coordinates) return false
+  return REQUIRED_ADDRESS_FIELDS.some((f) => !location[f.key].trim())
+}
 
 // `role` is required on create and immutable afterward (1:1 link, unique).
 // Coordinates are stored [lng, lat] (GeoJSON order); the form collects lat/lng separately and assembles the tuple on submit.
@@ -94,6 +116,7 @@ interface ReadOnlyGeoProfileViewProps {
 
 const ReadOnlyGeoProfileView = ({ geoProfile, roleName }: ReadOnlyGeoProfileViewProps) => {
   const [lng, lat] = geoProfile.coordinates.length === 2 ? geoProfile.coordinates : [undefined, undefined]
+  const address = formatGeoProfileAddress(geoProfile)
   return (
     <>
       <div
@@ -125,6 +148,7 @@ const ReadOnlyGeoProfileView = ({ geoProfile, roleName }: ReadOnlyGeoProfileView
           <span style={{ color: 'var(--qms-text-muted)' }}>Latitude</span><span>{lat ?? '—'}</span>
           <span style={{ color: 'var(--qms-text-muted)' }}>Longitude</span><span>{lng ?? '—'}</span>
           <span style={{ color: 'var(--qms-text-muted)' }}>Coverage radius</span><span>{geoProfile.coverageRadius / 1000} km</span>
+          <span style={{ color: 'var(--qms-text-muted)' }}>Address</span><span>{address ?? '—'}</span>
         </div>
       </div>
     </>
@@ -165,6 +189,7 @@ const CreateGeoProfileForm = ({ roles, roleName }: RoleNameLookupProps) => {
         type,
         coordinates: locationValueToCoordinates(location)!,
         coverageRadius: coverageRadiusKm ? radiusKm * 1000 : undefined,
+        ...locationValueToAddressPayload(location),
       },
       {
         onSuccess: (res) => {
@@ -260,10 +285,11 @@ const CreateGeoProfileForm = ({ roles, roleName }: RoleNameLookupProps) => {
               countryCode="IN"
             />
             {location?.coordinates && (
-              <p className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
+              <p className="text-[11px] mt-1.5 mb-3" style={{ color: 'var(--qms-text-muted)' }}>
                 Latitude: {location.coordinates[1]} · Longitude: {location.coordinates[0]}
               </p>
             )}
+            <LocationAddressFields value={location} onChange={setLocation} defaultCountry="India" />
           </div>
 
           <div>
@@ -298,7 +324,11 @@ const CreateGeoProfileForm = ({ roles, roleName }: RoleNameLookupProps) => {
           </div>
         )}
 
-        <Button onClick={handleSave} disabled={createGeoProfile.isPending || locationResolution === 'loading'} className="mt-4">
+        <Button
+          onClick={handleSave}
+          disabled={createGeoProfile.isPending || locationResolution === 'loading'}
+          className="mt-4"
+        >
           {createGeoProfile.isPending ? 'Saving…' : locationResolution === 'loading' ? 'Resolving location…' : 'Create geo profile'}
         </Button>
       </div>
@@ -315,7 +345,7 @@ const EditGeoProfileForm = ({ geoProfile, roleName }: EditGeoProfileFormProps) =
   const updateGeoProfile = useUpdateGeoProfile(geoProfile.id)
 
   const [type, setType] = useState<GeoProfileType>(geoProfile.type)
-  const [location, setLocation] = useState<LocationValue | null>(coordinatesToLocationValue(geoProfile.coordinates))
+  const [location, setLocation] = useState<LocationValue | null>(profileToLocationValue(geoProfile))
   // Seeding `location` from the loaded profile alone would resend those same
   // coordinates on every save — only include them when actually touched.
   const [locationDirty, setLocationDirty] = useState(false)
@@ -325,11 +355,22 @@ const EditGeoProfileForm = ({ geoProfile, roleName }: EditGeoProfileFormProps) =
   const [coverageRadiusKm, setCoverageRadiusKm] = useState(String(geoProfile.coverageRadius / 1000))
   const [status, setStatus] = useState<GeoProfileStatus>(geoProfile.status)
   const [formError, setFormError] = useState<string | null>(null)
+  // No geocoder confirmed this pin — the (possibly untouched) address may no
+  // longer match it. Distinct from staleAddressRisk, which only fires when the
+  // address is actually blank; this can fire even when it still looks complete.
+  const [manualCoordinateEntry, setManualCoordinateEntry] = useState(false)
 
   const handleLocationChange = (value: LocationValue) => {
     setLocation(value)
     setLocationDirty(true)
   }
+
+  // ANY prior address data (not just a complete one — a lone `city` is still
+  // real data that would go stale) makes a since-blanked address a real risk.
+  const hadAddress = REQUIRED_ADDRESS_FIELDS.some((f) => !!geoProfile[f.key])
+  // "Use this pin" or manual entry (Maps down) can leave the address blank/stale
+  // next to a moved pin. Address is optional server-side, so this warns, never blocks.
+  const staleAddressRisk = hadAddress && locationDirty && locationMissingRequiredAddress(location)
 
   const handleSave = () => {
     const radiusKm = Number(coverageRadiusKm)
@@ -343,6 +384,9 @@ const EditGeoProfileForm = ({ geoProfile, roleName }: EditGeoProfileFormProps) =
       coordinates: locationDirty ? locationValueToCoordinates(location) : undefined,
       coverageRadius: coverageRadiusKm ? radiusKm * 1000 : undefined,
       status: status || undefined,
+      // Same dirty-gating as coordinates — a background reload of `location`
+      // shouldn't resend the same address fields on every unrelated save.
+      ...(locationDirty ? locationValueToAddressPayload(location) : {}),
     })
   }
 
@@ -407,12 +451,24 @@ const EditGeoProfileForm = ({ geoProfile, roleName }: EditGeoProfileFormProps) =
               value={location}
               onChange={handleLocationChange}
               onResolutionStateChange={setLocationResolution}
+              onManualCoordinateEntry={() => setManualCoordinateEntry(true)}
               defaultCountry="India"
               countryCode="IN"
             />
             {location?.coordinates && (
-              <p className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
+              <p className="text-[11px] mt-1.5 mb-3" style={{ color: 'var(--qms-text-muted)' }}>
                 Latitude: {location.coordinates[1]} · Longitude: {location.coordinates[0]}
+              </p>
+            )}
+            <LocationAddressFields value={location} onChange={handleLocationChange} defaultCountry="India" />
+            {staleAddressRisk && (
+              <p className="text-[12px] rounded-lg px-3 py-2 mt-2 border border-warning bg-warning-soft text-warning">
+                Saving now will keep this profile's old address paired with the new pin — complete the address above if that's not intended.
+              </p>
+            )}
+            {!staleAddressRisk && manualCoordinateEntry && (
+              <p className="text-[12px] rounded-lg px-3 py-2 mt-2 border border-warning bg-warning-soft text-warning">
+                Coordinates were entered manually — review the address above, it wasn't confirmed against the new pin.
               </p>
             )}
           </div>
@@ -476,7 +532,11 @@ const EditGeoProfileForm = ({ geoProfile, roleName }: EditGeoProfileFormProps) =
           </div>
         )}
 
-        <Button onClick={handleSave} disabled={updateGeoProfile.isPending || locationResolution === 'loading'} className="mt-4">
+        <Button
+          onClick={handleSave}
+          disabled={updateGeoProfile.isPending || locationResolution === 'loading'}
+          className="mt-4"
+        >
           {updateGeoProfile.isPending ? 'Saving…' : locationResolution === 'loading' ? 'Resolving location…' : 'Save changes'}
         </Button>
       </div>

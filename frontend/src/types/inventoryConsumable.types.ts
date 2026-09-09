@@ -30,7 +30,9 @@ export interface InventoryConsumableEntity {
   vendor: InventoryConsumableVendorRef | null
   batch: string
   manufacturingDate: string
-  expiryDate: string
+  // Absent (not sent at all) when the lot has no expiry — the mapper returns
+  // it verbatim with no `?? null` fallback.
+  expiryDate?: string
   quantity: number
   createdAt: string
   updatedAt: string
@@ -53,7 +55,7 @@ export interface CreateInventoryConsumablePayload {
   vendor: string
   batch: string
   manufacturingDate: string
-  expiryDate: string
+  expiryDate?: string
   quantity?: number
 }
 

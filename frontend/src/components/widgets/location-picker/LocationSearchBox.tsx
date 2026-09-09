@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { FiSearch } from 'react-icons/fi'
 import { Input } from '@/components/ui/input'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
@@ -11,11 +11,15 @@ interface LocationSearchBoxProps {
   countryCode?: string
   defaultCountry?: string
   onSelected: (value: LocationValue) => void
+  /** Fires whenever a suggestion's place-details fetch starts/finishes — this is a real
+   *  network round trip, not synchronous, so a caller gating Save on resolution state
+   *  should treat 'true' the same as a reverse-geocode still being 'loading'. */
+  onSelectingStateChange?: (isSelecting: boolean) => void
 }
 
 const suggestionLabel = (suggestion: Suggestion) => suggestion.placePrediction.text.text
 
-const LocationSearchBox = ({ disabled, countryCode, defaultCountry, onSelected }: LocationSearchBoxProps) => {
+const LocationSearchBox = ({ disabled, countryCode, defaultCountry, onSelected, onSelectingStateChange }: LocationSearchBoxProps) => {
   const [query, setQuery] = useState('')
   const debouncedQuery = useDebouncedValue(query, 300)
   const { open, setOpen, containerRef } = useAsyncPickerState()
@@ -34,6 +38,10 @@ const LocationSearchBox = ({ disabled, countryCode, defaultCountry, onSelected }
       setHighlightedIndex(-1)
     },
   })
+
+  useEffect(() => {
+    onSelectingStateChange?.(isSelecting)
+  }, [isSelecting, onSelectingStateChange])
 
   // Raw query, not debouncedQuery — otherwise clearing the box leaves the
   // dropdown open (stale suggestions) until the debounce window elapses.

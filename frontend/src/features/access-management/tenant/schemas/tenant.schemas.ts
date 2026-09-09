@@ -18,6 +18,16 @@ const addressSchema = z.object({
   ]).optional(),
 })
 
+// Matches tenant.validators.ts's GstSchema; empty string passes through as "not provided".
+const gstSchema = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .refine((v) => v === '' || /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(v), {
+    message: 'Enter a valid 15-character GSTIN.',
+  })
+  .optional()
+
 export const updateTenantSchema = z.object({
   name: z.string().trim().min(1, 'Name is required'),
   description: z.string().trim().optional(),
@@ -28,6 +38,8 @@ export const updateTenantSchema = z.object({
   type: z.enum(['platform', 'customer']).optional(),
   salesPerson: z.string().optional().nullable(),
   address: addressSchema.optional(),
+  businessLifetime: z.number('Must be a number.').int('Must be a whole number.').nonnegative('Must be 0 or more.').optional(),
+  gst: gstSchema,
 })
 
 // Backend rejects a tenant code shaped like a Mongo ObjectId (24 hex chars).
@@ -55,4 +67,6 @@ export const createTenantSchema = z.object({
     gender: z.enum(['male', 'female', 'other']).optional(),
   }),
   address: addressSchema.optional(),
+  businessLifetime: z.number('Must be a number.').int('Must be a whole number.').nonnegative('Must be 0 or more.').optional(),
+  gst: gstSchema,
 })

@@ -103,8 +103,12 @@ interface EditContactModalFormProps {
 
 const EditContactModalForm = ({ contact, onClose, fixedTenantId, fixedDivisionId, fixedTenantType, onCreated }: EditContactModalFormProps) => {
   const isEdit = !!contact
-  const [draft, setDraft] = useState<ContactDraft>(contact ? draftFromContact(contact) : emptyDraft)
+  const initialDraft = contact ? draftFromContact(contact) : emptyDraft
+  const [draft, setDraft] = useState<ContactDraft>(initialDraft)
   const [tenant, setTenant] = useState(fixedTenantId ?? '')
+  const setDraftField = <K extends keyof ContactDraft>(key: K, value: ContactDraft[K]) => {
+    setDraft((p) => ({ ...p, [key]: value }))
+  }
 
   const { sessionPermissions } = usePermission()
   const needsTenantPicker = !isEdit && !fixedTenantId && sessionPermissions?.tenantType === 'platform'
@@ -147,18 +151,20 @@ const EditContactModalForm = ({ contact, onClose, fixedTenantId, fixedDivisionId
           toast.error(result.error.issues[0].message)
           return
         }
+        // Compare final value to the original snapshot (not "was ever
+        // touched") so a field edited then reverted is never resent.
         await updateContact.mutateAsync({
-          name: result.data.name,
+          ...(draft.name !== initialDraft.name ? { name: result.data.name } : {}),
           // '' (the "—" dropdown option) must be sent as-is, not folded into
           // undefined — the backend only clears the field when the key is
           // PRESENT (`model.designation !== undefined`); an omitted key
           // leaves the old value untouched, silently no-oping the clear.
-          designation: result.data.designation,
-          email: result.data.email || undefined,
-          phone: result.data.phone || undefined,
-          location: result.data.location || undefined,
-          type: result.data.type,
-          status: result.data.status,
+          ...(draft.designation !== initialDraft.designation ? { designation: result.data.designation } : {}),
+          ...(draft.email !== initialDraft.email ? { email: result.data.email || undefined } : {}),
+          ...(draft.phone !== initialDraft.phone ? { phone: result.data.phone || undefined } : {}),
+          ...(draft.location !== initialDraft.location ? { location: result.data.location || undefined } : {}),
+          ...(draft.type !== initialDraft.type ? { type: result.data.type } : {}),
+          ...(draft.status !== initialDraft.status ? { status: result.data.status } : {}),
         })
         toast.success('Contact updated')
       } else {
@@ -245,11 +251,11 @@ const EditContactModalForm = ({ contact, onClose, fixedTenantId, fixedDivisionId
           )}
           <div className="sm:col-span-2">
             <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Name</label>
-            <Input value={draft.name} onChange={(e) => setDraft((p) => ({ ...p, name: e.target.value }))} />
+            <Input value={draft.name} onChange={(e) => setDraftField('name', e.target.value)} />
           </div>
           <div>
             <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Designation</label>
-            <Select value={draft.designation || DESIGNATION_NONE} onValueChange={(v) => { if (!v) return; setDraft((p) => ({ ...p, designation: v === DESIGNATION_NONE ? '' : v })) }}>
+            <Select value={draft.designation || DESIGNATION_NONE} onValueChange={(v) => { if (!v) return; setDraftField('designation', v === DESIGNATION_NONE ? '' : v) }}>
               <SelectTrigger className="w-full text-[13px]">
                 <SelectValue>{(v: string) => (v === DESIGNATION_NONE ? 'Select designation' : v)}</SelectValue>
               </SelectTrigger>
@@ -266,7 +272,7 @@ const EditContactModalForm = ({ contact, onClose, fixedTenantId, fixedDivisionId
           {isEdit && (
             <div>
               <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Type</label>
-              <Select value={draft.type} onValueChange={(v) => setDraft((p) => ({ ...p, type: v as ContactType }))}>
+              <Select value={draft.type} onValueChange={(v) => setDraftField('type', v as ContactType)}>
                 <SelectTrigger className="w-full text-[13px]">
                   <SelectValue>{(v: string) => TYPE_OPTIONS.find((t) => t.value === v)?.label ?? v}</SelectValue>
                 </SelectTrigger>
@@ -278,20 +284,20 @@ const EditContactModalForm = ({ contact, onClose, fixedTenantId, fixedDivisionId
           )}
           <div>
             <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Email</label>
-            <Input value={draft.email} onChange={(e) => setDraft((p) => ({ ...p, email: e.target.value }))} />
+            <Input value={draft.email} onChange={(e) => setDraftField('email', e.target.value)} />
           </div>
           <div>
             <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Phone</label>
-            <Input value={draft.phone} onChange={(e) => setDraft((p) => ({ ...p, phone: e.target.value }))} />
+            <Input value={draft.phone} onChange={(e) => setDraftField('phone', e.target.value)} />
           </div>
           <div className="sm:col-span-2">
             <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Location</label>
-            <Input value={draft.location} onChange={(e) => setDraft((p) => ({ ...p, location: e.target.value }))} />
+            <Input value={draft.location} onChange={(e) => setDraftField('location', e.target.value)} />
           </div>
           {isEdit && (
             <div>
               <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Status</label>
-              <Select value={draft.status} onValueChange={(v) => setDraft((p) => ({ ...p, status: v as ContactStatus }))}>
+              <Select value={draft.status} onValueChange={(v) => setDraftField('status', v as ContactStatus)}>
                 <SelectTrigger className="w-full text-[13px]">
                   <SelectValue>{(v: string) => STATUS_OPTIONS.find((s) => s.value === v)?.label ?? v}</SelectValue>
                 </SelectTrigger>

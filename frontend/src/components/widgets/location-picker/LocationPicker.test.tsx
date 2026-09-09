@@ -26,6 +26,25 @@ vi.mock('@vis.gl/react-google-maps', () => ({
   APILoadingStatus: { FAILED: 'FAILED', AUTH_FAILURE: 'AUTH_FAILURE', LOADED: 'LOADED', LOADING: 'LOADING', NONE: 'NONE' },
 }))
 
+vi.mock('./LocationSearchBox', () => ({
+  default: ({ onSelected }: { onSelected: (v: LocationValue) => void }) => (
+    <button
+      type="button"
+      onClick={() => onSelected({ addressLine1: '', city: '', state: '', pincode: '', coordinates: [77.209, 28.6139] })}
+    >
+      Search-select a location
+    </button>
+  ),
+}))
+
+vi.mock('./MapCanvas', () => ({
+  default: ({ onResolutionStateChange }: { onResolutionStateChange?: (s: 'idle' | 'loading' | 'error') => void }) => (
+    <button type="button" onClick={() => onResolutionStateChange?.('error')}>
+      Simulate map reverse-geocode error
+    </button>
+  ),
+}))
+
 describe('LocationPicker — no-credentials mode', () => {
   const originalApiKey = ENV.Maps.ApiKey
   const originalMapId = ENV.Maps.MapId
@@ -133,6 +152,19 @@ describe('LocationPicker — no-credentials fallback, manual coordinate entry', 
     expect(lastCall.coordinates).toEqual([79.513, 29.2183])
   })
 
+  it('calls onManualCoordinateEntry once valid coordinates are committed, so callers can warn the address may be stale', async () => {
+    const onChange = vi.fn()
+    const onManualCoordinateEntry = vi.fn()
+    const user = userEvent.setup()
+    render(<LocationPicker value={null} onChange={onChange} onManualCoordinateEntry={onManualCoordinateEntry} />)
+
+    await user.type(screen.getByLabelText(/^latitude$/i), '29.2183')
+    expect(onManualCoordinateEntry).not.toHaveBeenCalled()
+
+    await user.type(screen.getByLabelText(/^longitude$/i), '79.5130')
+    expect(onManualCoordinateEntry).toHaveBeenCalled()
+  })
+
   it('pre-fills the fields from an existing value\'s coordinates', () => {
     const existing: LocationValue = {
       addressLine1: '', city: '', state: '', pincode: '',
@@ -198,5 +230,34 @@ describe('LocationPicker — map failed to load (credentials present but rejecte
 
     const lastCall = onChange.mock.calls.at(-1)?.[0] as LocationValue
     expect(lastCall.coordinates).toEqual([79.513, 29.2183])
+  })
+})
+
+describe('LocationPicker — combined resolution state (map + search)', () => {
+  const originalApiKey = ENV.Maps.ApiKey
+  const originalMapId = ENV.Maps.MapId
+
+  beforeEach(() => {
+    ;(ENV.Maps as { ApiKey: string }).ApiKey = 'test-api-key'
+    ;(ENV.Maps as { MapId: string }).MapId = 'test-map-id'
+    setMockLoadingStatus('LOADED')
+  })
+
+  afterEach(() => {
+    ;(ENV.Maps as { ApiKey: string }).ApiKey = originalApiKey
+    ;(ENV.Maps as { MapId: string }).MapId = originalMapId
+    setMockLoadingStatus(null)
+  })
+
+  it('a successful search selection clears a prior map reverse-geocode error, not leaving Save stuck blocked', async () => {
+    const onResolutionStateChange = vi.fn()
+    const user = userEvent.setup()
+    render(<LocationPicker value={null} onChange={vi.fn()} onResolutionStateChange={onResolutionStateChange} />)
+
+    await user.click(screen.getByRole('button', { name: /simulate map reverse-geocode error/i }))
+    expect(onResolutionStateChange).toHaveBeenLastCalledWith('error')
+
+    await user.click(screen.getByRole('button', { name: /search-select a location/i }))
+    expect(onResolutionStateChange).toHaveBeenLastCalledWith('idle')
   })
 })

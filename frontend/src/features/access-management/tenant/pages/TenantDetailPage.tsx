@@ -187,6 +187,16 @@ const TenantDetailPage = () => {
                   Address: <span className="font-semibold" style={{ color: 'var(--qms-text-soft)' }}>{tenantAddress}</span>
                 </div>
               )}
+              {tenant.businessLifetime != null && (
+                <div className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
+                  Business lifetime: <span className="font-semibold" style={{ color: 'var(--qms-text-soft)' }}>{tenant.businessLifetime} year{tenant.businessLifetime === 1 ? '' : 's'}</span>
+                </div>
+              )}
+              {tenant.gst && (
+                <div className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
+                  GST: <span className="font-semibold" style={{ color: 'var(--qms-text-soft)' }}>{tenant.gst}</span>
+                </div>
+              )}
               {divisionPenetrationPct !== null && (
                 <div className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
                   Division Penetration: <span className="font-semibold" style={{ color: 'var(--qms-text-soft)' }}>{divisionPenetrationPct}%</span>

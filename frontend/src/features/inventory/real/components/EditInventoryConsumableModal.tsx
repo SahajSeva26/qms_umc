@@ -104,7 +104,8 @@ const CreateForm = ({ onClose, mutation }: { onClose: () => void; mutation: Retu
         vendor: values.vendor,
         batch: values.batch,
         manufacturingDate: values.manufacturingDate,
-        expiryDate: values.expiryDate,
+        // A blank date input is '', not "no expiry" — send as absent instead.
+        expiryDate: values.expiryDate || undefined,
         quantity: values.quantity,
       },
       { onSuccess: onClose },
@@ -156,7 +157,7 @@ const CreateForm = ({ onClose, mutation }: { onClose: () => void; mutation: Retu
             <Field label="Manufacturing date *" error={fieldError('manufacturingDate')}>
               <Input type="date" className="text-[13px]" {...register('manufacturingDate')} />
             </Field>
-            <Field label="Expiry date *" error={fieldError('expiryDate')}>
+            <Field label="Expiry date" error={fieldError('expiryDate')}>
               <Input type="date" className="text-[13px]" {...register('expiryDate')} />
             </Field>
           </div>
@@ -191,7 +192,8 @@ const EditForm = ({
     register,
     handleSubmit,
     control,
-    formState: { errors, touchedFields, isSubmitted },
+    watch,
+    formState: { errors, touchedFields, isSubmitted, dirtyFields },
   } = useForm<InventoryConsumableUpdateFormValues>({
     resolver: zodResolver(updateInventoryConsumableSchema),
     mode: 'onChange',
@@ -207,17 +209,26 @@ const EditForm = ({
   const fieldError = (field: keyof InventoryConsumableUpdateFormValues) =>
     (touchedFields[field] || isSubmitted) ? errors[field]?.message : undefined
 
+  // Backend can't clear an already-set expiry (server only writes it when truthy),
+  // so blanking the input here would silently revert on save — block instead.
+  const hadExpiry = !!lot.expiryDate
+  const expiryBlanked = hadExpiry && watch('expiryDate') === ''
+
   const onSubmit = (values: InventoryConsumableUpdateFormValues) => {
     mutation.mutate(
       {
-        batch: values.batch,
-        manufacturingDate: values.manufacturingDate,
-        expiryDate: values.expiryDate,
-        quantity: values.quantity,
+        // Sent only when touched — every field here is last-write-wins server-side,
+        // so resending the stale defaultValues snapshot could clobber a concurrent edit.
+        ...(dirtyFields.batch ? { batch: values.batch } : {}),
+        ...(dirtyFields.manufacturingDate ? { manufacturingDate: values.manufacturingDate } : {}),
+        // Absent, not ''; also no way to CLEAR an already-set expiry via this form —
+        // backend's set() only assigns expiryDate when truthy.
+        ...(dirtyFields.expiryDate ? { expiryDate: values.expiryDate || undefined } : {}),
+        ...(dirtyFields.quantity ? { quantity: values.quantity } : {}),
         // Omitted entirely (not sent as `status: undefined`) unless the
         // caller can actually manage status — matches the backend's own
         // visibility gate: a non-manager can't set what they can't even see.
-        ...(canManageStatus ? { status: values.status } : {}),
+        ...(canManageStatus && dirtyFields.status ? { status: values.status } : {}),
       },
       { onSuccess: onClose },
     )
@@ -261,8 +272,11 @@ const EditForm = ({
             <Field label="Manufacturing date *" error={fieldError('manufacturingDate')}>
               <Input type="date" className="text-[13px]" {...register('manufacturingDate')} />
             </Field>
-            <Field label="Expiry date *" error={fieldError('expiryDate')}>
+            <Field label="Expiry date" error={fieldError('expiryDate')}>
               <Input type="date" className="text-[13px]" {...register('expiryDate')} />
+              {expiryBlanked && (
+                <p className="text-[11px] mt-1 text-danger">Can't be cleared once set — contact support.</p>
+              )}
             </Field>
           </div>
 
@@ -274,7 +288,7 @@ const EditForm = ({
 
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-            <Button type="submit" disabled={mutation.isPending}>
+            <Button type="submit" disabled={mutation.isPending || expiryBlanked}>
               {mutation.isPending ? 'Saving…' : 'Save changes'}
             </Button>
           </div>

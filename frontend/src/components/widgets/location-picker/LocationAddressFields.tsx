@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createEmptyLocationValue } from '@/types/location.types'
 import type { LocationValue } from '@/types/location.types'
+import { REQUIRED_ADDRESS_FIELDS } from './location.types'
 
 interface LocationAddressFieldsProps {
   value: LocationValue | null
@@ -10,13 +11,6 @@ interface LocationAddressFieldsProps {
   disabled?: boolean
   defaultCountry?: string
 }
-
-const REQUIRED_FIELDS: { key: 'addressLine1' | 'city' | 'state' | 'pincode'; label: string }[] = [
-  { key: 'addressLine1', label: 'address' },
-  { key: 'city', label: 'city' },
-  { key: 'state', label: 'state' },
-  { key: 'pincode', label: 'pincode' },
-]
 
 // Covers what LocationPicker can't complete on its own — an incomplete Google
 // result, or "Use this pin," can leave required fields blank.
@@ -28,7 +22,7 @@ const LocationAddressFields = ({ value, onChange, disabled, defaultCountry }: Lo
     onChange({ ...current, [key]: v })
   }
 
-  const missingRequired = value ? REQUIRED_FIELDS.filter((f) => !current[f.key].trim()) : []
+  const missingRequired = value ? REQUIRED_ADDRESS_FIELDS.filter((f) => !current[f.key].trim()) : []
 
   return (
     <div className="space-y-3">

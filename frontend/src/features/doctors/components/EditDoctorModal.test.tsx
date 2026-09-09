@@ -519,3 +519,94 @@ describe('EditDoctorModal — CSV file-picker UX', () => {
     expect(screen.getByText(/1 row skipped for invalid\/missing data/i)).toBeInTheDocument()
   })
 })
+
+describe('EditDoctorModal — partial update payload', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  it('saving without touching any field omits name/city/mobile — never resends a stale snapshot to clobber a concurrent edit', async () => {
+    await mockSession('customer')
+    const { doctorsService } = await import('@/features/doctors/doctors.service')
+    const user = userEvent.setup()
+    await renderModal(doctorFixture({ name: 'STALE-NAME', city: 'STALE-CITY', mobile: '9000000000' }))
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    const payload = await waitFor(() => {
+      const call = vi.mocked(doctorsService.updateDoctor).mock.calls[0]
+      if (!call) throw new Error('not called yet')
+      return call[1]
+    })
+    expect(payload).not.toHaveProperty('name')
+    expect(payload).not.toHaveProperty('city')
+    expect(payload).not.toHaveProperty('mobile')
+  })
+
+  it('editing doctor name directly includes only name in the payload', async () => {
+    await mockSession('customer')
+    const { doctorsService } = await import('@/features/doctors/doctors.service')
+    const user = userEvent.setup()
+    await renderModal(doctorFixture({ name: 'Dr. Old Name' }))
+
+    const nameInput = inputForLabel(/doctor name/i)
+    await user.clear(nameInput)
+    await user.type(nameInput, 'Dr. New Name')
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    const payload = await waitFor(() => {
+      const call = vi.mocked(doctorsService.updateDoctor).mock.calls[0]
+      if (!call) throw new Error('not called yet')
+      return call[1]
+    })
+    expect(payload.name).toBe('Dr. New Name')
+    expect(payload).not.toHaveProperty('city')
+  })
+
+  // googleMapLink already has an `|| undefined` guard in handleSave — that
+  // only folds an emptied field, it does not by itself stop an untouched,
+  // populated city value from being resent. Proves the gate covers it too.
+  it('editing city directly includes only city, leaving the untouched name out', async () => {
+    await mockSession('customer')
+    const { doctorsService } = await import('@/features/doctors/doctors.service')
+    const user = userEvent.setup()
+    await renderModal(doctorFixture({ name: 'STALE-NAME', city: 'Old City' }))
+
+    const cityInput = inputForLabel(/^city$/i)
+    await user.clear(cityInput)
+    await user.type(cityInput, 'New City')
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    const payload = await waitFor(() => {
+      const call = vi.mocked(doctorsService.updateDoctor).mock.calls[0]
+      if (!call) throw new Error('not called yet')
+      return call[1]
+    })
+    expect(payload.city).toBe('New City')
+    expect(payload).not.toHaveProperty('name')
+  })
+
+  // Dirty-gating must compare the FINAL value to the original snapshot, not
+  // "was the field ever touched" — editing then reverting is a no-op.
+  it('editing a field then reverting it to its exact original value omits it from the payload', async () => {
+    await mockSession('customer')
+    const { doctorsService } = await import('@/features/doctors/doctors.service')
+    const user = userEvent.setup()
+    await renderModal(doctorFixture({ name: 'ORIGINAL-NAME', city: 'STALE-CITY' }))
+
+    const nameInput = inputForLabel(/doctor name/i)
+    await user.clear(nameInput)
+    await user.type(nameInput, 'TEMP-NAME')
+    await user.clear(nameInput)
+    await user.type(nameInput, 'ORIGINAL-NAME')
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    const payload = await waitFor(() => {
+      const call = vi.mocked(doctorsService.updateDoctor).mock.calls[0]
+      if (!call) throw new Error('not called yet')
+      return call[1]
+    })
+    expect(payload).not.toHaveProperty('name')
+    expect(payload).not.toHaveProperty('city')
+  })
+})

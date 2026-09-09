@@ -196,6 +196,7 @@ const EditForm = ({
     register,
     handleSubmit,
     control,
+    formState: { dirtyFields },
   } = useForm<InventoryDeviceUpdateFormValues>({
     resolver: zodResolver(updateInventoryDeviceSchema),
     mode: 'onChange',
@@ -211,11 +212,13 @@ const EditForm = ({
   const onSubmit = (values: InventoryDeviceUpdateFormValues) => {
     mutation.mutate(
       {
-        manufacturingDate: values.manufacturingDate || undefined,
-        warrantyExpiryDate: values.warrantyExpiryDate || undefined,
-        lastCalibrationDate: values.lastCalibrationDate || undefined,
-        nextCalibrationDate: values.nextCalibrationDate || undefined,
-        status: values.status,
+        // Sent only when touched — every field here is last-write-wins server-side,
+        // so resending the stale defaultValues snapshot could clobber a concurrent edit.
+        ...(dirtyFields.manufacturingDate ? { manufacturingDate: values.manufacturingDate || undefined } : {}),
+        ...(dirtyFields.warrantyExpiryDate ? { warrantyExpiryDate: values.warrantyExpiryDate || undefined } : {}),
+        ...(dirtyFields.lastCalibrationDate ? { lastCalibrationDate: values.lastCalibrationDate || undefined } : {}),
+        ...(dirtyFields.nextCalibrationDate ? { nextCalibrationDate: values.nextCalibrationDate || undefined } : {}),
+        ...(dirtyFields.status ? { status: values.status } : {}),
       },
       { onSuccess: onClose },
     )

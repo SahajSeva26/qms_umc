@@ -8,8 +8,11 @@ export interface CsvColumn<T> {
   get: (row: T) => string | number
 }
 
+// A leading =/+/-/@ is executed as a formula by Excel/Sheets on open — prefix
+// with a quote to force plain-text, same mitigation OWASP recommends for CSV injection.
 function escapeCsvCell(value: string | number): string {
-  const str = String(value ?? '')
+  const raw = String(value ?? '')
+  const str = /^[=+\-@]/.test(raw) ? `'${raw}` : raw
   return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str
 }
 

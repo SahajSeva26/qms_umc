@@ -33,6 +33,7 @@ import type { ProjectEntity } from '@/types/project.types'
 import type { LocationValue } from '@/types/location.types'
 import LocationPicker from '@/components/widgets/location-picker/LocationPicker'
 import LocationAddressFields from '@/components/widgets/location-picker/LocationAddressFields'
+import type { LocationResolutionState } from '@/components/widgets/location-picker/location.types'
 
 const TYPE_OPTIONS: { value: CampType; label: string }[] = CAMP_TYPE_VALUES.map((value) => ({ value, label: CAMP_TYPE_LABEL[value] }))
 
@@ -136,6 +137,10 @@ const CampForm = ({ camp, isCreateMode, canWrite }: CampFormProps) => {
   const { draft, setField } = useCampDraft(camp)
   const { tenant, division, project, doctor, type, billingType, patientExpectation, fo, mr, date, timeSlot, location, devices, notes } = draft
 
+  // A caller-facing pin can visibly move well before (or without ever) firing
+  // onChange — Save must block until the picker settles, same as GeoProfileDetailPage.
+  const [locationResolution, setLocationResolution] = useState<LocationResolutionState>('idle')
+
   // mr/fo/project/devices' human labels aren't part of the string-only
   // CampDraft reducer, so they're tracked locally instead.
   const [mrLabel, setMrLabel] = useState(() => campRefName(camp?.mr) ?? '')
@@ -164,6 +169,11 @@ const CampForm = ({ camp, isCreateMode, canWrite }: CampFormProps) => {
     setField('devices', ids.join(', '))
     setDeviceLabels(labels)
   }
+
+  // Sorted-and-joined so membership (not order or a revert-then-reselect) is
+  // what counts as a change — same technique as EditDivisionModal's therapy array.
+  const sortedIds = (ids: string[]) => [...ids].sort().join(',')
+  const originalDeviceIds = sortedIds((camp?.devices ?? []).map((d) => d._id))
 
   // Scopes FO/MR/Doctor candidates: create mode's picked Company, or edit mode's loaded camp.tenant.
   const effectiveTenant = tenant || campRefId(camp?.tenant) || ''
@@ -215,6 +225,10 @@ const CampForm = ({ camp, isCreateMode, canWrite }: CampFormProps) => {
 
   const handleSave = () => {
     const patientExpectationNum = patientExpectation ? Number(patientExpectation) : undefined
+
+    // Applies to both branches — a save mid-resolution would submit a stale/incomplete pin.
+    if (locationResolution === 'loading') { setFormErrorState('Still resolving the picked location — wait a moment and try again'); return }
+    if (locationResolution === 'error') { setFormErrorState('Retry or choose "Use this pin" for the location before saving'); return }
 
     if (isCreateMode) {
       if (!tenant) { setFormErrorState('Company is required'); return }
@@ -271,9 +285,6 @@ const CampForm = ({ camp, isCreateMode, canWrite }: CampFormProps) => {
     setFormErrorState(null)
     updateCamp.mutate({
       doctor: doctor || undefined,
-      type,
-      billingType,
-      patientExpectation: patientExpectationNum,
       fo: fo || undefined,
       mr: mr || undefined,
       date: date || undefined,
@@ -281,9 +292,14 @@ const CampForm = ({ camp, isCreateMode, canWrite }: CampFormProps) => {
       // Omitted (not sent as null) when unset, so the backend's replace-wholesale
       // update semantics leave an untouched legacy-null location alone.
       location: location ?? undefined,
-      devices: deviceIds,
       // Send raw string (not `notes || undefined`) so clearing the textarea to '' actually clears it.
       notes,
+      // Backend leaves an absent key unchanged — omit (not just `undefined`, an
+      // actual missing key) unless the final value actually differs from the original.
+      ...(camp && type !== camp.type ? { type } : {}),
+      ...(camp && billingType !== camp.billingType ? { billingType } : {}),
+      ...(camp && patientExpectationNum !== camp.patientExpectation ? { patientExpectation: patientExpectationNum } : {}),
+      ...(sortedIds(deviceIds) !== originalDeviceIds ? { devices: deviceIds } : {}),
     })
   }
 
@@ -430,7 +446,14 @@ const CampForm = ({ camp, isCreateMode, canWrite }: CampFormProps) => {
 
         <div className="space-y-2">
           <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Location</Label>
-          <LocationPicker value={location} onChange={setLocation} disabled={isLocked} defaultCountry="India" countryCode="IN" />
+          <LocationPicker
+            value={location}
+            onChange={setLocation}
+            onResolutionStateChange={setLocationResolution}
+            disabled={isLocked}
+            defaultCountry="India"
+            countryCode="IN"
+          />
           <LocationAddressFields value={location} onChange={setLocation} disabled={isLocked} defaultCountry="India" />
         </div>
         <p className="text-[11px] -mt-2" style={{ color: 'var(--qms-text-muted)' }}>
@@ -492,8 +515,8 @@ const CampForm = ({ camp, isCreateMode, canWrite }: CampFormProps) => {
           changes, or use Move Stage above to change its status.
         </p>
       ) : canWrite ? (
-        <Button onClick={handleSave} disabled={mutation.isPending} className="mt-4">
-          {mutation.isPending ? 'Saving…' : isCreateMode ? 'Create camp' : 'Save changes'}
+        <Button onClick={handleSave} disabled={mutation.isPending || locationResolution === 'loading'} className="mt-4">
+          {mutation.isPending ? 'Saving…' : locationResolution === 'loading' ? 'Resolving location…' : isCreateMode ? 'Create camp' : 'Save changes'}
         </Button>
       ) : (
         <p className="text-[12px] mt-4" style={{ color: 'var(--qms-text-muted)' }}>

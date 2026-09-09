@@ -32,6 +32,9 @@ const EditDivisionModal = ({ division, onClose }: EditDivisionModalProps) => {
   const [status, setStatus] = useState<DivisionStatus | ''>(division.status ?? '')
   const [formError, setFormError] = useState<string | null>(null)
 
+  const sameTherapy = (a: DivisionTherapy[], b: DivisionTherapy[]) =>
+    a.length === b.length && new Set(a).size === new Set([...a, ...b]).size
+
   const handleSave = () => {
     const result = updateDivisionSchema.safeParse({
       name,
@@ -45,7 +48,17 @@ const EditDivisionModal = ({ division, onClose }: EditDivisionModalProps) => {
       return
     }
     setFormError(null)
-    updateDivision.mutate(result.data, { onSuccess: onClose })
+    const data = result.data
+    // Every field is last-write-wins server-side — diff against the original
+    // snapshot (not "was ever touched") so a reverted edit is never resent.
+    const payload: typeof data = {
+      ...(data.name !== undefined && data.name !== division.name ? { name: data.name } : {}),
+      ...(data.therapy !== undefined && !sameTherapy(data.therapy, division.therapy) ? { therapy: data.therapy } : {}),
+      ...(data.brandFocus !== (division.brandFocus ?? undefined) ? { brandFocus: data.brandFocus } : {}),
+      ...(data.mrCount !== undefined && data.mrCount !== (division.mrCount ?? 0) ? { mrCount: data.mrCount } : {}),
+      ...(data.status !== undefined && data.status !== (division.status ?? '') ? { status: data.status } : {}),
+    }
+    updateDivision.mutate(payload, { onSuccess: onClose })
   }
 
   return (

@@ -5,13 +5,26 @@ import userEvent from '@testing-library/user-event'
 import type { Tenant } from '@/types/accessManagement.types'
 
 vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
-  default: ({ value, onChange }: { value: unknown; onChange: (v: unknown) => void }) => (
-    <button
-      type="button"
-      onClick={() => onChange({ ...(value as object ?? {}), coordinates: [73.8567, 18.5204] })}
-    >
-      Set test coordinates
-    </button>
+  default: ({ value, onChange, onResolutionStateChange }: {
+    value: unknown
+    onChange: (v: unknown) => void
+    onResolutionStateChange?: (status: 'idle' | 'loading' | 'error') => void
+  }) => (
+    <>
+      <button
+        type="button"
+        onClick={() => onChange({ ...(value as object ?? {}), coordinates: [73.8567, 18.5204] })}
+      >
+        Set test coordinates
+      </button>
+      {/* Simulates the real widget's "pin moved, reverse-geocode still resolving" window. */}
+      <button type="button" onClick={() => onResolutionStateChange?.('loading')}>
+        Simulate location resolving
+      </button>
+      <button type="button" onClick={() => onResolutionStateChange?.('idle')}>
+        Simulate location resolved
+      </button>
+    </>
   ),
 }))
 
@@ -27,6 +40,7 @@ vi.mock('@/features/access-management/accessManagement.service', () => ({
 function tenantFixture(overrides: Partial<Tenant> = {}): Tenant {
   return {
     id: 't-1', code: 'acme', name: 'Acme Pharma', address: null,
+    businessLifetime: null, gst: null,
     status: 'active', type: 'customer', salesPerson: null,
     ...overrides,
   }
@@ -139,5 +153,114 @@ describe('EditTenantModal — address', () => {
     await waitFor(() => expect(accessManagementService.updateTenant).toHaveBeenCalledTimes(1))
     const [, payload] = vi.mocked(accessManagementService.updateTenant).mock.calls[0]
     expect(payload.address).toEqual(expect.objectContaining({ city: 'Mumbai', coordinates: [73.8567, 18.5204] }))
+  })
+
+  it('disables Save (relabeled "Resolving location…") while the picked pin is still resolving, so updateTenant is never called', async () => {
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    const user = userEvent.setup()
+    await renderModal(tenantFixture({
+      address: {
+        addressLine1: '221 Baker Street', city: 'Pune', state: 'Maharashtra',
+        pincode: '411001', coordinates: [73.8567, 18.5204],
+      },
+    }))
+
+    await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
+    await user.click(screen.getByRole('button', { name: /simulate location resolving/i }))
+
+    const saveButton = await screen.findByRole('button', { name: /resolving location/i })
+    expect(saveButton).toBeDisabled()
+    await user.click(saveButton)
+    expect(accessManagementService.updateTenant).not.toHaveBeenCalled()
+  })
+
+  it('allows Save once resolution returns to idle after a loading state', async () => {
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    const user = userEvent.setup()
+    await renderModal(tenantFixture({
+      address: {
+        addressLine1: '221 Baker Street', city: 'Pune', state: 'Maharashtra',
+        pincode: '411001', coordinates: [73.8567, 18.5204],
+      },
+    }))
+
+    await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
+    await user.click(screen.getByRole('button', { name: /simulate location resolving/i }))
+    await user.click(screen.getByRole('button', { name: /simulate location resolved/i }))
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => expect(accessManagementService.updateTenant).toHaveBeenCalledTimes(1))
+  })
+})
+
+describe('EditTenantModal — gst / businessLifetime concurrency', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  it('saving with only an unrelated field touched omits gst and businessLifetime entirely — never resends a stale snapshot', async () => {
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    const user = userEvent.setup()
+    await renderModal(tenantFixture({ gst: '27AAPFU0939F1ZV', businessLifetime: 5 }))
+
+    await user.type(screen.getByLabelText(/^name$/i), ' Updated')
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => expect(accessManagementService.updateTenant).toHaveBeenCalledTimes(1))
+    const [, payload] = vi.mocked(accessManagementService.updateTenant).mock.calls[0]
+    expect(payload.gst).toBeUndefined()
+    expect(payload.businessLifetime).toBeUndefined()
+    expect(payload).not.toHaveProperty('gst')
+    expect(payload).not.toHaveProperty('businessLifetime')
+  })
+
+  it('editing gst or businessLifetime directly includes that field in the payload', async () => {
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    const user = userEvent.setup()
+    await renderModal(tenantFixture({ gst: '27AAPFU0939F1ZV', businessLifetime: 5 }))
+
+    await user.clear(screen.getByLabelText(/^gst number$/i))
+    await user.type(screen.getByLabelText(/^gst number$/i), '29AABCU9603R1ZM')
+    await user.clear(screen.getByLabelText(/business lifetime/i))
+    await user.type(screen.getByLabelText(/business lifetime/i), '8')
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => expect(accessManagementService.updateTenant).toHaveBeenCalledTimes(1))
+    const [, payload] = vi.mocked(accessManagementService.updateTenant).mock.calls[0]
+    expect(payload.gst).toBe('29AABCU9603R1ZM')
+    expect(payload.businessLifetime).toBe(8)
+  })
+
+  it('blanking an already-set gst or businessLifetime warns instead of silently reverting on save', async () => {
+    const user = userEvent.setup()
+    await renderModal(tenantFixture({ gst: '27AAPFU0939F1ZV', businessLifetime: 5 }))
+
+    expect(screen.queryByText(/can't be cleared once set/i)).not.toBeInTheDocument()
+
+    await user.clear(screen.getByLabelText(/^gst number$/i))
+    expect(await screen.findAllByText(/can't be cleared once set/i)).toHaveLength(1)
+
+    await user.clear(screen.getByLabelText(/business lifetime/i))
+    expect(await screen.findAllByText(/can't be cleared once set/i)).toHaveLength(2)
+  })
+
+  it('blanking an already-set gst blocks Save entirely — no silent no-op that looks like success', async () => {
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    const user = userEvent.setup()
+    await renderModal(tenantFixture({ gst: '27AAPFU0939F1ZV' }))
+
+    await user.clear(screen.getByLabelText(/^gst number$/i))
+    await screen.findByText(/can't be cleared once set/i)
+
+    const saveButton = screen.getByRole('button', { name: /save changes/i })
+    expect(saveButton).toBeDisabled()
+
+    await user.click(saveButton)
+    expect(accessManagementService.updateTenant).not.toHaveBeenCalled()
+  })
+
+  it('a tenant with no gst/businessLifetime set shows no warning when those (already-empty) fields are left alone', async () => {
+    await renderModal(tenantFixture({ gst: null, businessLifetime: null }))
+    expect(screen.queryByText(/can't be cleared once set/i)).not.toBeInTheDocument()
   })
 })

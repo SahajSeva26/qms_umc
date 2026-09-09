@@ -219,7 +219,8 @@ const EditForm = ({
   const onSubmit = (values: UpdateVendorMasterFormValues) => {
     mutation.mutate(
       {
-        name: values.name,
+        // Sent only when touched — last-write-wins server-side like the other 3 fields here.
+        ...(dirtyFields.name ? { name: values.name } : {}),
         contacts: dirtyFields.contacts ? sanitizeContacts(values.contacts) : undefined,
         // Only sent when dirty — the backend replaces address wholesale whenever the key is present at all.
         ...(dirtyFields.address ? { address: values.address ?? undefined } : {}),

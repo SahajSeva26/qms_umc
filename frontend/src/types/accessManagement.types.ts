@@ -30,6 +30,10 @@ export interface Tenant {
   code: string
   name: string
   address: LocationValue | null
+  // Optional business age/lifetime in years, and GST registration number
+  // (GSTIN, format-validated server-side). Both `?? null` on the mapper.
+  businessLifetime: number | null
+  gst: string | null
   status?: TenantStatus
   owner?: string
   createdAt?: string
@@ -70,6 +74,8 @@ export interface CreateTenantPayload {
   // here per direct instruction — TODO: revisit once sales-rep vs sales-head settles.
   salesPerson: string
   address?: LocationValue
+  businessLifetime?: number
+  gst?: string
 }
 
 export interface UpdateTenantPayload {
@@ -83,6 +89,8 @@ export interface UpdateTenantPayload {
   salesPerson?: string | null
   // Optional, replace-wholesale — omitting it preserves whatever address the tenant already has.
   address?: LocationValue
+  businessLifetime?: number
+  gst?: string
 }
 
 // ---------------------------------------------------------------------------

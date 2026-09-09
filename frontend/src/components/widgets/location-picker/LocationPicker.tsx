@@ -1,11 +1,11 @@
-import { useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { APIProvider, useApiLoadingStatus, APILoadingStatus } from '@vis.gl/react-google-maps'
 import ENV from '@/config/env'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import LocationSearchBox from './LocationSearchBox'
 import MapCanvas from './MapCanvas'
-import type { LocationPickerProps } from './location.types'
+import type { LocationPickerProps, LocationResolutionState } from './location.types'
 import { createEmptyLocationValue, type LocationValue } from '@/types/location.types'
 
 const isValidLatitude = (lat: number) => Number.isFinite(lat) && lat >= -90 && lat <= 90
@@ -21,13 +21,14 @@ const DEFAULT_HEIGHT = 320
 // Shared fallback for missing credentials AND a failed/rejected APIProvider —
 // both leave no other way to produce coordinates. Latitude/longitude only
 // (no address fields), matching what a bare pin-drop itself produces.
-function ManualCoordinateFallback({ height, value, onChange, disabled, defaultCountry, message }: {
+function ManualCoordinateFallback({ height, value, onChange, disabled, defaultCountry, message, onManualCoordinateEntry }: {
   height: number
   value: LocationValue | null
   onChange: (value: LocationValue) => void
   disabled?: boolean
   defaultCountry?: string
   message: string
+  onManualCoordinateEntry?: () => void
 }) {
   const idPrefix = useId()
   const [latitude, setLatitude] = useState(value?.coordinates ? String(value.coordinates[1]) : '')
@@ -53,7 +54,10 @@ function ManualCoordinateFallback({ height, value, onChange, disabled, defaultCo
     if (!isValidLatitude(lat)) { setError('Latitude must be a number between -90 and 90'); return }
     if (!isValidLongitude(lng)) { setError('Longitude must be a number between -180 and 180'); return }
     setError(null)
+    // Preserves any existing address — manual entry has no geocoder to replace it with,
+    // so the caller (via onManualCoordinateEntry) decides whether that's a problem.
     onChange({ ...(value ?? createEmptyLocationValue(defaultCountry)), coordinates: [lng, lat] })
+    onManualCoordinateEntry?.()
   }
 
   return (
@@ -95,8 +99,16 @@ function ManualCoordinateFallback({ height, value, onChange, disabled, defaultCo
   )
 }
 
-function LocationPickerInner({ value, onChange, disabled, height = DEFAULT_HEIGHT, defaultCenter, defaultCountry, countryCode, onResolutionStateChange }: LocationPickerProps) {
+function LocationPickerInner({ value, onChange, disabled, height = DEFAULT_HEIGHT, defaultCenter, defaultCountry, countryCode, onResolutionStateChange, onManualCoordinateEntry }: LocationPickerProps) {
   const loadingStatus = useApiLoadingStatus()
+  // A search selection is a real network round trip too — while it's in flight,
+  // `value` isn't final yet, same hazard as the map's own reverse-geocode 'loading'.
+  const [isSelecting, setIsSelecting] = useState(false)
+  const [mapResolution, setMapResolution] = useState<LocationResolutionState>('idle')
+
+  useEffect(() => {
+    onResolutionStateChange?.(isSelecting ? 'loading' : mapResolution)
+  }, [isSelecting, mapResolution, onResolutionStateChange])
 
   if (loadingStatus === APILoadingStatus.FAILED || loadingStatus === APILoadingStatus.AUTH_FAILURE) {
     return (
@@ -107,13 +119,27 @@ function LocationPickerInner({ value, onChange, disabled, height = DEFAULT_HEIGH
         disabled={disabled}
         defaultCountry={defaultCountry}
         message="Map failed to load — check your connection, or enter coordinates manually."
+        onManualCoordinateEntry={onManualCoordinateEntry}
       />
     )
   }
 
+  const handleSearchSelected = (selected: LocationValue) => {
+    // A search pick replaces whatever the map was doing — a stale 'error' from
+    // an earlier failed pin-drop must not keep blocking Save after this succeeds.
+    setMapResolution('idle')
+    onChange(selected)
+  }
+
   return (
     <div className="space-y-2">
-      <LocationSearchBox disabled={disabled} countryCode={countryCode} defaultCountry={defaultCountry} onSelected={onChange} />
+      <LocationSearchBox
+        disabled={disabled}
+        countryCode={countryCode}
+        defaultCountry={defaultCountry}
+        onSelected={handleSearchSelected}
+        onSelectingStateChange={setIsSelecting}
+      />
       <MapCanvas
         value={value}
         onChange={onChange}
@@ -121,7 +147,7 @@ function LocationPickerInner({ value, onChange, disabled, height = DEFAULT_HEIGH
         height={height}
         defaultCenter={defaultCenter ?? INDIA_CENTER}
         defaultCountry={defaultCountry}
-        onResolutionStateChange={onResolutionStateChange}
+        onResolutionStateChange={setMapResolution}
       />
     </div>
   )
@@ -141,6 +167,7 @@ const LocationPicker = (props: LocationPickerProps) => {
         disabled={props.disabled}
         defaultCountry={props.defaultCountry}
         message="Map search is not configured in this environment — enter coordinates manually."
+        onManualCoordinateEntry={props.onManualCoordinateEntry}
       />
     )
   }

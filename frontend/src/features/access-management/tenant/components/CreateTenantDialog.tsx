@@ -21,6 +21,7 @@ import { TENANT_ROUTES } from '@/features/access-management/tenant/tenant.routes
 import { PLATFORM_TENANT_CODE, PLATFORM_TENANT_FETCH_LIMIT } from '@/features/access-management/accessManagement.constants'
 import LocationPicker from '@/components/widgets/location-picker/LocationPicker'
 import LocationAddressFields from '@/components/widgets/location-picker/LocationAddressFields'
+import type { LocationResolutionState } from '@/components/widgets/location-picker/location.types'
 import FieldErrorText from '@/components/ui/FieldErrorText'
 
 interface TenantFormValues {
@@ -35,6 +36,8 @@ interface TenantFormValues {
   ownerPhone: string
   ownerGender: '' | 'male' | 'female' | 'other'
   address: LocationValue | null
+  businessLifetime: string
+  gst: string
 }
 
 const EMPTY_FORM_VALUES: TenantFormValues = {
@@ -49,6 +52,8 @@ const EMPTY_FORM_VALUES: TenantFormValues = {
   ownerPhone: '',
   ownerGender: '',
   address: null,
+  businessLifetime: '',
+  gst: '',
 }
 
 const OWNER_FIELD_TO_FORM_FIELD: Record<string, keyof TenantFormValues> = {
@@ -84,6 +89,8 @@ const useTenantFormResolver = () =>
         gender: values.ownerGender || undefined,
       },
       address: values.address ?? undefined,
+      businessLifetime: values.businessLifetime === '' ? undefined : Number(values.businessLifetime),
+      gst: values.gst || undefined,
     }),
     nestedFieldMaps: { owner: OWNER_FIELD_TO_FORM_FIELD, address: ADDRESS_FIELD_TO_FORM_FIELD },
   })
@@ -94,6 +101,10 @@ const CreateTenantDialog = () => {
   // trigger() doesn't mark fields "touched", so a blind Next click on a
   // blank step 1 wouldn't otherwise show errors for untouched fields.
   const [step1Attempted, setStep1Attempted] = useState(false)
+  // `address` (RHF field value) isn't authoritative while this is anything but
+  // 'idle' — the pin can visibly move well before (or without ever) firing onChange.
+  const [locationResolution, setLocationResolution] = useState<LocationResolutionState>('idle')
+  const [locationResolutionError, setLocationResolutionError] = useState<string | null>(null)
   const navigate = useNavigate()
   const createTenant = useCreateTenant()
   const { resolver, parsePayload } = useTenantFormResolver()
@@ -137,6 +148,8 @@ const CreateTenantDialog = () => {
     setStep(0)
     setStep1Attempted(false)
     setSalesRepPickerOpened(false)
+    setLocationResolution('idle')
+    setLocationResolutionError(null)
     createTenant.reset()
     setOpen(false)
   }
@@ -150,6 +163,15 @@ const CreateTenantDialog = () => {
   }
 
   const onSubmit = async (values: TenantFormValues) => {
+    if (locationResolution === 'loading') {
+      setLocationResolutionError('Still resolving the picked location — wait a moment and try again')
+      return
+    }
+    if (locationResolution === 'error') {
+      setLocationResolutionError('Retry or choose "Use this pin" for the location before saving')
+      return
+    }
+    setLocationResolutionError(null)
     const payload = await parsePayload(values)
     createTenant.mutate(payload, {
       onSuccess: (res) => {
@@ -207,6 +229,22 @@ const CreateTenantDialog = () => {
                     </Label>
                     <Textarea id="tenantDescription" placeholder="Optional" {...register('description')} />
                   </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor="businessLifetime" className="text-xs mb-1.5">
+                        Business lifetime (years)
+                      </Label>
+                      <Input id="businessLifetime" type="number" placeholder="Optional" {...register('businessLifetime')} />
+                      {fieldError('businessLifetime') && <p className="text-[11px] mt-1 text-danger">{fieldError('businessLifetime')}</p>}
+                    </div>
+                    <div>
+                      <Label htmlFor="gst" className="text-xs mb-1.5">
+                        GST number
+                      </Label>
+                      <Input id="gst" type="text" placeholder="27AAPFU0939F1ZV" {...register('gst')} />
+                      {fieldError('gst') && <p className="text-[11px] mt-1 text-danger">{fieldError('gst')}</p>}
+                    </div>
+                  </div>
                   <div>
                     <Label htmlFor="salesPerson" className="text-xs mb-1.5">
                       Sales rep *
@@ -252,7 +290,13 @@ const CreateTenantDialog = () => {
                       name="address"
                       render={({ field }) => (
                         <div className="space-y-2">
-                          <LocationPicker value={field.value} onChange={field.onChange} defaultCountry="India" countryCode="IN" />
+                          <LocationPicker
+                            value={field.value}
+                            onChange={field.onChange}
+                            onResolutionStateChange={setLocationResolution}
+                            defaultCountry="India"
+                            countryCode="IN"
+                          />
                           <LocationAddressFields value={field.value} onChange={field.onChange} defaultCountry="India" />
                         </div>
                       )}
@@ -314,6 +358,12 @@ const CreateTenantDialog = () => {
                   'Failed to create company. Please try again.'}
               </div>
             )}
+
+            {locationResolutionError && (
+              <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
+                {locationResolutionError}
+              </div>
+            )}
           </div>
 
           <DialogFooter className="mt-4">
@@ -329,8 +379,8 @@ const CreateTenantDialog = () => {
                 <Button type="button" variant="outline" onClick={() => setStep(0)} disabled={createTenant.isPending}>
                   <FiArrowLeft size={14} /> Back
                 </Button>
-                <Button type="submit" disabled={createTenant.isPending}>
-                  {createTenant.isPending ? 'Creating…' : 'Create company'}
+                <Button type="submit" disabled={createTenant.isPending || locationResolution === 'loading'}>
+                  {createTenant.isPending ? 'Creating…' : locationResolution === 'loading' ? 'Resolving location…' : 'Create company'}
                 </Button>
               </>
             )}

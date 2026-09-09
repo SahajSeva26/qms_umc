@@ -13,7 +13,20 @@ export type GeoCoordinates = [number, number]
 // falls back to the raw ObjectId string when population didn't happen —
 // GeoProfileMapper.toResponse reads `profile.tenant?._id?.toString?.() ||
 // profile.tenant?.toString?.()`, so both shapes are possible on the wire).
-export interface GeoProfileEntity {
+// Registered/base address — spread flat on the profile (not nested). The mapper
+// returns each field as `?? null` (present-but-null, not absent) when unset.
+export interface GeoProfileAddressFields {
+  addressLine1: string | null
+  addressLine2: string | null
+  locality: string | null
+  city: string | null
+  state: string | null
+  country: string | null
+  pincode: string | null
+  googlePlaceId: string | null
+}
+
+export interface GeoProfileEntity extends GeoProfileAddressFields {
   id: string
   tenant: string
   role: string
@@ -43,7 +56,20 @@ export interface NearestGeoProfileQuery {
   limit?: string
 }
 
-export interface CreateGeoProfilePayload {
+// Plain optional strings — no way to explicitly CLEAR an address field this way,
+// only to add/change one.
+export interface GeoProfileAddressPayloadFields {
+  addressLine1?: string
+  addressLine2?: string
+  locality?: string
+  city?: string
+  state?: string
+  country?: string
+  pincode?: string
+  googlePlaceId?: string
+}
+
+export interface CreateGeoProfilePayload extends GeoProfileAddressPayloadFields {
   role: string
   type: GeoProfileType
   coordinates: GeoCoordinates
@@ -52,7 +78,7 @@ export interface CreateGeoProfilePayload {
   meta?: Record<string, unknown>
 }
 
-export interface UpdateGeoProfilePayload {
+export interface UpdateGeoProfilePayload extends GeoProfileAddressPayloadFields {
   type?: GeoProfileType
   coordinates?: GeoCoordinates
   coverageRadius?: number

@@ -100,7 +100,7 @@ const InventoryMasterTab = () => {
             <table className="w-full text-[13px]">
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--qms-border)' }}>
-                  {['Code', 'Name', 'Type', 'SKU', 'Unit', ...(canManage ? ['Status'] : []), 'Stock range', ...(canManage ? [''] : [])].map((h, i) => (
+                  {['Code', 'Name', 'Type', 'SKU', 'Unit', ...(canManage ? ['Status'] : []), 'Min stock', ...(canManage ? [''] : [])].map((h, i) => (
                     <th
                       key={`${h}-${i}`}
                       className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5"
@@ -139,7 +139,7 @@ const InventoryMasterTab = () => {
                         </span>
                       </td>
                     )}
-                    <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{item.minStock} - {item.maxStock}</td>
+                    <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{item.minStock}</td>
                     {canManage && (
                       <td className="px-4 py-2.5">
                         <button

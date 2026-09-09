@@ -7,13 +7,26 @@ import { MemoryRouter } from 'react-router-dom'
 // LocationPicker needs real Google Maps credentials, unavailable in tests —
 // mock it to a button using the same onChange(LocationValue) contract a real pin-drop would use.
 vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
-  default: ({ value, onChange }: { value: unknown; onChange: (v: unknown) => void }) => (
-    <button
-      type="button"
-      onClick={() => onChange({ ...(value as object ?? {}), coordinates: [73.8567, 18.5204] })}
-    >
-      Set test coordinates
-    </button>
+  default: ({ value, onChange, onResolutionStateChange }: {
+    value: unknown
+    onChange: (v: unknown) => void
+    onResolutionStateChange?: (status: 'idle' | 'loading' | 'error') => void
+  }) => (
+    <>
+      <button
+        type="button"
+        onClick={() => onChange({ ...(value as object ?? {}), coordinates: [73.8567, 18.5204] })}
+      >
+        Set test coordinates
+      </button>
+      {/* Simulates the real widget's "pin moved, reverse-geocode still resolving" window. */}
+      <button type="button" onClick={() => onResolutionStateChange?.('loading')}>
+        Simulate location resolving
+      </button>
+      <button type="button" onClick={() => onResolutionStateChange?.('idle')}>
+        Simulate location resolved
+      </button>
+    </>
   ),
 }))
 
@@ -142,5 +155,57 @@ describe('CreateTenantDialog — address', () => {
     expect(screen.getByText('State is required.')).toBeInTheDocument()
     expect(screen.getByText('Pincode is required.')).toBeInTheDocument()
     expect(screen.queryByText('City is required.')).not.toBeInTheDocument()
+  })
+
+  async function fillStep0WithAddressAndAdvance(user: ReturnType<typeof userEvent.setup>) {
+    await user.type(screen.getByLabelText(/code \*/i), 'acme-pharma')
+    await user.type(screen.getByLabelText(/^name \*$/i), 'Acme Pharma')
+    await user.click(screen.getByRole('combobox', { name: /sales rep/i }))
+    await user.click(await screen.findByText(/sales rep one/i))
+    await user.type(screen.getByLabelText(/^address line 1$/i), '221 Baker Street')
+    await user.type(screen.getByLabelText(/^city$/i), 'Pune')
+    await user.type(screen.getByLabelText(/^state$/i), 'Maharashtra')
+    await user.type(screen.getByLabelText(/^pincode$/i), '411001')
+  }
+
+  it('disables Create company (relabeled "Resolving location…") while the picked pin is still resolving, so createTenant is never called', async () => {
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    const user = userEvent.setup()
+    await renderDialog()
+
+    await user.click(screen.getByRole('button', { name: /new client/i }))
+    await fillStep0WithAddressAndAdvance(user)
+    await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
+    await user.click(screen.getByRole('button', { name: /simulate location resolving/i }))
+    await user.click(screen.getByRole('button', { name: /^next$/i }))
+
+    await user.type(screen.getByLabelText(/first name \*/i), 'Jane')
+    await user.type(screen.getByLabelText(/^email \*$/i), 'jane@example.com')
+    await user.type(screen.getByLabelText(/^password \*$/i), 'password123')
+
+    const submitButton = await screen.findByRole('button', { name: /resolving location/i })
+    expect(submitButton).toBeDisabled()
+    await user.click(submitButton)
+    expect(accessManagementService.createTenant).not.toHaveBeenCalled()
+  })
+
+  it('allows Create company once resolution returns to idle after a loading state', async () => {
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    const user = userEvent.setup()
+    await renderDialog()
+
+    await user.click(screen.getByRole('button', { name: /new client/i }))
+    await fillStep0WithAddressAndAdvance(user)
+    await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
+    await user.click(screen.getByRole('button', { name: /simulate location resolving/i }))
+    await user.click(screen.getByRole('button', { name: /simulate location resolved/i }))
+    await user.click(screen.getByRole('button', { name: /^next$/i }))
+
+    await user.type(screen.getByLabelText(/first name \*/i), 'Jane')
+    await user.type(screen.getByLabelText(/^email \*$/i), 'jane@example.com')
+    await user.type(screen.getByLabelText(/^password \*$/i), 'password123')
+    await user.click(screen.getByRole('button', { name: /create company/i }))
+
+    await waitFor(() => expect(accessManagementService.createTenant).toHaveBeenCalledTimes(1))
   })
 })

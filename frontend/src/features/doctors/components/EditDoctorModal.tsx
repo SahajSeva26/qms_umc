@@ -101,7 +101,11 @@ interface EditDoctorModalFormProps {
 
 const EditDoctorModalForm = ({ doctor, onClose, onCreated, forcedTenant }: EditDoctorModalFormProps) => {
   const isEdit = !!doctor
-  const [draft, setDraft] = useState<DoctorDraft>(doctor ? draftFromDoctor(doctor) : emptyDraft)
+  const initialDraft = doctor ? draftFromDoctor(doctor) : emptyDraft
+  const [draft, setDraft] = useState<DoctorDraft>(initialDraft)
+  const setDraftField = <K extends keyof DoctorDraft>(key: K, value: DoctorDraft[K]) => {
+    setDraft((p) => ({ ...p, [key]: value }))
+  }
   const { session } = useSession()
   // A platform caller has no single "home" tenant and must pick one; a
   // customer caller's submitted tenant is ignored server-side either way.
@@ -171,16 +175,18 @@ const EditDoctorModalForm = ({ doctor, onClose, onCreated, forcedTenant }: EditD
       if (isEdit) {
         // pharmaCode is immutable — not sent on update (matches backend's
         // UpdateDoctorPayloadSchema, which has no pharmaCode field at all).
+        // Compare final value to the original snapshot (not "was ever
+        // touched") so a field edited then reverted is never resent.
         await updateDoctor.mutateAsync({
-          name: draft.name,
-          specialization: draft.specialization,
-          mobile: draft.mobile,
-          city: draft.city,
-          state: draft.state,
-          pincode: draft.pincode,
-          email: draft.email,
-          googleMapLink: draft.googleMapLink || undefined,
-          status: draft.status,
+          ...(draft.name !== initialDraft.name ? { name: draft.name } : {}),
+          ...(draft.specialization !== initialDraft.specialization ? { specialization: draft.specialization } : {}),
+          ...(draft.mobile !== initialDraft.mobile ? { mobile: draft.mobile } : {}),
+          ...(draft.city !== initialDraft.city ? { city: draft.city } : {}),
+          ...(draft.state !== initialDraft.state ? { state: draft.state } : {}),
+          ...(draft.pincode !== initialDraft.pincode ? { pincode: draft.pincode } : {}),
+          ...(draft.email !== initialDraft.email ? { email: draft.email } : {}),
+          ...(draft.googleMapLink !== initialDraft.googleMapLink ? { googleMapLink: draft.googleMapLink || undefined } : {}),
+          ...(draft.status !== initialDraft.status ? { status: draft.status } : {}),
         })
         toast.success('Doctor updated')
       } else {
@@ -286,11 +292,11 @@ const EditDoctorModalForm = ({ doctor, onClose, onCreated, forcedTenant }: EditD
             </div>
             <div>
               <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Doctor name</label>
-              <Input value={draft.name} onChange={(e) => setDraft((p) => ({ ...p, name: e.target.value }))} />
+              <Input value={draft.name} onChange={(e) => setDraftField('name', e.target.value)} />
             </div>
             <div>
               <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Specialization</label>
-              <Select value={draft.specialization} onValueChange={(v) => setDraft((p) => ({ ...p, specialization: v as DoctorSpecialization }))}>
+              <Select value={draft.specialization} onValueChange={(v) => setDraftField('specialization', v as DoctorSpecialization)}>
                 <SelectTrigger className="w-full text-[13px]"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {SPECIALIZATION_OPTIONS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
@@ -299,32 +305,32 @@ const EditDoctorModalForm = ({ doctor, onClose, onCreated, forcedTenant }: EditD
             </div>
             <div>
               <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Mobile</label>
-              <Input value={draft.mobile} onChange={(e) => setDraft((p) => ({ ...p, mobile: e.target.value }))} />
+              <Input value={draft.mobile} onChange={(e) => setDraftField('mobile', e.target.value)} />
             </div>
             <div>
               <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>City</label>
-              <Input value={draft.city} onChange={(e) => setDraft((p) => ({ ...p, city: e.target.value }))} />
+              <Input value={draft.city} onChange={(e) => setDraftField('city', e.target.value)} />
             </div>
             <div>
               <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>State</label>
-              <Input value={draft.state} onChange={(e) => setDraft((p) => ({ ...p, state: e.target.value }))} />
+              <Input value={draft.state} onChange={(e) => setDraftField('state', e.target.value)} />
             </div>
             <div>
               <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Pincode</label>
-              <Input value={draft.pincode} onChange={(e) => setDraft((p) => ({ ...p, pincode: e.target.value }))} />
+              <Input value={draft.pincode} onChange={(e) => setDraftField('pincode', e.target.value)} />
             </div>
             <div>
               <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Email</label>
-              <Input value={draft.email} onChange={(e) => setDraft((p) => ({ ...p, email: e.target.value }))} />
+              <Input value={draft.email} onChange={(e) => setDraftField('email', e.target.value)} />
             </div>
             <div className="sm:col-span-2">
               <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Google Maps link</label>
-              <Input value={draft.googleMapLink} onChange={(e) => setDraft((p) => ({ ...p, googleMapLink: e.target.value }))} />
+              <Input value={draft.googleMapLink} onChange={(e) => setDraftField('googleMapLink', e.target.value)} />
             </div>
             {isEdit && (
               <div>
                 <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Status</label>
-                <Select value={draft.status} onValueChange={(v) => setDraft((p) => ({ ...p, status: v as DoctorStatus }))}>
+                <Select value={draft.status} onValueChange={(v) => setDraftField('status', v as DoctorStatus)}>
                   <SelectTrigger className="w-full text-[13px]"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {STATUS_OPTIONS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}

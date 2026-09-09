@@ -10,6 +10,7 @@ import type { ApiResponse } from '@/types/common.types'
 import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
 import { CAMP_TIME_SLOT_LABEL } from '@/types/campTimeSlot.constants'
 import type { LocationValue } from '@/types/location.types'
+import type { LocationResolutionState } from '@/components/widgets/location-picker/location.types'
 import DoctorPicker from '@/features/pharma/components/DoctorPicker'
 import MrPicker from '@/features/pharma/components/MrPicker'
 import EditDoctorModal from '@/features/doctors/components/EditDoctorModal'
@@ -109,6 +110,10 @@ const BookCampForm = ({ needsMrPicker, project, onBooked }: BookCampFormProps) =
   // isPending flips true only once mutate is called, but parsePayload's own
   // re-parse runs before that — this ref closes that race window synchronously.
   const submittingRef = useRef(false)
+  // Covers the map pin's reverse-geocode AND the search box's async place
+  // selection — either can still be in flight when Submit is clicked.
+  const [locationResolution, setLocationResolution] = useState<LocationResolutionState>('idle')
+  const [locationError, setLocationError] = useState<string | null>(null)
 
   const {
     register,
@@ -135,6 +140,17 @@ const BookCampForm = ({ needsMrPicker, project, onBooked }: BookCampFormProps) =
   const missingSelfMrId = !needsMrPicker && !selfMrId
 
   const onSubmit = async (values: FormValues) => {
+    // Same failure mode GeoProfileDetailPage guards: the pin/search result can
+    // still be resolving (or have failed) when Submit is clicked.
+    if (locationResolution !== 'idle') {
+      setLocationError(
+        locationResolution === 'loading'
+          ? 'Still resolving the picked location — wait a moment and try again'
+          : 'Retry or choose "Use this pin" for the location before saving',
+      )
+      return
+    }
+    setLocationError(null)
     const formPayload = await parsePayload(values)
     // project is context, not form state — assembled here, never claimed as
     // the resolver's own output type (see BookCampFormPayload).
@@ -276,7 +292,13 @@ const BookCampForm = ({ needsMrPicker, project, onBooked }: BookCampFormProps) =
           name="location"
           render={({ field }) => (
             <div className="space-y-2">
-              <LocationPicker value={field.value} onChange={field.onChange} defaultCountry="India" countryCode="IN" />
+              <LocationPicker
+                value={field.value}
+                onChange={field.onChange}
+                onResolutionStateChange={setLocationResolution}
+                defaultCountry="India"
+                countryCode="IN"
+              />
               <LocationAddressFields value={field.value} onChange={field.onChange} defaultCountry="India" />
             </div>
           )}
@@ -303,13 +325,19 @@ const BookCampForm = ({ needsMrPicker, project, onBooked }: BookCampFormProps) =
         </div>
       )}
 
+      {locationError && (
+        <div className="text-[12px] rounded-lg px-3 py-2 bg-danger-soft border border-danger text-danger">
+          {locationError}
+        </div>
+      )}
+
       <Button
         type="submit"
-        disabled={bookCamp.isPending || missingSelfMrId}
+        disabled={bookCamp.isPending || missingSelfMrId || locationResolution === 'loading'}
         className="w-full font-bold text-white"
         style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
       >
-        {bookCamp.isPending ? 'Booking…' : 'Book camp'}
+        {bookCamp.isPending ? 'Booking…' : locationResolution === 'loading' ? 'Resolving location…' : 'Book camp'}
       </Button>
     </form>
   )

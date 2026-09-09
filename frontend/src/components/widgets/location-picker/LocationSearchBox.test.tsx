@@ -154,4 +154,27 @@ describe('LocationSearchBox', () => {
     await waitFor(() => expect(onSelected).toHaveBeenCalledTimes(1))
     expect(input).not.toBeDisabled()
   })
+
+  it('reports isSelecting=true while a selection is in flight, then false once it resolves — a caller can gate Save on this', async () => {
+    let resolveFetchFields!: (v: { place: unknown }) => void
+    const suggestion = makeSuggestion('p1', 'Mumbai')
+    ;(suggestion.placePrediction as unknown as { toPlace: () => { fetchFields: () => Promise<{ place: unknown }> } }).toPlace = () => ({
+      fetchFields: vi.fn(() => new Promise<{ place: unknown }>((resolve) => { resolveFetchFields = resolve })),
+    })
+    fetchAutocompleteSuggestions.mockResolvedValue({ suggestions: [suggestion] })
+    const onSelectingStateChange = vi.fn()
+    const user = userEvent.setup()
+    render(<LocationSearchBox onSelected={vi.fn()} onSelectingStateChange={onSelectingStateChange} />)
+
+    const input = screen.getByRole('combobox')
+    await user.type(input, 'Mumbai')
+    await waitFor(() => expect(screen.getAllByRole('option')).toHaveLength(1))
+    expect(onSelectingStateChange).not.toHaveBeenCalledWith(true)
+
+    await user.click(screen.getByRole('option'))
+    expect(onSelectingStateChange).toHaveBeenLastCalledWith(true)
+
+    resolveFetchFields({ place: { id: 'p1', addressComponents: [], location: { lat: () => 1, lng: () => 2 } } })
+    await waitFor(() => expect(onSelectingStateChange).toHaveBeenLastCalledWith(false))
+  })
 })

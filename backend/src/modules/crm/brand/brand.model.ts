@@ -20,6 +20,12 @@ const brandSchema = new mongoose.Schema(
             lowercase: true,
             trim: true,
         },
+        // derived from name (lowercased, all whitespace stripped) by the service — never set by the
+        // caller. Serves as the natural key that uniqueness is enforced on.
+        code: {
+            type: String,
+            required: true,
+        },
         description: {
             type: String,
             required: false,
@@ -46,7 +52,9 @@ const brandSchema = new mongoose.Schema(
     },
 );
 
-brandSchema.index({ tenant: 1, division: 1 });
+// brand code (derived from name) is unique within a tenant's division. The prefix also serves
+// tenant / tenant+division scoped reads.
+brandSchema.index({ tenant: 1, division: 1, code: 1 }, { unique: true });
 
 export const BrandModel = mongoose.model('Brand', brandSchema);
 export type IBrand = mongoose.InferSchemaType<typeof brandSchema>;

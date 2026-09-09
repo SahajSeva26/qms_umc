@@ -16,11 +16,15 @@ const populate: any[] = [
     { path: 'division', select: 'name code therapy' },
 ];
 
+// derive the natural key from the name: lowercase + strip ALL whitespace (e.g. 'Cardace Plus' → 'cardaceplus')
+const toCode = (name: string): string => name.toLowerCase().replace(/\s+/g, '');
+
 // ========================================================================================
 // CORE FUNCTIONS
 // ========================================================================================
 
 const set = (model: any, entity: HydratedDocument<IBrand>) => {
+    // code is NOT set here — it is derived once at create and is immutable thereafter
     if (model.name) entity.name = model.name;
     if (model.description !== undefined) entity.description = model.description;
     if (model.molecule !== undefined) entity.molecule = model.molecule;
@@ -62,6 +66,9 @@ const search = async (filters: ISearchBrandQuery, ctx: RequestContext, options?:
     if (filters.division) {
         where.division = filters.division;
     }
+    if (filters.code) {
+        where.code = filters.code;
+    }
     if (filters.name) {
         where.name = { $regex: filters.name, $options: 'i' };
     }
@@ -94,15 +101,19 @@ const create = async (model: ICreateBrandPayload, ctx: RequestContext): Promise<
     // from the caller.
     const tenant = division.tenant;
 
-    //3: duplicate-name guard within the division (names are stored lowercased for case-insensitive
-    // dedup). create() always checks for an existing record first.
-    const existing = await BrandModel.findOne({ division: division._id, name: model.name.toLowerCase() });
-    if (existing) {
+    //3: derive the immutable natural key from the name (lowercase + all whitespace stripped)
+    const code = toCode(model.name);
+
+    //4: duplicate guard within the division — keyed on the derived code (create() always checks
+    // for an existing record first). Reuses search(); the unique {tenant,division,code} index is
+    // the race backstop.
+    const { count } = await BrandService.search({ division: division._id.toString(), code }, ctx);
+    if (count > 0) {
         return throwAppError('A brand with this name already exists in this division', StatusCodes.CONFLICT);
     }
 
-    //4: build + apply
-    const entity = new BrandModel({ tenant, division: division._id });
+    //5: build + apply — code is set here once and never touched again
+    const entity = new BrandModel({ tenant, division: division._id, code });
     let brand = set(model, entity);
     brand = await brand.save();
 

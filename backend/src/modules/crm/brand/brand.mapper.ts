@@ -4,6 +4,7 @@ export const BrandMapper = {
         tenant: brand.tenant,
         division: brand.division,
         name: brand.name,
+        code: brand.code,
         description: brand.description,
         molecule: brand.molecule,
         notes: brand.notes,

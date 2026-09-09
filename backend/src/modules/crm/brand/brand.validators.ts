@@ -33,6 +33,8 @@ export type IUpdateBrandPayload = z.infer<typeof UpdateBrandPayloadSchema>;
 //3: search ====================================>
 export const SearchBrandQuerySchema = z.object({
     name: z.string().optional().openapi({ example: 'Cardace' }),
+    // exact-match natural key (derived from name — lowercased, whitespace stripped)
+    code: z.string().optional().openapi({ example: 'cardace' }),
     status: z.enum(Object.values(BRAND_STATUS)).optional().openapi({ example: 'active' }),
     // only honoured for platform staff; customer users stay pinned to their own tenant
     tenant: objectId('Tenant').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),

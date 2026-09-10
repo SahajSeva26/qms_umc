@@ -27,6 +27,20 @@ const ADD_NEW_CONTACT_VALUE = '__add_new_contact__'
 
 const APPOINTMENT_TYPES: AppointmentType[] = ['new', 'follow-up', 'payment', 'spot']
 
+// Who-you're-meeting-as capture, scoped to this appointment only — not part of
+// the Contact's own stored record (that has its own separate, flat, free-text
+// `designation`). Frontend-only for now: neither field exists on the backend
+// Appointment yet, see TODO.md.
+const MEETING_DEPARTMENTS = ['Marketing', 'Purchase', 'Account', 'Logistic', 'Other'] as const
+type MeetingDepartment = (typeof MEETING_DEPARTMENTS)[number]
+const MEETING_DESIGNATIONS: Record<MeetingDepartment, string[]> = {
+  Marketing: ['Jr PMT', 'PMT', 'Sr.PMT', 'GPM', 'Sr.GPM', 'Marketing Manager', 'Division Head', 'BU Head', 'GM', 'Sr.GM', 'VP', 'Sr.VP', 'President', 'Other'],
+  Purchase: ['Executive', 'Manager', 'Head'],
+  Account: ['Executive', 'Manager', 'Head'],
+  Logistic: ['Executive', 'Manager', 'Head', 'Other'],
+  Other: ['Executive', 'Manager', 'Head', 'Other'],
+}
+
 // startTime is 'HH:mm' on the same calendar day; durationHours can be fractional
 // (e.g. 1.5) — a plain minute-of-day add suffices, wrapping past midnight is not
 // supported (matches the old same-day start/end picker's own assumption).
@@ -59,6 +73,8 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
   const [tenantId, setTenantId] = useState('')
   const [divisionId, setDivisionId] = useState('')
   const [contactPersonId, setContactPersonId] = useState('')
+  const [contactDepartment, setContactDepartment] = useState<MeetingDepartment | ''>('')
+  const [contactRole, setContactRole] = useState('')
   const [mode, setMode] = useState<AppointmentMode>('online')
   const [members, setMembers] = useState<SelectedMember[]>([])
   const [date, setDate] = useState(prefill?.date ?? new Date().toISOString().slice(0, 10))
@@ -105,6 +121,8 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
     setTenantId('')
     setDivisionId('')
     setContactPersonId('')
+    setContactDepartment('')
+    setContactRole('')
     setMode('online')
     setMembers([])
     setDate(new Date().toISOString().slice(0, 10))
@@ -131,6 +149,8 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
     setTenantId(id)
     setDivisionId('')
     setContactPersonId('')
+    setContactDepartment('')
+    setContactRole('')
     setAddingContact(false)
     setJustCreatedContact(null)
     setParentId('')
@@ -233,6 +253,8 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
                 onValueChange={(v) => {
                   setDivisionId(v ?? '')
                   setContactPersonId('')
+                  setContactDepartment('')
+                  setContactRole('')
                   setAddingContact(false)
                   setJustCreatedContact(null)
                   setParentId('')
@@ -282,6 +304,46 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
               {!contactsErrored && !contactsLoading && divisionId && contacts.length === 0 && (
                 <p className="text-[11px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>This company has no contacts yet — add one above.</p>
               )}
+            </div>
+          </div>
+
+          {/* Who-you're-meeting-as for this appointment, not the contact's own stored
+              designation — frontend-only for now, see TODO.md. */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className={labelClasses} style={labelStyle}>Department</Label>
+              <Select
+                key={contactDepartment || 'empty'}
+                value={contactDepartment || undefined}
+                onValueChange={(v) => {
+                  const nextDepartment = (v ?? '') as MeetingDepartment | ''
+                  setContactDepartment(nextDepartment)
+                  if (!nextDepartment || !MEETING_DESIGNATIONS[nextDepartment].includes(contactRole)) setContactRole('')
+                }}
+              >
+                <SelectTrigger className="w-full text-[13px]">
+                  <SelectValue placeholder="Select department...">{(v: string) => v}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {MEETING_DEPARTMENTS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className={labelClasses} style={labelStyle}>Designation</Label>
+              <Select
+                key={contactRole || 'empty'}
+                value={contactRole || undefined}
+                onValueChange={(v) => setContactRole(v ?? '')}
+                disabled={!contactDepartment}
+              >
+                <SelectTrigger className="w-full text-[13px]">
+                  <SelectValue placeholder={contactDepartment ? 'Select designation...' : 'Select a department first'}>{(v: string) => v}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {contactDepartment && MEETING_DESIGNATIONS[contactDepartment].map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

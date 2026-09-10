@@ -8,10 +8,25 @@ import type { RoleEntity } from '@/types/accessManagement.types'
 vi.mock('@/hooks/useSession')
 
 vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
-  default: ({ onResolutionStateChange }: {
+  default: ({ value, onChange, onResolutionStateChange }: {
+    value: unknown
+    onChange: (v: unknown) => void
     onResolutionStateChange?: (status: 'idle' | 'loading' | 'error') => void
   }) => (
     <>
+      {/* Simulates picking a real point on the map — needed for CampFoPicker's
+          coverage-radius-based eligibility, which requires real coordinates. */}
+      <button
+        type="button"
+        onClick={() => onChange({
+          addressLine1: '', addressLine2: undefined, locality: undefined,
+          city: '', state: '', country: undefined, pincode: '', googlePlaceId: undefined,
+          ...(value as object ?? {}),
+          coordinates: [77.02, 28.52],
+        })}
+      >
+        Set test coordinates
+      </button>
       {/* Simulates the real widget's "pin moved, reverse-geocode still resolving"
           window — the gap between a drag/click and onChange actually firing. */}
       <button type="button" onClick={() => onResolutionStateChange?.('loading')}>
@@ -69,6 +84,13 @@ vi.mock('@/features/access-management/accessManagement.service', () => ({
     searchTenants: vi.fn(async () => ({ success: true, message: '', data: { items: [], count: 0 } })),
     searchRoleTypes: vi.fn(async () => ({ success: true, message: '', data: { items: [{ id: 'rt-fo', code: 'field-officer' }], count: 1 } })),
     searchRoles: vi.fn(async () => ({ success: true, message: '', data: { items: [], count: 0 } })),
+    getRole: vi.fn(),
+  },
+}))
+
+vi.mock('@/features/geo-profile/geoProfile.service', () => ({
+  geoProfileService: {
+    nearestGeoProfiles: vi.fn(async () => ({ success: true, message: '', data: { items: [], count: 0 } })),
   },
 }))
 
@@ -268,10 +290,34 @@ describe('CampDetailPageReal — create mode, MR/FO pickers', () => {
       success: true, message: '', data: { items: [{ id: `rt-${q.code}`, code: q.code }], count: 1 },
     }) as never)
     vi.mocked(accessManagementService.searchRoles).mockImplementation(async (q) => {
-      const roleTypeCode = q.type === 'rt-pharma-mr' ? 'pharma-mr' : q.type === 'rt-field-officer' ? 'field-officer' : undefined
+      const roleTypeCode = q.type === 'rt-pharma-mr' ? 'pharma-mr' : undefined
       const items = roleTypeCode ? rolesByCode[roleTypeCode] ?? [] : []
       return { success: true, message: '', data: { items, count: items.length } } as never
     })
+  }
+
+  // FO eligibility is coverage-radius-based (GET /geo-profiles/nearest), not
+  // a name search — mock that path instead of searchRoles for FO fixtures.
+  async function mockNearestFo(role: RoleEntity | null) {
+    const { geoProfileService } = await import('@/features/geo-profile/geoProfile.service')
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    vi.mocked(geoProfileService.nearestGeoProfiles).mockResolvedValue({
+      success: true,
+      message: '',
+      data: {
+        items: role ? [{
+          id: 'geo-1', tenant: 't-1', role: role.id, type: 'fo', status: 'active',
+          coordinates: [77.02, 28.52], coverageRadius: 35000, meta: {},
+          addressLine1: null, addressLine2: null, locality: null, city: null, state: null,
+          country: null, pincode: null, googlePlaceId: null, createdAt: '', updatedAt: '',
+          distance: 5000,
+        }] : [],
+        count: role ? 1 : 0,
+      },
+    } as never)
+    if (role) {
+      vi.mocked(accessManagementService.getRole).mockResolvedValue({ success: true, message: '', data: role } as never)
+    }
   }
 
   it('changing Company clears MR, MR label, FO, and FO label together', async () => {
@@ -282,8 +328,8 @@ describe('CampDetailPageReal — create mode, MR/FO pickers', () => {
     ])
     await mockRoleTypesAndRoles({
       'pharma-mr': [{ id: 'mr-cipla', code: 'phr-001', name: 'Cipla MR', permissions: [], status: 'active', type: 'rt-pharma-mr', user: 'u-2', tenant: 't-cipla', createdAt: '', updatedAt: '' } as RoleEntity],
-      'field-officer': [{ id: 'fo-cipla', code: 'fo-001', name: 'Cipla FO', permissions: [], status: 'active', type: 'rt-field-officer', user: 'u-3', tenant: 't-cipla', createdAt: '', updatedAt: '' } as RoleEntity],
     })
+    await mockNearestFo({ id: 'fo-cipla', code: 'fo-001', name: 'Cipla FO', permissions: [], status: 'active', type: 'rt-field-officer', user: 'u-3', tenant: 't-cipla', createdAt: '', updatedAt: '' } as RoleEntity)
 
     const user = userEvent.setup()
     await renderCreatePage()
@@ -293,8 +339,10 @@ describe('CampDetailPageReal — create mode, MR/FO pickers', () => {
     await user.type(mrSearchInput, 'Cipla')
     await user.click(await screen.findByText(/cipla mr/i, {}, { timeout: 3000 }))
 
+    // FO picker needs real coordinates before it's usable at all (coverage-radius eligibility).
+    await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
     const foSearchInput = await screen.findByPlaceholderText(/search fo by name/i)
-    await user.type(foSearchInput, 'Cipla')
+    await user.click(foSearchInput)
     await user.click(await screen.findByText(/cipla fo/i, {}, { timeout: 3000 }))
 
     expect(screen.getByText(/cipla mr/i)).toBeInTheDocument()
@@ -321,21 +369,33 @@ describe('CampDetailPageReal — create mode, MR/FO pickers', () => {
     expect(foInput).toBeDisabled()
   })
 
-  it('FO search sends both the selected tenant and the field-officer role type', async () => {
+  it('the FO picker shows a "Pick a location first" placeholder until a location is set, even after a Company is picked', async () => {
     await mockSessionWithPermission(true)
     await mockTenants([{ id: 't-cipla', name: 'Cipla', code: 'cipla', type: 'customer' }])
-    await mockRoleTypesAndRoles({ 'field-officer': [] })
-    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
 
     const user = userEvent.setup()
     await renderCreatePage()
     await pickCompany(user, 'Cipla')
 
-    const foSearchInput = await screen.findByPlaceholderText(/search fo by name/i)
-    await user.type(foSearchInput, 'Ramesh')
+    expect(await screen.findByPlaceholderText('Pick a location first')).toBeInTheDocument()
+  })
 
-    await waitFor(() => expect(accessManagementService.searchRoles).toHaveBeenCalledWith(
-      expect.objectContaining({ tenant: 't-cipla', type: 'rt-field-officer' }),
+  it('FO search uses the coverage-radius lookup (GET /geo-profiles/nearest), not a name-based Role search — a platform-tenant-only RoleType has no meaningful tenant-scoped name search left in this picker', async () => {
+    await mockSessionWithPermission(true)
+    await mockTenants([{ id: 't-cipla', name: 'Cipla', code: 'cipla', type: 'customer' }])
+    await mockNearestFo(null)
+    const { geoProfileService } = await import('@/features/geo-profile/geoProfile.service')
+
+    const user = userEvent.setup()
+    await renderCreatePage()
+    await pickCompany(user, 'Cipla')
+    await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
+
+    const foSearchInput = await screen.findByPlaceholderText(/search fo by name/i)
+    await user.click(foSearchInput)
+
+    await waitFor(() => expect(geoProfileService.nearestGeoProfiles).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'fo', lng: 77.02, lat: 28.52 }),
     ))
   })
 })

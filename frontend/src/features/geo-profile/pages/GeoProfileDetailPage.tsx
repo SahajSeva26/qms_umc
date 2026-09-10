@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { FiArrowLeft, FiLock } from 'react-icons/fi'
 import { GEO_PROFILE_ROUTES, GEO_PROFILE_TYPE_OPTIONS, GEO_PROFILE_STATUS_LABEL, GEO_PROFILE_STATUS_OPTIONS } from '@/features/geo-profile/geoProfile.constants'
 import { profileToLocationValue, locationValueToCoordinates, locationValueToAddressPayload } from '@/features/geo-profile/utils/geoProfileLocationAdapter'
+import { isFieldOfficerRole } from '@/features/geo-profile/utils/geoProfile.utils'
 import { useGeoProfile } from '@/features/geo-profile/hooks/useGeoProfile'
 import { useCreateGeoProfile } from '@/features/geo-profile/hooks/useCreateGeoProfile'
 import { useUpdateGeoProfile } from '@/features/geo-profile/hooks/useUpdateGeoProfile'
@@ -173,11 +174,22 @@ const CreateGeoProfileForm = ({ roles, roleName }: RoleNameLookupProps) => {
   const [coverageRadiusKm, setCoverageRadiusKm] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
 
+  // A GeoProfile only ever backs a Field Officer or a Dietitian — never show
+  // unrelated roles (Admin, Sales Rep, MR, etc.) in this picker at all. No
+  // dietitian RoleType exists in this system yet (confirmed against the
+  // backend's RoleType catalog), so for now this only shows Field Officers.
+  const roleOptions = roles.filter(isFieldOfficerRole)
+
   const handleSave = () => {
     const radiusKm = Number(coverageRadiusKm)
 
     if (!role) { setFormError('Role is required'); return }
     if (!type) { setFormError('Type is required'); return }
+    const selectedRole = roles.find((r) => r.id === role)
+    if (!selectedRole || !isFieldOfficerRole(selectedRole)) {
+      setFormError('Selected role is not a Field Officer — pick a different role')
+      return
+    }
     if (locationResolution === 'loading') { setFormError('Still resolving the picked location — wait a moment and try again'); return }
     if (locationResolution === 'error') { setFormError('Retry or choose "Use this pin" for the location before saving'); return }
     if (!location?.coordinates) { setFormError('Pick a location on the map'); return }
@@ -236,7 +248,7 @@ const CreateGeoProfileForm = ({ roles, roleName }: RoleNameLookupProps) => {
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {roles.map((r) => (
+                {roleOptions.map((r) => (
                   <SelectItem key={r.id} value={r.id}>
                     {r.name} ({r.code})
                   </SelectItem>
@@ -244,7 +256,7 @@ const CreateGeoProfileForm = ({ roles, roleName }: RoleNameLookupProps) => {
               </SelectContent>
             </Select>
             <p className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
-              A role may back at most one geo profile — this link is immutable after create.
+              Only field-officer-typed roles are shown here. A role may back at most one geo profile — this link is immutable after create.
             </p>
           </div>
 

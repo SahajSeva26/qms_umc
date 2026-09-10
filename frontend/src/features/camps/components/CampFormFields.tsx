@@ -167,7 +167,7 @@ const CampFormFields = ({
           <CampFoPicker
             value={fo}
             label={foLabel}
-            tenant={effectiveTenant || undefined}
+            coordinates={location?.coordinates}
             onChange={(id, l) => { setField('fo', id); setFoLabel(l) }}
             disabled={isLocked || !effectiveTenant}
           />

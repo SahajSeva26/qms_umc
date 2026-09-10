@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FiUserPlus } from 'react-icons/fi'
+import { FiUserPlus, FiBell, FiX } from 'react-icons/fi'
 import type { AppointmentType, AppointmentMode } from '@/types/appointment.types'
 import { APPOINTMENT_TYPE_LABEL, APPOINTMENT_MODE_LABEL } from '@/types/appointment.types'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
@@ -376,6 +376,37 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
           <div>
             <Label className={labelClasses} style={labelStyle}>Private notes</Label>
             <Textarea value={agendaPrivate} onChange={(e) => setAgendaPrivate(e.target.value)} rows={2} className="text-[13px]" placeholder="Internal only" />
+          </div>
+
+          {/* Display-only shell — no backend support yet, nothing here is wired
+              to state or the save payload. Rows are static placeholders matching
+              the eventual "N hours before, via <channel>" reminder-rule shape. */}
+          <div>
+            <Label className={`${labelClasses} flex items-center gap-1.5`} style={labelStyle}>
+              <FiBell size={11} /> Reminders
+            </Label>
+            <p className="text-[11px] mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+              Default reminder fires exactly 24 hours before the meeting time. Adjust the offset or add more rows as needed.
+            </p>
+            <div className="space-y-2">
+              {(['WhatsApp', 'Email'] as const).map((channel) => (
+                <div key={channel} className="flex items-center gap-2">
+                  <Input value="24" disabled className="w-16 text-[13px]" />
+                  <span className="text-[12px] shrink-0" style={{ color: 'var(--qms-text-muted)' }}>hours before</span>
+                  <Select value={channel} disabled>
+                    <SelectTrigger className="w-full text-[13px]">
+                      <SelectValue>{channel}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={channel}>{channel}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <button type="button" disabled className="shrink-0 p-1 rounded-md text-danger opacity-60">
+                    <FiX size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
 
           {error && <p className="text-[12px] font-semibold text-danger">{error}</p>}

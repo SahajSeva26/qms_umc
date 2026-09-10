@@ -168,6 +168,8 @@ const CampFormFields = ({
             value={fo}
             label={foLabel}
             coordinates={location?.coordinates}
+            date={date}
+            timeSlot={timeSlot}
             onChange={(id, l) => { setField('fo', id); setFoLabel(l) }}
             disabled={isLocked || !effectiveTenant}
           />

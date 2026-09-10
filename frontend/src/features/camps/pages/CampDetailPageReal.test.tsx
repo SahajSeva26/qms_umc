@@ -296,6 +296,30 @@ describe('CampDetailPageReal — create mode, MR/FO pickers', () => {
     })
   }
 
+  // Time Slot has no options at all until a project (which carries
+  // campTimeSlots) is picked — needed now that CampFoPicker also gates on
+  // date+timeSlot, not just coordinates.
+  async function mockProjectWithSlots() {
+    const { projectsService } = await import('@/features/projects/projects.service')
+    vi.mocked(projectsService.searchProjects).mockResolvedValue({
+      success: true,
+      message: '',
+      data: {
+        items: [{
+          id: 'proj-1', code: 'prj-001', name: 'Cipla Project', status: 'new',
+          campTimeSlots: ['9am-1pm'], tests: [],
+        }],
+        count: 1,
+      },
+    } as never)
+  }
+
+  async function pickProject(user: ReturnType<typeof userEvent.setup>) {
+    const projectInput = await screen.findByPlaceholderText(/search project by name/i)
+    await user.type(projectInput, 'Cipla')
+    await user.click(await screen.findByText(/cipla project/i, {}, { timeout: 3000 }))
+  }
+
   // FO eligibility is coverage-radius-based (GET /geo-profiles/nearest), not
   // a name search — mock that path instead of searchRoles for FO fixtures.
   async function mockNearestFo(role: RoleEntity | null) {
@@ -330,17 +354,28 @@ describe('CampDetailPageReal — create mode, MR/FO pickers', () => {
       'pharma-mr': [{ id: 'mr-cipla', code: 'phr-001', name: 'Cipla MR', permissions: [], status: 'active', type: 'rt-pharma-mr', user: 'u-2', tenant: 't-cipla', createdAt: '', updatedAt: '' } as RoleEntity],
     })
     await mockNearestFo({ id: 'fo-cipla', code: 'fo-001', name: 'Cipla FO', permissions: [], status: 'active', type: 'rt-field-officer', user: 'u-3', tenant: 't-cipla', createdAt: '', updatedAt: '' } as RoleEntity)
+    await mockProjectWithSlots()
 
     const user = userEvent.setup()
     await renderCreatePage()
     await pickCompany(user, 'Cipla')
+    await pickProject(user)
 
     const mrSearchInput = await screen.findByPlaceholderText(/search mr by name/i)
     await user.type(mrSearchInput, 'Cipla')
     await user.click(await screen.findByText(/cipla mr/i, {}, { timeout: 3000 }))
 
-    // FO picker needs real coordinates before it's usable at all (coverage-radius eligibility).
+    // FO picker needs real coordinates AND date+timeSlot before it's usable at
+    // all (coverage-radius + availability eligibility).
     await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
+    const dateLabel = screen.getByText(/^date$/i)
+    const dateInput = dateLabel.parentElement!.querySelector('input[type="date"]')!
+    await user.type(dateInput, '2026-09-20')
+    const timeSlotLabel = screen.getByText(/time slot \*/i)
+    const timeSlotTrigger = timeSlotLabel.parentElement!.querySelector('[role="combobox"]')!
+    await user.click(timeSlotTrigger)
+    await user.click((await screen.findAllByRole('option'))[0])
+
     const foSearchInput = await screen.findByPlaceholderText(/search fo by name/i)
     await user.click(foSearchInput)
     await user.click(await screen.findByText(/cipla fo/i, {}, { timeout: 3000 }))
@@ -384,18 +419,27 @@ describe('CampDetailPageReal — create mode, MR/FO pickers', () => {
     await mockSessionWithPermission(true)
     await mockTenants([{ id: 't-cipla', name: 'Cipla', code: 'cipla', type: 'customer' }])
     await mockNearestFo(null)
+    await mockProjectWithSlots()
     const { geoProfileService } = await import('@/features/geo-profile/geoProfile.service')
 
     const user = userEvent.setup()
     await renderCreatePage()
     await pickCompany(user, 'Cipla')
+    await pickProject(user)
     await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
+    const dateLabel = screen.getByText(/^date$/i)
+    const dateInput = dateLabel.parentElement!.querySelector('input[type="date"]')!
+    await user.type(dateInput, '2026-09-20')
+    const timeSlotLabel = screen.getByText(/time slot \*/i)
+    const timeSlotTrigger = timeSlotLabel.parentElement!.querySelector('[role="combobox"]')!
+    await user.click(timeSlotTrigger)
+    await user.click((await screen.findAllByRole('option'))[0])
 
     const foSearchInput = await screen.findByPlaceholderText(/search fo by name/i)
     await user.click(foSearchInput)
 
     await waitFor(() => expect(geoProfileService.nearestGeoProfiles).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'fo', lng: 77.02, lat: 28.52 }),
+      expect.objectContaining({ type: 'fo', lng: 77.02, lat: 28.52, date: '2026-09-20' }),
     ))
   })
 })

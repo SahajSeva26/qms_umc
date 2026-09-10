@@ -17,6 +17,19 @@ const mapItem = (item: any) => {
     return { id: item.toString() };
 };
 
+// vendor may be a populated VendorMaster doc or a raw ObjectId ref — surface a shallow shape either way.
+const mapVendor = (vendor: any) => {
+    if (!vendor) return null;
+    if (typeof vendor === 'object' && vendor._id) {
+        return {
+            id: vendor._id.toString(),
+            code: vendor.code,
+            name: vendor.name,
+        };
+    }
+    return { id: vendor.toString() };
+};
+
 export const InventoryConsumableMapper = {
     toResponse: (lot: any, ctx: RequestContext) => {
         const result: any = {
@@ -24,6 +37,9 @@ export const InventoryConsumableMapper = {
 
             // catalog item this lot is stock of
             item: mapItem(lot.item),
+
+            // vendor this lot was purchased from
+            vendor: mapVendor(lot.vendor),
 
             // lot identity + shelf life
             batch: lot.batch,

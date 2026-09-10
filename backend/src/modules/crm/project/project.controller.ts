@@ -3,6 +3,7 @@ import { formatZodError } from '../../../shared/utils/error';
 import {
     CreateProjectPayloadSchema,
     MoveStagePayloadSchema,
+    ProjectReportQuerySchema,
     SearchProjectQuerySchema,
     UpdateProjectPayloadSchema,
 } from './project.validators';
@@ -152,10 +153,49 @@ const moveStage = async (req: any, res: any) => {
     }
 };
 
+const report = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+
+        const { data: filters, success, error } = ProjectReportQuerySchema.safeParse(req.query);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(
+                res,
+                StatusCodes.BAD_REQUEST,
+                false,
+                'Validation Error',
+                {
+                    fields: validationErrors,
+                }
+            );
+        }
+
+        const result = await ProjectService.report(filters, ctx);
+
+        return ResponseHandler.appResponse(
+            res,
+            StatusCodes.OK,
+            true,
+            'Project report generated successfully',
+            ProjectMapper.toReportResponse(result),
+        );
+    } catch (error: any) {
+        return ResponseHandler.appResponse(
+            res,
+            error?.statusCode,
+            false,
+            error?.message,
+            null
+        );
+    }
+};
+
 export const ProjectController = {
     get,
     search,
     create,
     update,
     moveStage,
+    report,
 };

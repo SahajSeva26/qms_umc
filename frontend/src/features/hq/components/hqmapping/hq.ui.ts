@@ -83,8 +83,11 @@ export const STATE_ANCHORS: [string, number, number][] = [
 ]
 
 // ── CSV export — exact port of hq-serviceability.js's toCsv()/dl() pattern ──
+// A leading =/+/-/@ is executed as a formula by Excel/Sheets on open —
+// prefix with a quote to force plain-text (OWASP's CSV-injection mitigation).
 function csvEscape(v: unknown): string {
-  const s = v == null ? '' : String(v)
+  let s = v == null ? '' : String(v)
+  if (/^[=+\-@]/.test(s)) s = `'${s}`
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 

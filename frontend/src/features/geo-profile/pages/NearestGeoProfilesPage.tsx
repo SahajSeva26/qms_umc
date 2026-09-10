@@ -3,16 +3,19 @@ import { useQueries } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { FiArrowLeft } from 'react-icons/fi'
 import { GEO_PROFILE_ROUTES, GEO_PROFILE_TYPE_OPTIONS } from '@/features/geo-profile/geoProfile.constants'
-import { isValidLatitude, isValidLongitude } from '@/features/geo-profile/utils/geoProfile.utils'
+import { locationValueToCoordinates } from '@/features/geo-profile/utils/geoProfileLocationAdapter'
 import { useNearestGeoProfiles } from '@/features/geo-profile/hooks/useNearestGeoProfiles'
 import { useRoles, roleKeys } from '@/features/access-management/role/hooks/useRoles'
 import { accessManagementService } from '@/features/access-management/accessManagement.service'
 import GeoProfileStatusPill from '@/features/geo-profile/components/GeoProfileStatusPill'
+import LocationPicker from '@/components/widgets/location-picker/LocationPicker'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { GeoProfileType, NearestGeoProfileQuery } from '@/types/geoProfile.types'
+import type { LocationValue } from '@/types/location.types'
+import type { LocationResolutionState } from '@/components/widgets/location-picker/location.types'
 
 // Query only fires once a valid type + lat/lng have been submitted — this is
 // a lookup tool, not a live-as-you-type search.
@@ -20,11 +23,13 @@ const NearestGeoProfilesPage = () => {
   const navigate = useNavigate()
 
   const [type, setType] = useState<GeoProfileType>('fo')
-  const [latitude, setLatitude] = useState('')
-  const [longitude, setLongitude] = useState('')
+  const [location, setLocation] = useState<LocationValue | null>(null)
   const [limit, setLimit] = useState('10')
   const [query, setQuery] = useState<NearestGeoProfileQuery | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
+  // Same race as GeoProfileDetailPage's Save — a stale `location` here would
+  // run a real allocation lookup from the wrong point, so block the same way.
+  const [locationResolution, setLocationResolution] = useState<LocationResolutionState>('idle')
 
   const { data, isLoading, isFetching, error } = useNearestGeoProfiles(query)
   const results = data?.data?.items ?? []
@@ -43,6 +48,9 @@ const NearestGeoProfilesPage = () => {
     })),
   })
 
+  // useQueries returns a fresh array every render, so key the memo on a
+  // stable identifier instead of `missingRoleQueries` itself.
+  const missingRoleDataVersion = missingRoleQueries.map((q) => q.dataUpdatedAt).join(',')
   const roleLabelById = useMemo(() => {
     const map = new Map(activeRoles.map((r) => [r.id, r.name]))
     for (const q of missingRoleQueries) {
@@ -50,14 +58,15 @@ const NearestGeoProfilesPage = () => {
       if (role) map.set(role.id, role.name)
     }
     return map
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeRoles, missingRoleQueries.map((q) => q.dataUpdatedAt).join(',')])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on missingRoleDataVersion, not missingRoleQueries itself (see comment above)
+  }, [activeRoles, missingRoleDataVersion])
 
   const handleSearch = () => {
-    const lat = Number(latitude)
-    const lng = Number(longitude)
-    if (latitude.trim() === '' || !isValidLatitude(lat)) { setFormError('Latitude must be a number between -90 and 90'); return }
-    if (longitude.trim() === '' || !isValidLongitude(lng)) { setFormError('Longitude must be a number between -180 and 180'); return }
+    if (locationResolution === 'loading') { setFormError('Still resolving the picked location — wait a moment and try again'); return }
+    if (locationResolution === 'error') { setFormError('Retry or choose "Use this pin" for the location before searching'); return }
+    const coordinates = locationValueToCoordinates(location)
+    if (!coordinates) { setFormError('Pick a location on the map'); return }
+    const [lng, lat] = coordinates
     setFormError(null)
     setQuery({ type, lat, lng, limit: limit || undefined })
   }
@@ -87,7 +96,7 @@ const NearestGeoProfilesPage = () => {
         className="rounded-xl border p-5 mb-5"
         style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}
       >
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
           <div>
             <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
               Type
@@ -105,22 +114,28 @@ const NearestGeoProfilesPage = () => {
           </div>
           <div>
             <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-              Latitude
-            </Label>
-            <Input type="text" inputMode="decimal" value={latitude} onChange={(e) => setLatitude(e.target.value)} placeholder="e.g. 29.2183" />
-          </div>
-          <div>
-            <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-              Longitude
-            </Label>
-            <Input type="text" inputMode="decimal" value={longitude} onChange={(e) => setLongitude(e.target.value)} placeholder="e.g. 79.5130" />
-          </div>
-          <div>
-            <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
               Limit
             </Label>
             <Input type="text" inputMode="numeric" value={limit} onChange={(e) => setLimit(e.target.value)} placeholder="10" />
           </div>
+        </div>
+
+        <div>
+          <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+            Location
+          </Label>
+          <LocationPicker
+            value={location}
+            onChange={setLocation}
+            defaultCountry="India"
+            countryCode="IN"
+            onResolutionStateChange={setLocationResolution}
+          />
+          {location?.coordinates && (
+            <p className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
+              Latitude: {location.coordinates[1]} · Longitude: {location.coordinates[0]}
+            </p>
+          )}
         </div>
 
         {formError && (
@@ -129,8 +144,8 @@ const NearestGeoProfilesPage = () => {
           </div>
         )}
 
-        <Button onClick={handleSearch} disabled={isFetching} className="mt-4">
-          {isFetching ? 'Searching…' : 'Find nearest'}
+        <Button onClick={handleSearch} disabled={isFetching || locationResolution === 'loading'} className="mt-4">
+          {isFetching ? 'Searching…' : locationResolution === 'loading' ? 'Resolving location…' : 'Find nearest'}
         </Button>
       </div>
 

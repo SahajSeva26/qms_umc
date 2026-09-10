@@ -1,6 +1,12 @@
 import mongoose, { HydratedDocument } from 'mongoose';
 import { IProject, Project } from './project.model';
-import { ICreateProjectPayload, IMoveStagePayload, ISearchProjectQuery, IUpdateProjectPayload } from './project.validators';
+import {
+    ICreateProjectPayload,
+    IMoveStagePayload,
+    IProjectReportQuery,
+    ISearchProjectQuery,
+    IUpdateProjectPayload,
+} from './project.validators';
 import { PROJECT_COUNTER_ENTITY, PROJECT_PERMISSIONS, PROJECT_TRANSITION_MAP } from './project.constants';
 import { canTransition } from '../lead/lead.validators';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
@@ -14,6 +20,7 @@ import { LeadService } from '../lead/lead.service';
 import { RoleService } from '../../access-management/role/role.service';
 import { ContactService } from '../contact/contact.service';
 import { TENANT_TYPE } from '../../access-management/tenant/tenant.constants';
+import { TestMasterService } from '../../operations/testMaster/testMaster.service';
 
 type ProjectDocument = HydratedDocument<IProject> | null;
 
@@ -24,6 +31,7 @@ const populate: any[] = [
     { path: 'salesRep' },
     { path: 'projectCoordinator' },
     { path: 'marketingContact' },
+    { path: 'tests', select: 'name code therapy' },
 ];
 
 // ========================================================================================
@@ -39,6 +47,17 @@ const assertPlatformStaff = async (roleId: string, label: string, ctx: RequestCo
     }
     if ((role.tenant as any)?.type !== TENANT_TYPE.PLATFORM) {
         return throwAppError(`${label} must be QMS internal staff`, StatusCodes.BAD_REQUEST);
+    }
+};
+
+// tests reference the global TestMaster catalog — every supplied id must resolve to a real test.
+const assertTestsExist = async (testIds: string[], ctx: RequestContext) => {
+    const uniqueIds = [...new Set(testIds)];
+    for (const id of uniqueIds) {
+        const test = await TestMasterService.get(id, ctx);
+        if (!test) {
+            return throwAppError(`Test not found: ${id}`, StatusCodes.BAD_REQUEST);
+        }
     }
 };
 
@@ -87,7 +106,10 @@ const set = async (model: any, entity: HydratedDocument<IProject>, ctx: RequestC
     if (model.name) entity.name = model.name;
     if (model.therapy) entity.therapy = model.therapy;
     if (model.type) entity.type = model.type;
-    if (model.tests) entity.tests = model.tests;
+    if (model.tests) {
+        await assertTestsExist(model.tests, ctx);
+        entity.tests = model.tests;
+    }
 
     // execution — `mode` is a nested sub-schema; InferSchemaType doesn't surface it, so cast
     if (model.mode) (entity as any).mode = model.mode;
@@ -274,12 +296,30 @@ const moveStage = async (id: string, model: IMoveStagePayload, ctx: RequestConte
     return project;
 };
 
+
+const report = async (filters: IProjectReportQuery, ctx: RequestContext) => {
+    const [result] = await Project.aggregate([
+        { $match: ctx.where() },
+        { $addFields: { estimatedRevenue: { $multiply: ['$campCost', '$totalCamps'] } } },
+        {
+            $facet: {
+                totalProjects: [{ $count: 'count' }],
+                statusStats: [{ $group: { _id: '$status', count: { $sum: 1 }, revenue: { $sum: '$estimatedRevenue' } } }],
+                therapyStats: [{ $group: { _id: '$therapy', count: { $sum: 1 }, revenue: { $sum: '$estimatedRevenue' } } }],
+            },
+        },
+    ]);
+
+    return { ...result };
+};
+
 export const ProjectService = {
     get,
     search,
     create,
     update,
     moveStage,
+    report,
 };
 
 // ========================================================================================

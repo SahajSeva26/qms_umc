@@ -6,12 +6,17 @@ import { ROLE_PERMISSIONS } from '../../modules/access-management/role/role.cons
 import { DIVISION_PERMISSIONS } from '../../modules/crm/division/division.constants';
 import { LEAD_PERMISSIONS } from '../../modules/crm/lead/lead.constants';
 import { CONTACT_PERMISSIONS } from '../../modules/crm/contact/contact.constants';
+import { BRAND_PERMISSIONS } from '../../modules/crm/brand/brand.constants';
 import { APPOINTMENT_PERMISSIONS } from '../../modules/crm/appointment/appointment.constants';
 import { PROJECT_PERMISSIONS } from '../../modules/crm/project/project.constants';
 import { QA_FEEDBACK_PERMISSIONS } from '../../modules/qa-feedback/qaFeedback.constants';
-import { DOCTOR_PERMISSIONS } from '../../modules/doctor/doctor.constants';
+import { DOCTOR_PERMISSIONS } from '../../modules/crm/doctor/doctor.constants';
 import { GEO_PROFILE_PERMISSIONS } from '../../modules/operations/geoProfile/geoProfile.constants';
 import { CAMP_PERMISSIONS } from '../../modules/operations/camp/camp.constants';
+import { TEST_MASTER_PERMISSIONS } from '../../modules/operations/testMaster/testMaster.constants';
+import { PATIENT_PERMISSIONS } from '../../modules/operations/patient/patient.constants';
+import { SCREENING_PERMISSIONS } from '../../modules/operations/screening/screening.constants';
+import { TEST_PERMISSIONS } from '../../modules/operations/test/test.constants';
 import { COUNTER_PERMISSIONS } from '../../modules/counter/counter.constants';
 import { INVENTORY_MASTER_PERMISSIONS } from '../../modules/inventory/inventory-master/inventory-master.constants';
 import { INVENTORY_CONSUMABLE_PERMISSIONS } from '../../modules/inventory/inventory-consumable/inventory-consumable.constants';
@@ -21,6 +26,7 @@ import { INVENTORY_REQUEST_PERMISSIONS } from '../../modules/inventory/inventory
 import { INVENTORY_LEDGER_PERMISSIONS } from '../../modules/inventory/inventory-ledger/inventory-ledger.constants';
 import { INVOICE_PERMISSIONS } from '../../modules/finance/invoice/invoice.constants';
 import { INVOICE_LINE_ITEM_PERMISSIONS } from '../../modules/finance/invoiceLineItem/invoiceLineItem.constants';
+import { VENDOR_MASTER_PERMISSIONS } from '../../modules/vendor-master/vendor-master.constants';
 
 export const SYSTEM_PERMISSIONS = {
     MANAGE: {
@@ -39,12 +45,17 @@ export const PERMISSIONS = {
     DIVISION: DIVISION_PERMISSIONS,
     LEAD: LEAD_PERMISSIONS,
     CONTACT: CONTACT_PERMISSIONS,
+    BRAND: BRAND_PERMISSIONS,
     APPOINTMENT: APPOINTMENT_PERMISSIONS,
     PROJECT: PROJECT_PERMISSIONS,
     QA_FEEDBACK: QA_FEEDBACK_PERMISSIONS,
     DOCTOR: DOCTOR_PERMISSIONS,
     GEO_PROFILE: GEO_PROFILE_PERMISSIONS,
     CAMP: CAMP_PERMISSIONS,
+    TEST_MASTER: TEST_MASTER_PERMISSIONS,
+    PATIENT: PATIENT_PERMISSIONS,
+    SCREENING: SCREENING_PERMISSIONS,
+    TEST: TEST_PERMISSIONS,
     COUNTER: COUNTER_PERMISSIONS,
     INVENTORY_MASTER: INVENTORY_MASTER_PERMISSIONS,
     INVENTORY_CONSUMABLE: INVENTORY_CONSUMABLE_PERMISSIONS,
@@ -54,6 +65,7 @@ export const PERMISSIONS = {
     INVENTORY_LEDGER: INVENTORY_LEDGER_PERMISSIONS,
     INVOICE: INVOICE_PERMISSIONS,
     INVOICE_LINE_ITEM: INVOICE_LINE_ITEM_PERMISSIONS,
+    VENDOR_MASTER: VENDOR_MASTER_PERMISSIONS,
 };
 
 export const PERMISSIONS_ARRAY = Object.values(PERMISSIONS)

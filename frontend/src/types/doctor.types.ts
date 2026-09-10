@@ -1,19 +1,10 @@
-// Doctor domain types — mirrors the real backend exactly:
-// backend/src/modules/doctor/{doctor.model,doctor.constants,doctor.validators}.ts
-//
-// Doctor is a global/system record (no tenant field, no populate chain) —
-// confirmed via doctor.service.ts's own comment. Reads are open to any
-// authenticated user; only create/update require `doctor:manage`.
-
+// Doctor is tenant-scoped — a customer-tenant caller is pinned to their own
+// tenant server-side; a platform caller must supply one explicitly.
 export type DoctorSpecialization = 'cp' | 'gp'
 export type DoctorStatus = 'active' | 'inactive'
 
-/**
- * NOTE: per backend DoctorMapper, `status` is only present when the caller
- * holds `doctor:manage` — everyone else gets every other field but not status
- * (search() also silently hard-scopes non-manage callers to status=active,
- * regardless of what they request via the `status` filter).
- */
+/** `status` is only present when the caller holds `doctor:manage`; search()
+ * also hard-scopes non-manage callers to status=active regardless of the `status` filter. */
 export interface DoctorEntity {
   id: string
   pharmaCode: string
@@ -27,8 +18,9 @@ export interface DoctorEntity {
   googleMapLink: string
   createdAt: string
   updatedAt: string
-  // TODO: only present server-side if caller has `doctor:manage` (mapper gate).
   status?: DoctorStatus
+  // Populated only on search() — create/update/get return the raw ObjectId string.
+  tenant: string | { _id?: string; name: string; code: string }
 }
 
 export interface SearchDoctorQuery {
@@ -40,11 +32,12 @@ export interface SearchDoctorQuery {
   pharmaCode?: string
   page?: string
   limit?: string
+  // Only honored server-side for a platform caller — a customer caller is
+  // always hard-scoped to their own tenant regardless of this filter.
+  tenant?: string
 }
 
-// pharmaCode is the immutable natural key — required on create, never
-// editable afterwards (see UpdateDoctorPayload below, and doctor.service.ts's
-// own comment: "pharmaCode is intentionally omitted — it is immutable after create").
+// pharmaCode is the immutable natural key — required on create, never editable afterwards.
 export interface CreateDoctorPayload {
   pharmaCode: string
   name: string
@@ -56,6 +49,9 @@ export interface CreateDoctorPayload {
   email: string
   googleMapLink?: string
   status?: DoctorStatus
+  // Required for a platform caller (backend 400s without it); ignored for a
+  // customer caller, who is always pinned to their own tenant server-side.
+  tenant?: string
 }
 
 export interface UpdateDoctorPayload {
@@ -68,4 +64,29 @@ export interface UpdateDoctorPayload {
   email?: string
   googleMapLink?: string
   status?: DoctorStatus
+}
+
+// `tenant` is only sent/needed for a PLATFORM-type session — a customer
+// session is always pinned to its own tenant server-side.
+export interface BulkDoctorPayload {
+  tenant?: string
+  file: File
+}
+
+// Covers BOTH schema-invalid rows (ZodError-shaped) and DB-layer create
+// failures (plain string), unlike MR-bulk's errors array (DB-layer only).
+export interface BulkDoctorRowError {
+  row: number
+  error: string | Record<string, unknown>
+}
+
+// Unlike BulkMrResult, doctor bulk's 400 response returns this FULL shape —
+// every count field here is a real number on either the 200 or 400 path.
+export interface BulkDoctorResult {
+  totalRows: number
+  validRows: number
+  invalidRows: number
+  created: number
+  failed: number
+  errors: BulkDoctorRowError[]
 }

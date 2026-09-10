@@ -28,13 +28,8 @@ const TABS: { id: TabId; label: string; icon: typeof FiColumns }[] = [
   { id: 'machines', label: 'Faulty machines', icon: FiCpu },
 ]
 
-// Operations-Manager-facing Incidents · SOS screen — a faithful port of the
-// prototype's incidents.html/incidents.js/incidents-data.js/machine-
-// replacement.js. Reads/writes the SAME qms.fo.incidents + machineFlags
-// stores as the FO-side RaiseSosModal/IncidentsModule via the shared
-// useFoIncidents/useMachineFlags hooks — this page never duplicates that
-// data layer, only adds the OM-facing Kanban/table/machines views + the
-// assign/start/resolve/close/cancel workflow actions on top of it.
+// Reads/writes the SAME qms.fo.incidents + machineFlags stores as the FO-side
+// RaiseSosModal/IncidentsModule via the shared hooks — never a separate data layer.
 const IncidentsPage = () => {
   const { user } = useAuth()
   const byName = user ? `${user.firstName} ${user.lastName}`.trim() : 'Operations Manager'
@@ -61,9 +56,8 @@ const IncidentsPage = () => {
   const [replacementDeviceId, setReplacementDeviceId] = useState<string | null>(null)
   const [replacementCampId, setReplacementCampId] = useState<string | undefined>(undefined)
 
-  // Re-sync the open drawer with the latest incidents list after a mutation
-  // so the stepper/actions/audit trail reflect the just-applied change
-  // instead of staying frozen on the pre-mutation snapshot.
+  // Re-sync the open drawer with the latest incidents list so it doesn't
+  // stay frozen on the pre-mutation snapshot.
   const refreshedDrawerIncident = drawerIncident ? (incidents.find((i) => i.id === drawerIncident.id) ?? drawerIncident) : null
 
   const openTicket = (incident: Incident) => setDrawerIncident(incident)
@@ -118,7 +112,7 @@ const IncidentsPage = () => {
       deviceId: payload.deviceId,
       title: payload.title,
       notes: payload.notes,
-      raisedById: user?._id ?? 'om',
+      raisedById: user?.id ?? 'om',
       raisedByName: byName,
       foId: payload.foId,
       foName: payload.foName,
@@ -137,10 +131,8 @@ const IncidentsPage = () => {
 
   const handleAssignReplacementConfirm = async (replacementId: string) => {
     if (!replacementDeviceId) return
-    // Resolve the originating machine_failure ticket (if any) with the
-    // chosen replacement — this both records the resolution and clears the
-    // fault flag via fo.service's resolveIncident (which internally calls
-    // clearMachineFlag when a replacementDeviceId is supplied).
+    // resolveIncident internally clears the fault flag too when a
+    // replacement device is supplied, so this records both in one call.
     const origin = incidents.find((i) => i.deviceId === replacementDeviceId && i.category === 'machine_failure' && i.status !== 'RESOLVED' && i.status !== 'CLOSED' && i.status !== 'CANCELLED')
     const replacementDeviceName = devices.find((d) => d.id === replacementId)?.name ?? replacementId
     if (origin) {

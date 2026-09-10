@@ -14,10 +14,11 @@ import { isValidObjectID } from '../../../shared/utils/strings';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { InventoryMasterService } from '../inventory-master/inventory-master.service';
 import { ITEM_TYPES } from '../inventory-master/inventory-master.constants';
+import { VendorMasterService } from '../../vendor-master/vendor-master.service';
 
 type InventoryConsumableDocument = HydratedDocument<IInventoryConsumable> | null;
 
-const populate: any[] = [{ path: 'item' }];
+const populate: any[] = [{ path: 'item' }, { path: 'vendor' }];
 
 // A consumable is a physical stock lot of an InventoryMaster catalog item. Like the catalog it
 // belongs to no tenant, so there is no ctx.where() scoping. A lot's identity is (item, batch);
@@ -73,6 +74,9 @@ const search = async (filters: ISearchInventoryConsumableQuery, ctx: RequestCont
     if (filters.item) {
         where.item = filters.item;
     }
+    if (filters.vendor) {
+        where.vendor = filters.vendor;
+    }
     if (filters.batch) {
         where.batch = filters.batch;
     }
@@ -106,6 +110,12 @@ const create = async (model: ICreateInventoryConsumablePayload, ctx: RequestCont
         return throwAppError('The referenced inventory item is not a consumable', StatusCodes.BAD_REQUEST);
     }
 
+    //1c: the referenced vendor (supplier) must exist
+    const vendor = await VendorMasterService.get(model.vendor, ctx);
+    if (!vendor) {
+        return throwAppError('The referenced vendor does not exist', StatusCodes.NOT_FOUND);
+    }
+
     //2: guard — a lot is identified by (item, batch); it must not already exist
     // FIXME (followup): search() defaults to status:active, so an EXPIRED lot with the same
     // (item, batch) is invisible here — this guard passes, then save() hits the unique
@@ -117,9 +127,9 @@ const create = async (model: ICreateInventoryConsumablePayload, ctx: RequestCont
         return throwAppError('A consumable lot with this item and batch already exists', StatusCodes.CONFLICT);
     }
 
-    //3: build entity — item (immutable ref) is seeded here, never in set().
+    //3: build entity — item + vendor (immutable refs) are seeded here, never in set().
     // status is not accepted at create — a new lot always starts active.
-    let entity = new InventoryConsumableModel({ item: model.item, status: INVENTORY_CONSUMABLE_STATUS.ACTIVE });
+    let entity = new InventoryConsumableModel({ item: model.item, vendor: model.vendor, status: INVENTORY_CONSUMABLE_STATUS.ACTIVE });
     entity = await set(model, entity, ctx);
     entity = await entity.save();
 

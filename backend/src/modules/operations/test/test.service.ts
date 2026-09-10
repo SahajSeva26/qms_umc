@@ -1,0 +1,275 @@
+// Test Service
+import mongoose, { HydratedDocument } from 'mongoose';
+import { TestModel, TestDocument as ITest } from './test.model';
+import { ICreateTestPayload, ISearchTestQuery, IUpdateTestPayload } from './test.validators';
+import { TEST_PERMISSIONS } from './test.constants';
+import { throwAppError } from '../../../shared/utils/error';
+import { StatusCodes } from 'http-status-codes';
+import { RequestContext } from '../../../shared/utils/contextBuilder';
+import { IServiceOptions } from '../../../shared/types/service.types';
+import { ScreeningService } from '../screening/screening.service';
+import { SCREENING_STATUS } from '../screening/screening.constants';
+import { CampService } from '../camp/camp.service';
+import { CAMP_STATUSES } from '../camp/camp.constants';
+import { TestMasterService } from '../testMaster/testMaster.service';
+import { ALLOWED_ROLETYPE_CODES } from '../../access-management/role-type/roleType.constants';
+import { withTransaction } from '../../../shared/helpers/transactionHelper';
+import { InventoryAssignmentService } from '../../inventory/inventory-assignment/inventory-assignment.service';
+import { INVENTORY_ASSIGNMENT_TYPES } from '../../inventory/inventory-assignment/inventory-assignment.constants';
+import { InventoryAssignmentModel } from '../../inventory/inventory-assignment/inventory-assignment.model';
+import { InventoryConsumableModel } from '../../inventory/inventory-consumable/inventory-consumable.model';
+
+type TestDoc = HydratedDocument<ITest> | null;
+
+const populate: any[] = [
+    { path: 'tenant', select: 'name code' },
+    { path: 'screening', select: 'status patient camp' },
+    { path: 'type', select: 'code name therapy' },
+    { path: 'performedBy', select: 'name code' },
+];
+
+// camp states past which no more tests may be recorded — the camp is over.
+const TERMINAL_CAMP_STATUSES: string[] = [
+    CAMP_STATUSES.CLOSED,
+    CAMP_STATUSES.CANCELLED,
+    CAMP_STATUSES.CANCELLED_CHARGED,
+];
+
+// ================================ HELPERS ================================
+
+// A non-manage actor may only record/mutate a test for a screening whose camp they are the
+// assigned FO of: their role must be a field-officer type AND camp.fo must equal their role id.
+// manage-level actors (test:manage / system) bypass this restriction.
+const assertAssignedFoOrManage = (camp: any, ctx: RequestContext) => {
+    if (ctx.hasAnyPermissions([TEST_PERMISSIONS.MANAGE.code])) {
+        return;
+    }
+    const isFoType = ctx.role?.type?.code === ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER;
+    // camp.fo may be a populated role doc or a raw ObjectId — normalise to an id before comparing
+    const foId = camp?.fo?._id ?? camp?.fo;
+    const isAssigned = foId && ctx.role?._id && foId.toString() === ctx.role._id.toString();
+    if (!isFoType || !isAssigned) {
+        return throwAppError("Only the field officer assigned to this camp can record its patients' tests", StatusCodes.FORBIDDEN);
+    }
+};
+
+// Load the screening for a test action and authorize the actor. Reuses ScreeningService.get (tenant
+// scope) then CampService.get (populated fo) to assert the actor is the assigned FO (or manage).
+// Returns both the screening and its (fo-populated) camp so the caller can bill the assigned FO's stock.
+const loadScreeningForAction = async (screeningId: any, ctx: RequestContext) => {
+    const screening: any = await ScreeningService.get(screeningId.toString(), ctx, { populate: true });
+    if (!screening) {
+        return throwAppError('Screening not found', StatusCodes.NOT_FOUND);
+    }
+
+    const campRef = screening.camp?._id ?? screening.camp;
+    const camp = await CampService.get(campRef.toString(), ctx, { populate: true });
+    if (!camp) {
+        return throwAppError('Camp not found', StatusCodes.NOT_FOUND);
+    }
+    assertAssignedFoOrManage(camp, ctx);
+
+    return { screening, camp };
+};
+
+// Reduce the assigned field officer's stock for a completed test, per the TestMaster consumption
+// recipe: subtract each line's `rate` from what the FO holds of that catalog item. Blocks (throws
+// 409, rolling back the create() txn) if the FO is short. Runs inside the create() transaction.
+const reduceFoStock = async (foId: any, consumption: any[], ctx: RequestContext) => {
+    if (!foId || !consumption?.length) {
+        return;
+    }
+    for (const line of consumption) {
+        const rate = line.rate ?? 1;
+        // devices carry rate 0 (reusable, not depleted) — nothing to subtract
+        if (rate <= 0) {
+            continue;
+        }
+        await reduceFoHoldingForItem(foId, line.item, rate, ctx);
+    }
+};
+
+// A consumption line's `item` is a catalog item (InventoryMaster), but the FO holds its stock as
+// specific lots (InventoryConsumable). Bridge item → the FO's lots of it (read-only lookup), then
+// subtract `rate` across those holdings, erroring (409) if the total held is less than required.
+// The subtraction only ever touches the FO's assignment rows (via adjustHolding), never the lots.
+const reduceFoHoldingForItem = async (foId: any, item: any, rate: number, ctx: RequestContext) => {
+    //1: the catalog item's lots — the bridge from the master to what the FO can actually hold
+    const lots = await InventoryConsumableModel.find({ item }).select('_id');
+    const lotIds = lots.map((lot) => lot._id);
+
+    //2: what the FO actually holds of those lots
+    const holdings = await InventoryAssignmentModel.find({
+        assignee: foId,
+        inventoryType: INVENTORY_ASSIGNMENT_TYPES.CONSUMABLE,
+        inventory: { $in: lotIds },
+    });
+
+    //3: block up-front if the FO can't cover the required rate across all their lots of this item
+    const totalHeld = holdings.reduce((sum, row) => sum + row.quantity, 0);
+    if (totalHeld < rate) {
+        return throwAppError('The field officer does not hold enough stock to record this test', StatusCodes.CONFLICT);
+    }
+
+    //4: subtract lot by lot until the rate is covered
+    let remaining = rate;
+    for (const row of holdings) {
+        if (remaining <= 0) {
+            break;
+        }
+        const take = Math.min(row.quantity, remaining);
+        await InventoryAssignmentService.adjustHolding(
+            foId.toString(),
+            INVENTORY_ASSIGNMENT_TYPES.CONSUMABLE,
+            row.inventory.toString(),
+            -take,
+            ctx,
+        );
+        remaining -= take;
+    }
+};
+
+// A non-manage actor (e.g. the assigned field officer) sees only the tests they performed.
+// A manage actor (test:manage / system) sees them all.
+const applyOwnScope = (where: any, ctx: RequestContext) => {
+    if (!ctx.hasAnyPermissions([TEST_PERMISSIONS.MANAGE.code])) {
+        where.performedBy = ctx.role?._id;
+    }
+};
+
+// ================================ CORE FUNCTIONS ================================
+
+// only the result is editable through set(); screening/type/tenant/performedBy are pinned at create.
+const set = async (model: any, entity: HydratedDocument<ITest>, ctx: RequestContext) => {
+    if (model.result !== undefined) {
+        entity.result = model.result;
+    }
+    return entity;
+};
+
+const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): Promise<TestDoc> => {
+    const where: mongoose.QueryFilter<ITest> = ctx.where();
+    where._id = id;
+    applyOwnScope(where, ctx);
+
+    let query = TestModel.findOne(where);
+    if (options?.populate) {
+        query = query.populate(populate);
+    }
+
+    return await query;
+};
+
+const search = async (filters: ISearchTestQuery, ctx: RequestContext, options?: IServiceOptions) => {
+    const sort: any = { createdAt: -1 };
+
+    const where: mongoose.QueryFilter<ITest> = { ...ctx.where() };
+    // own-scope up-front — a non-manage actor is pinned to their own tests. Safe here (not at the
+    // end) because the only actor-widening filter below (tenant) is itself manage-gated.
+    applyOwnScope(where, ctx);
+
+    // tenant filter (switch tenants) is only honoured for a test:manage actor not already
+    // tenant-pinned by ctx.where() — a scoped actor stays locked to their own tenant.
+    if (filters.tenant && !where.tenant && ctx.hasAnyPermissions([TEST_PERMISSIONS.MANAGE.code])) {
+        where.tenant = filters.tenant;
+    }
+    if (filters.screening) {
+        where.screening = filters.screening;
+    }
+    if (filters.type) {
+        where.type = filters.type;
+    }
+
+    const countPromise = TestModel.countDocuments(where);
+    const dataPromise = TestModel.find(where)
+        .populate(populate)
+        .limit(options?.pagination?.limit)
+        .skip(options?.pagination?.skip)
+        .sort(sort);
+
+    const [count, items] = await Promise.all([countPromise, dataPromise]);
+
+    return { count, items };
+};
+
+const create = async (model: ICreateTestPayload, ctx: RequestContext): Promise<HydratedDocument<ITest>> => {
+    //1: load the screening (scope) + the camp, and authorize the actor as the assigned FO (or manage).
+    // The test inherits its tenant from the screening; the assigned FO (camp.fo) owns the stock used.
+    const { screening, camp } = await loadScreeningForAction(model.screening, ctx);
+
+    //2: no tests once the camp is closed/cancelled — results are captured while the camp is running
+    if (TERMINAL_CAMP_STATUSES.includes(camp.status)) {
+        return throwAppError('Tests cannot be recorded once the camp is closed', StatusCodes.CONFLICT);
+    }
+
+    //3: tests are performed only after the screening itself is completed
+    if (screening.status !== SCREENING_STATUS.COMPLETED) {
+        return throwAppError('Tests can only be recorded once the screening is completed', StatusCodes.CONFLICT);
+    }
+
+    //3: the catalog test (TestMaster) must exist
+    const testMaster = await TestMasterService.get(model.type, ctx);
+    if (!testMaster) {
+        return throwAppError('Test master not found', StatusCodes.NOT_FOUND);
+    }
+
+    //4: the catalog test must belong to this camp's type — a screening-camp test cannot be run
+    // in a diet camp, etc.
+    if (testMaster.campType !== camp.type) {
+        return throwAppError(
+            `This test belongs to a ${testMaster.campType} camp and cannot be recorded in a ${camp.type} camp`,
+            StatusCodes.CONFLICT,
+        );
+    }
+
+    //5: one result per catalog test per screening. Runs before the txn below — search fires
+    // count+find in parallel, which MongoDB forbids inside a transaction.
+    const { count } = await TestService.search(
+        { screening: screening._id.toString(), type: testMaster._id.toString() },
+        ctx,
+    );
+    if (count > 0) {
+        return throwAppError('This test has already been recorded for this screening', StatusCodes.CONFLICT);
+    }
+
+    //6: build entity — tenant from screening, performedBy = the acting role
+    const entity = new TestModel({
+        tenant: screening.tenant?._id ?? screening.tenant,
+        screening: screening._id,
+        type: testMaster._id,
+        performedBy: ctx.role?._id,
+    });
+
+    //7: save the test and reduce the assigned FO's stock atomically — if the FO is short on any
+    // consumable, the deduction throws and the whole create rolls back (no orphan test recorded).
+    const foId = camp.fo?._id ?? camp.fo;
+    return await withTransaction(async () => {
+        let test = await set(model, entity, ctx);
+        test = await test.save();
+
+        await reduceFoStock(foId, testMaster.consumption as any[], ctx);
+
+        return test;
+    });
+};
+
+const update = async (id: string, model: IUpdateTestPayload, ctx: RequestContext) => {
+    // get() already own-scopes to performedBy for a non-manage actor, so a field officer can only
+    // ever load (and therefore mutate) a test they recorded — no extra assigned-FO check needed.
+    let entity = await TestService.get(id, ctx);
+    if (!entity) {
+        return throwAppError('Test not found', StatusCodes.NOT_FOUND);
+    }
+
+    entity = await set(model, entity, ctx);
+    entity = await entity.save();
+
+    return entity;
+};
+
+export const TestService = {
+    get,
+    search,
+    create,
+    update,
+};

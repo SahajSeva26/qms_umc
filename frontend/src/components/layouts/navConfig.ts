@@ -114,6 +114,8 @@ const ALL_NAV_ITEMS: NavItem[] = [
 
   { id: 'inventoryops', label: 'Inventory Operations',        icon: 'UserCheck',     path: ADMIN_ROUTES.ADMIN_INVENTORY_OPERATIONS },
 
+  { id: 'vendormasters', label: 'Vendor Master',              icon: 'Truck',         path: ADMIN_ROUTES.ADMIN_VENDOR_MASTERS },
+
   { id: 'assets',       label: 'Asset Management',            icon: 'Box',           path: ADMIN_ROUTES.ADMIN_ASSETS },
 
   { id: 'kpi',          label: 'Order & KPI Engine',          icon: 'Activity',      path: ADMIN_ROUTES.ADMIN_KPI },
@@ -139,6 +141,10 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { id: 'roles',            label: 'Roles',                   icon: 'UserCheck',     path: ACCESS_MANAGEMENT_ROUTES.ROLES },
 
   { id: 'qafeedback',       label: 'QA Feedback',             icon: 'MessageSquare', path: QA_FEEDBACK_ROUTES.QA_FEEDBACK_REVIEW },
+
+  // Temporary system-admin-only phase — route itself is guarded on
+  // system:manage (admin.routes.tsx), not just this section's own gate.
+  { id: 'testmaster',       label: 'Test Master',             icon: 'BookOpen',      path: ADMIN_ROUTES.ADMIN_TESTS },
 ]
 
 const NAV_BY_ID = Object.fromEntries(ALL_NAV_ITEMS.map((n) => [n.id, n]))
@@ -177,7 +183,9 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
   {
     section: 'Resources',
     subs: [
-      { title: '', items: ['inventory', 'itemmaster', 'inventoryitems', 'inventoryops', 'assets', 'kpi'].map((id) => NAV_BY_ID[id]) },
+      // 'inventory'/'assets'/'kpi' are deliberately hidden from nav, not deleted —
+      // only these four are backend-wired today.
+      { title: '', items: ['itemmaster', 'inventoryitems', 'inventoryops', 'vendormasters'].map((id) => NAV_BY_ID[id]) },
     ],
   },
   {
@@ -189,7 +197,7 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
   {
     section: 'System',
     subs: [
-      { title: '', items: ['admin', 'users', 'settings', 'permissiongroups', 'roletypes', 'roles', 'qafeedback'].map((id) => NAV_BY_ID[id]) },
+      { title: '', items: ['admin', 'users', 'settings', 'permissiongroups', 'roletypes', 'roles', 'qafeedback', 'testmaster'].map((id) => NAV_BY_ID[id]) },
     ],
   },
 ]

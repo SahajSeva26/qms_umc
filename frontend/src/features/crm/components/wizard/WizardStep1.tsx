@@ -4,7 +4,7 @@ import { useContacts } from '@/features/contacts/hooks/useContacts'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import ChipPicker from '@/features/crm/components/wizard/ChipPicker'
-import TenantIdPicker from '@/features/crm/components/wizard/TenantIdPicker'
+import TenantAsyncPicker from '@/components/ui/TenantAsyncPicker'
 import { labelClasses, labelStyle, fieldClasses } from '@/features/crm/components/wizard/wizard.styles'
 import { THERAPIES, SPECIALTIES } from '@/features/crm/crm.constants'
 
@@ -17,9 +17,8 @@ const WizardStep1 = ({ form, setField }: WizardStep1Props) => {
   const { data: divisionData, isLoading: divisionsLoading, isError: divisionsErrored } = useDivisions({ tenant: form.tenantId || undefined }, !!form.tenantId)
   const divisions = form.tenantId ? divisionData?.data?.items ?? [] : []
 
-  // Scoped by division, not tenant — Contact.division is required for
-  // customer-type contacts (contact.service.ts:112). Gated on divisionId
-  // since there's nothing to pick until one is chosen.
+  // Scoped by division, not tenant (contact.service.ts:112); gated on
+  // divisionId since there's nothing to pick until one is chosen.
   const { data: contactData, isLoading: contactsLoading, isError: contactsErrored } = useContacts({ division: form.divisionId || undefined, status: 'active' }, { enabled: !!form.divisionId })
   const contactPeople = form.divisionId ? contactData?.data?.items ?? [] : []
 
@@ -50,7 +49,7 @@ const WizardStep1 = ({ form, setField }: WizardStep1Props) => {
     <div className="space-y-4">
       <div>
         <Label className={labelClasses} style={labelStyle}>Pharma company *</Label>
-        <TenantIdPicker value={form.tenantId} label={form.tenantLabel} onChange={selectTenant} />
+        <TenantAsyncPicker value={form.tenantId} label={form.tenantLabel} onChange={selectTenant} />
       </div>
 
       <div>

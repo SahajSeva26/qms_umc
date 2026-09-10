@@ -12,12 +12,17 @@ import '../../../modules/access-management/role/role.routes';
 import '../../../modules/crm/division/division.routes';
 import '../../../modules/crm/lead/lead.routes';
 import '../../../modules/crm/contact/contact.routes';
+import '../../../modules/crm/brand/brand.routes';
 import '../../../modules/crm/appointment/appointment.routes';
 import '../../../modules/crm/project/project.routes';
 import '../../../modules/qa-feedback/qaFeedback.routes';
-import '../../../modules/doctor/doctor.routes';
+import '../../../modules/crm/doctor/doctor.routes';
 import '../../../modules/operations/geoProfile/geoProfile.routes';
 import '../../../modules/operations/camp/camp.routes';
+import '../../../modules/operations/testMaster/testMaster.routes';
+import '../../../modules/operations/patient/patient.routes';
+import '../../../modules/operations/screening/screening.routes';
+import '../../../modules/operations/test/test.routes';
 import '../../../modules/counter/counter.routes';
 import '../../../modules/inventory/inventory-master/inventory-master.routes';
 import '../../../modules/inventory/inventory-consumable/inventory-consumable.routes';
@@ -27,6 +32,7 @@ import '../../../modules/inventory/inventory-request/inventory-request.routes';
 import '../../../modules/inventory/inventory-ledger/inventory-ledger.routes';
 import '../../../modules/finance/invoice/invoice.routes';
 import '../../../modules/finance/invoiceLineItem/invoiceLineItem.routes';
+import '../../../modules/vendor-master/vendor-master.routes';
 // =============================================
 // =============================================
 

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FiPlus, FiSearch } from 'react-icons/fi'
+import { FiEdit2, FiPlus, FiSearch } from 'react-icons/fi'
 import { usePermission } from '@/hooks/usePermission'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { useInventoryMasters } from '@/features/inventory/real/hooks/useInventoryMasters'
@@ -100,9 +100,9 @@ const InventoryMasterTab = () => {
             <table className="w-full text-[13px]">
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--qms-border)' }}>
-                  {['Code', 'Name', 'Type', 'SKU', 'Unit', ...(canManage ? ['Status'] : []), 'Stock range'].map((h) => (
+                  {['Code', 'Name', 'Type', 'SKU', 'Unit', ...(canManage ? ['Status'] : []), 'Min stock', ...(canManage ? [''] : [])].map((h, i) => (
                     <th
-                      key={h}
+                      key={`${h}-${i}`}
                       className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5"
                       style={{ color: 'var(--qms-text-muted)' }}
                     >
@@ -121,11 +121,11 @@ const InventoryMasterTab = () => {
                   >
                     <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>
                       <div className="flex items-center gap-1.5">
-                        <span className="font-mono" title={item.code}>{truncateIdentifier(item.code)}</span>
+                        <span className="font-mono font-semibold" title={item.code}>{truncateIdentifier(item.code)}</span>
                         <CopyButton value={item.code} label="Code" />
                       </div>
                     </td>
-                    <td className="px-4 py-2.5 font-semibold max-w-xs truncate" style={{ color: 'var(--qms-text)' }} title={item.name}>{item.name}</td>
+                    <td className="px-4 py-2.5 max-w-xs truncate" style={{ color: 'var(--qms-text)' }} title={item.name}>{item.name}</td>
                     <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{INVENTORY_MASTER_TYPE_LABEL[item.type]}</td>
                     <td className="px-4 py-2.5 max-w-xs truncate" style={{ color: 'var(--qms-text-muted)' }} title={item.sku}>{item.sku}</td>
                     <td className="px-4 py-2.5 max-w-xs truncate" style={{ color: 'var(--qms-text-muted)' }} title={item.unit}>{item.unit}</td>
@@ -139,7 +139,22 @@ const InventoryMasterTab = () => {
                         </span>
                       </td>
                     )}
-                    <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{item.minStock} - {item.maxStock}</td>
+                    <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{item.minStock}</td>
+                    {canManage && (
+                      <td className="px-4 py-2.5">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setEditModal({ open: true, item })
+                          }}
+                          className="flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg border transition-colors hover:bg-(--qms-surface-hover)"
+                          style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-soft)' }}
+                        >
+                          <FiEdit2 size={12} /> Edit
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

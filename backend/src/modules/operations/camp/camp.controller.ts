@@ -3,6 +3,7 @@ import { ResponseHandler } from '../../../shared/utils/responseHandler';
 import { formatZodError } from '../../../shared/utils/error';
 import {
     BookCampPayloadSchema,
+    CampReportQuerySchema,
     CreateCampPayloadSchema,
     MoveStagePayloadSchema,
     SearchCampQuerySchema,
@@ -202,6 +203,32 @@ const allocateFo = async (req: any, res: any) => {
     }
 };
 
+const report = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+
+        const { data: filters, success, error } = CampReportQuerySchema.safeParse(req.query);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                fields: validationErrors,
+            });
+        }
+
+        const result = await CampService.report(filters, ctx);
+
+        return ResponseHandler.appResponse(
+            res,
+            StatusCodes.OK,
+            true,
+            'Camp report generated successfully',
+            CampMapper.toReportResponse(result),
+        );
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
 export const CampController = {
     get,
     search,
@@ -210,4 +237,5 @@ export const CampController = {
     update,
     moveStage,
     allocateFo,
+    report,
 };

@@ -13,6 +13,19 @@ export function campRefName(value: { name?: string } | string | null | undefined
   return value.name ?? null
 }
 
+// Mirrors the backend's assertAssignedFoOrManage exactly: role id matching
+// camp.fo alone is not enough, the roleType must also be 'field-officer'.
+export function canRunScreening(
+  camp: { fo: { _id?: string; id?: string } | string | null },
+  viewerRoleId: string | undefined,
+  viewerRoleTypeCode: string | undefined,
+  canManageScreening: boolean,
+): boolean {
+  if (canManageScreening) return true
+  if (!viewerRoleId || viewerRoleTypeCode !== 'field-officer') return false
+  return campRefId(camp.fo) === viewerRoleId
+}
+
 // Zod validation failures respond with data.data.fields (per-field reasons),
 // not a specific top-level message; fall back to the plain message otherwise.
 export function saveErrorMessage(err: unknown): string {

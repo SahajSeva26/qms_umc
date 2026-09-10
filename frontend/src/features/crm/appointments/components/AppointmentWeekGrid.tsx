@@ -1,6 +1,7 @@
 import type { AppointmentEntity } from '@/types/appointment.types'
 import { APPOINTMENT_STATUS_LABEL, APPOINTMENT_TYPE_LABEL } from '@/types/appointment.types'
-import { addDays, dayKey, DAY_START_HOUR, HOUR_PX, HOURS, isSameDay } from '@/features/crm/appointments/appointments.utils'
+import { DAY_START_HOUR, HOUR_PX, HOURS } from '@/features/crm/appointments/appointments.utils'
+import { addDays, dayKey, isSameDay } from '@/utils/calendarDate'
 import { appointmentChipColor, appointmentRefName, darken, isMomOverdue, layoutDayAppointments } from '@/features/crm/appointments/appointmentsReal.utils'
 
 // Beyond this many concurrent columns, individual chips become too narrow to
@@ -32,7 +33,9 @@ const AppointmentWeekGrid = ({ weekStart, appointments, onOpen, onSlotClick }: A
   const byDay = new Map<string, AppointmentEntity[]>()
   for (const a of appointments) {
     const key = dayKey(new Date(a.duration.startTime))
-    byDay.set(key, [...(byDay.get(key) ?? []), a])
+    const bucket = byDay.get(key)
+    if (bucket) bucket.push(a)
+    else byDay.set(key, [a])
   }
 
   const nowOffset = (now.getHours() + now.getMinutes() / 60 - DAY_START_HOUR) * HOUR_PX
@@ -45,16 +48,29 @@ const AppointmentWeekGrid = ({ weekStart, appointments, onOpen, onSlotClick }: A
             <div />
             {days.map((day) => {
               const today = isSameDay(day, now)
+              const weekday = day.getDay()
+              const isSaturday = weekday === 6
+              const isSunday = weekday === 0
+              const weekendColor = isSaturday ? 'var(--warning)' : isSunday ? 'var(--danger)' : undefined
               return (
                 <div
                   key={day.toISOString()}
                   className="py-2 text-center"
-                  style={{ borderLeft: '1px solid var(--qms-border)', ...(today ? { background: 'rgba(59,109,255,.08)' } : {}) }}
+                  style={{
+                    borderLeft: '1px solid var(--qms-border)',
+                    background: today
+                      ? 'rgba(59,109,255,.08)'
+                      : isSaturday
+                        ? 'color-mix(in srgb, var(--warning) 6%, transparent)'
+                        : isSunday
+                          ? 'color-mix(in srgb, var(--danger) 6%, transparent)'
+                          : undefined,
+                  }}
                 >
-                  <div className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: today ? 'var(--qms-brand)' : 'var(--qms-text-muted)' }}>
+                  <div className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: today ? 'var(--qms-brand)' : weekendColor ?? 'var(--qms-text-muted)' }}>
                     {day.toLocaleDateString('en-IN', { weekday: 'short' })}
                   </div>
-                  <div className="text-[15px] font-bold leading-tight" style={{ color: today ? 'var(--qms-brand)' : 'var(--qms-text)' }}>
+                  <div className="text-[15px] font-bold leading-tight" style={{ color: today ? 'var(--qms-brand)' : weekendColor ?? 'var(--qms-text)' }}>
                     {day.getDate()}
                   </div>
                 </div>
@@ -77,6 +93,9 @@ const AppointmentWeekGrid = ({ weekStart, appointments, onOpen, onSlotClick }: A
 
             {days.map((day) => {
               const today = isSameDay(day, now)
+              const weekday = day.getDay()
+              const isSaturday = weekday === 6
+              const isSunday = weekday === 0
               const dayAppointments = byDay.get(dayKey(day)) ?? []
               return (
                 <div
@@ -85,7 +104,13 @@ const AppointmentWeekGrid = ({ weekStart, appointments, onOpen, onSlotClick }: A
                   style={{
                     minHeight: BODY_HEIGHT,
                     borderLeft: '1px solid var(--qms-border)',
-                    ...(today ? { background: 'rgba(59,109,255,.03)' } : {}),
+                    background: today
+                      ? 'rgba(59,109,255,.03)'
+                      : isSaturday
+                        ? 'color-mix(in srgb, var(--warning) 3%, transparent)'
+                        : isSunday
+                          ? 'color-mix(in srgb, var(--danger) 3%, transparent)'
+                          : undefined,
                   }}
                 >
                   {HOURS.map((h) => (

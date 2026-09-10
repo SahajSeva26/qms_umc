@@ -24,7 +24,6 @@ export const createDivisionSchema = z.object({
     }),
   name: z.string().trim().min(1, 'Name is required.'),
   therapy: therapyListSchema,
-  brandFocus: z.string().optional(),
   mrCount: z.number().int('Must be a whole number.').nonnegative('Must be 0 or more.').optional(),
   // Every division has a head — the backend mints a new user for them.
   head: z.object({
@@ -41,7 +40,22 @@ export const createDivisionSchema = z.object({
 export const updateDivisionSchema = z.object({
   name: z.string().trim().min(1, 'Name is required.').optional(),
   therapy: therapyListSchema.optional(),
-  brandFocus: z.string().optional(),
   mrCount: z.number().int('Must be a whole number.').nonnegative('Must be 0 or more.').optional(),
   status: z.enum(['active', 'inactive']).optional(),
 })
+
+// Phone here is optional with a min(10) check if supplied, matching
+// RegisterUserPayloadSchema server-side — deliberately not the looser `head` shape above.
+export const singleMrSchema = z.object({
+  firstName: z.string().trim().min(1, 'First name is required'),
+  lastName: z.string().trim().optional(),
+  email: z.string().trim().min(1, 'Email is required').email('Enter a valid email'),
+  password: z.string().min(PASSWORD_MIN_LENGTH, `Password must be at least ${PASSWORD_MIN_LENGTH} characters`),
+  phone: z
+    .string()
+    .trim()
+    .optional()
+    .refine((v) => !v || v.length >= 10, { message: 'Phone number must be at least 10 characters if provided' }),
+})
+
+export type SingleMrFormValues = z.infer<typeof singleMrSchema>

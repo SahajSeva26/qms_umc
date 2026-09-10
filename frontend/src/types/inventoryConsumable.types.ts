@@ -14,12 +14,25 @@ export interface InventoryConsumableItemRef {
   unit?: string
 }
 
+// vendor is populated to {id, code, name} when hydrated, {id} only when not
+// (same mapVendor() shape inventory-device.mapper.ts uses). null on any
+// consumable created before `vendor` became a required field — the backend
+// only enforces required-ness on save, not retroactively on existing documents.
+export interface InventoryConsumableVendorRef {
+  id: string
+  code?: string
+  name?: string
+}
+
 export interface InventoryConsumableEntity {
   id: string
   item: InventoryConsumableItemRef
+  vendor: InventoryConsumableVendorRef | null
   batch: string
   manufacturingDate: string
-  expiryDate: string
+  // Absent (not sent at all) when the lot has no expiry — the mapper returns
+  // it verbatim with no `?? null` fallback.
+  expiryDate?: string
   quantity: number
   createdAt: string
   updatedAt: string
@@ -39,14 +52,15 @@ export interface SearchInventoryConsumableQuery {
 
 export interface CreateInventoryConsumablePayload {
   item: string
+  vendor: string
   batch: string
   manufacturingDate: string
-  expiryDate: string
+  expiryDate?: string
   quantity?: number
 }
 
 export interface UpdateInventoryConsumablePayload {
-  // item intentionally absent — immutable post-create.
+  // item/vendor intentionally absent — immutable post-create.
   batch?: string
   manufacturingDate?: string
   expiryDate?: string

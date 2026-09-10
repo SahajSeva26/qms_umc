@@ -1,4 +1,6 @@
 import { CAMP_PERMISSIONS } from '../../operations/camp/camp.constants';
+import { DOCTOR_PERMISSIONS } from '../../crm/doctor/doctor.constants';
+import { BRAND_PERMISSIONS } from '../../crm/brand/brand.constants';
 
 export const ROLE_TYPE_STATUSES = {
     ACTIVE: 'active',
@@ -8,6 +10,9 @@ export const ROLE_TYPE_STATUSES = {
 // pharma field force hold only camp:book — it is their single capability, and it also unlocks the
 // camp + project read routes (which accept camp:book) so they can see what they need to book.
 const PHARMA_CAMP_PERMISSIONS = [CAMP_PERMISSIONS.BOOK.code];
+
+// read-only view of their own tenant's brand catalog (scoped by ctx.where) — every pharma role
+const PHARMA_BRAND_PERMISSIONS = [BRAND_PERMISSIONS.SEARCH.code, BRAND_PERMISSIONS.GET.code];
 
 export const ALLOWED_ROLETYPE_CODES = {
     PLATFORM: {
@@ -62,24 +67,25 @@ export const DEFAULT_PHARMA_ROLE_TYPES = [
         code: ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_DIVISION_HEAD,
         name: 'Pharma Division Head',
         description: 'Pharma division head',
-        permissions: [...PHARMA_CAMP_PERMISSIONS] as string[],
+        // division head manages its own tenant's doctor registry (tenant-scoped via ctx.where())
+        permissions: [...PHARMA_CAMP_PERMISSIONS, ...PHARMA_BRAND_PERMISSIONS, DOCTOR_PERMISSIONS.MANAGE.code] as string[],
     },
     {
         code: ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_RSM,
         name: 'Pharma RSM',
         description: 'Pharma regional sales manager',
-        permissions: [...PHARMA_CAMP_PERMISSIONS] as string[],
+        permissions: [...PHARMA_CAMP_PERMISSIONS, ...PHARMA_BRAND_PERMISSIONS] as string[],
     },
     {
         code: ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_ASM,
         name: 'Pharma ASM',
         description: 'Pharma area sales manager',
-        permissions: [...PHARMA_CAMP_PERMISSIONS] as string[],
+        permissions: [...PHARMA_CAMP_PERMISSIONS, ...PHARMA_BRAND_PERMISSIONS] as string[],
     },
     {
         code: ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR,
         name: 'Pharma MR',
         description: 'Pharma MR',
-        permissions: [...PHARMA_CAMP_PERMISSIONS] as string[],
+        permissions: [...PHARMA_CAMP_PERMISSIONS, ...PHARMA_BRAND_PERMISSIONS] as string[],
     },
 ];

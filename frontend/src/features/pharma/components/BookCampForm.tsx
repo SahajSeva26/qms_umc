@@ -1,19 +1,25 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { useReshapingResolver } from '@/hooks/useReshapingResolver'
 import { bookCampPayloadSchema, type BookCampFormPayload } from '@/features/pharma/schemas/bookCamp.schemas'
 import { useBookCamp } from '@/features/camps/hooks/useBookCamp'
-import { useSession } from '@/hooks/useSession'
+import { usePermission } from '@/hooks/usePermission'
 import { getApiErrorMessage } from '@/utils/apiError'
 import type { BookCampPayload, CampMutationResponseEntity, CampType } from '@/types/campReal.types'
 import type { ApiResponse } from '@/types/common.types'
 import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
 import { CAMP_TIME_SLOT_LABEL } from '@/types/campTimeSlot.constants'
+import type { LocationValue } from '@/types/location.types'
+import type { LocationResolutionState } from '@/components/widgets/location-picker/location.types'
 import DoctorPicker from '@/features/pharma/components/DoctorPicker'
 import MrPicker from '@/features/pharma/components/MrPicker'
+import EditDoctorModal from '@/features/doctors/components/EditDoctorModal'
+import LocationPicker from '@/components/widgets/location-picker/LocationPicker'
+import LocationAddressFields from '@/components/widgets/location-picker/LocationAddressFields'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import FieldErrorText from '@/components/ui/FieldErrorText'
 // import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 
@@ -32,10 +38,7 @@ interface FormValues {
   patientExpectation: number
   date: string
   timeSlot: CampTimeSlotValue | ''
-  city: string
-  state: string
-  lng: number
-  lat: number
+  location: LocationValue | null
   // notes: string
   // devices: string
 }
@@ -47,15 +50,13 @@ const EMPTY_FORM_VALUES: FormValues = {
   patientExpectation: NaN,
   date: '',
   timeSlot: '',
-  city: '', state: '',
-  lng: NaN, lat: NaN,
+  location: null,
   // notes: '',
   // devices: '',
 }
 
-// selfMrId: the booking session's own role id — spliced in as `mr` when the
-// caller IS the MR (needsMrPicker false), since the schema requires `mr`
-// unconditionally but an MR's form never shows/populates the mrId field.
+// selfMrId is spliced in as `mr` when the caller IS the MR — the schema
+// requires `mr` unconditionally but an MR's form never shows the mrId field.
 const useBookCampFormResolver = (needsMrPicker: boolean, selfMrId: string | undefined) =>
   useReshapingResolver<FormValues, BookCampFormPayload>({
     schema: bookCampPayloadSchema,
@@ -70,15 +71,21 @@ const useBookCampFormResolver = (needsMrPicker: boolean, selfMrId: string | unde
       patientExpectation: Number.isNaN(values.patientExpectation) ? undefined : values.patientExpectation,
       date: values.date,
       timeSlot: (values.timeSlot || '') as CampTimeSlotValue,
-      city: values.city,
-      state: values.state,
-      coordinates: [values.lng, values.lat],
+      location: values.location as LocationValue,
       notes: undefined,
       devices: undefined,
       // conscentPath omitted — no consent-file upload UI/infra exists yet.
     }),
-    // Payload's `mr` (from the top-level .refine()) -> form's `mrId`.
-    topLevelFieldMap: { mr: 'mrId' },
+    // Maps payload keys to this form's differently-named fields, so a Zod
+    // error lands on the field actually rendered.
+    topLevelFieldMap: { mr: 'mrId', doctor: 'doctorId' },
+    nestedFieldMaps: {
+      location: {
+        addressLine1: 'location', addressLine2: 'location', locality: 'location',
+        city: 'location', state: 'location', country: 'location', pincode: 'location',
+        googlePlaceId: 'location', coordinates: 'location',
+      },
+    },
   })
 
 interface BookCampFormProps {
@@ -94,13 +101,19 @@ interface BookCampFormProps {
 // Shared across all 4 pharma portal pages — only whether the MR picker
 // renders differs per role; the submitted payload is identical either way.
 const BookCampForm = ({ needsMrPicker, project, onBooked }: BookCampFormProps) => {
-  const { session } = useSession()
+  const { session, hasPermission } = usePermission()
   const selfMrId = session?.role.id
+  const canManageDoctors = hasPermission('doctor:manage')
+  const [showNewDoctor, setShowNewDoctor] = useState(false)
   const { resolver, parsePayload } = useBookCampFormResolver(needsMrPicker, selfMrId)
   const bookCamp = useBookCamp()
   // isPending flips true only once mutate is called, but parsePayload's own
   // re-parse runs before that — this ref closes that race window synchronously.
   const submittingRef = useRef(false)
+  // Covers the map pin's reverse-geocode AND the search box's async place
+  // selection — either can still be in flight when Submit is clicked.
+  const [locationResolution, setLocationResolution] = useState<LocationResolutionState>('idle')
+  const [locationError, setLocationError] = useState<string | null>(null)
 
   const {
     register,
@@ -122,12 +135,22 @@ const BookCampForm = ({ needsMrPicker, project, onBooked }: BookCampFormProps) =
   const fieldError = (field: keyof FormValues) =>
     (touchedFields[field] || isSubmitted) ? errors[field]?.message : undefined
 
-  // A real MR booking for themselves needs no picker, but the schema still
-  // requires `mr` — this state should be unreachable for a genuine pharma MR
-  // session; if it happens anyway, fail safely instead of submitting `mr: undefined`.
+  // Should be unreachable for a genuine pharma MR session — fails safely
+  // instead of submitting `mr: undefined` if it happens anyway.
   const missingSelfMrId = !needsMrPicker && !selfMrId
 
   const onSubmit = async (values: FormValues) => {
+    // Same failure mode GeoProfileDetailPage guards: the pin/search result can
+    // still be resolving (or have failed) when Submit is clicked.
+    if (locationResolution !== 'idle') {
+      setLocationError(
+        locationResolution === 'loading'
+          ? 'Still resolving the picked location — wait a moment and try again'
+          : 'Retry or choose "Use this pin" for the location before saving',
+      )
+      return
+    }
+    setLocationError(null)
     const formPayload = await parsePayload(values)
     // project is context, not form state — assembled here, never claimed as
     // the resolver's own output type (see BookCampFormPayload).
@@ -184,15 +207,37 @@ const BookCampForm = ({ needsMrPicker, project, onBooked }: BookCampFormProps) =
 
       <div>
         <Label className="text-[10px] font-semibold tracking-widest uppercase mb-1.5 block text-qms-text-muted">Doctor *</Label>
-        <Controller
-          control={control}
-          name="doctorId"
-          render={({ field }) => (
-            <DoctorPicker value={field.value} label={doctorLabel} onChange={(id, l) => { field.onChange(id); setValue('doctorLabel', l) }} />
+        <div className="flex items-center gap-2">
+          <div className="flex-1 min-w-0">
+            <Controller
+              control={control}
+              name="doctorId"
+              render={({ field }) => (
+                <DoctorPicker value={field.value} label={doctorLabel} onChange={(id, l) => { field.onChange(id); setValue('doctorLabel', l) }} />
+              )}
+            />
+          </div>
+          {canManageDoctors && session && (
+            <Button type="button" variant="outline" onClick={() => setShowNewDoctor(true)}>
+              New doctor
+            </Button>
           )}
-        />
+        </div>
         {fieldError('doctorId') && <p className="text-[11px] mt-1 text-danger">{fieldError('doctorId')}</p>}
       </div>
+
+      {showNewDoctor && session && (
+        <EditDoctorModal
+          open
+          doctor={null}
+          forcedTenant={{ id: session.tenant.id, label: session.tenant.name }}
+          onCreated={(created) => {
+            setValue('doctorId', created.id, { shouldDirty: true, shouldTouch: true, shouldValidate: true })
+            setValue('doctorLabel', `${created.name} (${created.pharmaCode})`)
+          }}
+          onClose={() => setShowNewDoctor(false)}
+        />
+      )}
 
       <div>
         <Label className="text-[10px] font-semibold tracking-widest uppercase mb-1.5 block text-qms-text-muted">Camp type</Label>
@@ -240,30 +285,25 @@ const BookCampForm = ({ needsMrPicker, project, onBooked }: BookCampFormProps) =
         {fieldError('timeSlot') && <p className="text-[11px] mt-1 text-danger">{fieldError('timeSlot')}</p>}
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Label htmlFor="bookCampCity" className="text-[10px] font-semibold tracking-widest uppercase mb-1.5 block text-qms-text-muted">City *</Label>
-          <Input id="bookCampCity" type="text" className="text-[13px]" {...register('city')} />
-          {fieldError('city') && <p className="text-[11px] mt-1 text-danger">{fieldError('city')}</p>}
-        </div>
-        <div>
-          <Label htmlFor="bookCampState" className="text-[10px] font-semibold tracking-widest uppercase mb-1.5 block text-qms-text-muted">State *</Label>
-          <Input id="bookCampState" type="text" className="text-[13px]" {...register('state')} />
-          {fieldError('state') && <p className="text-[11px] mt-1 text-danger">{fieldError('state')}</p>}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Label htmlFor="bookCampLng" className="text-[10px] font-semibold tracking-widest uppercase mb-1.5 block text-qms-text-muted">Longitude *</Label>
-          <Input id="bookCampLng" type="number" step="any" className="text-[13px]" {...register('lng', { valueAsNumber: true })} />
-          {fieldError('lng') && <p className="text-[11px] mt-1 text-danger">{fieldError('lng')}</p>}
-        </div>
-        <div>
-          <Label htmlFor="bookCampLat" className="text-[10px] font-semibold tracking-widest uppercase mb-1.5 block text-qms-text-muted">Latitude *</Label>
-          <Input id="bookCampLat" type="number" step="any" className="text-[13px]" {...register('lat', { valueAsNumber: true })} />
-          {fieldError('lat') && <p className="text-[11px] mt-1 text-danger">{fieldError('lat')}</p>}
-        </div>
+      <div>
+        <Label className="text-[10px] font-semibold tracking-widest uppercase mb-1.5 block text-qms-text-muted">Location *</Label>
+        <Controller
+          control={control}
+          name="location"
+          render={({ field }) => (
+            <div className="space-y-2">
+              <LocationPicker
+                value={field.value}
+                onChange={field.onChange}
+                onResolutionStateChange={setLocationResolution}
+                defaultCountry="India"
+                countryCode="IN"
+              />
+              <LocationAddressFields value={field.value} onChange={field.onChange} defaultCountry="India" />
+            </div>
+          )}
+        />
+        {fieldError('location') && <FieldErrorText message={fieldError('location')!} />}
       </div>
 
       {/* Hidden pending an integrate-or-remove decision — devices now requires InventoryMaster
@@ -285,13 +325,19 @@ const BookCampForm = ({ needsMrPicker, project, onBooked }: BookCampFormProps) =
         </div>
       )}
 
+      {locationError && (
+        <div className="text-[12px] rounded-lg px-3 py-2 bg-danger-soft border border-danger text-danger">
+          {locationError}
+        </div>
+      )}
+
       <Button
         type="submit"
-        disabled={bookCamp.isPending || missingSelfMrId}
+        disabled={bookCamp.isPending || missingSelfMrId || locationResolution === 'loading'}
         className="w-full font-bold text-white"
         style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
       >
-        {bookCamp.isPending ? 'Booking…' : 'Book camp'}
+        {bookCamp.isPending ? 'Booking…' : locationResolution === 'loading' ? 'Resolving location…' : 'Book camp'}
       </Button>
     </form>
   )

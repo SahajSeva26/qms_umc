@@ -35,6 +35,11 @@ export const GeoProfileMapper = {
             result.distance = profile.distance;
         }
 
+        // present only on findNearest when a date + time slot were supplied — is this FO free then
+        if (profile.available !== undefined) {
+            result.available = profile.available;
+        }
+
         return result;
     },
     toSearchResponse: (data: { count: number; items: any[] }) => {

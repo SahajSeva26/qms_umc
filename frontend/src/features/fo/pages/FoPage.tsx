@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react'
+import { Navigate } from 'react-router-dom'
 import {
   FiUsers, FiCalendar, FiBarChart2, FiCpu, FiFileText, FiAward, FiShield, FiBriefcase,
   FiUpload, FiDownload, FiPlus, FiZap, FiCheckCircle, FiClock, FiStar, FiActivity, FiPhone, FiMail, FiMapPin,
 } from 'react-icons/fi'
 import { useAuth } from '@/hooks/useAuth'
+import { usePermission } from '@/hooks/usePermission'
 import { usePeopleData } from '@/hooks/usePeopleData'
 import { useCampsData } from '@/hooks/useCampsData'
 import { useFoClaims, useFoTraining, useFoLeaves } from '@/features/fo/hooks/useFo'
@@ -29,7 +31,7 @@ function daysUntil(iso: string): number {
 }
 
 const ALL_TABS: { id: TabId; label: string; icon: typeof FiUsers }[] = [
-  { id: 'roster', label: 'Roster', icon: FiUsers },
+  { id: 'roster', label: 'FO Roster', icon: FiShield },
   { id: 'assignments', label: 'Assignments', icon: FiCalendar },
   { id: 'performance', label: 'Performance', icon: FiBarChart2 },
   { id: 'devices', label: 'Devices', icon: FiCpu },
@@ -42,6 +44,7 @@ const ALL_TABS: { id: TabId; label: string; icon: typeof FiUsers }[] = [
 
 const FoPage = () => {
   const { user } = useAuth()
+  const { session } = usePermission()
   // No real backend permission exists yet to distinguish personal/sales-scoped
   // views, so this always renders the full "FO Management" admin view.
   const isPersonal = false
@@ -177,6 +180,15 @@ const FoPage = () => {
 
   const openFo = allPeople.find((p) => p.id === openFoId) ?? null
 
+  // field-officer (RoleType + every real Role) lives only under the platform
+  // tenant. The route's own anyOf guard only checks tenant:manage/tenant:admin,
+  // which a customer-tenant admin also legitimately holds — without this second
+  // check that session would reach the real-roster tab and hit a confusing
+  // false "role type not found" error instead of a real access decision.
+  if (session && session.tenant.type !== 'platform') {
+    return <Navigate to="/unauthorized" replace />
+  }
+
   return (
     <div className="w-full">
       <div className="flex items-start justify-between gap-3 mb-4 flex-wrap">
@@ -219,7 +231,7 @@ const FoPage = () => {
           </div>
         </div>
 
-        {!isPersonal && (
+        {!isPersonal && activeTab !== 'roster' && (
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => toast.info('Import would open here')}
@@ -303,7 +315,7 @@ const FoPage = () => {
         })}
       </div>
 
-      {activeTab === 'roster' && <RosterTab fos={scopedFos} camps={camps} onOpenFo={setOpenFoId} />}
+      {activeTab === 'roster' && <RosterTab />}
       {activeTab === 'assignments' && <AssignmentsTab fos={scopedFos} camps={camps} onOpenFo={setOpenFoId} />}
       {activeTab === 'performance' && <PerformanceTab fos={scopedFos} camps={camps} onOpenFo={setOpenFoId} />}
       {activeTab === 'devices' && <DevicesTab fos={scopedFos} camps={camps} devices={devices} onOpenFo={setOpenFoId} />}

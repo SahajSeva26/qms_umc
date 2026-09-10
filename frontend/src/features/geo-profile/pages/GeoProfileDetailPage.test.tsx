@@ -65,9 +65,21 @@ vi.mock('@/features/geo-profile/geoProfile.service', () => ({
   },
 }))
 
+// role-1 is field-officer-typed; role-2 is Sales Rep — the exact "any role
+// can be picked for a fo-typed profile" gap the filtering below closes.
 vi.mock('@/features/access-management/accessManagement.service', () => ({
   accessManagementService: {
-    searchRoles: vi.fn(async () => ({ success: true, message: '', data: { items: [{ id: 'role-1', name: 'FO One', code: 'fo-001' }], count: 1 } })),
+    searchRoles: vi.fn(async () => ({
+      success: true,
+      message: '',
+      data: {
+        items: [
+          { id: 'role-1', name: 'FO One', code: 'fo-001', type: { name: 'Field Officer', code: 'field-officer' } },
+          { id: 'role-2', name: 'Sales Rep One', code: 'sr-001', type: { name: 'Sales Rep', code: 'sales-rep' } },
+        ],
+        count: 2,
+      },
+    })),
     getRole: vi.fn(async () => ({ success: true, message: '', data: { id: 'role-1', name: 'FO One', code: 'fo-001' } })),
   },
 }))
@@ -272,6 +284,33 @@ describe('GeoProfileDetailPage — create mode', () => {
 
     await waitFor(() => expect(geoProfileService.createGeoProfile).toHaveBeenCalledTimes(1))
   })
+
+  it('Role options are always limited to field-officer-typed roles, regardless of the selected type — Sales Rep One is never offered', async () => {
+    await mockPermission(true)
+    const user = userEvent.setup()
+    await renderCreatePage()
+
+    await user.click(screen.getByRole('combobox', { name: /role/i }))
+    expect(await screen.findByText(/fo one/i)).toBeInTheDocument()
+    expect(screen.queryByText(/sales rep one/i)).not.toBeInTheDocument()
+  })
+
+  it('selecting type "dietitian" does not change the Role options — still Field Officer only, since no dietitian RoleType exists', async () => {
+    await mockPermission(true)
+    const user = userEvent.setup()
+    await renderCreatePage()
+
+    await user.click(screen.getByRole('combobox', { name: /type/i }))
+    await user.click(await screen.findByText(/dietitian/i))
+    await user.click(screen.getByRole('combobox', { name: /role/i }))
+
+    expect(await screen.findByText(/fo one/i)).toBeInTheDocument()
+    expect(screen.queryByText(/sales rep one/i)).not.toBeInTheDocument()
+  })
+
+  // handleSave's own non-FO-role guard has no independent UI path to reach
+  // it — the dropdown itself only ever offers field-officer-typed roles now.
+  // Covered directly instead via geoProfile.utils.test.ts's isFieldOfficerRole tests.
 })
 
 describe('GeoProfileDetailPage — edit mode', () => {

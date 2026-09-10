@@ -1,5 +1,6 @@
 // Invoice Mapper
 import { RequestContext } from '../../../shared/utils/contextBuilder';
+import { INVOICE_ISSUED_STATUSES, INVOICE_NOT_YET_ISSUED_STATUSES, INVOICE_STATUS } from './invoice.constants';
 
 export const InvoiceMapper = {
     toResponse: (invoice: any, ctx: RequestContext) => {
@@ -48,5 +49,31 @@ export const InvoiceMapper = {
             result.items.push(InvoiceMapper.toResponse(invoice, ctx));
         }
         return result;
+    },
+    toReportResponse: (report: any) => {
+        const grouped = new Map<string, { count: number; value: number }>(
+            (report?.statusCounts || []).map((s: any) => [s._id, { count: s.count || 0, value: s.value || 0 }]),
+        );
+
+        // every status is emitted, zero-filled — all six are reachable through the lifecycle
+        const byStatus = Object.values(INVOICE_STATUS).map((status) => ({
+            status,
+            count: grouped.get(status)?.count || 0,
+            value: grouped.get(status)?.value || 0,
+        }));
+
+        const valueOf = (statuses: string[]) =>
+            statuses.reduce((sum, status) => sum + (grouped.get(status)?.value || 0), 0);
+
+        return {
+            summary: {
+                totalInvoices: byStatus.reduce((sum, bucket) => sum + bucket.count, 0),
+                // `value` on a status bucket is invoice value in that status — never money collected.
+                issuedValue: valueOf(INVOICE_ISSUED_STATUSES),
+                notYetIssuedValue: valueOf(INVOICE_NOT_YET_ISSUED_STATUSES),
+                cancelledValue: valueOf([INVOICE_STATUS.CANCELLED]),
+            },
+            byStatus,
+        };
     },
 };

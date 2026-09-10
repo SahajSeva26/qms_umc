@@ -52,3 +52,12 @@ export const SearchInvoiceQuerySchema = z.object({
     limit: z.string().optional().openapi({ example: '10' }),
 });
 export type ISearchInvoiceQuery = z.infer<typeof SearchInvoiceQuerySchema>;
+
+//5: report ====================================>
+// Same date semantics as search(): the window applies to issueDate, dateTo snapped to end-of-day (UTC).
+export const InvoiceReportQuerySchema = z.object({
+    project: objectId('Project').optional(),
+    dateFrom: z.coerce.date().optional().openapi({ example: '2026-09-01' }),
+    dateTo: z.coerce.date().optional().openapi({ example: '2026-09-30' }),
+});
+export type IInvoiceReportQuery = z.infer<typeof InvoiceReportQuerySchema>;

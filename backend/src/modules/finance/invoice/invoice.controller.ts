@@ -3,6 +3,7 @@ import { ResponseHandler } from '../../../shared/utils/responseHandler';
 import { formatZodError } from '../../../shared/utils/error';
 import {
     CreateInvoicePayloadSchema,
+    InvoiceReportQuerySchema,
     MoveStagePayloadSchema,
     SearchInvoiceQuerySchema,
     UpdateInvoicePayloadSchema,
@@ -153,10 +154,37 @@ const moveStage = async (req: any, res: any) => {
     }
 };
 
+const report = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+
+        const { data: filters, success, error } = InvoiceReportQuerySchema.safeParse(req.query);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                errors: validationErrors,
+            });
+        }
+
+        const result = await InvoiceService.report(filters, ctx);
+
+        return ResponseHandler.appResponse(
+            res,
+            StatusCodes.OK,
+            true,
+            'Invoice report generated successfully',
+            InvoiceMapper.toReportResponse(result),
+        );
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
 export const InvoiceController = {
     get,
     search,
     create,
     update,
     moveStage,
+    report,
 };

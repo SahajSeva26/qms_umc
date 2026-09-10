@@ -21,6 +21,11 @@ export const INVOICE_TRANSITION_MAP: Record<string, string[]> = {
     [INVOICE_STATUS.CANCELLED]: [],
 };
 
+// Report summary buckets — mutually exclusive, together covering every status.
+// Issued value includes all statuses reached through the issued lifecycle.
+export const INVOICE_ISSUED_STATUSES: string[] = [INVOICE_STATUS.ISSUED, INVOICE_STATUS.GRN_SIGNED, INVOICE_STATUS.PAID];
+export const INVOICE_NOT_YET_ISSUED_STATUSES: string[] = [INVOICE_STATUS.DRAFT, INVOICE_STATUS.APPROVED];
+
 // ================= INVOICE PERMISSIONS CONSTANTS ===============
 
 export const INVOICE_PERMISSIONS = {

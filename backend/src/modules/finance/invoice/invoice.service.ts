@@ -1,7 +1,13 @@
 // Invoice Service
 import mongoose, { HydratedDocument } from 'mongoose';
 import { InvoiceModel, IInvoice } from './invoice.model';
-import { ICreateInvoicePayload, IMoveStagePayload, ISearchInvoiceQuery, IUpdateInvoicePayload } from './invoice.validators';
+import {
+    ICreateInvoicePayload,
+    IInvoiceReportQuery,
+    IMoveStagePayload,
+    ISearchInvoiceQuery,
+    IUpdateInvoicePayload,
+} from './invoice.validators';
 import { INVOICE_COUNTER_ENTITY, INVOICE_STATUS, INVOICE_TRANSITION_MAP } from './invoice.constants';
 import { InvoiceLineItemModel } from '../invoiceLineItem/invoiceLineItem.model';
 import { canTransition } from '../../crm/lead/lead.validators';
@@ -10,7 +16,7 @@ import { CounterService } from '../../counter/counter.service';
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
-import { isValidObjectID } from '../../../shared/utils/strings';
+import { isValidObjectID, toObjectId } from '../../../shared/utils/strings';
 import { endOfUTCDay } from '../../../shared/utils/dates';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { ProjectService } from '../../crm/project/project.service';
@@ -245,10 +251,32 @@ const moveStage = async (id: string, model: IMoveStagePayload, ctx: RequestConte
     return invoice;
 };
 
+const report = async (filters: IInvoiceReportQuery, ctx: RequestContext) => {
+    //1: scope — same layering as search(): ctx.where() first, then the caller's own filters
+    const where: mongoose.QueryFilter<IInvoice> = { ...ctx.where() };
+
+    // aggregate() does no schema casting, so the id must be cast explicitly
+    if (filters.project) where.project = toObjectId(filters.project);
+    if (filters.dateFrom || filters.dateTo) {
+        where.issueDate = {};
+        if (filters.dateFrom) where.issueDate.$gte = filters.dateFrom;
+        if (filters.dateTo) where.issueDate.$lte = endOfUTCDay(filters.dateTo);
+    }
+
+    //2: single aggregation — counts and values per status; the mapper derives the summary from it
+    const statusCounts = await InvoiceModel.aggregate([
+        { $match: where },
+        { $group: { _id: '$status', count: { $sum: 1 }, value: { $sum: '$total' } } },
+    ]);
+
+    return { statusCounts };
+};
+
 export const InvoiceService = {
     get,
     search,
     create,
     update,
     moveStage,
+    report,
 };

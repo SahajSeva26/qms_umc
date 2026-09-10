@@ -27,16 +27,16 @@ const ADD_NEW_CONTACT_VALUE = '__add_new_contact__'
 
 const APPOINTMENT_TYPES: AppointmentType[] = ['new', 'follow-up', 'payment', 'spot']
 
-// Both are 'HH:mm' on the same calendar day, so a plain minute-of-day diff suffices.
-function formatDuration(startTime: string, endTime: string): string {
+// startTime is 'HH:mm' on the same calendar day; durationHours can be fractional
+// (e.g. 1.5) — a plain minute-of-day add suffices, wrapping past midnight is not
+// supported (matches the old same-day start/end picker's own assumption).
+function addDuration(startTime: string, durationHours: number): string {
   const [sh, sm] = startTime.split(':').map(Number)
-  const [eh, em] = endTime.split(':').map(Number)
-  const totalMinutes = eh * 60 + em - (sh * 60 + sm)
-  const hours = Math.floor(totalMinutes / 60)
-  const minutes = totalMinutes % 60
-  if (hours === 0) return `${minutes} min`
-  if (minutes === 0) return `${hours} hr`
-  return `${hours} hr ${minutes} min`
+  const totalMinutes = Math.round(sh * 60 + sm + durationHours * 60)
+  const wrapped = ((totalMinutes % 1440) + 1440) % 1440
+  const eh = Math.floor(wrapped / 60)
+  const em = wrapped % 60
+  return `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`
 }
 
 const labelClasses = 'block text-[10px] font-semibold tracking-widest uppercase mb-2'
@@ -63,7 +63,8 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
   const [members, setMembers] = useState<SelectedMember[]>([])
   const [date, setDate] = useState(prefill?.date ?? new Date().toISOString().slice(0, 10))
   const [startTime, setStartTime] = useState(prefill ? `${String(prefill.hour).padStart(2, '0')}:00` : '10:00')
-  const [endTime, setEndTime] = useState(prefill ? `${String(prefill.hour + 1).padStart(2, '0')}:00` : '11:00')
+  const [durationHours, setDurationHours] = useState(1)
+  const endTime = addDuration(startTime, durationHours)
   const [destinationLink, setDestinationLink] = useState('')
   const [leadId, setLeadId] = useState('')
   const [leadLabel, setLeadLabel] = useState('')
@@ -108,7 +109,7 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
     setMembers([])
     setDate(new Date().toISOString().slice(0, 10))
     setStartTime('10:00')
-    setEndTime('11:00')
+    setDurationHours(1)
     setDestinationLink('')
     setLeadId('')
     setLeadLabel('')
@@ -142,9 +143,9 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
     if (!contactPersonId) return setError('Select a contact person')
     if (!agendaPublic.trim()) return setError('Public agenda is required')
     if (type === 'follow-up' && !leadId.trim() && !parentId.trim()) return setError('Follow-up appointments need a linked lead or a linked meeting')
+    if (!(durationHours > 0)) return setError('Duration must be greater than 0')
     const startAt = new Date(`${date}T${startTime}:00`)
     const endAt = new Date(`${date}T${endTime}:00`)
-    if (endAt.getTime() <= startAt.getTime()) return setError('End time must be after start time')
 
     setError('')
     try {
@@ -351,19 +352,26 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
             </div>
             <div>
               <div className="flex items-center justify-between mb-2">
-                <Label className={`${labelClasses} mb-0`} style={labelStyle}>End</Label>
-                {endTime && startTime && endTime > startTime && (
+                <Label className={`${labelClasses} mb-0`} style={labelStyle}>Duration (hrs) *</Label>
+                {durationHours > 0 && (
                   <span
                     className="text-[10px] font-bold px-2 py-0.5 rounded-full"
                     style={{ background: 'color-mix(in oklch, var(--qms-brand), transparent 88%)', color: 'var(--qms-brand)' }}
                   >
-                    {formatDuration(startTime, endTime)}
+                    Ends {endTime}
                   </span>
                 )}
               </div>
-              <TimePicker value={endTime} onChange={setEndTime} />
-              {endTime && startTime && endTime <= startTime && (
-                <p className="text-[11px] mt-1 text-danger">End time must be after start time</p>
+              <Input
+                type="number"
+                min="0.25"
+                step="0.25"
+                value={durationHours}
+                onChange={(e) => setDurationHours(Number(e.target.value))}
+                className="text-[13px]"
+              />
+              {!(durationHours > 0) && (
+                <p className="text-[11px] mt-1 text-danger">Duration must be greater than 0</p>
               )}
             </div>
           </div>

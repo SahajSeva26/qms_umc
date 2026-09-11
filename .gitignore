@@ -23,7 +23,7 @@ dist/
 build/
 out/
 dist-ssr/
-
+docs/db-learning
 # ======================
 # TypeScript
 # ======================
@@ -41,7 +41,7 @@ frontend/dist/
 backend/node_modules/
 backend/dist/
 backend/src/shared/test-cases
-backend/docs
+backend/docs*
 # ======================
 # Logs
 # ======================

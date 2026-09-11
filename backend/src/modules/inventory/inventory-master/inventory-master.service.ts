@@ -1,7 +1,12 @@
 // Inventory-master Service
 import { HydratedDocument } from 'mongoose';
 import { InventoryMasterModel, IInventoryMaster } from './inventory-master.model';
-import { ICreateInventoryMasterPayload, ISearchInventoryMasterQuery, IUpdateInventoryMasterPayload } from './inventory-master.validators';
+import {
+    ICreateInventoryMasterPayload,
+    IInventoryMasterReportQuery,
+    ISearchInventoryMasterQuery,
+    IUpdateInventoryMasterPayload,
+} from './inventory-master.validators';
 import { INVENTORY_MASTER_PERMISSIONS, ITEM_STATUS } from './inventory-master.constants';
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
@@ -102,9 +107,33 @@ const update = async (id: string, model: IUpdateInventoryMasterPayload, ctx: Req
     return entity;
 };
 
+// ========================================================================================
+// REPORT
+// ========================================================================================
+// A dedicated aggregation, not search(): search()'s pagination and active-only default would
+// change the counts.
+const report = async (_filters: IInventoryMasterReportQuery, _ctx: RequestContext) => {
+    const [result] = await InventoryMasterModel.aggregate([
+        {
+            $facet: {
+                total: [{ $count: 'count' }],
+                byType: [{ $group: { _id: '$type', count: { $sum: 1 } } }],
+                byStatus: [{ $group: { _id: '$status', count: { $sum: 1 } } }],
+            },
+        },
+    ]);
+
+    return {
+        totalMaster: result?.total?.[0]?.count || 0,
+        catalogByType: result?.byType || [],
+        catalogByStatus: result?.byStatus || [],
+    };
+};
+
 export const InventoryMasterService = {
     get,
     search,
     create,
     update,
+    report,
 };

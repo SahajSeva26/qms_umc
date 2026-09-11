@@ -4,6 +4,7 @@ import express from 'express';
 import { AppointmentController } from './appointment.controller';
 import { registry } from '../../../shared/config/swagger/swagger.registry';
 import {
+    AppointmentReportQuerySchema,
     CreateAppointmentPayloadSchema,
     MoveStagePayloadSchema,
     RespondPayloadSchema,
@@ -12,12 +13,29 @@ import {
 } from './appointment.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
 import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { reportRateLimiter } from '../../../shared/middlewares/rateLimiter';
 import { APPOINTMENT_PERMISSIONS } from './appointment.constants';
 import { TENANT_PERMISSIONS } from '../../access-management/tenant/tenant.constants';
 
 export const AppointmentRouter = express.Router();
 
 AppointmentRouter.use(AuthMiddleware);
+
+// appointment report
+registry.registerPath({
+    method: 'get',
+    path: '/appointments/report',
+    tags: ['APPOINTMENT'],
+    summary: 'Get appointment statistics report',
+    request: {
+        query: AppointmentReportQuerySchema,
+    },
+    responses: {
+        200: { description: 'Appointment report generated successfully' },
+        400: { description: 'Validation error' },
+        403: { description: 'Forbidden' },
+    },
+});
 
 // get appointment
 registry.registerPath({
@@ -144,6 +162,13 @@ registry.registerPath({
 const GUARD = [APPOINTMENT_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code];
 // reps (appointment:search) may read; the service scopes them to their own appointments
 const READ_GUARD = [APPOINTMENT_PERMISSIONS.SEARCH.code, ...GUARD];
+
+AppointmentRouter.get(
+    '/report',
+    reportRateLimiter,
+    AuthorizeMiddleware([APPOINTMENT_PERMISSIONS.MANAGE.code]),
+    AppointmentController.report,
+);
 
 AppointmentRouter.get(
     '/:id',

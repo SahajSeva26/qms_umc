@@ -95,3 +95,11 @@ export const SearchAppointmentQuerySchema = z.object({
     limit: z.string().optional().openapi({ example: '10' }),
 });
 export type ISearchAppointmentQuery = z.infer<typeof SearchAppointmentQuerySchema>;
+
+//6: report ====================================>
+export const AppointmentReportQuerySchema = z.object({
+    division: objectId('Division').optional(),
+    dateFrom: z.coerce.date().optional().openapi({ example: '2026-09-01' }),
+    dateTo: z.coerce.date().optional().openapi({ example: '2026-09-30' }),
+});
+export type IAppointmentReportQuery = z.infer<typeof AppointmentReportQuerySchema>;

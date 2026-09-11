@@ -42,19 +42,19 @@ describe('NewAppointmentDialog — prefill from the clicked calendar slot', () =
     vi.clearAllMocks()
   })
 
-  it('shows the clicked slot\'s date and start/end hour, not today\'s date and 10:00-11:00', async () => {
+  it('shows the clicked slot\'s date and start hour, and derives the end time from the default 1hr duration', async () => {
     await renderDialog({ date: '2026-09-02', hour: 14 }, 'slot-1')
 
     expect(await screen.findByText('02 Sep 2026', {}, { timeout: 10000 })).toBeInTheDocument()
     expect(screen.getAllByText('14').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('15').length).toBeGreaterThan(0)
+    expect(await screen.findByText('Ends 15:00')).toBeInTheDocument()
   }, 15000)
 
-  it('falls back to today\'s date and 10:00-11:00 when opened with no prefill (the header "New appointment" button)', async () => {
+  it('falls back to today\'s date, 10:00 start and a 1hr default duration when opened with no prefill (the header "New appointment" button)', async () => {
     await renderDialog(undefined, 'blank')
 
     expect(screen.getAllByText('10').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('11').length).toBeGreaterThan(0)
+    expect(await screen.findByText('Ends 11:00')).toBeInTheDocument()
   })
 
   it('regression: remounting with a NEW key picks up a different prefill even when reopened after a previous session', async () => {
@@ -76,6 +76,6 @@ describe('NewAppointmentDialog — prefill from the clicked calendar slot', () =
 
     expect(await screen.findByText('02 Sep 2026', {}, { timeout: 10000 })).toBeInTheDocument()
     expect(screen.getAllByText('14').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('15').length).toBeGreaterThan(0)
+    expect(await screen.findByText('Ends 15:00')).toBeInTheDocument()
   }, 20000)
 })

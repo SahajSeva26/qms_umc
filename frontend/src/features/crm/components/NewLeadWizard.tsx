@@ -111,6 +111,29 @@ const NewLeadWizard = ({ onClose, onCreated, prefill }: NewLeadWizardProps) => {
     if (step < 3) setStep(step + 1)
   }
 
+  // Jumping back to an already-completed step is always safe (its data was
+  // already validated on the way in). Jumping forward must still validate
+  // every step in between, since handleSave only re-checks step 3 — without
+  // this, a click straight to Review could skip Step 1/2/3's requirements.
+  const handleStepClick = (target: number) => {
+    if (target === step) return
+    if (target < step) {
+      setError(null)
+      setStep(target)
+      return
+    }
+    for (let i = step; i < target; i++) {
+      const err = validateStep(i, form)
+      if (err) {
+        setError(err)
+        setStep(i)
+        return
+      }
+    }
+    setError(null)
+    setStep(target)
+  }
+
   const handleSave = async () => {
     const err = validateStep(3, form)
     if (err) {
@@ -189,8 +212,10 @@ const NewLeadWizard = ({ onClose, onCreated, prefill }: NewLeadWizardProps) => {
                 {STEPS.map((s, i) => (
                   <Fragment key={s.label}>
                     {i > 0 && <span className="w-2.5 h-px shrink-0" style={{ background: 'var(--qms-border)' }} />}
-                    <div
-                      className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-full border text-[11px] font-bold whitespace-nowrap"
+                    <button
+                      type="button"
+                      onClick={() => handleStepClick(i)}
+                      className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-full border text-[11px] font-bold whitespace-nowrap cursor-pointer"
                       style={
                         i === step
                           ? { borderColor: 'var(--qms-brand)', color: 'var(--qms-brand)', background: 'color-mix(in oklab, var(--qms-brand) 8%, transparent)' }
@@ -212,7 +237,7 @@ const NewLeadWizard = ({ onClose, onCreated, prefill }: NewLeadWizardProps) => {
                         {i + 1}
                       </span>
                       {s.label}
-                    </div>
+                    </button>
                   </Fragment>
                 ))}
               </div>

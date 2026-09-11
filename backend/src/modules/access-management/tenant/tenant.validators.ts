@@ -116,5 +116,7 @@ export const SearchTenantQuerySchema = z.object({
     page: z.string().optional().openapi({ example: '1' }),
 
     limit: z.string().optional().openapi({ example: '10' }),
+    // when 'true', include each tenant's total project count (totalProjects) in the result
+    report: z.enum(['true', 'false']).optional().openapi({ example: 'true' }),
 });
 export type ISearchTenantQuery = z.infer<typeof SearchTenantQuerySchema>;

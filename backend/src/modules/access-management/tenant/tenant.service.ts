@@ -15,9 +15,15 @@ import { withTransaction } from '../../../shared/helpers/transactionHelper';
 import { provisionDefaultRoleTypes } from '../../../shared/env/roleTypeProvisioner';
 import { SYSTEM_PERMISSIONS } from '../../../shared/env/permissions';
 import { IUser, UserModel } from '../../user/user.model';
+import { Project } from '../../crm/project/project.model';
+import { PROJECT_STATUS } from '../../crm/project/project.constants';
+import { CampModel } from '../../operations/camp/camp.model';
+import { CAMP_STATUSES } from '../../operations/camp/camp.constants';
 
 type TenantDocument = HydratedDocument<ITenant> | null;
 const populate: any[] = [];
+// report adds per-tenant aggregations — cap the page size so a large limit can't make it heavy
+const REPORT_MAX_LIMIT = 20;
 // ========================================================================================
 // CORE FUNCTIONS
 // ========================================================================================
@@ -122,6 +128,14 @@ const search = async (filters: ISearchTenantQuery, ctx: RequestContext, options?
         where.status = filters.status;
     }
 
+    // report runs extra per-tenant aggregations, so cap the page size to keep the load bounded
+    if (filters.report === 'true' && (options?.pagination?.limit ?? 0) > REPORT_MAX_LIMIT) {
+        return throwAppError(
+            `limit must be at most ${REPORT_MAX_LIMIT} when report is true`,
+            StatusCodes.BAD_REQUEST,
+        );
+    }
+
     // 3: execute queries
     const countPromise = TenantModel.countDocuments(where);
     const dataPromise = TenantModel.find(where)
@@ -132,10 +146,71 @@ const search = async (filters: ISearchTenantQuery, ctx: RequestContext, options?
 
     const [count, items] = await Promise.all([countPromise, dataPromise]);
 
+    //4: optional report — per-tenant project/camp stats for this result page
+    const stats = filters.report === 'true' ? await getTenantStats(items) : undefined;
+
     return {
         count,
         items,
+        stats,
     };
+};
+
+// per-tenant rollup: total & live projects, total & live camps
+type TenantStats = {
+    totalProjects: number;
+    liveProjects: number;
+    totalCamps: number;
+    liveCamps: number;
+};
+
+// aggregate project & camp stats per tenant for the given tenants (one query each for the whole page)
+const getTenantStats = async (tenants: HydratedDocument<ITenant>[]): Promise<Record<string, TenantStats>> => {
+    const tenantIds = tenants.map((t) => t._id);
+
+    const [projectGroups, campGroups] = await Promise.all([
+        Project.aggregate([
+            { $match: { tenant: { $in: tenantIds } } },
+            {
+                $group: {
+                    _id: '$tenant',
+                    total: { $sum: 1 },
+                    live: { $sum: { $cond: [{ $eq: ['$status', PROJECT_STATUS.LIVE] }, 1, 0] } },
+                },
+            },
+        ]),
+        CampModel.aggregate([
+            { $match: { tenant: { $in: tenantIds } } },
+            {
+                $group: {
+                    _id: '$tenant',
+                    total: { $sum: 1 },
+                    live: { $sum: { $cond: [{ $eq: ['$status', CAMP_STATUSES.LIVE] }, 1, 0] } },
+                },
+            },
+        ]),
+    ]);
+
+    // seed every tenant with zeros, then fold each aggregation in
+    const stats: Record<string, TenantStats> = {};
+    for (const id of tenantIds) {
+        stats[id.toString()] = { totalProjects: 0, liveProjects: 0, totalCamps: 0, liveCamps: 0 };
+    }
+    for (const g of projectGroups) {
+        const entry = stats[g._id.toString()];
+        if (entry) {
+            entry.totalProjects = g.total;
+            entry.liveProjects = g.live;
+        }
+    }
+    for (const g of campGroups) {
+        const entry = stats[g._id.toString()];
+        if (entry) {
+            entry.totalCamps = g.total;
+            entry.liveCamps = g.live;
+        }
+    }
+    return stats;
 };
 
 const create = async (model: ICreateTenantPayload, ctx: RequestContext): Promise<HydratedDocument<ITenant>> => {

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { FiPlus, FiClock } from 'react-icons/fi'
 import type { ProjectStatus } from '@/types/project.types'
 import { useProjects } from '@/features/projects/hooks/useProjects'
+import { useProjectReport } from '@/features/projects/hooks/useProjectReport'
 import { usePermission } from '@/hooks/usePermission'
 import {
   computeGstBreakdown,
@@ -36,6 +37,8 @@ function healthColor(score: number): string {
 const ProjectGanttPage = () => {
   const { hasAnyPermission } = usePermission()
   const canWrite = hasAnyPermission(PROJECT_WRITE_PERMISSIONS)
+  // GET /projects/report needs the same permission set — hide the strip rather than let it 403.
+  const canViewReport = canWrite
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [wizardOpen, setWizardOpen] = useState(false)
@@ -43,7 +46,10 @@ const ProjectGanttPage = () => {
   const { data, isLoading, error } = useProjects(statusFilter !== 'all' ? { status: statusFilter } : {})
   const projects = data?.data?.items ?? EMPTY_ARRAY
 
-  const kpis = useMemo(() => computeProjectKpis(projects), [projects])
+  // Unfiltered — always the whole tenant's aggregate, independent of this
+  // page's own statusFilter (matches CrmPage's leads-report precedent).
+  const { report, isLoading: reportLoading, error: reportError } = useProjectReport(canViewReport)
+  const kpis = useMemo(() => computeProjectKpis(report), [report])
 
   // Only projects with a real date range plot on the timeline; the rest are
   // listed separately below rather than silently dropped.
@@ -89,7 +95,31 @@ const ProjectGanttPage = () => {
         )}
       </div>
 
-      <GanttKpiStrip kpis={kpis} />
+      {!canViewReport && (
+        <p className="text-[13px] mb-4" style={{ color: 'var(--qms-text-muted)' }}>
+          Statistics are available to project managers.
+        </p>
+      )}
+
+      {canViewReport && reportLoading && (
+        <div className="grid gap-2.5 mb-4 grid-cols-4 max-[1100px]:grid-cols-2 max-[560px]:grid-cols-1">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="rounded-xl border p-3 h-18 animate-pulse"
+              style={{ background: 'var(--qms-surface-strong)', borderColor: 'var(--qms-border)' }}
+            />
+          ))}
+        </div>
+      )}
+
+      {canViewReport && !reportLoading && reportError && (
+        <p className="text-[13px] mb-4" style={{ color: 'var(--qms-text-muted)' }}>
+          Couldn't load stats.
+        </p>
+      )}
+
+      {canViewReport && !reportLoading && !reportError && report && <GanttKpiStrip kpis={kpis} />}
 
       <div className="flex items-center gap-2 mb-3">
         <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>

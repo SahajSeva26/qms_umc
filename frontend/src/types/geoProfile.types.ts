@@ -3,6 +3,8 @@
 // used for camp allocation via the /nearest endpoint. `tenant` is never sent by
 // the client — geoProfile.service.ts derives it from the linked Role on create.
 
+import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
+
 export type GeoProfileType = 'fo' | 'dietitian'
 export type GeoProfileStatus = 'active' | 'inactive'
 
@@ -39,6 +41,9 @@ export interface GeoProfileEntity extends GeoProfileAddressFields {
   updatedAt: string
   /** Only present on /geo-profiles/nearest results — distance to the query point, in meters. */
   distance?: number
+  /** Only present when the /nearest query supplied BOTH date and timeSlot — false means this FO
+   * already has a non-cancelled camp in that exact date + slot. */
+  available?: boolean
 }
 
 export interface SearchGeoProfileQuery {
@@ -49,11 +54,16 @@ export interface SearchGeoProfileQuery {
   limit?: string
 }
 
+// date and timeSlot are an optional availability check — must be supplied
+// together (backend rejects one without the other). When present, each
+// returned item is annotated with `available`.
 export interface NearestGeoProfileQuery {
   type: GeoProfileType
   lng: number
   lat: number
   limit?: string
+  date?: string
+  timeSlot?: CampTimeSlotValue
 }
 
 // Plain optional strings — no way to explicitly CLEAR an address field this way,

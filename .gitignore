@@ -23,7 +23,7 @@ dist/
 build/
 out/
 dist-ssr/
-
+docs/db-learning
 # ======================
 # TypeScript
 # ======================
@@ -41,13 +41,14 @@ frontend/dist/
 backend/node_modules/
 backend/dist/
 backend/src/shared/test-cases
-backend/docs
+backend/docs*
 
 # Local-only QA seed script (drives the real API to populate a dev DB) — must
 # never be inside src/, since tsc would then compile+typecheck it as part of
 # the real build (this broke a Railway deploy once it got moved there).
 backend/scripts/seedQaData.ts
 backend/src/shared/env/scripts/seedQaData.ts
+
 # ======================
 # Logs
 # ======================

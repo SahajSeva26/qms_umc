@@ -4,6 +4,7 @@ import { InventoryAssignmentController } from './inventory-assignment.controller
 import { registry } from '../../../shared/config/swagger/swagger.registry';
 import {
     CreateInventoryAssignmentPayloadSchema,
+    InventoryAssignmentReportQuerySchema,
     SearchInventoryAssignmentQuerySchema,
     UpdateInventoryAssignmentPayloadSchema,
 } from './inventory-assignment.validators';
@@ -14,6 +15,26 @@ import { INVENTORY_ASSIGNMENT_PERMISSIONS } from './inventory-assignment.constan
 export const InventoryAssignmentRouter = express.Router();
 
 InventoryAssignmentRouter.use(AuthMiddleware);
+
+// inventory assignment field-officer roster report
+registry.registerPath({
+    method: 'get',
+    path: '/inventory-assignments/report',
+    tags: ['INVENTORY ASSIGNMENT'],
+    summary: 'Inventory field-officer roster report — per-FO holdings and pending requests',
+    description:
+        'Field-officer roster (all ACTIVE field officers, including those with zero holdings): ' +
+        'summary.totalFieldOfficers, summary.fieldOfficersHoldingInventory, and fieldOfficers[] each ' +
+        'with role/name/code + devicesHeld/consumableUnitsHeld/awaitingApproval/awaitingReceipt, ' +
+        'sorted by name. Requires inventory-assignment:manage.',
+    request: {
+        query: InventoryAssignmentReportQuerySchema,
+    },
+    responses: {
+        200: { description: 'Inventory assignment report generated successfully' },
+        403: { description: 'Forbidden — inventory-assignment:manage permission required' },
+    },
+});
 
 // get assignment (a single holding row) by id
 registry.registerPath({
@@ -105,6 +126,11 @@ registry.registerPath({
 // ================ EXPORT INVENTORY ASSIGNMENT ROUTES ===================
 // =======================================================================
 // reads are open to any authenticated user; only writes (create/update/remove) are permission-guarded.
+InventoryAssignmentRouter.get(
+    '/report',
+    AuthorizeMiddleware([INVENTORY_ASSIGNMENT_PERMISSIONS.MANAGE.code]),
+    InventoryAssignmentController.report,
+);
 InventoryAssignmentRouter.get('/:id', InventoryAssignmentController.get);
 InventoryAssignmentRouter.get('/', InventoryAssignmentController.search);
 

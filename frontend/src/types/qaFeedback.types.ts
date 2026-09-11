@@ -1,4 +1,7 @@
-export type QaFeedbackStatus = 'open' | 'resolved'
+// Jira can push any of its own workflow status names via the webhook (e.g. "In
+// Progress", "Done", "To Do") — no longer a closed app-defined enum. 'open' is
+// still the default a freshly-created row starts at.
+export type QaFeedbackStatus = string
 
 export interface QaFeedbackReportedByUser {
   id: string
@@ -14,6 +17,7 @@ export interface QaFeedbackEntity {
   pinXPercent: number
   pinYPercent: number
   comment: string
+  issueKey: string
   reportedBy: QaFeedbackReportedByUser | string
   status: QaFeedbackStatus
   resolutionNote: string
@@ -36,6 +40,7 @@ export interface UpdateQaFeedbackPayload {
 
 export interface SearchQaFeedbackQuery {
   status?: QaFeedbackStatus
+  issueKey?: string
   pageRoute?: string
   reportedBy?: string
   page?: string

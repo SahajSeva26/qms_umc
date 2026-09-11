@@ -1,7 +1,12 @@
 // Inventory-device Service
 import { HydratedDocument } from 'mongoose';
 import { InventoryDeviceModel, IInventoryDevice } from './inventory-device.model';
-import { ICreateInventoryDevicePayload, ISearchInventoryDeviceQuery, IUpdateInventoryDevicePayload } from './inventory-device.validators';
+import {
+    ICreateInventoryDevicePayload,
+    IInventoryDeviceReportQuery,
+    ISearchInventoryDeviceQuery,
+    IUpdateInventoryDevicePayload,
+} from './inventory-device.validators';
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
@@ -150,10 +155,31 @@ const findAvailable = async (item: string, limit: number, ctx: RequestContext): 
     return await InventoryDeviceModel.find({ item, status: INVENTORY_DEVICE_STATUS.AVAILABLE }).limit(limit);
 };
 
+// ========================================================================================
+// REPORT
+// ========================================================================================
+// A dedicated aggregation, not search(): search()'s pagination would change the counts.
+const report = async (_filters: IInventoryDeviceReportQuery, _ctx: RequestContext) => {
+    const [result] = await InventoryDeviceModel.aggregate([
+        {
+            $facet: {
+                total: [{ $count: 'count' }],
+                byStatus: [{ $group: { _id: '$status', count: { $sum: 1 } } }],
+            },
+        },
+    ]);
+
+    return {
+        totalDevices: result?.total?.[0]?.count || 0,
+        deviceByStatus: result?.byStatus || [],
+    };
+};
+
 export const InventoryDeviceService = {
     get,
     search,
     create,
     update,
     findAvailable,
+    report,
 };

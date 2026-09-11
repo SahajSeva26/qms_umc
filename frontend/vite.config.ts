@@ -14,4 +14,8 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+
+  server: {
+    allowedHosts: ["moving-skied-junction.ngrok-free.dev"],
+  },
 })

@@ -26,10 +26,15 @@ function mergeById(existing: RoleEntity[], incoming: RoleEntity[]): RoleEntity[]
 }
 
 // Scopes by tenant only, not downline, unlike the pharma portal's useEligibleMrs.
+// pharma-mr is customer-tenant-owned, so tenant-scoping is correct here.
+// field-officer used to route through this hook too (with an unscoped
+// "platform" mode), but eligibility for FO is coverage-radius-based, not
+// name-search — CampFoPicker now uses useNearestGeoProfiles instead, so this
+// hook is pharma-mr/CampMrPicker-only again.
 export const useTenantScopedRolePicker = (
   name: string,
   tenant: string | undefined,
-  roleTypeCode: 'pharma-mr' | 'field-officer',
+  roleTypeCode: 'pharma-mr',
   enabled: boolean,
 ) => {
   const debouncedName = useDebouncedValue(name, 300)
@@ -38,7 +43,7 @@ export const useTenantScopedRolePicker = (
   const key = `${roleTypeCode}::${debouncedName}::${tenant ?? ''}`
   const [accumulated, setAccumulated] = useState<Accumulated>(() => EMPTY_ACCUMULATED(key))
 
-  const { data: roleTypeData } = useRoleTypes({ code: roleTypeCode, status: 'active', tenant: tenant || undefined }, enabled && !!tenant)
+  const { data: roleTypeData, error: roleTypeError } = useRoleTypes({ code: roleTypeCode, status: 'active', tenant: tenant || undefined }, enabled && !!tenant)
   const roleTypeId = roleTypeData?.data?.items[0]?.id
 
   if (accumulated.key !== key) {
@@ -55,12 +60,16 @@ export const useTenantScopedRolePicker = (
     limit: String(PAGE_SIZE),
   }
 
-  const { data, isLoading, isFetching, error, refetch } = useEntityQuery(
+  const { data, isLoading, isFetching, error: roleError, refetch } = useEntityQuery(
     roleKeys,
     (q) => accessManagementService.searchRoles(q),
     query,
     { enabled: enabled && hasQuery && !!tenant && !!roleTypeId },
   )
+  // A RoleType-lookup failure must surface too — otherwise the Role query
+  // never even fires (gated on !!roleTypeId) and the picker would silently
+  // show "no results" instead of the real error.
+  const error = roleTypeError || roleError
 
   if (data && accumulated.key === key && accumulated.consumedResponse !== data) {
     const freshItems = data.data?.items ?? []

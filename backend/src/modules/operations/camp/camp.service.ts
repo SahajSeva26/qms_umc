@@ -9,7 +9,7 @@ import {
     ISearchCampQuery,
     IUpdateCampPayload,
 } from './camp.validators';
-import { CAMP_COUNTER_ENTITY, CAMP_PERMISSIONS, CAMP_STATUSES, CAMP_TRANSITION_MAP } from './camp.constants';
+import { CAMP_COUNTER_ENTITY, CAMP_PERMISSIONS, CAMP_STATUSES, CAMP_TRANSITION_MAP, CampTimeSlot } from './camp.constants';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
 import { CounterService } from '../../counter/counter.service';
 import { GeoProfileService } from '../geoProfile/geoProfile.service';
@@ -62,17 +62,24 @@ const applyOwnScope = (where: any, ctx: RequestContext) => {
     return where;
 };
 
-// statuses that occupy an FO for a date — a confirmed/live camp holds the FO; requested/cancelled do not.
+// statuses that occupy an FO for a slot — a confirmed/live camp holds the FO; requested/cancelled do not.
 const FO_BOOKING_STATUSES = [CAMP_STATUSES.CONFIRMED, CAMP_STATUSES.LIVE];
 
-// role ids of FOs already booked (confirmed/live) on another camp on the same UTC day.
-const bookedFoRoleIdsOnDate = async (date: Date, ctx: RequestContext, excludeCampId: any): Promise<string[]> => {
+// role ids of FOs already booked (confirmed/live) on another camp on the same UTC day AND time slot.
+// A camp occupies its FO only for its own slot, so the FO stays free for other slots the same day.
+const bookedFoRoleIdsOnDate = async (
+    date: Date,
+    timeSlot: CampTimeSlot,
+    ctx: RequestContext,
+    excludeCampId: any,
+): Promise<string[]> => {
     const camps = await CampModel.find({
         ...ctx.where(),
         _id: { $ne: excludeCampId },
         fo: { $ne: null },
         status: { $in: FO_BOOKING_STATUSES },
         date: utcDayRange(date),
+        timeSlot,
     })
         .select('fo')
         .lean();
@@ -97,10 +104,13 @@ const resolveNearestFreeFoRole = async (camp: HydratedDocument<ICamp>, ctx: Requ
         return throwAppError('No field officer covers this camp location', StatusCodes.UNPROCESSABLE_ENTITY);
     }
 
-    const booked = await bookedFoRoleIdsOnDate(camp.date, ctx, camp._id);
+    const booked = await bookedFoRoleIdsOnDate(camp.date, (camp as any).timeSlot, ctx, camp._id);
     const free = items.find((profile: any) => !booked.includes(profile.role?.toString()));
     if (!free) {
-        return throwAppError('All field officers near this camp are already booked on this date', StatusCodes.CONFLICT);
+        return throwAppError(
+            'All field officers near this camp are already booked on this date and time slot',
+            StatusCodes.CONFLICT,
+        );
     }
 
     return free.role;
@@ -338,11 +348,14 @@ const moveStage = async (id: string, model: IMoveStagePayload, ctx: RequestConte
         );
     }
 
-    // a camp cannot be confirmed if its FO is already booked on another camp the same day
+    // a camp cannot be confirmed if its FO is already booked on another camp the same day AND slot
     if (to === CAMP_STATUSES.CONFIRMED && camp.fo) {
-        const booked = await bookedFoRoleIdsOnDate(camp.date, ctx, camp._id);
+        const booked = await bookedFoRoleIdsOnDate(camp.date, (camp as any).timeSlot, ctx, camp._id);
         if (booked.includes(camp.fo.toString())) {
-            return throwAppError('Field officer is already booked on another camp on this date', StatusCodes.CONFLICT);
+            return throwAppError(
+                'Field officer is already booked on another camp on this date and time slot',
+                StatusCodes.CONFLICT,
+            );
         }
     }
 

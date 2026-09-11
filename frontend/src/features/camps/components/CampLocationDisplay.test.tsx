@@ -1,10 +1,12 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { usePermission } from '@/hooks/usePermission'
 import CampSummaryHeader from '@/features/camps/components/CampSummaryHeader'
 import CampTableReal from '@/features/camps/components/CampTableReal'
 import PharmaCampTable from '@/features/pharma/components/PharmaCampTable'
 import type { CampEntity } from '@/types/campReal.types'
 
+vi.mock('@/hooks/usePermission')
 vi.mock('@/features/camps/hooks/useCampRefNames', () => ({
   useCampRefNames: () => ({
     doctorName: () => 'Dr. Test',
@@ -13,6 +15,10 @@ vi.mock('@/features/camps/hooks/useCampRefNames', () => ({
     roleName: () => 'Test Role',
   }),
 }))
+
+vi.mocked(usePermission).mockReturnValue({
+  session: { tenant: { type: 'customer' } },
+} as unknown as ReturnType<typeof usePermission>)
 
 // A legacy camp predating the backend's location-nesting migration —
 // camp.mapper.ts's `location: camp.location || null` makes this a reachable shape.

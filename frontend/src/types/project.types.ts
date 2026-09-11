@@ -339,11 +339,24 @@ export interface MoveProjectStagePayload {
   reason: string
 }
 
-// UI-only KPI shape — no backend endpoint; computed client-side from the
-// real ProjectEntity[] already in cache.
-export interface ProjectKpiTile {
-  id: string
-  label: string
-  value: number | string
-  tone: string
+// GET /projects/report — no filters accepted server-side (empty query schema),
+// always a tenant-wide aggregate. requires project:manage or tenant:manage.
+export type ProjectReportQuery = Record<string, never>
+
+export interface ProjectReportStatusEntry {
+  status: ProjectStatus
+  count: number
+  revenue: number
+}
+
+export interface ProjectReportTherapyEntry {
+  therapy: ProjectTherapy
+  count: number
+  revenue: number
+}
+
+export interface ProjectReportResponse {
+  summary: { totalProjects: number }
+  byStatus: ProjectReportStatusEntry[]
+  byTherapy: ProjectReportTherapyEntry[]
 }

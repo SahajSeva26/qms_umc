@@ -49,7 +49,6 @@ backend/docs*
 backend/scripts/seedQaData.ts
 backend/src/shared/env/scripts/seedQaData.ts
 
-
 # ======================
 # Logs
 # ======================

@@ -22,6 +22,18 @@ export interface IPermission {
 export type TenantType = 'platform' | 'customer'
 export type TenantStatus = 'active' | 'inactive'
 
+// Only present when the search was called with report=true — see
+// SearchTenantQuery.report. Per-tenant rollup for the current result page
+// only (one aggregation per collection for the whole page, not per-row).
+export interface TenantStats {
+  totalProjects: number
+  liveProjects: number
+  totalCamps: number
+  liveCamps: number
+  screeningCamps: number
+  dietCamps: number
+}
+
 // Fields below `name` (except `address`) are optional: only present when the
 // caller holds `system:manage`. `address` is NOT gated — tenant.mapper.ts
 // returns it unconditionally as `tenant.address ?? null` for every caller.
@@ -42,6 +54,7 @@ export interface Tenant {
   // Raw Role id, same system:manage-only gate. Optional server-side —
   // required here per direct instruction, pending sales-rep vs sales-head decision.
   salesPerson?: string | null
+  stats?: TenantStats
 }
 
 export interface SearchTenantQuery {
@@ -54,6 +67,9 @@ export interface SearchTenantQuery {
   status?: TenantStatus
   page?: string
   limit?: string
+  // When 'true', each item gets a `stats` object (see TenantStats). Backend
+  // caps `limit` to 20 when this is set — a bigger page 400s.
+  report?: 'true' | 'false'
 }
 
 export interface RegisterOwnerPayload {

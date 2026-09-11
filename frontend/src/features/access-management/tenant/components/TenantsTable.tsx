@@ -44,6 +44,12 @@ const TenantsTable = ({ tenants }: TenantsTableProps) => {
                 Status
               </th>
               <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
+                Projects
+              </th>
+              <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
+                Camps
+              </th>
+              <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
                 Created
               </th>
             </tr>
@@ -71,6 +77,26 @@ const TenantsTable = ({ tenants }: TenantsTableProps) => {
                 </td>
                 <td className="px-4 py-2.5">
                   <TenantStatusPill status={tenant.status} />
+                </td>
+                <td className="px-4 py-2.5">
+                  {tenant.stats ? (
+                    <div>
+                      <span className="font-semibold" style={{ color: 'var(--qms-text)' }}>{tenant.stats.liveProjects}</span>
+                      <span style={{ color: 'var(--qms-text-muted)' }}> / {tenant.stats.totalProjects} active</span>
+                    </div>
+                  ) : (
+                    <span style={{ color: 'var(--qms-text-muted)' }}>—</span>
+                  )}
+                </td>
+                <td className="px-4 py-2.5">
+                  {tenant.stats ? (
+                    <div className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>
+                      <span style={{ color: 'var(--qms-text)' }}>{tenant.stats.screeningCamps}</span> screening ·{' '}
+                      <span style={{ color: 'var(--qms-text)' }}>{tenant.stats.dietCamps}</span> diet
+                    </div>
+                  ) : (
+                    <span style={{ color: 'var(--qms-text-muted)' }}>—</span>
+                  )}
                 </td>
                 <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
                   {formatCreated(tenant.createdAt)}

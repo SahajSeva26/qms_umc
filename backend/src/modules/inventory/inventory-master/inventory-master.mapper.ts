@@ -17,7 +17,6 @@ export const InventoryMasterMapper = {
 
             // stock thresholds (reorder policy)
             minStock: item.minStock,
-            maxStock: item.maxStock,
 
             createdAt: item.createdAt,
             updatedAt: item.updatedAt,

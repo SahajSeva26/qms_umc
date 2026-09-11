@@ -1,13 +1,21 @@
 import { useState } from 'react'
+import { FiDownload } from 'react-icons/fi'
 import { usePermission } from '@/hooks/usePermission'
 import { useInventoryAssignments } from '@/features/inventory/real/hooks/useInventoryAssignments'
 import { useFieldOfficerRoles } from '@/features/inventory/real/hooks/useFieldOfficerRoles'
 import { truncateIdentifier } from '@/features/inventory/real/utils/truncateIdentifier'
+import { inventoryAssignmentService } from '@/features/inventory/real/inventoryAssignment.service'
+import { inventoryDeviceService } from '@/features/inventory/real/inventoryDevice.service'
+import { geoProfileService } from '@/features/geo-profile/geoProfile.service'
+import { downloadAssignedDevicesCsv, type AssignedDeviceRow } from '@/features/inventory/real/inventoryAssignment.export'
 import type { InventoryAssignmentType } from '@/types/inventoryAssignment.types'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import { Button } from '@/components/ui/button'
 import PaginationControls from '@/components/ui/PaginationControls'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import { usePagination } from '@/hooks/usePagination'
+import { toast } from '@/components/ui/sonner'
+import { getApiErrorMessage } from '@/utils/apiError'
 
 const PAGE_SIZE = 10
 
@@ -32,12 +40,55 @@ const InventoryAssignmentsPanel = () => {
   const items = data?.data?.items ?? []
   const totalCount = data?.data?.count ?? 0
 
+  const [exporting, setExporting] = useState(false)
+  // Exports every device assignment, not just the current page. Calibration and FO
+  // City are joined in separately — assignment search only returns slim refs.
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const [assignmentsRes, devicesRes, geoProfilesRes] = await Promise.all([
+        inventoryAssignmentService.searchInventoryAssignments({
+          assignee: assigneeFilter === 'ALL' ? undefined : assigneeFilter,
+          inventoryType: 'InventoryDevice',
+          limit: '1000',
+        }),
+        inventoryDeviceService.searchInventoryDevices({ limit: '1000' }),
+        geoProfileService.searchGeoProfiles({ type: 'fo', limit: '1000' }),
+      ])
+      const deviceById = new Map(devicesRes.data.items.map((d) => [d.id, d]))
+      const geoProfileByRole = new Map(geoProfilesRes.data.items.map((g) => [g.role, g]))
+      const rows: AssignedDeviceRow[] = assignmentsRes.data.items.map((assignment) => ({
+        assignment,
+        device: deviceById.get(assignment.inventory.id) ?? null,
+        geoProfile: geoProfileByRole.get(assignment.assignee.id) ?? null,
+      }))
+      // Each of the 3 fetches is capped at limit:'1000' — a truncated devices/geoProfiles
+      // fetch would otherwise silently null out the Status/Calibration/FO City join.
+      const truncated = [
+        assignmentsRes.data.items.length < assignmentsRes.data.count ? 'assignments' : null,
+        devicesRes.data.items.length < devicesRes.data.count ? 'devices' : null,
+        geoProfilesRes.data.items.length < geoProfilesRes.data.count ? 'FO geo-profiles' : null,
+      ].filter((v): v is string => v !== null)
+      if (truncated.length > 0) {
+        toast.warning(`Export is incomplete: too many ${truncated.join(', ')} to include all — some rows may show missing data.`)
+      }
+      downloadAssignedDevicesCsv(rows, `device-assignments-${new Date().toISOString().slice(0, 10)}.csv`)
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'Failed to export assignments.'))
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return (
     <div>
       <div className="mb-3 flex items-start justify-between gap-4">
         <p className="text-[12px] mt-0.5" style={{ color: 'var(--qms-text-muted)' }}>
           {!isLoading && !error ? `${totalCount} total` : 'Who currently holds what.'}
         </p>
+        <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting} className="shrink-0">
+          <FiDownload size={14} /> {exporting ? 'Exporting…' : 'Export devices'}
+        </Button>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 mb-3 sm:justify-end">

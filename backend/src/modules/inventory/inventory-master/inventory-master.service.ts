@@ -33,7 +33,6 @@ const set = async (model: any, entity: HydratedDocument<IInventoryMaster>, ctx: 
     if (model.unit) entity.unit = model.unit;
     if (model.status && ctx.hasAnyPermissions([INVENTORY_MASTER_PERMISSIONS.MANAGE.code])) entity.status = model.status;
     if (model.minStock !== undefined) entity.minStock = model.minStock;
-    if (model.maxStock !== undefined) entity.maxStock = model.maxStock;
 
     return entity;
 };

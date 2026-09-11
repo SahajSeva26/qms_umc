@@ -1,16 +1,14 @@
+import axios from 'axios'
 import api from '@/lib/api/api'
 import type { ApiResponse, PaginatedResponse } from '@/types/common.types'
 import type {
+  BulkDoctorPayload,
+  BulkDoctorResult,
   CreateDoctorPayload,
   DoctorEntity,
   SearchDoctorQuery,
   UpdateDoctorPayload,
 } from '@/types/doctor.types'
-
-// Real backend-integrated Doctor service. Follows the exact pattern of
-// `@/features/access-management/accessManagement.service.ts`: same shared
-// `api` axios instance, same ApiResponse/PaginatedResponse envelope typing,
-// a plain object export, no class/default export.
 
 const searchDoctors = async (query: SearchDoctorQuery) => {
   const res = await api.get<PaginatedResponse<DoctorEntity>>('/doctors', { params: query })
@@ -32,9 +30,39 @@ const updateDoctor = async (id: string, payload: UpdateDoctorPayload) => {
   return res.data
 }
 
+// POST /doctors/bulk's 400 `data` can be a bad-payload `{ fields }` object,
+// `null` (missing CSV), or the genuine full result — only the full shape is safe to return.
+function isBulkDoctorResult(value: unknown): value is BulkDoctorResult {
+  if (!value || typeof value !== 'object') return false
+  const v = value as Record<string, unknown>
+  return Array.isArray(v.errors)
+    && typeof v.totalRows === 'number'
+    && typeof v.validRows === 'number'
+    && typeof v.invalidRows === 'number'
+    && typeof v.created === 'number'
+    && typeof v.failed === 'number'
+}
+
+const bulkCreateDoctors = async (payload: BulkDoctorPayload): Promise<BulkDoctorResult> => {
+  const formData = new FormData()
+  if (payload.tenant) formData.append('tenant', payload.tenant)
+  formData.append('file', payload.file)
+
+  try {
+    const res = await api.post<ApiResponse<BulkDoctorResult>>('/doctors/bulk', formData)
+    return res.data.data as BulkDoctorResult
+  } catch (err) {
+    if (axios.isAxiosError(err) && err.response?.status === 400 && isBulkDoctorResult(err.response.data?.data)) {
+      return err.response.data.data
+    }
+    throw err
+  }
+}
+
 export const doctorsService = {
   searchDoctors,
   getDoctor,
   createDoctor,
   updateDoctor,
+  bulkCreateDoctors,
 }

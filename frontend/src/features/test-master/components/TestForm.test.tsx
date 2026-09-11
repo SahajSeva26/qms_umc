@@ -251,11 +251,9 @@ describe('TestForm — create mode', () => {
     await user.type(screen.getByPlaceholderText(/field label/i), 'Pregnant')
     await user.type(screen.getByPlaceholderText(/unit, e\.g\. mg\/dL/i), 'mg/dL')
 
-    // Switch the field's own type dropdown (initial value 'number') to 'boolean'.
     await user.click(screen.getByRole('combobox', { name: '' }))
     await user.click(await screen.findByRole('option', { name: 'Yes/No' }))
 
-    // The unit input disappears entirely for a Boolean field — nothing left to clear via the UI.
     expect(screen.queryByPlaceholderText(/unit, e\.g\. mg\/dL/i)).not.toBeInTheDocument()
 
     await user.type(screen.getByLabelText(/^name/i), 'ECG Test')
@@ -270,9 +268,7 @@ describe('TestForm — create mode', () => {
 
     await waitFor(() => expect(testService.createTest).toHaveBeenCalledTimes(1))
     const payload = vi.mocked(testService.createTest).mock.calls[0][0]
-    // Genuinely undefined (JSON.stringify — what actually goes over the
-    // wire — omits an undefined-valued key entirely), not just an empty
-    // string riding along as a real value.
+    // JSON.stringify (what goes over the wire) omits an undefined key entirely.
     expect(payload.config?.inputs[0]?.unit).toBeUndefined()
     expect(JSON.stringify(payload.config)).not.toContain('unit')
   })
@@ -290,12 +286,10 @@ describe('TestForm — create mode', () => {
     await user.type(screen.getByPlaceholderText(/label, e\.g\. positive/i), 'Positive')
     await user.type(screen.getByPlaceholderText(/value, e\.g\. positive/i), 'positive')
 
-    // Switch away from 'select' — the options editor disappears.
     await user.click(screen.getByRole('combobox', { name: '' }))
     await user.click(await screen.findByRole('option', { name: 'Number' }))
     expect(screen.queryByText(/^options$/i)).not.toBeInTheDocument()
 
-    // Switch back to 'select' — the previously-added option must NOT reappear.
     await user.click(screen.getByRole('combobox', { name: '' }))
     await user.click(await screen.findByRole('option', { name: 'Select' }))
 
@@ -355,7 +349,7 @@ describe('TestForm — edit mode', () => {
     expect(screen.getByDisplayValue('250')).toBeInTheDocument()
   })
 
-  it('constructs an update payload with duration/price included and no code/therapy/campType/consumption keys', async () => {
+  it('constructs an update payload with no code/therapy/campType/consumption keys, and omits duration/price when untouched', async () => {
     const { testService } = await import('@/features/test-master/test.service')
     vi.mocked(testService.updateTest).mockResolvedValue({ success: true, message: '', data: baseTest } as never)
 
@@ -370,8 +364,27 @@ describe('TestForm — edit mode', () => {
     expect(payload).not.toHaveProperty('code')
     expect(payload).not.toHaveProperty('therapy')
     expect(payload).not.toHaveProperty('campType')
-    expect(payload.duration).toBe(15)
-    expect(payload.price).toBe(250)
+    // Never touched this session — dirty-gated, so must be omitted, not resent stale.
+    expect(payload).not.toHaveProperty('duration')
+    expect(payload).not.toHaveProperty('price')
+  })
+
+  it('touching duration directly includes only duration, still omitting untouched price', async () => {
+    const { testService } = await import('@/features/test-master/test.service')
+    vi.mocked(testService.updateTest).mockResolvedValue({ success: true, message: '', data: baseTest } as never)
+
+    const user = userEvent.setup()
+    await renderForm(baseTest)
+
+    const durationInput = screen.getByLabelText(/duration/i)
+    await user.clear(durationInput)
+    await user.type(durationInput, '30')
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => expect(testService.updateTest).toHaveBeenCalledTimes(1))
+    const [, payload] = vi.mocked(testService.updateTest).mock.calls[0]
+    expect(payload.duration).toBe(30)
+    expect(payload).not.toHaveProperty('price')
   })
 
   it('blocks blanking a previously-set description, and does not submit', async () => {

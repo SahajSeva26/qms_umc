@@ -106,8 +106,8 @@ describe('InventoryLedgerItemPicker', () => {
       data: {
         count: 2,
         items: [
-          { id: 'lot-1', item: { id: 'm1', name: 'Sterile Lancets' }, batch: 'BATCH-A', manufacturingDate: '', expiryDate: '', quantity: 10, createdAt: '', updatedAt: '' },
-          { id: 'lot-2', item: { id: 'm2', name: 'Alcohol Swabs' }, batch: 'BATCH-A', manufacturingDate: '', expiryDate: '', quantity: 5, createdAt: '', updatedAt: '' },
+          { id: 'lot-1', item: { id: 'm1', name: 'Sterile Lancets' }, vendor: { id: 'ven-1' }, batch: 'BATCH-A', manufacturingDate: '', expiryDate: '', quantity: 10, createdAt: '', updatedAt: '' },
+          { id: 'lot-2', item: { id: 'm2', name: 'Alcohol Swabs' }, vendor: { id: 'ven-1' }, batch: 'BATCH-A', manufacturingDate: '', expiryDate: '', quantity: 5, createdAt: '', updatedAt: '' },
         ],
       },
     })
@@ -124,7 +124,7 @@ describe('InventoryLedgerItemPicker', () => {
     searchInventoryDevices.mockResolvedValue({
       success: true,
       message: '',
-      data: { count: 1, items: [{ id: 'dev-1', serialNumber: 'SN-ACGLU-000142', item: { id: 'm1', name: 'Glucometer' }, status: 'available', createdAt: '', updatedAt: '' }] },
+      data: { count: 1, items: [{ id: 'dev-1', serialNumber: 'SN-ACGLU-000142', item: { id: 'm1', name: 'Glucometer' }, vendor: { id: 'ven-1' }, status: 'available', createdAt: '', updatedAt: '' }] },
     })
     const { user, onChange } = await renderPicker()
     await user.type(screen.getByPlaceholderText(/search serial number/i), 'SN-ACGLU')
@@ -140,7 +140,7 @@ describe('InventoryLedgerItemPicker', () => {
       message: '',
       data: {
         count: 1,
-        items: [{ id: 'lot-1', item: { id: 'm1', name: 'Sterile Lancets' }, batch: 'BATCH-A', manufacturingDate: '', expiryDate: '', quantity: 10, createdAt: '', updatedAt: '' }],
+        items: [{ id: 'lot-1', item: { id: 'm1', name: 'Sterile Lancets' }, vendor: { id: 'ven-1' }, batch: 'BATCH-A', manufacturingDate: '', expiryDate: '', quantity: 10, createdAt: '', updatedAt: '' }],
       },
     })
     const { user, onChange } = await renderPicker()
@@ -159,7 +159,7 @@ describe('InventoryLedgerItemPicker', () => {
       message: '',
       data: {
         count: 1,
-        items: [{ id: 'lot-1', item: { id: 'm1', name: 'Sterile Lancets' }, batch: 'BATCH-A', manufacturingDate: '', expiryDate: '', quantity: 10, createdAt: '', updatedAt: '' }],
+        items: [{ id: 'lot-1', item: { id: 'm1', name: 'Sterile Lancets' }, vendor: { id: 'ven-1' }, batch: 'BATCH-A', manufacturingDate: '', expiryDate: '', quantity: 10, createdAt: '', updatedAt: '' }],
       },
     })
     const { user } = await renderPicker()

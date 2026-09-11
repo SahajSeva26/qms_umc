@@ -14,8 +14,6 @@ interface CampMrPickerProps {
 
 const mrLabel = (mr: RoleEntity) => `${mr.name} (${mr.code})`
 
-// QMS-side MR picker for CampDetailPageReal — debounced, tenant-scoped, paginated search.
-// Thin UI wrapper over useTenantScopedRolePicker, shared with CampFoPicker.
 const CampMrPicker = ({ value, label, tenant, onChange, disabled }: CampMrPickerProps) => {
   const [query, setQuery] = useState('')
   const { open, setOpen, containerRef } = useAsyncPickerState()

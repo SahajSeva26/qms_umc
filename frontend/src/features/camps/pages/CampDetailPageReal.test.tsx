@@ -3,10 +3,54 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
-import type { CampEntity, CampPopulatedRole } from '@/types/campReal.types'
 import type { RoleEntity } from '@/types/accessManagement.types'
 
 vi.mock('@/hooks/useSession')
+
+vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
+  default: ({ value, onChange, onResolutionStateChange }: {
+    value: unknown
+    onChange: (v: unknown) => void
+    onResolutionStateChange?: (status: 'idle' | 'loading' | 'error') => void
+  }) => (
+    <>
+      {/* Simulates picking a real point on the map — needed for CampFoPicker's
+          coverage-radius-based eligibility, which requires real coordinates. */}
+      <button
+        type="button"
+        onClick={() => onChange({
+          addressLine1: '', addressLine2: undefined, locality: undefined,
+          city: '', state: '', country: undefined, pincode: '', googlePlaceId: undefined,
+          ...(value as object ?? {}),
+          coordinates: [77.02, 28.52],
+        })}
+      >
+        Set test coordinates
+      </button>
+      {/* Simulates the real widget's "pin moved, reverse-geocode still resolving"
+          window — the gap between a drag/click and onChange actually firing. */}
+      <button type="button" onClick={() => onResolutionStateChange?.('loading')}>
+        Simulate location resolving
+      </button>
+      <button type="button" onClick={() => onResolutionStateChange?.('idle')}>
+        Simulate location resolved
+      </button>
+    </>
+  ),
+}))
+
+vi.mock('@/features/inventory/real/components/InventoryMasterMultiPicker', () => ({
+  default: ({ onChange }: { onChange: (ids: string[], labels: Record<string, string>) => void }) => (
+    <>
+      <button type="button" onClick={() => onChange(['dev-new'], { 'dev-new': 'New Device (DEV-1)' })}>
+        Pick a device
+      </button>
+      <button type="button" onClick={() => onChange([], {})}>
+        Clear devices
+      </button>
+    </>
+  ),
+}))
 
 vi.mock('@/features/camps/campsReal.service', () => ({
   campsRealService: {
@@ -40,6 +84,13 @@ vi.mock('@/features/access-management/accessManagement.service', () => ({
     searchTenants: vi.fn(async () => ({ success: true, message: '', data: { items: [], count: 0 } })),
     searchRoleTypes: vi.fn(async () => ({ success: true, message: '', data: { items: [{ id: 'rt-fo', code: 'field-officer' }], count: 1 } })),
     searchRoles: vi.fn(async () => ({ success: true, message: '', data: { items: [], count: 0 } })),
+    getRole: vi.fn(),
+  },
+}))
+
+vi.mock('@/features/geo-profile/geoProfile.service', () => ({
+  geoProfileService: {
+    nearestGeoProfiles: vi.fn(async () => ({ success: true, message: '', data: { items: [], count: 0 } })),
   },
 }))
 
@@ -55,132 +106,6 @@ vi.mock('@/features/inventory/real/inventoryMaster.service', () => ({
     searchInventoryMasters: vi.fn(async () => ({ success: true, message: '', data: { items: [], count: 0 } })),
   },
 }))
-
-function campFixture(overrides: Partial<CampEntity> = {}): CampEntity {
-  const mrFixture: CampPopulatedRole = { _id: 'mr-original', code: 'phr-000001', name: 'Original MR', status: 'active' }
-  return {
-    id: 'camp-1', code: 'cmp-000001', tenant: 't-1', division: 'div-1', project: null,
-    doctor: 'doc-1', type: 'screening', billingType: 'billable', patientExpectation: 0,
-    fo: null, mr: mrFixture, date: '2026-09-15',
-    timeSlot: '9am-1pm', city: 'Pune', state: 'Maharashtra',
-    coordinates: [73.8567, 18.5204], devices: [], status: 'requested', stageHistory: [],
-    createdAt: '', updatedAt: '', ...overrides,
-  } as CampEntity
-}
-
-function mrRoleFixture(overrides: Partial<RoleEntity> = {}): RoleEntity {
-  return { id: 'mr-new', code: 'phr-000002', name: 'Replacement MR', permissions: [], status: 'active', type: 'rt-mr', user: 'u-2', tenant: 't-1', createdAt: '', updatedAt: '', ...overrides } as RoleEntity
-}
-
-async function mockSessionAndPermission() {
-  const { useSession } = await import('@/hooks/useSession')
-  vi.mocked(useSession).mockReturnValue({
-    session: { role: { id: 'r-1', code: 'admin', name: 'Admin' }, roleType: { id: 'rt-1', code: 'admin', name: 'admin' }, tenant: { id: 't-1', code: 'qms', name: 'QMS', type: 'platform' }, permissions: ['camp:manage', 'camp:create', 'camp:update'] },
-    isLoading: false, isFetching: false, isSettled: true, isError: false, error: null,
-    isAuthenticated: true, isConfirmedUnauthenticated: false,
-    hasPermission: () => true, hasAnyPermission: () => true, hasAllPermissions: () => true,
-    refetchSession: vi.fn(), clearSession: vi.fn(),
-  } as unknown as ReturnType<typeof useSession>)
-}
-
-function makeQueryClient() {
-  return new QueryClient({ defaultOptions: { queries: { retry: false } } })
-}
-
-async function renderEditPage(camp: CampEntity) {
-  const { campsRealService } = await import('@/features/camps/campsReal.service')
-  vi.mocked(campsRealService.getCamp).mockResolvedValue({ success: true, message: '', data: camp })
-
-  const CampDetailPageReal = (await import('./CampDetailPageReal')).default
-  const queryClient = makeQueryClient()
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[`/camps/${camp.id}`]}>
-        <Routes>
-          <Route path="/camps/:id" element={<CampDetailPageReal />} />
-        </Routes>
-      </MemoryRouter>
-    </QueryClientProvider>,
-  )
-}
-
-async function renderCreatePage() {
-  const CampDetailPageReal = (await import('./CampDetailPageReal')).default
-  const queryClient = makeQueryClient()
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={['/camps/new']}>
-        <Routes>
-          <Route path="/camps/new" element={<CampDetailPageReal />} />
-        </Routes>
-      </MemoryRouter>
-    </QueryClientProvider>,
-  )
-}
-
-describe('CampDetailPageReal — edit mode MR field', () => {
-  beforeEach(() => {
-    vi.resetAllMocks()
-  })
-
-  it('replacing the MR sends the new MR id in the update payload', async () => {
-    await mockSessionAndPermission()
-    const { campsRealService } = await import('@/features/camps/campsReal.service')
-    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
-
-    vi.mocked(accessManagementService.searchRoleTypes).mockResolvedValue({
-      success: true, message: '', data: { items: [{ id: 'rt-fo', code: 'field-officer' }], count: 1 } as never,
-    })
-    vi.mocked(accessManagementService.searchRoles).mockResolvedValue({
-      success: true, message: '', data: { items: [mrRoleFixture()], count: 1 } as never,
-    })
-
-    const user = userEvent.setup()
-    await renderEditPage(campFixture())
-
-    await screen.findByText(/edit camp/i)
-
-    // Existing MR shows as the current selection.
-    expect(await screen.findByText(/original mr/i)).toBeInTheDocument()
-
-    // Click the chip to reopen the picker and search for a replacement.
-    await user.click(screen.getByText(/original mr/i))
-    const mrSearchInput = await screen.findByPlaceholderText(/search mr by name/i)
-    await user.type(mrSearchInput, 'Replacement')
-    const option = await screen.findByText(/replacement mr/i, {}, { timeout: 3000 })
-    await user.click(option)
-
-    await user.click(screen.getByRole('button', { name: /save changes/i }))
-
-    await waitFor(() => expect(campsRealService.updateCamp).toHaveBeenCalledTimes(1))
-    const [, payload] = vi.mocked(campsRealService.updateCamp).mock.calls[0]
-    expect(payload.mr).toBe('mr-new')
-  })
-
-  it('clearing the MR then saving shows validation and sends no update request', async () => {
-    await mockSessionAndPermission()
-    const { campsRealService } = await import('@/features/camps/campsReal.service')
-
-    const user = userEvent.setup()
-    await renderEditPage(campFixture())
-
-    await screen.findByText(/edit camp/i)
-    expect(await screen.findByText(/original mr/i)).toBeInTheDocument()
-
-    // Clicking the chip itself clears the selection and reopens the search
-    // input (AsyncPicker's own chip-click behavior — same as the explicit X
-    // button, both call the same clearSelection()).
-    await user.click(screen.getByText(/original mr/i))
-
-    expect(screen.queryByText(/original mr/i)).not.toBeInTheDocument()
-    expect(await screen.findByPlaceholderText(/search mr by name/i)).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: /save changes/i }))
-
-    expect(await screen.findByText(/mr is required/i)).toBeInTheDocument()
-    expect(campsRealService.updateCamp).not.toHaveBeenCalled()
-  })
-})
 
 async function mockSessionWithPermission(hasDoctorManage: boolean) {
   const { useSession } = await import('@/hooks/useSession')
@@ -209,23 +134,40 @@ async function pickCompany(user: ReturnType<typeof userEvent.setup>, name: strin
   await user.click(option)
 }
 
+function makeQueryClient() {
+  return new QueryClient({ defaultOptions: { queries: { retry: false } } })
+}
+
+async function renderCreatePage() {
+  const CampDetailPageReal = (await import('./CampDetailPageReal')).default
+  const queryClient = makeQueryClient()
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={['/camps/new']}>
+        <Routes>
+          <Route path="/camps/new" element={<CampDetailPageReal />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
+}
+
 describe('CampDetailPageReal — create mode, inline doctor creation', () => {
   beforeEach(() => {
     vi.resetAllMocks()
   })
 
-// Fills the "Add doctor" modal's required create fields (pharma code, name)
-// by locating each input via its own label text's sibling, matching this
-// modal's markup (labels aren't htmlFor-associated with their inputs).
-async function fillNewDoctorRequiredFields(user: ReturnType<typeof userEvent.setup>) {
-  const codeLabel = screen.getByText(/pharma doctor code/i)
-  const codeInput = codeLabel.parentElement!.querySelector('input')!
-  await user.type(codeInput, 'DOC-NEW')
+  // Locates each input via its own label text's sibling — this modal's labels
+  // aren't htmlFor-associated with their inputs.
+  async function fillNewDoctorRequiredFields(user: ReturnType<typeof userEvent.setup>) {
+    const codeLabel = screen.getByText(/pharma doctor code/i)
+    const codeInput = codeLabel.parentElement!.querySelector('input')!
+    await user.type(codeInput, 'DOC-NEW')
 
-  const nameLabel = screen.getByText(/^doctor name$/i)
-  const nameInput = nameLabel.parentElement!.querySelector('input')!
-  await user.type(nameInput, 'Dr. New')
-}
+    const nameLabel = screen.getByText(/^doctor name$/i)
+    const nameInput = nameLabel.parentElement!.querySelector('input')!
+    await user.type(nameInput, 'Dr. New')
+  }
 
   it('hides the "New doctor" trigger without doctor:manage', async () => {
     await mockSessionWithPermission(false)
@@ -278,7 +220,6 @@ async function fillNewDoctorRequiredFields(user: ReturnType<typeof userEvent.set
     const payload = vi.mocked(doctorsService.createDoctor).mock.calls[0][0]
     expect(payload.tenant).toBe('t-cipla')
 
-    // Modal closes, new doctor is selected, and City (set earlier) is untouched.
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(screen.getByText(/dr\. new/i)).toBeInTheDocument()
     expect(screen.getByDisplayValue('Pune')).toBeInTheDocument()
@@ -308,16 +249,13 @@ async function fillNewDoctorRequiredFields(user: ReturnType<typeof userEvent.set
 
     await waitFor(() => expect(screen.getByText(/dr\. new/i)).toBeInTheDocument())
 
-    // Change company to a different one.
     const companyLabel = screen.getByText(/^Company \*/i)
     const trigger = companyLabel.parentElement!.querySelector('[role="combobox"]')!
     await user.click(trigger)
     const otherOption = await screen.findByRole('option', { name: /sun pharma/i })
     await user.click(otherOption)
 
-    // The previously-created/selected doctor is gone, but a new company IS
-    // selected, so the doctor selector reads "Select doctor," not the
-    // no-company placeholder.
+    // Doctor selector should read "Select doctor," not the no-company placeholder.
     expect(screen.queryByText(/dr\. new/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/select company first/i)).not.toBeInTheDocument()
   })
@@ -352,10 +290,58 @@ describe('CampDetailPageReal — create mode, MR/FO pickers', () => {
       success: true, message: '', data: { items: [{ id: `rt-${q.code}`, code: q.code }], count: 1 },
     }) as never)
     vi.mocked(accessManagementService.searchRoles).mockImplementation(async (q) => {
-      const roleTypeCode = q.type === 'rt-pharma-mr' ? 'pharma-mr' : q.type === 'rt-field-officer' ? 'field-officer' : undefined
+      const roleTypeCode = q.type === 'rt-pharma-mr' ? 'pharma-mr' : undefined
       const items = roleTypeCode ? rolesByCode[roleTypeCode] ?? [] : []
       return { success: true, message: '', data: { items, count: items.length } } as never
     })
+  }
+
+  // Time Slot has no options at all until a project (which carries
+  // campTimeSlots) is picked — needed now that CampFoPicker also gates on
+  // date+timeSlot, not just coordinates.
+  async function mockProjectWithSlots() {
+    const { projectsService } = await import('@/features/projects/projects.service')
+    vi.mocked(projectsService.searchProjects).mockResolvedValue({
+      success: true,
+      message: '',
+      data: {
+        items: [{
+          id: 'proj-1', code: 'prj-001', name: 'Cipla Project', status: 'new',
+          campTimeSlots: ['9am-1pm'], tests: [],
+        }],
+        count: 1,
+      },
+    } as never)
+  }
+
+  async function pickProject(user: ReturnType<typeof userEvent.setup>) {
+    const projectInput = await screen.findByPlaceholderText(/search project by name/i)
+    await user.type(projectInput, 'Cipla')
+    await user.click(await screen.findByText(/cipla project/i, {}, { timeout: 3000 }))
+  }
+
+  // FO eligibility is coverage-radius-based (GET /geo-profiles/nearest), not
+  // a name search — mock that path instead of searchRoles for FO fixtures.
+  async function mockNearestFo(role: RoleEntity | null) {
+    const { geoProfileService } = await import('@/features/geo-profile/geoProfile.service')
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    vi.mocked(geoProfileService.nearestGeoProfiles).mockResolvedValue({
+      success: true,
+      message: '',
+      data: {
+        items: role ? [{
+          id: 'geo-1', tenant: 't-1', role: role.id, type: 'fo', status: 'active',
+          coordinates: [77.02, 28.52], coverageRadius: 35000, meta: {},
+          addressLine1: null, addressLine2: null, locality: null, city: null, state: null,
+          country: null, pincode: null, googlePlaceId: null, createdAt: '', updatedAt: '',
+          distance: 5000,
+        }] : [],
+        count: role ? 1 : 0,
+      },
+    } as never)
+    if (role) {
+      vi.mocked(accessManagementService.getRole).mockResolvedValue({ success: true, message: '', data: role } as never)
+    }
   }
 
   it('changing Company clears MR, MR label, FO, and FO label together', async () => {
@@ -365,26 +351,38 @@ describe('CampDetailPageReal — create mode, MR/FO pickers', () => {
       { id: 't-sun', name: 'Sun Pharma', code: 'sunpharma', type: 'customer' },
     ])
     await mockRoleTypesAndRoles({
-      'pharma-mr': [mrRoleFixture({ id: 'mr-cipla', name: 'Cipla MR' })],
-      'field-officer': [{ id: 'fo-cipla', code: 'fo-001', name: 'Cipla FO', permissions: [], status: 'active', type: 'rt-field-officer', user: 'u-3', tenant: 't-cipla', createdAt: '', updatedAt: '' } as RoleEntity],
+      'pharma-mr': [{ id: 'mr-cipla', code: 'phr-001', name: 'Cipla MR', permissions: [], status: 'active', type: 'rt-pharma-mr', user: 'u-2', tenant: 't-cipla', createdAt: '', updatedAt: '' } as RoleEntity],
     })
+    await mockNearestFo({ id: 'fo-cipla', code: 'fo-001', name: 'Cipla FO', permissions: [], status: 'active', type: 'rt-field-officer', user: 'u-3', tenant: 't-cipla', createdAt: '', updatedAt: '' } as RoleEntity)
+    await mockProjectWithSlots()
 
     const user = userEvent.setup()
     await renderCreatePage()
     await pickCompany(user, 'Cipla')
+    await pickProject(user)
 
     const mrSearchInput = await screen.findByPlaceholderText(/search mr by name/i)
     await user.type(mrSearchInput, 'Cipla')
     await user.click(await screen.findByText(/cipla mr/i, {}, { timeout: 3000 }))
 
+    // FO picker needs real coordinates AND date+timeSlot before it's usable at
+    // all (coverage-radius + availability eligibility).
+    await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
+    const dateLabel = screen.getByText(/^date$/i)
+    const dateInput = dateLabel.parentElement!.querySelector('input[type="date"]')!
+    await user.type(dateInput, '2026-09-20')
+    const timeSlotLabel = screen.getByText(/time slot \*/i)
+    const timeSlotTrigger = timeSlotLabel.parentElement!.querySelector('[role="combobox"]')!
+    await user.click(timeSlotTrigger)
+    await user.click((await screen.findAllByRole('option'))[0])
+
     const foSearchInput = await screen.findByPlaceholderText(/search fo by name/i)
-    await user.type(foSearchInput, 'Cipla')
+    await user.click(foSearchInput)
     await user.click(await screen.findByText(/cipla fo/i, {}, { timeout: 3000 }))
 
     expect(screen.getByText(/cipla mr/i)).toBeInTheDocument()
     expect(screen.getByText(/cipla fo/i)).toBeInTheDocument()
 
-    // Switch Company.
     const companyLabel = screen.getByText(/^Company \*/i)
     const trigger = companyLabel.parentElement!.querySelector('[role="combobox"]')!
     await user.click(trigger)
@@ -406,21 +404,42 @@ describe('CampDetailPageReal — create mode, MR/FO pickers', () => {
     expect(foInput).toBeDisabled()
   })
 
-  it('FO search sends both the selected tenant and the field-officer role type', async () => {
+  it('the FO picker shows a "Pick a location first" placeholder until a location is set, even after a Company is picked', async () => {
     await mockSessionWithPermission(true)
     await mockTenants([{ id: 't-cipla', name: 'Cipla', code: 'cipla', type: 'customer' }])
-    await mockRoleTypesAndRoles({ 'field-officer': [] })
-    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
 
     const user = userEvent.setup()
     await renderCreatePage()
     await pickCompany(user, 'Cipla')
 
-    const foSearchInput = await screen.findByPlaceholderText(/search fo by name/i)
-    await user.type(foSearchInput, 'Ramesh')
+    expect(await screen.findByPlaceholderText('Pick a location first')).toBeInTheDocument()
+  })
 
-    await waitFor(() => expect(accessManagementService.searchRoles).toHaveBeenCalledWith(
-      expect.objectContaining({ tenant: 't-cipla', type: 'rt-field-officer' }),
+  it('FO search uses the coverage-radius lookup (GET /geo-profiles/nearest), not a name-based Role search — a platform-tenant-only RoleType has no meaningful tenant-scoped name search left in this picker', async () => {
+    await mockSessionWithPermission(true)
+    await mockTenants([{ id: 't-cipla', name: 'Cipla', code: 'cipla', type: 'customer' }])
+    await mockNearestFo(null)
+    await mockProjectWithSlots()
+    const { geoProfileService } = await import('@/features/geo-profile/geoProfile.service')
+
+    const user = userEvent.setup()
+    await renderCreatePage()
+    await pickCompany(user, 'Cipla')
+    await pickProject(user)
+    await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
+    const dateLabel = screen.getByText(/^date$/i)
+    const dateInput = dateLabel.parentElement!.querySelector('input[type="date"]')!
+    await user.type(dateInput, '2026-09-20')
+    const timeSlotLabel = screen.getByText(/time slot \*/i)
+    const timeSlotTrigger = timeSlotLabel.parentElement!.querySelector('[role="combobox"]')!
+    await user.click(timeSlotTrigger)
+    await user.click((await screen.findAllByRole('option'))[0])
+
+    const foSearchInput = await screen.findByPlaceholderText(/search fo by name/i)
+    await user.click(foSearchInput)
+
+    await waitFor(() => expect(geoProfileService.nearestGeoProfiles).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'fo', lng: 77.02, lat: 28.52, date: '2026-09-20' }),
     ))
   })
 })

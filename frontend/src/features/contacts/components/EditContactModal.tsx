@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,6 +22,21 @@ const STATUS_OPTIONS: { value: ContactStatus; label: string }[] = [
   { value: 'active', label: 'Active' },
   { value: 'inactive', label: 'Inactive' },
 ]
+
+// Frontend-only — `designation` stays a free string on the backend
+// (CreateContactPayload/UpdateContactPayload), this just constrains the
+// picker to a fixed list of real-world pharma-company contact roles.
+const DESIGNATION_OPTIONS = [
+  'Division Head',
+  'Marketing Manager',
+  'Regional Sales Manager',
+  'Medical Affairs Lead',
+  'Procurement Officer',
+]
+// Sentinel for the "—" (no designation) option — base-ui Select values must be
+// unique; this shape can't collide with a real free-typed legacy designation
+// the way a plain word like "NONE" could.
+const DESIGNATION_NONE = '__qms_no_designation__'
 
 interface ContactDraft {
   name: string
@@ -88,8 +103,12 @@ interface EditContactModalFormProps {
 
 const EditContactModalForm = ({ contact, onClose, fixedTenantId, fixedDivisionId, fixedTenantType, onCreated }: EditContactModalFormProps) => {
   const isEdit = !!contact
-  const [draft, setDraft] = useState<ContactDraft>(contact ? draftFromContact(contact) : emptyDraft)
+  const initialDraft = contact ? draftFromContact(contact) : emptyDraft
+  const [draft, setDraft] = useState<ContactDraft>(initialDraft)
   const [tenant, setTenant] = useState(fixedTenantId ?? '')
+  const setDraftField = <K extends keyof ContactDraft>(key: K, value: ContactDraft[K]) => {
+    setDraft((p) => ({ ...p, [key]: value }))
+  }
 
   const { sessionPermissions } = usePermission()
   const needsTenantPicker = !isEdit && !fixedTenantId && sessionPermissions?.tenantType === 'platform'
@@ -114,11 +133,6 @@ const EditContactModalForm = ({ contact, onClose, fixedTenantId, fixedDivisionId
   )
   const divisions = divisionsData?.data?.items ?? []
 
-  // Skip when fixedDivisionId is set, else this wipes the fixed value on mount.
-  useEffect(() => {
-    if (!fixedDivisionId) setDivision('')
-  }, [effectiveTenantId, fixedDivisionId])
-
   const createContact = useCreateContact()
   const updateContact = useUpdateContact(contact?.id ?? '')
 
@@ -132,14 +146,20 @@ const EditContactModalForm = ({ contact, onClose, fixedTenantId, fixedDivisionId
           toast.error(result.error.issues[0].message)
           return
         }
+        // Compare final value to the original snapshot (not "was ever
+        // touched") so a field edited then reverted is never resent.
         await updateContact.mutateAsync({
-          name: result.data.name,
-          designation: result.data.designation || undefined,
-          email: result.data.email || undefined,
-          phone: result.data.phone || undefined,
-          location: result.data.location || undefined,
-          type: result.data.type,
-          status: result.data.status,
+          ...(draft.name !== initialDraft.name ? { name: result.data.name } : {}),
+          // '' (the "—" dropdown option) must be sent as-is, not folded into
+          // undefined — the backend only clears the field when the key is
+          // PRESENT (`model.designation !== undefined`); an omitted key
+          // leaves the old value untouched, silently no-oping the clear.
+          ...(draft.designation !== initialDraft.designation ? { designation: result.data.designation } : {}),
+          ...(draft.email !== initialDraft.email ? { email: result.data.email || undefined } : {}),
+          ...(draft.phone !== initialDraft.phone ? { phone: result.data.phone || undefined } : {}),
+          ...(draft.location !== initialDraft.location ? { location: result.data.location || undefined } : {}),
+          ...(draft.type !== initialDraft.type ? { type: result.data.type } : {}),
+          ...(draft.status !== initialDraft.status ? { status: result.data.status } : {}),
         })
         toast.success('Contact updated')
       } else {
@@ -189,7 +209,16 @@ const EditContactModalForm = ({ contact, onClose, fixedTenantId, fixedDivisionId
           {needsTenantPicker && (
             <div className="sm:col-span-2">
               <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Company</label>
-              <Select value={tenant} onValueChange={(v) => setTenant(v ?? '')}>
+              <Select
+                value={tenant}
+                onValueChange={(v) => {
+                  setTenant(v ?? '')
+                  // Reset here, in the handler that changes the tenant — not an
+                  // effect reacting after the fact — so a stale division from the
+                  // old company can never be submitted alongside the new one.
+                  if (!fixedDivisionId) setDivision('')
+                }}
+              >
                 <SelectTrigger className="w-full text-[13px]">
                   <SelectValue placeholder="Select company">
                     {(v: string) => tenants.find((t) => t.id === v)?.name ?? 'Select company'}
@@ -226,16 +255,28 @@ const EditContactModalForm = ({ contact, onClose, fixedTenantId, fixedDivisionId
           )}
           <div className="sm:col-span-2">
             <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Name</label>
-            <Input value={draft.name} onChange={(e) => setDraft((p) => ({ ...p, name: e.target.value }))} />
+            <Input value={draft.name} onChange={(e) => setDraftField('name', e.target.value)} />
           </div>
           <div>
             <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Designation</label>
-            <Input value={draft.designation} onChange={(e) => setDraft((p) => ({ ...p, designation: e.target.value }))} />
+            <Select value={draft.designation || DESIGNATION_NONE} onValueChange={(v) => { if (!v) return; setDraftField('designation', v === DESIGNATION_NONE ? '' : v) }}>
+              <SelectTrigger className="w-full text-[13px]">
+                <SelectValue>{(v: string) => (v === DESIGNATION_NONE ? 'Select designation' : v)}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={DESIGNATION_NONE}>—</SelectItem>
+                {/* An existing contact's designation may predate this fixed list — keep it selectable rather than silently drop it. */}
+                {draft.designation && draft.designation !== DESIGNATION_NONE && !DESIGNATION_OPTIONS.includes(draft.designation) && (
+                  <SelectItem value={draft.designation}>{draft.designation}</SelectItem>
+                )}
+                {DESIGNATION_OPTIONS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
           {isEdit && (
             <div>
               <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Type</label>
-              <Select value={draft.type} onValueChange={(v) => setDraft((p) => ({ ...p, type: v as ContactType }))}>
+              <Select value={draft.type} onValueChange={(v) => setDraftField('type', v as ContactType)}>
                 <SelectTrigger className="w-full text-[13px]">
                   <SelectValue>{(v: string) => TYPE_OPTIONS.find((t) => t.value === v)?.label ?? v}</SelectValue>
                 </SelectTrigger>
@@ -247,20 +288,20 @@ const EditContactModalForm = ({ contact, onClose, fixedTenantId, fixedDivisionId
           )}
           <div>
             <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Email</label>
-            <Input value={draft.email} onChange={(e) => setDraft((p) => ({ ...p, email: e.target.value }))} />
+            <Input value={draft.email} onChange={(e) => setDraftField('email', e.target.value)} />
           </div>
           <div>
             <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Phone</label>
-            <Input value={draft.phone} onChange={(e) => setDraft((p) => ({ ...p, phone: e.target.value }))} />
+            <Input value={draft.phone} onChange={(e) => setDraftField('phone', e.target.value)} />
           </div>
           <div className="sm:col-span-2">
             <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Location</label>
-            <Input value={draft.location} onChange={(e) => setDraft((p) => ({ ...p, location: e.target.value }))} />
+            <Input value={draft.location} onChange={(e) => setDraftField('location', e.target.value)} />
           </div>
           {isEdit && (
             <div>
               <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Status</label>
-              <Select value={draft.status} onValueChange={(v) => setDraft((p) => ({ ...p, status: v as ContactStatus }))}>
+              <Select value={draft.status} onValueChange={(v) => setDraftField('status', v as ContactStatus)}>
                 <SelectTrigger className="w-full text-[13px]">
                   <SelectValue>{(v: string) => STATUS_OPTIONS.find((s) => s.value === v)?.label ?? v}</SelectValue>
                 </SelectTrigger>

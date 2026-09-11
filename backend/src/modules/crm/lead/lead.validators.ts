@@ -65,15 +65,25 @@ export const MoveStagePayloadSchema = z.object({
 export type IMoveStagePayload = z.infer<typeof MoveStagePayloadSchema>;
 
 //4: search ====================================>
-export const SearchLeadQuerySchema = z.object({
-    title: z.string().optional().openapi({ example: 'Cardio' }),
-    status: z.enum(Object.values(LEAD_STATUSES)).optional().openapi({ example: 'qualified' }),
-    projectType: z.enum(Object.values(LEAD_PROJECT_TYPES)).optional().openapi({ example: 'screening' }),
-    division: objectId('Division').optional(),
-    salesPerson: objectId('Sales person').optional(),
-    page: z.string().optional().openapi({ example: '1' }),
-    limit: z.string().optional().openapi({ example: '10' }),
-});
+// fyFrom / fyTo bound the lead's creation date (financial-year range). They come in as query
+// strings; z.coerce.date() parses + validates them (an unparseable date → 400), and the refine
+// guards that fyFrom is not after fyTo when both are supplied.
+export const SearchLeadQuerySchema = z
+    .object({
+        title: z.string().optional().openapi({ example: 'Cardio' }),
+        status: z.enum(Object.values(LEAD_STATUSES)).optional().openapi({ example: 'qualified' }),
+        projectType: z.enum(Object.values(LEAD_PROJECT_TYPES)).optional().openapi({ example: 'screening' }),
+        division: objectId('Division').optional(),
+        salesPerson: objectId('Sales person').optional(),
+        fyFrom: z.coerce.date().optional().openapi({ example: '2026-04-01' }),
+        fyTo: z.coerce.date().optional().openapi({ example: '2027-03-31' }),
+        page: z.string().optional().openapi({ example: '1' }),
+        limit: z.string().optional().openapi({ example: '10' }),
+    })
+    .refine((q) => !(q.fyFrom && q.fyTo) || q.fyFrom <= q.fyTo, {
+        message: 'fyFrom must be on or before fyTo',
+        path: ['fyFrom'],
+    });
 export type ISearchLeadQuery = z.infer<typeof SearchLeadQuerySchema>;
 
 //5: report ====================================>

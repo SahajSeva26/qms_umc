@@ -90,7 +90,6 @@ interface AppointmentDrawerProps {
 
 const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => {
   const [panel, setPanel] = useState<PanelKind>(null)
-  const [reason, setReason] = useState('')
   const [targetStatus, setTargetStatus] = useState<AppointmentStatus | ''>('')
   const [momText, setMomText] = useState('')
   const [nextStepsOption, setNextStepsOption] = useState<string>('')
@@ -136,7 +135,6 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
   const openMoveStage = (to: AppointmentStatus) => {
     blurActiveElement()
     setError('')
-    setReason('')
     setMomText(appointment.mom.details ?? '')
     resetNextStepsFromAppointment()
     setTargetStatus(to)
@@ -151,11 +149,20 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
 
   const resolvedNextSteps = nextStepsOption === NEXT_STEPS_OTHER ? nextStepsText.trim() : nextStepsOption
 
+  // moveStage's `reason` is required server-side (min length 1) but the UI no
+  // longer asks the user to type it separately — MoM/next steps already
+  // capture the "why" for a done/cancelled move, so it's derived from those
+  // instead of a redundant free-text box.
+  const buildMoveStageReason = (to: AppointmentStatus) => {
+    if (to === 'done') return momText.trim() ? `Marked done — ${momText.trim()}` : 'Marked done'
+    if (resolvedNextSteps) return `Moved to ${APPOINTMENT_STATUS_LABEL[to]} — ${resolvedNextSteps}`
+    return `Moved to ${APPOINTMENT_STATUS_LABEL[to]}`
+  }
+
   // MOM saves via the plain update endpoint before moveStage, so a failed
   // status flip doesn't lose the already-typed text.
   const handleMoveStageSave = async () => {
     if (!targetStatus) return
-    if (!reason.trim()) return setError('A reason is required')
     // Frontend-only check — not yet enforced by moveStage() on the backend.
     if (targetStatus === 'done' && !momText.trim()) return setError('Minutes of meeting are required to mark this appointment done')
     try {
@@ -163,7 +170,7 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
       if (momChanged) {
         await updateAppointment.mutateAsync({ mom: { details: momText.trim() } })
       }
-      await moveStage.mutateAsync({ to: targetStatus, reason: reason.trim(), nextSteps: resolvedNextSteps || undefined })
+      await moveStage.mutateAsync({ to: targetStatus, reason: buildMoveStageReason(targetStatus), nextSteps: resolvedNextSteps || undefined })
       toast.success(`Moved to ${APPOINTMENT_STATUS_LABEL[targetStatus]}`)
       setPanel(null)
     } catch (err) {
@@ -335,10 +342,6 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
         <DialogContent className="sm:max-w-sm">
           <DialogHeader><DialogTitle>{targetStatus && `Move to ${APPOINTMENT_STATUS_LABEL[targetStatus]}`}</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div>
-              <Label className={labelClasses} style={labelStyle}>Reason *</Label>
-              <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-[13px]" />
-            </div>
             {targetStatus === 'done' && (
               <div>
                 <Label className={labelClasses} style={labelStyle}>Minutes of meeting</Label>

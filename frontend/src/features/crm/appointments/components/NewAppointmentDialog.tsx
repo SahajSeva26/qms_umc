@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FiUserPlus } from 'react-icons/fi'
+import { FiUserPlus, FiBell, FiX } from 'react-icons/fi'
 import type { AppointmentType, AppointmentMode } from '@/types/appointment.types'
 import { APPOINTMENT_TYPE_LABEL, APPOINTMENT_MODE_LABEL } from '@/types/appointment.types'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
@@ -27,16 +27,30 @@ const ADD_NEW_CONTACT_VALUE = '__add_new_contact__'
 
 const APPOINTMENT_TYPES: AppointmentType[] = ['new', 'follow-up', 'payment', 'spot']
 
-// Both are 'HH:mm' on the same calendar day, so a plain minute-of-day diff suffices.
-function formatDuration(startTime: string, endTime: string): string {
+// Who-you're-meeting-as capture, scoped to this appointment only — not part of
+// the Contact's own stored record (that has its own separate, flat, free-text
+// `designation`). Frontend-only for now: neither field exists on the backend
+// Appointment yet, see TODO.md.
+const MEETING_DEPARTMENTS = ['Marketing', 'Purchase', 'Account', 'Logistic', 'Other'] as const
+type MeetingDepartment = (typeof MEETING_DEPARTMENTS)[number]
+const MEETING_DESIGNATIONS: Record<MeetingDepartment, string[]> = {
+  Marketing: ['Jr PMT', 'PMT', 'Sr.PMT', 'GPM', 'Sr.GPM', 'Marketing Manager', 'Division Head', 'BU Head', 'GM', 'Sr.GM', 'VP', 'Sr.VP', 'President', 'Other'],
+  Purchase: ['Executive', 'Manager', 'Head'],
+  Account: ['Executive', 'Manager', 'Head'],
+  Logistic: ['Executive', 'Manager', 'Head', 'Other'],
+  Other: ['Executive', 'Manager', 'Head', 'Other'],
+}
+
+// startTime is 'HH:mm' on the same calendar day; durationHours can be fractional
+// (e.g. 1.5) — a plain minute-of-day add suffices, wrapping past midnight is not
+// supported (matches the old same-day start/end picker's own assumption).
+function addDuration(startTime: string, durationHours: number): string {
   const [sh, sm] = startTime.split(':').map(Number)
-  const [eh, em] = endTime.split(':').map(Number)
-  const totalMinutes = eh * 60 + em - (sh * 60 + sm)
-  const hours = Math.floor(totalMinutes / 60)
-  const minutes = totalMinutes % 60
-  if (hours === 0) return `${minutes} min`
-  if (minutes === 0) return `${hours} hr`
-  return `${hours} hr ${minutes} min`
+  const totalMinutes = Math.round(sh * 60 + sm + durationHours * 60)
+  const wrapped = ((totalMinutes % 1440) + 1440) % 1440
+  const eh = Math.floor(wrapped / 60)
+  const em = wrapped % 60
+  return `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`
 }
 
 const labelClasses = 'block text-[10px] font-semibold tracking-widest uppercase mb-2'
@@ -59,11 +73,14 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
   const [tenantId, setTenantId] = useState('')
   const [divisionId, setDivisionId] = useState('')
   const [contactPersonId, setContactPersonId] = useState('')
+  const [contactDepartment, setContactDepartment] = useState<MeetingDepartment | ''>('')
+  const [contactRole, setContactRole] = useState('')
   const [mode, setMode] = useState<AppointmentMode>('online')
   const [members, setMembers] = useState<SelectedMember[]>([])
   const [date, setDate] = useState(prefill?.date ?? new Date().toISOString().slice(0, 10))
   const [startTime, setStartTime] = useState(prefill ? `${String(prefill.hour).padStart(2, '0')}:00` : '10:00')
-  const [endTime, setEndTime] = useState(prefill ? `${String(prefill.hour + 1).padStart(2, '0')}:00` : '11:00')
+  const [durationHours, setDurationHours] = useState(1)
+  const endTime = addDuration(startTime, durationHours)
   const [destinationLink, setDestinationLink] = useState('')
   const [leadId, setLeadId] = useState('')
   const [leadLabel, setLeadLabel] = useState('')
@@ -104,11 +121,13 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
     setTenantId('')
     setDivisionId('')
     setContactPersonId('')
+    setContactDepartment('')
+    setContactRole('')
     setMode('online')
     setMembers([])
     setDate(new Date().toISOString().slice(0, 10))
     setStartTime('10:00')
-    setEndTime('11:00')
+    setDurationHours(1)
     setDestinationLink('')
     setLeadId('')
     setLeadLabel('')
@@ -130,6 +149,8 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
     setTenantId(id)
     setDivisionId('')
     setContactPersonId('')
+    setContactDepartment('')
+    setContactRole('')
     setAddingContact(false)
     setJustCreatedContact(null)
     setParentId('')
@@ -142,9 +163,9 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
     if (!contactPersonId) return setError('Select a contact person')
     if (!agendaPublic.trim()) return setError('Public agenda is required')
     if (type === 'follow-up' && !leadId.trim() && !parentId.trim()) return setError('Follow-up appointments need a linked lead or a linked meeting')
+    if (!(durationHours > 0)) return setError('Duration must be greater than 0')
     const startAt = new Date(`${date}T${startTime}:00`)
     const endAt = new Date(`${date}T${endTime}:00`)
-    if (endAt.getTime() <= startAt.getTime()) return setError('End time must be after start time')
 
     setError('')
     try {
@@ -232,6 +253,8 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
                 onValueChange={(v) => {
                   setDivisionId(v ?? '')
                   setContactPersonId('')
+                  setContactDepartment('')
+                  setContactRole('')
                   setAddingContact(false)
                   setJustCreatedContact(null)
                   setParentId('')
@@ -281,6 +304,46 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
               {!contactsErrored && !contactsLoading && divisionId && contacts.length === 0 && (
                 <p className="text-[11px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>This company has no contacts yet — add one above.</p>
               )}
+            </div>
+          </div>
+
+          {/* Who-you're-meeting-as for this appointment, not the contact's own stored
+              designation — frontend-only for now, see TODO.md. */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className={labelClasses} style={labelStyle}>Department</Label>
+              <Select
+                key={contactDepartment || 'empty'}
+                value={contactDepartment || undefined}
+                onValueChange={(v) => {
+                  const nextDepartment = (v ?? '') as MeetingDepartment | ''
+                  setContactDepartment(nextDepartment)
+                  if (!nextDepartment || !MEETING_DESIGNATIONS[nextDepartment].includes(contactRole)) setContactRole('')
+                }}
+              >
+                <SelectTrigger className="w-full text-[13px]">
+                  <SelectValue placeholder="Select department...">{(v: string) => v}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {MEETING_DEPARTMENTS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className={labelClasses} style={labelStyle}>Designation</Label>
+              <Select
+                key={contactRole || 'empty'}
+                value={contactRole || undefined}
+                onValueChange={(v) => setContactRole(v ?? '')}
+                disabled={!contactDepartment}
+              >
+                <SelectTrigger className="w-full text-[13px]">
+                  <SelectValue placeholder={contactDepartment ? 'Select designation...' : 'Select a department first'}>{(v: string) => v}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {contactDepartment && MEETING_DESIGNATIONS[contactDepartment].map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -351,19 +414,26 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
             </div>
             <div>
               <div className="flex items-center justify-between mb-2">
-                <Label className={`${labelClasses} mb-0`} style={labelStyle}>End</Label>
-                {endTime && startTime && endTime > startTime && (
+                <Label className={`${labelClasses} mb-0`} style={labelStyle}>Duration (hrs) *</Label>
+                {durationHours > 0 && (
                   <span
                     className="text-[10px] font-bold px-2 py-0.5 rounded-full"
                     style={{ background: 'color-mix(in oklch, var(--qms-brand), transparent 88%)', color: 'var(--qms-brand)' }}
                   >
-                    {formatDuration(startTime, endTime)}
+                    Ends {endTime}
                   </span>
                 )}
               </div>
-              <TimePicker value={endTime} onChange={setEndTime} />
-              {endTime && startTime && endTime <= startTime && (
-                <p className="text-[11px] mt-1 text-danger">End time must be after start time</p>
+              <Input
+                type="number"
+                min="0.25"
+                step="0.25"
+                value={durationHours}
+                onChange={(e) => setDurationHours(Number(e.target.value))}
+                className="text-[13px]"
+              />
+              {!(durationHours > 0) && (
+                <p className="text-[11px] mt-1 text-danger">Duration must be greater than 0</p>
               )}
             </div>
           </div>
@@ -376,6 +446,37 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
           <div>
             <Label className={labelClasses} style={labelStyle}>Private notes</Label>
             <Textarea value={agendaPrivate} onChange={(e) => setAgendaPrivate(e.target.value)} rows={2} className="text-[13px]" placeholder="Internal only" />
+          </div>
+
+          {/* Display-only shell — no backend support yet, nothing here is wired
+              to state or the save payload. Rows are static placeholders matching
+              the eventual "N hours before, via <channel>" reminder-rule shape. */}
+          <div>
+            <Label className={`${labelClasses} flex items-center gap-1.5`} style={labelStyle}>
+              <FiBell size={11} /> Reminders
+            </Label>
+            <p className="text-[11px] mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+              Default reminder fires exactly 24 hours before the meeting time. Adjust the offset or add more rows as needed.
+            </p>
+            <div className="space-y-2">
+              {(['WhatsApp', 'Email'] as const).map((channel) => (
+                <div key={channel} className="flex items-center gap-2">
+                  <Input value="24" disabled className="w-16 text-[13px]" />
+                  <span className="text-[12px] shrink-0" style={{ color: 'var(--qms-text-muted)' }}>hours before</span>
+                  <Select value={channel} disabled>
+                    <SelectTrigger className="w-full text-[13px]">
+                      <SelectValue>{channel}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={channel}>{channel}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <button type="button" disabled className="shrink-0 p-1 rounded-md text-danger opacity-60">
+                    <FiX size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
 
           {error && <p className="text-[12px] font-semibold text-danger">{error}</p>}

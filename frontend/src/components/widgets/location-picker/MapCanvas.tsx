@@ -9,7 +9,9 @@ import type { LocationResolutionState } from './location.types'
 
 type MapTypeView = 'roadmap' | 'satellite'
 
-const DEFAULT_ZOOM = 5
+// 5 = whole-India view; 7 frames roughly one state (Maharashtra, given the
+// default center in LocationPicker.tsx) rather than the whole country.
+const DEFAULT_ZOOM = 7
 const SELECTED_ZOOM = 16
 const MIN_MEANINGFUL_ZOOM = 10
 

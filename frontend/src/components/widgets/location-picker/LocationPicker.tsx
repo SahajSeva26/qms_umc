@@ -15,7 +15,9 @@ const isValidLongitude = (lng: number) => Number.isFinite(lng) && lng >= -180 &&
 // changing this prop after mount "will in most cases have no effect, cause an error, or both."
 const MAP_LIBRARIES: string[] = ['places']
 
-const INDIA_CENTER = { lat: 22.3511148, lng: 78.6677428 }
+// Mumbai — used as the map's default center whenever no caller supplies its
+// own defaultCenter (confirmed: no current feature passes one).
+const DEFAULT_CENTER = { lat: 19.0759837, lng: 72.8776559 }
 const DEFAULT_HEIGHT = 320
 
 // Shared fallback for missing credentials AND a failed/rejected APIProvider —
@@ -148,7 +150,7 @@ function LocationPickerInner({ value, onChange, disabled, height = DEFAULT_HEIGH
         onChange={onChange}
         disabled={disabled}
         height={height}
-        defaultCenter={defaultCenter ?? INDIA_CENTER}
+        defaultCenter={defaultCenter ?? DEFAULT_CENTER}
         defaultCountry={defaultCountry}
         onResolutionStateChange={setMapResolution}
         resetToken={mapResetToken}

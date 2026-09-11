@@ -45,4 +45,21 @@ export const InventoryAssignmentMapper = {
         count: data?.count || 0,
         items: (data?.items || []).map(InventoryAssignmentMapper.toResponse),
     }),
+
+    // Each FO's _id is surfaced as `role`; counts default to 0.
+    toReportResponse: (report: any) => ({
+        summary: {
+            totalFieldOfficers: report?.totalFieldOfficers || 0,
+            fieldOfficersHoldingInventory: report?.fieldOfficersHoldingInventory || 0,
+        },
+        fieldOfficers: (report?.fieldOfficers || []).map((fo: any) => ({
+            role: fo._id?.toString(),
+            name: fo.name,
+            code: fo.code,
+            devicesHeld: fo.devicesHeld || 0,
+            consumableUnitsHeld: fo.consumableUnitsHeld || 0,
+            awaitingApproval: fo.awaitingApproval || 0,
+            awaitingReceipt: fo.awaitingReceipt || 0,
+        })),
+    }),
 };

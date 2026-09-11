@@ -92,11 +92,13 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
   const [panel, setPanel] = useState<PanelKind>(null)
   const [targetStatus, setTargetStatus] = useState<AppointmentStatus | ''>('')
   const [momText, setMomText] = useState('')
+  const [cancelReason, setCancelReason] = useState('')
   const [nextStepsOption, setNextStepsOption] = useState<string>('')
   const [nextStepsText, setNextStepsText] = useState('')
   const [newLeadOpen, setNewLeadOpen] = useState(false)
   const [rescheduleStart, setRescheduleStart] = useState('')
   const [rescheduleEnd, setRescheduleEnd] = useState('')
+  const [rescheduleReason, setRescheduleReason] = useState('')
   // True once the user has directly edited End — stops the auto-shift below.
   const [endTouched, setEndTouched] = useState(false)
   const [error, setError] = useState('')
@@ -135,8 +137,11 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
   const openMoveStage = (to: AppointmentStatus) => {
     blurActiveElement()
     setError('')
-    setMomText(appointment.mom.details ?? '')
-    resetNextStepsFromAppointment()
+    if (to === 'done') {
+      setMomText(appointment.mom.details ?? '')
+      resetNextStepsFromAppointment()
+    }
+    if (to === 'cancelled') setCancelReason('')
     setTargetStatus(to)
     setPanel('moveStage')
   }
@@ -149,22 +154,22 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
 
   const resolvedNextSteps = nextStepsOption === NEXT_STEPS_OTHER ? nextStepsText.trim() : nextStepsOption
 
-  // moveStage's `reason` is required server-side (min length 1) but the UI no
-  // longer asks the user to type it separately — MoM/next steps already
-  // capture the "why" for a done/cancelled move, so it's derived from those
-  // instead of a redundant free-text box.
+  // moveStage's `reason` is required server-side (min length 1) for every
+  // `to`. For "done" the UI doesn't ask for it separately — MoM already
+  // captures the "why" there, so it's derived. For "cancelled" there's no
+  // other field to borrow from, so the user's own typed reason is sent as-is.
   const buildMoveStageReason = (to: AppointmentStatus) => {
     if (to === 'done') return momText.trim() ? `Marked done — ${momText.trim()}` : 'Marked done'
-    if (resolvedNextSteps) return `Moved to ${APPOINTMENT_STATUS_LABEL[to]} — ${resolvedNextSteps}`
-    return `Moved to ${APPOINTMENT_STATUS_LABEL[to]}`
+    return cancelReason.trim()
   }
 
   // MOM saves via the plain update endpoint before moveStage, so a failed
   // status flip doesn't lose the already-typed text.
   const handleMoveStageSave = async () => {
     if (!targetStatus) return
-    // Frontend-only check — not yet enforced by moveStage() on the backend.
+    // Frontend-only checks — not yet enforced by moveStage() on the backend.
     if (targetStatus === 'done' && !momText.trim()) return setError('Minutes of meeting are required to mark this appointment done')
+    if (targetStatus === 'cancelled' && !cancelReason.trim()) return setError('A reason for cancelling is required')
     try {
       const momChanged = targetStatus === 'done' && momText.trim() && momText.trim() !== (appointment.mom.details ?? '')
       if (momChanged) {
@@ -183,6 +188,7 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
     setError('')
     setRescheduleStart(appointment.duration.startTime.slice(0, 16))
     setRescheduleEnd(appointment.duration.endTime?.slice(0, 16) ?? '')
+    setRescheduleReason('')
     setEndTouched(false)
     setPanel('reschedule')
   }
@@ -206,8 +212,12 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
     setRescheduleEnd(value)
   }
 
+  // rescheduleReason is frontend-only for now — the update endpoint has no
+  // dedicated reason field (unlike moveStage's required `reason`), so it's
+  // validated here for discipline but not sent. See TODO.md.
   const handleRescheduleSave = async () => {
     if (!rescheduleStart) return setError('A new start time is required')
+    if (!rescheduleReason.trim()) return setError('A reason for rescheduling is required')
     if (rescheduleEnd && new Date(rescheduleEnd).getTime() <= new Date(rescheduleStart).getTime()) {
       return setError('End must be after start')
     }
@@ -354,29 +364,43 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
                 />
               </div>
             )}
-            <div>
-              <Label className={labelClasses} style={labelStyle}>Next steps</Label>
-              <Select key={nextStepsOption || 'empty'} value={nextStepsOption || undefined} onValueChange={handleNextStepsOptionChange}>
-                <SelectTrigger className="w-full text-[13px]">
-                  <SelectValue placeholder="Select next step…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {NEXT_STEPS_OPTIONS.map((opt) => (
-                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                  ))}
-                  <SelectItem value={NEXT_STEPS_OTHER}>{NEXT_STEPS_OTHER}</SelectItem>
-                </SelectContent>
-              </Select>
-              {nextStepsOption === NEXT_STEPS_OTHER && (
+            {targetStatus === 'done' && (
+              <div>
+                <Label className={labelClasses} style={labelStyle}>Next steps</Label>
+                <Select key={nextStepsOption || 'empty'} value={nextStepsOption || undefined} onValueChange={handleNextStepsOptionChange}>
+                  <SelectTrigger className="w-full text-[13px]">
+                    <SelectValue placeholder="Select next step…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {NEXT_STEPS_OPTIONS.map((opt) => (
+                      <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                    ))}
+                    <SelectItem value={NEXT_STEPS_OTHER}>{NEXT_STEPS_OTHER}</SelectItem>
+                  </SelectContent>
+                </Select>
+                {nextStepsOption === NEXT_STEPS_OTHER && (
+                  <Textarea
+                    value={nextStepsText}
+                    onChange={(e) => setNextStepsText(e.target.value)}
+                    rows={2}
+                    placeholder="What happens next…"
+                    className="text-[13px] mt-2"
+                  />
+                )}
+              </div>
+            )}
+            {targetStatus === 'cancelled' && (
+              <div>
+                <Label className={labelClasses} style={labelStyle}>Reason for cancelling *</Label>
                 <Textarea
-                  value={nextStepsText}
-                  onChange={(e) => setNextStepsText(e.target.value)}
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
                   rows={2}
-                  placeholder="What happens next…"
-                  className="text-[13px] mt-2"
+                  placeholder="Why is this appointment being cancelled…"
+                  className="text-[13px]"
                 />
-              )}
-            </div>
+              </div>
+            )}
             {error && <p className="text-[12px] font-semibold text-danger">{error}</p>}
           </div>
           <DialogFooter className="sm:justify-between">
@@ -406,6 +430,16 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
                 <Label className={labelClasses} style={labelStyle}>New end</Label>
                 <DateTimePicker value={rescheduleEnd} onChange={handleRescheduleEndChange} className="text-[13px] w-full" />
               </div>
+            </div>
+            <div>
+              <Label className={labelClasses} style={labelStyle}>Reason for rescheduling *</Label>
+              <Textarea
+                value={rescheduleReason}
+                onChange={(e) => setRescheduleReason(e.target.value)}
+                rows={2}
+                placeholder="Why is this appointment being rescheduled…"
+                className="text-[13px]"
+              />
             </div>
             {error && <p className="text-[12px] font-semibold text-danger">{error}</p>}
           </div>

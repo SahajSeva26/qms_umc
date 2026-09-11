@@ -10,6 +10,7 @@ export const QaFeedbackMapper = {
             pinXPercent: feedback.pinXPercent,
             pinYPercent: feedback.pinYPercent,
             comment: feedback.comment,
+            issueKey: feedback.issueKey,
             reportedBy:
                 reportedBy && typeof reportedBy === 'object'
                     ? { id: reportedBy._id?.toString(), firstName: reportedBy.firstName, lastName: reportedBy.lastName, email: reportedBy.email }

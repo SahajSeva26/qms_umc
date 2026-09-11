@@ -1,3 +1,5 @@
+import { addDays } from '@/utils/calendarDate'
+
 export const DAY_START_HOUR = 8
 export const DAY_END_HOUR = 22
 export const HOUR_PX = 48
@@ -22,29 +24,6 @@ export const TONE_COLORS: Record<string, string> = {
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')
-
-/** Monday-first start of week, local midnight */
-export function startOfWeek(date: Date): Date {
-  const d = new Date(date)
-  d.setHours(0, 0, 0, 0)
-  d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
-  return d
-}
-
-export function addDays(date: Date, days: number): Date {
-  const d = new Date(date)
-  d.setDate(d.getDate() + days)
-  return d
-}
-
-export function isSameDay(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
-}
-
-/** Local-timezone YYYY-MM-DD key, for bucketing meetings into day columns */
-export function dayKey(d: Date): string {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-}
 
 /** 24h clock 'HH:mm' from an ISO datetime */
 export function formatTime(iso: string): string {

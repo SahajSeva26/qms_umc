@@ -4,18 +4,17 @@ import { MemoryRouter } from 'react-router-dom'
 import type { SessionResponse } from '@/types/accessManagement.types'
 
 vi.mock('@/hooks/useSession')
-// A stable reference matters: Sidebar.tsx's useEffect depends on `user` by
-// reference — a fresh object on every mock call would re-fire the effect
-// every render and infinite-loop the test.
+// Stable reference required: Sidebar.tsx's effect depends on `user` by
+// reference; a fresh object per call would re-fire it every render and infinite-loop the test.
 const MOCK_AUTH_USER = { id: 'u-1' }
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: MOCK_AUTH_USER }) }))
 
-function sessionFixture(roleTypeCode: string, permissions: string[]): SessionResponse {
+function sessionFixture(roleTypeCode: string, permissions: string[], tenantType: 'customer' | 'platform' = 'customer'): SessionResponse {
   return {
     user: { id: 'u-1', email: 'a@example.com', firstName: 'a', lastName: 'b' },
     role: { id: 'role-1', code: 'role-code', name: 'Role' },
     roleType: { id: 'rt-1', code: roleTypeCode, name: roleTypeCode },
-    tenant: { id: 't-1', code: 'tenant-1', name: 'Tenant', type: 'customer' },
+    tenant: { id: 't-1', code: 'tenant-1', name: 'Tenant', type: tenantType },
     permissions,
   } as unknown as SessionResponse
 }
@@ -83,5 +82,34 @@ describe('Sidebar — pharma identity isolation', () => {
 
     expect(screen.getByText('Dashboard')).toBeInTheDocument()
     expect(screen.queryByText(/pharma portal/i)).not.toBeInTheDocument()
+  })
+})
+
+describe('Sidebar — FO Management is gated on platform tenant, not permission alone', () => {
+  it('hides FO Management for a customer-tenant admin holding tenant:manage (the exact false-positive this gate exists to prevent)', async () => {
+    await renderSidebar({
+      permissions: ['tenant:manage'],
+      session: sessionFixture('admin', ['tenant:manage'], 'customer'),
+    })
+
+    expect(screen.queryByText('FO Management')).not.toBeInTheDocument()
+  })
+
+  it('hides FO Management for a platform-tenant session with neither tenant:manage nor tenant:admin', async () => {
+    await renderSidebar({
+      permissions: [],
+      session: sessionFixture('sales-rep', [], 'platform'),
+    })
+
+    expect(screen.queryByText('FO Management')).not.toBeInTheDocument()
+  })
+
+  it('shows FO Management for a platform-tenant session with tenant:admin', async () => {
+    await renderSidebar({
+      permissions: ['tenant:admin'],
+      session: sessionFixture('admin', ['tenant:admin'], 'platform'),
+    })
+
+    expect(screen.getByText('FO Management')).toBeInTheDocument()
   })
 })

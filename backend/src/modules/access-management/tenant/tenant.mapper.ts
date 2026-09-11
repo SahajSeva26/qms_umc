@@ -8,6 +8,8 @@ export const TenantMapper = {
             code: tenant.code,
             name: tenant.name,
             address: tenant.address ?? null,
+            businessLifetime: tenant.businessLifetime ?? null,
+            gst: tenant.gst ?? null,
         };
         if (ctx.hasAnyPermissions([SYSTEM_PERMISSIONS.MANAGE.code])) {
             result.status = tenant.status;

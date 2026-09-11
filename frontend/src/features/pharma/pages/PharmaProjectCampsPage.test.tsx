@@ -9,6 +9,19 @@ import type { CampEntity } from '@/types/campReal.types'
 
 vi.mock('@/hooks/useSession')
 
+// LocationPicker needs real Google Maps credentials, unavailable in tests —
+// mock it to a button supplying coordinates via the same onChange(LocationValue) contract.
+vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
+  default: ({ value, onChange }: { value: unknown; onChange: (v: unknown) => void }) => (
+    <button
+      type="button"
+      onClick={() => onChange({ ...(value as object ?? {}), coordinates: [73.8567, 18.5204] })}
+    >
+      Set test coordinates
+    </button>
+  ),
+}))
+
 vi.mock('@/features/pharma/pharmaProjects.service', () => ({
   pharmaProjectsService: {
     getProject: vi.fn(),
@@ -66,8 +79,12 @@ function campFixture(overrides: Partial<CampEntity> = {}): CampEntity {
     id: 'camp-1', code: 'cmp-000001', tenant: 't-1', division: 'div-1', project: 'proj-1',
     doctor: 'doc-1', type: 'screening', billingType: 'billable', patientExpectation: 0,
     fo: null, mr: null, date: '2026-09-15',
-    timeSlot: '9am-1pm', city: 'Pune', state: 'Maharashtra',
-    coordinates: [73.8567, 18.5204], devices: [], status: 'requested', stageHistory: [],
+    timeSlot: '9am-1pm',
+    location: {
+      addressLine1: '221 Baker Street', city: 'Pune', state: 'Maharashtra',
+      pincode: '411001', coordinates: [73.8567, 18.5204],
+    },
+    devices: [], status: 'requested', stageHistory: [],
     createdAt: '', updatedAt: '', ...overrides,
   } as CampEntity
 }
@@ -93,8 +110,6 @@ async function renderPage(projectId = 'proj-1') {
 
 describe('PharmaProjectCampsPage', () => {
   it('blocks a camp:book-holding but non-pharma role type from the real deep-linked page — neither project nor camps ever fetch', async () => {
-    // Renders the REAL page (not just the gate in isolation) to prove the
-    // gate/content split actually prevents the data hooks' requests from firing for this session.
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
       isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('some-other-custom-role'), hasPermission: () => false,
@@ -138,8 +153,6 @@ describe('PharmaProjectCampsPage', () => {
     const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
     const { pharmaCampsService } = await import('@/features/pharma/pharmaCamps.service')
     vi.mocked(pharmaProjectsService.getProject).mockResolvedValue({ success: true, message: '', data: projectFixture() })
-    // Scoped-empty response — RSM sees only camps they occupy an assignment
-    // slot on, so the true project-wide count is unknowable from it.
     vi.mocked(pharmaCampsService.searchScopedCamps).mockResolvedValue({ success: true, message: '', data: { items: [], count: 0 } })
 
     await renderPage()
@@ -199,17 +212,17 @@ describe('PharmaProjectCampsPage', () => {
     await user.type(screen.getByLabelText(/date/i), '2026-09-15')
     await user.click(screen.getByText(/select time slot/i))
     await user.click(await screen.findByText(/9 AM – 1 PM/i))
-    await user.type(screen.getByLabelText(/city/i), 'Pune')
-    await user.type(screen.getByLabelText(/state/i), 'Maharashtra')
-    await user.type(screen.getByLabelText(/longitude/i), '73.8567')
-    await user.type(screen.getByLabelText(/latitude/i), '18.5204')
+    await user.type(screen.getByLabelText(/^address line 1$/i), '221 Baker Street')
+    await user.type(screen.getByLabelText(/^city$/i), 'Pune')
+    await user.type(screen.getByLabelText(/^state$/i), 'Maharashtra')
+    await user.type(screen.getByLabelText(/^pincode$/i), '411001')
+    await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
 
     await user.click(screen.getByRole('button', { name: /^book camp$/i }))
 
     await waitFor(() => expect(campsRealService.bookCamp).toHaveBeenCalledTimes(1))
     expect(vi.mocked(campsRealService.bookCamp).mock.calls[0][0].project).toBe('proj-1')
 
-    // Dialog closes and the refetched, now-populated list renders.
     await waitFor(() => expect(screen.queryByText(/booking for project/i)).not.toBeInTheDocument())
     expect(await screen.findByText('cmp-000002')).toBeInTheDocument()
   })

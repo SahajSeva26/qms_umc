@@ -25,9 +25,8 @@ async function renderForm() {
 describe('PatientRegistrationForm — date of birth single source of truth', () => {
   beforeEach(() => {
     vi.resetAllMocks()
-    // Frozen so the calendar's default displayed month is deterministic —
-    // otherwise "September 15th, 2026" only stays clickable on first render
-    // while the real system clock happens to be in September 2026.
+    // Frozen so the calendar's default displayed month is deterministic,
+    // rather than depending on the real system clock being in September 2026.
     vi.setSystemTime(new Date('2026-09-01T00:00:00.000Z'))
   })
 
@@ -36,9 +35,8 @@ describe('PatientRegistrationForm — date of birth single source of truth', () 
   })
 
   it('submits the date picked via the DatePicker as dateOfBirth', async () => {
-    // Longer timeout: this drives a real dialog + popover calendar + select
-    // through several userEvent steps, which can exceed the 5s default under
-    // full-suite CPU contention even though each step itself is fast.
+    // Longer timeout: several userEvent steps through a real dialog + popover
+    // calendar can exceed the 5s default under full-suite CPU contention.
     const { patientService } = await import('@/features/clinical/patient/patient.service')
     vi.mocked(patientService.createPatient).mockResolvedValue({
       success: true,

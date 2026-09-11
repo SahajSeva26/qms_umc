@@ -1,6 +1,5 @@
-// Matches backend/operations/testMaster exactly. TestMaster is a global,
-// admin-managed catalog of screening tests — no tenant scoping, no delete
-// (status only).
+// TestMaster is a global, admin-managed catalog of screening tests — no
+// tenant scoping, no delete (status only).
 
 import type { ProjectTherapy } from '@/types/project.types'
 import type { CampType } from '@/types/campReal.types'
@@ -47,14 +46,10 @@ export interface TestEntity {
   code: string
   name: string
   description?: string
-  // Optional because some legacy records predate/lack this field entirely —
-  // the frontend keeps it immutable after create and never sends it on
-  // update, so this must stay honestly optional rather than asserting every
-  // record has a real value.
+  // Optional — some legacy records predate this field and lack it entirely;
+  // immutable after create with no backfill path (update payload omits it).
   therapy?: ProjectTherapy
-  // Optional because 12 pre-existing records predate this field and have it
-  // absent entirely; immutable after create with no backfill path (the
-  // update payload schema omits it), so this must stay honestly optional.
+  // Same reasoning as therapy above.
   campType?: CampType
   duration: number
   price: number
@@ -99,12 +94,8 @@ export interface CreateTestPayload {
   consumption?: TestConsumptionLinePayload[]
 }
 
-// code/campType absent — both immutable after create per backend schema.
-// therapy also treated as immutable here (frontend decision): changing it
+// therapy is frontend-immutable by choice (not a backend rule) — changing it
 // post-creation could desync Projects already linked to this test's id.
-// consumption absent — editing an existing test's resource lines isn't
-// supported yet. config IS included — backend allows editing it post-create,
-// and existing results are immutable snapshots so this can't corrupt them.
 export interface UpdateTestPayload {
   name?: string
   description?: string

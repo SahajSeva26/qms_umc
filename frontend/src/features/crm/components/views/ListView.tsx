@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { FiDownload } from 'react-icons/fi'
 import type { LeadEntity, LeadStatus } from '@/types/crm.types'
-import { LEAD_STATUS_LABEL, LEAD_TRANSITION_MAP } from '@/types/crm.types'
+import { LEAD_ADVANCE_ACTION_LABEL, LEAD_STATUS_COLOR, LEAD_STATUS_TEXT_COLOR, LEAD_TRANSITION_MAP } from '@/types/crm.types'
 import { downloadLeadsCsv } from '@/features/crm/crm.export'
 import { formatINR } from '@/utils/formatters'
 import { roleLabel, divisionLabel, tenantLabel } from '@/features/crm/crm.utils'
@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import StagePill from '@/features/crm/components/StagePill'
 import LeadAdvanceModal from '@/features/crm/components/LeadAdvanceModal'
 
-const COLUMNS = ['Code', 'Title', 'Company', 'Division', 'Sales rep', 'Status', 'Value', 'Actions']
+const COLUMNS = ['Code', 'Title', 'Company', 'Division', 'Sales rep', 'Status', 'Value', 'Update Action']
 
 interface ListViewProps {
   leads: LeadEntity[]
@@ -44,7 +44,7 @@ const ListView = ({ leads, onOpen, onMoveStage, canManage }: ListViewProps) => {
             {COLUMNS.map((h) => (
               <th
                 key={h}
-                className={`font-bold text-[11px] uppercase tracking-wider px-3 py-2 whitespace-nowrap ${h === 'Value' ? 'text-right' : 'text-left'}`}
+                className={`font-bold text-[11px] uppercase tracking-wider px-3 py-2 whitespace-nowrap ${h === 'Value' ? 'text-right' : h === 'Update Action' ? 'text-center' : 'text-left'}`}
                 style={{ color: 'var(--qms-text-muted)' }}
               >
                 {h}
@@ -76,7 +76,7 @@ const ListView = ({ leads, onOpen, onMoveStage, canManage }: ListViewProps) => {
                     <div className="flex justify-center" style={{ color: 'var(--qms-text-muted)' }}>-</div>
                   )}
                   {canManage && !isFinal && nextStatuses.length > 0 && (
-                    <div className="flex flex-wrap gap-1 justify-end">
+                    <div className="flex flex-wrap gap-1 justify-center">
                       {nextStatuses.map((to) => (
                         <button
                           key={to}
@@ -84,10 +84,14 @@ const ListView = ({ leads, onOpen, onMoveStage, canManage }: ListViewProps) => {
                             e.stopPropagation()
                             setAdvance({ lead, to })
                           }}
-                          className="text-[11px] font-semibold px-2 py-1 rounded-lg border transition-all hover:bg-(--qms-surface-hover)"
-                          style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-soft)' }}
+                          className="text-[11px] font-semibold px-2 py-1 rounded-lg border transition-all hover:opacity-80"
+                          style={{
+                            borderColor: `color-mix(in srgb, ${LEAD_STATUS_COLOR[to]} 35%, transparent)`,
+                            background: `color-mix(in srgb, ${LEAD_STATUS_COLOR[to]} 13%, transparent)`,
+                            color: LEAD_STATUS_TEXT_COLOR[to],
+                          }}
                         >
-                          {LEAD_STATUS_LABEL[to]} →
+                          {LEAD_ADVANCE_ACTION_LABEL[to]}
                         </button>
                       ))}
                     </div>

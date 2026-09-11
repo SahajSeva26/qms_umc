@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { FiEdit2 } from 'react-icons/fi'
 import type { LeadEntity, LeadStatus, UpdateLeadPayload } from '@/types/crm.types'
-import { LEAD_STATUS_LABEL, LEAD_TRANSITION_MAP } from '@/types/crm.types'
+import { LEAD_ADVANCE_ACTION_LABEL, LEAD_STATUS_COLOR, LEAD_STATUS_TEXT_COLOR, LEAD_TRANSITION_MAP } from '@/types/crm.types'
 import { contactPersonLabel, divisionLabel } from '@/features/crm/crm.utils'
 import SideDrawer from '@/components/ui/SideDrawer'
 import StagePill from '@/features/crm/components/StagePill'
@@ -41,7 +41,7 @@ const LeadDrawer = ({ lead, onClose, onMoveStage, onUpdateLead, canManage }: Lea
 
   if (!lead) return <SideDrawer open={false} title="" onClose={onClose}>{null}</SideDrawer>
 
-  // Same "Move to {next} →" buttons as ListView.tsx — empty once won/lost.
+  // Same LEAD_ADVANCE_ACTION_LABEL buttons as ListView.tsx — empty once won/lost.
   const nextStatuses = canManage ? LEAD_TRANSITION_MAP[lead.status] : []
 
   return (
@@ -102,10 +102,13 @@ const LeadDrawer = ({ lead, onClose, onMoveStage, onUpdateLead, canManage }: Lea
             <button
               key={to}
               onClick={() => setAdvanceTo(to)}
-              className={`text-[12px] font-bold px-3 py-2 rounded-lg transition-colors ${to === 'lost' ? 'bg-danger-soft text-danger' : ''}`}
-              style={to === 'lost' ? undefined : { background: 'var(--qms-surface-strong)', color: 'var(--qms-text)' }}
+              className="text-[12px] font-bold px-3 py-2 rounded-lg transition-colors hover:opacity-80"
+              style={{
+                background: `color-mix(in srgb, ${LEAD_STATUS_COLOR[to]} 13%, transparent)`,
+                color: LEAD_STATUS_TEXT_COLOR[to],
+              }}
             >
-              {LEAD_STATUS_LABEL[lead.status]} → {LEAD_STATUS_LABEL[to]}
+              {LEAD_ADVANCE_ACTION_LABEL[to]}
             </button>
           ))}
         </div>

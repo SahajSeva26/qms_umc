@@ -3,6 +3,8 @@ import type { ApiResponse, PaginatedResponse } from '@/types/common.types'
 import type {
   CreateLeadPayload,
   LeadEntity,
+  LeadReportQuery,
+  LeadReportResponse,
   MoveLeadStagePayload,
   SearchLeadQuery,
   UpdateLeadPayload,
@@ -10,6 +12,11 @@ import type {
 
 const searchLeads = async (query: SearchLeadQuery) => {
   const res = await api.get<PaginatedResponse<LeadEntity>>('/leads', { params: query })
+  return res.data
+}
+
+const getLeadReport = async (query: LeadReportQuery) => {
+  const res = await api.get<ApiResponse<LeadReportResponse>>('/leads/report', { params: query })
   return res.data
 }
 
@@ -37,6 +44,7 @@ const moveLeadStage = async (id: string, payload: MoveLeadStagePayload) => {
 export const crmService = {
   searchLeads,
   getLead,
+  getLeadReport,
   createLead,
   updateLead,
   moveLeadStage,

@@ -1,37 +1,24 @@
-import type { LeadEntity, KpiTile } from '@/types/crm.types'
+import type { KpiTile, LeadReportResponse } from '@/types/crm.types'
 
-// 'vel' (sales velocity) and 'top' (top rep) are omitted — no backend field exists to source them.
+// Pipeline Value / Won ₹ / Avg Deal Size are omitted — GET /leads/report has
+// no estimatedValue aggregation, so those figures have no correct backend source.
 const KPI_CONFIG: Omit<KpiTile, 'value' | 'delta'>[] = [
-  { id: 'pipe', label: 'Pipeline Value', tone: 'brand', icon: 'TrendingUp', fmt: 'inr' },
   { id: 'open', label: 'Open Opportunities', tone: 'violet', icon: 'Briefcase', fmt: 'num' },
-  { id: 'won', label: 'Won', tone: 'emerald', icon: 'CheckCircle', fmt: 'inr' },
+  { id: 'won', label: 'Won leads', tone: 'emerald', icon: 'CheckCircle', fmt: 'num' },
+  { id: 'lost', label: 'Lost leads', tone: 'rose', icon: 'XCircle', fmt: 'num' },
   { id: 'wr', label: 'Win Rate', tone: 'teal', icon: 'Target', fmt: 'pct' },
-  { id: 'aov', label: 'Avg Deal Size', tone: 'amber', icon: 'DollarSign', fmt: 'inr' },
 ]
 
-export function computeKpis(leads: LeadEntity[]): KpiTile[] {
-  const active = leads.filter((l) => l.status !== 'won' && l.status !== 'lost')
-  const won = leads.filter((l) => l.status === 'won')
-  const lost = leads.filter((l) => l.status === 'lost')
+export function computeKpis(report: LeadReportResponse | null | undefined): KpiTile[] {
+  const { open = 0, converted = 0, lost = 0 } = report?.summary ?? {}
+  const winRate = converted + lost > 0 ? (converted / (converted + lost)) * 100 : 0
 
-  const pipe = active.reduce((sum, l) => sum + l.estimatedValue, 0)
-  const wonValue = won.reduce((sum, l) => sum + l.estimatedValue, 0)
-  const winRate = won.length + lost.length > 0 ? (won.length / (won.length + lost.length)) * 100 : 0
-  const aov = active.length > 0 ? pipe / active.length : 0
-
-  const values: Record<string, number | string> = {
-    pipe,
-    open: active.length,
-    won: wonValue,
+  const values: Record<string, number> = {
+    open,
+    won: converted,
+    lost,
     wr: Math.round(winRate * 10) / 10,
-    aov: Math.round(aov),
   }
 
-  const deltas: Record<string, number> = { pipe: 0, open: 0, won: 0, wr: 0, aov: 0 }
-
-  return KPI_CONFIG.map((cfg) => ({
-    ...cfg,
-    value: values[cfg.id],
-    delta: deltas[cfg.id] ?? 0,
-  }))
+  return KPI_CONFIG.map((cfg) => ({ ...cfg, value: values[cfg.id], delta: 0 }))
 }

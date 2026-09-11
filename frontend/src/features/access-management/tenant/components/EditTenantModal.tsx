@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Controller, useForm } from 'react-hook-form'
-import type { Tenant, TenantStatus, TenantType, UpdateTenantPayload } from '@/types/accessManagement.types'
+import { Controller, useForm, useWatch } from 'react-hook-form'
+import type { Tenant, TenantStatus, UpdateTenantPayload } from '@/types/accessManagement.types'
 import { useUpdateTenant } from '@/features/access-management/tenant/hooks/useUpdateTenant'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRoleTypes'
@@ -14,6 +14,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import type { LocationValue } from '@/types/location.types'
+import LocationPicker from '@/components/widgets/location-picker/LocationPicker'
+import LocationAddressFields from '@/components/widgets/location-picker/LocationAddressFields'
+import type { LocationResolutionState } from '@/components/widgets/location-picker/location.types'
+import FieldErrorText from '@/components/ui/FieldErrorText'
 
 interface EditTenantModalProps {
   tenant: Tenant
@@ -26,11 +31,19 @@ interface EditTenantFormValues {
   name: string
   description: string
   status: TenantStatus | ''
-  type: TenantType | ''
   salesPerson: string
+  address: LocationValue | null
+  businessLifetime: string
+  gst: string
 }
 
-// '' must be normalized to undefined — status/type are bare enums with no '' member.
+const ADDRESS_FIELD_TO_FORM_FIELD: Record<string, keyof EditTenantFormValues> = {
+  addressLine1: 'address', addressLine2: 'address', locality: 'address',
+  city: 'address', state: 'address', country: 'address', pincode: 'address',
+  googlePlaceId: 'address', coordinates: 'address',
+}
+
+// '' must be normalized to undefined — status is a bare enum with no '' member.
 const useEditTenantFormResolver = () =>
   useReshapingResolver<EditTenantFormValues, UpdateTenantPayload>({
     schema: updateTenantSchema,
@@ -38,9 +51,13 @@ const useEditTenantFormResolver = () =>
       name: values.name,
       description: values.description || undefined,
       status: values.status || undefined,
-      type: values.type || undefined,
       salesPerson: values.salesPerson || undefined,
+      // Omitted when unset so the backend's replace-wholesale address update leaves it alone.
+      address: values.address ?? undefined,
+      businessLifetime: values.businessLifetime === '' ? undefined : Number(values.businessLifetime),
+      gst: values.gst || undefined,
     }),
+    nestedFieldMaps: { address: ADDRESS_FIELD_TO_FORM_FIELD },
   })
 
 const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: EditTenantModalProps) => {
@@ -51,7 +68,7 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
     register,
     handleSubmit,
     control,
-    formState: { errors, touchedFields, isSubmitted },
+    formState: { errors, touchedFields, isSubmitted, dirtyFields },
   } = useForm<EditTenantFormValues>({
     resolver,
     mode: 'onChange',
@@ -59,10 +76,26 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
       name: tenant.name,
       description: '',
       status: tenant.status ?? '',
-      type: tenant.type ?? '',
       salesPerson: tenant.salesPerson ?? '',
+      address: tenant.address,
+      businessLifetime: tenant.businessLifetime != null ? String(tenant.businessLifetime) : '',
+      gst: tenant.gst ?? '',
     },
   })
+
+  // useWatch (not the plain watch() function) so React Compiler can track this
+  // subscription properly — watch() reads outside React's render tracking.
+  const businessLifetimeValue = useWatch({ control, name: 'businessLifetime' })
+  const gstValue = useWatch({ control, name: 'gst' })
+  // Backend rejects null/'' for both (no .nullable() in the validator), so an
+  // already-set value can't be cleared — blanking the input would silently revert on save.
+  const businessLifetimeBlanked = tenant.businessLifetime != null && businessLifetimeValue === ''
+  const gstBlanked = !!tenant.gst && gstValue === ''
+
+  // `address` (RHF field value) isn't authoritative while this is anything but
+  // 'idle' — the pin can visibly move well before (or without ever) firing onChange.
+  const [locationResolution, setLocationResolution] = useState<LocationResolutionState>('idle')
+  const [locationResolutionError, setLocationResolutionError] = useState<string | null>(null)
 
   const [salesRepPickerOpened, setSalesRepPickerOpened] = useState(false)
   // Loads eagerly if a sales rep is already assigned, so the trigger shows that rep's name right away.
@@ -88,10 +121,27 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
     (touchedFields[field] || isSubmitted) ? errors[field]?.message : undefined
 
   const onSubmit = async (values: EditTenantFormValues) => {
+    if (locationResolution === 'loading') {
+      setLocationResolutionError('Still resolving the picked location — wait a moment and try again')
+      return
+    }
+    if (locationResolution === 'error') {
+      setLocationResolutionError('Retry or choose "Use this pin" for the location before saving')
+      return
+    }
+    setLocationResolutionError(null)
     const parsed = await parsePayload(values)
-    const payload: UpdateTenantPayload = { name: parsed.name, description: parsed.description }
+    const payload: UpdateTenantPayload = {
+      name: parsed.name,
+      description: parsed.description,
+    }
+    // Sent only when touched — address is replace-wholesale server-side, so
+    // resending the stale defaultValues snapshot could clobber a newer save.
+    if (dirtyFields.address) payload.address = parsed.address
+    // Same rationale as address — a stale snapshot here could clobber a concurrent update.
+    if (dirtyFields.businessLifetime) payload.businessLifetime = parsed.businessLifetime
+    if (dirtyFields.gst) payload.gst = parsed.gst
     if (canManageTenant && parsed.status) payload.status = parsed.status
-    if (canManageSystem && parsed.type) payload.type = parsed.type
     if (canManageSystem) payload.salesPerson = values.salesPerson || null
     updateTenant.mutate(payload)
   }
@@ -123,6 +173,52 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
             />
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="businessLifetime" className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+                Business lifetime (years)
+              </Label>
+              <Input id="businessLifetime" type="number" {...register('businessLifetime')} />
+              {fieldError('businessLifetime') && <p className="text-[11px] mt-1 text-danger">{fieldError('businessLifetime')}</p>}
+              {!fieldError('businessLifetime') && businessLifetimeBlanked && (
+                <p className="text-[11px] mt-1 text-danger">Can't be cleared once set — contact support.</p>
+              )}
+            </div>
+            <div>
+              <Label htmlFor="gst" className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+                GST number
+              </Label>
+              <Input id="gst" type="text" placeholder="27AAPFU0939F1ZV" {...register('gst')} />
+              {fieldError('gst') && <p className="text-[11px] mt-1 text-danger">{fieldError('gst')}</p>}
+              {!fieldError('gst') && gstBlanked && (
+                <p className="text-[11px] mt-1 text-danger">Can't be cleared once set — contact support.</p>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+              Address (optional)
+            </Label>
+            <Controller
+              control={control}
+              name="address"
+              render={({ field }) => (
+                <div className="space-y-2">
+                  <LocationPicker
+                    value={field.value}
+                    onChange={field.onChange}
+                    onResolutionStateChange={setLocationResolution}
+                    defaultCountry="India"
+                    countryCode="IN"
+                  />
+                  <LocationAddressFields value={field.value} onChange={field.onChange} defaultCountry="India" />
+                </div>
+              )}
+            />
+            {fieldError('address') && <FieldErrorText message={fieldError('address')!} />}
+          </div>
+
           {canManageTenant && (
             <div>
               <Label htmlFor="status" className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
@@ -141,31 +237,6 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
                     <SelectContent>
                       <SelectItem value="active">Active</SelectItem>
                       <SelectItem value="inactive">Inactive</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-            </div>
-          )}
-
-          {canManageSystem && (
-            <div>
-              <Label htmlFor="type" className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-                Type
-              </Label>
-              <Controller
-                control={control}
-                name="type"
-                render={({ field }) => (
-                  <Select key={field.value || 'empty'} value={field.value || undefined} onValueChange={field.onChange}>
-                    <SelectTrigger id="type" className="w-full">
-                      <SelectValue placeholder="Select type">
-                        {(v) => (v === 'platform' ? 'Platform' : v === 'customer' ? 'Customer' : 'Select type')}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="platform">Platform</SelectItem>
-                      <SelectItem value="customer">Customer</SelectItem>
                     </SelectContent>
                   </Select>
                 )}
@@ -219,7 +290,7 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
 
           {!canManageTenant && !canManageSystem && (
             <p className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>
-              Status and type are only editable by users with company or system management permissions.
+              Status is only editable by users with company or system management permissions.
             </p>
           )}
 
@@ -230,10 +301,16 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
             </div>
           )}
 
+          {locationResolutionError && (
+            <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
+              {locationResolutionError}
+            </div>
+          )}
+
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-            <Button type="submit" disabled={updateTenant.isPending}>
-              {updateTenant.isPending ? 'Saving…' : 'Save changes'}
+            <Button type="submit" disabled={updateTenant.isPending || businessLifetimeBlanked || gstBlanked || locationResolution === 'loading'}>
+              {updateTenant.isPending ? 'Saving…' : locationResolution === 'loading' ? 'Resolving location…' : 'Save changes'}
             </Button>
           </div>
         </form>

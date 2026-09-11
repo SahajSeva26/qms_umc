@@ -23,7 +23,6 @@ export interface InventoryMasterEntity {
   sku: string
   unit: string
   minStock: number
-  maxStock: number
   createdAt: string
   updatedAt: string
   // Key is ABSENT (not null/undefined-but-present) unless the caller holds
@@ -51,7 +50,6 @@ export interface CreateInventoryMasterPayload {
   type?: InventoryMasterType
   status?: InventoryMasterStatus
   minStock?: number
-  maxStock?: number
 }
 
 export interface UpdateInventoryMasterPayload {
@@ -65,5 +63,4 @@ export interface UpdateInventoryMasterPayload {
   type?: InventoryMasterType
   status?: InventoryMasterStatus
   minStock?: number
-  maxStock?: number
 }

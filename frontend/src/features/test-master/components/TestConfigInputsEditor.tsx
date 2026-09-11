@@ -144,20 +144,15 @@ const TestConfigOptionsEditor = ({ index }: { index: number }) => {
   const { control, register, trigger, formState: { errors } } = useFormContext<TestFormValues>()
   const { fields, append, remove } = useFieldArray({ control, name: `config.inputs.${index}.options` as const })
   const optionsError = errors.config?.inputs?.[index]?.options
-  // Array-level error (e.g. "add at least one option") lives at .options.root
-  // once useFieldArray has mutated the array at least once (e.g. via
-  // remove()); before any such mutation, RHF instead reports the identical
-  // error directly on .options itself, with no .root wrapper. A specific
-  // row's error (e.g. a duplicate value) lives at .options[i].value.
+  // RHF's array-level superRefine error can land on .options or .options.root
+  // depending on resolver/field-array state — this checks both shapes.
   const optionsRoot = (optionsError as { root?: { message?: string } } | undefined)?.root
   const optionsArrayError = optionsRoot ?? (Array.isArray(optionsError) ? undefined : optionsError)
 
   const removeOption = async (optionIndex: number) => {
     remove(optionIndex)
-    // useFieldArray's remove() is a structural mutation, not a registered
-    // field onChange — it doesn't re-run the parent superRefine on its own,
-    // so removing the last option would otherwise leave the "add at least
-    // one option" check silently stale instead of firing.
+    // remove() is a structural mutation, not a field onChange — it won't
+    // re-run the parent superRefine (e.g. "add at least one option") on its own.
     await trigger(`config.inputs.${index}.options` as const)
   }
 

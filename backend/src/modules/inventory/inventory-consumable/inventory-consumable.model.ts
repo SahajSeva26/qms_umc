@@ -29,7 +29,6 @@ const inventoryConsumableSchema = new mongoose.Schema(
         },
         expiryDate: {
             type: Date,
-            required: true,
         },
         quantity: {
             type: Number,

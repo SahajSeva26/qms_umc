@@ -37,9 +37,25 @@ export function formatTimeRange(startAt: string, endAt: string): string {
 
 const DAY_MONTH = new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short' })
 const DAY_MONTH_YEAR = new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+const MONTH_YEAR = new Intl.DateTimeFormat('en-IN', { month: 'long', year: 'numeric' })
 
 /** e.g. '07 Jul — 13 Jul 2026' */
 export function formatWeekRange(weekStart: Date): string {
   return `${DAY_MONTH.format(weekStart)} — ${DAY_MONTH_YEAR.format(addDays(weekStart, 6))}`
+}
+
+/** e.g. 'September 2026' */
+export function formatMonthLabel(cursor: Date): string {
+  return MONTH_YEAR.format(cursor)
+}
+
+// Month view advances by a calendar month (snapped to day 1, sidestepping
+// the "Jan 31 + 1 month" overflow into March); week/list still shift by
+// exactly 7 days, matching the grids they actually render.
+export function shiftCalendarCursor(cursor: Date, view: 'week' | 'month' | 'list', direction: 1 | -1): Date {
+  if (view === 'month') {
+    return new Date(cursor.getFullYear(), cursor.getMonth() + direction, 1)
+  }
+  return addDays(cursor, direction * 7)
 }
 

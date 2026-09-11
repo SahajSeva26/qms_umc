@@ -1,5 +1,5 @@
 import { FiChevronLeft, FiChevronRight, FiPlus } from 'react-icons/fi'
-import { formatWeekRange } from '@/features/crm/appointments/appointments.utils'
+import { formatMonthLabel, formatWeekRange } from '@/features/crm/appointments/appointments.utils'
 
 export type CalendarViewMode = 'week' | 'month' | 'list'
 
@@ -11,6 +11,7 @@ const VIEWS: { id: CalendarViewMode; label: string }[] = [
 
 interface AppointmentCalendarToolbarProps {
   weekStart: Date
+  cursor: Date
   view: CalendarViewMode
   onViewChange: (view: CalendarViewMode) => void
   onPrev: () => void
@@ -27,6 +28,7 @@ const navBtnStyle = { borderColor: 'var(--qms-border)', color: 'var(--qms-text-m
 // peer-overlay concept — see AppointmentWeekGrid.tsx's comment).
 const AppointmentCalendarToolbar = ({
   weekStart,
+  cursor,
   view,
   onViewChange,
   onPrev,
@@ -39,19 +41,19 @@ const AppointmentCalendarToolbar = ({
     style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}
   >
     <div className="flex items-center gap-1">
-      <button onClick={onPrev} aria-label="Previous week" className={`${navBtnClasses} w-8`} style={navBtnStyle}>
+      <button onClick={onPrev} aria-label={view === 'month' ? 'Previous month' : 'Previous week'} className={`${navBtnClasses} w-8`} style={navBtnStyle}>
         <FiChevronLeft size={15} />
       </button>
       <button onClick={onToday} className={`${navBtnClasses} px-3 text-[12px] font-semibold`} style={navBtnStyle}>
         Today
       </button>
-      <button onClick={onNext} aria-label="Next week" className={`${navBtnClasses} w-8`} style={navBtnStyle}>
+      <button onClick={onNext} aria-label={view === 'month' ? 'Next month' : 'Next week'} className={`${navBtnClasses} w-8`} style={navBtnStyle}>
         <FiChevronRight size={15} />
       </button>
     </div>
 
     <div className="text-[13px] font-bold px-1" style={{ color: 'var(--qms-text)' }}>
-      {formatWeekRange(weekStart)}
+      {view === 'month' ? formatMonthLabel(cursor) : formatWeekRange(weekStart)}
     </div>
 
     <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--qms-surface-strong)' }}>

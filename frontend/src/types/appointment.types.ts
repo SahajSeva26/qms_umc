@@ -33,6 +33,31 @@ export const APPOINTMENT_STATUS_LABEL: Record<AppointmentStatus, string> = {
   cancelled: 'Cancelled',
 }
 
+// GET /appointments/report — division/dateFrom/dateTo are real, applied
+// filters (unlike the empty-schema Project report). Gated on
+// appointment:manage alone (narrower than the calendar's own read guard).
+export interface AppointmentReportQuery {
+  division?: string
+  dateFrom?: string
+  dateTo?: string
+}
+
+export interface AppointmentReportByStatus {
+  status: AppointmentStatus
+  count: number
+}
+
+export interface AppointmentReportByType {
+  type: AppointmentType
+  count: number
+}
+
+export interface AppointmentReportResponse {
+  summary: { total: number; planned: number; done: number; cancelled: number }
+  byStatus: AppointmentReportByStatus[]
+  byType: AppointmentReportByType[]
+}
+
 export interface AppointmentPopulatedTenant {
   _id?: string
   name: string

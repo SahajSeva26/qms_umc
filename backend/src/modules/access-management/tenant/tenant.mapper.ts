@@ -36,6 +36,8 @@ export const TenantMapper = {
                     liveProjects: 0,
                     totalCamps: 0,
                     liveCamps: 0,
+                    screeningCamps: 0,
+                    dietCamps: 0,
                 };
             }
             result.items.push(item);

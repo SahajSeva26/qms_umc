@@ -18,7 +18,7 @@ import { IUser, UserModel } from '../../user/user.model';
 import { Project } from '../../crm/project/project.model';
 import { PROJECT_STATUS } from '../../crm/project/project.constants';
 import { CampModel } from '../../operations/camp/camp.model';
-import { CAMP_STATUSES } from '../../operations/camp/camp.constants';
+import { CAMP_STATUSES, CAMP_TYPES } from '../../operations/camp/camp.constants';
 
 type TenantDocument = HydratedDocument<ITenant> | null;
 const populate: any[] = [];
@@ -162,6 +162,8 @@ type TenantStats = {
     liveProjects: number;
     totalCamps: number;
     liveCamps: number;
+    screeningCamps: number;
+    dietCamps: number;
 };
 
 // aggregate project & camp stats per tenant for the given tenants (one query each for the whole page)
@@ -186,6 +188,8 @@ const getTenantStats = async (tenants: HydratedDocument<ITenant>[]): Promise<Rec
                     _id: '$tenant',
                     total: { $sum: 1 },
                     live: { $sum: { $cond: [{ $eq: ['$status', CAMP_STATUSES.LIVE] }, 1, 0] } },
+                    screening: { $sum: { $cond: [{ $eq: ['$type', CAMP_TYPES.SCREENING] }, 1, 0] } },
+                    diet: { $sum: { $cond: [{ $eq: ['$type', CAMP_TYPES.DIET] }, 1, 0] } },
                 },
             },
         ]),
@@ -194,7 +198,14 @@ const getTenantStats = async (tenants: HydratedDocument<ITenant>[]): Promise<Rec
     // seed every tenant with zeros, then fold each aggregation in
     const stats: Record<string, TenantStats> = {};
     for (const id of tenantIds) {
-        stats[id.toString()] = { totalProjects: 0, liveProjects: 0, totalCamps: 0, liveCamps: 0 };
+        stats[id.toString()] = {
+            totalProjects: 0,
+            liveProjects: 0,
+            totalCamps: 0,
+            liveCamps: 0,
+            screeningCamps: 0,
+            dietCamps: 0,
+        };
     }
     for (const g of projectGroups) {
         const entry = stats[g._id.toString()];
@@ -208,6 +219,8 @@ const getTenantStats = async (tenants: HydratedDocument<ITenant>[]): Promise<Rec
         if (entry) {
             entry.totalCamps = g.total;
             entry.liveCamps = g.live;
+            entry.screeningCamps = g.screening;
+            entry.dietCamps = g.diet;
         }
     }
     return stats;

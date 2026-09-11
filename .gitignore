@@ -41,7 +41,7 @@ frontend/dist/
 backend/node_modules/
 backend/dist/
 backend/src/shared/test-cases
-backend/docs
+backend/docs*
 # ======================
 # Logs
 # ======================

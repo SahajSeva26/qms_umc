@@ -3,6 +3,7 @@ import { ResponseHandler } from '../../../shared/utils/responseHandler';
 import { formatZodError } from '../../../shared/utils/error';
 import {
     CreateInventoryAssignmentPayloadSchema,
+    InventoryAssignmentReportQuerySchema,
     SearchInventoryAssignmentQuerySchema,
     UpdateInventoryAssignmentPayloadSchema,
 } from './inventory-assignment.validators';
@@ -138,10 +139,37 @@ const remove = async (req: any, res: any) => {
     }
 };
 
+const report = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+
+        const { data: filters, success, error } = InventoryAssignmentReportQuerySchema.safeParse(req.query);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                fields: validationErrors,
+            });
+        }
+
+        const result = await InventoryAssignmentService.report(filters, ctx);
+
+        return ResponseHandler.appResponse(
+            res,
+            StatusCodes.OK,
+            true,
+            'Inventory assignment report generated successfully',
+            InventoryAssignmentMapper.toReportResponse(result),
+        );
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
 export const InventoryAssignmentController = {
     get,
     search,
     create,
     update,
     remove,
+    report,
 };

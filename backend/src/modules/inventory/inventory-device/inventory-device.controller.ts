@@ -3,6 +3,7 @@ import { ResponseHandler } from '../../../shared/utils/responseHandler';
 import { formatZodError } from '../../../shared/utils/error';
 import {
     CreateInventoryDevicePayloadSchema,
+    InventoryDeviceReportQuerySchema,
     SearchInventoryDeviceQuerySchema,
     UpdateInventoryDevicePayloadSchema,
 } from './inventory-device.validators';
@@ -122,9 +123,36 @@ const update = async (req: any, res: any) => {
     }
 };
 
+const report = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+
+        const { data: filters, success, error } = InventoryDeviceReportQuerySchema.safeParse(req.query);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                fields: validationErrors,
+            });
+        }
+
+        const result = await InventoryDeviceService.report(filters, ctx);
+
+        return ResponseHandler.appResponse(
+            res,
+            StatusCodes.OK,
+            true,
+            'Inventory device report generated successfully',
+            InventoryDeviceMapper.toReportResponse(result),
+        );
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
 export const InventoryDeviceController = {
     get,
     search,
     create,
     update,
+    report,
 };

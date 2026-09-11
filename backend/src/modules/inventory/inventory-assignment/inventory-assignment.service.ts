@@ -3,6 +3,7 @@ import { HydratedDocument } from 'mongoose';
 import { InventoryAssignmentModel, IInventoryAssignment } from './inventory-assignment.model';
 import {
     ICreateInventoryAssignmentPayload,
+    IInventoryAssignmentReportQuery,
     ISearchInventoryAssignmentQuery,
     IUpdateInventoryAssignmentPayload,
 } from './inventory-assignment.validators';
@@ -13,7 +14,10 @@ import { RequestContext } from '../../../shared/utils/contextBuilder';
 import { isValidObjectID } from '../../../shared/utils/strings';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { RoleService } from '../../access-management/role/role.service';
+import { RoleModel } from '../../access-management/role/role.model';
+import { ROLE_STATUSES } from '../../access-management/role/role.constants';
 import { ALLOWED_ROLETYPE_CODES } from '../../access-management/role-type/roleType.constants';
+import { INVENTORY_REQUEST_STATUS } from '../inventory-request/inventory-request.constants';
 import { InventoryDeviceService } from '../inventory-device/inventory-device.service';
 import { InventoryConsumableService } from '../inventory-consumable/inventory-consumable.service';
 
@@ -216,6 +220,152 @@ const adjustHolding = async (
     return await row.save();
 };
 
+// ========================================================================================
+// REPORT — field-officer roster (cross-feature)
+// ========================================================================================
+// Base is `roles` (NOT inventoryassignments), so every active field officer appears, INCLUDING those
+// with zero holdings — starting from assignments would drop zero-holding FOs. Three correlated lookups
+// build each row:
+//  • roles → roletypes: keep only active roles whose role type code is 'field-officer'.
+//  • roles → inventoryassignments (on assignee): devicesHeld = device-row COUNT (device qty is 1 by
+//    model invariant, so count == device count — NOT sum(quantity)); consumableUnitsHeld = SUM(quantity).
+//  • roles → inventoryrequests (on requestedBy, status ∈ {requested,approved}): awaitingApproval =
+//    count(requested), awaitingReceipt = count(approved). This per-FO join is NOT caller own-scope
+//    (applyOwnScope() is never used) — the endpoint is manager-gated, so the roster is global.
+// Sorted by name ascending.
+const report = async (_filters: IInventoryAssignmentReportQuery, _ctx: RequestContext) => {
+    const DEVICE_TYPE = INVENTORY_ASSIGNMENT_TYPES.DEVICE;
+    const CONSUMABLE_TYPE = INVENTORY_ASSIGNMENT_TYPES.CONSUMABLE;
+    const REQUESTED = INVENTORY_REQUEST_STATUS.REQUESTED;
+    const APPROVED = INVENTORY_REQUEST_STATUS.APPROVED;
+
+    const fieldOfficers = await RoleModel.aggregate([
+        // ── active roles only ────────────────────────────────────────────────────
+        { $match: { status: ROLE_STATUSES.ACTIVE } },
+
+        // ── identify field officers via their role type ──────────────────────────
+        {
+            $lookup: {
+                from: 'roletypes',
+                localField: 'type',
+                foreignField: '_id',
+                as: 'roleType',
+            },
+        },
+        { $match: { 'roleType.code': ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER } },
+
+        // ── holdings by type (correlated on assignee) ────────────────────────────
+        {
+            $lookup: {
+                from: 'inventoryassignments',
+                let: { roleId: '$_id' },
+                pipeline: [
+                    { $match: { $expr: { $eq: ['$assignee', '$$roleId'] } } },
+                    { $group: { _id: '$inventoryType', count: { $sum: 1 }, qty: { $sum: '$quantity' } } },
+                ],
+                as: 'holdingsByType',
+            },
+        },
+
+        // ── pending/approved requests (correlated on requestedBy) ────────────────
+        {
+            $lookup: {
+                from: 'inventoryrequests',
+                let: { roleId: '$_id' },
+                pipeline: [
+                    {
+                        $match: {
+                            $expr: {
+                                $and: [
+                                    { $eq: ['$requestedBy', '$$roleId'] },
+                                    { $in: ['$status', [REQUESTED, APPROVED]] },
+                                ],
+                            },
+                        },
+                    },
+                    { $group: { _id: '$status', count: { $sum: 1 } } },
+                ],
+                as: 'requestCounts',
+            },
+        },
+
+        {
+            $project: {
+                name: 1,
+                code: 1,
+                // device assignment rows have quantity=1 by model invariant — group count equals device count.
+                devicesHeld: {
+                    $let: {
+                        vars: {
+                            g: {
+                                $arrayElemAt: [
+                                    { $filter: { input: '$holdingsByType', cond: { $eq: ['$$this._id', DEVICE_TYPE] } } },
+                                    0,
+                                ],
+                            },
+                        },
+                        in: { $ifNull: ['$$g.count', 0] },
+                    },
+                },
+                // consumable assignments store actual quantity — grouped sum across all lots held.
+                consumableUnitsHeld: {
+                    $let: {
+                        vars: {
+                            g: {
+                                $arrayElemAt: [
+                                    { $filter: { input: '$holdingsByType', cond: { $eq: ['$$this._id', CONSUMABLE_TYPE] } } },
+                                    0,
+                                ],
+                            },
+                        },
+                        in: { $ifNull: ['$$g.qty', 0] },
+                    },
+                },
+                // manager still needs to approve
+                awaitingApproval: {
+                    $let: {
+                        vars: {
+                            g: {
+                                $arrayElemAt: [
+                                    { $filter: { input: '$requestCounts', cond: { $eq: ['$$this._id', REQUESTED] } } },
+                                    0,
+                                ],
+                            },
+                        },
+                        in: { $ifNull: ['$$g.count', 0] },
+                    },
+                },
+                // manager already approved; FO has not yet confirmed receipt
+                awaitingReceipt: {
+                    $let: {
+                        vars: {
+                            g: {
+                                $arrayElemAt: [
+                                    { $filter: { input: '$requestCounts', cond: { $eq: ['$$this._id', APPROVED] } } },
+                                    0,
+                                ],
+                            },
+                        },
+                        in: { $ifNull: ['$$g.count', 0] },
+                    },
+                },
+            },
+        },
+        { $sort: { name: 1 } },
+    ]);
+
+    // "holding inventory" counts only devicesHeld/consumableUnitsHeld — NOT pending requests.
+    const fieldOfficersHoldingInventory = fieldOfficers.filter(
+        (fo: any) => fo.devicesHeld > 0 || fo.consumableUnitsHeld > 0,
+    ).length;
+
+    return {
+        fieldOfficers,
+        totalFieldOfficers: fieldOfficers.length,
+        fieldOfficersHoldingInventory,
+    };
+};
+
 export const InventoryAssignmentService = {
     get,
     search,
@@ -223,4 +373,5 @@ export const InventoryAssignmentService = {
     update,
     remove,
     adjustHolding,
+    report,
 };

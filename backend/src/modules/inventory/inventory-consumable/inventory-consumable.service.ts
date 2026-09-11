@@ -3,6 +3,7 @@ import { HydratedDocument } from 'mongoose';
 import { InventoryConsumableModel, IInventoryConsumable } from './inventory-consumable.model';
 import {
     ICreateInventoryConsumablePayload,
+    IInventoryConsumableReportQuery,
     ISearchInventoryConsumableQuery,
     IUpdateInventoryConsumablePayload,
 } from './inventory-consumable.validators';
@@ -196,6 +197,41 @@ const adjustQuantity = async (id: string, delta: number, ctx: RequestContext): P
     return await lot.save();
 };
 
+// ========================================================================================
+// REPORT
+// ========================================================================================
+// A dedicated aggregation, not search(): search()'s active-only default and pagination would change
+// the counts. Two non-obvious semantics (do NOT "correct" them):
+//  • warehouseConsumableQuantity = SUM(quantity) over status:active lots ONLY. There is no `location`
+//    field — despite the name this is NOT a warehouse-location filter. This single value feeds both
+//    summary.warehouseConsumableQuantity and consumables.warehouseQuantity.
+//  • expiredByDate = COUNT of lots with expiryDate < now (captured at execution time) — date-based,
+//    INDEPENDENT of the stored `expired` status, so an active lot past its expiry still counts. $lt (not $lte).
+const report = async (_filters: IInventoryConsumableReportQuery, _ctx: RequestContext) => {
+    const now = new Date();
+
+    const [result] = await InventoryConsumableModel.aggregate([
+        {
+            $facet: {
+                total: [{ $count: 'count' }],
+                byStatus: [{ $group: { _id: '$status', count: { $sum: 1 } } }],
+                activeQuantity: [
+                    { $match: { status: INVENTORY_CONSUMABLE_STATUS.ACTIVE } },
+                    { $group: { _id: null, total: { $sum: '$quantity' } } },
+                ],
+                expiredByDate: [{ $match: { expiryDate: { $lt: now } } }, { $count: 'count' }],
+            },
+        },
+    ]);
+
+    return {
+        totalConsumableLots: result?.total?.[0]?.count || 0,
+        consumableByStatus: result?.byStatus || [],
+        warehouseConsumableQuantity: result?.activeQuantity?.[0]?.total || 0,
+        expiredByDate: result?.expiredByDate?.[0]?.count || 0,
+    };
+};
+
 export const InventoryConsumableService = {
     get,
     search,
@@ -203,4 +239,5 @@ export const InventoryConsumableService = {
     update,
     pullFEFO,
     adjustQuantity,
+    report,
 };

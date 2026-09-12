@@ -49,3 +49,21 @@ export interface UpdateInventoryAssignmentPayload {
   // assignee/inventoryType/inventory intentionally absent — immutable post-create.
   quantity: number
 }
+
+// GET /inventory-assignments/report — organisation-wide, no query params,
+// gated on inventory-assignment:manage. Backend has no pagination on this
+// aggregation — returns every active FO role in one response; see TODO.md.
+export interface InventoryAssignmentReportFieldOfficer {
+  role: string
+  name: string
+  code: string
+  devicesHeld: number
+  consumableUnitsHeld: number
+  awaitingApproval: number
+  awaitingReceipt: number
+}
+
+export interface InventoryAssignmentReportResponse {
+  summary: { totalFieldOfficers: number; fieldOfficersHoldingInventory: number }
+  fieldOfficers: InventoryAssignmentReportFieldOfficer[]
+}

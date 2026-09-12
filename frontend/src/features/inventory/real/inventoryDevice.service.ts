@@ -3,6 +3,7 @@ import type { ApiResponse, PaginatedResponse } from '@/types/common.types'
 import type {
   CreateInventoryDevicePayload,
   InventoryDeviceEntity,
+  InventoryDeviceReportResponse,
   SearchInventoryDeviceQuery,
   UpdateInventoryDevicePayload,
 } from '@/types/inventoryDevice.types'
@@ -27,9 +28,15 @@ const updateInventoryDevice = async (id: string, payload: UpdateInventoryDeviceP
   return res.data
 }
 
+const getInventoryDeviceReport = async () => {
+  const res = await api.get<ApiResponse<InventoryDeviceReportResponse>>('/inventory-devices/report')
+  return res.data
+}
+
 export const inventoryDeviceService = {
   searchInventoryDevices,
   getInventoryDevice,
   createInventoryDevice,
   updateInventoryDevice,
+  getInventoryDeviceReport,
 }

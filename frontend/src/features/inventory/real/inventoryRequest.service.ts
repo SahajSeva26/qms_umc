@@ -3,6 +3,7 @@ import type { ApiResponse, PaginatedResponse } from '@/types/common.types'
 import type {
   CreateInventoryRequestPayload,
   InventoryRequestEntity,
+  InventoryRequestReportResponse,
   MoveInventoryRequestStagePayload,
   SearchInventoryRequestQuery,
   UpdateInventoryRequestPayload,
@@ -33,10 +34,16 @@ const moveInventoryRequestStage = async (id: string, payload: MoveInventoryReque
   return res.data
 }
 
+const getInventoryRequestReport = async () => {
+  const res = await api.get<ApiResponse<InventoryRequestReportResponse>>('/inventory-requests/report')
+  return res.data
+}
+
 export const inventoryRequestService = {
   searchInventoryRequests,
   getInventoryRequest,
   createInventoryRequest,
   updateInventoryRequest,
   moveInventoryRequestStage,
+  getInventoryRequestReport,
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { RoleEntity, RoleTypeEntity } from '@/types/accessManagement.types'
 import { toast } from '@/components/ui/sonner'
@@ -27,9 +27,23 @@ const searchInventoryAssignments = vi.fn(async () => ({
   data: { count: 1, items: [ASSIGNMENT_ITEM] },
 }))
 
+const getInventoryAssignmentReport = vi.fn(async () => ({
+  success: true,
+  message: '',
+  data: {
+    summary: { totalFieldOfficers: 0, fieldOfficersHoldingInventory: 0 },
+    fieldOfficers: [] as {
+      role: string; name: string; code: string
+      devicesHeld: number; consumableUnitsHeld: number
+      awaitingApproval: number; awaitingReceipt: number
+    }[],
+  },
+}))
+
 vi.mock('@/features/inventory/real/inventoryAssignment.service', () => ({
   inventoryAssignmentService: {
     searchInventoryAssignments: () => searchInventoryAssignments(),
+    getInventoryAssignmentReport: () => getInventoryAssignmentReport(),
   },
 }))
 
@@ -89,6 +103,11 @@ describe('InventoryAssignmentsPanel — read-only', () => {
     searchInventoryAssignments.mockResolvedValue({ success: true, message: '', data: { count: 1, items: [ASSIGNMENT_ITEM] } })
     searchInventoryDevices.mockResolvedValue({ success: true, message: '', data: { count: 1, items: [{ id: 'dev-1', status: 'assigned', lastCalibrationDate: null, nextCalibrationDate: null }] } })
     searchGeoProfiles.mockResolvedValue({ success: true, message: '', data: { count: 1, items: [{ id: 'geo-1', role: 'role-1', city: 'Pune' }] } })
+    getInventoryAssignmentReport.mockResolvedValue({
+      success: true,
+      message: '',
+      data: { summary: { totalFieldOfficers: 0, fieldOfficersHoldingInventory: 0 }, fieldOfficers: [] },
+    })
   })
 
   it('renders the table with no create/delete controls and no clickable row, even for a manager-level identity', async () => {
@@ -190,6 +209,109 @@ describe('InventoryAssignmentsPanel — Field Officer filter permission gating',
 
     await vi.waitFor(() => expect(searchRoleTypes).toHaveBeenCalledWith(expect.objectContaining({ code: 'field-officer' })))
     await vi.waitFor(() => expect(searchRoles).toHaveBeenCalledWith(expect.objectContaining({ type: 'rt-fo' })))
+  })
+})
+
+describe('InventoryAssignmentsPanel — FO roster report', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    searchRoleTypes.mockResolvedValue({ success: true, message: '', data: { count: 0, items: [] } })
+    searchRoles.mockResolvedValue({ success: true, message: '', data: { count: 0, items: [] } })
+    searchInventoryAssignments.mockResolvedValue({ success: true, message: '', data: { count: 1, items: [ASSIGNMENT_ITEM] } })
+    searchInventoryDevices.mockResolvedValue({ success: true, message: '', data: { count: 1, items: [{ id: 'dev-1', status: 'assigned', lastCalibrationDate: null, nextCalibrationDate: null }] } })
+    searchGeoProfiles.mockResolvedValue({ success: true, message: '', data: { count: 1, items: [{ id: 'geo-1', role: 'role-1', city: 'Pune' }] } })
+  })
+
+  it('non-manager: report strip and FO roster table are both absent, report endpoint never called', async () => {
+    const { usePermission } = await import('@/hooks/usePermission')
+    vi.mocked(usePermission).mockReturnValue({ hasAnyPermission: () => false } as unknown as ReturnType<typeof usePermission>)
+
+    const InventoryAssignmentsPanel = (await import('@/features/inventory/real/components/InventoryAssignmentsPanel')).default
+
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <InventoryAssignmentsPanel />
+      </QueryClientProvider>,
+    )
+
+    await screen.findByText('SN-001')
+    expect(getInventoryAssignmentReport).not.toHaveBeenCalled()
+    expect(screen.queryByText('Total Field Officers')).not.toBeInTheDocument()
+    expect(screen.queryByText('All active field officers')).not.toBeInTheDocument()
+  })
+
+  it('manager: report strip and FO roster table render real data from the report response', async () => {
+    getInventoryAssignmentReport.mockResolvedValue({
+      success: true,
+      message: '',
+      data: {
+        summary: { totalFieldOfficers: 12, fieldOfficersHoldingInventory: 8 },
+        fieldOfficers: [
+          { role: 'role-9', name: 'Priya Roster', code: 'fo-9', devicesHeld: 3, consumableUnitsHeld: 5, awaitingApproval: 1, awaitingReceipt: 0 },
+        ],
+      },
+    })
+
+    const { usePermission } = await import('@/hooks/usePermission')
+    vi.mocked(usePermission).mockReturnValue({ hasAnyPermission: () => true } as unknown as ReturnType<typeof usePermission>)
+
+    const InventoryAssignmentsPanel = (await import('@/features/inventory/real/components/InventoryAssignmentsPanel')).default
+
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <InventoryAssignmentsPanel />
+      </QueryClientProvider>,
+    )
+
+    await screen.findByText('All active field officers')
+    expect(getInventoryAssignmentReport).toHaveBeenCalled()
+    // 12/8 only exist in the report summary — the assignment list fixture's own count is 1.
+    expect(screen.getByText('12')).toBeInTheDocument()
+    expect(screen.getByText('8')).toBeInTheDocument()
+    expect(screen.getByText('Priya Roster')).toBeInTheDocument()
+    expect(screen.getByText('fo-9')).toBeInTheDocument()
+  })
+
+  it('paging the FO roster table does not move the assignment list page, and vice versa', async () => {
+    const foRoster = Array.from({ length: 11 }, (_, i) => ({
+      role: `role-${i}`, name: `FO ${i}`, code: `fo-${i}`,
+      devicesHeld: 0, consumableUnitsHeld: 0, awaitingApproval: 0, awaitingReceipt: 0,
+    }))
+    getInventoryAssignmentReport.mockResolvedValue({
+      success: true,
+      message: '',
+      data: { summary: { totalFieldOfficers: 11, fieldOfficersHoldingInventory: 0 }, fieldOfficers: foRoster },
+    })
+    // 11 assignments so the assignment list also has 2 pages, independent of the FO roster's own 2 pages.
+    searchInventoryAssignments.mockResolvedValue({ success: true, message: '', data: { count: 11, items: [ASSIGNMENT_ITEM] } })
+
+    const { usePermission } = await import('@/hooks/usePermission')
+    vi.mocked(usePermission).mockReturnValue({ hasAnyPermission: () => true } as unknown as ReturnType<typeof usePermission>)
+
+    const InventoryAssignmentsPanel = (await import('@/features/inventory/real/components/InventoryAssignmentsPanel')).default
+    const user = userEvent.setup()
+
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <InventoryAssignmentsPanel />
+      </QueryClientProvider>,
+    )
+
+    await screen.findByText('All active field officers')
+    expect(screen.getByText('FO 0')).toBeInTheDocument()
+
+    const rosterHeading = screen.getByText('All active field officers')
+    const rosterContainer = rosterHeading.parentElement as HTMLElement
+    const rosterNextButton = within(rosterContainer).getByRole('button', { name: /next/i })
+
+    await user.click(rosterNextButton)
+
+    // FO roster advanced to page 2 (FO 10 is the 11th/last row)...
+    await screen.findByText('FO 10')
+    expect(screen.queryByText('FO 0')).not.toBeInTheDocument()
+    // ...while the assignment list above stayed on its own page 1.
+    const assignmentPageLabels = screen.getAllByText(/page 1 of 2/i)
+    expect(assignmentPageLabels.length).toBeGreaterThan(0)
   })
 })
 

@@ -3,23 +3,25 @@ import mongoose, { HydratedDocument } from 'mongoose';
 import { CampModel, ICamp } from './camp.model';
 import {
     IBookCampPayload,
+    IBookingAvailabilityPayload,
     ICampReportQuery,
     ICreateCampPayload,
     IMoveStagePayload,
     ISearchCampQuery,
     IUpdateCampPayload,
 } from './camp.validators';
-import { CAMP_COUNTER_ENTITY, CAMP_PERMISSIONS, CAMP_STATUSES, CAMP_TRANSITION_MAP, CampTimeSlot } from './camp.constants';
+import { CAMP_COUNTER_ENTITY, CAMP_PERMISSIONS, CAMP_STATUSES, CAMP_TIME_SLOTS, CAMP_TRANSITION_MAP, CampTimeSlot } from './camp.constants';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
 import { CounterService } from '../../counter/counter.service';
 import { GeoProfileService } from '../geoProfile/geoProfile.service';
-import { GEO_PROFILE_TYPES } from '../geoProfile/geoProfile.constants';
+import { geoProfileModel } from '../geoProfile/geoProfile.model';
+import { GEO_ALLOCATION_MAX_DISTANCE, GEO_PROFILE_STATUS, GEO_PROFILE_TYPES } from '../geoProfile/geoProfile.constants';
 import { canTransition } from '../../crm/lead/lead.validators';
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
 import { isValidObjectID, toObjectId } from '../../../shared/utils/strings';
-import { endOfUTCDay, utcDayRange } from '../../../shared/utils/dates';
+import { endOfUTCDay, startOfUTCDay, utcDayRange } from '../../../shared/utils/dates';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { ProjectService } from '../../crm/project/project.service';
 import { DoctorService } from '../../crm/doctor/doctor.service';
@@ -64,6 +66,26 @@ const applyOwnScope = (where: any, ctx: RequestContext) => {
 
 // statuses that occupy an FO for a slot — a confirmed/live camp holds the FO; requested/cancelled do not.
 const FO_BOOKING_STATUSES = [CAMP_STATUSES.CONFIRMED, CAMP_STATUSES.LIVE];
+
+// the four bookable slots, in display order.
+const ALL_SLOTS = Object.values(CAMP_TIME_SLOTS);
+
+// which slots each slot overlaps. The three daytime slots (9-1/10-2/11-3) all overlap one another,
+// so a camp on any of them holds the FO for all three; the evening slot (6-10) stands alone. A camp
+// on slot S therefore blocks its FO for every slot in SLOT_OVERLAPS[S].
+const SLOT_OVERLAPS: Record<CampTimeSlot, CampTimeSlot[]> = {
+    [CAMP_TIME_SLOTS.SLOT_9_1]: [CAMP_TIME_SLOTS.SLOT_9_1, CAMP_TIME_SLOTS.SLOT_10_2, CAMP_TIME_SLOTS.SLOT_11_3],
+    [CAMP_TIME_SLOTS.SLOT_10_2]: [CAMP_TIME_SLOTS.SLOT_9_1, CAMP_TIME_SLOTS.SLOT_10_2, CAMP_TIME_SLOTS.SLOT_11_3],
+    [CAMP_TIME_SLOTS.SLOT_11_3]: [CAMP_TIME_SLOTS.SLOT_9_1, CAMP_TIME_SLOTS.SLOT_10_2, CAMP_TIME_SLOTS.SLOT_11_3],
+    [CAMP_TIME_SLOTS.SLOT_6_10]: [CAMP_TIME_SLOTS.SLOT_6_10],
+};
+
+// max span (in days) allowed for a single booking-availability query — the requested range may not
+// exceed this. Keeps the one camp fetch bounded.
+const MAX_AVAILABILITY_RANGE_DAYS = 15;
+
+// YYYY-MM-DD key for the UTC day a date falls on — the availability tree is keyed by this.
+const dateKey = (date: Date | string | number): string => startOfUTCDay(date).toISOString().slice(0, 10);
 
 // role ids of FOs already booked (confirmed/live) on another camp on the same UTC day AND time slot.
 // A camp occupies its FO only for its own slot, so the FO stays free for other slots the same day.
@@ -527,6 +549,112 @@ const report = async (filters: ICampReportQuery, ctx: RequestContext) => {
     return { ...result };
 };
 
+// booking availability — for a location + date range, report per-date/per-slot availability across
+// the FOs who can service that location. A slot is available when at least one eligible FO is free
+// for it; a date is available when at least one of its 4 slots is available.
+const bookingAvailability = async (model: IBookingAvailabilityPayload, ctx: RequestContext) => {
+    const { lat, lng } = model;
+    const dateFrom = startOfUTCDay(model.dateFrom);
+    const dateTo = startOfUTCDay(model.dateTo);
+
+    //1: the requested range is capped — refuse anything wider than the allowed span
+    if (dateTo < dateFrom) {
+        return throwAppError('dateTo cannot be before dateFrom', StatusCodes.BAD_REQUEST);
+    }
+    const spanDays = Math.round((dateTo.getTime() - dateFrom.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+    if (spanDays > MAX_AVAILABILITY_RANGE_DAYS) {
+        return throwAppError(
+            `The date range cannot exceed ${MAX_AVAILABILITY_RANGE_DAYS} days`,
+            StatusCodes.BAD_REQUEST,
+        );
+    }
+
+    //2: eligible FOs — nearest active FOs whose OWN coverage radius reaches the point. This is the
+    // separate "already calculated" eligible set; only their role ids are needed downstream.
+    const nearbyFos = await geoProfileModel.aggregate([
+        {
+            $geoNear: {
+                near: { type: 'Point', coordinates: [lng, lat] },
+                distanceField: 'distance', // meters
+                spherical: true,
+                // hard outer cap — a mis-set coverageRadius can never pull in a far-away worker
+                maxDistance: GEO_ALLOCATION_MAX_DISTANCE,
+                query: { ...ctx.where(), type: GEO_PROFILE_TYPES.FO, status: GEO_PROFILE_STATUS.ACTIVE },
+            },
+        },
+        // keep only FOs whose own coverage radius reaches the point
+        { $match: { $expr: { $lte: ['$distance', '$coverageRadius'] } } },
+        { $project: { role: 1 } },
+    ]);
+
+    const eligibleFoIds: string[] = nearbyFos.map((p: any) => p.role?.toString()).filter(Boolean);
+
+    //3: pull the confirmed/live camps for those FOs across the whole range in one query, then build
+    // the tree: date -> slot -> Set(blocked FO ids). Only FOs that actually have a camp appear here.
+    const tree = new Map<string, Map<CampTimeSlot, Set<string>>>();
+
+    if (eligibleFoIds.length) {
+        const camps = await CampModel.find({
+            ...ctx.where(),
+            fo: { $in: eligibleFoIds },
+            status: { $in: FO_BOOKING_STATUSES },
+            date: { $gte: dateFrom, $lte: endOfUTCDay(dateTo) },
+        })
+            .select('fo date timeSlot')
+            .lean();
+
+        for (const camp of camps) {
+            const foId = (camp as any).fo?.toString();
+            if (!foId) {
+                continue;
+            }
+            const key = dateKey((camp as any).date);
+            const slot = (camp as any).timeSlot as CampTimeSlot;
+            // a camp blocks its FO for every slot it overlaps (daytime slots block each other)
+            const overlaps = SLOT_OVERLAPS[slot] || [slot];
+
+            let slotMap = tree.get(key);
+            if (!slotMap) {
+                slotMap = new Map();
+                tree.set(key, slotMap);
+            }
+            for (const overlappingSlot of overlaps) {
+                let blocked = slotMap.get(overlappingSlot);
+                if (!blocked) {
+                    blocked = new Set();
+                    slotMap.set(overlappingSlot, blocked);
+                }
+                blocked.add(foId);
+            }
+        }
+    }
+
+    //4: walk EVERY date in the range (not just dates that have camps) and evaluate all 4 slots.
+    const dates: any[] = [];
+    for (let cursor = new Date(dateFrom); cursor <= dateTo; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
+        const key = dateKey(cursor);
+        const slotMap = tree.get(key);
+
+        const slots = ALL_SLOTS.map((slot) => {
+            const blocked = slotMap?.get(slot);
+            // available when at least one eligible FO is NOT blocked on this slot
+            const available = eligibleFoIds.some((id) => !blocked || !blocked.has(id));
+            return { slot, available };
+        });
+
+        // a date is available if any of its slots is available
+        const available = slots.some((s) => s.available);
+        dates.push({ date: new Date(key), available, slots });
+    }
+
+    return {
+        eligibleFoCount: eligibleFoIds.length,
+        dateFrom,
+        dateTo,
+        dates,
+    };
+};
+
 export const CampService = {
     get,
     search,
@@ -536,4 +664,5 @@ export const CampService = {
     allocateFo,
     book,
     report,
+    bookingAvailability,
 };

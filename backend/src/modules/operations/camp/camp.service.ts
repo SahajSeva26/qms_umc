@@ -614,9 +614,9 @@ const report = async (filters: ICampReportQuery, ctx: RequestContext) => {
 const bookingAvailability = async (model: IBookingAvailabilityPayload, ctx: RequestContext) => {
     // customer (pharma) tenants only. The route already limits entry to camp:book holders, but a
     // god-mode / platform actor would otherwise slip past — availability is a pharma-facing check.
-    // if (ctx.tenant?.type !== TENANT_TYPE.CUSTOMER) {
-    //     return throwAppError('Only customer-tenant users can check booking availability', StatusCodes.FORBIDDEN);
-    // }
+    if (ctx.tenant?.type !== TENANT_TYPE.CUSTOMER) {
+        return throwAppError('Only customer-tenant users can check booking availability', StatusCodes.FORBIDDEN);
+    }
 
     // the project must belong to the caller's tenant. ProjectService.get runs under ctx.where(), so a
     // project on any other tenant 404s — this enforces ctx.tenant === project.tenant without leaking a
@@ -629,10 +629,10 @@ const bookingAvailability = async (model: IBookingAvailabilityPayload, ctx: Requ
     // explicit tenant-ownership assertion (defence-in-depth on top of the scoped read above): the
     // project's tenant must equal the caller's tenant, so a future change to ProjectService.get's
     // scoping can never silently open cross-tenant availability.
-    // const callerTenantId = (ctx.tenant?._id || ctx.tenant?.id)?.toString();
-    // if (project.tenant?.toString() !== callerTenantId) {
-    //     return throwAppError('Project does not belong to your account', StatusCodes.FORBIDDEN);
-    // }
+    const callerTenantId = (ctx.tenant?._id || ctx.tenant?.id)?.toString();
+    if (project.tenant?.toString() !== callerTenantId) {
+        return throwAppError('Project does not belong to your account', StatusCodes.FORBIDDEN);
+    }
 
     const { lat, lng } = model;
     const dateFrom = startOfUTCDay(model.dateFrom);

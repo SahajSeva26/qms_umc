@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import PasswordInput from '@/components/ui/PasswordInput'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { useCreateTenant } from '@/features/access-management/tenant/hooks/useCreateTenant'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
@@ -27,7 +26,6 @@ import FieldErrorText from '@/components/ui/FieldErrorText'
 interface TenantFormValues {
   code: string
   name: string
-  description: string
   salesPerson: string
   ownerFirstName: string
   ownerLastName: string
@@ -43,7 +41,6 @@ interface TenantFormValues {
 const EMPTY_FORM_VALUES: TenantFormValues = {
   code: '',
   name: '',
-  description: '',
   salesPerson: '',
   ownerFirstName: '',
   ownerLastName: '',
@@ -78,7 +75,6 @@ const useTenantFormResolver = () =>
     toPayload: (values) => ({
       code: values.code,
       name: values.name,
-      description: values.description || undefined,
       salesPerson: values.salesPerson,
       owner: {
         firstName: values.ownerFirstName,
@@ -222,12 +218,6 @@ const CreateTenantDialog = () => {
                     </Label>
                     <Input id="tenantName" type="text" placeholder="e.g. Acme Pharma" {...register('name')} />
                     {fieldError('name') && <p className="text-[11px] mt-1 text-danger">{fieldError('name')}</p>}
-                  </div>
-                  <div>
-                    <Label htmlFor="tenantDescription" className="text-xs mb-1.5">
-                      Description
-                    </Label>
-                    <Textarea id="tenantDescription" placeholder="Optional" {...register('description')} />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>

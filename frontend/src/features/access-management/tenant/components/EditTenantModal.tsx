@@ -12,7 +12,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { LocationValue } from '@/types/location.types'
 import LocationPicker from '@/components/widgets/location-picker/LocationPicker'
@@ -29,7 +28,6 @@ interface EditTenantModalProps {
 
 interface EditTenantFormValues {
   name: string
-  description: string
   status: TenantStatus | ''
   salesPerson: string
   address: LocationValue | null
@@ -49,7 +47,6 @@ const useEditTenantFormResolver = () =>
     schema: updateTenantSchema,
     toPayload: (values) => ({
       name: values.name,
-      description: values.description || undefined,
       status: values.status || undefined,
       salesPerson: values.salesPerson || undefined,
       // Omitted when unset so the backend's replace-wholesale address update leaves it alone.
@@ -74,7 +71,6 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
     mode: 'onChange',
     defaultValues: {
       name: tenant.name,
-      description: '',
       status: tenant.status ?? '',
       salesPerson: tenant.salesPerson ?? '',
       address: tenant.address,
@@ -133,7 +129,6 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
     const parsed = await parsePayload(values)
     const payload: UpdateTenantPayload = {
       name: parsed.name,
-      description: parsed.description,
     }
     // Sent only when touched — address is replace-wholesale server-side, so
     // resending the stale defaultValues snapshot could clobber a newer save.
@@ -160,17 +155,6 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
             </Label>
             <Input id="name" type="text" {...register('name')} />
             {fieldError('name') && <p className="text-[11px] mt-1 text-danger">{fieldError('name')}</p>}
-          </div>
-
-          <div>
-            <Label htmlFor="description" className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-              Description
-            </Label>
-            <Textarea
-              id="description"
-              placeholder="Leave blank to keep unchanged (not returned by GET, so it can't be pre-filled)"
-              {...register('description')}
-            />
           </div>
 
           <div className="grid grid-cols-2 gap-3">

@@ -84,7 +84,6 @@ export interface RegisterOwnerPayload {
 export interface CreateTenantPayload {
   code: string
   name: string
-  description?: string
   owner: RegisterOwnerPayload
   // Role id, must be type 'sales-rep'. Optional on the backend; required
   // here per direct instruction — TODO: revisit once sales-rep vs sales-head settles.
@@ -96,7 +95,6 @@ export interface CreateTenantPayload {
 
 export interface UpdateTenantPayload {
   name?: string
-  description?: string
   // Only takes effect server-side if caller has `tenant:manage`; silently ignored otherwise.
   status?: TenantStatus
   // Currently a no-op server-side — tenant.service.ts's set() has this update path commented out entirely.

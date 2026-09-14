@@ -308,8 +308,47 @@ const main = async () => {
     }
     await Project.updateOne({ _id: project._id }, { campTimeSlots: originalSlots }); // restore
 
+    // eslint-disable-next-line no-console
+    console.log('\n============ pharma booking → GLOBAL FO allocation ============');
+
+    // The reported bug: POST /camps/book runs create() under the pharma CUSTOMER context, so FO
+    // allocation used to scope to the customer tenant → 0 platform FOs → camp saved with fo:null.
+    // Now the FO lookup + validation + clash are GLOBAL, so a platform FO is allocated while the camp
+    // stays owned by the customer tenant.
+    const mrPopulated = await RoleModel.findById(mr._id).populate('type');
+    const mrBookCtx = makeContext(
+        customer,
+        mrPopulated,
+        mrUser ? { _id: mrUser._id.toString(), email: mrUser.email } : {},
+        [PERMISSIONS.CAMP.BOOK.code],
+    );
+    const bookDay = addUTCDays(today, 6); // no seeded camps → FOs free
+    let bookedCamp: any = null;
+    try {
+        bookedCamp = await CampService.book(
+            {
+                mr: mr._id.toString(),
+                project: project._id.toString(),
+                doctor: doctor._id.toString(),
+                date: bookDay,
+                timeSlot: S.SLOT_9_1,
+                location,
+            } as any,
+            mrBookCtx,
+        );
+        const foAssigned = Boolean(bookedCamp.fo);
+        const ownedByCustomer = bookedCamp.tenant?.toString() === customer._id.toString();
+        if (foAssigned && ownedByCustomer) {
+            ok(`pharma book: customer-owned camp + global platform FO auto-allocated (fo=${bookedCamp.fo})`);
+        } else {
+            bad('pharma book allocation', `fo=${bookedCamp.fo} (expected set), tenant match=${ownedByCustomer}`);
+        }
+    } catch (err: any) {
+        bad('pharma book allocation', `threw ${err?.statusCode} ${err?.message}`);
+    }
+
     // cleanup the camps this test created (leave the seed intact for re-runs)
-    const createdIds = [eve, canc, draft].filter(Boolean).map((c: any) => c._id);
+    const createdIds = [eve, canc, draft, bookedCamp].filter(Boolean).map((c: any) => c._id);
     if (createdIds.length) {
         await CampModel.deleteMany({ _id: { $in: createdIds } });
     }

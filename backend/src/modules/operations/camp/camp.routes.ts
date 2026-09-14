@@ -4,6 +4,7 @@ import { CampController } from './camp.controller';
 import { registry } from '../../../shared/config/swagger/swagger.registry';
 import {
     BookCampPayloadSchema,
+    BookingAvailabilityPayloadSchema,
     CampReportQuerySchema,
     CreateCampPayloadSchema,
     MoveStagePayloadSchema,
@@ -105,6 +106,27 @@ registry.registerPath({
         400: { description: 'Validation error / MR not in your tenant or division' },
         403: { description: 'Not allowed to book for this MR' },
         404: { description: 'MR or doctor not found' },
+    },
+});
+
+// booking availability
+registry.registerPath({
+    method: 'post',
+    path: '/camps/booking-availability',
+    tags: ['CAMP'],
+    summary: 'Check camp booking availability for a project around a location within a date range',
+    request: {
+        body: {
+            content: {
+                'application/json': {
+                    schema: BookingAvailabilityPayloadSchema,
+                },
+            },
+        },
+    },
+    responses: {
+        200: { description: 'Booking availability fetched successfully' },
+        400: { description: 'Validation error' },
     },
 });
 
@@ -236,6 +258,14 @@ CampRouter.post(
         TENANT_PERMISSIONS.MANAGE.code,
     ]),
     CampController.create,
+);
+
+// booking availability — a pre-booking check for the pharma field-force. Entry is limited to
+// camp:book holders (pharma role types); the service further restricts to customer tenants.
+CampRouter.post(
+    '/booking-availability',
+    AuthorizeMiddleware([CAMP_PERMISSIONS.BOOK.code]),
+    CampController.bookingAvailability,
 );
 
 // pharma field-force booking — only pharma role types hold camp:book. The service then authorizes

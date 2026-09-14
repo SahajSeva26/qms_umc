@@ -554,10 +554,12 @@ Seeded camp days:
   ${isoDay(result.DAY_CANCELLED)}  → one CANCELLED camp (ignored)                 → DATE AVAILABLE
   (any other day in range has no camps                              → DATE AVAILABLE)
 
---- STEP 1: log in as the system user (god-mode; cookie-based auth) ---
+--- STEP 1: log in as the seeded pharma MR (customer tenant, holds camp:book) ---
+NOTE: /camps/booking-availability is restricted to camp:book holders on a CUSTOMER tenant.
+The system user (platform tenant) will get 403 here — use the MR login below.
 curl -i -c cookies.txt -X POST http://localhost:3000/api/v1/auth/login \\
   -H "Content-Type: application/json" \\
-  -d '{"email":"${ENV.App.SystemUserEmail}","password":"${ENV.App.SystemUserPassword}"}'
+  -d '{"email":"mr@${SEED.emailDomain}","password":"${SEED.password}"}'
 
 --- STEP 2: booking availability (projectID accepted but unused — any valid ObjectId) ---
 curl -s -b cookies.txt -X POST http://localhost:3000/api/v1/camps/booking-availability \\
@@ -573,7 +575,7 @@ curl -s -b cookies.txt -X POST http://localhost:3000/api/v1/camps/booking-availa
 Expect: eligibleFoCount = 3, and the three seeded days match the notes above.
 (Or use Swagger at http://localhost:3000/api-docs — it keeps the login cookie for you.)
 
-Other seeded logins (password "${SEED.password}"): mr@${SEED.emailDomain}, salesrep@${SEED.emailDomain}
+Other seeded logins (password "${SEED.password}"): system@... (platform → 403 here), salesrep@${SEED.emailDomain}
 ============================================================
 `);
     /* eslint-enable no-console */

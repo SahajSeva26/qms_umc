@@ -260,16 +260,11 @@ CampRouter.post(
     CampController.create,
 );
 
-// booking availability — a read-style check; same audience as search (assigned field-force,
-// pharma field-force, and managers).
+// booking availability — a pre-booking check for the pharma field-force. Entry is limited to
+// camp:book holders (pharma role types); the service further restricts to customer tenants.
 CampRouter.post(
     '/booking-availability',
-    AuthorizeMiddleware([
-        CAMP_PERMISSIONS.SEARCH.code,
-        CAMP_PERMISSIONS.MANAGE.code,
-        CAMP_PERMISSIONS.BOOK.code,
-        TENANT_PERMISSIONS.MANAGE.code,
-    ]),
+    AuthorizeMiddleware([CAMP_PERMISSIONS.BOOK.code]),
     CampController.bookingAvailability,
 );
 

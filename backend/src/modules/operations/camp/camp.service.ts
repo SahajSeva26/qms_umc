@@ -28,6 +28,7 @@ import { DoctorService } from '../../crm/doctor/doctor.service';
 import { RoleService } from '../../access-management/role/role.service';
 import { DivisionService } from '../../crm/division/division.service';
 import { ALLOWED_ROLETYPE_CODES } from '../../access-management/role-type/roleType.constants';
+import { TENANT_TYPE } from '../../access-management/tenant/tenant.constants';
 import { InventoryMasterService } from '../../inventory/inventory-master/inventory-master.service';
 
 type CampDocument = HydratedDocument<ICamp> | null;
@@ -611,6 +612,12 @@ const report = async (filters: ICampReportQuery, ctx: RequestContext) => {
 // the FOs who can service that location. A slot is available when at least one eligible FO is free
 // for it; a date is available when at least one of its 4 slots is available.
 const bookingAvailability = async (model: IBookingAvailabilityPayload, ctx: RequestContext) => {
+    // customer (pharma) tenants only. The route already limits entry to camp:book holders, but a
+    // god-mode / platform actor would otherwise slip past — availability is a pharma-facing check.
+    if (ctx.tenant?.type !== TENANT_TYPE.CUSTOMER) {
+        return throwAppError('Only customer-tenant users can check booking availability', StatusCodes.FORBIDDEN);
+    }
+
     const { lat, lng } = model;
     const dateFrom = startOfUTCDay(model.dateFrom);
     const dateTo = startOfUTCDay(model.dateTo);
@@ -637,7 +644,9 @@ const bookingAvailability = async (model: IBookingAvailabilityPayload, ctx: Requ
                 spherical: true,
                 // hard outer cap — a mis-set coverageRadius can never pull in a far-away worker
                 maxDistance: GEO_ALLOCATION_MAX_DISTANCE,
-                query: { ...ctx.where(), type: GEO_PROFILE_TYPES.FO, status: GEO_PROFILE_STATUS.ACTIVE },
+                // NOT tenant-scoped: FOs are global QMS platform staff serving every pharma tenant,
+                // so the lookup must reach them regardless of the (customer) caller's tenant.
+                query: { type: GEO_PROFILE_TYPES.FO, status: GEO_PROFILE_STATUS.ACTIVE },
             },
         },
         // keep only FOs whose own coverage radius reaches the point
@@ -652,8 +661,10 @@ const bookingAvailability = async (model: IBookingAvailabilityPayload, ctx: Requ
     const tree = new Map<string, Map<CampTimeSlot, Set<string>>>();
 
     if (eligibleFoIds.length) {
+        // NOT tenant-scoped: an FO booked (confirmed/live) by ANY pharma tenant is unavailable to
+        // every other tenant, so availability must consider that FO's camps across all tenants. Only
+        // per-slot booleans are returned, so no cross-tenant camp detail leaks.
         const camps = await CampModel.find({
-            ...ctx.where(),
             fo: { $in: eligibleFoIds },
             status: { $in: FO_BOOKING_STATUSES },
             date: { $gte: dateFrom, $lte: endOfUTCDay(dateTo) },

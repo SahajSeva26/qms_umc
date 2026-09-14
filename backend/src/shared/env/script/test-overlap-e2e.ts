@@ -84,6 +84,19 @@ const expect409 = async (name: string, thunk: () => Promise<any>) => {
     }
 };
 
+const expect403 = async (name: string, thunk: () => Promise<any>) => {
+    try {
+        await thunk();
+        bad(name, 'expected 403, but the call SUCCEEDED');
+    } catch (err: any) {
+        if (err?.statusCode === StatusCodes.FORBIDDEN) {
+            ok(`${name} → 403`);
+        } else {
+            bad(name, `expected 403, got ${err?.statusCode ?? 'no statusCode'} (${err?.message})`);
+        }
+    }
+};
+
 // asserts the thunk succeeds; returns its result
 const expectOk = async (name: string, thunk: () => Promise<any>) => {
     try {
@@ -96,29 +109,39 @@ const expectOk = async (name: string, thunk: () => Promise<any>) => {
     }
 };
 
-const makeGodContext = (actor: { user: any; role: any; tenant: any }): any => {
-    const SYSTEM_MANAGE = PERMISSIONS.SYSTEM.MANAGE.code;
-    return {
-        requestID: 'overlap-e2e',
-        ipAddress: 'overlap-e2e',
-        user: actor.user,
-        role: actor.role,
-        tenant: actor.tenant,
-        permissions: [SYSTEM_MANAGE],
-        logger,
-        setUser(u: any) { this.user = u; },
-        setRole(r: any) { this.role = r; },
-        setTenant(t: any) { this.tenant = t; },
-        setPermissions(p: string[]) { this.permissions = p; },
-        hasAnyPermissions() { return true; },
-        hasAllPermissions() { return true; },
-        requirePermissions() { return true; },
-        where() {
-            if (this.tenant?.type === TENANT_TYPE.PLATFORM) return {};
-            return { tenant: this.tenant?._id || this.tenant?.id };
-        },
-    };
-};
+const SYSTEM_MANAGE = PERMISSIONS.SYSTEM.MANAGE.code;
+
+// generic ctx builder — permissions is whatever this actor holds; where() mirrors the real
+// contextBuilder (platform → unscoped, customer → tenant-pinned).
+const makeContext = (tenant: any, role: any, user: any, permissions: string[]): any => ({
+    requestID: 'overlap-e2e',
+    ipAddress: 'overlap-e2e',
+    user,
+    role,
+    tenant,
+    permissions,
+    logger,
+    setUser(u: any) { this.user = u; },
+    setRole(r: any) { this.role = r; },
+    setTenant(t: any) { this.tenant = t; },
+    setPermissions(p: string[]) { this.permissions = p; },
+    hasAnyPermissions(req: string[]) {
+        if (this.permissions.includes(SYSTEM_MANAGE)) return true;
+        return req.some((c) => this.permissions.includes(c));
+    },
+    hasAllPermissions(req: string[]) {
+        if (this.permissions.includes(SYSTEM_MANAGE)) return true;
+        return req.every((c) => this.permissions.includes(c));
+    },
+    requirePermissions() { return true; },
+    where() {
+        if (this.tenant?.type === TENANT_TYPE.PLATFORM) return {};
+        return { tenant: this.tenant?._id || this.tenant?.id };
+    },
+});
+
+const makeGodContext = (actor: { user: any; role: any; tenant: any }): any =>
+    makeContext(actor.tenant, actor.role, actor.user, [SYSTEM_MANAGE]);
 
 const main = async () => {
     await connectDB();
@@ -214,6 +237,41 @@ const main = async () => {
         await expectOk('update: draft → DAY_PARTIAL @ 6-10 (evening, free)', () =>
             CampService.update(draftId, { date: DAY_PARTIAL, timeSlot: S.SLOT_6_10 } as any, ctx),
         );
+    }
+
+    // eslint-disable-next-line no-console
+    console.log('\n============ booking-availability access ============');
+
+    const mrUser = await UserModel.findOne({ email: 'mr@seed.qms.test' });
+    const availabilityBody = {
+        projectID: project._id.toString(),
+        lat: 19.076,
+        lng: 72.8777,
+        dateFrom: today,
+        dateTo: addUTCDays(today, 6),
+    };
+
+    // NEGATIVE: a platform-tenant actor (even with camp:book) must be rejected — customer-only.
+    const platformCtx = makeContext(
+        systemTenant, // platform tenant
+        systemRole,
+        { _id: systemUser._id.toString(), email: systemUser.email },
+        [PERMISSIONS.CAMP.BOOK.code], // holds camp:book but NOT system:manage
+    );
+    await expect403('booking-availability: platform-tenant actor (camp:book) rejected', () =>
+        CampService.bookingAvailability(availabilityBody as any, platformCtx),
+    );
+
+    // POSITIVE: a customer MR (camp:book) passes the tenant guard.
+    const mrCtx = makeContext(customer, mr, mrUser ? { _id: mrUser._id.toString(), email: mrUser.email } : {}, [
+        PERMISSIONS.CAMP.BOOK.code,
+    ]);
+    const mrResult = await expectOk('booking-availability: customer MR (camp:book) allowed', () =>
+        CampService.bookingAvailability(availabilityBody as any, mrCtx),
+    );
+    if (mrResult) {
+        // eslint-disable-next-line no-console
+        console.log(`         → eligibleFoCount = ${mrResult.eligibleFoCount}`);
     }
 
     // cleanup the camps this test created (leave the seed intact for re-runs)

@@ -147,6 +147,57 @@ describe('NewProjectWizard — navigation', () => {
   })
 })
 
+describe('NewProjectWizard — clickable step pills', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    sessionStorage.clear()
+  })
+
+  it('clicking an earlier step pill jumps straight back with no re-validation, preserving entered values', async () => {
+    const user = userEvent.setup()
+    await renderWizard()
+
+    await advanceThroughLeadAndBasics(user)
+    await waitFor(() => expect(fieldByName('poNumber')).toBeInTheDocument())
+
+    // Jump directly from Execution (step 2) back to Lead (step 0),
+    // skipping Basics — mirrors going from a later page straight to page 1.
+    await user.click(screen.getByRole('button', { name: /^1.*Lead/i }))
+
+    expect(await screen.findByText(/pick the source lead/i)).toBeInTheDocument()
+
+    // Values entered earlier survive the jump.
+    await user.click(screen.getByRole('button', { name: /^2.*Basics/i }))
+    expect(screen.getByDisplayValue('My Test Project')).toBeInTheDocument()
+  })
+
+  it('clicking a later step pill stops at the first invalid step in between and shows its error', async () => {
+    const user = userEvent.setup()
+    await renderWizard()
+
+    // Only complete Step 0 (Lead) — Basics (step 1) is left with no name/therapy/type.
+    await user.type(screen.getByPlaceholderText(/search by lead title/i), 'Sun Cardio')
+    await user.click(await screen.findByRole('button', { name: /Sun Cardio Screening/i }))
+    await user.click(screen.getByRole('button', { name: /^Next/i }))
+    expect(await screen.findByText(/project basics/i)).toBeInTheDocument()
+
+    // Jump straight to Financials (step 3) — must stop at Basics (step 1),
+    // never silently land past it with invalid data hidden behind.
+    await user.click(screen.getByRole('button', { name: /^4.*Financials/i }))
+
+    expect(await screen.findByText(/project basics/i)).toBeInTheDocument()
+    expect(queryFieldByName('campCost')).not.toBeInTheDocument()
+  })
+
+  it('clicking the currently-active step pill is a no-op', async () => {
+    const user = userEvent.setup()
+    await renderWizard()
+
+    await user.click(screen.getByRole('button', { name: /^1.*Lead/i }))
+    expect(screen.getByText(/pick the source lead/i)).toBeInTheDocument()
+  })
+})
+
 describe('NewProjectWizard — execution mode switching preserves other modes\' fields', () => {
   beforeEach(() => {
     vi.clearAllMocks()

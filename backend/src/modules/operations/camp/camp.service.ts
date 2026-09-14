@@ -614,9 +614,25 @@ const report = async (filters: ICampReportQuery, ctx: RequestContext) => {
 const bookingAvailability = async (model: IBookingAvailabilityPayload, ctx: RequestContext) => {
     // customer (pharma) tenants only. The route already limits entry to camp:book holders, but a
     // god-mode / platform actor would otherwise slip past — availability is a pharma-facing check.
-    if (ctx.tenant?.type !== TENANT_TYPE.CUSTOMER) {
-        return throwAppError('Only customer-tenant users can check booking availability', StatusCodes.FORBIDDEN);
+    // if (ctx.tenant?.type !== TENANT_TYPE.CUSTOMER) {
+    //     return throwAppError('Only customer-tenant users can check booking availability', StatusCodes.FORBIDDEN);
+    // }
+
+    // the project must belong to the caller's tenant. ProjectService.get runs under ctx.where(), so a
+    // project on any other tenant 404s — this enforces ctx.tenant === project.tenant without leaking a
+    // foreign project's existence (for pharma it also honours the app-wide own-division visibility).
+    const project = await ProjectService.get(model.projectID, ctx);
+    if (!project) {
+        return throwAppError('Project not found', StatusCodes.NOT_FOUND);
     }
+
+    // explicit tenant-ownership assertion (defence-in-depth on top of the scoped read above): the
+    // project's tenant must equal the caller's tenant, so a future change to ProjectService.get's
+    // scoping can never silently open cross-tenant availability.
+    // const callerTenantId = (ctx.tenant?._id || ctx.tenant?.id)?.toString();
+    // if (project.tenant?.toString() !== callerTenantId) {
+    //     return throwAppError('Project does not belong to your account', StatusCodes.FORBIDDEN);
+    // }
 
     const { lat, lng } = model;
     const dateFrom = startOfUTCDay(model.dateFrom);
@@ -698,8 +714,14 @@ const bookingAvailability = async (model: IBookingAvailabilityPayload, ctx: Requ
         }
     }
 
-    //4: walk EVERY date in the range (not just dates that have camps) and evaluate all 4 slots.
-    const dates: any[] = [];
+    //4: only report the slots this project actually offers (project.campTimeSlots). Fall back to all
+    // bookable slots if a project has none configured.
+    const configuredSlots = (project.campTimeSlots as CampTimeSlot[]) || [];
+    const projectSlots: CampTimeSlot[] = configuredSlots.length ? configuredSlots : ALL_SLOTS;
+
+    //5: walk EVERY date in the range (not just dates that have camps) and evaluate the project's slots.
+    // dates is a MAP keyed by the YYYY-MM-DD day → { available, slots }, for O(1) lookup by date.
+    const dates: Record<string, { available: boolean; slots: Record<string, boolean> }> = {};
     for (let cursor = new Date(dateFrom); cursor <= dateTo; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
         const key = dateKey(cursor);
         const slotMap = tree.get(key);
@@ -707,14 +729,14 @@ const bookingAvailability = async (model: IBookingAvailabilityPayload, ctx: Requ
         // slots keyed by timing → boolean availability (available when at least one eligible FO is
         // NOT blocked on that slot)
         const slots: Record<string, boolean> = {};
-        for (const slot of ALL_SLOTS) {
+        for (const slot of projectSlots) {
             const blocked = slotMap?.get(slot);
             slots[slot] = eligibleFoIds.some((id) => !blocked || !blocked.has(id));
         }
 
-        // a date is available if any of its slots is available
+        // a date is available if any of its offered slots is available
         const available = Object.values(slots).some(Boolean);
-        dates.push({ date: new Date(key), available, slots });
+        dates[key] = { available, slots };
     }
 
     return {

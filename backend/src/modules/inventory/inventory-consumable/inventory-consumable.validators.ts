@@ -37,3 +37,7 @@ export const SearchInventoryConsumableQuerySchema = z.object({
     limit: z.string().optional().openapi({ example: '10' }),
 });
 export type ISearchInventoryConsumableQuery = z.infer<typeof SearchInventoryConsumableQuerySchema>;
+
+//4: report ====================================>
+export const InventoryConsumableReportQuerySchema = z.object({});
+export type IInventoryConsumableReportQuery = z.infer<typeof InventoryConsumableReportQuerySchema>;

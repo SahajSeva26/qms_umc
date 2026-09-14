@@ -53,17 +53,15 @@ const FoWorkspacePage = () => {
 
   const fos = useMemo(() => allPeople.filter((p) => p.role === 'Field Officer'), [allPeople])
 
-  // ME (Person) — same synthetic-fallback pattern as FoPage's selfPerson:
-  // match the logged-in user against the FO roster by name/email/id, else
-  // synthesize a minimal Person record from the auth user so the workspace
-  // still renders sensibly for accounts not yet seeded into PEOPLE.
+  // Falls back to a synthesized minimal Person so the workspace still
+  // renders for accounts not yet seeded into PEOPLE.
   const me: Person = useMemo(() => {
     if (!user) return fos[0] ?? ({} as Person)
     const fullName = `${user.firstName} ${user.lastName}`.trim()
-    const match = fos.find((f) => f.name === fullName || f.email === user.email || f.id === user._id)
+    const match = fos.find((f) => f.name === fullName || f.email === user.email || f.id === user.id)
     if (match) return match
     return {
-      id: user._id,
+      id: user.id,
       name: fullName || 'Field Officer',
       role: 'Field Officer',
       phone: '',
@@ -86,10 +84,8 @@ const FoWorkspacePage = () => {
 
   const myClaims = useMemo(() => claims.filter((c) => c.foId === me.id), [claims, me.id])
 
-  // DevicesModule's "Report" button hands off to IncidentsModule's own Raise
-  // SOS modal (which already owns that state) by switching tabs and bumping
-  // a signal + prefill device id — mirrors the openSignal/onModalHandled
-  // contract IncidentsModule/DevicesModule were already built against.
+  // Hands off to IncidentsModule's Raise SOS modal by switching tabs and
+  // bumping a signal + prefill device id.
   const [deviceReportSignal, setDeviceReportSignal] = useState(0)
   const [prefillDeviceId, setPrefillDeviceId] = useState<string | undefined>(undefined)
 
@@ -99,7 +95,6 @@ const FoWorkspacePage = () => {
     setTab('incidents')
   }
 
-  // Run Camp wizard
   const [runCampCampId, setRunCampCampId] = useState<string | null>(null)
   const runCampCamp = runCampCampId ? camps.find((c) => c.id === runCampCampId) ?? null : null
 

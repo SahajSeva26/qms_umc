@@ -29,16 +29,14 @@ function mergeById(existing: RoleEntity[], incoming: RoleEntity[]): RoleEntity[]
   return Array.from(byId.values())
 }
 
-// Server-scoped/searched downline MRs — debounced name search + real
-// "load more" pagination. `enabled` gates on the dropdown being open AND a
-// non-empty query — mirrors DoctorPicker/WizardStep0's "type to search"
-// pattern rather than eagerly fetching an unfiltered page on open.
+// `enabled` gates on the dropdown being open AND a non-empty query — mirrors
+// DoctorPicker/WizardStep0's "type to search" rather than an eager unfiltered fetch.
 export const useEligibleMrs = (name: string, enabled: boolean) => {
   const debouncedName = useDebouncedValue(name, 300)
   const hasQuery = debouncedName.trim().length > 0
   const [page, setPage] = useState(1)
   // `items`/`count` are always read from the same accumulated snapshot —
-  // never a fresh `data.count` against a stale `items`, which briefly made hasMore true with an empty list.
+  // never a fresh `data.count` paired with stale `items`.
   const [accumulated, setAccumulated] = useState<Accumulated>(() => EMPTY_ACCUMULATED(debouncedName))
 
   if (accumulated.query !== debouncedName) {

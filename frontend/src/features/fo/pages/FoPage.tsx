@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react'
+import { Navigate } from 'react-router-dom'
 import {
   FiUsers, FiCalendar, FiBarChart2, FiCpu, FiFileText, FiAward, FiShield, FiBriefcase,
   FiUpload, FiDownload, FiPlus, FiZap, FiCheckCircle, FiClock, FiStar, FiActivity, FiPhone, FiMail, FiMapPin,
 } from 'react-icons/fi'
 import { useAuth } from '@/hooks/useAuth'
+import { usePermission } from '@/hooks/usePermission'
 import { usePeopleData } from '@/hooks/usePeopleData'
 import { useCampsData } from '@/hooks/useCampsData'
 import { useFoClaims, useFoTraining, useFoLeaves } from '@/features/fo/hooks/useFo'
@@ -29,7 +31,7 @@ function daysUntil(iso: string): number {
 }
 
 const ALL_TABS: { id: TabId; label: string; icon: typeof FiUsers }[] = [
-  { id: 'roster', label: 'Roster', icon: FiUsers },
+  { id: 'roster', label: 'FO Roster', icon: FiShield },
   { id: 'assignments', label: 'Assignments', icon: FiCalendar },
   { id: 'performance', label: 'Performance', icon: FiBarChart2 },
   { id: 'devices', label: 'Devices', icon: FiCpu },
@@ -42,13 +44,9 @@ const ALL_TABS: { id: TabId; label: string; icon: typeof FiUsers }[] = [
 
 const FoPage = () => {
   const { user } = useAuth()
-  // Old placeholder UserRole checks (role === 'fo' / 'sales_lead' /
-  // 'sales_rep') never once fired for a real user — every AuthUser was
-  // hardcoded to 'super_admin' regardless of who was logged in, so this
-  // page has always shown the full "FO Management" admin view (never "My
-  // Workspace" or the sales-scoped tab set). No real backend concept
-  // exists yet to replace this with; this keeps the actual, historical
-  // behavior.
+  const { session } = usePermission()
+  // No real backend permission exists yet to distinguish personal/sales-scoped
+  // views, so this always renders the full "FO Management" admin view.
   const isPersonal = false
   const isSalesView = false
 
@@ -64,10 +62,10 @@ const FoPage = () => {
   const selfPerson: Person = useMemo(() => {
     if (!isPersonal || !user) return fos[0] ?? ({} as Person)
     const fullName = `${user.firstName} ${user.lastName}`.trim()
-    const match = fos.find((f) => f.name === fullName || f.email === user.email || f.id === user._id)
+    const match = fos.find((f) => f.name === fullName || f.email === user.email || f.id === user.id)
     if (match) return match
     return {
-      id: user._id,
+      id: user.id,
       name: fullName || 'Field Officer',
       role: 'Field Officer',
       phone: '',
@@ -81,17 +79,12 @@ const FoPage = () => {
 
   const scopedFos = isPersonal ? [selfPerson] : fos
 
-  // Training-due-across-all-FOs KPI needs each FO's records — reuse the
-  // hook per-FO would violate hooks rules in a loop, so read the service
-  // layer synchronously isn't possible; approximate via useFoTraining for
-  // the currently-scoped single FO in personal mode, and compute manager
-  // KPI from a lazily-loaded aggregate below.
+  // useFoTraining is per-FO and calling it in a loop would violate hooks
+  // rules — the manager-view KPI is instead computed from a separate aggregate below.
   const { training: selfTraining } = useFoTraining(isPersonal ? selfPerson.id : '')
 
   const todayIso = new Date().toISOString().slice(0, 10)
 
-  // Personal-mode KPI strip — mirrors fo-manager.js:452-461's `personal` branch exactly
-  // (myToday/myUpcoming/myClosed/validCerts/pendingClaims all scoped to this one FO).
   const myCamps = useMemo(() => camps.filter((c) => c.foId === selfPerson.id), [camps, selfPerson.id])
   const myTodayCamps = useMemo(() => myCamps.filter((c) => c.date?.slice(0, 10) === todayIso && c.status !== 'CANCELLED' && c.status !== 'CANCELLED_CHARGED'), [myCamps, todayIso])
   const myUpcomingCamps = useMemo(() => myCamps.filter((c) => (c.date?.slice(0, 10) ?? '') > todayIso && c.status !== 'CANCELLED' && c.status !== 'CANCELLED_CHARGED' && c.status !== 'CLOSED'), [myCamps, todayIso])
@@ -137,9 +130,8 @@ const FoPage = () => {
   const pendingClaims = claims.filter((c) => c.status === 'PENDING' || c.status === 'SUBMITTED')
   const pendingClaimsSum = pendingClaims.reduce((s, c) => s + c.amount, 0)
 
-  // Manager-view "Training due" KPI aggregates each FO's seeded/persisted
-  // training rows via the service layer directly (read-only snapshot from
-  // localStorage, not a live subscription) since useFoTraining is per-FO.
+  // Reads localStorage directly as a snapshot, not a live subscription —
+  // useFoTraining is per-FO and can't be reused in a loop here.
   const trainingDueCount = useMemo(() => {
     let all: { foId: string; expiresOn: string }[] = []
     try {
@@ -188,6 +180,15 @@ const FoPage = () => {
 
   const openFo = allPeople.find((p) => p.id === openFoId) ?? null
 
+  // field-officer (RoleType + every real Role) lives only under the platform
+  // tenant. The route's own anyOf guard only checks tenant:manage/tenant:admin,
+  // which a customer-tenant admin also legitimately holds — without this second
+  // check that session would reach the real-roster tab and hit a confusing
+  // false "role type not found" error instead of a real access decision.
+  if (session && session.tenant.type !== 'platform') {
+    return <Navigate to="/unauthorized" replace />
+  }
+
   return (
     <div className="w-full">
       <div className="flex items-start justify-between gap-3 mb-4 flex-wrap">
@@ -230,7 +231,7 @@ const FoPage = () => {
           </div>
         </div>
 
-        {!isPersonal && (
+        {!isPersonal && activeTab !== 'roster' && (
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => toast.info('Import would open here')}
@@ -314,7 +315,7 @@ const FoPage = () => {
         })}
       </div>
 
-      {activeTab === 'roster' && <RosterTab fos={scopedFos} camps={camps} onOpenFo={setOpenFoId} />}
+      {activeTab === 'roster' && <RosterTab />}
       {activeTab === 'assignments' && <AssignmentsTab fos={scopedFos} camps={camps} onOpenFo={setOpenFoId} />}
       {activeTab === 'performance' && <PerformanceTab fos={scopedFos} camps={camps} onOpenFo={setOpenFoId} />}
       {activeTab === 'devices' && <DevicesTab fos={scopedFos} camps={camps} devices={devices} onOpenFo={setOpenFoId} />}

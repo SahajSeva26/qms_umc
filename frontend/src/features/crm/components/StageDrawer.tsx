@@ -26,7 +26,7 @@ const StageDrawer = ({ status, leads, onClose, onOpenLead, onNewLead, canManage 
     <SideDrawer open title={LEAD_STATUS_LABEL[status]} onClose={onClose} widthClassName="max-w-xl">
       <div
         className="rounded-xl border p-3 mb-4"
-        style={{ borderColor: 'var(--qms-border)', background: `${color}10` }}
+        style={{ borderColor: 'var(--qms-border)', background: `color-mix(in srgb, ${color} 6%, transparent)` }}
       >
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full" style={{ background: color }} />

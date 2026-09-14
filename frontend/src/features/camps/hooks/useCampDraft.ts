@@ -3,6 +3,7 @@ import { campRefId } from '@/features/camps/campsReal.utils'
 import type { BillingType, CampEntity, CampType } from '@/types/campReal.types'
 import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
 import { CAMP_TIME_SLOT_VALUES } from '@/types/campTimeSlot.constants'
+import type { LocationValue } from '@/types/location.types'
 
 export interface CampDraft {
   tenant: string
@@ -16,10 +17,7 @@ export interface CampDraft {
   mr: string
   date: string
   timeSlot: CampTimeSlotValue | ''
-  city: string
-  state: string
-  latitude: string
-  longitude: string
+  location: LocationValue | null
   /** Selected InventoryMaster device ObjectIds — comma-joined for the shared SET_FIELD string reducer, split back into an array at submit time. */
   devices: string
   notes: string
@@ -42,10 +40,7 @@ function buildInitialDraft(camp: CampEntity | null): CampDraft {
     mr: campRefId(camp?.mr) ?? '',
     date: camp?.date ? camp.date.slice(0, 10) : '',
     timeSlot: camp?.timeSlot && (CAMP_TIME_SLOT_VALUES as string[]).includes(camp.timeSlot) ? camp.timeSlot : '',
-    city: camp?.city ?? '',
-    state: camp?.state ?? '',
-    latitude: camp?.coordinates && camp.coordinates.length === 2 ? String(camp.coordinates[1]) : '',
-    longitude: camp?.coordinates && camp.coordinates.length === 2 ? String(camp.coordinates[0]) : '',
+    location: camp?.location ?? null,
     // camp.devices is always populated sub-docs on a fetched camp, never bare
     // id strings — .join() alone would have produced "[object Object]" here.
     devices: (camp?.devices ?? []).map((d) => d._id).join(', '),

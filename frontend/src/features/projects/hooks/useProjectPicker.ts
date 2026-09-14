@@ -28,8 +28,6 @@ function mergeById(existing: ProjectEntity[], incoming: ProjectEntity[]): Projec
   return Array.from(byId.values())
 }
 
-// Server-scoped/searched projects for a picker — debounced name search + "load
-// more" pagination, mirroring useEligibleMrs.ts's shape.
 export const useProjectPicker = (name: string, tenant: string | undefined, enabled: boolean) => {
   const debouncedName = useDebouncedValue(name, 300)
   const hasQuery = debouncedName.trim().length > 0

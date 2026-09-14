@@ -222,7 +222,10 @@ export function toCsv<T extends object>(rows: T[], columns: (keyof T)[]): string
   const lines = rows.map((r) =>
     columns.map((c) => {
       const v = r[c]
-      const s = typeof v === 'object' ? JSON.stringify(v) : String(v ?? '')
+      let s = typeof v === 'object' ? JSON.stringify(v) : String(v ?? '')
+      // A leading =/+/-/@ is executed as a formula by Excel/Sheets on open,
+      // even inside quotes — prefix with a quote character to force plain-text.
+      if (/^[=+\-@]/.test(s)) s = `'${s}`
       return `"${s.replace(/"/g, '""')}"`
     }).join(',')
   )

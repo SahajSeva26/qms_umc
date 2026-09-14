@@ -17,9 +17,8 @@ const WizardStep1 = ({ form, setField }: WizardStep1Props) => {
   const { data: divisionData, isLoading: divisionsLoading, isError: divisionsErrored } = useDivisions({ tenant: form.tenantId || undefined }, !!form.tenantId)
   const divisions = form.tenantId ? divisionData?.data?.items ?? [] : []
 
-  // Scoped by division, not tenant — Contact.division is required for
-  // customer-type contacts (contact.service.ts:112). Gated on divisionId
-  // since there's nothing to pick until one is chosen.
+  // Scoped by division, not tenant (contact.service.ts:112); gated on
+  // divisionId since there's nothing to pick until one is chosen.
   const { data: contactData, isLoading: contactsLoading, isError: contactsErrored } = useContacts({ division: form.divisionId || undefined, status: 'active' }, { enabled: !!form.divisionId })
   const contactPeople = form.divisionId ? contactData?.data?.items ?? [] : []
 

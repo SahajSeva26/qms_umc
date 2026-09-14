@@ -18,8 +18,6 @@ interface TenantResult {
 
 const tenantLabel = (t: TenantResult) => `${t.name} (${t.code})`
 
-// Same shape as LeadIdPicker.tsx — a single search box whose results appear
-// automatically as you type, rather than a separate text box + dropdown.
 const TenantAsyncPicker = ({ value, label, onChange }: TenantAsyncPickerProps) => {
   const [query, setQuery] = useState('')
   const debouncedQuery = useDebouncedValue(query, 300)

@@ -10,7 +10,6 @@ export const DivisionMapper = {
             code: division?.code,
             name: division?.name,
             therapy: division?.therapy,
-            brandFocus: division?.brandFocus,
             mrCount: division?.mrCount,
             tenant: division?.tenant,
 

@@ -18,8 +18,7 @@ export const useSession = () => {
     queryKey: SESSION_QUERY_KEY,
     queryFn: () => accessManagementService.getMe(),
     staleTime: 5 * 60 * 1000, // 5 minutes — permissions rarely change mid-session
-    // Never retry a 401 (no valid session) — retrying doubles isLoading
-    // time, and SessionBootstrap blocks the whole router on isLoading.
+    // Never retry a 401 (no valid session) — retrying just doubles isLoading time for no benefit.
     retry: (failureCount, error) => {
       if (axios.isAxiosError(error) && error.response?.status === 401) return false
       return failureCount < 1

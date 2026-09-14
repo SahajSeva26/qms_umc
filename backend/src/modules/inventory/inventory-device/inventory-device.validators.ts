@@ -37,3 +37,7 @@ export const SearchInventoryDeviceQuerySchema = z.object({
     limit: z.string().optional().openapi({ example: '10' }),
 });
 export type ISearchInventoryDeviceQuery = z.infer<typeof SearchInventoryDeviceQuerySchema>;
+
+//4: report ====================================>
+export const InventoryDeviceReportQuerySchema = z.object({});
+export type IInventoryDeviceReportQuery = z.infer<typeof InventoryDeviceReportQuerySchema>;

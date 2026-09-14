@@ -39,7 +39,7 @@ const PharmaCampTable = ({ camps }: PharmaCampTableProps) => (
               <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
                 {camp.timeSlot ? CAMP_TIME_SLOT_LABEL[camp.timeSlot] : '—'}
               </td>
-              <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{camp.city}, {camp.state}</td>
+              <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{camp.location ? `${camp.location.city}, ${camp.location.state}` : 'Location unavailable'}</td>
               <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{mrName(camp.mr)}</td>
               <td className="px-4 py-2.5"><CampStatusPillReal status={camp.status} /></td>
             </tr>

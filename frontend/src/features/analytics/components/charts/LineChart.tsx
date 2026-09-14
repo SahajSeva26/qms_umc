@@ -11,6 +11,9 @@ interface LineChartProps {
   labels: string[]
   formatY: (value: number) => string
   height?: number
+  // Transforms each axis label for DISPLAY only — hover tooltips and the
+  // aria-label still use the raw `labels` values.
+  formatLabel?: (label: string) => string
 }
 
 const WIDTH = 640
@@ -20,7 +23,7 @@ const PADDING_TOP = 12
 
 // One axis only — both series share the same y-scale (dataviz skill rule:
 // never a dual-axis chart). Legend + direct hover tooltip per point.
-const LineChart = ({ series, labels, formatY, height = 220 }: LineChartProps) => {
+const LineChart = ({ series, labels, formatY, height = 220, formatLabel }: LineChartProps) => {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null)
 
   const allValues = series.flatMap((s) => s.data)
@@ -104,7 +107,7 @@ const LineChart = ({ series, labels, formatY, height = 220 }: LineChartProps) =>
             fill="var(--qms-text-muted)"
             style={{ display: i % 2 === 0 ? undefined : 'none' }}
           >
-            {label}
+            {formatLabel ? formatLabel(label) : label}
           </text>
         ))}
       </svg>

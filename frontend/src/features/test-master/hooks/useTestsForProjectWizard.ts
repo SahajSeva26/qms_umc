@@ -52,10 +52,7 @@ function useCampTypeSlot(therapy: ProjectTherapy | undefined, campType: CampType
 }
 
 // Backend's campType search filter accepts only one value at a time, so a
-// project spanning multiple camp types (or `mixed`) needs one parallel,
-// independently-paginated request per type, merged/deduped into one list.
-// `canBrowseTests` gates the query since not every project-creating actor
-// holds test-master:search/manage (mirrors EditTestModal's canViewResults).
+// project spanning multiple camp types needs one parallel request per type, merged/deduped.
 export function useTestsForProjectWizard(therapy: ProjectTherapy | '', allowedCampTypes: CampType[], canBrowseTests: boolean) {
   const enabled = canBrowseTests && !!therapy && allowedCampTypes.length > 0
   const therapyArg = therapy || undefined

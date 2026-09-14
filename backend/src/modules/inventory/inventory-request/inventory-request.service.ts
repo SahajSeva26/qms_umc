@@ -3,6 +3,7 @@ import { HydratedDocument } from 'mongoose';
 import { InventoryRequestModel, IInventoryRequest } from './inventory-request.model';
 import {
     ICreateInventoryRequestPayload,
+    IInventoryRequestReportQuery,
     IMoveStagePayload,
     ISearchInventoryRequestQuery,
     IUpdateInventoryRequestPayload,
@@ -507,10 +508,39 @@ const moveStage = async (id: string, model: IMoveStagePayload, ctx: RequestConte
     return saved;
 };
 
+// ========================================================================================
+// REPORT
+// ========================================================================================
+// Globally unscoped: this deliberately does NOT call applyOwnScope() and does NOT set
+// where.requestedBy, so it counts EVERY request across all requesters, not just the caller's own.
+const report = async (_filters: IInventoryRequestReportQuery, _ctx: RequestContext) => {
+    const [result] = await InventoryRequestModel.aggregate([
+        {
+            $facet: {
+                total: [{ $count: 'count' }],
+                byStatus: [{ $group: { _id: '$status', count: { $sum: 1 } } }],
+                byType: [{ $group: { _id: '$type', count: { $sum: 1 } } }],
+            },
+        },
+    ]);
+
+    const byStatus = result?.byStatus || [];
+    // pendingRequests is exactly the count of 'requested' (not requested+approved).
+    const pendingRequests = byStatus.find((r: any) => r._id === INVENTORY_REQUEST_STATUS.REQUESTED)?.count || 0;
+
+    return {
+        totalRequests: result?.total?.[0]?.count || 0,
+        requestByStatus: byStatus,
+        requestByType: result?.byType || [],
+        pendingRequests,
+    };
+};
+
 export const InventoryRequestService = {
     get,
     search,
     create,
     update,
     moveStage,
+    report,
 };

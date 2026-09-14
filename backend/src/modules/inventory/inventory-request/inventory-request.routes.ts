@@ -4,6 +4,7 @@ import { InventoryRequestController } from './inventory-request.controller';
 import { registry } from '../../../shared/config/swagger/swagger.registry';
 import {
     CreateInventoryRequestPayloadSchema,
+    InventoryRequestReportQuerySchema,
     MoveStagePayloadSchema,
     SearchInventoryRequestQuerySchema,
     UpdateInventoryRequestPayloadSchema,
@@ -15,6 +16,26 @@ import { INVENTORY_REQUEST_PERMISSIONS } from './inventory-request.constants';
 export const InventoryRequestRouter = express.Router();
 
 InventoryRequestRouter.use(AuthMiddleware);
+
+// inventory request lifecycle report
+registry.registerPath({
+    method: 'get',
+    path: '/inventory-requests/report',
+    tags: ['INVENTORY REQUEST'],
+    summary: 'Inventory request report — request counts by status and type',
+    description:
+        'Request lifecycle snapshot (all requests, globally — not own-scoped): summary.totalRequests, ' +
+        'summary.pendingRequests (count of requested), requests.byStatus (requested/approved/rejected/' +
+        'received/cancelled) and requests.byType (refill/return) — every status/type appears, ' +
+        'defaulting to 0. Requires inventory-request:manage.',
+    request: {
+        query: InventoryRequestReportQuerySchema,
+    },
+    responses: {
+        200: { description: 'Inventory request report generated successfully' },
+        403: { description: 'Forbidden — inventory-request:manage permission required' },
+    },
+});
 
 // get request
 registry.registerPath({
@@ -117,6 +138,11 @@ registry.registerPath({
 // =======================================================================
 // each route accepts its own CRUD permission OR manage (the domain superset). progressing the
 // request's stage (approve/reject/receive) is a manage-only action.
+InventoryRequestRouter.get(
+    '/report',
+    AuthorizeMiddleware([INVENTORY_REQUEST_PERMISSIONS.MANAGE.code]),
+    InventoryRequestController.report,
+);
 InventoryRequestRouter.get(
     '/:id',
     AuthorizeMiddleware([INVENTORY_REQUEST_PERMISSIONS.GET.code, INVENTORY_REQUEST_PERMISSIONS.MANAGE.code], 'OR'),

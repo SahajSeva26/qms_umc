@@ -10,6 +10,7 @@ import { TEST_PERMISSIONS } from '../../modules/operations/test/test.constants';
 import { TENANT_PERMISSIONS } from '../../modules/access-management/tenant/tenant.constants';
 import { DIVISION_PERMISSIONS } from '../../modules/crm/division/division.constants';
 import { CONTACT_PERMISSIONS } from '../../modules/crm/contact/contact.constants';
+import { BRAND_PERMISSIONS } from '../../modules/crm/brand/brand.constants';
 import { ROLE_PERMISSIONS } from '../../modules/access-management/role/role.constants';
 import { INVENTORY_REQUEST_PERMISSIONS } from '../../modules/inventory/inventory-request/inventory-request.constants';
 import { INVENTORY_MASTER_PERMISSIONS } from '../../modules/inventory/inventory-master/inventory-master.constants';
@@ -47,6 +48,10 @@ export const CRM_BUSINESS_ROLE_TYPES = [
 
             CONTACT_PERMISSIONS.SEARCH.code,
             CONTACT_PERMISSIONS.GET.code,
+
+            // read-only view of the brand catalog (their own tenant's brands, scoped by ctx.where)
+            BRAND_PERMISSIONS.SEARCH.code,
+            BRAND_PERMISSIONS.GET.code,
         ],
     },
     {
@@ -64,6 +69,7 @@ export const CRM_BUSINESS_ROLE_TYPES = [
 
             DIVISION_PERMISSIONS.MANAGE.code,
             CONTACT_PERMISSIONS.MANAGE.code,
+            BRAND_PERMISSIONS.MANAGE.code,
         ],
     },
 ];
@@ -118,6 +124,7 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
 
             CAMP_PERMISSIONS.MANAGE.code,
             TEST_MASTER_PERMISSIONS.MANAGE.code,
+            BRAND_PERMISSIONS.MANAGE.code,
             APPOINTMENT_PERMISSIONS.SEARCH.code,
             APPOINTMENT_PERMISSIONS.GET.code,
             APPOINTMENT_PERMISSIONS.RSVP.code,
@@ -133,6 +140,7 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
 
             CAMP_PERMISSIONS.MANAGE.code,
             TEST_MASTER_PERMISSIONS.MANAGE.code,
+            BRAND_PERMISSIONS.MANAGE.code,
             APPOINTMENT_PERMISSIONS.SEARCH.code,
             APPOINTMENT_PERMISSIONS.GET.code,
             APPOINTMENT_PERMISSIONS.RSVP.code,

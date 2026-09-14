@@ -1,4 +1,5 @@
 // Inventory-device Mapper
+import { INVENTORY_DEVICE_STATUS } from './inventory-device.constants';
 
 // item may be a populated InventoryMaster doc or a raw ObjectId ref — surface a shallow shape either way.
 const mapItem = (item: any) => {
@@ -57,4 +58,17 @@ export const InventoryDeviceMapper = {
         count: data?.count || 0,
         items: (data?.items || []).map(InventoryDeviceMapper.toResponse),
     }),
+
+    toReportResponse: (report: any) => {
+        const byStatus = new Map<string, number>((report?.deviceByStatus || []).map((r: any) => [r._id, r.count]));
+
+        return {
+            summary: {
+                totalDevices: report?.totalDevices || 0,
+            },
+            devices: {
+                byStatus: Object.values(INVENTORY_DEVICE_STATUS).map((status) => ({ status, count: byStatus.get(status) || 0 })),
+            },
+        };
+    },
 };

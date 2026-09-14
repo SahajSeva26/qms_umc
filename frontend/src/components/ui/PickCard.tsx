@@ -1,17 +1,6 @@
 import type { ReactNode } from 'react'
 import type { IconType } from 'react-icons'
 
-// Matches the prototype's .pick-grid / .pick-card / .pick-card.on / .pick-card .ic
-// CSS exactly (projects-manager.js / crm-sales-leads.js injectCss()):
-//   .pick-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:8px; }
-//   .pick-card { display:flex; align-items:flex-start; gap:8px; padding:10px; border-radius:12px;
-//                border:1px solid var(--border); background:var(--surface); cursor:pointer; }
-//   .pick-card:hover { border-color:rgba(59,109,255,.4); }
-//   .pick-card.on { border-color:var(--pc,var(--brand-500)); background:color-mix(in srgb,var(--pc,var(--brand-500)) 8%,transparent);
-//                   box-shadow:0 0 0 3px color-mix(in srgb,var(--pc,var(--brand-500)) 16%,transparent); }
-//   .pick-card .ic { width:28px; height:28px; border-radius:8px; color:#fff; background:var(--pc,var(--brand-500)); }
-//   .pick-card .lab { font-size:12px; font-weight:700; color:var(--text); }
-//   .pick-card .ds { font-size:10px; color:var(--text-soft); margin-top:2px; }
 export const PickGrid = ({ children }: { children: ReactNode }) => (
   <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
     {children}
@@ -41,6 +30,7 @@ export const PickCard = ({ active, color, label, desc, icon: Icon, tileColor, ti
   const activeColor = color ?? ACTIVE_DEFAULT
   return (
     <button
+      type="button"
       onClick={onClick}
       className="flex items-start gap-2 p-2.5 rounded-xl border text-left transition-colors"
       style={

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { FiArrowLeft, FiEdit2, FiPlus } from 'react-icons/fi'
+import { FiArrowLeft, FiDownload, FiEdit2, FiPlus } from 'react-icons/fi'
 import { useTenant } from '@/features/access-management/tenant/hooks/useTenant'
 import { useRole } from '@/features/access-management/role/hooks/useRole'
 import { ROLE_ROUTES } from '@/features/access-management/role/role.routes'
@@ -12,14 +12,26 @@ import CreateDivisionModal from '@/features/crm/divisions/components/CreateDivis
 import EditTenantModal from '@/features/access-management/tenant/components/EditTenantModal'
 import EditContactModal from '@/features/contacts/components/EditContactModal'
 import { DIVISION_ROUTES } from '@/features/crm/divisions/divisions.routes'
+import { divisionService } from '@/features/crm/divisions/division.service'
+import { downloadDivisionsCsv } from '@/features/crm/divisions/division.export'
+import { warnIfExportTruncated } from '@/utils/csvExport'
 import { usePermission } from '@/hooks/usePermission'
 import { TENANT_ROUTES } from '@/features/access-management/tenant/tenant.routes'
 import TenantTypeBadge from '@/features/access-management/tenant/components/TenantTypeBadge'
 import TenantStatusPill from '@/features/access-management/tenant/components/TenantStatusPill'
 import { Button } from '@/components/ui/button'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { toast } from '@/components/ui/sonner'
+import { getApiErrorMessage } from '@/utils/apiError'
 import type { DivisionEntity } from '@/types/crm.types'
-import type { RolePopulatedUser } from '@/types/accessManagement.types'
+import type { RolePopulatedUser, Tenant } from '@/types/accessManagement.types'
+
+function formatTenantAddress(address: Tenant['address']): string | null {
+  if (!address) return null
+  const line1 = [address.addressLine1, address.addressLine2, address.locality].filter(Boolean).join(', ')
+  const line2 = [address.city, address.state, address.pincode].filter(Boolean).join(', ')
+  return [line1, line2].filter(Boolean).join(' — ') || null
+}
 
 const TenantDetailPage = () => {
   const { id } = useParams<{ id: string }>()
@@ -40,6 +52,7 @@ const TenantDetailPage = () => {
   const ownerUser = ownerRole && typeof ownerRole.user !== 'string' ? (ownerRole.user as RolePopulatedUser) : null
   const ownerName = ownerUser?.firstName ? `${ownerUser.firstName} ${ownerUser.lastName ?? ''}`.trim() : null
   const ownerEmailSuffix = ownerName && ownerUser?.email ? ownerUser.email : null
+  const tenantAddress = tenant ? formatTenantAddress(tenant.address) : null
 
   const [editOpen, setEditOpen] = useState(false)
   const [createDivisionOpen, setCreateDivisionOpen] = useState(false)
@@ -62,6 +75,53 @@ const TenantDetailPage = () => {
   )
   const divisions = divisionsData?.data?.items ?? []
   const totalDivisions = divisionsData?.data?.count ?? 0
+
+  // Independent of the filtered/paginated list above (whose own `count` shifts with
+  // whatever status filter the table's own dropdown is set to) — count-only, `limit:
+  // '1'`, so this never fetches the actual rows twice. Only division:manage/tenant:admin
+  // can even see the inactive count at all, so the metric is gated the same way.
+  const { data: activeDivisionsData } = useDivisions(
+    { tenant: tenant?.id, status: 'active', limit: '1' },
+    canSeeInactiveDivisions && !!tenant?.id,
+  )
+  const { data: inactiveDivisionsData } = useDivisions(
+    { tenant: tenant?.id, status: 'inactive', limit: '1' },
+    canSeeInactiveDivisions && !!tenant?.id,
+  )
+  const activeDivisionCount = activeDivisionsData?.data?.count
+  const inactiveDivisionCount = inactiveDivisionsData?.data?.count
+  const divisionPenetrationPct =
+    activeDivisionCount !== undefined && inactiveDivisionCount !== undefined && (activeDivisionCount + inactiveDivisionCount) > 0
+      ? Math.round((activeDivisionCount / (activeDivisionCount + inactiveDivisionCount)) * 100)
+      : null
+
+  const [exportingDivisions, setExportingDivisions] = useState(false)
+  // Exports the whole tenant's division set — both statuses, not just whatever
+  // the on-screen filter happens to show, and not just the current
+  // filtered/paginated page (the table itself caps at limit:'10' with no page
+  // control). The backend defaults an unfiltered search to active-only
+  // (division.service.ts), so "the whole set" needs an explicit fetch per
+  // status; canSeeInactiveDivisions gates whether the inactive half is even
+  // visible to this caller (matches the same gate already used for the
+  // Divisions table's own status filter/penetration metric on this page).
+  const handleExportDivisions = async () => {
+    if (!tenant) return
+    setExportingDivisions(true)
+    try {
+      const statuses = canSeeInactiveDivisions ? (['active', 'inactive'] as const) : (['active'] as const)
+      const results = await Promise.all(
+        statuses.map((status) => divisionService.searchDivisions({ tenant: tenant.id, status, limit: '1000' })),
+      )
+      const divisions = results.flatMap((res) => res.data.items)
+      const realTotal = results.reduce((sum, res) => sum + res.data.count, 0)
+      warnIfExportTruncated(divisions.length, realTotal)
+      downloadDivisionsCsv(divisions, `${tenant.code}-divisions-${new Date().toISOString().slice(0, 10)}.csv`)
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'Failed to export divisions.'))
+    } finally {
+      setExportingDivisions(false)
+    }
+  }
 
   return (
     <div className="w-full">
@@ -122,6 +182,26 @@ const TenantDetailPage = () => {
                   {ownerEmailSuffix && <span className="ml-1.5">({ownerEmailSuffix})</span>}
                 </div>
               )}
+              {tenantAddress && (
+                <div className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
+                  Address: <span className="font-semibold" style={{ color: 'var(--qms-text-soft)' }}>{tenantAddress}</span>
+                </div>
+              )}
+              {tenant.businessLifetime != null && (
+                <div className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
+                  Business lifetime: <span className="font-semibold" style={{ color: 'var(--qms-text-soft)' }}>{tenant.businessLifetime} year{tenant.businessLifetime === 1 ? '' : 's'}</span>
+                </div>
+              )}
+              {tenant.gst && (
+                <div className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
+                  GST: <span className="font-semibold" style={{ color: 'var(--qms-text-soft)' }}>{tenant.gst}</span>
+                </div>
+              )}
+              {divisionPenetrationPct !== null && (
+                <div className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
+                  Division Penetration: <span className="font-semibold" style={{ color: 'var(--qms-text-soft)' }}>{divisionPenetrationPct}%</span>
+                </div>
+              )}
             </div>
 
             <Button variant="outline" size="sm" className="shrink-0" onClick={() => setEditOpen(true)}>
@@ -136,9 +216,20 @@ const TenantDetailPage = () => {
                   <h2 className="text-base font-bold" style={{ color: 'var(--qms-text)' }}>Divisions</h2>
                   <p className="text-[12px] mt-0.5" style={{ color: 'var(--qms-text-muted)' }}>
                     {!divisionsLoading && !divisionsError ? `${totalDivisions} total` : 'Divisions under this company.'}
+                    {divisionPenetrationPct !== null && (
+                      <span> · Penetration: <span className="font-semibold" style={{ color: 'var(--qms-text-soft)' }}>{divisionPenetrationPct}%</span></span>
+                    )}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleExportDivisions}
+                    disabled={exportingDivisions || totalDivisions === 0}
+                  >
+                    <FiDownload size={14} /> {exportingDivisions ? 'Exporting…' : 'Export'}
+                  </Button>
                   {canManageContacts && (
                     <Button
                       onClick={() => setAddContactOpen(true)}

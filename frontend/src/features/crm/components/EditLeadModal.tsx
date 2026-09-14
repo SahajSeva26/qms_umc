@@ -66,8 +66,14 @@ const toFormState = (lead: LeadEntity): EditFormState => ({
 
 const PROJECT_TYPES: LeadProjectType[] = ['screening', 'diet', 'tele_diet', 'lab', 'mixed']
 
+// Every field here is last-write-wins server-side — compare against the original
+// snapshot at submit time so a value reverted back to its original is never resent.
+const valueChanged = (a: unknown, b: unknown) =>
+  typeof a === 'object' && a !== null ? JSON.stringify(a) !== JSON.stringify(b) : a !== b
+
 const EditLeadModal = ({ lead, onSave, onClose }: EditLeadModalProps) => {
-  const [form, setForm] = useState<EditFormState>(() => toFormState(lead))
+  const [initial] = useState<EditFormState>(() => toFormState(lead))
+  const [form, setForm] = useState<EditFormState>(initial)
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
@@ -107,21 +113,22 @@ const EditLeadModal = ({ lead, onSave, onClose }: EditLeadModalProps) => {
     }
     setError(null)
 
+    const changed = <K extends keyof EditFormState>(key: K) => valueChanged(form[key], initial[key])
     const payload: UpdateLeadPayload = {
-      contactPerson: form.contactPersonId,
-      salesPerson: form.salesPersonId,
-      title: form.title,
-      problemStatement: form.problemStatement,
-      numberOfMRS: form.numberOfMRS,
-      projectType: form.projectType || undefined,
-      focusTherapy: form.focusTherapy,
-      focusTherapyDoctor: form.focusTherapyDoctor,
-      currentlyDoing: form.currentlyDoing,
-      offers: form.offers,
-      notes: form.notes || undefined,
-      estimatedValue: form.estimatedValue,
-      confidence: form.confidence,
-      followUpDate: form.followUpDate || undefined,
+      ...(changed('contactPersonId') ? { contactPerson: form.contactPersonId } : {}),
+      ...(changed('salesPersonId') ? { salesPerson: form.salesPersonId } : {}),
+      ...(changed('title') ? { title: form.title } : {}),
+      ...(changed('problemStatement') ? { problemStatement: form.problemStatement } : {}),
+      ...(changed('numberOfMRS') ? { numberOfMRS: form.numberOfMRS } : {}),
+      ...(changed('projectType') ? { projectType: form.projectType || undefined } : {}),
+      ...(changed('focusTherapy') ? { focusTherapy: form.focusTherapy } : {}),
+      ...(changed('focusTherapyDoctor') ? { focusTherapyDoctor: form.focusTherapyDoctor } : {}),
+      ...(changed('currentlyDoing') ? { currentlyDoing: form.currentlyDoing } : {}),
+      ...(changed('offers') ? { offers: form.offers } : {}),
+      ...(changed('notes') ? { notes: form.notes || undefined } : {}),
+      ...(changed('estimatedValue') ? { estimatedValue: form.estimatedValue } : {}),
+      ...(changed('confidence') ? { confidence: form.confidence } : {}),
+      ...(changed('followUpDate') ? { followUpDate: form.followUpDate || undefined } : {}),
     }
 
     setIsSaving(true)

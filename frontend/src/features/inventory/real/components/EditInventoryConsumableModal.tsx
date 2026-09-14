@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Controller, useForm } from 'react-hook-form'
+import { Controller, useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import type { ReactNode } from 'react'
 import type { InventoryConsumableEntity } from '@/types/inventoryConsumable.types'
@@ -12,6 +12,7 @@ import {
   type InventoryConsumableUpdateFormValues,
 } from '@/features/inventory/real/schemas/inventoryConsumable.schemas'
 import InventoryMasterItemPicker from '@/features/inventory/real/components/InventoryMasterItemPicker'
+import VendorMasterPicker from '@/features/inventory/real/components/VendorMasterPicker'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -73,6 +74,7 @@ const CreateForm = ({ onClose, mutation }: { onClose: () => void; mutation: Retu
   // label of what it resolved the id to, so the selected item's display text
   // has to be held here alongside the form's own `item` id field.
   const [itemLabel, setItemLabel] = useState('')
+  const [vendorLabel, setVendorLabel] = useState('')
 
   const {
     register,
@@ -84,6 +86,7 @@ const CreateForm = ({ onClose, mutation }: { onClose: () => void; mutation: Retu
     mode: 'onChange',
     defaultValues: {
       item: '',
+      vendor: '',
       batch: '',
       manufacturingDate: '',
       expiryDate: '',
@@ -98,9 +101,11 @@ const CreateForm = ({ onClose, mutation }: { onClose: () => void; mutation: Retu
     mutation.mutate(
       {
         item: values.item,
+        vendor: values.vendor,
         batch: values.batch,
         manufacturingDate: values.manufacturingDate,
-        expiryDate: values.expiryDate,
+        // A blank date input is '', not "no expiry" — send as absent instead.
+        expiryDate: values.expiryDate || undefined,
         quantity: values.quantity,
       },
       { onSuccess: onClose },
@@ -130,6 +135,20 @@ const CreateForm = ({ onClose, mutation }: { onClose: () => void; mutation: Retu
             />
           </Field>
 
+          <Field label="Vendor *" error={fieldError('vendor')}>
+            <Controller
+              control={control}
+              name="vendor"
+              render={({ field }) => (
+                <VendorMasterPicker
+                  value={field.value}
+                  label={vendorLabel}
+                  onChange={(id, label) => { field.onChange(id); setVendorLabel(label) }}
+                />
+              )}
+            />
+          </Field>
+
           <Field label="Batch *" error={fieldError('batch')}>
             <Input type="text" className="text-[13px]" {...register('batch')} />
           </Field>
@@ -138,7 +157,7 @@ const CreateForm = ({ onClose, mutation }: { onClose: () => void; mutation: Retu
             <Field label="Manufacturing date *" error={fieldError('manufacturingDate')}>
               <Input type="date" className="text-[13px]" {...register('manufacturingDate')} />
             </Field>
-            <Field label="Expiry date *" error={fieldError('expiryDate')}>
+            <Field label="Expiry date" error={fieldError('expiryDate')}>
               <Input type="date" className="text-[13px]" {...register('expiryDate')} />
             </Field>
           </div>
@@ -173,7 +192,7 @@ const EditForm = ({
     register,
     handleSubmit,
     control,
-    formState: { errors, touchedFields, isSubmitted },
+    formState: { errors, touchedFields, isSubmitted, dirtyFields },
   } = useForm<InventoryConsumableUpdateFormValues>({
     resolver: zodResolver(updateInventoryConsumableSchema),
     mode: 'onChange',
@@ -189,17 +208,29 @@ const EditForm = ({
   const fieldError = (field: keyof InventoryConsumableUpdateFormValues) =>
     (touchedFields[field] || isSubmitted) ? errors[field]?.message : undefined
 
+  // useWatch (not the plain watch() function) so React Compiler can track this
+  // subscription properly — watch() reads outside React's render tracking.
+  const expiryDateValue = useWatch({ control, name: 'expiryDate' })
+  // Backend can't clear an already-set expiry (server only writes it when truthy),
+  // so blanking the input here would silently revert on save — block instead.
+  const hadExpiry = !!lot.expiryDate
+  const expiryBlanked = hadExpiry && expiryDateValue === ''
+
   const onSubmit = (values: InventoryConsumableUpdateFormValues) => {
     mutation.mutate(
       {
-        batch: values.batch,
-        manufacturingDate: values.manufacturingDate,
-        expiryDate: values.expiryDate,
-        quantity: values.quantity,
+        // Sent only when touched — every field here is last-write-wins server-side,
+        // so resending the stale defaultValues snapshot could clobber a concurrent edit.
+        ...(dirtyFields.batch ? { batch: values.batch } : {}),
+        ...(dirtyFields.manufacturingDate ? { manufacturingDate: values.manufacturingDate } : {}),
+        // Absent, not ''; also no way to CLEAR an already-set expiry via this form —
+        // backend's set() only assigns expiryDate when truthy.
+        ...(dirtyFields.expiryDate ? { expiryDate: values.expiryDate || undefined } : {}),
+        ...(dirtyFields.quantity ? { quantity: values.quantity } : {}),
         // Omitted entirely (not sent as `status: undefined`) unless the
         // caller can actually manage status — matches the backend's own
         // visibility gate: a non-manager can't set what they can't even see.
-        ...(canManageStatus ? { status: values.status } : {}),
+        ...(canManageStatus && dirtyFields.status ? { status: values.status } : {}),
       },
       { onSuccess: onClose },
     )
@@ -214,6 +245,7 @@ const EditForm = ({
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 min-w-0" noValidate>
           <ReadOnlyField label="Catalog item" value={lot.item.name ? `${lot.item.name} (${lot.item.code})` : lot.item.id} />
+          <ReadOnlyField label="Vendor" value={lot.vendor ? (lot.vendor.name ? `${lot.vendor.name} (${lot.vendor.code})` : lot.vendor.id) : '—'} />
 
           <Field label="Batch *" error={fieldError('batch')}>
             <Input type="text" className="text-[13px]" {...register('batch')} />
@@ -242,8 +274,11 @@ const EditForm = ({
             <Field label="Manufacturing date *" error={fieldError('manufacturingDate')}>
               <Input type="date" className="text-[13px]" {...register('manufacturingDate')} />
             </Field>
-            <Field label="Expiry date *" error={fieldError('expiryDate')}>
+            <Field label="Expiry date" error={fieldError('expiryDate')}>
               <Input type="date" className="text-[13px]" {...register('expiryDate')} />
+              {expiryBlanked && (
+                <p className="text-[11px] mt-1 text-danger">Can't be cleared once set — contact support.</p>
+              )}
             </Field>
           </div>
 
@@ -255,7 +290,7 @@ const EditForm = ({
 
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-            <Button type="submit" disabled={mutation.isPending}>
+            <Button type="submit" disabled={mutation.isPending || expiryBlanked}>
               {mutation.isPending ? 'Saving…' : 'Save changes'}
             </Button>
           </div>

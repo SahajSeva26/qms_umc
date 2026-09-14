@@ -20,9 +20,8 @@ import type { WhoCanBookCampCode } from '@/types/project.types'
 
 const PAGE_SIZE = 10
 
-// Must wrap a separate content component, never sit beside the data hooks
-// gated by an early return — that would still mount usePharmaProject/usePharmaCamps
-// (and their queries) for a role the gate is about to reject.
+// Must wrap a separate content component, not sit beside an early-return gate
+// — that would still mount usePharmaProject/usePharmaCamps for a rejected role.
 const PharmaProjectCampsPage = () => (
   <AnyPharmaRoleGate>
     <PharmaProjectCampsContent />
@@ -151,6 +150,7 @@ const PharmaProjectCampsContent = () => {
                 needsMrPicker={needsMrPicker}
                 project={{ id: project.id, name: project.name, campTimeSlots: project.campTimeSlots }}
                 onBooked={handleBooked}
+                onCancel={() => setBookOpen(false)}
               />
             </DialogContent>
           </Dialog>

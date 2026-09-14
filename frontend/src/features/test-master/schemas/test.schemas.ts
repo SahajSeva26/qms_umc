@@ -9,7 +9,6 @@ const configInputOptionSchema = z.object({
   value: z.string().trim().min(1, 'Option value is required'),
 })
 
-// Options required only for a 'select' input, matching the backend model.
 const configInputSchema = z
   .object({
     label: z.string().trim().min(1, 'Field label is required'),
@@ -45,13 +44,10 @@ export const testFormSchema = z.object({
   // code is intentionally absent — server-generated (tst-000001 format).
   name: z.string().trim().min(1, 'Name is required'),
   description: z.string().trim().optional(),
-  // Not a plain z.enum: some legacy records predate/lack this field and load
-  // with therapy === '' in edit mode. buildTestFormSchema requires a real
-  // value only in create mode so those legacy records stay saveable.
+  // Not a plain z.enum: legacy records predate this field and load with
+  // therapy === '' in edit mode; buildTestFormSchema requires it only on create.
   therapy: z.union([z.enum(THERAPY_VALUES), z.literal('')]),
-  // Not a plain z.enum: 12 pre-existing records predate this field and load
-  // with campType === '' in edit mode. buildTestFormSchema requires a real
-  // value only in create mode so those legacy records stay saveable.
+  // Same reasoning as therapy above — some pre-existing records lack campType.
   campType: z.union([z.enum(CAMP_TYPE_VALUES), z.literal('')]),
   duration: z.number({ error: 'Duration is required' }).min(0, 'Duration must be 0 or more'),
   price: z.number({ error: 'Price is required' }).min(0, 'Price must be 0 or more'),
@@ -72,9 +68,8 @@ export const testFormSchema = z.object({
 
 export type TestFormValues = z.infer<typeof testFormSchema>
 
-// Blocks blanking a previously-set description — backend's set() has a
-// falsy-check bug that can't distinguish "omitted" from "explicitly cleared",
-// so a blank PUT would silently no-op instead of actually clearing it.
+// Blocks blanking a previously-set description — backend's set() uses a
+// truthy check, so a blank PUT would silently no-op instead of clearing it.
 export const buildTestFormSchema = (previousDescription: string | undefined, isEdit: boolean) =>
   testFormSchema.superRefine((values, ctx) => {
     const hadDescription = !!previousDescription?.trim()

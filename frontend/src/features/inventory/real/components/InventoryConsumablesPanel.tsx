@@ -1,7 +1,9 @@
-import { useState } from 'react'
-import { FiPlus, FiClock } from 'react-icons/fi'
+import { useMemo, useState } from 'react'
+import { FiPlus, FiClock, FiLayers, FiPackage, FiAlertCircle, FiCheckCircle, FiXCircle } from 'react-icons/fi'
 import { usePermission } from '@/hooks/usePermission'
 import { useInventoryConsumables } from '@/features/inventory/real/hooks/useInventoryConsumables'
+import { useInventoryConsumableReport } from '@/features/inventory/real/hooks/useInventoryConsumableReport'
+import { INVENTORY_CONSUMABLE_STATUS_LABEL } from '@/types/inventoryConsumable.types'
 import type { InventoryConsumableEntity, InventoryConsumableStatus } from '@/types/inventoryConsumable.types'
 import type { InventoryMovementHistorySource } from '@/types/inventoryLedger.types'
 import { Button } from '@/components/ui/button'
@@ -13,6 +15,7 @@ import EditInventoryConsumableModal from '@/features/inventory/real/components/E
 import InventoryConsumableSearchBar from '@/features/inventory/real/components/InventoryConsumableSearchBar'
 import type { InventoryConsumableSearchBarValue } from '@/features/inventory/real/components/InventoryConsumableSearchBar'
 import InventoryMovementHistoryDrawer from '@/features/inventory/real/components/InventoryMovementHistoryDrawer'
+import InventoryReportKpiStrip, { type InventoryReportTile } from '@/features/inventory/real/components/InventoryReportKpiStrip'
 import { usePagination } from '@/hooks/usePagination'
 import { truncateIdentifier } from '@/features/inventory/real/utils/truncateIdentifier'
 
@@ -43,6 +46,23 @@ const InventoryConsumablesPanel = () => {
   const items = data?.data?.items ?? []
   const totalCount = data?.data?.count ?? 0
 
+  const { report, isLoading: reportLoading, error: reportError } = useInventoryConsumableReport(canManage)
+  const reportTiles = useMemo<InventoryReportTile[]>(() => {
+    if (!report) return []
+    const byStatus = new Map(report.consumables.byStatus.map((s) => [s.status, s.count]))
+    return [
+      { key: 'lots', label: 'Consumable Lots', value: report.summary.consumableLots, tone: 'brand', icon: FiLayers },
+      // "Active stock units", not "Warehouse Qty" — there's no
+      // warehouse/location filter; it's the same value as summary.warehouseConsumableQuantity.
+      { key: 'stock-units', label: 'Active stock units', value: report.consumables.warehouseQuantity, tone: 'teal', icon: FiPackage },
+      // Distinct from the 'expired' status tile below: this is a date-based
+      // count (past expiryDate), not the lot's own status field.
+      { key: 'expired-by-date', label: 'Expired (by date)', value: report.consumables.expiredByDate, tone: 'amber', icon: FiAlertCircle },
+      { key: 'status-active', label: INVENTORY_CONSUMABLE_STATUS_LABEL.active, value: byStatus.get('active') ?? 0, tone: 'emerald', icon: FiCheckCircle },
+      { key: 'status-expired', label: INVENTORY_CONSUMABLE_STATUS_LABEL.expired, value: byStatus.get('expired') ?? 0, tone: 'rose', icon: FiXCircle },
+    ]
+  }, [report])
+
   return (
     <div>
       <div className="mb-3 flex items-start justify-between gap-4">
@@ -59,6 +79,14 @@ const InventoryConsumablesPanel = () => {
           </Button>
         )}
       </div>
+
+      <InventoryReportKpiStrip
+        tiles={reportTiles}
+        isLoading={reportLoading}
+        error={reportError}
+        canView={canManage}
+        skeletonCount={5}
+      />
 
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <InventoryConsumableSearchBar

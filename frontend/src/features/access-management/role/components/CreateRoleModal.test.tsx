@@ -8,7 +8,7 @@ import type { DivisionEntity } from '@/types/crm.types'
 
 vi.mock('@/features/access-management/accessManagement.service', () => ({
   accessManagementService: {
-    searchTenants: vi.fn(async () => ({ success: true, message: '', data: { items: [{ id: 't-1', name: 'Acme', code: 'acme' }], count: 1 } })),
+    searchTenants: vi.fn(async () => ({ success: true, message: '', data: { items: [{ id: 't-1', name: 'Acme', code: 'acme', address: null, businessLifetime: null, gst: null }], count: 1 } })),
     searchRoleTypes: vi.fn(async () => ({ success: true, message: '', data: { items: [], count: 0 } })),
     searchRoles: vi.fn(async () => ({ success: true, message: '', data: { items: [], count: 0 } })),
     searchPermissionGroups: vi.fn(async () => ({ success: true, message: '', data: { items: [], count: 0 } })),
@@ -116,7 +116,7 @@ describe('CreateRoleModal', () => {
     const { divisionService } = await import('@/features/crm/divisions/division.service')
 
     vi.mocked(accessManagementService.searchTenants).mockResolvedValue({
-      success: true, message: '', data: { items: [{ id: 't-1', name: 'Acme', code: 'acme' }], count: 1 },
+      success: true, message: '', data: { items: [{ id: 't-1', name: 'Acme', code: 'acme', address: null, businessLifetime: null, gst: null }], count: 1 },
     })
     vi.mocked(accessManagementService.searchRoleTypes).mockResolvedValue({
       success: true,
@@ -132,8 +132,9 @@ describe('CreateRoleModal', () => {
     vi.mocked(divisionService.searchDivisions).mockResolvedValue({
       success: true, message: '', data: { items: [divisionFixture()], count: 1 },
     } as never)
+    // Zero candidates — a single one now auto-fills (see the test below).
     vi.mocked(accessManagementService.searchRoles).mockResolvedValue({
-      success: true, message: '', data: { items: [roleFixture()], count: 1 },
+      success: true, message: '', data: { items: [], count: 0 },
     } as never)
     vi.mocked(accessManagementService.searchPermissionGroups).mockResolvedValue({
       success: true, message: '', data: { items: [permissionGroupFixture()], count: 1 },
@@ -166,8 +167,60 @@ describe('CreateRoleModal', () => {
     await user.click(nextButton)
 
     expect(screen.queryByText(/step 2 of 3/i)).not.toBeInTheDocument()
-    expect(await screen.findByText(/select a supervisor/i)).toBeInTheDocument()
+    // Renders once as RoleDetailsSection's inline hint and again as this
+    // step's blocked-Next banner — both share this same copy.
+    await waitFor(() => expect(screen.getAllByText(/no eligible supervisor/i).length).toBeGreaterThan(0))
     expect(accessManagementService.createRole).not.toHaveBeenCalled()
+  })
+
+  it('auto-fills the supervisor when exactly one eligible candidate exists for the chosen division', async () => {
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    const { divisionService } = await import('@/features/crm/divisions/division.service')
+
+    vi.mocked(accessManagementService.searchTenants).mockResolvedValue({
+      success: true, message: '', data: { items: [{ id: 't-1', name: 'Acme', code: 'acme', address: null, businessLifetime: null, gst: null }], count: 1 },
+    })
+    vi.mocked(accessManagementService.searchRoleTypes).mockResolvedValue({
+      success: true,
+      message: '',
+      data: {
+        items: [
+          roleTypeFixture({ id: 'rt-rsm', code: 'pharma-rsm', name: 'RSM' }),
+          roleTypeFixture({ id: 'rt-dh', code: 'pharma-division-head', name: 'Division Head' }),
+        ],
+        count: 2,
+      },
+    })
+    vi.mocked(divisionService.searchDivisions).mockResolvedValue({
+      success: true, message: '', data: { items: [divisionFixture()], count: 1 },
+    } as never)
+    // Division Head is architecturally singular per division — exactly one
+    // active candidate is the common, expected case this auto-fill targets.
+    vi.mocked(accessManagementService.searchRoles).mockResolvedValue({
+      success: true, message: '', data: { items: [roleFixture()], count: 1 },
+    } as never)
+    vi.mocked(accessManagementService.searchPermissionGroups).mockResolvedValue({
+      success: true, message: '', data: { items: [permissionGroupFixture()], count: 1 },
+    })
+
+    const queryClient = makeQueryClient()
+    const user = userEvent.setup()
+    await renderAndOpenModal(user, queryClient)
+
+    await user.type(screen.getByLabelText(/code/i), 'rsm-north')
+    await user.type(screen.getByLabelText(/^name$/i), 'RSM North')
+    await selectCompany(user, 'Acme', /Acme/i)
+    await selectByLabel(user, /role type/i, /RSM/i)
+    await waitFor(() => expect(screen.getByText(/select division/i)).toBeInTheDocument())
+    await selectByVisibleText(user, /select division/i, /Cardiology Division/i)
+
+    // No manual supervisor selection — the one candidate fills in on its own.
+    await waitFor(() => expect(screen.getByText(/Existing Supervisor/i)).toBeInTheDocument())
+    expect(screen.queryByText(/^select supervisor$/i)).not.toBeInTheDocument()
+
+    // Next proceeds straight through since the field is already satisfied.
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    expect(await screen.findByText(/step 2 of 3/i)).toBeInTheDocument()
   })
 
   it('changing Company clears role type, division, and supervisor', async () => {
@@ -177,7 +230,7 @@ describe('CreateRoleModal', () => {
     vi.mocked(accessManagementService.searchTenants).mockResolvedValue({
       success: true,
       message: '',
-      data: { items: [{ id: 't-1', name: 'Acme', code: 'acme' }, { id: 't-2', name: 'Beta Co', code: 'beta' }], count: 2 },
+      data: { items: [{ id: 't-1', name: 'Acme', code: 'acme', address: null, businessLifetime: null, gst: null }, { id: 't-2', name: 'Beta Co', code: 'beta', address: null, businessLifetime: null, gst: null }], count: 2 },
     })
     vi.mocked(accessManagementService.searchRoleTypes).mockResolvedValue({
       success: true,
@@ -209,8 +262,8 @@ describe('CreateRoleModal', () => {
     await selectByLabel(user, /role type/i, /RSM/i)
     await waitFor(() => expect(screen.getByText(/select division/i)).toBeInTheDocument())
     await selectByVisibleText(user, /select division/i, /Cardiology Division/i)
-    await waitFor(() => expect(screen.getByText(/select supervisor/i)).toBeInTheDocument())
-    await selectByVisibleText(user, /select supervisor/i, /Existing Supervisor/i)
+    // The single eligible candidate auto-fills — no manual supervisor pick needed.
+    await waitFor(() => expect(screen.getByText(/Existing Supervisor/i)).toBeInTheDocument())
 
     expect(screen.queryByText(/^select division$/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/^select supervisor$/i)).not.toBeInTheDocument()
@@ -220,9 +273,8 @@ describe('CreateRoleModal', () => {
     await selectCompany(user, 'Beta', /Beta Co/i)
 
     await waitFor(() => expect(screen.getByText(/select a company first|select role type/i)).toBeInTheDocument())
-    // Checking the division/supervisor UI is merely absent wouldn't catch a
-    // stale-value bug, since a cleared field looks the same either way — instead
-    // re-select RSM under the NEW company and confirm the OLD selections don't reappear.
+    // A cleared field looks the same as absent, so re-select RSM and confirm
+    // the OLD division/supervisor selections don't reappear.
     await selectByLabel(user, /role type/i, /RSM/i)
     await waitFor(() => expect(screen.queryByText(/Cardiology Division/i)).not.toBeInTheDocument())
     expect(screen.getByText(/^select division$/i)).toBeInTheDocument()
@@ -234,7 +286,7 @@ describe('CreateRoleModal', () => {
     const { divisionService } = await import('@/features/crm/divisions/division.service')
 
     vi.mocked(accessManagementService.searchTenants).mockResolvedValue({
-      success: true, message: '', data: { items: [{ id: 't-1', name: 'Acme', code: 'acme' }], count: 1 },
+      success: true, message: '', data: { items: [{ id: 't-1', name: 'Acme', code: 'acme', address: null, businessLifetime: null, gst: null }], count: 1 },
     })
     vi.mocked(accessManagementService.searchRoleTypes).mockResolvedValue({
       success: true,
@@ -268,8 +320,8 @@ describe('CreateRoleModal', () => {
     await selectByLabel(user, /role type/i, /RSM/i)
     await waitFor(() => expect(screen.getByText(/select division/i)).toBeInTheDocument())
     await selectByVisibleText(user, /select division/i, /Cardiology Division/i)
-    await waitFor(() => expect(screen.getByText(/select supervisor/i)).toBeInTheDocument())
-    await selectByVisibleText(user, /select supervisor/i, /Existing Supervisor/i)
+    // The single eligible candidate auto-fills — no manual supervisor pick needed.
+    await waitFor(() => expect(screen.getByText(/Existing Supervisor/i)).toBeInTheDocument())
 
     expect(screen.queryByText(/^select division$/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/^select supervisor$/i)).not.toBeInTheDocument()
@@ -286,7 +338,7 @@ describe('CreateRoleModal', () => {
     const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
 
     vi.mocked(accessManagementService.searchTenants).mockResolvedValue({
-      success: true, message: '', data: { items: [{ id: 't-1', name: 'Acme', code: 'acme' }], count: 1 },
+      success: true, message: '', data: { items: [{ id: 't-1', name: 'Acme', code: 'acme', address: null, businessLifetime: null, gst: null }], count: 1 },
     })
     vi.mocked(accessManagementService.searchRoleTypes).mockResolvedValue({
       success: true,
@@ -347,7 +399,7 @@ describe('CreateRoleModal', () => {
     const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
 
     vi.mocked(accessManagementService.searchTenants).mockResolvedValue({
-      success: true, message: '', data: { items: [{ id: 't-1', name: 'Acme', code: 'acme' }], count: 1 },
+      success: true, message: '', data: { items: [{ id: 't-1', name: 'Acme', code: 'acme', address: null, businessLifetime: null, gst: null }], count: 1 },
     })
     vi.mocked(accessManagementService.searchRoleTypes).mockResolvedValue({
       success: true,

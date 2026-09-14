@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { FiFilter, FiXCircle, FiUsers, FiBriefcase } from 'react-icons/fi'
 import type { LeadEntity, LeadStatus } from '@/types/crm.types'
-import { LEAD_STATUS_LABEL, LEAD_STATUS_COLOR } from '@/types/crm.types'
+import { LEAD_STATUS_LABEL, LEAD_STATUS_COLOR, LEAD_STATUS_ON_COLOR } from '@/types/crm.types'
 import { roleLabel, tenantLabel } from '@/features/crm/crm.utils'
 import { formatINR } from '@/utils/formatters'
 import AnalyticsSectionCard from '@/features/analytics/components/AnalyticsSectionCard'
@@ -29,6 +29,7 @@ const SalesPipelineTab = ({ leads }: SalesPipelineTabProps) => {
         count: statusLeads.length,
         value: statusLeads.reduce((sum, l) => sum + l.estimatedValue, 0),
         color: LEAD_STATUS_COLOR[status],
+        onColor: LEAD_STATUS_ON_COLOR[status],
       }
     })
   }, [leads])

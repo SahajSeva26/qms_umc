@@ -69,14 +69,14 @@ const RoleUserSection = <TFormValues extends FieldValues & RoleUserFields>({
           <>
             <div>
               <FieldLabel htmlFor="userEmail">Email</FieldLabel>
-              <Input id="userEmail" type="email" {...register(field('userEmail'))} />
+              <Input id="userEmail" type="email" autoComplete="off" {...register(field('userEmail'))} />
               {fieldTouched('userEmail') && fieldError('userEmail') && (
                 <p className="text-xs text-danger mt-1.5">{fieldError('userEmail')?.message as string}</p>
               )}
             </div>
             <div>
               <FieldLabel htmlFor="userPassword">Password</FieldLabel>
-              <PasswordInput id="userPassword" {...register(field('userPassword'))} />
+              <PasswordInput id="userPassword" autoComplete="new-password" {...register(field('userPassword'))} />
               {fieldTouched('userPassword') && fieldError('userPassword') && (
                 <p className="text-xs text-danger mt-1.5">{fieldError('userPassword')?.message as string}</p>
               )}

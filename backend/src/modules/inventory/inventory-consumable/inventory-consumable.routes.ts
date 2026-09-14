@@ -4,6 +4,7 @@ import { InventoryConsumableController } from './inventory-consumable.controller
 import { registry } from '../../../shared/config/swagger/swagger.registry';
 import {
     CreateInventoryConsumablePayloadSchema,
+    InventoryConsumableReportQuerySchema,
     SearchInventoryConsumableQuerySchema,
     UpdateInventoryConsumablePayloadSchema,
 } from './inventory-consumable.validators';
@@ -14,6 +15,27 @@ import { INVENTORY_CONSUMABLE_PERMISSIONS } from './inventory-consumable.constan
 export const InventoryConsumableRouter = express.Router();
 
 InventoryConsumableRouter.use(AuthMiddleware);
+
+// inventory consumable stock report
+registry.registerPath({
+    method: 'get',
+    path: '/inventory-consumables/report',
+    tags: ['INVENTORY CONSUMABLE'],
+    summary: 'Inventory consumable report — lot counts, active stock quantity, expiry',
+    description:
+        'Consumable stock snapshot: summary.consumableLots (total lots) and summary.' +
+        'warehouseConsumableQuantity + consumables.warehouseQuantity (both = SUM of quantity over ' +
+        'active lots only — no location filter, same value), consumables.expiredByDate (lots with ' +
+        'expiryDate < now, date-based not status-based), and consumables.byStatus (counts per status ' +
+        '— active/expired — every status appears, defaulting to 0). Requires inventory-consumable:manage.',
+    request: {
+        query: InventoryConsumableReportQuerySchema,
+    },
+    responses: {
+        200: { description: 'Inventory consumable report generated successfully' },
+        403: { description: 'Forbidden — inventory-consumable:manage permission required' },
+    },
+});
 
 // get consumable lot
 registry.registerPath({
@@ -92,6 +114,12 @@ registry.registerPath({
 // ================= EXPORT INVENTORY CONSUMABLE ROUTES ==================
 // =======================================================================
 // reads are open to any authenticated user; only writes (create/update) are permission-guarded.
+// the report is manager-only; it MUST be registered before '/:id' so 'report' is not read as an id.
+InventoryConsumableRouter.get(
+    '/report',
+    AuthorizeMiddleware([INVENTORY_CONSUMABLE_PERMISSIONS.MANAGE.code]),
+    InventoryConsumableController.report,
+);
 InventoryConsumableRouter.get('/:id', InventoryConsumableController.get);
 InventoryConsumableRouter.get('/', InventoryConsumableController.search);
 

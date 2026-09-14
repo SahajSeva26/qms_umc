@@ -68,7 +68,7 @@ const InventoryMovementHistoryDrawer = ({ open, onClose, source, canManage }: In
           </span>
         ) : (
           <p className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>
-            Warehouse quantity: {source.summary.quantity} · {source.summary.status === 'active' ? 'Active' : source.summary.status === 'expired' ? 'Expired' : 'Status unavailable'} · Expires {formatDate(source.summary.expiryDate)}
+            Warehouse quantity: {source.summary.quantity} · {source.summary.status === 'active' ? 'Active' : source.summary.status === 'expired' ? 'Expired' : 'Status unavailable'} · {source.summary.expiryDate ? `Expires ${formatDate(source.summary.expiryDate)}` : 'No expiry'}
           </p>
         )}
       </div>

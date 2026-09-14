@@ -161,12 +161,8 @@ describe('AppLayout — pharma/QMS route isolation', () => {
       refetchSession: vi.fn(),
     } as unknown as ReturnType<typeof useSession>)
 
-    // No matching route for this path — router falls through with nothing
-    // rendered inside AppLayout's <Outlet />, but crucially AppLayout itself
-    // must not treat this path as "on a pharma path" and skip its own redirect.
     await renderAt('/pharmaceutical-x')
 
-    // A pharma session on a non-pharma, non-exact-match path still redirects to their portal.
     expect(await screen.findByText('RSM Portal Page')).toBeInTheDocument()
   })
 })

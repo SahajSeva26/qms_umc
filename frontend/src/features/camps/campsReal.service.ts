@@ -2,6 +2,8 @@ import api from '@/lib/api/api'
 import type { ApiResponse, PaginatedResponse } from '@/types/common.types'
 import type {
   BookCampPayload,
+  BookingAvailabilityPayload,
+  BookingAvailabilityResponse,
   CampEntity,
   CampMutationResponseEntity,
   CreateCampPayload,
@@ -9,9 +11,10 @@ import type {
   SearchCampQuery,
   UpdateCampPayload,
 } from '@/types/campReal.types'
+import type { CampReport } from '@/types/campReport.types'
 
 // Real API calls against backend/src/modules/operations/camp/**. Deliberately
-// separate from `camps.service.ts` (the old mock store ~100 files still depend on).
+// separate from `camps.service.ts`, the old mock store other files still depend on.
 
 const searchCamps = async (query: SearchCampQuery) => {
   const res = await api.get<PaginatedResponse<CampEntity>>('/camps', { params: query })
@@ -23,9 +26,8 @@ const getCamp = async (id: string) => {
   return res.data
 }
 
-// create/bookCamp/update/moveStage/allocateFo return the unpopulated in-memory
-// document (CampMutationResponseEntity, not CampEntity — see its doc comment).
-// Never read `.devices` off these as populated; fetch/refetch the camp instead.
+// Mutations return the unpopulated in-memory document (CampMutationResponseEntity,
+// not CampEntity) — never read `.devices` off these as populated; fetch/refetch the camp instead.
 const createCamp = async (payload: CreateCampPayload) => {
   const res = await api.post<ApiResponse<CampMutationResponseEntity>>('/camps', payload)
   return res.data
@@ -53,6 +55,22 @@ const allocateFo = async (id: string) => {
   return res.data
 }
 
+const getCampReport = async () => {
+  const res = await api.get<ApiResponse<CampReport>>('/camps/report')
+  return res.data
+}
+
+// Backend requires the payload key spelled `projectID` — translated here
+// only, so no other caller in the app has to know about that spelling.
+const getBookingAvailability = async (payload: BookingAvailabilityPayload) => {
+  const { projectId, ...rest } = payload
+  const res = await api.post<ApiResponse<BookingAvailabilityResponse>>('/camps/booking-availability', {
+    projectID: projectId,
+    ...rest,
+  })
+  return res.data
+}
+
 export const campsRealService = {
   searchCamps,
   getCamp,
@@ -61,4 +79,6 @@ export const campsRealService = {
   updateCamp,
   moveCampStage,
   allocateFo,
+  getCampReport,
+  getBookingAvailability,
 }

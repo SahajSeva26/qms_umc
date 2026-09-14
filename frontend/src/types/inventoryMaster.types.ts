@@ -14,6 +14,21 @@ export const INVENTORY_MASTER_TYPE_LABEL: Record<InventoryMasterType, string> = 
 
 export type InventoryMasterStatus = 'active' | 'inactive'
 
+export const INVENTORY_MASTER_STATUS_LABEL: Record<InventoryMasterStatus, string> = {
+  active: 'Active',
+  inactive: 'Inactive',
+}
+
+// GET /inventory-masters/report — no query params (empty backend schema),
+// always an organisation-wide aggregate. Gated on inventory-master:manage alone.
+export interface InventoryMasterReportResponse {
+  summary: { catalogItems: number }
+  catalog: {
+    byType: { type: InventoryMasterType; count: number }[]
+    byStatus: { status: InventoryMasterStatus; count: number }[]
+  }
+}
+
 export interface InventoryMasterEntity {
   id: string
   code: string
@@ -23,7 +38,6 @@ export interface InventoryMasterEntity {
   sku: string
   unit: string
   minStock: number
-  maxStock: number
   createdAt: string
   updatedAt: string
   // Key is ABSENT (not null/undefined-but-present) unless the caller holds
@@ -51,7 +65,6 @@ export interface CreateInventoryMasterPayload {
   type?: InventoryMasterType
   status?: InventoryMasterStatus
   minStock?: number
-  maxStock?: number
 }
 
 export interface UpdateInventoryMasterPayload {
@@ -65,5 +78,4 @@ export interface UpdateInventoryMasterPayload {
   type?: InventoryMasterType
   status?: InventoryMasterStatus
   minStock?: number
-  maxStock?: number
 }

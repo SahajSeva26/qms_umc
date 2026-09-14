@@ -20,6 +20,13 @@ export const INVENTORY_DEVICE_STATUS_LABEL: Record<InventoryDeviceStatus, string
   damaged: 'Damaged',
 }
 
+// GET /inventory-devices/report — no query params (empty backend schema),
+// always an organisation-wide aggregate. Gated on inventory-device:manage alone.
+export interface InventoryDeviceReportResponse {
+  summary: { totalDevices: number }
+  devices: { byStatus: { status: InventoryDeviceStatus; count: number }[] }
+}
+
 export interface InventoryDeviceItemRef {
   id: string
   code?: string
@@ -28,9 +35,20 @@ export interface InventoryDeviceItemRef {
   unit?: string
 }
 
+// vendor is populated to {id, code, name} when hydrated, {id} only when not
+// (inventory-device.mapper.ts's mapVendor()). null on any device created
+// before `vendor` became a required field — the backend only enforces
+// required-ness on save, not retroactively on existing documents.
+export interface InventoryDeviceVendorRef {
+  id: string
+  code?: string
+  name?: string
+}
+
 export interface InventoryDeviceEntity {
   id: string
   item: InventoryDeviceItemRef
+  vendor: InventoryDeviceVendorRef | null
   serialNumber: string
   // Never permission-gated — every authenticated reader sees the real status.
   status: InventoryDeviceStatus
@@ -52,6 +70,7 @@ export interface SearchInventoryDeviceQuery {
 
 export interface CreateInventoryDevicePayload {
   item: string
+  vendor: string
   serialNumber: string
   manufacturingDate?: string
   warrantyExpiryDate?: string
@@ -60,7 +79,7 @@ export interface CreateInventoryDevicePayload {
 }
 
 export interface UpdateInventoryDevicePayload {
-  // item/serialNumber intentionally absent — immutable post-create.
+  // item/vendor/serialNumber intentionally absent — immutable post-create.
   manufacturingDate?: string
   warrantyExpiryDate?: string
   status?: InventoryDeviceStatus

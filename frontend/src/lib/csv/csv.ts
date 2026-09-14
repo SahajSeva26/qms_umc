@@ -14,8 +14,11 @@
 export function toCsv(rows: Record<string, unknown>[]): string {
   if (!rows.length) return ''
   const headers = Object.keys(rows[0])
+  // A leading =/+/-/@ is executed as a formula by Excel/Sheets on open —
+  // prefix with a quote to force plain-text (OWASP's CSV-injection mitigation).
   const escape = (v: unknown): string => {
-    const s = v === null || v === undefined ? '' : String(v)
+    let s = v === null || v === undefined ? '' : String(v)
+    if (/^[=+\-@]/.test(s)) s = `'${s}`
     if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`
     return s
   }

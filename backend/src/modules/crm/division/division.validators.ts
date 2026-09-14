@@ -34,7 +34,6 @@ export const CreateDivisionPayloadSchema = z.object({
     name: z.string().min(1).openapi({ example: 'Cardio Care' }),
     // one or more therapy areas — a division may span several
     therapy: TherapyListSchema,
-    brandFocus: z.string().optional().openapi({ example: 'Atorvastatin+' }),
     mrCount: z.number().int().nonnegative().optional().openapi({ example: 38 }),
     // the division is created together with its head: a new user (registered inactive) linked to a
     // pharma-division-head role scoped to this division. Required — every division has a head.
@@ -49,7 +48,6 @@ export const UpdateDivisionPayloadSchema = z.object({
     name: z.string().min(1).optional().openapi({ example: 'Cardio Care' }),
     // replaces the therapy list wholesale when supplied — must be a non-empty, duplicate-free list
     therapy: TherapyListSchema.optional(),
-    brandFocus: z.string().optional().openapi({ example: 'Atorvastatin+' }),
     mrCount: z.number().int().nonnegative().optional().openapi({ example: 38 }),
     status: z
         .enum([DIVISION_STATUS.ACTIVE, DIVISION_STATUS.INACTIVE])

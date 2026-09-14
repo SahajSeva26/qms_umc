@@ -1,6 +1,6 @@
 // Inventory-consumable Mapper
 import { RequestContext } from '../../../shared/utils/contextBuilder';
-import { INVENTORY_CONSUMABLE_PERMISSIONS } from './inventory-consumable.constants';
+import { INVENTORY_CONSUMABLE_PERMISSIONS, INVENTORY_CONSUMABLE_STATUS } from './inventory-consumable.constants';
 
 // item may be a populated InventoryMaster doc or a raw ObjectId ref — surface a shallow shape either way.
 const mapItem = (item: any) => {
@@ -65,5 +65,23 @@ export const InventoryConsumableMapper = {
             result.items.push(InventoryConsumableMapper.toResponse(lot, ctx));
         }
         return result;
+    },
+
+    // warehouseConsumableQuantity and consumables.warehouseQuantity are the same value surfaced twice.
+    toReportResponse: (report: any) => {
+        const byStatus = new Map<string, number>((report?.consumableByStatus || []).map((r: any) => [r._id, r.count]));
+        const warehouseQuantity = report?.warehouseConsumableQuantity || 0;
+
+        return {
+            summary: {
+                consumableLots: report?.totalConsumableLots || 0,
+                warehouseConsumableQuantity: warehouseQuantity,
+            },
+            consumables: {
+                warehouseQuantity,
+                expiredByDate: report?.expiredByDate || 0,
+                byStatus: Object.values(INVENTORY_CONSUMABLE_STATUS).map((status) => ({ status, count: byStatus.get(status) || 0 })),
+            },
+        };
     },
 };

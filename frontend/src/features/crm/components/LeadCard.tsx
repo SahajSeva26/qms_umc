@@ -1,6 +1,6 @@
 import { FiClock } from 'react-icons/fi'
 import type { LeadEntity, LeadStatus } from '@/types/crm.types'
-import { LEAD_STATUS_LABEL, LEAD_TRANSITION_MAP } from '@/types/crm.types'
+import { LEAD_ADVANCE_ACTION_LABEL, LEAD_STATUS_COLOR, LEAD_STATUS_TEXT_COLOR, LEAD_TRANSITION_MAP } from '@/types/crm.types'
 import { formatINR } from '@/utils/formatters'
 import { roleLabel, contactPersonLabel, divisionLabel } from '@/features/crm/crm.utils'
 import UserAvatar from '@/components/ui/UserAvatar'
@@ -64,10 +64,14 @@ const LeadCard = ({ lead, onOpen, onAdvance, draggable, onDragStart, onDragEnd }
                 e.stopPropagation()
                 onAdvance(lead.id, to)
               }}
-              className="w-full text-[11px] font-semibold py-1.5 rounded-lg border transition-all hover:bg-(--qms-surface-hover)"
-              style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-soft)' }}
+              className="w-full text-[11px] font-semibold py-1.5 rounded-lg border transition-all hover:opacity-80"
+              style={{
+                borderColor: `color-mix(in srgb, ${LEAD_STATUS_COLOR[to]} 35%, transparent)`,
+                background: `color-mix(in srgb, ${LEAD_STATUS_COLOR[to]} 13%, transparent)`,
+                color: LEAD_STATUS_TEXT_COLOR[to],
+              }}
             >
-              Move to {LEAD_STATUS_LABEL[to]} →
+              {LEAD_ADVANCE_ACTION_LABEL[to]}
             </button>
           ))}
         </div>

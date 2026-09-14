@@ -46,7 +46,7 @@ const EditInventoryMasterModal = ({ item, onClose }: EditInventoryMasterModalPro
     register,
     handleSubmit,
     control,
-    formState: { errors, touchedFields, isSubmitted },
+    formState: { errors, touchedFields, isSubmitted, dirtyFields },
   } = useForm<InventoryMasterFormValues>({
     // One resolver for both modes — code is always valid in edit mode (disabled,
     // pre-filled), harmless to validate; it's stripped before sending since update doesn't accept it.
@@ -64,7 +64,6 @@ const EditInventoryMasterModal = ({ item, onClose }: EditInventoryMasterModalPro
       // non-manage caller, so this can't default from item?.status alone.
       status: item?.status ?? 'active',
       minStock: item?.minStock ?? 0,
-      maxStock: item?.maxStock ?? 0,
     },
   })
 
@@ -77,8 +76,20 @@ const EditInventoryMasterModal = ({ item, onClose }: EditInventoryMasterModalPro
 
   const onSubmit = (values: InventoryMasterFormValues) => {
     if (isEdit) {
-      const { name, description, sku, unit, type, status, minStock, maxStock } = values
-      updateMutation.mutate({ name, description, sku, unit, type, status, minStock, maxStock }, { onSuccess: onClose })
+      // Sent only when touched — every field here is last-write-wins server-side,
+      // so resending the stale defaultValues snapshot could clobber a concurrent edit.
+      updateMutation.mutate(
+        {
+          ...(dirtyFields.name ? { name: values.name } : {}),
+          ...(dirtyFields.description ? { description: values.description } : {}),
+          ...(dirtyFields.sku ? { sku: values.sku } : {}),
+          ...(dirtyFields.unit ? { unit: values.unit } : {}),
+          ...(dirtyFields.type ? { type: values.type } : {}),
+          ...(dirtyFields.status ? { status: values.status } : {}),
+          ...(dirtyFields.minStock ? { minStock: values.minStock } : {}),
+        },
+        { onSuccess: onClose },
+      )
       return
     }
     createMutation.mutate(values, { onSuccess: onClose })
@@ -157,14 +168,9 @@ const EditInventoryMasterModal = ({ item, onClose }: EditInventoryMasterModalPro
             </Field>
           </div>
 
-          <div className="grid grid-cols-2 gap-2.5">
-            <Field label="Min stock" error={fieldError('minStock')}>
-              <Input type="number" className="text-[13px]" {...register('minStock', { valueAsNumber: true })} />
-            </Field>
-            <Field label="Max stock" error={fieldError('maxStock')}>
-              <Input type="number" className="text-[13px]" {...register('maxStock', { valueAsNumber: true })} />
-            </Field>
-          </div>
+          <Field label="Min stock" error={fieldError('minStock')}>
+            <Input type="number" className="text-[13px]" {...register('minStock', { valueAsNumber: true })} />
+          </Field>
 
           <MutationStatusBanner mutation={mutation} errorFallback="Could not save the item — try again." showSuccess={false} />
 

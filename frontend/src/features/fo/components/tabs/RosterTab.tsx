@@ -1,99 +1,127 @@
-import { useMemo, useState } from 'react'
-import type { Person } from '@/types/people.types'
-import type { Camp } from '@/types/camp.types'
-import FoFilterBar, { type FoFilters } from '@/features/fo/components/FoFilterBar'
-import { foLiveStatus, STATUS_LABEL, STATUS_COLOR, initials, avatarGradient, personCamps, closedCampsOf, upcomingCampsOf, avgFeedback } from '@/features/fo/components/fo.ui'
-import { foMatchesSearch } from '@/features/fo/utils/foSearch'
+import { FiAlertTriangle, FiMapPin, FiMail, FiPhone } from 'react-icons/fi'
+import { useFoRoster } from '@/features/fo/hooks/useFoRoster'
+import { usePagination } from '@/hooks/usePagination'
+import PaginationControls from '@/components/ui/PaginationControls'
+import { Button } from '@/components/ui/button'
+import type { RolePopulatedUser } from '@/types/accessManagement.types'
 
-interface RosterTabProps {
-  fos: Person[]
-  camps: Camp[]
-  onOpenFo: (id: string) => void
+const PAGE_SIZE = 10
+
+function displayName(role: { name: string; user: RolePopulatedUser | string }): string {
+  if (typeof role.user === 'string') return role.name
+  return `${role.user.firstName}${role.user.lastName ? ` ${role.user.lastName}` : ''}`
 }
 
-const RosterTab = ({ fos, camps, onOpenFo }: RosterTabProps) => {
-  const [filters, setFilters] = useState<FoFilters>({ state: 'ALL', status: 'ALL', search: '' })
-  const onFilterChange = (patch: Partial<FoFilters>) => setFilters((prev) => ({ ...prev, ...patch }))
+// Real Role + GeoProfile data only — no occupancy/feedback/salary/device/camp
+// fields, since none of those have a real source yet. Assignments/Performance/
+// Devices/Training/Expenses still read the separate mock roster (usePeopleData).
+const RosterTab = () => {
+  const { page, setPage, totalPages } = usePagination(PAGE_SIZE)
+  const { fos, count, isLoading, error, typeResolvedButMissing, geoTruncated, refetch } = useFoRoster({
+    page: String(page),
+    limit: String(PAGE_SIZE),
+  })
 
-  const states = useMemo(() => [...new Set(fos.flatMap((f) => f.states ?? []))].sort(), [fos])
+  if (isLoading) {
+    return (
+      <div className="text-[13px] py-10 text-center" style={{ color: 'var(--qms-text-muted)' }}>
+        Loading field officers…
+      </div>
+    )
+  }
 
-  const todayIso = new Date().toISOString().slice(0, 10)
-
-  const filtered = useMemo(() => {
-    return fos.filter((f) => {
-      if (filters.state !== 'ALL' && !(f.states ?? []).includes(filters.state)) return false
-      if (filters.status !== 'ALL' && foLiveStatus(f, camps) !== filters.status) return false
-      if (!foMatchesSearch(f, filters.search)) return false
-      return true
-    })
-  }, [fos, camps, filters])
+  if (error || typeResolvedButMissing) {
+    return (
+      <div className="rounded-xl border px-4 py-6 text-center" style={{ borderColor: 'var(--qms-border)' }}>
+        <p className="text-[13px]" style={{ color: 'var(--qms-text-muted)' }}>
+          {typeResolvedButMissing
+            ? "Couldn't find the Field Officer role type — this looks like a setup issue, not a real empty roster."
+            : 'Failed to load field officers. Please try again.'}
+        </p>
+        <Button variant="outline" size="sm" className="mt-3" onClick={refetch}>
+          Retry
+        </Button>
+      </div>
+    )
+  }
 
   return (
     <div>
-      <FoFilterBar filters={filters} onChange={onFilterChange} states={states} />
-      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
-        {filtered.map((f) => {
-          const myCamps = personCamps(f, camps)
-          const status = foLiveStatus(f, camps)
-          const todayCamp = myCamps.find((c) => c.date?.slice(0, 10) === todayIso)
-          const closed = closedCampsOf(myCamps).length
-          const upcoming = upcomingCampsOf(myCamps).length
-          const fb = avgFeedback(myCamps)
-          return (
-            <button
-              key={f.id}
-              onClick={() => onOpenFo(f.id)}
-              className="text-left rounded-xl border p-3.5 transition-transform hover:-translate-y-0.5"
-              style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}
-            >
-              <div className="flex items-start gap-2.5 mb-2.5">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-[13px] shrink-0" style={{ background: avatarGradient(f) }}>
-                  {initials(f.name)}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="font-extrabold truncate" style={{ color: 'var(--qms-text)' }}>{f.name}</div>
-                  <div className="text-[11px] truncate" style={{ color: 'var(--qms-text-muted)' }}>{f.hq} · {(f.states ?? []).join(', ')}</div>
-                </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0" style={{ background: `color-mix(in oklab, ${STATUS_COLOR[status]} 16%, transparent)`, color: STATUS_COLOR[status] }}>
-                  {STATUS_LABEL[status]}
-                </span>
-              </div>
+      {geoTruncated && (
+        <div className="flex items-center gap-2 text-[12px] rounded-lg px-3 py-2 mb-3" style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text-muted)' }}>
+          <FiAlertTriangle size={13} className="shrink-0" />
+          Some field officers' locations may not be shown — more exist than this view can currently check.
+        </div>
+      )}
 
-              {todayCamp ? (
-                <div className="text-[11px] font-semibold px-2 py-1.5 rounded-lg mb-2.5" style={{ background: 'var(--success-soft)', color: 'var(--success)' }}>
-                  Today: {todayCamp.id} · {todayCamp.city}
-                </div>
-              ) : (
-                <div className="text-[11px] px-2 py-1.5 rounded-lg mb-2.5" style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text-muted)' }}>
-                  No camp today
-                </div>
-              )}
+      {fos.length === 0 && (
+        <div className="text-[13px] py-10 text-center rounded-xl border" style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }}>
+          No field officers found.
+        </div>
+      )}
 
-              <div className="grid grid-cols-4 gap-1 text-center">
-                <div>
-                  <div className="text-[13px] font-extrabold" style={{ color: 'var(--qms-text)' }}>{closed}</div>
-                  <div className="text-[10px]" style={{ color: 'var(--qms-text-muted)' }}>Closed</div>
-                </div>
-                <div>
-                  <div className="text-[13px] font-extrabold" style={{ color: 'var(--qms-text)' }}>{upcoming}</div>
-                  <div className="text-[10px]" style={{ color: 'var(--qms-text-muted)' }}>Upcoming</div>
-                </div>
-                <div>
-                  <div className="text-[13px] font-extrabold" style={{ color: 'var(--qms-text)' }}>{f.occupancyPct ?? '—'}%</div>
-                  <div className="text-[10px]" style={{ color: 'var(--qms-text-muted)' }}>Occ.</div>
-                </div>
-                <div>
-                  <div className="text-[13px] font-extrabold" style={{ color: 'var(--qms-text)' }}>{fb > 0 ? fb.toFixed(1) : '—'}</div>
-                  <div className="text-[10px]" style={{ color: 'var(--qms-text-muted)' }}>★</div>
-                </div>
-              </div>
-            </button>
-          )
-        })}
-        {filtered.length === 0 && (
-          <div className="col-span-full text-center py-10 text-[13px]" style={{ color: 'var(--qms-text-muted)' }}>No FOs match these filters.</div>
-        )}
-      </div>
+      {fos.length > 0 && (
+        <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}>
+          <div className="overflow-x-auto">
+            <table className="w-full text-[13px]">
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--qms-border)' }}>
+                  {['Name', 'Contact', 'Status', 'Location'].map((h) => (
+                    <th key={h} className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {fos.map(({ role, geoProfile }) => {
+                  const user = typeof role.user === 'string' ? null : role.user
+                  return (
+                    <tr key={role.id} style={{ borderBottom: '1px solid var(--qms-border)' }}>
+                      <td className="px-4 py-2.5">
+                        <div className="font-semibold" style={{ color: 'var(--qms-text)' }}>{displayName(role)}</div>
+                        <div className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>{role.code}</div>
+                      </td>
+                      <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
+                        {user?.email && (
+                          <div className="flex items-center gap-1.5"><FiMail size={11} /> {user.email}</div>
+                        )}
+                        {user?.phone && (
+                          <div className="flex items-center gap-1.5 mt-0.5"><FiPhone size={11} /> {user.phone}</div>
+                        )}
+                        {!user?.email && !user?.phone && '—'}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span
+                          className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase"
+                          style={{
+                            background: role.status === 'active' ? 'color-mix(in oklch, var(--success), transparent 85%)' : 'var(--qms-surface-strong)',
+                            color: role.status === 'active' ? 'var(--success)' : 'var(--qms-text-muted)',
+                          }}
+                        >
+                          {role.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
+                        {geoProfile ? (
+                          <div className="flex items-center gap-1.5">
+                            <FiMapPin size={11} className="shrink-0" />
+                            {[geoProfile.city, geoProfile.state].filter(Boolean).join(', ') || '—'}
+                          </div>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <PaginationControls page={page} totalPages={totalPages(count)} onPageChange={setPage} />
     </div>
   )
 }

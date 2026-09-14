@@ -39,3 +39,7 @@ export const SearchInventoryAssignmentQuerySchema = z.object({
     limit: z.string().optional().openapi({ example: '10' }),
 });
 export type ISearchInventoryAssignmentQuery = z.infer<typeof SearchInventoryAssignmentQuerySchema>;
+
+//4: report ====================================>
+export const InventoryAssignmentReportQuerySchema = z.object({});
+export type IInventoryAssignmentReportQuery = z.infer<typeof InventoryAssignmentReportQuerySchema>;

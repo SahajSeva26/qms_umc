@@ -1,6 +1,8 @@
 // Shared types for the PBAC domain — reflects the real backend permission
 // model (GET /auth/me), decoupled from auth.types.ts's frontend-only UserRole system.
 
+import type { LocationValue } from '@/types/location.types'
+
 // ---------------------------------------------------------------------------
 // Permission catalog
 // ---------------------------------------------------------------------------
@@ -20,11 +22,30 @@ export interface IPermission {
 export type TenantType = 'platform' | 'customer'
 export type TenantStatus = 'active' | 'inactive'
 
-// Fields below `name` are optional: only present when the caller holds `system:manage`.
+// Only present when the search was called with report=true — see
+// SearchTenantQuery.report. Per-tenant rollup for the current result page
+// only (one aggregation per collection for the whole page, not per-row).
+export interface TenantStats {
+  totalProjects: number
+  liveProjects: number
+  totalCamps: number
+  liveCamps: number
+  screeningCamps: number
+  dietCamps: number
+}
+
+// Fields below `name` (except `address`) are optional: only present when the
+// caller holds `system:manage`. `address` is NOT gated — tenant.mapper.ts
+// returns it unconditionally as `tenant.address ?? null` for every caller.
 export interface Tenant {
   id: string
   code: string
   name: string
+  address: LocationValue | null
+  // Optional business age/lifetime in years, and GST registration number
+  // (GSTIN, format-validated server-side). Both `?? null` on the mapper.
+  businessLifetime: number | null
+  gst: string | null
   status?: TenantStatus
   owner?: string
   createdAt?: string
@@ -33,6 +54,7 @@ export interface Tenant {
   // Raw Role id, same system:manage-only gate. Optional server-side —
   // required here per direct instruction, pending sales-rep vs sales-head decision.
   salesPerson?: string | null
+  stats?: TenantStats
 }
 
 export interface SearchTenantQuery {
@@ -45,6 +67,9 @@ export interface SearchTenantQuery {
   status?: TenantStatus
   page?: string
   limit?: string
+  // When 'true', each item gets a `stats` object (see TenantStats). Backend
+  // caps `limit` to 20 when this is set — a bigger page 400s.
+  report?: 'true' | 'false'
 }
 
 export interface RegisterOwnerPayload {
@@ -59,22 +84,27 @@ export interface RegisterOwnerPayload {
 export interface CreateTenantPayload {
   code: string
   name: string
-  description?: string
   owner: RegisterOwnerPayload
   // Role id, must be type 'sales-rep'. Optional on the backend; required
   // here per direct instruction — TODO: revisit once sales-rep vs sales-head settles.
   salesPerson: string
+  address?: LocationValue
+  businessLifetime?: number
+  gst?: string
 }
 
 export interface UpdateTenantPayload {
   name?: string
-  description?: string
   // Only takes effect server-side if caller has `tenant:manage`; silently ignored otherwise.
   status?: TenantStatus
   // Currently a no-op server-side — tenant.service.ts's set() has this update path commented out entirely.
   type?: TenantType
   // Role id, or null to unassign — same 'sales-rep' RoleType constraint as create.
   salesPerson?: string | null
+  // Optional, replace-wholesale — omitting it preserves whatever address the tenant already has.
+  address?: LocationValue
+  businessLifetime?: number
+  gst?: string
 }
 
 // ---------------------------------------------------------------------------

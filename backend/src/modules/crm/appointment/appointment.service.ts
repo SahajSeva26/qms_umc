@@ -2,6 +2,7 @@
 import mongoose, { HydratedDocument } from 'mongoose';
 import { AppointmentModel, IAppointment } from './appointment.model';
 import {
+    IAppointmentReportQuery,
     ICreateAppointmentPayload,
     IMoveStagePayload,
     IRespondPayload,
@@ -21,7 +22,7 @@ import { canTransition } from '../lead/lead.validators';
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
-import { isValidObjectID } from '../../../shared/utils/strings';
+import { isValidObjectID, toObjectId } from '../../../shared/utils/strings';
 import { endOfUTCDay } from '../../../shared/utils/dates';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
@@ -358,6 +359,38 @@ const respond = async (id: string, model: IRespondPayload, ctx: RequestContext) 
     return appointment;
 };
 
+const report = async (filters: IAppointmentReportQuery, ctx: RequestContext) => {
+    //1: scope — same layering as search(): ctx.where() first, then the caller's own filters.
+    const where: mongoose.QueryFilter<IAppointment> = { ...ctx.where() };
+
+    // cast explicitly: search() runs through Model.find(), where Mongoose casts a string id against the schema, but aggregate() does NO casting
+    if (filters.division) {
+        where.division = toObjectId(filters.division);
+    }
+    // same date semantics as search() — the window applies to the scheduled start time, and dateTo is snapped to end-of-day (UTC) so the whole day is included.
+    if (filters.dateFrom || filters.dateTo) {
+        where['duration.startTime'] = {};
+        if (filters.dateFrom) {
+            where['duration.startTime'].$gte = filters.dateFrom;
+        }
+        if (filters.dateTo) {
+            where['duration.startTime'].$lte = endOfUTCDay(filters.dateTo);
+        }
+    }
+
+    const [result] = await AppointmentModel.aggregate([
+        { $match: where },
+        {
+            $facet: {
+                statusCounts: [{ $group: { _id: '$status', count: { $sum: 1 } } }],
+                typeCounts: [{ $group: { _id: '$type', count: { $sum: 1 } } }],
+            },
+        },
+    ]);
+
+    return { ...result };
+};
+
 export const AppointmentService = {
     get,
     search,
@@ -365,6 +398,7 @@ export const AppointmentService = {
     update,
     moveStage,
     respond,
+    report,
 };
 
 // ========================================================================================

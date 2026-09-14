@@ -185,6 +185,26 @@
   --qms-text-soft:       #475089;
   --qms-text-muted:      #6e77a8;
 
+  /* ── QMS lead stage colors (light) ── */
+  /* Distinct hue per stage, not an ordinal ramp — matches the prototype's palette. */
+  --qms-lead-stage-new:          #3567f0;
+  --qms-lead-stage-qualified:    #14b8a6;
+  --qms-lead-stage-proposal:     #a855f7;
+  --qms-lead-stage-pilot:        #6366f1;
+  --qms-lead-stage-negotiation:  #f59e0b;
+  /* Per-stage pill-text ink — darkened from the fill above; the raw hues fail 4.5:1 as their own text on their own pale tint. */
+  --qms-lead-stage-new-text:          #1653fa;
+  --qms-lead-stage-qualified-text:    #067568;
+  --qms-lead-stage-proposal-text:     #9424ff;
+  --qms-lead-stage-pilot-text:        #474bf9;
+  --qms-lead-stage-negotiation-text:  #9a6100;
+  /* Per-stage text for solid-fill contexts — whichever of white/dark-ink clears (or comes closest to) 4.5:1 against that fill. */
+  --qms-lead-stage-new-on:         #ffffff;
+  --qms-lead-stage-qualified-on:   #0b1020;
+  --qms-lead-stage-proposal-on:    #0b1020;
+  --qms-lead-stage-pilot-on:       #ffffff;
+  --qms-lead-stage-negotiation-on: #0b1020;
+
   /* ── QMS page background (light) ── */
   --qms-page-bg:         linear-gradient(135deg, #eef3ff 0%, #f6f8ff 35%, #ecfeff 100%);
 
@@ -293,6 +313,25 @@
   --qms-text:            #e8ebff;
   --qms-text-soft:       #aab2dc;
   --qms-text-muted:      #7b85b8;
+
+  /* ── QMS lead stage colors (dark) ── */
+  /* Same distinct-hue-per-stage scheme as light mode, each lightened to stay legible on a dark surface. */
+  --qms-lead-stage-new:          #8faaf1;
+  --qms-lead-stage-qualified:    #46e1d0;
+  --qms-lead-stage-proposal:     #d5b0f8;
+  --qms-lead-stage-pilot:        #babcf5;
+  --qms-lead-stage-negotiation:  #f2bf6a;
+  /* These lightened fills already pass 4.5:1 as their own text — no separate darkening needed here, unlike light mode. */
+  --qms-lead-stage-new-text:          #8faaf1;
+  --qms-lead-stage-qualified-text:    #46e1d0;
+  --qms-lead-stage-proposal-text:     #d5b0f8;
+  --qms-lead-stage-pilot-text:        #babcf5;
+  --qms-lead-stage-negotiation-text:  #f2bf6a;
+  --qms-lead-stage-new-on:         #0b1020;
+  --qms-lead-stage-qualified-on:   #0b1020;
+  --qms-lead-stage-proposal-on:    #0b1020;
+  --qms-lead-stage-pilot-on:       #0b1020;
+  --qms-lead-stage-negotiation-on: #0b1020;
 
   /* ── QMS page background (dark) ── */
   --qms-page-bg:

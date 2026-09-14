@@ -116,8 +116,11 @@ export const EMP_TYPE_CONFIG: Record<EmpTypeKey, EmpTypeConfig> = {
   tpmp: { empType: 'TP_MANPOWER', title: '3rd-Party Manpower', label: '3rd-Party Manpower', addLabel: 'Add 3rd-Party Manpower', vendor: true },
 }
 
+// A leading =/+/-/@ is executed as a formula by Excel/Sheets on open —
+// prefix with a quote to force plain-text (OWASP's CSV-injection mitigation).
 function escapeCsvCell(value: string | number): string {
-  const str = String(value ?? '')
+  const raw = String(value ?? '')
+  const str = /^[=+\-@]/.test(raw) ? `'${raw}` : raw
   return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str
 }
 

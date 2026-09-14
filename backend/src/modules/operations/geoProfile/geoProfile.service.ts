@@ -14,6 +14,9 @@ import { isValidObjectID } from '../../../shared/utils/strings';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { RoleService } from '../../access-management/role/role.service';
 import { GEO_ALLOCATION_MAX_DISTANCE, GEO_PROFILE_PERMISSIONS, GEO_PROFILE_STATUS } from './geoProfile.constants';
+import { CampModel } from '../camp/camp.model';
+import { CAMP_STATUSES } from '../camp/camp.constants';
+import { utcDayRange } from '../../../shared/utils/dates';
 
 type GeoProfileDocument = HydratedDocument<IGeoProfile> | null;
 
@@ -162,6 +165,33 @@ const findNearest = async (filters: INearestGeoProfileQuery, ctx: RequestContext
         { $match: { $expr: { $lte: ['$distance', '$coverageRadius'] } } },
         { $limit: limit },
     ]);
+
+    // optional availability check — only when a date + time slot are both supplied.
+    // A returned FO is "busy" if their role is already on a camp that day + slot whose status is
+    // not cancelled/cancelled_charged (those free the slot up); everyone else is `available`.
+    if (filters.date && filters.timeSlot) {
+        const roleIds = items.map((item: any) => item.role).filter(Boolean);
+
+        const busyRoleIds = new Set<string>();
+        if (roleIds.length) {
+            const occupyingCamps = await CampModel.find({
+                fo: { $in: roleIds },
+                date: utcDayRange(filters.date),
+                timeSlot: filters.timeSlot,
+                status: { $nin: [CAMP_STATUSES.CANCELLED, CAMP_STATUSES.CANCELLED_CHARGED] },
+            }).select('fo');
+
+            for (const camp of occupyingCamps) {
+                if (camp.fo) {
+                    busyRoleIds.add(camp.fo.toString());
+                }
+            }
+        }
+
+        for (const item of items) {
+            item.available = !busyRoleIds.has(item.role?.toString());
+        }
+    }
 
     return { count: items.length, items };
 };

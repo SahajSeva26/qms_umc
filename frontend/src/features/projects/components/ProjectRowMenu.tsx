@@ -11,9 +11,8 @@ interface ProjectRowMenuProps {
 
 const itemClasses = 'w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-[13px] font-medium text-left transition-colors hover:bg-(--qms-surface-hover)'
 
-// "Close" is just a stage move to 'closed' via the Change-status dialog; no separate close action exists.
-// Edit/Change-status are omitted entirely (not just disabled) without canWrite — View details
-// stays, since it's a read action gated separately by the page's own route guard.
+// Edit/Change-status are omitted entirely (not just disabled) without canWrite —
+// View details stays, since it's a read action gated separately by the route guard.
 const ProjectRowMenu = ({ canWrite, onViewDetail, onEdit, onChangeStatus }: ProjectRowMenuProps) => (
   <Popover>
     <PopoverTrigger

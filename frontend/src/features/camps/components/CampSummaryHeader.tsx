@@ -27,7 +27,7 @@ const CampSummaryHeader = ({ camp, isCreateMode, doctorName, divisionName, proje
                 {doctorName(camp.doctor)} · {divisionName(camp.division)}
               </div>
               <div className="text-[13px]" style={{ color: 'var(--qms-text-muted)' }}>
-                {camp.city}, {camp.state} · {new Date(camp.date).toLocaleDateString()}
+                {camp.location ? `${camp.location.city}, ${camp.location.state}` : 'Location unavailable'} · {new Date(camp.date).toLocaleDateString()}
               </div>
               {camp.project && (
                 <div className="text-[13px]" style={{ color: 'var(--qms-text-muted)' }}>

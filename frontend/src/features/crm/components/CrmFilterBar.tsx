@@ -1,6 +1,7 @@
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import SearchInput from '@/components/ui/SearchInput'
 import { Button } from '@/components/ui/button'
+import DatePicker from '@/components/ui/DatePicker'
 import { LEAD_STATUS_LABEL } from '@/types/crm.types'
 import type { LeadStatus } from '@/types/crm.types'
 import type { CrmFilterState } from '@/features/crm/hooks/useCrmFilters'
@@ -38,6 +39,12 @@ const CrmFilterBar = ({ filters, setFilter, reset }: CrmFilterBarProps) => (
           ))}
         </SelectContent>
       </Select>
+
+      <div className="flex items-center gap-1.5">
+        <DatePicker value={filters.fyFrom} onChange={(v) => setFilter('fyFrom', v)} placeholder="FY from" className="w-32" />
+        <span className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>–</span>
+        <DatePicker value={filters.fyTo} onChange={(v) => setFilter('fyTo', v)} placeholder="FY to" className="w-32" />
+      </div>
 
       <Button variant="outline" size="sm" onClick={reset}>Reset</Button>
     </div>

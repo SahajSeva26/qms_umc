@@ -7,7 +7,7 @@ import {
   FiClipboard, FiSun, FiVideo, FiHeart, FiDollarSign, FiUserCheck,
   FiSettings, FiMapPin, FiAlertTriangle, FiCpu, FiGlobe, FiUser,
   FiPackage, FiBox, FiFileText, FiShield, FiZap, FiMessageSquare,
-  FiChevronsLeft, FiChevronDown, FiCircle, FiBookOpen,
+  FiChevronsLeft, FiChevronDown, FiCircle, FiBookOpen, FiTruck,
 } from 'react-icons/fi'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
@@ -19,11 +19,8 @@ import {
   type NavSection,
 } from './navConfig'
 
-// FULL_NAV_SECTIONS items whose route is wrapped in RequirePermission — used
-// to hide items the viewer would otherwise click into and get bounced from.
-// 'pharma' is deliberately NOT listed here — its visibility is identity-based
-// (see isPharmaRoleType in Sidebar), not permission-based, since system:manage
-// must NOT bypass it the way it bypasses every other check in this map.
+// Hides nav items the viewer would otherwise click into and get bounced from.
+// 'pharma' is deliberately excluded — its visibility is identity-based, not permission-based; system:manage must not bypass it.
 const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
   // Temporary v1 gate on system:manage, not invoice:manage: Finance Manager
   // (the role that actually holds invoice:manage) lacks Project/Camp read perms the page's pickers need.
@@ -38,7 +35,12 @@ const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
   projects: ['project:search', 'project:manage', 'tenant:manage'],
   gantt: ['project:search', 'project:manage', 'tenant:manage'],
   camps: ['camp:search', 'camp:manage', 'tenant:manage'],
+  // Permission-code half only — isNavItemVisible() also requires a platform-tenant
+  // session for this specific item, since field-officer is a platform-only RoleType.
+  fo: ['tenant:manage', 'tenant:admin'],
   users: ['user:get', 'user:search', 'user:update'],
+  // :get is deliberately excluded — the list page only calls search, which needs :search/:manage.
+  vendormasters: ['vendor-master:search', 'vendor-master:manage'],
 }
 
 interface SidebarProps {
@@ -76,6 +78,7 @@ const ICON_MAP: Record<string, IconType> = {
   Shield:        FiShield,
   Zap:           FiZap,
   MessageSquare: FiMessageSquare,
+  Truck:         FiTruck,
 }
 
 const SECTIONS_KEY = 'qms.sb.sections'
@@ -305,7 +308,12 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
     const requiredCodes = REAL_GATED_NAV_ITEMS[item.id]
     if (!requiredCodes) return true
     if (!isSettled) return false
-    return isRealSystemManage || requiredCodes.some((code) => permissions.includes(code))
+    const hasCode = isRealSystemManage || requiredCodes.some((code) => permissions.includes(code))
+    // field-officer (RoleType + every real Role) lives only under the platform
+    // tenant — a customer-tenant admin holding the same permission codes must
+    // still not see this item, or they'd land on a confusing false "not found" error.
+    if (item.id === 'fo') return hasCode && session?.tenant.type === 'platform'
+    return hasCode
   }
 
   const visibleFullNavSections = FULL_NAV_SECTIONS

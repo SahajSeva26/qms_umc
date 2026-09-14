@@ -71,7 +71,7 @@ describe('InventoryConsumableSearchBar', () => {
     searchInventoryMasters.mockResolvedValue({
       success: true,
       message: '',
-      data: { count: 1, items: [{ id: 'm1', code: 'LANC-003', name: 'Sterile Lancets', description: '', type: 'consumable', sku: '', unit: '', minStock: 0, maxStock: 0, createdAt: '', updatedAt: '' }] },
+      data: { count: 1, items: [{ id: 'm1', code: 'LANC-003', name: 'Sterile Lancets', description: '', type: 'consumable', sku: '', unit: '', minStock: 0, createdAt: '', updatedAt: '' }] },
     })
     const { user, onChange } = await renderBar()
     await switchToNameMode(user)

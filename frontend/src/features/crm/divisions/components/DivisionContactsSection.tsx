@@ -1,6 +1,9 @@
 import { useState } from 'react'
-import { FiPlus, FiUser, FiSearch } from 'react-icons/fi'
+import { FiDownload, FiPlus, FiUser, FiSearch } from 'react-icons/fi'
 import { useContacts } from '@/features/contacts/hooks/useContacts'
+import { contactsService } from '@/features/contacts/contacts.service'
+import { downloadContactsCsv } from '@/features/contacts/contact.export'
+import { warnIfExportTruncated } from '@/utils/csvExport'
 import { usePermission } from '@/hooks/usePermission'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -8,7 +11,10 @@ import PaginationControls from '@/components/ui/PaginationControls'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import EditContactModal from '@/features/contacts/components/EditContactModal'
 import ContactsTable from '@/features/crm/divisions/components/ContactsTable'
+import ContactDrawer from '@/features/crm/divisions/components/ContactDrawer'
 import { usePagination } from '@/hooks/usePagination'
+import { toast } from '@/components/ui/sonner'
+import { getApiErrorMessage } from '@/utils/apiError'
 import type { ContactEntity } from '@/types/contact.types'
 
 interface DivisionContactsSectionProps {
@@ -25,6 +31,7 @@ const DivisionContactsSection = ({ tenantId, divisionId }: DivisionContactsSecti
   const [search, setSearch] = useState('')
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
   const [editModal, setEditModal] = useState<{ open: boolean; contact: ContactEntity | null }>({ open: false, contact: null })
+  const [viewContact, setViewContact] = useState<ContactEntity | null>(null)
 
   const { data, isLoading, error, refetch } = useContacts({
     division: divisionId,
@@ -34,6 +41,22 @@ const DivisionContactsSection = ({ tenantId, divisionId }: DivisionContactsSecti
   })
   const contacts = data?.data?.items ?? []
   const totalCount = data?.data?.count ?? 0
+
+  const [exporting, setExporting] = useState(false)
+  // Exports the whole division's contact set, not just the current search/paginated
+  // page — the table itself caps at PAGE_SIZE with no "show all" option.
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const res = await contactsService.searchContacts({ division: divisionId, limit: '1000' })
+      warnIfExportTruncated(res.data.items.length, res.data.count)
+      downloadContactsCsv(res.data.items, `division-contacts-${new Date().toISOString().slice(0, 10)}.csv`)
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'Failed to export contacts.'))
+    } finally {
+      setExporting(false)
+    }
+  }
 
   return (
     <div>
@@ -52,15 +75,20 @@ const DivisionContactsSection = ({ tenantId, divisionId }: DivisionContactsSecti
             </p>
           </div>
         </div>
-        {canManage && (
-          <Button
-            onClick={() => setEditModal({ open: true, contact: null })}
-            className="text-white shrink-0"
-            style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
-          >
-            <FiPlus size={14} /> New Contact
+        <div className="flex items-center gap-2 shrink-0">
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting || totalCount === 0}>
+            <FiDownload size={14} /> {exporting ? 'Exporting…' : 'Export'}
           </Button>
-        )}
+          {canManage && (
+            <Button
+              onClick={() => setEditModal({ open: true, contact: null })}
+              className="text-white"
+              style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
+            >
+              <FiPlus size={14} /> New Contact
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="relative mb-3">
@@ -80,10 +108,17 @@ const DivisionContactsSection = ({ tenantId, divisionId }: DivisionContactsSecti
       <QueryStateBlock isLoading={isLoading} error={error} loadingLabel="Loading contacts…" errorLabel="Failed to load contacts. Please try again." onRetry={refetch}>
         <ContactsTable
           contacts={contacts}
-          onRowClick={(contact) => canManage && setEditModal({ open: true, contact })}
+          onView={(contact) => setViewContact(contact)}
         />
         <PaginationControls page={page} totalPages={totalPages(totalCount)} onPageChange={setPage} />
       </QueryStateBlock>
+
+      <ContactDrawer
+        contact={viewContact}
+        canEdit={canManage}
+        onClose={() => setViewContact(null)}
+        onEdit={() => { setEditModal({ open: true, contact: viewContact }); setViewContact(null) }}
+      />
 
       <EditContactModal
         open={editModal.open}

@@ -42,6 +42,14 @@ export const APPOINTMENT_TRANSITION_MAP: Record<string, string[]> = {
     [APPOINTMENT_STATUSES.CANCELLED]: [],
 };
 
+//Report only statuses reachable through the current appointment lifecycle; excludes unreachable statuses.
+export const APPOINTMENT_REPORT_STATUSES: string[] = [
+    APPOINTMENT_STATUSES.PLANNED, // schema default — every appointment starts here
+    ...Object.values(APPOINTMENT_TRANSITION_MAP)
+        .flat()
+        .filter((status) => status !== APPOINTMENT_STATUSES.PLANNED),
+].filter((status, index, all) => all.indexOf(status) === index);
+
 // ============================================================
 // ============= APPOINTMENT PERMISSIONS CONSTANTS ============
 // ============================================================

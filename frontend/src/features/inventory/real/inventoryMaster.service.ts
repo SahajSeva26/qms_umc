@@ -3,6 +3,7 @@ import type { ApiResponse, PaginatedResponse } from '@/types/common.types'
 import type {
   CreateInventoryMasterPayload,
   InventoryMasterEntity,
+  InventoryMasterReportResponse,
   SearchInventoryMasterQuery,
   UpdateInventoryMasterPayload,
 } from '@/types/inventoryMaster.types'
@@ -27,9 +28,15 @@ const updateInventoryMaster = async (id: string, payload: UpdateInventoryMasterP
   return res.data
 }
 
+const getInventoryMasterReport = async () => {
+  const res = await api.get<ApiResponse<InventoryMasterReportResponse>>('/inventory-masters/report')
+  return res.data
+}
+
 export const inventoryMasterService = {
   searchInventoryMasters,
   getInventoryMaster,
   createInventoryMaster,
   updateInventoryMaster,
+  getInventoryMasterReport,
 }

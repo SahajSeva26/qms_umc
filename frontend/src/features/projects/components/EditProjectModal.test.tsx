@@ -93,3 +93,115 @@ describe('EditProjectModal — save failure', () => {
     expect(toast.error).not.toHaveBeenCalled()
   })
 })
+
+describe('EditProjectModal — partial update payload', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('saving without touching any field omits name/therapy/paymentTerms — never resends a stale snapshot to clobber a concurrent edit', async () => {
+    const { projectsService } = await import('@/features/projects/projects.service')
+    vi.mocked(projectsService.updateProject).mockResolvedValue({ success: true, message: '', data: projectFixture() })
+    const user = userEvent.setup()
+    await renderModal(projectFixture({ name: 'STALE-NAME', therapy: 'cardiology', paymentTerms: 'net_30' }))
+
+    await screen.findByText(/edit project/i)
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    const payload = await vi.waitFor(() => {
+      const call = vi.mocked(projectsService.updateProject).mock.calls[0]
+      if (!call) throw new Error('not called yet')
+      return call[1]
+    })
+    expect(payload).not.toHaveProperty('name')
+    expect(payload).not.toHaveProperty('therapy')
+    expect(payload).not.toHaveProperty('paymentTerms')
+  })
+
+  it('editing project name directly includes only name in the payload', async () => {
+    const { projectsService } = await import('@/features/projects/projects.service')
+    vi.mocked(projectsService.updateProject).mockResolvedValue({ success: true, message: '', data: projectFixture() })
+    const user = userEvent.setup()
+    await renderModal(projectFixture({ name: 'OLD-NAME', paymentTerms: 'net_30' }))
+
+    await screen.findByText(/edit project/i)
+    const nameInput = screen.getByDisplayValue('OLD-NAME')
+    await user.clear(nameInput)
+    await user.type(nameInput, 'NEW-NAME')
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    const payload = await vi.waitFor(() => {
+      const call = vi.mocked(projectsService.updateProject).mock.calls[0]
+      if (!call) throw new Error('not called yet')
+      return call[1]
+    })
+    expect(payload.name).toBe('NEW-NAME')
+    expect(payload).not.toHaveProperty('paymentTerms')
+  })
+
+  it('editing payment terms directly includes only paymentTerms, leaving the untouched name out', async () => {
+    const { projectsService } = await import('@/features/projects/projects.service')
+    vi.mocked(projectsService.updateProject).mockResolvedValue({ success: true, message: '', data: projectFixture() })
+    const user = userEvent.setup()
+    await renderModal(projectFixture({ name: 'STALE-NAME', paymentTerms: 'net_30' }))
+
+    await screen.findByText(/edit project/i)
+    // Payment terms is the last combobox in the form; its SelectValue has no
+    // render fn so it displays the raw value text.
+    const comboboxes = screen.getAllByRole('combobox')
+    await user.click(comboboxes[comboboxes.length - 1])
+    const option = await screen.findByText('Net 60')
+    await user.click(option)
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    const payload = await vi.waitFor(() => {
+      const call = vi.mocked(projectsService.updateProject).mock.calls[0]
+      if (!call) throw new Error('not called yet')
+      return call[1]
+    })
+    expect(payload.paymentTerms).toBe('net_60')
+    expect(payload).not.toHaveProperty('name')
+  })
+
+  it('editing name then reverting to its exact original value omits it from the payload', async () => {
+    const { projectsService } = await import('@/features/projects/projects.service')
+    vi.mocked(projectsService.updateProject).mockResolvedValue({ success: true, message: '', data: projectFixture() })
+    const user = userEvent.setup()
+    await renderModal(projectFixture({ name: 'ORIGINAL-NAME', paymentTerms: 'net_30' }))
+
+    await screen.findByText(/edit project/i)
+    const nameInput = screen.getByDisplayValue('ORIGINAL-NAME')
+    await user.clear(nameInput)
+    await user.type(nameInput, 'TEMP-NAME')
+    await user.clear(nameInput)
+    await user.type(nameInput, 'ORIGINAL-NAME')
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    const payload = await vi.waitFor(() => {
+      const call = vi.mocked(projectsService.updateProject).mock.calls[0]
+      if (!call) throw new Error('not called yet')
+      return call[1]
+    })
+    expect(payload).not.toHaveProperty('name')
+  })
+
+  it('toggling a camp time slot off then back on omits campTimeSlots from the payload', async () => {
+    const { projectsService } = await import('@/features/projects/projects.service')
+    vi.mocked(projectsService.updateProject).mockResolvedValue({ success: true, message: '', data: projectFixture() })
+    const user = userEvent.setup()
+    await renderModal(projectFixture({ campTimeSlots: ['9am-1pm'], paymentTerms: 'net_30' }))
+
+    await screen.findByText(/edit project/i)
+    const slotChip = screen.getByText('9 AM – 1 PM')
+    await user.click(slotChip)
+    await user.click(slotChip)
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    const payload = await vi.waitFor(() => {
+      const call = vi.mocked(projectsService.updateProject).mock.calls[0]
+      if (!call) throw new Error('not called yet')
+      return call[1]
+    })
+    expect(payload).not.toHaveProperty('campTimeSlots')
+  })
+})

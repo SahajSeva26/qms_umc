@@ -14,9 +14,8 @@ function makeQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } })
 }
 
-// A customer tenant (e.g. "Cipla") should be selectable; the platform's own
-// tenant ("Qms", type: 'platform') never should be — this picker is scoped
-// to real customer companies only.
+// The platform's own tenant (type: 'platform') must never be selectable here —
+// this picker is scoped to real customer companies only.
 describe('TenantAsyncPicker', () => {
   beforeEach(() => {
     vi.resetAllMocks()

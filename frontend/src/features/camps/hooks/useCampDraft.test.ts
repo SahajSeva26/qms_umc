@@ -8,8 +8,12 @@ function campFixture(overrides: Partial<CampEntity> = {}): CampEntity {
     id: 'camp-1', code: 'cmp-000001', tenant: 't-1', division: 'div-1', project: null,
     doctor: 'doc-1', type: 'screening', billingType: 'billable', patientExpectation: 0,
     fo: null, mr: null, date: '2026-09-15',
-    timeSlot: '9am-1pm', city: 'Pune', state: 'Maharashtra',
-    coordinates: [73.8567, 18.5204], devices: [], status: 'requested', stageHistory: [],
+    timeSlot: '9am-1pm',
+    location: {
+      addressLine1: '221 Baker Street', city: 'Pune', state: 'Maharashtra',
+      pincode: '411001', coordinates: [73.8567, 18.5204],
+    },
+    devices: [], status: 'requested', stageHistory: [],
     createdAt: '', updatedAt: '', ...overrides,
   } as CampEntity
 }
@@ -39,5 +43,11 @@ describe('useCampDraft — buildInitialDraft', () => {
     const camp = campFixture({ timeSlot: '10am-2pm' })
     const { result } = renderHook(() => useCampDraft(camp))
     expect(result.current.draft.timeSlot).toBe('10am-2pm')
+  })
+
+  it('a legacy camp with location: null seeds the draft with location: null, not a crash or a synthesized empty object', () => {
+    const camp = campFixture({ location: null })
+    const { result } = renderHook(() => useCampDraft(camp))
+    expect(result.current.draft.location).toBeNull()
   })
 })

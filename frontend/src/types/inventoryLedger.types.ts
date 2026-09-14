@@ -94,7 +94,8 @@ export interface InventoryMovementConsumableSummary {
   itemName: string
   quantity: number
   status?: InventoryConsumableStatus
-  expiryDate: string
+  // Absent when the lot has no expiry — backend now allows this.
+  expiryDate?: string
 }
 
 // Discriminated on (mode, inventoryType) so a device can only ever pair with DeviceSummary, never ConsumableSummary.

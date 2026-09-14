@@ -4,6 +4,7 @@ import { InventoryDeviceController } from './inventory-device.controller';
 import { registry } from '../../../shared/config/swagger/swagger.registry';
 import {
     CreateInventoryDevicePayloadSchema,
+    InventoryDeviceReportQuerySchema,
     SearchInventoryDeviceQuerySchema,
     UpdateInventoryDevicePayloadSchema,
 } from './inventory-device.validators';
@@ -14,6 +15,25 @@ import { INVENTORY_DEVICE_PERMISSIONS } from './inventory-device.constants';
 export const InventoryDeviceRouter = express.Router();
 
 InventoryDeviceRouter.use(AuthMiddleware);
+
+// inventory device fleet report
+registry.registerPath({
+    method: 'get',
+    path: '/inventory-devices/report',
+    tags: ['INVENTORY DEVICE'],
+    summary: 'Inventory device report — total device count and counts by lifecycle status',
+    description:
+        'Device fleet snapshot: summary.totalDevices (total device units) and devices.byStatus ' +
+        '(counts per device status — available/in-transit/assigned/maintainance/lost/damaged — every ' +
+        'status appears, defaulting to 0). Requires inventory-device:manage.',
+    request: {
+        query: InventoryDeviceReportQuerySchema,
+    },
+    responses: {
+        200: { description: 'Inventory device report generated successfully' },
+        403: { description: 'Forbidden — inventory-device:manage permission required' },
+    },
+});
 
 // get device
 registry.registerPath({
@@ -92,6 +112,12 @@ registry.registerPath({
 // =================== EXPORT INVENTORY DEVICE ROUTES ====================
 // =======================================================================
 // reads are open to any authenticated user; only writes (create/update) are permission-guarded.
+// the report is manager-only; it MUST be registered before '/:id' so 'report' is not read as an id.
+InventoryDeviceRouter.get(
+    '/report',
+    AuthorizeMiddleware([INVENTORY_DEVICE_PERMISSIONS.MANAGE.code]),
+    InventoryDeviceController.report,
+);
 InventoryDeviceRouter.get('/:id', InventoryDeviceController.get);
 InventoryDeviceRouter.get('/', InventoryDeviceController.search);
 

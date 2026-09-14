@@ -1,10 +1,11 @@
 import api from '@/lib/api/api'
 import type { ApiResponse, PaginatedResponse } from '@/types/common.types'
 import type { SearchUserQuery, UpdateUserPayload, User } from '@/types/user.types'
+import type { UserReport, UserReportQuery } from '@/types/userReport.types'
 import { withMockFields } from '@/features/admin/admin.mock'
 
 // Backend returns real status (for callers with system:manage) but has no
-// role/avatarTone fields — see admin.mock.ts for why those are patched in here.
+// avatarTone field — see admin.mock.ts for why it's patched in here.
 type UserApiShape = Omit<User, '_id' | 'role' | 'avatarTone'> & { id: string }
 
 const searchUsers = async (query: SearchUserQuery) => {
@@ -35,4 +36,11 @@ const updateUser = async (id: string, payload: UpdateUserPayload) => {
   return toUser(res.data)
 }
 
-export const adminService = { searchUsers, getUser, updateUser }
+// Maps straight through — unlike searchUsers/getUser, this response has no
+// avatarTone field that needs mock-patching.
+const getUserReport = async (query: UserReportQuery = {}) => {
+  const res = await api.get<ApiResponse<UserReport>>('/users/report', { params: query })
+  return res.data
+}
+
+export const adminService = { searchUsers, getUser, updateUser, getUserReport }

@@ -34,13 +34,33 @@ export function useReshapingResolver<TFormValues extends object, TPayload = TFor
     errors: ResolverErrors
   }>
 
+  // A nested tuple error adds one extra level (e.g. `coordinates.0` ->
+  // {coordinates: {0: {message}}}) — walk down until a {message} leaf turns up.
+  const findFirstLeaf = (err: unknown): FieldError | undefined => {
+    if (!err || typeof err !== 'object') return undefined
+    if ('message' in err) return err as FieldError
+    for (const value of Object.values(err)) {
+      const leaf = findFirstLeaf(value)
+      if (leaf) return leaf
+    }
+    return undefined
+  }
+
   const mapErrors = (errors: ResolverErrors) => {
     const mappedErrors: Record<string, unknown> = {}
     for (const [path, err] of Object.entries(errors)) {
       const nestedMap = nestedFieldMaps[path]
       if (nestedMap && err && typeof err === 'object' && !('message' in err)) {
         for (const [nestedField, nestedErr] of Object.entries(err)) {
-          mappedErrors[nestedMap[nestedField] ?? nestedField] = nestedErr
+          const target = nestedMap[nestedField] ?? nestedField
+          const leaf = findFirstLeaf(nestedErr) ?? nestedErr
+          // Sibling nested fields can map to the SAME target form field —
+          // accumulate their messages instead of the last one overwriting an earlier sibling's.
+          const existing = mappedErrors[target] as FieldError | undefined
+          mappedErrors[target] =
+            existing?.message && leaf && typeof leaf === 'object' && 'message' in leaf && leaf.message
+              ? { ...leaf, message: `${existing.message} ${leaf.message}` }
+              : leaf
         }
         continue
       }

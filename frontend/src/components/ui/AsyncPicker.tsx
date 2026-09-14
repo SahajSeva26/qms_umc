@@ -36,6 +36,8 @@ interface AsyncPickerProps<TResult> {
   disabled?: boolean
   /** Rendered above the results list, only once results are actually present and ready (never during fetching/error/empty). */
   resultsBanner?: React.ReactNode
+  /** Per-row disable — the row still renders (via renderResult) for context, but can't be picked. */
+  isResultDisabled?: (result: TResult) => boolean
 }
 
 // Shared shell for a single-select, search-as-you-type dropdown field. Query state stays with the caller.
@@ -47,6 +49,7 @@ function AsyncPicker<TResult>({
   hasMore, isLoadingMore, onLoadMore,
   disabled,
   resultsBanner,
+  isResultDisabled,
 }: AsyncPickerProps<TResult>) {
   const pickResult = (result: TResult) => {
     onChange(getId(result), getLabel(result))
@@ -95,7 +98,7 @@ function AsyncPicker<TResult>({
         <div
           className={
             dropdownClassName ??
-            'absolute left-0 right-0 top-full mt-1 z-50 p-1.5 rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10'
+            'absolute left-0 right-0 top-full mt-1 z-50 p-1.5 rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10 max-h-64 overflow-y-auto'
           }
         >
           {isFetching && (
@@ -125,17 +128,22 @@ function AsyncPicker<TResult>({
             <div className="text-[12px] px-2 py-2" style={{ color: 'var(--qms-text-muted)' }}>{emptyResultsText ?? noResultsText}</div>
           )}
           {!isFetching && !isError && results.length > 0 && resultsBanner}
-          {!isError && results.map((result) => (
-            <button
-              key={getId(result)}
-              type="button"
-              onClick={() => pickResult(result)}
-              className="w-full flex items-center justify-between gap-2 text-left text-[13px] px-2 py-1.5 rounded-md transition-colors hover:bg-(--qms-surface-hover)"
-              style={{ color: 'var(--qms-text)' }}
-            >
-              {renderResult(result)}
-            </button>
-          ))}
+          {!isError && results.map((result) => {
+            const rowDisabled = isResultDisabled?.(result) ?? false
+            return (
+              <button
+                key={getId(result)}
+                type="button"
+                onClick={() => { if (!rowDisabled) pickResult(result) }}
+                disabled={rowDisabled}
+                aria-disabled={rowDisabled}
+                className="w-full flex items-center justify-between gap-2 text-left text-[13px] px-2 py-1.5 rounded-md transition-colors hover:bg-(--qms-surface-hover) disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                style={{ color: 'var(--qms-text)', opacity: rowDisabled ? 0.7 : 1 }}
+              >
+                {renderResult(result)}
+              </button>
+            )
+          })}
           {!isError && hasMore && (
             <button
               type="button"

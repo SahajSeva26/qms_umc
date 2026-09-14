@@ -3,6 +3,7 @@ import type { ApiResponse, PaginatedResponse } from '@/types/common.types'
 import type {
   CreateInventoryConsumablePayload,
   InventoryConsumableEntity,
+  InventoryConsumableReportResponse,
   SearchInventoryConsumableQuery,
   UpdateInventoryConsumablePayload,
 } from '@/types/inventoryConsumable.types'
@@ -27,9 +28,15 @@ const updateInventoryConsumable = async (id: string, payload: UpdateInventoryCon
   return res.data
 }
 
+const getInventoryConsumableReport = async () => {
+  const res = await api.get<ApiResponse<InventoryConsumableReportResponse>>('/inventory-consumables/report')
+  return res.data
+}
+
 export const inventoryConsumableService = {
   searchInventoryConsumables,
   getInventoryConsumable,
   createInventoryConsumable,
   updateInventoryConsumable,
+  getInventoryConsumableReport,
 }

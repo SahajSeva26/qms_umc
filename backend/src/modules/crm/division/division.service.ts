@@ -48,9 +48,6 @@ const set = async (model: any, entity: HydratedDocument<IDivision>, ctx: Request
         // dedupe — the same therapy listed twice must not persist duplicate entries
         entity.therapy = Array.from(new Set(model.therapy));
     }
-    if (model.brandFocus !== undefined) {
-        entity.brandFocus = model.brandFocus;
-    }
     if (model.mrCount !== undefined) {
         entity.mrCount = model.mrCount;
     }

@@ -13,7 +13,6 @@ import {
 import { CAMP_COUNTER_ENTITY, CAMP_PERMISSIONS, CAMP_STATUSES, CAMP_TIME_SLOTS, CAMP_TRANSITION_MAP, CampTimeSlot } from './camp.constants';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
 import { CounterService } from '../../counter/counter.service';
-import { GeoProfileService } from '../geoProfile/geoProfile.service';
 import { geoProfileModel } from '../geoProfile/geoProfile.model';
 import { GEO_ALLOCATION_MAX_DISTANCE, GEO_PROFILE_STATUS, GEO_PROFILE_TYPES } from '../geoProfile/geoProfile.constants';
 import { canTransition } from '../../crm/lead/lead.validators';
@@ -28,6 +27,7 @@ import { DoctorService } from '../../crm/doctor/doctor.service';
 import { RoleService } from '../../access-management/role/role.service';
 import { DivisionService } from '../../crm/division/division.service';
 import { ALLOWED_ROLETYPE_CODES } from '../../access-management/role-type/roleType.constants';
+import { RoleModel } from '../../access-management/role/role.model';
 import { TENANT_TYPE } from '../../access-management/tenant/tenant.constants';
 import { InventoryMasterService } from '../../inventory/inventory-master/inventory-master.service';
 
@@ -88,6 +88,9 @@ const overlappingSlots = (slot: CampTimeSlot): CampTimeSlot[] => SLOT_OVERLAPS[s
 // decoupled reusable overlap check: is `foRoleId` already committed (confirmed/live) to a camp on the
 // same UTC day in a slot that OVERLAPS `timeSlot`? excludeCampId skips a camp from the check (itself).
 // Reused by create (hard block) and by the availability / allocation helpers below.
+// GLOBAL (not ctx-scoped): an FO is shared platform staff, so a clash with ANY pharma tenant's camp
+// must count — otherwise the same FO could be booked by two clients for the same slot. `ctx` is kept
+// in the signature for call-site symmetry but no longer scopes the query.
 const isFoBookedForSlot = async (
     foRoleId: string,
     date: Date,
@@ -96,7 +99,6 @@ const isFoBookedForSlot = async (
     excludeCampId?: any,
 ): Promise<boolean> => {
     const where: any = {
-        ...ctx.where(),
         fo: toObjectId(foRoleId),
         status: { $in: FO_BOOKING_STATUSES },
         date: utcDayRange(date),
@@ -128,13 +130,14 @@ const assertFoAvailableForSlot = async (
 
 // max span (in days) allowed for a single booking-availability query — the requested range may not
 // exceed this. Keeps the one camp fetch bounded.
-const MAX_AVAILABILITY_RANGE_DAYS = 15;
+const MAX_AVAILABILITY_RANGE_DAYS = 30;
 
 // YYYY-MM-DD key for the UTC day a date falls on — the availability tree is keyed by this.
 const dateKey = (date: Date | string | number): string => startOfUTCDay(date).toISOString().slice(0, 10);
 
 // role ids of FOs already booked (confirmed/live) on another camp on the same UTC day in any slot
 // that OVERLAPS `timeSlot` (daytime slots block each other; see overlappingSlots / SLOT_OVERLAPS).
+// GLOBAL (not ctx-scoped) — same reasoning as isFoBookedForSlot: FO clashes span all pharma tenants.
 const bookedFoRoleIdsOnDate = async (
     date: Date,
     timeSlot: CampTimeSlot,
@@ -142,7 +145,6 @@ const bookedFoRoleIdsOnDate = async (
     excludeCampId: any,
 ): Promise<string[]> => {
     const camps = await CampModel.find({
-        ...ctx.where(),
         _id: { $ne: excludeCampId },
         fo: { $ne: null },
         status: { $in: FO_BOOKING_STATUSES },
@@ -155,8 +157,30 @@ const bookedFoRoleIdsOnDate = async (
     return camps.map((c: any) => c.fo?.toString()).filter(Boolean);
 };
 
+// GLOBAL nearest active FO profiles whose OWN coverage radius reaches the point. FOs are QMS platform
+// staff serving every pharma tenant, so this lookup is intentionally NOT ctx-scoped (a customer-scoped
+// query would match zero platform FOs). Shared by auto-allocation and booking-availability.
+const nearestFoProfilesGlobal = async (lng: number, lat: number, limit = 100): Promise<any[]> => {
+    return geoProfileModel.aggregate([
+        {
+            $geoNear: {
+                near: { type: 'Point', coordinates: [lng, lat] },
+                distanceField: 'distance', // meters
+                spherical: true,
+                // hard outer cap — a mis-set coverageRadius can never pull in a far-away worker
+                maxDistance: GEO_ALLOCATION_MAX_DISTANCE,
+                query: { type: GEO_PROFILE_TYPES.FO, status: GEO_PROFILE_STATUS.ACTIVE },
+            },
+        },
+        // keep only FOs whose own coverage radius reaches the point
+        { $match: { $expr: { $lte: ['$distance', '$coverageRadius'] } } },
+        { $limit: limit },
+        { $project: { role: 1 } },
+    ]);
+};
+
 // nearest FO within their own coverage who is not already booked that day. 422 (no coordinates /
-// nobody covers) or 409 (everyone nearby booked) on failure.
+// nobody covers) or 409 (everyone nearby booked) on failure. FO lookup + clash are both GLOBAL.
 const resolveNearestFreeFoRole = async (camp: HydratedDocument<ICamp>, ctx: RequestContext): Promise<any> => {
     const coordinates = (camp.location as any)?.coordinates as number[] | undefined;
     if (!coordinates || coordinates.length !== 2) {
@@ -165,9 +189,7 @@ const resolveNearestFreeFoRole = async (camp: HydratedDocument<ICamp>, ctx: Requ
 
     const lng = coordinates[0] as number;
     const lat = coordinates[1] as number;
-    const { items } = await GeoProfileService.findNearest({ type: GEO_PROFILE_TYPES.FO, lng, lat }, ctx, {
-        pagination: { limit: 100 } as any,
-    });
+    const items = await nearestFoProfilesGlobal(lng, lat, 100);
     if (!items.length) {
         return throwAppError('No field officer covers this camp location', StatusCodes.UNPROCESSABLE_ENTITY);
     }
@@ -226,8 +248,16 @@ const set = async (model: any, entity: HydratedDocument<ICamp>, ctx: RequestCont
     }
 
     if (model.fo) {
-        const fo = await RoleService.get(model.fo, ctx);
-        if (!fo) return throwAppError('FO not found', StatusCodes.NOT_FOUND);
+        // GLOBAL validation — an FO is QMS platform staff, never in the (customer) caller's tenant, so
+        // this must NOT run under ctx.where() (RoleService.get would 404 the platform FO for a pharma
+        // caller). Also assert the role really is a field officer.
+        const fo: any = await RoleModel.findById(model.fo).populate('type');
+        if (!fo) {
+            return throwAppError('FO not found', StatusCodes.NOT_FOUND);
+        }
+        if (fo.type?.code !== ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER) {
+            return throwAppError('The selected role is not a field officer', StatusCodes.BAD_REQUEST);
+        }
         entity.fo = model.fo;
     }
     // mr is the only pharma-chain ref accepted; asm/rsm are derived from it (reset when the MR changes)
@@ -618,6 +648,22 @@ const bookingAvailability = async (model: IBookingAvailabilityPayload, ctx: Requ
         return throwAppError('Only customer-tenant users can check booking availability', StatusCodes.FORBIDDEN);
     }
 
+    // the project must belong to the caller's tenant. ProjectService.get runs under ctx.where(), so a
+    // project on any other tenant 404s — this enforces ctx.tenant === project.tenant without leaking a
+    // foreign project's existence (for pharma it also honours the app-wide own-division visibility).
+    const project = await ProjectService.get(model.projectID, ctx);
+    if (!project) {
+        return throwAppError('Project not found', StatusCodes.NOT_FOUND);
+    }
+
+    // explicit tenant-ownership assertion (defence-in-depth on top of the scoped read above): the
+    // project's tenant must equal the caller's tenant, so a future change to ProjectService.get's
+    // scoping can never silently open cross-tenant availability.
+    const callerTenantId = (ctx.tenant?._id || ctx.tenant?.id)?.toString();
+    if (project.tenant?.toString() !== callerTenantId) {
+        return throwAppError('Project does not belong to your account', StatusCodes.FORBIDDEN);
+    }
+
     const { lat, lng } = model;
     const dateFrom = startOfUTCDay(model.dateFrom);
     const dateTo = startOfUTCDay(model.dateTo);
@@ -634,25 +680,10 @@ const bookingAvailability = async (model: IBookingAvailabilityPayload, ctx: Requ
         );
     }
 
-    //2: eligible FOs — nearest active FOs whose OWN coverage radius reaches the point. This is the
-    // separate "already calculated" eligible set; only their role ids are needed downstream.
-    const nearbyFos = await geoProfileModel.aggregate([
-        {
-            $geoNear: {
-                near: { type: 'Point', coordinates: [lng, lat] },
-                distanceField: 'distance', // meters
-                spherical: true,
-                // hard outer cap — a mis-set coverageRadius can never pull in a far-away worker
-                maxDistance: GEO_ALLOCATION_MAX_DISTANCE,
-                // NOT tenant-scoped: FOs are global QMS platform staff serving every pharma tenant,
-                // so the lookup must reach them regardless of the (customer) caller's tenant.
-                query: { type: GEO_PROFILE_TYPES.FO, status: GEO_PROFILE_STATUS.ACTIVE },
-            },
-        },
-        // keep only FOs whose own coverage radius reaches the point
-        { $match: { $expr: { $lte: ['$distance', '$coverageRadius'] } } },
-        { $project: { role: 1 } },
-    ]);
+    //2: eligible FOs — nearest active FOs whose OWN coverage radius reaches the point (GLOBAL — FOs
+    // are platform staff, never tenant-scoped). Only their role ids are needed downstream. Cap is high
+    // so a dense area isn't silently truncated when computing availability.
+    const nearbyFos = await nearestFoProfilesGlobal(lng, lat, 500);
 
     const eligibleFoIds: string[] = nearbyFos.map((p: any) => p.role?.toString()).filter(Boolean);
 
@@ -698,8 +729,14 @@ const bookingAvailability = async (model: IBookingAvailabilityPayload, ctx: Requ
         }
     }
 
-    //4: walk EVERY date in the range (not just dates that have camps) and evaluate all 4 slots.
-    const dates: any[] = [];
+    //4: only report the slots this project actually offers (project.campTimeSlots). Fall back to all
+    // bookable slots if a project has none configured.
+    const configuredSlots = (project.campTimeSlots as CampTimeSlot[]) || [];
+    const projectSlots: CampTimeSlot[] = configuredSlots.length ? configuredSlots : ALL_SLOTS;
+
+    //5: walk EVERY date in the range (not just dates that have camps) and evaluate the project's slots.
+    // dates is a MAP keyed by the YYYY-MM-DD day → { available, slots }, for O(1) lookup by date.
+    const dates: Record<string, { available: boolean; slots: Record<string, boolean> }> = {};
     for (let cursor = new Date(dateFrom); cursor <= dateTo; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
         const key = dateKey(cursor);
         const slotMap = tree.get(key);
@@ -707,14 +744,14 @@ const bookingAvailability = async (model: IBookingAvailabilityPayload, ctx: Requ
         // slots keyed by timing → boolean availability (available when at least one eligible FO is
         // NOT blocked on that slot)
         const slots: Record<string, boolean> = {};
-        for (const slot of ALL_SLOTS) {
+        for (const slot of projectSlots) {
             const blocked = slotMap?.get(slot);
             slots[slot] = eligibleFoIds.some((id) => !blocked || !blocked.has(id));
         }
 
-        // a date is available if any of its slots is available
+        // a date is available if any of its offered slots is available
         const available = Object.values(slots).some(Boolean);
-        dates.push({ date: new Date(key), available, slots });
+        dates[key] = { available, slots };
     }
 
     return {

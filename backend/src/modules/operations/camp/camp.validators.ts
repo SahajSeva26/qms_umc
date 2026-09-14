@@ -140,6 +140,17 @@ export const SearchCampQuerySchema = z.object({
 });
 export type ISearchCampQuery = z.infer<typeof SearchCampQuerySchema>;
 
+//4b: booking availability ====================================>
+// checks slot availability for a project around a location within a date range.
+export const BookingAvailabilityPayloadSchema = z.object({
+    projectID: objectId('Project').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
+    lat: z.number().min(-90).max(90).openapi({ example: 29.2183 }),
+    lng: z.number().min(-180).max(180).openapi({ example: 79.513 }),
+    dateFrom: z.coerce.date().openapi({ example: '2026-08-01' }),
+    dateTo: z.coerce.date().openapi({ example: '2026-08-31' }),
+});
+export type IBookingAvailabilityPayload = z.infer<typeof BookingAvailabilityPayloadSchema>;
+
 //5: report ====================================>
 // no filters required by the current reporting requirement — scoping is handled entirely by
 // ctx.where() in the service, same as get()/search().

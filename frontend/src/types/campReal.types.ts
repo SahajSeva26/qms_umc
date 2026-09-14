@@ -161,3 +161,30 @@ export interface MoveCampStagePayload {
   to: CampStatus
   reason: string
 }
+
+/** App-facing shape for POST /camps/booking-availability — `projectId`
+ * (not the backend's required `projectID` spelling) and `[lng, lat]`
+ * are translated to the wire shape inside campsReal.service.ts only. */
+export interface BookingAvailabilityPayload {
+  projectId: string
+  lat: number
+  lng: number
+  /** YYYY-MM-DD — never a JS Date; the backend coerces the string itself. */
+  dateFrom: string
+  dateTo: string
+}
+
+export interface BookingAvailabilityDayEntry {
+  /** Project-scoped — computed only over this project's own configured slots (see `slots`). */
+  available: boolean
+  /** Only the project's own configured slots are present (or all 4 if the project has none configured) — not every CampTimeSlotValue is guaranteed. */
+  slots: Partial<Record<CampTimeSlotValue, boolean>>
+}
+
+export interface BookingAvailabilityResponse {
+  eligibleFoCount: number
+  dateFrom: string
+  dateTo: string
+  /** Keyed by YYYY-MM-DD — a map, not an array. */
+  dates: Record<string, BookingAvailabilityDayEntry>
+}

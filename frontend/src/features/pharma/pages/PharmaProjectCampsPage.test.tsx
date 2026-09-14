@@ -47,9 +47,32 @@ vi.mock('@/features/doctors/doctors.service', () => ({
   },
 }))
 
+// dayKey (local YYYY-MM-DD) of "today", matching how the availability grid
+// derives its own default fetch window.
+function todayKey(): string {
+  const d = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
 vi.mock('@/features/camps/campsReal.service', () => ({
   campsRealService: {
     bookCamp: vi.fn(async () => ({ success: true, message: '', data: { id: 'camp-new', code: 'cmp-000002' } })),
+    getBookingAvailability: vi.fn(async () => ({
+      success: true,
+      message: '',
+      data: {
+        eligibleFoCount: 1,
+        dateFrom: todayKey(),
+        dateTo: todayKey(),
+        dates: {
+          [todayKey()]: {
+            available: true,
+            slots: { '9am-1pm': true, '10am-2pm': true, '11am-3pm': true, '6pm-10pm': true },
+          },
+        },
+      },
+    })),
   },
 }))
 
@@ -205,18 +228,25 @@ describe('PharmaProjectCampsPage', () => {
     await user.click(screen.getByRole('button', { name: /new camp/i }))
     await screen.findByText(/booking for project/i)
 
+    // Step 1 — who.
     await user.type(screen.getByPlaceholderText(/search doctor by name/i), 'Priya')
     const doctorOption = await screen.findByText(/Dr\. Priya Sharma/i, {}, { timeout: 3000 })
     await user.click(doctorOption)
+    await user.click(screen.getByRole('button', { name: /^next$/i }))
 
-    await user.type(screen.getByLabelText(/date/i), '2026-09-15')
-    await user.click(screen.getByText(/select time slot/i))
-    await user.click(await screen.findByText(/9 AM – 1 PM/i))
-    await user.type(screen.getByLabelText(/^address line 1$/i), '221 Baker Street')
+    // Step 2 — where.
+    await user.type(await screen.findByLabelText(/^address line 1$/i), '221 Baker Street')
     await user.type(screen.getByLabelText(/^city$/i), 'Pune')
     await user.type(screen.getByLabelText(/^state$/i), 'Maharashtra')
     await user.type(screen.getByLabelText(/^pincode$/i), '411001')
     await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
+    await user.click(screen.getByRole('button', { name: /^next$/i }))
+
+    // Step 3 — when & details: today is the only mocked-available day.
+    const today = new Date()
+    const todayCell = await screen.findByRole('gridcell', { name: String(today.getDate()) })
+    await user.click(todayCell.querySelector('button')!)
+    await user.click(await screen.findByRole('button', { name: /9 AM – 1 PM/i }))
 
     await user.click(screen.getByRole('button', { name: /^book camp$/i }))
 

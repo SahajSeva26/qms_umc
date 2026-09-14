@@ -1,9 +1,13 @@
 import { useMemo, useState } from 'react'
 import { addDays, dayKey, startOfWeek } from '@/utils/calendarDate'
+import { shiftCalendarCursor } from '@/features/crm/appointments/appointments.utils'
 import { useAppointmentsReal } from '@/features/crm/appointments/hooks/useAppointmentsReal'
 import { useAppointmentReal } from '@/features/crm/appointments/hooks/useAppointmentReal'
+import { useAppointmentReport } from '@/features/crm/appointments/hooks/useAppointmentReport'
+import { usePermission } from '@/hooks/usePermission'
 import type { CalendarViewMode } from '@/features/crm/appointments/components/AppointmentCalendarToolbar'
 import AppointmentCalendarToolbar from '@/features/crm/appointments/components/AppointmentCalendarToolbar'
+import AppointmentKpiStrip from '@/features/crm/appointments/components/AppointmentKpiStrip'
 import AppointmentWeekGrid from '@/features/crm/appointments/components/AppointmentWeekGrid'
 import AppointmentMonthGrid from '@/features/crm/appointments/components/AppointmentMonthGrid'
 import AppointmentList from '@/features/crm/appointments/components/AppointmentList'
@@ -11,6 +15,11 @@ import AppointmentDrawer from '@/features/crm/appointments/components/Appointmen
 import NewAppointmentDialog from '@/features/crm/appointments/components/NewAppointmentDialog'
 
 const AppointmentsPage = () => {
+  const { hasPermission } = usePermission()
+  // Matches the route's actual guard exactly (appointment.routes.ts) — this
+  // endpoint accepts appointment:manage alone, not the usual tenant:manage pair.
+  const canViewReport = hasPermission('appointment:manage')
+
   const [cursor, setCursor] = useState(new Date())
   const [view, setView] = useState<CalendarViewMode>('month')
   const [openAppointmentId, setOpenAppointmentId] = useState<string | null>(null)
@@ -33,6 +42,23 @@ const AppointmentsPage = () => {
     limit: '200',
   })
   const appointments = useMemo(() => data?.data?.items ?? [], [data])
+
+  // Scoped to the same visible range as the calendar grid, unlike the
+  // Leads/Projects reports (always tenant-wide) — this report's date filters
+  // are real, and the page is inherently date-driven.
+  const { report, isLoading: reportLoading, error: reportError } = useAppointmentReport(
+    { dateFrom: dayKey(rangeStart), dateTo: dayKey(rangeEnd) },
+    canViewReport,
+  )
+  const kpis = useMemo(
+    () => ({
+      total: report?.summary.total ?? 0,
+      planned: report?.summary.planned ?? 0,
+      done: report?.summary.done ?? 0,
+      cancelled: report?.summary.cancelled ?? 0,
+    }),
+    [report],
+  )
 
   const weekAppointments = useMemo(() => {
     const startKey = dayKey(weekStart)
@@ -72,12 +98,39 @@ const AppointmentsPage = () => {
         </div>
       </div>
 
+      {!canViewReport && (
+        <p className="text-[13px] mb-4" style={{ color: 'var(--qms-text-muted)' }}>
+          Statistics are available to appointment managers.
+        </p>
+      )}
+
+      {canViewReport && reportLoading && (
+        <div className="grid gap-2.5 mb-4 grid-cols-4 max-[1100px]:grid-cols-2 max-[560px]:grid-cols-1">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="rounded-xl border p-3 h-18 animate-pulse"
+              style={{ background: 'var(--qms-surface-strong)', borderColor: 'var(--qms-border)' }}
+            />
+          ))}
+        </div>
+      )}
+
+      {canViewReport && !reportLoading && reportError && (
+        <p className="text-[13px] mb-4" style={{ color: 'var(--qms-text-muted)' }}>
+          Couldn't load stats.
+        </p>
+      )}
+
+      {canViewReport && !reportLoading && !reportError && report && <AppointmentKpiStrip kpis={kpis} />}
+
       <AppointmentCalendarToolbar
         weekStart={weekStart}
+        cursor={cursor}
         view={view}
         onViewChange={setView}
-        onPrev={() => setCursor((c) => addDays(c, -7))}
-        onNext={() => setCursor((c) => addDays(c, 7))}
+        onPrev={() => setCursor((c) => shiftCalendarCursor(c, view, -1))}
+        onNext={() => setCursor((c) => shiftCalendarCursor(c, view, 1))}
         onToday={() => setCursor(new Date())}
         onNewAppointment={handleNewAppointment}
       />
@@ -103,10 +156,13 @@ const AppointmentsPage = () => {
             <AppointmentMonthGrid
               cursor={cursor}
               appointments={appointments}
-              onPickDate={(date) => {
-                setCursor(date)
-                setView('week')
-              }}
+              // Opens New Appointment directly, prefilled with the clicked
+              // day — matches week view's own one-click behavior instead of
+              // making the user land on week view and click a second time.
+              // Month cells have no hour granularity, so this reuses the
+              // dialog's own no-prefill default start hour (10:00, see
+              // NewAppointmentDialog.tsx).
+              onPickDate={(date) => handleSlotClick(date, 10)}
             />
           )}
           {view === 'list' && <AppointmentList appointments={weekAppointments} onOpen={setOpenAppointmentId} />}

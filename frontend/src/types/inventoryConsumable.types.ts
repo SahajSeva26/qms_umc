@@ -6,6 +6,23 @@
 
 export type InventoryConsumableStatus = 'active' | 'expired'
 
+export const INVENTORY_CONSUMABLE_STATUS_LABEL: Record<InventoryConsumableStatus, string> = {
+  active: 'Active',
+  expired: 'Expired',
+}
+
+// GET /inventory-consumables/report — organisation-wide, no query params,
+// gated on inventory-consumable:manage. summary.warehouseConsumableQuantity
+// and consumables.warehouseQuantity are the same value surfaced twice by the backend's own mapper.
+export interface InventoryConsumableReportResponse {
+  summary: { consumableLots: number; warehouseConsumableQuantity: number }
+  consumables: {
+    warehouseQuantity: number
+    expiredByDate: number
+    byStatus: { status: InventoryConsumableStatus; count: number }[]
+  }
+}
+
 export interface InventoryConsumableItemRef {
   id: string
   code?: string

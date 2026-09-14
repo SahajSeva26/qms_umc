@@ -26,8 +26,21 @@ export const TenantMapper = {
             count: data?.count || 0,
             items: [] as any[],
         };
+        const stats = data?.stats;
         for (const t of data?.items || []) {
-            result.items.push(TenantMapper.toResponse(t, ctx));
+            const item = TenantMapper.toResponse(t, ctx);
+            // only present when the caller requested report=true
+            if (stats) {
+                item.stats = stats[t._id?.toString()] ?? {
+                    totalProjects: 0,
+                    liveProjects: 0,
+                    totalCamps: 0,
+                    liveCamps: 0,
+                    screeningCamps: 0,
+                    dietCamps: 0,
+                };
+            }
+            result.items.push(item);
         }
         return result;
     },

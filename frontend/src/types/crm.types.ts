@@ -200,13 +200,16 @@ export const LEAD_STATUS_COLOR: Record<LeadStatus, string> = {
   lost: 'var(--danger)',
 }
 
-// Text color for a pill label on a pale LEAD_STATUS_COLOR tint — the ordinal ramp's lighter steps fail as their own text; won/lost pass and keep their own color.
+// Text color for a pill label on a pale LEAD_STATUS_COLOR tint — each stage's raw
+// hue fails 4.5:1 as its own text on its own tint, so this is a darkened (light
+// mode) or already-legible (dark mode) variant of that SAME stage's color, not a
+// shared generic ink — keeps every stage visually distinct, matching won/lost.
 export const LEAD_STATUS_TEXT_COLOR: Record<LeadStatus, string> = {
-  new: 'var(--qms-lead-stage-text)',
-  qualified: 'var(--qms-lead-stage-text)',
-  proposal: 'var(--qms-lead-stage-text)',
-  pilot: 'var(--qms-lead-stage-text)',
-  negotiation: 'var(--qms-lead-stage-text)',
+  new: 'var(--qms-lead-stage-new-text)',
+  qualified: 'var(--qms-lead-stage-qualified-text)',
+  proposal: 'var(--qms-lead-stage-proposal-text)',
+  pilot: 'var(--qms-lead-stage-pilot-text)',
+  negotiation: 'var(--qms-lead-stage-negotiation-text)',
   won: 'var(--success)',
   lost: 'var(--danger)',
 }

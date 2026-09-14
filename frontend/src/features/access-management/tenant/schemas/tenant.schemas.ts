@@ -30,7 +30,6 @@ const gstSchema = z
 
 export const updateTenantSchema = z.object({
   name: z.string().trim().min(1, 'Name is required'),
-  description: z.string().trim().optional(),
   // Only takes effect server-side if caller has `tenant:manage`.
   status: z.enum(['active', 'inactive']).optional(),
   // Backend currently silently ignores this on update (its write path is
@@ -56,7 +55,6 @@ export const createTenantSchema = z.object({
       message: 'Company code must not look like an ObjectId',
     }),
   name: z.string().trim().min(1, 'Company name is required'),
-  description: z.string().trim().optional(),
   salesPerson: z.string().min(1, 'Sales rep is required'),
   owner: z.object({
     firstName: z.string().trim().min(1, "Owner's first name is required"),

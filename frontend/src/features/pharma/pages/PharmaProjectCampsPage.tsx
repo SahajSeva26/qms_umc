@@ -150,6 +150,7 @@ const PharmaProjectCampsContent = () => {
                 needsMrPicker={needsMrPicker}
                 project={{ id: project.id, name: project.name, campTimeSlots: project.campTimeSlots }}
                 onBooked={handleBooked}
+                onCancel={() => setBookOpen(false)}
               />
             </DialogContent>
           </Dialog>

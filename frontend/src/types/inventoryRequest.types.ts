@@ -23,6 +23,17 @@ export const INVENTORY_REQUEST_TYPE_LABEL: Record<InventoryRequestType, string> 
   return: 'Return',
 }
 
+// GET /inventory-requests/report — organisation-wide, no query params,
+// gated on inventory-request:manage. pendingRequests is exactly the
+// 'requested'-status count, NOT requested+approved — surfaced as "Awaiting approval" on the frontend, never "Pending".
+export interface InventoryRequestReportResponse {
+  summary: { totalRequests: number; pendingRequests: number }
+  requests: {
+    byStatus: { status: InventoryRequestStatus; count: number }[]
+    byType: { type: InventoryRequestType; count: number }[]
+  }
+}
+
 // Verbatim port of the backend's own transition maps
 // (inventory-request.constants.ts) — the client-side source of truth for
 // which moveStage actions to offer, mirrored not reimplemented independently.

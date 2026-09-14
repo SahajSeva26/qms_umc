@@ -5,6 +5,8 @@ import type {
   CreateProjectPayload,
   MoveProjectStagePayload,
   ProjectEntity,
+  ProjectReportQuery,
+  ProjectReportResponse,
   SearchProjectQuery,
   UpdateProjectPayload,
 } from '@/types/project.types'
@@ -49,6 +51,13 @@ const moveProjectStage = async (id: string, payload: MoveProjectStagePayload) =>
   return res.data
 }
 
+// Always a tenant-wide aggregate (accepts no filters server-side) — gated on
+// project:manage/tenant:manage, narrower than searchProjects' own read guard.
+const getProjectReport = async (query: ProjectReportQuery = {}) => {
+  const res = await api.get<ApiResponse<ProjectReportResponse>>('/projects/report', { params: query })
+  return res.data
+}
+
 // Scoped, self-contained call for the New Project wizard's Step 0 (pick a
 // lead) — deliberately NOT routed through crmService, which is still the
 // stale pre-migration mock file on this branch (crm.service.ts has no real
@@ -69,4 +78,5 @@ export const projectsService = {
   updateProject,
   moveProjectStage,
   searchWonLeads,
+  getProjectReport,
 }

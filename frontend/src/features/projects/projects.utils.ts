@@ -1,4 +1,4 @@
-import type { ProjectEntity, ProjectType } from '@/types/project.types'
+import type { ProjectEntity, ProjectReportResponse, ProjectType } from '@/types/project.types'
 import { CAMP_TYPE_VALUES, type CampType } from '@/types/campReal.types'
 
 // Frontend-only UI cap — the backend's daysToBookBefore validator is
@@ -73,33 +73,16 @@ export function projectSalesRepName(project: ProjectEntity): string {
   return typeof project.salesRep === 'string' ? project.salesRep : project.salesRep.name
 }
 
-// overdue/renewingIn30d are derived from projectNearestExpiry — a project
-// with no date range (mail-confirmation mode, or `mode` unset) counts toward neither.
-export function computeProjectKpis(projects: ProjectEntity[]) {
-  const live = projects.filter((p) => p.status === 'live')
-  const hold = projects.filter((p) => p.status === 'hold')
-  const closed = projects.filter((p) => p.status === 'closed')
-  const totalCamps = projects.reduce((sum, p) => sum + (p.totalCamps || 0), 0)
-
-  const now = Date.now()
-  let overdue = 0
-  let renewingIn30d = 0
-  for (const p of projects) {
-    const expiry = projectNearestExpiry(p)
-    if (!expiry) continue
-    const daysLeft = Math.ceil((new Date(expiry).getTime() - now) / 86_400_000)
-    if (daysLeft <= 0) overdue += 1
-    else if (daysLeft <= 30) renewingIn30d += 1
-  }
+// From GET /projects/report — a tenant-wide aggregate, unlike the fetched
+// project list, which defaults to a limit of 10.
+export function computeProjectKpis(report: ProjectReportResponse | null | undefined) {
+  const byStatus = new Map(report?.byStatus.map((s) => [s.status, s.count]) ?? [])
 
   return {
-    total: projects.length,
-    live: live.length,
-    hold: hold.length,
-    closed: closed.length,
-    totalCamps,
-    overdue,
-    renewingIn30d,
+    total: report?.summary.totalProjects ?? 0,
+    live: byStatus.get('live') ?? 0,
+    hold: byStatus.get('hold') ?? 0,
+    closed: byStatus.get('closed') ?? 0,
   }
 }
 

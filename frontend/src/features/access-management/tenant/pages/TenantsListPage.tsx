@@ -30,6 +30,8 @@ const TenantsListPage = () => {
     type: canFilterByType ? (filters.type === 'ALL' ? undefined : filters.type) : 'customer',
     page: String(page),
     limit: String(PAGE_SIZE),
+    // PAGE_SIZE (10) stays under the backend's report-mode cap of 20.
+    report: 'true',
   })
   const tenants = data?.data?.items ?? []
   const totalCount = data?.data?.count ?? 0

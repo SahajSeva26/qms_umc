@@ -1,9 +1,14 @@
-import { useState } from 'react'
-import { FiEdit2, FiPlus, FiSearch } from 'react-icons/fi'
+import { useMemo, useState } from 'react'
+import { FiBox, FiCheckCircle, FiEdit2, FiLayers, FiPlus, FiSearch, FiXCircle } from 'react-icons/fi'
 import { usePermission } from '@/hooks/usePermission'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { useInventoryMasters } from '@/features/inventory/real/hooks/useInventoryMasters'
-import { INVENTORY_MASTER_TYPE_LABEL, INVENTORY_MASTER_TYPES } from '@/types/inventoryMaster.types'
+import { useInventoryMasterReport } from '@/features/inventory/real/hooks/useInventoryMasterReport'
+import {
+  INVENTORY_MASTER_STATUS_LABEL,
+  INVENTORY_MASTER_TYPE_LABEL,
+  INVENTORY_MASTER_TYPES,
+} from '@/types/inventoryMaster.types'
 import type { InventoryMasterEntity, InventoryMasterStatus, InventoryMasterType } from '@/types/inventoryMaster.types'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -12,8 +17,12 @@ import PaginationControls from '@/components/ui/PaginationControls'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import CopyButton from '@/components/ui/CopyButton'
 import EditInventoryMasterModal from '@/features/inventory/real/components/EditInventoryMasterModal'
+import InventoryReportKpiStrip, { type InventoryReportTile } from '@/features/inventory/real/components/InventoryReportKpiStrip'
 import { usePagination } from '@/hooks/usePagination'
 import { truncateIdentifier } from '@/features/inventory/real/utils/truncateIdentifier'
+
+const TYPE_TONE: Record<InventoryMasterType, 'brand' | 'teal'> = { device: 'brand', consumable: 'teal' }
+const STATUS_TONE: Record<InventoryMasterStatus, 'emerald' | 'rose'> = { active: 'emerald', inactive: 'rose' }
 
 const PAGE_SIZE = 10
 
@@ -39,6 +48,37 @@ const InventoryMasterTab = () => {
   const items = data?.data?.items ?? []
   const totalCount = data?.data?.count ?? 0
 
+  const { report, isLoading: reportLoading, error: reportError } = useInventoryMasterReport(canManage)
+  const reportTiles = useMemo<InventoryReportTile[]>(() => {
+    if (!report) return []
+    const byType = new Map(report.catalog.byType.map((t) => [t.type, t.count]))
+    const byStatus = new Map(report.catalog.byStatus.map((s) => [s.status, s.count]))
+    return [
+      { key: 'catalogItems', label: 'Catalog Items', value: report.summary.catalogItems, tone: 'brand', icon: FiLayers },
+      ...INVENTORY_MASTER_TYPES.map((t) => ({
+        key: `type-${t}`,
+        label: INVENTORY_MASTER_TYPE_LABEL[t],
+        value: byType.get(t) ?? 0,
+        tone: TYPE_TONE[t],
+        icon: FiBox,
+      })),
+      {
+        key: 'status-active',
+        label: INVENTORY_MASTER_STATUS_LABEL.active,
+        value: byStatus.get('active') ?? 0,
+        tone: STATUS_TONE.active,
+        icon: FiCheckCircle,
+      },
+      {
+        key: 'status-inactive',
+        label: INVENTORY_MASTER_STATUS_LABEL.inactive,
+        value: byStatus.get('inactive') ?? 0,
+        tone: STATUS_TONE.inactive,
+        icon: FiXCircle,
+      },
+    ]
+  }, [report])
+
   return (
     <div>
       <div className="mb-3 flex items-start justify-between gap-4">
@@ -57,6 +97,14 @@ const InventoryMasterTab = () => {
           </Button>
         )}
       </div>
+
+      <InventoryReportKpiStrip
+        tiles={reportTiles}
+        isLoading={reportLoading}
+        error={reportError}
+        canView={canManage}
+        skeletonCount={5}
+      />
 
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <div className="relative flex-1 min-w-[220px] max-w-xs">

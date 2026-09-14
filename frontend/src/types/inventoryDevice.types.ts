@@ -20,6 +20,13 @@ export const INVENTORY_DEVICE_STATUS_LABEL: Record<InventoryDeviceStatus, string
   damaged: 'Damaged',
 }
 
+// GET /inventory-devices/report — no query params (empty backend schema),
+// always an organisation-wide aggregate. Gated on inventory-device:manage alone.
+export interface InventoryDeviceReportResponse {
+  summary: { totalDevices: number }
+  devices: { byStatus: { status: InventoryDeviceStatus; count: number }[] }
+}
+
 export interface InventoryDeviceItemRef {
   id: string
   code?: string

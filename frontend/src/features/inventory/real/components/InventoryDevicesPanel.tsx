@@ -1,8 +1,9 @@
-import { useState } from 'react'
-import { FiPlus, FiClock } from 'react-icons/fi'
+import { useMemo, useState } from 'react'
+import { FiAlertTriangle, FiCheckCircle, FiHardDrive, FiPlus, FiClock, FiTag } from 'react-icons/fi'
 import { usePermission } from '@/hooks/usePermission'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { useInventoryDevices } from '@/features/inventory/real/hooks/useInventoryDevices'
+import { useInventoryDeviceReport } from '@/features/inventory/real/hooks/useInventoryDeviceReport'
 import { INVENTORY_DEVICE_STATUS_LABEL, INVENTORY_DEVICE_STATUSES } from '@/types/inventoryDevice.types'
 import type { InventoryDeviceEntity, InventoryDeviceStatus } from '@/types/inventoryDevice.types'
 import type { InventoryMovementHistorySource } from '@/types/inventoryLedger.types'
@@ -15,8 +16,14 @@ import EditInventoryDeviceModal from '@/features/inventory/real/components/EditI
 import InventoryDeviceSearchBar from '@/features/inventory/real/components/InventoryDeviceSearchBar'
 import type { InventoryDeviceSearchBarValue } from '@/features/inventory/real/components/InventoryDeviceSearchBar'
 import InventoryMovementHistoryDrawer from '@/features/inventory/real/components/InventoryMovementHistoryDrawer'
+import InventoryReportKpiStrip, { type InventoryReportTile } from '@/features/inventory/real/components/InventoryReportKpiStrip'
 import { usePagination } from '@/hooks/usePagination'
 import { truncateIdentifier } from '@/features/inventory/real/utils/truncateIdentifier'
+
+// 'in-transit' is the one status deliberately left off the KPI strip (the
+// other 5 either drive a tile directly or roll into "Needs attention") —
+// keeping the strip at 4 tiles instead of showing all 6 real statuses.
+const NEEDS_ATTENTION_STATUSES: InventoryDeviceStatus[] = ['maintainance', 'lost', 'damaged']
 
 const PAGE_SIZE = 10
 
@@ -55,6 +62,19 @@ const InventoryDevicesPanel = () => {
   const items = data?.data?.items ?? []
   const totalCount = data?.data?.count ?? 0
 
+  const { report, isLoading: reportLoading, error: reportError } = useInventoryDeviceReport(canManage)
+  const reportTiles = useMemo<InventoryReportTile[]>(() => {
+    if (!report) return []
+    const byStatus = new Map(report.devices.byStatus.map((s) => [s.status, s.count]))
+    const needsAttention = NEEDS_ATTENTION_STATUSES.reduce((sum, s) => sum + (byStatus.get(s) ?? 0), 0)
+    return [
+      { key: 'total', label: 'Total', value: report.summary.totalDevices, tone: 'brand', icon: FiHardDrive },
+      { key: 'available', label: INVENTORY_DEVICE_STATUS_LABEL.available, value: byStatus.get('available') ?? 0, tone: 'emerald', icon: FiCheckCircle },
+      { key: 'assigned', label: INVENTORY_DEVICE_STATUS_LABEL.assigned, value: byStatus.get('assigned') ?? 0, tone: 'teal', icon: FiTag },
+      { key: 'needs-attention', label: 'Needs attention', value: needsAttention, tone: 'rose', icon: FiAlertTriangle },
+    ]
+  }, [report])
+
   return (
     <div>
       <div className="mb-3 flex items-start justify-between gap-4">
@@ -71,6 +91,14 @@ const InventoryDevicesPanel = () => {
           </Button>
         )}
       </div>
+
+      <InventoryReportKpiStrip
+        tiles={reportTiles}
+        isLoading={reportLoading}
+        error={reportError}
+        canView={canManage}
+        skeletonCount={4}
+      />
 
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <InventoryDeviceSearchBar

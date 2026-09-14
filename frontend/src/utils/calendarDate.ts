@@ -17,6 +17,13 @@ export function addDays(date: Date, days: number): Date {
   return d
 }
 
+/** Whole-day difference (b - a), both treated as local midnight — for bucketing a date into a fixed-size window (e.g. which 15-day block it falls in). */
+export function diffInDays(a: Date, b: Date): number {
+  const start = new Date(a.getFullYear(), a.getMonth(), a.getDate())
+  const end = new Date(b.getFullYear(), b.getMonth(), b.getDate())
+  return Math.round((end.getTime() - start.getTime()) / 86400000)
+}
+
 export function isSameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 }

@@ -2,6 +2,8 @@ import api from '@/lib/api/api'
 import type { ApiResponse, PaginatedResponse } from '@/types/common.types'
 import type {
   BookCampPayload,
+  BookingAvailabilityPayload,
+  BookingAvailabilityResponse,
   CampEntity,
   CampMutationResponseEntity,
   CreateCampPayload,
@@ -58,6 +60,17 @@ const getCampReport = async () => {
   return res.data
 }
 
+// Backend requires the payload key spelled `projectID` — translated here
+// only, so no other caller in the app has to know about that spelling.
+const getBookingAvailability = async (payload: BookingAvailabilityPayload) => {
+  const { projectId, ...rest } = payload
+  const res = await api.post<ApiResponse<BookingAvailabilityResponse>>('/camps/booking-availability', {
+    projectID: projectId,
+    ...rest,
+  })
+  return res.data
+}
+
 export const campsRealService = {
   searchCamps,
   getCamp,
@@ -67,4 +80,5 @@ export const campsRealService = {
   moveCampStage,
   allocateFo,
   getCampReport,
+  getBookingAvailability,
 }

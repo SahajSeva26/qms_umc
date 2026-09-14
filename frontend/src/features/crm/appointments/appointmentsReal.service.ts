@@ -7,6 +7,8 @@ import {
 import type { ApiResponse, PaginatedResponse } from '@/types/common.types'
 import type {
   AppointmentEntity,
+  AppointmentReportQuery,
+  AppointmentReportResponse,
   CreateAppointmentPayload,
   MoveAppointmentStagePayload,
   RespondAppointmentPayload,
@@ -48,6 +50,12 @@ const respondToAppointment = async (id: string, payload: RespondAppointmentPaylo
   return res.data
 }
 
+// Gated on appointment:manage alone, narrower than searchAppointments' own read guard.
+const getAppointmentReport = async (query: AppointmentReportQuery = {}) => {
+  const res = await api.get<ApiResponse<AppointmentReportResponse>>('/appointments/report', { params: query })
+  return res.data
+}
+
 export const appointmentsRealService = {
   searchAppointments,
   getAppointment,
@@ -55,4 +63,5 @@ export const appointmentsRealService = {
   updateAppointment,
   moveAppointmentStage,
   respondToAppointment,
+  getAppointmentReport,
 }

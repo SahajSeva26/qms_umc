@@ -80,6 +80,51 @@ const SLOT_OVERLAPS: Record<CampTimeSlot, CampTimeSlot[]> = {
     [CAMP_TIME_SLOTS.SLOT_6_10]: [CAMP_TIME_SLOTS.SLOT_6_10],
 };
 
+// pure, decoupled: the set of slots a camp on `slot` occupies for its FO (itself + every slot it
+// overlaps). Single source of truth for the overlapping condition — reused everywhere overlap matters.
+const overlappingSlots = (slot: CampTimeSlot): CampTimeSlot[] => SLOT_OVERLAPS[slot] || [slot];
+
+// decoupled reusable overlap check: is `foRoleId` already committed (confirmed/live) to a camp on the
+// same UTC day in a slot that OVERLAPS `timeSlot`? excludeCampId skips a camp from the check (itself).
+// Reused by create (hard block) and by the availability / allocation helpers below.
+const isFoBookedForSlot = async (
+    foRoleId: string,
+    date: Date,
+    timeSlot: CampTimeSlot,
+    ctx: RequestContext,
+    excludeCampId?: any,
+): Promise<boolean> => {
+    const where: any = {
+        ...ctx.where(),
+        fo: toObjectId(foRoleId),
+        status: { $in: FO_BOOKING_STATUSES },
+        date: utcDayRange(date),
+        timeSlot: { $in: overlappingSlots(timeSlot) },
+    };
+    if (excludeCampId) {
+        where._id = { $ne: excludeCampId };
+    }
+    const clash = await CampModel.exists(where);
+    return Boolean(clash);
+};
+
+// throwing wrapper for the write paths (create/confirm) — 409 when the FO is already booked on an
+// overlapping slot that day.
+const assertFoAvailableForSlot = async (
+    foRoleId: string,
+    date: Date,
+    timeSlot: CampTimeSlot,
+    ctx: RequestContext,
+    excludeCampId?: any,
+): Promise<void> => {
+    if (await isFoBookedForSlot(foRoleId, date, timeSlot, ctx, excludeCampId)) {
+        return throwAppError(
+            'Field officer is already booked on another camp on this date and time slot',
+            StatusCodes.CONFLICT,
+        );
+    }
+};
+
 // max span (in days) allowed for a single booking-availability query — the requested range may not
 // exceed this. Keeps the one camp fetch bounded.
 const MAX_AVAILABILITY_RANGE_DAYS = 15;
@@ -87,8 +132,8 @@ const MAX_AVAILABILITY_RANGE_DAYS = 15;
 // YYYY-MM-DD key for the UTC day a date falls on — the availability tree is keyed by this.
 const dateKey = (date: Date | string | number): string => startOfUTCDay(date).toISOString().slice(0, 10);
 
-// role ids of FOs already booked (confirmed/live) on another camp on the same UTC day AND time slot.
-// A camp occupies its FO only for its own slot, so the FO stays free for other slots the same day.
+// role ids of FOs already booked (confirmed/live) on another camp on the same UTC day in any slot
+// that OVERLAPS `timeSlot` (daytime slots block each other; see overlappingSlots / SLOT_OVERLAPS).
 const bookedFoRoleIdsOnDate = async (
     date: Date,
     timeSlot: CampTimeSlot,
@@ -101,7 +146,7 @@ const bookedFoRoleIdsOnDate = async (
         fo: { $ne: null },
         status: { $in: FO_BOOKING_STATUSES },
         date: utcDayRange(date),
-        timeSlot,
+        timeSlot: { $in: overlappingSlots(timeSlot) },
     })
         .select('fo')
         .lean();
@@ -306,6 +351,12 @@ const create = async (model: ICreateCampPayload, ctx: RequestContext): Promise<H
     const entity = new CampModel({ tenant: division.tenant, division: divisionId, project });
     let camp = await set(model, entity, ctx);
 
+    //3b: a caller-supplied FO must be free for this camp's date + slot (overlap-aware). Hard 409.
+    // (The no-FO auto-assign path below already resolves a free FO, so it needs no separate check.)
+    if (camp.fo) {
+        await assertFoAvailableForSlot(camp.fo.toString(), camp.date, (camp as any).timeSlot, ctx, camp._id);
+    }
+
     //4: best-effort auto-assign the nearest free FO when none supplied. On failure the camp stays
     // requested with no FO — moveStage guard 3b then blocks it leaving requested until one is set.
     if (!camp.fo) {
@@ -339,6 +390,13 @@ const update = async (id: string, model: IUpdateCampPayload, ctx: RequestContext
     }
 
     camp = await set(model, camp, ctx);
+
+    // fo/date/slot can all change here — the assigned FO must stay free for the (possibly new)
+    // date + slot (overlap-aware). Hard 409. Excludes this camp from the check.
+    if (camp.fo) {
+        await assertFoAvailableForSlot(camp.fo.toString(), camp.date, (camp as any).timeSlot, ctx, camp._id);
+    }
+
     camp = await camp.save();
 
     return camp;
@@ -611,7 +669,7 @@ const bookingAvailability = async (model: IBookingAvailabilityPayload, ctx: Requ
             const key = dateKey((camp as any).date);
             const slot = (camp as any).timeSlot as CampTimeSlot;
             // a camp blocks its FO for every slot it overlaps (daytime slots block each other)
-            const overlaps = SLOT_OVERLAPS[slot] || [slot];
+            const overlaps = overlappingSlots(slot);
 
             let slotMap = tree.get(key);
             if (!slotMap) {
@@ -635,15 +693,16 @@ const bookingAvailability = async (model: IBookingAvailabilityPayload, ctx: Requ
         const key = dateKey(cursor);
         const slotMap = tree.get(key);
 
-        const slots = ALL_SLOTS.map((slot) => {
+        // slots keyed by timing → boolean availability (available when at least one eligible FO is
+        // NOT blocked on that slot)
+        const slots: Record<string, boolean> = {};
+        for (const slot of ALL_SLOTS) {
             const blocked = slotMap?.get(slot);
-            // available when at least one eligible FO is NOT blocked on this slot
-            const available = eligibleFoIds.some((id) => !blocked || !blocked.has(id));
-            return { slot, available };
-        });
+            slots[slot] = eligibleFoIds.some((id) => !blocked || !blocked.has(id));
+        }
 
         // a date is available if any of its slots is available
-        const available = slots.some((s) => s.available);
+        const available = Object.values(slots).some(Boolean);
         dates.push({ date: new Date(key), available, slots });
     }
 

@@ -7,55 +7,68 @@ import type { GeoProfileEntity } from '@/types/geoProfile.types'
 
 vi.mock('@/hooks/usePermission')
 
-vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
-  default: ({ value, onChange, onResolutionStateChange, onManualCoordinateEntry }: {
-    value: unknown
-    onChange: (v: unknown) => void
-    onResolutionStateChange?: (status: 'idle' | 'loading' | 'error') => void
-    onManualCoordinateEntry?: () => void
-  }) => (
-    <>
-      <button
-        type="button"
-        onClick={() => onChange({
-          ...(value as object ?? {}),
-          addressLine1: '', addressLine2: undefined, locality: undefined,
-          city: '', state: '', pincode: '', country: undefined, googlePlaceId: undefined,
-          coordinates: [79.5130, 29.2183],
-        })}
-      >
-        Set test coordinates
-      </button>
-      <button
-        type="button"
-        onClick={() => onChange({
-          ...(value as object ?? {}),
-          coordinates: [77.2090, 28.6139],
-          addressLine1: 'Kartavya Path', locality: 'India Gate',
-          city: 'New Delhi', state: 'Delhi', pincode: '110001',
-        })}
-      >
-        Pick a location with address details
-      </button>
-      {/* Simulates the Maps-down manual lat/lng fallback — address is preserved
-          (real onChange is a no-op here), only the callback signal is what's tested. */}
-      <button type="button" onClick={() => onManualCoordinateEntry?.()}>
-        Simulate manual coordinate entry
-      </button>
-      {/* Simulates the real widget's "pin moved, reverse-geocode still resolving"
-          window — the gap between a drag/click and onChange actually firing. */}
-      <button type="button" onClick={() => onResolutionStateChange?.('loading')}>
-        Simulate location resolving
-      </button>
-      <button type="button" onClick={() => onResolutionStateChange?.('error')}>
-        Simulate location resolve error
-      </button>
-      <button type="button" onClick={() => onResolutionStateChange?.('idle')}>
-        Simulate location resolved
-      </button>
-    </>
-  ),
-}))
+// The real LocationAddressFields still renders for real when
+// showAddressFields is set, matching LocationPicker's real contract now that
+// the address form is composed inside it rather than rendered as a sibling.
+vi.mock('@/components/widgets/location-picker/LocationPicker', async () => {
+  const { default: LocationAddressFields } = await import('@/components/widgets/location-picker/LocationAddressFields')
+  return {
+    default: ({ value, onChange, onResolutionStateChange, onManualCoordinateEntry, showAddressFields, disabled, defaultCountry }: {
+      value: unknown
+      onChange: (v: unknown) => void
+      onResolutionStateChange?: (status: 'idle' | 'loading' | 'error') => void
+      onManualCoordinateEntry?: () => void
+      showAddressFields?: boolean
+      disabled?: boolean
+      defaultCountry?: string
+    }) => (
+      <>
+        <button
+          type="button"
+          onClick={() => onChange({
+            ...(value as object ?? {}),
+            addressLine1: '', addressLine2: undefined, locality: undefined,
+            city: '', state: '', pincode: '', country: undefined, googlePlaceId: undefined,
+            coordinates: [79.5130, 29.2183],
+          })}
+        >
+          Set test coordinates
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange({
+            ...(value as object ?? {}),
+            coordinates: [77.2090, 28.6139],
+            addressLine1: 'Kartavya Path', locality: 'India Gate',
+            city: 'New Delhi', state: 'Delhi', pincode: '110001',
+          })}
+        >
+          Pick a location with address details
+        </button>
+        {/* Simulates the Maps-down manual lat/lng fallback — address is preserved
+            (real onChange is a no-op here), only the callback signal is what's tested. */}
+        <button type="button" onClick={() => onManualCoordinateEntry?.()}>
+          Simulate manual coordinate entry
+        </button>
+        {/* Simulates the real widget's "pin moved, reverse-geocode still resolving"
+            window — the gap between a drag/click and onChange actually firing. */}
+        <button type="button" onClick={() => onResolutionStateChange?.('loading')}>
+          Simulate location resolving
+        </button>
+        <button type="button" onClick={() => onResolutionStateChange?.('error')}>
+          Simulate location resolve error
+        </button>
+        <button type="button" onClick={() => onResolutionStateChange?.('idle')}>
+          Simulate location resolved
+        </button>
+        {showAddressFields && (
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          <LocationAddressFields value={value as any} onChange={onChange as any} disabled={disabled} defaultCountry={defaultCountry} />
+        )}
+      </>
+    ),
+  }
+})
 
 vi.mock('@/features/geo-profile/geoProfile.service', () => ({
   geoProfileService: {

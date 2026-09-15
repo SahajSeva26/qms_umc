@@ -16,7 +16,6 @@ import MrPicker from '@/features/pharma/components/MrPicker'
 import EditDoctorModal from '@/features/doctors/components/EditDoctorModal'
 import DateSlotAvailabilityGrid from '@/features/pharma/components/DateSlotAvailabilityGrid'
 import LocationPicker from '@/components/widgets/location-picker/LocationPicker'
-import LocationAddressFields from '@/components/widgets/location-picker/LocationAddressFields'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -359,16 +358,14 @@ const BookCampForm = ({ needsMrPicker, project, onBooked, onCancel }: BookCampFo
             control={control}
             name="location"
             render={({ field }) => (
-              <div className="space-y-2">
-                <LocationPicker
-                  value={field.value}
-                  onChange={field.onChange}
-                  onResolutionStateChange={setLocationResolution}
-                  defaultCountry="India"
-                  countryCode="IN"
-                />
-                <LocationAddressFields value={field.value} onChange={field.onChange} defaultCountry="India" />
-              </div>
+              <LocationPicker
+                value={field.value}
+                onChange={field.onChange}
+                onResolutionStateChange={setLocationResolution}
+                defaultCountry="India"
+                countryCode="IN"
+                showAddressFields
+              />
             )}
           />
           {fieldError('location') && <FieldErrorText message={fieldError('location')!} />}

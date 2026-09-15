@@ -15,7 +15,6 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { LocationValue } from '@/types/location.types'
 import LocationPicker from '@/components/widgets/location-picker/LocationPicker'
-import LocationAddressFields from '@/components/widgets/location-picker/LocationAddressFields'
 import type { LocationResolutionState } from '@/components/widgets/location-picker/location.types'
 import FieldErrorText from '@/components/ui/FieldErrorText'
 
@@ -188,16 +187,14 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
               control={control}
               name="address"
               render={({ field }) => (
-                <div className="space-y-2">
-                  <LocationPicker
-                    value={field.value}
-                    onChange={field.onChange}
-                    onResolutionStateChange={setLocationResolution}
-                    defaultCountry="India"
-                    countryCode="IN"
-                  />
-                  <LocationAddressFields value={field.value} onChange={field.onChange} defaultCountry="India" />
-                </div>
+                <LocationPicker
+                  value={field.value}
+                  onChange={field.onChange}
+                  onResolutionStateChange={setLocationResolution}
+                  defaultCountry="India"
+                  countryCode="IN"
+                  showAddressFields
+                />
               )}
             />
             {fieldError('address') && <FieldErrorText message={fieldError('address')!} />}

@@ -62,6 +62,22 @@ describe('LocationAddressFields', () => {
     expect(screen.queryByText(/complete the address below/i)).not.toBeInTheDocument()
   })
 
+  it('shows the labelled "Map location" hint alongside the missing-fields notice when both are present', () => {
+    render(<LocationAddressFields value={makeValue({ city: '' })} onChange={vi.fn()} locationHint="Dehene, Maharashtra, India" />)
+    expect(screen.getByText(/map location/i)).toBeInTheDocument()
+    expect(screen.getByText('Dehene, Maharashtra, India')).toBeInTheDocument()
+  })
+
+  it('does NOT show the location hint when the address is already complete, even if one was supplied', () => {
+    render(<LocationAddressFields value={makeValue()} onChange={vi.fn()} locationHint="221 Baker Street, Mumbai" />)
+    expect(screen.queryByText(/map location/i)).not.toBeInTheDocument()
+  })
+
+  it('does not show the location hint block at all when none was supplied, even with missing fields', () => {
+    render(<LocationAddressFields value={makeValue({ city: '' })} onChange={vi.fn()} />)
+    expect(screen.queryByText(/map location/i)).not.toBeInTheDocument()
+  })
+
   it('clearing the Country input calls onChange with country: undefined, never ""', async () => {
     const onChange = vi.fn()
     const user = userEvent.setup()

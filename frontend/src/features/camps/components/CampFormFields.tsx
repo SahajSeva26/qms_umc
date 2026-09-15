@@ -14,7 +14,6 @@ import { CAMP_TIME_SLOT_LABEL } from '@/types/campTimeSlot.constants'
 import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
 import type { LocationValue } from '@/types/location.types'
 import LocationPicker from '@/components/widgets/location-picker/LocationPicker'
-import LocationAddressFields from '@/components/widgets/location-picker/LocationAddressFields'
 import type { LocationResolutionState } from '@/components/widgets/location-picker/location.types'
 
 const TYPE_OPTIONS: { value: CampType; label: string }[] = CAMP_TYPE_VALUES.map((value) => ({ value, label: CAMP_TYPE_LABEL[value] }))
@@ -152,8 +151,8 @@ const CampFormFields = ({
           disabled={isLocked}
           defaultCountry="India"
           countryCode="IN"
+          showAddressFields
         />
-        <LocationAddressFields value={location} onChange={(v: LocationValue) => setField('location', v)} disabled={isLocked} defaultCountry="India" />
       </div>
       <p className="text-[11px] -mt-2" style={{ color: 'var(--qms-text-muted)' }}>
         Used to auto-allocate the nearest available field officer if none is picked below.

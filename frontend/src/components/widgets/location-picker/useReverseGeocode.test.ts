@@ -175,4 +175,97 @@ describe('useReverseGeocode', () => {
 
     expect(onResolved).toHaveBeenCalledWith(expect.objectContaining({ country: undefined }))
   })
+
+  it('fills pincode from a later result when the first result has none — the rural-gap fallback', async () => {
+    geocode.mockResolvedValue({
+      results: [
+        {
+          place_id: 'primary',
+          address_components: [{ long_name: 'Dehene', short_name: 'Dehene', types: ['locality'] }],
+          formatted_address: 'Dehene, Maharashtra, India',
+        },
+        { address_components: [{ long_name: '421302', short_name: '421302', types: ['postal_code'] }] },
+      ],
+    })
+    const onResolved = vi.fn()
+    const { result } = renderHook(() => useReverseGeocode({ onResolved }))
+
+    await act(async () => {
+      await result.current.runGeocode({ lat: 19.2, lng: 73.1 })
+    })
+
+    expect(onResolved).toHaveBeenCalledWith(expect.objectContaining({ pincode: '421302', city: 'Dehene' }))
+  })
+
+  it('exposes locationHint from the primary result\'s formatted_address once resolved', async () => {
+    geocode.mockResolvedValue(geocoderResult())
+    // geocoderResult() has no formatted_address by default — override it here.
+    geocode.mockResolvedValueOnce({
+      results: [{ place_id: 'p1', address_components: [], formatted_address: 'Somewhere, Maharashtra' }],
+    })
+    const { result } = renderHook(() => useReverseGeocode({ onResolved: vi.fn() }))
+
+    await act(async () => {
+      await result.current.runGeocode({ lat: 1, lng: 1 })
+    })
+
+    expect(result.current.locationHint).toBe('Somewhere, Maharashtra')
+  })
+
+  it('clears locationHint back to null on reset()', async () => {
+    geocode.mockResolvedValueOnce({
+      results: [{ place_id: 'p1', address_components: [], formatted_address: 'Somewhere, Maharashtra' }],
+    })
+    const { result } = renderHook(() => useReverseGeocode({ onResolved: vi.fn() }))
+
+    await act(async () => {
+      await result.current.runGeocode({ lat: 1, lng: 1 })
+    })
+    expect(result.current.locationHint).toBe('Somewhere, Maharashtra')
+
+    act(() => { result.current.reset() })
+    expect(result.current.locationHint).toBeNull()
+  })
+
+  it('clears locationHint on "Use this pin" — a hint about the abandoned reverse-geocode should not linger', async () => {
+    geocode.mockResolvedValueOnce({
+      results: [{ place_id: 'p1', address_components: [], formatted_address: 'Somewhere, Maharashtra' }],
+    })
+    const { result } = renderHook(() => useReverseGeocode({ onResolved: vi.fn() }))
+
+    await act(async () => {
+      await result.current.runGeocode({ lat: 1, lng: 1 })
+    })
+    expect(result.current.locationHint).toBe('Somewhere, Maharashtra')
+
+    geocode.mockRejectedValue(new Error('ZERO_RESULTS'))
+    await act(async () => {
+      await result.current.runGeocode({ lat: 2, lng: 2 })
+    })
+    act(() => { result.current.useProvisionalPinWithoutAddress() })
+    expect(result.current.locationHint).toBeNull()
+  })
+
+  it('a successful lookup for pin A, then a FAILED lookup for a different pin B, leaves locationHint null — never A\'s stale hint shown against B\'s marker', async () => {
+    geocode.mockResolvedValueOnce({
+      results: [{ place_id: 'pin-a', address_components: [], formatted_address: 'Pin A, Maharashtra' }],
+    })
+    const { result } = renderHook(() => useReverseGeocode({ onResolved: vi.fn() }))
+
+    // Pin A resolves successfully — hint is set.
+    await act(async () => {
+      await result.current.runGeocode({ lat: 1, lng: 1 })
+    })
+    expect(result.current.locationHint).toBe('Pin A, Maharashtra')
+
+    // Pin B's lookup fails outright — no explicit reset/"Use this pin" call,
+    // just the new runGeocode itself.
+    geocode.mockRejectedValueOnce(new Error('ZERO_RESULTS'))
+    await act(async () => {
+      await result.current.runGeocode({ lat: 2, lng: 2 })
+    })
+
+    expect(result.current.status).toBe('error')
+    expect(result.current.locationHint).toBeNull()
+  })
 })

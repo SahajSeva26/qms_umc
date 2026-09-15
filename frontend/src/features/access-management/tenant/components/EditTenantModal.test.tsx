@@ -4,29 +4,42 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { Tenant } from '@/types/accessManagement.types'
 
-vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
-  default: ({ value, onChange, onResolutionStateChange }: {
-    value: unknown
-    onChange: (v: unknown) => void
-    onResolutionStateChange?: (status: 'idle' | 'loading' | 'error') => void
-  }) => (
-    <>
-      <button
-        type="button"
-        onClick={() => onChange({ ...(value as object ?? {}), coordinates: [73.8567, 18.5204] })}
-      >
-        Set test coordinates
-      </button>
-      {/* Simulates the real widget's "pin moved, reverse-geocode still resolving" window. */}
-      <button type="button" onClick={() => onResolutionStateChange?.('loading')}>
-        Simulate location resolving
-      </button>
-      <button type="button" onClick={() => onResolutionStateChange?.('idle')}>
-        Simulate location resolved
-      </button>
-    </>
-  ),
-}))
+// The real LocationAddressFields still renders for real when
+// showAddressFields is set, matching LocationPicker's real contract now that
+// the address form is composed inside it rather than rendered as a sibling.
+vi.mock('@/components/widgets/location-picker/LocationPicker', async () => {
+  const { default: LocationAddressFields } = await import('@/components/widgets/location-picker/LocationAddressFields')
+  return {
+    default: ({ value, onChange, onResolutionStateChange, showAddressFields, disabled, defaultCountry }: {
+      value: unknown
+      onChange: (v: unknown) => void
+      onResolutionStateChange?: (status: 'idle' | 'loading' | 'error') => void
+      showAddressFields?: boolean
+      disabled?: boolean
+      defaultCountry?: string
+    }) => (
+      <>
+        <button
+          type="button"
+          onClick={() => onChange({ ...(value as object ?? {}), coordinates: [73.8567, 18.5204] })}
+        >
+          Set test coordinates
+        </button>
+        {/* Simulates the real widget's "pin moved, reverse-geocode still resolving" window. */}
+        <button type="button" onClick={() => onResolutionStateChange?.('loading')}>
+          Simulate location resolving
+        </button>
+        <button type="button" onClick={() => onResolutionStateChange?.('idle')}>
+          Simulate location resolved
+        </button>
+        {showAddressFields && (
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          <LocationAddressFields value={value as any} onChange={onChange as any} disabled={disabled} defaultCountry={defaultCountry} />
+        )}
+      </>
+    ),
+  }
+})
 
 vi.mock('@/features/access-management/accessManagement.service', () => ({
   accessManagementService: {

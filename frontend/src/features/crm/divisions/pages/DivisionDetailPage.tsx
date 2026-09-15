@@ -11,6 +11,8 @@ import EditDivisionModal from '@/features/crm/divisions/components/EditDivisionM
 import { Button } from '@/components/ui/button'
 import { unwrapId } from '@/utils/unwrapId'
 
+type DivisionDetailView = 'mrs' | 'brands' | 'contacts'
+
 const DivisionDetailPage = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -22,6 +24,7 @@ const DivisionDetailPage = () => {
   const tenantId = division ? unwrapId(division.tenant, undefined) : undefined
 
   const [editOpen, setEditOpen] = useState(false)
+  const [view, setView] = useState<DivisionDetailView>('mrs')
 
   return (
     <div className="w-full">
@@ -83,16 +86,37 @@ const DivisionDetailPage = () => {
             </Button>
           </div>
 
-          <div className="mt-5">
-            {tenantId && <DivisionMrsSection tenantId={tenantId} divisionId={division.id} />}
+          <div
+            className="inline-flex gap-1 p-1 rounded-[10px] mt-5 mb-1"
+            style={{ background: 'var(--qms-surface-strong, rgba(0,0,0,.04))' }}
+          >
+            {([
+              { key: 'mrs', label: 'MRs' },
+              { key: 'brands', label: 'Brands' },
+              { key: 'contacts', label: 'Contacts' },
+            ] as const).map(({ key, label }) => (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={view === key}
+                onClick={() => setView(key)}
+                className="rounded-lg text-xs font-bold border-0"
+                style={{
+                  padding: '6px 14px',
+                  background: view === key ? 'var(--qms-card)' : 'transparent',
+                  color: view === key ? 'var(--qms-text)' : 'var(--qms-text-muted)',
+                  boxShadow: view === key ? '0 1px 4px rgba(0,0,0,.08)' : 'none',
+                }}
+              >
+                {label}
+              </button>
+            ))}
           </div>
 
-          <div className="mt-5">
-            {tenantId && <DivisionBrandsSection tenantId={tenantId} divisionId={division.id} />}
-          </div>
-
-          <div className="mt-5">
-            {tenantId && <DivisionContactsSection tenantId={tenantId} divisionId={division.id} />}
+          <div className="mt-4">
+            {tenantId && view === 'mrs' && <DivisionMrsSection tenantId={tenantId} divisionId={division.id} />}
+            {tenantId && view === 'brands' && <DivisionBrandsSection tenantId={tenantId} divisionId={division.id} />}
+            {tenantId && view === 'contacts' && <DivisionContactsSection tenantId={tenantId} divisionId={division.id} />}
           </div>
 
           {editOpen && <EditDivisionModal division={division} onClose={() => setEditOpen(false)} />}

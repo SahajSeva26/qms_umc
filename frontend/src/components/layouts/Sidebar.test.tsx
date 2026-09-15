@@ -44,7 +44,7 @@ describe('Sidebar — pharma identity isolation', () => {
     })
 
     expect(screen.queryByText(/pharma portal/i)).not.toBeInTheDocument()
-    expect(screen.getByText('Dashboard')).toBeInTheDocument()
+    expect(screen.getByText('CRM')).toBeInTheDocument()
   })
 
   it('shows ONLY the Pharma Portal section for a pharma-identity session with camp:book — no other section', async () => {
@@ -80,12 +80,12 @@ describe('Sidebar — pharma identity isolation', () => {
       session: sessionFixture('sales-rep', []),
     })
 
-    expect(screen.getByText('Dashboard')).toBeInTheDocument()
+    expect(screen.getByText('Doctor Management')).toBeInTheDocument()
     expect(screen.queryByText(/pharma portal/i)).not.toBeInTheDocument()
   })
 })
 
-describe('Sidebar — FO Management is gated on platform tenant, not permission alone', () => {
+describe('Sidebar — FO Management platform-tenant gate (unreachable via nav while the item is hidden, but must not silently break)', () => {
   it('hides FO Management for a customer-tenant admin holding tenant:manage (the exact false-positive this gate exists to prevent)', async () => {
     await renderSidebar({
       permissions: ['tenant:manage'],
@@ -104,12 +104,12 @@ describe('Sidebar — FO Management is gated on platform tenant, not permission 
     expect(screen.queryByText('FO Management')).not.toBeInTheDocument()
   })
 
-  it('shows FO Management for a platform-tenant session with tenant:admin', async () => {
+  it('hides FO Management for a platform-tenant session with tenant:admin — deliberately nav-hidden (mock-backed), not deleted', async () => {
     await renderSidebar({
       permissions: ['tenant:admin'],
       session: sessionFixture('admin', ['tenant:admin'], 'platform'),
     })
 
-    expect(screen.getByText('FO Management')).toBeInTheDocument()
+    expect(screen.queryByText('FO Management')).not.toBeInTheDocument()
   })
 })

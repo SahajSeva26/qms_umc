@@ -42,6 +42,7 @@ export const ENTITY_TYPE = {
 export const ENTITY_RELATION = {
     //user
     [ENTITY_TYPE.USER]: {
+        
         PROFILE_PICTURE: 'profile_picture',
     },
 

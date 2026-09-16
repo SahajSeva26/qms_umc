@@ -1,13 +1,13 @@
 import { IStorageProvider, IUploadInput } from '../../types/storagetypes';
 import { CLOUDINARY, CloudinaryProvider } from './cloudinary/cloudinary';
-import { AWS, AwsProvider } from './aws/aws';
+import { S3, S3Provider } from './aws/s3.provider';
 
 class StorageManager {
     private readonly providers: Map<string, IStorageProvider> = new Map();
 
     constructor() {
         this.providers.set(CLOUDINARY, new CloudinaryProvider());
-        this.providers.set(AWS, new AwsProvider());
+        this.providers.set(S3, new S3Provider());
     }
 
     get(name: string = CLOUDINARY): IStorageProvider {

@@ -9,8 +9,6 @@ import {
     UpdateFilePayloadSchema,
 } from './file.validators';
 import { AuthMiddleware } from '../../shared/middlewares/authmiddleware';
-import { AuthorizeMiddleware } from '../../shared/middlewares/authorizeMiddleware';
-import { FILE_PERMISSIONS } from './file.constants';
 
 export const FileRouter = express.Router();
 
@@ -113,11 +111,11 @@ registry.registerPath({
 // =======================================================================
 // ========================= EXPORT FILE ROUTES ==========================
 // =======================================================================
-// reads are tenant-scoped but open to any authenticated user; writes (create/update/status)
-// are guarded by file:manage.
+// All routes are tenant-scoped but open to ANY authenticated user — no permission guard.
+// (file:manage still gates discarded-file *visibility* in the search service.)
 FileRouter.get('/:id', FileController.get);
 FileRouter.get('/', FileController.search);
 
-FileRouter.post('/', AuthorizeMiddleware([FILE_PERMISSIONS.MANAGE.code]), FileController.create);
-FileRouter.put('/:id', AuthorizeMiddleware([FILE_PERMISSIONS.MANAGE.code]), FileController.update);
-FileRouter.patch('/:id/status', AuthorizeMiddleware([FILE_PERMISSIONS.MANAGE.code]), FileController.changeStatus);
+FileRouter.post('/', FileController.create);
+FileRouter.put('/:id', FileController.update);
+FileRouter.patch('/:id/status', FileController.changeStatus);

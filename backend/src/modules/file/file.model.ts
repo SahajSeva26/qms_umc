@@ -46,13 +46,13 @@ const contentSchema = new mongoose.Schema({
 const fileSchema = new mongoose.Schema(
     {
         entity: {
-            id: {
+            id: {       
                 type: String,
                 required: true,
             },
-            type: {
+            type: { 
                 type: String,
-                enum: Object.values(ENTITY_TYPE),
+                enum: Object.values(ENTITY_TYPE), 
                 required: true,
             },
             relation: {
@@ -95,3 +95,5 @@ const fileSchema = new mongoose.Schema(
 
 export const FileModel = mongoose.model('File', fileSchema);
 export type IFile = mongoose.InferSchemaType<typeof fileSchema>;
+
+

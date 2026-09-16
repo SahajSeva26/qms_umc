@@ -56,7 +56,7 @@ let ENV = {
         RefreshExpirySec: Number(process.env.JWT_REFRESH_EXPIRY_SEC) || 60 * 60 * 24 * 7, // 7 days fallback
     },
 
-    Integrations: {
+    Providers: {
         // Jira Cloud — credentials come from .env (gitignored). Non-secret
         // fallbacks are fine to keep; email/token have no fallback on purpose so
         // no secret ever lands in this git-tracked file.
@@ -66,6 +66,17 @@ let ENV = {
             ApiToken: process.env.JIRA_API_TOKEN || '',
             ProjectKey: process.env.JIRA_PROJECT_KEY || 'QF',
             IssueType: process.env.JIRA_ISSUE_TYPE || 'Bug',
+        },
+
+        // AWS S3 — file storage. Non-secret config (region/bucket/endpoint) keeps fallbacks;
+        // the access key + secret have no fallback on purpose so no credential lands in this
+        // git-tracked file. Endpoint is optional — set it for LocalStack/S3-compatible dev.
+        AWS_S3: {
+            Region: process.env.AWS_REGION || 'ap-south-1',
+            AccessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+            SecretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
+            S3Bucket: process.env.AWS_S3_BUCKET || '',
+            S3Endpoint: process.env.AWS_S3_ENDPOINT || '',
         },
     },
 

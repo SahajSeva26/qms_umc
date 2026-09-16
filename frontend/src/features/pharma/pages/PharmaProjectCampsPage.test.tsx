@@ -11,6 +11,8 @@ vi.mock('@/hooks/useSession')
 
 // LocationPicker needs real Google Maps credentials, unavailable in tests —
 // mock it to a button supplying coordinates via the same onChange(LocationValue) contract.
+// LocationAddressFields is rendered for real by BookCampForm itself, as a
+// sibling of this mock, not by LocationPicker.
 vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
   default: ({ value, onChange }: { value: unknown; onChange: (v: unknown) => void }) => (
     <button

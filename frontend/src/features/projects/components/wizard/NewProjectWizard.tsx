@@ -202,6 +202,28 @@ const NewProjectWizard = ({ editProject, onClose, onSaved }: NewProjectWizardPro
 
   const handleBack = () => setStep((s) => Math.max(0, s - 1))
 
+  // Jumping back to an already-completed step is always safe — its fields
+  // were already validated on the way in. Jumping forward must still
+  // validate every step in between, since submit only re-checks the last
+  // step's own fields — without this, clicking straight to "Reports &
+  // Review" could skip every earlier step's required fields.
+  const handleStepClick = async (target: number) => {
+    if (target === step) return
+    if (target < step) {
+      setStep(target)
+      return
+    }
+    for (let i = step; i < target; i++) {
+      setAttemptedFields((prev) => new Set([...prev, ...activeStepFieldNames[i]]))
+      const valid = await trigger(activeStepFieldNames[i])
+      if (!valid) {
+        setStep(i)
+        return
+      }
+    }
+    setStep(target)
+  }
+
   const onSubmit = async (values: WizardFormState) => {
     const mode: ExecutionMode = {
       mode: values.mode,
@@ -318,8 +340,10 @@ const NewProjectWizard = ({ editProject, onClose, onSaved }: NewProjectWizardPro
                     {STEPS.map((s, i) => (
                       <Fragment key={s.label}>
                         {i > 0 && <span className="w-2.5 h-px shrink-0" style={{ background: 'var(--qms-border)' }} />}
-                        <div
-                          className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-full border text-[11px] font-bold whitespace-nowrap"
+                        <button
+                          type="button"
+                          onClick={() => handleStepClick(i)}
+                          className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-full border text-[11px] font-bold whitespace-nowrap cursor-pointer"
                           style={
                             i === step
                               ? { borderColor: 'var(--qms-brand)', color: 'var(--qms-brand)', background: 'color-mix(in oklab, var(--qms-brand) 8%, transparent)' }
@@ -341,7 +365,7 @@ const NewProjectWizard = ({ editProject, onClose, onSaved }: NewProjectWizardPro
                             {i + 1}
                           </span>
                           {s.label}
-                        </div>
+                        </button>
                       </Fragment>
                     ))}
                   </div>

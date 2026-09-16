@@ -103,7 +103,7 @@ const UserEditor = ({ user }: UserEditorProps) => {
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <RealRoleBadge
-              roleTypeName={roles[0] && typeof roles[0].type !== 'string' ? roles[0].type.name : null}
+              roleTypeName={roles[0] && typeof roles[0].type === 'object' && roles[0].type !== null ? roles[0].type.name : null}
               isLoading={isLoadingRoles}
             />
             <StatusPill status={user.status} />

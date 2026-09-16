@@ -28,4 +28,8 @@ export interface LocationPickerProps {
    *  geocoder ever ran, so any existing address may no longer match. The picker only reports
    *  this; whether that's a hard block (address required) or a soft warning is caller-owned. */
   onManualCoordinateEntry?: () => void
+  /** Reports the map's reverse-geocode hint (Google's own description of the pinned point),
+   *  including clears back to null — pass straight through to LocationAddressFields's own
+   *  `locationHint` prop if the caller renders one alongside this picker. */
+  onLocationHintChange?: (hint: string | null) => void
 }

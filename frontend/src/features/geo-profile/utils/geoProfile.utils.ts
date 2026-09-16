@@ -14,6 +14,9 @@ export const isValidLongitude = (lng: number): boolean => {
 // no corresponding RoleType at all (confirmed against ALLOWED_ROLETYPE_CODES
 // — GeoProfile's type is deliberately decoupled from role-type), so there is
 // nothing to filter/validate against for that case; it's left unfiltered.
+//
+// role.type populates to `null` for a dangling RoleType ref (confirmed in
+// live data) — treated as "not a field officer" rather than thrown on.
 export function isFieldOfficerRole(role: RoleEntity): boolean {
-  return typeof role.type !== 'string' && role.type.code === 'field-officer'
+  return typeof role.type === 'object' && role.type !== null && role.type.code === 'field-officer'
 }

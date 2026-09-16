@@ -5,7 +5,7 @@ import { FiUser, FiLock, FiEye, FiEyeOff } from 'react-icons/fi'
 import { loginSchema, type LoginFormValues } from '../auth.schemas'
 import { useLogin } from '../hooks/useLogin'
 import ThemeToggle from '@/components/ui/ThemeToggle'
-import { DASHBOARD_ROUTES } from '@/components/layouts/navConfig'
+import { ACCESS_MANAGEMENT_ROUTES } from '@/features/access-management/accessManagement.routes'
 import { useNavigate } from 'react-router-dom'
 import { getApiErrorMessage, isServerUnreachable, isServiceFailure } from '@/utils/apiError'
 import { useServerHealth } from '@/hooks/useServerHealth'
@@ -33,7 +33,8 @@ const LoginForm = () => {
   const onSubmit = (values: LoginFormValues) => {
     login(values, {
       onSuccess: () => {
-        navigate(DASHBOARD_ROUTES.DASHBOARD, { replace: true })
+        // TODO: revert to DASHBOARD_ROUTES.DASHBOARD once Dashboard is backend-wired and un-hidden from nav.
+        navigate(ACCESS_MANAGEMENT_ROUTES.TENANTS, { replace: true })
       },
       onError: (err) => {
         if (isServerUnreachable(err)) setUnreachable(true)

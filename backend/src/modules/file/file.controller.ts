@@ -67,9 +67,9 @@ const create = async (req: any, res: any) => {
             });
         }
 
-        const file = await FileService.create(data, ctx, req.files);
+        const files = await FileService.create(data, ctx, req.files);
 
-        return ResponseHandler.appResponse(res, StatusCodes.CREATED, true, 'File created successfully', FileMapper.toResponse(file));
+        return ResponseHandler.appResponse(res, StatusCodes.CREATED, true, 'Files created successfully', files.map((file) => FileMapper.toResponse(file)));
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }

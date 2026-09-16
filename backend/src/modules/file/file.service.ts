@@ -2,7 +2,7 @@
 import mongoose, { HydratedDocument } from 'mongoose';
 import { FileModel, IFile } from './file.model';
 import { IChangeFileStatusPayload, ICreateFilePayload, ISearchFileQuery, IUpdateFilePayload } from './file.validators';
-import { ENTITY_RELATION, FILE_PERMISSIONS, FILE_STATUS, FILE_TRANSITION_MAP, FILE_TYPE } from './file.constants';
+import { ENTITY_RELATION, FILE_PERMISSIONS, FILE_STATUS, FILE_TRANSITION_MAP, FILE_TYPE, getRelationCap } from './file.constants';
 import { throwAppError } from '../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../shared/utils/contextBuilder';
@@ -48,9 +48,37 @@ const resolveTenant = async (model: ICreateFilePayload, ctx: RequestContext): Pr
 // `profile_picture`, a `tenant` file a `logo`). Guards against attaching a logo to a user record.
 const assertRelationCoherent = (type: string, relation: string) => {
     const group = (ENTITY_RELATION as any)[type];
-    const allowed: string[] = group ? Object.values(group) : [];
+    const allowed: string[] = group ? Object.values(group).map((r: any) => r.name) : [];
     if (!allowed.includes(relation)) {
         return throwAppError(`Relation "${relation}" is not valid for entity type "${type}"`, StatusCodes.BAD_REQUEST);
+    }
+};
+
+// Enforce the relation's cap: the incoming files plus the entity's existing (non-discarded) files
+// for this relation must not exceed the cap. undefined cap = unlimited.
+const assertWithinRelationCap = async (model: ICreateFilePayload, tenant: string, incoming: number) => {
+    const cap = getRelationCap(model.entity.type, model.entity.relation);
+    if (cap === undefined) {
+        return;
+    }
+    if (incoming > cap) {
+        return throwAppError(
+            `The "${model.entity.relation}" relation accepts at most ${cap} file(s)`,
+            StatusCodes.BAD_REQUEST,
+        );
+    }
+    const existing = await FileModel.countDocuments({
+        tenant,
+        'entity.id': model.entity.id,
+        'entity.type': model.entity.type,
+        'entity.relation': model.entity.relation,
+        status: { $ne: FILE_STATUS.DISCARDED },
+    });
+    if (existing + incoming > cap) {
+        return throwAppError(
+            `The "${model.entity.relation}" relation already holds ${existing} of ${cap} file(s)`,
+            StatusCodes.CONFLICT,
+        );
     }
 };
 
@@ -217,11 +245,12 @@ const search = async (filters: ISearchFileQuery, ctx: RequestContext, options?: 
     return { count, items };
 };
 
-const create = async (model: ICreateFilePayload, ctx: RequestContext, files?: any[]): Promise<HydratedDocument<IFile>> => {
-    //0: an upload is mandatory — content is derived from it
+// Accepts one or many uploaded files and creates a File doc per upload — each with its own
+// storage content and derived type, all sharing the same tenant/owner/entity.
+const create = async (model: ICreateFilePayload, ctx: RequestContext, files?: any[]): Promise<HydratedDocument<IFile>[]> => {
+    //0: at least one upload is mandatory — content is derived from it
     ctx.logger.info({ files }, 'Files received in create');
-    const file = files?.[0];
-    if (!file) {
+    if (!files?.length) {
         return throwAppError('A file upload is required', StatusCodes.BAD_REQUEST);
     }
 
@@ -231,33 +260,40 @@ const create = async (model: ICreateFilePayload, ctx: RequestContext, files?: an
     //2: coherence — the relation must be valid for the entity type
     assertRelationCoherent(model.entity.type, model.entity.relation);
 
-    //3: type is derived from the uploaded file, never from the client
-    const type = resolveFileType(file.mimetype);
+    //3: enforce the relation's cap against what already exists + what's incoming
+    await assertWithinRelationCap(model, tenant, files.length);
 
-    //4: the acting role owns the file
+    //4: the acting role owns every file
     const owner = resolveOwner(ctx);
 
-    //5: content is derived from the uploaded file (pushed to storage here), never from the client
-    const content = await buildContent(file, tenant, model.entity);
+    //5: one File doc per uploaded file — type + content are derived per file
+    const created: HydratedDocument<IFile>[] = [];
+    for (const file of files) {
+        // type is derived from the uploaded file, never from the client
+        const type = resolveFileType(file.mimetype);
+        // content is derived from the uploaded file (pushed to storage here), never from the client
+        const content = await buildContent(file, tenant, model.entity);
 
-    //6: build entity — tenant, owner, entity ref, type and content are all seeded here; status
-    // defaults to DRAFT on the model; only tags flow through set()
-    const doc = new FileModel({
-        tenant,
-        owner,
-        type,
-        entity: {
-            id: model.entity.id,
-            type: model.entity.type,
-            relation: model.entity.relation,
-        },
-        content,
-    });
+        // tenant, owner, entity ref, type and content are all seeded here; status defaults to
+        // DRAFT on the model; only tags flow through set()
+        const doc = new FileModel({
+            tenant,
+            owner,
+            type,
+            entity: {
+                id: model.entity.id,
+                type: model.entity.type,
+                relation: model.entity.relation,
+            },
+            content,
+        });
 
-    let fileDoc = set(model, doc);
-    fileDoc = await fileDoc.save();
+        let fileDoc = set(model, doc);
+        fileDoc = await fileDoc.save();
+        created.push((await withUrl(fileDoc)) as HydratedDocument<IFile>);
+    }
 
-    return (await withUrl(fileDoc)) as HydratedDocument<IFile>;
+    return created;
 };
 
 const update = async (id: string, model: IUpdateFilePayload, ctx: RequestContext) => {

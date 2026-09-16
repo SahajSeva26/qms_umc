@@ -1,13 +1,10 @@
 // File Constants
 
 export const FILE_STATUS = {
-    DRAFT: 'draft', // signed URL issued / record created, upload not confirmed
-    UPLOADED: 'uploaded', // bytes received, not yet validated/processed
-    PROCESSING: 'processing', // async pipeline running (scan, validate, generate variants)
-    ACTIVE: 'active', // passed all checks, safe and available for use
+    DRAFT: 'draft', // record created, not yet in use
+    ACTIVE: 'active', // current and available for use
     INACTIVE: 'inactive', // exists, not current (superseded/archived), still retrievable
-    FAILED: 'failed', // upload never completed, or processing rejected it
-    DISCARDED: 'discarded',
+    DISCARDED: 'discarded', // soft-deleted, terminal
 } as const;
 
 export const FILE_TYPE = {
@@ -17,12 +14,9 @@ export const FILE_TYPE = {
 
 
 export const FILE_TRANSITION_MAP = {
-    [FILE_STATUS.DRAFT]: [FILE_STATUS.UPLOADED, FILE_STATUS.PROCESSING, FILE_STATUS.ACTIVE, FILE_STATUS.INACTIVE, FILE_STATUS.FAILED, FILE_STATUS.DISCARDED],
-    [FILE_STATUS.UPLOADED]: [FILE_STATUS.PROCESSING, FILE_STATUS.ACTIVE, FILE_STATUS.INACTIVE, FILE_STATUS.FAILED, FILE_STATUS.DISCARDED],
-    [FILE_STATUS.PROCESSING]: [FILE_STATUS.ACTIVE, FILE_STATUS.INACTIVE, FILE_STATUS.FAILED, FILE_STATUS.DISCARDED],
+    [FILE_STATUS.DRAFT]: [FILE_STATUS.ACTIVE, FILE_STATUS.INACTIVE, FILE_STATUS.DISCARDED],
     [FILE_STATUS.ACTIVE]: [FILE_STATUS.INACTIVE, FILE_STATUS.DISCARDED],
     [FILE_STATUS.INACTIVE]: [FILE_STATUS.ACTIVE, FILE_STATUS.DISCARDED],
-    [FILE_STATUS.FAILED]: [FILE_STATUS.DISCARDED],
     [FILE_STATUS.DISCARDED]: [],
 } as const;
 
@@ -39,24 +33,38 @@ export const ENTITY_TYPE = {
     TEST: 'test',
 } as const;
 
+// Each relation carries its `name` (the stored/validated string) and a `cap` = the max number of
+// active files an entity may hold for that relation (e.g. one logo, one profile picture). Omit
+// `cap` for an unlimited/gallery-style relation.
 export const ENTITY_RELATION = {
     //user
     [ENTITY_TYPE.USER]: {
-        
-        PROFILE_PICTURE: 'profile_picture',
+        PROFILE_PICTURE: { name: 'profile_picture', cap: 1 },
     },
 
     //tenant
     [ENTITY_TYPE.TENANT]: {
-        LOGO: 'logo',
+        LOGO: { name: 'logo', cap: 1 },
     },
 
-    // Add more entity types and their categories here
+    // Add more entity types and their relations here
 } as const;
 
-export const ENTITY_RELATION_ARRAY = Object.values(ENTITY_RELATION).flatMap((categories) =>
-    Object.values(categories),
-);
+// flat list of every relation record across all entity types
+const ENTITY_RELATIONS = Object.values(ENTITY_RELATION).flatMap((group) => Object.values(group));
+
+// the valid relation name strings — used for the zod enum, swagger, and coherence checks
+export const ENTITY_RELATION_ARRAY = ENTITY_RELATIONS.map((relation) => relation.name);
+
+// look up the cap (max active files per entity) for an entity type + relation; undefined = unlimited
+export const getRelationCap = (type: string, relation: string): number | undefined => {
+    const group = (ENTITY_RELATION as any)[type];
+    if (!group) {
+        return undefined;
+    }
+    const record = Object.values(group).find((r: any) => r.name === relation) as any;
+    return record?.cap;
+};
 
 // ================= FILE PERMISSIONS CONSTANTS ===============
 

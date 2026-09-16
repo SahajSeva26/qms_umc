@@ -83,16 +83,20 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { id: 'dietprofile',  label: 'Dietitian Profiles',          icon: 'UserCheck',     path: DIET_ROUTES.DIET_PROFILES },
 
   // Operations — Field Network
-  { id: 'fo',           label: 'FO Management',               icon: 'Navigation',    path: FO_ROUTES.FO },
+  { id: 'fo',           label: 'Mock FO Management',          icon: 'Navigation',    path: FO_ROUTES.FO },
 
   { id: 'fo_workspace', label: 'My FO Workspace',             icon: 'Briefcase',     path: FO_ROUTES.FO_WORKSPACE },
 
   { id: 'foconfig',     label: 'FO Config Master',            icon: 'Settings',      path: FO_ROUTES.FO_CONFIG },
 
+  { id: 'fieldofficers', label: 'FO Management',              icon: 'Navigation',    path: FO_ROUTES.FIELD_OFFICERS },
+
   // GET /doctors is open to any authenticated user server-side — no REAL_GATED_NAV_ITEMS entry.
   { id: 'doctors',      label: 'Doctor Management',           icon: 'Activity',      path: DOCTORS_ROUTES.DOCTORS },
 
-  // GET /geo-profiles is open to any authenticated user server-side — no REAL_GATED_NAV_ITEMS entry.
+  // GET /geo-profiles is open to any authenticated user server-side, but
+  // Sidebar.tsx's REAL_GATED_NAV_ITEMS still hides this item from a
+  // field-officer session (frontend-only nav gate — see that file's comment).
   { id: 'geoprofiles',  label: 'Field Staff Coverage',        icon: 'MapPin',        path: GEO_PROFILE_ROUTES.GEO_PROFILES },
 
   // Operations — Coverage & Alerts
@@ -177,8 +181,8 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
       // Commented out, not deleted — this whole subsection is still mock-backed.
       // { title: 'Dietitians',        items: ['dietapprovals', 'dietpayment', 'dietprofile'].map((id) => NAV_BY_ID[id]) },
       // 'fo'/'fo_workspace'/'foconfig' are commented out, not deleted — only
-      // 'doctors'/'geoprofiles' are backend-wired today.
-      { title: 'Field Network',     items: ['doctors', 'geoprofiles'/* , 'fo', 'fo_workspace', 'foconfig' */].map((id) => NAV_BY_ID[id]) },
+      // 'doctors'/'geoprofiles'/'fieldofficers' are backend-wired today.
+      { title: 'Field Network',     items: ['fieldofficers', 'doctors', 'geoprofiles'/* , 'fo', 'fo_workspace', 'foconfig' */].map((id) => NAV_BY_ID[id]) },
       // Commented out, not deleted — this whole subsection is still mock-backed.
       // { title: 'Coverage & Alerts', items: ['hqmapping', 'incidents', 'remindauto'].map((id) => NAV_BY_ID[id]) },
     ],

@@ -9,4 +9,5 @@ export interface IStorageProvider {
     getUrl: (identifier: string) => Promise<object>;
     delete: (identifier: string) => Promise<object>;
     download: (identifier: string) => Promise<object>;
+    getPresignedUrl: (identifier: string) => Promise<string>;
 }

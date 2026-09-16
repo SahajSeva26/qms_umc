@@ -22,4 +22,9 @@ export class CloudinaryProvider implements IStorageProvider {
         return Promise.resolve({ success: true });
         // throw new Error('Method not implemented.');
     }
+    getPresignedUrl(identifier: string): Promise<string> {
+        console.log('Getting presigned URL for Cloudinary file', identifier);
+        return Promise.resolve('https://example.com');
+        // throw new Error('Method not implemented.');
+    }
 }

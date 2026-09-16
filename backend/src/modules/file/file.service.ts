@@ -1,19 +1,8 @@
 // File Service
 import mongoose, { HydratedDocument } from 'mongoose';
 import { FileModel, IFile } from './file.model';
-import {
-    IChangeFileStatusPayload,
-    ICreateFilePayload,
-    ISearchFileQuery,
-    IUpdateFilePayload,
-} from './file.validators';
-import {
-    ENTITY_RELATION,
-    FILE_PERMISSIONS,
-    FILE_STATUS,
-    FILE_TRANSITION_MAP,
-    FILE_TYPE,
-} from './file.constants';
+import { IChangeFileStatusPayload, ICreateFilePayload, ISearchFileQuery, IUpdateFilePayload } from './file.validators';
+import { ENTITY_RELATION, FILE_PERMISSIONS, FILE_STATUS, FILE_TRANSITION_MAP, FILE_TYPE } from './file.constants';
 import { throwAppError } from '../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../shared/utils/contextBuilder';
@@ -23,6 +12,7 @@ import { TENANT_TYPE } from '../access-management/tenant/tenant.constants';
 import { TenantService } from '../access-management/tenant/tenant.service';
 import { storageManager } from '../../shared/providers/storage/storage';
 import { S3 } from '../../shared/providers/storage/aws/s3.provider';
+import { logger } from '../../shared/utils/logger';
 
 type FileDocument = HydratedDocument<IFile> | null;
 
@@ -60,10 +50,7 @@ const assertRelationCoherent = (type: string, relation: string) => {
     const group = (ENTITY_RELATION as any)[type];
     const allowed: string[] = group ? Object.values(group) : [];
     if (!allowed.includes(relation)) {
-        return throwAppError(
-            `Relation "${relation}" is not valid for entity type "${type}"`,
-            StatusCodes.BAD_REQUEST,
-        );
+        return throwAppError(`Relation "${relation}" is not valid for entity type "${type}"`, StatusCodes.BAD_REQUEST);
     }
 };
 
@@ -85,46 +72,39 @@ const resolveFileType = (mimeType: string): string => {
 // The content block is derived entirely from the uploaded file + the storage upload result — it is
 // never accepted from the client. The file is pushed to storage here and the returned coordinates
 // (path/identifier) are captured; file-intrinsic fields come straight off the multer file.
-const buildContent = async (
-    file: any,
-    tenant: string,
-    entity: { type: string; relation: string },
-) => {
-    const originalName: string = file.originalname;
-    const extension = originalName.includes('.')
-        ? originalName.split('.').pop()!.toLowerCase()
-        : '';
+const buildContent = async (file: any, tenant: string, entity: { type: string; relation: string }) => {
+    try {
+        const originalName: string = file.originalname;
+        const extension = originalName.includes('.') ? originalName.split('.').pop()!.toLowerCase() : '';
 
-    // storage object key — derived from the owning tenant + entity, with a UUID filename (not the
-    // original name) to avoid collisions and unsafe chars; the original name is still kept in
-    // content.originalName / displayName
-    const uuid = generateUUID();
-    const key = [
-        'tenants',
-        tenant,
-        entity.type,
-        entity.relation,
-        extension ? `${uuid}.${extension}` : uuid,
-    ].join('/');
+        // storage object key — derived from the owning tenant + entity, with a UUID filename (not
+        // the original name) to avoid collisions and unsafe chars; the original name is still kept
+        // in content.originalName / displayName
+        const uuid = generateUUID();
+        const key = ['tenants', tenant, entity.type, entity.relation, extension ? `${uuid}.${extension}` : uuid].join('/');
 
-    const provider = storageManager.get(S3); // explicitly the S3 provider
-    const result: any = await provider.upload({
-        buffer: file.buffer,
-        mimetype: file.mimetype,
-        key,
-    });
+        const provider = storageManager.get(S3); // explicitly the S3 provider
+        const result: any = await provider.upload({
+            buffer: file.buffer,
+            mimetype: file.mimetype,
+            key,
+        });
 
-    return {
-        provider: S3,
-        // fall back to the derived key until the storage provider returns real coordinates
-        path: result?.path ?? key,
-        identifier: result?.identifier ?? result?.key ?? key,
-        originalName,
-        displayName: originalName,
-        mimeType: file.mimetype,
-        extension,
-        size: file.size,
-    };
+        return {
+            provider: S3,
+            // fall back to the derived key until the storage provider returns real coordinates
+            path: result?.path ?? key,
+            identifier: result?.identifier ?? result?.key ?? key,
+            originalName,
+            displayName: originalName,
+            mimeType: file.mimetype,
+            extension,
+            size: file.size,
+        };
+    } catch (error: any) {
+        logger.error({ err: error }, error?.message || 'Failed to build file content / upload to storage');
+        return throwAppError('Failed to upload the file to storage', StatusCodes.INTERNAL_SERVER_ERROR);
+    }
 };
 
 // ========================================================================================
@@ -212,11 +192,7 @@ const search = async (filters: ISearchFileQuery, ctx: RequestContext, options?: 
     return { count, items };
 };
 
-const create = async (
-    model: ICreateFilePayload,
-    ctx: RequestContext,
-    files?: any[],
-): Promise<HydratedDocument<IFile>> => {
+const create = async (model: ICreateFilePayload, ctx: RequestContext, files?: any[]): Promise<HydratedDocument<IFile>> => {
     //0: an upload is mandatory — content is derived from it
     ctx.logger.info({ files }, 'Files received in create');
     const file = files?.[0];
@@ -291,10 +267,7 @@ const changeStatus = async (id: string, model: IChangeFileStatusPayload, ctx: Re
     //3: validate the transition against the state machine
     const allowed: readonly string[] = FILE_TRANSITION_MAP[current] || [];
     if (!allowed.includes(model.status)) {
-        return throwAppError(
-            `Cannot move a file from "${current}" to "${model.status}"`,
-            StatusCodes.CONFLICT,
-        );
+        return throwAppError(`Cannot move a file from "${current}" to "${model.status}"`, StatusCodes.CONFLICT);
     }
 
     //4: apply + save

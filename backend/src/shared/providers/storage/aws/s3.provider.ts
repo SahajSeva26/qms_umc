@@ -1,5 +1,5 @@
-import { S3Client } from '@aws-sdk/client-s3';
-import { IStorageProvider } from '../../../types/storagetypes';
+import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { IStorageProvider, IUploadInput } from '../../../types/storagetypes';
 import ENV from '../../../config/app.config';
 
 export const S3 = 's3';
@@ -19,24 +19,39 @@ export class S3Provider implements IStorageProvider {
         });
         this.bucket = ENV.Providers.AWS_S3.S3Bucket;
     }
-    
-    upload(input: any): Promise<object> {
+
+    async upload(input: IUploadInput): Promise<object> {
         console.log('Uploading file to AWS', input);
-        return Promise.resolve({ url: 'https://example.com' });
+        const command = new PutObjectCommand({
+            Bucket: this.bucket,
+            Key: input.key,
+            Body: input.buffer,
+            ContentType: input.mimetype,
+        });
+
+        await this.client.send(command);
+
+        return {
+            provider: S3,
+            key: input.key,
+            identifier: input.key,
+            path: input.key,
+        };
+        // return Promise.resolve({ url: 'https://example.com' });
         // throw new Error('Method not implemented.');
     }
-    getUrl(identifier: string): Promise<object> {
+    async getUrl(identifier: string): Promise<object> {
         console.log('Getting URL for AWS file', identifier);
 
         return Promise.resolve({ url: 'https://example.com' });
         // throw new Error('Method not implemented.');
     }
-    delete(identifier: string): Promise<object> {
+    async delete(identifier: string): Promise<object> {
         console.log('Deleting AWS file', identifier);
         return Promise.resolve({ success: true });
         // throw new Error('Method not implemented.');
     }
-    download(identifier: string): Promise<object> {
+    async download(identifier: string): Promise<object> {
         console.log('Downloading AWS file', identifier);
         return Promise.resolve({ success: true });
         // throw new Error('Method not implemented.');

@@ -17,7 +17,7 @@ import {
 import { throwAppError } from '../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../shared/utils/contextBuilder';
-import { isValidObjectID } from '../../shared/utils/strings';
+import { generateUUID, isValidObjectID } from '../../shared/utils/strings';
 import { IServiceOptions } from '../../shared/types/service.types';
 import { TENANT_TYPE } from '../access-management/tenant/tenant.constants';
 import { TenantService } from '../access-management/tenant/tenant.service';
@@ -95,21 +95,30 @@ const buildContent = async (
         ? originalName.split('.').pop()!.toLowerCase()
         : '';
 
-    // deterministic storage folder derived from the owning tenant + entity
-    const folder = `tenants/${tenant}/${entity.type}/${entity.relation}`;
+    // storage object key — derived from the owning tenant + entity, with a UUID filename (not the
+    // original name) to avoid collisions and unsafe chars; the original name is still kept in
+    // content.originalName / displayName
+    const uuid = generateUUID();
+    const key = [
+        'tenants',
+        tenant,
+        entity.type,
+        entity.relation,
+        extension ? `${uuid}.${extension}` : uuid,
+    ].join('/');
 
-    const provider = storageManager.get(); // default provider (S3)
+    const provider = storageManager.get(S3); // explicitly the S3 provider
     const result: any = await provider.upload({
         buffer: file.buffer,
         mimetype: file.mimetype,
-        folder,
+        key,
     });
 
     return {
         provider: S3,
-        // fall back to a derived key until the storage provider returns real coordinates
-        path: result?.path ?? `${folder}/${originalName}`,
-        identifier: result?.identifier ?? result?.key ?? `${folder}/${originalName}`,
+        // fall back to the derived key until the storage provider returns real coordinates
+        path: result?.path ?? key,
+        identifier: result?.identifier ?? result?.key ?? key,
         originalName,
         displayName: originalName,
         mimeType: file.mimetype,

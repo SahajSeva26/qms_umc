@@ -1,8 +1,8 @@
-export type IUploadInput = {
+export interface IUploadInput {
     buffer: Buffer;
     mimetype: string;
-    folder?: string;
-};
+    key?: string;
+}
 
 export interface IStorageProvider {
     upload: (input: IUploadInput) => Promise<object>;

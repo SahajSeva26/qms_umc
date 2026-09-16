@@ -4,10 +4,10 @@ import { FileController } from './file.controller';
 import { registry } from '../../shared/config/swagger/swagger.registry';
 import {
     ChangeFileStatusPayloadSchema,
-    CreateFilePayloadSchema,
     SearchFileQuerySchema,
     UpdateFilePayloadSchema,
 } from './file.validators';
+import { ENTITY_RELATION_ARRAY, ENTITY_TYPE } from './file.constants';
 import { AuthMiddleware } from '../../shared/middlewares/authmiddleware';
 import { imageUploader } from '../../shared/middlewares/upload/imageUploader';
 
@@ -66,15 +66,26 @@ registry.registerPath({
                                 description: 'Owning tenant id (platform staff only; ignored for customers)',
                                 example: '665f0c3a1a2b3c4d5e6f7a8a',
                             },
-                            entity: {
+                            // entity reference — three flat fields instead of a nested JSON blob.
+                            entityId: {
                                 type: 'string',
-                                description: 'JSON string: { id, type, relation } — all required',
-                                example: '{"id":"665f0c3a1a2b3c4d5e6f7a8a","type":"tenant","relation":"logo"}',
+                                description: 'Id of the record this file hangs off',
+                                example: '665f0c3a1a2b3c4d5e6f7a8a',
+                            },
+                            entityType: {
+                                type: 'string',
+                                enum: Object.values(ENTITY_TYPE),
+                                example: 'tenant',
+                            },
+                            entityRelation: {
+                                type: 'string',
+                                enum: ENTITY_RELATION_ARRAY,
+                                example: 'logo',
                             },
                             // content and type are NOT accepted — both are derived from the uploaded file in the service.
                             tags: { type: 'array', items: { type: 'string' }, example: ['branding'] },
                         },
-                        required: ['files', 'entity'],
+                        required: ['files', 'entityId', 'entityType', 'entityRelation'],
                     },
                 },
             },

@@ -12,6 +12,7 @@ import {
     FILE_PERMISSIONS,
     FILE_STATUS,
     FILE_TRANSITION_MAP,
+    FILE_TYPE,
 } from './file.constants';
 import { throwAppError } from '../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
@@ -20,6 +21,8 @@ import { isValidObjectID } from '../../shared/utils/strings';
 import { IServiceOptions } from '../../shared/types/service.types';
 import { TENANT_TYPE } from '../access-management/tenant/tenant.constants';
 import { TenantService } from '../access-management/tenant/tenant.service';
+import { storageManager } from '../../shared/providers/storage/storage';
+import { S3 } from '../../shared/providers/storage/aws/s3.provider';
 
 type FileDocument = HydratedDocument<IFile> | null;
 
@@ -71,6 +74,48 @@ const resolveOwner = (ctx: RequestContext): string => {
         return throwAppError('Unable to resolve the owning role', StatusCodes.UNAUTHORIZED);
     }
     return owner;
+};
+
+// The file type is decided by the actual upload, not the client — image/* is an image, everything
+// else is a document.
+const resolveFileType = (mimeType: string): string => {
+    return mimeType?.startsWith('image/') ? FILE_TYPE.IMAGE : FILE_TYPE.DOCUMENT;
+};
+
+// The content block is derived entirely from the uploaded file + the storage upload result — it is
+// never accepted from the client. The file is pushed to storage here and the returned coordinates
+// (path/identifier) are captured; file-intrinsic fields come straight off the multer file.
+const buildContent = async (
+    file: any,
+    tenant: string,
+    entity: { type: string; relation: string },
+) => {
+    const originalName: string = file.originalname;
+    const extension = originalName.includes('.')
+        ? originalName.split('.').pop()!.toLowerCase()
+        : '';
+
+    // deterministic storage folder derived from the owning tenant + entity
+    const folder = `tenants/${tenant}/${entity.type}/${entity.relation}`;
+
+    const provider = storageManager.get(); // default provider (S3)
+    const result: any = await provider.upload({
+        buffer: file.buffer,
+        mimetype: file.mimetype,
+        folder,
+    });
+
+    return {
+        provider: S3,
+        // fall back to a derived key until the storage provider returns real coordinates
+        path: result?.path ?? `${folder}/${originalName}`,
+        identifier: result?.identifier ?? result?.key ?? `${folder}/${originalName}`,
+        originalName,
+        displayName: originalName,
+        mimeType: file.mimetype,
+        extension,
+        size: file.size,
+    };
 };
 
 // ========================================================================================
@@ -158,34 +203,51 @@ const search = async (filters: ISearchFileQuery, ctx: RequestContext, options?: 
     return { count, items };
 };
 
-const create = async (model: ICreateFilePayload, ctx: RequestContext): Promise<HydratedDocument<IFile>> => {
+const create = async (
+    model: ICreateFilePayload,
+    ctx: RequestContext,
+    files?: any[],
+): Promise<HydratedDocument<IFile>> => {
+    //0: an upload is mandatory — content is derived from it
+    ctx.logger.info({ files }, 'Files received in create');
+    const file = files?.[0];
+    if (!file) {
+        return throwAppError('A file upload is required', StatusCodes.BAD_REQUEST);
+    }
+
     //1: resolve the owning tenant (explicit + existence-checked for platform, own-tenant for customer)
     const tenant = await resolveTenant(model, ctx);
 
     //2: coherence — the relation must be valid for the entity type
     assertRelationCoherent(model.entity.type, model.entity.relation);
 
-    //3: the acting role owns the file
+    //3: type is derived from the uploaded file, never from the client
+    const type = resolveFileType(file.mimetype);
+
+    //4: the acting role owns the file
     const owner = resolveOwner(ctx);
 
-    //4: build entity — tenant, owner, entity ref and content (immutable) are seeded here; status
+    //5: content is derived from the uploaded file (pushed to storage here), never from the client
+    const content = await buildContent(file, tenant, model.entity);
+
+    //6: build entity — tenant, owner, entity ref, type and content are all seeded here; status
     // defaults to DRAFT on the model; only tags flow through set()
     const doc = new FileModel({
         tenant,
         owner,
+        type,
         entity: {
             id: model.entity.id,
             type: model.entity.type,
             relation: model.entity.relation,
         },
-        content: model.content,
-        ...(model.type ? { type: model.type } : {}),
+        content,
     });
 
-    let file = set(model, doc);
-    file = await file.save();
+    let fileDoc = set(model, doc);
+    fileDoc = await fileDoc.save();
 
-    return file;
+    return fileDoc;
 };
 
 const update = async (id: string, model: IUpdateFilePayload, ctx: RequestContext) => {

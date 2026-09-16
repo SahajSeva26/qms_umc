@@ -8,19 +8,6 @@ const objectId = (label: string) =>
         message: `${label} must be a valid id`,
     });
 
-// The upload metadata block — mirrors the embedded contentSchema on the model. Every field is
-// captured at registration time from the storage provider (S3, etc.) and is never edited afterwards.
-const ContentSchema = z.object({
-    provider: z.string().min(1).openapi({ example: 's3' }),
-    path: z.string().min(1).openapi({ example: 'tenants/665f.../logo/abc.png' }),
-    identifier: z.string().min(1).openapi({ example: 'abc123-key' }),
-    originalName: z.string().min(1).openapi({ example: 'company-logo.png' }),
-    displayName: z.string().min(1).openapi({ example: 'Company Logo' }),
-    mimeType: z.string().min(1).openapi({ example: 'image/png' }),
-    extension: z.string().min(1).openapi({ example: 'png' }),
-    size: z.number().min(0).openapi({ example: 20480 }),
-});
-
 // The polymorphic owner reference — which record this file hangs off, and in what role.
 // `relation` is validated for coherence against `type` in the service (ENTITY_RELATION map).
 const EntitySchema = z.object({
@@ -32,13 +19,13 @@ const EntitySchema = z.object({
 //1: create ====================================>
 // status is intentionally omitted — a new file always starts at DRAFT (model default).
 // owner is intentionally omitted — it is pinned from the acting role in the service.
+// content and type are intentionally omitted — both are derived from the uploaded file in the
+// service, never accepted from the client.
 export const CreateFilePayloadSchema = z.object({
     // required only for platform (QMS) staff — which tenant this file belongs to.
     // ignored for customer users: the service pins it to their own tenant.
     tenant: objectId('Tenant').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
     entity: EntitySchema,
-    content: ContentSchema,
-    type: z.enum(Object.values(FILE_TYPE)).optional().openapi({ example: 'image' }),
     tags: z.array(z.string()).optional().openapi({ example: ['branding'] }),
 });
 export type ICreateFilePayload = z.infer<typeof CreateFilePayloadSchema>;

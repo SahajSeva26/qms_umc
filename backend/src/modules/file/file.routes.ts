@@ -9,6 +9,7 @@ import {
     UpdateFilePayloadSchema,
 } from './file.validators';
 import { AuthMiddleware } from '../../shared/middlewares/authmiddleware';
+import { imageUploader } from '../../shared/middlewares/upload/imageUploader';
 
 export const FileRouter = express.Router();
 
@@ -50,8 +51,31 @@ registry.registerPath({
     request: {
         body: {
             content: {
-                'application/json': {
-                    schema: CreateFilePayloadSchema,
+                'multipart/form-data': {
+                    schema: {
+                        type: 'object',
+                        properties: {
+                            // the binary upload(s) — multer field name is `files` (max 10)
+                            files: {
+                                type: 'array',
+                                items: { type: 'string', format: 'binary' },
+                                description: 'File(s) to upload (max 10)',
+                            },
+                            tenant: {
+                                type: 'string',
+                                description: 'Owning tenant id (platform staff only; ignored for customers)',
+                                example: '665f0c3a1a2b3c4d5e6f7a8a',
+                            },
+                            entity: {
+                                type: 'string',
+                                description: 'JSON string: { id, type, relation } — all required',
+                                example: '{"id":"665f0c3a1a2b3c4d5e6f7a8a","type":"tenant","relation":"logo"}',
+                            },
+                            // content and type are NOT accepted — both are derived from the uploaded file in the service.
+                            tags: { type: 'array', items: { type: 'string' }, example: ['branding'] },
+                        },
+                        required: ['files', 'entity'],
+                    },
                 },
             },
         },
@@ -116,6 +140,6 @@ registry.registerPath({
 FileRouter.get('/:id', FileController.get);
 FileRouter.get('/', FileController.search);
 
-FileRouter.post('/', FileController.create);
+FileRouter.post('/', imageUploader.array('files', 5), FileController.create);
 FileRouter.put('/:id', FileController.update);
 FileRouter.patch('/:id/status', FileController.changeStatus);

@@ -10,7 +10,8 @@ class StorageManager {
         this.providers.set(S3, new S3Provider());
     }
 
-    get(name: string = CLOUDINARY): IStorageProvider {
+    get(name: string = S3): IStorageProvider {
+
         const provider = this.providers.get(name);
         if (!provider) {
             throw new Error(`Storage provider ${name} not found`);

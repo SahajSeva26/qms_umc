@@ -92,6 +92,7 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
   // 'idle' — the pin can visibly move well before (or without ever) firing onChange.
   const [locationResolution, setLocationResolution] = useState<LocationResolutionState>('idle')
   const [locationResolutionError, setLocationResolutionError] = useState<string | null>(null)
+  const [locationHint, setLocationHint] = useState<string | null>(null)
 
   const [salesRepPickerOpened, setSalesRepPickerOpened] = useState(false)
   // Loads eagerly if a sales rep is already assigned, so the trigger shows that rep's name right away.
@@ -193,10 +194,11 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
                     value={field.value}
                     onChange={field.onChange}
                     onResolutionStateChange={setLocationResolution}
+                    onLocationHintChange={setLocationHint}
                     defaultCountry="India"
                     countryCode="IN"
                   />
-                  <LocationAddressFields value={field.value} onChange={field.onChange} defaultCountry="India" />
+                  <LocationAddressFields value={field.value} onChange={field.onChange} defaultCountry="India" locationHint={locationHint} />
                 </div>
               )}
             />

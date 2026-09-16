@@ -268,8 +268,9 @@ export interface RoleEntity {
   // Bare permission-code strings — see the same note on RoleTypeEntity.permissions.
   permissions: string[]
   status: RoleStatus
-  // Populated {RolePopulatedRoleType} on GET-by-id/search; raw ObjectId string on create/update responses.
-  type: RolePopulatedRoleType | string
+  // Populated {RolePopulatedRoleType} on GET-by-id/search; raw ObjectId string on
+  // create/update responses; `null` when the referenced RoleType was deleted.
+  type: RolePopulatedRoleType | string | null
   // Populated {RolePopulatedUser} on GET-by-id/search; raw ObjectId string on create/update responses.
   user: RolePopulatedUser | string
   // Populated {RolePopulatedTenant} on GET-by-id/search; raw ObjectId string on create/update responses.

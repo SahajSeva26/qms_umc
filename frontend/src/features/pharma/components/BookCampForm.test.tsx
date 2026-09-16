@@ -12,7 +12,9 @@ import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
 vi.mock('@/hooks/useSession')
 
 // LocationPicker needs real Google Maps credentials unavailable in tests —
-// mocked to buttons using the same onChange(LocationValue)/onResolutionStateChange contract.
+// mocked to buttons using the same onChange(LocationValue)/onResolutionStateChange
+// contract. LocationAddressFields is rendered for real by BookCampForm itself,
+// as a sibling of this mock, not by LocationPicker.
 vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
   default: ({ value, onChange, onResolutionStateChange }: {
     value: unknown

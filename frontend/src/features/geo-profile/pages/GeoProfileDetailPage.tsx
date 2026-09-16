@@ -171,6 +171,7 @@ const CreateGeoProfileForm = ({ roles, roleName }: RoleNameLookupProps) => {
   // `location` isn't authoritative while this is anything but 'idle' — the
   // pin can visibly move well before (or without ever) firing onChange.
   const [locationResolution, setLocationResolution] = useState<LocationResolutionState>('idle')
+  const [locationHint, setLocationHint] = useState<string | null>(null)
   const [coverageRadiusKm, setCoverageRadiusKm] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -293,6 +294,7 @@ const CreateGeoProfileForm = ({ roles, roleName }: RoleNameLookupProps) => {
               value={location}
               onChange={setLocation}
               onResolutionStateChange={setLocationResolution}
+              onLocationHintChange={setLocationHint}
               defaultCountry="India"
               countryCode="IN"
             />
@@ -301,7 +303,7 @@ const CreateGeoProfileForm = ({ roles, roleName }: RoleNameLookupProps) => {
                 Latitude: {location.coordinates[1]} · Longitude: {location.coordinates[0]}
               </p>
             )}
-            <LocationAddressFields value={location} onChange={setLocation} defaultCountry="India" />
+            <LocationAddressFields value={location} onChange={setLocation} defaultCountry="India" locationHint={locationHint} />
           </div>
 
           <div>
@@ -364,6 +366,7 @@ const EditGeoProfileForm = ({ geoProfile, roleName }: EditGeoProfileFormProps) =
   // Higher-stakes than create mode: a save mid-resolution would submit
   // NOTHING for coordinates while showing a plain "Saved." success.
   const [locationResolution, setLocationResolution] = useState<LocationResolutionState>('idle')
+  const [locationHint, setLocationHint] = useState<string | null>(null)
   const [coverageRadiusKm, setCoverageRadiusKm] = useState(String(geoProfile.coverageRadius / 1000))
   const [status, setStatus] = useState<GeoProfileStatus>(geoProfile.status)
   const [formError, setFormError] = useState<string | null>(null)
@@ -464,6 +467,7 @@ const EditGeoProfileForm = ({ geoProfile, roleName }: EditGeoProfileFormProps) =
               onChange={handleLocationChange}
               onResolutionStateChange={setLocationResolution}
               onManualCoordinateEntry={() => setManualCoordinateEntry(true)}
+              onLocationHintChange={setLocationHint}
               defaultCountry="India"
               countryCode="IN"
             />
@@ -472,7 +476,7 @@ const EditGeoProfileForm = ({ geoProfile, roleName }: EditGeoProfileFormProps) =
                 Latitude: {location.coordinates[1]} · Longitude: {location.coordinates[0]}
               </p>
             )}
-            <LocationAddressFields value={location} onChange={handleLocationChange} defaultCountry="India" />
+            <LocationAddressFields value={location} onChange={handleLocationChange} defaultCountry="India" locationHint={locationHint} />
             {staleAddressRisk && (
               <p className="text-[12px] rounded-lg px-3 py-2 mt-2 border border-warning bg-warning-soft text-warning">
                 Saving now will keep this profile's old address paired with the new pin — complete the address above if that's not intended.

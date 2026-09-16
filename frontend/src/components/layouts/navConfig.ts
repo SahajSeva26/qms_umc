@@ -83,16 +83,20 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { id: 'dietprofile',  label: 'Dietitian Profiles',          icon: 'UserCheck',     path: DIET_ROUTES.DIET_PROFILES },
 
   // Operations — Field Network
-  { id: 'fo',           label: 'FO Management',               icon: 'Navigation',    path: FO_ROUTES.FO },
+  { id: 'fo',           label: 'Mock FO Management',          icon: 'Navigation',    path: FO_ROUTES.FO },
 
   { id: 'fo_workspace', label: 'My FO Workspace',             icon: 'Briefcase',     path: FO_ROUTES.FO_WORKSPACE },
 
   { id: 'foconfig',     label: 'FO Config Master',            icon: 'Settings',      path: FO_ROUTES.FO_CONFIG },
 
+  { id: 'fieldofficers', label: 'FO Management',              icon: 'Navigation',    path: FO_ROUTES.FIELD_OFFICERS },
+
   // GET /doctors is open to any authenticated user server-side — no REAL_GATED_NAV_ITEMS entry.
   { id: 'doctors',      label: 'Doctor Management',           icon: 'Activity',      path: DOCTORS_ROUTES.DOCTORS },
 
-  // GET /geo-profiles is open to any authenticated user server-side — no REAL_GATED_NAV_ITEMS entry.
+  // GET /geo-profiles is open to any authenticated user server-side, but
+  // Sidebar.tsx's REAL_GATED_NAV_ITEMS still hides this item from a
+  // field-officer session (frontend-only nav gate — see that file's comment).
   { id: 'geoprofiles',  label: 'Field Staff Coverage',        icon: 'MapPin',        path: GEO_PROFILE_ROUTES.GEO_PROFILES },
 
   // Operations — Coverage & Alerts
@@ -153,9 +157,11 @@ const NAV_BY_ID = Object.fromEntries(ALL_NAV_ITEMS.map((n) => [n.id, n]))
 
 export const FULL_NAV_SECTIONS: NavSection[] = [
   {
+    // Every item here is still mock-backed, no real endpoint yet — commented
+    // out, not deleted.
     section: 'Overview',
     subs: [
-      { title: '', items: ['dashboard', 'analytics', 'foanalytics', 'docanalytics', 'finanalytics'].map((id) => NAV_BY_ID[id]) },
+      // { title: '', items: ['dashboard', 'analytics', 'foanalytics', 'docanalytics', 'finanalytics'].map((id) => NAV_BY_ID[id]) },
     ],
   },
   {
@@ -168,10 +174,17 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
   {
     section: 'Operations',
     subs: [
-      { title: 'Camps',             items: ['omportal', 'camps', 'telecamps', 'diet', 'dedicatedops'].map((id) => NAV_BY_ID[id]) },
-      { title: 'Dietitians',        items: ['dietapprovals', 'dietpayment', 'dietprofile'].map((id) => NAV_BY_ID[id]) },
-      { title: 'Field Network',     items: ['fo', 'fo_workspace', 'foconfig', 'doctors', 'geoprofiles'].map((id) => NAV_BY_ID[id]) },
-      { title: 'Coverage & Alerts', items: ['hqmapping', 'incidents', 'remindauto'].map((id) => NAV_BY_ID[id]) },
+      // 'omportal'/'diet'/'dedicatedops'/'telecamps' are commented out, not
+      // deleted — only 'camps' is backend-wired today (telecamps' own page
+      // states the real Camp module has no teleconsultation concept yet).
+      { title: 'Camps',             items: ['camps'/* , 'omportal', 'telecamps', 'diet', 'dedicatedops' */].map((id) => NAV_BY_ID[id]) },
+      // Commented out, not deleted — this whole subsection is still mock-backed.
+      // { title: 'Dietitians',        items: ['dietapprovals', 'dietpayment', 'dietprofile'].map((id) => NAV_BY_ID[id]) },
+      // 'fo'/'fo_workspace'/'foconfig' are commented out, not deleted — only
+      // 'doctors'/'geoprofiles'/'fieldofficers' are backend-wired today.
+      { title: 'Field Network',     items: ['fieldofficers', 'doctors', 'geoprofiles'/* , 'fo', 'fo_workspace', 'foconfig' */].map((id) => NAV_BY_ID[id]) },
+      // Commented out, not deleted — this whole subsection is still mock-backed.
+      // { title: 'Coverage & Alerts', items: ['hqmapping', 'incidents', 'remindauto'].map((id) => NAV_BY_ID[id]) },
     ],
   },
   {
@@ -191,7 +204,9 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
   {
     section: 'Finance',
     subs: [
-      { title: '', items: ['billing', 'crminvoicing', 'accounting'].map((id) => NAV_BY_ID[id]) },
+      // 'billing'/'accounting' are commented out, not deleted — both are still
+      // stubs with no dedicated backend module (see billing.routes.tsx).
+      { title: '', items: ['crminvoicing'/* , 'billing', 'accounting' */].map((id) => NAV_BY_ID[id]) },
     ],
   },
   {

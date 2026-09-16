@@ -123,6 +123,7 @@ const BookCampForm = ({ needsMrPicker, project, onBooked, onCancel }: BookCampFo
   // selection — either can still be in flight when Submit is clicked.
   const [locationResolution, setLocationResolution] = useState<LocationResolutionState>('idle')
   const [locationError, setLocationError] = useState<string | null>(null)
+  const [locationHint, setLocationHint] = useState<string | null>(null)
 
   const [step, setStep] = useState(0)
   const [step1Attempted, setStep1Attempted] = useState(false)
@@ -364,10 +365,11 @@ const BookCampForm = ({ needsMrPicker, project, onBooked, onCancel }: BookCampFo
                   value={field.value}
                   onChange={field.onChange}
                   onResolutionStateChange={setLocationResolution}
+                  onLocationHintChange={setLocationHint}
                   defaultCountry="India"
                   countryCode="IN"
                 />
-                <LocationAddressFields value={field.value} onChange={field.onChange} defaultCountry="India" />
+                <LocationAddressFields value={field.value} onChange={field.onChange} defaultCountry="India" locationHint={locationHint} />
               </div>
             )}
           />

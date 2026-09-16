@@ -44,7 +44,7 @@ describe('Sidebar — pharma identity isolation', () => {
     })
 
     expect(screen.queryByText(/pharma portal/i)).not.toBeInTheDocument()
-    expect(screen.getByText('Dashboard')).toBeInTheDocument()
+    expect(screen.getByText('CRM')).toBeInTheDocument()
   })
 
   it('shows ONLY the Pharma Portal section for a pharma-identity session with camp:book — no other section', async () => {
@@ -80,36 +80,100 @@ describe('Sidebar — pharma identity isolation', () => {
       session: sessionFixture('sales-rep', []),
     })
 
-    expect(screen.getByText('Dashboard')).toBeInTheDocument()
+    expect(screen.getByText('Doctor Management')).toBeInTheDocument()
     expect(screen.queryByText(/pharma portal/i)).not.toBeInTheDocument()
   })
 })
 
-describe('Sidebar — FO Management is gated on platform tenant, not permission alone', () => {
-  it('hides FO Management for a customer-tenant admin holding tenant:manage (the exact false-positive this gate exists to prevent)', async () => {
+describe('Sidebar — FO Management platform-tenant gate (unreachable via nav while the item is hidden, but must not silently break)', () => {
+  it('hides both FO Management and Mock FO Management for a customer-tenant admin holding tenant:manage (the exact false-positive this gate exists to prevent)', async () => {
     await renderSidebar({
       permissions: ['tenant:manage'],
       session: sessionFixture('admin', ['tenant:manage'], 'customer'),
     })
 
     expect(screen.queryByText('FO Management')).not.toBeInTheDocument()
+    expect(screen.queryByText('Mock FO Management')).not.toBeInTheDocument()
   })
 
-  it('hides FO Management for a platform-tenant session with neither tenant:manage nor tenant:admin', async () => {
+  it('hides both FO Management and Mock FO Management for a platform-tenant session with neither tenant:manage nor tenant:admin', async () => {
     await renderSidebar({
       permissions: [],
       session: sessionFixture('sales-rep', [], 'platform'),
     })
 
     expect(screen.queryByText('FO Management')).not.toBeInTheDocument()
+    expect(screen.queryByText('Mock FO Management')).not.toBeInTheDocument()
   })
 
-  it('shows FO Management for a platform-tenant session with tenant:admin', async () => {
+  it('shows the real FO Management but keeps Mock FO Management nav-hidden for a platform-tenant session with tenant:admin', async () => {
     await renderSidebar({
       permissions: ['tenant:admin'],
       session: sessionFixture('admin', ['tenant:admin'], 'platform'),
     })
 
     expect(screen.getByText('FO Management')).toBeInTheDocument()
+    expect(screen.queryByText('Mock FO Management')).not.toBeInTheDocument()
+  })
+})
+
+describe('Sidebar — Inventory Operations nav label mirrors the page\'s own "Requests-only" state', () => {
+  it('labels the nav item "Requests" for a field-officer-shaped session (only inventory-request:* permissions)', async () => {
+    await renderSidebar({
+      permissions: ['inventory-request:search', 'inventory-request:create'],
+      session: sessionFixture('field-officer', ['inventory-request:search', 'inventory-request:create'], 'platform'),
+    })
+
+    expect(screen.getByText('Requests')).toBeInTheDocument()
+    expect(screen.queryByText('Inventory Operations')).not.toBeInTheDocument()
+  })
+
+  it('keeps the "Inventory Operations" label for a session holding inventory-assignment:manage', async () => {
+    await renderSidebar({
+      permissions: ['inventory-assignment:manage'],
+      session: sessionFixture('inventory-manager', ['inventory-assignment:manage']),
+    })
+
+    expect(screen.getByText('Inventory Operations')).toBeInTheDocument()
+    expect(screen.queryByText('Requests')).not.toBeInTheDocument()
+  })
+
+  it('keeps the "Inventory Operations" label for a system:manage session, even though it holds no explicit inventory-assignment/-ledger code', async () => {
+    await renderSidebar({
+      permissions: ['system:manage'],
+      session: sessionFixture('system-admin', ['system:manage']),
+    })
+
+    expect(screen.getByText('Inventory Operations')).toBeInTheDocument()
+    expect(screen.queryByText('Requests')).not.toBeInTheDocument()
+  })
+})
+
+describe('Sidebar — Field Staff Coverage is hidden from field-officer sessions', () => {
+  it('hides Field Staff Coverage for a field-officer-shaped session (holds neither tenant nor role read/manage codes)', async () => {
+    await renderSidebar({
+      permissions: ['inventory-request:search', 'inventory-request:create'],
+      session: sessionFixture('field-officer', ['inventory-request:search', 'inventory-request:create'], 'platform'),
+    })
+
+    expect(screen.queryByText('Field Staff Coverage')).not.toBeInTheDocument()
+  })
+
+  it('shows Field Staff Coverage for a sales-rep session holding tenant:search/tenant:get', async () => {
+    await renderSidebar({
+      permissions: ['tenant:search', 'tenant:get'],
+      session: sessionFixture('sales-rep', ['tenant:search', 'tenant:get'], 'platform'),
+    })
+
+    expect(screen.getByText('Field Staff Coverage')).toBeInTheDocument()
+  })
+
+  it('shows Field Staff Coverage for a system:manage session even without an explicit tenant/role code', async () => {
+    await renderSidebar({
+      permissions: ['system:manage'],
+      session: sessionFixture('system-admin', ['system:manage']),
+    })
+
+    expect(screen.getByText('Field Staff Coverage')).toBeInTheDocument()
   })
 })

@@ -57,7 +57,14 @@ interface GeocoderAddressComponentLike {
   types: string[]
 }
 
-// Same ''-default contract as fromPlacesAddressComponents above.
+interface GeocoderResultLike {
+  address_components: GeocoderAddressComponentLike[]
+  formatted_address?: string
+  plus_code?: { global_code?: string; compound_code?: string }
+}
+
+// Same ''-default contract as fromPlacesAddressComponents above. Reads only
+// the primary result — see fromGeocoderAddressComponentsWithFallback below.
 export function fromGeocoderAddressComponents(
   components: GeocoderAddressComponentLike[],
   placeId: string | null | undefined,
@@ -85,4 +92,36 @@ export function fromGeocoderAddressComponents(
     pincode,
     googlePlaceId: placeId ?? undefined,
   }
+}
+
+export interface GeocoderFallbackResult {
+  address: Omit<LocationValue, 'coordinates'>
+  // Purely informational — never written into a LocationValue field.
+  locationHint: string | null
+}
+
+// Scans every result for a postal_code when the primary result lacks one —
+// never derived from city/state, since one city can span many pincodes.
+export function fromGeocoderAddressComponentsWithFallback(
+  results: GeocoderResultLike[],
+  placeId: string | null | undefined,
+  defaultCountry?: string,
+): GeocoderFallbackResult {
+  const primary = results[0]
+  const address = fromGeocoderAddressComponents(primary?.address_components ?? [], placeId, defaultCountry)
+
+  if (!address.pincode) {
+    for (const result of results) {
+      const postalComponent = result.address_components.find((c) => c.types.includes('postal_code'))
+      if (postalComponent?.long_name) {
+        address.pincode = postalComponent.long_name
+        break
+      }
+    }
+  }
+
+  // Falls back to a Plus Code when Google has no formatted address either.
+  const locationHint = primary?.formatted_address || primary?.plus_code?.compound_code || primary?.plus_code?.global_code || null
+
+  return { address, locationHint }
 }

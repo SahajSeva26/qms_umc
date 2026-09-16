@@ -28,9 +28,9 @@ function makeValue(coordinates: [number, number]): LocationValue {
   }
 }
 
-function geocoderResult(place_id: string) {
+function geocoderResult(place_id: string, formatted_address?: string) {
   return {
-    results: [{ place_id, address_components: [{ long_name: 'City', short_name: 'City', types: ['locality'] }] }],
+    results: [{ place_id, address_components: [{ long_name: 'City', short_name: 'City', types: ['locality'] }], formatted_address }],
   }
 }
 
@@ -196,6 +196,53 @@ describe('MapCanvas — onResolutionStateChange reports geocode status changes',
       await new Promise((r) => setTimeout(r, 0))
     })
     expect(onResolutionStateChange).toHaveBeenLastCalledWith('error')
+  })
+})
+
+describe('MapCanvas — onLocationHintChange reports the reverse-geocode hint', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    ;(globalThis as unknown as { google: unknown }).google = {
+      maps: {
+        Geocoder: vi.fn(function (this: { geocode: typeof geocode }) {
+          this.geocode = geocode
+        }),
+      },
+    }
+  })
+
+  it('reports null on mount, then the resolved formatted_address once a pin-drop succeeds', async () => {
+    geocode.mockResolvedValue(geocoderResult('dropped-pin-place', 'Dehene, Maharashtra, India'))
+    const onLocationHintChange = vi.fn()
+    render(
+      <MapCanvas value={null} onChange={vi.fn()} onLocationHintChange={onLocationHintChange} height={300} defaultCenter={{ lat: 0, lng: 0 }} />,
+    )
+    expect(onLocationHintChange).toHaveBeenCalledWith(null)
+
+    await act(async () => {
+      capturedMapOnClick?.({ detail: { latLng: { lat: 10, lng: 20 } } })
+      await new Promise((r) => setTimeout(r, 0))
+    })
+    expect(onLocationHintChange).toHaveBeenLastCalledWith('Dehene, Maharashtra, India')
+  })
+
+  it('clears the hint back to null when resetToken cancels the pin — a stale hint must not survive a search-box pick that supersedes it', async () => {
+    geocode.mockResolvedValue(geocoderResult('dropped-pin-place', 'Dehene, Maharashtra, India'))
+    const onLocationHintChange = vi.fn()
+    const { rerender } = render(
+      <MapCanvas value={null} onChange={vi.fn()} onLocationHintChange={onLocationHintChange} height={300} defaultCenter={{ lat: 0, lng: 0 }} resetToken={0} />,
+    )
+
+    await act(async () => {
+      capturedMapOnClick?.({ detail: { latLng: { lat: 10, lng: 20 } } })
+      await new Promise((r) => setTimeout(r, 0))
+    })
+    expect(onLocationHintChange).toHaveBeenLastCalledWith('Dehene, Maharashtra, India')
+
+    rerender(
+      <MapCanvas value={null} onChange={vi.fn()} onLocationHintChange={onLocationHintChange} height={300} defaultCenter={{ lat: 0, lng: 0 }} resetToken={1} />,
+    )
+    expect(onLocationHintChange).toHaveBeenLastCalledWith(null)
   })
 })
 

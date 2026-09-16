@@ -38,9 +38,24 @@ const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
   // Permission-code half only — isNavItemVisible() also requires a platform-tenant
   // session for this specific item, since field-officer is a platform-only RoleType.
   fo: ['tenant:manage', 'tenant:admin'],
+  fieldofficers: ['tenant:manage', 'tenant:admin'],
   users: ['user:get', 'user:search', 'user:update'],
   // :get is deliberately excluded — the list page only calls search, which needs :search/:manage.
   vendormasters: ['vendor-master:search', 'vendor-master:manage'],
+  // Neither inventory-master nor inventory-device/-consumable has a :search
+  // code — the backend read routes themselves are :manage-gated, so this just
+  // mirrors that boundary in nav (a field-officer legitimately holds none of these).
+  itemmaster: ['inventory-master:manage'],
+  inventoryitems: ['inventory-device:manage', 'inventory-consumable:manage'],
+  // GET /geo-profiles has no permission gate server-side (see the item's own
+  // comment in navConfig.ts), so this can't key off a geo-profile:* code — no
+  // RoleType is ever granted one. Gated instead on tenant/role read access,
+  // which every platform RoleType holds except field-officer (confirmed in
+  // defaultRoleTypes.ts: FO is the only one with neither tenant:get/:search
+  // nor role:get/:search) — an FO seeing every field officer's live
+  // coordinates and coverage radius is the same over-exposure already fixed
+  // for Inventory, just on a page with no backend gate to lean on.
+  geoprofiles: ['tenant:get', 'tenant:search', 'tenant:manage', 'tenant:admin', 'role:get', 'role:search'],
 }
 
 interface SidebarProps {
@@ -312,7 +327,7 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
     // field-officer (RoleType + every real Role) lives only under the platform
     // tenant — a customer-tenant admin holding the same permission codes must
     // still not see this item, or they'd land on a confusing false "not found" error.
-    if (item.id === 'fo') return hasCode && session?.tenant.type === 'platform'
+    if (item.id === 'fo' || item.id === 'fieldofficers') return hasCode && session?.tenant.type === 'platform'
     return hasCode
   }
 
@@ -327,13 +342,23 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
     }))
     .filter((section) => section.subs.length > 0)
 
-  const itemOverrides: Record<string, NavItemOverride> = isPharmaRoleType
-    ? {
-        pharma: hasCampBook
-          ? { label: `Pharma Portal ${pharmaMeta.label}` }
-          : { label: `Pharma Portal ${pharmaMeta.label}`, disabledReason: 'Access not configured — contact an administrator' },
-      }
-    : {}
+  // Same "only Requests is visible" condition InventoryOperationsPage.tsx
+  // itself uses to drop its own toggle group — kept in sync manually since
+  // the page computes it from usePermission(), not from this nav config.
+  const isInventoryRequestsOnly = !isRealSystemManage
+    && !permissions.includes('inventory-assignment:manage')
+    && !permissions.includes('inventory-ledger:manage')
+
+  const itemOverrides: Record<string, NavItemOverride> = {
+    ...(isPharmaRoleType
+      ? {
+          pharma: hasCampBook
+            ? { label: `Pharma Portal ${pharmaMeta.label}` }
+            : { label: `Pharma Portal ${pharmaMeta.label}`, disabledReason: 'Access not configured — contact an administrator' },
+        }
+      : {}),
+    ...(isInventoryRequestsOnly ? { inventoryops: { label: 'Requests' } } : {}),
+  }
 
   return (
     <aside

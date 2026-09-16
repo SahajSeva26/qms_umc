@@ -16,6 +16,7 @@ import MrPicker from '@/features/pharma/components/MrPicker'
 import EditDoctorModal from '@/features/doctors/components/EditDoctorModal'
 import DateSlotAvailabilityGrid from '@/features/pharma/components/DateSlotAvailabilityGrid'
 import LocationPicker from '@/components/widgets/location-picker/LocationPicker'
+import LocationAddressFields from '@/components/widgets/location-picker/LocationAddressFields'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -122,6 +123,7 @@ const BookCampForm = ({ needsMrPicker, project, onBooked, onCancel }: BookCampFo
   // selection — either can still be in flight when Submit is clicked.
   const [locationResolution, setLocationResolution] = useState<LocationResolutionState>('idle')
   const [locationError, setLocationError] = useState<string | null>(null)
+  const [locationHint, setLocationHint] = useState<string | null>(null)
 
   const [step, setStep] = useState(0)
   const [step1Attempted, setStep1Attempted] = useState(false)
@@ -358,14 +360,17 @@ const BookCampForm = ({ needsMrPicker, project, onBooked, onCancel }: BookCampFo
             control={control}
             name="location"
             render={({ field }) => (
-              <LocationPicker
-                value={field.value}
-                onChange={field.onChange}
-                onResolutionStateChange={setLocationResolution}
-                defaultCountry="India"
-                countryCode="IN"
-                showAddressFields
-              />
+              <div className="space-y-2">
+                <LocationPicker
+                  value={field.value}
+                  onChange={field.onChange}
+                  onResolutionStateChange={setLocationResolution}
+                  onLocationHintChange={setLocationHint}
+                  defaultCountry="India"
+                  countryCode="IN"
+                />
+                <LocationAddressFields value={field.value} onChange={field.onChange} defaultCountry="India" locationHint={locationHint} />
+              </div>
             )}
           />
           {fieldError('location') && <FieldErrorText message={fieldError('location')!} />}

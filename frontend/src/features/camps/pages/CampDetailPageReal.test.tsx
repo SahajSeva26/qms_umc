@@ -7,50 +7,37 @@ import type { RoleEntity } from '@/types/accessManagement.types'
 
 vi.mock('@/hooks/useSession')
 
-// The real LocationAddressFields still renders for real when
-// showAddressFields is set, matching LocationPicker's real contract now that
-// the address form is composed inside it rather than rendered as a sibling.
-vi.mock('@/components/widgets/location-picker/LocationPicker', async () => {
-  const { default: LocationAddressFields } = await import('@/components/widgets/location-picker/LocationAddressFields')
-  return {
-    default: ({ value, onChange, onResolutionStateChange, showAddressFields, disabled, defaultCountry }: {
-      value: unknown
-      onChange: (v: unknown) => void
-      onResolutionStateChange?: (status: 'idle' | 'loading' | 'error') => void
-      showAddressFields?: boolean
-      disabled?: boolean
-      defaultCountry?: string
-    }) => (
-      <>
-        {/* Simulates picking a real point on the map — needed for CampFoPicker's
-            coverage-radius-based eligibility, which requires real coordinates. */}
-        <button
-          type="button"
-          onClick={() => onChange({
-            addressLine1: '', addressLine2: undefined, locality: undefined,
-            city: '', state: '', country: undefined, pincode: '', googlePlaceId: undefined,
-            ...(value as object ?? {}),
-            coordinates: [77.02, 28.52],
-          })}
-        >
-          Set test coordinates
-        </button>
-        {/* Simulates the real widget's "pin moved, reverse-geocode still resolving"
-            window — the gap between a drag/click and onChange actually firing. */}
-        <button type="button" onClick={() => onResolutionStateChange?.('loading')}>
-          Simulate location resolving
-        </button>
-        <button type="button" onClick={() => onResolutionStateChange?.('idle')}>
-          Simulate location resolved
-        </button>
-        {showAddressFields && (
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          <LocationAddressFields value={value as any} onChange={onChange as any} disabled={disabled} defaultCountry={defaultCountry} />
-        )}
-      </>
-    ),
-  }
-})
+vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
+  default: ({ value, onChange, onResolutionStateChange }: {
+    value: unknown
+    onChange: (v: unknown) => void
+    onResolutionStateChange?: (status: 'idle' | 'loading' | 'error') => void
+  }) => (
+    <>
+      {/* Simulates picking a real point on the map — needed for CampFoPicker's
+          coverage-radius-based eligibility, which requires real coordinates. */}
+      <button
+        type="button"
+        onClick={() => onChange({
+          addressLine1: '', addressLine2: undefined, locality: undefined,
+          city: '', state: '', country: undefined, pincode: '', googlePlaceId: undefined,
+          ...(value as object ?? {}),
+          coordinates: [77.02, 28.52],
+        })}
+      >
+        Set test coordinates
+      </button>
+      {/* Simulates the real widget's "pin moved, reverse-geocode still resolving"
+          window — the gap between a drag/click and onChange actually firing. */}
+      <button type="button" onClick={() => onResolutionStateChange?.('loading')}>
+        Simulate location resolving
+      </button>
+      <button type="button" onClick={() => onResolutionStateChange?.('idle')}>
+        Simulate location resolved
+      </button>
+    </>
+  ),
+}))
 
 vi.mock('@/features/inventory/real/components/InventoryMasterMultiPicker', () => ({
   default: ({ onChange }: { onChange: (ids: string[], labels: Record<string, string>) => void }) => (

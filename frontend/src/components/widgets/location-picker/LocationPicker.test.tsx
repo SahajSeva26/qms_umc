@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import LocationPicker from './LocationPicker'
+import LocationAddressFields from './LocationAddressFields'
 import ENV from '@/config/env'
 import type { LocationValue } from '@/types/location.types'
 
@@ -38,18 +40,17 @@ vi.mock('./LocationSearchBox', () => ({
 }))
 
 vi.mock('./MapCanvas', () => ({
-  default: ({ onResolutionStateChange, bottomRightOverlay }: {
+  default: ({ onResolutionStateChange, onLocationHintChange }: {
     onResolutionStateChange?: (s: 'idle' | 'loading' | 'error') => void
-    bottomRightOverlay?: React.ReactNode
+    onLocationHintChange?: (hint: string | null) => void
   }) => (
     <>
-      <button type="button" onClick={() => onResolutionStateChange?.('loading')}>
-        Simulate map reverse-geocode loading
-      </button>
       <button type="button" onClick={() => onResolutionStateChange?.('error')}>
         Simulate map reverse-geocode error
       </button>
-      {bottomRightOverlay}
+      <button type="button" onClick={() => onLocationHintChange?.('Dehene, Maharashtra, India')}>
+        Simulate map reverse-geocode hint
+      </button>
     </>
   ),
 }))
@@ -72,16 +73,6 @@ describe('LocationPicker — no-credentials mode', () => {
   it('renders the "not configured" fallback and never mounts APIProvider when both keys are missing', () => {
     render(<LocationPicker value={null} onChange={vi.fn()} />)
     expect(screen.getByText(/map search is not configured/i)).toBeInTheDocument()
-  })
-
-  it('still renders a real, editable address form inline when showAddressFields is true and no Maps credentials exist at all', async () => {
-    const onChange = vi.fn()
-    const user = userEvent.setup()
-    render(<LocationPicker value={null} onChange={onChange} showAddressFields />)
-
-    const addressInput = screen.getByLabelText(/^address line 1$/i)
-    await user.type(addressInput, '221 Baker Street')
-    expect(onChange).toHaveBeenCalled()
   })
 
   it('renders the fallback when only the API key is missing (Map ID set)', () => {
@@ -238,17 +229,6 @@ describe('LocationPicker — map failed to load (credentials present but rejecte
     expect(screen.getByLabelText(/^longitude$/i)).toBeInTheDocument()
   })
 
-  it('still renders a real, editable address form inline when showAddressFields is true and the SDK reports FAILED — the fallback must not silently lose the address form', async () => {
-    setMockLoadingStatus('FAILED')
-    const onChange = vi.fn()
-    const user = userEvent.setup()
-    render(<LocationPicker value={null} onChange={onChange} showAddressFields />)
-
-    const addressInput = screen.getByLabelText(/^address line 1$/i)
-    await user.type(addressInput, '221 Baker Street')
-    expect(onChange).toHaveBeenCalled()
-  })
-
   it('offers manual coordinate entry when the SDK reports AUTH_FAILURE (e.g. a rejected key)', async () => {
     setMockLoadingStatus('AUTH_FAILURE')
     const onChange = vi.fn()
@@ -292,7 +272,7 @@ describe('LocationPicker — combined resolution state (map + search)', () => {
   })
 })
 
-describe('LocationPicker — showAddressFields', () => {
+describe('LocationPicker — onLocationHintChange wired into a below-map LocationAddressFields (real call-site shape)', () => {
   const originalApiKey = ENV.Maps.ApiKey
   const originalMapId = ENV.Maps.MapId
 
@@ -308,41 +288,28 @@ describe('LocationPicker — showAddressFields', () => {
     setMockLoadingStatus(null)
   })
 
-  it('renders no address panel when showAddressFields is unset, even though value/onChange are passed — the NearestGeoProfilesPage shape', () => {
-    render(<LocationPicker value={{ addressLine1: '221 Baker Street', city: 'Mumbai', state: 'Maharashtra', pincode: '400001', coordinates: [72.8, 19.07] }} onChange={vi.fn()} />)
-    expect(screen.queryByRole('button', { name: /add address/i })).not.toBeInTheDocument()
-    expect(screen.queryByText(/221 baker street/i)).not.toBeInTheDocument()
-  })
+  // Mirrors the real pattern every call site uses (CampFormFields.tsx,
+  // CreateTenantDialog.tsx, etc.): the caller — not LocationPicker — owns the
+  // hint state and threads it into its own sibling LocationAddressFields.
+  function LocationWithAddressFields({ value }: { value: LocationValue | null }) {
+    const [locationHint, setLocationHint] = useState<string | null>(null)
+    return (
+      <div>
+        <LocationPicker value={value} onChange={vi.fn()} onLocationHintChange={setLocationHint} />
+        <LocationAddressFields value={value} onChange={vi.fn()} locationHint={locationHint} />
+      </div>
+    )
+  }
 
-  it('renders the address overlay pill when showAddressFields is true, and edits flow through the same onChange prop', async () => {
-    const onChange = vi.fn()
+  it('shows the map\'s hint text in the below-map address form once the map reports one, alongside the missing-fields warning', async () => {
     const user = userEvent.setup()
-    render(<LocationPicker value={null} onChange={onChange} showAddressFields />)
+    render(<LocationWithAddressFields value={{ addressLine1: '', city: '', state: '', pincode: '', coordinates: [72.8, 19.07] }} />)
 
-    const pill = screen.getByRole('button', { name: /add address/i })
-    expect(pill).toBeInTheDocument()
+    expect(screen.queryByText(/dehene, maharashtra, india/i)).not.toBeInTheDocument()
 
-    await user.click(pill)
-    const addressInput = screen.getByLabelText(/^address line 1$/i)
-    await user.type(addressInput, 'X')
-    expect(onChange).toHaveBeenCalled()
-  })
+    await user.click(screen.getByRole('button', { name: /simulate map reverse-geocode hint/i }))
 
-  it('shrinks the expanded address card\'s height budget when the map reports "loading" (not just "error") — both share MapCanvas\'s bottom stack', async () => {
-    const user = userEvent.setup()
-    const { unmount } = render(<LocationPicker value={null} onChange={vi.fn()} showAddressFields />)
-    await user.click(screen.getByRole('button', { name: /add address/i }))
-    const panelIdle = document.querySelector('div[style*="max-height"]') as HTMLElement
-    const maxHeightIdle = parseInt(panelIdle.style.maxHeight, 10)
-    unmount()
-
-    const user2 = userEvent.setup()
-    render(<LocationPicker value={null} onChange={vi.fn()} showAddressFields />)
-    await user2.click(screen.getByRole('button', { name: /simulate map reverse-geocode loading/i }))
-    await user2.click(screen.getByRole('button', { name: /add address/i }))
-    const panelLoading = document.querySelector('div[style*="max-height"]') as HTMLElement
-    const maxHeightLoading = parseInt(panelLoading.style.maxHeight, 10)
-
-    expect(maxHeightLoading).toBeLessThan(maxHeightIdle)
+    expect(await screen.findByText(/map location/i)).toBeInTheDocument()
+    expect(screen.getByText('Dehene, Maharashtra, India')).toBeInTheDocument()
   })
 })

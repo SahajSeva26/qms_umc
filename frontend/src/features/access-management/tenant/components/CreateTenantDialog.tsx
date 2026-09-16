@@ -19,6 +19,7 @@ import { useReshapingResolver } from '@/hooks/useReshapingResolver'
 import { TENANT_ROUTES } from '@/features/access-management/tenant/tenant.routes'
 import { PLATFORM_TENANT_CODE, PLATFORM_TENANT_FETCH_LIMIT } from '@/features/access-management/accessManagement.constants'
 import LocationPicker from '@/components/widgets/location-picker/LocationPicker'
+import LocationAddressFields from '@/components/widgets/location-picker/LocationAddressFields'
 import type { LocationResolutionState } from '@/components/widgets/location-picker/location.types'
 import FieldErrorText from '@/components/ui/FieldErrorText'
 
@@ -100,6 +101,7 @@ const CreateTenantDialog = () => {
   // 'idle' — the pin can visibly move well before (or without ever) firing onChange.
   const [locationResolution, setLocationResolution] = useState<LocationResolutionState>('idle')
   const [locationResolutionError, setLocationResolutionError] = useState<string | null>(null)
+  const [locationHint, setLocationHint] = useState<string | null>(null)
   const navigate = useNavigate()
   const createTenant = useCreateTenant()
   const { resolver, parsePayload } = useTenantFormResolver()
@@ -278,14 +280,17 @@ const CreateTenantDialog = () => {
                       control={control}
                       name="address"
                       render={({ field }) => (
-                        <LocationPicker
-                          value={field.value}
-                          onChange={field.onChange}
-                          onResolutionStateChange={setLocationResolution}
-                          defaultCountry="India"
-                          countryCode="IN"
-                          showAddressFields
-                        />
+                        <div className="space-y-2">
+                          <LocationPicker
+                            value={field.value}
+                            onChange={field.onChange}
+                            onResolutionStateChange={setLocationResolution}
+                            onLocationHintChange={setLocationHint}
+                            defaultCountry="India"
+                            countryCode="IN"
+                          />
+                          <LocationAddressFields value={field.value} onChange={field.onChange} defaultCountry="India" locationHint={locationHint} />
+                        </div>
                       )}
                     />
                     {fieldError('address') && <FieldErrorText message={fieldError('address')!} />}

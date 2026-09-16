@@ -24,8 +24,12 @@ export interface LocationPickerProps {
   countryCode?: string
   /** Fires on both pin-drop/drag reverse-geocode and search-box selection state changes — both are async. A caller that passes this should block submit until the state is 'idle'. */
   onResolutionStateChange?: (status: LocationResolutionState) => void
-  /** Fires when coordinates come from the manual lat/lng fallback (no geocoder ran) — hard-block vs. warn is caller-owned. */
+  /** Fires when coordinates come from the Maps-unavailable manual lat/lng fallback — no
+   *  geocoder ever ran, so any existing address may no longer match. The picker only reports
+   *  this; whether that's a hard block (address required) or a soft warning is caller-owned. */
   onManualCoordinateEntry?: () => void
-  /** Renders the address form inside LocationPicker instead of the caller rendering it separately — overlay when Maps is available, inline in the fallback otherwise. Explicit opt-in, never inferred. */
-  showAddressFields?: boolean
+  /** Reports the map's reverse-geocode hint (Google's own description of the pinned point),
+   *  including clears back to null — pass straight through to LocationAddressFields's own
+   *  `locationHint` prop if the caller renders one alongside this picker. */
+  onLocationHintChange?: (hint: string | null) => void
 }

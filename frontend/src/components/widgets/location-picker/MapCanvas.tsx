@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AdvancedMarker, Map, useMap } from '@vis.gl/react-google-maps'
 import { Button } from '@/components/ui/button'
 import ENV from '@/config/env'
@@ -26,10 +26,8 @@ interface MapCanvasProps {
   /** Bump this counter to cancel any in-flight/stale reverse-geocode — a location
    *  committed some other way (e.g. search) must win over a late response. */
   resetToken?: number
-  /** Reports the current hint (Google's description of the point), including clears back to null on a new lookup or reset — not only alongside onChange. */
+  /** Reports the current hint (Google's description of the point), including clears back to null on a new lookup or reset. */
   onLocationHintChange?: (hint: string | null) => void
-  /** Generic slot in the map's bottom-right stack — MapCanvas has no knowledge of its contents. */
-  bottomRightOverlay?: ReactNode
 }
 
 
@@ -53,7 +51,7 @@ function CameraFocus({ coordinates }: { coordinates: [number, number] | undefine
   return null
 }
 
-const MapCanvas = ({ value, onChange, disabled, height, defaultCenter, defaultCountry, onResolutionStateChange, resetToken, bottomRightOverlay, onLocationHintChange }: MapCanvasProps) => {
+const MapCanvas = ({ value, onChange, disabled, height, defaultCenter, defaultCountry, onResolutionStateChange, resetToken, onLocationHintChange }: MapCanvasProps) => {
   const [mapType, setMapType] = useState<MapTypeView>('roadmap')
 
   const { status: geocodeStatus, provisionalPosition, locationHint, runGeocode, retry, useProvisionalPinWithoutAddress, reset } =
@@ -136,26 +134,21 @@ const MapCanvas = ({ value, onChange, disabled, height, defaultCenter, defaultCo
         ))}
       </div>
 
-      {/* One positioned stack; children must stay plain flow (not `absolute`) to actually stack. */}
-      <div className="absolute inset-x-2 bottom-2 flex flex-col items-end gap-1.5 pointer-events-none">
-        {bottomRightOverlay && <div className="pointer-events-auto">{bottomRightOverlay}</div>}
+      {geocodeStatus === 'loading' && (
+        <div className="absolute bottom-2 left-2 px-2.5 py-1.5 rounded-lg text-[12px] bg-popover shadow-md ring-1 ring-foreground/10" style={{ color: 'var(--qms-text-muted)' }}>
+          Looking up address…
+        </div>
+      )}
 
-        {geocodeStatus === 'loading' && (
-          <div className="pointer-events-auto self-start px-2.5 py-1.5 rounded-lg text-[12px] bg-popover shadow-md ring-1 ring-foreground/10" style={{ color: 'var(--qms-text-muted)' }}>
-            Looking up address…
+      {geocodeStatus === 'error' && (
+        <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-[12px] bg-popover shadow-md ring-1 ring-foreground/10 text-danger">
+          <span>Couldn't determine an address for this location.</span>
+          <div className="flex gap-1.5 shrink-0">
+            <Button type="button" size="sm" variant="ghost" onClick={retry}>Retry</Button>
+            <Button type="button" size="sm" variant="ghost" onClick={useProvisionalPinWithoutAddress}>Use this pin</Button>
           </div>
-        )}
-
-        {geocodeStatus === 'error' && (
-          <div className="pointer-events-auto w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-[12px] bg-popover shadow-md ring-1 ring-foreground/10 text-danger">
-            <span>Couldn't determine an address for this location.</span>
-            <div className="flex gap-1.5 shrink-0">
-              <Button type="button" size="sm" variant="ghost" onClick={retry}>Retry</Button>
-              <Button type="button" size="sm" variant="ghost" onClick={useProvisionalPinWithoutAddress}>Use this pin</Button>
-            </div>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }

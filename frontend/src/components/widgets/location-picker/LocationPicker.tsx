@@ -5,8 +5,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import LocationSearchBox from './LocationSearchBox'
 import MapCanvas from './MapCanvas'
-import LocationAddressFields from './LocationAddressFields'
-import LocationAddressOverlay from './LocationAddressOverlay'
 import type { LocationPickerProps, LocationResolutionState } from './location.types'
 import { createEmptyLocationValue, type LocationValue } from '@/types/location.types'
 
@@ -22,9 +20,10 @@ const MAP_LIBRARIES: string[] = ['places']
 const DEFAULT_CENTER = { lat: 19.0759837, lng: 72.8776559 }
 const DEFAULT_HEIGHT = 320
 
-// Shared fallback for missing credentials AND a failed/rejected APIProvider.
-// LocationAddressFields still renders inline here when showAddressFields is set.
-function ManualCoordinateFallback({ height, value, onChange, disabled, defaultCountry, message, onManualCoordinateEntry, showAddressFields }: {
+// Shared fallback for missing credentials AND a failed/rejected APIProvider —
+// both leave no other way to produce coordinates. Latitude/longitude only
+// (no address fields), matching what a bare pin-drop itself produces.
+function ManualCoordinateFallback({ height, value, onChange, disabled, defaultCountry, message, onManualCoordinateEntry }: {
   height: number
   value: LocationValue | null
   onChange: (value: LocationValue) => void
@@ -32,7 +31,6 @@ function ManualCoordinateFallback({ height, value, onChange, disabled, defaultCo
   defaultCountry?: string
   message: string
   onManualCoordinateEntry?: () => void
-  showAddressFields?: boolean
 }) {
   const idPrefix = useId()
   const [latitude, setLatitude] = useState(value?.coordinates ? String(value.coordinates[1]) : '')
@@ -99,22 +97,17 @@ function ManualCoordinateFallback({ height, value, onChange, disabled, defaultCo
         </div>
       </div>
       {error && <p className="text-[11px] text-danger">{error}</p>}
-
-      {showAddressFields && (
-        <LocationAddressFields value={value} onChange={onChange} disabled={disabled} defaultCountry={defaultCountry} />
-      )}
     </div>
   )
 }
 
-function LocationPickerInner({ value, onChange, disabled, height = DEFAULT_HEIGHT, defaultCenter, defaultCountry, countryCode, onResolutionStateChange, onManualCoordinateEntry, showAddressFields }: LocationPickerProps) {
+function LocationPickerInner({ value, onChange, disabled, height = DEFAULT_HEIGHT, defaultCenter, defaultCountry, countryCode, onResolutionStateChange, onManualCoordinateEntry, onLocationHintChange }: LocationPickerProps) {
   const loadingStatus = useApiLoadingStatus()
   // A search selection is a real network round trip too — while it's in flight,
   // `value` isn't final yet, same hazard as the map's own reverse-geocode 'loading'.
   const [isSelecting, setIsSelecting] = useState(false)
   const [mapResolution, setMapResolution] = useState<LocationResolutionState>('idle')
   const [mapResetToken, setMapResetToken] = useState(0)
-  const [locationHint, setLocationHint] = useState<string | null>(null)
 
   useEffect(() => {
     onResolutionStateChange?.(isSelecting ? 'loading' : mapResolution)
@@ -130,7 +123,6 @@ function LocationPickerInner({ value, onChange, disabled, height = DEFAULT_HEIGH
         defaultCountry={defaultCountry}
         message="Map failed to load — check your connection, or enter coordinates manually."
         onManualCoordinateEntry={onManualCoordinateEntry}
-        showAddressFields={showAddressFields}
       />
     )
   }
@@ -142,7 +134,7 @@ function LocationPickerInner({ value, onChange, disabled, height = DEFAULT_HEIGH
     setMapResolution('idle')
     setMapResetToken((t) => t + 1)
     // The map's own hint (from a now-superseded pin drop) no longer applies.
-    setLocationHint(null)
+    onLocationHintChange?.(null)
     onChange(selected)
   }
 
@@ -163,21 +155,8 @@ function LocationPickerInner({ value, onChange, disabled, height = DEFAULT_HEIGH
         defaultCenter={defaultCenter ?? DEFAULT_CENTER}
         defaultCountry={defaultCountry}
         onResolutionStateChange={setMapResolution}
-        onLocationHintChange={setLocationHint}
+        onLocationHintChange={onLocationHintChange}
         resetToken={mapResetToken}
-        bottomRightOverlay={
-          showAddressFields ? (
-            <LocationAddressOverlay
-              value={value}
-              onChange={onChange}
-              disabled={disabled}
-              defaultCountry={defaultCountry}
-              mapHeight={height}
-              reserveStatusBannerSpace={mapResolution === 'loading' || mapResolution === 'error'}
-              locationHint={locationHint}
-            />
-          ) : undefined
-        }
       />
     </div>
   )
@@ -198,7 +177,6 @@ const LocationPicker = (props: LocationPickerProps) => {
         defaultCountry={props.defaultCountry}
         message="Map search is not configured in this environment — enter coordinates manually."
         onManualCoordinateEntry={props.onManualCoordinateEntry}
-        showAddressFields={props.showAddressFields}
       />
     )
   }

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { CampDraft } from '@/features/camps/hooks/useCampDraft'
 import CampFoPicker from '@/features/camps/components/CampFoPicker'
 import CampMrPicker from '@/features/camps/components/CampMrPicker'
@@ -14,6 +15,7 @@ import { CAMP_TIME_SLOT_LABEL } from '@/types/campTimeSlot.constants'
 import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
 import type { LocationValue } from '@/types/location.types'
 import LocationPicker from '@/components/widgets/location-picker/LocationPicker'
+import LocationAddressFields from '@/components/widgets/location-picker/LocationAddressFields'
 import type { LocationResolutionState } from '@/components/widgets/location-picker/location.types'
 
 const TYPE_OPTIONS: { value: CampType; label: string }[] = CAMP_TYPE_VALUES.map((value) => ({ value, label: CAMP_TYPE_LABEL[value] }))
@@ -67,6 +69,7 @@ const CampFormFields = ({
 }: CampFormFieldsProps) => {
   const { doctor, type, billingType, patientExpectation, date, timeSlot, location, fo, mr, devices, notes } = draft
   const deviceIds = devices ? devices.split(',').map((d) => d.trim()).filter(Boolean) : []
+  const [locationHint, setLocationHint] = useState<string | null>(null)
 
   return (
     <div className="space-y-4">
@@ -148,11 +151,12 @@ const CampFormFields = ({
           value={location}
           onChange={(v: LocationValue) => setField('location', v)}
           onResolutionStateChange={onLocationResolutionChange}
+          onLocationHintChange={setLocationHint}
           disabled={isLocked}
           defaultCountry="India"
           countryCode="IN"
-          showAddressFields
         />
+        <LocationAddressFields value={location} onChange={(v: LocationValue) => setField('location', v)} disabled={isLocked} defaultCountry="India" locationHint={locationHint} />
       </div>
       <p className="text-[11px] -mt-2" style={{ color: 'var(--qms-text-muted)' }}>
         Used to auto-allocate the nearest available field officer if none is picked below.

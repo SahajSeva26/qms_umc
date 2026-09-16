@@ -13,43 +13,32 @@ vi.mock('@/hooks/useSession')
 
 // LocationPicker needs real Google Maps credentials unavailable in tests —
 // mocked to buttons using the same onChange(LocationValue)/onResolutionStateChange
-// contract. The real LocationAddressFields still renders for real when
-// showAddressFields is set, matching LocationPicker's real contract now that
-// the address form is composed inside it rather than rendered as a sibling.
-vi.mock('@/components/widgets/location-picker/LocationPicker', async () => {
-  const { default: LocationAddressFields } = await import('@/components/widgets/location-picker/LocationAddressFields')
-  return {
-    default: ({ value, onChange, onResolutionStateChange, showAddressFields, disabled, defaultCountry }: {
-      value: unknown
-      onChange: (v: unknown) => void
-      onResolutionStateChange?: (status: 'idle' | 'loading' | 'error') => void
-      showAddressFields?: boolean
-      disabled?: boolean
-      defaultCountry?: string
-    }) => (
-      <>
-        <button
-          type="button"
-          onClick={() => onChange({ ...(value as object ?? {}), coordinates: [73.8567, 18.5204] })}
-        >
-          Set test coordinates
-        </button>
-        {/* Simulates the real widget's "pin moved / search result picked, still
-            resolving" window — the gap between a pick and onChange actually firing. */}
-        <button type="button" onClick={() => onResolutionStateChange?.('loading')}>
-          Simulate location resolving
-        </button>
-        <button type="button" onClick={() => onResolutionStateChange?.('idle')}>
-          Simulate location resolved
-        </button>
-        {showAddressFields && (
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          <LocationAddressFields value={value as any} onChange={onChange as any} disabled={disabled} defaultCountry={defaultCountry} />
-        )}
-      </>
-    ),
-  }
-})
+// contract. LocationAddressFields is rendered for real by BookCampForm itself,
+// as a sibling of this mock, not by LocationPicker.
+vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
+  default: ({ value, onChange, onResolutionStateChange }: {
+    value: unknown
+    onChange: (v: unknown) => void
+    onResolutionStateChange?: (status: 'idle' | 'loading' | 'error') => void
+  }) => (
+    <>
+      <button
+        type="button"
+        onClick={() => onChange({ ...(value as object ?? {}), coordinates: [73.8567, 18.5204] })}
+      >
+        Set test coordinates
+      </button>
+      {/* Simulates the real widget's "pin moved / search result picked, still
+          resolving" window — the gap between a pick and onChange actually firing. */}
+      <button type="button" onClick={() => onResolutionStateChange?.('loading')}>
+        Simulate location resolving
+      </button>
+      <button type="button" onClick={() => onResolutionStateChange?.('idle')}>
+        Simulate location resolved
+      </button>
+    </>
+  ),
+}))
 
 vi.mock('@/features/access-management/accessManagement.service', () => ({
   accessManagementService: {

@@ -11,6 +11,7 @@ import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import { usePermission } from '@/hooks/usePermission'
 import GeoProfileStatusPill from '@/features/geo-profile/components/GeoProfileStatusPill'
 import LocationPicker from '@/components/widgets/location-picker/LocationPicker'
+import LocationAddressFields from '@/components/widgets/location-picker/LocationAddressFields'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -170,6 +171,7 @@ const CreateGeoProfileForm = ({ roles, roleName }: RoleNameLookupProps) => {
   // `location` isn't authoritative while this is anything but 'idle' — the
   // pin can visibly move well before (or without ever) firing onChange.
   const [locationResolution, setLocationResolution] = useState<LocationResolutionState>('idle')
+  const [locationHint, setLocationHint] = useState<string | null>(null)
   const [coverageRadiusKm, setCoverageRadiusKm] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -292,15 +294,16 @@ const CreateGeoProfileForm = ({ roles, roleName }: RoleNameLookupProps) => {
               value={location}
               onChange={setLocation}
               onResolutionStateChange={setLocationResolution}
+              onLocationHintChange={setLocationHint}
               defaultCountry="India"
               countryCode="IN"
-              showAddressFields
             />
             {location?.coordinates && (
               <p className="text-[11px] mt-1.5 mb-3" style={{ color: 'var(--qms-text-muted)' }}>
                 Latitude: {location.coordinates[1]} · Longitude: {location.coordinates[0]}
               </p>
             )}
+            <LocationAddressFields value={location} onChange={setLocation} defaultCountry="India" locationHint={locationHint} />
           </div>
 
           <div>
@@ -363,6 +366,7 @@ const EditGeoProfileForm = ({ geoProfile, roleName }: EditGeoProfileFormProps) =
   // Higher-stakes than create mode: a save mid-resolution would submit
   // NOTHING for coordinates while showing a plain "Saved." success.
   const [locationResolution, setLocationResolution] = useState<LocationResolutionState>('idle')
+  const [locationHint, setLocationHint] = useState<string | null>(null)
   const [coverageRadiusKm, setCoverageRadiusKm] = useState(String(geoProfile.coverageRadius / 1000))
   const [status, setStatus] = useState<GeoProfileStatus>(geoProfile.status)
   const [formError, setFormError] = useState<string | null>(null)
@@ -463,23 +467,24 @@ const EditGeoProfileForm = ({ geoProfile, roleName }: EditGeoProfileFormProps) =
               onChange={handleLocationChange}
               onResolutionStateChange={setLocationResolution}
               onManualCoordinateEntry={() => setManualCoordinateEntry(true)}
+              onLocationHintChange={setLocationHint}
               defaultCountry="India"
               countryCode="IN"
-              showAddressFields
             />
             {location?.coordinates && (
               <p className="text-[11px] mt-1.5 mb-3" style={{ color: 'var(--qms-text-muted)' }}>
                 Latitude: {location.coordinates[1]} · Longitude: {location.coordinates[0]}
               </p>
             )}
+            <LocationAddressFields value={location} onChange={handleLocationChange} defaultCountry="India" locationHint={locationHint} />
             {staleAddressRisk && (
               <p className="text-[12px] rounded-lg px-3 py-2 mt-2 border border-warning bg-warning-soft text-warning">
-                Saving now will keep this profile's old address paired with the new pin — complete the address in the map's address panel if that's not intended.
+                Saving now will keep this profile's old address paired with the new pin — complete the address above if that's not intended.
               </p>
             )}
             {!staleAddressRisk && manualCoordinateEntry && (
               <p className="text-[12px] rounded-lg px-3 py-2 mt-2 border border-warning bg-warning-soft text-warning">
-                Coordinates were entered manually — review the address in the map's address panel, it wasn't confirmed against the new pin.
+                Coordinates were entered manually — review the address above, it wasn't confirmed against the new pin.
               </p>
             )}
           </div>

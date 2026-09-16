@@ -11,34 +11,18 @@ vi.mock('@/hooks/useSession')
 
 // LocationPicker needs real Google Maps credentials, unavailable in tests —
 // mock it to a button supplying coordinates via the same onChange(LocationValue) contract.
-// The real LocationAddressFields still renders for real when
-// showAddressFields is set, matching LocationPicker's real contract now that
-// the address form is composed inside it rather than rendered as a sibling.
-vi.mock('@/components/widgets/location-picker/LocationPicker', async () => {
-  const { default: LocationAddressFields } = await import('@/components/widgets/location-picker/LocationAddressFields')
-  return {
-    default: ({ value, onChange, showAddressFields, disabled, defaultCountry }: {
-      value: unknown
-      onChange: (v: unknown) => void
-      showAddressFields?: boolean
-      disabled?: boolean
-      defaultCountry?: string
-    }) => (
-      <>
-        <button
-          type="button"
-          onClick={() => onChange({ ...(value as object ?? {}), coordinates: [73.8567, 18.5204] })}
-        >
-          Set test coordinates
-        </button>
-        {showAddressFields && (
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          <LocationAddressFields value={value as any} onChange={onChange as any} disabled={disabled} defaultCountry={defaultCountry} />
-        )}
-      </>
-    ),
-  }
-})
+// LocationAddressFields is rendered for real by BookCampForm itself, as a
+// sibling of this mock, not by LocationPicker.
+vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
+  default: ({ value, onChange }: { value: unknown; onChange: (v: unknown) => void }) => (
+    <button
+      type="button"
+      onClick={() => onChange({ ...(value as object ?? {}), coordinates: [73.8567, 18.5204] })}
+    >
+      Set test coordinates
+    </button>
+  ),
+}))
 
 vi.mock('@/features/pharma/pharmaProjects.service', () => ({
   pharmaProjectsService: {

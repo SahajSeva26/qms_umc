@@ -27,7 +27,7 @@ const get = async (req: any, res: any) => {
             return ResponseHandler.appResponse(res, StatusCodes.NOT_FOUND, false, 'File not found', null);
         }
 
-        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'File fetched successfully', await FileMapper.toResponse(file));
+        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'File fetched successfully', FileMapper.toResponse(file));
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }
@@ -49,7 +49,7 @@ const search = async (req: any, res: any) => {
 
         const result = await FileService.search(filters, ctx, { pagination });
 
-        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Files fetched successfully', await FileMapper.toSearchResponse(result));
+        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Files fetched successfully', FileMapper.toSearchResponse(result));
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }
@@ -69,7 +69,7 @@ const create = async (req: any, res: any) => {
 
         const file = await FileService.create(data, ctx, req.files);
 
-        return ResponseHandler.appResponse(res, StatusCodes.CREATED, true, 'File created successfully', await FileMapper.toResponse(file));
+        return ResponseHandler.appResponse(res, StatusCodes.CREATED, true, 'File created successfully', FileMapper.toResponse(file));
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }
@@ -93,7 +93,7 @@ const update = async (req: any, res: any) => {
 
         const file = await FileService.update(id, data, ctx);
 
-        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'File updated successfully', await FileMapper.toResponse(file));
+        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'File updated successfully', FileMapper.toResponse(file));
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }
@@ -117,7 +117,7 @@ const changeStatus = async (req: any, res: any) => {
 
         const file = await FileService.changeStatus(id, data, ctx);
 
-        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'File status updated successfully', await FileMapper.toResponse(file));
+        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'File status updated successfully', FileMapper.toResponse(file));
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }

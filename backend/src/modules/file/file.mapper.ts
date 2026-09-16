@@ -1,23 +1,6 @@
 // File Mapper
-import { storageManager } from '../../shared/providers/storage/storage';
-import { S3 } from '../../shared/providers/storage/aws/s3.provider';
-
-// Generate a short-lived, read-only presigned URL for the stored object. Failures are swallowed to
-// null so one unreachable object never breaks a whole listing — the error is already logged by the
-// provider.
-const presign = async (content: any): Promise<string | null> => {
-    if (!content?.identifier) {
-        return null;
-    }
-    try {
-        return await storageManager.get(content.provider || S3).getPresignedUrl(content.identifier);
-    } catch {
-        return null;
-    }
-};
-
 export const FileMapper = {
-    toResponse: async (file: any) => ({
+    toResponse: (file: any) => ({
         id: file._id?.toString(),
 
         // owning tenant (populated { name, code } when requested, else the raw id)
@@ -51,21 +34,22 @@ export const FileMapper = {
               }
             : null,
 
-        // short-lived presigned URL to fetch the object directly from storage
-        url: await presign(file.content),
+        // short-lived presigned URL — attached by the service (FileService withUrl)
+        url: file.url ?? null,
 
         tags: file.tags || [],
 
         createdAt: file.createdAt,
         updatedAt: file.updatedAt,
     }),
-    toSearchResponse: async (data: { count: number; items: any[] }) => {
-        const items = await Promise.all(
-            (data?.items || []).map((file) => FileMapper.toResponse(file)),
-        );
-        return {
+    toSearchResponse: (data: { count: number; items: any[] }) => {
+        const result = {
             count: data?.count || 0,
-            items,
+            items: [] as any[],
         };
+        for (const file of data?.items || []) {
+            result.items.push(FileMapper.toResponse(file));
+        }
+        return result;
     },
 };

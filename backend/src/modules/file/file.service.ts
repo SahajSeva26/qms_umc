@@ -107,6 +107,30 @@ const buildContent = async (file: any, tenant: string, entity: { type: string; r
     }
 };
 
+// Generate a short-lived, read-only presigned URL for a file's stored object. Failures are
+// swallowed to null (already logged by the provider) so one unreachable object never breaks a
+// listing. This lives in the service — not the mapper — so the mapper stays a pure sync transform.
+const presignUrl = async (content: any): Promise<string | null> => {
+    if (!content?.identifier) {
+        return null;
+    }
+    try {
+        return await storageManager.get(content.provider || S3).getPresignedUrl(content.identifier);
+    } catch (error: any) {
+        logger.error({ err: error }, 'Failed to presign file URL');
+        return null;
+    }
+};
+
+// Attach the presigned url onto the doc as a plain (non-schema) field the mapper reads.
+const withUrl = async (file: FileDocument): Promise<FileDocument> => {
+    if (!file) {
+        return file;
+    }
+    (file as any).url = await presignUrl(file.content);
+    return file;
+};
+
 // ========================================================================================
 // CORE FUNCTIONS
 // ========================================================================================
@@ -135,7 +159,7 @@ const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): 
         query = query.populate(populate);
     }
 
-    return await query;
+    return await withUrl(await query);
 };
 
 const search = async (filters: ISearchFileQuery, ctx: RequestContext, options?: IServiceOptions) => {
@@ -189,6 +213,7 @@ const search = async (filters: ISearchFileQuery, ctx: RequestContext, options?: 
 
     const [count, items] = await Promise.all([countPromise, dataPromise]);
 
+    // no presigned urls on listings — url is attached only on get/create/update
     return { count, items };
 };
 
@@ -232,7 +257,7 @@ const create = async (model: ICreateFilePayload, ctx: RequestContext, files?: an
     let fileDoc = set(model, doc);
     fileDoc = await fileDoc.save();
 
-    return fileDoc;
+    return (await withUrl(fileDoc)) as HydratedDocument<IFile>;
 };
 
 const update = async (id: string, model: IUpdateFilePayload, ctx: RequestContext) => {

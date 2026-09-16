@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import LocationPicker from './LocationPicker'
+import LocationAddressFields from './LocationAddressFields'
 import ENV from '@/config/env'
 import type { LocationValue } from '@/types/location.types'
 
@@ -38,10 +40,18 @@ vi.mock('./LocationSearchBox', () => ({
 }))
 
 vi.mock('./MapCanvas', () => ({
-  default: ({ onResolutionStateChange }: { onResolutionStateChange?: (s: 'idle' | 'loading' | 'error') => void }) => (
-    <button type="button" onClick={() => onResolutionStateChange?.('error')}>
-      Simulate map reverse-geocode error
-    </button>
+  default: ({ onResolutionStateChange, onLocationHintChange }: {
+    onResolutionStateChange?: (s: 'idle' | 'loading' | 'error') => void
+    onLocationHintChange?: (hint: string | null) => void
+  }) => (
+    <>
+      <button type="button" onClick={() => onResolutionStateChange?.('error')}>
+        Simulate map reverse-geocode error
+      </button>
+      <button type="button" onClick={() => onLocationHintChange?.('Dehene, Maharashtra, India')}>
+        Simulate map reverse-geocode hint
+      </button>
+    </>
   ),
 }))
 
@@ -259,5 +269,47 @@ describe('LocationPicker — combined resolution state (map + search)', () => {
 
     await user.click(screen.getByRole('button', { name: /search-select a location/i }))
     expect(onResolutionStateChange).toHaveBeenLastCalledWith('idle')
+  })
+})
+
+describe('LocationPicker — onLocationHintChange wired into a below-map LocationAddressFields (real call-site shape)', () => {
+  const originalApiKey = ENV.Maps.ApiKey
+  const originalMapId = ENV.Maps.MapId
+
+  beforeEach(() => {
+    ;(ENV.Maps as { ApiKey: string }).ApiKey = 'test-api-key'
+    ;(ENV.Maps as { MapId: string }).MapId = 'test-map-id'
+    setMockLoadingStatus('LOADED')
+  })
+
+  afterEach(() => {
+    ;(ENV.Maps as { ApiKey: string }).ApiKey = originalApiKey
+    ;(ENV.Maps as { MapId: string }).MapId = originalMapId
+    setMockLoadingStatus(null)
+  })
+
+  // Mirrors the real pattern every call site uses (CampFormFields.tsx,
+  // CreateTenantDialog.tsx, etc.): the caller — not LocationPicker — owns the
+  // hint state and threads it into its own sibling LocationAddressFields.
+  function LocationWithAddressFields({ value }: { value: LocationValue | null }) {
+    const [locationHint, setLocationHint] = useState<string | null>(null)
+    return (
+      <div>
+        <LocationPicker value={value} onChange={vi.fn()} onLocationHintChange={setLocationHint} />
+        <LocationAddressFields value={value} onChange={vi.fn()} locationHint={locationHint} />
+      </div>
+    )
+  }
+
+  it('shows the map\'s hint text in the below-map address form once the map reports one, alongside the missing-fields warning', async () => {
+    const user = userEvent.setup()
+    render(<LocationWithAddressFields value={{ addressLine1: '', city: '', state: '', pincode: '', coordinates: [72.8, 19.07] }} />)
+
+    expect(screen.queryByText(/dehene, maharashtra, india/i)).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /simulate map reverse-geocode hint/i }))
+
+    expect(await screen.findByText(/map location/i)).toBeInTheDocument()
+    expect(screen.getByText('Dehene, Maharashtra, India')).toBeInTheDocument()
   })
 })

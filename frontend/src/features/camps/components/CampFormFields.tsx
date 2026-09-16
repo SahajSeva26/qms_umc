@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { CampDraft } from '@/features/camps/hooks/useCampDraft'
 import CampFoPicker from '@/features/camps/components/CampFoPicker'
 import CampMrPicker from '@/features/camps/components/CampMrPicker'
@@ -68,6 +69,7 @@ const CampFormFields = ({
 }: CampFormFieldsProps) => {
   const { doctor, type, billingType, patientExpectation, date, timeSlot, location, fo, mr, devices, notes } = draft
   const deviceIds = devices ? devices.split(',').map((d) => d.trim()).filter(Boolean) : []
+  const [locationHint, setLocationHint] = useState<string | null>(null)
 
   return (
     <div className="space-y-4">
@@ -149,11 +151,12 @@ const CampFormFields = ({
           value={location}
           onChange={(v: LocationValue) => setField('location', v)}
           onResolutionStateChange={onLocationResolutionChange}
+          onLocationHintChange={setLocationHint}
           disabled={isLocked}
           defaultCountry="India"
           countryCode="IN"
         />
-        <LocationAddressFields value={location} onChange={(v: LocationValue) => setField('location', v)} disabled={isLocked} defaultCountry="India" />
+        <LocationAddressFields value={location} onChange={(v: LocationValue) => setField('location', v)} disabled={isLocked} defaultCountry="India" locationHint={locationHint} />
       </div>
       <p className="text-[11px] -mt-2" style={{ color: 'var(--qms-text-muted)' }}>
         Used to auto-allocate the nearest available field officer if none is picked below.

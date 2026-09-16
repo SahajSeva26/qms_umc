@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { toLatLngLiteral, toCoordinatesTuple, fromPlacesAddressComponents, fromGeocoderAddressComponents } from './location.utils'
+import { toLatLngLiteral, toCoordinatesTuple, fromPlacesAddressComponents, fromGeocoderAddressComponents, fromGeocoderAddressComponentsWithFallback } from './location.utils'
 
 describe('coordinate conversion', () => {
   it('toLatLngLiteral converts [lng, lat] to {lat, lng} — order genuinely swapped, not just relabeled', () => {
@@ -121,5 +121,80 @@ describe('fromGeocoderAddressComponents', () => {
   it('falls back to defaultCountry when Google supplies no country component', () => {
     const result = fromGeocoderAddressComponents([component('Mumbai', ['locality'])], undefined, 'India')
     expect(result.country).toBe('India')
+  })
+})
+
+describe('fromGeocoderAddressComponentsWithFallback', () => {
+  const component = (long_name: string, types: string[]) => ({ long_name, short_name: long_name, types })
+
+  it('uses the primary (first) result for every field when it already has everything, ignoring later results entirely', () => {
+    const result = fromGeocoderAddressComponentsWithFallback(
+      [
+        {
+          address_components: [
+            component('221', ['street_number']),
+            component('Baker Street', ['route']),
+            component('Mumbai', ['locality']),
+            component('Maharashtra', ['administrative_area_level_1']),
+            component('400001', ['postal_code']),
+          ],
+          formatted_address: '221 Baker Street, Mumbai, Maharashtra 400001',
+        },
+        // A later result with a DIFFERENT pincode — must never override the primary's own real value.
+        { address_components: [component('400099', ['postal_code'])] },
+      ],
+      'place-id',
+    )
+
+    expect(result.address.pincode).toBe('400001')
+    expect(result.address.addressLine1).toBe('221 Baker Street')
+    expect(result.locationHint).toBe('221 Baker Street, Mumbai, Maharashtra 400001')
+  })
+
+  it('fills pincode from a later result when the first result genuinely has none — the rural-gap fallback', () => {
+    const result = fromGeocoderAddressComponentsWithFallback(
+      [
+        // First result: only a locality/state, no street or postal code at all — a plausible rural pin drop.
+        { address_components: [component('Dehene', ['locality']), component('Maharashtra', ['administrative_area_level_1'])], formatted_address: 'Dehene, Maharashtra, India' },
+        // A later result Google also returned for this same point, carrying a real postal_code.
+        { address_components: [component('421302', ['postal_code'])] },
+      ],
+      'place-id',
+    )
+
+    expect(result.address.pincode).toBe('421302')
+    // Never derived/guessed — addressLine1 stays blank since no result had a street_number/route.
+    expect(result.address.addressLine1).toBe('')
+    expect(result.address.city).toBe('Dehene')
+  })
+
+  it('leaves pincode blank (never invents one from city/state) when NO result anywhere has a postal_code component', () => {
+    const result = fromGeocoderAddressComponentsWithFallback(
+      [
+        { address_components: [component('Dehene', ['locality']), component('Maharashtra', ['administrative_area_level_1'])] },
+      ],
+      'place-id',
+    )
+
+    expect(result.address.pincode).toBe('')
+  })
+
+  it('locationHint falls back to a Plus Code when formatted_address is unavailable', () => {
+    const result = fromGeocoderAddressComponentsWithFallback(
+      [{ address_components: [], plus_code: { compound_code: '7JVW+8Q Dehene, Maharashtra', global_code: '7JVW7JVW+8Q' } }],
+      null,
+    )
+    expect(result.locationHint).toBe('7JVW+8Q Dehene, Maharashtra')
+  })
+
+  it('locationHint is null when Google supplies neither a formatted address nor a Plus Code', () => {
+    const result = fromGeocoderAddressComponentsWithFallback([{ address_components: [] }], null)
+    expect(result.locationHint).toBeNull()
+  })
+
+  it('locationHint is null for an empty results array (no primary result at all)', () => {
+    const result = fromGeocoderAddressComponentsWithFallback([], null)
+    expect(result.locationHint).toBeNull()
+    expect(result.address.city).toBe('')
   })
 })

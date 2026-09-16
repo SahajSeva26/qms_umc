@@ -10,11 +10,13 @@ interface LocationAddressFieldsProps {
   onChange: (value: LocationValue) => void
   disabled?: boolean
   defaultCountry?: string
+  // Google's best-effort description of the point — shown as a read-only hint, never written to a field.
+  locationHint?: string | null
 }
 
 // Covers what LocationPicker can't complete on its own — an incomplete Google
 // result, or "Use this pin," can leave required fields blank.
-const LocationAddressFields = ({ value, onChange, disabled, defaultCountry }: LocationAddressFieldsProps) => {
+const LocationAddressFields = ({ value, onChange, disabled, defaultCountry, locationHint }: LocationAddressFieldsProps) => {
   const idPrefix = useId()
   const current = value ?? createEmptyLocationValue(defaultCountry)
 
@@ -27,9 +29,17 @@ const LocationAddressFields = ({ value, onChange, disabled, defaultCountry }: Lo
   return (
     <div className="space-y-3">
       {missingRequired.length > 0 && (
-        <p className="text-[12px] rounded-lg px-3 py-2 border border-warning bg-warning-soft text-warning">
-          Complete the address below ({missingRequired.map((f) => f.label).join(', ')} missing).
-        </p>
+        <>
+          <p className="text-[12px] rounded-lg px-3 py-2 border border-warning bg-warning-soft text-warning">
+            Complete the address below ({missingRequired.map((f) => f.label).join(', ')} missing).
+          </p>
+          {locationHint && (
+            <p className="text-[12px] rounded-lg px-3 py-2 border" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-strong)', color: 'var(--qms-text-muted)' }}>
+              <span className="font-semibold uppercase tracking-wide text-[10px] block mb-0.5" style={{ color: 'var(--qms-text-soft)' }}>Map location</span>
+              {locationHint}
+            </p>
+          )}
+        </>
       )}
 
       <div>

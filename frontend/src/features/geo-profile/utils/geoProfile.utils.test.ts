@@ -23,4 +23,8 @@ describe('isFieldOfficerRole', () => {
   it('false (not a crash) for an unpopulated role.type (raw id string)', () => {
     expect(isFieldOfficerRole(roleFixture({ type: 'role-type-id-string' }))).toBe(false)
   })
+
+  it('false (not a crash) for a dangling role.type reference (populates to null)', () => {
+    expect(isFieldOfficerRole(roleFixture({ type: null }))).toBe(false)
+  })
 })

@@ -26,6 +26,8 @@ interface MapCanvasProps {
   /** Bump this counter to cancel any in-flight/stale reverse-geocode — a location
    *  committed some other way (e.g. search) must win over a late response. */
   resetToken?: number
+  /** Reports the current hint (Google's description of the point), including clears back to null on a new lookup or reset. */
+  onLocationHintChange?: (hint: string | null) => void
 }
 
 
@@ -49,10 +51,10 @@ function CameraFocus({ coordinates }: { coordinates: [number, number] | undefine
   return null
 }
 
-const MapCanvas = ({ value, onChange, disabled, height, defaultCenter, defaultCountry, onResolutionStateChange, resetToken }: MapCanvasProps) => {
+const MapCanvas = ({ value, onChange, disabled, height, defaultCenter, defaultCountry, onResolutionStateChange, resetToken, onLocationHintChange }: MapCanvasProps) => {
   const [mapType, setMapType] = useState<MapTypeView>('roadmap')
 
-  const { status: geocodeStatus, provisionalPosition, runGeocode, retry, useProvisionalPinWithoutAddress, reset } =
+  const { status: geocodeStatus, provisionalPosition, locationHint, runGeocode, retry, useProvisionalPinWithoutAddress, reset } =
     useReverseGeocode({ defaultCountry, onResolved: onChange })
 
   // Reports 'loading'/'error' immediately, not just on the next onChange —
@@ -61,6 +63,11 @@ const MapCanvas = ({ value, onChange, disabled, height, defaultCenter, defaultCo
     onResolutionStateChange?.(geocodeStatus)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- onResolutionStateChange intentionally excluded: an inline arrow from the caller would otherwise re-fire this on every parent render, not just on a real status change
   }, [geocodeStatus])
+
+  useEffect(() => {
+    onLocationHintChange?.(locationHint)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- onLocationHintChange intentionally excluded, same rationale as onResolutionStateChange above
+  }, [locationHint])
 
   const isFirstResetRender = useRef(true)
   useEffect(() => {

@@ -3,6 +3,14 @@ import { CAMP_STATUS_COLOR, CAMP_STATUS_LABEL } from '@/features/camps/component
 
 const TILE_STATUSES: CampStatus[] = ['requested', 'confirmed', 'live', 'closed', 'cancelled', 'cancelled_charged']
 
+// KPI-strip-only display names — the underlying CampStatus values/transitions
+// are unchanged; CAMP_STATUS_LABEL elsewhere (e.g. status pills) still says
+// "Confirmed"/"Closed".
+const TILE_LABEL_OVERRIDE: Partial<Record<CampStatus, string>> = {
+  confirmed: 'Upcoming',
+  closed: 'Completed',
+}
+
 interface CampsKpiStripRealProps {
   counts: Record<CampStatus, number>
   total: number
@@ -42,7 +50,7 @@ const CampsKpiStripReal = ({ counts, total, activeStatus, onSelectStatus }: Camp
             }}
           >
             <div className="text-[10px] font-bold uppercase tracking-wide truncate" style={{ color: 'var(--qms-text-muted)' }}>
-              {CAMP_STATUS_LABEL[status]}
+              {TILE_LABEL_OVERRIDE[status] ?? CAMP_STATUS_LABEL[status]}
             </div>
             <div className="text-xl font-extrabold mt-0.5" style={{ color }}>{counts[status] ?? 0}</div>
           </button>

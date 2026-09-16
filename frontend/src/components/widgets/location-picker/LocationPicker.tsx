@@ -101,7 +101,7 @@ function ManualCoordinateFallback({ height, value, onChange, disabled, defaultCo
   )
 }
 
-function LocationPickerInner({ value, onChange, disabled, height = DEFAULT_HEIGHT, defaultCenter, defaultCountry, countryCode, onResolutionStateChange, onManualCoordinateEntry }: LocationPickerProps) {
+function LocationPickerInner({ value, onChange, disabled, height = DEFAULT_HEIGHT, defaultCenter, defaultCountry, countryCode, onResolutionStateChange, onManualCoordinateEntry, onLocationHintChange }: LocationPickerProps) {
   const loadingStatus = useApiLoadingStatus()
   // A search selection is a real network round trip too — while it's in flight,
   // `value` isn't final yet, same hazard as the map's own reverse-geocode 'loading'.
@@ -133,6 +133,8 @@ function LocationPickerInner({ value, onChange, disabled, height = DEFAULT_HEIGH
     // the stale 'error' state that would otherwise keep blocking Save.
     setMapResolution('idle')
     setMapResetToken((t) => t + 1)
+    // The map's own hint (from a now-superseded pin drop) no longer applies.
+    onLocationHintChange?.(null)
     onChange(selected)
   }
 
@@ -153,6 +155,7 @@ function LocationPickerInner({ value, onChange, disabled, height = DEFAULT_HEIGH
         defaultCenter={defaultCenter ?? DEFAULT_CENTER}
         defaultCountry={defaultCountry}
         onResolutionStateChange={setMapResolution}
+        onLocationHintChange={onLocationHintChange}
         resetToken={mapResetToken}
       />
     </div>

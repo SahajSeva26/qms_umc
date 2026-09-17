@@ -24,10 +24,8 @@ const toOptionalStringArray = (v: unknown) => {
 // flat fields (easier over multipart), folded back into a nested `entity` so the service sees model.entity.*.
 export const CreateFilePayloadSchema = z
     .object({
-        // required for platform staff, ignored for customers (service pins it to their own tenant)
-        tenant: z
-            .preprocess(emptyToUndefined, objectId('Tenant').optional())
-            .openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
+        // required; used for platform staff, ignored for customers (service pins it to their own tenant)
+        tenant: objectId('Tenant').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
         // optional — upload-first: the record is attached later via update (type + relation stay required)
         entityId: z
             .preprocess(emptyToUndefined, z.string().min(1).optional())

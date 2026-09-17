@@ -65,7 +65,7 @@ const fileSchema = new mongoose.Schema(
         tenant: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Tenant',
-            // required: true,
+            required: true,
         },
         type: {
             type: String,

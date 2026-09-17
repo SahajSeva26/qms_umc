@@ -26,13 +26,11 @@ const populate: any[] = [
 // HELPERS
 // ========================================================================================
 
-// Platform staff pass the tenant; a customer is pinned to their own (their payload tenant is ignored).
+// A customer is pinned to their own tenant; a platform actor's (required, validator-enforced) tenant
+// is existence-checked here.
 const resolveTenant = async (model: ICreateFilePayload, ctx: RequestContext): Promise<string> => {
     if (ctx.tenant?.type === TENANT_TYPE.CUSTOMER) {
         return (ctx.tenant?._id || ctx.tenant?.id)?.toString();
-    }
-    if (!model.tenant) {
-        return throwAppError('Tenant is required', StatusCodes.BAD_REQUEST);
     }
     const tenant = await TenantService.get(model.tenant, ctx);
     if (!tenant) {
@@ -66,12 +64,14 @@ const assertWithinRelationCap = async (entity: any, tenant: any, incoming: numbe
         return;
     }
     const filter: any = {
-        tenant,
         'entity.id': entity.id,
         'entity.type': entity.type,
         'entity.relation': entity.relation,
         status: { $ne: FILE_STATUS.DISCARDED },
     };
+    if (tenant) {
+        filter.tenant = tenant;
+    }
     const existing = await FileModel.countDocuments(filter);
     if (existing + incoming > cap) {
         return throwAppError(
@@ -155,13 +155,22 @@ const withUrl = async (file: FileDocument): Promise<FileDocument> => {
 // CORE FUNCTIONS
 // ========================================================================================
 
-// Only presentational metadata is mutable here (displayName, tags); everything else is seeded elsewhere.
+// Applies the optional, client-settable fields (used by both create and update). tenant is the
+// resolved value folded back onto the model by create; entityId arrives nested at create
+// (model.entity.id) and flat at update-attach (model.entityId).
 const set = (model: any, entity: HydratedDocument<IFile>) => {
-    if (model.displayName && entity.content) {
-        entity.content.displayName = model.displayName;
+    if (model.tenant) {
+        entity.tenant = model.tenant;
+    }
+    const entityId = model.entity?.id ?? model.entityId;
+    if (entityId && entity.entity) {
+        entity.entity.id = entityId;
     }
     if (model.tags) {
         entity.tags = model.tags;
+    }
+    if (model.displayName && entity.content) {
+        entity.content.displayName = model.displayName;
     }
     return entity;
 };
@@ -242,8 +251,10 @@ const create = async (model: ICreateFilePayload, ctx: RequestContext, files?: an
         return throwAppError('A file upload is required', StatusCodes.BAD_REQUEST);
     }
 
-    //1: resolve the owning tenant (explicit + existence-checked for platform, own-tenant for customer)
+    //1: resolve the owning tenant (existence-checked for platform, own-tenant for customer), then
+    // fold the resolved value back onto the model so set() assigns it
     const tenant = await resolveTenant(model, ctx);
+    model.tenant = tenant;
 
     //2: coherence — the relation must be valid for the entity type
     assertRelationCoherent(model.entity.type, model.entity.relation);
@@ -260,13 +271,11 @@ const create = async (model: ICreateFilePayload, ctx: RequestContext, files?: an
         const type = resolveFileType(file.mimetype);
         const content = await buildContent(file, model.entity);
 
-        // tenant/owner/entity/type/content seeded here; status defaults to DRAFT; only tags flow through set()
+        // owner/type/entity.type+relation/content seeded here; status defaults to DRAFT; tenant, entity.id and tags flow through set()
         const doc = new FileModel({
-            tenant,
             owner,
             type,
             entity: {
-                id: model.entity.id,
                 type: model.entity.type,
                 relation: model.entity.relation,
             },
@@ -301,10 +310,9 @@ const update = async (id: string, model: IUpdateFilePayload, ctx: RequestContext
             file.tenant?.toString(),
             1,
         );
-        file.entity.id = model.entityId;
     }
 
-    //3: apply editable fields
+    //3: apply editable fields (entity.id assignment handled in set)
     file = set(model, file);
     file = await file.save();
 

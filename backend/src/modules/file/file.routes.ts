@@ -85,7 +85,7 @@ registry.registerPath({
                             // content and type are NOT accepted — both are derived from the uploaded file in the service.
                             tags: { type: 'array', items: { type: 'string' }, example: ['branding'] },
                         },
-                        required: ['files', 'entityType', 'entityRelation'],
+                        required: ['files', 'tenant', 'entityType', 'entityRelation'],
                     },
                 },
             },

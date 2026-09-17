@@ -1,5 +1,6 @@
 import type { InvoiceEntity } from '@/types/invoice.types'
 import { formatDate, formatINRFull } from '@/utils/formatters'
+import CopyButton from '@/components/ui/CopyButton'
 import InvoiceStatusPill from '@/features/billing/components/InvoiceStatusPill'
 
 // No camp-count column — the invoice API returns no line count, and
@@ -36,7 +37,12 @@ const InvoiceTable = ({ invoices, onOpenDetail }: InvoiceTableProps) => (
             className="cursor-pointer transition-colors hover:bg-(--qms-surface-hover)"
             style={{ borderBottom: '1px solid var(--qms-border)' }}
           >
-            <td className="px-3 py-2.5 align-top font-semibold" style={{ color: 'var(--qms-text)' }}>{invoice.code}</td>
+            <td className="px-3 py-2.5 align-top font-semibold" style={{ color: 'var(--qms-text)' }}>
+              <div className="flex items-center gap-1.5">
+                {invoice.code}
+                <CopyButton value={invoice.code} label="Code" />
+              </div>
+            </td>
             <td className="px-3 py-2.5 align-top" style={{ color: 'var(--qms-text-muted)' }}>{projectLabel(invoice)}</td>
             <td className="px-3 py-2.5 align-top whitespace-nowrap"><InvoiceStatusPill status={invoice.status} /></td>
             <td className="px-3 py-2.5 align-top whitespace-nowrap" style={{ color: 'var(--qms-text-muted)' }}>

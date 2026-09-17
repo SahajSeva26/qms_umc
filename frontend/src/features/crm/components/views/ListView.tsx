@@ -6,6 +6,7 @@ import { downloadLeadsCsv } from '@/features/crm/crm.export'
 import { formatINR } from '@/utils/formatters'
 import { roleLabel, divisionLabel, tenantLabel } from '@/features/crm/crm.utils'
 import { Button } from '@/components/ui/button'
+import CopyButton from '@/components/ui/CopyButton'
 import StagePill from '@/features/crm/components/StagePill'
 import LeadAdvanceModal from '@/features/crm/components/LeadAdvanceModal'
 
@@ -64,7 +65,12 @@ const ListView = ({ leads, onOpen, onMoveStage, canManage }: ListViewProps) => {
                 className="cursor-pointer transition-colors hover:bg-(--qms-surface-hover)"
                 style={{ borderBottom: '1px solid var(--qms-border)' }}
               >
-                <td className="px-3 py-2 font-bold whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>{lead.code}</td>
+                <td className="px-3 py-2 font-bold whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>
+                  <div className="flex items-center gap-1.5">
+                    {lead.code}
+                    <CopyButton value={lead.code} label="Code" />
+                  </div>
+                </td>
                 <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>{lead.title}</td>
                 <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>{tenantLabel(lead.tenant)}</td>
                 <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>{divisionLabel(lead.division)}</td>

@@ -1,4 +1,5 @@
 import CampStatusPillReal from '@/features/camps/components/CampStatusPillReal'
+import CopyButton from '@/components/ui/CopyButton'
 import type { CampEntity, CampPopulatedDoctor, CampPopulatedRole } from '@/types/campReal.types'
 import { CAMP_TIME_SLOT_LABEL } from '@/types/campTimeSlot.constants'
 
@@ -33,7 +34,12 @@ const PharmaCampTable = ({ camps }: PharmaCampTableProps) => (
         <tbody>
           {camps.map((camp) => (
             <tr key={camp.id} style={{ borderBottom: '1px solid var(--qms-border)' }}>
-              <td className="px-4 py-2.5 font-mono" style={{ color: 'var(--qms-text)' }}>{camp.code}</td>
+              <td className="px-4 py-2.5 font-mono" style={{ color: 'var(--qms-text)' }}>
+                <div className="flex items-center gap-1.5">
+                  {camp.code}
+                  <CopyButton value={camp.code} label="Code" />
+                </div>
+              </td>
               <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>{doctorName(camp.doctor)}</td>
               <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>{new Date(camp.date).toLocaleDateString()}</td>
               <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>

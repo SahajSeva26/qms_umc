@@ -16,8 +16,7 @@ import { logger } from '../../shared/utils/logger';
 
 type FileDocument = HydratedDocument<IFile> | null;
 
-// File is tenant-scoped — every read starts from ctx.where() so a customer can only ever see
-// its own tenant's files, and a forged id from another tenant 404s instead of leaking.
+// Tenant-scoped: every read starts from ctx.where() so a customer can't read another tenant's files.
 const populate: any[] = [
     { path: 'tenant', select: 'name code' },
     { path: 'owner', select: 'name code' },
@@ -27,9 +26,7 @@ const populate: any[] = [
 // HELPERS
 // ========================================================================================
 
-// Files are registered by internal (platform) roles on behalf of a tenant, so the tenant comes
-// from the payload. A customer user can only ever create within their own tenant, so we ignore
-// whatever they send and pin it to their context tenant.
+// Platform staff pass the tenant; a customer is pinned to their own (their payload tenant is ignored).
 const resolveTenant = async (model: ICreateFilePayload, ctx: RequestContext): Promise<string> => {
     if (ctx.tenant?.type === TENANT_TYPE.CUSTOMER) {
         return (ctx.tenant?._id || ctx.tenant?.id)?.toString();
@@ -44,8 +41,7 @@ const resolveTenant = async (model: ICreateFilePayload, ctx: RequestContext): Pr
     return (tenant._id || tenant.id)?.toString();
 };
 
-// The relation must be one the entity type actually declares (e.g. a `user` file can only be a
-// `profile_picture`, a `tenant` file a `logo`). Guards against attaching a logo to a user record.
+// The relation must be one the entity type declares (e.g. user→profile_picture, tenant→logo).
 const assertRelationCoherent = (type: string, relation: string) => {
     const group = (ENTITY_RELATION as any)[type];
     const allowed: string[] = group ? Object.values(group).map((r: any) => r.name) : [];
@@ -54,29 +50,32 @@ const assertRelationCoherent = (type: string, relation: string) => {
     }
 };
 
-// Enforce the relation's cap: the incoming files plus the entity's existing (non-discarded) files
-// for this relation must not exceed the cap. undefined cap = unlimited.
-const assertWithinRelationCap = async (model: ICreateFilePayload, tenant: string, incoming: number) => {
-    const cap = getRelationCap(model.entity.type, model.entity.relation);
+// Cap = max files an entity may hold for a relation; the existing-count only applies once an id is attached.
+const assertWithinRelationCap = async (entity: any, tenant: any, incoming: number) => {
+    const cap = getRelationCap(entity.type, entity.relation);
     if (cap === undefined) {
         return;
     }
     if (incoming > cap) {
         return throwAppError(
-            `The "${model.entity.relation}" relation accepts at most ${cap} file(s)`,
+            `The "${entity.relation}" relation accepts at most ${cap} file(s)`,
             StatusCodes.BAD_REQUEST,
         );
     }
-    const existing = await FileModel.countDocuments({
+    if (!entity.id) {
+        return;
+    }
+    const filter: any = {
         tenant,
-        'entity.id': model.entity.id,
-        'entity.type': model.entity.type,
-        'entity.relation': model.entity.relation,
+        'entity.id': entity.id,
+        'entity.type': entity.type,
+        'entity.relation': entity.relation,
         status: { $ne: FILE_STATUS.DISCARDED },
-    });
+    };
+    const existing = await FileModel.countDocuments(filter);
     if (existing + incoming > cap) {
         return throwAppError(
-            `The "${model.entity.relation}" relation already holds ${existing} of ${cap} file(s)`,
+            `The "${entity.relation}" relation already holds ${existing} of ${cap} file(s)`,
             StatusCodes.CONFLICT,
         );
     }
@@ -91,25 +90,20 @@ const resolveOwner = (ctx: RequestContext): string => {
     return owner;
 };
 
-// The file type is decided by the actual upload, not the client — image/* is an image, everything
-// else is a document.
+// File type is derived from the upload, not the client — image/* is an image, else a document.
 const resolveFileType = (mimeType: string): string => {
     return mimeType?.startsWith('image/') ? FILE_TYPE.IMAGE : FILE_TYPE.DOCUMENT;
 };
 
-// The content block is derived entirely from the uploaded file + the storage upload result — it is
-// never accepted from the client. The file is pushed to storage here and the returned coordinates
-// (path/identifier) are captured; file-intrinsic fields come straight off the multer file.
-const buildContent = async (file: any, tenant: string, entity: { type: string; relation: string }) => {
+// Content is derived from the upload + storage result (pushed to storage here), never from the client.
+const buildContent = async (file: any, entity: { type: string; relation: string }) => {
     try {
         const originalName: string = file.originalname;
         const extension = originalName.includes('.') ? originalName.split('.').pop()!.toLowerCase() : '';
 
-        // storage object key — derived from the owning tenant + entity, with a UUID filename (not
-        // the original name) to avoid collisions and unsafe chars; the original name is still kept
-        // in content.originalName / displayName
+        // Generic key, decoupled from business hierarchy: /{entityType}/{entityRelation}/{uuid}.{ext}.
         const uuid = generateUUID();
-        const key = ['tenants', tenant, entity.type, entity.relation, extension ? `${uuid}.${extension}` : uuid].join('/');
+        const key = ['', entity.type, entity.relation, extension ? `${uuid}.${extension}` : uuid].join('/');
 
         const provider = storageManager.get(S3); // explicitly the S3 provider
         const result: any = await provider.upload({
@@ -135,9 +129,7 @@ const buildContent = async (file: any, tenant: string, entity: { type: string; r
     }
 };
 
-// Generate a short-lived, read-only presigned URL for a file's stored object. Failures are
-// swallowed to null (already logged by the provider) so one unreachable object never breaks a
-// listing. This lives in the service — not the mapper — so the mapper stays a pure sync transform.
+// Short-lived read-only presigned URL; failures swallowed to null so one bad object won't break a listing.
 const presignUrl = async (content: any): Promise<string | null> => {
     if (!content?.identifier) {
         return null;
@@ -163,8 +155,7 @@ const withUrl = async (file: FileDocument): Promise<FileDocument> => {
 // CORE FUNCTIONS
 // ========================================================================================
 
-// Only presentational metadata is mutable here — entity, content (except displayName), tenant,
-// owner and status are all seeded/moved elsewhere and intentionally ignored.
+// Only presentational metadata is mutable here (displayName, tags); everything else is seeded elsewhere.
 const set = (model: any, entity: HydratedDocument<IFile>) => {
     if (model.displayName && entity.content) {
         entity.content.displayName = model.displayName;
@@ -196,14 +187,12 @@ const search = async (filters: ISearchFileQuery, ctx: RequestContext, options?: 
     //1: default scoping — platform sees all, customer pinned to own tenant (ctx.where)
     const where: mongoose.QueryFilter<IFile> = { ...ctx.where() };
 
-    //2: platform staff may narrow to a specific tenant's files; the filter is ignored for
-    // customer users so they can never read another tenant's files.
+    //2: platform staff may narrow to a specific tenant; ignored for customers (own-tenant only)
     if (filters.tenant && ctx.tenant?.type === TENANT_TYPE.PLATFORM) {
         where.tenant = filters.tenant;
     }
 
-    //3: status visibility — discarded (soft-deleted) files are hidden unless a file:manage actor
-    // explicitly asks for them; everyone else's status filter is honoured as-is.
+    //3: discarded files are hidden unless a file:manage actor explicitly asks for them
     const canManage = ctx.hasAnyPermissions([FILE_PERMISSIONS.MANAGE.code]);
     if (filters.status && (filters.status !== FILE_STATUS.DISCARDED || canManage)) {
         where.status = filters.status;
@@ -245,8 +234,7 @@ const search = async (filters: ISearchFileQuery, ctx: RequestContext, options?: 
     return { count, items };
 };
 
-// Accepts one or many uploaded files and creates a File doc per upload — each with its own
-// storage content and derived type, all sharing the same tenant/owner/entity.
+// Creates one File doc per uploaded file, all sharing the same tenant/owner/entity.
 const create = async (model: ICreateFilePayload, ctx: RequestContext, files?: any[]): Promise<HydratedDocument<IFile>[]> => {
     //0: at least one upload is mandatory — content is derived from it
     ctx.logger.info({ files }, 'Files received in create');
@@ -260,8 +248,8 @@ const create = async (model: ICreateFilePayload, ctx: RequestContext, files?: an
     //2: coherence — the relation must be valid for the entity type
     assertRelationCoherent(model.entity.type, model.entity.relation);
 
-    //3: enforce the relation's cap against what already exists + what's incoming
-    await assertWithinRelationCap(model, tenant, files.length);
+    //3: enforce the relation cap (existing-count only applies once an id is attached — upload-first)
+    await assertWithinRelationCap(model.entity, tenant, files.length);
 
     //4: the acting role owns every file
     const owner = resolveOwner(ctx);
@@ -269,13 +257,10 @@ const create = async (model: ICreateFilePayload, ctx: RequestContext, files?: an
     //5: one File doc per uploaded file — type + content are derived per file
     const created: HydratedDocument<IFile>[] = [];
     for (const file of files) {
-        // type is derived from the uploaded file, never from the client
         const type = resolveFileType(file.mimetype);
-        // content is derived from the uploaded file (pushed to storage here), never from the client
-        const content = await buildContent(file, tenant, model.entity);
+        const content = await buildContent(file, model.entity);
 
-        // tenant, owner, entity ref, type and content are all seeded here; status defaults to
-        // DRAFT on the model; only tags flow through set()
+        // tenant/owner/entity/type/content seeded here; status defaults to DRAFT; only tags flow through set()
         const doc = new FileModel({
             tenant,
             owner,
@@ -303,15 +288,30 @@ const update = async (id: string, model: IUpdateFilePayload, ctx: RequestContext
         return throwAppError('File not found', StatusCodes.NOT_FOUND);
     }
 
-    //2: apply editable fields (entity/content-body/tenant/owner/status untouched here)
+    //2: attach the record later (upload-first) — a one-time link; cap enforced now a real entity is known
+    if (model.entityId) {
+        if (!file.entity) {
+            return throwAppError('File has no entity classification to attach to', StatusCodes.CONFLICT);
+        }
+        if (file.entity.id) {
+            return throwAppError('File is already attached to an entity', StatusCodes.CONFLICT);
+        }
+        await assertWithinRelationCap(
+            { id: model.entityId, type: file.entity.type, relation: file.entity.relation },
+            file.tenant?.toString(),
+            1,
+        );
+        file.entity.id = model.entityId;
+    }
+
+    //3: apply editable fields
     file = set(model, file);
     file = await file.save();
 
     return file;
 };
 
-// Status moves through the FILE_TRANSITION_MAP state machine, never a free write. Discarded is
-// terminal (empty transition list), so a discarded file can't be revived.
+// Status moves via the FILE_TRANSITION_MAP, never a free write; discarded is terminal.
 const changeStatus = async (id: string, model: IChangeFileStatusPayload, ctx: RequestContext) => {
     //1: get first (scoped)
     const file = await FileService.get(id, ctx);

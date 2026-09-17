@@ -66,10 +66,10 @@ registry.registerPath({
                                 description: 'Owning tenant id (platform staff only; ignored for customers)',
                                 example: '665f0c3a1a2b3c4d5e6f7a8a',
                             },
-                            // entity reference — three flat fields instead of a nested JSON blob.
+                            // entityId is optional (upload-first — attach later via PUT /files/{id}); type + relation are required
                             entityId: {
                                 type: 'string',
-                                description: 'Id of the record this file hangs off',
+                                description: 'Id of the record this file hangs off (optional — attach later via update)',
                                 example: '665f0c3a1a2b3c4d5e6f7a8a',
                             },
                             entityType: {
@@ -85,7 +85,7 @@ registry.registerPath({
                             // content and type are NOT accepted — both are derived from the uploaded file in the service.
                             tags: { type: 'array', items: { type: 'string' }, example: ['branding'] },
                         },
-                        required: ['files', 'entityId', 'entityType', 'entityRelation'],
+                        required: ['files', 'entityType', 'entityRelation'],
                     },
                 },
             },

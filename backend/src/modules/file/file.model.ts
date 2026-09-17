@@ -46,9 +46,10 @@ const contentSchema = new mongoose.Schema({
 const fileSchema = new mongoose.Schema(
     {
         entity: {
-            id: {       
+            // optional — upload-first: the specific record is linked later via update (type + relation are always known)
+            id: {
                 type: String,
-                required: true,
+                required: false,
             },
             type: { 
                 type: String,

@@ -33,9 +33,7 @@ export const ENTITY_TYPE = {
     TEST: 'test',
 } as const;
 
-// Each relation carries its `name` (the stored/validated string) and a `cap` = the max number of
-// active files an entity may hold for that relation (e.g. one logo, one profile picture). Omit
-// `cap` for an unlimited/gallery-style relation.
+// Each relation carries its `name` (the stored string) and a `cap` (max active files per entity; omit for unlimited).
 export const ENTITY_RELATION = {
     //user
     [ENTITY_TYPE.USER]: {

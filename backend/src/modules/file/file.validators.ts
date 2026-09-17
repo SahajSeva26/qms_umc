@@ -8,12 +8,10 @@ const objectId = (label: string) =>
         message: `${label} must be a valid id`,
     });
 
-// multipart form-data sends an untouched optional text field as an empty string rather than
-// omitting it — treat '' as "not provided" so `.optional()` actually kicks in.
+// Multipart sends an untouched optional field as '' — treat '' as "not provided" so .optional() kicks in.
 const emptyToUndefined = (v: unknown) => (v === '' ? undefined : v);
 
-// Over multipart a repeated field arrives as string[] (many), a lone value as a plain string, and
-// an empty field as ''. Normalise all of them to an optional string[].
+// Multipart: repeated field → string[], lone value → string, empty → ''. Normalise to an optional string[].
 const toOptionalStringArray = (v: unknown) => {
     if (v === '' || v === undefined || v === null) {
         return undefined;
@@ -22,27 +20,20 @@ const toOptionalStringArray = (v: unknown) => {
 };
 
 //1: create ====================================>
-// status is intentionally omitted — a new file always starts at DRAFT (model default).
-// owner is intentionally omitted — it is pinned from the acting role in the service.
-// content and type are intentionally omitted — both are derived from the uploaded file in the
-// service, never accepted from the client.
-// The entity reference is captured as three flat fields (`entityId`/`entityType`/`entityRelation`)
-// because they're far easier to submit via a multipart form than a nested JSON object; they're
-// folded back into a nested `entity` here so the service keeps seeing `model.entity.*`.
+// status/owner/content/type are omitted — all derived/pinned in the service. The entity ref is three
+// flat fields (easier over multipart), folded back into a nested `entity` so the service sees model.entity.*.
 export const CreateFilePayloadSchema = z
     .object({
-        // required only for platform (QMS) staff — which tenant this file belongs to.
-        // ignored for customer users: the service pins it to their own tenant.
-        // multipart form-data sends an untouched optional field as '' (not omitted), so normalise
-        // '' → undefined before validating; otherwise `.optional()` still runs against the ''.
+        // required for platform staff, ignored for customers (service pins it to their own tenant)
         tenant: z
             .preprocess(emptyToUndefined, objectId('Tenant').optional())
             .openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
-        entityId: z.string().min(1).openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
+        // optional — upload-first: the record is attached later via update (type + relation stay required)
+        entityId: z
+            .preprocess(emptyToUndefined, z.string().min(1).optional())
+            .openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
         entityType: z.enum(Object.values(ENTITY_TYPE)).openapi({ example: 'tenant' }),
         entityRelation: z.enum(ENTITY_RELATION_ARRAY).openapi({ example: 'logo' }),
-        // tags arrive as '' (empty), a single string, or a string[] over multipart — coerce all
-        // three to an optional string array.
         tags: z
             .preprocess(toOptionalStringArray, z.array(z.string()).optional())
             .openapi({ example: ['branding'] }),
@@ -55,11 +46,11 @@ export const CreateFilePayloadSchema = z
 export type ICreateFilePayload = z.infer<typeof CreateFilePayloadSchema>;
 
 //2: update ====================================>
-// Only presentational metadata is editable. entity / content / tenant / owner are immutable,
-// and status moves only through the dedicated transition endpoint (changeStatus).
+// Presentational metadata is editable; entityId is the exception — attach an unlinked file to its record (one-time).
 export const UpdateFilePayloadSchema = z.object({
     displayName: z.string().min(1).optional().openapi({ example: 'Company Logo (2026)' }),
     tags: z.array(z.string()).optional().openapi({ example: ['branding', 'active'] }),
+    entityId: objectId('Entity').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
 });
 export type IUpdateFilePayload = z.infer<typeof UpdateFilePayloadSchema>;
 

@@ -117,6 +117,10 @@ mongodb-data/
 test-results/
 *.snap
 
+# Playwright MCP's own local session artifacts (snapshots/screenshots/console
+# logs from interactive browser verification) — never source, never for teammates.
+.playwright-mcp/
+
 # ======================
 # PIDs
 # ======================

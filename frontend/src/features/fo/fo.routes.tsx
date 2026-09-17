@@ -6,6 +6,7 @@ export const FO_ROUTES = {
   FO_WORKSPACE:    '/fo/workspace',
   FO_CONFIG:       '/fo/config',
   FIELD_OFFICERS:  '/field-officers',
+  FIELD_OFFICER_DETAIL: '/field-officers/:id',
 }
 
 // Cheap first filter only — field-officer (RoleType + every real Role of that
@@ -19,4 +20,5 @@ export const foRoutes: RouteObject[] = [
   { path: FO_ROUTES.FO_WORKSPACE,   lazy: lazyRoute(() => import('./pages/FoWorkspacePage')) },
   { path: FO_ROUTES.FO_CONFIG,      lazy: lazyRoute(() => import('./pages/FoConfigPage')) },
   { path: FO_ROUTES.FIELD_OFFICERS, lazy: lazyRoute(() => import('./pages/FieldOfficersPage'), FO_VIEW_PERMISSIONS) },
+  { path: FO_ROUTES.FIELD_OFFICER_DETAIL, lazy: lazyRoute(() => import('./pages/FieldOfficerDetailPage'), FO_VIEW_PERMISSIONS) },
 ]

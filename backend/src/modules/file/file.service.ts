@@ -48,7 +48,7 @@ const assertRelationCoherent = (type: string, relation: string) => {
     }
 };
 
-// Cap = max files an entity may hold for a relation; the existing-count only applies once an id is attached.
+// Cap = max ACTIVE files an entity may hold for a relation; the existing-count only applies once an id is attached.
 const assertWithinRelationCap = async (entity: any, tenant: any, incoming: number) => {
     const cap = getRelationCap(entity.type, entity.relation);
     if (cap === undefined) {
@@ -63,11 +63,12 @@ const assertWithinRelationCap = async (entity: any, tenant: any, incoming: numbe
     if (!entity.id) {
         return;
     }
+    // Count existing ACTIVE files for this entity + relation.
     const filter: any = {
         'entity.id': entity.id,
         'entity.type': entity.type,
         'entity.relation': entity.relation,
-        status: { $ne: FILE_STATUS.DISCARDED },
+        status: FILE_STATUS.ACTIVE,
     };
     if (tenant) {
         filter.tenant = tenant;
@@ -75,7 +76,7 @@ const assertWithinRelationCap = async (entity: any, tenant: any, incoming: numbe
     const existing = await FileModel.countDocuments(filter);
     if (existing + incoming > cap) {
         return throwAppError(
-            `The "${entity.relation}" relation already holds ${existing} of ${cap} file(s)`,
+            `The "${entity.relation}" relation already holds ${existing} of ${cap} active file(s). Please delete some first.`,
             StatusCodes.CONFLICT,
         );
     }

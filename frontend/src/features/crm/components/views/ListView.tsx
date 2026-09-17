@@ -10,7 +10,7 @@ import CopyButton from '@/components/ui/CopyButton'
 import StagePill from '@/features/crm/components/StagePill'
 import LeadAdvanceModal from '@/features/crm/components/LeadAdvanceModal'
 
-const COLUMNS = ['Code', 'Title', 'Company', 'Division', 'Sales rep', 'Status', 'Value', 'Update Action']
+const COLUMNS = ['Lead', 'Company', 'Division', 'Sales rep', 'Status', 'Value', 'Update Action']
 
 interface ListViewProps {
   leads: LeadEntity[]
@@ -65,13 +65,13 @@ const ListView = ({ leads, onOpen, onMoveStage, canManage }: ListViewProps) => {
                 className="cursor-pointer transition-colors hover:bg-(--qms-surface-hover)"
                 style={{ borderBottom: '1px solid var(--qms-border)' }}
               >
-                <td className="px-3 py-2 font-bold whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>
-                  <div className="flex items-center gap-1.5">
+                <td className="px-3 py-2 align-top">
+                  <div className="font-semibold whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>{lead.title}</div>
+                  <div className="flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>
                     {lead.code}
                     <CopyButton value={lead.code} label="Code" />
                   </div>
                 </td>
-                <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>{lead.title}</td>
                 <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>{tenantLabel(lead.tenant)}</td>
                 <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>{divisionLabel(lead.division)}</td>
                 <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>{roleLabel(lead.salesPerson)}</td>

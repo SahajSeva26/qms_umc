@@ -58,6 +58,18 @@ const set = (model: any, entity: EmployeeDocument) => {
     if (model.status) entity.status = model.status;
     if (model.meta !== undefined) entity.meta = model.meta;
 
+    // compensation
+    if (model.salary !== undefined) entity.salary = model.salary;
+    if (model.daRule !== undefined) entity.daRule = model.daRule;
+
+    // KYC
+    if (model.aadharNumber !== undefined) entity.aadharNumber = model.aadharNumber;
+    if (model.panNumber !== undefined) entity.panNumber = model.panNumber;
+
+    // payout account + address (replaced wholesale when supplied)
+    if (model.bankDetails !== undefined) entity.bankDetails = model.bankDetails;
+    if (model.location !== undefined) entity.location = model.location;
+
     // profile is merged field-by-field so a partial update keeps untouched fields
     if (model.profile) {
         const current: any = entity.profile ? (entity.profile as any).toObject?.() ?? entity.profile : {};

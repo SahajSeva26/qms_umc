@@ -1,6 +1,75 @@
 // Employee Model
 import mongoose from 'mongoose';
-import { EMPLOYEE_TYPES, EMPLOYEE_STATUS, EMPLOYEE_GENDER } from './employee.constants';
+import { EMPLOYEE_TYPES, EMPLOYEE_STATUS, EMPLOYEE_GENDER, DA_RULE_TYPES } from './employee.constants';
+
+// dearness/daily allowance rule — a flat amount or a percent of salary. A subschema (not an inline
+// nested object) so the reserved key `type` is unambiguously a field, not a SchemaType declaration.
+const daRuleSchema = new mongoose.Schema(
+    {
+        type: {
+            type: String,
+            enum: Object.values(DA_RULE_TYPES),
+            required: true,
+        },
+        value: {
+            type: Number,
+            required: true,
+            min: 0,
+        },
+    },
+    { _id: false },
+);
+
+// full postal address — mirrors the location schema used in operations/camp/camp.model.ts (kept
+// self-contained here rather than importing across modules). coordinates are GeoJSON [lng, lat].
+const locationSchema = new mongoose.Schema(
+    {
+        addressLine1: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        addressLine2: {
+            type: String,
+            trim: true,
+        },
+        locality: {
+            type: String,
+            trim: true,
+        },
+        city: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        state: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        country: {
+            type: String,
+            required: true,
+            default: 'India',
+            trim: true,
+        },
+        pincode: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        googlePlaceId: {
+            type: String,
+            trim: true,
+        },
+        coordinates: {
+            type: [Number], // [longitude, latitude]
+            required: true,
+            index: '2dsphere',
+        },
+    },
+    { _id: false },
+);
 
 const employeeSchema = new mongoose.Schema(
     {
@@ -17,6 +86,25 @@ const employeeSchema = new mongoose.Schema(
         dol: { type: Date },
         reason: { type: String },
         meta: { type: Object },
+
+        // compensation
+        salary: { type: Number, min: 0 },
+        daRule: { type: daRuleSchema },
+
+        // KYC
+        aadharNumber: { type: String, trim: true },
+        panNumber: { type: String, trim: true, uppercase: true },
+
+        // payout account
+        bankDetails: {
+            accountHolderName: { type: String, trim: true },
+            accountNumber: { type: String, trim: true },
+            ifscCode: { type: String, trim: true, uppercase: true },
+            bankName: { type: String, trim: true },
+            branch: { type: String, trim: true },
+        },
+
+        location: { type: locationSchema },
 
         profile: {
             firstName: String,

@@ -15,6 +15,12 @@ export const EMPLOYEE_GENDER = {
     OTHER: 'other',
 } as const;
 
+// how an employee's dearness/daily allowance is computed off their salary
+export const DA_RULE_TYPES = {
+    FIXED: 'fixed', // a flat rupee amount
+    PERCENTAGE: 'percentage', // a percent of salary
+} as const;
+
 // ========================================================
 // EMPLOYEE PERMISSIONS
 // ========================================================

@@ -14,3 +14,17 @@ export const EMPLOYEE_GENDER = {
     FEMALE: 'female',
     OTHER: 'other',
 } as const;
+
+// ========================================================
+// EMPLOYEE PERMISSIONS
+// ========================================================
+// NOTE: employee routes are gated by ROLE TYPE (RoleGuard) rather than by these permission codes.
+// They are registered for convention/parity with the other modules and are reserved for a future
+// switch to permission-based gating.
+export const EMPLOYEE_PERMISSIONS = {
+    GET: { code: 'employee:get', name: 'Get Employee', description: 'Get Employee' },
+    SEARCH: { code: 'employee:search', name: 'Search Employee', description: 'Search Employee' },
+    CREATE: { code: 'employee:create', name: 'Create Employee', description: 'Create Employee' },
+    UPDATE: { code: 'employee:update', name: 'Update Employee', description: 'Update Employee' },
+    MANAGE: { code: 'employee:manage', name: 'Manage Employee', description: 'Manage Employee' },
+} as const;

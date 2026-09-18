@@ -9,6 +9,7 @@ import { TenantRouter } from '../modules/access-management/tenant/tenant.routes'
 import { PermissionGroupRouter } from '../modules/access-management/permission-group/permissionGroup.routes';
 import { RoleTypeRouter } from '../modules/access-management/role-type/roleType.routes';
 import { RoleRouter } from '../modules/access-management/role/role.routes';
+import { EmployeeRouter } from '../modules/access-management/employee/employee.routes';
 import { DivisionRouter } from '../modules/crm/division/division.routes';
 import { LeadRouter } from '../modules/crm/lead/lead.routes';
 import { ContactRouter } from '../modules/crm/contact/contact.routes';
@@ -84,6 +85,7 @@ app.use('/api/v1/tenants', TenantRouter);
 app.use('/api/v1/permission-groups', PermissionGroupRouter);
 app.use('/api/v1/role-types', RoleTypeRouter);
 app.use('/api/v1/roles', RoleRouter);
+app.use('/api/v1/employees', EmployeeRouter);
 app.use('/api/v1/divisions', DivisionRouter);
 app.use('/api/v1/leads', LeadRouter);
 app.use('/api/v1/contacts', ContactRouter);

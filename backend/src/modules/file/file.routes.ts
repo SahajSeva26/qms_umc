@@ -175,7 +175,7 @@ registry.registerPath({
 FileRouter.get('/:id', FileController.get);
 FileRouter.get('/', FileController.search);
 
-FileRouter.post('/', imageUploader.array('files', 5), FileController.create);
+FileRouter.post('/', imageUploader.array('files', 10), FileController.create);
 FileRouter.post('/attach', FileController.attach);
 FileRouter.put('/:id', FileController.update);
 FileRouter.patch('/:id/status', FileController.changeStatus);

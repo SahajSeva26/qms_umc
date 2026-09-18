@@ -1,54 +1,67 @@
 // File Mapper
+import { RequestContext } from '../../shared/utils/contextBuilder';
+import { FILE_PERMISSIONS } from './file.constants';
+
+// Only a file:manage actor sees the raw storage coordinates (provider / path / identifier); everyone
+// else gets the presentational metadata + presigned url only. The check reads ctx.permissions.
 export const FileMapper = {
-    toResponse: (file: any) => ({
-        id: file._id?.toString(),
+    toResponse: (file: any, ctx?: RequestContext) => {
+        const canManage = ctx?.hasAnyPermissions([FILE_PERMISSIONS.MANAGE.code]) ?? false;
 
-        // owning tenant (populated { name, code } when requested, else the raw id)
-        tenant: file.tenant,
+        return {
+            id: file._id?.toString(),
 
-        // the record this file hangs off, and in what role
-        entity: {
-            id: file.entity?.id,
-            type: file.entity?.type,
-            relation: file.entity?.relation,
-        },
+            // owning tenant (populated { name, code } when requested, else the raw id)
+            tenant: file.tenant,
 
-        // classification + lifecycle
-        type: file.type,
-        status: file.status,
+            // the record this file hangs off, and in what role
+            entity: {
+                id: file.entity?.id,
+                type: file.entity?.type,
+                relation: file.entity?.relation,
+            },
 
-        // the role that registered the file (populated { name, code } when requested, else raw id)
-        owner: file.owner,
+            // classification + lifecycle
+            type: file.type,
+            status: file.status,
 
-        // storage metadata
-        content: file.content
-            ? {
-                  provider: file.content.provider,
-                  path: file.content.path,
-                  identifier: file.content.identifier,
-                  originalName: file.content.originalName,
-                  displayName: file.content.displayName,
-                  mimeType: file.content.mimeType,
-                  extension: file.content.extension,
-                  size: file.content.size,
-              }
-            : null,
+            // the role that registered the file (populated { name, code } when requested, else raw id)
+            owner: file.owner,
 
-        // short-lived presigned URL — attached by the service (FileService withUrl)
-        url: file.url ?? null,
+            // storage metadata — raw coordinates (provider/path/identifier) are file:manage only
+            content: file.content
+                ? {
+                      ...(canManage
+                          ? {
+                                provider: file.content.provider,
+                                path: file.content.path,
+                                identifier: file.content.identifier,
+                            }
+                          : {}),
+                      originalName: file.content.originalName,
+                      displayName: file.content.displayName,
+                      mimeType: file.content.mimeType,
+                      extension: file.content.extension,
+                      size: file.content.size,
+                  }
+                : null,
 
-        tags: file.tags || [],
+            // short-lived presigned URL — attached by the service (FileService withUrl)
+            url: file.url ?? null,
 
-        createdAt: file.createdAt,
-        updatedAt: file.updatedAt,
-    }),
-    toSearchResponse: (data: { count: number; items: any[] }) => {
+            tags: file.tags || [],
+
+            createdAt: file.createdAt,
+            updatedAt: file.updatedAt,
+        };
+    },
+    toSearchResponse: (data: { count: number; items: any[] }, ctx?: RequestContext) => {
         const result = {
             count: data?.count || 0,
             items: [] as any[],
         };
         for (const file of data?.items || []) {
-            result.items.push(FileMapper.toResponse(file));
+            result.items.push(FileMapper.toResponse(file, ctx));
         }
         return result;
     },

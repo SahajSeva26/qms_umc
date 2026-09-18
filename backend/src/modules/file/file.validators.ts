@@ -28,7 +28,7 @@ export const CreateFilePayloadSchema = z
         tenant: objectId('Tenant').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
         // optional — upload-first: the record is attached later via update (type + relation stay required)
         entityId: z
-            .preprocess(emptyToUndefined, z.string().min(1).optional())
+            .preprocess(emptyToUndefined, objectId('Entity').optional())
             .openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
         entityType: z.enum(Object.values(ENTITY_TYPE)).openapi({ example: 'tenant' }),
         entityRelation: z.enum(ENTITY_RELATION_ARRAY).openapi({ example: 'logo' }),

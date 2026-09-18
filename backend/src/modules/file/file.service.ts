@@ -27,11 +27,15 @@ const populate: any[] = [
 // HELPERS
 // ========================================================================================
 
-// A customer is pinned to their own tenant; a platform actor's (required, validator-enforced) tenant
-// is existence-checked here.
+// tenant is required for everyone (validator-enforced). A customer may only pass their OWN tenant id —
+// anything else is rejected, not silently ignored. A platform actor's tenant is existence-checked here.
 const resolveTenant = async (model: ICreateFilePayload, ctx: RequestContext): Promise<string> => {
     if (ctx.tenant?.type === TENANT_TYPE.CUSTOMER) {
-        return (ctx.tenant?._id || ctx.tenant?.id)?.toString();
+        const own = (ctx.tenant?._id || ctx.tenant?.id)?.toString();
+        if (model.tenant !== own) {
+            return throwAppError('You can only upload files for your own tenant', StatusCodes.FORBIDDEN);
+        }
+        return own;
     }
     const tenant = await TenantService.get(model.tenant, ctx);
     if (!tenant) {
@@ -141,6 +145,20 @@ const presignUrl = async (content: any): Promise<string | null> => {
     } catch (error: any) {
         logger.error({ err: error }, 'Failed to presign file URL');
         return null;
+    }
+};
+
+// Files are never deleted from storage inline — deletion is a soft-delete (status = discarded) and a
+// cron later reclaims the storage objects of discarded files. On a failed create batch we mark the
+// docs already persisted as discarded so they're unusable and the cron sweeps them. Best-effort.
+const discardFiles = async (ids: string[]) => {
+    if (!ids.length) {
+        return;
+    }
+    try {
+        await FileModel.updateMany({ _id: { $in: ids } }, { $set: { status: FILE_STATUS.DISCARDED } });
+    } catch (error: any) {
+        logger.error({ err: error, ids }, 'Failed to mark files discarded after a failed create batch');
     }
 };
 
@@ -267,35 +285,45 @@ const create = async (model: ICreateFilePayload, ctx: RequestContext, files?: an
     //4: the acting role owns every file
     const owner = resolveOwner(ctx);
 
-    //5: one File doc per uploaded file — type + content are derived per file
-    const created: HydratedDocument<IFile>[] = [];
-    for (const file of files) {
-        const type = resolveFileType(file.mimetype);
-        const content = await buildContent(file, model.entity);
+    // One File doc per uploaded file — type + content are derived per file. Track each persisted doc's
+    // id so a mid-batch failure can soft-delete the whole batch (status = discarded) rather than leave
+    // half of it usable; a cron reclaims the storage objects of discarded files later.
+    const createdIds: string[] = [];
+    try {
+        const created: HydratedDocument<IFile>[] = [];
+        for (const file of files) {
+            const type = resolveFileType(file.mimetype);
+            const content = await buildContent(file, model.entity);
 
-        // owner/type/entity.type+relation/content seeded here; status defaults to DRAFT; tenant, entity.id and tags flow through set()
-        const doc = new FileModel({
-            owner,
-            type,
-            entity: {
-                type: model.entity.type,
-                relation: model.entity.relation,
-            },
-            content,
-        });
+            // owner/type/entity.type+relation/content seeded here; status defaults to DRAFT; tenant, entity.id and tags flow through set()
+            const doc = new FileModel({
+                owner,
+                type,
+                entity: {
+                    type: model.entity.type,
+                    relation: model.entity.relation,
+                },
+                content,
+            });
 
-        let fileDoc = set(model, doc);
-        fileDoc = await fileDoc.save();
+            let fileDoc = set(model, doc);
+            fileDoc = await fileDoc.save();
+            createdIds.push((fileDoc._id as any).toString());
 
-        // only activate when the file is attached to an entity (cap already validated above); otherwise it stays draft
-        if (model.entity.id) {
-            fileDoc = (await FileService.changeStatus((fileDoc._id as any).toString(), { status: FILE_STATUS.ACTIVE }, ctx)) as HydratedDocument<IFile>;
+            // only activate when the file is attached to an entity (cap already validated above); otherwise it stays draft
+            if (model.entity.id) {
+                fileDoc = (await FileService.changeStatus((fileDoc._id as any).toString(), { status: FILE_STATUS.ACTIVE }, ctx)) as HydratedDocument<IFile>;
+            }
+
+            created.push((await withUrl(fileDoc)) as HydratedDocument<IFile>);
         }
 
-        created.push((await withUrl(fileDoc)) as HydratedDocument<IFile>);
+        return created;
+    } catch (error: any) {
+        // the batch failed — soft-delete whatever was persisted so nothing partial stays usable
+        await discardFiles(createdIds);
+        throw error;
     }
-
-    return created;
 };
 
 const update = async (id: string, model: IUpdateFilePayload, ctx: RequestContext) => {

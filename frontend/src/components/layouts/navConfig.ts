@@ -69,9 +69,14 @@ const ALL_NAV_ITEMS: NavItem[] = [
 
   { id: 'camps',        label: 'Camp Management',             icon: 'Sun',           path: CAMPS_ROUTES.CAMPS },
 
+  { id: 'campsscreening', label: 'Screening Camps',           icon: 'Sun',           path: CAMPS_ROUTES.CAMPS_SCREENING },
+
+  { id: 'campsdiet',    label: 'Diet Camps',                  icon: 'Heart',         path: CAMPS_ROUTES.CAMPS_DIET },
+
   { id: 'telecamps',    label: 'Teleconsultation Camps',      icon: 'Video',         path: CAMPS_ROUTES.CAMPS_TELE },
 
-  { id: 'diet',         label: 'Diet Camps',                  icon: 'Heart',         path: DIET_ROUTES.DIET },
+  // Mock, no real backend — slated for eventual deletion.
+  { id: 'diet',         label: 'Mock Diet Page',              icon: 'Heart',         path: DIET_ROUTES.DIET },
 
   { id: 'dedicatedops', label: 'Dedicated Ops',               icon: 'Briefcase',     path: DEDICATEDOPS_ROUTES.DEDICATEDOPS },
 
@@ -174,10 +179,8 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
   {
     section: 'Operations',
     subs: [
-      // 'omportal'/'diet'/'dedicatedops'/'telecamps' are commented out, not
-      // deleted — only 'camps' is backend-wired today (telecamps' own page
-      // states the real Camp module has no teleconsultation concept yet).
-      { title: 'Camps',             items: ['camps'/* , 'omportal', 'telecamps', 'diet', 'dedicatedops' */].map((id) => NAV_BY_ID[id]) },
+      // Only 'camps'/'campsscreening'/'campsdiet' are backend-wired; the rest stay commented out, not deleted.
+      { title: 'Camps',             items: ['camps', 'campsscreening', 'campsdiet'/* , 'omportal', 'telecamps', 'diet', 'dedicatedops' */].map((id) => NAV_BY_ID[id]) },
       // Commented out, not deleted — this whole subsection is still mock-backed.
       // { title: 'Dietitians',        items: ['dietapprovals', 'dietpayment', 'dietprofile'].map((id) => NAV_BY_ID[id]) },
       // 'fo'/'fo_workspace'/'foconfig' are commented out, not deleted — only

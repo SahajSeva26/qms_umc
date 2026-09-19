@@ -35,6 +35,8 @@ const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
   projects: ['project:search', 'project:manage', 'tenant:manage'],
   gantt: ['project:search', 'project:manage', 'tenant:manage'],
   camps: ['camp:search', 'camp:manage', 'tenant:manage'],
+  campsscreening: ['camp:search', 'camp:manage', 'tenant:manage'],
+  campsdiet: ['camp:search', 'camp:manage', 'tenant:manage'],
   // Permission-code half only — isNavItemVisible() also requires a platform-tenant
   // session for this specific item, since field-officer is a platform-only RoleType.
   fo: ['tenant:manage', 'tenant:admin'],
@@ -119,7 +121,20 @@ const ALL_NAV_PATHS: string[] = FULL_NAV_SECTIONS.flatMap((section) =>
   section.subs.flatMap((sub) => sub.items.map((item) => item.path)),
 )
 
-function findBestMatchingNavPath(pathname: string): string | null {
+// /camps/new is shared by 3 sidebar items, distinguished only by a `type` query param (not part of pathname).
+const CAMP_TYPE_NAV_PATH: Record<string, string> = {
+  screening: '/camps/screening',
+  diet: '/camps/diet',
+}
+
+function findBestMatchingNavPath(pathname: string, search: string): string | null {
+  if (pathname === '/camps/new') {
+    const type = new URLSearchParams(search).get('type')
+    if (type && CAMP_TYPE_NAV_PATH[type] && ALL_NAV_PATHS.includes(CAMP_TYPE_NAV_PATH[type])) {
+      return CAMP_TYPE_NAV_PATH[type]
+    }
+  }
+
   let best: string | null = null
   for (const path of ALL_NAV_PATHS) {
     const matches = pathname === path || pathname.startsWith(path + '/')
@@ -142,7 +157,7 @@ const NavItemRow = ({
   disabledReason?: string
 }) => {
   const location = useLocation()
-  const isActive = item.path === findBestMatchingNavPath(location.pathname)
+  const isActive = item.path === findBestMatchingNavPath(location.pathname, location.search)
   const label = labelOverride ?? item.label
 
   if (disabledReason) {

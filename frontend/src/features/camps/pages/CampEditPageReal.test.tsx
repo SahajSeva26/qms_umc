@@ -114,7 +114,7 @@ function makeQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } })
 }
 
-async function renderEditPage(camp: CampEntity) {
+async function renderEditPage(camp: CampEntity, initialPath = `/camps/${camp.id}/edit`) {
   const { campsRealService } = await import('@/features/camps/campsReal.service')
   vi.mocked(campsRealService.getCamp).mockResolvedValue({ success: true, message: '', data: camp })
 
@@ -122,9 +122,11 @@ async function renderEditPage(camp: CampEntity) {
   const queryClient = makeQueryClient()
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[`/camps/${camp.id}/edit`]}>
+      <MemoryRouter initialEntries={[initialPath]}>
         <Routes>
           <Route path="/camps/:id/edit" element={<CampEditPageReal />} />
+          <Route path="/camps" element={<div>Camp Management page</div>} />
+          <Route path="/camps/screening" element={<div>Screening Camps page</div>} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -209,6 +211,51 @@ describe('CampEditPageReal — location resolution guard', () => {
     const saveButton = await screen.findByRole('button', { name: /resolving location/i })
     expect(saveButton).toBeDisabled()
     expect(campsRealService.updateCamp).not.toHaveBeenCalled()
+  })
+})
+
+describe('CampEditPageReal — returns to the originating page after saving (Screening/Diet Camps, not always Camp Management)', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  it('with no `from` param, saving lands back on the combined Camp Management page with `camp` set', async () => {
+    await mockSessionAndPermission()
+    const { campsRealService } = await import('@/features/camps/campsReal.service')
+
+    const user = userEvent.setup()
+    await renderEditPage(campFixture(), '/camps/camp-1/edit')
+    await screen.findByText(/edit camp/i)
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => expect(campsRealService.updateCamp).toHaveBeenCalledTimes(1))
+    expect(await screen.findByText('Camp Management page')).toBeInTheDocument()
+  })
+
+  it('with `from=/camps/screening`, saving returns to Screening Camps (not Camp Management) with `camp` set', async () => {
+    await mockSessionAndPermission()
+    const { campsRealService } = await import('@/features/camps/campsReal.service')
+
+    const user = userEvent.setup()
+    await renderEditPage(campFixture(), `/camps/camp-1/edit?from=${encodeURIComponent('/camps/screening')}`)
+    await screen.findByText(/edit camp/i)
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => expect(campsRealService.updateCamp).toHaveBeenCalledTimes(1))
+    expect(await screen.findByText('Screening Camps page')).toBeInTheDocument()
+  })
+
+  it('"Back to camp" (direct/bookmarked load, no drawer history) also honors `from` instead of hardcoding Camp Management', async () => {
+    await mockSessionAndPermission()
+    const user = userEvent.setup()
+    await renderEditPage(campFixture(), `/camps/camp-1/edit?from=${encodeURIComponent('/camps/screening')}`)
+    await screen.findByText(/edit camp/i)
+
+    await user.click(screen.getByRole('button', { name: /back to camp/i }))
+
+    expect(await screen.findByText('Screening Camps page')).toBeInTheDocument()
   })
 })
 

@@ -23,11 +23,13 @@ interface CampsFilterBarRealProps {
   filters: CampsRealFilterState
   setFilter: <K extends keyof CampsRealFilterState>(key: K, value: CampsRealFilterState[K]) => void
   reset: () => void
+  // Set by pages already scoped to a single fixed type (e.g. Screening/Diet).
+  hideType?: boolean
 }
 
 // project/division/doctor/fo are also real query params but are ObjectId-based
 // and left out of this quick filter bar — no picker UI for them yet.
-const CampsFilterBarReal = ({ filters, setFilter, reset }: CampsFilterBarRealProps) => {
+const CampsFilterBarReal = ({ filters, setFilter, reset, hideType = false }: CampsFilterBarRealProps) => {
   return (
     <div
       className="flex flex-wrap items-center justify-between gap-2 p-2.5 mb-3 rounded-xl border"
@@ -51,15 +53,17 @@ const CampsFilterBarReal = ({ filters, setFilter, reset }: CampsFilterBarRealPro
           </SelectContent>
         </Select>
 
-        <Select value={filters.type} onValueChange={(v) => setFilter('type', (v ?? 'ALL') as CampsRealFilterState['type'])}>
-          <SelectTrigger className="text-[12px]">
-            <SelectValue>{(v: string) => (v === 'ALL' ? 'Type' : (TYPE_OPTIONS.find((t) => t.value === v)?.label ?? 'Type'))}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ALL">All</SelectItem>
-            {TYPE_OPTIONS.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        {!hideType && (
+          <Select value={filters.type} onValueChange={(v) => setFilter('type', (v ?? 'ALL') as CampsRealFilterState['type'])}>
+            <SelectTrigger className="text-[12px]">
+              <SelectValue>{(v: string) => (v === 'ALL' ? 'Type' : (TYPE_OPTIONS.find((t) => t.value === v)?.label ?? 'Type'))}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All</SelectItem>
+              {TYPE_OPTIONS.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
 
         <Select value={filters.billingType} onValueChange={(v) => setFilter('billingType', (v ?? 'ALL') as CampsRealFilterState['billingType'])}>
           <SelectTrigger className="text-[12px]">

@@ -22,7 +22,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import FieldErrorText from '@/components/ui/FieldErrorText'
 // import { Textarea } from '@/components/ui/textarea'
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 
 const startOfToday = () => {
   const d = new Date()
@@ -30,18 +29,11 @@ const startOfToday = () => {
   return d
 }
 
-const CAMP_TYPE_OPTIONS: { value: CampType; label: string }[] = [
-  { value: 'screening', label: 'Screening' },
-  { value: 'diet', label: 'Diet' },
-  { value: 'lab', label: 'Lab' },
-]
-
 interface FormValues {
   mrId: string
   mrLabel: string
   doctorId: string
   doctorLabel: string
-  type: CampType | ''
   patientExpectation: number
   date: string
   timeSlot: CampTimeSlotValue | ''
@@ -53,7 +45,6 @@ interface FormValues {
 const EMPTY_FORM_VALUES: FormValues = {
   mrId: '', mrLabel: '',
   doctorId: '', doctorLabel: '',
-  type: '',
   patientExpectation: NaN,
   date: '',
   timeSlot: '',
@@ -62,9 +53,9 @@ const EMPTY_FORM_VALUES: FormValues = {
   // devices: '',
 }
 
-// selfMrId is spliced in as `mr` when the caller IS the MR — the schema
-// requires `mr` unconditionally but an MR's form never shows the mrId field.
-const useBookCampFormResolver = (needsMrPicker: boolean, selfMrId: string | undefined) =>
+// selfMrId is spliced in as `mr` when the caller IS the MR — an MR's form never shows the mrId field.
+// `type` is locked context from the caller's page, like `project` — never user-editable.
+const useBookCampFormResolver = (needsMrPicker: boolean, selfMrId: string | undefined, type: CampType) =>
   useReshapingResolver<FormValues, BookCampFormPayload>({
     schema: bookCampPayloadSchema,
     toPayload: (values) => ({
@@ -72,7 +63,7 @@ const useBookCampFormResolver = (needsMrPicker: boolean, selfMrId: string | unde
       // checks produce a friendly required message instead of a generic type error.
       mr: ((needsMrPicker ? values.mrId : selfMrId) || '') as string,
       doctor: values.doctorId,
-      type: values.type || undefined,
+      type,
       // valueAsNumber turns a cleared field into NaN, not undefined — treat
       // NaN as "omit" while preserving a genuine 0.
       patientExpectation: Number.isNaN(values.patientExpectation) ? undefined : values.patientExpectation,
@@ -98,10 +89,11 @@ const useBookCampFormResolver = (needsMrPicker: boolean, selfMrId: string | unde
 interface BookCampFormProps {
   /** Whether this role books on behalf of someone else — shows the MR picker. MR itself never does. */
   needsMrPicker: boolean
-  /** Locked context from the caller's page, never user-editable — spliced into the payload before the mutation fires; the form/schema never see it. */
+  /** Locked context from the caller's page, never user-editable — no Camp type picker shown. */
+  type: CampType
+  /** Locked context from the caller's page, never user-editable — the form/schema never see it. */
   project: { id: string; name: string; campTimeSlots: CampTimeSlotValue[] }
-  /** Called once the mutation succeeds, with the created camp — the parent (a
-   * dialog over the project's camp list) closes and refetches. */
+  /** Called on mutation success with the created camp — the parent dialog closes and refetches. */
   onBooked: (camp: ApiResponse<CampMutationResponseEntity>) => void
   /** Called when the user cancels out of step 1 — the parent owns closing its own dialog. */
   onCancel: () => void
@@ -109,12 +101,12 @@ interface BookCampFormProps {
 
 // Shared across all 4 pharma portal pages — only whether the MR picker
 // renders differs per role; the submitted payload is identical either way.
-const BookCampForm = ({ needsMrPicker, project, onBooked, onCancel }: BookCampFormProps) => {
+const BookCampForm = ({ needsMrPicker, type, project, onBooked, onCancel }: BookCampFormProps) => {
   const { session, hasPermission } = usePermission()
   const selfMrId = session?.role.id
   const canManageDoctors = hasPermission('doctor:manage')
   const [showNewDoctor, setShowNewDoctor] = useState(false)
-  const { resolver, parsePayload } = useBookCampFormResolver(needsMrPicker, selfMrId)
+  const { resolver, parsePayload } = useBookCampFormResolver(needsMrPicker, selfMrId, type)
   const bookCamp = useBookCamp()
   // isPending flips true only once mutate is called, but parsePayload's own
   // re-parse runs before that — this ref closes that race window synchronously.
@@ -401,22 +393,6 @@ const BookCampForm = ({ needsMrPicker, project, onBooked, onCancel }: BookCampFo
             )}
             {fieldError('date') && <p className="text-[11px] mt-1 text-danger">{fieldError('date')}</p>}
             {fieldError('timeSlot') && <p className="text-[11px] mt-1 text-danger">{fieldError('timeSlot')}</p>}
-          </div>
-
-          <div>
-            <Label className="text-[10px] font-semibold tracking-widest uppercase mb-1.5 block text-qms-text-muted">Camp type</Label>
-            <Controller
-              control={control}
-              name="type"
-              render={({ field }) => (
-                <Select value={field.value || undefined} onValueChange={field.onChange}>
-                  <SelectTrigger className="w-full text-[13px]"><SelectValue placeholder="Select type…" /></SelectTrigger>
-                  <SelectContent>
-                    {CAMP_TYPE_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              )}
-            />
           </div>
 
           <div>

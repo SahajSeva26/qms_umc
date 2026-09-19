@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { FiEdit2 } from 'react-icons/fi'
 import { useCampReal } from '@/features/camps/hooks/useCampReal'
 import { useCampRefNames } from '@/features/camps/hooks/useCampRefNames'
@@ -23,21 +23,21 @@ const TYPE_LABEL: Record<string, string> = {
 
 const CAMP_UPDATE_PERMISSIONS = ['camp:update', 'camp:manage', 'tenant:manage']
 const CAMP_STAGE_PERMISSIONS = ['camp:manage', 'tenant:manage']
+// Mirrors each backend route's own read guard exactly, so the drawer never fires a request the caller will 403 on.
+const DIVISION_READ_PERMISSIONS = ['division:manage', 'tenant:admin', 'lead:manage']
+const ROLE_READ_PERMISSIONS = ['tenant:admin', 'tenant:manage', 'role:search']
+const PROJECT_READ_PERMISSIONS = ['project:manage', 'project:search', 'camp:book', 'tenant:manage']
 
 interface CampDrawerProps {
   campId: string | null
   onClose: () => void
 }
 
-// Read-only — Edit navigates to a dedicated full page (/camps/:id/edit) rather
-// than opening an inline form or a modal over this drawer. The Camp form is
-// too large (location map, address fields, several pickers, devices, notes)
-// for a modal-over-drawer without cramped, nested-scrolling UI.
+// Read-only — Edit navigates to a dedicated full page instead of a cramped modal-over-drawer form.
 const CampDrawer = ({ campId, onClose }: CampDrawerProps) => {
   if (!campId) return <SideDrawer open={false} title="" onClose={onClose}>{null}</SideDrawer>
 
-  // Keyed by campId so switching to a different camp remounts this inner
-  // component fresh (resetting `tab` etc.) instead of needing an effect.
+  // Keyed by campId so switching camps remounts fresh instead of needing an effect.
   return <CampDrawerContent key={campId} campId={campId} onClose={onClose} />
 }
 
@@ -48,6 +48,7 @@ interface CampDrawerContentProps {
 
 const CampDrawerContent = ({ campId, onClose }: CampDrawerContentProps) => {
   const navigate = useNavigate()
+  const location = useLocation()
   const { hasAnyPermission, session } = usePermission()
   const canUpdate = hasAnyPermission(CAMP_UPDATE_PERMISSIONS)
   const canMoveStage = hasAnyPermission(CAMP_STAGE_PERMISSIONS)
@@ -60,9 +61,9 @@ const CampDrawerContent = ({ campId, onClose }: CampDrawerContentProps) => {
 
   const { doctorName, divisionName, projectName, roleName } = useCampRefNames({
     doctors: true,
-    divisions: true,
-    projects: true,
-    roles: true,
+    divisions: hasAnyPermission(DIVISION_READ_PERMISSIONS),
+    projects: hasAnyPermission(PROJECT_READ_PERMISSIONS),
+    roles: hasAnyPermission(ROLE_READ_PERMISSIONS),
   })
 
   return (
@@ -86,7 +87,14 @@ const CampDrawerContent = ({ campId, onClose }: CampDrawerContentProps) => {
               <div className="text-[15px] font-bold truncate" style={{ color: 'var(--qms-text)' }}>{camp.code}</div>
               {canUpdate && (
                 <button
-                  onClick={() => navigate(`/camps/${camp.id}/edit`, { state: { fromDrawer: true } })}
+                  onClick={() => {
+                    // Strip `camp` so Save returns to whichever page this drawer was opened over.
+                    const returnParams = new URLSearchParams(location.search)
+                    returnParams.delete('camp')
+                    const query = returnParams.toString()
+                    const from = encodeURIComponent(`${location.pathname}${query ? `?${query}` : ''}`)
+                    navigate(`/camps/${camp.id}/edit?from=${from}`, { state: { fromDrawer: true } })
+                  }}
                   aria-label="Edit camp"
                   className="shrink-0 rounded-lg border p-1.5 transition-colors hover:bg-(--qms-surface-hover)"
                   style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-soft)' }}

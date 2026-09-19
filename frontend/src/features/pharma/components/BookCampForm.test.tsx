@@ -11,10 +11,7 @@ import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
 
 vi.mock('@/hooks/useSession')
 
-// LocationPicker needs real Google Maps credentials unavailable in tests —
-// mocked to buttons using the same onChange(LocationValue)/onResolutionStateChange
-// contract. LocationAddressFields is rendered for real by BookCampForm itself,
-// as a sibling of this mock, not by LocationPicker.
+// Mocks the map (needs real Google Maps creds) with buttons firing the same onChange/onResolutionStateChange contract.
 vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
   default: ({ value, onChange, onResolutionStateChange }: {
     value: unknown
@@ -135,14 +132,14 @@ async function mockSession(roleId?: string, hasDoctorManage = false) {
   } as unknown as ReturnType<typeof useSession>)
 }
 
-function renderForm(props: { needsMrPicker?: boolean } = {}) {
+function renderForm(props: { needsMrPicker?: boolean; type?: 'screening' | 'diet' } = {}) {
   return async () => {
     const BookCampForm = (await import('@/features/pharma/components/BookCampForm')).default
     const onBooked = vi.fn()
     const onCancel = vi.fn()
     render(
       <QueryClientProvider client={makeQueryClient()}>
-        <BookCampForm needsMrPicker={props.needsMrPicker ?? false} project={TEST_PROJECT} onBooked={onBooked} onCancel={onCancel} />
+        <BookCampForm needsMrPicker={props.needsMrPicker ?? false} type={props.type ?? 'screening'} project={TEST_PROJECT} onBooked={onBooked} onCancel={onCancel} />
       </QueryClientProvider>,
     )
     return { onBooked, onCancel }
@@ -328,9 +325,7 @@ describe('BookCampForm — step 2 (where)', () => {
     await renderForm()()
 
     await completeStep1(user)
-    // Address line 1 filled (avoids LocationAddressFields' own crash on a
-    // coordinates-only value with no addressLine1 key at all), but city/
-    // state/pincode left blank — Next fails validation, stays on step 2.
+    // Address filled but city/state/pincode blank — Next fails validation, stays on step 2.
     await user.type(screen.getByLabelText(/^address line 1$/i), '221 Baker Street')
     await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
     await user.click(screen.getByRole('button', { name: /^next$/i }))
@@ -501,10 +496,7 @@ describe('BookCampForm — step 3 (when & details) and submit', () => {
     await waitFor(() => expect(onBooked).toHaveBeenCalledTimes(1))
   })
 
-  // "Blocks submit while location is still resolving" is covered by the
-  // step-2 test above — LocationPicker (and its "simulate resolving"
-  // control) is only mounted on step 2, not step 3, so that scenario can't
-  // occur at the Submit button in the new stepped flow.
+  // The "blocks submit while location resolving" case is covered by the step-2 test above — LocationPicker isn't mounted on step 3.
 
   it('blocks a true rapid double-submit to exactly one mutation call', async () => {
     await mockSession()
@@ -542,7 +534,7 @@ describe('BookCampForm — zero configured slots', () => {
 
     render(
       <QueryClientProvider client={makeQueryClient()}>
-        <BookCampForm needsMrPicker={false} project={{ id: 'proj-2', name: 'Empty Project', campTimeSlots: [] }} onBooked={vi.fn()} onCancel={vi.fn()} />
+        <BookCampForm needsMrPicker={false} type="screening" project={{ id: 'proj-2', name: 'Empty Project', campTimeSlots: [] }} onBooked={vi.fn()} onCancel={vi.fn()} />
       </QueryClientProvider>,
     )
 

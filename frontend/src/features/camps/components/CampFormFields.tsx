@@ -33,6 +33,8 @@ interface CampFormFieldsProps {
   setField: <K extends keyof CampDraft>(key: K, value: CampDraft[K]) => void
   effectiveTenant: string
   isLocked: boolean
+  // Locks only the Type select, independent of isLocked (which disables the whole form).
+  lockedType?: boolean
   doctors: DoctorEntity[]
   doctorLabel: (id: string) => string
   showNewDoctorButton: boolean
@@ -53,6 +55,7 @@ const CampFormFields = ({
   setField,
   effectiveTenant,
   isLocked,
+  lockedType = false,
   doctors,
   doctorLabel,
   showNewDoctorButton,
@@ -97,12 +100,17 @@ const CampFormFields = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Type</Label>
-          <Select value={type} onValueChange={(v) => setField('type', v as CampType)} disabled={isLocked}>
+          <Select value={type} onValueChange={(v) => setField('type', v as CampType)} disabled={isLocked || lockedType}>
             <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
             <SelectContent>
               {TYPE_OPTIONS.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
             </SelectContent>
           </Select>
+          {lockedType && !isLocked && (
+            <p className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
+              Set from the page you booked this camp from.
+            </p>
+          )}
         </div>
         <div>
           <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Billing</Label>

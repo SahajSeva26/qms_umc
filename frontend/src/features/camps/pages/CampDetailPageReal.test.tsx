@@ -138,14 +138,16 @@ function makeQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } })
 }
 
-async function renderCreatePage() {
+async function renderCreatePage(initialPath = '/camps/new') {
   const CampDetailPageReal = (await import('./CampDetailPageReal')).default
   const queryClient = makeQueryClient()
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={['/camps/new']}>
+      <MemoryRouter initialEntries={[initialPath]}>
         <Routes>
           <Route path="/camps/new" element={<CampDetailPageReal />} />
+          <Route path="/camps" element={<div>Camp Management page</div>} />
+          <Route path="/camps/screening" element={<div>Screening Camps page</div>} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -279,6 +281,55 @@ describe('CampDetailPageReal — create mode, inline doctor creation', () => {
   })
 })
 
+describe('CampDetailPageReal — arriving from a type-scoped page (Screening/Diet Camps)', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  it('with no type/from params (plain "Camp Management" → New camp), Type is editable and Back goes to /camps', async () => {
+    await mockSessionWithPermission(true)
+    await renderCreatePage('/camps/new')
+
+    const typeLabel = await screen.findByText(/^Type$/i)
+    const typeTrigger = typeLabel.parentElement!.querySelector('[role="combobox"]')!
+    expect(typeTrigger).not.toBeDisabled()
+    expect(screen.queryByText(/set from the page you booked this camp from/i)).not.toBeInTheDocument()
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /back to camps/i }))
+    expect(await screen.findByText('Camp Management page')).toBeInTheDocument()
+  })
+
+  it('with type=diet, Type is pre-filled to Diet and locked, with an explanatory note', async () => {
+    await mockSessionWithPermission(true)
+    await renderCreatePage('/camps/new?type=diet')
+
+    const typeLabel = await screen.findByText(/^Type$/i)
+    const typeTrigger = typeLabel.parentElement!.querySelector('[role="combobox"]')!
+    expect(typeTrigger).toBeDisabled()
+    expect(typeTrigger).toHaveTextContent(/diet/i)
+    expect(screen.getByText(/set from the page you booked this camp from/i)).toBeInTheDocument()
+  })
+
+  it('with an invalid type value, Type falls back to editable/unlocked (defensive — no crash on a malformed query param)', async () => {
+    await mockSessionWithPermission(true)
+    await renderCreatePage('/camps/new?type=not-a-real-type')
+
+    const typeLabel = await screen.findByText(/^Type$/i)
+    const typeTrigger = typeLabel.parentElement!.querySelector('[role="combobox"]')!
+    expect(typeTrigger).not.toBeDisabled()
+  })
+
+  it('Back to camps navigates to the `from` param instead of /camps when present', async () => {
+    await mockSessionWithPermission(true)
+    const user = userEvent.setup()
+    await renderCreatePage('/camps/new?type=screening&from=%2Fcamps%2Fscreening')
+
+    await user.click(await screen.findByRole('button', { name: /back to camps/i }))
+    expect(await screen.findByText('Screening Camps page')).toBeInTheDocument()
+  })
+})
+
 describe('CampDetailPageReal — create mode, MR/FO pickers', () => {
   beforeEach(() => {
     vi.resetAllMocks()
@@ -296,9 +347,7 @@ describe('CampDetailPageReal — create mode, MR/FO pickers', () => {
     })
   }
 
-  // Time Slot has no options at all until a project (which carries
-  // campTimeSlots) is picked — needed now that CampFoPicker also gates on
-  // date+timeSlot, not just coordinates.
+  // Time Slot has no options until a project (carrying campTimeSlots) is picked.
   async function mockProjectWithSlots() {
     const { projectsService } = await import('@/features/projects/projects.service')
     vi.mocked(projectsService.searchProjects).mockResolvedValue({

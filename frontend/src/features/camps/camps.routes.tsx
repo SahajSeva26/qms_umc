@@ -4,6 +4,8 @@ import TeleconsultationCampsStubPage from './pages/TeleconsultationCampsStubPage
 
 export const CAMPS_ROUTES = {
   CAMPS:            '/camps',
+  CAMPS_SCREENING:  '/camps/screening',
+  CAMPS_DIET:       '/camps/diet',
   CAMPS_TELE:       '/camps/tele',
   CAMP_NEW:         '/camps/new',
   CAMP_DETAIL:      '/camps/:id',
@@ -35,6 +37,14 @@ export const campsRoutes: RouteObject[] = [
   {
     path: CAMPS_ROUTES.CAMPS,
     lazy: lazyRoute(() => import('./pages/CampsPageReal'), CAMP_READ_PERMISSIONS),
+  },
+  {
+    path: CAMPS_ROUTES.CAMPS_SCREENING,
+    lazy: lazyRoute(() => import('./pages/ScreeningCampsPage'), CAMP_READ_PERMISSIONS),
+  },
+  {
+    path: CAMPS_ROUTES.CAMPS_DIET,
+    lazy: lazyRoute(() => import('./pages/DietCampsPage'), CAMP_READ_PERMISSIONS),
   },
   { path: CAMPS_ROUTES.CAMPS_TELE, element: <TeleconsultationCampsStubPage /> },
   {

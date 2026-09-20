@@ -49,6 +49,10 @@ backend/docs*
 backend/scripts/seedQaData.ts
 backend/src/shared/env/scripts/seedQaData.ts
 
+# Local-only dev/e2e scripts (seed data + service-level e2e harnesses that drive
+# the real API against a dev rs0 DB) — never source for teammates, never in a build.
+backend/src/shared/env/script/
+
 # ======================
 # Logs
 # ======================

@@ -10,6 +10,27 @@ const objectId = (label: string) =>
             message: `${label} must be a valid id`,
         });
 
+// coordinates are stored GeoJSON-style: [longitude, latitude] (lng first) — matches camp/geoProfile.
+const CoordinatesSchema = z
+    .tuple([
+        z.number().min(-180).max(180), // longitude
+        z.number().min(-90).max(90), // latitude
+    ])
+    .openapi({ example: [72.8777, 19.076] });
+
+// full postal address for the doctor — same embedded shape as camp's `location`.
+const LocationSchema = z.object({
+    addressLine1: z.string().min(1).openapi({ example: '12 MG Road' }),
+    addressLine2: z.string().optional().openapi({ example: 'Near City Mall' }),
+    locality: z.string().optional().openapi({ example: 'Andheri West' }),
+    city: z.string().min(1).openapi({ example: 'Mumbai' }),
+    state: z.string().min(1).openapi({ example: 'Maharashtra' }),
+    country: z.string().min(1).optional().openapi({ example: 'India' }),
+    pincode: z.string().min(1).openapi({ example: '400058' }),
+    googlePlaceId: z.string().optional().openapi({ example: 'ChIJ...' }),
+    coordinates: CoordinatesSchema,
+});
+
 //1: create ====================================>
 // pharmaCode is the natural key — required here, and never editable afterwards.
 export const CreateDoctorPayloadSchema = z.object({
@@ -27,14 +48,9 @@ export const CreateDoctorPayloadSchema = z.object({
         .enum(Object.values(DOCTOR_SPECIALIZATION))
         .openapi({ example: 'cp' }),
     mobile: z.string().min(10).openapi({ example: '9876543210' }),
-    city: z.string().min(1).openapi({ example: 'Haldwani' }),
-    state: z.string().min(1).openapi({ example: 'Uttarakhand' }),
-    pincode: z.string().min(6).openapi({ example: '263139' }),
     email: z.email().openapi({ example: 'anil.kumar@example.com' }),
-    googleMapLink: z
-        .string()
-        .optional()
-        .openapi({ example: 'https://maps.app.goo.gl/xyz' }),
+    // full postal address + geo point (embedded, same shape as camp's location)
+    location: LocationSchema,
     status: z
         .enum(Object.values(DOCTOR_STATUS))
         .optional()
@@ -48,11 +64,9 @@ export const UpdateDoctorPayloadSchema = z.object({
     name: z.string().min(1).optional(),
     specialization: z.enum(Object.values(DOCTOR_SPECIALIZATION)).optional(),
     mobile: z.string().min(10).optional(),
-    city: z.string().min(1).optional(),
-    state: z.string().min(1).optional(),
-    pincode: z.string().min(6).optional(),
     email: z.email().optional(),
-    googleMapLink: z.string().optional(),
+    // location is replaced wholesale — supply the full object to change any part of it
+    location: LocationSchema.optional(),
     status: z.enum(Object.values(DOCTOR_STATUS)).optional(),
 });
 export type IUpdateDoctorPayload = z.infer<typeof UpdateDoctorPayloadSchema>;
@@ -85,7 +99,21 @@ export const SearchDoctorQuerySchema = z.object({
 });
 export type ISearchDoctorQuery = z.infer<typeof SearchDoctorQuerySchema>;
 
-//4: bulk create (CSV upload) ====================================>
+//4: nearest ====================================>
+// find doctors within a fixed 35km radius of point [lng, lat], nearest first. lng/lat come in
+// as query strings and are coerced to numbers. Respects tenant + division scope like search.
+export const NearestDoctorQuerySchema = z.object({
+    lng: z.coerce.number().min(-180).max(180).openapi({ example: 72.8777 }),
+    lat: z.coerce.number().min(-90).max(90).openapi({ example: 19.076 }),
+    specialization: z
+        .enum(Object.values(DOCTOR_SPECIALIZATION))
+        .optional()
+        .openapi({ example: 'cp' }),
+    limit: z.string().optional().openapi({ example: '10' }),
+});
+export type INearestDoctorQuery = z.infer<typeof NearestDoctorQuerySchema>;
+
+//5: bulk create (CSV upload) ====================================>
 // The non-file fields carried in the multipart/form-data body. Per-row doctor fields
 // (pharmaCode, name, specialization, mobile, city, state, pincode, email, googleMapLink, status)
 // come from the CSV rows and are validated per-row against CreateDoctorPayloadSchema in the service.

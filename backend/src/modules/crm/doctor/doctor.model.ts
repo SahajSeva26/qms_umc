@@ -1,6 +1,57 @@
 import mongoose from 'mongoose';
 import { DOCTOR_SPECIALIZATION, DOCTOR_STATUS } from './doctor.constants';
 
+// Full postal address for the doctor — same embedded shape as camp's `location`.
+// coordinates are GeoJSON-style [longitude, latitude] (lng first), 2dsphere-indexed.
+const locationSchema = new mongoose.Schema(
+    {
+        addressLine1: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        addressLine2: {
+            type: String,
+            trim: true,
+        },
+        locality: {
+            type: String,
+            trim: true,
+        },
+        city: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        state: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        country: {
+            type: String,
+            required: true,
+            default: 'India',
+            trim: true,
+        },
+        pincode: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        googlePlaceId: {
+            type: String,
+            trim: true,
+        },
+        coordinates: {
+            type: [Number], // [longitude, latitude]
+            required: true,
+            index: '2dsphere',
+        },
+    },
+    { _id: false },
+);
+
 // Doctor Model
 const doctorSchema = new mongoose.Schema({
     // owner / isolation key — which tenant this doctor belongs to
@@ -35,25 +86,14 @@ const doctorSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
-    city: {
-        type: String,
-        required: [true, 'City is required'],
-    },
-    state: {
-        type: String,
-        required: [true, 'State is required'],
-    },
-    pincode: {
-        type: String,
-        required: [true, 'Pincode is required'],
-    },
     email: {
         type: String,
         required: [true, 'Email is required'],
     },
-    googleMapLink: {
-        type: String,
-        default: '',
+    // full postal address + geo point — embedded, same pattern as camp's `location`
+    location: {
+        type: locationSchema,
+        required: true,
     },
     status: {
         type: String,

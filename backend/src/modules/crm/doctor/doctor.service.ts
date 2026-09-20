@@ -5,10 +5,11 @@ import {
     CreateDoctorPayloadSchema,
     IBulkDoctorPayload,
     ICreateDoctorPayload,
+    INearestDoctorQuery,
     ISearchDoctorQuery,
     IUpdateDoctorPayload,
 } from './doctor.validators';
-import { DOCTOR_PERMISSIONS, DOCTOR_STATUS } from './doctor.constants';
+import { DOCTOR_NEAREST_MAX_DISTANCE, DOCTOR_PERMISSIONS, DOCTOR_STATUS } from './doctor.constants';
 import { formatZodError, throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
@@ -70,11 +71,9 @@ const set = async (model: any, entity: HydratedDocument<IDoctor>, ctx: RequestCo
     if (model.name) entity.name = model.name;
     if (model.specialization) entity.specialization = model.specialization;
     if (model.mobile) entity.mobile = model.mobile;
-    if (model.city) entity.city = model.city;
-    if (model.state) entity.state = model.state;
-    if (model.pincode) entity.pincode = model.pincode;
     if (model.email) entity.email = model.email;
-    if (model.googleMapLink !== undefined) entity.googleMapLink = model.googleMapLink;
+    // location is replaced wholesale (same as camp) — supply the full object to change any part
+    if (model.location) entity.location = model.location;
     if (model.status) entity.status = model.status;
 
     return entity;
@@ -122,10 +121,10 @@ const search = async (filters: ISearchDoctorQuery, ctx: RequestContext, options?
         where.status = filters.status;
     }
     if (filters.city) {
-        where.city = { $regex: filters.city, $options: 'i' };
+        where['location.city'] = { $regex: filters.city, $options: 'i' };
     }
     if (filters.state) {
-        where.state = { $regex: filters.state, $options: 'i' };
+        where['location.state'] = { $regex: filters.state, $options: 'i' };
     }
     if (filters.pharmaCode) {
         where.pharmaCode = filters.pharmaCode;
@@ -148,6 +147,38 @@ const search = async (filters: ISearchDoctorQuery, ctx: RequestContext, options?
     const [count, items] = await Promise.all([countPromise, dataPromise]);
 
     return { count, items };
+};
+
+// findNearest returns doctors within a FIXED 35km radius of the target point, nearest first.
+// Unlike geoProfile (per-worker coverage radius), a doctor has no radius of its own — this is a
+// plain fixed-maxDistance $geoNear. Respects tenant scope (ctx.where) + division own-scope, and
+// only ever returns active doctors.
+const findNearest = async (filters: INearestDoctorQuery, ctx: RequestContext, options?: IServiceOptions) => {
+    const limit = options?.pagination?.limit || 10;
+
+    // scoping mirrors search(): tenant (ctx.where) + active only + optional specialization,
+    // then division own-scope for a customer actor.
+    const where: any = { ...ctx.where(), status: DOCTOR_STATUS.ACTIVE };
+    if (filters.specialization) {
+        where.specialization = filters.specialization;
+    }
+    applyOwnScope(where, ctx);
+
+    const items = await DoctorModel.aggregate([
+        {
+            $geoNear: {
+                near: { type: 'Point', coordinates: [filters.lng, filters.lat] },
+                distanceField: 'distance', // meters
+                spherical: true,
+                maxDistance: DOCTOR_NEAREST_MAX_DISTANCE, // 35 km hard cap
+                key: 'location.coordinates', // doctor's only geo index
+                query: where,
+            },
+        },
+        { $limit: limit },
+    ]);
+
+    return { count: items.length, items };
 };
 
 const create = async (model: ICreateDoctorPayload, ctx: RequestContext): Promise<HydratedDocument<IDoctor>> => {
@@ -255,11 +286,19 @@ const bulkCreate = async (payload: IBulkDoctorPayload, file: Express.Multer.File
             name: row.name,
             specialization: row.specialization,
             mobile: row.mobile,
-            city: row.city,
-            state: row.state,
-            pincode: row.pincode,
             email: row.email,
-            googleMapLink: row.googleMapLink || undefined,
+            // location columns → embedded address (coordinates from longitude/latitude columns)
+            location: {
+                addressLine1: row.addressLine1,
+                addressLine2: row.addressLine2 || undefined,
+                locality: row.locality || undefined,
+                city: row.city,
+                state: row.state,
+                country: row.country || undefined,
+                pincode: row.pincode,
+                googlePlaceId: row.googlePlaceId || undefined,
+                coordinates: [Number(row.longitude), Number(row.latitude)],
+            },
             status: row.status || undefined,
         };
 
@@ -308,6 +347,7 @@ const bulkCreate = async (payload: IBulkDoctorPayload, file: Express.Multer.File
 export const DoctorService = {
     get,
     search,
+    findNearest,
     create,
     update,
     bulkCreate,

@@ -3,6 +3,7 @@ import { HydratedDocument } from 'mongoose';
 import { InventoryAssignmentModel, IInventoryAssignment } from './inventory-assignment.model';
 import {
     ICreateInventoryAssignmentPayload,
+    IDirectAssignmentPayload,
     IInventoryAssignmentReportQuery,
     ISearchInventoryAssignmentQuery,
     IUpdateInventoryAssignmentPayload,
@@ -13,13 +14,19 @@ import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
 import { isValidObjectID } from '../../../shared/utils/strings';
 import { IServiceOptions } from '../../../shared/types/service.types';
+import { withTransaction } from '../../../shared/helpers/transactionHelper';
 import { RoleService } from '../../access-management/role/role.service';
 import { RoleModel } from '../../access-management/role/role.model';
 import { ROLE_STATUSES } from '../../access-management/role/role.constants';
 import { ALLOWED_ROLETYPE_CODES } from '../../access-management/role-type/roleType.constants';
 import { INVENTORY_REQUEST_STATUS } from '../inventory-request/inventory-request.constants';
+import { InventoryMasterService } from '../inventory-master/inventory-master.service';
+import { ITEM_TYPES } from '../inventory-master/inventory-master.constants';
 import { InventoryDeviceService } from '../inventory-device/inventory-device.service';
+import { INVENTORY_DEVICE_STATUS } from '../inventory-device/inventory-device.constants';
 import { InventoryConsumableService } from '../inventory-consumable/inventory-consumable.service';
+import { InventoryLedgerService } from '../inventory-ledger/inventory-ledger.service';
+import { INVENTORY_LEDGER_LOCATION, INVENTORY_LEDGER_SOURCE } from '../inventory-ledger/inventory-ledger.constants';
 
 type InventoryAssignmentDocument = HydratedDocument<IInventoryAssignment> | null;
 
@@ -220,6 +227,87 @@ const adjustHolding = async (
     return await row.save();
 };
 
+// The assignee of a direct assignment must exist and be a field officer (same rule as create()).
+const assertFieldOfficer = async (foId: string, ctx: RequestContext) => {
+    const fo = await RoleService.get(foId, ctx, { populate: true });
+    if (!fo) {
+        return throwAppError('The assignee does not exist', StatusCodes.NOT_FOUND);
+    }
+    if ((fo.type as any)?.code !== ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER) {
+        return throwAppError('The assignee must be a field officer', StatusCodes.BAD_REQUEST);
+    }
+    return fo;
+};
+
+// Log one direct (request-less) warehouse → FO movement. source='direct', no request ref.
+const logDirect = (assignee: string, inventoryType: string, inventory: string, quantity: number, ctx: RequestContext) =>
+    InventoryLedgerService.record(
+        {
+            source: INVENTORY_LEDGER_SOURCE.DIRECT,
+            inventoryType,
+            inventory,
+            quantity,
+            from: INVENTORY_LEDGER_LOCATION.WAREHOUSE,
+            to: INVENTORY_LEDGER_LOCATION.FIELD_OFFICER,
+            assignee,
+        } as any,
+        ctx,
+    );
+
+// Manager pushes stock STRAIGHT to a field officer, bypassing the request/approve/receive cycle.
+//  • devices: each is a concrete unit and must be an AVAILABLE warehouse unit ("if inventory allows it")
+//    → flip it to 'assigned' and give it to the FO.
+//  • consumables: named by catalog item + quantity → pull FEFO from the warehouse lots and give the
+//    per-lot draws to the FO.
+// Every move decrements the warehouse, updates the FO holding, and logs a DIRECT ledger row — all in
+// ONE transaction, so an unavailable device or short consumable stock rolls the whole assignment back.
+const directAssign = async (foId: string, payload: IDirectAssignmentPayload, ctx: RequestContext) => {
+    //1: the target must be a field officer
+    await assertFieldOfficer(foId, ctx);
+
+    const devices = payload.devices || [];
+    const consumables = payload.consumables || [];
+
+    await withTransaction(async () => {
+        //2: devices — each must be a concrete AVAILABLE unit; hand it straight to the FO
+        for (const deviceId of devices) {
+            const device = await InventoryDeviceService.get(deviceId, ctx);
+            if (!device) {
+                return throwAppError(`Device ${deviceId} does not exist`, StatusCodes.NOT_FOUND);
+            }
+            if (device.status !== INVENTORY_DEVICE_STATUS.AVAILABLE) {
+                return throwAppError(`Device ${device.serialNumber} is not available for assignment`, StatusCodes.CONFLICT);
+            }
+            await InventoryDeviceService.update(deviceId, { status: INVENTORY_DEVICE_STATUS.ASSIGNED } as any, ctx);
+            await adjustHolding(foId, INVENTORY_ASSIGNMENT_TYPES.DEVICE, deviceId, 1, ctx);
+            await logDirect(foId, INVENTORY_ASSIGNMENT_TYPES.DEVICE, deviceId, 1, ctx);
+        }
+
+        //3: consumables — pull FEFO from the warehouse lots of the catalog item; give each draw to the FO
+        for (const line of consumables) {
+            const master = await InventoryMasterService.get(line.item, ctx);
+            if (!master) {
+                return throwAppError(`Item ${line.item} does not exist`, StatusCodes.NOT_FOUND);
+            }
+            if (master.type !== ITEM_TYPES.CONSUMABLE) {
+                return throwAppError('The referenced item is not a consumable', StatusCodes.BAD_REQUEST);
+            }
+            // pullFEFO decrements the warehouse lots (or throws → rolls back if stock is short)
+            const draws = await InventoryConsumableService.pullFEFO(line.item, line.quantity, ctx);
+            for (const draw of draws) {
+                await adjustHolding(foId, INVENTORY_ASSIGNMENT_TYPES.CONSUMABLE, draw.item, draw.quantity, ctx);
+                await logDirect(foId, INVENTORY_ASSIGNMENT_TYPES.CONSUMABLE, draw.item, draw.quantity, ctx);
+            }
+        }
+    });
+
+    //4: return the FO's holdings after the assignment (search runs outside the txn, so its
+    //   parallel count+find is safe)
+    return await InventoryAssignmentService.search({ assignee: foId } as any, ctx, {
+        pagination: { limit: 1000, skip: 0 } as any,
+    });
+};
+
 // ========================================================================================
 // REPORT — field-officer roster (cross-feature)
 // ========================================================================================
@@ -373,5 +461,6 @@ export const InventoryAssignmentService = {
     update,
     remove,
     adjustHolding,
+    directAssign,
     report,
 };

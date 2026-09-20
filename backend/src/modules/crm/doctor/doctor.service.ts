@@ -12,10 +12,11 @@ import { DOCTOR_PERMISSIONS, DOCTOR_STATUS } from './doctor.constants';
 import { formatZodError, throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
-import { isValidObjectID } from '../../../shared/utils/strings';
+import { isValidObjectID, toObjectId } from '../../../shared/utils/strings';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { TENANT_TYPE } from '../../access-management/tenant/tenant.constants';
 import { TenantService } from '../../access-management/tenant/tenant.service';
+import { DivisionService } from '../division/division.service';
 import { CsvHelper } from '../../../shared/helpers/csvHelper';
 import { processInBatches } from '../../../shared/utils/batchProcessor';
 
@@ -23,7 +24,20 @@ type DoctorDocument = HydratedDocument<IDoctor> | null;
 
 // Doctor is tenant-scoped — every read starts from ctx.where() so a customer can only ever
 // see its own tenant's doctors, and a forged id from another tenant 404s instead of leaking.
-const populate: any[] = [{ path: 'tenant', select: 'name code' }];
+const populate: any[] = [
+    { path: 'tenant', select: 'name code' },
+    { path: 'division', select: 'name code therapy' },
+];
+
+// Division scoping — a customer (pharma) actor only ever sees doctors in their OWN division.
+// A customer actor without a division (e.g. the tenant admin) stays scoped to the whole tenant
+// (ctx.where already pins the tenant). Platform (QMS) staff see all divisions.
+const applyOwnScope = (where: any, ctx: RequestContext) => {
+    if (ctx.tenant?.type === TENANT_TYPE.CUSTOMER && ctx.role?.division) {
+        where.division = toObjectId(ctx.role.division);
+    }
+    return where;
+};
 
 // ========================================================================================
 // CORE FUNCTIONS
@@ -70,6 +84,9 @@ const set = async (model: any, entity: HydratedDocument<IDoctor>, ctx: RequestCo
 const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): Promise<DoctorDocument> => {
     const where: any = { ...ctx.where(), ...(isValidObjectID(id) ? { _id: id } : { pharmaCode: id }) };
 
+    //  a customer actor can only reach a doctor within their own division (else 404)
+    applyOwnScope(where, ctx);
+
     let query = DoctorModel.findOne(where);
     if (options?.populate) {
         query = query.populate(populate);
@@ -113,6 +130,12 @@ const search = async (filters: ISearchDoctorQuery, ctx: RequestContext, options?
     if (filters.pharmaCode) {
         where.pharmaCode = filters.pharmaCode;
     }
+    if (filters.division) {
+        where.division = filters.division;
+    }
+
+    //5: apply own-division scope LAST so a customer actor can't widen past their own division
+    applyOwnScope(where, ctx);
 
     //3: execute count + data together
     const countPromise = DoctorModel.countDocuments(where);
@@ -131,6 +154,32 @@ const create = async (model: ICreateDoctorPayload, ctx: RequestContext): Promise
     //1: resolve the owning tenant (explicit + existence-checked for platform, own-tenant for customer)
     const tenant = await resolveTenant(model, ctx);
 
+    //1b: division is required — how it's validated depends on the actor's tenant type.
+    let divisionId: string;
+    if (ctx.tenant?.type === TENANT_TYPE.CUSTOMER) {
+        // a customer (pharma) actor can only ever create within their OWN division — the incoming
+        // division must match the division on their role (extracted from ctx), never another one.
+        const ctxDivision = ctx.role?.division?.toString();
+        if (!ctxDivision) {
+            return throwAppError('Your account is not assigned to a division', StatusCodes.FORBIDDEN);
+        }
+        if (model.division !== ctxDivision) {
+            return throwAppError('You can only create doctors within your own division', StatusCodes.FORBIDDEN);
+        }
+        divisionId = ctxDivision;
+    } else {
+        // platform (QMS) staff may target any division — it just has to exist and belong to the
+        // resolved tenant (never link a doctor to another company's division)
+        const divisionDoc = await DivisionService.get(model.division, ctx);
+        if (!divisionDoc) {
+            return throwAppError('Division not found', StatusCodes.NOT_FOUND);
+        }
+        if (divisionDoc.tenant?.toString() !== tenant?.toString()) {
+            return throwAppError('Division does not belong to the selected company', StatusCodes.BAD_REQUEST);
+        }
+        divisionId = divisionDoc._id.toString();
+    }
+
     //2: guard — pharmaCode must be free within this tenant (scoped to the resolved tenant,
     // not ctx, so a platform actor can't collide a doctor against a different tenant's scope)
     const existingCode = await DoctorModel.findOne({ tenant, pharmaCode: model.pharmaCode });
@@ -145,8 +194,9 @@ const create = async (model: ICreateDoctorPayload, ctx: RequestContext): Promise
         return throwAppError('A doctor with this email already exists for this company', StatusCodes.CONFLICT);
     }
 
-    //4: build entity — tenant + pharmaCode (immutable natural key) are seeded here, never in set()
-    const entity = new DoctorModel({ tenant, pharmaCode: model.pharmaCode });
+    //4: build entity — tenant + division + pharmaCode (immutable natural key) are seeded here,
+    // never in set() (division is fixed at create, same as tenant/pharmaCode)
+    const entity = new DoctorModel({ tenant, division: divisionId, pharmaCode: model.pharmaCode });
     let doctor = await set(model, entity, ctx);
 
     //5: save — the findOne guards above catch the common case, but concurrent creates (e.g. bulk
@@ -197,8 +247,10 @@ const bulkCreate = async (payload: IBulkDoctorPayload, file: Express.Multer.File
     rows.forEach((row: any, index: number) => {
         const rowNumber = index + 1;
         const doctorPayload = {
-            // tenant is taken from the form body, not the CSV — one upload targets one tenant
+            // tenant + division are taken from the form body, not the CSV — one upload targets
+            // one tenant and one division (division is validated per row against the tenant in create)
             tenant: payload.tenant,
+            division: payload.division,
             pharmaCode: row.pharmaCode,
             name: row.name,
             specialization: row.specialization,

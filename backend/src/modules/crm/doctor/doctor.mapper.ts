@@ -10,6 +10,9 @@ export const DoctorMapper = {
             // owning tenant (populated { name, code } when requested, else the raw id)
             tenant: doctor.tenant,
 
+            // owning division (populated { name, code, therapy } when requested, else the raw id)
+            division: doctor.division,
+
             // identity
             pharmaCode: doctor.pharmaCode,
             name: doctor.name,

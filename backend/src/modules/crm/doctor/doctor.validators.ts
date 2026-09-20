@@ -18,6 +18,9 @@ export const CreateDoctorPayloadSchema = z.object({
     tenant: objectId('Tenant')
         .optional()
         .openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
+    // the division (within the tenant) this doctor belongs to — required, and validated in the
+    // service to actually belong to the resolved tenant. Immutable after create (not in update).
+    division: objectId('Division').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8b' }),
     pharmaCode: z.string().min(1).openapi({ example: 'DOC-0012' }),
     name: z.string().min(1).openapi({ example: 'Dr. Anil Kumar' }),
     specialization: z
@@ -60,6 +63,11 @@ export const SearchDoctorQuerySchema = z.object({
     tenant: objectId('Tenant')
         .optional()
         .openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
+    // filter to a specific division within the tenant (honoured on top of the actor's own-division
+    // scope — a customer actor can only ever narrow within their own division, never widen out of it)
+    division: objectId('Division')
+        .optional()
+        .openapi({ example: '665f0c3a1a2b3c4d5e6f7a8b' }),
     name: z.string().optional().openapi({ example: 'Anil' }),
     specialization: z
         .enum(Object.values(DOCTOR_SPECIALIZATION))
@@ -87,6 +95,9 @@ export const BulkDoctorPayloadSchema = z.object({
     tenant: objectId('Tenant')
         .optional()
         .openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
+    // the division every doctor in this upload belongs to — one upload targets one division.
+    // required (division is mandatory on a doctor) and validated per row against the tenant.
+    division: objectId('Division').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8b' }),
 });
 export type IBulkDoctorPayload = z.infer<typeof BulkDoctorPayloadSchema>;
 

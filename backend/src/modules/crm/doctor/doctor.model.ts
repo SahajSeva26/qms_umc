@@ -10,6 +10,14 @@ const doctorSchema = new mongoose.Schema({
         required: [true, 'Tenant is required'],
         index: true,
     },
+    // the division (within the tenant) this doctor belongs to — required. Doctors are scoped
+    // by division: a customer/field-force actor only ever sees doctors in their own division.
+    division: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Division',
+        required: [true, 'Division is required'],
+        index: true,
+    },
     pharmaCode: {
         type: String,
         required: true,

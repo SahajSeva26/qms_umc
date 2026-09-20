@@ -399,6 +399,7 @@ const seed = async () => {
     const doctor = await DoctorService.create(
         {
             tenant: customerId,
+            division: divisionId,
             pharmaCode: 'SEED-DOC-1',
             name: 'Dr Seed Sharma',
             specialization: DOCTOR_SPECIALIZATION.GP,

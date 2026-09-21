@@ -16,6 +16,12 @@ export interface IPresignedUpload {
     expiresIn: number;
 }
 
+export interface IObjectHead {
+    exists: boolean; // false when the object is not present (e.g. never uploaded)
+    size?: number; // ContentLength, when it exists
+    contentType?: string; // ContentType, when it exists
+}
+
 export interface IStorageProvider {
     upload: (input: IUploadInput) => Promise<object>;
     getUrl: (identifier: string) => Promise<object>;
@@ -23,4 +29,5 @@ export interface IStorageProvider {
     download: (identifier: string) => Promise<object>;
     getPresignedUrl: (identifier: string) => Promise<string>;
     getPresignedUploadUrl: (input: IPresignedUploadInput) => Promise<IPresignedUpload>;
+    headObject: (identifier: string) => Promise<IObjectHead>;
 }

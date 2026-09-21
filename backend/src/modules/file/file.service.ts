@@ -6,7 +6,7 @@ import { ENTITY_RELATION, FILE_PERMISSIONS, FILE_STATUS, FILE_TRANSITION_MAP, FI
 import { throwAppError } from '../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../shared/utils/contextBuilder';
-import { generateUUID, isValidObjectID } from '../../shared/utils/strings';
+import { isValidObjectID } from '../../shared/utils/strings';
 import { IServiceOptions } from '../../shared/types/service.types';
 import { TENANT_TYPE } from '../access-management/tenant/tenant.constants';
 import { TenantService } from '../access-management/tenant/tenant.service';
@@ -102,15 +102,14 @@ const resolveFileType = (mimeType: string): string => {
 };
 
 // Content is derived from the client-sent metadata (presigned-upload flow — nothing is uploaded
-// server-side here). The storage key is generated now so the presigned PUT URL points at it; the
-// client uploads the bytes directly to S3 afterwards.
-const buildContentFromMeta = (meta: { fileName: string; fileSize: number; fileType: string }, entity: { type: string; relation: string }) => {
+// server-side here). The storage key embeds the file doc's own _id, giving a strict 1:1 object↔doc
+// mapping: at activation we can HeadObject exactly this key and know it's the object for this doc.
+const buildContentFromMeta = (meta: { fileName: string; fileSize: number; fileType: string }, entity: { type: string; relation: string }, fileId: string) => {
     const originalName = meta.fileName;
     const extension = originalName.includes('.') ? originalName.split('.').pop()!.toLowerCase() : '';
 
-    // Generic key, decoupled from business hierarchy: /{entityType}/{entityRelation}/{uuid}.{ext}.
-    const uuid = generateUUID();
-    const key = ['', entity.type, entity.relation, extension ? `${uuid}.${extension}` : uuid].join('/');
+    // Deterministic key, decoupled from business hierarchy: {entityType}/{entityRelation}/{fileId}.{ext}.
+    const key = [entity.type, entity.relation, extension ? `${fileId}.${extension}` : fileId].join('/');
 
     return {
         provider: S3,
@@ -136,6 +135,37 @@ const getUploadUrl = async (content: any): Promise<string> => {
     } catch (error: any) {
         logger.error({ err: error, key: content?.identifier }, 'Failed to generate a presigned upload URL');
         return throwAppError('Failed to generate an upload URL', StatusCodes.INTERNAL_SERVER_ERROR);
+    }
+};
+
+// Before a file may go active, confirm its object actually landed in storage. The storage key embeds
+// the file's own _id, so we (1) assert the identifier matches this exact doc — no drifted/foreign
+// object — and (2) HeadObject it. Missing object → 409 (client hasn't uploaded yet).
+const assertObjectUploaded = async (file: HydratedDocument<IFile>) => {
+    const content: any = file.content;
+    const identifier: string | undefined = content?.identifier;
+    const fileId = (file._id as any).toString();
+
+    // exact match: the key must belong to this file doc (keys are /{type}/{relation}/{fileId}.{ext})
+    if (!identifier || !identifier.includes(fileId)) {
+        return throwAppError('The file object does not match this file record', StatusCodes.CONFLICT);
+    }
+
+    const head = await storageManager.get(content.provider || S3).headObject(identifier);
+    if (!head.exists) {
+        return throwAppError('File has not been uploaded to storage yet', StatusCodes.CONFLICT);
+    }
+};
+
+// No-op guard + transition-map validation. Pure/sync — no DB, no storage.
+const assertStatusTransition = (file: HydratedDocument<IFile>, target: string) => {
+    const current = file.status as keyof typeof FILE_TRANSITION_MAP;
+    if (current === target) {
+        return throwAppError(`File is already "${target}"`, StatusCodes.CONFLICT);
+    }
+    const allowed: readonly string[] = FILE_TRANSITION_MAP[current] || [];
+    if (!allowed.includes(target)) {
+        return throwAppError(`Cannot move a file from "${current}" to "${target}"`, StatusCodes.CONFLICT);
     }
 };
 
@@ -304,9 +334,9 @@ const create = async (model: ICreateFilePayload, ctx: RequestContext): Promise<H
         const created: HydratedDocument<IFile>[] = [];
         for (const meta of model.files) {
             const type = resolveFileType(meta.fileType);
-            const content = buildContentFromMeta(meta, model.entity);
 
-            // owner/type/entity.type+relation/content seeded here; status defaults to DRAFT; tenant, entity.id and tags flow through set()
+            // instantiate first so the doc's _id exists (Mongoose assigns it at construction); the
+            // storage key is derived from that _id so the object and the doc map 1:1.
             const doc = new FileModel({
                 owner,
                 type,
@@ -314,8 +344,8 @@ const create = async (model: ICreateFilePayload, ctx: RequestContext): Promise<H
                     type: model.entity.type,
                     relation: model.entity.relation,
                 },
-                content,
             });
+            doc.content = buildContentFromMeta(meta, model.entity, (doc._id as any).toString()) as any;
 
             let fileDoc = set(model, doc);
             fileDoc = await fileDoc.save();
@@ -370,29 +400,22 @@ const changeStatus = async (id: string, model: IChangeFileStatusPayload, ctx: Re
         return throwAppError('File not found', StatusCodes.NOT_FOUND);
     }
 
-    //2: no-op guard
-    const current = file.status as keyof typeof FILE_TRANSITION_MAP;
-    if (current === model.status) {
-        return throwAppError(`File is already "${model.status}"`, StatusCodes.CONFLICT);
-    }
+    //2: no-op guard + validate the transition against the state machine
+    assertStatusTransition(file, model.status);
 
-    //3: validate the transition against the state machine
-    const allowed: readonly string[] = FILE_TRANSITION_MAP[current] || [];
-    if (!allowed.includes(model.status)) {
-        return throwAppError(`Cannot move a file from "${current}" to "${model.status}"`, StatusCodes.CONFLICT);
-    }
-
-    //4: moving INTO active must respect the relation cap (existing active + this one <= maxFiles).
-    // The file isn't active yet (no-op guard above), so it isn't already in the count.
+    //3: moving INTO active must respect the relation cap (existing active + this one <= maxFiles; the
+    // file isn't active yet, so it isn't already in the count) AND its object must exist in storage —
+    // the object check always runs when going active, never optional.
     if (model.status === FILE_STATUS.ACTIVE) {
         await assertWithinRelationCap(
             { id: file.entity?.id, type: file.entity?.type, relation: file.entity?.relation },
             file.tenant?.toString(),
             1,
         );
+        await assertObjectUploaded(file);
     }
 
-    //5: apply + save
+    //4: apply + save
     file.status = model.status;
     return await file.save();
 };
@@ -401,11 +424,31 @@ const changeStatus = async (id: string, model: IChangeFileStatusPayload, ctx: Re
 // move reuses changeStatus (transition-map + relation-cap validated) inside one transaction — all or
 // nothing. The GET presigned url is attached for the response (the objects now exist).
 const bulkActivate = async (model: IBulkActivateFilesPayload, ctx: RequestContext): Promise<HydratedDocument<IFile>[]> => {
+    //1: load every file (scoped), validate the transition, and verify its object exists — ALL before
+    // the transaction (fail fast; keep the external S3 HeadObject calls out of the txn)
+    const files: HydratedDocument<IFile>[] = [];
+    for (const id of model.fileIds) {
+        const file = await FileService.get(id, ctx);
+        if (!file) {
+            return throwAppError(`File "${id}" not found`, StatusCodes.NOT_FOUND);
+        }
+        assertStatusTransition(file, FILE_STATUS.ACTIVE);
+        await assertObjectUploaded(file);
+        files.push(file);
+    }
+
+    //2: flip the batch active in one transaction. The relation-cap check stays INSIDE the txn so each
+    // file sees the ones already activated in this batch (an accurate running count).
     const activated = await withTransaction(async () => {
         const updated: HydratedDocument<IFile>[] = [];
-        for (const id of model.fileIds) {
-            const file = (await FileService.changeStatus(id, { status: FILE_STATUS.ACTIVE }, ctx)) as HydratedDocument<IFile>;
-            updated.push(file);
+        for (const file of files) {
+            await assertWithinRelationCap(
+                { id: file.entity?.id, type: file.entity?.type, relation: file.entity?.relation },
+                file.tenant?.toString(),
+                1,
+            );
+            file.status = FILE_STATUS.ACTIVE;
+            updated.push(await file.save());
         }
         return updated;
     });

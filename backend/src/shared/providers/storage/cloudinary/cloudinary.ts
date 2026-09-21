@@ -1,4 +1,4 @@
-import { IPresignedUpload, IPresignedUploadInput, IStorageProvider } from '../../../types/storagetypes';
+import { IObjectHead, IPresignedUpload, IPresignedUploadInput, IStorageProvider } from '../../../types/storagetypes';
 
 export const CLOUDINARY = 'cloudinary';
 export class CloudinaryProvider implements IStorageProvider {
@@ -30,6 +30,11 @@ export class CloudinaryProvider implements IStorageProvider {
     getPresignedUploadUrl(input: IPresignedUploadInput): Promise<IPresignedUpload> {
         console.log('Getting presigned upload URL for Cloudinary file', input);
         return Promise.resolve({ url: 'https://example.com', key: input.key, expiresIn: input.expiresIn ?? 3600 });
+        // throw new Error('Method not implemented.');
+    }
+    headObject(identifier: string): Promise<IObjectHead> {
+        console.log('Heading Cloudinary object', identifier);
+        return Promise.resolve({ exists: true });
         // throw new Error('Method not implemented.');
     }
 }

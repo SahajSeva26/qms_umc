@@ -1,5 +1,5 @@
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import { IPresignedUpload, IPresignedUploadInput, IStorageProvider, IUploadInput } from '../../../types/storagetypes';
+import { GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { IObjectHead, IPresignedUpload, IPresignedUploadInput, IStorageProvider, IUploadInput } from '../../../types/storagetypes';
 import ENV from '../../../config/app.config';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { StatusCodes } from 'http-status-codes';
@@ -91,6 +91,30 @@ export class S3Provider implements IStorageProvider {
         } catch (error: any) {
             logger.error({ err: error, key: input.key }, error?.message || 'Failed to generate a presigned upload URL');
             return throwAppError('Failed to generate a presigned upload URL', StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // Metadata-only lookup to confirm an object actually exists (e.g. before activating a file). A
+    // 404/NotFound is a normal "not uploaded yet" answer (exists: false), not an error; anything else throws.
+    async headObject(identifier: string): Promise<IObjectHead> {
+        try {
+            const command = new HeadObjectCommand({
+                Bucket: this.bucket,
+                Key: identifier,
+            });
+
+            const result = await this.client.send(command);
+            return {
+                exists: true,
+                ...(result.ContentLength !== undefined ? { size: result.ContentLength } : {}),
+                ...(result.ContentType !== undefined ? { contentType: result.ContentType } : {}),
+            };
+        } catch (error: any) {
+            if (error?.name === 'NotFound' || error?.$metadata?.httpStatusCode === 404) {
+                return { exists: false };
+            }
+            logger.error({ err: error, identifier }, error?.message || 'Failed to head the storage object');
+            return throwAppError('Failed to verify the uploaded object', StatusCodes.INTERNAL_SERVER_ERROR);
         }
     }
 }

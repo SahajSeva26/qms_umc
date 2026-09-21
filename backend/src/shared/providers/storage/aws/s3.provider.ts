@@ -1,5 +1,5 @@
 import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import { IStorageProvider, IUploadInput } from '../../../types/storagetypes';
+import { IPresignedUpload, IPresignedUploadInput, IStorageProvider, IUploadInput } from '../../../types/storagetypes';
 import ENV from '../../../config/app.config';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { StatusCodes } from 'http-status-codes';
@@ -24,7 +24,7 @@ export class S3Provider implements IStorageProvider {
     }
 
     async upload(input: IUploadInput): Promise<object> {
-        console.log('Uploading file to AWS', input);
+        logger.info({ key: input.key, mimetype: input.mimetype }, 'Uploading file to AWS');
         const command = new PutObjectCommand({
             Bucket: this.bucket,
             Key: input.key,
@@ -44,18 +44,18 @@ export class S3Provider implements IStorageProvider {
         // throw new Error('Method not implemented.');
     }
     async getUrl(identifier: string): Promise<object> {
-        console.log('Getting URL for AWS file', identifier);
+        logger.info({ identifier }, 'Getting URL for AWS file');
 
         return Promise.resolve({ url: 'https://example.com' });
         // throw new Error('Method not implemented.');
     }
     async delete(identifier: string): Promise<object> {
-        console.log('Deleting AWS file', identifier);
+        logger.info({ identifier }, 'Deleting AWS file');
         return Promise.resolve({ success: true });
         // throw new Error('Method not implemented.');
     }
     async download(identifier: string): Promise<object> {
-        console.log('Downloading AWS file', identifier);
+        logger.info({ identifier }, 'Downloading AWS file');
         return Promise.resolve({ success: true });
         // throw new Error('Method not implemented.');
     }
@@ -72,6 +72,25 @@ export class S3Provider implements IStorageProvider {
         } catch (error: any) {
             logger.error({ err: error, identifier }, error?.message || 'Failed to generate a presigned URL');
             return throwAppError('Failed to generate a presigned URL', StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // Short-lived presigned PUT URL for a client to upload an object directly to S3 (no buffer through the API).
+    async getPresignedUploadUrl(input: IPresignedUploadInput): Promise<IPresignedUpload> {
+        try {
+            const expiresIn = input.expiresIn ?? 3600;
+            const command = new PutObjectCommand({
+                Bucket: this.bucket,
+                Key: input.key,
+                ContentType: input.mimetype,
+            });
+
+            const url = await getSignedUrl(this.client, command, { expiresIn });
+
+            return { url, key: input.key, expiresIn };
+        } catch (error: any) {
+            logger.error({ err: error, key: input.key }, error?.message || 'Failed to generate a presigned upload URL');
+            return throwAppError('Failed to generate a presigned upload URL', StatusCodes.INTERNAL_SERVER_ERROR);
         }
     }
 }

@@ -10,6 +10,9 @@ export const DoctorMapper = {
             // owning tenant (populated { name, code } when requested, else the raw id)
             tenant: doctor.tenant,
 
+            // owning division (populated { name, code, therapy } when requested, else the raw id)
+            division: doctor.division,
+
             // identity
             pharmaCode: doctor.pharmaCode,
             name: doctor.name,
@@ -19,11 +22,8 @@ export const DoctorMapper = {
             mobile: doctor.mobile,
             email: doctor.email,
 
-            // location
-            city: doctor.city,
-            state: doctor.state,
-            pincode: doctor.pincode,
-            googleMapLink: doctor.googleMapLink || '',
+            // full postal address + geo point (embedded, same shape as camp's location)
+            location: doctor.location || null,
 
             createdAt: doctor.createdAt,
             updatedAt: doctor.updatedAt,
@@ -43,4 +43,12 @@ export const DoctorMapper = {
         }
         return result;
     },
+    // nearest results carry a $geoNear `distance` (meters from the search point) — surface it
+    toNearestResponse: (data: { count: number; items: any[] }, ctx: RequestContext) => ({
+        count: data?.count || 0,
+        items: (data?.items || []).map((doctor) => ({
+            ...DoctorMapper.toResponse(doctor, ctx),
+            distanceMeters: typeof doctor.distance === 'number' ? Math.round(doctor.distance) : null,
+        })),
+    }),
 };

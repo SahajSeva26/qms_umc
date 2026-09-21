@@ -5,6 +5,7 @@ import { registry } from '../../../shared/config/swagger/swagger.registry';
 import {
     BulkDoctorOpenApiSchema,
     CreateDoctorPayloadSchema,
+    NearestDoctorQuerySchema,
     SearchDoctorQuerySchema,
     UpdateDoctorPayloadSchema,
 } from './doctor.validators';
@@ -16,6 +17,20 @@ import { csvUploader } from '../../../shared/middlewares/upload/csvUploader';
 export const DoctorRouter = express.Router();
 
 DoctorRouter.use(AuthMiddleware);
+
+// nearest doctors (fixed 35km radius)
+registry.registerPath({
+    method: 'get',
+    path: '/doctors/nearest',
+    tags: ['DOCTOR'],
+    summary: 'Find doctors within a fixed 35km radius of a point (nearest first)',
+    request: {
+        query: NearestDoctorQuerySchema,
+    },
+    responses: {
+        200: { description: 'Nearest doctors fetched successfully' },
+    },
+});
 
 // get doctor
 registry.registerPath({
@@ -49,7 +64,7 @@ registry.registerPath({
     method: 'post',
     path: '/doctors',
     tags: ['DOCTOR'],
-    summary: 'Create doctor (global system record)',
+    summary: 'Create doctor (tenant + division scoped)',
     request: {
         body: {
             content: {
@@ -115,6 +130,8 @@ registry.registerPath({
 // =======================================================================
 // reads are tenant-scoped but open to any authenticated user; writes (create/update/bulk)
 // are guarded by doctor:manage.
+// NOTE: /nearest is declared before /:id so the literal path is not swallowed by the param route.
+DoctorRouter.get('/nearest', DoctorController.nearest);
 DoctorRouter.get('/:id', DoctorController.get);
 DoctorRouter.get('/', DoctorController.search);
 

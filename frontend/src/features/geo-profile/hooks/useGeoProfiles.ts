@@ -5,5 +5,7 @@ import type { SearchGeoProfileQuery } from '@/types/geoProfile.types'
 
 export const geoProfileKeys = createEntityKeys<SearchGeoProfileQuery>('geoProfiles', 'geoProfile')
 
-export const useGeoProfiles = (query: SearchGeoProfileQuery) =>
-  useEntityQuery(geoProfileKeys, (q) => geoProfileService.searchGeoProfiles(q), query)
+// `enabled` lets callers (e.g. FieldOfficerDetailPage's role-id-scoped lookup)
+// defer the query until the id it's keyed on is actually known.
+export const useGeoProfiles = (query: SearchGeoProfileQuery, enabled = true) =>
+  useEntityQuery(geoProfileKeys, (q) => geoProfileService.searchGeoProfiles(q), query, { enabled })

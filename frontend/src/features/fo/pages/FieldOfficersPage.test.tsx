@@ -111,3 +111,13 @@ describe('FieldOfficersPage — a GeoProfile-only failure does not blank the ros
     vi.doUnmock('@/features/geo-profile/hooks/useGeoProfiles')
   })
 })
+
+describe('FieldOfficersPage — a roster row is keyboard-reachable, not mouse-only', () => {
+  it('renders the FO name/code as a real link to its detail route, not just a clickable <tr>', async () => {
+    vi.clearAllMocks()
+    await renderPage({ tenant: { type: 'platform' } })
+
+    const link = await screen.findByRole('link', { name: /Jane FO/i })
+    expect(link).toHaveAttribute('href', '/field-officers/role-1')
+  })
+})

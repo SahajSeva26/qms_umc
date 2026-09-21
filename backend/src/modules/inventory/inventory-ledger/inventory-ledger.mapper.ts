@@ -41,6 +41,7 @@ export const InventoryLedgerMapper = {
     toResponse: (row: any) => ({
         id: row._id?.toString(),
 
+        source: row.source,
         request: mapRequest(row.request),
         requestType: row.requestType,
 

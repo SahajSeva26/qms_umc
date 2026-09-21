@@ -3,6 +3,7 @@ import { ResponseHandler } from '../../../shared/utils/responseHandler';
 import { formatZodError } from '../../../shared/utils/error';
 import {
     CreateInventoryAssignmentPayloadSchema,
+    DirectAssignmentPayloadSchema,
     InventoryAssignmentReportQuerySchema,
     SearchInventoryAssignmentQuerySchema,
     UpdateInventoryAssignmentPayloadSchema,
@@ -93,6 +94,37 @@ const create = async (req: any, res: any) => {
     }
 };
 
+// direct assignment — manager pushes stock straight to a field officer (the :fo route param)
+const directAssign = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+        const { fo } = req?.params;
+        if (!fo) {
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Field officer id is required', null);
+        }
+
+        const { data, success, error } = DirectAssignmentPayloadSchema.safeParse(req.body);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                fields: validationErrors,
+            });
+        }
+
+        const result = await InventoryAssignmentService.directAssign(fo, data, ctx);
+
+        return ResponseHandler.appResponse(
+            res,
+            StatusCodes.CREATED,
+            true,
+            'Inventory directly assigned successfully',
+            InventoryAssignmentMapper.toSearchResponse(result),
+        );
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
 const update = async (req: any, res: any) => {
     try {
         const ctx: RequestContext = req.context;
@@ -169,6 +201,7 @@ export const InventoryAssignmentController = {
     get,
     search,
     create,
+    directAssign,
     update,
     remove,
     report,

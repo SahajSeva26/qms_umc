@@ -23,6 +23,7 @@ const populate: any[] = [{ path: 'request' }, { path: 'inventory' }, { path: 'as
 const record = async (payload: IRecordInventoryLedgerPayload, ctx: RequestContext): Promise<HydratedDocument<IInventoryLedger>> => {
     const actorName = `${ctx.user?.firstName || ''} ${ctx.user?.lastName || ''}`.trim();
     const entity = new InventoryLedgerModel({
+        source: payload.source, // undefined → model default 'request'
         request: payload.request,
         requestType: payload.requestType,
         inventoryType: payload.inventoryType,
@@ -60,6 +61,9 @@ const search = async (filters: ISearchInventoryLedgerQuery, ctx: RequestContext,
     const where: any = {};
 
     //2: add search filters
+    if (filters.source) {
+        where.source = filters.source;
+    }
     if (filters.request) {
         where.request = filters.request;
     }

@@ -4,6 +4,7 @@ import { formatZodError, throwAppError } from '../../../shared/utils/error';
 import {
     BulkDoctorPayloadSchema,
     CreateDoctorPayloadSchema,
+    NearestDoctorQuerySchema,
     SearchDoctorQuerySchema,
     UpdateDoctorPayloadSchema,
 } from './doctor.validators';
@@ -61,6 +62,34 @@ const search = async (req: any, res: any) => {
             true,
             'Doctors fetched successfully',
             DoctorMapper.toSearchResponse(result, ctx),
+        );
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
+// nearest — doctors within a fixed 35km radius of a point, nearest first
+const nearest = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+
+        const { data: filters, success, error } = NearestDoctorQuerySchema.safeParse(req.query);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                errors: validationErrors,
+            });
+        }
+
+        const pagination = RequestHandler.getPagination(filters);
+        const result = await DoctorService.findNearest(filters, ctx, { pagination });
+
+        return ResponseHandler.appResponse(
+            res,
+            StatusCodes.OK,
+            true,
+            'Nearest doctors fetched successfully',
+            DoctorMapper.toNearestResponse(result, ctx),
         );
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
@@ -156,6 +185,7 @@ const bulkCreate = async (req: any, res: any) => {
 export const DoctorController = {
     get,
     search,
+    nearest,
     create,
     update,
     bulkCreate,

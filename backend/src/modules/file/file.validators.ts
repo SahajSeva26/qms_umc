@@ -73,16 +73,7 @@ export const SearchFileQuerySchema = z.object({
 });
 export type ISearchFileQuery = z.infer<typeof SearchFileQuerySchema>;
 
-//5: attach + activate (batch) ====================================>
-// Attach a set of previously uploaded draft files to a now-existing record and activate them in one call.
-// The whole batch is validated against the relation cap in the service — all or nothing.
-export const AttachFilesPayloadSchema = z.object({
-    entityId: objectId('Entity').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
-    fileIds: z.array(objectId('File')).min(1).openapi({ example: ['665f0c3a1a2b3c4d5e6f7a8a'] }),
-});
-export type IAttachFilesPayload = z.infer<typeof AttachFilesPayloadSchema>;
-
-//6: bulk activate ====================================>
+//5: bulk activate ====================================>
 // After the client has uploaded the objects to S3 via the presigned URLs, it flips the whole batch
 // of draft files to active in one call. Each move is validated against the transition map + cap in
 // the service — all or nothing.

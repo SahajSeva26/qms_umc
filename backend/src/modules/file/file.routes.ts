@@ -3,7 +3,6 @@ import express from 'express';
 import { FileController } from './file.controller';
 import { registry } from '../../shared/config/swagger/swagger.registry';
 import {
-    AttachFilesPayloadSchema,
     BulkActivateFilesPayloadSchema,
     ChangeFileStatusPayloadSchema,
     CreateFilePayloadSchema,
@@ -133,29 +132,6 @@ registry.registerPath({
     },
 });
 
-// attach + activate a batch of draft files to a now-existing record
-registry.registerPath({
-    method: 'post',
-    path: '/files/attach',
-    tags: ['FILE'],
-    summary: 'Attach a batch of draft files to a record and activate them (validated as a whole against the cap)',
-    request: {
-        body: {
-            content: {
-                'application/json': {
-                    schema: AttachFilesPayloadSchema,
-                },
-            },
-        },
-    },
-    responses: {
-        200: { description: 'Files attached and activated successfully' },
-        400: { description: 'Validation error' },
-        404: { description: 'A file was not found' },
-        409: { description: 'A file is not an unattached draft, or the cap would be exceeded' },
-    },
-});
-
 // =======================================================================
 // ========================= EXPORT FILE ROUTES ==========================
 // =======================================================================
@@ -166,6 +142,5 @@ FileRouter.get('/', FileController.search);
 
 FileRouter.post('/', FileController.create);
 FileRouter.post('/activate', FileController.bulkActivate);
-FileRouter.post('/attach', FileController.attach);
 FileRouter.put('/:id', FileController.update);
 FileRouter.patch('/:id/status', FileController.changeStatus);

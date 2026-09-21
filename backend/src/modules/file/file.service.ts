@@ -1,7 +1,7 @@
 // File Service
 import mongoose, { HydratedDocument } from 'mongoose';
 import { FileModel, IFile } from './file.model';
-import { IAttachFilesPayload, IBulkActivateFilesPayload, IChangeFileStatusPayload, ICreateFilePayload, ISearchFileQuery, IUpdateFilePayload } from './file.validators';
+import { IBulkActivateFilesPayload, IChangeFileStatusPayload, ICreateFilePayload, ISearchFileQuery, IUpdateFilePayload } from './file.validators';
 import { ENTITY_RELATION, FILE_PERMISSIONS, FILE_STATUS, FILE_TRANSITION_MAP, FILE_TYPE, getRelationCap } from './file.constants';
 import { throwAppError } from '../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
@@ -397,70 +397,6 @@ const changeStatus = async (id: string, model: IChangeFileStatusPayload, ctx: Re
     return await file.save();
 };
 
-// Batch attach previously uploaded draft files to a now-existing record and activate them together.
-// The whole batch is validated against the relation cap first — all or nothing (no partial success).
-const attach = async (model: IAttachFilesPayload, ctx: RequestContext): Promise<HydratedDocument<IFile>[]> => {
-    //1: load every file (tenant-scoped); all must exist
-    const files: HydratedDocument<IFile>[] = [];
-    for (const id of model.fileIds) {
-        const file = await FileService.get(id, ctx);
-        if (!file) {
-            return throwAppError(`File "${id}" not found`, StatusCodes.NOT_FOUND);
-        }
-        files.push(file);
-    }
-
-    //2: every file must be an unattached draft
-    for (const file of files) {
-        if (file.status !== FILE_STATUS.DRAFT) {
-            return throwAppError(`File "${file._id}" is not a draft`, StatusCodes.CONFLICT);
-        }
-        if (file.entity?.id) {
-            return throwAppError(`File "${file._id}" is already attached to an entity`, StatusCodes.CONFLICT);
-        }
-    }
-
-    //3: all files must share one entity type + relation + tenant (the cap is per entity + relation)
-    const first = files[0]!;
-    const type = first.entity?.type;
-    const relation = first.entity?.relation;
-    const tenant = first.tenant?.toString();
-    if (!type || !relation) {
-        return throwAppError('File has no entity classification to attach to', StatusCodes.CONFLICT);
-    }
-    for (const file of files) {
-        if (file.entity?.type !== type || file.entity?.relation !== relation) {
-            return throwAppError('All files must share the same entity type and relation', StatusCodes.BAD_REQUEST);
-        }
-        if (file.tenant?.toString() !== tenant) {
-            return throwAppError('All files must belong to the same tenant', StatusCodes.BAD_REQUEST);
-        }
-    }
-
-    //4: validate the whole batch against the cap (existing active + these files <= maxFiles)
-    await assertWithinRelationCap({ id: model.entityId, type, relation }, tenant, files.length);
-
-    //5: attach + activate atomically — all or nothing
-    const activated = await withTransaction(async () => {
-        const updated: HydratedDocument<IFile>[] = [];
-        for (const file of files) {
-            if (file.entity) {
-                file.entity.id = model.entityId;
-            }
-            file.status = FILE_STATUS.ACTIVE;
-            updated.push(await file.save());
-        }
-        return updated;
-    });
-
-    //6: attach presigned urls for the response
-    const result: HydratedDocument<IFile>[] = [];
-    for (const doc of activated) {
-        result.push((await withUrl(doc)) as HydratedDocument<IFile>);
-    }
-    return result;
-};
-
 // Bulk flip a batch of draft files to active once the client has uploaded the objects to S3. Each
 // move reuses changeStatus (transition-map + relation-cap validated) inside one transaction — all or
 // nothing. The GET presigned url is attached for the response (the objects now exist).
@@ -487,6 +423,5 @@ export const FileService = {
     create,
     update,
     changeStatus,
-    attach,
     bulkActivate,
 };

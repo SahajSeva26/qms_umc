@@ -2,7 +2,6 @@
 import { ResponseHandler } from '../../shared/utils/responseHandler';
 import { formatZodError } from '../../shared/utils/error';
 import {
-    AttachFilesPayloadSchema,
     BulkActivateFilesPayloadSchema,
     ChangeFileStatusPayloadSchema,
     CreateFilePayloadSchema,
@@ -125,26 +124,6 @@ const changeStatus = async (req: any, res: any) => {
     }
 };
 
-const attach = async (req: any, res: any) => {
-    try {
-        const ctx: RequestContext = req.context;
-
-        const { data, success, error } = AttachFilesPayloadSchema.safeParse(req.body);
-        if (!success) {
-            const validationErrors = formatZodError(error);
-            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
-                fields: validationErrors,
-            });
-        }
-
-        const files = await FileService.attach(data, ctx);
-
-        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Files attached and activated successfully', files.map((file) => FileMapper.toResponse(file, ctx)));
-    } catch (error: any) {
-        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
-    }
-};
-
 const bulkActivate = async (req: any, res: any) => {
     try {
         const ctx: RequestContext = req.context;
@@ -171,6 +150,5 @@ export const FileController = {
     create,
     update,
     changeStatus,
-    attach,
     bulkActivate,
 };

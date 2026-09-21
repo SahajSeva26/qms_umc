@@ -24,6 +24,9 @@ export const AuthMapper = {
                       id: role._id?.toString(),
                       code: role.code,
                       name: role.name,
+                      // division id when the role is division-restricted (MR/HO/ASM/RSM); null otherwise.
+                      // handles both a raw ObjectId ref and a populated division doc — always emits just the id.
+                      division: role.division ? (role.division._id ?? role.division).toString() : null,
                   }
                 : null,
             roleType: roleType

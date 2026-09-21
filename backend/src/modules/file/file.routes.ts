@@ -4,13 +4,13 @@ import { FileController } from './file.controller';
 import { registry } from '../../shared/config/swagger/swagger.registry';
 import {
     AttachFilesPayloadSchema,
+    BulkActivateFilesPayloadSchema,
     ChangeFileStatusPayloadSchema,
+    CreateFilePayloadSchema,
     SearchFileQuerySchema,
     UpdateFilePayloadSchema,
 } from './file.validators';
-import { ENTITY_RELATION_ARRAY, ENTITY_TYPE } from './file.constants';
 import { AuthMiddleware } from '../../shared/middlewares/authmiddleware';
-import { imageUploader } from '../../shared/middlewares/upload/imageUploader';
 
 export const FileRouter = express.Router();
 
@@ -43,57 +43,23 @@ registry.registerPath({
     },
 });
 
-// create file
+// create file(s) — presigned-upload flow: send file METADATA, get back a draft doc + upload URL each
 registry.registerPath({
     method: 'post',
     path: '/files',
     tags: ['FILE'],
-    summary: 'Register a file (starts in draft)',
+    summary: 'Register file(s) from metadata (each starts in draft) and get a presigned upload URL per file',
     request: {
         body: {
             content: {
-                'multipart/form-data': {
-                    schema: {
-                        type: 'object',
-                        properties: {
-                            // the binary upload(s) — multer field name is `files` (max 10)
-                            files: {
-                                type: 'array',
-                                items: { type: 'string', format: 'binary' },
-                                description: 'File(s) to upload (max 10)',
-                            },
-                            tenant: {
-                                type: 'string',
-                                description: 'Owning tenant id (platform staff only; ignored for customers)',
-                                example: '665f0c3a1a2b3c4d5e6f7a8a',
-                            },
-                            // entityId is optional (upload-first — attach later via PUT /files/{id}); type + relation are required
-                            entityId: {
-                                type: 'string',
-                                description: 'Id of the record this file hangs off (optional — attach later via update)',
-                                example: '665f0c3a1a2b3c4d5e6f7a8a',
-                            },
-                            entityType: {
-                                type: 'string',
-                                enum: Object.values(ENTITY_TYPE),
-                                example: 'tenant',
-                            },
-                            entityRelation: {
-                                type: 'string',
-                                enum: ENTITY_RELATION_ARRAY,
-                                example: 'logo',
-                            },
-                            // content and type are NOT accepted — both are derived from the uploaded file in the service.
-                            tags: { type: 'array', items: { type: 'string' }, example: ['branding'] },
-                        },
-                        required: ['files', 'tenant', 'entityType', 'entityRelation'],
-                    },
+                'application/json': {
+                    schema: CreateFilePayloadSchema,
                 },
             },
         },
     },
     responses: {
-        201: { description: 'File created successfully' },
+        201: { description: 'File(s) created; response carries an uploadUrl per file' },
         400: { description: 'Validation error' },
     },
 });
@@ -144,6 +110,29 @@ registry.registerPath({
     },
 });
 
+// bulk activate a batch of draft files (called after the client uploads via the presigned URLs)
+registry.registerPath({
+    method: 'post',
+    path: '/files/activate',
+    tags: ['FILE'],
+    summary: 'Flip a batch of draft files to active (after the client has uploaded them to storage)',
+    request: {
+        body: {
+            content: {
+                'application/json': {
+                    schema: BulkActivateFilesPayloadSchema,
+                },
+            },
+        },
+    },
+    responses: {
+        200: { description: 'Files activated successfully' },
+        400: { description: 'Validation error' },
+        404: { description: 'A file was not found' },
+        409: { description: 'A file cannot be activated (invalid transition or cap exceeded)' },
+    },
+});
+
 // attach + activate a batch of draft files to a now-existing record
 registry.registerPath({
     method: 'post',
@@ -175,7 +164,8 @@ registry.registerPath({
 FileRouter.get('/:id', FileController.get);
 FileRouter.get('/', FileController.search);
 
-FileRouter.post('/', imageUploader.array('files', 10), FileController.create);
+FileRouter.post('/', FileController.create);
+FileRouter.post('/activate', FileController.bulkActivate);
 FileRouter.post('/attach', FileController.attach);
 FileRouter.put('/:id', FileController.update);
 FileRouter.patch('/:id/status', FileController.changeStatus);

@@ -46,8 +46,11 @@ export const FileMapper = {
                   }
                 : null,
 
-            // short-lived presigned URL — attached by the service (FileService withUrl)
+            // short-lived presigned read URL — attached by the service (FileService withUrl)
             url: file.url ?? null,
+
+            // short-lived presigned PUT URL for the client to upload the bytes — present on create only
+            ...(file.uploadUrl ? { uploadUrl: file.uploadUrl } : {}),
 
             tags: file.tags || [],
 

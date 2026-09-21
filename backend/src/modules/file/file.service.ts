@@ -1,7 +1,7 @@
 // File Service
 import mongoose, { HydratedDocument } from 'mongoose';
 import { FileModel, IFile } from './file.model';
-import { IAttachFilesPayload, IChangeFileStatusPayload, ICreateFilePayload, ISearchFileQuery, IUpdateFilePayload } from './file.validators';
+import { IAttachFilesPayload, IBulkActivateFilesPayload, IChangeFileStatusPayload, ICreateFilePayload, ISearchFileQuery, IUpdateFilePayload } from './file.validators';
 import { ENTITY_RELATION, FILE_PERMISSIONS, FILE_STATUS, FILE_TRANSITION_MAP, FILE_TYPE, getRelationCap } from './file.constants';
 import { throwAppError } from '../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
@@ -101,37 +101,41 @@ const resolveFileType = (mimeType: string): string => {
     return mimeType?.startsWith('image/') ? FILE_TYPE.IMAGE : FILE_TYPE.DOCUMENT;
 };
 
-// Content is derived from the upload + storage result (pushed to storage here), never from the client.
-const buildContent = async (file: any, entity: { type: string; relation: string }) => {
+// Content is derived from the client-sent metadata (presigned-upload flow — nothing is uploaded
+// server-side here). The storage key is generated now so the presigned PUT URL points at it; the
+// client uploads the bytes directly to S3 afterwards.
+const buildContentFromMeta = (meta: { fileName: string; fileSize: number; fileType: string }, entity: { type: string; relation: string }) => {
+    const originalName = meta.fileName;
+    const extension = originalName.includes('.') ? originalName.split('.').pop()!.toLowerCase() : '';
+
+    // Generic key, decoupled from business hierarchy: /{entityType}/{entityRelation}/{uuid}.{ext}.
+    const uuid = generateUUID();
+    const key = ['', entity.type, entity.relation, extension ? `${uuid}.${extension}` : uuid].join('/');
+
+    return {
+        provider: S3,
+        path: key,
+        identifier: key,
+        originalName,
+        displayName: originalName,
+        mimeType: meta.fileType,
+        extension,
+        size: meta.fileSize,
+    };
+};
+
+// Short-lived presigned PUT URL the client uploads the object to directly. Failures are fatal here —
+// a doc without an upload URL is useless to the caller — so we surface a 500.
+const getUploadUrl = async (content: any): Promise<string> => {
     try {
-        const originalName: string = file.originalname;
-        const extension = originalName.includes('.') ? originalName.split('.').pop()!.toLowerCase() : '';
-
-        // Generic key, decoupled from business hierarchy: /{entityType}/{entityRelation}/{uuid}.{ext}.
-        const uuid = generateUUID();
-        const key = ['', entity.type, entity.relation, extension ? `${uuid}.${extension}` : uuid].join('/');
-
-        const provider = storageManager.get(S3); // explicitly the S3 provider
-        const result: any = await provider.upload({
-            buffer: file.buffer,
-            mimetype: file.mimetype,
-            key,
+        const result = await storageManager.get(content.provider || S3).getPresignedUploadUrl({
+            key: content.identifier,
+            mimetype: content.mimeType,
         });
-
-        return {
-            provider: S3,
-            // fall back to the derived key until the storage provider returns real coordinates
-            path: result?.path ?? key,
-            identifier: result?.identifier ?? result?.key ?? key,
-            originalName,
-            displayName: originalName,
-            mimeType: file.mimetype,
-            extension,
-            size: file.size,
-        };
+        return result.url;
     } catch (error: any) {
-        logger.error({ err: error }, error?.message || 'Failed to build file content / upload to storage');
-        return throwAppError('Failed to upload the file to storage', StatusCodes.INTERNAL_SERVER_ERROR);
+        logger.error({ err: error, key: content?.identifier }, 'Failed to generate a presigned upload URL');
+        return throwAppError('Failed to generate an upload URL', StatusCodes.INTERNAL_SERVER_ERROR);
     }
 };
 
@@ -162,12 +166,18 @@ const discardFiles = async (ids: string[]) => {
     }
 };
 
-// Attach the presigned url onto the doc as a plain (non-schema) field the mapper reads.
+// Attach the presigned (read) url onto the doc as a plain (non-schema) field the mapper reads.
 const withUrl = async (file: FileDocument): Promise<FileDocument> => {
     if (!file) {
         return file;
     }
     (file as any).url = await presignUrl(file.content);
+    return file;
+};
+
+// Attach the presigned UPLOAD url onto the doc — the client PUTs the bytes to it (create response only).
+const withUploadUrl = async (file: HydratedDocument<IFile>): Promise<HydratedDocument<IFile>> => {
+    (file as any).uploadUrl = await getUploadUrl(file.content);
     return file;
 };
 
@@ -263,12 +273,13 @@ const search = async (filters: ISearchFileQuery, ctx: RequestContext, options?: 
     return { count, items };
 };
 
-// Creates one File doc per uploaded file, all sharing the same tenant/owner/entity.
-const create = async (model: ICreateFilePayload, ctx: RequestContext, files?: any[]): Promise<HydratedDocument<IFile>[]> => {
-    //0: at least one upload is mandatory — content is derived from it
-    ctx.logger.info({ files }, 'Files received in create');
-    if (!files?.length) {
-        return throwAppError('A file upload is required', StatusCodes.BAD_REQUEST);
+// Presigned-upload flow: creates one DRAFT File doc per file-metadata entry (all sharing the same
+// tenant/owner/entity) and returns each doc with a presigned PUT `uploadUrl`. Nothing is uploaded
+// server-side — the client PUTs the bytes to each URL, then flips the batch active via bulkActivate.
+const create = async (model: ICreateFilePayload, ctx: RequestContext): Promise<HydratedDocument<IFile>[]> => {
+    //0: at least one file's metadata is mandatory (validator-enforced, guarded here too)
+    if (!model.files?.length) {
+        return throwAppError('At least one file is required', StatusCodes.BAD_REQUEST);
     }
 
     //1: resolve the owning tenant (existence-checked for platform, own-tenant for customer), then
@@ -279,21 +290,21 @@ const create = async (model: ICreateFilePayload, ctx: RequestContext, files?: an
     //2: coherence — the relation must be valid for the entity type
     assertRelationCoherent(model.entity.type, model.entity.relation);
 
-    //3: enforce the relation cap (existing-count only applies once an id is attached — upload-first)
-    await assertWithinRelationCap(model.entity, tenant, files.length);
+    //3: enforce the relation cap (existing active-count only applies once an id is attached)
+    await assertWithinRelationCap(model.entity, tenant, model.files.length);
 
     //4: the acting role owns every file
     const owner = resolveOwner(ctx);
 
-    // One File doc per uploaded file — type + content are derived per file. Track each persisted doc's
-    // id so a mid-batch failure can soft-delete the whole batch (status = discarded) rather than leave
-    // half of it usable; a cron reclaims the storage objects of discarded files later.
+    // One File doc per metadata entry — type + content derived per file. Track each persisted doc's id
+    // so a mid-batch failure (e.g. presign error) soft-deletes the whole batch (status = discarded)
+    // rather than leaving half of it usable; a cron reclaims the storage objects of discarded files.
     const createdIds: string[] = [];
     try {
         const created: HydratedDocument<IFile>[] = [];
-        for (const file of files) {
-            const type = resolveFileType(file.mimetype);
-            const content = await buildContent(file, model.entity);
+        for (const meta of model.files) {
+            const type = resolveFileType(meta.fileType);
+            const content = buildContentFromMeta(meta, model.entity);
 
             // owner/type/entity.type+relation/content seeded here; status defaults to DRAFT; tenant, entity.id and tags flow through set()
             const doc = new FileModel({
@@ -310,12 +321,8 @@ const create = async (model: ICreateFilePayload, ctx: RequestContext, files?: an
             fileDoc = await fileDoc.save();
             createdIds.push((fileDoc._id as any).toString());
 
-            // only activate when the file is attached to an entity (cap already validated above); otherwise it stays draft
-            if (model.entity.id) {
-                fileDoc = (await FileService.changeStatus((fileDoc._id as any).toString(), { status: FILE_STATUS.ACTIVE }, ctx)) as HydratedDocument<IFile>;
-            }
-
-            created.push((await withUrl(fileDoc)) as HydratedDocument<IFile>);
+            // files stay DRAFT until the client uploads and calls bulkActivate — attach the upload URL
+            created.push(await withUploadUrl(fileDoc));
         }
 
         return created;
@@ -454,6 +461,26 @@ const attach = async (model: IAttachFilesPayload, ctx: RequestContext): Promise<
     return result;
 };
 
+// Bulk flip a batch of draft files to active once the client has uploaded the objects to S3. Each
+// move reuses changeStatus (transition-map + relation-cap validated) inside one transaction — all or
+// nothing. The GET presigned url is attached for the response (the objects now exist).
+const bulkActivate = async (model: IBulkActivateFilesPayload, ctx: RequestContext): Promise<HydratedDocument<IFile>[]> => {
+    const activated = await withTransaction(async () => {
+        const updated: HydratedDocument<IFile>[] = [];
+        for (const id of model.fileIds) {
+            const file = (await FileService.changeStatus(id, { status: FILE_STATUS.ACTIVE }, ctx)) as HydratedDocument<IFile>;
+            updated.push(file);
+        }
+        return updated;
+    });
+
+    const result: HydratedDocument<IFile>[] = [];
+    for (const doc of activated) {
+        result.push((await withUrl(doc)) as HydratedDocument<IFile>);
+    }
+    return result;
+};
+
 export const FileService = {
     get,
     search,
@@ -461,4 +488,5 @@ export const FileService = {
     update,
     changeStatus,
     attach,
+    bulkActivate,
 };

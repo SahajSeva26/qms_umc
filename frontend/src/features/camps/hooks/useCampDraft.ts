@@ -27,13 +27,13 @@ type CampDraftField = keyof CampDraft
 type CampDraftFieldValue<F extends CampDraftField> = CampDraft[F]
 type CampDraftAction = { [F in CampDraftField]: { type: 'SET_FIELD'; field: F; value: CampDraftFieldValue<F> } }[CampDraftField]
 
-function buildInitialDraft(camp: CampEntity | null): CampDraft {
+function buildInitialDraft(camp: CampEntity | null, initialType?: CampType): CampDraft {
   return {
     tenant: '',
     division: campRefId(camp?.division) ?? '',
     project: campRefId(camp?.project) ?? '',
     doctor: campRefId(camp?.doctor) ?? '',
-    type: camp?.type ?? 'screening',
+    type: camp?.type ?? initialType ?? 'screening',
     billingType: camp?.billingType ?? 'billable',
     patientExpectation: camp ? String(camp.patientExpectation ?? '') : '',
     fo: campRefId(camp?.fo) ?? '',
@@ -57,9 +57,9 @@ function campDraftReducer(state: CampDraft, action: CampDraftAction): CampDraft 
   }
 }
 
-// CampForm remounts fresh per record via key={camp?.id ?? 'create'}.
-export const useCampDraft = (camp: CampEntity | null) => {
-  const [draft, dispatch] = useReducer(campDraftReducer, camp, buildInitialDraft)
+// initialType seeds a fresh create draft only — an existing camp's own type always wins.
+export const useCampDraft = (camp: CampEntity | null, initialType?: CampType) => {
+  const [draft, dispatch] = useReducer(campDraftReducer, camp, (c) => buildInitialDraft(c, initialType))
 
   const setField = <F extends CampDraftField>(field: F, value: CampDraftFieldValue<F>) =>
     dispatch({ type: 'SET_FIELD', field, value } as CampDraftAction)

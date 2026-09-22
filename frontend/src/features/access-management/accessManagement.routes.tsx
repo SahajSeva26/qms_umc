@@ -13,12 +13,12 @@ export const ACCESS_MANAGEMENT_ROUTES = {
   ROLE_TYPE_DETAIL:     '/admin/role-types/:id',
   ROLES:                '/admin/roles',
   ROLE_DETAIL:          '/admin/roles/:id',
+  EMPLOYEES:            '/admin/employees',
+  EMPLOYEE_DETAIL:      '/admin/employees/:id',
 }
 
-// Each array unions its list+detail backend guards, not one shared guard —
-// list-only (search) and detail-only (get) permissions genuinely differ on
-// the backend, so a search-only caller can still reach a detail page that
-// then 403s on its own fetch (tenant/permission-group/role all do this).
+// Each array unions its list+detail backend guards, not one shared guard — a search-only
+// caller can still reach a detail page that then 403s on its own fetch.
 const TENANTS_VIEW_PERMISSIONS = ['tenant:get', 'tenant:search', 'tenant:manage']
 const PERMISSION_GROUPS_VIEW_PERMISSIONS = ['permission-group:get', 'permission-group:search', 'tenant:admin']
 const ROLE_TYPES_VIEW_PERMISSIONS = ['tenant:manage', 'tenant:admin']
@@ -73,5 +73,16 @@ export const accessManagementRoutes: RouteObject[] = [
   {
     path: ACCESS_MANAGEMENT_ROUTES.ROLE_DETAIL,
     lazy: lazyRoute(() => import('@/features/access-management/role/pages/RoleDetailPage'), ROLES_VIEW_PERMISSIONS),
+  },
+
+  // Employees — gated by role TYPE (RoleGuard), not permission codes, so no `anyOf` here;
+  // RequireEmployeeAccess (rendered inside each page) is the real guard.
+  {
+    path: ACCESS_MANAGEMENT_ROUTES.EMPLOYEES,
+    lazy: lazyRoute(() => import('@/features/access-management/employee/pages/EmployeesListPage')),
+  },
+  {
+    path: ACCESS_MANAGEMENT_ROUTES.EMPLOYEE_DETAIL,
+    lazy: lazyRoute(() => import('@/features/access-management/employee/pages/EmployeeDetailPage')),
   },
 ]

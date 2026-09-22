@@ -1,28 +1,12 @@
 import { describe, it, expect, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import type { SessionResponse } from '@/types/accessManagement.types'
 import type { ProjectEntity } from '@/types/project.types'
 import type { CampEntity } from '@/types/campReal.types'
 
 vi.mock('@/hooks/useSession')
-
-// LocationPicker needs real Google Maps credentials, unavailable in tests —
-// mock it to a button supplying coordinates via the same onChange(LocationValue) contract.
-// LocationAddressFields is rendered for real by BookCampForm itself, as a
-// sibling of this mock, not by LocationPicker.
-vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
-  default: ({ value, onChange }: { value: unknown; onChange: (v: unknown) => void }) => (
-    <button
-      type="button"
-      onClick={() => onChange({ ...(value as object ?? {}), coordinates: [73.8567, 18.5204] })}
-    >
-      Set test coordinates
-    </button>
-  ),
-}))
 
 vi.mock('@/features/pharma/pharmaProjects.service', () => ({
   pharmaProjectsService: {
@@ -34,47 +18,6 @@ vi.mock('@/features/pharma/pharmaProjects.service', () => ({
 vi.mock('@/features/pharma/pharmaCamps.service', () => ({
   pharmaCampsService: {
     searchScopedCamps: vi.fn(),
-  },
-}))
-
-vi.mock('@/features/access-management/accessManagement.service', () => ({
-  accessManagementService: {
-    searchDownlineMrs: vi.fn(async () => ({ success: true, message: '', data: { items: [], count: 0 } })),
-  },
-}))
-
-vi.mock('@/features/doctors/doctors.service', () => ({
-  doctorsService: {
-    searchDoctors: vi.fn(async () => ({ success: true, message: '', data: { items: [], count: 0 } })),
-  },
-}))
-
-// dayKey (local YYYY-MM-DD) of "today", matching how the availability grid
-// derives its own default fetch window.
-function todayKey(): string {
-  const d = new Date()
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-}
-
-vi.mock('@/features/camps/campsReal.service', () => ({
-  campsRealService: {
-    bookCamp: vi.fn(async () => ({ success: true, message: '', data: { id: 'camp-new', code: 'cmp-000002' } })),
-    getBookingAvailability: vi.fn(async () => ({
-      success: true,
-      message: '',
-      data: {
-        eligibleFoCount: 1,
-        dateFrom: todayKey(),
-        dateTo: todayKey(),
-        dates: {
-          [todayKey()]: {
-            available: true,
-            slots: { '9am-1pm': true, '10am-2pm': true, '11am-3pm': true, '6pm-10pm': true },
-          },
-        },
-      },
-    })),
   },
 }))
 
@@ -91,7 +34,7 @@ function sessionFixture(roleTypeCode: string): SessionResponse {
 function projectFixture(overrides: Partial<ProjectEntity> = {}): ProjectEntity {
   return {
     id: 'proj-1', code: 'PRJ-1', name: 'Cardio Screening Drive', tenant: 't-1', division: 'div-1',
-    therapy: 'cardiology', type: [], tests: [], lead: null, mode: null, campCost: 0, totalCamps: 0,
+    therapy: 'cardiology', type: ['screening_camp', 'diet'], tests: [], lead: null, mode: null, campCost: 0, totalCamps: 0,
     gst: 0, valueBeforeGST: 0, additionalCost: 0, campTimeSlots: ['9am-1pm', '10am-2pm'], freeCancelHours: 0,
     cancellationAllowed: 0, campCostDeductionOnChargableCancel: 0, goLiveScope: null,
     whoCanBookCamp: [], salesRep: null, projectCoordinator: null, status: 'live',
@@ -133,7 +76,8 @@ async function renderPage(projectId = 'proj-1') {
   )
 }
 
-describe('PharmaProjectCampsPage', () => {
+// Unrestricted "All camps" view — no type filter, no booking (see TypeScopedPharmaCampsPage.test.tsx for that).
+describe('PharmaProjectCampsPage — unrestricted "All camps" view', () => {
   it('blocks a camp:book-holding but non-pharma role type from the real deep-linked page — neither project nor camps ever fetch', async () => {
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
@@ -148,10 +92,9 @@ describe('PharmaProjectCampsPage', () => {
     expect(await screen.findByText(/not available for your role/i)).toBeInTheDocument()
     expect(pharmaProjectsService.getProject).not.toHaveBeenCalled()
     expect(pharmaCampsService.searchScopedCamps).not.toHaveBeenCalled()
-    expect(screen.queryByRole('button', { name: /new camp/i })).not.toBeInTheDocument()
   })
 
-  it('never fetches camps and never renders "New camp" when the project is inaccessible (404)', async () => {
+  it('never fetches camps when the project is inaccessible (404)', async () => {
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
       isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-rsm'), hasPermission: () => false,
@@ -164,9 +107,30 @@ describe('PharmaProjectCampsPage', () => {
     await renderPage()
 
     await waitFor(() => expect(screen.getByText(/not found, or you don't have access/i)).toBeInTheDocument())
-
     expect(pharmaCampsService.searchScopedCamps).not.toHaveBeenCalled()
-    expect(screen.queryByRole('button', { name: /new camp/i })).not.toBeInTheDocument()
+  })
+
+  it('fetches camps with NO type filter — every type incl. Lab is shown, never narrowed by the project\'s own configured type', async () => {
+    const { useSession } = await import('@/hooks/useSession')
+    vi.mocked(useSession).mockReturnValue({
+      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-rsm'), hasPermission: () => false,
+    } as unknown as ReturnType<typeof useSession>)
+
+    const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
+    const { pharmaCampsService } = await import('@/features/pharma/pharmaCamps.service')
+    // A Screening-only project can still have a stray Lab (or any other type)
+    // camp attached — the backend doesn't enforce project-type-to-camp-type.
+    vi.mocked(pharmaProjectsService.getProject).mockResolvedValue({ success: true, message: '', data: projectFixture({ type: ['screening_camp'] }) })
+    vi.mocked(pharmaCampsService.searchScopedCamps).mockResolvedValue({
+      success: true, message: '', data: { items: [campFixture({ type: 'lab' }), campFixture({ id: 'camp-2', code: 'cmp-000002', type: 'screening' })], count: 2 },
+    })
+
+    await renderPage()
+
+    expect(await screen.findByText('cmp-000001')).toBeInTheDocument()
+    expect(screen.getByText('cmp-000002')).toBeInTheDocument()
+    const query = vi.mocked(pharmaCampsService.searchScopedCamps).mock.calls[0][0]
+    expect(query).not.toHaveProperty('type')
   })
 
   it('RSM/ASM/MR empty state never claims the whole project has no camps', async () => {
@@ -203,7 +167,7 @@ describe('PharmaProjectCampsPage', () => {
     expect(screen.queryByText(/assigned to you/i)).not.toBeInTheDocument()
   })
 
-  it('post-booking: closes the dialog and shows the newly booked camp in the refreshed list', async () => {
+  it('has no "New camp" button — booking always happens on the dedicated Screening/Diet page', async () => {
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
       isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-mr'), hasPermission: () => false,
@@ -211,51 +175,12 @@ describe('PharmaProjectCampsPage', () => {
 
     const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
     const { pharmaCampsService } = await import('@/features/pharma/pharmaCamps.service')
-    const { doctorsService } = await import('@/features/doctors/doctors.service')
-    const { campsRealService } = await import('@/features/camps/campsReal.service')
-
     vi.mocked(pharmaProjectsService.getProject).mockResolvedValue({ success: true, message: '', data: projectFixture() })
-    vi.mocked(pharmaCampsService.searchScopedCamps)
-      .mockResolvedValueOnce({ success: true, message: '', data: { items: [], count: 0 } })
-      .mockResolvedValueOnce({ success: true, message: '', data: { items: [campFixture({ code: 'cmp-000002' })], count: 1 } })
-    vi.mocked(doctorsService.searchDoctors).mockResolvedValue({
-      success: true, message: '', data: { items: [{ id: 'doc-1', pharmaCode: 'DOC-1', name: 'Dr. Priya Sharma', specialization: 'cp', mobile: '9876543210', email: 'p@example.com', city: 'Pune', state: 'Maharashtra', pincode: '411001', googleMapLink: '', createdAt: '', updatedAt: '' } as never], count: 1 },
-    })
+    vi.mocked(pharmaCampsService.searchScopedCamps).mockResolvedValue({ success: true, message: '', data: { items: [], count: 0 } })
 
-    const user = userEvent.setup()
     await renderPage()
 
-    await waitFor(() => expect(screen.getByText(/no camps assigned to you on this project yet/i)).toBeInTheDocument())
-
-    await user.click(screen.getByRole('button', { name: /new camp/i }))
-    await screen.findByText(/booking for project/i)
-
-    // Step 1 — who.
-    await user.type(screen.getByPlaceholderText(/search doctor by name/i), 'Priya')
-    const doctorOption = await screen.findByText(/Dr\. Priya Sharma/i, {}, { timeout: 3000 })
-    await user.click(doctorOption)
-    await user.click(screen.getByRole('button', { name: /^next$/i }))
-
-    // Step 2 — where.
-    await user.type(await screen.findByLabelText(/^address line 1$/i), '221 Baker Street')
-    await user.type(screen.getByLabelText(/^city$/i), 'Pune')
-    await user.type(screen.getByLabelText(/^state$/i), 'Maharashtra')
-    await user.type(screen.getByLabelText(/^pincode$/i), '411001')
-    await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
-    await user.click(screen.getByRole('button', { name: /^next$/i }))
-
-    // Step 3 — when & details: today is the only mocked-available day.
-    const today = new Date()
-    const todayCell = await screen.findByRole('gridcell', { name: String(today.getDate()) })
-    await user.click(todayCell.querySelector('button')!)
-    await user.click(await screen.findByRole('button', { name: /9 AM – 1 PM/i }))
-
-    await user.click(screen.getByRole('button', { name: /^book camp$/i }))
-
-    await waitFor(() => expect(campsRealService.bookCamp).toHaveBeenCalledTimes(1))
-    expect(vi.mocked(campsRealService.bookCamp).mock.calls[0][0].project).toBe('proj-1')
-
-    await waitFor(() => expect(screen.queryByText(/booking for project/i)).not.toBeInTheDocument())
-    expect(await screen.findByText('cmp-000002')).toBeInTheDocument()
+    await screen.findByText('Cardio Screening Drive')
+    expect(screen.queryByRole('button', { name: /new camp/i })).not.toBeInTheDocument()
   })
 })

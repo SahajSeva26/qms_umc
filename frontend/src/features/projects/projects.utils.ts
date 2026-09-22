@@ -1,5 +1,4 @@
 import type { ProjectEntity, ProjectReportResponse, ProjectType } from '@/types/project.types'
-import { CAMP_TYPE_VALUES, type CampType } from '@/types/campReal.types'
 
 // Frontend-only UI cap — the backend's daysToBookBefore validator is
 // nonnegative-only with no upper bound, so a direct API caller can submit more.
@@ -34,19 +33,8 @@ export const PROJECT_TYPE_COLOR: Record<ProjectType, string> = {
   mixed: '#f59e0b',
 }
 
-// No backend rule links Project type to Camp type — this is a frontend-only,
-// advisory mapping used to narrow the wizard's test picker.
-export const PROJECT_TYPE_CAMP_TYPES: Record<ProjectType, CampType[]> = {
-  screening_camp: ['screening'],
-  diet: ['diet'],
-  teleconsultation_diet: ['diet'],
-  lab_test: ['lab'],
-  mixed: [...CAMP_TYPE_VALUES],
-}
-
-export function allowedCampTypesForProjectTypes(types: ProjectType[]): CampType[] {
-  return [...new Set(types.flatMap((t) => PROJECT_TYPE_CAMP_TYPES[t]))]
-}
+// Moved to types/project.types.ts (shared with Pharma) — re-exported here for existing imports.
+export { PROJECT_TYPE_CAMP_TYPES, allowedCampTypesForProjectTypes } from '@/types/project.types'
 
 // `gst` has no schema default (unlike campCost/totalCamps/valueBeforeGST), so
 // a project created without one genuinely has gst: undefined server-side.

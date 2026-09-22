@@ -21,6 +21,11 @@ const DoctorDrawer = ({ doctor, canEdit, onClose, onEdit }: DoctorDrawerProps) =
   const d = doctor
   const handleWhatsApp = () => toast.info('WhatsApp opened')
   const handleEmail = () => toast.info('Email composer opened')
+  const mapsLink = d.location?.coordinates
+    ? `https://www.google.com/maps?q=${d.location.coordinates[1]},${d.location.coordinates[0]}`
+    : d.location?.googlePlaceId
+      ? `https://www.google.com/maps/place/?q=place_id:${d.location.googlePlaceId}`
+      : null
 
   return (
     <SideDrawer open={!!doctor} title={`${d.name} · ${d.pharmaCode}`} onClose={onClose} widthClassName="max-w-lg">
@@ -33,7 +38,7 @@ const DoctorDrawer = ({ doctor, canEdit, onClose, onEdit }: DoctorDrawerProps) =
         </div>
         <div className="min-w-0 flex-1">
           <div className="text-[16px] font-extrabold" style={{ color: 'var(--qms-text)' }}>{d.name}</div>
-          <div className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>{d.specialization.toUpperCase()} · {d.city}</div>
+          <div className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>{d.specialization.toUpperCase()} · {d.location?.city ?? '—'}</div>
           <div className="mt-2"><StatusPill status={d.status} /></div>
         </div>
       </div>
@@ -43,12 +48,12 @@ const DoctorDrawer = ({ doctor, canEdit, onClose, onEdit }: DoctorDrawerProps) =
         <div className="flex items-center gap-1" style={{ color: 'var(--qms-text-muted)' }}><FiMail size={11} /> Email</div><div>{d.email || '—'}</div>
         <div className="flex items-center gap-1" style={{ color: 'var(--qms-text-muted)' }}><FiPhone size={11} /> Mobile</div><div>{d.mobile || '—'}</div>
         <div style={{ color: 'var(--qms-text-muted)' }}>Specialization</div><div>{d.specialization.toUpperCase()}</div>
-        <div className="flex items-center gap-1" style={{ color: 'var(--qms-text-muted)' }}><FiMapPin size={11} /> City</div><div>{d.city || '—'}, {d.state || '—'} · {d.pincode || '—'}</div>
-        {d.googleMapLink && (
+        <div className="flex items-center gap-1" style={{ color: 'var(--qms-text-muted)' }}><FiMapPin size={11} /> City</div><div>{d.location?.city || '—'}, {d.location?.state || '—'} · {d.location?.pincode || '—'}</div>
+        {mapsLink && (
           <>
             <div style={{ color: 'var(--qms-text-muted)' }}>Map</div>
             <div>
-              <a href={d.googleMapLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold" style={{ color: 'var(--qms-brand)' }}>
+              <a href={mapsLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold" style={{ color: 'var(--qms-brand)' }}>
                 Open Google Maps <FiExternalLink size={11} />
               </a>
             </div>

@@ -1,36 +1,33 @@
 import { useState } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { FiArrowLeft } from 'react-icons/fi'
 import { useCampReal } from '@/features/camps/hooks/useCampReal'
 import { useUpdateCamp } from '@/features/camps/hooks/useUpdateCamp'
 import { useCampDraft } from '@/features/camps/hooks/useCampDraft'
 import { useProject } from '@/features/projects/hooks/useProject'
 import { useDoctors } from '@/features/doctors/hooks/useDoctors'
-import { campRefId, campRefName, saveErrorMessage } from '@/features/camps/campsReal.utils'
+import { campRefId, campRefName, saveErrorMessage, withCampParam } from '@/features/camps/campsReal.utils'
 import { usePermission } from '@/hooks/usePermission'
 import CampFormFields from '@/features/camps/components/CampFormFields'
 import { Button } from '@/components/ui/button'
 import type { CampEntity } from '@/types/campReal.types'
 import type { LocationResolutionState } from '@/components/widgets/location-picker/location.types'
 
-// create (camp:create) and update (camp:update) are two distinct backend
-// permission codes — a create-only actor can't edit this page.
+// create and update are distinct permissions — a create-only actor can't edit this page.
 const CAMP_UPDATE_PERMISSIONS = ['camp:update', 'camp:manage', 'tenant:manage']
 
 const CampEditPageReal = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const location = useLocation()
-  // Real browser back when we arrived via a push from the drawer (avoids a
-  // Back/forward loop where "Back to camp" itself pushes another entry) —
-  // falls back to the explicit URL for a direct/bookmarked link to this page.
+  const [searchParams] = useSearchParams()
+  // Set by CampDrawer's Edit button to whichever page the drawer was opened over.
+  const returnTo = searchParams.get('from') || (id ? `/camps?camp=${id}` : '/camps')
+  // Real back when we arrived via a drawer push; a direct/bookmarked load has no entry to pop back to.
   const arrivedFromDrawer = (location.state as { fromDrawer?: boolean } | null)?.fromDrawer === true
   const goBackToCamp = () => {
     if (arrivedFromDrawer) navigate(-1)
-    // Direct/bookmarked/refreshed load — there's no drawer entry to pop back
-    // to, so replace this entry instead of pushing a new one (otherwise
-    // browser Back from the drawer would return here, not leave the page).
-    else navigate(id ? `/camps?camp=${id}` : '/camps', { replace: true })
+    else navigate(returnTo, { replace: true })
   }
 
   const { data, isLoading, error } = useCampReal(id)
@@ -59,20 +56,19 @@ const CampEditPageReal = () => {
         </div>
       )}
 
-      {/* key={camp.id} forces a fresh draft when a background refetch swaps
-          in a different camp object — mirrors CampForm's own remount-by-key contract. */}
-      {camp && !isLoading && <CampEditForm key={camp.id} camp={camp} />}
+      {/* key={camp.id} forces a fresh draft when a background refetch swaps in a different camp. */}
+      {camp && !isLoading && <CampEditForm key={camp.id} camp={camp} returnTo={returnTo} />}
     </div>
   )
 }
 
 interface CampEditFormProps {
   camp: CampEntity
+  returnTo: string
 }
 
-// Everything here is locked (disabled, not just save-blocked) once the camp
-// leaves `requested` — the backend 409s the WHOLE update, not just fo/date.
-const CampEditForm = ({ camp }: CampEditFormProps) => {
+// Locked once the camp leaves `requested` — the backend 409s the whole update, not just fo/date.
+const CampEditForm = ({ camp, returnTo }: CampEditFormProps) => {
   const navigate = useNavigate()
   const { hasAnyPermission } = usePermission()
   const canWrite = hasAnyPermission(CAMP_UPDATE_PERMISSIONS)
@@ -97,8 +93,7 @@ const CampEditForm = ({ camp }: CampEditFormProps) => {
     return effectiveTenant ? 'Select doctor' : 'Select company first'
   }
 
-  // A camp's own `project` populate is slim ({_id,name,status}, no campTimeSlots) —
-  // fetch the full project separately so the time-slot Select can be scoped.
+  // camp.project is a slim populate (no campTimeSlots) — fetch the full project to scope the time-slot Select.
   const { data: editProjectData } = useProject(camp.project ? campRefId(camp.project) ?? undefined : undefined)
   const editProject = editProjectData?.data ?? null
   const bookableSlots = editProject?.campTimeSlots ?? []
@@ -113,11 +108,9 @@ const CampEditForm = ({ camp }: CampEditFormProps) => {
   const handleSave = () => {
     if (locationResolution === 'loading') { setFormError('Still resolving the picked location — wait a moment and try again'); return }
     if (locationResolution === 'error') { setFormError('Retry or choose "Use this pin" for the location before saving'); return }
-    // The backend treats an absent mr as "leave unchanged," not "clear" — block
-    // an empty picker here instead of silently keeping the old MR.
+    // An absent mr means "leave unchanged" server-side, so block an empty picker instead of silently keeping the old MR.
     if (!mr) { setFormError('MR is required'); return }
-    // Only validated when the user has actually set a location — a legacy
-    // camp's location may load as null and must be allowed to stay that way.
+    // Only validated once a location is set — a legacy camp may load with location: null.
     if (location && (!location.coordinates || !location.addressLine1.trim() || !location.city.trim() || !location.state.trim() || !location.pincode.trim())) {
       setFormError('Complete the address (street, city, state, pincode) or leave it unset'); return
     }
@@ -131,8 +124,7 @@ const CampEditForm = ({ camp }: CampEditFormProps) => {
         mr: mr || undefined,
         date: date || undefined,
         timeSlot: timeSlot || undefined,
-        // Omitted (not sent as null) when unset, so the backend's replace-wholesale
-        // update semantics leave an untouched legacy-null location alone.
+        // Omitted (not null) when unset, so an untouched legacy-null location stays alone.
         location: location ?? undefined,
         // Send raw string (not `notes || undefined`) so clearing the textarea to '' actually clears it.
         notes,
@@ -143,10 +135,8 @@ const CampEditForm = ({ camp }: CampEditFormProps) => {
         ...(sortedIds(deviceIds) !== originalDeviceIds ? { devices: deviceIds } : {}),
       },
       {
-        // replace, not push — a successful save shouldn't leave the edit page
-        // as a Back-able history step; landing back on the drawer is the only
-        // sensible "undo" of a save.
-        onSuccess: () => navigate(`/camps?camp=${camp.id}`, { replace: true }),
+        // replace, not push — a save shouldn't leave the edit page as a Back-able history step.
+        onSuccess: () => navigate(withCampParam(returnTo, camp.id), { replace: true }),
       },
     )
   }

@@ -30,12 +30,32 @@ vi.mock('@vis.gl/react-google-maps', () => ({
 
 vi.mock('./LocationSearchBox', () => ({
   default: ({ onSelected }: { onSelected: (v: LocationValue) => void }) => (
-    <button
-      type="button"
-      onClick={() => onSelected({ addressLine1: '', city: '', state: '', pincode: '', coordinates: [77.209, 28.6139] })}
-    >
-      Search-select a location
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={() => onSelected({ addressLine1: '', city: '', state: '', pincode: '', coordinates: [77.209, 28.6139] })}
+      >
+        Search-select a location
+      </button>
+      <button
+        type="button"
+        onClick={() => onSelected({ addressLine1: 'New number', city: 'Pune', state: 'Maharashtra', pincode: '411001', googlePlaceId: 'place-clinic-a', coordinates: [73.86, 18.53] })}
+      >
+        Search-select a refinement of the same address
+      </button>
+      <button
+        type="button"
+        onClick={() => onSelected({ addressLine1: 'Connaught Place', city: 'New Delhi', state: 'Delhi', pincode: '110001', googlePlaceId: 'place-cp', coordinates: [77.21, 28.63] })}
+      >
+        Search-select a different city
+      </button>
+      <button
+        type="button"
+        onClick={() => onSelected({ addressLine1: 'Clinic B', city: 'Pune', state: 'Maharashtra', pincode: '411001', googlePlaceId: 'place-clinic-b', coordinates: [73.87, 18.54] })}
+      >
+        Search-select a different place in the same postcode
+      </button>
+    </>
   ),
 }))
 
@@ -269,6 +289,73 @@ describe('LocationPicker — combined resolution state (map + search)', () => {
 
     await user.click(screen.getByRole('button', { name: /search-select a location/i }))
     expect(onResolutionStateChange).toHaveBeenLastCalledWith('idle')
+  })
+
+  it('re-selecting the same place (same googlePlaceId) keeps a manually-typed addressLine2/locality, since Google never reliably returns those', async () => {
+    const onChange = vi.fn()
+    const user = userEvent.setup()
+    const existing: LocationValue = {
+      addressLine1: 'Old address', addressLine2: 'Near the old landmark', locality: 'Old locality',
+      city: 'Pune', state: 'Maharashtra', pincode: '411001', googlePlaceId: 'place-clinic-a', coordinates: [73.85, 18.52],
+    }
+    render(<LocationPicker value={existing} onChange={onChange} />)
+
+    await user.click(screen.getByRole('button', { name: /search-select a refinement of the same address/i }))
+
+    const lastCall = onChange.mock.calls.at(-1)?.[0] as LocationValue
+    expect(lastCall.addressLine2).toBe('Near the old landmark')
+    expect(lastCall.locality).toBe('Old locality')
+    expect(lastCall.city).toBe('Pune')
+  })
+
+  it('selecting a different place (different city) does NOT carry over the old addressLine2/locality — prevents mixing two addresses', async () => {
+    const onChange = vi.fn()
+    const user = userEvent.setup()
+    const existing: LocationValue = {
+      addressLine1: 'Old address', addressLine2: 'Near the old landmark', locality: 'Old Pune locality',
+      city: 'Pune', state: 'Maharashtra', pincode: '411001', googlePlaceId: 'place-clinic-a', coordinates: [73.85, 18.52],
+    }
+    render(<LocationPicker value={existing} onChange={onChange} />)
+
+    await user.click(screen.getByRole('button', { name: /search-select a different city/i }))
+
+    const lastCall = onChange.mock.calls.at(-1)?.[0] as LocationValue
+    expect(lastCall.city).toBe('New Delhi')
+    expect(lastCall.addressLine2).toBeUndefined()
+    expect(lastCall.locality).toBeUndefined()
+  })
+
+  it('selecting a DIFFERENT place with the SAME city/state/pincode (e.g. a neighboring clinic) does NOT carry over the old addressLine2/locality', async () => {
+    const onChange = vi.fn()
+    const user = userEvent.setup()
+    const existing: LocationValue = {
+      addressLine1: 'Clinic A', addressLine2: 'Near the old landmark', locality: 'Old locality',
+      city: 'Pune', state: 'Maharashtra', pincode: '411001', googlePlaceId: 'place-clinic-a', coordinates: [73.85, 18.52],
+    }
+    render(<LocationPicker value={existing} onChange={onChange} />)
+
+    await user.click(screen.getByRole('button', { name: /search-select a different place in the same postcode/i }))
+
+    const lastCall = onChange.mock.calls.at(-1)?.[0] as LocationValue
+    expect(lastCall.googlePlaceId).toBe('place-clinic-b')
+    expect(lastCall.addressLine2).toBeUndefined()
+    expect(lastCall.locality).toBeUndefined()
+  })
+
+  it('a googlePlaceId-less prior value (e.g. a manual pin drop) never counts as "the same place" on a subsequent search selection', async () => {
+    const onChange = vi.fn()
+    const user = userEvent.setup()
+    const existing: LocationValue = {
+      addressLine1: 'Old address', addressLine2: 'Near the old landmark', locality: 'Old locality',
+      city: 'Pune', state: 'Maharashtra', pincode: '411001', coordinates: [73.85, 18.52],
+    }
+    render(<LocationPicker value={existing} onChange={onChange} />)
+
+    await user.click(screen.getByRole('button', { name: /search-select a refinement of the same address/i }))
+
+    const lastCall = onChange.mock.calls.at(-1)?.[0] as LocationValue
+    expect(lastCall.addressLine2).toBeUndefined()
+    expect(lastCall.locality).toBeUndefined()
   })
 })
 

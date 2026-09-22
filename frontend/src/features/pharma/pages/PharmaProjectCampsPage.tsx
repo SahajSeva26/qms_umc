@@ -1,46 +1,37 @@
-import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { FiArrowLeft, FiPlus } from 'react-icons/fi'
-import { toast } from 'sonner'
-import { useQueryClient } from '@tanstack/react-query'
+import { FiArrowLeft } from 'react-icons/fi'
 import AnyPharmaRoleGate from '@/features/pharma/components/AnyPharmaRoleGate'
 import { usePharmaProject } from '@/features/pharma/hooks/usePharmaProject'
-import { usePharmaCamps, pharmaCampKeys } from '@/features/pharma/hooks/usePharmaCamps'
+import { usePharmaCamps } from '@/features/pharma/hooks/usePharmaCamps'
 import { PHARMA_ROUTES, getPharmaRoleMeta } from '@/features/pharma/pharma.constants'
 import PharmaCampTable from '@/features/pharma/components/PharmaCampTable'
-import BookCampForm from '@/features/pharma/components/BookCampForm'
+import PharmaCampsNav from '@/features/pharma/components/PharmaCampsNav'
 import ProjectStatusPill from '@/features/projects/components/ProjectStatusPill'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import PaginationControls from '@/components/ui/PaginationControls'
-import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { usePagination } from '@/hooks/usePagination'
 import { useSession } from '@/hooks/useSession'
-import type { WhoCanBookCampCode } from '@/types/project.types'
 
 const PAGE_SIZE = 10
 
-// Must wrap a separate content component, not sit beside an early-return gate
-// — that would still mount usePharmaProject/usePharmaCamps for a rejected role.
+// Separate content component so a rejected role never mounts usePharmaProject/usePharmaCamps.
 const PharmaProjectCampsPage = () => (
   <AnyPharmaRoleGate>
     <PharmaProjectCampsContent />
   </AnyPharmaRoleGate>
 )
 
+// The unrestricted "All camps" view — every type incl. Lab, view-only; booking happens on Screening/Diet.
 const PharmaProjectCampsContent = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const queryClient = useQueryClient()
   const { session } = useSession()
-  const [bookOpen, setBookOpen] = useState(false)
   const { page, setPage, totalPages } = usePagination(PAGE_SIZE)
 
   const { data: projectData, isLoading: projectLoading, error: projectError } = usePharmaProject(id)
   const project = projectData?.data ?? null
 
-  // Waits on the RESOLVED project object, not just a truthy id param — an
-  // inaccessible/404'd project must never trigger a redundant camps request.
+  // Waits on the resolved project, not just the id — an inaccessible project must never fetch camps.
   const { data: campsData, isLoading: campsLoading, error: campsError, refetch: refetchCamps } = usePharmaCamps(
     { project: project?.id, page: String(page), limit: String(PAGE_SIZE) },
     { enabled: !!project },
@@ -48,31 +39,12 @@ const PharmaProjectCampsContent = () => {
   const camps = campsData?.data?.items ?? []
   const totalCamps = campsData?.data?.count ?? 0
 
-  // Only HO/RSM/ASM book on behalf of a downline MR — derived directly from
-  // the session here, not threaded down as a prop through two route levels.
-  const needsMrPicker = session?.roleType?.code !== 'pharma-mr'
   const backRoute = getPharmaRoleMeta(session?.roleType?.code)?.portalPath ?? PHARMA_ROUTES.PHARMA
-  // Division-head's camp scoping is division-wide, not assignment-scoped —
-  // unlike RSM/ASM/MR, an empty list for them genuinely means no camps yet.
+  // Division-head scoping is division-wide, not assignment-scoped like RSM/ASM/MR.
   const isDivisionHead = session?.roleType?.code === 'pharma-division-head'
   const emptyCampsText = isDivisionHead
     ? 'No camps have been booked for this project yet.'
     : 'No camps assigned to you on this project yet.'
-
-  const roleCanBook = !project || project.whoCanBookCamp.length === 0 || project.whoCanBookCamp.includes((session?.roleType?.code ?? '') as WhoCanBookCampCode)
-  const hasSlots = !!project && project.campTimeSlots.length > 0
-  const canBook = roleCanBook && hasSlots
-  const cannotBookReason = !roleCanBook
-    ? 'Your role cannot book camps on this project.'
-    : !hasSlots
-      ? 'This project has no configured time slots.'
-      : null
-
-  const handleBooked = () => {
-    setBookOpen(false)
-    queryClient.invalidateQueries({ queryKey: pharmaCampKeys.list({ project: project?.id, page: String(page), limit: String(PAGE_SIZE) }) })
-    toast.success('Camp requested')
-  }
 
   return (
     <div className="w-full">
@@ -100,7 +72,7 @@ const PharmaProjectCampsContent = () => {
       {project && !projectLoading && (
         <>
           <div
-            className="rounded-xl border p-5 mb-5 flex items-start justify-between gap-3"
+            className="rounded-xl border p-5 mb-5"
             style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}
           >
             <div className="min-w-0">
@@ -108,20 +80,10 @@ const PharmaProjectCampsContent = () => {
               <div className="text-[13px] truncate mb-2" style={{ color: 'var(--qms-text-muted)' }}>{project.code}</div>
               <ProjectStatusPill status={project.status} />
             </div>
-            <div className="text-right shrink-0">
-              <Button
-                onClick={() => setBookOpen(true)}
-                disabled={!canBook}
-                className="text-white"
-                style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
-              >
-                <FiPlus size={14} /> New camp
-              </Button>
-              {cannotBookReason && (
-                <p className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>{cannotBookReason}</p>
-              )}
-            </div>
           </div>
+
+          <h1 className="text-base font-bold mb-2" style={{ color: 'var(--qms-text)' }}>All camps</h1>
+          <PharmaCampsNav project={project} active="all" />
 
           <QueryStateBlock
             isLoading={campsLoading}
@@ -139,21 +101,6 @@ const PharmaProjectCampsContent = () => {
             )}
             <PaginationControls page={page} totalPages={totalPages(totalCamps)} onPageChange={setPage} />
           </QueryStateBlock>
-
-          <Dialog open={bookOpen} onOpenChange={setBookOpen}>
-            <DialogContent className="sm:max-w-lg">
-              <DialogHeader>
-                <DialogTitle>New camp</DialogTitle>
-                <DialogDescription>Book a camp against {project.name}.</DialogDescription>
-              </DialogHeader>
-              <BookCampForm
-                needsMrPicker={needsMrPicker}
-                project={{ id: project.id, name: project.name, campTimeSlots: project.campTimeSlots }}
-                onBooked={handleBooked}
-                onCancel={() => setBookOpen(false)}
-              />
-            </DialogContent>
-          </Dialog>
         </>
       )}
     </div>

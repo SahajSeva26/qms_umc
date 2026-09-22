@@ -1,4 +1,5 @@
 import type { ProjectEntity } from '@/types/project.types'
+import CopyButton from '@/components/ui/CopyButton'
 import { formatINR } from '@/utils/formatters'
 import { computeGstBreakdown, projectSalesRepName } from '@/features/projects/projects.utils'
 import ProjectTypePills from '@/features/projects/components/ProjectTypePill'
@@ -47,7 +48,10 @@ const ProjectTable = ({ projects, canWrite, onOpenDetail, onEdit, onChangeStatus
             >
               <td className="px-3 py-2.5 align-top">
                 <div className="font-semibold" style={{ color: 'var(--qms-text)' }}>{project.name}</div>
-                <div className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>{project.code}</div>
+                <div className="flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>
+                  {project.code}
+                  <CopyButton value={project.code} label="Code" />
+                </div>
               </td>
               <td className="px-3 py-2.5 align-top whitespace-nowrap">
                 <div className="flex flex-wrap justify-center gap-1"><ProjectTypePills types={project.type} /></div>

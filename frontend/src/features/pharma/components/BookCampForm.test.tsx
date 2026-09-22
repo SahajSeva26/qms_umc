@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { format } from 'date-fns'
 import type { RoleEntity, SessionResponse } from '@/types/accessManagement.types'
@@ -11,10 +11,7 @@ import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
 
 vi.mock('@/hooks/useSession')
 
-// LocationPicker needs real Google Maps credentials unavailable in tests —
-// mocked to buttons using the same onChange(LocationValue)/onResolutionStateChange
-// contract. LocationAddressFields is rendered for real by BookCampForm itself,
-// as a sibling of this mock, not by LocationPicker.
+// Mocks the map (needs real Google Maps creds) with buttons firing the same onChange/onResolutionStateChange contract.
 vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
   default: ({ value, onChange, onResolutionStateChange }: {
     value: unknown
@@ -85,7 +82,7 @@ vi.mock('@/features/camps/campsReal.service', () => ({
 function sessionFixture(roleId = 'self-role-1'): SessionResponse {
   return {
     user: { id: 'u-1', email: 'a@example.com', firstName: 'a', lastName: 'b' },
-    role: { id: roleId, code: 'pharma-mr', name: 'MR' },
+    role: { id: roleId, code: 'pharma-mr', name: 'MR', division: 'div-1' },
     roleType: { id: 'rt-1', code: 'pharma-mr', name: 'pharma-mr' },
     tenant: { id: 't-1', code: 'tenant-1', name: 'Tenant', type: 'customer' },
     permissions: ['camp:book'],
@@ -97,7 +94,11 @@ function mrFixture(overrides: Partial<RoleEntity> = {}): RoleEntity {
 }
 
 function doctorFixture(overrides: Partial<DoctorEntity> = {}): DoctorEntity {
-  return { id: 'doc-1', pharmaCode: 'DOC-1', name: 'Dr. Priya Sharma', specialization: 'cp', mobile: '9876543210', email: 'p@example.com', city: 'Pune', state: 'Maharashtra', pincode: '411001', googleMapLink: '', createdAt: '', updatedAt: '', ...overrides } as DoctorEntity
+  return {
+    id: 'doc-1', pharmaCode: 'DOC-1', name: 'Dr. Priya Sharma', specialization: 'cp', mobile: '9876543210', email: 'p@example.com',
+    location: { addressLine1: '221 Baker Street', city: 'Pune', state: 'Maharashtra', pincode: '411001', coordinates: [73.8567, 18.5204] },
+    division: 'div-1', createdAt: '', updatedAt: '', ...overrides,
+  } as DoctorEntity
 }
 
 function bookCampResponseFixture(overrides: Partial<CampMutationResponseEntity> = {}): ApiResponse<CampMutationResponseEntity> {
@@ -135,14 +136,14 @@ async function mockSession(roleId?: string, hasDoctorManage = false) {
   } as unknown as ReturnType<typeof useSession>)
 }
 
-function renderForm(props: { needsMrPicker?: boolean } = {}) {
+function renderForm(props: { needsMrPicker?: boolean; type?: 'screening' | 'diet' } = {}) {
   return async () => {
     const BookCampForm = (await import('@/features/pharma/components/BookCampForm')).default
     const onBooked = vi.fn()
     const onCancel = vi.fn()
     render(
       <QueryClientProvider client={makeQueryClient()}>
-        <BookCampForm needsMrPicker={props.needsMrPicker ?? false} project={TEST_PROJECT} onBooked={onBooked} onCancel={onCancel} />
+        <BookCampForm needsMrPicker={props.needsMrPicker ?? false} type={props.type ?? 'screening'} project={TEST_PROJECT} onBooked={onBooked} onCancel={onCancel} />
       </QueryClientProvider>,
     )
     return { onBooked, onCancel }
@@ -174,6 +175,17 @@ async function completeStep1(user: ReturnType<typeof userEvent.setup>, { withMr 
   if (withMr) await pickMr(user)
   await pickDoctor(user)
   await user.click(screen.getByRole('button', { name: /^next$/i }))
+}
+
+// Fills EditDoctorModal's own Location card (required on create) — same real
+// LocationAddressFields inputs as Camp's own step 2, scoped to the open dialog.
+async function fillNewDoctorLocation(user: ReturnType<typeof userEvent.setup>) {
+  const dialog = screen.getByRole('dialog')
+  await user.type(within(dialog).getByLabelText(/^address line 1$/i), '221 Baker Street')
+  await user.type(within(dialog).getByLabelText(/^city$/i), 'Pune')
+  await user.type(within(dialog).getByLabelText(/^state$/i), 'Maharashtra')
+  await user.type(within(dialog).getByLabelText(/^pincode$/i), '411001')
+  await user.click(within(dialog).getByRole('button', { name: /set test coordinates/i }))
 }
 
 // Step 2 -> step 3, filling location and resolving coordinates.
@@ -328,9 +340,7 @@ describe('BookCampForm — step 2 (where)', () => {
     await renderForm()()
 
     await completeStep1(user)
-    // Address line 1 filled (avoids LocationAddressFields' own crash on a
-    // coordinates-only value with no addressLine1 key at all), but city/
-    // state/pincode left blank — Next fails validation, stays on step 2.
+    // Address filled but city/state/pincode blank — Next fails validation, stays on step 2.
     await user.type(screen.getByLabelText(/^address line 1$/i), '221 Baker Street')
     await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
     await user.click(screen.getByRole('button', { name: /^next$/i }))
@@ -501,10 +511,7 @@ describe('BookCampForm — step 3 (when & details) and submit', () => {
     await waitFor(() => expect(onBooked).toHaveBeenCalledTimes(1))
   })
 
-  // "Blocks submit while location is still resolving" is covered by the
-  // step-2 test above — LocationPicker (and its "simulate resolving"
-  // control) is only mounted on step 2, not step 3, so that scenario can't
-  // occur at the Submit button in the new stepped flow.
+  // The "blocks submit while location resolving" case is covered by the step-2 test above — LocationPicker isn't mounted on step 3.
 
   it('blocks a true rapid double-submit to exactly one mutation call', async () => {
     await mockSession()
@@ -542,7 +549,7 @@ describe('BookCampForm — zero configured slots', () => {
 
     render(
       <QueryClientProvider client={makeQueryClient()}>
-        <BookCampForm needsMrPicker={false} project={{ id: 'proj-2', name: 'Empty Project', campTimeSlots: [] }} onBooked={vi.fn()} onCancel={vi.fn()} />
+        <BookCampForm needsMrPicker={false} type="screening" project={{ id: 'proj-2', name: 'Empty Project', campTimeSlots: [] }} onBooked={vi.fn()} onCancel={vi.fn()} />
       </QueryClientProvider>,
     )
 
@@ -568,7 +575,7 @@ describe('BookCampForm — inline doctor creation (dormant until doctor:manage i
     const { doctorsService } = await import('@/features/doctors/doctors.service')
     vi.mocked(doctorsService.createDoctor).mockResolvedValue({
       success: true, message: '',
-      data: { id: 'doc-new', pharmaCode: 'DOC-NEW', name: 'Dr. New', specialization: 'cp', mobile: '', email: '', city: '', state: '', pincode: '', googleMapLink: '', createdAt: '', updatedAt: '', tenant: 't-1' },
+      data: { id: 'doc-new', pharmaCode: 'DOC-NEW', name: 'Dr. New', specialization: 'cp', mobile: '', email: '', location: null, division: 'div-1', createdAt: '', updatedAt: '', tenant: 't-1' },
     })
     const user = userEvent.setup()
     await renderForm()()
@@ -581,6 +588,11 @@ describe('BookCampForm — inline doctor creation (dormant until doctor:manage i
     await user.type(codeLabel.parentElement!.querySelector('input')!, 'DOC-NEW')
     const nameLabel = screen.getByText(/^doctor name$/i)
     await user.type(nameLabel.parentElement!.querySelector('input')!, 'Dr. New')
+    const mobileLabel = screen.getByText(/^mobile$/i)
+    await user.type(mobileLabel.parentElement!.querySelector('input')!, '9876543210')
+    const emailLabel = screen.getByText(/^email$/i)
+    await user.type(emailLabel.parentElement!.querySelector('input')!, 'newdoc@example.com')
+    await fillNewDoctorLocation(user)
     await user.click(screen.getByRole('button', { name: /^add doctor$/i }))
 
     await waitFor(() => expect(doctorsService.createDoctor).toHaveBeenCalledTimes(1))
@@ -595,7 +607,7 @@ describe('BookCampForm — inline doctor creation (dormant until doctor:manage i
     const { doctorsService } = await import('@/features/doctors/doctors.service')
     vi.mocked(doctorsService.createDoctor).mockResolvedValue({
       success: true, message: '',
-      data: { id: 'doc-new', pharmaCode: 'DOC-NEW', name: 'Dr. New', specialization: 'cp', mobile: '', email: '', city: '', state: '', pincode: '', googleMapLink: '', createdAt: '', updatedAt: '', tenant: 't-1' },
+      data: { id: 'doc-new', pharmaCode: 'DOC-NEW', name: 'Dr. New', specialization: 'cp', mobile: '', email: '', location: null, division: 'div-1', createdAt: '', updatedAt: '', tenant: 't-1' },
     })
     const user = userEvent.setup()
     await renderForm()()
@@ -609,6 +621,11 @@ describe('BookCampForm — inline doctor creation (dormant until doctor:manage i
     await user.type(codeLabel.parentElement!.querySelector('input')!, 'DOC-NEW')
     const nameLabel = screen.getByText(/^doctor name$/i)
     await user.type(nameLabel.parentElement!.querySelector('input')!, 'Dr. New')
+    const mobileLabel = screen.getByText(/^mobile$/i)
+    await user.type(mobileLabel.parentElement!.querySelector('input')!, '9876543210')
+    const emailLabel = screen.getByText(/^email$/i)
+    await user.type(emailLabel.parentElement!.querySelector('input')!, 'newdoc@example.com')
+    await fillNewDoctorLocation(user)
     await user.click(screen.getByRole('button', { name: /^add doctor$/i }))
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())

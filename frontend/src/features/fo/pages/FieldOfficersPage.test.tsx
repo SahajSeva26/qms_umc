@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 
 vi.mock('@/hooks/usePermission')
@@ -39,10 +40,18 @@ vi.mock('@/features/access-management/role/hooks/useRoles', () => ({
 vi.mock('@/features/geo-profile/hooks/useGeoProfiles', () => ({
   useGeoProfiles: () => { searchGeoProfiles(); return { data: { data: { count: 0, items: [] } }, isLoading: false, error: null, refetch: vi.fn() } },
 }))
+// CreateFoModal renders in this tree once tenantId/foTypeId both resolve —
+// stub its own mutation dependency so this file stays a pure page-wiring test.
+vi.mock('@/features/access-management/role/hooks/useCreateRole', () => ({
+  useCreateRole: () => ({ mutate: vi.fn(), isPending: false, isError: false, isSuccess: false, error: null, reset: vi.fn() }),
+}))
 
-async function renderPage(session: { tenant: { type: 'platform' | 'customer' } } | null) {
+async function renderPage(
+  session: { tenant: { type: 'platform' | 'customer'; id?: string } } | null,
+  hasAnyPermission: (codes: string[]) => boolean = () => true,
+) {
   const { usePermission } = await import('@/hooks/usePermission')
-  vi.mocked(usePermission).mockReturnValue({ session, hasAnyPermission: () => true } as unknown as ReturnType<typeof usePermission>)
+  vi.mocked(usePermission).mockReturnValue({ session, hasAnyPermission } as unknown as ReturnType<typeof usePermission>)
   const FieldOfficersPage = (await import('./FieldOfficersPage')).default
   return render(
     <MemoryRouter initialEntries={['/field-officers']}>
@@ -119,5 +128,42 @@ describe('FieldOfficersPage — a roster row is keyboard-reachable, not mouse-on
 
     const link = await screen.findByRole('link', { name: /Jane FO/i })
     expect(link).toHaveAttribute('href', '/field-officers/role-1')
+  })
+})
+
+describe('FieldOfficersPage — "Add FO" mounting and visibility', () => {
+  it('renders a disabled placeholder button, not the real CreateFoModal, while tenantId is unresolved', async () => {
+    vi.clearAllMocks()
+    // tenant has no id yet — mirrors a session still settling
+    await renderPage({ tenant: { type: 'platform' } })
+
+    const button = await screen.findByRole('button', { name: /add fo/i })
+    expect(button).toBeDisabled()
+  })
+
+  it('renders the real, enabled CreateFoModal trigger once tenantId and foTypeId are both resolved', async () => {
+    vi.clearAllMocks()
+    await renderPage({ tenant: { type: 'platform', id: 't-platform-1' } })
+
+    const button = await screen.findByRole('button', { name: /add fo/i })
+    expect(button).not.toBeDisabled()
+  })
+
+  it('renders no "Add FO" button at all when the caller lacks tenant:admin/tenant:manage', async () => {
+    vi.clearAllMocks()
+    await renderPage({ tenant: { type: 'platform', id: 't-platform-1' } }, () => false)
+
+    await screen.findByText('Jane FO')
+    expect(screen.queryByRole('button', { name: /add fo/i })).not.toBeInTheDocument()
+  })
+
+  it('clicking the real "Add FO" button opens the create-FO dialog', async () => {
+    vi.clearAllMocks()
+    const user = userEvent.setup()
+    await renderPage({ tenant: { type: 'platform', id: 't-platform-1' } })
+
+    await user.click(await screen.findByRole('button', { name: /add fo/i }))
+
+    expect(await screen.findByText('Add field officer')).toBeInTheDocument()
   })
 })

@@ -3,13 +3,9 @@ import { Input } from '@/components/ui/input'
 import SearchInput from '@/components/ui/SearchInput'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { DoctorsFilterState } from '@/features/doctors/hooks/useDoctorsFilters'
+import { SPECIALIZATION_OPTIONS } from '@/features/doctors/doctors.ui'
 import type { DoctorSpecialization, DoctorStatus } from '@/types/doctor.types'
 
-// Backend enum only has these two values — do not add more.
-const SPECIALIZATION_OPTIONS: { value: DoctorSpecialization; label: string }[] = [
-  { value: 'cp', label: 'CP' },
-  { value: 'gp', label: 'GP' },
-]
 const SPECIALIZATION_LABEL_BY_VALUE = new Map(SPECIALIZATION_OPTIONS.map((s) => [s.value, s.label]))
 
 const STATUS_OPTIONS: { value: DoctorStatus; label: string }[] = [

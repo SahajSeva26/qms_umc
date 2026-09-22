@@ -3,6 +3,7 @@
 
 import type { DivisionTherapy, LeadPopulatedContact } from './crm.types'
 import type { CampTimeSlotValue } from './campTimeSlot.constants'
+import { CAMP_TYPE_VALUES, type CampType } from './campReal.types'
 
 // ---------------------------------------------------------------------------
 // Enums / constants
@@ -43,6 +44,18 @@ export const PROJECT_TYPE_LABEL: Record<ProjectType, string> = {
   mixed: 'Mixed',
 }
 
+// No backend rule links Project type to Camp type — frontend-only advisory mapping, shared across features.
+export const PROJECT_TYPE_CAMP_TYPES: Record<ProjectType, CampType[]> = {
+  screening_camp: ['screening'],
+  diet: ['diet'],
+  teleconsultation_diet: ['diet'],
+  lab_test: ['lab'],
+  mixed: [...CAMP_TYPE_VALUES],
+}
+
+export function allowedCampTypesForProjectTypes(types: ProjectType[]): CampType[] {
+  return [...new Set(types.flatMap((t) => PROJECT_TYPE_CAMP_TYPES[t]))]
+}
 
 export type ExecutionModeType = 'po' | 'agreement' | 'mail_confirmation'
 

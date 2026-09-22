@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { campRefId, campRefName, canRunScreening, saveErrorMessage } from './campsReal.utils'
+import { campRefId, campRefName, canRunScreening, saveErrorMessage, withCampParam } from './campsReal.utils'
 
 describe('campRefId', () => {
   it('returns the id string as-is for a bare string value', () => {
@@ -66,6 +66,25 @@ describe('canRunScreening', () => {
 
   it('blocks when the viewer role id is missing entirely', () => {
     expect(canRunScreening(campWithPopulatedFo, undefined, 'field-officer', false)).toBe(false)
+  })
+})
+
+describe('withCampParam', () => {
+  it('appends camp as the only query param when returnTo has none', () => {
+    expect(withCampParam('/camps/screening', 'camp-new')).toBe('/camps/screening?camp=camp-new')
+  })
+
+  it('preserves other existing params when adding camp', () => {
+    expect(withCampParam('/camps/screening?status=live', 'camp-new')).toBe('/camps/screening?status=live&camp=camp-new')
+  })
+
+  it('REPLACES a stale camp param instead of appending a second one', () => {
+    expect(withCampParam('/camps/screening?camp=camp-old', 'camp-new')).toBe('/camps/screening?camp=camp-new')
+  })
+
+  it('replaces a stale camp param while preserving other params around it', () => {
+    expect(withCampParam('/camps/screening?status=live&camp=camp-old&city=Pune', 'camp-new'))
+      .toBe('/camps/screening?status=live&camp=camp-new&city=Pune')
   })
 })
 

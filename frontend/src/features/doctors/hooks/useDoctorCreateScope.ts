@@ -11,7 +11,7 @@ interface UseDoctorCreateScopeArgs {
   isEdit: boolean
   session: SessionResponse | null
   forcedTenant?: { id: string; label: string }
-  forcedDivision?: { id: string; label: string }
+  forcedDivision?: { id: string; label: string; note?: string }
 }
 
 // Single source of truth for tenant/division scope resolution in EditDoctorModal — owns the

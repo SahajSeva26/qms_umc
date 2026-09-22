@@ -33,10 +33,9 @@ interface EditDoctorModalProps {
   /** Locks create mode to a specific company: the picker becomes read-only
    * context text, and this id is submitted regardless of session type. */
   forcedTenant?: { id: string; label: string }
-  /** Locks create mode to a specific division within forcedTenant (e.g. a project-scoped camp
-   * booking) — same locked-context-text treatment as forcedTenant, skips the platform-actor
-   * tenant→division picker entirely, and never falls back to a session-derived division. */
-  forcedDivision?: { id: string; label: string }
+  /** Locks create mode to a specific division within forcedTenant, same treatment as forcedTenant.
+   * `note` explains why it's locked (caller-specific); falls back to a default wording if omitted. */
+  forcedDivision?: { id: string; label: string; note?: string }
 }
 
 // Keyed on doctor id so the inner form remounts (resetting draft state)
@@ -60,7 +59,7 @@ interface EditDoctorModalFormProps {
   onClose: () => void
   onCreated?: (doctor: DoctorEntity) => void
   forcedTenant?: { id: string; label: string }
-  forcedDivision?: { id: string; label: string }
+  forcedDivision?: { id: string; label: string; note?: string }
 }
 
 const EditDoctorModalForm = ({ doctor, onClose, onCreated, forcedTenant, forcedDivision }: EditDoctorModalFormProps) => {

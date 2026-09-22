@@ -261,6 +261,13 @@ export interface RolePopulatedTenant {
   status?: TenantStatus
 }
 
+export interface RolePopulatedDivision {
+  _id?: string
+  name: string
+  code: string
+  status?: string
+}
+
 export interface RoleEntity {
   id: string
   code: string
@@ -277,6 +284,9 @@ export interface RoleEntity {
   user: RolePopulatedUser | string | null
   // Populated {RolePopulatedTenant} on GET-by-id/search; raw ObjectId string on create/update responses.
   tenant: RolePopulatedTenant | string
+  // Populated {RolePopulatedDivision} on GET-by-id/search; always absent/null for platform-tenant
+  // roles. Customer-tenant admin roles are exempt from REQUIRING one, but one can still be set.
+  division?: RolePopulatedDivision | string | null
   createdAt: string
   updatedAt: string
 }

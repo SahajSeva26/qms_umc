@@ -7,12 +7,18 @@ import AsyncPicker from '@/components/ui/AsyncPicker'
 interface MrPickerProps {
   value: string
   label: string
-  onChange: (mrRoleId: string, mrLabel: string) => void
+  // Third arg is the MR's normalized division id (null if unreadable) — see BookCampForm's mismatch guard.
+  onChange: (mrRoleId: string, mrLabel: string, mrDivisionId: string | null) => void
 }
 
 // Server-scopes results to the caller's own downline — never fetches
 // more than the caller is actually allowed to book for.
 const mrLabel = (mr: RoleEntity) => `${mr.name} (${mr.code})`
+
+// Mongoose's raw .populate() output carries `_id`, not `id` — same convention as every other
+// RolePopulated* field on RoleEntity.
+const mrDivisionId = (mr: RoleEntity): string | null =>
+  typeof mr.division === 'string' ? mr.division : mr.division?._id ?? null
 
 const MrPicker = ({ value, label, onChange }: MrPickerProps) => {
   const [query, setQuery] = useState('')
@@ -20,11 +26,16 @@ const MrPicker = ({ value, label, onChange }: MrPickerProps) => {
 
   const { mrs, isFetching, error, hasMore, loadMore, refetch } = useEligibleMrs(query, open)
 
+  const handleChange = (mrRoleId: string, mrLabel: string) => {
+    const mr = mrs.find((m) => m.id === mrRoleId)
+    onChange(mrRoleId, mrLabel, mr ? mrDivisionId(mr) : null)
+  }
+
   return (
     <AsyncPicker<RoleEntity>
       value={value}
       label={label}
-      onChange={onChange}
+      onChange={handleChange}
       query={query}
       onQueryChange={setQuery}
       open={open}

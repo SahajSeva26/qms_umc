@@ -6,7 +6,7 @@ interface DoctorScopeFieldsProps {
   scope: DoctorCreateScope
   isEdit: boolean
   forcedTenant?: { id: string; label: string }
-  forcedDivision?: { id: string; label: string }
+  forcedDivision?: { id: string; label: string; note?: string }
   /** Only affects wrapper className/layout — both callers render otherwise-identical JSX. */
   mode: 'single' | 'csv'
 }
@@ -33,7 +33,7 @@ const DoctorScopeFields = ({ scope, isEdit, forcedTenant, forcedDivision, mode }
       {forcedDivision ? (
         <div className={wrapperClassName(mode)}>
           <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Division</label>
-          <p className="text-[13px]" style={{ color: 'var(--qms-text)' }}>{forcedDivision.label} <span style={{ color: 'var(--qms-text-muted)' }}>(locked to the project's division)</span></p>
+          <p className="text-[13px]" style={{ color: 'var(--qms-text)' }}>{forcedDivision.label} <span style={{ color: 'var(--qms-text-muted)' }}>({forcedDivision.note ?? "locked to the project's division"})</span></p>
         </div>
       ) : scope.isCustomerActor ? (
         <div className={wrapperClassName(mode)}>

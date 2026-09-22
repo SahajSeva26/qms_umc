@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useEntityQuery } from '@/hooks/useEntityQuery'
-import { projectKeys } from '@/features/projects/hooks/useProjects'
+import { projectKeys } from '@/hooks/projectKeys'
 import { projectsService } from '@/features/projects/projects.service'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import type { ProjectEntity, SearchProjectQuery } from '@/types/project.types'
@@ -28,12 +28,12 @@ function mergeById(existing: ProjectEntity[], incoming: ProjectEntity[]): Projec
   return Array.from(byId.values())
 }
 
-export const useProjectPicker = (name: string, tenant: string | undefined, enabled: boolean) => {
+export const useProjectPicker = (name: string, tenant: string | undefined, division: string | undefined, enabled: boolean) => {
   const debouncedName = useDebouncedValue(name, 300)
   const hasQuery = debouncedName.trim().length > 0
   const [page, setPage] = useState(1)
-  // Accumulation is keyed by query+tenant together — changing either resets pagination.
-  const key = `${debouncedName}::${tenant ?? ''}`
+  // Accumulation is keyed by query+tenant+division together — changing any of them resets pagination.
+  const key = `${debouncedName}::${tenant ?? ''}::${division ?? ''}`
   const [accumulated, setAccumulated] = useState<Accumulated>(() => EMPTY_ACCUMULATED(key))
 
   if (accumulated.key !== key) {
@@ -46,6 +46,7 @@ export const useProjectPicker = (name: string, tenant: string | undefined, enabl
   const query: SearchProjectQuery = {
     name: debouncedName.trim() || undefined,
     tenant: tenant || undefined,
+    division: division || undefined,
     page: String(page),
     limit: String(PAGE_SIZE),
   }
@@ -54,7 +55,7 @@ export const useProjectPicker = (name: string, tenant: string | undefined, enabl
     projectKeys,
     (q) => projectsService.searchProjects(q),
     query,
-    { enabled: enabled && hasQuery && !!tenant },
+    { enabled: enabled && hasQuery && !!tenant && !!division },
   )
 
   if (data && accumulated.key === key && accumulated.consumedResponse !== data) {

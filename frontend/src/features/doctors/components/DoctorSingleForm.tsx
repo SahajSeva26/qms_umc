@@ -35,7 +35,7 @@ interface DoctorSingleFormProps {
   doctor: DoctorEntity | null
   scope: DoctorCreateScope
   forcedTenant?: { id: string; label: string }
-  forcedDivision?: { id: string; label: string }
+  forcedDivision?: { id: string; label: string; note?: string }
   onSubmit: (payload: CreateDoctorPayload | UpdateDoctorPayload) => Promise<void>
   onCancel: () => void
   isSaving: boolean
@@ -72,7 +72,7 @@ export default DoctorSingleForm
 interface CreateDoctorSingleFormProps {
   scope: DoctorCreateScope
   forcedTenant?: { id: string; label: string }
-  forcedDivision?: { id: string; label: string }
+  forcedDivision?: { id: string; label: string; note?: string }
   onSubmit: (payload: CreateDoctorPayload) => Promise<void>
   onCancel: () => void
   isSaving: boolean

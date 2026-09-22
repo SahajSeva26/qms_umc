@@ -38,6 +38,10 @@ interface CampFormFieldsProps {
   doctors: DoctorEntity[]
   doctorLabel: (id: string) => string
   showNewDoctorButton: boolean
+  // A new doctor must be created scoped to a known division — until one is picked
+  // (create mode: derived from the Project), "New doctor" would fall back to an
+  // unconstrained tenant-wide division picker instead of staying camp-scoped.
+  newDoctorDisabled?: boolean
   onNewDoctor: () => void
   bookableSlots: CampTimeSlotValue[]
   timeSlotDisabledPlaceholder: string
@@ -59,6 +63,7 @@ const CampFormFields = ({
   doctors,
   doctorLabel,
   showNewDoctorButton,
+  newDoctorDisabled = false,
   onNewDoctor,
   bookableSlots,
   timeSlotDisabledPlaceholder,
@@ -90,7 +95,7 @@ const CampFormFields = ({
             </SelectContent>
           </Select>
           {showNewDoctorButton && (
-            <Button type="button" variant="outline" disabled={isLocked || !effectiveTenant} onClick={onNewDoctor}>
+            <Button type="button" variant="outline" disabled={isLocked || !effectiveTenant || newDoctorDisabled} onClick={onNewDoctor}>
               New doctor
             </Button>
           )}

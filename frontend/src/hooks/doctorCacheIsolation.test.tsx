@@ -49,7 +49,8 @@ describe('doctors vs mockCampDoctors cache isolation', () => {
     await act(async () => {
       await createDoctorResult.current.mutateAsync({
         pharmaCode: 'DOC-1', name: 'Dr. Test', specialization: 'cp', mobile: '9999999999',
-        city: 'X', state: 'Y', pincode: '123456', email: 'test@example.com',
+        email: 'test@example.com', division: 'div-1',
+        location: { addressLine1: 'X', city: 'X', state: 'Y', pincode: '123456', coordinates: [72.8, 19.1] },
       })
     })
 

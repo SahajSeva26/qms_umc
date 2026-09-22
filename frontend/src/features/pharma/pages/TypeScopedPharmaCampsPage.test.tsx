@@ -6,6 +6,7 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import type { SessionResponse } from '@/types/accessManagement.types'
 import type { ProjectEntity } from '@/types/project.types'
 import type { CampEntity } from '@/types/campReal.types'
+import type { DoctorEntity } from '@/types/doctor.types'
 
 vi.mock('@/hooks/useSession')
 
@@ -109,6 +110,15 @@ function campFixture(overrides: Partial<CampEntity> = {}): CampEntity {
     devices: [], status: 'requested', stageHistory: [],
     createdAt: '', updatedAt: '', ...overrides,
   } as CampEntity
+}
+
+function doctorFixture(overrides: Partial<DoctorEntity> = {}): DoctorEntity {
+  return {
+    id: 'doc-1', pharmaCode: 'DOC-1', name: 'Dr. Priya Sharma', specialization: 'cp',
+    mobile: '9876543210', email: 'p@example.com',
+    location: { addressLine1: '221 Baker Street', city: 'Pune', state: 'Maharashtra', pincode: '411001', coordinates: [73.8567, 18.5204] },
+    division: 'div-1', tenant: 't-1', createdAt: '', updatedAt: '', ...overrides,
+  }
 }
 
 // Matches production's 5-minute staleTime (queryClient.ts) — a 0 default
@@ -409,7 +419,7 @@ describe('PharmaScreeningCampsPage / PharmaDietCampsPage — separate routes, sh
         : { items: [], count: 0 },
     }))
     vi.mocked(doctorsService.searchDoctors).mockResolvedValue({
-      success: true, message: '', data: { items: [{ id: 'doc-1', pharmaCode: 'DOC-1', name: 'Dr. Priya Sharma', specialization: 'cp', mobile: '9876543210', email: 'p@example.com', city: 'Pune', state: 'Maharashtra', pincode: '411001', googleMapLink: '', createdAt: '', updatedAt: '' } as never], count: 1 },
+      success: true, message: '', data: { items: [doctorFixture()], count: 1 },
     })
     vi.mocked(campsRealService.bookCamp).mockImplementationOnce(async () => {
       booked = true
@@ -448,7 +458,7 @@ describe('PharmaScreeningCampsPage / PharmaDietCampsPage — separate routes, sh
 
     vi.mocked(pharmaProjectsService.getProject).mockResolvedValue({ success: true, message: '', data: projectFixture() })
     vi.mocked(doctorsService.searchDoctors).mockResolvedValue({
-      success: true, message: '', data: { items: [{ id: 'doc-1', pharmaCode: 'DOC-1', name: 'Dr. Priya Sharma', specialization: 'cp', mobile: '9876543210', email: 'p@example.com', city: 'Pune', state: 'Maharashtra', pincode: '411001', googleMapLink: '', createdAt: '', updatedAt: '' } as never], count: 1 },
+      success: true, message: '', data: { items: [doctorFixture()], count: 1 },
     })
     // A mutable flag, not a fixed once-queue: the invalidation under test also
     // refetches Screening's own query, one more call than a fixed sequence predicts.

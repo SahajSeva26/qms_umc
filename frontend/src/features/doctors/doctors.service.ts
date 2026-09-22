@@ -6,6 +6,7 @@ import type {
   BulkDoctorResult,
   CreateDoctorPayload,
   DoctorEntity,
+  NearestDoctorQuery,
   SearchDoctorQuery,
   UpdateDoctorPayload,
 } from '@/types/doctor.types'
@@ -17,6 +18,12 @@ const searchDoctors = async (query: SearchDoctorQuery) => {
 
 const getDoctor = async (id: string) => {
   const res = await api.get<ApiResponse<DoctorEntity>>(`/doctors/${id}`)
+  return res.data
+}
+
+// 35km radius is server-fixed — no radius param exists to send.
+const nearestDoctors = async (query: NearestDoctorQuery) => {
+  const res = await api.get<PaginatedResponse<DoctorEntity>>('/doctors/nearest', { params: query })
   return res.data
 }
 
@@ -46,6 +53,7 @@ function isBulkDoctorResult(value: unknown): value is BulkDoctorResult {
 const bulkCreateDoctors = async (payload: BulkDoctorPayload): Promise<BulkDoctorResult> => {
   const formData = new FormData()
   if (payload.tenant) formData.append('tenant', payload.tenant)
+  formData.append('division', payload.division)
   formData.append('file', payload.file)
 
   try {
@@ -62,6 +70,7 @@ const bulkCreateDoctors = async (payload: BulkDoctorPayload): Promise<BulkDoctor
 export const doctorsService = {
   searchDoctors,
   getDoctor,
+  nearestDoctors,
   createDoctor,
   updateDoctor,
   bulkCreateDoctors,

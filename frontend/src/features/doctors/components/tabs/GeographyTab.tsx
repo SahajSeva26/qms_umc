@@ -12,8 +12,9 @@ const GeographyTab = ({ doctors, onSelectCity }: GeographyTabProps) => {
   const byState = useMemo(() => {
     const map = new Map<string, number>()
     doctors.forEach((d) => {
-      if (!d.state) return
-      map.set(d.state, (map.get(d.state) ?? 0) + 1)
+      const state = d.location?.state
+      if (!state) return
+      map.set(state, (map.get(state) ?? 0) + 1)
     })
     return [...map.entries()].map(([state, count]) => ({ state, count })).sort((a, b) => b.count - a.count)
   }, [doctors])
@@ -21,12 +22,13 @@ const GeographyTab = ({ doctors, onSelectCity }: GeographyTabProps) => {
   const byCity = useMemo(() => {
     const map = new Map<string, { city: string; state: string; count: number }>()
     doctors.forEach((d) => {
-      if (!d.city) return
-      const existing = map.get(d.city)
+      const city = d.location?.city
+      if (!city) return
+      const existing = map.get(city)
       if (existing) {
         existing.count += 1
       } else {
-        map.set(d.city, { city: d.city, state: d.state || '—', count: 1 })
+        map.set(city, { city, state: d.location?.state || '—', count: 1 })
       }
     })
     return [...map.values()].sort((a, b) => b.count - a.count)

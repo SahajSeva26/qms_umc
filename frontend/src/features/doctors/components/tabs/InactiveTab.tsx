@@ -46,7 +46,7 @@ const InactiveTab = ({ doctors, onOpenDoctor }: InactiveTabProps) => {
               >
                 <td className="px-2.5 py-2 font-semibold" style={{ color: 'var(--qms-text)' }}>{d.name}</td>
                 <td className="px-2.5 py-2" style={{ color: 'var(--qms-text-soft)' }}>{d.specialization.toUpperCase()}</td>
-                <td className="px-2.5 py-2" style={{ color: 'var(--qms-text-soft)' }}>{d.city}</td>
+                <td className="px-2.5 py-2" style={{ color: 'var(--qms-text-soft)' }}>{d.location?.city ?? '—'}</td>
                 <td className="px-2.5 py-2"><StatusPill status={d.status} /></td>
               </tr>
             ))}

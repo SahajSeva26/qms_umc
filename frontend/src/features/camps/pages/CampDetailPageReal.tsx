@@ -188,6 +188,7 @@ const CampDetailPageReal = () => {
               open
               doctor={null}
               forcedTenant={{ id: effectiveTenant, label: tenants.find((t) => t.id === effectiveTenant)?.name ?? effectiveTenant }}
+              forcedDivision={division ? { id: division, label: lockedDivisionName ?? '' } : undefined}
               onCreated={(created) => {
                 setLocalDoctors((prev) => [...prev, created])
                 setField('doctor', created.id)
@@ -205,6 +206,10 @@ const CampDetailPageReal = () => {
             doctors={doctors}
             doctorLabel={doctorLabel}
             showNewDoctorButton={canManageDoctors}
+            // A new doctor must be scoped to the camp's own division (derived from the
+            // picked Project) — before that's known, the modal would otherwise fall back
+            // to an unconstrained tenant-wide division picker. See forcedDivision below.
+            newDoctorDisabled={!division}
             onNewDoctor={() => setShowNewDoctor(true)}
             bookableSlots={bookableSlots}
             timeSlotDisabledPlaceholder="Select a project first"

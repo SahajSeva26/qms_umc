@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { format } from 'date-fns'
 import type { RoleEntity, SessionResponse } from '@/types/accessManagement.types'
@@ -82,7 +82,7 @@ vi.mock('@/features/camps/campsReal.service', () => ({
 function sessionFixture(roleId = 'self-role-1'): SessionResponse {
   return {
     user: { id: 'u-1', email: 'a@example.com', firstName: 'a', lastName: 'b' },
-    role: { id: roleId, code: 'pharma-mr', name: 'MR' },
+    role: { id: roleId, code: 'pharma-mr', name: 'MR', division: 'div-1' },
     roleType: { id: 'rt-1', code: 'pharma-mr', name: 'pharma-mr' },
     tenant: { id: 't-1', code: 'tenant-1', name: 'Tenant', type: 'customer' },
     permissions: ['camp:book'],
@@ -94,7 +94,11 @@ function mrFixture(overrides: Partial<RoleEntity> = {}): RoleEntity {
 }
 
 function doctorFixture(overrides: Partial<DoctorEntity> = {}): DoctorEntity {
-  return { id: 'doc-1', pharmaCode: 'DOC-1', name: 'Dr. Priya Sharma', specialization: 'cp', mobile: '9876543210', email: 'p@example.com', city: 'Pune', state: 'Maharashtra', pincode: '411001', googleMapLink: '', createdAt: '', updatedAt: '', ...overrides } as DoctorEntity
+  return {
+    id: 'doc-1', pharmaCode: 'DOC-1', name: 'Dr. Priya Sharma', specialization: 'cp', mobile: '9876543210', email: 'p@example.com',
+    location: { addressLine1: '221 Baker Street', city: 'Pune', state: 'Maharashtra', pincode: '411001', coordinates: [73.8567, 18.5204] },
+    division: 'div-1', createdAt: '', updatedAt: '', ...overrides,
+  } as DoctorEntity
 }
 
 function bookCampResponseFixture(overrides: Partial<CampMutationResponseEntity> = {}): ApiResponse<CampMutationResponseEntity> {
@@ -171,6 +175,17 @@ async function completeStep1(user: ReturnType<typeof userEvent.setup>, { withMr 
   if (withMr) await pickMr(user)
   await pickDoctor(user)
   await user.click(screen.getByRole('button', { name: /^next$/i }))
+}
+
+// Fills EditDoctorModal's own Location card (required on create) — same real
+// LocationAddressFields inputs as Camp's own step 2, scoped to the open dialog.
+async function fillNewDoctorLocation(user: ReturnType<typeof userEvent.setup>) {
+  const dialog = screen.getByRole('dialog')
+  await user.type(within(dialog).getByLabelText(/^address line 1$/i), '221 Baker Street')
+  await user.type(within(dialog).getByLabelText(/^city$/i), 'Pune')
+  await user.type(within(dialog).getByLabelText(/^state$/i), 'Maharashtra')
+  await user.type(within(dialog).getByLabelText(/^pincode$/i), '411001')
+  await user.click(within(dialog).getByRole('button', { name: /set test coordinates/i }))
 }
 
 // Step 2 -> step 3, filling location and resolving coordinates.
@@ -560,7 +575,7 @@ describe('BookCampForm — inline doctor creation (dormant until doctor:manage i
     const { doctorsService } = await import('@/features/doctors/doctors.service')
     vi.mocked(doctorsService.createDoctor).mockResolvedValue({
       success: true, message: '',
-      data: { id: 'doc-new', pharmaCode: 'DOC-NEW', name: 'Dr. New', specialization: 'cp', mobile: '', email: '', city: '', state: '', pincode: '', googleMapLink: '', createdAt: '', updatedAt: '', tenant: 't-1' },
+      data: { id: 'doc-new', pharmaCode: 'DOC-NEW', name: 'Dr. New', specialization: 'cp', mobile: '', email: '', location: null, division: 'div-1', createdAt: '', updatedAt: '', tenant: 't-1' },
     })
     const user = userEvent.setup()
     await renderForm()()
@@ -573,6 +588,11 @@ describe('BookCampForm — inline doctor creation (dormant until doctor:manage i
     await user.type(codeLabel.parentElement!.querySelector('input')!, 'DOC-NEW')
     const nameLabel = screen.getByText(/^doctor name$/i)
     await user.type(nameLabel.parentElement!.querySelector('input')!, 'Dr. New')
+    const mobileLabel = screen.getByText(/^mobile$/i)
+    await user.type(mobileLabel.parentElement!.querySelector('input')!, '9876543210')
+    const emailLabel = screen.getByText(/^email$/i)
+    await user.type(emailLabel.parentElement!.querySelector('input')!, 'newdoc@example.com')
+    await fillNewDoctorLocation(user)
     await user.click(screen.getByRole('button', { name: /^add doctor$/i }))
 
     await waitFor(() => expect(doctorsService.createDoctor).toHaveBeenCalledTimes(1))
@@ -587,7 +607,7 @@ describe('BookCampForm — inline doctor creation (dormant until doctor:manage i
     const { doctorsService } = await import('@/features/doctors/doctors.service')
     vi.mocked(doctorsService.createDoctor).mockResolvedValue({
       success: true, message: '',
-      data: { id: 'doc-new', pharmaCode: 'DOC-NEW', name: 'Dr. New', specialization: 'cp', mobile: '', email: '', city: '', state: '', pincode: '', googleMapLink: '', createdAt: '', updatedAt: '', tenant: 't-1' },
+      data: { id: 'doc-new', pharmaCode: 'DOC-NEW', name: 'Dr. New', specialization: 'cp', mobile: '', email: '', location: null, division: 'div-1', createdAt: '', updatedAt: '', tenant: 't-1' },
     })
     const user = userEvent.setup()
     await renderForm()()
@@ -601,6 +621,11 @@ describe('BookCampForm — inline doctor creation (dormant until doctor:manage i
     await user.type(codeLabel.parentElement!.querySelector('input')!, 'DOC-NEW')
     const nameLabel = screen.getByText(/^doctor name$/i)
     await user.type(nameLabel.parentElement!.querySelector('input')!, 'Dr. New')
+    const mobileLabel = screen.getByText(/^mobile$/i)
+    await user.type(mobileLabel.parentElement!.querySelector('input')!, '9876543210')
+    const emailLabel = screen.getByText(/^email$/i)
+    await user.type(emailLabel.parentElement!.querySelector('input')!, 'newdoc@example.com')
+    await fillNewDoctorLocation(user)
     await user.click(screen.getByRole('button', { name: /^add doctor$/i }))
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())

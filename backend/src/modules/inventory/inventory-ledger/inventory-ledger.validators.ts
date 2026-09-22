@@ -1,18 +1,20 @@
 // Inventory-ledger Validators
 import { z } from 'zod';
-import { INVENTORY_LEDGER_ITEM_TYPE, INVENTORY_LEDGER_LOCATION } from './inventory-ledger.constants';
+import { INVENTORY_LEDGER_ITEM_TYPE, INVENTORY_LEDGER_LOCATION, INVENTORY_LEDGER_SOURCE } from './inventory-ledger.constants';
 import { INVENTORY_REQUEST_TYPE } from '../inventory-request/inventory-request.constants';
 import { isValidObjectID } from '../../../shared/utils/strings';
 
 const objectId = (label: string) => z.string().refine((v) => isValidObjectID(v), { message: `${label} must be a valid id` });
 
 //1: record ====================================>
-// the ledger is written by the system (inventory-request service) inside a transaction, never by a
-// client — so there is no create ROUTE. This schema just types/validates what record() accepts.
-// actor is NOT here: record() snapshots it from ctx.
+// the ledger is written by the system (inventory-request service, or a direct assignment) inside a
+// transaction, never by a client — so there is no create ROUTE. This schema just types/validates what
+// record() accepts. actor is NOT here: record() snapshots it from ctx. request/requestType are absent
+// for a direct assignment (source='direct').
 export const RecordInventoryLedgerPayloadSchema = z.object({
-    request: objectId('Request'),
-    requestType: z.enum(Object.values(INVENTORY_REQUEST_TYPE)),
+    source: z.enum(Object.values(INVENTORY_LEDGER_SOURCE)).optional(),
+    request: objectId('Request').optional(),
+    requestType: z.enum(Object.values(INVENTORY_REQUEST_TYPE)).optional(),
     inventoryType: z.enum(Object.values(INVENTORY_LEDGER_ITEM_TYPE)),
     inventory: objectId('Inventory'),
     quantity: z.number().min(1),
@@ -24,6 +26,7 @@ export type IRecordInventoryLedgerPayload = z.infer<typeof RecordInventoryLedger
 
 //2: search ====================================>
 export const SearchInventoryLedgerQuerySchema = z.object({
+    source: z.enum(Object.values(INVENTORY_LEDGER_SOURCE)).optional().openapi({ example: 'direct' }),
     request: objectId('Request').optional().openapi({ example: '665f1a2b3c4d5e6f70819293' }),
     requestType: z.enum(Object.values(INVENTORY_REQUEST_TYPE)).optional().openapi({ example: 'refill' }),
     inventoryType: z.enum(Object.values(INVENTORY_LEDGER_ITEM_TYPE)).optional().openapi({ example: 'InventoryDevice' }),

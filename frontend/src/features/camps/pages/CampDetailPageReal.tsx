@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { FiArrowLeft } from 'react-icons/fi'
 import { useCreateCamp } from '@/features/camps/hooks/useCreateCamp'
 import { useCampPickerData } from '@/features/camps/hooks/useCampPickerData'
 import { useCampDraft } from '@/features/camps/hooks/useCampDraft'
-import { campRefId, saveErrorMessage } from '@/features/camps/campsReal.utils'
+import { campRefId, saveErrorMessage, withCampParam } from '@/features/camps/campsReal.utils'
 import { usePermission } from '@/hooks/usePermission'
 import ProjectPicker from '@/features/camps/components/ProjectPicker'
 import CampFormFields from '@/features/camps/components/CampFormFields'
@@ -18,6 +18,7 @@ import type { ProjectEntity } from '@/types/project.types'
 import type { DoctorEntity } from '@/types/doctor.types'
 import type { LocationValue } from '@/types/location.types'
 import type { LocationResolutionState } from '@/components/widgets/location-picker/location.types'
+import { CAMP_TYPE_VALUES, type CampType } from '@/types/campReal.types'
 
 // create (camp:create) is a distinct backend permission from update — this
 // page only ever handles creation, so only the create code is checked here.
@@ -25,11 +26,18 @@ const CAMP_CREATE_PERMISSIONS = ['camp:create', 'camp:manage', 'tenant:manage']
 
 const CampDetailPageReal = () => {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { hasAnyPermission, hasPermission } = usePermission()
   const canWrite = hasAnyPermission(CAMP_CREATE_PERMISSIONS)
   const canManageDoctors = hasPermission('doctor:manage')
 
-  const { draft, setField } = useCampDraft(null)
+  // From a type-scoped page's "New camp" button — autofills+locks Type, routes back on cancel/success.
+  const rawType = searchParams.get('type')
+  const isValidCampType = (v: string): v is CampType => (CAMP_TYPE_VALUES as readonly string[]).includes(v)
+  const lockedTypeValue = rawType && isValidCampType(rawType) ? rawType : null
+  const returnTo = searchParams.get('from') || '/camps'
+
+  const { draft, setField } = useCampDraft(null, lockedTypeValue ?? undefined)
   const { tenant, division, project, doctor, mr, date, timeSlot, location, devices, notes, type, billingType, patientExpectation, fo } = draft
 
   // A caller-facing pin can visibly move well before (or without ever) firing
@@ -111,9 +119,7 @@ const CampDetailPageReal = () => {
       },
       {
         onSuccess: (res) => {
-          if (res.data?.id) {
-            navigate(`/camps?camp=${res.data.id}`)
-          }
+          if (res.data?.id) navigate(withCampParam(returnTo, res.data.id))
         },
       },
     )
@@ -122,7 +128,7 @@ const CampDetailPageReal = () => {
   return (
     <div className="max-w-3xl">
       <button
-        onClick={() => navigate('/camps')}
+        onClick={() => navigate(returnTo)}
         className="flex items-center gap-1.5 text-[13px] font-semibold mb-5 transition-colors hover:opacity-80"
         style={{ color: 'var(--qms-text-soft)' }}
       >
@@ -182,6 +188,7 @@ const CampDetailPageReal = () => {
               open
               doctor={null}
               forcedTenant={{ id: effectiveTenant, label: tenants.find((t) => t.id === effectiveTenant)?.name ?? effectiveTenant }}
+              forcedDivision={division ? { id: division, label: lockedDivisionName ?? '' } : undefined}
               onCreated={(created) => {
                 setLocalDoctors((prev) => [...prev, created])
                 setField('doctor', created.id)
@@ -195,9 +202,14 @@ const CampDetailPageReal = () => {
             setField={setField}
             effectiveTenant={effectiveTenant}
             isLocked={false}
+            lockedType={!!lockedTypeValue}
             doctors={doctors}
             doctorLabel={doctorLabel}
             showNewDoctorButton={canManageDoctors}
+            // A new doctor must be scoped to the camp's own division (derived from the
+            // picked Project) — before that's known, the modal would otherwise fall back
+            // to an unconstrained tenant-wide division picker. See forcedDivision below.
+            newDoctorDisabled={!division}
             onNewDoctor={() => setShowNewDoctor(true)}
             bookableSlots={bookableSlots}
             timeSlotDisabledPlaceholder="Select a project first"

@@ -13,6 +13,12 @@ export const INVENTORY_LEDGER_ITEM_TYPE = {
     CONSUMABLE: 'InventoryConsumable',
 } as const;
 
+// what caused the movement — a request stage transition, or a manager's direct assignment (no request).
+export const INVENTORY_LEDGER_SOURCE = {
+    REQUEST: 'request',
+    DIRECT: 'direct',
+} as const;
+
 // ================= INVENTORY LEDGER PERMISSIONS CONSTANTS ===============
 
 export const INVENTORY_LEDGER_PERMISSIONS = {

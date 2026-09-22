@@ -7,8 +7,8 @@ import type { RolePopulatedUser } from '@/types/accessManagement.types'
 
 const PAGE_SIZE = 10
 
-function displayName(role: { name: string; user: RolePopulatedUser | string }): string {
-  if (typeof role.user === 'string') return role.name
+function displayName(role: { name: string; user: RolePopulatedUser | string | null }): string {
+  if (role.user === null || typeof role.user === 'string') return role.name
   return `${role.user.firstName}${role.user.lastName ? ` ${role.user.lastName}` : ''}`
 }
 

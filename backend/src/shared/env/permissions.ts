@@ -3,6 +3,7 @@ import { TENANT_PERMISSIONS } from '../../modules/access-management/tenant/tenan
 import { PERMISSION_GROUP_PERMISSIONS } from '../../modules/access-management/permission-group/permissionGroup.constants';
 import { ROLE_TYPE_PERMISSIONS } from '../../modules/access-management/role-type/roleType.constants';
 import { ROLE_PERMISSIONS } from '../../modules/access-management/role/role.constants';
+import { EMPLOYEE_PERMISSIONS } from '../../modules/access-management/employee/employee.constants';
 import { DIVISION_PERMISSIONS } from '../../modules/crm/division/division.constants';
 import { LEAD_PERMISSIONS } from '../../modules/crm/lead/lead.constants';
 import { CONTACT_PERMISSIONS } from '../../modules/crm/contact/contact.constants';
@@ -42,6 +43,7 @@ export const PERMISSIONS = {
     PERMISSION_GROUP: PERMISSION_GROUP_PERMISSIONS,
     ROLE_TYPE: ROLE_TYPE_PERMISSIONS,
     ROLE: ROLE_PERMISSIONS,
+    EMPLOYEE: EMPLOYEE_PERMISSIONS,
     DIVISION: DIVISION_PERMISSIONS,
     LEAD: LEAD_PERMISSIONS,
     CONTACT: CONTACT_PERMISSIONS,

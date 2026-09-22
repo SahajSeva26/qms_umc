@@ -1,10 +1,13 @@
 export const PHARMA_ROUTES = {
-  PHARMA:              '/pharma',
-  PHARMA_HO:            '/pharma/ho',
-  PHARMA_RSM:           '/pharma/rsm',
-  PHARMA_ASM:           '/pharma/asm',
-  PHARMA_MR:            '/pharma/mr',
-  PHARMA_PROJECT_CAMPS: '/pharma/projects/:id/camps',
+  PHARMA:                          '/pharma',
+  PHARMA_HO:                       '/pharma/ho',
+  PHARMA_RSM:                      '/pharma/rsm',
+  PHARMA_ASM:                      '/pharma/asm',
+  PHARMA_MR:                       '/pharma/mr',
+  // All camps on the project, every type incl. Lab, unrestricted.
+  PHARMA_PROJECT_CAMPS:            '/pharma/projects/:id/camps',
+  PHARMA_PROJECT_CAMPS_SCREENING:  '/pharma/projects/:id/camps/screening',
+  PHARMA_PROJECT_CAMPS_DIET:       '/pharma/projects/:id/camps/diet',
 }
 
 interface PharmaRoleMeta {

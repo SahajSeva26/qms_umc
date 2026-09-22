@@ -76,10 +76,10 @@ function makeQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } })
 }
 
-function renderDrawer(campId: string | null, onClose = vi.fn()) {
+function renderDrawer(campId: string | null, onClose = vi.fn(), initialPath = '/') {
   return render(
     <QueryClientProvider client={makeQueryClient()}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[initialPath]}>
         <CampDrawer campId={campId} onClose={onClose} />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -130,17 +130,34 @@ describe('CampDrawer', () => {
     expect(screen.queryByRole('button', { name: /run screening/i })).not.toBeInTheDocument()
   })
 
-  it('Edit navigates to the dedicated edit page, not an inline form or modal', async () => {
+  it('Edit navigates to the dedicated edit page carrying `from` (the combined Camp Management page, minus `camp`), not an inline form or modal', async () => {
     mockPermission({ canUpdate: true })
     mockCamp(campFixture())
     const user = userEvent.setup()
-    renderDrawer('camp-1')
+    renderDrawer('camp-1', undefined, '/camps?camp=camp-1&status=live')
 
     await user.click(screen.getByRole('button', { name: /edit camp/i }))
 
-    expect(navigateMock).toHaveBeenCalledWith('/camps/camp-1/edit', { state: { fromDrawer: true } })
+    expect(navigateMock).toHaveBeenCalledWith(
+      `/camps/camp-1/edit?from=${encodeURIComponent('/camps?status=live')}`,
+      { state: { fromDrawer: true } },
+    )
     // No inline field editing anywhere in the drawer.
     expect(screen.queryByRole('textbox', { name: /notes/i })).not.toBeInTheDocument()
+  })
+
+  it('Edit preserves a type-scoped origin (Screening/Diet Camps) in `from`, not the combined page', async () => {
+    mockPermission({ canUpdate: true })
+    mockCamp(campFixture())
+    const user = userEvent.setup()
+    renderDrawer('camp-1', undefined, '/camps/screening?camp=camp-1')
+
+    await user.click(screen.getByRole('button', { name: /edit camp/i }))
+
+    expect(navigateMock).toHaveBeenCalledWith(
+      `/camps/camp-1/edit?from=${encodeURIComponent('/camps/screening')}`,
+      { state: { fromDrawer: true } },
+    )
   })
 
   it('hides the Edit control without camp:update/camp:manage/tenant:manage', () => {
@@ -170,5 +187,21 @@ describe('CampDrawer', () => {
     renderDrawer('camp-1')
 
     expect(screen.getByText(/loading camp/i)).toBeInTheDocument()
+  })
+
+  it('only requests divisions/roles/projects ref data the viewer actually has permission for, mirroring each backend route\'s own read guard', () => {
+    vi.mocked(usePermission).mockReturnValue({
+      hasAnyPermission: (codes: string[]) => codes.includes('camp:book'),
+      session: { role: { id: 'r-viewer' }, roleType: { code: 'pharma-mr' } },
+    } as unknown as ReturnType<typeof usePermission>)
+    mockCamp(campFixture())
+    renderDrawer('camp-1')
+
+    expect(useCampRefNames).toHaveBeenCalledWith({
+      doctors: true,
+      divisions: false,
+      projects: true,
+      roles: false,
+    })
   })
 })

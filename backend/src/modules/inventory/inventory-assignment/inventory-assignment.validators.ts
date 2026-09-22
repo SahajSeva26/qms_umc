@@ -27,6 +27,28 @@ export const UpdateInventoryAssignmentPayloadSchema = z.object({
 });
 export type IUpdateInventoryAssignmentPayload = z.infer<typeof UpdateInventoryAssignmentPayloadSchema>;
 
+//2b: direct assignment (manager pushes stock straight to an FO, no request) ============>
+// devices are named by their concrete unit id (must be an AVAILABLE warehouse unit); consumables
+// are named by their catalog item (master) + quantity, pulled FEFO from the warehouse. At least one
+// of the two must be present. The FO comes from the :fo route param, not the body.
+export const DirectAssignmentPayloadSchema = z
+    .object({
+        devices: z.array(objectId('Device')).optional().openapi({ example: ['665f1a2b3c4d5e6f70819293'] }),
+        consumables: z
+            .array(
+                z.object({
+                    item: objectId('Item'),
+                    quantity: z.number().min(1),
+                }),
+            )
+            .optional()
+            .openapi({ example: [{ item: '665f1a2b3c4d5e6f70819294', quantity: 10 }] }),
+    })
+    .refine((v) => (v.devices?.length || 0) + (v.consumables?.length || 0) > 0, {
+        message: 'Provide at least one device or consumable to assign',
+    });
+export type IDirectAssignmentPayload = z.infer<typeof DirectAssignmentPayloadSchema>;
+
 //3: search ====================================>
 export const SearchInventoryAssignmentQuerySchema = z.object({
     assignee: objectId('Assignee').optional().openapi({ example: '665f1a2b3c4d5e6f70819291' }),

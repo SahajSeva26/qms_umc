@@ -34,7 +34,7 @@ const RosterTab = ({ doctors, filters, setFilter, reset, onOpenDoctor }: RosterT
             <div className="min-w-0 flex-1">
               <div className="text-[13px] font-bold truncate" style={{ color: 'var(--qms-text)' }}>{d.name}</div>
               <div className="text-[11px] truncate" style={{ color: 'var(--qms-text-muted)' }}>{d.specialization.toUpperCase()}</div>
-              <div className="text-[10.5px] truncate" style={{ color: 'var(--qms-text-soft)' }}>{d.pharmaCode} · {d.city}, {d.state}</div>
+              <div className="text-[10.5px] truncate" style={{ color: 'var(--qms-text-soft)' }}>{d.pharmaCode} · {d.location ? `${d.location.city}, ${d.location.state}` : '—'}</div>
             </div>
             <StatusPill status={d.status} />
           </div>

@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { usePharmaProjects } from '@/features/pharma/hooks/usePharmaProjects'
-import { PHARMA_ROUTES } from '@/features/pharma/pharma.constants'
+import { resolveProjectCampsRoute, type PreferredPharmaCampType } from '@/features/pharma/pharmaCamps.routing'
 import ProjectStatusPill from '@/features/projects/components/ProjectStatusPill'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import PaginationControls from '@/components/ui/PaginationControls'
@@ -10,12 +10,19 @@ import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { usePagination } from '@/hooks/usePagination'
 import type { ProjectEntity } from '@/types/project.types'
 
+function isPreferredType(value: string | null): value is PreferredPharmaCampType {
+  return value === 'screening' || value === 'diet'
+}
+
 const PAGE_SIZE = 10
 
-// No "New Project" affordance — pharma never holds project:manage. All
-// statuses are shown, never filtered to `live` — the backend itself doesn't enforce that restriction either.
+// No "New Project" affordance — pharma never holds project:manage.
 const PharmaProjectsPage = () => {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  // Set by a type-scoped page's "Back to projects" link — keeps the same camp category on the next pick.
+  const rawPreferredType = searchParams.get('preferType')
+  const preferredType = isPreferredType(rawPreferredType) ? rawPreferredType : null
   const [search, setSearch] = useState('')
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
   const debouncedSearch = useDebouncedValue(search, 300)
@@ -61,7 +68,7 @@ const PharmaProjectsPage = () => {
               <button
                 key={project.id}
                 type="button"
-                onClick={() => navigate(PHARMA_ROUTES.PHARMA_PROJECT_CAMPS.replace(':id', project.id))}
+                onClick={() => navigate(resolveProjectCampsRoute(project, preferredType))}
                 className="w-full flex items-center justify-between gap-3 rounded-xl border p-4 text-left transition-colors hover:bg-muted/50"
                 style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}
               >

@@ -19,7 +19,7 @@ function sessionFixture(roleTypeCode: string, permissions: string[], tenantType:
   } as unknown as SessionResponse
 }
 
-async function renderSidebar(overrides: Record<string, unknown>) {
+async function renderSidebar(overrides: Record<string, unknown>, initialPath = '/dashboard') {
   const { useSession } = await import('@/hooks/useSession')
   vi.mocked(useSession).mockReturnValue({
     isSettled: true,
@@ -30,10 +30,16 @@ async function renderSidebar(overrides: Record<string, unknown>) {
 
   const Sidebar = (await import('./Sidebar')).default
   return render(
-    <MemoryRouter initialEntries={['/dashboard']}>
+    <MemoryRouter initialEntries={[initialPath]}>
       <Sidebar collapsed={false} onToggle={() => {}} />
     </MemoryRouter>,
   )
+}
+
+// Highlight is driven by this component's own `isActive`, not NavLink's aria-current — assert on the background.
+function isHighlighted(linkText: string) {
+  const link = screen.getByText(linkText).closest('a')!
+  return link.getAttribute('style')?.includes('linear-gradient(135deg, rgba(36, 81, 240') ?? false
 }
 
 describe('Sidebar — pharma identity isolation', () => {
@@ -149,6 +155,52 @@ describe('Sidebar — Inventory Operations nav label mirrors the page\'s own "Re
   })
 })
 
+describe('Sidebar — /camps/new highlights the originating Screening/Diet page, not the combined Camp Management page', () => {
+  const CAMP_SESSION_OVERRIDES = {
+    permissions: ['camp:search'],
+    session: sessionFixture('sales-rep', ['camp:search'], 'platform'),
+  }
+
+  it('with no type param, highlights "Camp Management" (regression check — unaffected by this fix)', async () => {
+    await renderSidebar(CAMP_SESSION_OVERRIDES, '/camps/new')
+
+    expect(isHighlighted('Camp Management')).toBe(true)
+    expect(isHighlighted('Screening Camps')).toBe(false)
+    expect(isHighlighted('Diet Camps')).toBe(false)
+  })
+
+  it('with type=screening, highlights "Screening Camps" instead of "Camp Management"', async () => {
+    await renderSidebar(CAMP_SESSION_OVERRIDES, '/camps/new?type=screening')
+
+    expect(isHighlighted('Screening Camps')).toBe(true)
+    expect(isHighlighted('Camp Management')).toBe(false)
+    expect(isHighlighted('Diet Camps')).toBe(false)
+  })
+
+  it('with type=diet, highlights "Diet Camps" instead of "Camp Management"', async () => {
+    await renderSidebar(CAMP_SESSION_OVERRIDES, '/camps/new?type=diet')
+
+    expect(isHighlighted('Diet Camps')).toBe(true)
+    expect(isHighlighted('Camp Management')).toBe(false)
+    expect(isHighlighted('Screening Camps')).toBe(false)
+  })
+
+  it('with an invalid type value, falls back to highlighting "Camp Management" (defensive — no crash, no orphaned highlight)', async () => {
+    await renderSidebar(CAMP_SESSION_OVERRIDES, '/camps/new?type=not-a-real-type')
+
+    expect(isHighlighted('Camp Management')).toBe(true)
+    expect(isHighlighted('Screening Camps')).toBe(false)
+    expect(isHighlighted('Diet Camps')).toBe(false)
+  })
+
+  it('visiting the Screening Camps page itself (not /camps/new) still highlights it normally', async () => {
+    await renderSidebar(CAMP_SESSION_OVERRIDES, '/camps/screening')
+
+    expect(isHighlighted('Screening Camps')).toBe(true)
+    expect(isHighlighted('Camp Management')).toBe(false)
+  })
+})
+
 describe('Sidebar — Field Staff Coverage is hidden from field-officer sessions', () => {
   it('hides Field Staff Coverage for a field-officer-shaped session (holds neither tenant nor role read/manage codes)', async () => {
     await renderSidebar({
@@ -175,5 +227,39 @@ describe('Sidebar — Field Staff Coverage is hidden from field-officer sessions
     })
 
     expect(screen.getByText('Field Staff Coverage')).toBeInTheDocument()
+  })
+})
+
+// 'employees' must not live under 'System' — visibleFullNavSections drops that whole section
+// unless isRealSystemManage is true, and none of these three role types hold system:manage.
+describe('Sidebar — Employees is visible to its allowed role types even without system:manage', () => {
+  it.each(['admin', 'operation-manager-screening', 'operation-manager-diet', 'field-officer'])(
+    'shows Employees for a %s session with no system:manage',
+    async (roleTypeCode) => {
+      await renderSidebar({
+        permissions: [],
+        session: sessionFixture(roleTypeCode, [], 'platform'),
+      })
+
+      expect(screen.getByText('Employees')).toBeInTheDocument()
+    },
+  )
+
+  it('hides Employees for an unrelated role type', async () => {
+    await renderSidebar({
+      permissions: [],
+      session: sessionFixture('sales-rep', [], 'platform'),
+    })
+
+    expect(screen.queryByText('Employees')).not.toBeInTheDocument()
+  })
+
+  it('shows Employees for a system:manage session regardless of role-type code', async () => {
+    await renderSidebar({
+      permissions: ['system:manage'],
+      session: sessionFixture('sales-rep', ['system:manage']),
+    })
+
+    expect(screen.getByText('Employees')).toBeInTheDocument()
   })
 })

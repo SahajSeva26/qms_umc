@@ -117,4 +117,33 @@ describe('EditRoleEditor', () => {
     expect(payload.user).not.toHaveProperty('email')
     expect(payload.user).not.toHaveProperty('password')
   })
+
+  it('mounts without throwing, with empty user-field defaults, when the linked User was hard-deleted (role.user: null — a dangling populate reference)', async () => {
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    const EditRoleEditor = (await import('@/features/access-management/role/components/EditRoleEditor')).default
+
+    vi.mocked(accessManagementService.searchRoleTypes).mockResolvedValue({
+      success: true, message: '', data: { items: [], count: 0 },
+    })
+    vi.mocked(accessManagementService.searchPermissionGroups).mockResolvedValue({
+      success: true, message: '', data: { items: [], count: 0 },
+    })
+
+    const role = roleFixture({ user: null })
+    const queryClient = makeQueryClient()
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <EditRoleEditor role={role} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    expect(await screen.findByLabelText(/^name$/i)).toHaveValue('Original Name')
+    expect(screen.getByLabelText(/first name/i)).toHaveValue('')
+    expect(screen.getByLabelText(/last name/i)).toHaveValue('')
+    expect(screen.getByLabelText(/phone/i)).toHaveValue('')
+    expect(screen.queryByText('jane@example.com')).not.toBeInTheDocument()
+  })
 })

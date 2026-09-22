@@ -229,3 +229,37 @@ describe('Sidebar — Field Staff Coverage is hidden from field-officer sessions
     expect(screen.getByText('Field Staff Coverage')).toBeInTheDocument()
   })
 })
+
+// 'employees' must not live under 'System' — visibleFullNavSections drops that whole section
+// unless isRealSystemManage is true, and none of these three role types hold system:manage.
+describe('Sidebar — Employees is visible to its allowed role types even without system:manage', () => {
+  it.each(['admin', 'operation-manager-screening', 'operation-manager-diet', 'field-officer'])(
+    'shows Employees for a %s session with no system:manage',
+    async (roleTypeCode) => {
+      await renderSidebar({
+        permissions: [],
+        session: sessionFixture(roleTypeCode, [], 'platform'),
+      })
+
+      expect(screen.getByText('Employees')).toBeInTheDocument()
+    },
+  )
+
+  it('hides Employees for an unrelated role type', async () => {
+    await renderSidebar({
+      permissions: [],
+      session: sessionFixture('sales-rep', [], 'platform'),
+    })
+
+    expect(screen.queryByText('Employees')).not.toBeInTheDocument()
+  })
+
+  it('shows Employees for a system:manage session regardless of role-type code', async () => {
+    await renderSidebar({
+      permissions: ['system:manage'],
+      session: sessionFixture('sales-rep', ['system:manage']),
+    })
+
+    expect(screen.getByText('Employees')).toBeInTheDocument()
+  })
+})

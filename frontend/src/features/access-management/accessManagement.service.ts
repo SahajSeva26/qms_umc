@@ -3,19 +3,23 @@ import { validateApiResponse } from '@/lib/api/validateApiResponse'
 import { AuthMeResponseSchema } from '@/features/access-management/accessManagement.response-schemas'
 import type { ApiResponse, PaginatedResponse } from '@/types/common.types'
 import type {
+  CreateEmployeePayload,
   CreateRolePayload,
   CreateRoleTypePayload,
   CreateTenantPayload,
+  EmployeeEntity,
   PermissionGroupEntity,
   RoleEntity,
   RoleTypeEntity,
   SearchDownlineMrQuery,
+  SearchEmployeeQuery,
   SearchPermissionGroupQuery,
   SearchRoleQuery,
   SearchRoleTypeQuery,
   SearchTenantQuery,
   SessionResponse,
   Tenant,
+  UpdateEmployeePayload,
   UpdatePermissionGroupPayload,
   UpdateRolePayload,
   UpdateRoleTypePayload,
@@ -132,6 +136,30 @@ const searchDownlineMrs = async (query: SearchDownlineMrQuery) => {
   return res.data
 }
 
+// ---------------------------------------------------------------------------
+// Employees
+// ---------------------------------------------------------------------------
+
+const searchEmployees = async (query: SearchEmployeeQuery) => {
+  const res = await api.get<PaginatedResponse<EmployeeEntity>>('/employees', { params: query })
+  return res.data
+}
+
+const getEmployee = async (id: string) => {
+  const res = await api.get<ApiResponse<EmployeeEntity>>(`/employees/${id}`)
+  return res.data
+}
+
+const createEmployee = async (payload: CreateEmployeePayload) => {
+  const res = await api.post<ApiResponse<EmployeeEntity>>('/employees', payload)
+  return res.data
+}
+
+const updateEmployee = async (id: string, payload: UpdateEmployeePayload) => {
+  const res = await api.put<ApiResponse<EmployeeEntity>>(`/employees/${id}`, payload)
+  return res.data
+}
+
 export const accessManagementService = {
   getMe,
   searchTenants,
@@ -150,4 +178,8 @@ export const accessManagementService = {
   createRole,
   updateRole,
   searchDownlineMrs,
+  searchEmployees,
+  getEmployee,
+  createEmployee,
+  updateEmployee,
 }

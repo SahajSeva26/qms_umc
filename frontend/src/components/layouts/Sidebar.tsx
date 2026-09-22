@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { useSession } from '@/hooks/useSession'
 import { getPharmaRoleMeta } from '@/features/pharma/pharma.constants'
+import { canReadEmployees } from '@/features/access-management/employee/employeeAccess'
 import {
   FULL_NAV_SECTIONS,
   type NavItem,
@@ -44,19 +45,12 @@ const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
   users: ['user:get', 'user:search', 'user:update'],
   // :get is deliberately excluded — the list page only calls search, which needs :search/:manage.
   vendormasters: ['vendor-master:search', 'vendor-master:manage'],
-  // Neither inventory-master nor inventory-device/-consumable has a :search
-  // code — the backend read routes themselves are :manage-gated, so this just
-  // mirrors that boundary in nav (a field-officer legitimately holds none of these).
+  // Neither inventory-master nor inventory-device/-consumable has a :search code — the backend
+  // read routes themselves are :manage-gated, so this mirrors that boundary in nav.
   itemmaster: ['inventory-master:manage'],
   inventoryitems: ['inventory-device:manage', 'inventory-consumable:manage'],
-  // GET /geo-profiles has no permission gate server-side (see the item's own
-  // comment in navConfig.ts), so this can't key off a geo-profile:* code — no
-  // RoleType is ever granted one. Gated instead on tenant/role read access,
-  // which every platform RoleType holds except field-officer (confirmed in
-  // defaultRoleTypes.ts: FO is the only one with neither tenant:get/:search
-  // nor role:get/:search) — an FO seeing every field officer's live
-  // coordinates and coverage radius is the same over-exposure already fixed
-  // for Inventory, just on a page with no backend gate to lean on.
+  // GET /geo-profiles has no permission gate server-side, so this can't key off a geo-profile:*
+  // code — gated instead on tenant/role read access, which every platform RoleType holds except field-officer.
   geoprofiles: ['tenant:get', 'tenant:search', 'tenant:manage', 'tenant:admin', 'role:get', 'role:search'],
 }
 
@@ -335,13 +329,14 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
 
   const isNavItemVisible = (item: NavItem): boolean => {
     if (item.id === 'pharma') return isPharmaRoleType
+    // Gated by role TYPE (RoleGuard), not permission codes — same reasoning as employeeAccess.ts.
+    if (item.id === 'employees') return !isSettled ? false : canReadEmployees(session?.roleType?.code, permissions)
     const requiredCodes = REAL_GATED_NAV_ITEMS[item.id]
     if (!requiredCodes) return true
     if (!isSettled) return false
     const hasCode = isRealSystemManage || requiredCodes.some((code) => permissions.includes(code))
-    // field-officer (RoleType + every real Role) lives only under the platform
-    // tenant — a customer-tenant admin holding the same permission codes must
-    // still not see this item, or they'd land on a confusing false "not found" error.
+    // field-officer lives only under the platform tenant — a customer-tenant admin holding the
+    // same permission codes must still not see this item, or they'd land on a confusing false "not found" error.
     if (item.id === 'fo' || item.id === 'fieldofficers') return hasCode && session?.tenant.type === 'platform'
     return hasCode
   }
@@ -357,9 +352,8 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
     }))
     .filter((section) => section.subs.length > 0)
 
-  // Same "only Requests is visible" condition InventoryOperationsPage.tsx
-  // itself uses to drop its own toggle group — kept in sync manually since
-  // the page computes it from usePermission(), not from this nav config.
+  // Mirrors InventoryOperationsPage.tsx's own "only Requests is visible" condition — kept in
+  // sync manually since that page computes it from usePermission(), not this nav config.
   const isInventoryRequestsOnly = !isRealSystemManage
     && !permissions.includes('inventory-assignment:manage')
     && !permissions.includes('inventory-ledger:manage')

@@ -90,4 +90,28 @@ describe('AuthMeResponseSchema', () => {
     const result = AuthMeResponseSchema.safeParse(malformed)
     expect(result.success).toBe(false)
   })
+
+  // role.division is a real, newer backend field (exposed so the frontend can pre-fill/lock a
+  // division-restricted actor's own division, e.g. for Doctor creation) — this asserts it actually
+  // SURVIVES parsing, not just that parsing doesn't throw, since SessionRoleSchema's .passthrough()
+  // could in principle be misconfigured to strip it.
+  it('retains role.division through parsing when the backend includes it', () => {
+    const withDivision = {
+      ...VALID_SESSION_RESPONSE,
+      data: { ...VALID_SESSION_RESPONSE.data, role: { ...VALID_SESSION_RESPONSE.data.role, division: 'div-cardiology' } },
+    }
+    const result = AuthMeResponseSchema.safeParse(withDivision)
+    expect(result.success).toBe(true)
+    expect(result.success && result.data.data.role.division).toBe('div-cardiology')
+  })
+
+  it('retains role.division: null through parsing (a role with no division on file)', () => {
+    const withNullDivision = {
+      ...VALID_SESSION_RESPONSE,
+      data: { ...VALID_SESSION_RESPONSE.data, role: { ...VALID_SESSION_RESPONSE.data.role, division: null } },
+    }
+    const result = AuthMeResponseSchema.safeParse(withNullDivision)
+    expect(result.success).toBe(true)
+    expect(result.success && result.data.data.role.division).toBeNull()
+  })
 })

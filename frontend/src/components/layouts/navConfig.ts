@@ -14,6 +14,7 @@ import { GEO_PROFILE_ROUTES } from '@/features/geo-profile/geoProfile.constants'
 import { BILLING_ROUTES }   from '@/features/billing/billing.routes'
 import { ADMIN_ROUTES }     from '@/features/admin/admin.routes'
 import { ACCESS_MANAGEMENT_ROUTES }      from '@/features/access-management/accessManagement.routes'
+import { EMPLOYEE_ROUTES }  from '@/features/access-management/employee/employee.routes'
 import { QA_FEEDBACK_ROUTES } from '@/features/qa-feedback/qa-feedback.routes'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -96,12 +97,15 @@ const ALL_NAV_ITEMS: NavItem[] = [
 
   { id: 'fieldofficers', label: 'FO Management',              icon: 'Navigation',    path: FO_ROUTES.FIELD_OFFICERS },
 
+  // Gated by role TYPE (RoleGuard), not permission codes — see Sidebar.tsx's isNavItemVisible
+  // special case and employeeAccess.ts. Placed in Operations, not System (hidden without system:manage).
+  { id: 'employees',    label: 'Employees',                   icon: 'Users',         path: EMPLOYEE_ROUTES.EMPLOYEES },
+
   // GET /doctors is open to any authenticated user server-side — no REAL_GATED_NAV_ITEMS entry.
   { id: 'doctors',      label: 'Doctor Management',           icon: 'Activity',      path: DOCTORS_ROUTES.DOCTORS },
 
-  // GET /geo-profiles is open to any authenticated user server-side, but
-  // Sidebar.tsx's REAL_GATED_NAV_ITEMS still hides this item from a
-  // field-officer session (frontend-only nav gate — see that file's comment).
+  // GET /geo-profiles is open to any authenticated user server-side, but Sidebar.tsx's
+  // REAL_GATED_NAV_ITEMS still hides this item from a field-officer session (frontend-only gate).
   { id: 'geoprofiles',  label: 'Field Staff Coverage',        icon: 'MapPin',        path: GEO_PROFILE_ROUTES.GEO_PROFILES },
 
   // Operations — Coverage & Alerts
@@ -185,7 +189,7 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
       // { title: 'Dietitians',        items: ['dietapprovals', 'dietpayment', 'dietprofile'].map((id) => NAV_BY_ID[id]) },
       // 'fo'/'fo_workspace'/'foconfig' are commented out, not deleted — only
       // 'doctors'/'geoprofiles'/'fieldofficers' are backend-wired today.
-      { title: 'Field Network',     items: ['fieldofficers', 'doctors', 'geoprofiles'/* , 'fo', 'fo_workspace', 'foconfig' */].map((id) => NAV_BY_ID[id]) },
+      { title: 'Field Network',     items: ['fieldofficers', 'employees', 'doctors', 'geoprofiles'/* , 'fo', 'fo_workspace', 'foconfig' */].map((id) => NAV_BY_ID[id]) },
       // Commented out, not deleted — this whole subsection is still mock-backed.
       // { title: 'Coverage & Alerts', items: ['hqmapping', 'incidents', 'remindauto'].map((id) => NAV_BY_ID[id]) },
     ],

@@ -22,7 +22,7 @@ import type { LocationValue } from '@/types/location.types'
 import type { GeoProfileEntity } from '@/types/geoProfile.types'
 
 function userField<K extends keyof RolePopulatedUser>(user: RoleEntity['user'], key: K): RolePopulatedUser[K] | undefined {
-  if (typeof user === 'string') return undefined
+  if (user === null || typeof user === 'string') return undefined
   return user[key]
 }
 

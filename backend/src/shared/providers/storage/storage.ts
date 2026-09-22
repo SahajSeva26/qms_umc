@@ -1,4 +1,4 @@
-import { IStorageProvider, IUploadInput } from '../../types/storagetypes';
+import { IStorageProvider } from '../../types/storagetypes';
 import { CLOUDINARY, CloudinaryProvider } from './cloudinary/cloudinary';
 import { S3, S3Provider } from './aws/s3.provider';
 

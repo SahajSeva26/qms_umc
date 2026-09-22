@@ -1,9 +1,3 @@
-export interface IUploadInput {
-    buffer: Buffer;
-    mimetype: string;
-    key?: string;
-}
-
 export interface IPresignedUploadInput {
     key: string;
     mimetype?: string;
@@ -23,11 +17,9 @@ export interface IObjectHead {
 }
 
 export interface IStorageProvider {
-    upload: (input: IUploadInput) => Promise<object>;
+    // upload hands back a short-lived presigned PUT URL — the client uploads the bytes to S3 directly.
+    upload: (input: IPresignedUploadInput) => Promise<IPresignedUpload>;
     getUrl: (identifier: string) => Promise<object>;
     delete: (identifier: string) => Promise<object>;
-    download: (identifier: string) => Promise<object>;
-    getPresignedUrl: (identifier: string) => Promise<string>;
-    getPresignedUploadUrl: (input: IPresignedUploadInput) => Promise<IPresignedUpload>;
     headObject: (identifier: string) => Promise<IObjectHead>;
 }

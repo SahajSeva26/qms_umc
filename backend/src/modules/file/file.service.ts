@@ -127,7 +127,7 @@ const buildContentFromMeta = (meta: { fileName: string; fileSize: number; fileTy
 // a doc without an upload URL is useless to the caller — so we surface a 500.
 const getUploadUrl = async (content: any): Promise<string> => {
     try {
-        const result = await storageManager.get(content.provider || S3).getPresignedUploadUrl({
+        const result = await storageManager.get(content.provider || S3).upload({
             key: content.identifier,
             mimetype: content.mimeType,
         });
@@ -175,7 +175,8 @@ const presignUrl = async (content: any): Promise<string | null> => {
         return null;
     }
     try {
-        return await storageManager.get(content.provider || S3).getPresignedUrl(content.identifier);
+        const { url } = (await storageManager.get(content.provider || S3).getUrl(content.identifier)) as { url: string };
+        return url;
     } catch (error: any) {
         logger.error({ err: error }, 'Failed to presign file URL');
         return null;
@@ -261,6 +262,7 @@ const search = async (filters: ISearchFileQuery, ctx: RequestContext, options?: 
         where.tenant = filters.tenant;
     }
 
+    
     //3: discarded files are hidden unless a file:manage actor explicitly asks for them
     const canManage = ctx.hasAnyPermissions([FILE_PERMISSIONS.MANAGE.code]);
     if (filters.status && (filters.status !== FILE_STATUS.DISCARDED || canManage)) {

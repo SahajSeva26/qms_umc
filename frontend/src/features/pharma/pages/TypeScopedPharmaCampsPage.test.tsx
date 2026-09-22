@@ -44,6 +44,7 @@ vi.mock('@/features/access-management/accessManagement.service', () => ({
 vi.mock('@/features/doctors/doctors.service', () => ({
   doctorsService: {
     searchDoctors: vi.fn(async () => ({ success: true, message: '', data: { items: [], count: 0 } })),
+    nearestDoctors: vi.fn(async () => ({ success: true, message: '', data: { items: [], count: 0 } })),
   },
 }))
 
@@ -117,7 +118,7 @@ function doctorFixture(overrides: Partial<DoctorEntity> = {}): DoctorEntity {
     id: 'doc-1', pharmaCode: 'DOC-1', name: 'Dr. Priya Sharma', specialization: 'cp',
     mobile: '9876543210', email: 'p@example.com',
     location: { addressLine1: '221 Baker Street', city: 'Pune', state: 'Maharashtra', pincode: '411001', coordinates: [73.8567, 18.5204] },
-    division: 'div-1', tenant: 't-1', createdAt: '', updatedAt: '', ...overrides,
+    division: 'div-1', tenant: 't-1', distanceMeters: 1200, createdAt: '', updatedAt: '', ...overrides,
   }
 }
 
@@ -127,20 +128,21 @@ function makeQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 5 * 60 * 1000 } } })
 }
 
-// Drives BookCampForm's 3-step wizard to submission — identical across Screening/Diet.
+// Drives BookCampForm's wizard to submission — identical across Screening/Diet. Assumes a
+// pharma-mr (self-booking) session, so there's no step 0 — it starts directly at Location.
 async function fillAndSubmitBookCampForm(user: ReturnType<typeof userEvent.setup>, doctorName: string) {
-  // Step 1 — who.
-  await user.type(screen.getByPlaceholderText(/search doctor by name/i), doctorName.split(' ')[0])
-  const doctorOption = await screen.findByText(new RegExp(doctorName.replace('.', '\\.'), 'i'), {}, { timeout: 3000 })
-  await user.click(doctorOption)
-  await user.click(screen.getByRole('button', { name: /^next$/i }))
-
-  // Step 2 — where.
+  // Step 1 — where.
   await user.type(await screen.findByLabelText(/^address line 1$/i), '221 Baker Street')
   await user.type(screen.getByLabelText(/^city$/i), 'Pune')
   await user.type(screen.getByLabelText(/^state$/i), 'Maharashtra')
   await user.type(screen.getByLabelText(/^pincode$/i), '411001')
   await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
+  await user.click(screen.getByRole('button', { name: /^next$/i }))
+
+  // Step 2 — doctor (distance-sorted, coordinates now set).
+  await user.type(await screen.findByPlaceholderText(/search doctor by name/i), doctorName.split(' ')[0])
+  const doctorOption = await screen.findByText(new RegExp(doctorName.replace('.', '\\.'), 'i'), {}, { timeout: 3000 })
+  await user.click(doctorOption)
   await user.click(screen.getByRole('button', { name: /^next$/i }))
 
   // Step 3 — when & details: today is the only mocked-available day.
@@ -418,7 +420,7 @@ describe('PharmaScreeningCampsPage / PharmaDietCampsPage — separate routes, sh
         ? { items: [campFixture({ code: 'cmp-000002', type: 'diet' })], count: 1 }
         : { items: [], count: 0 },
     }))
-    vi.mocked(doctorsService.searchDoctors).mockResolvedValue({
+    vi.mocked(doctorsService.nearestDoctors).mockResolvedValue({
       success: true, message: '', data: { items: [doctorFixture()], count: 1 },
     })
     vi.mocked(campsRealService.bookCamp).mockImplementationOnce(async () => {
@@ -457,7 +459,7 @@ describe('PharmaScreeningCampsPage / PharmaDietCampsPage — separate routes, sh
     const { campsRealService } = await import('@/features/camps/campsReal.service')
 
     vi.mocked(pharmaProjectsService.getProject).mockResolvedValue({ success: true, message: '', data: projectFixture() })
-    vi.mocked(doctorsService.searchDoctors).mockResolvedValue({
+    vi.mocked(doctorsService.nearestDoctors).mockResolvedValue({
       success: true, message: '', data: { items: [doctorFixture()], count: 1 },
     })
     // A mutable flag, not a fixed once-queue: the invalidation under test also

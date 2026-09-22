@@ -20,3 +20,8 @@ export function isServiceFailure(err: unknown): boolean {
   const status = axios.isAxiosError(err) ? err.response?.status : undefined
   return status !== undefined && (status >= 500 || status === 429)
 }
+
+// 403 — caller lacks permission, or is missing required context (e.g. no assigned division). Retrying never helps.
+export function isForbiddenError(err: unknown): boolean {
+  return axios.isAxiosError(err) && err.response?.status === 403
+}

@@ -11,7 +11,7 @@ import type { ApiResponse } from '@/types/common.types'
 import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
 import type { LocationValue } from '@/types/location.types'
 import type { LocationResolutionState } from '@/components/widgets/location-picker/location.types'
-import DoctorPicker from '@/features/pharma/components/DoctorPicker'
+import DoctorDistancePicker from '@/features/pharma/components/DoctorDistancePicker'
 import MrPicker from '@/features/pharma/components/MrPicker'
 import EditDoctorModal from '@/features/doctors/components/EditDoctorModal'
 import DateSlotAvailabilityGrid from '@/features/pharma/components/DateSlotAvailabilityGrid'
@@ -117,9 +117,19 @@ const BookCampForm = ({ needsMrPicker, type, project, onBooked, onCancel }: Book
   const [locationError, setLocationError] = useState<string | null>(null)
   const [locationHint, setLocationHint] = useState<string | null>(null)
 
-  const [step, setStep] = useState(0)
+  // /doctors/nearest scopes to the CALLING session's own division, never the picked MR's — an
+  // MR's division can drift from their supervisor's (see role.service.ts's handleSupervisor).
+  const [mrDivisionId, setMrDivisionId] = useState<string | null>(null)
+  const actingDivisionId = session?.role.division ?? null
+  // "Unknown" division is never treated as "probably fine" — blocks like a genuine mismatch.
+  const mrDivisionMismatch = needsMrPicker && (mrDivisionId === null || mrDivisionId !== actingDivisionId)
+
+  // A self-booking MR has nothing to show on step 0 (no MR field) — start at Location instead.
+  const FIRST_STEP = needsMrPicker ? 0 : 1
+  const [step, setStep] = useState(FIRST_STEP)
   const [step1Attempted, setStep1Attempted] = useState(false)
   const [step2Attempted, setStep2Attempted] = useState(false)
+  const [step3Attempted, setStep3Attempted] = useState(false)
 
   const {
     register,
@@ -156,6 +166,11 @@ const BookCampForm = ({ needsMrPicker, type, project, onBooked, onCancel }: Book
     if (prevCoordKeyRef.current !== null && coordKey !== null && prevCoordKeyRef.current !== coordKey) {
       setValue('date', '', { shouldDirty: true })
       setValue('timeSlot', '', { shouldDirty: true })
+    }
+    // Doctor is coordinates-gated — clear it on any coordinate change, including becoming absent.
+    if (prevCoordKeyRef.current !== coordKey) {
+      setValue('doctorId', '', { shouldDirty: true })
+      setValue('doctorLabel', '')
     }
     prevCoordKeyRef.current = coordKey
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -201,10 +216,12 @@ const BookCampForm = ({ needsMrPicker, type, project, onBooked, onCancel }: Book
 
   // Step-scoped so an error on a later step's field never appears just
   // because an earlier step's Next was attempted.
+  // Steps: 0 = MR, 1 = Location, 2 = Doctor, 3 = Date/slot + Patient expectation.
   const fieldError = (field: keyof FormValues) => {
     if (touchedFields[field] || isSubmitted) return errors[field]?.message
-    if (step1Attempted && (field === 'mrId' || field === 'doctorId')) return errors[field]?.message
+    if (step1Attempted && field === 'mrId') return errors[field]?.message
     if (step2Attempted && field === 'location') return errors[field]?.message
+    if (step3Attempted && field === 'doctorId') return errors[field]?.message
     return undefined
   }
 
@@ -217,14 +234,14 @@ const BookCampForm = ({ needsMrPicker, type, project, onBooked, onCancel }: Book
     // Blocks Next the same way Submit already blocked on this — a genuine
     // session-data gap, not a validation failure the user can fix by re-entering anything.
     if (missingSelfMrId) return
-    const valid = await trigger(needsMrPicker ? ['mrId', 'doctorId'] : ['doctorId'])
+    const valid = await trigger(needsMrPicker ? ['mrId'] : [])
     if (valid) setStep(1)
   }
   const handleNext2 = async () => {
     setStep2Attempted(true)
     // Same guard shape onSubmit uses — a still-resolving pin shouldn't let
-    // the user into step 3, where the calendar would fetch against a
-    // stale/wrong location.
+    // the user past Location, where the Doctor step would otherwise query
+    // /doctors/nearest against a stale/wrong point.
     if (locationResolution !== 'idle') {
       setLocationError(
         locationResolution === 'loading'
@@ -236,6 +253,11 @@ const BookCampForm = ({ needsMrPicker, type, project, onBooked, onCancel }: Book
     setLocationError(null)
     const valid = await trigger(['location'])
     if (valid) setStep(2)
+  }
+  const handleNext3 = async () => {
+    setStep3Attempted(true)
+    const valid = await trigger(['doctorId'])
+    if (valid) setStep(3)
   }
 
   const onSubmit = async (values: FormValues) => {
@@ -256,9 +278,11 @@ const BookCampForm = ({ needsMrPicker, type, project, onBooked, onCancel }: Book
     const payload: BookCampPayload = { ...formPayload, project: project.id }
     const res = await bookCamp.mutateAsync(payload)
     reset(EMPTY_FORM_VALUES)
-    setStep(0)
+    setStep(FIRST_STEP)
     setStep1Attempted(false)
     setStep2Attempted(false)
+    setStep3Attempted(false)
+    setMrDivisionId(null)
     onBooked(res)
   }
 
@@ -287,62 +311,37 @@ const BookCampForm = ({ needsMrPicker, type, project, onBooked, onCancel }: Book
         Booking for project: <span className="font-semibold" style={{ color: 'var(--qms-text)' }}>{project.name}</span>
       </div>
 
-      {step === 0 && (
-        <>
-          {needsMrPicker && (
-            <div>
-              <Label className="text-[10px] font-semibold tracking-widest uppercase mb-1.5 block text-qms-text-muted">MR *</Label>
-              <Controller
-                control={control}
-                name="mrId"
-                render={({ field }) => (
-                  <MrPicker value={field.value} label={mrLabel} onChange={(id, l) => { field.onChange(id); setValue('mrLabel', l) }} />
-                )}
+      {/* Session-level, not step-scoped — a self-booking MR never renders step 0 at all. */}
+      {missingSelfMrId && (
+        <div className="text-[12px] rounded-lg px-3 py-2 bg-danger-soft border border-danger text-danger">
+          Couldn't resolve your MR identity from the session — try reloading the page.
+        </div>
+      )}
+
+      {step === 0 && needsMrPicker && (
+        <div>
+          <Label className="text-[10px] font-semibold tracking-widest uppercase mb-1.5 block text-qms-text-muted">MR *</Label>
+          <Controller
+            control={control}
+            name="mrId"
+            render={({ field }) => (
+              <MrPicker
+                value={field.value}
+                label={mrLabel}
+                onChange={(id, l, divisionId) => {
+                  field.onChange(id)
+                  setValue('mrLabel', l)
+                  setMrDivisionId(divisionId)
+                  // A newly-picked MR may resolve to a different division than the one the
+                  // previous MR resolved to — a stale doctor selection could be wrong-division.
+                  setValue('doctorId', '', { shouldDirty: true })
+                  setValue('doctorLabel', '')
+                }}
               />
-              {fieldError('mrId') && <p className="text-[11px] mt-1 text-danger">{fieldError('mrId')}</p>}
-            </div>
-          )}
-
-          {missingSelfMrId && (
-            <div className="text-[12px] rounded-lg px-3 py-2 bg-danger-soft border border-danger text-danger">
-              Couldn't resolve your MR identity from the session — try reloading the page.
-            </div>
-          )}
-
-          <div>
-            <Label className="text-[10px] font-semibold tracking-widest uppercase mb-1.5 block text-qms-text-muted">Doctor *</Label>
-            <div className="flex items-center gap-2">
-              <div className="flex-1 min-w-0">
-                <Controller
-                  control={control}
-                  name="doctorId"
-                  render={({ field }) => (
-                    <DoctorPicker value={field.value} label={doctorLabel} onChange={(id, l) => { field.onChange(id); setValue('doctorLabel', l) }} />
-                  )}
-                />
-              </div>
-              {canManageDoctors && session && (
-                <Button type="button" variant="outline" onClick={() => setShowNewDoctor(true)}>
-                  New doctor
-                </Button>
-              )}
-            </div>
-            {fieldError('doctorId') && <p className="text-[11px] mt-1 text-danger">{fieldError('doctorId')}</p>}
-          </div>
-
-          {showNewDoctor && session && (
-            <EditDoctorModal
-              open
-              doctor={null}
-              forcedTenant={{ id: session.tenant.id, label: session.tenant.name }}
-              onCreated={(created) => {
-                setValue('doctorId', created.id, { shouldDirty: true, shouldTouch: true, shouldValidate: true })
-                setValue('doctorLabel', `${created.name} (${created.pharmaCode})`)
-              }}
-              onClose={() => setShowNewDoctor(false)}
-            />
-          )}
-        </>
+            )}
+          />
+          {fieldError('mrId') && <p className="text-[11px] mt-1 text-danger">{fieldError('mrId')}</p>}
+        </div>
       )}
 
       {step === 1 && (
@@ -370,6 +369,59 @@ const BookCampForm = ({ needsMrPicker, type, project, onBooked, onCancel }: Book
       )}
 
       {step === 2 && (
+        <>
+          {mrDivisionMismatch ? (
+            <div className="text-[12px] rounded-lg px-3 py-2 bg-danger-soft border border-danger text-danger">
+              {mrDivisionId === null
+                ? "Can't confirm this MR's division — doctor search may not be accurate for this booking."
+                : "This MR's division doesn't match your own — doctor search is scoped to your division and may not be accurate for this booking."}
+            </div>
+          ) : (
+            <div>
+              <Label className="text-[10px] font-semibold tracking-widest uppercase mb-1.5 block text-qms-text-muted">Doctor *</Label>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <Controller
+                    control={control}
+                    name="doctorId"
+                    render={({ field }) => (
+                      <DoctorDistancePicker
+                        value={field.value}
+                        label={doctorLabel}
+                        coordinates={location?.coordinates}
+                        onChange={(id, l) => { field.onChange(id); setValue('doctorLabel', l) }}
+                      />
+                    )}
+                  />
+                </div>
+                {/* No "New doctor" button when the acting user has no division — the create would just 403. */}
+                {canManageDoctors && session && actingDivisionId && (
+                  <Button type="button" variant="outline" onClick={() => setShowNewDoctor(true)}>
+                    New doctor
+                  </Button>
+                )}
+              </div>
+              {fieldError('doctorId') && <p className="text-[11px] mt-1 text-danger">{fieldError('doctorId')}</p>}
+            </div>
+          )}
+
+          {showNewDoctor && session && actingDivisionId && (
+            <EditDoctorModal
+              open
+              doctor={null}
+              forcedTenant={{ id: session.tenant.id, label: session.tenant.name }}
+              forcedDivision={{ id: actingDivisionId, label: 'Your assigned division', note: 'locked to your account' }}
+              onCreated={(created) => {
+                setValue('doctorId', created.id, { shouldDirty: true, shouldTouch: true, shouldValidate: true })
+                setValue('doctorLabel', `${created.name} (${created.pharmaCode})`)
+              }}
+              onClose={() => setShowNewDoctor(false)}
+            />
+          )}
+        </>
+      )}
+
+      {step === 3 && (
         <>
           <div>
             {location?.coordinates && locationResolution === 'idle' ? (
@@ -437,13 +489,23 @@ const BookCampForm = ({ needsMrPicker, type, project, onBooked, onCancel }: Book
         )}
         {step === 1 && (
           <>
-            <Button type="button" variant="outline" onClick={() => setStep(0)}>Back</Button>
+            {/* A self-booking MR never has a step 0 to go back to — Cancel out of the form
+                entirely instead of a "Back" that would land on a screen that's never shown. */}
+            {needsMrPicker
+              ? <Button type="button" variant="outline" onClick={() => setStep(0)}>Back</Button>
+              : <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>}
             <Button type="button" onClick={handleNext2}>Next</Button>
           </>
         )}
         {step === 2 && (
           <>
             <Button type="button" variant="outline" onClick={() => setStep(1)}>Back</Button>
+            <Button type="button" onClick={handleNext3} disabled={mrDivisionMismatch}>Next</Button>
+          </>
+        )}
+        {step === 3 && (
+          <>
+            <Button type="button" variant="outline" onClick={() => setStep(2)}>Back</Button>
             <Button
               type="submit"
               disabled={bookCamp.isPending || missingSelfMrId || locationResolution === 'loading'}

@@ -14,10 +14,15 @@ interface CopyButtonProps {
 const CopyButton = ({ value, label, size = 12, className = '' }: CopyButtonProps) => (
   <button
     type="button"
-    onClick={(e) => {
+    onClick={async (e) => {
       e.stopPropagation()
-      navigator.clipboard?.writeText(value)
-      toast.success(label ? `${label} copied` : 'Copied')
+      try {
+        if (!navigator.clipboard) throw new Error('Clipboard API unavailable')
+        await navigator.clipboard.writeText(value)
+        toast.success(label ? `${label} copied` : 'Copied')
+      } catch {
+        toast.error(label ? `Couldn't copy ${label.toLowerCase()}` : "Couldn't copy")
+      }
     }}
     className={`shrink-0 rounded p-0.5 transition-colors hover:bg-(--qms-surface-hover) ${className}`}
     style={{ color: 'var(--qms-text-muted)' }}

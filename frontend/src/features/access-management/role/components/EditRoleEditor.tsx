@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button'
 import MutationStatusBanner from '@/components/ui/MutationStatusBanner'
 import { useEditRoleFormResolver, toUpdateRolePayload, type UpdateRoleFormValues } from '@/features/access-management/role/roleForm'
 import { unwrapId } from '@/utils/unwrapId'
-import type { RoleEntity, RolePopulatedRoleType, RolePopulatedTenant, RolePopulatedUser } from '@/types/accessManagement.types'
+import type { RoleEntity, RolePopulatedRoleType, RolePopulatedTenant } from '@/types/accessManagement.types'
 
 interface EditRoleEditorProps {
   role: RoleEntity
@@ -22,7 +22,9 @@ interface EditRoleEditorProps {
 const EditRoleEditor = ({ role }: EditRoleEditorProps) => {
   const navigate = useNavigate()
   const { resolver, parsePayload } = useEditRoleFormResolver()
-  const userValue = role.user as RolePopulatedUser | string
+  // role.user is null for a dangling reference (the linked User was hard-deleted) — narrowed
+  // explicitly here rather than cast, so every default-value read below is genuinely null-safe.
+  const userValue = role.user
 
   const {
     register,
@@ -37,11 +39,11 @@ const EditRoleEditor = ({ role }: EditRoleEditorProps) => {
       description: role.description ?? '',
       status: role.status ?? '',
       roleType: unwrapId(role.type),
-      userFirstName: typeof userValue !== 'string' ? (userValue.firstName ?? '') : '',
-      userLastName: typeof userValue !== 'string' ? (userValue.lastName ?? '') : '',
-      userPhone: typeof userValue !== 'string' ? (userValue.phone ?? '') : '',
-      userGender: typeof userValue !== 'string' ? ((userValue.gender as UpdateRoleFormValues['userGender']) ?? '') : '',
-      userStatus: typeof userValue !== 'string' ? ((userValue.status as UpdateRoleFormValues['userStatus']) ?? '') : '',
+      userFirstName: userValue && typeof userValue !== 'string' ? (userValue.firstName ?? '') : '',
+      userLastName: userValue && typeof userValue !== 'string' ? (userValue.lastName ?? '') : '',
+      userPhone: userValue && typeof userValue !== 'string' ? (userValue.phone ?? '') : '',
+      userGender: userValue && typeof userValue !== 'string' ? ((userValue.gender as UpdateRoleFormValues['userGender']) ?? '') : '',
+      userStatus: userValue && typeof userValue !== 'string' ? ((userValue.status as UpdateRoleFormValues['userStatus']) ?? '') : '',
     },
   })
 
@@ -62,7 +64,7 @@ const EditRoleEditor = ({ role }: EditRoleEditorProps) => {
 
   const roleTypeName = (role.type as RolePopulatedRoleType)?.name
   const tenantName = (role.tenant as RolePopulatedTenant)?.name
-  const userEmail = typeof userValue !== 'string' ? userValue.email : undefined
+  const userEmail = userValue && typeof userValue !== 'string' ? userValue.email : undefined
 
   return (
     <div className="max-w-3xl">

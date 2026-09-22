@@ -22,9 +22,8 @@ export interface IPermission {
 export type TenantType = 'platform' | 'customer'
 export type TenantStatus = 'active' | 'inactive'
 
-// Only present when the search was called with report=true — see
-// SearchTenantQuery.report. Per-tenant rollup for the current result page
-// only (one aggregation per collection for the whole page, not per-row).
+// Only present when the search was called with report=true (see SearchTenantQuery.report) —
+// a per-tenant rollup for the current result page only.
 export interface TenantStats {
   totalProjects: number
   liveProjects: number
@@ -34,9 +33,8 @@ export interface TenantStats {
   dietCamps: number
 }
 
-// Fields below `name` (except `address`) are optional: only present when the
-// caller holds `system:manage`. `address` is NOT gated — tenant.mapper.ts
-// returns it unconditionally as `tenant.address ?? null` for every caller.
+// Fields below `name` (except `address`) are optional: only present when the caller holds
+// `system:manage`. `address` is NOT gated — returned unconditionally for every caller.
 export interface Tenant {
   id: string
   code: string
@@ -244,6 +242,9 @@ export interface RolePopulatedRoleType {
 }
 
 export interface RolePopulatedUser {
+  // Mongoose's .populate() always includes _id unless explicitly excluded — role.service.ts's
+  // populate select ('firstName lastName email phone gender status') doesn't exclude it.
+  _id?: string
   firstName: string
   lastName?: string
   email: string
@@ -271,8 +272,9 @@ export interface RoleEntity {
   // Populated {RolePopulatedRoleType} on GET-by-id/search; raw ObjectId string on
   // create/update responses; `null` when the referenced RoleType was deleted.
   type: RolePopulatedRoleType | string | null
-  // Populated {RolePopulatedUser} on GET-by-id/search; raw ObjectId string on create/update responses.
-  user: RolePopulatedUser | string
+  // Populated {RolePopulatedUser} on GET-by-id/search; raw ObjectId string on create/update responses;
+  // `null` when the referenced User was deleted (Mongoose resolves a dangling populate to `null`).
+  user: RolePopulatedUser | string | null
   // Populated {RolePopulatedTenant} on GET-by-id/search; raw ObjectId string on create/update responses.
   tenant: RolePopulatedTenant | string
   createdAt: string
@@ -360,6 +362,9 @@ export interface SessionRole {
   id: string
   code: string
   name: string
+  // Division id when the role is division-restricted (e.g. Pharma Division Head); null when the
+  // role has no division, absent only if the backend response predates this field.
+  division?: string | null
 }
 
 export interface SessionRoleType {
@@ -394,4 +399,149 @@ export interface SessionPermissions {
   tenantCode: string
   tenantType: 'platform' | 'customer'
   tenantId: string
+}
+
+// ---------------------------------------------------------------------------
+// Employee — HR/staff-registry record layered on top of a User+Role, currently scoped to Field
+// Officers only. Gated by role-TYPE (RoleGuard), not permission codes — see employeeAccess.ts.
+// ---------------------------------------------------------------------------
+
+export type EmployeeStatus = 'active' | 'inactive' | 'terminated'
+export type EmployeeType = 'field-officer'
+export type EmployeeGender = 'male' | 'female' | 'other'
+export type DaRuleType = 'fixed' | 'percentage'
+
+export interface EmployeePopulatedTenant {
+  _id?: string
+  name: string
+  code: string
+  type?: TenantType
+}
+
+export interface EmployeePopulatedUser {
+  _id?: string
+  firstName: string
+  lastName?: string
+  email: string
+  phone?: string
+  avatar?: { url: string; id: string }
+  status?: string
+}
+
+export interface EmployeePopulatedSupervisor {
+  _id?: string
+  email: string
+  type?: EmployeeType
+  status?: EmployeeStatus
+  profile?: EmployeeProfile
+}
+
+export interface DaRule {
+  type: DaRuleType
+  value: number
+}
+
+export interface BankDetails {
+  accountHolderName?: string
+  accountNumber?: string
+  ifscCode?: string
+  bankName?: string
+  branch?: string
+}
+
+export interface EmployeeProfilePicture {
+  url?: string
+  thumbnail?: string
+}
+
+export interface EmployeeProfile {
+  firstName?: string
+  lastName?: string
+  profilePicture?: EmployeeProfilePicture
+  dob?: string | null
+  fatherName?: string
+  bloodGroup?: string
+  gender?: EmployeeGender
+}
+
+export interface EmployeeEntity {
+  id: string
+  // Populated {EmployeePopulatedTenant} on GET-by-id/search; raw ObjectId string on create/update responses.
+  tenant: EmployeePopulatedTenant | string
+  // Populated {EmployeePopulatedUser} on GET-by-id/search; raw ObjectId string on create/update responses.
+  user: EmployeePopulatedUser | string
+  email: string
+  phone: string
+  type: EmployeeType
+  doj: string
+  dol?: string
+  reason?: string
+  profile?: EmployeeProfile
+  salary?: number
+  daRule?: DaRule
+  aadharNumber?: string
+  panNumber?: string
+  bankDetails?: BankDetails
+  location?: LocationValue
+  // Populated {EmployeePopulatedSupervisor} on GET-by-id/search; raw ObjectId string on create/update responses; null when unset.
+  supervisor?: EmployeePopulatedSupervisor | string | null
+  status: EmployeeStatus
+  meta?: Record<string, unknown>
+  createdAt: string
+  updatedAt: string
+}
+
+export interface SearchEmployeeQuery {
+  name?: string
+  email?: string
+  type?: EmployeeType
+  status?: EmployeeStatus
+  tenant?: string
+  supervisor?: string
+  user?: string
+  page?: string
+  limit?: string
+}
+
+// No `supervisor` field surfaced this pass — deferred (see the Employee wiring plan).
+export interface CreateEmployeePayload {
+  /** Id of an existing User — the backend has no combined create-User+Employee endpoint. */
+  user: string
+  email: string
+  phone: string
+  type: EmployeeType
+  doj: string
+  dol?: string
+  reason?: string
+  profile?: EmployeeProfile
+  /** Platform actors must supply; customer actors are pinned to their own tenant. */
+  tenant?: string
+  status?: EmployeeStatus
+  salary?: number
+  daRule?: DaRule
+  aadharNumber?: string
+  panNumber?: string
+  bankDetails?: BankDetails
+  location?: LocationValue
+  meta?: Record<string, unknown>
+}
+
+// tenant/user/email are identity — immutable via update (omitted from the backend's own update schema).
+export interface UpdateEmployeePayload {
+  phone?: string
+  type?: EmployeeType
+  doj?: string
+  dol?: string
+  reason?: string
+  profile?: EmployeeProfile
+  status?: EmployeeStatus
+  salary?: number
+  daRule?: DaRule
+  aadharNumber?: string
+  panNumber?: string
+  /** Replaced wholesale server-side when supplied — never deep-merged. */
+  bankDetails?: BankDetails
+  /** Replaced wholesale server-side when supplied — never deep-merged. */
+  location?: LocationValue
+  meta?: Record<string, unknown>
 }

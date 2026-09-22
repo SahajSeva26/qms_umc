@@ -50,4 +50,20 @@ describe('useCampDraft — buildInitialDraft', () => {
     const { result } = renderHook(() => useCampDraft(camp))
     expect(result.current.draft.location).toBeNull()
   })
+
+  it('seeds type from initialType on a fresh create draft (camp: null)', () => {
+    const { result } = renderHook(() => useCampDraft(null, 'diet'))
+    expect(result.current.draft.type).toBe('diet')
+  })
+
+  it('defaults to "screening" when camp is null and no initialType is given', () => {
+    const { result } = renderHook(() => useCampDraft(null))
+    expect(result.current.draft.type).toBe('screening')
+  })
+
+  it('an existing camp\'s own type always wins over initialType', () => {
+    const camp = campFixture({ type: 'lab' })
+    const { result } = renderHook(() => useCampDraft(camp, 'diet'))
+    expect(result.current.draft.type).toBe('lab')
+  })
 })

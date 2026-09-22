@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { Navigate, useNavigate, Link } from 'react-router-dom'
+import { FiPlus } from 'react-icons/fi'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRoleTypes'
 import { useGeoProfiles } from '@/features/geo-profile/hooks/useGeoProfiles'
@@ -8,6 +9,7 @@ import { usePagination } from '@/hooks/usePagination'
 import { useFilterState } from '@/hooks/useFilterState'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { FO_ROUTES } from '@/features/fo/fo.routes'
+import CreateFoModal from '@/features/fo/components/CreateFoModal'
 import { Button } from '@/components/ui/button'
 import SearchInput from '@/components/ui/SearchInput'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -73,6 +75,15 @@ const FieldOfficersPage = () => {
 
 const FieldOfficersContent = () => {
   const navigate = useNavigate()
+  const { session, hasAnyPermission } = usePermission()
+  // Belt-and-suspenders UI symmetry, not closing a real gap — anyone who can
+  // already see this page (passed the route's FO_VIEW_PERMISSIONS gate)
+  // already holds one of these two codes, same as RolesListPage's canCreateRole.
+  const canCreateFo = hasAnyPermission(['tenant:admin', 'tenant:manage'])
+  // Not guaranteed present the instant this renders — session can still be
+  // loading independently of the outer platform-tenant gate. Treated the
+  // same as foTypeId below: may start undefined, resolves later.
+  const tenantId = session?.tenant.id
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
   const { filters, setFilter, reset } = useFilterState<FieldOfficersFilterState>({ search: '', status: 'ALL' })
   const debouncedSearch = useDebouncedValue(filters.search, 300)
@@ -131,13 +142,24 @@ const FieldOfficersContent = () => {
 
   return (
     <div className="w-full">
-      <div className="mb-5">
-        <h1 className="text-2xl font-bold" style={{ color: 'var(--qms-text)' }}>
-          FO Management
-        </h1>
-        <p className="text-[13px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>
-          {!isLoading && !error ? `${totalCount} total` : 'Field officers across your organization.'}
-        </p>
+      <div className="mb-5 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--qms-text)' }}>
+            FO Management
+          </h1>
+          <p className="text-[13px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>
+            {!isLoading && !error ? `${totalCount} total` : 'Field officers across your organization.'}
+          </p>
+        </div>
+        {canCreateFo && (
+          tenantId && foTypeId ? (
+            <CreateFoModal tenantId={tenantId} foTypeId={foTypeId} />
+          ) : (
+            <Button disabled className="shrink-0">
+              <FiPlus size={14} /> Add FO
+            </Button>
+          )
+        )}
       </div>
 
       <div

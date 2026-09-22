@@ -156,13 +156,19 @@ const search = async (filters: ISearchDoctorQuery, ctx: RequestContext, options?
 const findNearest = async (filters: INearestDoctorQuery, ctx: RequestContext, options?: IServiceOptions) => {
     const limit = options?.pagination?.limit || 10;
 
-    // scoping mirrors search(): tenant (ctx.where) + active only + optional specialization,
-    // then division own-scope for a customer actor.
-    const where: any = { ...ctx.where(), status: DOCTOR_STATUS.ACTIVE };
+    // This endpoint is pharma-side only (gated to camp:book holders), so it always scopes to the
+    // caller's OWN division — taken straight from their role context, never from the payload. A
+    // pharma role without a division can't meaningfully use this lookup, so hard-fail.
+    const division = ctx.role?.division;
+    if (!division) {
+        return throwAppError('Your account is not assigned to a division', StatusCodes.FORBIDDEN);
+    }
+
+    // tenant (ctx.where) + active only + the caller's division + optional specialization.
+    const where: any = { ...ctx.where(), status: DOCTOR_STATUS.ACTIVE, division: toObjectId(division) };
     if (filters.specialization) {
         where.specialization = filters.specialization;
     }
-    applyOwnScope(where, ctx);
 
     const items = await DoctorModel.aggregate([
         {

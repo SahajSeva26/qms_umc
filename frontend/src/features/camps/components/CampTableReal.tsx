@@ -1,6 +1,7 @@
 import { Fragment, useState, type ReactNode } from 'react'
 import { FiChevronDown, FiChevronUp } from 'react-icons/fi'
 import type { CampEntity } from '@/types/campReal.types'
+import CopyButton from '@/components/ui/CopyButton'
 import CampStatusPillReal from '@/features/camps/components/CampStatusPillReal'
 import { useCampRefNames } from '@/features/camps/hooks/useCampRefNames'
 import { usePermission } from '@/hooks/usePermission'
@@ -67,13 +68,16 @@ const CampTableReal = ({ camps, onOpen }: CampTableRealProps) => {
                     style={{ borderBottom: isExpanded ? 'none' : '1px solid var(--qms-border)' }}
                   >
                     <td className="px-4 py-2.5 whitespace-nowrap">
-                      <button
-                        onClick={() => onOpen(camp.id)}
-                        className="font-semibold rounded-md -mx-1 px-1 transition-colors hover:underline focus-visible:outline-2 focus-visible:outline-offset-2"
-                        style={{ color: 'var(--qms-brand)', outlineColor: 'var(--qms-brand)' }}
-                      >
-                        {camp.code}
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => onOpen(camp.id)}
+                          className="font-semibold rounded-md -mx-1 px-1 transition-colors hover:underline focus-visible:outline-2 focus-visible:outline-offset-2"
+                          style={{ color: 'var(--qms-brand)', outlineColor: 'var(--qms-brand)' }}
+                        >
+                          {camp.code}
+                        </button>
+                        <CopyButton value={camp.code} label="Code" />
+                      </div>
                     </td>
                     <td className="px-4 py-2.5 whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>
                       {new Date(camp.date).toLocaleDateString()}

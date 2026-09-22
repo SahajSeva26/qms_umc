@@ -12,6 +12,7 @@ import {
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
 import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
 import { DOCTOR_PERMISSIONS } from './doctor.constants';
+import { CAMP_PERMISSIONS } from '../../operations/camp/camp.constants';
 import { csvUploader } from '../../../shared/middlewares/upload/csvUploader';
 
 export const DoctorRouter = express.Router();
@@ -23,7 +24,7 @@ registry.registerPath({
     method: 'get',
     path: '/doctors/nearest',
     tags: ['DOCTOR'],
-    summary: 'Find doctors within a fixed 35km radius of a point (nearest first)',
+    summary: 'Find doctors within a fixed 35km radius of a point (nearest first) — pharma-side, requires camp:book',
     request: {
         query: NearestDoctorQuerySchema,
     },
@@ -131,7 +132,9 @@ registry.registerPath({
 // reads are tenant-scoped but open to any authenticated user; writes (create/update/bulk)
 // are guarded by doctor:manage.
 // NOTE: /nearest is declared before /:id so the literal path is not swallowed by the param route.
-DoctorRouter.get('/nearest', DoctorController.nearest);
+// /nearest is a pharma-side lookup (find doctors near a point when booking a camp) — gated to
+// camp:book holders only, so only pharma field-force roles can reach it.
+DoctorRouter.get('/nearest', AuthorizeMiddleware([CAMP_PERMISSIONS.BOOK.code]), DoctorController.nearest);
 DoctorRouter.get('/:id', DoctorController.get);
 DoctorRouter.get('/', DoctorController.search);
 

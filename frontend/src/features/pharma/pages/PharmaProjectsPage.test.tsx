@@ -11,10 +11,11 @@ vi.mock('@/features/pharma/pharmaProjects.service', () => ({
   },
 }))
 
+// Defaults to allowing both screening and diet — a real project's `type` is never actually empty.
 function projectFixture(overrides: Partial<ProjectEntity> = {}): ProjectEntity {
   return {
     id: 'proj-1', code: 'PRJ-1', name: 'Cardio Screening Drive', tenant: 't-1', division: 'div-1',
-    therapy: 'cardiology', type: [], tests: [], lead: null, mode: null, campCost: 0, totalCamps: 0,
+    therapy: 'cardiology', type: ['screening_camp', 'diet'], tests: [], lead: null, mode: null, campCost: 0, totalCamps: 0,
     gst: 0, valueBeforeGST: 0, additionalCost: 0, campTimeSlots: ['9am-1pm', '10am-2pm'], freeCancelHours: 0,
     cancellationAllowed: 0, campCostDeductionOnChargableCancel: 0, goLiveScope: null,
     whoCanBookCamp: [], salesRep: null, projectCoordinator: null, status: 'live',
@@ -28,18 +29,30 @@ function makeQueryClient() {
 
 const CampsRouteStub = () => {
   const { id } = useParams<{ id: string }>()
-  return <div>Camps for project {id}</div>
+  return <div>All camps for project {id}</div>
 }
 
-async function renderPage() {
+const ScreeningRouteStub = () => {
+  const { id } = useParams<{ id: string }>()
+  return <div>Screening camps for project {id}</div>
+}
+
+const DietRouteStub = () => {
+  const { id } = useParams<{ id: string }>()
+  return <div>Diet camps for project {id}</div>
+}
+
+async function renderPage(initialPath = '/pharma/rsm') {
   const PharmaProjectsPage = (await import('./PharmaProjectsPage')).default
   const queryClient = makeQueryClient()
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={['/pharma/rsm']}>
+      <MemoryRouter initialEntries={[initialPath]}>
         <Routes>
           <Route path="/pharma/rsm" element={<PharmaProjectsPage />} />
           <Route path="/pharma/projects/:id/camps" element={<CampsRouteStub />} />
+          <Route path="/pharma/projects/:id/camps/screening" element={<ScreeningRouteStub />} />
+          <Route path="/pharma/projects/:id/camps/diet" element={<DietRouteStub />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -120,10 +133,10 @@ describe('PharmaProjectsPage', () => {
     expect(lastCall?.page).toBe('1')
   })
 
-  it('navigates to the project\'s camps page on click', async () => {
+  it('a project allowing both screening and diet defaults to Screening (not the combined All-camps page)', async () => {
     const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
     vi.mocked(pharmaProjectsService.searchScopedProjects).mockResolvedValue({
-      success: true, message: '', data: { items: [projectFixture({ id: 'proj-42' })], count: 1 },
+      success: true, message: '', data: { items: [projectFixture({ id: 'proj-42', type: ['screening_camp', 'diet'] })], count: 1 },
     })
 
     const user = userEvent.setup()
@@ -131,6 +144,62 @@ describe('PharmaProjectsPage', () => {
 
     await user.click(await screen.findByText('Cardio Screening Drive'))
 
-    expect(await screen.findByText(/camps for project proj-42/i)).toBeInTheDocument()
+    expect(await screen.findByText(/screening camps for project proj-42/i)).toBeInTheDocument()
+  })
+
+  it('a diet-only project opens Diet directly, never an empty Screening page', async () => {
+    const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
+    vi.mocked(pharmaProjectsService.searchScopedProjects).mockResolvedValue({
+      success: true, message: '', data: { items: [projectFixture({ id: 'proj-diet', type: ['diet'] })], count: 1 },
+    })
+
+    const user = userEvent.setup()
+    await renderPage()
+
+    await user.click(await screen.findByText('Cardio Screening Drive'))
+
+    expect(await screen.findByText(/diet camps for project proj-diet/i)).toBeInTheDocument()
+  })
+
+  it('a lab-only project opens the unrestricted All-camps view, not a nonexistent Lab page', async () => {
+    const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
+    vi.mocked(pharmaProjectsService.searchScopedProjects).mockResolvedValue({
+      success: true, message: '', data: { items: [projectFixture({ id: 'proj-lab', type: ['lab_test'] })], count: 1 },
+    })
+
+    const user = userEvent.setup()
+    await renderPage()
+
+    await user.click(await screen.findByText('Cardio Screening Drive'))
+
+    expect(await screen.findByText(/all camps for project proj-lab/i)).toBeInTheDocument()
+  })
+
+  it('arriving with ?preferType=diet opens Diet for a project that allows both, instead of defaulting to Screening', async () => {
+    const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
+    vi.mocked(pharmaProjectsService.searchScopedProjects).mockResolvedValue({
+      success: true, message: '', data: { items: [projectFixture({ id: 'proj-42', type: ['screening_camp', 'diet'] })], count: 1 },
+    })
+
+    const user = userEvent.setup()
+    await renderPage('/pharma/rsm?preferType=diet')
+
+    await user.click(await screen.findByText('Cardio Screening Drive'))
+
+    expect(await screen.findByText(/diet camps for project proj-42/i)).toBeInTheDocument()
+  })
+
+  it('?preferType=diet still falls back to Screening for a screening-only project (the preferred type isn\'t allowed there)', async () => {
+    const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
+    vi.mocked(pharmaProjectsService.searchScopedProjects).mockResolvedValue({
+      success: true, message: '', data: { items: [projectFixture({ id: 'proj-screen', type: ['screening_camp'] })], count: 1 },
+    })
+
+    const user = userEvent.setup()
+    await renderPage('/pharma/rsm?preferType=diet')
+
+    await user.click(await screen.findByText('Cardio Screening Drive'))
+
+    expect(await screen.findByText(/screening camps for project proj-screen/i)).toBeInTheDocument()
   })
 })

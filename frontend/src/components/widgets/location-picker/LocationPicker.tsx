@@ -20,9 +20,8 @@ const MAP_LIBRARIES: string[] = ['places']
 const DEFAULT_CENTER = { lat: 19.0759837, lng: 72.8776559 }
 const DEFAULT_HEIGHT = 320
 
-// Shared fallback for missing credentials AND a failed/rejected APIProvider —
-// both leave no other way to produce coordinates. Latitude/longitude only
-// (no address fields), matching what a bare pin-drop itself produces.
+// Shared fallback for missing credentials AND a failed/rejected APIProvider — both leave no other way to produce coordinates.
+// Latitude/longitude only (no address fields), matching what a bare pin-drop itself produces.
 function ManualCoordinateFallback({ height, value, onChange, disabled, defaultCountry, message, onManualCoordinateEntry }: {
   height: number
   value: LocationValue | null
@@ -37,9 +36,8 @@ function ManualCoordinateFallback({ height, value, onChange, disabled, defaultCo
   const [longitude, setLongitude] = useState(value?.coordinates ? String(value.coordinates[0]) : '')
   const [error, setError] = useState<string | null>(null)
 
-  // Adjusts state during render (React's documented alternative to an effect
-  // here) so an external `value` replacement re-syncs immediately, without an
-  // effect's extra commit-then-recommit cascade.
+  // Adjusts state during render (React's documented alternative to an effect) so an external
+  // `value` replacement re-syncs immediately, without an effect's extra commit-then-recommit cascade.
   const lastSyncedCoordinates = useRef(value?.coordinates)
   if (lastSyncedCoordinates.current !== value?.coordinates) {
     lastSyncedCoordinates.current = value?.coordinates
@@ -128,14 +126,18 @@ function LocationPickerInner({ value, onChange, disabled, height = DEFAULT_HEIGH
   }
 
   const handleSearchSelected = (selected: LocationValue) => {
-    // A search pick replaces whatever the map was doing — cancel any in-flight/stale
-    // reverse-geocode so a late response can't overwrite this selection, and clear
-    // the stale 'error' state that would otherwise keep blocking Save.
+    // Cancels any in-flight/stale reverse-geocode and clears a stuck 'error' state so a late response can't overwrite this selection.
     setMapResolution('idle')
     setMapResetToken((t) => t + 1)
     // The map's own hint (from a now-superseded pin drop) no longer applies.
     onLocationHintChange?.(null)
-    onChange(selected)
+    // Same Google Place ID = the same place re-selected (Google omits addressLine2/locality) — carry those over. Any other place, including a same-postcode neighbor, must not inherit them.
+    const isSamePlace = !!value?.googlePlaceId && value.googlePlaceId === selected.googlePlaceId
+    onChange({
+      ...selected,
+      addressLine2: selected.addressLine2 ?? (isSamePlace ? value?.addressLine2 : undefined),
+      locality: selected.locality ?? (isSamePlace ? value?.locality : undefined),
+    })
   }
 
   return (

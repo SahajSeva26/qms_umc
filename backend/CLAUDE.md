@@ -16,6 +16,7 @@ src/modules/
   counter/                  global atomic per-entity sequence (feeds LEAD-/PROJECT-/CAMP- codes)
   qa-feedback/              QA feedback
   vendor-master/            global platform-only vendor/supplier registry
+  file/                     generic file/attachment store — presigned direct-to-S3 upload flow
   access-management/        tenant, role, role-type, permission-group (RBAC)
   crm/                      division, brand, lead, project, appointment, contact, doctor (tenant-scoped registry)
   operations/               camp, geoProfile (field-staff geo + camp allocation),

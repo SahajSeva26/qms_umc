@@ -34,6 +34,7 @@ function makeQueryClient() {
 function makeRow(overrides: Partial<InventoryLedgerEntity>): InventoryLedgerEntity {
   return {
     id: 'ledg-1',
+    source: 'request',
     request: { id: 'req-1', type: 'refill', status: 'approved' },
     requestType: 'refill',
     inventoryType: 'InventoryDevice',
@@ -126,6 +127,25 @@ describe('InventoryLedgerPanel', () => {
     await screen.findByText('noname@qms.test')
     const dashes = screen.getAllByText('—')
     expect(dashes.length).toBeGreaterThanOrEqual(2) // assignee + item, at minimum
+  })
+
+  // Regression: a direct-assignment row has no request behind it, so requestType is genuinely
+  // absent — the Type column must show "Direct", not render blank.
+  it('a direct-assignment row (no request, no requestType) shows "Direct" in the Type column, not blank', async () => {
+    mockRows([
+      makeRow({
+        source: 'direct',
+        request: null,
+        requestType: undefined,
+        from: 'warehouse',
+        to: 'field-officer',
+      }),
+    ])
+    await renderPanel(true)
+
+    await screen.findByText('SN-001')
+    expect(screen.getByText('Direct')).toBeInTheDocument()
+    expect(screen.getByText('—')).toBeInTheDocument() // Status (now) — no request to read a status from
   })
 
   it('changing a filter resets pagination back to page 1, not just defaults to it', async () => {

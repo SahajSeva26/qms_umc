@@ -50,6 +50,11 @@ export interface UpdateInventoryAssignmentPayload {
   quantity: number
 }
 
+export interface DirectAssignmentPayload {
+  devices?: string[]
+  consumables?: { item: string; quantity: number }[]
+}
+
 // GET /inventory-assignments/report — organisation-wide, no query params,
 // gated on inventory-assignment:manage. Backend has no pagination on this
 // aggregation — returns every active FO role in one response; see TODO.md.

@@ -47,9 +47,7 @@ vi.mock('@/features/inventory/real/inventoryAssignment.service', () => ({
   },
 }))
 
-// handleExport's CSV/blob download is exercised elsewhere (inventoryAssignment.export.ts) —
-// mocked out here so these tests isolate the truncation-warning logic instead of jsdom's
-// Blob/URL.createObjectURL plumbing.
+// Mocked out so these tests isolate fetch/truncation-warning logic, not jsdom's Blob/URL.createObjectURL plumbing.
 vi.mock('@/features/inventory/real/inventoryAssignment.export', () => ({
   downloadAssignedDevicesCsv: vi.fn(),
 }))
@@ -92,10 +90,8 @@ function makeQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } })
 }
 
-// Locks in the product rule from features/inventory/real/*: assignment rows
-// only ever appear/disappear via the FO request lifecycle, never a manual
-// write — this must hold even for a manager-level identity, not just default off.
-describe('InventoryAssignmentsPanel — read-only', () => {
+// No per-row edit/delete/click — a manager can still push stock via "Assign to FO" separately.
+describe('InventoryAssignmentsPanel — no per-row create/delete/edit controls', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     searchRoleTypes.mockResolvedValue({ success: true, message: '', data: { count: 0, items: [] } })
@@ -110,7 +106,7 @@ describe('InventoryAssignmentsPanel — read-only', () => {
     })
   })
 
-  it('renders the table with no create/delete controls and no clickable row, even for a manager-level identity', async () => {
+  it('renders the table with no per-row edit/delete controls and no clickable row, even for a manager-level identity', async () => {
     const { usePermission } = await import('@/hooks/usePermission')
     vi.mocked(usePermission).mockReturnValue({ hasAnyPermission: () => true } as unknown as ReturnType<typeof usePermission>)
 
@@ -124,12 +120,111 @@ describe('InventoryAssignmentsPanel — read-only', () => {
 
     await screen.findByText('SN-001')
 
-    expect(screen.queryByRole('button', { name: /new assignment/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^new assignment$/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /remove assignment/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 
     const row = screen.getByText('SN-001').closest('tr')
     expect(row).not.toHaveClass('cursor-pointer')
+  })
+})
+
+describe('InventoryAssignmentsPanel — "Assign to FO" roster loading/error/empty states', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    searchRoleTypes.mockResolvedValue({ success: true, message: '', data: { count: 0, items: [] } })
+    searchRoles.mockResolvedValue({ success: true, message: '', data: { count: 0, items: [] } })
+    searchInventoryAssignments.mockResolvedValue({ success: true, message: '', data: { count: 1, items: [ASSIGNMENT_ITEM] } })
+    searchInventoryDevices.mockResolvedValue({ success: true, message: '', data: { count: 1, items: [{ id: 'dev-1', status: 'assigned', lastCalibrationDate: null, nextCalibrationDate: null }] } })
+    searchGeoProfiles.mockResolvedValue({ success: true, message: '', data: { count: 1, items: [{ id: 'geo-1', role: 'role-1', city: 'Pune' }] } })
+  })
+
+  async function renderAsManager() {
+    const { usePermission } = await import('@/hooks/usePermission')
+    vi.mocked(usePermission).mockReturnValue({ hasAnyPermission: () => true } as unknown as ReturnType<typeof usePermission>)
+    const InventoryAssignmentsPanel = (await import('@/features/inventory/real/components/InventoryAssignmentsPanel')).default
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <InventoryAssignmentsPanel />
+      </QueryClientProvider>,
+    )
+    await screen.findByText('SN-001')
+  }
+
+  it('"Assign to FO" is disabled while the roster is still loading', async () => {
+    let resolveReport: (value: Awaited<ReturnType<typeof getInventoryAssignmentReport>>) => void = () => {}
+    getInventoryAssignmentReport.mockImplementation(() => new Promise((resolve) => { resolveReport = resolve }))
+
+    await renderAsManager()
+
+    expect(screen.getByRole('button', { name: /assign to fo/i })).toBeDisabled()
+
+    resolveReport({
+      success: true,
+      message: '',
+      data: { summary: { totalFieldOfficers: 1, fieldOfficersHoldingInventory: 0 }, fieldOfficers: [{ role: 'role-1', name: 'Jane FO', code: 'fo-1', devicesHeld: 0, consumableUnitsHeld: 0, awaitingApproval: 0, awaitingReceipt: 0 }] },
+    })
+
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: /assign to fo/i })).toBeEnabled())
+  })
+
+  it('a roster fetch failure shows a retryable error, and Retry calls the report hook again', async () => {
+    getInventoryAssignmentReport.mockRejectedValueOnce(new Error('network down'))
+    getInventoryAssignmentReport.mockResolvedValue({
+      success: true,
+      message: '',
+      data: { summary: { totalFieldOfficers: 1, fieldOfficersHoldingInventory: 0 }, fieldOfficers: [{ role: 'role-1', name: 'Jane FO', code: 'fo-1', devicesHeld: 0, consumableUnitsHeld: 0, awaitingApproval: 0, awaitingReceipt: 0 }] },
+    })
+    const user = userEvent.setup()
+
+    await renderAsManager()
+
+    await screen.findByText("Couldn't load field officers.")
+    expect(screen.getByRole('button', { name: /assign to fo/i })).toBeDisabled()
+
+    await user.click(screen.getByRole('button', { name: /retry/i }))
+
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: /assign to fo/i })).toBeEnabled())
+    expect(getInventoryAssignmentReport).toHaveBeenCalledTimes(2)
+  })
+
+  it('a roster that loads with zero FOs keeps the button disabled with an explanatory message', async () => {
+    getInventoryAssignmentReport.mockResolvedValue({
+      success: true,
+      message: '',
+      data: { summary: { totalFieldOfficers: 0, fieldOfficersHoldingInventory: 0 }, fieldOfficers: [] },
+    })
+
+    await renderAsManager()
+
+    await screen.findByText('No eligible field officers found.')
+    expect(screen.getByRole('button', { name: /assign to fo/i })).toBeDisabled()
+  })
+
+  it('clicking "Assign to FO" with a real roster opens the modal, passing the same fieldOfficers already fetched', async () => {
+    getInventoryAssignmentReport.mockResolvedValue({
+      success: true,
+      message: '',
+      data: {
+        summary: { totalFieldOfficers: 1, fieldOfficersHoldingInventory: 0 },
+        fieldOfficers: [{ role: 'role-1', name: 'Jane FO', code: 'fo-1', devicesHeld: 0, consumableUnitsHeld: 0, awaitingApproval: 0, awaitingReceipt: 0 }],
+      },
+    })
+    const user = userEvent.setup()
+
+    await renderAsManager()
+
+    const assignButton = await vi.waitFor(() => {
+      const btn = screen.getByRole('button', { name: /assign to fo/i })
+      expect(btn).toBeEnabled()
+      return btn
+    })
+    await user.click(assignButton)
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByText('Assign inventory to FO')).toBeInTheDocument()
+    // No second, independent report/roster fetch was triggered by opening the modal.
+    expect(getInventoryAssignmentReport).toHaveBeenCalledTimes(1)
   })
 })
 

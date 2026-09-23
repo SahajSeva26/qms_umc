@@ -1,6 +1,7 @@
 import api from '@/lib/api/api'
 import type { ApiResponse, PaginatedResponse } from '@/types/common.types'
 import type {
+  DirectAssignmentPayload,
   InventoryAssignmentEntity,
   InventoryAssignmentReportResponse,
   SearchInventoryAssignmentQuery,
@@ -16,7 +17,15 @@ const getInventoryAssignmentReport = async () => {
   return res.data
 }
 
+const directAssign = async (fo: string, payload: DirectAssignmentPayload) => {
+  const res = await api.post<PaginatedResponse<InventoryAssignmentEntity>>(
+    `/inventory-assignments/direct-assignment/${fo}`, payload,
+  )
+  return res.data
+}
+
 export const inventoryAssignmentService = {
   searchInventoryAssignments,
   getInventoryAssignmentReport,
+  directAssign,
 }

@@ -10,6 +10,7 @@ import DivisionsFilterBar from '@/features/crm/divisions/components/DivisionsFil
 import DivisionsTable from '@/features/crm/divisions/components/DivisionsTable'
 import CreateDivisionModal from '@/features/crm/divisions/components/CreateDivisionModal'
 import EditTenantModal from '@/features/access-management/tenant/components/EditTenantModal'
+import TenantLogoUploader from '@/features/access-management/tenant/components/TenantLogoUploader'
 import EditContactModal from '@/features/contacts/components/EditContactModal'
 import { DIVISION_ROUTES } from '@/features/crm/divisions/divisions.routes'
 import { divisionService } from '@/features/crm/divisions/division.service'
@@ -152,56 +153,59 @@ const TenantDetailPage = () => {
             className="rounded-xl border p-5 mb-5 flex items-start justify-between gap-3"
             style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}
           >
-            <div className="min-w-0">
-              <div className="text-lg font-bold truncate" style={{ color: 'var(--qms-text)' }}>
-                {tenant.name}
+            <div className="flex items-start gap-4 min-w-0">
+              <TenantLogoUploader tenantId={tenant.id} canManage={canManageTenant} />
+              <div className="min-w-0">
+                <div className="text-lg font-bold truncate" style={{ color: 'var(--qms-text)' }}>
+                  {tenant.name}
+                </div>
+                <div className="text-[13px] truncate mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+                  {tenant.code}
+                </div>
+                <div className="flex items-center gap-2">
+                  <TenantTypeBadge type={tenant.type} />
+                  <TenantStatusPill status={tenant.status} />
+                </div>
+                {tenant.owner && (
+                  <div className="text-[11px] mt-3" style={{ color: 'var(--qms-text-muted)' }}>
+                    Owner:{' '}
+                    {canViewRole ? (
+                      <button
+                        onClick={() => navigate(ROLE_ROUTES.ROLE_DETAIL.replace(':id', tenant.owner as string))}
+                        className="font-semibold underline underline-offset-2 hover:opacity-80"
+                        style={{ color: 'var(--qms-text-soft)' }}
+                      >
+                        {ownerName ?? (ownerUser?.email ?? tenant.owner)}
+                      </button>
+                    ) : (
+                      <span className="font-semibold" style={{ color: 'var(--qms-text-soft)' }}>
+                        {ownerName ?? tenant.owner}
+                      </span>
+                    )}
+                    {ownerEmailSuffix && <span className="ml-1.5">({ownerEmailSuffix})</span>}
+                  </div>
+                )}
+                {tenantAddress && (
+                  <div className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
+                    Address: <span className="font-semibold" style={{ color: 'var(--qms-text-soft)' }}>{tenantAddress}</span>
+                  </div>
+                )}
+                {tenant.businessLifetime != null && (
+                  <div className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
+                    Business lifetime: <span className="font-semibold" style={{ color: 'var(--qms-text-soft)' }}>{tenant.businessLifetime} year{tenant.businessLifetime === 1 ? '' : 's'}</span>
+                  </div>
+                )}
+                {tenant.gst && (
+                  <div className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
+                    GST: <span className="font-semibold" style={{ color: 'var(--qms-text-soft)' }}>{tenant.gst}</span>
+                  </div>
+                )}
+                {divisionPenetrationPct !== null && (
+                  <div className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
+                    Division Penetration: <span className="font-semibold" style={{ color: 'var(--qms-text-soft)' }}>{divisionPenetrationPct}%</span>
+                  </div>
+                )}
               </div>
-              <div className="text-[13px] truncate mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-                {tenant.code}
-              </div>
-              <div className="flex items-center gap-2">
-                <TenantTypeBadge type={tenant.type} />
-                <TenantStatusPill status={tenant.status} />
-              </div>
-              {tenant.owner && (
-                <div className="text-[11px] mt-3" style={{ color: 'var(--qms-text-muted)' }}>
-                  Owner:{' '}
-                  {canViewRole ? (
-                    <button
-                      onClick={() => navigate(ROLE_ROUTES.ROLE_DETAIL.replace(':id', tenant.owner as string))}
-                      className="font-semibold underline underline-offset-2 hover:opacity-80"
-                      style={{ color: 'var(--qms-text-soft)' }}
-                    >
-                      {ownerName ?? (ownerUser?.email ?? tenant.owner)}
-                    </button>
-                  ) : (
-                    <span className="font-semibold" style={{ color: 'var(--qms-text-soft)' }}>
-                      {ownerName ?? tenant.owner}
-                    </span>
-                  )}
-                  {ownerEmailSuffix && <span className="ml-1.5">({ownerEmailSuffix})</span>}
-                </div>
-              )}
-              {tenantAddress && (
-                <div className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
-                  Address: <span className="font-semibold" style={{ color: 'var(--qms-text-soft)' }}>{tenantAddress}</span>
-                </div>
-              )}
-              {tenant.businessLifetime != null && (
-                <div className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
-                  Business lifetime: <span className="font-semibold" style={{ color: 'var(--qms-text-soft)' }}>{tenant.businessLifetime} year{tenant.businessLifetime === 1 ? '' : 's'}</span>
-                </div>
-              )}
-              {tenant.gst && (
-                <div className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
-                  GST: <span className="font-semibold" style={{ color: 'var(--qms-text-soft)' }}>{tenant.gst}</span>
-                </div>
-              )}
-              {divisionPenetrationPct !== null && (
-                <div className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
-                  Division Penetration: <span className="font-semibold" style={{ color: 'var(--qms-text-soft)' }}>{divisionPenetrationPct}%</span>
-                </div>
-              )}
             </div>
 
             <Button variant="outline" size="sm" className="shrink-0" onClick={() => setEditOpen(true)}>

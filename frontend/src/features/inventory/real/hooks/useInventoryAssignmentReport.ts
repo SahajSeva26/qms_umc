@@ -7,12 +7,12 @@ import { inventoryAssignmentKeys } from '@/features/inventory/real/hooks/useInve
 // (approving/receiving a request changes who holds what), which
 // prefix-matches this query's own key too.
 export const useInventoryAssignmentReport = (enabled: boolean) => {
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: [...inventoryAssignmentKeys.all, 'report'],
     queryFn: () => inventoryAssignmentService.getInventoryAssignmentReport(),
     enabled,
     staleTime: 60_000,
   })
 
-  return { report: data?.data, isLoading, error }
+  return { report: data?.data, isLoading, error, refetch }
 }

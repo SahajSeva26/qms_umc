@@ -40,11 +40,16 @@ export interface InventoryLedgerActor {
   email?: string
 }
 
+export type InventoryLedgerSource = 'request' | 'direct'
+
 // request/inventory/assignee can each be populated, id-only, or null — every ref here is nullable to match.
 export interface InventoryLedgerEntity {
   id: string
+  // 'direct' rows (a manager's direct assignment) have no request behind them —
+  // requestType is genuinely absent then, not just unpopulated.
+  source: InventoryLedgerSource
   request: InventoryLedgerRequestRef | null
-  requestType: InventoryRequestType
+  requestType?: InventoryRequestType
   inventoryType: InventoryLedgerItemType
   inventory: InventoryLedgerInventoryRef | null
   quantity: number

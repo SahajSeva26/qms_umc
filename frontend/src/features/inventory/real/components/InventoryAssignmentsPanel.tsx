@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { FiDownload, FiUsers, FiUserCheck } from 'react-icons/fi'
+import { FiDownload, FiUsers, FiUserCheck, FiUserPlus } from 'react-icons/fi'
 import { usePermission } from '@/hooks/usePermission'
 import { useInventoryAssignments } from '@/features/inventory/real/hooks/useInventoryAssignments'
 import { useInventoryAssignmentReport } from '@/features/inventory/real/hooks/useInventoryAssignmentReport'
@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import PaginationControls from '@/components/ui/PaginationControls'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import InventoryReportKpiStrip, { type InventoryReportTile } from '@/features/inventory/real/components/InventoryReportKpiStrip'
+import DirectAssignmentModal from '@/features/inventory/real/components/DirectAssignmentModal'
 import { usePagination } from '@/hooks/usePagination'
 import { toast } from '@/components/ui/sonner'
 import { getApiErrorMessage } from '@/utils/apiError'
@@ -22,8 +23,8 @@ import { getApiErrorMessage } from '@/utils/apiError'
 const PAGE_SIZE = 10
 const FO_ROSTER_PAGE_SIZE = 10
 
-// Read-only — rows only ever appear/disappear via the FO refill/return
-// request lifecycle (see inventory-request.service.ts's adjustHolding calls). No manual create/edit/delete path exists here by design.
+// Rows normally appear/disappear via the FO request lifecycle, but a manager can also
+// directly push stock via the "Assign to FO" button below.
 const InventoryAssignmentsPanel = () => {
   // GET /role-types needs tenant:manage/tenant:admin, not an inventory-* code — a stock Inventory Manager holds neither.
   const { hasAnyPermission } = usePermission()
@@ -46,8 +47,9 @@ const InventoryAssignmentsPanel = () => {
   const items = data?.data?.items ?? []
   const totalCount = data?.data?.count ?? 0
 
-  const { report, isLoading: reportLoading, error: reportError } = useInventoryAssignmentReport(canManage)
+  const { report, isLoading: reportLoading, error: reportError, refetch: refetchReport } = useInventoryAssignmentReport(canManage)
   const fieldOfficers = report?.fieldOfficers ?? []
+  const [showDirectAssignment, setShowDirectAssignment] = useState(false)
   // Derived, not stored — a refetch with fewer FOs self-corrects next render, no useEffect needed.
   const safeReportPage = Math.min(reportPage, reportTotalPages(fieldOfficers.length))
   const pagedFieldOfficers = fieldOfficers.slice((safeReportPage - 1) * FO_ROSTER_PAGE_SIZE, safeReportPage * FO_ROSTER_PAGE_SIZE)
@@ -61,8 +63,7 @@ const InventoryAssignmentsPanel = () => {
   }, [report])
 
   const [exporting, setExporting] = useState(false)
-  // Exports every device assignment, not just the current page. Calibration and FO
-  // City are joined in separately — assignment search only returns slim refs.
+  // Attempts to export all device assignments (capped at 1000, warns if truncated), not just the current page.
   const handleExport = async () => {
     setExporting(true)
     try {
@@ -106,10 +107,36 @@ const InventoryAssignmentsPanel = () => {
         <p className="text-[12px] mt-0.5" style={{ color: 'var(--qms-text-muted)' }}>
           {!isLoading && !error ? `${totalCount} total` : 'Who currently holds what.'}
         </p>
-        <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting} className="shrink-0">
-          <FiDownload size={14} /> {exporting ? 'Exporting…' : 'Export devices'}
-        </Button>
+        <div className="flex flex-col items-end gap-1.5 shrink-0">
+          <div className="flex items-center gap-2">
+            {canManage && (
+              <Button
+                size="sm"
+                onClick={() => setShowDirectAssignment(true)}
+                disabled={reportLoading || !!reportError || fieldOfficers.length === 0}
+              >
+                <FiUserPlus size={14} /> Assign to FO
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting} className="shrink-0">
+              <FiDownload size={14} /> {exporting ? 'Exporting…' : 'Export devices'}
+            </Button>
+          </div>
+          {canManage && reportError && (
+            <div className="flex items-center gap-2 text-[12px] text-danger">
+              <span>Couldn't load field officers.</span>
+              <Button variant="outline" size="sm" onClick={() => refetchReport()}>Retry</Button>
+            </div>
+          )}
+          {canManage && !reportLoading && !reportError && fieldOfficers.length === 0 && (
+            <p className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>No eligible field officers found.</p>
+          )}
+        </div>
       </div>
+
+      {showDirectAssignment && (
+        <DirectAssignmentModal fieldOfficers={fieldOfficers} onClose={() => setShowDirectAssignment(false)} />
+      )}
 
       <InventoryReportKpiStrip
         tiles={reportTiles}

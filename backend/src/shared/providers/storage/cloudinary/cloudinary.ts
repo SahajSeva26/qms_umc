@@ -1,4 +1,4 @@
-import { IObjectHead, IPresignedUpload, IPresignedUploadInput, IStorageProvider } from '../../../types/storagetypes';
+import { IObjectHead, IPresignedUpload, IPresignedUploadInput, IStorageProvider } from '../../../types/storage.types';
 
 export const CLOUDINARY = 'cloudinary';
 export class CloudinaryProvider implements IStorageProvider {

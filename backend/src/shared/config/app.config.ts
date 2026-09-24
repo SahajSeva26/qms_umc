@@ -1,12 +1,13 @@
 import { configDotenv } from 'dotenv';
+import { AppEnvironment } from '../types/app.types';
 configDotenv();
 
-let ENV = {
+const ENV = {
     App: {
         // INIT_ADMIN_TOKEN: process.env.INIT_ADMIN_TOKEN || "",
         Port: process.env.PORT || process.env.APP_PORT || 3000,
         Host: process.env.APP_HOST || 'localhost',
-        Environment: process.env.APP_ENV || 'development',
+        Environment: (process.env.APP_ENV || 'development') as AppEnvironment,
 
         // Allowed frontend origins for CORS — comma-separated list, e.g.
         // "https://app.example.com,https://admin.example.com".

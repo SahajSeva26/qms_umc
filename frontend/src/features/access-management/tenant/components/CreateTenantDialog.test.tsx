@@ -4,6 +4,10 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 
+// File-local, not global — these multi-step tests exceeded the default 5s under CPU contention
+// even with userEvent's { delay: null } applied below.
+vi.setConfig({ testTimeout: 15_000 })
+
 const navigateMock = vi.fn()
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom')
@@ -92,7 +96,7 @@ describe('CreateTenantDialog — address', () => {
 
   it('creates a company with NO address at all — address is optional end-to-end', async () => {
     const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     await renderDialog()
 
     await user.click(screen.getByRole('button', { name: /new client/i }))
@@ -113,7 +117,7 @@ describe('CreateTenantDialog — address', () => {
 
   it('creates a company WITH an address when the user fills one in on step 1', async () => {
     const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     await renderDialog()
 
     await user.click(screen.getByRole('button', { name: /new client/i }))
@@ -143,7 +147,7 @@ describe('CreateTenantDialog — address', () => {
   })
 
   it('advancing from step 1 to step 2 does not require an address to be filled in', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     await renderDialog()
 
     await user.click(screen.getByRole('button', { name: /new client/i }))
@@ -156,7 +160,7 @@ describe('CreateTenantDialog — address', () => {
   })
 
   it('a PARTIAL address (only City typed) blocks advancing from step 1 to step 2, with the error visible on step 1 — not a silently stuck submit on step 2', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     await renderDialog()
 
     await user.click(screen.getByRole('button', { name: /new client/i }))
@@ -183,7 +187,7 @@ describe('CreateTenantDialog — address', () => {
   }
 
   it('disables step 1\'s Next (relabeled "Resolving location…") while the picked pin is still resolving, so it never advances to step 2', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     await renderDialog()
 
     await user.click(screen.getByRole('button', { name: /new client/i }))
@@ -203,7 +207,7 @@ describe('CreateTenantDialog — address', () => {
 
   it('allows advancing to step 2 and creating once resolution returns to idle after a loading state', async () => {
     const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     await renderDialog()
 
     await user.click(screen.getByRole('button', { name: /new client/i }))
@@ -226,7 +230,7 @@ describe('CreateTenantDialog — address', () => {
   })
 
   it('Back from step 1 returns to step 0, and Back from step 2 returns to step 1', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     await renderDialog()
 
     await user.click(screen.getByRole('button', { name: /new client/i }))
@@ -287,13 +291,13 @@ describe('CreateTenantDialog — logo', () => {
     vi.mocked(accessManagementService.searchRoleTypes).mockResolvedValue({ success: true, message: '', data: { items: [{ id: 'rt-sales-rep', code: 'sales-rep' }], count: 1 } } as never)
     vi.mocked(accessManagementService.searchRoles).mockResolvedValue({ success: true, message: '', data: { items: [{ id: 'role-sales-rep-1', code: 'sr-001', name: 'Sales Rep One' }], count: 1 } } as never)
 
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     await renderDialog()
     await user.click(screen.getByRole('button', { name: /new client/i }))
 
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
     const badFile = makeFile('doc.pdf', 'application/pdf')
-    const pickerUser = userEvent.setup({ applyAccept: false })
+    const pickerUser = userEvent.setup({ applyAccept: false, delay: null })
     await pickerUser.upload(input, badFile)
 
     expect(screen.getByText(/png, jpeg, or webp/i)).toBeInTheDocument()
@@ -308,7 +312,7 @@ describe('CreateTenantDialog — logo', () => {
     vi.mocked(accessManagementService.searchRoles).mockResolvedValue({ success: true, message: '', data: { items: [{ id: 'role-sales-rep-1', code: 'sr-001', name: 'Sales Rep One' }], count: 1 } } as never)
     vi.mocked(accessManagementService.createTenant).mockResolvedValue({ success: true, message: '', data: { id: 'new-tenant-id' } } as never)
 
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     await renderDialog()
     await user.click(screen.getByRole('button', { name: /new client/i }))
     await fillStep0Simple(user)
@@ -335,7 +339,7 @@ describe('CreateTenantDialog — logo', () => {
     vi.mocked(fileService.changeFileStatus).mockResolvedValueOnce({ success: true, message: '', data: {} } as never) // activate
     vi.mocked(fileService.linkFileToEntity).mockResolvedValueOnce({ success: true, message: '', data: {} } as never)
 
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     await renderDialog()
     await user.click(screen.getByRole('button', { name: /new client/i }))
 
@@ -370,7 +374,7 @@ describe('CreateTenantDialog — logo', () => {
     vi.mocked(fileService.changeFileStatus).mockResolvedValue({ success: true, message: '', data: {} } as never)
     vi.mocked(fileService.linkFileToEntity).mockResolvedValue({ success: true, message: '', data: {} } as never)
 
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     await renderDialog()
 
     // First tenant, with a logo — let it fully complete.
@@ -414,7 +418,7 @@ describe('CreateTenantDialog — logo', () => {
     vi.mocked(fileService.changeFileStatus).mockResolvedValue({ success: true, message: '', data: {} } as never)
     vi.mocked(fileService.linkFileToEntity).mockResolvedValue({ success: true, message: '', data: {} } as never)
 
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     await renderDialog()
     await user.click(screen.getByRole('button', { name: /new client/i }))
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
@@ -455,7 +459,7 @@ describe('CreateTenantDialog — logo', () => {
     )
     vi.mocked(fileService.changeFileStatus).mockResolvedValueOnce({ success: true, message: '', data: {} } as never) // discard succeeds (inside the hook)
 
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     await renderDialog()
     await user.click(screen.getByRole('button', { name: /new client/i }))
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
@@ -478,6 +482,94 @@ describe('CreateTenantDialog — logo', () => {
     expect(fileService.changeFileStatus).not.toHaveBeenCalled()
   })
 
+  it('link-failed: "Choose another logo" actually opens the picker and re-enters the upload flow for the already-created tenant', async () => {
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    vi.mocked(accessManagementService.searchTenants).mockResolvedValue({ success: true, message: '', data: { items: [{ id: 't-platform', name: 'QMS Platform', code: 'qms-platform', type: 'platform', address: null }], count: 1 } } as never)
+    vi.mocked(accessManagementService.searchRoleTypes).mockResolvedValue({ success: true, message: '', data: { items: [{ id: 'rt-sales-rep', code: 'sales-rep' }], count: 1 } } as never)
+    vi.mocked(accessManagementService.searchRoles).mockResolvedValue({ success: true, message: '', data: { items: [{ id: 'role-sales-rep-1', code: 'sr-001', name: 'Sales Rep One' }], count: 1 } } as never)
+    vi.mocked(accessManagementService.createTenant).mockResolvedValue({ success: true, message: '', data: { id: 'new-tenant-id' } } as never)
+
+    const { fileService } = await import('@/lib/file/file.service')
+    const { uploadFileToS3 } = await import('@/lib/file/file.upload')
+    vi.mocked(fileService.createFiles).mockResolvedValueOnce({ success: true, message: '', data: [{ id: 'first-file', uploadUrl: 'https://s3.example.com/first-file' }] } as never)
+    vi.mocked(uploadFileToS3).mockResolvedValueOnce(undefined)
+    vi.mocked(fileService.changeFileStatus).mockResolvedValueOnce({ success: true, message: '', data: {} } as never) // activate
+    vi.mocked(fileService.linkFileToEntity).mockRejectedValueOnce(
+      Object.assign(new Error('Bad Request'), { isAxiosError: true, response: { status: 400, data: { message: 'Validation failed' } } }),
+    )
+    vi.mocked(fileService.changeFileStatus).mockResolvedValueOnce({ success: true, message: '', data: {} } as never) // discard succeeds (inside the hook)
+
+    const user = userEvent.setup({ delay: null })
+    await renderDialog()
+    await user.click(screen.getByRole('button', { name: /new client/i }))
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    await user.upload(input, makeFile('first-logo.png'))
+    await fillStep0Simple(user)
+    await skipLocationStep(user)
+    await user.click(screen.getByRole('button', { name: /^next$/i }))
+    await fillStep1AndSubmit(user)
+
+    await screen.findByText(/couldn't attach the logo/i)
+    const chooseAnotherBtn = screen.getByRole('button', { name: /choose another logo/i })
+
+    // The replacement upload succeeds fully this time.
+    vi.mocked(fileService.createFiles).mockResolvedValueOnce({ success: true, message: '', data: [{ id: 'second-file', uploadUrl: 'https://s3.example.com/second-file' }] } as never)
+    vi.mocked(uploadFileToS3).mockResolvedValueOnce(undefined)
+    vi.mocked(fileService.changeFileStatus).mockResolvedValueOnce({ success: true, message: '', data: {} } as never) // activate
+    vi.mocked(fileService.linkFileToEntity).mockResolvedValueOnce({ success: true, message: '', data: {} } as never)
+
+    await user.click(chooseAnotherBtn)
+    // The post-create input (not step 0's, which has unmounted) is what actually opens/receives this.
+    const postCreateInput = document.querySelector('input[type="file"]') as HTMLInputElement
+    expect(postCreateInput).not.toBeNull()
+    await user.upload(postCreateInput, makeFile('second-logo.png'))
+
+    await waitFor(() => expect(fileService.linkFileToEntity).toHaveBeenCalledWith('second-file', { entityId: 'new-tenant-id' }))
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/admin/tenants/new-tenant-id'))
+  })
+
+  it('link-failed: picking an INVALID replacement file via "Choose another logo" shows the validation error in the status view, no network call', async () => {
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    vi.mocked(accessManagementService.searchTenants).mockResolvedValue({ success: true, message: '', data: { items: [{ id: 't-platform', name: 'QMS Platform', code: 'qms-platform', type: 'platform', address: null }], count: 1 } } as never)
+    vi.mocked(accessManagementService.searchRoleTypes).mockResolvedValue({ success: true, message: '', data: { items: [{ id: 'rt-sales-rep', code: 'sales-rep' }], count: 1 } } as never)
+    vi.mocked(accessManagementService.searchRoles).mockResolvedValue({ success: true, message: '', data: { items: [{ id: 'role-sales-rep-1', code: 'sr-001', name: 'Sales Rep One' }], count: 1 } } as never)
+    vi.mocked(accessManagementService.createTenant).mockResolvedValue({ success: true, message: '', data: { id: 'new-tenant-id' } } as never)
+
+    const { fileService } = await import('@/lib/file/file.service')
+    const { uploadFileToS3 } = await import('@/lib/file/file.upload')
+    vi.mocked(fileService.createFiles).mockResolvedValueOnce({ success: true, message: '', data: [{ id: 'first-file', uploadUrl: 'https://s3.example.com/first-file' }] } as never)
+    vi.mocked(uploadFileToS3).mockResolvedValueOnce(undefined)
+    vi.mocked(fileService.changeFileStatus).mockResolvedValueOnce({ success: true, message: '', data: {} } as never) // activate
+    vi.mocked(fileService.linkFileToEntity).mockRejectedValueOnce(
+      Object.assign(new Error('Bad Request'), { isAxiosError: true, response: { status: 400, data: { message: 'Validation failed' } } }),
+    )
+    vi.mocked(fileService.changeFileStatus).mockResolvedValueOnce({ success: true, message: '', data: {} } as never) // discard succeeds (inside the hook)
+
+    const user = userEvent.setup({ delay: null })
+    await renderDialog()
+    await user.click(screen.getByRole('button', { name: /new client/i }))
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    await user.upload(input, makeFile('first-logo.png'))
+    await fillStep0Simple(user)
+    await skipLocationStep(user)
+    await user.click(screen.getByRole('button', { name: /^next$/i }))
+    await fillStep1AndSubmit(user)
+
+    await screen.findByText(/couldn't attach the logo/i)
+    await user.click(screen.getByRole('button', { name: /choose another logo/i }))
+
+    const postCreateInput = document.querySelector('input[type="file"]') as HTMLInputElement
+    const badFile = makeFile('doc.pdf', 'application/pdf')
+    const pickerUser = userEvent.setup({ applyAccept: false, delay: null })
+    await pickerUser.upload(postCreateInput, badFile)
+
+    expect(screen.getByText(/png, jpeg, or webp/i)).toBeInTheDocument()
+    // The original link-failed banner/buttons are still there — a rejected pick is a no-op.
+    expect(screen.getByText(/couldn't attach the logo/i)).toBeInTheDocument()
+    expect(fileService.createFiles).not.toHaveBeenCalledTimes(2)
+    expect(navigateMock).not.toHaveBeenCalled()
+  })
+
   it('SAFETY: link-attached-elsewhere — "Continue without logo" closes+navigates with zero discard call of any kind', async () => {
     const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
     vi.mocked(accessManagementService.searchTenants).mockResolvedValue({ success: true, message: '', data: { items: [{ id: 't-platform', name: 'QMS Platform', code: 'qms-platform', type: 'platform', address: null }], count: 1 } } as never)
@@ -497,7 +589,7 @@ describe('CreateTenantDialog — logo', () => {
       success: true, message: '', data: { id: 'new-file', entity: { id: 'some-other-tenant' } },
     } as never)
 
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     await renderDialog()
     await user.click(screen.getByRole('button', { name: /new client/i }))
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
@@ -526,7 +618,7 @@ describe('CreateTenantDialog — logo', () => {
     const networkErr = Object.assign(new Error('Network Error'), { isAxiosError: true, response: undefined })
     vi.mocked(fileService.createFiles).mockRejectedValueOnce(networkErr)
 
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     await renderDialog()
     await user.click(screen.getByRole('button', { name: /new client/i }))
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
@@ -561,7 +653,7 @@ describe('CreateTenantDialog — logo', () => {
     vi.mocked(fileService.createFiles).mockResolvedValueOnce({ success: true, message: '', data: [{ id: 'new-file', uploadUrl: 'https://s3.example.com/new-file' }] } as never)
     vi.mocked(uploadFileToS3).mockRejectedValueOnce(new Error('S3 PUT failed'))
 
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     await renderDialog()
     await user.click(screen.getByRole('button', { name: /new client/i }))
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
@@ -597,7 +689,7 @@ describe('CreateTenantDialog — logo', () => {
       // Never resolves or rejects — simulates a dropped connection / hanging backend.
       vi.mocked(uploadFileToS3).mockReturnValueOnce(new Promise(() => {}))
 
-      const user = userEvent.setup()
+      const user = userEvent.setup({ delay: null })
       await renderDialog()
       await user.click(screen.getByRole('button', { name: /new client/i }))
       const input = document.querySelector('input[type="file"]') as HTMLInputElement
@@ -633,7 +725,7 @@ describe('CreateTenantDialog — logo', () => {
       // Never resolves or rejects — the POST /files call itself is stuck.
       vi.mocked(fileService.createFiles).mockReturnValueOnce(new Promise(() => {}))
 
-      const user = userEvent.setup()
+      const user = userEvent.setup({ delay: null })
       await renderDialog()
       await user.click(screen.getByRole('button', { name: /new client/i }))
       const input = document.querySelector('input[type="file"]') as HTMLInputElement
@@ -672,7 +764,7 @@ describe('CreateTenantDialog — logo', () => {
     vi.mocked(fileService.createFiles).mockResolvedValueOnce({ success: true, message: '', data: [{ id: 'new-file', uploadUrl: 'https://s3.example.com/new-file' }] } as never)
     vi.mocked(uploadFileToS3).mockRejectedValueOnce(new Error('S3 PUT failed'))
 
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     await renderDialog()
     await user.click(screen.getByRole('button', { name: /new client/i }))
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
@@ -713,7 +805,7 @@ describe('CreateTenantDialog — logo', () => {
     )
     vi.mocked(fileService.changeFileStatus).mockResolvedValueOnce({ success: true, message: '', data: {} } as never) // discard succeeds
 
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     await renderDialog()
     await user.click(screen.getByRole('button', { name: /new client/i }))
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
@@ -730,5 +822,222 @@ describe('CreateTenantDialog — logo', () => {
     // Still open — the failure banner and its actions remain visible, no navigation happened.
     expect(screen.getByText(/couldn't attach the logo/i)).toBeInTheDocument()
     expect(navigateMock).not.toHaveBeenCalled()
+  })
+
+  async function mockPlatformStaff() {
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    vi.mocked(accessManagementService.searchTenants).mockResolvedValue({ success: true, message: '', data: { items: [{ id: 't-platform', name: 'QMS Platform', code: 'qms-platform', type: 'platform', address: null }], count: 1 } } as never)
+    vi.mocked(accessManagementService.searchRoleTypes).mockResolvedValue({ success: true, message: '', data: { items: [{ id: 'rt-sales-rep', code: 'sales-rep' }], count: 1 } } as never)
+    vi.mocked(accessManagementService.searchRoles).mockResolvedValue({ success: true, message: '', data: { items: [{ id: 'role-sales-rep-1', code: 'sr-001', name: 'Sales Rep One' }], count: 1 } } as never)
+    vi.mocked(accessManagementService.createTenant).mockResolvedValue({ success: true, message: '', data: { id: 'new-tenant-id' } } as never)
+  }
+
+  it('upload-failed shows only Try again on the first failure — Start a new upload appears only after a retry also fails', async () => {
+    await mockPlatformStaff()
+    const { fileService } = await import('@/lib/file/file.service')
+    const { uploadFileToS3 } = await import('@/lib/file/file.upload')
+    vi.mocked(fileService.createFiles).mockResolvedValue({ success: true, message: '', data: [{ id: 'new-file', uploadUrl: 'https://s3.example.com/new-file' }] } as never)
+    vi.mocked(uploadFileToS3).mockRejectedValueOnce(new Error('S3 PUT failed'))
+
+    const user = userEvent.setup({ delay: null })
+    await renderDialog()
+    await user.click(screen.getByRole('button', { name: /new client/i }))
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    await user.upload(input, makeFile())
+    await fillStep0Simple(user)
+    await skipLocationStep(user)
+    await user.click(screen.getByRole('button', { name: /^next$/i }))
+    await fillStep1AndSubmit(user)
+
+    await screen.findByRole('button', { name: /try again/i })
+    expect(screen.queryByRole('button', { name: /start a new upload/i })).not.toBeInTheDocument()
+
+    vi.mocked(uploadFileToS3).mockRejectedValueOnce(new Error('S3 PUT failed again'))
+    await user.click(screen.getByRole('button', { name: /try again/i }))
+    await screen.findByRole('button', { name: /start a new upload/i })
+  })
+
+  it("selecting an invalid replacement file does NOT reset an already-visible fallback", async () => {
+    await mockPlatformStaff()
+    const { fileService } = await import('@/lib/file/file.service')
+    const { uploadFileToS3 } = await import('@/lib/file/file.upload')
+    vi.mocked(fileService.createFiles).mockResolvedValue({ success: true, message: '', data: [{ id: 'new-file', uploadUrl: 'https://s3.example.com/new-file' }] } as never)
+    vi.mocked(uploadFileToS3).mockRejectedValueOnce(new Error('S3 PUT failed'))
+
+    const user = userEvent.setup({ delay: null })
+    await renderDialog()
+    await user.click(screen.getByRole('button', { name: /new client/i }))
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    await user.upload(input, makeFile())
+    await fillStep0Simple(user)
+    await skipLocationStep(user)
+    await user.click(screen.getByRole('button', { name: /^next$/i }))
+    await fillStep1AndSubmit(user)
+
+    await screen.findByRole('button', { name: /try again/i })
+    vi.mocked(uploadFileToS3).mockRejectedValueOnce(new Error('S3 PUT failed again'))
+    await user.click(screen.getByRole('button', { name: /try again/i }))
+    await screen.findByRole('button', { name: /start a new upload/i })
+
+    // Pick an invalid file — a no-op from the upload state's perspective.
+    const badFile = makeFile('doc.pdf', 'application/pdf')
+    const pickerUser = userEvent.setup({ applyAccept: false, delay: null })
+    await pickerUser.upload(input, badFile)
+
+    // The earned fallback must survive the rejected pick.
+    expect(screen.getByRole('button', { name: /start a new upload/i })).toBeInTheDocument()
+  })
+
+  it('confirming "Start new upload," then failing the new upload, returns to first-failure UX (Try again only)', async () => {
+    await mockPlatformStaff()
+    const { fileService } = await import('@/lib/file/file.service')
+    const { uploadFileToS3 } = await import('@/lib/file/file.upload')
+    vi.mocked(fileService.createFiles).mockResolvedValueOnce({ success: true, message: '', data: [{ id: 'new-file', uploadUrl: 'https://s3.example.com/new-file' }] } as never)
+    vi.mocked(uploadFileToS3).mockRejectedValueOnce(new Error('S3 PUT failed'))
+
+    const user = userEvent.setup({ delay: null })
+    await renderDialog()
+    await user.click(screen.getByRole('button', { name: /new client/i }))
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    await user.upload(input, makeFile())
+    await fillStep0Simple(user)
+    await skipLocationStep(user)
+    await user.click(screen.getByRole('button', { name: /^next$/i }))
+    await fillStep1AndSubmit(user)
+
+    await screen.findByRole('button', { name: /try again/i })
+    vi.mocked(uploadFileToS3).mockRejectedValueOnce(new Error('S3 PUT failed again'))
+    await user.click(screen.getByRole('button', { name: /try again/i }))
+    await screen.findByRole('button', { name: /start a new upload/i })
+
+    vi.mocked(fileService.changeFileStatus).mockResolvedValueOnce({ success: true, message: '', data: {} } as never)
+    vi.mocked(fileService.createFiles).mockResolvedValueOnce({ success: true, message: '', data: [{ id: 'draft-2', uploadUrl: 'https://s3.example.com/draft-2' }] } as never)
+    vi.mocked(uploadFileToS3).mockRejectedValueOnce(new Error('draft-2 also failed'))
+
+    await user.click(screen.getByRole('button', { name: /start a new upload/i }))
+    await user.click(await screen.findByRole('button', { name: /^start new upload$/i }))
+
+    // Fresh attempt (draft-2) failed too — the flag was genuinely reset, back to first-failure grace.
+    await screen.findByRole('button', { name: /try again/i })
+    expect(screen.queryByRole('button', { name: /start a new upload/i })).not.toBeInTheDocument()
+  })
+
+  it('Escape/Cancel on the nested start-over confirmation closes only the confirmation, not the create-tenant dialog', async () => {
+    await mockPlatformStaff()
+    const { fileService } = await import('@/lib/file/file.service')
+    const { uploadFileToS3 } = await import('@/lib/file/file.upload')
+    vi.mocked(fileService.createFiles).mockResolvedValue({ success: true, message: '', data: [{ id: 'new-file', uploadUrl: 'https://s3.example.com/new-file' }] } as never)
+    vi.mocked(uploadFileToS3).mockRejectedValueOnce(new Error('S3 PUT failed'))
+
+    const user = userEvent.setup({ delay: null })
+    await renderDialog()
+    await user.click(screen.getByRole('button', { name: /new client/i }))
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    await user.upload(input, makeFile())
+    await fillStep0Simple(user)
+    await skipLocationStep(user)
+    await user.click(screen.getByRole('button', { name: /^next$/i }))
+    await fillStep1AndSubmit(user)
+
+    await screen.findByRole('button', { name: /try again/i })
+    vi.mocked(uploadFileToS3).mockRejectedValueOnce(new Error('S3 PUT failed again'))
+    await user.click(screen.getByRole('button', { name: /try again/i }))
+    const trigger = await screen.findByRole('button', { name: /start a new upload/i })
+    await user.click(trigger)
+
+    // The confirmation dialog is open.
+    expect(await screen.findByText('Start a new upload?')).toBeInTheDocument()
+    await user.keyboard('{Escape}')
+
+    // The confirmation closed, but the outer create-tenant dialog is still open on upload-failed.
+    await waitFor(() => expect(screen.queryByText('Start a new upload?')).not.toBeInTheDocument())
+    expect(screen.getByRole('button', { name: /start a new upload/i })).toBeInTheDocument()
+    expect(navigateMock).not.toHaveBeenCalled()
+    expect(fileService.changeFileStatus).not.toHaveBeenCalled()
+    // Focus returns to the trigger, not lost to the document body or the outer dialog's own close button.
+    await waitFor(() => expect(trigger).toHaveFocus())
+  })
+
+  it('a fresh S3 upload that stalls after a successful restart still shows the 20s "Continue without logo" escape hatch', async () => {
+    // shouldAdvanceTime keeps real async work (userEvent, waitFor) progressing while still
+    // letting advanceTimersByTime fast-forward the component's own setTimeout.
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      await mockPlatformStaff()
+      const { fileService } = await import('@/lib/file/file.service')
+      const { uploadFileToS3 } = await import('@/lib/file/file.upload')
+      vi.mocked(fileService.createFiles).mockResolvedValueOnce({ success: true, message: '', data: [{ id: 'new-file', uploadUrl: 'https://s3.example.com/new-file' }] } as never)
+      vi.mocked(uploadFileToS3).mockRejectedValueOnce(new Error('S3 PUT failed'))
+
+      const user = userEvent.setup({ delay: null })
+      await renderDialog()
+      await user.click(screen.getByRole('button', { name: /new client/i }))
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement
+      await user.upload(input, makeFile())
+      await fillStep0Simple(user)
+      await skipLocationStep(user)
+      await user.click(screen.getByRole('button', { name: /^next$/i }))
+      await fillStep1AndSubmit(user)
+
+      await screen.findByRole('button', { name: /try again/i })
+      vi.mocked(uploadFileToS3).mockRejectedValueOnce(new Error('S3 PUT failed again'))
+      await user.click(screen.getByRole('button', { name: /try again/i }))
+      await user.click(await screen.findByRole('button', { name: /start a new upload/i }))
+
+      // Restart's discard succeeds and the fresh draft is created, but its own S3 PUT hangs.
+      vi.mocked(fileService.changeFileStatus).mockResolvedValueOnce({ success: true, message: '', data: {} } as never)
+      vi.mocked(fileService.createFiles).mockResolvedValueOnce({ success: true, message: '', data: [{ id: 'draft-2', uploadUrl: 'https://s3.example.com/draft-2' }] } as never)
+      vi.mocked(uploadFileToS3).mockReturnValueOnce(new Promise(() => {}))
+
+      await user.click(await screen.findByRole('button', { name: /^start new upload$/i }))
+
+      await screen.findByText(/uploading logo/i)
+      expect(screen.queryByRole('button', { name: /continue without logo/i })).not.toBeInTheDocument()
+
+      await vi.advanceTimersByTimeAsync(20_000)
+
+      expect(await screen.findByRole('button', { name: /continue without logo/i })).toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('done with priorDraftCleanupConfirmed:false does NOT auto-close — requires acknowledgement; true/null auto-close as before', async () => {
+    await mockPlatformStaff()
+    const { fileService } = await import('@/lib/file/file.service')
+    const { uploadFileToS3 } = await import('@/lib/file/file.upload')
+    vi.mocked(fileService.createFiles).mockResolvedValueOnce({ success: true, message: '', data: [{ id: 'draft-1', uploadUrl: 'https://s3.example.com/draft-1' }] } as never)
+    vi.mocked(uploadFileToS3).mockRejectedValueOnce(new Error('S3 PUT failed'))
+
+    const user = userEvent.setup({ delay: null })
+    await renderDialog()
+    await user.click(screen.getByRole('button', { name: /new client/i }))
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    await user.upload(input, makeFile())
+    await fillStep0Simple(user)
+    await skipLocationStep(user)
+    await user.click(screen.getByRole('button', { name: /^next$/i }))
+    await fillStep1AndSubmit(user)
+
+    await screen.findByRole('button', { name: /try again/i })
+    vi.mocked(uploadFileToS3).mockRejectedValueOnce(new Error('S3 PUT failed again'))
+    await user.click(screen.getByRole('button', { name: /try again/i }))
+    await user.click(await screen.findByRole('button', { name: /start a new upload/i }))
+
+    // Restart's own discard fails -> priorDraftCleanupConfirmed: false. Fresh draft-2 succeeds fully.
+    vi.mocked(fileService.changeFileStatus).mockRejectedValueOnce(new Error('discard failed'))
+    vi.mocked(fileService.createFiles).mockResolvedValueOnce({ success: true, message: '', data: [{ id: 'draft-2', uploadUrl: 'https://s3.example.com/draft-2' }] } as never)
+    vi.mocked(uploadFileToS3).mockResolvedValueOnce(undefined)
+    vi.mocked(fileService.changeFileStatus).mockResolvedValueOnce({ success: true, message: '', data: {} } as never) // activate
+    vi.mocked(fileService.linkFileToEntity).mockResolvedValueOnce({ success: true, message: '', data: {} } as never)
+
+    await user.click(await screen.findByRole('button', { name: /^start new upload$/i }))
+
+    // Company created + logo attached, but the dialog must NOT auto-close — cleanup is unconfirmed.
+    await screen.findByText(/couldn't confirm an earlier failed upload/i)
+    expect(navigateMock).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: /continue anyway/i }))
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/admin/tenants/new-tenant-id'))
   })
 })

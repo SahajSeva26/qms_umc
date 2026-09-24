@@ -4,9 +4,8 @@ import { fileService } from '@/lib/file/file.service'
 import { uploadFileToS3 } from '@/lib/file/file.upload'
 import type { FileEntityRelation, FileEntityType } from '@/types/file.types'
 
-// Generic create -> S3-PUT -> activate orchestration hook. Has zero knowledge of any specific
-// entity, linking, or rollback — those are caller-side concerns layered on the unlinked-active
-// file id this hook exposes on 'done'.
+// Generic create -> S3-PUT -> activate orchestration; caller layers entity linking/rollback on
+// the unlinked-active file id this hook exposes on 'done'.
 
 export interface UploadFileConfig {
   tenant: string
@@ -15,40 +14,33 @@ export interface UploadFileConfig {
   tags?: string[]
 }
 
+// priorDraftCleanupConfirmed: null = nothing attempted; true = discard confirmed; false = failed
+// and STICKY until the caller acknowledges it. See combineCleanupConfirmed().
 export type UploadState =
   | { step: 'idle' }
-  | { step: 'creating' }
-  // A confirmed 4xx — nothing was persisted that matters (this hook never sends entityId, so no
-  // cap check even runs), so a fresh start()-equivalent retry is safe.
-  | { step: 'create-failed'; error: unknown }
-  // A network error/timeout/5xx — the draft may have been created despite the lost response.
-  // retry() re-POSTs anyway here: an extra orphan unlinked draft is an acceptable, bounded,
-  // self-contained cost (nothing else references it, and it's never linked to an entity).
-  | { step: 'create-uncertain'; error: unknown }
-  | { step: 'uploading'; fileId: string; uploadUrl: string; fileName: string }
-  // Always ambiguous by nature — an S3 PUT can fail after the object was actually written (e.g. the
-  // response was lost). retry() re-attempts the SAME uploadUrl (idempotent for a given key). Never
-  // auto-falls back to create() on any particular status code — startOver() is the only path back
-  // to a fresh draft, and it is always a deliberate user action.
-  | { step: 'upload-failed'; fileId: string; uploadUrl: string; fileName: string; error: unknown }
-  | { step: 'activating'; fileId: string; uploadUrl: string; fileName: string }
-  // Confirmed 4xx OTHER than "object not uploaded yet". This hook always activates exactly one,
-  // always-unlinked file (entityId is never supplied at create), so the cap's existing-active-count
-  // check can never fire here — there is no cap-conflict branch, deliberately.
-  | { step: 'activate-failed'; fileId: string; uploadUrl: string; fileName: string; error: unknown }
-  // The confirmed "File has not been uploaded to storage yet" 409 — the object genuinely isn't in
-  // S3 yet. retry() must re-PUT first, then re-activate (a bare activate-only retry would just
-  // 409 identically again).
-  | { step: 'activate-not-uploaded'; fileId: string; uploadUrl: string; fileName: string; error: unknown }
+  | { step: 'creating'; priorDraftCleanupConfirmed: boolean | null }
+  // A confirmed 4xx — nothing persisted matters, so a fresh start()-equivalent retry is safe.
+  | { step: 'create-failed'; error: unknown; priorDraftCleanupConfirmed: boolean | null }
+  // Network/timeout/5xx — retry() re-POSTs anyway; an extra orphan unlinked draft is a bounded cost.
+  | { step: 'create-uncertain'; error: unknown; priorDraftCleanupConfirmed: boolean | null }
+  | { step: 'uploading'; fileId: string; uploadUrl: string; fileName: string; priorDraftCleanupConfirmed: boolean | null }
+  // Always ambiguous — an S3 PUT can fail after the object was actually written. retry() re-PUTs
+  // the SAME uploadUrl (idempotent); only startOver() goes back to a fresh draft.
+  | { step: 'upload-failed'; fileId: string; uploadUrl: string; fileName: string; error: unknown; priorDraftCleanupConfirmed: boolean | null }
+  | { step: 'activating'; fileId: string; uploadUrl: string; fileName: string; priorDraftCleanupConfirmed: boolean | null }
+  // Confirmed 4xx other than "not uploaded yet" — this hook always activates one always-unlinked
+  // file, so the cap's active-count check can never fire; no cap-conflict branch, deliberately.
+  | { step: 'activate-failed'; fileId: string; uploadUrl: string; fileName: string; error: unknown; priorDraftCleanupConfirmed: boolean | null }
+  // The confirmed 409 for "object not uploaded yet" — retry() must re-PUT first, then re-activate.
+  | { step: 'activate-not-uploaded'; fileId: string; uploadUrl: string; fileName: string; error: unknown; priorDraftCleanupConfirmed: boolean | null }
   // A network error/timeout/5xx on activate — reconcile via getFile() before deciding.
-  | { step: 'activate-uncertain'; fileId: string; uploadUrl: string; fileName: string }
-  // priorDraftCleanupConfirmed is null when no prior-draft cleanup was ever attempted (a plain
-  // start()/retry() path) — distinct from true/false, which only apply after startOver() actually
-  // ran its discard call. A caller must not render a "cleanup couldn't be confirmed" warning for
-  // the null case; there is no prior draft to warn about.
+  | { step: 'activate-uncertain'; fileId: string; uploadUrl: string; fileName: string; priorDraftCleanupConfirmed: boolean | null }
+  // The discard-with-timeout wait between "start over" and the fresh create() beginning.
+  | { step: 'restarting'; priorDraftCleanupConfirmed: boolean | null }
   | { step: 'done'; fileId: string; priorDraftCleanupConfirmed: boolean | null }
 
 const NOT_UPLOADED_MESSAGE = 'File has not been uploaded to storage yet'
+const RESTART_DISCARD_TIMEOUT_MS = 10_000
 
 function isConfirmedRejection(err: unknown): boolean {
   if (!axios.isAxiosError(err)) return false
@@ -63,27 +55,33 @@ function is409WithMessage(err: unknown, message: string): boolean {
   return data?.message === message
 }
 
+// false is sticky: an earlier unconfirmed draft's cleanup stays unconfirmed regardless of whether
+// a LATER, unrelated draft's own discard succeeds — cleaning up draft B says nothing about draft A.
+function combineCleanupConfirmed(incoming: boolean | null, thisAttempt: boolean): boolean | null {
+  if (incoming === false) return false
+  return thisAttempt
+}
+
 export function useUploadFile() {
   const [state, setState] = useState<UploadState>({ step: 'idle' })
   // The original file/config passed to start() — startOver() re-uses these verbatim to re-run
   // create() with the exact same inputs, without the caller having to re-supply them.
   const originalArgsRef = useRef<{ file: File; config: UploadFileConfig } | null>(null)
 
-  // Bumped on every start()/startOver() call. None of createFiles/uploadFileToS3/changeFileStatus
-  // are actually cancelled when a caller moves on (e.g. abandons this run) — a stale run's own
-  // promise chain keeps running and would otherwise call setState with a LATER run already in
-  // flight, silently stomping its state with a different run's fileId. Every setState below is
-  // guarded on this token so only the run that's still current can ever apply its result.
+  // Bumped by start() — no in-flight call is actually cancelled, so every setState below is
+  // guarded on this token to stop a stale run stomping a later run's state.
   const runIdRef = useRef(0)
   const setStateForRun = (runId: number, next: UploadState) => {
     if (runId !== runIdRef.current) return
     setState(next)
   }
 
-  // Threaded through so the eventual 'done' state can carry it: null on plain start()/retry(),
-  // a real boolean only when startOver()'s own discard call ran.
+  // A synchronous lock (setState's async scheduling can't prevent a concurrent stale read); scoped
+  // to restart PREPARATION only, cleared before doCreate — never held through the upload chain.
+  const restartInFlightRef = useRef(false)
+
   const doCreate = async (runId: number, file: File, config: UploadFileConfig, priorDraftCleanupConfirmed: boolean | null) => {
-    setStateForRun(runId, { step: 'creating' })
+    setStateForRun(runId, { step: 'creating', priorDraftCleanupConfirmed })
     // Only classifies the create call itself — doUpload does its own classification below.
     let created: { id: string; uploadUrl?: string }
     try {
@@ -100,9 +98,9 @@ export function useUploadFile() {
       created = first
     } catch (err) {
       if (isConfirmedRejection(err)) {
-        setStateForRun(runId, { step: 'create-failed', error: err })
+        setStateForRun(runId, { step: 'create-failed', error: err, priorDraftCleanupConfirmed })
       } else {
-        setStateForRun(runId, { step: 'create-uncertain', error: err })
+        setStateForRun(runId, { step: 'create-uncertain', error: err, priorDraftCleanupConfirmed })
       }
       throw err
     }
@@ -117,11 +115,11 @@ export function useUploadFile() {
     fileName: string,
     priorDraftCleanupConfirmed: boolean | null,
   ) => {
-    setStateForRun(runId, { step: 'uploading', fileId, uploadUrl, fileName })
+    setStateForRun(runId, { step: 'uploading', fileId, uploadUrl, fileName, priorDraftCleanupConfirmed })
     try {
       await uploadFileToS3(uploadUrl, file)
     } catch (err) {
-      setStateForRun(runId, { step: 'upload-failed', fileId, uploadUrl, fileName, error: err })
+      setStateForRun(runId, { step: 'upload-failed', fileId, uploadUrl, fileName, error: err, priorDraftCleanupConfirmed })
       throw err
     }
     await doActivate(runId, fileId, uploadUrl, fileName, priorDraftCleanupConfirmed)
@@ -134,17 +132,17 @@ export function useUploadFile() {
     fileName: string,
     priorDraftCleanupConfirmed: boolean | null,
   ) => {
-    setStateForRun(runId, { step: 'activating', fileId, uploadUrl, fileName })
+    setStateForRun(runId, { step: 'activating', fileId, uploadUrl, fileName, priorDraftCleanupConfirmed })
     try {
       await fileService.changeFileStatus(fileId, { status: 'active' })
       setStateForRun(runId, { step: 'done', fileId, priorDraftCleanupConfirmed })
     } catch (err) {
       if (is409WithMessage(err, NOT_UPLOADED_MESSAGE)) {
-        setStateForRun(runId, { step: 'activate-not-uploaded', fileId, uploadUrl, fileName, error: err })
+        setStateForRun(runId, { step: 'activate-not-uploaded', fileId, uploadUrl, fileName, error: err, priorDraftCleanupConfirmed })
       } else if (isConfirmedRejection(err)) {
-        setStateForRun(runId, { step: 'activate-failed', fileId, uploadUrl, fileName, error: err })
+        setStateForRun(runId, { step: 'activate-failed', fileId, uploadUrl, fileName, error: err, priorDraftCleanupConfirmed })
       } else {
-        setStateForRun(runId, { step: 'activate-uncertain', fileId, uploadUrl, fileName })
+        setStateForRun(runId, { step: 'activate-uncertain', fileId, uploadUrl, fileName, priorDraftCleanupConfirmed })
       }
       throw err
     }
@@ -156,37 +154,38 @@ export function useUploadFile() {
     await doCreate(runId, file, config, null)
   }
 
-  // Re-enters only at the currently-failed step, never restarts from idle. Reuses the current
-  // run id — this is the same logical run continuing, not a new one.
+  // Re-enters only at the currently-failed step, reusing the current run id. Bails while a
+  // restart is being prepared, so a stale closure can't race a real restart.
   const retry = async () => {
+    if (restartInFlightRef.current) return
     const runId = runIdRef.current
     switch (state.step) {
       case 'create-failed':
       case 'create-uncertain': {
         const args = originalArgsRef.current
         if (!args) return
-        await doCreate(runId, args.file, args.config, null)
+        await doCreate(runId, args.file, args.config, state.priorDraftCleanupConfirmed)
         return
       }
       case 'upload-failed': {
-        const { fileId, uploadUrl, fileName } = state
+        const { fileId, uploadUrl, fileName, priorDraftCleanupConfirmed } = state
         const args = originalArgsRef.current
         if (!args) return
-        await doUpload(runId, fileId, uploadUrl, args.file, fileName, null)
+        await doUpload(runId, fileId, uploadUrl, args.file, fileName, priorDraftCleanupConfirmed)
         return
       }
       case 'activate-failed': {
-        const { fileId, uploadUrl, fileName } = state
-        await doActivate(runId, fileId, uploadUrl, fileName, null)
+        const { fileId, uploadUrl, fileName, priorDraftCleanupConfirmed } = state
+        await doActivate(runId, fileId, uploadUrl, fileName, priorDraftCleanupConfirmed)
         return
       }
       case 'activate-not-uploaded': {
         // The object genuinely isn't in S3 yet — re-PUT first, THEN re-activate. A bare
         // activate-only retry here would just 409 identically again.
-        const { fileId, uploadUrl, fileName } = state
+        const { fileId, uploadUrl, fileName, priorDraftCleanupConfirmed } = state
         const args = originalArgsRef.current
         if (!args) return
-        await doUpload(runId, fileId, uploadUrl, args.file, fileName, null)
+        await doUpload(runId, fileId, uploadUrl, args.file, fileName, priorDraftCleanupConfirmed)
         return
       }
       case 'activate-uncertain': {
@@ -202,42 +201,67 @@ export function useUploadFile() {
   const reconcileActivation = async () => {
     if (state.step !== 'activate-uncertain') return
     const runId = runIdRef.current
-    const { fileId, uploadUrl, fileName } = state
+    const { fileId, uploadUrl, fileName, priorDraftCleanupConfirmed } = state
     try {
       const res = await fileService.getFile(fileId)
       const status = res.data?.status
       if (status === 'active') {
-        setStateForRun(runId, { step: 'done', fileId, priorDraftCleanupConfirmed: null })
+        setStateForRun(runId, { step: 'done', fileId, priorDraftCleanupConfirmed })
       } else if (status === 'draft') {
-        await doActivate(runId, fileId, uploadUrl, fileName, null)
+        await doActivate(runId, fileId, uploadUrl, fileName, priorDraftCleanupConfirmed)
       } else {
         // discarded/inactive — something else moved it; surface as a confirmed failure rather than
         // silently retrying a transition that can no longer succeed.
-        setStateForRun(runId, { step: 'activate-failed', fileId, uploadUrl, fileName, error: new Error(`File is unexpectedly "${status}"`) })
+        setStateForRun(runId, { step: 'activate-failed', fileId, uploadUrl, fileName, error: new Error(`File is unexpectedly "${status}"`), priorDraftCleanupConfirmed })
       }
     } catch {
       // A failed check is not proof either way — stay uncertain, don't fall back to a blind retry.
-      setStateForRun(runId, { step: 'activate-uncertain', fileId, uploadUrl, fileName })
+      setStateForRun(runId, { step: 'activate-uncertain', fileId, uploadUrl, fileName, priorDraftCleanupConfirmed })
     }
   }
 
-  // Discards the known draft, then REGARDLESS of that outcome, re-runs create() from scratch —
-  // unlike retry(), which never calls create() again from this step.
+  // Discards the known draft (timeout-bounded, since the request itself can't be cancelled), then
+  // REGARDLESS of that outcome re-runs create() — unlike retry(), which never does from this step.
   const startOver = async () => {
     if (state.step !== 'upload-failed') return
+    if (restartInFlightRef.current) return
+    restartInFlightRef.current = true
+    const runId = runIdRef.current
     const args = originalArgsRef.current
-    if (!args) return
+    const { fileId, priorDraftCleanupConfirmed: incoming } = state
 
-    let priorDraftCleanupConfirmed: boolean
+    let thisAttemptConfirmed: boolean
     try {
-      await fileService.changeFileStatus(state.fileId, { status: 'discarded' })
-      priorDraftCleanupConfirmed = true
-    } catch {
-      // Either way, proceed to a fresh create() below — the eventual 'done' flag shows unconfirmed.
-      priorDraftCleanupConfirmed = false
+      // Carry `incoming` forward unchanged, not reset to null, or a sticky-false warning would flicker off.
+      setStateForRun(runId, { step: 'restarting', priorDraftCleanupConfirmed: incoming })
+
+      let timeoutId: ReturnType<typeof setTimeout> | undefined
+      const timeout = new Promise<'timeout'>((resolve) => {
+        timeoutId = setTimeout(() => resolve('timeout'), RESTART_DISCARD_TIMEOUT_MS)
+      })
+      try {
+        const outcome = await Promise.race([
+          fileService.changeFileStatus(fileId, { status: 'discarded' }).then(() => 'discarded' as const),
+          timeout,
+        ])
+        // A timeout is treated the same as a rejection below — never reported as confirmed.
+        thisAttemptConfirmed = outcome === 'discarded'
+      } catch {
+        thisAttemptConfirmed = false
+      } finally {
+        clearTimeout(timeoutId)
+      }
+    } finally {
+      restartInFlightRef.current = false
     }
 
-    await doCreate(runIdRef.current, args.file, args.config, priorDraftCleanupConfirmed)
+    if (!args) return
+    // setStateForRun's no-op only skips the render, not doCreate itself — a newer run must not
+    // have a stale restart attach a fresh create() to it.
+    if (runId !== runIdRef.current) return
+
+    const priorDraftCleanupConfirmed = combineCleanupConfirmed(incoming, thisAttemptConfirmed)
+    await doCreate(runId, args.file, args.config, priorDraftCleanupConfirmed)
   }
 
   return { state, start, retry, startOver }

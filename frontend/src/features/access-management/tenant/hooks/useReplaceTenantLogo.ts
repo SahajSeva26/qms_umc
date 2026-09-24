@@ -34,7 +34,7 @@ export type ReplaceLogoState =
   | { step: 'restore-uncertain'; linkError: unknown; priorDraftCleanupConfirmed: boolean | null; cleanup?: CleanupSubState; forFile: 'discard' | 'attached-elsewhere' }
   | { step: 'restore-failed'; linkError: unknown; priorDraftCleanupConfirmed: boolean | null; cleanup?: CleanupSubState; forFile: 'discard' | 'attached-elsewhere' }
   | { step: 'cleaning-up-orphan'; primary: ReplaceLogoState }
-  | { step: 'done'; fileId: string }
+  | { step: 'done'; fileId: string; priorDraftCleanupConfirmed: boolean | null }
 
 const DEACTIVATE_ALREADY_INACTIVE = 'File is already "inactive"'
 const ALREADY_DISCARDED = 'File is already "discarded"'
@@ -147,7 +147,7 @@ export function useReplaceTenantLogo(tenantId: string, oldLogoId: string | null,
           // Reconciled as already restored — still discard, still surface the overall failure.
           await discardCandidate({ step: 'link-failed', error: linkError, priorDraftCleanupConfirmed })
         } else {
-          // Not confirmed restored — surface as a terminal restore failure, discard regardless.
+          // Not confirmed restored — surface as restore-failed (retryable), discard regardless.
           await discardCandidate({ step: 'restore-failed', linkError, priorDraftCleanupConfirmed, forFile: 'discard' })
         }
       } catch {
@@ -157,8 +157,8 @@ export function useReplaceTenantLogo(tenantId: string, oldLogoId: string | null,
     }
   }
 
-  // Candidate is attached to a DIFFERENT entity — never discards; restores the old logo (if any)
-  // then always surfaces link-attached-elsewhere, regardless of the restore's own outcome.
+  // Candidate is attached to a DIFFERENT entity — never discards; restores the old logo (if any),
+  // surfacing link-attached-elsewhere only if that restore itself succeeds (else restore-failed/-uncertain).
   const restoreOldForAttachedElsewhere = async (
     linkError: unknown,
     oldLogoIdKnown: string | null,
@@ -242,7 +242,7 @@ export function useReplaceTenantLogo(tenantId: string, oldLogoId: string | null,
     setState({ step: 'linking-new', priorDraftCleanupConfirmed })
     try {
       await fileService.linkFileToEntity(fileId, { entityId: tenantId })
-      finishSuccess(fileId)
+      finishSuccess(fileId, priorDraftCleanupConfirmed)
     } catch (err) {
       const oldLogoIdKnown = oldLogoIdRef.current
       if (isCapConflict(err)) {
@@ -258,7 +258,7 @@ export function useReplaceTenantLogo(tenantId: string, oldLogoId: string | null,
         try {
           const res = await fileService.getFile(fileId)
           if (linkedEntityId(res.data?.entity) === tenantId) {
-            finishSuccess(fileId)
+            finishSuccess(fileId, priorDraftCleanupConfirmed)
             return
           }
           if (res.data?.entity?.id) {
@@ -285,7 +285,7 @@ export function useReplaceTenantLogo(tenantId: string, oldLogoId: string | null,
       try {
         const res = await fileService.getFile(fileId)
         if (linkedEntityId(res.data?.entity) === tenantId) {
-          finishSuccess(fileId)
+          finishSuccess(fileId, priorDraftCleanupConfirmed)
           return
         }
         if (res.data?.entity?.id) {
@@ -302,8 +302,8 @@ export function useReplaceTenantLogo(tenantId: string, oldLogoId: string | null,
     }
   }
 
-  const finishSuccess = (fileId: string) => {
-    setState({ step: 'done', fileId })
+  const finishSuccess = (fileId: string, priorDraftCleanupConfirmed: boolean | null) => {
+    setState({ step: 'done', fileId, priorDraftCleanupConfirmed })
     onSuccessRef.current?.()
   }
 
@@ -311,7 +311,7 @@ export function useReplaceTenantLogo(tenantId: string, oldLogoId: string | null,
     runIdRef.current += 1
     startRunIdRef.current = runIdRef.current
     newFileIdRef.current = null
-    setState({ step: 'uploading', upload: { step: 'creating' } })
+    setState({ step: 'uploading', upload: { step: 'creating', priorDraftCleanupConfirmed: null } })
     // Failure is already tracked in useUploadFile's own state, surfaced via the effect below.
     void uploadFile.start(file, { tenant: tenantId, entityType: 'tenant', entityRelation: 'logo' }).catch(() => {})
   }
@@ -372,8 +372,8 @@ export function useReplaceTenantLogo(tenantId: string, oldLogoId: string | null,
     startOverUpload: uploadFile.startOver,
     retryCleanup,
     abandonPendingUpload,
-    // deactivate-failed/link-failed/link-conflict are excluded on purpose — the candidate is
-    // already discarded by the time those show, so retrying would try to re-use it. replace() only.
+    // deactivate-failed/link-failed/link-conflict excluded on purpose — discard was already
+    // attempted for the candidate (retryCleanup handles a failed one); retrying would re-use it.
     retry: async () => {
       const oldLogoIdKnown = oldLogoIdRef.current
       switch (state.step) {

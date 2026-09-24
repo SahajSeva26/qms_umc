@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router-dom'
 import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import TenantLogoUploader from './TenantLogoUploader'
+import TenantHeader from './TenantHeader'
 import { tenantLogoKeys } from '@/features/access-management/tenant/hooks/useTenantLogo'
+import type { Tenant } from '@/types/accessManagement.types'
 
 vi.mock('@/lib/file/file.service', () => ({
   fileService: {
@@ -26,11 +28,32 @@ beforeEach(() => {
   window.URL.revokeObjectURL = vi.fn()
 })
 
-function renderUploader(props: Partial<{ tenantId: string; canManage: boolean }> = {}) {
+const TENANT: Tenant = {
+  id: 't-1',
+  code: 'acme',
+  name: 'Acme Pharma',
+  type: 'customer',
+  status: 'active',
+} as Tenant
+
+function renderHeader(props: Partial<{ tenant: Tenant; canManageTenant: boolean }> = {}) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={queryClient}>
-      <TenantLogoUploader tenantId="t-1" canManage {...props} />
+      <MemoryRouter>
+        <TenantHeader
+          tenant={TENANT}
+          canManageTenant
+          canViewRole={false}
+          ownerName={null}
+          ownerUser={null}
+          ownerEmailSuffix={null}
+          tenantAddress={null}
+          divisionPenetrationPct={null}
+          onEditClick={vi.fn()}
+          {...props}
+        />
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }
@@ -44,7 +67,7 @@ function makeFile(name = 'logo.png', type = 'image/png', size = 1024) {
   return file
 }
 
-describe('TenantLogoUploader', () => {
+describe('TenantHeader', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     window.URL.createObjectURL = vi.fn(() => 'blob:mock-preview-url')
@@ -55,7 +78,7 @@ describe('TenantLogoUploader', () => {
     const { fileService } = await import('@/lib/file/file.service')
     vi.mocked(fileService.searchFiles).mockResolvedValue(noLogo())
 
-    renderUploader()
+    renderHeader()
     await waitFor(() => expect(screen.getByRole('button', { name: /upload logo/i })).toBeEnabled())
     expect(screen.queryByRole('img', { name: /company logo/i })).not.toBeInTheDocument()
   })
@@ -73,7 +96,7 @@ describe('TenantLogoUploader', () => {
       data: { id: 'file-1', url: 'https://s3.example.com/logo.png' },
     } as never)
 
-    renderUploader()
+    renderHeader()
     await waitFor(() => expect(screen.getByRole('img', { name: /company logo/i })).toHaveAttribute('src', 'https://s3.example.com/logo.png'))
     expect(screen.getByRole('button', { name: /change logo/i })).toBeEnabled()
   })
@@ -83,7 +106,7 @@ describe('TenantLogoUploader', () => {
     let resolveSearch: (v: unknown) => void = () => {}
     vi.mocked(fileService.searchFiles).mockReturnValue(new Promise((r) => { resolveSearch = r }) as never)
 
-    renderUploader()
+    renderHeader()
     expect(screen.getByRole('button', { name: /upload logo/i })).toBeDisabled()
 
     resolveSearch(noLogo())
@@ -94,7 +117,7 @@ describe('TenantLogoUploader', () => {
     const { fileService } = await import('@/lib/file/file.service')
     vi.mocked(fileService.searchFiles).mockRejectedValue(new Error('down'))
 
-    renderUploader()
+    renderHeader()
     await waitFor(() => expect(screen.getByText(/couldn't check the current logo/i)).toBeInTheDocument())
     expect(screen.getByRole('button', { name: /upload logo/i })).toBeDisabled()
 
@@ -106,11 +129,11 @@ describe('TenantLogoUploader', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: /upload logo/i })).toBeEnabled())
   })
 
-  it('canManage=false hides the whole change-logo affordance, shows only the logo/placeholder', async () => {
+  it('canManageTenant=false hides the whole change-logo affordance, shows only the logo/placeholder', async () => {
     const { fileService } = await import('@/lib/file/file.service')
     vi.mocked(fileService.searchFiles).mockResolvedValue(noLogo())
 
-    renderUploader({ canManage: false })
+    renderHeader({ canManageTenant: false })
     await waitFor(() => expect(fileService.searchFiles).toHaveBeenCalled())
     expect(screen.queryByRole('button', { name: /upload logo/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /change logo/i })).not.toBeInTheDocument()
@@ -120,7 +143,7 @@ describe('TenantLogoUploader', () => {
     const { fileService } = await import('@/lib/file/file.service')
     vi.mocked(fileService.searchFiles).mockResolvedValue(noLogo())
 
-    renderUploader()
+    renderHeader()
     await waitFor(() => expect(screen.getByRole('button', { name: /upload logo/i })).toBeEnabled())
 
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
@@ -138,7 +161,7 @@ describe('TenantLogoUploader', () => {
     const { fileService } = await import('@/lib/file/file.service')
     vi.mocked(fileService.searchFiles).mockResolvedValue(noLogo())
 
-    renderUploader()
+    renderHeader()
     await waitFor(() => expect(screen.getByRole('button', { name: /upload logo/i })).toBeEnabled())
 
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
@@ -160,7 +183,7 @@ describe('TenantLogoUploader', () => {
     vi.mocked(fileService.changeFileStatus).mockResolvedValueOnce({ success: true, message: '', data: {} } as never) // activate
     vi.mocked(fileService.linkFileToEntity).mockResolvedValueOnce({ success: true, message: '', data: {} } as never)
 
-    renderUploader()
+    renderHeader()
     await waitFor(() => expect(screen.getByRole('button', { name: /upload logo/i })).toBeEnabled())
 
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
@@ -188,7 +211,7 @@ describe('TenantLogoUploader', () => {
       success: true, message: '', data: { id: 'new-file', entity: { id: 'some-other-tenant' } },
     } as never)
 
-    renderUploader()
+    renderHeader()
     await waitFor(() => expect(screen.getByRole('button', { name: /upload logo/i })).toBeEnabled())
 
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
@@ -227,7 +250,7 @@ describe('TenantLogoUploader', () => {
     } as never)
     vi.mocked(fileService.changeFileStatus).mockResolvedValueOnce({ success: true, message: '', data: {} } as never) // restore old to active
 
-    renderUploader()
+    renderHeader()
     await waitFor(() => expect(screen.getByRole('button', { name: /change logo/i })).toBeEnabled())
 
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
@@ -257,7 +280,7 @@ describe('TenantLogoUploader', () => {
     vi.mocked(fileService.getFile).mockResolvedValueOnce({ success: true, message: '', data: { status: 'active' } } as never) // best-effort reconcile
     vi.mocked(fileService.changeFileStatus).mockResolvedValueOnce({ success: true, message: '', data: {} } as never) // discard candidate
 
-    renderUploader()
+    renderHeader()
     await waitFor(() => expect(screen.getByRole('button', { name: /change logo/i })).toBeEnabled())
 
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
@@ -268,23 +291,28 @@ describe('TenantLogoUploader', () => {
     expect(screen.getByRole('button', { name: /change logo/i })).toBeEnabled()
   })
 
-  it('upload-failed state shows Retry upload and Start over as two separate always-available actions', async () => {
+  it('upload-failed state shows only Try again on the first failure — Start a new upload appears only after a retry also fails', async () => {
     const { fileService } = await import('@/lib/file/file.service')
     const { uploadFileToS3 } = await import('@/lib/file/file.upload')
     vi.mocked(fileService.searchFiles).mockResolvedValue(noLogo())
-    vi.mocked(fileService.createFiles).mockResolvedValueOnce({
+    vi.mocked(fileService.createFiles).mockResolvedValue({
       success: true, message: '', data: [{ id: 'new-file', uploadUrl: 'https://s3.example.com/new-file' }],
     } as never)
     vi.mocked(uploadFileToS3).mockRejectedValueOnce(new Error('upload failed'))
 
-    renderUploader()
+    renderHeader()
     await waitFor(() => expect(screen.getByRole('button', { name: /upload logo/i })).toBeEnabled())
 
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
     await userEvent.upload(input, makeFile())
 
-    await waitFor(() => expect(screen.getByRole('button', { name: /retry upload/i })).toBeInTheDocument())
-    expect(screen.getByRole('button', { name: /start over/i })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: /start a new upload/i })).not.toBeInTheDocument()
+
+    // Retry fails again — only now does the fallback appear.
+    vi.mocked(uploadFileToS3).mockRejectedValueOnce(new Error('upload failed again'))
+    await userEvent.click(screen.getByRole('button', { name: /try again/i }))
+    await waitFor(() => expect(screen.getByRole('button', { name: /start a new upload/i })).toBeInTheDocument())
   })
 
   it('clicking Retry upload when the retry itself rejects again does not throw an unhandled promise rejection', async () => {
@@ -302,16 +330,16 @@ describe('TenantLogoUploader', () => {
       } as never)
       vi.mocked(uploadFileToS3).mockRejectedValueOnce(new Error('upload failed'))
 
-      renderUploader()
+      renderHeader()
       await waitFor(() => expect(screen.getByRole('button', { name: /upload logo/i })).toBeEnabled())
 
       const input = document.querySelector('input[type="file"]') as HTMLInputElement
       await userEvent.upload(input, makeFile())
-      await waitFor(() => expect(screen.getByRole('button', { name: /retry upload/i })).toBeInTheDocument())
+      await waitFor(() => expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument())
 
       // The retry rejects again — this is the exact path that used to escape as unhandled.
       vi.mocked(uploadFileToS3).mockRejectedValueOnce(new Error('upload failed again'))
-      await userEvent.click(screen.getByRole('button', { name: /retry upload/i }))
+      await userEvent.click(screen.getByRole('button', { name: /try again/i }))
 
       await waitFor(() => expect(uploadFileToS3).toHaveBeenCalledTimes(2))
       // Give any unhandled rejection a tick to surface before asserting none did.
@@ -335,7 +363,7 @@ describe('TenantLogoUploader', () => {
         Object.assign(new Error('Bad Request'), { isAxiosError: true, response: { status: 400, data: { message: 'Validation failed' } } }),
       )
 
-      renderUploader()
+      renderHeader()
       await waitFor(() => expect(screen.getByRole('button', { name: /upload logo/i })).toBeEnabled())
 
       const input = document.querySelector('input[type="file"]') as HTMLInputElement
@@ -373,7 +401,7 @@ describe('TenantLogoUploader', () => {
       Object.assign(new Error('Bad Request'), { isAxiosError: true, response: { status: 400, data: { message: 'Cannot discard' } } }),
     )
 
-    renderUploader()
+    renderHeader()
     await waitFor(() => expect(screen.getByRole('button', { name: /upload logo/i })).toBeEnabled())
 
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
@@ -400,7 +428,7 @@ describe('TenantLogoUploader', () => {
     )
     vi.mocked(fileService.changeFileStatus).mockResolvedValueOnce({ success: true, message: '', data: {} } as never) // discard succeeds
 
-    renderUploader()
+    renderHeader()
     await waitFor(() => expect(screen.getByRole('button', { name: /upload logo/i })).toBeEnabled())
 
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
@@ -414,17 +442,22 @@ describe('TenantLogoUploader', () => {
     const { fileService } = await import('@/lib/file/file.service')
     const { uploadFileToS3 } = await import('@/lib/file/file.upload')
     vi.mocked(fileService.searchFiles).mockResolvedValue(noLogo())
-    vi.mocked(fileService.createFiles).mockResolvedValueOnce({
+    vi.mocked(fileService.createFiles).mockResolvedValue({
       success: true, message: '', data: [{ id: 'draft-1', uploadUrl: 'https://s3.example.com/draft-1' }],
     } as never)
     vi.mocked(uploadFileToS3).mockRejectedValueOnce(new Error('boom')) // upload-failed
 
-    renderUploader()
+    renderHeader()
     await waitFor(() => expect(screen.getByRole('button', { name: /upload logo/i })).toBeEnabled())
 
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
     await userEvent.upload(input, makeFile())
-    await waitFor(() => expect(screen.getByRole('button', { name: /start over/i })).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument())
+
+    // Retry fails again to reveal the fallback (progressive disclosure).
+    vi.mocked(uploadFileToS3).mockRejectedValueOnce(new Error('boom again'))
+    await userEvent.click(screen.getByRole('button', { name: /try again/i }))
+    await waitFor(() => expect(screen.getByRole('button', { name: /start a new upload/i })).toBeInTheDocument())
 
     // startOver's own discard fails here -> priorDraftCleanupConfirmed: false, asserted below once
     // it hands off to 'linking-new' (first-ever upload, oldLogoId null).
@@ -439,12 +472,77 @@ describe('TenantLogoUploader', () => {
       new Promise((resolve) => { resolveLink = resolve }) as never,
     )
 
-    await userEvent.click(screen.getByRole('button', { name: /start over/i }))
+    await userEvent.click(screen.getByRole('button', { name: /start a new upload/i }))
+    await userEvent.click(await screen.findByRole('button', { name: /^start new upload$/i }))
 
-    await waitFor(() => expect(screen.getByText(/linking new logo/i)).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText(/linking logo/i)).toBeInTheDocument())
     expect(screen.getByText(/previous draft upload couldn't be confirmed/i)).toBeInTheDocument()
 
     resolveLink({ success: true, message: '', data: {} })
+  })
+
+  it('while restarting (discard pending), Try again and the fallback are both hidden — only "Starting a new upload…" shows', async () => {
+    const { fileService } = await import('@/lib/file/file.service')
+    const { uploadFileToS3 } = await import('@/lib/file/file.upload')
+    vi.mocked(fileService.searchFiles).mockResolvedValue(noLogo())
+    vi.mocked(fileService.createFiles).mockResolvedValue({
+      success: true, message: '', data: [{ id: 'draft-1', uploadUrl: 'https://s3.example.com/draft-1' }],
+    } as never)
+    vi.mocked(uploadFileToS3).mockRejectedValueOnce(new Error('boom'))
+
+    renderHeader()
+    await waitFor(() => expect(screen.getByRole('button', { name: /upload logo/i })).toBeEnabled())
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    await userEvent.upload(input, makeFile())
+    await waitFor(() => expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument())
+
+    vi.mocked(uploadFileToS3).mockRejectedValueOnce(new Error('boom again'))
+    await userEvent.click(screen.getByRole('button', { name: /try again/i }))
+    await waitFor(() => expect(screen.getByRole('button', { name: /start a new upload/i })).toBeInTheDocument())
+
+    // Discard never settles for the duration of this assertion.
+    vi.mocked(fileService.changeFileStatus).mockReturnValueOnce(new Promise(() => {}))
+    await userEvent.click(screen.getByRole('button', { name: /start a new upload/i }))
+    await userEvent.click(await screen.findByRole('button', { name: /^start new upload$/i }))
+
+    await waitFor(() => expect(screen.getByText(/starting a new upload/i)).toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: /try again/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /start a new upload/i })).not.toBeInTheDocument()
+  })
+
+  it('a fresh S3 upload that itself stalls after a successful restart still shows Uploading… (no lingering restarting UI)', async () => {
+    const { fileService } = await import('@/lib/file/file.service')
+    const { uploadFileToS3 } = await import('@/lib/file/file.upload')
+    vi.mocked(fileService.searchFiles).mockResolvedValue(noLogo())
+    vi.mocked(fileService.createFiles).mockResolvedValue({
+      success: true, message: '', data: [{ id: 'draft-1', uploadUrl: 'https://s3.example.com/draft-1' }],
+    } as never)
+    vi.mocked(uploadFileToS3).mockRejectedValueOnce(new Error('boom'))
+
+    renderHeader()
+    await waitFor(() => expect(screen.getByRole('button', { name: /upload logo/i })).toBeEnabled())
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    await userEvent.upload(input, makeFile())
+    await waitFor(() => expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument())
+
+    vi.mocked(uploadFileToS3).mockRejectedValueOnce(new Error('boom again'))
+    await userEvent.click(screen.getByRole('button', { name: /try again/i }))
+    await waitFor(() => expect(screen.getByRole('button', { name: /start a new upload/i })).toBeInTheDocument())
+
+    vi.mocked(fileService.changeFileStatus).mockResolvedValueOnce({ success: true, message: '', data: {} } as never)
+    vi.mocked(fileService.createFiles).mockResolvedValueOnce({
+      success: true, message: '', data: [{ id: 'draft-2', uploadUrl: 'https://s3.example.com/draft-2' }],
+    } as never)
+    // The fresh S3 upload itself now hangs.
+    vi.mocked(uploadFileToS3).mockReturnValueOnce(new Promise(() => {}))
+
+    await userEvent.click(screen.getByRole('button', { name: /start a new upload/i }))
+    await userEvent.click(await screen.findByRole('button', { name: /^start new upload$/i }))
+
+    await waitFor(() => expect(screen.getByText(/^uploading…$/i)).toBeInTheDocument())
+    expect(screen.queryByText(/starting a new upload/i)).not.toBeInTheDocument()
   })
 
   it('a normal (non-startOver) upload never shows the "previous draft couldn\'t be cleaned up" warning', async () => {
@@ -459,7 +557,7 @@ describe('TenantLogoUploader', () => {
     vi.mocked(fileService.changeFileStatus).mockResolvedValueOnce({ success: true, message: '', data: {} } as never) // activate
     vi.mocked(fileService.linkFileToEntity).mockResolvedValueOnce({ success: true, message: '', data: {} } as never)
 
-    renderUploader()
+    renderHeader()
     await waitFor(() => expect(screen.getByRole('button', { name: /upload logo/i })).toBeEnabled())
 
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
@@ -477,7 +575,19 @@ describe('TenantLogoUploader', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     render(
       <QueryClientProvider client={queryClient}>
-        <TenantLogoUploader tenantId="t-1" canManage />
+        <MemoryRouter>
+          <TenantHeader
+            tenant={TENANT}
+            canManageTenant
+            canViewRole={false}
+            ownerName={null}
+            ownerUser={null}
+            ownerEmailSuffix={null}
+            tenantAddress={null}
+            divisionPenetrationPct={null}
+            onEditClick={vi.fn()}
+          />
+        </MemoryRouter>
       </QueryClientProvider>,
     )
     await waitFor(() => expect(screen.getByRole('button', { name: /upload logo/i })).toBeEnabled())
@@ -508,7 +618,19 @@ describe('TenantLogoUploader', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     render(
       <QueryClientProvider client={queryClient}>
-        <TenantLogoUploader tenantId="t-1" canManage />
+        <MemoryRouter>
+          <TenantHeader
+            tenant={TENANT}
+            canManageTenant
+            canViewRole={false}
+            ownerName={null}
+            ownerUser={null}
+            ownerEmailSuffix={null}
+            tenantAddress={null}
+            divisionPenetrationPct={null}
+            onEditClick={vi.fn()}
+          />
+        </MemoryRouter>
       </QueryClientProvider>,
     )
     await waitFor(() => expect(screen.getByRole('img', { name: /company logo/i })).toHaveAttribute('src', 'https://s3.example.com/stale-logo.png'))
@@ -530,5 +652,310 @@ describe('TenantLogoUploader', () => {
     resolveSecondSearch({ success: true, message: '', data: { count: 1, items: [{ id: 'file-2' }] } })
 
     await waitFor(() => expect(screen.getByRole('img', { name: /company logo/i })).toHaveAttribute('src', 'https://s3.example.com/fresh-logo.png'))
+  })
+
+  // ---- New TenantHeader-specific coverage ----
+
+  it('canManageTenant=false renders full tenant identity with no upload controls', async () => {
+    const { fileService } = await import('@/lib/file/file.service')
+    vi.mocked(fileService.searchFiles).mockResolvedValue(noLogo())
+
+    renderHeader({ canManageTenant: false })
+    await waitFor(() => expect(fileService.searchFiles).toHaveBeenCalled())
+
+    // Identity always renders, regardless of canManageTenant.
+    expect(screen.getByText('Acme Pharma')).toBeInTheDocument()
+    expect(screen.getByText('acme')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /edit client/i })).toBeInTheDocument()
+
+    // No upload controls for a non-manager.
+    expect(screen.queryByRole('button', { name: /upload logo/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /change logo/i })).not.toBeInTheDocument()
+    expect(document.querySelector('input[type="file"]')).not.toBeInTheDocument()
+  })
+
+  it('local preview survives a background refetch — not replaced by the loading ellipsis', async () => {
+    const { fileService } = await import('@/lib/file/file.service')
+    const { uploadFileToS3 } = await import('@/lib/file/file.upload')
+    vi.mocked(fileService.searchFiles).mockResolvedValueOnce(noLogo())
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <TenantHeader
+            tenant={TENANT}
+            canManageTenant
+            canViewRole={false}
+            ownerName={null}
+            ownerUser={null}
+            ownerEmailSuffix={null}
+            tenantAddress={null}
+            divisionPenetrationPct={null}
+            onEditClick={vi.fn()}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    await waitFor(() => expect(screen.getByRole('button', { name: /upload logo/i })).toBeEnabled())
+
+    // Pick a file — a local preview (blob URL) is set, and the upload starts.
+    vi.mocked(fileService.createFiles).mockReturnValueOnce(new Promise(() => {})) // hold the upload open
+    void uploadFileToS3
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    await userEvent.upload(input, makeFile())
+    await waitFor(() => expect(screen.getByRole('img', { name: /company logo/i })).toHaveAttribute('src', 'blob:mock-preview-url'))
+
+    // A background refetch of the (old, now-being-replaced) server logo starts concurrently.
+    let resolveSecondSearch: (v: unknown) => void = () => {}
+    vi.mocked(fileService.searchFiles).mockReturnValueOnce(new Promise((r) => { resolveSecondSearch = r }) as never)
+    act(() => {
+      void queryClient.refetchQueries({ queryKey: tenantLogoKeys.detail('t-1') })
+    })
+
+    // The local preview must stay visible throughout — not replaced by the loading ellipsis.
+    expect(screen.getByRole('img', { name: /company logo/i })).toHaveAttribute('src', 'blob:mock-preview-url')
+    resolveSecondSearch(noLogo())
+  })
+
+  it('a long failure message renders in the full-width second row, not the 128px logo column', async () => {
+    const { fileService } = await import('@/lib/file/file.service')
+    const { uploadFileToS3 } = await import('@/lib/file/file.upload')
+    vi.mocked(fileService.searchFiles).mockResolvedValue({
+      success: true, message: '', data: { count: 1, items: [{ id: 'old-file' }] },
+    } as never)
+    vi.mocked(fileService.getFile).mockResolvedValueOnce({
+      success: true, message: '', data: { id: 'old-file', url: 'https://s3.example.com/old-logo.png' },
+    } as never)
+    vi.mocked(fileService.createFiles).mockResolvedValueOnce({
+      success: true, message: '', data: [{ id: 'new-file', uploadUrl: 'https://s3.example.com/new-file' }],
+    } as never)
+    vi.mocked(uploadFileToS3).mockResolvedValueOnce(undefined)
+    vi.mocked(fileService.changeFileStatus).mockResolvedValueOnce({ success: true, message: '', data: {} } as never) // activate
+    vi.mocked(fileService.changeFileStatus).mockRejectedValueOnce(
+      Object.assign(new Error('Forbidden'), { isAxiosError: true, response: { status: 403, data: { message: 'Forbidden' } } }),
+    ) // deactivate old fails -> restore-failed path
+    vi.mocked(fileService.getFile).mockRejectedValueOnce(new Error('network')) // best-effort reconcile fails
+    vi.mocked(fileService.changeFileStatus).mockRejectedValueOnce(new Error('network')) // discard also ambiguous
+
+    renderHeader()
+    await waitFor(() => expect(screen.getByRole('button', { name: /change logo/i })).toBeEnabled())
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    await userEvent.upload(input, makeFile())
+
+    const longMessage = await screen.findByText(/couldn't replace the logo/i)
+    const logoColumn = screen.getByRole('button', { name: /change logo/i }).closest('.w-32')
+    expect(logoColumn).not.toBeNull()
+    expect(logoColumn?.contains(longMessage)).toBe(false)
+  })
+
+  it('a short in-progress caption stays in the compact column, not the second row', async () => {
+    const { fileService } = await import('@/lib/file/file.service')
+    const { uploadFileToS3 } = await import('@/lib/file/file.upload')
+    vi.mocked(fileService.searchFiles).mockResolvedValue(noLogo())
+    vi.mocked(fileService.createFiles).mockResolvedValueOnce({
+      success: true, message: '', data: [{ id: 'new-file', uploadUrl: 'https://s3.example.com/new-file' }],
+    } as never)
+    vi.mocked(uploadFileToS3).mockReturnValueOnce(new Promise(() => {})) // stay in 'uploading'
+
+    renderHeader()
+    await waitFor(() => expect(screen.getByRole('button', { name: /upload logo/i })).toBeEnabled())
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    await userEvent.upload(input, makeFile())
+
+    const caption = await screen.findByText(/^uploading…$/i)
+    const logoColumn = screen.getByRole('button', { name: /upload logo/i }).closest('.w-32')
+    expect(logoColumn?.contains(caption)).toBe(true)
+    // No second-row wrapper for short content.
+    expect(document.querySelector('.border-t.flex.flex-col')).not.toBeInTheDocument()
+  })
+
+  it('idle with no warnings renders no feedback-row wrapper at all', async () => {
+    const { fileService } = await import('@/lib/file/file.service')
+    vi.mocked(fileService.searchFiles).mockResolvedValue(noLogo())
+
+    renderHeader()
+    await waitFor(() => expect(screen.getByRole('button', { name: /upload logo/i })).toBeEnabled())
+
+    expect(document.querySelector('.border-t.flex.flex-col')).not.toBeInTheDocument()
+  })
+
+  it('upload in progress WITH a cleanup warning shows both the progress caption and the feedback row simultaneously', async () => {
+    const { fileService } = await import('@/lib/file/file.service')
+    const { uploadFileToS3 } = await import('@/lib/file/file.upload')
+    vi.mocked(fileService.searchFiles).mockResolvedValue(noLogo())
+    vi.mocked(fileService.createFiles).mockResolvedValue({
+      success: true, message: '', data: [{ id: 'draft-1', uploadUrl: 'https://s3.example.com/draft-1' }],
+    } as never)
+    vi.mocked(uploadFileToS3).mockRejectedValueOnce(new Error('boom'))
+
+    renderHeader()
+    await waitFor(() => expect(screen.getByRole('button', { name: /upload logo/i })).toBeEnabled())
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    await userEvent.upload(input, makeFile())
+    await waitFor(() => expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument())
+
+    vi.mocked(uploadFileToS3).mockRejectedValueOnce(new Error('boom again'))
+    await userEvent.click(screen.getByRole('button', { name: /try again/i }))
+    await waitFor(() => expect(screen.getByRole('button', { name: /start a new upload/i })).toBeInTheDocument())
+
+    // Restart: discard fails -> sticky-false cleanup warning; the fresh upload then stays pending.
+    vi.mocked(fileService.changeFileStatus).mockRejectedValueOnce(new Error('discard failed'))
+    vi.mocked(fileService.createFiles).mockResolvedValueOnce({
+      success: true, message: '', data: [{ id: 'draft-2', uploadUrl: 'https://s3.example.com/draft-2' }],
+    } as never)
+    vi.mocked(uploadFileToS3).mockReturnValueOnce(new Promise(() => {})) // stays 'uploading'
+
+    await userEvent.click(screen.getByRole('button', { name: /start a new upload/i }))
+    await userEvent.click(await screen.findByRole('button', { name: /^start new upload$/i }))
+
+    await waitFor(() => expect(screen.getByText(/^uploading…$/i)).toBeInTheDocument())
+    expect(screen.getByText(/previous draft upload couldn't be confirmed/i)).toBeInTheDocument()
+  })
+
+  it('done with a cleanup warning still visible after success', async () => {
+    const { fileService } = await import('@/lib/file/file.service')
+    const { uploadFileToS3 } = await import('@/lib/file/file.upload')
+    vi.mocked(fileService.searchFiles).mockResolvedValue(noLogo())
+    vi.mocked(fileService.createFiles).mockResolvedValue({
+      success: true, message: '', data: [{ id: 'draft-1', uploadUrl: 'https://s3.example.com/draft-1' }],
+    } as never)
+    vi.mocked(uploadFileToS3).mockRejectedValueOnce(new Error('boom'))
+
+    renderHeader()
+    await waitFor(() => expect(screen.getByRole('button', { name: /upload logo/i })).toBeEnabled())
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    await userEvent.upload(input, makeFile())
+    await waitFor(() => expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument())
+
+    vi.mocked(uploadFileToS3).mockRejectedValueOnce(new Error('boom again'))
+    await userEvent.click(screen.getByRole('button', { name: /try again/i }))
+    await waitFor(() => expect(screen.getByRole('button', { name: /start a new upload/i })).toBeInTheDocument())
+
+    // Restart: discard fails (sticky-false), but the fresh upload succeeds fully through to done.
+    vi.mocked(fileService.changeFileStatus).mockRejectedValueOnce(new Error('discard failed'))
+    vi.mocked(fileService.createFiles).mockResolvedValueOnce({
+      success: true, message: '', data: [{ id: 'draft-2', uploadUrl: 'https://s3.example.com/draft-2' }],
+    } as never)
+    vi.mocked(uploadFileToS3).mockResolvedValueOnce(undefined)
+    vi.mocked(fileService.changeFileStatus).mockResolvedValueOnce({ success: true, message: '', data: {} } as never) // activate
+    vi.mocked(fileService.linkFileToEntity).mockResolvedValueOnce({ success: true, message: '', data: {} } as never)
+
+    await userEvent.click(screen.getByRole('button', { name: /start a new upload/i }))
+    await userEvent.click(await screen.findByRole('button', { name: /^start new upload$/i }))
+
+    await waitFor(() => expect(fileService.linkFileToEntity).toHaveBeenCalledWith('draft-2', { entityId: 't-1' }))
+    expect(screen.getByText(/previous draft upload couldn't be confirmed/i)).toBeInTheDocument()
+  })
+
+  it('activate-not-uploaded still shows a working Retry (not a bare busy caption)', async () => {
+    const { fileService } = await import('@/lib/file/file.service')
+    const { uploadFileToS3 } = await import('@/lib/file/file.upload')
+    vi.mocked(fileService.searchFiles).mockResolvedValue(noLogo())
+    vi.mocked(fileService.createFiles).mockResolvedValueOnce({
+      success: true, message: '', data: [{ id: 'new-file', uploadUrl: 'https://s3.example.com/new-file' }],
+    } as never)
+    vi.mocked(uploadFileToS3).mockResolvedValueOnce(undefined)
+    vi.mocked(fileService.changeFileStatus).mockRejectedValueOnce(
+      Object.assign(new Error('Conflict'), {
+        isAxiosError: true,
+        response: { status: 409, data: { message: 'File has not been uploaded to storage yet' } },
+      }),
+    )
+
+    renderHeader()
+    await waitFor(() => expect(screen.getByRole('button', { name: /upload logo/i })).toBeEnabled())
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    await userEvent.upload(input, makeFile())
+
+    const retryButton = await screen.findByRole('button', { name: /retry/i })
+    expect(retryButton).toBeInTheDocument()
+
+    vi.mocked(uploadFileToS3).mockResolvedValueOnce(undefined)
+    vi.mocked(fileService.changeFileStatus).mockResolvedValueOnce({ success: true, message: '', data: {} } as never)
+    vi.mocked(fileService.linkFileToEntity).mockResolvedValueOnce({ success: true, message: '', data: {} } as never)
+    await userEvent.click(retryButton)
+
+    // Re-PUTs then re-activates — matches activate-not-uploaded's real recovery path.
+    await waitFor(() => expect(uploadFileToS3).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(fileService.linkFileToEntity).toHaveBeenCalled())
+  })
+
+  it('activate-uncertain still shows a working Retry (not a bare busy caption)', async () => {
+    const { fileService } = await import('@/lib/file/file.service')
+    const { uploadFileToS3 } = await import('@/lib/file/file.upload')
+    vi.mocked(fileService.searchFiles).mockResolvedValue(noLogo())
+    vi.mocked(fileService.createFiles).mockResolvedValueOnce({
+      success: true, message: '', data: [{ id: 'new-file', uploadUrl: 'https://s3.example.com/new-file' }],
+    } as never)
+    vi.mocked(uploadFileToS3).mockResolvedValueOnce(undefined)
+    vi.mocked(fileService.changeFileStatus).mockRejectedValueOnce(new Error('Network Error'))
+
+    renderHeader()
+    await waitFor(() => expect(screen.getByRole('button', { name: /upload logo/i })).toBeEnabled())
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    await userEvent.upload(input, makeFile())
+
+    const retryButton = await screen.findByRole('button', { name: /retry/i })
+    expect(retryButton).toBeInTheDocument()
+
+    // retry() from activate-uncertain reconciles via getFile() — active means it's already done.
+    vi.mocked(fileService.getFile).mockResolvedValueOnce({ success: true, message: '', data: { status: 'active' } } as never)
+    vi.mocked(fileService.linkFileToEntity).mockResolvedValueOnce({ success: true, message: '', data: {} } as never)
+    await userEvent.click(retryButton)
+
+    await waitFor(() => expect(fileService.getFile).toHaveBeenCalledWith('new-file'))
+    await waitFor(() => expect(fileService.linkFileToEntity).toHaveBeenCalled())
+  })
+
+  it('the sticky cleanup warning stays visible while cleaning-up-orphan is in flight', async () => {
+    // cleaning-up-orphan wraps the failure it's cleaning up in state.primary rather than carrying
+    // priorDraftCleanupConfirmed itself — this is the regression guard for that read-through.
+    const { fileService } = await import('@/lib/file/file.service')
+    const { uploadFileToS3 } = await import('@/lib/file/file.upload')
+    vi.mocked(fileService.searchFiles).mockResolvedValue(noLogo())
+    vi.mocked(fileService.createFiles).mockResolvedValue({
+      success: true, message: '', data: [{ id: 'draft-1', uploadUrl: 'https://s3.example.com/draft-1' }],
+    } as never)
+    vi.mocked(uploadFileToS3).mockRejectedValueOnce(new Error('boom'))
+
+    renderHeader()
+    await waitFor(() => expect(screen.getByRole('button', { name: /upload logo/i })).toBeEnabled())
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    await userEvent.upload(input, makeFile())
+    await waitFor(() => expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument())
+
+    vi.mocked(uploadFileToS3).mockRejectedValueOnce(new Error('boom again'))
+    await userEvent.click(screen.getByRole('button', { name: /try again/i }))
+    await waitFor(() => expect(screen.getByRole('button', { name: /start a new upload/i })).toBeInTheDocument())
+
+    // Restart: this draft's own discard fails (confirmed) -> priorDraftCleanupConfirmed becomes
+    // sticky-false, carried forward into the fresh upload that follows.
+    vi.mocked(fileService.changeFileStatus).mockRejectedValueOnce(
+      Object.assign(new Error('Bad Request'), { isAxiosError: true, response: { status: 400, data: { message: 'discard failed' } } }),
+    )
+    vi.mocked(fileService.createFiles).mockResolvedValueOnce({
+      success: true, message: '', data: [{ id: 'draft-2', uploadUrl: 'https://s3.example.com/draft-2' }],
+    } as never)
+    vi.mocked(uploadFileToS3).mockResolvedValueOnce(undefined)
+    vi.mocked(fileService.changeFileStatus).mockResolvedValueOnce({ success: true, message: '', data: {} } as never) // activate
+    // Plain link failure -> discardCandidate -> 'cleaning-up-orphan'; discard held open for the assertion below.
+    vi.mocked(fileService.linkFileToEntity).mockRejectedValueOnce(
+      Object.assign(new Error('Bad Request'), { isAxiosError: true, response: { status: 400, data: { message: 'link failed' } } }),
+    )
+    vi.mocked(fileService.changeFileStatus).mockReturnValueOnce(new Promise(() => {})) // this attempt's own discard, held open
+
+    await userEvent.click(screen.getByRole('button', { name: /start a new upload/i }))
+    await userEvent.click(await screen.findByRole('button', { name: /^start new upload$/i }))
+
+    await waitFor(() => expect(screen.getByText(/^cleaning up…$/i)).toBeInTheDocument())
+    expect(screen.getByText(/previous draft upload couldn't be confirmed/i)).toBeInTheDocument()
   })
 })

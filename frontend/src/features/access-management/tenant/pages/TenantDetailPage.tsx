@@ -1,16 +1,15 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { FiArrowLeft, FiDownload, FiEdit2, FiPlus } from 'react-icons/fi'
+import { FiArrowLeft, FiDownload, FiPlus } from 'react-icons/fi'
 import { useTenant } from '@/features/access-management/tenant/hooks/useTenant'
 import { useRole } from '@/features/access-management/role/hooks/useRole'
-import { ROLE_ROUTES } from '@/features/access-management/role/role.routes'
 import { useDivisions } from '@/features/crm/divisions/hooks/useDivisions'
 import { useDivisionsFilters } from '@/features/crm/divisions/hooks/useDivisionsFilters'
 import DivisionsFilterBar from '@/features/crm/divisions/components/DivisionsFilterBar'
 import DivisionsTable from '@/features/crm/divisions/components/DivisionsTable'
 import CreateDivisionModal from '@/features/crm/divisions/components/CreateDivisionModal'
 import EditTenantModal from '@/features/access-management/tenant/components/EditTenantModal'
-import TenantLogoUploader from '@/features/access-management/tenant/components/TenantLogoUploader'
+import TenantHeader from '@/features/access-management/tenant/components/TenantHeader'
 import EditContactModal from '@/features/contacts/components/EditContactModal'
 import { DIVISION_ROUTES } from '@/features/crm/divisions/divisions.routes'
 import { divisionService } from '@/features/crm/divisions/division.service'
@@ -18,8 +17,6 @@ import { downloadDivisionsCsv } from '@/features/crm/divisions/division.export'
 import { warnIfExportTruncated } from '@/utils/csvExport'
 import { usePermission } from '@/hooks/usePermission'
 import { TENANT_ROUTES } from '@/features/access-management/tenant/tenant.routes'
-import TenantTypeBadge from '@/features/access-management/tenant/components/TenantTypeBadge'
-import TenantStatusPill from '@/features/access-management/tenant/components/TenantStatusPill'
 import { Button } from '@/components/ui/button'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { toast } from '@/components/ui/sonner'
@@ -149,69 +146,17 @@ const TenantDetailPage = () => {
 
       {tenant && !isLoading && (
         <>
-          <div
-            className="rounded-xl border p-5 mb-5 flex items-start justify-between gap-3"
-            style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}
-          >
-            <div className="flex items-start gap-4 min-w-0">
-              <TenantLogoUploader tenantId={tenant.id} canManage={canManageTenant} />
-              <div className="min-w-0">
-                <div className="text-lg font-bold truncate" style={{ color: 'var(--qms-text)' }}>
-                  {tenant.name}
-                </div>
-                <div className="text-[13px] truncate mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-                  {tenant.code}
-                </div>
-                <div className="flex items-center gap-2">
-                  <TenantTypeBadge type={tenant.type} />
-                  <TenantStatusPill status={tenant.status} />
-                </div>
-                {tenant.owner && (
-                  <div className="text-[11px] mt-3" style={{ color: 'var(--qms-text-muted)' }}>
-                    Owner:{' '}
-                    {canViewRole ? (
-                      <button
-                        onClick={() => navigate(ROLE_ROUTES.ROLE_DETAIL.replace(':id', tenant.owner as string))}
-                        className="font-semibold underline underline-offset-2 hover:opacity-80"
-                        style={{ color: 'var(--qms-text-soft)' }}
-                      >
-                        {ownerName ?? (ownerUser?.email ?? tenant.owner)}
-                      </button>
-                    ) : (
-                      <span className="font-semibold" style={{ color: 'var(--qms-text-soft)' }}>
-                        {ownerName ?? tenant.owner}
-                      </span>
-                    )}
-                    {ownerEmailSuffix && <span className="ml-1.5">({ownerEmailSuffix})</span>}
-                  </div>
-                )}
-                {tenantAddress && (
-                  <div className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
-                    Address: <span className="font-semibold" style={{ color: 'var(--qms-text-soft)' }}>{tenantAddress}</span>
-                  </div>
-                )}
-                {tenant.businessLifetime != null && (
-                  <div className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
-                    Business lifetime: <span className="font-semibold" style={{ color: 'var(--qms-text-soft)' }}>{tenant.businessLifetime} year{tenant.businessLifetime === 1 ? '' : 's'}</span>
-                  </div>
-                )}
-                {tenant.gst && (
-                  <div className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
-                    GST: <span className="font-semibold" style={{ color: 'var(--qms-text-soft)' }}>{tenant.gst}</span>
-                  </div>
-                )}
-                {divisionPenetrationPct !== null && (
-                  <div className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
-                    Division Penetration: <span className="font-semibold" style={{ color: 'var(--qms-text-soft)' }}>{divisionPenetrationPct}%</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <Button variant="outline" size="sm" className="shrink-0" onClick={() => setEditOpen(true)}>
-              <FiEdit2 size={14} /> Edit client
-            </Button>
-          </div>
+          <TenantHeader
+            tenant={tenant}
+            canManageTenant={canManageTenant}
+            canViewRole={canViewRole}
+            ownerName={ownerName}
+            ownerUser={ownerUser}
+            ownerEmailSuffix={ownerEmailSuffix}
+            tenantAddress={tenantAddress}
+            divisionPenetrationPct={divisionPenetrationPct}
+            onEditClick={() => setEditOpen(true)}
+          />
 
           {canViewDivisions && (
             <div>

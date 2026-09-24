@@ -7,7 +7,7 @@ describe('StartOverUploadDialog', () => {
   it('renders the exact title and body copy when open', () => {
     render(<StartOverUploadDialog open onOpenChange={vi.fn()} onConfirm={vi.fn()} />)
     expect(screen.getByText('Start a new upload?')).toBeInTheDocument()
-    expect(screen.getByText("We'll discard this failed attempt and create a fresh upload link.")).toBeInTheDocument()
+    expect(screen.getByText("We'll attempt to discard this failed attempt and create a fresh upload link.")).toBeInTheDocument()
   })
 
   it('renders nothing when not open', () => {

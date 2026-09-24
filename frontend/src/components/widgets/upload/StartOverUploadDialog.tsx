@@ -16,7 +16,7 @@ const StartOverUploadDialog = ({ open, onOpenChange, onConfirm, isSubmitting }: 
       <DialogContent className="sm:max-w-sm">
         <DialogHeader><DialogTitle>Start a new upload?</DialogTitle></DialogHeader>
         <p className="text-[13px]" style={{ color: 'var(--qms-text-muted)' }}>
-          We'll discard this failed attempt and create a fresh upload link.
+          We'll attempt to discard this failed attempt and create a fresh upload link.
         </p>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>

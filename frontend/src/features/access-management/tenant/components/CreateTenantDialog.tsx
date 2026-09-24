@@ -1,102 +1,27 @@
 import { useState } from 'react'
-import { Controller, useForm } from 'react-hook-form'
+import { FormProvider, useForm } from 'react-hook-form'
 import { FiArrowLeft, FiPlus } from 'react-icons/fi'
 import { useNavigate } from 'react-router-dom'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import PasswordInput from '@/components/ui/PasswordInput'
-import { Label } from '@/components/ui/label'
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { useCreateTenant } from '@/features/access-management/tenant/hooks/useCreateTenant'
-import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
-import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRoleTypes'
-import { useRoles } from '@/features/access-management/role/hooks/useRoles'
-import { createTenantSchema } from '@/features/access-management/tenant/schemas/tenant.schemas'
-import type { CreateTenantPayload } from '@/types/accessManagement.types'
-import type { LocationValue } from '@/types/location.types'
-import { useReshapingResolver } from '@/hooks/useReshapingResolver'
-import { TENANT_ROUTES } from '@/features/access-management/tenant/tenant.routes'
-import { PLATFORM_TENANT_CODE, PLATFORM_TENANT_FETCH_LIMIT } from '@/features/access-management/accessManagement.constants'
-import LocationPicker from '@/components/widgets/location-picker/LocationPicker'
-import LocationAddressFields from '@/components/widgets/location-picker/LocationAddressFields'
+import { useTenantSalesRepPicker } from '@/features/access-management/tenant/hooks/useTenantSalesRepPicker'
+import { useCreateTenantLogoFlow } from '@/features/access-management/tenant/hooks/useCreateTenantLogoFlow'
+import { CREATE_TENANT_STEP_FIELD_NAMES, EMPTY_FORM_VALUES, useTenantFormResolver, type TenantFormValues } from '@/features/access-management/tenant/tenant.wizard'
 import type { LocationResolutionState } from '@/components/widgets/location-picker/location.types'
-import FieldErrorText from '@/components/ui/FieldErrorText'
-
-interface TenantFormValues {
-  code: string
-  name: string
-  salesPerson: string
-  ownerFirstName: string
-  ownerLastName: string
-  ownerEmail: string
-  ownerPassword: string
-  ownerPhone: string
-  ownerGender: '' | 'male' | 'female' | 'other'
-  address: LocationValue | null
-  businessLifetime: string
-  gst: string
-}
-
-const EMPTY_FORM_VALUES: TenantFormValues = {
-  code: '',
-  name: '',
-  salesPerson: '',
-  ownerFirstName: '',
-  ownerLastName: '',
-  ownerEmail: '',
-  ownerPassword: '',
-  ownerPhone: '',
-  ownerGender: '',
-  address: null,
-  businessLifetime: '',
-  gst: '',
-}
-
-const OWNER_FIELD_TO_FORM_FIELD: Record<string, keyof TenantFormValues> = {
-  firstName: 'ownerFirstName',
-  lastName: 'ownerLastName',
-  email: 'ownerEmail',
-  password: 'ownerPassword',
-  phone: 'ownerPhone',
-  gender: 'ownerGender',
-}
-
-// Optional end-to-end, unlike Camp where location is required for FO auto-allocation.
-const ADDRESS_FIELD_TO_FORM_FIELD: Record<string, keyof TenantFormValues> = {
-  addressLine1: 'address', addressLine2: 'address', locality: 'address',
-  city: 'address', state: 'address', country: 'address', pincode: 'address',
-  googlePlaceId: 'address', coordinates: 'address',
-}
-
-const useTenantFormResolver = () =>
-  useReshapingResolver<TenantFormValues, CreateTenantPayload>({
-    schema: createTenantSchema,
-    toPayload: (values) => ({
-      code: values.code,
-      name: values.name,
-      salesPerson: values.salesPerson,
-      owner: {
-        firstName: values.ownerFirstName,
-        lastName: values.ownerLastName || undefined,
-        email: values.ownerEmail,
-        password: values.ownerPassword,
-        phone: values.ownerPhone || undefined,
-        gender: values.ownerGender || undefined,
-      },
-      address: values.address ?? undefined,
-      businessLifetime: values.businessLifetime === '' ? undefined : Number(values.businessLifetime),
-      gst: values.gst || undefined,
-    }),
-    nestedFieldMaps: { owner: OWNER_FIELD_TO_FORM_FIELD, address: ADDRESS_FIELD_TO_FORM_FIELD },
-  })
+import { TENANT_ROUTES } from '@/features/access-management/tenant/tenant.routes'
+import { TenantWizardValidationProvider } from '@/features/access-management/tenant/components/wizard/TenantWizardValidationContext'
+import TenantBasicsStep from '@/features/access-management/tenant/components/wizard/TenantBasicsStep'
+import TenantLocationStep from '@/features/access-management/tenant/components/wizard/TenantLocationStep'
+import TenantOwnerStep from '@/features/access-management/tenant/components/wizard/TenantOwnerStep'
+import CreateTenantLogoFlow from '@/features/access-management/tenant/components/wizard/CreateTenantLogoFlow'
 
 const CreateTenantDialog = () => {
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState(0)
   // trigger() doesn't mark fields "touched", so a blind Next click on a
-  // blank step 1 wouldn't otherwise show errors for untouched fields.
-  const [step1Attempted, setStep1Attempted] = useState(false)
+  // blank step wouldn't otherwise show errors for untouched fields.
+  const [advanceAttempted, setAdvanceAttempted] = useState(false)
   // `address` (RHF field value) isn't authoritative while this is anything but
   // 'idle' — the pin can visibly move well before (or without ever) firing onChange.
   const [locationResolution, setLocationResolution] = useState<LocationResolutionState>('idle')
@@ -106,57 +31,48 @@ const CreateTenantDialog = () => {
   const createTenant = useCreateTenant()
   const { resolver, parsePayload } = useTenantFormResolver()
 
-  const {
-    register,
-    handleSubmit,
-    control,
-    reset,
-    trigger,
-    formState: { errors, touchedFields, isSubmitted },
-  } = useForm<TenantFormValues>({
+  const salesRepPicker = useTenantSalesRepPicker(open)
+
+  const logoFlow = useCreateTenantLogoFlow({
+    onDone: (tenantId) => {
+      resetAndClose()
+      navigate(TENANT_ROUTES.TENANT_DETAIL.replace(':id', tenantId))
+    },
+  })
+  const isPostCreateFlowActive = logoFlow.isPostCreateFlowActive
+
+  const methods = useForm<TenantFormValues>({
     resolver,
     mode: 'onChange',
     defaultValues: EMPTY_FORM_VALUES,
   })
-
-  // Queries only fire once the dropdown has been opened, not just whenever the dialog is open.
-  const [salesRepPickerOpened, setSalesRepPickerOpened] = useState(false)
-  const salesRepQueriesEnabled = open && salesRepPickerOpened
-
-  const { data: platformTenantData, isError: platformTenantErrored } = useTenants({ type: 'platform', status: 'active', limit: PLATFORM_TENANT_FETCH_LIMIT }, salesRepQueriesEnabled)
-  const platformTenant = platformTenantData?.data?.items.find((t) => t.type === 'platform' || t.code === PLATFORM_TENANT_CODE)
-
-  const { data: salesRepTypeData, isLoading: roleTypeLoading, isError: roleTypeErrored } = useRoleTypes({ code: 'sales-rep', status: 'active' }, salesRepQueriesEnabled)
-  const salesRepTypeId = salesRepTypeData?.data?.items[0]?.id
-
-  const { data: salesRepRoleData, isLoading: salesRepsLoading, isError: salesRepsErrored } = useRoles(
-    { tenant: platformTenant?.id, type: salesRepTypeId, status: 'active' },
-    salesRepQueriesEnabled && !!platformTenant && !!salesRepTypeId,
-  )
-  const salesReps = salesRepRoleData?.data?.items ?? []
-  const salesRepsBusy = roleTypeLoading || salesRepsLoading
-  const salesRepsErroredOut = platformTenantErrored || roleTypeErrored || salesRepsErrored
-
-  const fieldError = (field: keyof TenantFormValues) =>
-    (touchedFields[field] || isSubmitted || step1Attempted) ? errors[field]?.message : undefined
+  const { handleSubmit, reset, trigger } = methods
 
   const resetAndClose = () => {
     reset(EMPTY_FORM_VALUES)
     setStep(0)
-    setStep1Attempted(false)
-    setSalesRepPickerOpened(false)
+    setAdvanceAttempted(false)
+    salesRepPicker.setPickerOpened(false)
     setLocationResolution('idle')
     setLocationResolutionError(null)
     createTenant.reset()
+    logoFlow.reset()
     setOpen(false)
   }
 
-  const handleNext = async () => {
-    setStep1Attempted(true)
-    // address must validate here on step 0, where its error UI renders — step 1
-    // has no address UI, so an incomplete address would otherwise silently block submit.
-    const valid = await trigger(['code', 'name', 'salesPerson', 'address'])
+  // Step 0 -> 1: validate only the company-basics fields that render on step 0.
+  const handleNextFromBasics = async () => {
+    setAdvanceAttempted(true)
+    const valid = await trigger(CREATE_TENANT_STEP_FIELD_NAMES[0])
     if (valid) setStep(1)
+  }
+
+  // Step 1 -> 2: validate address here, where its error UI now renders — step 2 (owner account)
+  // has no address UI, so an incomplete address would otherwise silently block submit.
+  const handleNextFromLocation = async () => {
+    setAdvanceAttempted(true)
+    const valid = await trigger(CREATE_TENANT_STEP_FIELD_NAMES[1])
+    if (valid) setStep(2)
   }
 
   const onSubmit = async (values: TenantFormValues) => {
@@ -172,16 +88,21 @@ const CreateTenantDialog = () => {
     const payload = await parsePayload(values)
     createTenant.mutate(payload, {
       onSuccess: (res) => {
-        resetAndClose()
-        if (res.data?.id) {
+        if (!res.data?.id) return
+        if (!logoFlow.pickedLogoFile) {
+          resetAndClose()
           navigate(TENANT_ROUTES.TENANT_DETAIL.replace(':id', res.data.id))
+          return
         }
+        // Logo picked — don't close/navigate yet; the guarded effect inside useCreateTenantLogoFlow
+        // starts the upload once it re-renders with this id, and finish happens once that flow ends.
+        logoFlow.startForTenant(res.data.id)
       },
     })
   }
 
   return (
-    <Dialog open={open} onOpenChange={(next) => (next ? setOpen(true) : resetAndClose())}>
+    <Dialog open={open} onOpenChange={(next) => (next ? setOpen(true) : (isPostCreateFlowActive ? undefined : resetAndClose()))}>
       <Button
         onClick={() => setOpen(true)}
         className="text-white shrink-0"
@@ -194,190 +115,86 @@ const CreateTenantDialog = () => {
         <DialogHeader>
           <DialogTitle>Create company</DialogTitle>
           <DialogDescription>
-            {step === 0 ? 'Step 1 of 2 — company details.' : 'Step 2 of 2 — registers the company’s initial admin user.'}
+            {isPostCreateFlowActive
+              ? 'The company was created — attaching the logo you selected.'
+              : step === 0
+                ? 'Step 1 of 3 — company details.'
+                : step === 1
+                  ? 'Step 2 of 3 — company location.'
+                  : 'Step 3 of 3 — registers the company’s initial admin user.'}
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} noValidate>
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
-            {step === 0 && (
-              <div>
-                <h3 className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-                  Company details
-                </h3>
-                <div className="space-y-3">
-                  <div>
-                    <Label htmlFor="tenantCode" className="text-xs mb-1.5">
-                      Code *
-                    </Label>
-                    <Input id="tenantCode" type="text" placeholder="e.g. acme-pharma" {...register('code')} />
-                    {fieldError('code') && <p className="text-[11px] mt-1 text-danger">{fieldError('code')}</p>}
-                  </div>
-                  <div>
-                    <Label htmlFor="tenantName" className="text-xs mb-1.5">
-                      Name *
-                    </Label>
-                    <Input id="tenantName" type="text" placeholder="e.g. Acme Pharma" {...register('name')} />
-                    {fieldError('name') && <p className="text-[11px] mt-1 text-danger">{fieldError('name')}</p>}
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label htmlFor="businessLifetime" className="text-xs mb-1.5">
-                        Business lifetime (years)
-                      </Label>
-                      <Input id="businessLifetime" type="number" placeholder="Optional" {...register('businessLifetime')} />
-                      {fieldError('businessLifetime') && <p className="text-[11px] mt-1 text-danger">{fieldError('businessLifetime')}</p>}
-                    </div>
-                    <div>
-                      <Label htmlFor="gst" className="text-xs mb-1.5">
-                        GST number
-                      </Label>
-                      <Input id="gst" type="text" placeholder="27AAPFU0939F1ZV" {...register('gst')} />
-                      {fieldError('gst') && <p className="text-[11px] mt-1 text-danger">{fieldError('gst')}</p>}
-                    </div>
-                  </div>
-                  <div>
-                    <Label htmlFor="salesPerson" className="text-xs mb-1.5">
-                      Sales rep *
-                    </Label>
-                    <Controller
-                      control={control}
-                      name="salesPerson"
-                      render={({ field }) => (
-                        <Select
-                          key={field.value || 'empty'}
-                          value={field.value || undefined}
-                          onValueChange={field.onChange}
-                          onOpenChange={(next) => next && setSalesRepPickerOpened(true)}
-                        >
-                          <SelectTrigger id="salesPerson" className="w-full">
-                            <SelectValue placeholder={salesRepsBusy ? 'Loading...' : 'Select sales rep...'}>
-                              {(v: string) => {
-                                const r = salesReps.find((role) => role.id === v)
-                                return r ? `${r.name} (${r.code})` : salesRepsBusy ? 'Loading...' : 'Select sales rep...'
-                              }}
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {salesReps.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                    {fieldError('salesPerson') && <p className="text-[11px] mt-1 text-danger">{fieldError('salesPerson')}</p>}
-                    {salesRepPickerOpened && salesRepsErroredOut && (
-                      <p className="text-[11px] mt-1 text-danger">Couldn't load sales reps — try again.</p>
-                    )}
-                    {salesRepPickerOpened && !salesRepsErroredOut && !salesRepsBusy && !platformTenant && (
-                      <p className="text-[11px] mt-1 text-danger">No QMS internal (platform) company found — a sales rep must belong to one.</p>
-                    )}
-                  </div>
-                  <div>
-                    <Label className="text-xs mb-1.5">
-                      Address (optional)
-                    </Label>
-                    <Controller
-                      control={control}
-                      name="address"
-                      render={({ field }) => (
-                        <div className="space-y-2">
-                          <LocationPicker
-                            value={field.value}
-                            onChange={field.onChange}
-                            onResolutionStateChange={setLocationResolution}
-                            onLocationHintChange={setLocationHint}
-                            defaultCountry="India"
-                            countryCode="IN"
-                          />
-                          <LocationAddressFields value={field.value} onChange={field.onChange} defaultCountry="India" locationHint={locationHint} />
-                        </div>
-                      )}
-                    />
-                    {fieldError('address') && <FieldErrorText message={fieldError('address')!} />}
-                  </div>
-                </div>
-              </div>
-            )}
+        <FormProvider {...methods}>
+          <TenantWizardValidationProvider value={{ advanceAttempted }}>
+            <form onSubmit={handleSubmit(onSubmit)} noValidate>
+              <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+                {!isPostCreateFlowActive && step === 0 && (
+                  <TenantBasicsStep salesRepPicker={salesRepPicker} logoFlow={logoFlow} />
+                )}
 
-            {step === 1 && (
-              <div>
-                <h3 className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-                  Owner account
-                </h3>
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label htmlFor="ownerFirstName" className="text-xs mb-1.5">
-                        First name *
-                      </Label>
-                      <Input id="ownerFirstName" type="text" {...register('ownerFirstName')} />
-                      {fieldError('ownerFirstName') && <p className="text-[11px] mt-1 text-danger">{fieldError('ownerFirstName')}</p>}
-                    </div>
-                    <div>
-                      <Label htmlFor="ownerLastName" className="text-xs mb-1.5">
-                        Last name
-                      </Label>
-                      <Input id="ownerLastName" type="text" {...register('ownerLastName')} />
-                    </div>
-                  </div>
-                  <div>
-                    <Label htmlFor="ownerEmail" className="text-xs mb-1.5">
-                      Email *
-                    </Label>
-                    <Input id="ownerEmail" type="email" autoComplete="off" {...register('ownerEmail')} />
-                    {fieldError('ownerEmail') && <p className="text-[11px] mt-1 text-danger">{fieldError('ownerEmail')}</p>}
-                  </div>
-                  <div>
-                    <Label htmlFor="ownerPassword" className="text-xs mb-1.5">
-                      Password *
-                    </Label>
-                    <PasswordInput id="ownerPassword" autoComplete="new-password" {...register('ownerPassword')} />
-                    {fieldError('ownerPassword') && <p className="text-[11px] mt-1 text-danger">{fieldError('ownerPassword')}</p>}
-                  </div>
-                  <div>
-                    <Label htmlFor="ownerPhone" className="text-xs mb-1.5">
-                      Phone
-                    </Label>
-                    <Input id="ownerPhone" type="text" placeholder="Optional" {...register('ownerPhone')} />
-                  </div>
-                </div>
-              </div>
-            )}
+                {!isPostCreateFlowActive && step === 1 && (
+                  <TenantLocationStep
+                    setLocationResolution={setLocationResolution}
+                    locationHint={locationHint}
+                    setLocationHint={setLocationHint}
+                  />
+                )}
 
-            {createTenant.isError && (
-              <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
-                {(createTenant.error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-                  'Failed to create company. Please try again.'}
-              </div>
-            )}
+                {!isPostCreateFlowActive && step === 2 && <TenantOwnerStep />}
 
-            {locationResolutionError && (
-              <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
-                {locationResolutionError}
-              </div>
-            )}
-          </div>
+                {isPostCreateFlowActive && <CreateTenantLogoFlow flow={logoFlow} variant="status" />}
 
-          <DialogFooter className="mt-4">
-            {step === 0 ? (
-              <>
-                <Button type="button" variant="outline" onClick={resetAndClose} disabled={createTenant.isPending}>
-                  Cancel
-                </Button>
-                <Button type="button" onClick={handleNext}>Next</Button>
-              </>
-            ) : (
-              <>
-                <Button type="button" variant="outline" onClick={() => setStep(0)} disabled={createTenant.isPending}>
-                  <FiArrowLeft size={14} /> Back
-                </Button>
-                <Button type="submit" disabled={createTenant.isPending || locationResolution === 'loading'}>
-                  {createTenant.isPending ? 'Creating…' : locationResolution === 'loading' ? 'Resolving location…' : 'Create company'}
-                </Button>
-              </>
-            )}
-          </DialogFooter>
-        </form>
+                {createTenant.isError && (
+                  <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
+                    {(createTenant.error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+                      'Failed to create company. Please try again.'}
+                  </div>
+                )}
+
+                {locationResolutionError && (
+                  <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
+                    {locationResolutionError}
+                  </div>
+                )}
+              </div>
+
+              {/* No footer during the post-create logo flow — its own actions live inline above instead. */}
+              {!isPostCreateFlowActive && (
+                <DialogFooter className="mt-4">
+                  {step === 0 && (
+                    <>
+                      <Button type="button" variant="outline" onClick={resetAndClose} disabled={createTenant.isPending}>
+                        Cancel
+                      </Button>
+                      <Button type="button" onClick={handleNextFromBasics}>Next</Button>
+                    </>
+                  )}
+                  {step === 1 && (
+                    <>
+                      <Button type="button" variant="outline" onClick={() => setStep(0)} disabled={createTenant.isPending}>
+                        <FiArrowLeft size={14} /> Back
+                      </Button>
+                      <Button type="button" onClick={handleNextFromLocation} disabled={locationResolution === 'loading'}>
+                        {locationResolution === 'loading' ? 'Resolving location…' : 'Next'}
+                      </Button>
+                    </>
+                  )}
+                  {step === 2 && (
+                    <>
+                      <Button type="button" variant="outline" onClick={() => setStep(1)} disabled={createTenant.isPending}>
+                        <FiArrowLeft size={14} /> Back
+                      </Button>
+                      <Button type="submit" disabled={createTenant.isPending || locationResolution === 'loading'}>
+                        {createTenant.isPending ? 'Creating…' : locationResolution === 'loading' ? 'Resolving location…' : 'Create company'}
+                      </Button>
+                    </>
+                  )}
+                </DialogFooter>
+              )}
+            </form>
+          </TenantWizardValidationProvider>
+        </FormProvider>
       </DialogContent>
     </Dialog>
   )

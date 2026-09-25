@@ -7,11 +7,12 @@ import { DIVISION_THERAPY_LABEL } from '@/types/crm.types'
 import DivisionMrsSection from '@/features/crm/divisions/components/DivisionMrsSection'
 import DivisionBrandsSection from '@/features/crm/brands/components/DivisionBrandsSection'
 import DivisionContactsSection from '@/features/crm/divisions/components/DivisionContactsSection'
+import DivisionDoctorsSection from '@/features/crm/divisions/components/DivisionDoctorsSection'
 import EditDivisionModal from '@/features/crm/divisions/components/EditDivisionModal'
 import { Button } from '@/components/ui/button'
 import { unwrapId } from '@/utils/unwrapId'
 
-type DivisionDetailView = 'mrs' | 'brands' | 'contacts'
+type DivisionDetailView = 'mrs' | 'brands' | 'contacts' | 'doctors'
 
 const DivisionDetailPage = () => {
   const { id } = useParams<{ id: string }>()
@@ -94,6 +95,7 @@ const DivisionDetailPage = () => {
               { key: 'mrs', label: 'MRs' },
               { key: 'brands', label: 'Brands' },
               { key: 'contacts', label: 'Contacts' },
+              { key: 'doctors', label: 'Doctors' },
             ] as const).map(({ key, label }) => (
               <button
                 key={key}
@@ -117,6 +119,7 @@ const DivisionDetailPage = () => {
             {tenantId && view === 'mrs' && <DivisionMrsSection tenantId={tenantId} divisionId={division.id} />}
             {tenantId && view === 'brands' && <DivisionBrandsSection tenantId={tenantId} divisionId={division.id} />}
             {tenantId && view === 'contacts' && <DivisionContactsSection tenantId={tenantId} divisionId={division.id} />}
+            {tenantId && view === 'doctors' && <DivisionDoctorsSection tenantId={tenantId} divisionId={division.id} />}
           </div>
 
           {editOpen && <EditDivisionModal division={division} onClose={() => setEditOpen(false)} />}

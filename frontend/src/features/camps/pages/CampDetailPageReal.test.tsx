@@ -160,7 +160,7 @@ async function mockProjectWithDivision() {
 }
 
 async function pickProject(user: ReturnType<typeof userEvent.setup>) {
-  const projectInput = await screen.findByPlaceholderText(/search project by name/i)
+  const projectInput = await screen.findByPlaceholderText(/search or browse projects/i)
   await user.type(projectInput, 'Cipla')
   await user.click(await screen.findByText(/cipla project/i, {}, { timeout: 3000 }))
 }
@@ -484,7 +484,7 @@ describe('CampDetailPageReal — Division/Project field interplay', () => {
     await pickDivision(user, 'Oncology')
 
     expect(screen.queryByText(/cipla project cardio/i)).not.toBeInTheDocument()
-    expect(screen.getByPlaceholderText(/search project by name/i)).toBeInTheDocument()
+    expect(screen.getByPlaceholderText(/search or browse projects/i)).toBeInTheDocument()
     // Doctor is cleared but re-scoped to the NEW division — a live search box, not the no-division placeholder.
     expect(screen.queryByText(/dr\. cardio doe/i)).not.toBeInTheDocument()
     expect(screen.getByPlaceholderText(/search doctor by name/i)).toBeInTheDocument()
@@ -522,7 +522,7 @@ describe('CampDetailPageReal — Division/Project field interplay', () => {
     const divisionLabel = screen.getByText(/^Division \*/i)
     const divisionTrigger = divisionLabel.parentElement!.querySelector('[role="combobox"]')!
     expect(divisionTrigger).toHaveTextContent(/cardiology/i)
-    expect(screen.getByPlaceholderText(/search project by name/i)).toBeInTheDocument()
+    expect(screen.getByPlaceholderText(/search or browse projects/i)).toBeInTheDocument()
   })
 })
 
@@ -610,7 +610,7 @@ describe('CampDetailPageReal — create mode, MR/FO pickers', () => {
   }
 
   async function pickProject(user: ReturnType<typeof userEvent.setup>) {
-    const projectInput = await screen.findByPlaceholderText(/search project by name/i)
+    const projectInput = await screen.findByPlaceholderText(/search or browse projects/i)
     await user.type(projectInput, 'Cipla')
     await user.click(await screen.findByText(/cipla project/i, {}, { timeout: 3000 }))
   }

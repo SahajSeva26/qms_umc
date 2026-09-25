@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { addMonths } from 'date-fns'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { useReshapingResolver } from '@/hooks/useReshapingResolver'
 import { bookCampPayloadSchema, type BookCampFormPayload } from '@/features/pharma/schemas/bookCamp.schemas'
@@ -192,7 +193,9 @@ const BookCampForm = ({ needsMrPicker, type, project, onBooked, onCancel }: Book
     }
   })()
 
-  const availabilityQuery = useMonthAvailability(availabilityBasePayload, month)
+  // The calendar shows two months side by side — both must be fetched, or the second (unfetched)
+  // one renders all-unavailable by default (no entry in `dates` reads the same as `available: false`).
+  const availabilityQuery = useMonthAvailability(availabilityBasePayload, [month, addMonths(month, 1)])
   const availability = availabilityQuery.dates
 
   // Changing the displayed month invalidates any date/slot picked in a

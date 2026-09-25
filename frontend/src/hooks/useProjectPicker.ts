@@ -30,7 +30,6 @@ function mergeById(existing: ProjectEntity[], incoming: ProjectEntity[]): Projec
 
 export const useProjectPicker = (name: string, tenant: string | undefined, division: string | undefined, enabled: boolean) => {
   const debouncedName = useDebouncedValue(name, 300)
-  const hasQuery = debouncedName.trim().length > 0
   const [page, setPage] = useState(1)
   // Accumulation is keyed by query+tenant+division together — changing any of them resets pagination.
   const key = `${debouncedName}::${tenant ?? ''}::${division ?? ''}`
@@ -55,7 +54,7 @@ export const useProjectPicker = (name: string, tenant: string | undefined, divis
     projectKeys,
     (q) => projectsService.searchProjects(q),
     query,
-    { enabled: enabled && hasQuery && !!tenant && !!division },
+    { enabled: enabled && !!tenant && !!division },
   )
 
   if (data && accumulated.key === key && accumulated.consumedResponse !== data) {

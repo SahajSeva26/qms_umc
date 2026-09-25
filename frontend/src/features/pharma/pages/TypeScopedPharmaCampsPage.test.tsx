@@ -145,10 +145,11 @@ async function fillAndSubmitBookCampForm(user: ReturnType<typeof userEvent.setup
   await user.click(doctorOption)
   await user.click(screen.getByRole('button', { name: /^next$/i }))
 
-  // Step 3 — when & details: today is the only mocked-available day.
+  // Step 3 — today is the only mocked-available day. With two months now visible, today's digit
+  // can match twice — index 0 is always today's own (first) month, never ambiguous here.
   const today = new Date()
-  const todayCell = await screen.findByRole('gridcell', { name: String(today.getDate()) })
-  await user.click(todayCell.querySelector('button')!)
+  const todayCells = await screen.findAllByRole('gridcell', { name: String(today.getDate()) })
+  await user.click(todayCells[0].querySelector('button')!)
   await user.click(await screen.findByRole('button', { name: /9 AM – 1 PM/i }))
 
   await user.click(screen.getByRole('button', { name: /^book camp$/i }))

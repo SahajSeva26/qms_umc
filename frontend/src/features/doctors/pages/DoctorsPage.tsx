@@ -103,10 +103,18 @@ const DoctorsPage = () => {
     setTab('roster')
   }
 
-  const handleGoToRosterWithCity = (city: string) => {
+  // Bumped on every jump so StateCityFilter (remounted via this key) re-seeds even when the
+  // same city/state is clicked twice in a row.
+  const [geographySeedKey, setGeographySeedKey] = useState(0)
+  const [geographySeed, setGeographySeed] = useState<{ city: string; state: string } | null>(null)
+
+  const handleGoToRosterWithCityState = (city: string, state: string) => {
     setFilter('city', city)
+    setFilter('state', state)
     resetToFirstPage()
     setTab('roster')
+    setGeographySeed({ city, state })
+    setGeographySeedKey((k) => k + 1)
   }
 
   return (
@@ -167,6 +175,8 @@ const DoctorsPage = () => {
               setFilter={handleFilterChange}
               reset={handleReset}
               onOpenDoctor={setOpenDoctorId}
+              geographySeedKey={geographySeedKey}
+              geographySeed={geographySeed}
             />
             <PaginationControls page={page} totalPages={totalPages(totalCount)} onPageChange={setPage} />
           </>
@@ -177,7 +187,7 @@ const DoctorsPage = () => {
         )}
 
         {tab === 'geography' && (
-          <GeographyTab doctors={activeDoctors} onSelectCity={handleGoToRosterWithCity} />
+          <GeographyTab doctors={activeDoctors} onSelectCityState={handleGoToRosterWithCityState} />
         )}
 
         {tab === 'inactive' && (

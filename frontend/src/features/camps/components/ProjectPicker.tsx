@@ -22,7 +22,7 @@ const projectLabel = (project: ProjectEntity) => `${project.name} (${project.cod
 const searchPlaceholder = (tenant: string | undefined, division: string | undefined) => {
   if (!tenant) return 'Select a company first'
   if (!division) return 'Select a division first'
-  return 'Search project by name…'
+  return 'Search or browse projects…'
 }
 
 const ProjectPicker = ({ value, label, tenant, division, onChange, onClear }: ProjectPickerProps) => {
@@ -61,7 +61,10 @@ const ProjectPicker = ({ value, label, tenant, division, onChange, onClear }: Pr
       getLabel={projectLabel}
       searchPlaceholder={searchPlaceholder(tenant, division)}
       clearAriaLabel="Clear selected project"
-      emptyQueryText={tenant && division ? 'Start typing to search projects.' : undefined}
+      // Must be unset (not just reworded) once tenant+division are set, or it permanently masks
+      // the real emptyResultsText once the browse-all fetch confirms zero projects.
+      emptyQueryText={tenant && division ? undefined : 'Start typing to search projects.'}
+      emptyResultsText="No projects found under this division."
       noResultsText="No matching projects found."
       renderResult={(p) => <>{projectLabel(p)}</>}
       isError={!!error}

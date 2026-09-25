@@ -161,6 +161,63 @@ describe('usePlacesAutocomplete', () => {
     await waitFor(() => expect(sessionTokenCtor).toHaveBeenCalledTimes(2))
   })
 
+  it('passes includedPrimaryTypes/locationRestriction through to fetchAutocompleteSuggestions when supplied', async () => {
+    fetchAutocompleteSuggestions.mockResolvedValue({ suggestions: [] })
+    const restriction = { south: 1, west: 2, north: 3, east: 4 } as unknown as google.maps.LatLngBoundsLiteral
+    renderHook(() =>
+      usePlacesAutocomplete({
+        input: 'Maharashtra',
+        onSelected: vi.fn(),
+        includedPrimaryTypes: ['administrative_area_level_1'],
+        locationRestriction: restriction,
+      }),
+    )
+
+    await waitFor(() => expect(fetchAutocompleteSuggestions).toHaveBeenCalled())
+    expect(fetchAutocompleteSuggestions).toHaveBeenCalledWith(
+      expect.objectContaining({ includedPrimaryTypes: ['administrative_area_level_1'], locationRestriction: restriction }),
+    )
+  })
+
+  it('re-fetches when only includedPrimaryTypes/locationRestriction change and input stays the same', async () => {
+    fetchAutocompleteSuggestions.mockResolvedValue({ suggestions: [] })
+    const { rerender } = renderHook(
+      ({ locationRestriction }) => usePlacesAutocomplete({ input: 'Pune', onSelected: vi.fn(), locationRestriction }),
+      { initialProps: { locationRestriction: null as google.maps.places.LocationRestriction | null } },
+    )
+    await waitFor(() => expect(fetchAutocompleteSuggestions).toHaveBeenCalledTimes(1))
+
+    const newRestriction = { south: 5, west: 6, north: 7, east: 8 } as unknown as google.maps.LatLngBoundsLiteral
+    rerender({ locationRestriction: newRestriction })
+    await waitFor(() => expect(fetchAutocompleteSuggestions).toHaveBeenCalledTimes(2))
+  })
+
+  it('selecting a suggestion fires onSelectedDetails with types/viewport when the caller supplies it', async () => {
+    const onSelectedDetails = vi.fn()
+    fetchAutocompleteSuggestions.mockResolvedValue({ suggestions: [] })
+    const { result } = renderHook(() =>
+      usePlacesAutocomplete({ input: '', onSelected: vi.fn(), onSelectedDetails }),
+    )
+
+    const viewport = { toString: () => 'viewport' } as unknown as google.maps.LatLngBounds
+    const suggestion = makeSuggestion('p1', 'Maharashtra', {
+      place: {
+        id: 'p1',
+        addressComponents: [],
+        location: { lat: () => 19.75, lng: () => 75.71 },
+        viewport,
+        types: ['administrative_area_level_1', 'political'],
+      },
+    })
+    await act(async () => {
+      await result.current.selectSuggestion(suggestion)
+    })
+
+    expect(onSelectedDetails).toHaveBeenCalledWith(
+      expect.objectContaining({ types: ['administrative_area_level_1', 'political'], viewport }),
+    )
+  })
+
   it('ignores a second selection attempt while the first is still in flight', async () => {
     const onSelected = vi.fn()
     let resolveFetchFields!: (v: { place: unknown }) => void

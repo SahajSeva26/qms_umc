@@ -9,6 +9,7 @@ import RouteFallback from './RouteFallback'
 import SessionLoading from './SessionLoading'
 import SessionRecovery from './SessionRecovery'
 import FeedbackWidget from '@/features/qa-feedback/components/FeedbackWidget'
+import GoogleMapsProvider from '@/components/widgets/location-picker/GoogleMapsProvider'
 
 const SB_INTENT_KEY = 'qms.sb.intent'
 
@@ -73,34 +74,36 @@ const AppLayout = () => {
   }
 
   return (
-    <div className="app-bg flex h-dvh overflow-hidden">
-      <div className="hidden lg:flex shrink-0">
-        <Sidebar collapsed={collapsed} onToggle={handleToggle} />
+    <GoogleMapsProvider>
+      <div className="app-bg flex h-dvh overflow-hidden">
+        <div className="hidden lg:flex shrink-0">
+          <Sidebar collapsed={collapsed} onToggle={handleToggle} />
+        </div>
+
+        {mobileOpen && (
+          <>
+            <div
+              className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm lg:hidden"
+              onClick={() => setMobileOpen(false)}
+            />
+            <div className="fixed inset-y-0 left-0 z-50 lg:hidden">
+              <Sidebar collapsed={false} onToggle={() => setMobileOpen(false)} />
+            </div>
+          </>
+        )}
+
+        <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+          <Topbar onMobileMenuToggle={() => setMobileOpen((v) => !v)} />
+          <main className="flex-1 overflow-auto p-6">
+            <Suspense fallback={<RouteFallback />}>
+              <Outlet />
+            </Suspense>
+          </main>
+        </div>
+
+        <FeedbackWidget />
       </div>
-
-      {mobileOpen && (
-        <>
-          <div
-            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm lg:hidden"
-            onClick={() => setMobileOpen(false)}
-          />
-          <div className="fixed inset-y-0 left-0 z-50 lg:hidden">
-            <Sidebar collapsed={false} onToggle={() => setMobileOpen(false)} />
-          </div>
-        </>
-      )}
-
-      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-        <Topbar onMobileMenuToggle={() => setMobileOpen((v) => !v)} />
-        <main className="flex-1 overflow-auto p-6">
-          <Suspense fallback={<RouteFallback />}>
-            <Outlet />
-          </Suspense>
-        </main>
-      </div>
-
-      <FeedbackWidget />
-    </div>
+    </GoogleMapsProvider>
   )
 }
 

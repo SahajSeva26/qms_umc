@@ -210,10 +210,11 @@ async function completeStep3(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: /^next$/i }))
 }
 
-// Step 3: pick today's date (the only mocked-available day) then its first slot.
+// Step 3: pick today's date (the only mocked-available day) then its first slot. With two months
+// now visible, today's digit can match twice — index 0 is always today's own (first) month.
 async function pickDateAndSlot(user: ReturnType<typeof userEvent.setup>) {
-  const todayCell = await screen.findByRole('gridcell', { name: String(startOfToday().getDate()) })
-  const todayBtn = todayCell.querySelector('button')!
+  const todayCells = await screen.findAllByRole('gridcell', { name: String(startOfToday().getDate()) })
+  const todayBtn = todayCells[0].querySelector('button')!
   await user.click(todayBtn)
   const slotPill = await screen.findByRole('button', { name: /9 AM – 1 PM/i })
   await user.click(slotPill)
@@ -439,8 +440,8 @@ describe('BookCampForm — step 3 (when & details) and submit', () => {
     await completeStep2(user)
     await completeStep3(user)
 
-    const todayCell = await screen.findByRole('gridcell', { name: String(startOfToday().getDate()) })
-    await user.click(todayCell.querySelector('button')!)
+    const todayCells = await screen.findAllByRole('gridcell', { name: String(startOfToday().getDate()) })
+    await user.click(todayCells[0].querySelector('button')!)
 
     expect(await screen.findByRole('button', { name: /9 AM – 1 PM/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /10 AM – 2 PM/i })).toBeInTheDocument()

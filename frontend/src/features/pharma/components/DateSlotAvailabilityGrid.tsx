@@ -45,9 +45,20 @@ const DateSlotAvailabilityGrid = ({
         Date &amp; time slot *
       </p>
 
+      <div className="flex items-center gap-4 mb-2 text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>
+        <span className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-success-soft" /> At least one FO available
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-danger-soft" /> No field officer available
+        </span>
+      </div>
+
       <Calendar
         mode="single"
         required
+        numberOfMonths={2}
+        pagedNavigation
         showOutsideDays={false}
         selected={selectedDate ? new Date(`${selectedDate}T00:00:00`) : undefined}
         onSelect={(date) => onDateSelect(format(date, 'yyyy-MM-dd'))}

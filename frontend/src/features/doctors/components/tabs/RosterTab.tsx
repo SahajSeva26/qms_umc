@@ -10,11 +10,21 @@ interface RosterTabProps {
   setFilter: <K extends keyof DoctorsFilterState>(key: K, value: DoctorsFilterState[K]) => void
   reset: () => void
   onOpenDoctor: (id: string) => void
+  /** From the Geography tab's "jump to roster" action — bumped on every jump so the filter bar's
+   * StateCityFilter remounts and re-seeds, even for the same city/state clicked twice in a row. */
+  geographySeedKey?: number
+  geographySeed?: { city: string; state: string } | null
 }
 
-const RosterTab = ({ doctors, filters, setFilter, reset, onOpenDoctor }: RosterTabProps) => (
+const RosterTab = ({ doctors, filters, setFilter, reset, onOpenDoctor, geographySeedKey, geographySeed }: RosterTabProps) => (
   <div>
-    <DoctorFilterBar filters={filters} setFilter={setFilter} reset={reset} />
+    <DoctorFilterBar
+      filters={filters}
+      setFilter={setFilter}
+      reset={reset}
+      geographySeedKey={geographySeedKey}
+      geographySeed={geographySeed}
+    />
 
     <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
       {doctors.map((d) => (

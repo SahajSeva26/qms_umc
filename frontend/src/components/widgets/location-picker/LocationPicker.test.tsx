@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { APIProviderContext } from '@vis.gl/react-google-maps'
 import LocationPicker from './LocationPicker'
 import LocationAddressFields from './LocationAddressFields'
 import ENV from '@/config/env'
@@ -9,6 +10,10 @@ import type { LocationValue } from '@/types/location.types'
 
 // APIProvider throws if mounted with no credentials, so a regression removing
 // the no-credentials guard fails loudly here instead of rendering blank.
+//
+// LocationPicker no longer mounts its own APIProvider (a shared one lives at AppLayout) — these
+// tests simulate "a provider exists somewhere above" by rendering a real APIProviderContext.Provider
+// whenever mockLoadingStatus() is non-null, mirroring what the shared provider would do.
 const { mockLoadingStatus, setMockLoadingStatus } = vi.hoisted(() => {
   let status: string | null = null
   return {
@@ -17,16 +22,24 @@ const { mockLoadingStatus, setMockLoadingStatus } = vi.hoisted(() => {
   }
 })
 
-vi.mock('@vis.gl/react-google-maps', () => ({
-  APIProvider: ({ children }: { children: React.ReactNode }) => {
-    if (mockLoadingStatus() === null) {
-      throw new Error('APIProvider must never mount when credentials are missing')
-    }
-    return <>{children}</>
-  },
-  useApiLoadingStatus: () => mockLoadingStatus(),
-  APILoadingStatus: { FAILED: 'FAILED', AUTH_FAILURE: 'AUTH_FAILURE', LOADED: 'LOADED', LOADING: 'LOADING', NONE: 'NONE' },
-}))
+// Built lazily inside the mock factory (which runs at import time, unlike vi.mock's own hoisted
+// call) since createContext needs the real React module, and factories can't reference top-level
+// consts declared via imports that haven't executed yet at hoist time.
+vi.mock('@vis.gl/react-google-maps', async () => {
+  const { createContext } = await import('react')
+  const MockAPIProviderContext = createContext<{ status: string } | null>(null)
+  return {
+    APIProvider: ({ children }: { children: React.ReactNode }) => {
+      if (mockLoadingStatus() === null) {
+        throw new Error('APIProvider must never mount when credentials are missing')
+      }
+      return <>{children}</>
+    },
+    APIProviderContext: MockAPIProviderContext,
+    useApiLoadingStatus: () => mockLoadingStatus(),
+    APILoadingStatus: { NOT_LOADED: 'NOT_LOADED', FAILED: 'FAILED', AUTH_FAILURE: 'AUTH_FAILURE', LOADED: 'LOADED', LOADING: 'LOADING', NONE: 'NONE' },
+  }
+})
 
 vi.mock('./LocationSearchBox', () => ({
   default: ({ onSelected }: { onSelected: (v: LocationValue) => void }) => (
@@ -75,6 +88,18 @@ vi.mock('./MapCanvas', () => ({
   ),
 }))
 
+// Simulates the shared GoogleMapsProvider (mounted at AppLayout in production) — its context is
+// present whenever mockLoadingStatus() is non-null, absent (not-configured) otherwise. The real
+// component only null-checks this context and reads status via the separately-mocked
+// useApiLoadingStatus, so a partial value is cast rather than filling in the full real shape.
+function providerContextValue() {
+  return mockLoadingStatus() !== null ? ({ status: mockLoadingStatus() } as never) : null
+}
+
+function renderPicker(ui: React.ReactElement) {
+  return render(<APIProviderContext.Provider value={providerContextValue()}>{ui}</APIProviderContext.Provider>)
+}
+
 describe('LocationPicker — no-credentials mode', () => {
   const originalApiKey = ENV.Maps.ApiKey
   const originalMapId = ENV.Maps.MapId
@@ -91,19 +116,19 @@ describe('LocationPicker — no-credentials mode', () => {
   })
 
   it('renders the "not configured" fallback and never mounts APIProvider when both keys are missing', () => {
-    render(<LocationPicker value={null} onChange={vi.fn()} />)
+    renderPicker(<LocationPicker value={null} onChange={vi.fn()} />)
     expect(screen.getByText(/map search is not configured/i)).toBeInTheDocument()
   })
 
   it('renders the fallback when only the API key is missing (Map ID set)', () => {
     ;(ENV.Maps as { MapId: string }).MapId = 'test-map-id'
-    render(<LocationPicker value={null} onChange={vi.fn()} />)
+    renderPicker(<LocationPicker value={null} onChange={vi.fn()} />)
     expect(screen.getByText(/map search is not configured/i)).toBeInTheDocument()
   })
 
   it('renders the fallback when only the Map ID is missing (API key set) — the real current state of this session', () => {
     ;(ENV.Maps as { ApiKey: string }).ApiKey = 'test-api-key'
-    render(<LocationPicker value={null} onChange={vi.fn()} />)
+    renderPicker(<LocationPicker value={null} onChange={vi.fn()} />)
     expect(screen.getByText(/map search is not configured/i)).toBeInTheDocument()
   })
 })
@@ -112,7 +137,7 @@ describe('LocationPicker — disabled prop', () => {
   it('is accepted without crashing while in no-credentials mode (disabled + not-configured together)', () => {
     const originalApiKey = ENV.Maps.ApiKey
     ;(ENV.Maps as { ApiKey: string }).ApiKey = ''
-    render(<LocationPicker value={null} onChange={vi.fn()} disabled />)
+    renderPicker(<LocationPicker value={null} onChange={vi.fn()} disabled />)
     expect(screen.getByText(/map search is not configured/i)).toBeInTheDocument()
     ;(ENV.Maps as { ApiKey: string }).ApiKey = originalApiKey
   })
@@ -135,7 +160,7 @@ describe('LocationPicker — no-credentials fallback, manual coordinate entry', 
   it('produces a LocationValue with the correct [lng, lat] tuple once both fields are filled with valid numbers', async () => {
     const onChange = vi.fn()
     const user = userEvent.setup()
-    render(<LocationPicker value={null} onChange={onChange} />)
+    renderPicker(<LocationPicker value={null} onChange={onChange} />)
 
     await user.type(screen.getByLabelText(/^latitude$/i), '29.2183')
     await user.type(screen.getByLabelText(/^longitude$/i), '79.5130')
@@ -147,7 +172,7 @@ describe('LocationPicker — no-credentials fallback, manual coordinate entry', 
   it('does not call onChange while only one of the two fields is filled', async () => {
     const onChange = vi.fn()
     const user = userEvent.setup()
-    render(<LocationPicker value={null} onChange={onChange} />)
+    renderPicker(<LocationPicker value={null} onChange={onChange} />)
 
     await user.type(screen.getByLabelText(/^latitude$/i), '29.2183')
     expect(onChange).not.toHaveBeenCalled()
@@ -156,7 +181,7 @@ describe('LocationPicker — no-credentials fallback, manual coordinate entry', 
   it('shows a validation error and does not call onChange for an out-of-range latitude', async () => {
     const onChange = vi.fn()
     const user = userEvent.setup()
-    render(<LocationPicker value={null} onChange={onChange} />)
+    renderPicker(<LocationPicker value={null} onChange={onChange} />)
 
     await user.type(screen.getByLabelText(/^latitude$/i), '200')
     await user.type(screen.getByLabelText(/^longitude$/i), '79.5130')
@@ -171,7 +196,7 @@ describe('LocationPicker — no-credentials fallback, manual coordinate entry', 
     const existing: LocationValue = {
       addressLine1: '221 Baker Street', city: 'Pune', state: 'Maharashtra', pincode: '411001',
     }
-    render(<LocationPicker value={existing} onChange={onChange} />)
+    renderPicker(<LocationPicker value={existing} onChange={onChange} />)
 
     await user.type(screen.getByLabelText(/^latitude$/i), '29.2183')
     await user.type(screen.getByLabelText(/^longitude$/i), '79.5130')
@@ -186,7 +211,7 @@ describe('LocationPicker — no-credentials fallback, manual coordinate entry', 
     const onChange = vi.fn()
     const onManualCoordinateEntry = vi.fn()
     const user = userEvent.setup()
-    render(<LocationPicker value={null} onChange={onChange} onManualCoordinateEntry={onManualCoordinateEntry} />)
+    renderPicker(<LocationPicker value={null} onChange={onChange} onManualCoordinateEntry={onManualCoordinateEntry} />)
 
     await user.type(screen.getByLabelText(/^latitude$/i), '29.2183')
     expect(onManualCoordinateEntry).not.toHaveBeenCalled()
@@ -200,7 +225,7 @@ describe('LocationPicker — no-credentials fallback, manual coordinate entry', 
       addressLine1: '', city: '', state: '', pincode: '',
       coordinates: [79.513, 29.2183],
     }
-    render(<LocationPicker value={existing} onChange={vi.fn()} />)
+    renderPicker(<LocationPicker value={existing} onChange={vi.fn()} />)
 
     expect(screen.getByLabelText(/^latitude$/i)).toHaveValue('29.2183')
     expect(screen.getByLabelText(/^longitude$/i)).toHaveValue('79.513')
@@ -208,18 +233,31 @@ describe('LocationPicker — no-credentials fallback, manual coordinate entry', 
 
   it('re-syncs the fields when the parent replaces `value` from outside (e.g. a form reset), not just on first mount', () => {
     const onChange = vi.fn()
-    const { rerender } = render(<LocationPicker value={null} onChange={onChange} />)
+    const providerValue = providerContextValue()
+    const { rerender } = render(
+      <APIProviderContext.Provider value={providerValue}>
+        <LocationPicker value={null} onChange={onChange} />
+      </APIProviderContext.Provider>,
+    )
     expect(screen.getByLabelText(/^latitude$/i)).toHaveValue('')
 
     const externallySet: LocationValue = {
       addressLine1: '', city: '', state: '', pincode: '',
       coordinates: [79.513, 29.2183],
     }
-    rerender(<LocationPicker value={externallySet} onChange={onChange} />)
+    rerender(
+      <APIProviderContext.Provider value={providerValue}>
+        <LocationPicker value={externallySet} onChange={onChange} />
+      </APIProviderContext.Provider>,
+    )
     expect(screen.getByLabelText(/^latitude$/i)).toHaveValue('29.2183')
     expect(screen.getByLabelText(/^longitude$/i)).toHaveValue('79.513')
 
-    rerender(<LocationPicker value={null} onChange={onChange} />)
+    rerender(
+      <APIProviderContext.Provider value={providerValue}>
+        <LocationPicker value={null} onChange={onChange} />
+      </APIProviderContext.Provider>,
+    )
     expect(screen.getByLabelText(/^latitude$/i)).toHaveValue('')
     expect(screen.getByLabelText(/^longitude$/i)).toHaveValue('')
   })
@@ -242,7 +280,7 @@ describe('LocationPicker — map failed to load (credentials present but rejecte
 
   it('offers manual coordinate entry (not a dead-end message) when the SDK reports FAILED', () => {
     setMockLoadingStatus('FAILED')
-    render(<LocationPicker value={null} onChange={vi.fn()} />)
+    renderPicker(<LocationPicker value={null} onChange={vi.fn()} />)
 
     expect(screen.getByText(/map failed to load/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/^latitude$/i)).toBeInTheDocument()
@@ -253,7 +291,7 @@ describe('LocationPicker — map failed to load (credentials present but rejecte
     setMockLoadingStatus('AUTH_FAILURE')
     const onChange = vi.fn()
     const user = userEvent.setup()
-    render(<LocationPicker value={null} onChange={onChange} />)
+    renderPicker(<LocationPicker value={null} onChange={onChange} />)
 
     await user.type(screen.getByLabelText(/^latitude$/i), '29.2183')
     await user.type(screen.getByLabelText(/^longitude$/i), '79.5130')
@@ -282,7 +320,7 @@ describe('LocationPicker — combined resolution state (map + search)', () => {
   it('a successful search selection clears a prior map reverse-geocode error, not leaving Save stuck blocked', async () => {
     const onResolutionStateChange = vi.fn()
     const user = userEvent.setup()
-    render(<LocationPicker value={null} onChange={vi.fn()} onResolutionStateChange={onResolutionStateChange} />)
+    renderPicker(<LocationPicker value={null} onChange={vi.fn()} onResolutionStateChange={onResolutionStateChange} />)
 
     await user.click(screen.getByRole('button', { name: /simulate map reverse-geocode error/i }))
     expect(onResolutionStateChange).toHaveBeenLastCalledWith('error')
@@ -298,7 +336,7 @@ describe('LocationPicker — combined resolution state (map + search)', () => {
       addressLine1: 'Old address', addressLine2: 'Near the old landmark', locality: 'Old locality',
       city: 'Pune', state: 'Maharashtra', pincode: '411001', googlePlaceId: 'place-clinic-a', coordinates: [73.85, 18.52],
     }
-    render(<LocationPicker value={existing} onChange={onChange} />)
+    renderPicker(<LocationPicker value={existing} onChange={onChange} />)
 
     await user.click(screen.getByRole('button', { name: /search-select a refinement of the same address/i }))
 
@@ -315,7 +353,7 @@ describe('LocationPicker — combined resolution state (map + search)', () => {
       addressLine1: 'Old address', addressLine2: 'Near the old landmark', locality: 'Old Pune locality',
       city: 'Pune', state: 'Maharashtra', pincode: '411001', googlePlaceId: 'place-clinic-a', coordinates: [73.85, 18.52],
     }
-    render(<LocationPicker value={existing} onChange={onChange} />)
+    renderPicker(<LocationPicker value={existing} onChange={onChange} />)
 
     await user.click(screen.getByRole('button', { name: /search-select a different city/i }))
 
@@ -332,7 +370,7 @@ describe('LocationPicker — combined resolution state (map + search)', () => {
       addressLine1: 'Clinic A', addressLine2: 'Near the old landmark', locality: 'Old locality',
       city: 'Pune', state: 'Maharashtra', pincode: '411001', googlePlaceId: 'place-clinic-a', coordinates: [73.85, 18.52],
     }
-    render(<LocationPicker value={existing} onChange={onChange} />)
+    renderPicker(<LocationPicker value={existing} onChange={onChange} />)
 
     await user.click(screen.getByRole('button', { name: /search-select a different place in the same postcode/i }))
 
@@ -349,7 +387,7 @@ describe('LocationPicker — combined resolution state (map + search)', () => {
       addressLine1: 'Old address', addressLine2: 'Near the old landmark', locality: 'Old locality',
       city: 'Pune', state: 'Maharashtra', pincode: '411001', coordinates: [73.85, 18.52],
     }
-    render(<LocationPicker value={existing} onChange={onChange} />)
+    renderPicker(<LocationPicker value={existing} onChange={onChange} />)
 
     await user.click(screen.getByRole('button', { name: /search-select a refinement of the same address/i }))
 
@@ -390,7 +428,7 @@ describe('LocationPicker — onLocationHintChange wired into a below-map Locatio
 
   it('shows the map\'s hint text in the below-map address form once the map reports one, alongside the missing-fields warning', async () => {
     const user = userEvent.setup()
-    render(<LocationWithAddressFields value={{ addressLine1: '', city: '', state: '', pincode: '', coordinates: [72.8, 19.07] }} />)
+    renderPicker(<LocationWithAddressFields value={{ addressLine1: '', city: '', state: '', pincode: '', coordinates: [72.8, 19.07] }} />)
 
     expect(screen.queryByText(/dehene, maharashtra, india/i)).not.toBeInTheDocument()
 

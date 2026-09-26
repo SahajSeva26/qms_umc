@@ -35,6 +35,7 @@ import '../../../modules/finance/invoice/invoice.routes';
 import '../../../modules/finance/invoiceLineItem/invoiceLineItem.routes';
 import '../../../modules/vendor-master/vendor-master.routes';
 import '../../../modules/file/file.routes';
+import '../../../modules/notification/notification.routes';
 // =============================================
 // =============================================
 

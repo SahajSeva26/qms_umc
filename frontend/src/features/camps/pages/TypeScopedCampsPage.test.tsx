@@ -124,7 +124,7 @@ describe.each([
     })))
 
     // Change City (debounced text input).
-    await user.type(screen.getByPlaceholderText('City...'), 'Mumbai')
+    await user.type(screen.getByPlaceholderText('Search by city...'), 'Mumbai')
     await waitFor(() => expect(useCampsReal).toHaveBeenLastCalledWith(expect.objectContaining({
       type,
       city: 'Mumbai',

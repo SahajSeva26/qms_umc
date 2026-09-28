@@ -718,6 +718,112 @@ describe('TenantHeader', () => {
     resolveSecondSearch(noLogo())
   })
 
+  it('regression (QUP-457): when a logo replace fails on upload, the header keeps showing the OLD logo, not the failed new pick', async () => {
+    const { fileService } = await import('@/lib/file/file.service')
+    const { uploadFileToS3 } = await import('@/lib/file/file.upload')
+    vi.mocked(fileService.searchFiles).mockResolvedValue({
+      success: true, message: '', data: { count: 1, items: [{ id: 'old-file' }] },
+    } as never)
+    vi.mocked(fileService.getFile).mockResolvedValue({
+      success: true, message: '', data: { id: 'old-file', url: 'https://s3.example.com/red-logo.png' },
+    } as never)
+    vi.mocked(fileService.createFiles).mockResolvedValueOnce({
+      success: true, message: '', data: [{ id: 'new-file', uploadUrl: 'https://s3.example.com/new-file' }],
+    } as never)
+    vi.mocked(uploadFileToS3).mockRejectedValueOnce(Object.assign(new Error('network error'), { isAxiosError: true }))
+
+    renderHeader()
+    await waitFor(() => expect(screen.getByRole('button', { name: /change logo/i })).toBeEnabled())
+    expect(screen.getByRole('img', { name: /company logo/i })).toHaveAttribute('src', 'https://s3.example.com/red-logo.png')
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    await userEvent.upload(input, makeFile('blue.png'))
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument())
+    expect(screen.getByRole('img', { name: /company logo/i })).toHaveAttribute('src', 'https://s3.example.com/red-logo.png')
+  })
+
+  it('regression (QUP-458 S3b): when a link failure\'s old-logo restore is CONFIRMED, shows a calm dismissible warning, not the scary error banner, and the header still shows the restored OLD logo', async () => {
+    const { fileService } = await import('@/lib/file/file.service')
+    const { uploadFileToS3 } = await import('@/lib/file/file.upload')
+    vi.mocked(fileService.searchFiles).mockResolvedValue({
+      success: true, message: '', data: { count: 1, items: [{ id: 'old-file' }] },
+    } as never)
+    vi.mocked(fileService.getFile).mockResolvedValue({
+      success: true, message: '', data: { id: 'old-file', url: 'https://s3.example.com/red-logo.png' },
+    } as never)
+    vi.mocked(fileService.createFiles).mockResolvedValueOnce({
+      success: true, message: '', data: [{ id: 'new-file', uploadUrl: 'https://s3.example.com/new-file' }],
+    } as never)
+    vi.mocked(uploadFileToS3).mockResolvedValueOnce(undefined)
+    vi.mocked(fileService.changeFileStatus).mockResolvedValueOnce({ success: true, message: '', data: {} } as never) // activate
+    vi.mocked(fileService.changeFileStatus).mockResolvedValueOnce({ success: true, message: '', data: {} } as never) // deactivate-old
+    vi.mocked(fileService.linkFileToEntity).mockRejectedValueOnce(
+      Object.assign(new Error('Bad Request'), { isAxiosError: true, response: { status: 400, data: { message: 'Validation failed' } } }),
+    )
+    vi.mocked(fileService.changeFileStatus).mockResolvedValueOnce({ success: true, message: '', data: {} } as never) // restore-old CONFIRMED
+    vi.mocked(fileService.changeFileStatus).mockResolvedValueOnce({ success: true, message: '', data: {} } as never) // discard candidate
+
+    renderHeader()
+    await waitFor(() => expect(screen.getByRole('button', { name: /change logo/i })).toBeEnabled())
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    await userEvent.upload(input, makeFile('blue.png'))
+
+    await waitFor(() =>
+      expect(screen.getByText(/couldn't be saved\. your previous logo has been restored/i)).toBeInTheDocument(),
+    )
+    // Not the scary error banner's wording — a distinct, calmer message.
+    expect(screen.queryByText(/we couldn't link the new logo/i)).not.toBeInTheDocument()
+    // The header shows the restored OLD logo, same defect class as QUP-458 S3(a) — must not regress.
+    expect(screen.getByRole('img', { name: /company logo/i })).toHaveAttribute('src', 'https://s3.example.com/red-logo.png')
+
+    // Dismissible: clicking dismiss clears the warning.
+    await userEvent.click(screen.getByRole('button', { name: /dismiss/i }))
+    expect(screen.queryByText(/couldn't be saved\. your previous logo has been restored/i)).not.toBeInTheDocument()
+  })
+
+  it('regression: dismissing the restored-after-link-failure warning does NOT hide a still-unresolved CLEANUP failure', async () => {
+    const { fileService } = await import('@/lib/file/file.service')
+    const { uploadFileToS3 } = await import('@/lib/file/file.upload')
+    vi.mocked(fileService.searchFiles).mockResolvedValue({
+      success: true, message: '', data: { count: 1, items: [{ id: 'old-file' }] },
+    } as never)
+    vi.mocked(fileService.getFile).mockResolvedValue({
+      success: true, message: '', data: { id: 'old-file', url: 'https://s3.example.com/red-logo.png' },
+    } as never)
+    vi.mocked(fileService.createFiles).mockResolvedValueOnce({
+      success: true, message: '', data: [{ id: 'new-file', uploadUrl: 'https://s3.example.com/new-file' }],
+    } as never)
+    vi.mocked(uploadFileToS3).mockResolvedValueOnce(undefined)
+    vi.mocked(fileService.changeFileStatus).mockResolvedValueOnce({ success: true, message: '', data: {} } as never) // activate
+    vi.mocked(fileService.changeFileStatus).mockResolvedValueOnce({ success: true, message: '', data: {} } as never) // deactivate-old
+    vi.mocked(fileService.linkFileToEntity).mockRejectedValueOnce(
+      Object.assign(new Error('Bad Request'), { isAxiosError: true, response: { status: 400, data: { message: 'Validation failed' } } }),
+    )
+    vi.mocked(fileService.changeFileStatus).mockResolvedValueOnce({ success: true, message: '', data: {} } as never) // restore-old CONFIRMED
+    // discard candidate fails (confirmed 4xx) — cleanup-failed
+    vi.mocked(fileService.changeFileStatus).mockRejectedValueOnce(
+      Object.assign(new Error('Bad Request'), { isAxiosError: true, response: { status: 400, data: { message: 'Cannot discard' } } }),
+    )
+
+    renderHeader()
+    await waitFor(() => expect(screen.getByRole('button', { name: /change logo/i })).toBeEnabled())
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    await userEvent.upload(input, makeFile('blue.png'))
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /retry cleanup/i })).toBeInTheDocument())
+    expect(screen.getByText(/couldn't be saved\. your previous logo has been restored/i)).toBeInTheDocument()
+    expect(screen.getByText(/couldn't be cleaned up/i)).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /dismiss/i }))
+    // The warning is gone, but the cleanup failure + its retry action must still be visible.
+    expect(screen.queryByText(/couldn't be saved\. your previous logo has been restored/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/couldn't be cleaned up/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /retry cleanup/i })).toBeInTheDocument()
+  })
+
   it('a long failure message renders in the full-width second row, not the 128px logo column', async () => {
     const { fileService } = await import('@/lib/file/file.service')
     const { uploadFileToS3 } = await import('@/lib/file/file.upload')

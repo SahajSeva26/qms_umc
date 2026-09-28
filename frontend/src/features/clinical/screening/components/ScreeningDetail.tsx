@@ -29,11 +29,17 @@ const ScreeningDetail = ({ screening, canWrite, canMoveStage, onClose }: Screeni
   const updateMutation = useUpdateScreening(screening.id)
 
   const handleSave = () => {
-    const symptoms = symptomsText
+    const submittedText = symptomsText
+    const symptoms = submittedText
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean)
-    updateMutation.mutate({ symptoms, referral })
+    // Re-sync only if the textarea still matches what was submitted — it stays editable during
+    // the request, so a fresher edit typed while in flight must never be clobbered on response.
+    updateMutation.mutate(
+      { symptoms, referral },
+      { onSuccess: () => setSymptomsText((current) => (current === submittedText ? symptoms.join(', ') : current)) },
+    )
   }
 
   return (

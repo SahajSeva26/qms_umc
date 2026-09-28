@@ -41,6 +41,10 @@ const EmployeeFieldsSection = <TFormValues extends FieldValues & EmployeeFieldsV
   const locationErrorMessage = (coordinatesError?.message as string | undefined) ?? (locationError?.message as string | undefined)
   // The refine's error path is ['value'], so the message lives at daRule.value, not daRule itself.
   const daRuleValueError = (errors[field('daRule')] as { value?: { message?: string } } | undefined)?.value
+  const ifscError = (errors[field('bankDetails')] as { ifscCode?: { message?: string } } | undefined)?.ifscCode
+  const locationFieldErrors = locationError as
+    | { addressLine1?: { message?: string }; city?: { message?: string }; state?: { message?: string }; pincode?: { message?: string } }
+    | undefined
 
   return (
     <div className="space-y-5">
@@ -203,6 +207,9 @@ const EmployeeFieldsSection = <TFormValues extends FieldValues & EmployeeFieldsV
             <div>
               <FieldLabel htmlFor="ifscCode">IFSC code</FieldLabel>
               <Input id="ifscCode" type="text" placeholder="Optional" {...register('bankDetails.ifscCode' as Path<TFormValues>)} />
+              {showErrors && ifscError && (
+                <p className="text-xs text-danger mt-1.5">{ifscError.message}</p>
+              )}
             </div>
             <div>
               <FieldLabel htmlFor="bankName">Bank name</FieldLabel>
@@ -239,6 +246,16 @@ const EmployeeFieldsSection = <TFormValues extends FieldValues & EmployeeFieldsV
             </div>
           )}
         />
+        {showErrors && locationFieldErrors && (
+          <div className="mt-1.5 space-y-0.5">
+            {locationFieldErrors.addressLine1 && <p className="text-xs text-danger">{locationFieldErrors.addressLine1.message}</p>}
+            {locationFieldErrors.city && <p className="text-xs text-danger">{locationFieldErrors.city.message}</p>}
+            {locationFieldErrors.state && <p className="text-xs text-danger">{locationFieldErrors.state.message}</p>}
+            {locationFieldErrors.pincode && <p className="text-xs text-danger">{locationFieldErrors.pincode.message}</p>}
+          </div>
+        )}
+        {/* Coordinates/object-level message stays separate — it's the map-pin complaint, distinct
+            from the per-field address messages above, and can appear even when those are all clean. */}
         {showErrors && locationErrorMessage && (
           <p className="text-xs text-danger mt-1.5">{locationErrorMessage}</p>
         )}

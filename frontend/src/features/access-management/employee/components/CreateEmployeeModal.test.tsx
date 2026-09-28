@@ -218,6 +218,27 @@ describe('CreateEmployeeModal', () => {
     await user.click(screen.getByRole('button', { name: /create employee/i }))
   }
 
+  it('regression (QUP-469 S7-S13): Mode A (onboard a new person) also shows validation messages on a FRESH invalid submit, not only after one prior valid submit — same shared showErrors fix as QUP-470 S12', async () => {
+    const user = userEvent.setup()
+    renderModal()
+    await user.click(screen.getByRole('button', { name: /new employee/i }))
+    await user.click(screen.getByRole('button', { name: /^onboard a new person$/i }))
+    await user.type(screen.getByLabelText('Code'), 'fo-ravi')
+    await user.type(screen.getByLabelText('Name'), 'Ravi Kumar')
+    await user.click(screen.getByRole('button', { name: /^next$/i }))
+    await user.type(screen.getByLabelText('First name'), 'Ravi')
+    await user.type(screen.getByLabelText('Email'), 'ravi@example.com')
+    await user.type(screen.getByLabelText('Password'), 'Password1')
+    await user.type(screen.getByLabelText(/^phone/i), '9876543210')
+    await user.click(screen.getByRole('button', { name: /^next$/i }))
+
+    // No DOJ filled in, no prior submit attempt at all — the very first click.
+    await user.click(screen.getByRole('button', { name: /create employee/i }))
+
+    expect(await screen.findByText(/date of joining is required/i)).toBeInTheDocument()
+    expect(createRole).not.toHaveBeenCalled()
+  })
+
   it('a CONFIRMED (4xx) Role/User creation failure shows the error banner, and retrying calls createRole again, never createEmployee for the failed attempt', async () => {
     createRole.mockRejectedValueOnce(confirmedRejection())
     const user = userEvent.setup()
@@ -231,6 +252,24 @@ describe('CreateEmployeeModal', () => {
 
     await waitFor(() => expect(createRole).toHaveBeenCalledTimes(2))
     expect(createEmployee).toHaveBeenCalledTimes(1)
+  })
+
+  it('regression (QUP-469 S15): a CONFIRMED (4xx) Role/User creation failure with a specific backend message shows that EXACT message, not the generic fallback', async () => {
+    const err = new AxiosError('Request failed with status code 409')
+    err.response = {
+      status: 409,
+      data: { message: 'This email belongs to a different account in another tenant.' },
+      statusText: '', headers: {}, config: {} as never,
+    }
+    createRole.mockRejectedValueOnce(err)
+    const user = userEvent.setup()
+    await fillAndSubmitModeA(user)
+
+    // err.message here is just "Request failed with status code 409" — the real backend text lives
+    // at err.response.data.message, which the fix must read instead of the generic fallback.
+    expect(await screen.findByText(/this email belongs to a different account in another tenant/i)).toBeInTheDocument()
+    expect(screen.queryByText(/couldn't create the account for this person\. nothing was saved/i)).not.toBeInTheDocument()
+    expect(createEmployee).not.toHaveBeenCalled()
   })
 
   it('an AMBIGUOUS (network error) Role/User creation failure shows the uncertain banner, blocks a blind resubmit, and "Check again" recovers by finding the Role and continuing straight into Employee creation', async () => {
@@ -263,7 +302,7 @@ describe('CreateEmployeeModal', () => {
     expect(createRole).toHaveBeenCalledTimes(1)
   })
 
-  it('"Check again" finding nothing falls back to the confirmed-failure state (a fresh retry is then safe)', async () => {
+  it('"Check again" finding nothing falls back to the confirmed-failure state (a fresh retry is then safe), showing the specific "no account found" message', async () => {
     createRole.mockRejectedValueOnce(networkError())
     const user = userEvent.setup()
     await fillAndSubmitModeA(user)
@@ -273,7 +312,9 @@ describe('CreateEmployeeModal', () => {
 
     await user.click(screen.getByRole('button', { name: /check again/i }))
 
-    expect(await screen.findByText(/couldn't create the account/i)).toBeInTheDocument()
+    // regression (QUP-469 S15): this is a real, specific Error (not an axios error), so its own
+    // .message is shown verbatim, not the generic fallback the old substring-gated check produced.
+    expect(await screen.findByText(/no account found for this code/i)).toBeInTheDocument()
     expect(createEmployee).not.toHaveBeenCalled()
   })
 
@@ -521,7 +562,7 @@ describe('CreateEmployeeModal', () => {
     await assertForcedSubmitIsNoOp()
 
     check.resolve({ success: true, message: '', data: { count: 0, items: [] } })
-    await screen.findByText(/couldn't create the account/i)
+    await screen.findByText(/no account found for this code/i)
   })
 
   it('a forced submit is a pure no-op during checking-employee (the in-flight recovery lookup)', async () => {
@@ -653,6 +694,18 @@ describe('CreateEmployeeModal', () => {
     await user.click(screen.getByRole('button', { name: pickButtonName }))
     await user.click(screen.getByRole('button', { name: /^next$/i }))
   }
+
+  it('regression (QUP-470 S12): a blank Create-employee submit on a FRESH Employee-details step (no prior submit) still shows the Date-of-joining error, not silence', async () => {
+    const user = userEvent.setup()
+    await goToModeBEmployeeStep(user)
+
+    // No prior submit attempt at all — react-hook-form only calls handleSubmit's success callback
+    // on valid input, so this needs the onInvalid path to still flip showErrors on.
+    await user.click(screen.getByRole('button', { name: /create employee/i }))
+
+    expect(await screen.findByText(/date of joining is required/i)).toBeInTheDocument()
+    expect(createEmployee).not.toHaveBeenCalled()
+  })
 
   it('Mode B: picking an FO with a gender submits it in the Employee create payload', async () => {
     const user = userEvent.setup()

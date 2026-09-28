@@ -25,3 +25,8 @@ export function isServiceFailure(err: unknown): boolean {
 export function isForbiddenError(err: unknown): boolean {
   return axios.isAxiosError(err) && err.response?.status === 403
 }
+
+// 404 — missing OR out-of-scope (many backend routes return the same status for both, by design). Retrying never helps.
+export function isNotFoundError(err: unknown): boolean {
+  return axios.isAxiosError(err) && err.response?.status === 404
+}

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { FiArrowLeft, FiPlus } from 'react-icons/fi'
@@ -17,6 +18,7 @@ import { useCreateEmployee } from '@/features/access-management/employee/hooks/u
 import { EMPLOYEE_ROUTES } from '@/features/access-management/employee/employee.routes'
 import type { EmployeeFieldsValues } from '@/features/access-management/employee/schemas/employee.schemas'
 import type { CreateRolePayload } from '@/types/accessManagement.types'
+import { getApiErrorMessage } from '@/utils/apiError'
 
 type Mode = 'new' | 'existing'
 
@@ -243,22 +245,27 @@ const CreateEmployeeModal = ({
     }
   }
 
-  /* eslint-disable react-hooks/refs -- handleSubmit(...) only invokes this callback later, on an
+  /* eslint-disable react-hooks/refs -- handleSubmit(...) only invokes these callbacks later, on an
      actual submit event; submittingRef.current is never read during render. */
-  const guardedFinalSubmit = employeeForm.handleSubmit((values) => {
-    // Synchronous guard: a rapid double-submit must not re-enter while the first is still in
-    // flight, including Mode A's account-created -> retryEmployee path — retryEmployee now returns
-    // its underlying promise specifically so this await captures the true end of the attempt.
-    if (submittingRef.current) return
-    submittingRef.current = true
-    markStepAttempted(lastStepIndex)
-    const run = mode === 'new' ? submitNewPerson(values) : submitExisting(values)
-    // Errors are swallowed here, not left to become unhandled rejections — onboard.state /
-    // createEmployee's own mutation state (rendered below) is what surfaces the failure to the user.
-    run.catch(() => {}).finally(() => {
-      submittingRef.current = false
-    })
-  })
+  const guardedFinalSubmit = employeeForm.handleSubmit(
+    (values) => {
+      // Synchronous guard: a rapid double-submit must not re-enter while the first is still in
+      // flight, including Mode A's account-created -> retryEmployee path — retryEmployee now returns
+      // its underlying promise specifically so this await captures the true end of the attempt.
+      if (submittingRef.current) return
+      submittingRef.current = true
+      markStepAttempted(lastStepIndex)
+      const run = mode === 'new' ? submitNewPerson(values) : submitExisting(values)
+      // Errors are swallowed here, not left to become unhandled rejections — onboard.state /
+      // createEmployee's own mutation state (rendered below) is what surfaces the failure to the user.
+      run.catch(() => {}).finally(() => {
+        submittingRef.current = false
+      })
+    },
+    // react-hook-form only calls the success callback above when validation PASSES — an invalid
+    // submit needs its own path to still flip showErrors on, or field messages never appear at all.
+    () => markStepAttempted(lastStepIndex),
+  )
   /* eslint-enable react-hooks/refs */
 
   useEffect(() => {
@@ -373,9 +380,15 @@ const CreateEmployeeModal = ({
 
             {onboard.state.step === 'account-creation-failed' && (
               <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
-                {onboard.state.error instanceof Error && onboard.state.error.message.includes('different account')
-                  ? onboard.state.error.message
-                  : "Couldn't create the account for this person. Nothing was saved — check the details and try again."}
+                {(() => {
+                  const err = onboard.state.error
+                  // A real 4xx's text lives at err.response.data.message, not err.message — AxiosError
+                  // IS an Error instance, so it must be excluded from the internalMessage check below.
+                  const backendMessage = getApiErrorMessage(err, '')
+                  const internalMessage = !axios.isAxiosError(err) && err instanceof Error ? err.message : ''
+                  return backendMessage || internalMessage
+                    || "Couldn't create the account for this person. Nothing was saved — check the details and try again."
+                })()}
               </div>
             )}
             {(onboard.state.step === 'account-creation-uncertain' || onboard.state.step === 'checking-account') && (

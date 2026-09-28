@@ -3,7 +3,7 @@ import { FiRefreshCw, FiUpload } from 'react-icons/fi'
 import { Button } from '@/components/ui/button'
 import LogoPreview from '@/components/ui/LogoPreview'
 import StartOverUploadDialog from '@/components/widgets/upload/StartOverUploadDialog'
-import { ErrorBanner, RetryRow, CleanupLine } from '@/components/widgets/upload/UploadFeedbackRows'
+import { ErrorBanner, WarningBanner, RetryRow, CleanupLine } from '@/components/widgets/upload/UploadFeedbackRows'
 import { callSafely } from '@/components/widgets/upload/callSafely'
 import type { ReplaceFileState } from '@/hooks/useReplaceFile'
 
@@ -31,6 +31,9 @@ export interface EntityImageUploadCopy {
   /** Full sentence for the restore-failed state. Supplied whole — whether "a manual fix" is possible
    * depends on whether an admin-override path exists, which differs per entity. */
   restoreFailedMessage: string
+  /** Full sentence for restored-after-link-failure — the old file is confirmed back, but must not
+   * imply the user's actual request (the new file) succeeded. */
+  restoredAfterFailureMessage: string
 }
 
 export interface EntityImageUploadReadState {
@@ -68,6 +71,9 @@ export function useEntityImageUpload({ read, replace: flow, size, canManage, cop
   // upload" appears once a retry has been attempted at all — not gated on that retry failing.
   const [hasRetriedThisAttempt, setHasRetriedThisAttempt] = useState(false)
   const [startOverDialogOpen, setStartOverDialogOpen] = useState(false)
+  // Dismissible: cleared automatically the moment a new pick starts (handleFilePicked below), so it
+  // never lingers once the user has moved past this outcome.
+  const [restoredWarningDismissed, setRestoredWarningDismissed] = useState(false)
 
   // Revoke the local object URL on unmount or whenever a new one replaces it.
   useEffect(() => {
@@ -92,6 +98,7 @@ export function useEntityImageUpload({ read, replace: flow, size, canManage, cop
     }
     setValidationError(null)
     setHasRetriedThisAttempt(false)
+    setRestoredWarningDismissed(false)
     if (previewUrl) URL.revokeObjectURL(previewUrl)
     setPreviewUrl(URL.createObjectURL(picked))
     replace(picked)
@@ -112,10 +119,17 @@ export function useEntityImageUpload({ read, replace: flow, size, canManage, cop
   const isTerminalFailure =
     state.step === 'deactivate-failed' ||
     state.step === 'link-failed' ||
+    state.step === 'restored-after-link-failure' ||
     state.step === 'link-conflict' ||
     state.step === 'link-attached-elsewhere' ||
     state.step === 'restore-failed'
   const isBusy = state.step !== 'idle' && state.step !== 'done' && !isTerminalFailure
+
+  // The local preview must stop covering the real `url` once the pick is confirmed failed/uncertain
+  // or the flow is done/never started — otherwise a failed pick looks saved, or a success never proves it.
+  const isUploadPending =
+    state.step === 'uploading' &&
+    (state.upload.step === 'creating' || state.upload.step === 'uploading' || state.upload.step === 'activating' || state.upload.step === 'restarting')
   // isFetching too, not just isLoading — a background refetch can leave a stale cached fileId/url.
   const triggerDisabled = isLoading || isFetching || isError || isBusy
 
@@ -232,6 +246,18 @@ export function useEntityImageUpload({ read, replace: flow, size, canManage, cop
         </div>,
       )
     }
+    if (state.step === 'restored-after-link-failure') {
+      feedbackItems.push(
+        <div key="restored-after-link-failure" className="flex flex-col gap-2">
+          {/* Only the warning itself is dismissible — a still-unresolved cleanup failure/uncertainty
+              must stay visible regardless, it isn't part of what the dismiss is acknowledging. */}
+          {!restoredWarningDismissed && (
+            <WarningBanner message={copy.restoredAfterFailureMessage} onDismiss={() => setRestoredWarningDismissed(true)} />
+          )}
+          {state.cleanup && <CleanupLine status={state.cleanup.status} onRetry={retryCleanup} />}
+        </div>,
+      )
+    }
     if (state.step === 'link-attached-elsewhere') {
       feedbackItems.push(
         <ErrorBanner
@@ -268,7 +294,7 @@ export function useEntityImageUpload({ read, replace: flow, size, canManage, cop
       <LogoPreview
         size={size}
         alt={copy.alt}
-        src={canManage ? (previewUrl ?? url) : url}
+        src={canManage && isUploadPending ? (previewUrl ?? url) : url}
         isLoading={canManage ? !previewUrl && (isLoading || isFetching) : isLoading || isFetching}
       />
       {canManage && (

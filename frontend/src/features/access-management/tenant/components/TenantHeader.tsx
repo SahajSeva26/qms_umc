@@ -34,6 +34,7 @@ const TENANT_LOGO_COPY = {
   previousNoun: 'previous logo',
   linkConflictMessage: 'Another logo was just activated for this tenant.',
   restoreFailedMessage: "We couldn't restore the previous logo — a manual fix may be needed. Retrying won't necessarily fix this on its own.",
+  restoredAfterFailureMessage: "The new logo couldn't be saved. Your previous logo has been restored. You can choose a file to try again.",
 }
 
 const TenantHeader = ({

@@ -22,6 +22,9 @@ export type ReplaceFileState =
   | { step: 'deactivate-failed'; error: unknown; priorDraftCleanupConfirmed: boolean | null; cleanup?: CleanupSubState }
   | { step: 'linking-new'; priorDraftCleanupConfirmed: boolean | null }
   | { step: 'link-failed'; error: unknown; priorDraftCleanupConfirmed: boolean | null; cleanup?: CleanupSubState }
+  // Link failed, old file CONFIRMED restored — calmer than link-failed (no old file existed) or
+  // restore-failed/restore-uncertain (restore itself didn't confirm), each their own state.
+  | { step: 'restored-after-link-failure'; error: unknown; priorDraftCleanupConfirmed: boolean | null; cleanup?: CleanupSubState }
   | { step: 'link-conflict'; error: unknown; priorDraftCleanupConfirmed: boolean | null; cleanup?: CleanupSubState }
   // Candidate is attached to a DIFFERENT entity — terminal, never discarded; old file is restored
   // first if there was one. hadOldLogo's name is kept from this state machine's tenant-logo origin.
@@ -139,8 +142,9 @@ export function useReplaceFile(
     setState({ step: 'restoring-old', priorDraftCleanupConfirmed })
     try {
       await fileService.changeFileStatus(oldFileIdKnown, { status: 'active' })
-      // Restore succeeded — proceed to discard the candidate; overall outcome is still a failure.
-      await discardCandidate({ step: 'link-failed', error: linkError, priorDraftCleanupConfirmed })
+      // Restore CONFIRMED — the entity is back to its pre-attempt state, a calmer outcome than a
+      // plain link-failed (whose old file was never restored, or there wasn't one to begin with).
+      await discardCandidate({ step: 'restored-after-link-failure', error: linkError, priorDraftCleanupConfirmed })
       return
     } catch (restoreErr) {
       if (isConfirmedRejection(restoreErr)) {
@@ -152,8 +156,8 @@ export function useReplaceFile(
         const res = await fileService.getFile(oldFileIdKnown)
         const status = res.data?.status
         if (status === 'active') {
-          // Reconciled as already restored — still discard, still surface the overall failure.
-          await discardCandidate({ step: 'link-failed', error: linkError, priorDraftCleanupConfirmed })
+          // Reconciled as already restored — confirmed, same calmer outcome as the clean-success path.
+          await discardCandidate({ step: 'restored-after-link-failure', error: linkError, priorDraftCleanupConfirmed })
         } else {
           // Not confirmed restored — surface as restore-failed (retryable), discard regardless.
           await discardCandidate({ step: 'restore-failed', linkError, priorDraftCleanupConfirmed, forFile: 'discard' })
@@ -410,6 +414,7 @@ function withCleanup(state: ReplaceFileState, cleanup: CleanupSubState): Replace
   if (
     state.step === 'deactivate-failed' ||
     state.step === 'link-failed' ||
+    state.step === 'restored-after-link-failure' ||
     state.step === 'link-conflict' ||
     state.step === 'restore-uncertain' ||
     state.step === 'restore-failed'

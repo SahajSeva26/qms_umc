@@ -243,4 +243,63 @@ describe('MyProfileModal', () => {
     await waitFor(() => expect(screen.getByText(/couldn't restore your previous picture/i)).toBeInTheDocument())
     expect(screen.queryByText(/manual fix/i)).not.toBeInTheDocument()
   })
+
+  it('regression (QUP-462): once the upload completes, the image shows the real server url, not the stale local blob preview', async () => {
+    const { fileService } = await import('@/lib/file/file.service')
+    const { uploadFileToS3 } = await import('@/lib/file/file.upload')
+    // Stateful: no active file until the mutation's own onSuccess invalidates the read query,
+    // at which point the same picture the mutation just linked is what the refetch finds.
+    vi.mocked(fileService.searchFiles).mockImplementation(async () => {
+      if (vi.mocked(fileService.linkFileToEntity).mock.calls.length > 0) {
+        return { success: true, message: '', data: { count: 1, items: [{ id: 'new-file' }] } } as never
+      }
+      return noPicture()
+    })
+    vi.mocked(fileService.getFile).mockResolvedValue({
+      success: true, message: '', data: { id: 'new-file', url: 'https://s3.example.com/new-avatar.png' },
+    } as never)
+    vi.mocked(fileService.createFiles).mockResolvedValueOnce({
+      success: true, message: '', data: [{ id: 'new-file', uploadUrl: 'https://s3.example.com/new-file' }],
+    } as never)
+    vi.mocked(uploadFileToS3).mockResolvedValueOnce(undefined)
+    vi.mocked(fileService.changeFileStatus).mockResolvedValueOnce({ success: true, message: '', data: {} } as never)
+    vi.mocked(fileService.linkFileToEntity).mockResolvedValueOnce({ success: true, message: '', data: {} } as never)
+
+    renderModal()
+    await waitFor(() => expect(screen.getByRole('button', { name: /upload picture/i })).toBeEnabled())
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    await userEvent.upload(input, makeFile())
+
+    await waitFor(() => expect(fileService.linkFileToEntity).toHaveBeenCalled())
+    await waitFor(() =>
+      expect(screen.getByRole('img', { name: /profile picture/i })).toHaveAttribute('src', 'https://s3.example.com/new-avatar.png'),
+    )
+  })
+
+  it('regression (QUP-463): when the upload fails, the image reverts to the old server picture, not the failed local pick', async () => {
+    const { fileService } = await import('@/lib/file/file.service')
+    const { uploadFileToS3 } = await import('@/lib/file/file.upload')
+    vi.mocked(fileService.searchFiles).mockResolvedValue({
+      success: true, message: '', data: { count: 1, items: [{ id: 'old-file' }] },
+    } as never)
+    vi.mocked(fileService.getFile).mockResolvedValue({
+      success: true, message: '', data: { id: 'old-file', url: 'https://s3.example.com/old-avatar.png' },
+    } as never)
+    vi.mocked(fileService.createFiles).mockResolvedValueOnce({
+      success: true, message: '', data: [{ id: 'new-file', uploadUrl: 'https://s3.example.com/new-file' }],
+    } as never)
+    vi.mocked(uploadFileToS3).mockRejectedValueOnce(
+      Object.assign(new Error('network error'), { isAxiosError: true }),
+    )
+
+    renderModal()
+    await waitFor(() => expect(screen.getByRole('button', { name: /change picture/i })).toBeEnabled())
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    await userEvent.upload(input, makeFile())
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument())
+    expect(screen.getByRole('img', { name: /profile picture/i })).toHaveAttribute('src', 'https://s3.example.com/old-avatar.png')
+  })
 })

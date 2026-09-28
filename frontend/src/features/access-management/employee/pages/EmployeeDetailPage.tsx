@@ -7,6 +7,7 @@ import EditEmployeeEditor from '@/features/access-management/employee/components
 import EmployeeStatusPill from '@/features/access-management/employee/components/EmployeeStatusPill'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import type { EmployeeEntity, EmployeePopulatedTenant, EmployeePopulatedUser } from '@/types/accessManagement.types'
+import { isNotFoundError } from '@/utils/apiError'
 
 // A Field Officer viewing their own record (own-scope, server-side) gets a read-only view here —
 // only a manage-capable role gets the editable form.
@@ -48,6 +49,16 @@ const EmployeeDetailContent = () => {
   const { session, permissions } = usePermission()
   const { data, isLoading, error, refetch } = useEmployee(id)
   const employee = data?.data ?? null
+
+  // A 404 (missing OR out-of-scope, same status for both) is a query ERROR here, not empty data,
+  // so it never reaches the "not found" branch below — and retrying it can never succeed either.
+  if (isNotFoundError(error)) {
+    return (
+      <div className="text-[13px] rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
+        Employee not found, or you don't have access to it.
+      </div>
+    )
+  }
 
   return (
     <QueryStateBlock

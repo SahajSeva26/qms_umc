@@ -1,9 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { AxiosError } from 'axios'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { usePermission } from '@/hooks/usePermission'
 import { useEmployee } from '@/features/access-management/employee/hooks/useEmployee'
+
+function notFoundError() {
+  const err = new AxiosError('Request failed with status code 404')
+  err.response = { status: 404, data: { message: 'Employee not found' }, statusText: '', headers: {}, config: {} as never }
+  return err
+}
 
 vi.mock('@/hooks/usePermission')
 vi.mock('@/features/access-management/employee/hooks/useEmployee')
@@ -50,12 +57,24 @@ describe('EmployeeDetailPage', () => {
     expect(refetch).toHaveBeenCalled()
   })
 
-  it('shows "not found" only when there is genuinely no error and no data (a real 404/inaccessible record)', async () => {
+  it('shows "not found" when there is genuinely no error and no data (an empty successful response)', async () => {
     vi.mocked(useEmployee).mockReturnValue({ data: undefined, isLoading: false, error: null, refetch: vi.fn() } as never)
 
     await renderPage()
 
     expect(await screen.findByText(/not found, or you don't have access/i)).toBeInTheDocument()
+  })
+
+  it('regression (QUP-471 S16): a real HTTP 404 (missing OR out-of-scope — the backend returns the same status for both) shows "not found", not the generic retry-able error', async () => {
+    const refetch = vi.fn()
+    vi.mocked(useEmployee).mockReturnValue({ data: undefined, isLoading: false, error: notFoundError(), refetch } as never)
+
+    await renderPage()
+
+    expect(await screen.findByText(/not found, or you don't have access/i)).toBeInTheDocument()
+    expect(screen.queryByText(/failed to load employee/i)).not.toBeInTheDocument()
+    // Retrying a genuine 404 can never succeed — no Retry button for this case.
+    expect(screen.queryByRole('button', { name: /retry/i })).not.toBeInTheDocument()
   })
 
   it('renders the editor for a manage-capable session once the employee loads', async () => {

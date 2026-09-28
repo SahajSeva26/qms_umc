@@ -208,7 +208,7 @@ describe('useReplaceTenantLogo', () => {
       return { result, fileService }
     }
 
-    it('400 "accepts at most N file(s)" -> restore succeeds -> discard candidate, surfaces link-failed (restore outcome doesn\'t change surfaced error)', async () => {
+    it('400 "accepts at most N file(s)" -> restore succeeds -> discard candidate, surfaces restored-after-link-failure (a confirmed restore is a calmer outcome than plain link-failed)', async () => {
       const { result, fileService } = await setupToLinkStep()
       vi.mocked(fileService.linkFileToEntity).mockRejectedValueOnce(confirmedRejection(400, 'accepts at most 1 file(s)'))
       vi.mocked(fileService.changeFileStatus).mockResolvedValueOnce(ok()) // restore succeeds
@@ -218,7 +218,7 @@ describe('useReplaceTenantLogo', () => {
         result.current.replace(makeFile())
       })
 
-      await waitFor(() => expect(result.current.state.step).toBe('link-failed'))
+      await waitFor(() => expect(result.current.state.step).toBe('restored-after-link-failure'))
       expect(fileService.changeFileStatus).toHaveBeenCalledWith(OLD_LOGO_ID, { status: 'active' })
       expect(fileService.changeFileStatus).toHaveBeenCalledWith(NEW_FILE.id, { status: 'discarded' })
     })
@@ -253,7 +253,8 @@ describe('useReplaceTenantLogo', () => {
       expect(fileService.changeFileStatus).toHaveBeenCalledWith(NEW_FILE.id, { status: 'discarded' })
 
       // Retry the restore — this time it succeeds, and the candidate (already discarded once) is
-      // discarded again via the "already discarded" reconciliation, ending in link-failed.
+      // discarded again via the "already discarded" reconciliation, ending in restored-after-link-failure
+      // (restore is now confirmed, so this is the calmer outcome, not plain link-failed).
       vi.mocked(fileService.changeFileStatus).mockResolvedValueOnce(ok()) // restore succeeds
       vi.mocked(fileService.changeFileStatus).mockRejectedValueOnce(confirmedRejection(409, 'File is already "discarded"'))
 
@@ -261,11 +262,11 @@ describe('useReplaceTenantLogo', () => {
         await result.current.retry()
       })
 
-      await waitFor(() => expect(result.current.state.step).toBe('link-failed'))
+      await waitFor(() => expect(result.current.state.step).toBe('restored-after-link-failure'))
       expect(fileService.changeFileStatus).toHaveBeenCalledWith(OLD_LOGO_ID, { status: 'active' })
     })
 
-    it('cap conflict -> restore ambiguous (network error) -> reconciles via getFile -> STILL discards candidate', async () => {
+    it('cap conflict -> restore ambiguous (network error) -> reconciles via getFile as confirmed-restored -> STILL discards candidate, surfaces restored-after-link-failure', async () => {
       const { result, fileService } = await setupToLinkStep()
       vi.mocked(fileService.linkFileToEntity).mockRejectedValueOnce(confirmedRejection(409, 'already holds 1 of 1 active file(s)'))
       vi.mocked(fileService.changeFileStatus).mockRejectedValueOnce(networkError()) // restore ambiguous
@@ -276,7 +277,7 @@ describe('useReplaceTenantLogo', () => {
         result.current.replace(makeFile())
       })
 
-      await waitFor(() => expect(result.current.state.step).toBe('link-failed'))
+      await waitFor(() => expect(result.current.state.step).toBe('restored-after-link-failure'))
       expect(fileService.getFile).toHaveBeenCalledWith(OLD_LOGO_ID)
       expect(fileService.changeFileStatus).toHaveBeenCalledWith(NEW_FILE.id, { status: 'discarded' })
     })

@@ -2,7 +2,10 @@ import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { FiArrowLeft, FiDownload, FiPlus } from 'react-icons/fi'
 import { useTenant } from '@/features/access-management/tenant/hooks/useTenant'
+import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { useRole } from '@/features/access-management/role/hooks/useRole'
+import { useRoles } from '@/features/access-management/role/hooks/useRoles'
+import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRoleTypes'
 import { useDivisions } from '@/features/crm/divisions/hooks/useDivisions'
 import { useDivisionsFilters } from '@/features/crm/divisions/hooks/useDivisionsFilters'
 import DivisionsFilterBar from '@/features/crm/divisions/components/DivisionsFilterBar'
@@ -10,7 +13,7 @@ import DivisionsTable from '@/features/crm/divisions/components/DivisionsTable'
 import CreateDivisionModal from '@/features/crm/divisions/components/CreateDivisionModal'
 import EditTenantModal from '@/features/access-management/tenant/components/EditTenantModal'
 import TenantHeader from '@/features/access-management/tenant/components/TenantHeader'
-import EditContactModal from '@/features/contacts/components/EditContactModal'
+import { TenantKpiGrid, TenantKpiTile, TenantMiniBreakdown, TenantSectionLabel } from '@/features/access-management/tenant/components/TenantKpiTile'
 import { DIVISION_ROUTES } from '@/features/crm/divisions/divisions.routes'
 import { divisionService } from '@/features/crm/divisions/division.service'
 import { downloadDivisionsCsv } from '@/features/crm/divisions/division.export'
@@ -23,6 +26,11 @@ import { toast } from '@/components/ui/sonner'
 import { getApiErrorMessage } from '@/utils/apiError'
 import type { DivisionEntity } from '@/types/crm.types'
 import type { RolePopulatedUser, Tenant } from '@/types/accessManagement.types'
+
+// Mirrors the backend's own REPORT_MAX_LIMIT (tenant.service.ts) — the largest page report=true
+// will serve in one call, used here to fetch as wide a result set as possible before matching the
+// exact code client-side (see the Projects KPI comment below for why an exact match is needed).
+const REPORT_MAX_LIMIT = 20
 
 function formatTenantAddress(address: Tenant['address']): string | null {
   if (!address) return null
@@ -41,9 +49,15 @@ const TenantDetailPage = () => {
   const canManageTenant = hasPermission('tenant:manage')
   const canManageSystem = hasPermission('system:manage')
   const canViewRole = hasAnyPermission(['role:get', 'role:search', 'role:manage'])
+  // The MR KPI needs BOTH GET /role-types (role-type.routes.ts: tenant:admin/tenant:manage ONLY —
+  // no role:* permission accepted) AND GET /roles search (role.routes.ts: tenant:admin/
+  // tenant:manage/role:search). Gating on role:search alone (or any single-call requirement) lets a
+  // role:search-only actor pass this check, then get a real 403 from GET /role-types — which
+  // silently renders as "Coming soon" instead of a permission error. So this must be the
+  // intersection both calls actually accept: tenant:admin or tenant:manage only.
+  const canSearchRoles = hasAnyPermission(['tenant:admin', 'tenant:manage'])
   const canViewDivisions = hasAnyPermission(['division:manage', 'tenant:admin', 'lead:manage'])
   const canSeeInactiveDivisions = hasAnyPermission(['division:manage', 'tenant:manage'])
-  const canManageContacts = hasAnyPermission(['contact:manage', 'tenant:manage', 'tenant:admin'])
 
   const { data: ownerRoleData } = useRole(tenant?.owner)
   const ownerRole = ownerRoleData?.data ?? null
@@ -54,7 +68,6 @@ const TenantDetailPage = () => {
 
   const [editOpen, setEditOpen] = useState(false)
   const [createDivisionOpen, setCreateDivisionOpen] = useState(false)
-  const [addContactOpen, setAddContactOpen] = useState(false)
 
   const { filters, setFilter, reset } = useDivisionsFilters()
   const debouncedSearch = useDebouncedValue(filters.search, 300)
@@ -92,6 +105,36 @@ const TenantDetailPage = () => {
     activeDivisionCount !== undefined && inactiveDivisionCount !== undefined && (activeDivisionCount + inactiveDivisionCount) > 0
       ? Math.round((activeDivisionCount / (activeDivisionCount + inactiveDivisionCount)) * 100)
       : null
+
+  // Total MRs — role-type is per-tenant (no shared "pharma-mr" id across tenants), so the id
+  // must be resolved first before it can filter GET /roles. Both calls are count-only (limit: '1').
+  const { data: mrRoleTypeData } = useRoleTypes(
+    { code: 'pharma-mr', tenant: tenant?.id, limit: '1' },
+    canSearchRoles && !!tenant?.id,
+  )
+  const mrRoleTypeId = mrRoleTypeData?.data?.items[0]?.id
+  const { data: mrRolesData } = useRoles(
+    { type: mrRoleTypeId, limit: '1' },
+    canSearchRoles && !!mrRoleTypeId,
+  )
+  const totalMrCount = mrRolesData?.data?.count
+
+  // Projects — reuses the same report=true per-tenant aggregation the list page uses (search.ts
+  // getTenantStats). Tenant search has no id/tenant filter, so this is scoped via `code` instead —
+  // BUT the backend's code filter is an UNANCHORED regex ($regex, no ^$), so e.g. code "acme" also
+  // matches "acme-pharma". Picking items[0] blindly can silently show a DIFFERENT tenant's project
+  // count. Mitigated here by matching the exact code client-side within the (report-capped, max 20)
+  // result page — genuinely safe only when the real match is within that page; a tenant whose code
+  // collides with 20+ others sorted newer would still be missed. The correct fix is a backend exact
+  // -match contract (an `id`/`tenant` filter on GET /tenants, or an anchored code match) — not done
+  // here, logged in md-files/ui-revisions.md. Also requires tenant:search/tenant:manage (see the
+  // canSearchProjectsKpi gate below) even though this page itself only needs tenant:get to load.
+  const canSearchProjectsKpi = hasAnyPermission(['tenant:search', 'tenant:manage'])
+  const { data: tenantReportData } = useTenants(
+    { code: tenant?.code, report: 'true', limit: String(REPORT_MAX_LIMIT) },
+    canSearchProjectsKpi && !!tenant?.code,
+  )
+  const totalProjectCount = tenantReportData?.data?.items.find((t) => t.code === tenant?.code)?.stats?.totalProjects
 
   const [exportingDivisions, setExportingDivisions] = useState(false)
   // Exports the whole tenant's division set — both statuses, not just whatever
@@ -158,12 +201,47 @@ const TenantDetailPage = () => {
             onEditClick={() => setEditOpen(true)}
           />
 
+          {/* Prototype's "Client KPIs" strip — Active Divisions/Total MRs/Projects are real;
+              Billing/Outstanding/Project Types need backend work logged in md-files/ui-revisions.md. */}
+          <TenantSectionLabel>Client KPIs</TenantSectionLabel>
+          <TenantKpiGrid>
+            <TenantKpiTile
+              label="Active Divisions"
+              value={canSeeInactiveDivisions && activeDivisionCount !== undefined ? activeDivisionCount : totalDivisions}
+            />
+            <TenantKpiTile
+              label="Projects"
+              value={
+                !canSearchProjectsKpi
+                  ? <span style={{ color: 'var(--qms-text-muted)' }} className="italic text-[14px] font-bold">Restricted</span>
+                  : totalProjectCount !== undefined ? totalProjectCount : <span style={{ color: '#8b5cf6' }} className="italic text-[14px] font-bold">Coming soon</span>
+              }
+            />
+            <TenantKpiTile
+              label="Total MRs"
+              value={
+                !canSearchRoles
+                  ? <span style={{ color: 'var(--qms-text-muted)' }} className="italic text-[14px] font-bold">Restricted</span>
+                  : totalMrCount !== undefined ? totalMrCount : <span style={{ color: '#8b5cf6' }} className="italic text-[14px] font-bold">Coming soon</span>
+              }
+            />
+            <TenantKpiTile label="Billing" value={<span style={{ color: '#8b5cf6' }} className="italic text-[14px] font-bold">Coming soon</span>} />
+            <TenantKpiTile label="Outstanding" value={<span style={{ color: '#8b5cf6' }} className="italic text-[14px] font-bold">Coming soon</span>} />
+            <TenantMiniBreakdown
+              label="Project Types"
+              rows={[{ name: 'Screening / Diet / Lab / Mixed', value: <span className="italic">Coming soon</span> }]}
+            />
+          </TenantKpiGrid>
+
           {canViewDivisions && (
             <div>
               <div className="mb-3 flex items-start justify-between gap-4">
                 <div>
-                  <h2 className="text-base font-bold" style={{ color: 'var(--qms-text)' }}>Divisions</h2>
-                  <p className="text-[12px] mt-0.5" style={{ color: 'var(--qms-text-muted)' }}>
+                  <div className="flex items-center gap-2">
+                    <span className="w-1 h-3.5 rounded-sm shrink-0" style={{ background: '#8b5cf6' }} />
+                    <h2 className="text-base font-bold" style={{ color: 'var(--qms-text)' }}>Divisions</h2>
+                  </div>
+                  <p className="text-[12px] mt-0.5 ml-3" style={{ color: 'var(--qms-text-muted)' }}>
                     {!divisionsLoading && !divisionsError ? `${totalDivisions} total` : 'Divisions under this company.'}
                     {divisionPenetrationPct !== null && (
                       <span> · Penetration: <span className="font-semibold" style={{ color: 'var(--qms-text-soft)' }}>{divisionPenetrationPct}%</span></span>
@@ -179,15 +257,6 @@ const TenantDetailPage = () => {
                   >
                     <FiDownload size={14} /> {exportingDivisions ? 'Exporting…' : 'Export'}
                   </Button>
-                  {canManageContacts && (
-                    <Button
-                      onClick={() => setAddContactOpen(true)}
-                      className="text-white"
-                      style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
-                    >
-                      <FiPlus size={14} /> New Contact
-                    </Button>
-                  )}
                   <Button
                     onClick={() => setCreateDivisionOpen(true)}
                     className="text-white"
@@ -233,14 +302,6 @@ const TenantDetailPage = () => {
           {createDivisionOpen && (
             <CreateDivisionModal onClose={() => setCreateDivisionOpen(false)} defaultTenantId={tenant.id} />
           )}
-
-          <EditContactModal
-            open={addContactOpen}
-            contact={null}
-            onClose={() => setAddContactOpen(false)}
-            fixedTenantId={tenant.id}
-            fixedTenantType={tenant.type}
-          />
         </>
       )}
     </div>

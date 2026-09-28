@@ -4,13 +4,21 @@ import type { LeadEntity, LeadStatus } from '@/types/crm.types'
 import { LEAD_ADVANCE_ACTION_LABEL, LEAD_STATUS_COLOR, LEAD_STATUS_TEXT_COLOR, LEAD_TRANSITION_MAP } from '@/types/crm.types'
 import { downloadLeadsCsv } from '@/features/crm/crm.export'
 import { formatINR } from '@/utils/formatters'
-import { roleLabel, divisionLabel, tenantLabel } from '@/features/crm/crm.utils'
+import { roleLabel, divisionLabel, tenantLabel, contactPersonLabel } from '@/features/crm/crm.utils'
 import { Button } from '@/components/ui/button'
 import CopyButton from '@/components/ui/CopyButton'
+import UserAvatar from '@/components/ui/UserAvatar'
 import StagePill from '@/features/crm/components/StagePill'
 import LeadAdvanceModal from '@/features/crm/components/LeadAdvanceModal'
 
-const COLUMNS = ['Lead', 'Company', 'Division', 'Sales rep', 'Status', 'Value', 'Update Action']
+// Matches the prototype's column order/copy. "Follow-ups" has no real count
+// source (no lead<->meeting relation on our Lead model — see ui-revisions.md)
+// so it renders '—' rather than a fabricated number.
+const COLUMNS = ['Lead', 'Company', 'Division', 'Person', 'Therapy', 'Status', 'Value', 'Follow-ups', 'Age', 'Status action', 'Owner']
+
+function daysSince(date: string): number {
+  return Math.max(0, Math.floor((Date.now() - new Date(date).getTime()) / 86400000))
+}
 
 interface ListViewProps {
   leads: LeadEntity[]
@@ -45,7 +53,7 @@ const ListView = ({ leads, onOpen, onMoveStage, canManage }: ListViewProps) => {
             {COLUMNS.map((h) => (
               <th
                 key={h}
-                className={`font-bold text-[11px] uppercase tracking-wider px-3 py-2 whitespace-nowrap ${h === 'Value' ? 'text-right' : h === 'Update Action' ? 'text-center' : 'text-left'}`}
+                className={`font-bold text-[11px] uppercase tracking-wider px-3 py-2 whitespace-nowrap ${h === 'Value' ? 'text-right' : h === 'Status action' || h === 'Follow-ups' ? 'text-center' : 'text-left'}`}
                 style={{ color: 'var(--qms-text-muted)' }}
               >
                 {h}
@@ -65,18 +73,27 @@ const ListView = ({ leads, onOpen, onMoveStage, canManage }: ListViewProps) => {
                 className="cursor-pointer transition-colors hover:bg-(--qms-surface-hover)"
                 style={{ borderBottom: '1px solid var(--qms-border)' }}
               >
-                <td className="px-3 py-2 align-top">
-                  <div className="font-semibold whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>{lead.title}</div>
-                  <div className="flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>
+                <td className="px-3 py-2 align-top max-w-48">
+                  <div className="font-semibold" style={{ color: 'var(--qms-text)' }}>{lead.title}</div>
+                  <div className="flex items-center gap-1.5 text-[11px] whitespace-nowrap" style={{ color: 'var(--qms-text-muted)' }}>
                     {lead.code}
                     <CopyButton value={lead.code} label="Code" />
                   </div>
                 </td>
-                <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>{tenantLabel(lead.tenant)}</td>
-                <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>{divisionLabel(lead.division)}</td>
-                <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>{roleLabel(lead.salesPerson)}</td>
+                <td className="px-3 py-2 max-w-40" style={{ color: 'var(--qms-text)' }}>{tenantLabel(lead.tenant)}</td>
+                <td className="px-3 py-2 max-w-40" style={{ color: 'var(--qms-text)' }}>{divisionLabel(lead.division)}</td>
+                <td className="px-3 py-2 text-[12px] max-w-40" style={{ color: 'var(--qms-text)' }}>{contactPersonLabel(lead.contactPerson)}</td>
+                <td className="px-3 py-2 text-[12px] max-w-32 truncate" title={lead.focusTherapy.join(', ')} style={{ color: 'var(--qms-text)' }}>
+                  {lead.focusTherapy.length > 1
+                    ? `${lead.focusTherapy[0]}, +${lead.focusTherapy.length - 1}`
+                    : lead.focusTherapy[0] || '—'}
+                </td>
                 <td className="px-3 py-2 whitespace-nowrap"><StagePill status={lead.status} /></td>
                 <td className="px-3 py-2 whitespace-nowrap font-bold text-right" style={{ color: 'var(--qms-text)' }}>{formatINR(lead.estimatedValue)}</td>
+                <td className="px-3 py-2 whitespace-nowrap text-center">
+                  <span className="text-[10px] font-bold italic" style={{ color: 'var(--qms-brand)' }}>Coming soon</span>
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>{daysSince(lead.createdAt)}d</td>
                 <td className="px-3 py-2 whitespace-nowrap">
                   {isFinal && (
                     <div className="flex justify-center" style={{ color: 'var(--qms-text-muted)' }}>-</div>
@@ -102,6 +119,12 @@ const ListView = ({ leads, onOpen, onMoveStage, canManage }: ListViewProps) => {
                       ))}
                     </div>
                   )}
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap">
+                  <div className="flex items-center gap-1.5">
+                    <UserAvatar firstName={roleLabel(lead.salesPerson)} size="sm" />
+                    <span className="text-[12px]" style={{ color: 'var(--qms-text)' }}>{roleLabel(lead.salesPerson).split(' ')[0]}</span>
+                  </div>
                 </td>
               </tr>
             )

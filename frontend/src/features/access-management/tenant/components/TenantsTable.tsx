@@ -5,7 +5,10 @@ import { TENANT_ROUTES } from '@/features/access-management/tenant/tenant.routes
 import TenantStatusPill from '@/features/access-management/tenant/components/TenantStatusPill'
 
 // Prototype's .cm-row: no shared header row, each stat self-labels (value + kicker underneath).
-// Divisions/MRs/Billing are placeholders — real data needs the backend work in md-files/ui-revisions.md.
+// Divisions/Billing are placeholders — real data needs the backend work in md-files/ui-revisions.md.
+// MRs is intentionally NOT shown here (see md-files/ui-revisions.md) — a real per-tenant MR count
+// on a 10-row list page is an N+1 problem without a batched backend aggregation (unlike the single
+// -tenant Detail page, where the 2-call resolve is cheap and already wired).
 
 interface TenantsTableProps {
   tenants: Tenant[]
@@ -73,10 +76,6 @@ const TenantsTable = ({ tenants }: TenantsTableProps) => {
           <Stat
             value={<span className="text-[10px] font-bold italic" style={{ color: 'var(--cm-accent, var(--qms-brand))' }}>Coming soon</span>}
             label="Divisions"
-          />
-          <Stat
-            value={<span className="text-[10px] font-bold italic" style={{ color: 'var(--cm-accent, var(--qms-brand))' }}>Coming soon</span>}
-            label="MRs"
           />
           <Stat
             value={

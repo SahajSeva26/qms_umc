@@ -2,13 +2,11 @@ import type { LeadEntity } from '@/types/crm.types'
 import type { CrmFilterState } from '@/features/crm/hooks/useCrmFilters'
 
 // Search matches Title only — Company/Division have their own dedicated filters.
-// status/title are also sent as real backend query params (CrmPage.tsx) — kept
-// here too as a harmless, idempotent defense-in-depth check.
-//
-// fyFrom/fyTo filter client-side against whatever page is already loaded — the
-// backend doesn't accept these as real search params yet (see SearchLeadQuery's
-// own note), so this is a working stand-in until it does. Matches against
-// `createdAt` (the only date every lead reliably has).
+// status/title/fyFrom/fyTo are all also sent as real backend query params
+// (CrmPage.tsx, validated + applied server-side in lead.validators.ts/lead.service.ts)
+// — kept here too as a harmless, idempotent defense-in-depth check against
+// whatever page is already loaded. Matches against `createdAt` (the only date
+// every lead reliably has).
 //
 // fyFrom/fyTo are YYYY-MM-DD in the BROWSER'S LOCAL timezone (DatePicker.tsx
 // formats with date-fns in local time) — comparing them as bare strings against

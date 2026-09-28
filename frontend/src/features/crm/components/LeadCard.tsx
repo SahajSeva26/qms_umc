@@ -31,15 +31,18 @@ const LeadCard = ({ lead, onOpen, onAdvance, draggable, onDragStart, onDragEnd }
       onDragStart={(e) => onDragStart?.(e, lead.id)}
       onDragEnd={onDragEnd}
       onClick={() => onOpen(lead.id)}
-      className={`rounded-xl border p-3 mb-2 transition-all hover:-translate-y-0.5 ${draggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
-      style={{ background: 'var(--qms-surface-card)', borderColor: 'var(--qms-border)' }}
+      className={`rounded-[14px] border p-3 mb-2 transition-all hover:-translate-y-0.5 hover:shadow-md ${draggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+      style={{ background: 'var(--qms-surface-strong)', borderColor: 'var(--qms-border)' }}
     >
       <div className="text-[13px] font-bold mb-0.5 truncate" style={{ color: 'var(--qms-text)' }}>{lead.title}</div>
       <div className="text-[11px] mb-2 truncate" style={{ color: 'var(--qms-text-muted)' }}>
         {contactPersonLabel(lead.contactPerson)} · {divisionLabel(lead.division)}
       </div>
 
-      <div className="flex items-center justify-between mb-2.5">
+      <div
+        className="flex items-center justify-between mb-2.5 pt-2"
+        style={{ borderTop: '1px dashed var(--qms-border)' }}
+      >
         <div className="flex items-center gap-1.5">
           <UserAvatar firstName={roleLabel(lead.salesPerson)} size="sm" />
           <span className="flex items-center gap-1 text-[10px]" style={{ color: 'var(--qms-text-muted)' }}>

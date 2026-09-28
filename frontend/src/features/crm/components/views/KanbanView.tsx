@@ -53,12 +53,14 @@ const KanbanView = ({ leads, onOpen, onMoveStage, canManage }: KanbanViewProps) 
                 setDragOverStatus(null)
                 if (draggingId && isLegalTarget) requestMove(draggingId, status)
               }}
-              className="rounded-2xl border p-2.5 transition-all"
+              className="rounded-[20px] border p-3 transition-all"
               style={{
                 background: isDragOver ? 'var(--qms-surface-strong)' : 'var(--qms-surface)',
                 borderColor: isDragOver ? 'var(--qms-brand)' : 'var(--qms-border)',
+                boxShadow: isDragOver ? '0 0 0 3px color-mix(in oklab, var(--qms-brand) 18%, transparent)' : undefined,
                 opacity: isLegalTarget ? 1 : 0.45,
                 cursor: draggingLead && !isLegalTarget ? 'not-allowed' : undefined,
+                minHeight: 360,
               }}
             >
               <div className="flex items-center gap-2 mb-1 px-1">
@@ -72,7 +74,7 @@ const KanbanView = ({ leads, onOpen, onMoveStage, canManage }: KanbanViewProps) 
                   {columnLeads.length}
                 </span>
               </div>
-              <div className="text-[11px] font-semibold px-1 mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+              <div className="text-[11px] font-semibold px-1.5 py-1 mb-2 inline-block rounded-full" style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text-muted)' }}>
                 {formatINR(total)}
               </div>
 

@@ -19,7 +19,7 @@ const STATUS_COLOR: Record<AppointmentStatus, string> = {
   cancelled: '#94a3b8',
 }
 
-const TYPE_COLOR: Record<AppointmentEntity['type'], string> = {
+export const APPOINTMENT_TYPE_COLOR: Record<AppointmentEntity['type'], string> = {
   new: '#3b6dff',
   'follow-up': '#14b8a6',
   payment: '#f59e0b',
@@ -28,7 +28,7 @@ const TYPE_COLOR: Record<AppointmentEntity['type'], string> = {
 
 // Calendar chip background: type color while planned, overridden by status color once it's left that state.
 export function appointmentChipColor(a: AppointmentEntity): string {
-  return a.status === 'planned' ? TYPE_COLOR[a.type] : STATUS_COLOR[a.status]
+  return a.status === 'planned' ? APPOINTMENT_TYPE_COLOR[a.type] : STATUS_COLOR[a.status]
 }
 
 export function appointmentStatusColor(status: AppointmentStatus): string {

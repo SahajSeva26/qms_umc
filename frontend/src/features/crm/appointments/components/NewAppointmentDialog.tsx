@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { FiUserPlus, FiBell, FiX } from 'react-icons/fi'
+import type { ReactNode } from 'react'
+import { FiUserPlus, FiBell, FiX, FiRefreshCw, FiDollarSign, FiZap, FiTag, FiBriefcase, FiVideo, FiClock, FiFileText } from 'react-icons/fi'
+import type { IconType } from 'react-icons'
 import type { AppointmentType, AppointmentMode } from '@/types/appointment.types'
 import { APPOINTMENT_TYPE_LABEL, APPOINTMENT_MODE_LABEL } from '@/types/appointment.types'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
@@ -13,12 +15,21 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import DatePicker from '@/components/ui/DatePicker'
-import { TimePicker } from '@/components/ui/TimePicker'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
+import { APPOINTMENT_TYPE_COLOR } from '@/features/crm/appointments/appointmentsReal.utils'
 import InternalMembersPicker from '@/features/crm/appointments/components/InternalMembersPicker'
 import LeadIdPicker from '@/features/crm/appointments/components/LeadIdPicker'
 import LinkedMeetingPicker from '@/features/crm/appointments/components/LinkedMeetingPicker'
+import { AppointmentTimePicker } from '@/features/crm/appointments/components/AppointmentTimePicker'
+import {
+  fieldInputClassName,
+  fieldInputStyle,
+  fieldSelectContentClassName,
+  fieldSelectContentStyle,
+  fieldSelectTriggerClassName,
+  fieldSelectTriggerStyle,
+} from '@/features/crm/appointments/components/appointmentField.styles'
 import EditContactModal from '@/features/contacts/components/EditContactModal'
 
 // Sentinel for the inline "+ Add new contact" option — never a real contact id,
@@ -26,6 +37,14 @@ import EditContactModal from '@/features/contacts/components/EditContactModal'
 const ADD_NEW_CONTACT_VALUE = '__add_new_contact__'
 
 const APPOINTMENT_TYPES: AppointmentType[] = ['new', 'follow-up', 'payment', 'spot']
+// Matches the prototype's MEETING_TYPES icons (sales-calendar-data.js) as closely as react-icons/fi
+// allows: user-plus/refresh-cw/banknote/zap → FiUserPlus/FiRefreshCw/FiDollarSign/FiZap.
+const APPOINTMENT_TYPE_ICON: Record<AppointmentType, IconType> = {
+  new: FiUserPlus,
+  'follow-up': FiRefreshCw,
+  payment: FiDollarSign,
+  spot: FiZap,
+}
 
 // Who-you're-meeting-as capture, scoped to this appointment only — not part of
 // the Contact's own stored record (that has its own separate, flat, free-text
@@ -53,8 +72,23 @@ function addDuration(startTime: string, durationHours: number): string {
   return `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`
 }
 
-const labelClasses = 'block text-[10px] font-semibold tracking-widest uppercase mb-2'
+// Prototype's .qms-cal-modal label (sales-calendar.js) — 11px/700/uppercase/.04em/mb-5px.
+const labelClasses = 'block text-[11px] font-bold tracking-[.04em] uppercase mb-1.5'
 const labelStyle = { color: 'var(--qms-text-muted)' }
+
+// Prototype's .section-h (sales-calendar.js) — 11px/800/uppercase/.06em, icon + text, groups the
+// form into named sections (Type/Account/Mode of meeting/Time/Agenda/Reminders). Our field SET and
+// grouping stay ours (Date+Start+Duration instead of Start/End, Mode+conditional-Link merged,
+// Reminders already its own block) — only the section-header visual treatment is ported here.
+const SectionHeader = ({ icon: Icon, children, color }: { icon: IconType; children: ReactNode; color?: string }) => (
+  <div
+    className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-[.06em] mt-3 mb-1.5"
+    style={{ color: color ?? 'var(--qms-text-muted)' }}
+  >
+    <Icon size={13} />
+    {children}
+  </div>
+)
 
 interface SelectedMember {
   roleId: string
@@ -204,25 +238,33 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
 
         <div className="space-y-4">
           <div>
-            <Label className={labelClasses} style={labelStyle}>Type</Label>
-            <div className="flex flex-wrap gap-1.5">
+            <SectionHeader icon={FiTag}>Type</SectionHeader>
+            {/* Prototype's .type-row/.type-card (sales-calendar.js) — auto-fit grid, each card a
+                28px colored icon badge + label, active state uses the TYPE's own color (not a
+                single brand color) for border/background tint/glow ring. */}
+            <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))' }}>
               {APPOINTMENT_TYPES.map((t) => {
                 const active = type === t
+                const color = APPOINTMENT_TYPE_COLOR[t]
+                const Icon = APPOINTMENT_TYPE_ICON[t]
                 return (
                   <button
                     key={t}
                     type="button"
                     onClick={() => setType(t)}
-                    className="rounded-xl border px-3 py-2 text-left transition-colors"
+                    className="flex items-center gap-2 rounded-xl border p-2.5 text-left transition-colors"
                     style={
                       active
-                        ? { borderColor: 'var(--qms-brand)', background: 'color-mix(in oklch, var(--qms-brand), transparent 92%)' }
-                        : { borderColor: 'var(--qms-border)' }
+                        ? { borderColor: color, background: `color-mix(in srgb, ${color} 8%, transparent)`, boxShadow: `0 0 0 3px color-mix(in srgb, ${color} 16%, transparent)` }
+                        : { borderColor: 'var(--qms-border)', background: 'var(--qms-surface)' }
                     }
                   >
-                    <div className="text-[12px] font-bold" style={{ color: active ? 'var(--qms-brand)' : 'var(--qms-text)' }}>
+                    <span className="flex items-center justify-center w-7 h-7 rounded-lg text-white shrink-0" style={{ background: color }}>
+                      <Icon size={14} />
+                    </span>
+                    <span className="text-[12px] font-bold" style={{ color: 'var(--qms-text)' }}>
                       {APPOINTMENT_TYPE_LABEL[t]}
-                    </div>
+                    </span>
                   </button>
                 )
               })}
@@ -230,14 +272,15 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
           </div>
 
           <div>
+            <SectionHeader icon={FiBriefcase}>Account</SectionHeader>
             <Label className={labelClasses} style={labelStyle}>Company *</Label>
             <Select key={tenantId || 'empty'} value={tenantId || undefined} onValueChange={(v) => selectTenant(v ?? '')}>
-              <SelectTrigger className="w-full text-[13px]">
+              <SelectTrigger className={fieldSelectTriggerClassName} style={fieldSelectTriggerStyle}>
                 <SelectValue placeholder={tenantsLoading ? 'Loading...' : 'Select company...'}>
                   {(v: string) => tenants.find((t) => t.id === v)?.name ?? (tenantsLoading ? 'Loading...' : 'Select company...')}
                 </SelectValue>
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className={fieldSelectContentClassName} style={fieldSelectContentStyle}>
                 {tenants.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -262,12 +305,12 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
                 }}
                 disabled={!tenantId}
               >
-                <SelectTrigger className="w-full text-[13px]">
+                <SelectTrigger className={fieldSelectTriggerClassName} style={fieldSelectTriggerStyle}>
                   <SelectValue placeholder={!tenantId ? 'Select a company first' : divisionsLoading ? 'Loading...' : 'Select division...'}>
                     {(v: string) => divisions.find((d) => d.id === v)?.name ?? (divisionsLoading ? 'Loading...' : 'Select division...')}
                   </SelectValue>
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className={fieldSelectContentClassName} style={fieldSelectContentStyle}>
                   {divisions.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -280,7 +323,7 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
               <Label className={labelClasses} style={labelStyle}>Contact person *</Label>
               {/* key forces a remount when set programmatically, else the Select keeps showing the placeholder. */}
               <Select key={contactPersonId || 'empty'} value={contactPersonId || undefined} onValueChange={handleContactSelect} disabled={!divisionId}>
-                <SelectTrigger className="w-full text-[13px]">
+                <SelectTrigger className={fieldSelectTriggerClassName} style={fieldSelectTriggerStyle}>
                   <SelectValue placeholder={!divisionId ? 'Select a division first' : contactsLoading ? 'Loading...' : 'Select contact...'}>
                     {(v: string) =>
                       contacts.find((c) => c.id === v)?.name ??
@@ -289,7 +332,7 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
                     }
                   </SelectValue>
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className={fieldSelectContentClassName} style={fieldSelectContentStyle}>
                   {contacts.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                   {divisionId && (
                     <SelectItem value={ADD_NEW_CONTACT_VALUE}>
@@ -321,10 +364,10 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
                   if (!nextDepartment || !MEETING_DESIGNATIONS[nextDepartment].includes(contactRole)) setContactRole('')
                 }}
               >
-                <SelectTrigger className="w-full text-[13px]">
+                <SelectTrigger className={fieldSelectTriggerClassName} style={fieldSelectTriggerStyle}>
                   <SelectValue placeholder="Select department...">{(v: string) => v}</SelectValue>
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className={fieldSelectContentClassName} style={fieldSelectContentStyle}>
                   {MEETING_DEPARTMENTS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -337,10 +380,10 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
                 onValueChange={(v) => setContactRole(v ?? '')}
                 disabled={!contactDepartment}
               >
-                <SelectTrigger className="w-full text-[13px]">
+                <SelectTrigger className={fieldSelectTriggerClassName} style={fieldSelectTriggerStyle}>
                   <SelectValue placeholder={contactDepartment ? 'Select designation...' : 'Select a department first'}>{(v: string) => v}</SelectValue>
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className={fieldSelectContentClassName} style={fieldSelectContentStyle}>
                   {contactDepartment && MEETING_DESIGNATIONS[contactDepartment].map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -348,54 +391,62 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
           </div>
 
           {type === 'follow-up' && (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className={labelClasses} style={labelStyle}>Linked lead {!parentId && '*'}</Label>
-                <LeadIdPicker value={leadId} label={leadLabel} onChange={(id, label) => { setLeadId(id); setLeadLabel(label) }} />
+            <div>
+              {/* Matches the prototype's teal "Follow-up of" section header (sales-calendar.js). */}
+              <SectionHeader icon={FiRefreshCw} color="#0f766e">Follow-up reference</SectionHeader>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className={labelClasses} style={labelStyle}>Linked lead {!parentId && '*'}</Label>
+                  <LeadIdPicker value={leadId} label={leadLabel} onChange={(id, label) => { setLeadId(id); setLeadLabel(label) }} />
+                </div>
+                <div>
+                  <Label className={labelClasses} style={labelStyle}>Linked meeting {!leadId && '*'}</Label>
+                  <LinkedMeetingPicker
+                    value={parentId}
+                    label={parentLabel}
+                    divisionId={divisionId}
+                    onChange={(id, label) => { setParentId(id); setParentLabel(label) }}
+                  />
+                </div>
+                {!leadId && !parentId && (
+                  <p className="text-[11px] col-span-2" style={{ color: 'var(--qms-text-muted)' }}>
+                    Follow-up appointments need either a linked lead or a linked meeting.
+                  </p>
+                )}
               </div>
-              <div>
-                <Label className={labelClasses} style={labelStyle}>Linked meeting {!leadId && '*'}</Label>
-                <LinkedMeetingPicker
-                  value={parentId}
-                  label={parentLabel}
-                  divisionId={divisionId}
-                  onChange={(id, label) => { setParentId(id); setParentLabel(label) }}
-                />
-              </div>
-              {!leadId && !parentId && (
-                <p className="text-[11px] col-span-2" style={{ color: 'var(--qms-text-muted)' }}>
-                  Follow-up appointments need either a linked lead or a linked meeting.
-                </p>
-              )}
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className={labelClasses} style={labelStyle}>Mode</Label>
-              <Select value={mode} onValueChange={(v) => setMode(v as AppointmentMode)}>
-                <SelectTrigger className="w-full text-[13px]">
-                  <SelectValue>{(v: string) => APPOINTMENT_MODE_LABEL[v as AppointmentMode]}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {(['online', 'offline', 'call'] as AppointmentMode[]).map((m) => (
-                    <SelectItem key={m} value={m}>{APPOINTMENT_MODE_LABEL[m]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {mode !== 'call' && (
+          <div>
+            <SectionHeader icon={FiVideo}>Mode of meeting</SectionHeader>
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className={labelClasses} style={labelStyle}>{mode === 'online' ? 'Meeting link' : 'Map link'}</Label>
-                <Input
-                  value={destinationLink}
-                  onChange={(e) => setDestinationLink(e.target.value)}
-                  className="text-[13px]"
-                  placeholder={mode === 'online' ? 'https://meet.google.com/...' : 'https://maps.google.com/...'}
-                />
+                <Label className={labelClasses} style={labelStyle}>Mode</Label>
+                <Select value={mode} onValueChange={(v) => setMode(v as AppointmentMode)}>
+                  <SelectTrigger className={fieldSelectTriggerClassName} style={fieldSelectTriggerStyle}>
+                    <SelectValue>{(v: string) => APPOINTMENT_MODE_LABEL[v as AppointmentMode]}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className={fieldSelectContentClassName} style={fieldSelectContentStyle}>
+                    {(['online', 'offline', 'call'] as AppointmentMode[]).map((m) => (
+                      <SelectItem key={m} value={m}>{APPOINTMENT_MODE_LABEL[m]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            )}
+
+              {mode !== 'call' && (
+                <div>
+                  <Label className={labelClasses} style={labelStyle}>{mode === 'online' ? 'Meeting link' : 'Map link'}</Label>
+                  <Input
+                    value={destinationLink}
+                    onChange={(e) => setDestinationLink(e.target.value)}
+                    className={fieldInputClassName}
+                    style={fieldInputStyle}
+                    placeholder={mode === 'online' ? 'https://meet.google.com/...' : 'https://maps.google.com/...'}
+                  />
+                </div>
+              )}
+            </div>
           </div>
 
           <div>
@@ -403,14 +454,23 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
             <InternalMembersPicker selected={members} onChange={setMembers} />
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div>
+            <SectionHeader icon={FiClock}>Time</SectionHeader>
+            <div className="grid grid-cols-3 gap-3">
             <div>
               <Label className={labelClasses} style={labelStyle}>Date *</Label>
-              <DatePicker value={date} onChange={setDate} className="w-full text-[13px]" />
+              {/* DatePicker's PopoverTrigger only accepts className (no style prop) — border/bg
+                  encoded as Tailwind arbitrary-property classes instead of appointmentField.styles'
+                  own `style` object, which needs an actual style-accepting element. */}
+              <DatePicker
+                value={date}
+                onChange={setDate}
+                className={`w-full ${fieldInputClassName} border-(--qms-border-strong) bg-(--qms-surface-strong)`}
+              />
             </div>
             <div>
               <Label className={labelClasses} style={labelStyle}>Start *</Label>
-              <TimePicker value={startTime} onChange={setStartTime} />
+              <AppointmentTimePicker value={startTime} onChange={setStartTime} />
             </div>
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -430,31 +490,36 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
                 step="0.25"
                 value={durationHours}
                 onChange={(e) => setDurationHours(Number(e.target.value))}
-                className="text-[13px]"
+                className={fieldInputClassName}
+                style={fieldInputStyle}
               />
               {!(durationHours > 0) && (
                 <p className="text-[11px] mt-1 text-danger">Duration must be greater than 0</p>
               )}
             </div>
+            </div>
           </div>
 
           <div>
-            <Label className={labelClasses} style={labelStyle}>Public agenda *</Label>
-            <Textarea value={agendaPublic} onChange={(e) => setAgendaPublic(e.target.value)} rows={2} className="text-[13px]" />
-          </div>
+            <SectionHeader icon={FiFileText}>Agenda</SectionHeader>
+            <div className="space-y-4">
+              <div>
+                <Label className={labelClasses} style={labelStyle}>Public agenda *</Label>
+                <Textarea value={agendaPublic} onChange={(e) => setAgendaPublic(e.target.value)} rows={2} className={fieldInputClassName} style={fieldInputStyle} />
+              </div>
 
-          <div>
-            <Label className={labelClasses} style={labelStyle}>Private notes</Label>
-            <Textarea value={agendaPrivate} onChange={(e) => setAgendaPrivate(e.target.value)} rows={2} className="text-[13px]" placeholder="Internal only" />
+              <div>
+                <Label className={labelClasses} style={labelStyle}>Private notes</Label>
+                <Textarea value={agendaPrivate} onChange={(e) => setAgendaPrivate(e.target.value)} rows={2} className={fieldInputClassName} style={fieldInputStyle} placeholder="Internal only" />
+              </div>
+            </div>
           </div>
 
           {/* Display-only shell — no backend support yet, nothing here is wired
               to state or the save payload. Rows are static placeholders matching
               the eventual "N hours before, via <channel>" reminder-rule shape. */}
           <div>
-            <Label className={`${labelClasses} flex items-center gap-1.5`} style={labelStyle}>
-              <FiBell size={11} /> Reminders
-            </Label>
+            <SectionHeader icon={FiBell}>Reminders</SectionHeader>
             <p className="text-[11px] mb-2" style={{ color: 'var(--qms-text-muted)' }}>
               Default reminder fires exactly 24 hours before the meeting time. Adjust the offset or add more rows as needed.
             </p>
@@ -482,16 +547,23 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
           {error && <p className="text-[12px] font-semibold text-danger">{error}</p>}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClose}>Cancel</Button>
-          <Button
-            onClick={handleSave}
-            disabled={createAppointment.isPending}
-            className="font-bold text-white"
-            style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
-          >
-            {createAppointment.isPending ? 'Scheduling...' : 'Schedule appointment'}
-          </Button>
+        {/* Matches the prototype's modal-foot layout (sales-calendar.js) — a static MOM-SLA
+            caption on the left, actions on the right, instead of just right-aligned buttons. */}
+        <DialogFooter className="sm:justify-between sm:items-center">
+          <p className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>
+            {type === 'spot' ? 'Spot meeting' : 'Standard meeting'} · MOM expected within 24 working hours
+          </p>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleClose}>Cancel</Button>
+            <Button
+              onClick={handleSave}
+              disabled={createAppointment.isPending}
+              className="font-bold text-white"
+              style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
+            >
+              {createAppointment.isPending ? 'Scheduling...' : 'Schedule appointment'}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
 

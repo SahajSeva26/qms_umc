@@ -12,7 +12,7 @@ const searchProjects = async (query: SearchProjectQuery) => {
 }
 
 // Single-project fetch — used once the picker resolves an id, so
-// GenerateInvoiceDialog/InvoiceDetailDrawer have the full ProjectEntity
+// GenerateInvoiceTab/InvoiceDetailDrawer have the full ProjectEntity
 // (campCost) to work with, not just id+label.
 const getProject = async (id: string) => {
   const res = await api.get<ApiResponse<ProjectEntity>>(`/projects/${id}`)

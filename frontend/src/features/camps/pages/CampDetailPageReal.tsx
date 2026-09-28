@@ -4,21 +4,25 @@ import { FiArrowLeft } from 'react-icons/fi'
 import { useCreateCamp } from '@/features/camps/hooks/useCreateCamp'
 import { useCampPickerData } from '@/features/camps/hooks/useCampPickerData'
 import { useCampDraft } from '@/features/camps/hooks/useCampDraft'
+import { useDivisionsShared } from '@/hooks/useDivisionsShared'
 import { campRefId, saveErrorMessage, withCampParam } from '@/features/camps/campsReal.utils'
 import { usePermission } from '@/hooks/usePermission'
+import { isForbiddenError } from '@/utils/apiError'
 import ProjectPicker from '@/features/camps/components/ProjectPicker'
 import CampFormFields from '@/features/camps/components/CampFormFields'
 import EditDoctorModal from '@/features/doctors/components/EditDoctorModal'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import TenantPicker from '@/components/ui/TenantPicker'
 import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
 import type { ProjectEntity } from '@/types/project.types'
-import type { DoctorEntity } from '@/types/doctor.types'
 import type { LocationValue } from '@/types/location.types'
 import type { LocationResolutionState } from '@/components/widgets/location-picker/location.types'
 import { CAMP_TYPE_VALUES, type CampType } from '@/types/campReal.types'
+
+// Matches useDoctorCreateScope's own CLIENT_SIDE_FETCH_LIMIT convention.
+const CLIENT_SIDE_FETCH_LIMIT = 200
 
 // create (camp:create) is a distinct backend permission from update — this
 // page only ever handles creation, so only the create code is checked here.
@@ -47,32 +51,39 @@ const CampDetailPageReal = () => {
   const [mrLabel, setMrLabel] = useState('')
   const [foLabel, setFoLabel] = useState('')
   const [projectLabel, setProjectLabelState] = useState('')
+  const [doctorLabelState, setDoctorLabelState] = useState('')
   const [deviceLabels, setDeviceLabels] = useState<Record<string, string>>({})
   const [pickedProject, setPickedProject] = useState<ProjectEntity | null>(null)
-  const [localDoctors, setLocalDoctors] = useState<DoctorEntity[]>([])
   const [showNewDoctor, setShowNewDoctor] = useState(false)
+  const [projectMismatchError, setProjectMismatchError] = useState<string | null>(null)
 
   const effectiveTenant = tenant
 
-  const { tenants, doctors: fetchedDoctors } = useCampPickerData(true, effectiveTenant)
-  // Locally merges a just-created doctor in immediately — a query invalidation
-  // could still land on a limit:10 page that doesn't include it.
-  const doctors = [...fetchedDoctors, ...localDoctors.filter((d) => !fetchedDoctors.some((f) => f.id === d.id))]
+  const { tenants } = useCampPickerData(true)
 
-  const doctorLabel = (id: string) => {
-    if (id) return doctors.find((d) => d.id === id)?.name ?? id
-    return effectiveTenant ? 'Select doctor' : 'Select company first'
-  }
-
+  const {
+    data: divisionsData,
+    isLoading: divisionsLoading,
+    isError: divisionsErrored,
+    error: divisionsError,
+    refetch: refetchDivisions,
+  } = useDivisionsShared({ tenant: effectiveTenant || undefined, limit: String(CLIENT_SIDE_FETCH_LIMIT) }, !!effectiveTenant)
+  const divisions = divisionsData?.data?.items ?? []
+  // A 403 means the actor lacks division:manage/tenant:admin/lead:manage — retrying never helps.
+  const divisionsForbidden = isForbiddenError(divisionsError)
   const bookableSlots = pickedProject?.campTimeSlots ?? []
-  const lockedDivisionName = pickedProject ? pickedProject.division && typeof pickedProject.division !== 'string' ? (pickedProject.division as { name?: string }).name ?? null : null : null
 
   const handleProjectChange = (p: ProjectEntity) => {
+    // A picked project must belong to the already-chosen Division — reject rather than
+    // silently overwrite division out from under the user (defensive; ProjectPicker already filters).
+    if (campRefId(p.division) !== division) {
+      setProjectMismatchError("This project doesn't belong to the selected division.")
+      return
+    }
+    setProjectMismatchError(null)
     setField('project', p.id)
     setProjectLabelState(p.name)
     setPickedProject(p)
-    // Division is derived/locked from the project — clear any independently-picked value.
-    setField('division', campRefId(p.division) ?? '')
     // The previously-selected slot may not be valid for the new project.
     if (timeSlot && !p.campTimeSlots.includes(timeSlot)) setField('timeSlot', '')
   }
@@ -150,15 +161,17 @@ const CampDetailPageReal = () => {
               value={tenant}
               onValueChange={(v) => {
                 setField('tenant', v)
+                setField('division', '')
                 setField('project', '')
                 setProjectLabelState('')
                 setPickedProject(null)
-                setField('division', '')
+                setProjectMismatchError(null)
                 // A doctor (fetched or just-created) scoped to the old company is no longer valid.
                 setField('doctor', '')
-                setLocalDoctors([])
-                // An MR/FO scoped to the old company is no longer valid either — same
-                // reasoning as doctor above.
+                setDoctorLabelState('')
+                setField('timeSlot', '')
+                // MR is scoped to the old company, no longer valid. FO is global platform staff
+                // (not company-scoped) but is cleared too, conservatively, on a company change.
                 setField('mr', '')
                 setMrLabel('')
                 setField('fo', '')
@@ -167,20 +180,69 @@ const CampDetailPageReal = () => {
             />
           </div>
           <div>
+            <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Division *</Label>
+            <Select
+              key={division || 'empty'}
+              value={division || undefined}
+              onValueChange={(v) => {
+                setField('division', v ?? '')
+                setField('project', '')
+                setProjectLabelState('')
+                setPickedProject(null)
+                setProjectMismatchError(null)
+                setField('doctor', '')
+                setDoctorLabelState('')
+                setField('timeSlot', '')
+              }}
+              disabled={!effectiveTenant || divisionsErrored}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder={!effectiveTenant ? 'Select a company first' : divisionsLoading ? 'Loading…' : 'Select division…'}>
+                  {(v: string) => divisions.find((d) => d.id === v)?.name ?? (divisionsLoading ? 'Loading…' : 'Select division…')}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {divisions.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {effectiveTenant && divisionsErrored && (
+              <div className="flex items-center gap-2 mt-1.5">
+                {divisionsForbidden ? (
+                  <p className="text-[11px] text-danger">Your role doesn't have access to Divisions — contact an admin to update your permissions.</p>
+                ) : (
+                  <>
+                    <p className="text-[11px] text-danger">Couldn't load this company's divisions.</p>
+                    <button type="button" onClick={() => refetchDivisions()} className="text-[11px] font-semibold underline decoration-dotted underline-offset-2 hover:no-underline">
+                      Retry
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+            {effectiveTenant && !divisionsLoading && !divisionsErrored && divisions.length === 0 && (
+              <p className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>This company has no divisions yet.</p>
+            )}
+          </div>
+          <div>
             <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Project *</Label>
             <ProjectPicker
               value={project}
               label={projectLabel}
               tenant={tenant || undefined}
+              division={division || undefined}
               onChange={handleProjectChange}
-              onClear={() => { setField('project', ''); setProjectLabelState(''); setPickedProject(null); setField('division', ''); setField('timeSlot', '') }}
+              onClear={() => {
+                setField('project', '')
+                setProjectLabelState('')
+                setPickedProject(null)
+                setProjectMismatchError(null)
+                // Division was picked independently, before Project — retain it on a Project clear.
+                setField('timeSlot', '')
+              }}
             />
-          </div>
-          <div>
-            <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Division</Label>
-            {/* Locked/derived from the picked Project — the backend silently overrides any
-                submitted division with the project's own, so an editable dropdown here is pointless. */}
-            <Input value={lockedDivisionName ?? (project ? 'Loading…' : '')} disabled placeholder="Select a project first" />
+            {projectMismatchError && (
+              <p className="text-[11px] text-danger mt-1.5">{projectMismatchError}</p>
+            )}
           </div>
 
           {showNewDoctor && (
@@ -188,27 +250,26 @@ const CampDetailPageReal = () => {
               open
               doctor={null}
               forcedTenant={{ id: effectiveTenant, label: tenants.find((t) => t.id === effectiveTenant)?.name ?? effectiveTenant }}
-              forcedDivision={division ? { id: division, label: lockedDivisionName ?? '' } : undefined}
+              forcedDivision={division ? { id: division, label: divisions.find((d) => d.id === division)?.name ?? division, note: 'locked to the selected division' } : undefined}
               onCreated={(created) => {
-                setLocalDoctors((prev) => [...prev, created])
                 setField('doctor', created.id)
+                setDoctorLabelState(created.name)
               }}
               onClose={() => setShowNewDoctor(false)}
             />
           )}
 
           <CampFormFields
+            mode="create"
             draft={draft}
             setField={setField}
             effectiveTenant={effectiveTenant}
             isLocked={false}
             lockedType={!!lockedTypeValue}
-            doctors={doctors}
-            doctorLabel={doctorLabel}
+            doctorLabel={doctorLabelState}
+            setDoctorLabel={setDoctorLabelState}
             showNewDoctorButton={canManageDoctors}
-            // A new doctor must be scoped to the camp's own division (derived from the
-            // picked Project) — before that's known, the modal would otherwise fall back
-            // to an unconstrained tenant-wide division picker. See forcedDivision below.
+            // A new doctor must be scoped to the camp's own division — see forcedDivision above.
             newDoctorDisabled={!division}
             onNewDoctor={() => setShowNewDoctor(true)}
             bookableSlots={bookableSlots}

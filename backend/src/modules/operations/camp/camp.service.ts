@@ -399,6 +399,25 @@ const create = async (model: ICreateCampPayload, ctx: RequestContext): Promise<H
         }
     }
 
+    //4b: once an FO is on the camp — whether supplied (3b, verified free) or auto-allocated (4,
+    // resolved free) — auto-confirm it. The FO is already known free, so we skip moveStage's clash
+    // re-check and move straight to confirmed, recording the requested→confirmed transition in the
+    // stage journal (mirrors moveStage).
+    if (camp.fo) {
+        const actorName = `${ctx.user?.firstName || ''} ${ctx.user?.lastName || ''}`.trim();
+        camp.stageHistory.push({
+            from: CAMP_STATUSES.REQUESTED,
+            to: CAMP_STATUSES.CONFIRMED,
+            reason: 'Auto-confirmed on field officer allocation',
+            actor: {
+                roleId: ctx.role?._id || ctx.role?.id,
+                name: actorName || undefined,
+                email: ctx.user?.email,
+            },
+        } as any);
+        camp.status = CAMP_STATUSES.CONFIRMED;
+    }
+
     //5: reserve the sequential code + persist in a txn ($geoNear above stays outside the txn)
     const saved = await withTransaction(async () => {
         camp.code = await CounterService.next(CAMP_COUNTER_ENTITY, ctx);

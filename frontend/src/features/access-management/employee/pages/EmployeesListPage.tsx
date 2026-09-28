@@ -67,7 +67,9 @@ const EmployeesListContent = () => {
   const employees = data?.data?.items ?? []
   const totalCount = data?.data?.count ?? 0
 
-  const { data: tenantsData } = useTenants({}, isPlatformActor && canSearchTenants)
+  // A fixed high limit, not pagination — this populates a <Select>'s full option list (matches the
+  // same "load everything for a dropdown" convention used elsewhere, e.g. useRoles({ limit: '500' })).
+  const { data: tenantsData } = useTenants({ limit: '500' }, isPlatformActor && canSearchTenants)
   const tenantOptions = isPlatformActor ? (tenantsData?.data?.items ?? []).map((t) => ({ id: t.id, label: t.name })) : undefined
 
   const handleFilterChange = <K extends keyof typeof filters>(key: K, value: (typeof filters)[K]) => {

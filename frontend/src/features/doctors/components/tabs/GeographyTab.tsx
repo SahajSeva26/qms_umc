@@ -5,10 +5,10 @@ import DoBar from '@/components/ui/DoBar'
 
 interface GeographyTabProps {
   doctors: DoctorEntity[]
-  onSelectCity: (city: string) => void
+  onSelectCityState: (city: string, state: string) => void
 }
 
-const GeographyTab = ({ doctors, onSelectCity }: GeographyTabProps) => {
+const GeographyTab = ({ doctors, onSelectCityState }: GeographyTabProps) => {
   const byState = useMemo(() => {
     const map = new Map<string, number>()
     doctors.forEach((d) => {
@@ -20,15 +20,19 @@ const GeographyTab = ({ doctors, onSelectCity }: GeographyTabProps) => {
   }, [doctors])
 
   const byCity = useMemo(() => {
+    // Keyed on (city, state) — two same-named cities in different states (a real, common case in
+    // India) must stay distinct rows, not silently merge into one aggregate.
     const map = new Map<string, { city: string; state: string; count: number }>()
     doctors.forEach((d) => {
       const city = d.location?.city
       if (!city) return
-      const existing = map.get(city)
+      const state = d.location?.state || '—'
+      const key = `${city}::${state}`
+      const existing = map.get(key)
       if (existing) {
         existing.count += 1
       } else {
-        map.set(city, { city, state: d.location?.state || '—', count: 1 })
+        map.set(key, { city, state, count: 1 })
       }
     })
     return [...map.values()].sort((a, b) => b.count - a.count)
@@ -70,8 +74,8 @@ const GeographyTab = ({ doctors, onSelectCity }: GeographyTabProps) => {
             <tbody>
               {byCity.map((c) => (
                 <tr
-                  key={c.city}
-                  onClick={() => onSelectCity(c.city)}
+                  key={`${c.city}::${c.state}`}
+                  onClick={() => onSelectCityState(c.city, c.state)}
                   className="border-t cursor-pointer transition-colors hover:bg-(--qms-surface-hover)"
                   style={{ borderColor: 'var(--qms-border)' }}
                 >

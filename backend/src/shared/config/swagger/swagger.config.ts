@@ -34,6 +34,7 @@ import '../../../modules/inventory/inventory-ledger/inventory-ledger.routes';
 import '../../../modules/finance/invoice/invoice.routes';
 import '../../../modules/finance/invoiceLineItem/invoiceLineItem.routes';
 import '../../../modules/vendor-master/vendor-master.routes';
+import '../../../modules/file/file.routes';
 // =============================================
 // =============================================
 

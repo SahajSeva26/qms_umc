@@ -1,9 +1,7 @@
 import { useEntityQuery } from '@/hooks/useEntityQuery'
-import { createEntityKeys } from '@/hooks/entityQueryKeys'
+import { projectKeys } from '@/hooks/projectKeys'
 import { projectsService } from '@/features/projects/projects.service'
 import type { SearchProjectQuery } from '@/types/project.types'
-
-export const projectKeys = createEntityKeys<SearchProjectQuery>('projects', 'project')
 
 // `enabled` defaults to true; pass false to opt out (e.g. a caller that
 // never calls projectName() and shouldn't fire this query at all).

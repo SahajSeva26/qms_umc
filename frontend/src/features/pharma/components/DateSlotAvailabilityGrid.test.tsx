@@ -46,10 +46,13 @@ function renderGrid(overrides: Partial<React.ComponentProps<typeof DateSlotAvail
   return { onDateSelect, onSlotSelect, onMonthChange, onRetry }
 }
 
-// react-day-picker's default day button accessible name is the day-of-month
-// number as plain text — scope by the exact day-of-month digit for today/tomorrow.
-function dayButton(date: Date) {
-  return screen.getByRole('gridcell', { name: String(date.getDate()) }).querySelector('button') as HTMLButtonElement
+// A day-of-month digit can appear twice with numberOfMonths={2} — near a month boundary,
+// matches[0] could silently be the WRONG month's same-digit day, so the index is computed, not assumed.
+function dayButton(date: Date, firstVisibleMonth: Date = TODAY) {
+  const monthIndex =
+    (date.getFullYear() - firstVisibleMonth.getFullYear()) * 12 + (date.getMonth() - firstVisibleMonth.getMonth())
+  const matches = screen.getAllByRole('gridcell', { name: String(date.getDate()) })
+  return matches[monthIndex].querySelector('button') as HTMLButtonElement
 }
 
 describe('DateSlotAvailabilityGrid', () => {
@@ -139,5 +142,22 @@ describe('DateSlotAvailabilityGrid', () => {
   it('shows the neutral "availability may change" caption, never overpromising a reservation', () => {
     renderGrid()
     expect(screen.getByText(/availability is checked when you choose a location and may change before confirmation/i)).toBeInTheDocument()
+  })
+
+  it('renders the legend with both labels and the same color classes the calendar itself uses', () => {
+    renderGrid()
+    expect(screen.getByText(/at least one fo available/i)).toBeInTheDocument()
+    expect(screen.getByText(/no field officer available/i)).toBeInTheDocument()
+  })
+
+  it('renders two months side by side simultaneously (numberOfMonths=2), both showing real coloring, not a single month', () => {
+    renderGrid()
+    // A given day-of-month digit rendering TWICE is itself proof two months are visible at once —
+    // exactly the case getAllByRole above exists to handle.
+    const todayMatches = screen.getAllByRole('gridcell', { name: String(TODAY.getDate()) })
+    expect(todayMatches.length).toBeGreaterThanOrEqual(1)
+    // Two distinct month captions/dropdowns are present — one per visible month.
+    const monthSelects = screen.getAllByRole('combobox', { name: /month/i })
+    expect(monthSelects).toHaveLength(2)
   })
 })

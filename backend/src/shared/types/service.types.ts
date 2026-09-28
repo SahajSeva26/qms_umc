@@ -12,7 +12,7 @@ export interface IServiceOptions {
     pagination?: any;
 
     // //transactionexplain with me easy steps
-    
+
     // isTransaction?: boolean;
     // session?: ClientSession;
 }

@@ -1,6 +1,6 @@
 import { useUpdateEntity } from '@/hooks/useUpdateEntity'
 import { doctorsService } from '@/features/doctors/doctors.service'
-import { doctorKeys } from '@/features/doctors/hooks/useDoctors'
+import { doctorKeys } from '@/hooks/doctorKeys'
 import type { UpdateDoctorPayload } from '@/types/doctor.types'
 
 export const useUpdateDoctor = (id: string) =>

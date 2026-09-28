@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { FiSearch, FiBell, FiHelpCircle, FiChevronDown, FiLogOut, FiUser, FiMenu } from 'react-icons/fi'
 import { useAuth } from '@/hooks/useAuth'
 import { useSession } from '@/hooks/useSession'
+import { useProfilePicture } from '@/hooks/useProfilePicture'
 import { getGreeting, formatClockDisplay } from '@/utils/formatters'
 import ThemeToggle from '@/components/ui/ThemeToggle'
 import MyProfileModal from '@/components/layouts/MyProfileModal'
@@ -17,6 +18,9 @@ function getInitials(firstName?: string, lastName?: string): string {
 const Topbar = ({ onMobileMenuToggle }: TopbarProps) => {
   const { user, signOut } = useAuth()
   const { session } = useSession()
+  // Called unconditionally with a safe fallback id (Rules of Hooks) — read-only display here,
+  // so no separate trigger-level gate is needed like MyProfileModal's.
+  const { url: pictureUrl } = useProfilePicture(user?.id ?? '')
   const [clock, setClock] = useState(formatClockDisplay)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [profileModalOpen, setProfileModalOpen] = useState(false)
@@ -117,10 +121,14 @@ const Topbar = ({ onMobileMenuToggle }: TopbarProps) => {
             }}
           >
             <div
-              className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+              className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 overflow-hidden"
               style={{ background: roleColor }}
             >
-              {initials}
+              {pictureUrl ? (
+                <img src={pictureUrl} alt="Profile picture" className="w-full h-full object-cover" />
+              ) : (
+                initials
+              )}
             </div>
             <div className="hidden sm:block text-left">
               <div className="text-[13px] font-semibold leading-none" style={{ color: 'var(--qms-text)' }}>

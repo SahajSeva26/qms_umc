@@ -19,6 +19,7 @@ function makeQueryClient() {
 function makeRow(overrides: Partial<InventoryLedgerEntity>): InventoryLedgerEntity {
   return {
     id: 'ledg-1',
+    source: 'request',
     request: { id: 'req-1', type: 'refill', status: 'approved' },
     requestType: 'refill',
     inventoryType: 'InventoryDevice',
@@ -183,5 +184,13 @@ describe('InventoryMovementHistoryDrawer', () => {
     await screen.findByText('BATCH-2026-014 · Lancets')
     expect(screen.getByText(/Status unavailable/)).toBeInTheDocument()
     expect(screen.queryByText(/Warehouse quantity: 450 · Active/)).not.toBeInTheDocument()
+  })
+
+  // Regression: a direct-assignment row has no requestType at all (no request behind it) —
+  // movementEventLabel must never be called with undefined; the row gets its own clear label.
+  it('a direct-assignment row (no requestType) shows "Direct assignment", not a blank/crashed label', async () => {
+    mockRows([makeRow({ source: 'direct', request: null, requestType: undefined, from: 'warehouse', to: 'field-officer' })])
+    await renderDrawer({ open: true, source: deviceSource, canManage: true })
+    expect(await screen.findByText('Direct assignment')).toBeInTheDocument()
   })
 })

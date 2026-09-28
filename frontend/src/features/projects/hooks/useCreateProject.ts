@@ -1,6 +1,6 @@
 import { useCreateEntity } from '@/hooks/useCreateEntity'
 import { projectsService } from '@/features/projects/projects.service'
-import { projectKeys } from '@/features/projects/hooks/useProjects'
+import { projectKeys } from '@/hooks/projectKeys'
 import type { CreateProjectPayload } from '@/types/project.types'
 
 // Consumer calls mutateAsync and awaits it (per EditLeadModal's consumption

@@ -141,7 +141,9 @@ const InventoryLedgerPanel = () => {
                           <td className="px-4 py-2.5 max-w-xs truncate font-mono" style={{ color: 'var(--qms-text)' }} title={itemIdentifier}>
                             {itemIdentifier ? truncateIdentifier(itemIdentifier) : '—'}
                           </td>
-                          <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>{INVENTORY_REQUEST_TYPE_LABEL[row.requestType]}</td>
+                          <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>
+                            {row.requestType ? INVENTORY_REQUEST_TYPE_LABEL[row.requestType] : row.source === 'direct' ? 'Direct' : '—'}
+                          </td>
                           <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
                             {row.request?.status ? INVENTORY_REQUEST_STATUS_LABEL[row.request.status] : '—'}
                           </td>

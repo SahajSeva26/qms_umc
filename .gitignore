@@ -41,6 +41,7 @@ frontend/dist/
 backend/node_modules/
 backend/dist/
 backend/src/shared/test-cases
+backend/test-cases
 backend/docs*
 
 # Local-only QA seed script (drives the real API to populate a dev DB) — must

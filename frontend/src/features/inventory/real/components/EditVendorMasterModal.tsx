@@ -20,9 +20,22 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import MutationStatusBanner from '@/components/ui/MutationStatusBanner'
 
 // An empty string is "provided but invalid" to the backend's email().optional() — must be an absent key, not ''.
+// Empty list -> undefined (omit the key) is correct for CREATE only — edit has its own wrapper below,
+// since there an empty list is a real, intentional "remove all contacts", not "nothing to send".
 function sanitizeContacts(contacts: VendorContact[] | undefined): VendorContact[] | undefined {
   if (!contacts?.length) return undefined
   return contacts.map((c) => ({
+    name: c.name,
+    number: c.number?.trim() || undefined,
+    email: c.email?.trim() || undefined,
+    designation: c.designation?.trim() || undefined,
+  }))
+}
+
+// Edit-mode variant: an empty array must still be sent as `[]`, not dropped as `undefined`,
+// or removing a vendor's last contact silently no-ops (the PUT body omits the key entirely).
+function sanitizeContactsForUpdate(contacts: VendorContact[] | undefined): VendorContact[] {
+  return (contacts ?? []).map((c) => ({
     name: c.name,
     number: c.number?.trim() || undefined,
     email: c.email?.trim() || undefined,
@@ -146,6 +159,9 @@ const CreateForm = ({ onClose, mutation }: { onClose: () => void; mutation: Retu
                         <Input placeholder="Phone" className="text-[13px]" {...register(`contacts.${i}.number`)} />
                         <Input placeholder="Email" className="text-[13px]" {...register(`contacts.${i}.email`)} />
                       </div>
+                      {errors.contacts?.[i]?.email && (
+                        <p className="text-[11px] text-danger">{errors.contacts[i]?.email?.message}</p>
+                      )}
                       <Input placeholder="Designation" className="text-[13px]" {...register(`contacts.${i}.designation`)} />
                     </div>
                     <button
@@ -221,7 +237,7 @@ const EditForm = ({
       {
         // Sent only when touched — last-write-wins server-side like the other 3 fields here.
         ...(dirtyFields.name ? { name: values.name } : {}),
-        contacts: dirtyFields.contacts ? sanitizeContacts(values.contacts) : undefined,
+        contacts: dirtyFields.contacts ? sanitizeContactsForUpdate(values.contacts) : undefined,
         // Only sent when dirty — the backend replaces address wholesale whenever the key is present at all.
         ...(dirtyFields.address ? { address: values.address ?? undefined } : {}),
         ...(canManageStatus ? { status: values.status } : {}),
@@ -269,6 +285,9 @@ const EditForm = ({
                         <Input placeholder="Phone" className="text-[13px]" {...register(`contacts.${i}.number`)} />
                         <Input placeholder="Email" className="text-[13px]" {...register(`contacts.${i}.email`)} />
                       </div>
+                      {errors.contacts?.[i]?.email && (
+                        <p className="text-[11px] text-danger">{errors.contacts[i]?.email?.message}</p>
+                      )}
                       <Input placeholder="Designation" className="text-[13px]" {...register(`contacts.${i}.designation`)} />
                     </div>
                     <button

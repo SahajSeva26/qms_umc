@@ -25,7 +25,7 @@ function formatFileSize(bytes: number): string {
 interface DoctorCsvImportProps {
   scope: DoctorCreateScope
   forcedTenant?: { id: string; label: string }
-  forcedDivision?: { id: string; label: string }
+  forcedDivision?: { id: string; label: string; note?: string }
   onCancel: () => void
 }
 

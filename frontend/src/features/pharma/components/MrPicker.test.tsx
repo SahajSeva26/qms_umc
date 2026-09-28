@@ -152,6 +152,87 @@ describe('MrPicker', () => {
     expect(vi.mocked(accessManagementService.searchDownlineMrs)).toHaveBeenCalledTimes(2)
   })
 
+  it("passes the selected MR's normalized division id (from a populated _id) as onChange's third argument", async () => {
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    vi.mocked(accessManagementService.searchDownlineMrs).mockResolvedValue({
+      success: true,
+      message: '',
+      data: {
+        items: [{ ...mrFixture('mr-0', 'Cardio MR Mona'), division: { _id: 'div-1', name: 'Cardiology', code: 'cardio' } }],
+        count: 1,
+      },
+    })
+
+    const MrPicker = (await import('@/features/pharma/components/MrPicker')).default
+    const onChange = vi.fn()
+    const queryClient = makeQueryClient()
+    const user = userEvent.setup()
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MrPicker value="" label="" onChange={onChange} />
+      </QueryClientProvider>,
+    )
+
+    await user.type(screen.getByPlaceholderText(/search mr by name/i), 'mo')
+    const option = await screen.findByText(/^Cardio MR Mona /, {}, { timeout: 3000 })
+    await user.click(option)
+
+    expect(onChange).toHaveBeenCalledWith('mr-0', 'Cardio MR Mona (phr-mr-0)', 'div-1')
+  })
+
+  it("passes the raw string when the MR's division comes back unpopulated (a bare ObjectId string)", async () => {
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    vi.mocked(accessManagementService.searchDownlineMrs).mockResolvedValue({
+      success: true,
+      message: '',
+      data: { items: [{ ...mrFixture('mr-0', 'Cardio MR Mona'), division: 'div-raw' }], count: 1 },
+    })
+
+    const MrPicker = (await import('@/features/pharma/components/MrPicker')).default
+    const onChange = vi.fn()
+    const queryClient = makeQueryClient()
+    const user = userEvent.setup()
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MrPicker value="" label="" onChange={onChange} />
+      </QueryClientProvider>,
+    )
+
+    await user.type(screen.getByPlaceholderText(/search mr by name/i), 'mo')
+    const option = await screen.findByText(/^Cardio MR Mona /, {}, { timeout: 3000 })
+    await user.click(option)
+
+    expect(onChange).toHaveBeenCalledWith('mr-0', 'Cardio MR Mona (phr-mr-0)', 'div-raw')
+  })
+
+  it("passes null when the selected MR has no division at all (absent/null field)", async () => {
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    vi.mocked(accessManagementService.searchDownlineMrs).mockResolvedValue({
+      success: true,
+      message: '',
+      data: { items: [mrFixture('mr-0', 'Cardio MR Mona')], count: 1 },
+    })
+
+    const MrPicker = (await import('@/features/pharma/components/MrPicker')).default
+    const onChange = vi.fn()
+    const queryClient = makeQueryClient()
+    const user = userEvent.setup()
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MrPicker value="" label="" onChange={onChange} />
+      </QueryClientProvider>,
+    )
+
+    await user.type(screen.getByPlaceholderText(/search mr by name/i), 'mo')
+    const option = await screen.findByText(/^Cardio MR Mona /, {}, { timeout: 3000 })
+    await user.click(option)
+
+    expect(onChange).toHaveBeenCalledWith('mr-0', 'Cardio MR Mona (phr-mr-0)', null)
+  })
+
   it('does not show a Load more control when every result already fits on one page', async () => {
     const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
     vi.mocked(accessManagementService.searchDownlineMrs).mockResolvedValue({

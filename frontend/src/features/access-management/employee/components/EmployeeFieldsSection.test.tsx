@@ -144,6 +144,38 @@ describe('EmployeeFieldsSection', () => {
     expect(await screen.findByText(/expected string, received null/i)).toBeInTheDocument()
   })
 
+  it('regression (QUP-470 S12): an invalid IFSC code fails validation with a visible error, not silently', async () => {
+    const onSubmit = vi.fn()
+    const user = userEvent.setup()
+    render(<Harness defaultValues={{ ...EMPTY_EMPLOYEE_FIELDS_VALUES, doj: '2026-01-01' }} onSubmit={onSubmit} />)
+
+    await user.type(screen.getByLabelText('IFSC code'), 'ABCD1234567')
+    await user.click(screen.getByRole('button', { name: /submit/i }))
+
+    expect(onSubmit).not.toHaveBeenCalled()
+    expect(await screen.findByText(/invalid ifsc code/i)).toBeInTheDocument()
+  })
+
+  it('regression (QUP-470 S12): a location missing address/city/state/pincode shows a message for EACH missing field, not just the coordinates complaint', async () => {
+    const onSubmit = vi.fn()
+    const user = userEvent.setup()
+    const emptyLocation = { addressLine1: '', city: '', state: '', pincode: '' } as EmployeeFieldsValues['location']
+    render(
+      <Harness
+        defaultValues={{ ...EMPTY_EMPLOYEE_FIELDS_VALUES, doj: '2026-01-01', location: emptyLocation }}
+        onSubmit={onSubmit}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: /submit/i }))
+
+    expect(onSubmit).not.toHaveBeenCalled()
+    expect(await screen.findByText(/^address is required\.$/i)).toBeInTheDocument()
+    expect(screen.getByText(/^city is required\.$/i)).toBeInTheDocument()
+    expect(screen.getByText(/^state is required\.$/i)).toBeInTheDocument()
+    expect(screen.getByText(/^pincode is required\.$/i)).toBeInTheDocument()
+  })
+
   it('a daRule with a type picked but no value fails validation with a visible error on the value input', async () => {
     const onSubmit = vi.fn()
     const user = userEvent.setup()

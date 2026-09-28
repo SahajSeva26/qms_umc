@@ -1,16 +1,13 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { FiUsers, FiLayers, FiMap, FiMoon, FiPlus, FiCheckCircle, FiNavigation } from 'react-icons/fi'
+import { FiUsers, FiLayers, FiMap, FiMoon, FiPlus, FiCheckCircle } from 'react-icons/fi'
 import KpiTile from '@/components/ui/KpiTile'
-import { Button } from '@/components/ui/button'
 import PaginationControls from '@/components/ui/PaginationControls'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
-import { useDoctors } from '@/features/doctors/hooks/useDoctors'
+import { useDoctorSearch as useDoctors } from '@/hooks/useDoctorSearch'
 import { useDoctorsFilters } from '@/features/doctors/hooks/useDoctorsFilters'
 import { usePermission } from '@/hooks/usePermission'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { usePagination } from '@/hooks/usePagination'
-import { DOCTORS_ROUTES } from '@/features/doctors/doctors.routes'
 import type { DoctorEntity, DoctorSpecialization } from '@/types/doctor.types'
 import { EMPTY_ARRAY } from '@/utils/emptyArray'
 import RosterTab from '@/features/doctors/components/tabs/RosterTab'
@@ -36,7 +33,6 @@ const PAGE_SIZE = 20
 const AGGREGATE_LIMIT = 10
 
 const DoctorsPage = () => {
-  const navigate = useNavigate()
   const { filters, setFilter, reset } = useDoctorsFilters()
   const debouncedSearch = useDebouncedValue(filters.search, 300)
   const debouncedCity = useDebouncedValue(filters.city, 300)
@@ -107,10 +103,18 @@ const DoctorsPage = () => {
     setTab('roster')
   }
 
-  const handleGoToRosterWithCity = (city: string) => {
+  // Bumped on every jump so StateCityFilter (remounted via this key) re-seeds even when the
+  // same city/state is clicked twice in a row.
+  const [geographySeedKey, setGeographySeedKey] = useState(0)
+  const [geographySeed, setGeographySeed] = useState<{ city: string; state: string } | null>(null)
+
+  const handleGoToRosterWithCityState = (city: string, state: string) => {
     setFilter('city', city)
+    setFilter('state', state)
     resetToFirstPage()
     setTab('roster')
+    setGeographySeed({ city, state })
+    setGeographySeedKey((k) => k + 1)
   }
 
   return (
@@ -121,9 +125,6 @@ const DoctorsPage = () => {
           <h1 className="text-2xl font-bold" style={{ color: 'var(--qms-text)' }}>Doctor Management</h1>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Button variant="outline" onClick={() => navigate(DOCTORS_ROUTES.DOCTORS_NEAREST)}>
-            <FiNavigation size={14} /> Nearest lookup
-          </Button>
           {/* Hide create entry point rather than let a 403 hit on submit. */}
           {canManageDoctors && (
             <button
@@ -174,6 +175,8 @@ const DoctorsPage = () => {
               setFilter={handleFilterChange}
               reset={handleReset}
               onOpenDoctor={setOpenDoctorId}
+              geographySeedKey={geographySeedKey}
+              geographySeed={geographySeed}
             />
             <PaginationControls page={page} totalPages={totalPages(totalCount)} onPageChange={setPage} />
           </>
@@ -184,7 +187,7 @@ const DoctorsPage = () => {
         )}
 
         {tab === 'geography' && (
-          <GeographyTab doctors={activeDoctors} onSelectCity={handleGoToRosterWithCity} />
+          <GeographyTab doctors={activeDoctors} onSelectCityState={handleGoToRosterWithCityState} />
         )}
 
         {tab === 'inactive' && (

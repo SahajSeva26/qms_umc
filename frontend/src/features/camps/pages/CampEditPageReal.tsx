@@ -5,7 +5,7 @@ import { useCampReal } from '@/features/camps/hooks/useCampReal'
 import { useUpdateCamp } from '@/features/camps/hooks/useUpdateCamp'
 import { useCampDraft } from '@/features/camps/hooks/useCampDraft'
 import { useProject } from '@/features/projects/hooks/useProject'
-import { useDoctors } from '@/features/doctors/hooks/useDoctors'
+import { useDoctorSearch as useDoctors } from '@/hooks/useDoctorSearch'
 import { campRefId, campRefName, saveErrorMessage, withCampParam } from '@/features/camps/campsReal.utils'
 import { usePermission } from '@/hooks/usePermission'
 import CampFormFields from '@/features/camps/components/CampFormFields'
@@ -149,6 +149,7 @@ const CampEditForm = ({ camp, returnTo }: CampEditFormProps) => {
       <h2 className="text-sm font-bold mb-4" style={{ color: 'var(--qms-text)' }}>Edit camp {camp.code}</h2>
 
       <CampFormFields
+        mode="edit"
         draft={draft}
         setField={setField}
         effectiveTenant={effectiveTenant}

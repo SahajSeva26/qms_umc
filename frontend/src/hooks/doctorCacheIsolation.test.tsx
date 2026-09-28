@@ -63,7 +63,7 @@ describe('doctors vs mockCampDoctors cache isolation', () => {
   })
 
   it('doctorKeys.all is exactly [\'doctors\'] and never collides with the literal \'mockCampDoctors\' key', async () => {
-    const { doctorKeys } = await import('@/features/doctors/hooks/useDoctors')
+    const { doctorKeys } = await import('@/hooks/doctorKeys')
     expect(doctorKeys.all).toEqual(['doctors'])
     expect(doctorKeys.all[0]).not.toBe('mockCampDoctors')
   })

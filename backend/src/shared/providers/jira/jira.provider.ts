@@ -7,8 +7,8 @@ import { throwAppError } from '../../utils/error';
 interface CreateTicketPayload {
     summary: string;
     description: string;
-    projectKey?: string; // falls back to ENV.Integrations.Jira.ProjectKey
-    issueType?: string; // falls back to ENV.Integrations.Jira.IssueType
+    projectKey?: string; // falls back to ENV.Providers.Jira.ProjectKey
+    issueType?: string; // falls back to ENV.Providers.Jira.IssueType
 }
 
 // Jira Cloud REST v3 requires `description` as an Atlassian Document Format (ADF)
@@ -21,7 +21,7 @@ const toAdf = (text: string) => ({
 });
 
 const createTicket = async (payload: CreateTicketPayload) => {
-    const { BaseUrl, Email, ApiToken, ProjectKey, IssueType } = ENV.Integrations.Jira;
+    const { BaseUrl, Email, ApiToken, ProjectKey, IssueType } = ENV.Providers.Jira;
 
     if (!BaseUrl || !Email || !ApiToken) {
         return throwAppError('Jira integration is not configured', StatusCodes.INTERNAL_SERVER_ERROR);

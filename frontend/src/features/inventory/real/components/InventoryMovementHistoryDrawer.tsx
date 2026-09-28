@@ -92,7 +92,7 @@ const InventoryMovementHistoryDrawer = ({ open, onClose, source, canManage }: In
                   <div key={row.id} className="rounded-lg border p-3" style={{ borderColor: 'var(--qms-border)' }}>
                     <div className="flex items-start justify-between gap-2">
                       <p className="text-[13px] font-bold" style={{ color: 'var(--qms-text)' }}>
-                        {movementEventLabel(row.requestType, row.from, row.to)}
+                        {row.requestType ? movementEventLabel(row.requestType, row.from, row.to) : 'Direct assignment'}
                       </p>
                       <p className="text-[11px] whitespace-nowrap" style={{ color: 'var(--qms-text-muted)' }}>{formatDateTime(row.createdAt)}</p>
                     </div>

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { CampDraft } from '@/features/camps/hooks/useCampDraft'
 import CampFoPicker from '@/features/camps/components/CampFoPicker'
 import CampMrPicker from '@/features/camps/components/CampMrPicker'
+import CampDoctorSearchPicker from '@/features/camps/components/CampDoctorSearchPicker'
 import InventoryMasterMultiPicker from '@/features/inventory/real/components/InventoryMasterMultiPicker'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,21 +26,24 @@ const BILLING_OPTIONS: { value: BillingType; label: string }[] = [
   { value: 'void', label: 'Void' },
 ]
 
-// Fields shared by both create (CampDetailPageReal.tsx) and edit (CampEditPageReal.tsx) —
-// everything EXCEPT Company/Project/Division, which only create mode collects (Project
-// derives Division there; edit mode's camp already has both fixed).
+// Fields shared by create/edit, except Company/Project/Division (create-only). `mode` governs
+// the Doctor field: create uses CampDoctorSearchPicker, edit uses the plain pre-fetched <Select>.
 interface CampFormFieldsProps {
+  mode: 'create' | 'edit'
   draft: CampDraft
   setField: <K extends keyof CampDraft>(key: K, value: CampDraft[K]) => void
   effectiveTenant: string
   isLocked: boolean
   // Locks only the Type select, independent of isLocked (which disables the whole form).
   lockedType?: boolean
-  doctors: DoctorEntity[]
-  doctorLabel: (id: string) => string
+  // edit-mode only — the pre-fetched doctors list for the plain <Select>.
+  doctors?: DoctorEntity[]
+  // create mode: plain label string (matches mrLabel/foLabel). edit mode: id->label resolver.
+  doctorLabel: string | ((id: string) => string)
+  setDoctorLabel?: (label: string) => void
   showNewDoctorButton: boolean
   // A new doctor must be created scoped to a known division — until one is picked
-  // (create mode: derived from the Project), "New doctor" would fall back to an
+  // (create mode: the Division field), "New doctor" would fall back to an
   // unconstrained tenant-wide division picker instead of staying camp-scoped.
   newDoctorDisabled?: boolean
   onNewDoctor: () => void
@@ -55,13 +59,15 @@ interface CampFormFieldsProps {
 }
 
 const CampFormFields = ({
+  mode,
   draft,
   setField,
   effectiveTenant,
   isLocked,
   lockedType = false,
-  doctors,
+  doctors = [],
   doctorLabel,
+  setDoctorLabel,
   showNewDoctorButton,
   newDoctorDisabled = false,
   onNewDoctor,
@@ -75,33 +81,18 @@ const CampFormFields = ({
   onDevicesChange,
   onLocationResolutionChange,
 }: CampFormFieldsProps) => {
-  const { doctor, type, billingType, patientExpectation, date, timeSlot, location, fo, mr, devices, notes } = draft
+  const { doctor, division, type, billingType, patientExpectation, date, timeSlot, location, fo, mr, devices, notes } = draft
   const deviceIds = devices ? devices.split(',').map((d) => d.trim()).filter(Boolean) : []
   const [locationHint, setLocationHint] = useState<string | null>(null)
 
+  const editDoctorLabel = (id: string) => {
+    if (typeof doctorLabel !== 'function') return id
+    if (id) return doctorLabel(id)
+    return effectiveTenant ? 'Select doctor' : 'Select company first'
+  }
+
   return (
     <div className="space-y-4">
-      <div>
-        <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Doctor *</Label>
-        <div className="flex items-center gap-2">
-          {/* key forces a remount on undefined->defined transitions — base-ui's Select
-              otherwise keeps treating it as uncontrolled after the first render. */}
-          <Select key={doctor || 'empty'} value={doctor || undefined} onValueChange={(v) => setField('doctor', v ?? '')} disabled={isLocked || !effectiveTenant}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder={effectiveTenant ? 'Select doctor' : 'Select company first'}>{(v) => doctorLabel(v as string)}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {doctors.map((d) => <SelectItem key={d.id} value={d.id}>{d.name} ({d.pharmaCode})</SelectItem>)}
-            </SelectContent>
-          </Select>
-          {showNewDoctorButton && (
-            <Button type="button" variant="outline" disabled={isLocked || !effectiveTenant || newDoctorDisabled} onClick={onNewDoctor}>
-              New doctor
-            </Button>
-          )}
-        </div>
-      </div>
-
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Type</Label>
@@ -175,7 +166,37 @@ const CampFormFields = ({
         Used to auto-allocate the nearest available field officer if none is picked below.
       </p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div>
+          <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Doctor *</Label>
+          <div className="flex items-center gap-2">
+            {mode === 'create' ? (
+              <CampDoctorSearchPicker
+                value={doctor}
+                label={typeof doctorLabel === 'string' ? doctorLabel : ''}
+                division={division || undefined}
+                onChange={(id, label) => { setField('doctor', id); setDoctorLabel?.(label) }}
+                disabled={isLocked}
+              />
+            ) : (
+              /* key forces a remount on undefined->defined transitions — base-ui's Select
+                  otherwise keeps treating it as uncontrolled after the first render. */
+              <Select key={doctor || 'empty'} value={doctor || undefined} onValueChange={(v) => setField('doctor', v ?? '')} disabled={isLocked || !effectiveTenant}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder={effectiveTenant ? 'Select doctor' : 'Select company first'}>{(v) => editDoctorLabel(v as string)}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {doctors.map((d) => <SelectItem key={d.id} value={d.id}>{d.name} ({d.pharmaCode})</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+            {mode === 'create' && showNewDoctorButton && (
+              <Button type="button" variant="outline" disabled={isLocked || !effectiveTenant || newDoctorDisabled} onClick={onNewDoctor}>
+                New doctor
+              </Button>
+            )}
+          </div>
+        </div>
         <div>
           <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
             Field Officer (optional — auto-assigned if blank)

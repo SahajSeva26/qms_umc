@@ -1,5 +1,5 @@
-import { useEffect, useId, useRef, useState } from 'react'
-import { APIProvider, useApiLoadingStatus, APILoadingStatus } from '@vis.gl/react-google-maps'
+import { useContext, useEffect, useId, useRef, useState } from 'react'
+import { useApiLoadingStatus, APILoadingStatus, APIProviderContext } from '@vis.gl/react-google-maps'
 import ENV from '@/config/env'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,10 +10,6 @@ import { createEmptyLocationValue, type LocationValue } from '@/types/location.t
 
 const isValidLatitude = (lat: number) => Number.isFinite(lat) && lat >= -90 && lat <= 90
 const isValidLongitude = (lng: number) => Number.isFinite(lng) && lng >= -180 && lng <= 180
-
-// Module-scope so the reference stays stable — APIProvider's docs warn that
-// changing this prop after mount "will in most cases have no effect, cause an error, or both."
-const MAP_LIBRARIES: string[] = ['places']
 
 // Mumbai — used as the map's default center whenever no caller supplies its
 // own defaultCenter (confirmed: no current feature passes one).
@@ -101,6 +97,9 @@ function ManualCoordinateFallback({ height, value, onChange, disabled, defaultCo
 
 function LocationPickerInner({ value, onChange, disabled, height = DEFAULT_HEIGHT, defaultCenter, defaultCountry, countryCode, onResolutionStateChange, onManualCoordinateEntry, onLocationHintChange }: LocationPickerProps) {
   const loadingStatus = useApiLoadingStatus()
+  // Distinguishes "no APIProvider ancestor at all" (GoogleMapsProvider didn't mount — no API key
+  // configured) from a real, momentarily-NOT_LOADED provider that's about to start loading.
+  const hasProviderContext = useContext(APIProviderContext) !== null
   // A search selection is a real network round trip too — while it's in flight,
   // `value` isn't final yet, same hazard as the map's own reverse-geocode 'loading'.
   const [isSelecting, setIsSelecting] = useState(false)
@@ -111,7 +110,7 @@ function LocationPickerInner({ value, onChange, disabled, height = DEFAULT_HEIGH
     onResolutionStateChange?.(isSelecting ? 'loading' : mapResolution)
   }, [isSelecting, mapResolution, onResolutionStateChange])
 
-  if (loadingStatus === APILoadingStatus.FAILED || loadingStatus === APILoadingStatus.AUTH_FAILURE) {
+  if (!hasProviderContext || loadingStatus === APILoadingStatus.FAILED || loadingStatus === APILoadingStatus.AUTH_FAILURE) {
     return (
       <ManualCoordinateFallback
         height={height}
@@ -167,8 +166,8 @@ function LocationPickerInner({ value, onChange, disabled, height = DEFAULT_HEIGH
 const LocationPicker = (props: LocationPickerProps) => {
   const height = props.height ?? DEFAULT_HEIGHT
 
-  // Never mounts APIProvider when credentials are missing, so a Maps-less
-  // environment (CI, a dev with no key) doesn't crash on load.
+  // MapCanvas renders an <AdvancedMarker>, which requires a MapId (Map itself doesn't) — the
+  // shared GoogleMapsProvider (mounted at AppLayout) only guarantees the API key + Places library.
   if (!ENV.Maps.ApiKey || !ENV.Maps.MapId) {
     return (
       <ManualCoordinateFallback
@@ -183,11 +182,7 @@ const LocationPicker = (props: LocationPickerProps) => {
     )
   }
 
-  return (
-    <APIProvider apiKey={ENV.Maps.ApiKey} libraries={MAP_LIBRARIES}>
-      <LocationPickerInner {...props} />
-    </APIProvider>
-  )
+  return <LocationPickerInner {...props} />
 }
 
 export default LocationPicker

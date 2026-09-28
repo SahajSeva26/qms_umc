@@ -7,13 +7,17 @@ interface ProjectStatusPillProps {
   onClick?: () => void
 }
 
+// Prototype's .status-pill (projects-manager.js) is a solid color fill with white text/dot,
+// unlike ColorPill's shared tinted default — other callers keep the tinted look.
 const ProjectStatusPill = ({ status, onClick }: ProjectStatusPillProps) => (
   <ColorPill
     status={status}
     colorMap={PROJECT_STATUS_COLOR}
     labelMap={PROJECT_STATUS_LABEL}
     onClick={onClick}
-    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider"
+    textColor="#fff"
+    solid
+    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold"
   />
 )
 

@@ -39,11 +39,12 @@ export const LeadMapper = {
         };
         return result;
     },
-    toSearchResponse: (data: { count: number; items: any[] }, ctx: RequestContext) => {
+    toSearchResponse: (data: { count: number; items: any[]; stats?: any }, ctx: RequestContext) => {
         const result = {
             count: data?.count || 0,
             items: [] as any[],
         };
+        const stats = data?.stats;
         for (const lead of data?.items || []) {
             // NOTE: independent from toResponse on purpose — mirrors it field-for-field for now (incl. same permission gating) so nothing breaks; search rows can be trimmed later without affecting GET /:id.
             const item: any = {
@@ -80,6 +81,10 @@ export const LeadMapper = {
                 createdAt: lead.createdAt,
                 updatedAt: lead.updatedAt,
             };
+            // present only when the caller requested report=true
+            if (stats) {
+                item.stats = stats[lead._id?.toString()] ?? { followUps: 0 };
+            }
             result.items.push(item);
         }
         return result;
@@ -92,6 +97,8 @@ export const LeadMapper = {
 
         return {
             summary: report?.summary,
+            // KPI strip: pipelineValue, wonValue/wonCount, avgDealSize, winRate, salesVelocityDays, topRep
+            kpis: report?.kpis,
             byStatus: Object.values(LEAD_STATUSES).map((status) => ({
                 status,
                 count: statusCounts.get(status) || 0,

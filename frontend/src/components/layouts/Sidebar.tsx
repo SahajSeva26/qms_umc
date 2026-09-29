@@ -40,7 +40,6 @@ const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
   campsdiet: ['camp:search', 'camp:manage', 'tenant:manage'],
   // Permission-code half only — isNavItemVisible() also requires a platform-tenant
   // session for this specific item, since field-officer is a platform-only RoleType.
-  fo: ['tenant:manage', 'tenant:admin'],
   fieldofficers: ['tenant:manage', 'tenant:admin'],
   users: ['user:get', 'user:search', 'user:update'],
   // :get is deliberately excluded — the list page only calls search, which needs :search/:manage.
@@ -337,7 +336,7 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
     const hasCode = isRealSystemManage || requiredCodes.some((code) => permissions.includes(code))
     // field-officer lives only under the platform tenant — a customer-tenant admin holding the
     // same permission codes must still not see this item, or they'd land on a confusing false "not found" error.
-    if (item.id === 'fo' || item.id === 'fieldofficers') return hasCode && session?.tenant.type === 'platform'
+    if (item.id === 'fieldofficers') return hasCode && session?.tenant.type === 'platform'
     return hasCode
   }
 

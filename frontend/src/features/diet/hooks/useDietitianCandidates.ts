@@ -15,10 +15,13 @@ import {
 //      exactly the "large objects retained longer than necessary" problem. A
 //      useMemo is released with the component.
 //   2. A staleness risk the synchronous read does not have. Two of the backing
-//      stores (rate history, BCA equipment) are also written by features/om
-//      through its own service, which invalidates its own keys — never
-//      `dietKeys`. A cached shortlist could therefore serve data the current
-//      synchronous read would not.
+//      stores (rate history, BCA equipment) are written by other Diet domain
+//      hooks (useDietitianRates/useDietitianEquipment), which do invalidate a
+//      query key afterward — but only their own narrow per-dietitian
+//      `dietKeys.profileFor(id)`, never any key the shortlist itself is keyed
+//      under (no such key exists). A cached shortlist could therefore serve
+//      data the current synchronous read would not, with no invalidation call
+//      anywhere positioned to refresh it.
 //   3. A fake async boundary: queryFn would have to wrap a synchronous call in
 //      a resolved promise purely to look like an API.
 //

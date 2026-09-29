@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { InventoryConsumableEntity } from '@/types/inventoryConsumable.types'
 
 vi.mock('@/hooks/usePermission')
@@ -23,9 +24,7 @@ vi.mock('@/features/inventory/real/inventoryConsumable.service', () => ({
             quantity: 100,
             createdAt: '2026-01-01T00:00:00.000Z',
             updatedAt: '2026-01-01T00:00:00.000Z',
-            // status present on the fixture — the mapper WOULD include it
-            // for a manager caller; the test verifies the frontend hides it
-            // regardless of what's in the payload when the permission is absent.
+            // Present on the fixture regardless — the test verifies the frontend hides it when the permission is absent.
             status: 'active',
           } satisfies InventoryConsumableEntity,
         ],
@@ -46,6 +45,10 @@ vi.mock('@/features/inventory/real/inventoryConsumable.service', () => ({
         },
       },
     })),
+    // Unused by these tests (no form submit) — present only so
+    // EditInventoryConsumableModal's mutation hooks can mount without throwing.
+    createInventoryConsumable: vi.fn(),
+    updateInventoryConsumable: vi.fn(),
   },
 }))
 
@@ -137,5 +140,49 @@ describe('InventoryConsumablesPanel', () => {
     expect(screen.getByText('42')).toBeInTheDocument()
     expect(screen.getByText('900')).toBeInTheDocument()
     expect(screen.getByText('5')).toBeInTheDocument()
+  })
+})
+
+// Row click opens a read-only detail drawer — Edit lives inside it, only for a manage-level viewer.
+describe('InventoryConsumablesPanel — row click opens a detail drawer, Edit lives inside it', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  it('a non-manager can still open the drawer by clicking a row, but sees no Edit button inside it', async () => {
+    const user = userEvent.setup()
+    const { usePermission } = await import('@/hooks/usePermission')
+    vi.mocked(usePermission).mockReturnValue({ hasAnyPermission: () => false } as unknown as ReturnType<typeof usePermission>)
+    const InventoryConsumablesPanel = (await import('@/features/inventory/real/components/InventoryConsumablesPanel')).default
+
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <InventoryConsumablesPanel />
+      </QueryClientProvider>,
+    )
+
+    await user.click(await screen.findByText('BATCH-2026…'))
+    expect(await screen.findByRole('heading', { name: 'Syringe 5ml' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument()
+  })
+
+  it('a manager clicks a row to open the drawer, then Edit inside it to open the edit modal', async () => {
+    const user = userEvent.setup()
+    const { usePermission } = await import('@/hooks/usePermission')
+    vi.mocked(usePermission).mockReturnValue({ hasAnyPermission: () => true } as unknown as ReturnType<typeof usePermission>)
+    const InventoryConsumablesPanel = (await import('@/features/inventory/real/components/InventoryConsumablesPanel')).default
+
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <InventoryConsumablesPanel />
+      </QueryClientProvider>,
+    )
+
+    await user.click(await screen.findByText('BATCH-2026…'))
+    const editButton = await screen.findByRole('button', { name: /^edit$/i })
+    await user.click(editButton)
+
+    expect(await screen.findByRole('heading', { name: /^edit consumable lot$/i })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Syringe 5ml' })).not.toBeInTheDocument()
   })
 })

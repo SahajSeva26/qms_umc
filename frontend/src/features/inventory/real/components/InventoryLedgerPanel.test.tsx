@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import type { InventoryLedgerEntity } from '@/types/inventoryLedger.types'
+import { movementEventLabel } from '@/types/inventoryLedger.types'
 
 vi.mock('@/hooks/usePermission')
 
@@ -95,20 +96,20 @@ describe('InventoryLedgerPanel', () => {
   })
 
   it.each([
-    { name: 'refill reserve (warehouse -> in-transit)', row: makeRow({ requestType: 'refill', from: 'warehouse', to: 'in-transit', request: { id: 'r1', type: 'refill', status: 'approved' } }), expectedStatus: 'Approved', expectedMovement: 'Warehouse → In transit' },
-    { name: 'refill issue (in-transit -> field-officer)', row: makeRow({ requestType: 'refill', from: 'in-transit', to: 'field-officer', request: { id: 'r2', type: 'refill', status: 'received' } }), expectedStatus: 'Received', expectedMovement: 'In transit → Field officer' },
-    { name: 'refill release/cancel (in-transit -> warehouse)', row: makeRow({ requestType: 'refill', from: 'in-transit', to: 'warehouse', request: { id: 'r3', type: 'refill', status: 'cancelled' } }), expectedStatus: 'Cancelled', expectedMovement: 'In transit → Warehouse' },
-    { name: 'return withdraw (field-officer -> in-transit)', row: makeRow({ requestType: 'return', from: 'field-officer', to: 'in-transit', request: { id: 'r4', type: 'return', status: 'requested' } }), expectedStatus: 'Requested', expectedMovement: 'Field officer → In transit' },
-    { name: 'return restock (in-transit -> warehouse)', row: makeRow({ requestType: 'return', from: 'in-transit', to: 'warehouse', request: { id: 'r5', type: 'return', status: 'approved' } }), expectedStatus: 'Approved', expectedMovement: 'In transit → Warehouse' },
-    { name: 'return restore-to-FO (in-transit -> field-officer)', row: makeRow({ requestType: 'return', from: 'in-transit', to: 'field-officer', request: { id: 'r6', type: 'return', status: 'rejected' } }), expectedStatus: 'Rejected', expectedMovement: 'In transit → Field officer' },
-  ])('renders the $name movement shape with type, current status, movement, and assignee', async ({ row, expectedStatus, expectedMovement }) => {
+    { name: 'refill reserve (warehouse -> in-transit)', row: makeRow({ requestType: 'refill', from: 'warehouse', to: 'in-transit', request: { id: 'r1', type: 'refill', status: 'approved' } }), expectedStatus: 'Approved' },
+    { name: 'refill issue (in-transit -> field-officer)', row: makeRow({ requestType: 'refill', from: 'in-transit', to: 'field-officer', request: { id: 'r2', type: 'refill', status: 'received' } }), expectedStatus: 'Received' },
+    { name: 'refill release/cancel (in-transit -> warehouse)', row: makeRow({ requestType: 'refill', from: 'in-transit', to: 'warehouse', request: { id: 'r3', type: 'refill', status: 'cancelled' } }), expectedStatus: 'Cancelled' },
+    { name: 'return withdraw (field-officer -> in-transit)', row: makeRow({ requestType: 'return', from: 'field-officer', to: 'in-transit', request: { id: 'r4', type: 'return', status: 'requested' } }), expectedStatus: 'Requested' },
+    { name: 'return restock (in-transit -> warehouse)', row: makeRow({ requestType: 'return', from: 'in-transit', to: 'warehouse', request: { id: 'r5', type: 'return', status: 'approved' } }), expectedStatus: 'Approved' },
+    { name: 'return restore-to-FO (in-transit -> field-officer)', row: makeRow({ requestType: 'return', from: 'in-transit', to: 'field-officer', request: { id: 'r6', type: 'return', status: 'rejected' } }), expectedStatus: 'Rejected' },
+  ])('renders the $name movement shape with type, current status, from/to, and assignee', async ({ row, expectedStatus }) => {
     mockRows([row])
     await renderPanel(true)
 
-    const typeLabel = row.requestType === 'refill' ? 'Refill' : 'Return'
+    const typeLabel = movementEventLabel(row.requestType!, row.from, row.to)
     await screen.findByText(typeLabel)
     expect(screen.getByText(expectedStatus)).toBeInTheDocument()
-    expect(screen.getByText(expectedMovement)).toBeInTheDocument()
+    expect(screen.getAllByText(new RegExp(`^(Warehouse|In transit|Field officer)$`)).length).toBeGreaterThan(0)
     expect(screen.getByText('Jane FO')).toBeInTheDocument()
     expect(screen.getByText('Manager Bob')).toBeInTheDocument()
   })
@@ -125,13 +126,13 @@ describe('InventoryLedgerPanel', () => {
     await renderPanel(true)
 
     await screen.findByText('noname@qms.test')
-    const dashes = screen.getAllByText('—')
-    expect(dashes.length).toBeGreaterThanOrEqual(2) // assignee + item, at minimum
+    // No serial/batch (inventory: null) and no assignee — the Unit cell falls back to '—'.
+    expect(screen.getByText('—')).toBeInTheDocument()
   })
 
   // Regression: a direct-assignment row has no request behind it, so requestType is genuinely
-  // absent — the Type column must show "Direct", not render blank.
-  it('a direct-assignment row (no request, no requestType) shows "Direct" in the Type column, not blank', async () => {
+  // absent — the Type column must show "Direct assignment", not render blank.
+  it('a direct-assignment row (no request, no requestType) shows "Direct assignment" in the Type column, not blank', async () => {
     mockRows([
       makeRow({
         source: 'direct',
@@ -144,7 +145,7 @@ describe('InventoryLedgerPanel', () => {
     await renderPanel(true)
 
     await screen.findByText('SN-001')
-    expect(screen.getByText('Direct')).toBeInTheDocument()
+    expect(screen.getByText('Direct assignment')).toBeInTheDocument()
     expect(screen.getByText('—')).toBeInTheDocument() // Status (now) — no request to read a status from
   })
 

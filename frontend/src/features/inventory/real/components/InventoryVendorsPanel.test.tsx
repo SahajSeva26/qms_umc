@@ -28,6 +28,10 @@ vi.mock('@/features/inventory/real/vendorMaster.service', () => ({
         ],
       },
     })),
+    // Unused by these tests (no form submit) — present only so
+    // EditVendorMasterModal's mutation hooks can mount without throwing.
+    createVendorMaster: vi.fn(),
+    updateVendorMaster: vi.fn(),
   },
 }))
 
@@ -80,7 +84,8 @@ describe('InventoryVendorsPanel', () => {
     )
 
     await screen.findByText('Acme Medical Supplies')
-    expect(screen.getByText('Status')).toBeInTheDocument()
+    // No "Status" column header — vendors render as cards, not a table; the
+    // status pill itself is still real and manage-gated.
     expect(screen.getByText('ACTIVE')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /new vendor/i })).toBeInTheDocument()
 
@@ -100,5 +105,48 @@ describe('InventoryVendorsPanel', () => {
       const lastCall = vi.mocked(vendorMasterService.searchVendorMasters).mock.calls.at(-1)
       expect(lastCall?.[0]).toMatchObject({ status: 'inactive' })
     })
+  })
+})
+
+// Card click opens a read-only detail drawer — Edit lives inside it, only for vendor-master:update/manage.
+describe('InventoryVendorsPanel — card click opens a detail drawer, Edit lives inside it', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  it('a viewer with no update permission can still open the drawer by clicking a card, but sees no Edit button inside it', async () => {
+    const user = userEvent.setup()
+    const { usePermission } = await import('@/hooks/usePermission')
+    vi.mocked(usePermission).mockReturnValue({ hasAnyPermission: () => false } as unknown as ReturnType<typeof usePermission>)
+    const InventoryVendorsPanel = (await import('@/features/inventory/real/components/InventoryVendorsPanel')).default
+
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <InventoryVendorsPanel />
+      </QueryClientProvider>,
+    )
+
+    await user.click(await screen.findByText('Acme Medical Supplies'))
+    expect(await screen.findByRole('heading', { name: 'Acme Medical Supplies' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument()
+  })
+
+  it('a viewer with vendor-master:manage clicks a card to open the drawer, then Edit inside it to open the edit modal', async () => {
+    const user = userEvent.setup()
+    const { usePermission } = await import('@/hooks/usePermission')
+    vi.mocked(usePermission).mockReturnValue({ hasAnyPermission: () => true } as unknown as ReturnType<typeof usePermission>)
+    const InventoryVendorsPanel = (await import('@/features/inventory/real/components/InventoryVendorsPanel')).default
+
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <InventoryVendorsPanel />
+      </QueryClientProvider>,
+    )
+
+    await user.click(await screen.findByText('Acme Medical Supplies'))
+    const editButton = await screen.findByRole('button', { name: /^edit$/i })
+    await user.click(editButton)
+
+    expect(await screen.findByRole('heading', { name: /^edit vendor$/i })).toBeInTheDocument()
   })
 })

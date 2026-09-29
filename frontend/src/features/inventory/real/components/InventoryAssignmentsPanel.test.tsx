@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { RoleEntity, RoleTypeEntity } from '@/types/accessManagement.types'
 import { toast } from '@/components/ui/sonner'
 
 vi.mock('@/hooks/usePermission')
@@ -11,7 +10,7 @@ vi.mock('@/components/ui/sonner', () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
 }))
 
-const ASSIGNMENT_ITEM = {
+const DEVICE_ASSIGNMENT_ITEM = {
   id: 'asn-1',
   assignee: { id: 'role-1', name: 'Jane FO', code: 'fo-1' },
   inventoryType: 'InventoryDevice',
@@ -21,11 +20,23 @@ const ASSIGNMENT_ITEM = {
   updatedAt: '2026-01-01T00:00:00.000Z',
 }
 
-const searchInventoryAssignments = vi.fn(async () => ({
-  success: true,
-  message: '',
-  data: { count: 1, items: [ASSIGNMENT_ITEM] },
-}))
+const CONSUMABLE_ASSIGNMENT_ITEM = {
+  id: 'asn-2',
+  assignee: { id: 'role-1', name: 'Jane FO', code: 'fo-1' },
+  inventoryType: 'InventoryConsumable',
+  inventory: { id: 'lot-1', batch: 'BATCH-01' },
+  quantity: 25,
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+}
+
+// Branches on inventoryType, matching the panel's two separate device/consumable calls.
+const searchInventoryAssignments = vi.fn(async (query: { inventoryType?: string }) => {
+  if (query.inventoryType === 'InventoryConsumable') {
+    return { success: true, message: '', data: { count: 1, items: [CONSUMABLE_ASSIGNMENT_ITEM] } }
+  }
+  return { success: true, message: '', data: { count: 1, items: [DEVICE_ASSIGNMENT_ITEM] } }
+})
 
 const getInventoryAssignmentReport = vi.fn(async () => ({
   success: true,
@@ -42,7 +53,7 @@ const getInventoryAssignmentReport = vi.fn(async () => ({
 
 vi.mock('@/features/inventory/real/inventoryAssignment.service', () => ({
   inventoryAssignmentService: {
-    searchInventoryAssignments: () => searchInventoryAssignments(),
+    searchInventoryAssignments: (query: { inventoryType?: string }) => searchInventoryAssignments(query),
     getInventoryAssignmentReport: () => getInventoryAssignmentReport(),
   },
 }))
@@ -55,12 +66,24 @@ vi.mock('@/features/inventory/real/inventoryAssignment.export', () => ({
 const searchInventoryDevices = vi.fn(async () => ({
   success: true,
   message: '',
-  data: { count: 1, items: [{ id: 'dev-1', status: 'assigned', lastCalibrationDate: null, nextCalibrationDate: null }] },
+  data: { count: 1, items: [{ id: 'dev-1', item: { id: 'item-1', name: 'Infusion pump' }, serialNumber: 'SN-001', status: 'assigned', lastCalibrationDate: null, nextCalibrationDate: null }] },
 }))
 
 vi.mock('@/features/inventory/real/inventoryDevice.service', () => ({
   inventoryDeviceService: {
     searchInventoryDevices: () => searchInventoryDevices(),
+  },
+}))
+
+const searchInventoryConsumables = vi.fn(async () => ({
+  success: true,
+  message: '',
+  data: { count: 1, items: [{ id: 'lot-1', item: { id: 'item-2', name: 'Sterile Lancets' }, batch: 'BATCH-01', quantity: 100, expiryDate: null }] },
+}))
+
+vi.mock('@/features/inventory/real/inventoryConsumable.service', () => ({
+  inventoryConsumableService: {
+    searchInventoryConsumables: () => searchInventoryConsumables(),
   },
 }))
 
@@ -76,93 +99,114 @@ vi.mock('@/features/geo-profile/geoProfile.service', () => ({
   },
 }))
 
-const searchRoleTypes = vi.fn<(query: unknown) => Promise<{ success: boolean; message: string; data: { items: RoleTypeEntity[]; count: number } }>>()
-const searchRoles = vi.fn<(query: unknown) => Promise<{ success: boolean; message: string; data: { items: RoleEntity[]; count: number } }>>()
-
-vi.mock('@/features/access-management/accessManagement.service', () => ({
-  accessManagementService: {
-    searchRoleTypes: (query: unknown) => searchRoleTypes(query),
-    searchRoles: (query: unknown) => searchRoles(query),
-  },
-}))
-
 function makeQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } })
 }
 
-// No per-row edit/delete/click — a manager can still push stock via "Assign to FO" separately.
-describe('InventoryAssignmentsPanel — no per-row create/delete/edit controls', () => {
-  beforeEach(() => {
-    vi.resetAllMocks()
-    searchRoleTypes.mockResolvedValue({ success: true, message: '', data: { count: 0, items: [] } })
-    searchRoles.mockResolvedValue({ success: true, message: '', data: { count: 0, items: [] } })
-    searchInventoryAssignments.mockResolvedValue({ success: true, message: '', data: { count: 1, items: [ASSIGNMENT_ITEM] } })
-    searchInventoryDevices.mockResolvedValue({ success: true, message: '', data: { count: 1, items: [{ id: 'dev-1', status: 'assigned', lastCalibrationDate: null, nextCalibrationDate: null }] } })
-    searchGeoProfiles.mockResolvedValue({ success: true, message: '', data: { count: 1, items: [{ id: 'geo-1', role: 'role-1', city: 'Pune' }] } })
+const ROSTER_FO = { role: 'role-1', name: 'Jane FO', code: 'fo-1', devicesHeld: 1, consumableUnitsHeld: 25, awaitingApproval: 0, awaitingReceipt: 0 }
+
+function resetAllMocks() {
+  vi.resetAllMocks()
+  searchInventoryAssignments.mockImplementation(async (query: { inventoryType?: string }) => {
+    if (query.inventoryType === 'InventoryConsumable') {
+      return { success: true, message: '', data: { count: 1, items: [CONSUMABLE_ASSIGNMENT_ITEM] } }
+    }
+    return { success: true, message: '', data: { count: 1, items: [DEVICE_ASSIGNMENT_ITEM] } }
+  })
+  searchInventoryDevices.mockResolvedValue({
+    success: true,
+    message: '',
+    data: { count: 1, items: [{ id: 'dev-1', item: { id: 'item-1', name: 'Infusion pump' }, serialNumber: 'SN-001', status: 'assigned', lastCalibrationDate: null, nextCalibrationDate: null }] },
+  })
+  searchInventoryConsumables.mockResolvedValue({
+    success: true,
+    message: '',
+    data: { count: 1, items: [{ id: 'lot-1', item: { id: 'item-2', name: 'Sterile Lancets' }, batch: 'BATCH-01', quantity: 100, expiryDate: null }] },
+  })
+  searchGeoProfiles.mockResolvedValue({ success: true, message: '', data: { count: 1, items: [{ id: 'geo-1', role: 'role-1', city: 'Pune' }] } })
+  getInventoryAssignmentReport.mockResolvedValue({
+    success: true,
+    message: '',
+    data: { summary: { totalFieldOfficers: 1, fieldOfficersHoldingInventory: 1 }, fieldOfficers: [ROSTER_FO] },
+  })
+}
+
+async function renderPanel(canManage: boolean) {
+  const { usePermission } = await import('@/hooks/usePermission')
+  vi.mocked(usePermission).mockReturnValue({ hasAnyPermission: () => canManage } as unknown as ReturnType<typeof usePermission>)
+  const InventoryAssignmentsPanel = (await import('@/features/inventory/real/components/InventoryAssignmentsPanel')).default
+  return render(
+    <QueryClientProvider client={makeQueryClient()}>
+      <InventoryAssignmentsPanel />
+    </QueryClientProvider>,
+  )
+}
+
+// This tab requires inventory-assignment:manage for ALL reads — unlike most inventory tabs, no partial non-manager view.
+describe('InventoryAssignmentsPanel — permission gating', () => {
+  beforeEach(resetAllMocks)
+
+  // Regression: devices/consumables hooks had no `enabled` gate, so both fired regardless of this permission check.
+  it('without inventory-assignment:manage: shows a permission message, fetches nothing at all', async () => {
+    await renderPanel(false)
+
+    await screen.findByText(/you don't have permission to view assignments/i)
+    expect(getInventoryAssignmentReport).not.toHaveBeenCalled()
+    expect(searchInventoryAssignments).not.toHaveBeenCalled()
+    expect(searchInventoryDevices).not.toHaveBeenCalled()
+    expect(searchInventoryConsumables).not.toHaveBeenCalled()
+    expect(searchGeoProfiles).not.toHaveBeenCalled()
+  })
+
+  it('with inventory-assignment:manage: renders the per-FO chip grid from real report + assignment data', async () => {
+    await renderPanel(true)
+
+    expect(await screen.findByText('Jane FO')).toBeInTheDocument()
+    expect(screen.getByText('Pune')).toBeInTheDocument()
+    // The device chip is built from the joined device name + serial.
+    expect(screen.getByText(/Infusion pump.*SN-001/)).toBeInTheDocument()
+  })
+
+  // Regression: an earlier rebuild fetched only InventoryDevice, dropping every consumable assignment.
+  it('shows consumable-assignment chips alongside device chips — not device-only', async () => {
+    await renderPanel(true)
+
+    await screen.findByText('Jane FO')
+    expect(searchInventoryAssignments).toHaveBeenCalledWith(expect.objectContaining({ inventoryType: 'InventoryConsumable' }))
+    // The consumable chip is built from the joined lot's item name + quantity.
+    expect(screen.getByText(/Sterile Lancets.*×25/)).toBeInTheDocument()
+  })
+
+  it('an FO with no assigned units shows the "no units assigned" placeholder, not an empty cell', async () => {
     getInventoryAssignmentReport.mockResolvedValue({
       success: true,
       message: '',
-      data: { summary: { totalFieldOfficers: 0, fieldOfficersHoldingInventory: 0 }, fieldOfficers: [] },
+      data: { summary: { totalFieldOfficers: 1, fieldOfficersHoldingInventory: 0 }, fieldOfficers: [{ ...ROSTER_FO, devicesHeld: 0, consumableUnitsHeld: 0 }] },
     })
-  })
+    searchInventoryAssignments.mockResolvedValue({ success: true, message: '', data: { count: 0, items: [] } })
 
-  it('renders the table with no per-row edit/delete controls and no clickable row, even for a manager-level identity', async () => {
-    const { usePermission } = await import('@/hooks/usePermission')
-    vi.mocked(usePermission).mockReturnValue({ hasAnyPermission: () => true } as unknown as ReturnType<typeof usePermission>)
+    await renderPanel(true)
 
-    const InventoryAssignmentsPanel = (await import('@/features/inventory/real/components/InventoryAssignmentsPanel')).default
-
-    render(
-      <QueryClientProvider client={makeQueryClient()}>
-        <InventoryAssignmentsPanel />
-      </QueryClientProvider>,
-    )
-
-    await screen.findByText('SN-001')
-
-    expect(screen.queryByRole('button', { name: /^new assignment$/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /remove assignment/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-
-    const row = screen.getByText('SN-001').closest('tr')
-    expect(row).not.toHaveClass('cursor-pointer')
+    expect(await screen.findByText('Jane FO')).toBeInTheDocument()
+    expect(screen.getByText('— No units assigned —')).toBeInTheDocument()
   })
 })
 
 describe('InventoryAssignmentsPanel — "Assign to FO" roster loading/error/empty states', () => {
-  beforeEach(() => {
-    vi.resetAllMocks()
-    searchRoleTypes.mockResolvedValue({ success: true, message: '', data: { count: 0, items: [] } })
-    searchRoles.mockResolvedValue({ success: true, message: '', data: { count: 0, items: [] } })
-    searchInventoryAssignments.mockResolvedValue({ success: true, message: '', data: { count: 1, items: [ASSIGNMENT_ITEM] } })
-    searchInventoryDevices.mockResolvedValue({ success: true, message: '', data: { count: 1, items: [{ id: 'dev-1', status: 'assigned', lastCalibrationDate: null, nextCalibrationDate: null }] } })
-    searchGeoProfiles.mockResolvedValue({ success: true, message: '', data: { count: 1, items: [{ id: 'geo-1', role: 'role-1', city: 'Pune' }] } })
-  })
-
-  async function renderAsManager() {
-    const { usePermission } = await import('@/hooks/usePermission')
-    vi.mocked(usePermission).mockReturnValue({ hasAnyPermission: () => true } as unknown as ReturnType<typeof usePermission>)
-    const InventoryAssignmentsPanel = (await import('@/features/inventory/real/components/InventoryAssignmentsPanel')).default
-    render(
-      <QueryClientProvider client={makeQueryClient()}>
-        <InventoryAssignmentsPanel />
-      </QueryClientProvider>,
-    )
-    await screen.findByText('SN-001')
-  }
+  beforeEach(resetAllMocks)
 
   it('"Assign to FO" is disabled while the roster is still loading', async () => {
     let resolveReport: (value: Awaited<ReturnType<typeof getInventoryAssignmentReport>>) => void = () => {}
     getInventoryAssignmentReport.mockImplementation(() => new Promise((resolve) => { resolveReport = resolve }))
 
-    await renderAsManager()
+    await renderPanel(true)
 
     expect(screen.getByRole('button', { name: /assign to fo/i })).toBeDisabled()
 
     resolveReport({
       success: true,
       message: '',
-      data: { summary: { totalFieldOfficers: 1, fieldOfficersHoldingInventory: 0 }, fieldOfficers: [{ role: 'role-1', name: 'Jane FO', code: 'fo-1', devicesHeld: 0, consumableUnitsHeld: 0, awaitingApproval: 0, awaitingReceipt: 0 }] },
+      data: { summary: { totalFieldOfficers: 1, fieldOfficersHoldingInventory: 0 }, fieldOfficers: [ROSTER_FO] },
     })
 
     await vi.waitFor(() => expect(screen.getByRole('button', { name: /assign to fo/i })).toBeEnabled())
@@ -173,46 +217,39 @@ describe('InventoryAssignmentsPanel — "Assign to FO" roster loading/error/empt
     getInventoryAssignmentReport.mockResolvedValue({
       success: true,
       message: '',
-      data: { summary: { totalFieldOfficers: 1, fieldOfficersHoldingInventory: 0 }, fieldOfficers: [{ role: 'role-1', name: 'Jane FO', code: 'fo-1', devicesHeld: 0, consumableUnitsHeld: 0, awaitingApproval: 0, awaitingReceipt: 0 }] },
+      data: { summary: { totalFieldOfficers: 1, fieldOfficersHoldingInventory: 0 }, fieldOfficers: [ROSTER_FO] },
     })
     const user = userEvent.setup()
 
-    await renderAsManager()
+    await renderPanel(true)
 
-    await screen.findByText("Couldn't load field officers.")
+    const bannerText = await screen.findByText("Couldn't load field officers.")
     expect(screen.getByRole('button', { name: /assign to fo/i })).toBeDisabled()
 
-    await user.click(screen.getByRole('button', { name: /retry/i }))
+    // Two Retry buttons now exist (this banner's own, and the grid's) — scope to this one.
+    const inlineRetry = bannerText.parentElement!.querySelector('button')!
+    await user.click(inlineRetry)
 
     await vi.waitFor(() => expect(screen.getByRole('button', { name: /assign to fo/i })).toBeEnabled())
     expect(getInventoryAssignmentReport).toHaveBeenCalledTimes(2)
   })
 
-  it('a roster that loads with zero FOs keeps the button disabled with an explanatory message', async () => {
+  it('a roster that loads with zero FOs keeps the "Assign to FO" button disabled', async () => {
     getInventoryAssignmentReport.mockResolvedValue({
       success: true,
       message: '',
       data: { summary: { totalFieldOfficers: 0, fieldOfficersHoldingInventory: 0 }, fieldOfficers: [] },
     })
 
-    await renderAsManager()
+    await renderPanel(true)
 
-    await screen.findByText('No eligible field officers found.')
-    expect(screen.getByRole('button', { name: /assign to fo/i })).toBeDisabled()
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: /assign to fo/i })).toBeDisabled())
   })
 
   it('clicking "Assign to FO" with a real roster opens the modal, passing the same fieldOfficers already fetched', async () => {
-    getInventoryAssignmentReport.mockResolvedValue({
-      success: true,
-      message: '',
-      data: {
-        summary: { totalFieldOfficers: 1, fieldOfficersHoldingInventory: 0 },
-        fieldOfficers: [{ role: 'role-1', name: 'Jane FO', code: 'fo-1', devicesHeld: 0, consumableUnitsHeld: 0, awaitingApproval: 0, awaitingReceipt: 0 }],
-      },
-    })
     const user = userEvent.setup()
 
-    await renderAsManager()
+    await renderPanel(true)
 
     const assignButton = await vi.waitFor(() => {
       const btn = screen.getByRole('button', { name: /assign to fo/i })
@@ -228,217 +265,79 @@ describe('InventoryAssignmentsPanel — "Assign to FO" roster loading/error/empt
   })
 })
 
-// A stock inventory-manager permission set holds neither tenant:manage nor tenant:admin.
-describe('InventoryAssignmentsPanel — Field Officer filter permission gating', () => {
-  beforeEach(() => {
-    vi.resetAllMocks()
-    searchRoleTypes.mockResolvedValue({ success: true, message: '', data: { count: 0, items: [] } })
-    searchRoles.mockResolvedValue({ success: true, message: '', data: { count: 0, items: [] } })
-    searchInventoryAssignments.mockResolvedValue({ success: true, message: '', data: { count: 1, items: [ASSIGNMENT_ITEM] } })
-    searchInventoryDevices.mockResolvedValue({ success: true, message: '', data: { count: 1, items: [{ id: 'dev-1', status: 'assigned', lastCalibrationDate: null, nextCalibrationDate: null }] } })
-    searchGeoProfiles.mockResolvedValue({ success: true, message: '', data: { count: 1, items: [{ id: 'geo-1', role: 'role-1', city: 'Pune' }] } })
-  })
+// Regression: a truncated geo-profiles fetch used to render identically to "this FO has no HQ".
+describe('InventoryAssignmentsPanel — truncation disclosure', () => {
+  beforeEach(resetAllMocks)
 
-  it('without tenant:manage/tenant:admin: the Field Officer filter does not render and never queries role-types/roles', async () => {
-    const { usePermission } = await import('@/hooks/usePermission')
-    vi.mocked(usePermission).mockReturnValue({
-      hasAnyPermission: (perms: string[]) => perms.every((p) => p.startsWith('inventory-')),
-    } as unknown as ReturnType<typeof usePermission>)
-
-    const InventoryAssignmentsPanel = (await import('@/features/inventory/real/components/InventoryAssignmentsPanel')).default
-
-    render(
-      <QueryClientProvider client={makeQueryClient()}>
-        <InventoryAssignmentsPanel />
-      </QueryClientProvider>,
-    )
-
-    await screen.findByText('SN-001')
-
-    expect(screen.queryByText('All field officers')).not.toBeInTheDocument()
-    expect(searchRoleTypes).not.toHaveBeenCalled()
-    expect(searchRoles).not.toHaveBeenCalled()
-    // The rest of the tab stays fully usable.
-    expect(screen.getByText('All types')).toBeInTheDocument()
-  })
-
-  it('with tenant:admin: the Field Officer filter renders and resolves the field-officer role type', async () => {
-    searchRoleTypes.mockResolvedValue({
+  it('discloses a truncated geo-profiles fetch by name, not silently', async () => {
+    searchGeoProfiles.mockResolvedValue({
       success: true,
       message: '',
-      data: {
-        count: 1,
-        items: [{
-          id: 'rt-fo', code: 'field-officer', name: 'Field Officer', description: '', permissions: [],
-          tenant: 'tenant-1', createdAt: '', updatedAt: '',
-        }],
-      },
-    })
-    searchRoles.mockResolvedValue({
-      success: true,
-      message: '',
-      data: {
-        count: 1,
-        items: [{
-          id: 'role-1', name: 'Jane FO', code: 'fo-1', permissions: [], status: 'active',
-          type: 'rt-fo', user: 'user-1', tenant: 'tenant-1', createdAt: '', updatedAt: '',
-        }],
-      },
+      data: { count: 1000, items: [{ id: 'geo-1', role: 'role-1', city: 'Pune' }] },
     })
 
-    const { usePermission } = await import('@/hooks/usePermission')
-    vi.mocked(usePermission).mockReturnValue({
-      hasAnyPermission: (perms: string[]) => perms.includes('tenant:admin'),
-    } as unknown as ReturnType<typeof usePermission>)
+    await renderPanel(true)
 
-    const InventoryAssignmentsPanel = (await import('@/features/inventory/real/components/InventoryAssignmentsPanel')).default
+    await screen.findByText('Jane FO')
+    expect(await screen.findByText(/FO locations/)).toBeInTheDocument()
+  })
 
-    render(
-      <QueryClientProvider client={makeQueryClient()}>
-        <InventoryAssignmentsPanel />
-      </QueryClientProvider>,
-    )
+  it('discloses a truncated consumable-assignments fetch by name', async () => {
+    searchInventoryAssignments.mockImplementation(async (query: { inventoryType?: string }) => {
+      if (query.inventoryType === 'InventoryConsumable') {
+        return { success: true, message: '', data: { count: 1000, items: [CONSUMABLE_ASSIGNMENT_ITEM] } }
+      }
+      return { success: true, message: '', data: { count: 1, items: [DEVICE_ASSIGNMENT_ITEM] } }
+    })
 
-    await screen.findByText('SN-001')
-    expect(screen.getByText('All field officers')).toBeInTheDocument()
+    await renderPanel(true)
 
-    await vi.waitFor(() => expect(searchRoleTypes).toHaveBeenCalledWith(expect.objectContaining({ code: 'field-officer' })))
-    await vi.waitFor(() => expect(searchRoles).toHaveBeenCalledWith(expect.objectContaining({ type: 'rt-fo' })))
+    await screen.findByText('Jane FO')
+    expect(await screen.findByText(/consumable assignments/)).toBeInTheDocument()
+  })
+
+  it('shows no truncation notice when every dataset is complete', async () => {
+    await renderPanel(true)
+
+    await screen.findByText('Jane FO')
+    expect(screen.queryByText(/showing the first 1,000/i)).not.toBeInTheDocument()
   })
 })
 
-describe('InventoryAssignmentsPanel — FO roster report', () => {
-  beforeEach(() => {
-    vi.resetAllMocks()
-    searchRoleTypes.mockResolvedValue({ success: true, message: '', data: { count: 0, items: [] } })
-    searchRoles.mockResolvedValue({ success: true, message: '', data: { count: 0, items: [] } })
-    searchInventoryAssignments.mockResolvedValue({ success: true, message: '', data: { count: 1, items: [ASSIGNMENT_ITEM] } })
-    searchInventoryDevices.mockResolvedValue({ success: true, message: '', data: { count: 1, items: [{ id: 'dev-1', status: 'assigned', lastCalibrationDate: null, nextCalibrationDate: null }] } })
-    searchGeoProfiles.mockResolvedValue({ success: true, message: '', data: { count: 1, items: [{ id: 'geo-1', role: 'role-1', city: 'Pune' }] } })
-  })
+// Regression: the grid's QueryStateBlock previously had no onRetry at all.
+describe('InventoryAssignmentsPanel — grid retry', () => {
+  beforeEach(resetAllMocks)
 
-  it('non-manager: report strip and FO roster table are both absent, report endpoint never called', async () => {
-    const { usePermission } = await import('@/hooks/usePermission')
-    vi.mocked(usePermission).mockReturnValue({ hasAnyPermission: () => false } as unknown as ReturnType<typeof usePermission>)
-
-    const InventoryAssignmentsPanel = (await import('@/features/inventory/real/components/InventoryAssignmentsPanel')).default
-
-    render(
-      <QueryClientProvider client={makeQueryClient()}>
-        <InventoryAssignmentsPanel />
-      </QueryClientProvider>,
-    )
-
-    await screen.findByText('SN-001')
-    expect(getInventoryAssignmentReport).not.toHaveBeenCalled()
-    expect(screen.queryByText('Total Field Officers')).not.toBeInTheDocument()
-    expect(screen.queryByText('All active field officers')).not.toBeInTheDocument()
-  })
-
-  it('manager: report strip and FO roster table render real data from the report response', async () => {
-    getInventoryAssignmentReport.mockResolvedValue({
-      success: true,
-      message: '',
-      data: {
-        summary: { totalFieldOfficers: 12, fieldOfficersHoldingInventory: 8 },
-        fieldOfficers: [
-          { role: 'role-9', name: 'Priya Roster', code: 'fo-9', devicesHeld: 3, consumableUnitsHeld: 5, awaitingApproval: 1, awaitingReceipt: 0 },
-        ],
-      },
-    })
-
-    const { usePermission } = await import('@/hooks/usePermission')
-    vi.mocked(usePermission).mockReturnValue({ hasAnyPermission: () => true } as unknown as ReturnType<typeof usePermission>)
-
-    const InventoryAssignmentsPanel = (await import('@/features/inventory/real/components/InventoryAssignmentsPanel')).default
-
-    render(
-      <QueryClientProvider client={makeQueryClient()}>
-        <InventoryAssignmentsPanel />
-      </QueryClientProvider>,
-    )
-
-    await screen.findByText('All active field officers')
-    expect(getInventoryAssignmentReport).toHaveBeenCalled()
-    // 12/8 only exist in the report summary — the assignment list fixture's own count is 1.
-    expect(screen.getByText('12')).toBeInTheDocument()
-    expect(screen.getByText('8')).toBeInTheDocument()
-    expect(screen.getByText('Priya Roster')).toBeInTheDocument()
-    expect(screen.getByText('fo-9')).toBeInTheDocument()
-  })
-
-  it('paging the FO roster table does not move the assignment list page, and vice versa', async () => {
-    const foRoster = Array.from({ length: 11 }, (_, i) => ({
-      role: `role-${i}`, name: `FO ${i}`, code: `fo-${i}`,
-      devicesHeld: 0, consumableUnitsHeld: 0, awaitingApproval: 0, awaitingReceipt: 0,
-    }))
-    getInventoryAssignmentReport.mockResolvedValue({
-      success: true,
-      message: '',
-      data: { summary: { totalFieldOfficers: 11, fieldOfficersHoldingInventory: 0 }, fieldOfficers: foRoster },
-    })
-    // 11 assignments so the assignment list also has 2 pages, independent of the FO roster's own 2 pages.
-    searchInventoryAssignments.mockResolvedValue({ success: true, message: '', data: { count: 11, items: [ASSIGNMENT_ITEM] } })
-
-    const { usePermission } = await import('@/hooks/usePermission')
-    vi.mocked(usePermission).mockReturnValue({ hasAnyPermission: () => true } as unknown as ReturnType<typeof usePermission>)
-
-    const InventoryAssignmentsPanel = (await import('@/features/inventory/real/components/InventoryAssignmentsPanel')).default
+  it('the grid error state has its own Retry button that re-fires every underlying fetch', async () => {
+    searchInventoryDevices.mockRejectedValue(new Error('network down'))
     const user = userEvent.setup()
 
-    render(
-      <QueryClientProvider client={makeQueryClient()}>
-        <InventoryAssignmentsPanel />
-      </QueryClientProvider>,
-    )
+    await renderPanel(true)
 
-    await screen.findByText('All active field officers')
-    expect(screen.getByText('FO 0')).toBeInTheDocument()
+    await screen.findByText('Failed to load assignments. Please try again.')
+    searchInventoryDevices.mockResolvedValue({
+      success: true,
+      message: '',
+      data: { count: 1, items: [{ id: 'dev-1', item: { id: 'item-1', name: 'Infusion pump' }, serialNumber: 'SN-001', status: 'assigned', lastCalibrationDate: null, nextCalibrationDate: null }] },
+    })
 
-    const rosterHeading = screen.getByText('All active field officers')
-    const rosterContainer = rosterHeading.parentElement as HTMLElement
-    const rosterNextButton = within(rosterContainer).getByRole('button', { name: /next/i })
+    const retryButtons = screen.getAllByRole('button', { name: /retry/i })
+    await user.click(retryButtons[retryButtons.length - 1])
 
-    await user.click(rosterNextButton)
-
-    // FO roster advanced to page 2 (FO 10 is the 11th/last row)...
-    await screen.findByText('FO 10')
-    expect(screen.queryByText('FO 0')).not.toBeInTheDocument()
-    // ...while the assignment list above stayed on its own page 1.
-    const assignmentPageLabels = screen.getAllByText(/page 1 of 2/i)
-    expect(assignmentPageLabels.length).toBeGreaterThan(0)
+    await screen.findByText('Jane FO')
+    expect(searchInventoryDevices).toHaveBeenCalledTimes(2)
   })
 })
 
-// Regression coverage for the silent-truncation bug: handleExport fetches
-// assignments/devices/geo-profiles in parallel, each capped at limit:'1000', but only
-// the assignments fetch was ever checked against its own real total — a devices or
-// geo-profiles fetch that hit the same cap silently null-joined Status/Calibration/FO
-// City onto affected rows with no warning at all.
+// Regression: only the assignments fetch was checked for truncation — a truncated devices/geo-profiles fetch silently null-joined rows.
 describe('InventoryAssignmentsPanel — export truncation warning', () => {
-  beforeEach(async () => {
-    vi.resetAllMocks()
-    searchRoleTypes.mockResolvedValue({ success: true, message: '', data: { count: 0, items: [] } })
-    searchRoles.mockResolvedValue({ success: true, message: '', data: { count: 0, items: [] } })
-    searchInventoryAssignments.mockResolvedValue({ success: true, message: '', data: { count: 1, items: [ASSIGNMENT_ITEM] } })
-    searchInventoryDevices.mockResolvedValue({ success: true, message: '', data: { count: 1, items: [{ id: 'dev-1', status: 'assigned', lastCalibrationDate: null, nextCalibrationDate: null }] } })
-    searchGeoProfiles.mockResolvedValue({ success: true, message: '', data: { count: 1, items: [{ id: 'geo-1', role: 'role-1', city: 'Pune' }] } })
-
-    const { usePermission } = await import('@/hooks/usePermission')
-    vi.mocked(usePermission).mockReturnValue({ hasAnyPermission: () => false } as unknown as ReturnType<typeof usePermission>)
-  })
+  beforeEach(resetAllMocks)
 
   async function clickExport() {
-    const InventoryAssignmentsPanel = (await import('@/features/inventory/real/components/InventoryAssignmentsPanel')).default
+    await renderPanel(true)
     const user = userEvent.setup()
 
-    render(
-      <QueryClientProvider client={makeQueryClient()}>
-        <InventoryAssignmentsPanel />
-      </QueryClientProvider>,
-    )
-
-    await screen.findByText('SN-001')
+    await screen.findByText('Jane FO')
     await user.click(screen.getByRole('button', { name: /export devices/i }))
     return user
   }
@@ -448,7 +347,7 @@ describe('InventoryAssignmentsPanel — export truncation warning', () => {
     searchInventoryDevices.mockResolvedValue({
       success: true,
       message: '',
-      data: { count: 1000, items: [{ id: 'dev-1', status: 'assigned', lastCalibrationDate: null, nextCalibrationDate: null }] },
+      data: { count: 1000, items: [{ id: 'dev-1', item: { id: 'item-1', name: 'Infusion pump' }, serialNumber: 'SN-001', status: 'assigned', lastCalibrationDate: null, nextCalibrationDate: null }] },
     })
 
     await clickExport()
@@ -463,7 +362,7 @@ describe('InventoryAssignmentsPanel — export truncation warning', () => {
     searchInventoryDevices.mockResolvedValue({
       success: true,
       message: '',
-      data: { count: 1000, items: [{ id: 'dev-1', status: 'assigned', lastCalibrationDate: null, nextCalibrationDate: null }] },
+      data: { count: 1000, items: [{ id: 'dev-1', item: { id: 'item-1', name: 'Infusion pump' }, serialNumber: 'SN-001', status: 'assigned', lastCalibrationDate: null, nextCalibrationDate: null }] },
     })
     searchGeoProfiles.mockResolvedValue({
       success: true,
@@ -481,11 +380,16 @@ describe('InventoryAssignmentsPanel — export truncation warning', () => {
   })
 
   it('warns naming ALL THREE datasets when assignments, devices, and geo-profiles are all truncated', async () => {
-    searchInventoryAssignments.mockResolvedValue({ success: true, message: '', data: { count: 1000, items: [ASSIGNMENT_ITEM] } })
+    searchInventoryAssignments.mockImplementation(async (query: { inventoryType?: string }) => {
+      if (query.inventoryType === 'InventoryConsumable') {
+        return { success: true, message: '', data: { count: 1, items: [CONSUMABLE_ASSIGNMENT_ITEM] } }
+      }
+      return { success: true, message: '', data: { count: 1000, items: [DEVICE_ASSIGNMENT_ITEM] } }
+    })
     searchInventoryDevices.mockResolvedValue({
       success: true,
       message: '',
-      data: { count: 1000, items: [{ id: 'dev-1', status: 'assigned', lastCalibrationDate: null, nextCalibrationDate: null }] },
+      data: { count: 1000, items: [{ id: 'dev-1', item: { id: 'item-1', name: 'Infusion pump' }, serialNumber: 'SN-001', status: 'assigned', lastCalibrationDate: null, nextCalibrationDate: null }] },
     })
     searchGeoProfiles.mockResolvedValue({
       success: true,

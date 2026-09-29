@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { FiAlertTriangle, FiCheckCircle, FiHardDrive, FiPlus, FiClock, FiTag } from 'react-icons/fi'
+import { FiAlertTriangle, FiCheckCircle, FiCpu, FiHardDrive, FiPlus, FiTag } from 'react-icons/fi'
 import { usePermission } from '@/hooks/usePermission'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { useInventoryDevices } from '@/features/inventory/real/hooks/useInventoryDevices'
@@ -13,6 +13,7 @@ import PaginationControls from '@/components/ui/PaginationControls'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import CopyButton from '@/components/ui/CopyButton'
 import EditInventoryDeviceModal from '@/features/inventory/real/components/EditInventoryDeviceModal'
+import InventoryDeviceDetailDrawer from '@/features/inventory/real/components/InventoryDeviceDetailDrawer'
 import InventoryDeviceSearchBar from '@/features/inventory/real/components/InventoryDeviceSearchBar'
 import type { InventoryDeviceSearchBarValue } from '@/features/inventory/real/components/InventoryDeviceSearchBar'
 import InventoryMovementHistoryDrawer from '@/features/inventory/real/components/InventoryMovementHistoryDrawer'
@@ -20,9 +21,7 @@ import InventoryReportKpiStrip, { type InventoryReportTile } from '@/features/in
 import { usePagination } from '@/hooks/usePagination'
 import { truncateIdentifier } from '@/features/inventory/real/utils/truncateIdentifier'
 
-// 'in-transit' is the one status deliberately left off the KPI strip (the
-// other 5 either drive a tile directly or roll into "Needs attention") —
-// keeping the strip at 4 tiles instead of showing all 6 real statuses.
+// 'in-transit' is the one status deliberately left off the KPI strip — the other 5 fill all 4 tiles.
 const NEEDS_ATTENTION_STATUSES: InventoryDeviceStatus[] = ['maintainance', 'lost', 'damaged']
 
 const PAGE_SIZE = 10
@@ -51,6 +50,8 @@ const InventoryDevicesPanel = () => {
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
   const [editModal, setEditModal] = useState<{ open: boolean; device: InventoryDeviceEntity | null }>({ open: false, device: null })
   const [historySource, setHistorySource] = useState<InventoryMovementHistorySource | null>(null)
+  // Card click opens the read-only detail drawer — Edit and Movement history both live inside it.
+  const [detailDevice, setDetailDevice] = useState<InventoryDeviceEntity | null>(null)
 
   const { data, isLoading, error, refetch } = useInventoryDevices({
     serialNumber: debouncedSerial.trim() || undefined,
@@ -100,7 +101,10 @@ const InventoryDevicesPanel = () => {
         skeletonCount={4}
       />
 
-      <div className="flex flex-wrap items-center gap-2 mb-3">
+      <div
+        className="flex flex-wrap items-center gap-2 mb-3 rounded-xl border p-2.5"
+        style={{ background: 'var(--qms-surface-card)', borderColor: 'var(--qms-border)' }}
+      >
         <InventoryDeviceSearchBar
           value={searchBar}
           onChange={(v) => { setSearchBar(v); resetToFirstPage() }}
@@ -121,86 +125,65 @@ const InventoryDevicesPanel = () => {
       </div>
 
       <QueryStateBlock isLoading={isLoading} error={error} loadingLabel="Loading devices…" errorLabel="Failed to load devices. Please try again." onRetry={refetch}>
-        <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}>
-          <div className="overflow-x-auto">
-            <table className="w-full text-[13px]">
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--qms-border)' }}>
-                  {['Serial number', 'Item Type', 'Status', 'Mfg date', 'Warranty', 'Next calibration', ...(canViewLedger ? [''] : [])].map((h) => (
-                    <th
-                      key={h}
-                      className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5"
-                      style={{ color: 'var(--qms-text-muted)' }}
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((device) => {
-                  const sc = STATUS_STYLE[device.status]
-                  return (
-                    <tr
-                      key={device.id}
-                      onClick={() => canManage && setEditModal({ open: true, device })}
-                      className={canManage ? 'cursor-pointer transition-colors hover:bg-(--qms-surface-hover)' : ''}
-                      style={{ borderBottom: '1px solid var(--qms-border)' }}
-                    >
-                      <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-mono" title={device.serialNumber}>{truncateIdentifier(device.serialNumber)}</span>
-                          <CopyButton value={device.serialNumber} label="Serial number" />
-                        </div>
-                      </td>
-                      <td className="px-4 py-2.5 max-w-xs truncate" style={{ color: 'var(--qms-text)' }} title={device.item.name}>
-                        {device.item.name ?? device.item.id}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <span
-                          className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                          style={{ background: sc.bg, color: sc.fg }}
-                        >
-                          {INVENTORY_DEVICE_STATUS_LABEL[device.status].toUpperCase()}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{device.manufacturingDate?.slice(0, 10) ?? '—'}</td>
-                      <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{device.warrantyExpiryDate?.slice(0, 10) ?? '—'}</td>
-                      <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{device.nextCalibrationDate?.slice(0, 10) ?? '—'}</td>
-                      {canViewLedger && (
-                        <td className="px-4 py-2.5">
-                          <button
-                            type="button"
-                            title="View movement history" aria-label="View movement history"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setHistorySource({
-                                mode: 'inventory',
-                                inventoryType: 'InventoryDevice',
-                                inventoryId: device.id,
-                                summary: { serialNumber: device.serialNumber, itemName: device.item.name ?? device.item.id, status: device.status },
-                              })
-                            }}
-                            className="rounded p-1 transition-colors hover:bg-(--qms-surface-hover)"
-                            style={{ color: 'var(--qms-text-muted)' }}
-                          >
-                            <FiClock size={13} />
-                          </button>
-                        </td>
-                      )}
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+        {items.length === 0 ? (
+          <div className="px-4 py-10 text-center text-[13px] rounded-xl border" style={{ color: 'var(--qms-text-muted)', borderColor: 'var(--qms-border)' }}>
+            No devices found.
           </div>
+        ) : (
+          <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
+            {items.map((device) => {
+              const sc = STATUS_STYLE[device.status]
+              return (
+                <div
+                  key={device.id}
+                  onClick={() => setDetailDevice(device)}
+                  className="rounded-xl border p-3.5 space-y-2.5 cursor-pointer transition-colors hover:bg-(--qms-surface-hover)"
+                  style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}
+                >
+                  <div className="flex items-start gap-2.5">
+                    <div
+                      className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+                      style={{ background: 'linear-gradient(135deg, rgba(36,81,240,.16), rgba(20,184,166,.16))', color: 'var(--qms-brand)' }}
+                    >
+                      <FiCpu size={16} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[13px] font-bold truncate" style={{ color: 'var(--qms-text)' }} title={device.item.name}>
+                        {device.item.name ?? device.item.id}
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>
+                        <span className="font-mono" title={device.serialNumber}>{truncateIdentifier(device.serialNumber)}</span>
+                        <CopyButton value={device.serialNumber} label="Serial number" />
+                      </div>
+                    </div>
+                    <span
+                      className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0"
+                      style={{ background: sc.bg, color: sc.fg }}
+                    >
+                      {INVENTORY_DEVICE_STATUS_LABEL[device.status].toUpperCase()}
+                    </span>
+                  </div>
 
-          {items.length === 0 && (
-            <div className="px-4 py-10 text-center text-[13px]" style={{ color: 'var(--qms-text-muted)' }}>
-              No devices found.
-            </div>
-          )}
-        </div>
+                  <div className="grid grid-cols-3 gap-2 text-center pt-2" style={{ borderTop: '1px solid var(--qms-border)' }}>
+                    <div>
+                      <div className="text-[12px] font-extrabold" style={{ color: 'var(--qms-text)' }}>{device.manufacturingDate?.slice(0, 10) ?? '—'}</div>
+                      <div className="text-[10px]" style={{ color: 'var(--qms-text-muted)' }}>Mfg date</div>
+                    </div>
+                    <div>
+                      <div className="text-[12px] font-extrabold" style={{ color: 'var(--qms-text)' }}>{device.warrantyExpiryDate?.slice(0, 10) ?? '—'}</div>
+                      <div className="text-[10px]" style={{ color: 'var(--qms-text-muted)' }}>Warranty</div>
+                    </div>
+                    <div>
+                      <div className="text-[12px] font-extrabold" style={{ color: 'var(--qms-text)' }}>{device.nextCalibrationDate?.slice(0, 10) ?? '—'}</div>
+                      <div className="text-[10px]" style={{ color: 'var(--qms-text-muted)' }}>Next calib.</div>
+                    </div>
+                  </div>
+
+                </div>
+              )
+            })}
+          </div>
+        )}
         <PaginationControls page={page} totalPages={totalPages(totalCount)} onPageChange={setPage} />
       </QueryStateBlock>
 
@@ -217,6 +200,28 @@ const InventoryDevicesPanel = () => {
           source={historySource}
           canManage={canViewLedger}
           onClose={() => setHistorySource(null)}
+        />
+      )}
+
+      {detailDevice && (
+        <InventoryDeviceDetailDrawer
+          device={detailDevice}
+          canManage={canManage}
+          canViewLedger={canViewLedger}
+          onClose={() => setDetailDevice(null)}
+          onEdit={() => {
+            setEditModal({ open: true, device: detailDevice })
+            setDetailDevice(null)
+          }}
+          onViewHistory={() => {
+            setHistorySource({
+              mode: 'inventory',
+              inventoryType: 'InventoryDevice',
+              inventoryId: detailDevice.id,
+              summary: { serialNumber: detailDevice.serialNumber, itemName: detailDevice.item.name ?? detailDevice.item.id, status: detailDevice.status },
+            })
+            setDetailDevice(null)
+          }}
         />
       )}
     </div>

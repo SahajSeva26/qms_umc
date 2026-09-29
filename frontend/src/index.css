@@ -407,6 +407,31 @@
 .hide-scrollbar               { scrollbar-width: none; }
 .hide-scrollbar::-webkit-scrollbar { display: none; }
 
+/* ── Prototype-matching data table (inventory.js .inv-tbl/.inv-card, styles.css .inv-filter) ── */
+.inv-card {
+  padding: 0;
+  border-radius: 14px;
+  background: var(--qms-surface-card);
+  border: 1px solid var(--qms-border);
+  overflow: hidden;
+}
+.inv-tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+.inv-tbl th, .inv-tbl td { padding: 8px 6px; text-align: left; border-bottom: 1px dashed var(--qms-border); }
+.inv-tbl th {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--qms-text-muted); font-weight: 700;
+}
+.inv-tbl tr:hover td { background: rgba(59, 109, 255, .03); }
+.inv-tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.inv-filter {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  padding: 10px 12px;
+  background: var(--qms-surface-card);
+  border: 1px solid var(--qms-border);
+  border-radius: 10px;
+}
+
 /* ── Base ── */
 @layer base {
   * { @apply border-border outline-ring/50; }

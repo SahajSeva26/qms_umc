@@ -8,7 +8,6 @@ import { FO_ROUTES }        from '@/features/fo/fo.routes'
 import { DEDICATEDOPS_ROUTES } from '@/features/dedicatedops/dedicatedops.routes'
 import { PHARMA_ROUTES }    from '@/features/pharma/pharma.constants'
 import { PROJECTS_ROUTES }  from '@/features/projects/projects.routes'
-import { OM_ROUTES }        from '@/features/om/om.routes'
 import { DOCTORS_ROUTES }   from '@/features/doctors/doctors.routes'
 import { GEO_PROFILE_ROUTES } from '@/features/geo-profile/geoProfile.constants'
 import { BILLING_ROUTES }   from '@/features/billing/billing.routes'
@@ -66,8 +65,6 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { id: 'gantt',        label: 'Project Gantt',               icon: 'Sliders',       path: PROJECTS_ROUTES.PROJECTS_GANTT },
 
   // Operations — Camps
-  { id: 'omportal',     label: 'Ops Manager',                 icon: 'Clipboard',     path: OM_ROUTES.OM },
-
   { id: 'camps',        label: 'Camp Management',             icon: 'Sun',           path: CAMPS_ROUTES.CAMPS },
 
   { id: 'campsscreening', label: 'Screening Camps',           icon: 'Sun',           path: CAMPS_ROUTES.CAMPS_SCREENING },
@@ -89,12 +86,6 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { id: 'dietprofile',  label: 'Dietitian Profiles',          icon: 'UserCheck',     path: DIET_ROUTES.DIET_PROFILES },
 
   // Operations — Field Network
-  { id: 'fo',           label: 'Mock FO Management',          icon: 'Navigation',    path: FO_ROUTES.FO },
-
-  { id: 'fo_workspace', label: 'My FO Workspace',             icon: 'Briefcase',     path: FO_ROUTES.FO_WORKSPACE },
-
-  { id: 'foconfig',     label: 'FO Config Master',            icon: 'Settings',      path: FO_ROUTES.FO_CONFIG },
-
   { id: 'fieldofficers', label: 'FO Management',              icon: 'Navigation',    path: FO_ROUTES.FIELD_OFFICERS },
 
   // Gated by role TYPE (RoleGuard), not permission codes — see Sidebar.tsx's isNavItemVisible
@@ -110,8 +101,6 @@ const ALL_NAV_ITEMS: NavItem[] = [
 
   // Operations — Coverage & Alerts
   { id: 'hqmapping',    label: 'HQ Mapping & Serviceability', icon: 'MapPin',        path: ADMIN_ROUTES.ADMIN_HQ },
-
-  { id: 'incidents',    label: 'Incidents · SOS',             icon: 'AlertTriangle', path: OM_ROUTES.OM_INCIDENTS },
 
   { id: 'remindauto',   label: 'AI Reminders',                icon: 'Cpu',           path: ADMIN_ROUTES.ADMIN_REMINDERS },
 
@@ -185,14 +174,12 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
     section: 'Operations',
     subs: [
       // Only 'camps'/'campsscreening'/'campsdiet' are backend-wired; the rest stay commented out, not deleted.
-      { title: 'Camps',             items: ['camps', 'campsscreening', 'campsdiet'/* , 'omportal', 'telecamps', 'diet', 'dedicatedops' */].map((id) => NAV_BY_ID[id]) },
+      { title: 'Camps',             items: ['camps', 'campsscreening', 'campsdiet'/* , 'telecamps', 'diet', 'dedicatedops' */].map((id) => NAV_BY_ID[id]) },
       // Commented out, not deleted — this whole subsection is still mock-backed.
       // { title: 'Dietitians',        items: ['dietapprovals', 'dietpayment', 'dietprofile'].map((id) => NAV_BY_ID[id]) },
-      // 'fo'/'fo_workspace'/'foconfig' are commented out, not deleted — only
-      // 'doctors'/'geoprofiles'/'fieldofficers' are backend-wired today.
-      { title: 'Field Network',     items: ['fieldofficers', 'employees', 'doctors', 'geoprofiles'/* , 'fo', 'fo_workspace', 'foconfig' */].map((id) => NAV_BY_ID[id]) },
+      { title: 'Field Network',     items: ['fieldofficers', 'employees', 'doctors', 'geoprofiles'].map((id) => NAV_BY_ID[id]) },
       // Commented out, not deleted — this whole subsection is still mock-backed.
-      // { title: 'Coverage & Alerts', items: ['hqmapping', 'incidents', 'remindauto'].map((id) => NAV_BY_ID[id]) },
+      // { title: 'Coverage & Alerts', items: ['hqmapping', 'remindauto'].map((id) => NAV_BY_ID[id]) },
     ],
   },
   {
@@ -231,5 +218,5 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
 export {
   AUTH_ROUTES,    DASHBOARD_ROUTES, CRM_ROUTES,      ANALYTICS_ROUTES,
   CAMPS_ROUTES,   DIET_ROUTES,      FO_ROUTES,        PHARMA_ROUTES,
-  PROJECTS_ROUTES, OM_ROUTES,       DOCTORS_ROUTES,   BILLING_ROUTES, ADMIN_ROUTES,
+  PROJECTS_ROUTES, DOCTORS_ROUTES,  BILLING_ROUTES,   ADMIN_ROUTES,
 }

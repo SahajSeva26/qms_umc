@@ -79,8 +79,8 @@ export async function addCamp(camp: Camp): Promise<Camp[]> {
 // TODO: replace with real API calls once backend endpoints exist
 // Generic single-camp patch for other features that need to write fields
 // Camps' own mutations (setStatus/assignFo/toggleTele) don't cover — e.g.
-// Ops Manager's dietitian-rate/assignment writes, Diet Camps' cancellation/
-// close-out/reminder writes. Keeps this feature the sole owner of the
+// Diet Camps' dietitian-rate/assignment/cancellation/close-out/reminder
+// writes, HQ's own writes. Keeps this feature the sole owner of the
 // qms.master.camps store instead of other features reaching into it via
 // direct localStorage access (a modularity violation CLAUDE.md §3 forbids).
 export async function patchCamp(id: string, patch: Partial<Camp>): Promise<Camp[]> {

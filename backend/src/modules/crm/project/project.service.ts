@@ -183,6 +183,9 @@ const search = async (filters: ISearchProjectQuery, ctx: RequestContext, options
     if (filters.name) {
         where.name = { $regex: filters.name, $options: 'i' };
     }
+    if (filters.code) {
+        where.code = { $regex: filters.code, $options: 'i' };
+    }
     if (filters.status) {
         where.status = filters.status;
     }

@@ -137,6 +137,7 @@ export type IMoveStagePayload = z.infer<typeof MoveStagePayloadSchema>;
 //4: search ====================================>
 export const SearchProjectQuerySchema = z.object({
     name: z.string().optional().openapi({ example: 'Cardio' }),
+    code: z.string().optional().openapi({ example: 'prj-000123' }),
     status: z.enum(Object.values(PROJECT_STATUS)).optional().openapi({ example: 'live' }),
     therapy: z.enum(Object.values(PROJECT_THERAPY_TYPES)).optional().openapi({ example: 'cardiology' }),
     tenant: objectId('Tenant').optional(),

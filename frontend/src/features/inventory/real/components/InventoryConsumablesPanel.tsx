@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { FiPlus, FiClock, FiLayers, FiPackage, FiAlertCircle, FiCheckCircle, FiXCircle } from 'react-icons/fi'
+import { FiPlus, FiLayers, FiPackage, FiAlertCircle, FiCheckCircle, FiXCircle } from 'react-icons/fi'
 import { usePermission } from '@/hooks/usePermission'
 import { useInventoryConsumables } from '@/features/inventory/real/hooks/useInventoryConsumables'
 import { useInventoryConsumableReport } from '@/features/inventory/real/hooks/useInventoryConsumableReport'
@@ -12,10 +12,12 @@ import CopyButton from '@/components/ui/CopyButton'
 import PaginationControls from '@/components/ui/PaginationControls'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import EditInventoryConsumableModal from '@/features/inventory/real/components/EditInventoryConsumableModal'
+import InventoryConsumableDetailDrawer from '@/features/inventory/real/components/InventoryConsumableDetailDrawer'
 import InventoryConsumableSearchBar from '@/features/inventory/real/components/InventoryConsumableSearchBar'
 import type { InventoryConsumableSearchBarValue } from '@/features/inventory/real/components/InventoryConsumableSearchBar'
 import InventoryMovementHistoryDrawer from '@/features/inventory/real/components/InventoryMovementHistoryDrawer'
 import InventoryReportKpiStrip, { type InventoryReportTile } from '@/features/inventory/real/components/InventoryReportKpiStrip'
+import ExpiryBandPill from '@/features/inventory/real/components/ExpiryBandPill'
 import { usePagination } from '@/hooks/usePagination'
 import { truncateIdentifier } from '@/features/inventory/real/utils/truncateIdentifier'
 
@@ -35,6 +37,9 @@ const InventoryConsumablesPanel = () => {
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
   const [editModal, setEditModal] = useState<{ open: boolean; lot: InventoryConsumableEntity | null }>({ open: false, lot: null })
   const [historySource, setHistorySource] = useState<InventoryMovementHistorySource | null>(null)
+  // Row click opens the read-only detail drawer — Edit and Movement history
+  // both live inside it, matching the prototype's drawer-first pattern.
+  const [detailLot, setDetailLot] = useState<InventoryConsumableEntity | null>(null)
 
   const { data, isLoading, error, refetch } = useInventoryConsumables({
     batch: searchBar.batch || undefined,
@@ -88,7 +93,10 @@ const InventoryConsumablesPanel = () => {
         skeletonCount={5}
       />
 
-      <div className="flex flex-wrap items-center gap-2 mb-3">
+      <div
+        className="flex flex-wrap items-center gap-2 mb-3 rounded-xl border p-2.5"
+        style={{ background: 'var(--qms-surface-card)', borderColor: 'var(--qms-border)' }}
+      >
         <InventoryConsumableSearchBar
           value={searchBar}
           onChange={(v) => { setSearchBar(v); resetToFirstPage() }}
@@ -115,10 +123,10 @@ const InventoryConsumablesPanel = () => {
             <table className="w-full text-[13px]">
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--qms-border)' }}>
-                  {['Batch', 'Item', 'Qty', 'Mfg date', 'Expiry date', ...(canManage ? ['Status'] : []), ...(canViewLedger ? [' '] : [])].map((h) => (
+                  {['Batch', 'Item', 'Qty', 'Mfg date', 'Expiry date', 'FEFO', ...(canManage ? ['Status'] : [])].map((h) => (
                     <th
                       key={h}
-                      className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5"
+                      className={`font-bold text-[11px] uppercase tracking-wider px-4 py-2 ${h === 'Qty' ? 'text-right' : 'text-left'}`}
                       style={{ color: 'var(--qms-text-muted)' }}
                     >
                       {h}
@@ -130,51 +138,31 @@ const InventoryConsumablesPanel = () => {
                 {items.map((lot) => (
                   <tr
                     key={lot.id}
-                    onClick={() => canManage && setEditModal({ open: true, lot })}
-                    className={canManage ? 'cursor-pointer transition-colors hover:bg-(--qms-surface-hover)' : ''}
+                    onClick={() => setDetailLot(lot)}
+                    className="cursor-pointer transition-colors hover:bg-(--qms-surface-hover)"
                     style={{ borderBottom: '1px solid var(--qms-border)' }}
                   >
-                    <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>
+                    <td className="px-4 py-2" style={{ color: 'var(--qms-text)' }}>
                       <div className="flex items-center gap-1.5">
                         <span className="font-mono" title={lot.batch}>{truncateIdentifier(lot.batch)}</span>
                         <CopyButton value={lot.batch} label="Batch number" />
                       </div>
                     </td>
-                    <td className="px-4 py-2.5 max-w-xs truncate" style={{ color: 'var(--qms-text)' }} title={lot.item.name}>
+                    <td className="px-4 py-2 max-w-xs truncate" style={{ color: 'var(--qms-text)' }} title={lot.item.name}>
                       {lot.item.name ?? lot.item.id}
                     </td>
-                    <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>{lot.quantity}</td>
-                    <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{lot.manufacturingDate?.slice(0, 10) ?? '—'}</td>
-                    <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{lot.expiryDate?.slice(0, 10) ?? '—'}</td>
+                    <td className="px-4 py-2 text-right font-mono" style={{ color: 'var(--qms-text)' }}>{lot.quantity}</td>
+                    <td className="px-4 py-2" style={{ color: 'var(--qms-text-muted)' }}>{lot.manufacturingDate?.slice(0, 10) ?? '—'}</td>
+                    <td className="px-4 py-2" style={{ color: 'var(--qms-text-muted)' }}>{lot.expiryDate?.slice(0, 10) ?? '—'}</td>
+                    <td className="px-4 py-2"><ExpiryBandPill expiryDate={lot.expiryDate} /></td>
                     {canManage && (
-                      <td className="px-4 py-2.5">
+                      <td className="px-4 py-2">
                         <span
                           className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${lot.status === 'active' ? 'bg-success-soft text-success' : ''}`}
                           style={lot.status !== 'active' ? { background: 'var(--qms-surface-strong)', color: 'var(--qms-text-muted)' } : undefined}
                         >
                           {lot.status === 'active' ? 'ACTIVE' : 'EXPIRED'}
                         </span>
-                      </td>
-                    )}
-                    {canViewLedger && (
-                      <td className="px-4 py-2.5">
-                        <button
-                          type="button"
-                          title="View movement history" aria-label="View movement history"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setHistorySource({
-                              mode: 'inventory',
-                              inventoryType: 'InventoryConsumable',
-                              inventoryId: lot.id,
-                              summary: { batch: lot.batch, itemName: lot.item.name ?? lot.item.id, quantity: lot.quantity, status: lot.status, expiryDate: lot.expiryDate },
-                            })
-                          }}
-                          className="rounded p-1 transition-colors hover:bg-(--qms-surface-hover)"
-                          style={{ color: 'var(--qms-text-muted)' }}
-                        >
-                          <FiClock size={13} />
-                        </button>
                       </td>
                     )}
                   </tr>
@@ -206,6 +194,28 @@ const InventoryConsumablesPanel = () => {
           source={historySource}
           canManage={canViewLedger}
           onClose={() => setHistorySource(null)}
+        />
+      )}
+
+      {detailLot && (
+        <InventoryConsumableDetailDrawer
+          lot={detailLot}
+          canManage={canManage}
+          canViewLedger={canViewLedger}
+          onClose={() => setDetailLot(null)}
+          onEdit={() => {
+            setEditModal({ open: true, lot: detailLot })
+            setDetailLot(null)
+          }}
+          onViewHistory={() => {
+            setHistorySource({
+              mode: 'inventory',
+              inventoryType: 'InventoryConsumable',
+              inventoryId: detailLot.id,
+              summary: { batch: detailLot.batch, itemName: detailLot.item.name ?? detailLot.item.id, quantity: detailLot.quantity, status: detailLot.status, expiryDate: detailLot.expiryDate },
+            })
+            setDetailLot(null)
+          }}
         />
       )}
     </div>

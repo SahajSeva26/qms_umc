@@ -11,13 +11,10 @@ import SearchInput from '@/components/ui/SearchInput'
 import PaginationControls from '@/components/ui/PaginationControls'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import EditVendorMasterModal from '@/features/inventory/real/components/EditVendorMasterModal'
+import VendorMasterDetailDrawer from '@/features/inventory/real/components/VendorMasterDetailDrawer'
+import VendorMasterCard from '@/features/inventory/real/components/VendorMasterCard'
 
 const PAGE_SIZE = 10
-
-const STATUS_STYLE: Record<VendorStatus, { bg: string; fg: string }> = {
-  active: { bg: 'var(--qms-surface-strong)', fg: 'var(--qms-text-soft)' },
-  inactive: { bg: 'rgba(244,63,94,.15)', fg: '#e11d48' },
-}
 
 type SearchField = 'name' | 'code' | 'city'
 const SEARCH_FIELD_LABEL: Record<SearchField, string> = { name: 'Name', code: 'Code', city: 'City' }
@@ -41,6 +38,9 @@ const InventoryVendorsPanel = () => {
   const [status, setStatus] = useState<VendorStatus>('active')
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
   const [editModal, setEditModal] = useState<{ open: boolean; vendor: VendorMasterEntity | null }>({ open: false, vendor: null })
+  // Card click opens the read-only detail drawer — Edit lives inside it,
+  // matching the prototype's own drawer-first pattern (see Item Master).
+  const [detailVendor, setDetailVendor] = useState<VendorMasterEntity | null>(null)
 
   const switchSearchField = (field: SearchField) => {
     setSearchField(field)
@@ -74,7 +74,10 @@ const InventoryVendorsPanel = () => {
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 mb-3">
+      <div
+        className="flex flex-wrap items-center gap-2 mb-3 rounded-xl border p-2.5"
+        style={{ background: 'var(--qms-surface-card)', borderColor: 'var(--qms-border)' }}
+      >
         <Select value={searchField} onValueChange={(v) => switchSearchField(v as SearchField)}>
           <SelectTrigger className="w-28 text-[13px]" aria-label="Search by">
             <SelectValue>{() => SEARCH_FIELD_LABEL[searchField]}</SelectValue>
@@ -107,60 +110,22 @@ const InventoryVendorsPanel = () => {
       </div>
 
       <QueryStateBlock isLoading={isLoading} error={error} loadingLabel="Loading vendors…" errorLabel="Failed to load vendors. Please try again." onRetry={refetch}>
-        <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}>
-          <div className="overflow-x-auto">
-            <table className="w-full text-[13px]">
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--qms-border)' }}>
-                  {['Name', 'Code', 'Primary contact', 'City', ...(canManage ? ['Status'] : [])].map((h) => (
-                    <th
-                      key={h}
-                      className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5"
-                      style={{ color: 'var(--qms-text-muted)' }}
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((vendor) => {
-                  const sc = vendor.status ? STATUS_STYLE[vendor.status] : undefined
-                  const primaryContact = vendor.contacts[0]
-                  return (
-                    <tr
-                      key={vendor.id}
-                      onClick={() => canUpdate && setEditModal({ open: true, vendor })}
-                      className={canUpdate ? 'cursor-pointer transition-colors hover:bg-(--qms-surface-hover)' : ''}
-                      style={{ borderBottom: '1px solid var(--qms-border)' }}
-                    >
-                      <td className="px-4 py-2.5 font-semibold" style={{ color: 'var(--qms-text)' }}>{vendor.name}</td>
-                      <td className="px-4 py-2.5 font-mono" style={{ color: 'var(--qms-text-muted)' }}>{vendor.code}</td>
-                      <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{primaryContact?.name ?? '—'}</td>
-                      <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{vendor.address?.city ?? '—'}</td>
-                      {canManage && sc && (
-                        <td className="px-4 py-2.5">
-                          <span
-                            className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                            style={{ background: sc.bg, color: sc.fg }}
-                          >
-                            {vendor.status?.toUpperCase()}
-                          </span>
-                        </td>
-                      )}
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+        {items.length === 0 ? (
+          <div className="px-4 py-10 text-center text-[13px] rounded-xl border" style={{ color: 'var(--qms-text-muted)', borderColor: 'var(--qms-border)' }}>
+            No vendors found.
           </div>
-
-          {items.length === 0 && (
-            <div className="px-4 py-10 text-center text-[13px]" style={{ color: 'var(--qms-text-muted)' }}>
-              No vendors found.
-            </div>
-          )}
-        </div>
+        ) : (
+          <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
+            {items.map((vendor) => (
+              <VendorMasterCard
+                key={vendor.id}
+                vendor={vendor}
+                canManage={canManage}
+                onOpen={(v) => setDetailVendor(v)}
+              />
+            ))}
+          </div>
+        )}
         <PaginationControls page={page} totalPages={totalPages(totalCount)} onPageChange={setPage} />
       </QueryStateBlock>
 
@@ -169,6 +134,18 @@ const InventoryVendorsPanel = () => {
           vendor={editModal.vendor}
           canManageStatus={canManage}
           onClose={() => setEditModal({ open: false, vendor: null })}
+        />
+      )}
+
+      {detailVendor && (
+        <VendorMasterDetailDrawer
+          vendor={detailVendor}
+          canManage={canUpdate}
+          onClose={() => setDetailVendor(null)}
+          onEdit={() => {
+            setEditModal({ open: true, vendor: detailVendor })
+            setDetailVendor(null)
+          }}
         />
       )}
     </div>

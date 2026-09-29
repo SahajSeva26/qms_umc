@@ -1,4 +1,4 @@
-import { FiMail, FiPhone, FiMapPin, FiExternalLink, FiEdit2, FiMessageCircle } from 'react-icons/fi'
+import { FiMail, FiPhone, FiMapPin, FiExternalLink, FiEdit2, FiMessageCircle, FiHash, FiLayers, FiActivity } from 'react-icons/fi'
 import type { DoctorEntity } from '@/types/doctor.types'
 import SideDrawer from '@/components/ui/SideDrawer'
 import { Button } from '@/components/ui/button'
@@ -13,8 +13,8 @@ interface DoctorDrawerProps {
   onEdit: () => void
 }
 
-// Real fields only; mock-era engagement/AI/empanelment/camp-history sections
-// have no backend equivalent and are dropped entirely.
+// Camps/Patients/★/Engagement and the AI prediction panel have no backend equivalent (shown as —,
+// see md-files/ui-revisions.md); empanelment/MR-coverage/camp-history sections are dropped entirely.
 const DoctorDrawer = ({ doctor, canEdit, onClose, onEdit }: DoctorDrawerProps) => {
   if (!doctor) return <SideDrawer open={false} title="" onClose={onClose}>{null}</SideDrawer>
 
@@ -28,7 +28,7 @@ const DoctorDrawer = ({ doctor, canEdit, onClose, onEdit }: DoctorDrawerProps) =
       : null
 
   return (
-    <SideDrawer open={!!doctor} title={`${d.name} · ${d.pharmaCode}`} onClose={onClose} widthClassName="max-w-lg">
+    <SideDrawer open={!!doctor} title={`${d.name} · ${d.pharmaCode}`} onClose={onClose} widthClassName="max-w-[940px]">
       <div className="flex items-start gap-3.5 mb-4">
         <div
           className="rounded-2xl flex items-center justify-center text-white font-extrabold text-xl shrink-0"
@@ -37,18 +37,52 @@ const DoctorDrawer = ({ doctor, canEdit, onClose, onEdit }: DoctorDrawerProps) =
           {initials(d.name)}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-[16px] font-extrabold" style={{ color: 'var(--qms-text)' }}>{d.name}</div>
-          <div className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>{d.specialization.toUpperCase()} · {d.location?.city ?? '—'}</div>
-          <div className="mt-2"><StatusPill status={d.status} /></div>
+          <div className="text-[18px] font-extrabold" style={{ color: 'var(--qms-text)' }}>{d.name}</div>
+          <div className="text-[13px]" style={{ color: 'var(--qms-text-soft)' }}>{d.specialization.toUpperCase()} · {d.pharmaCode}</div>
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            <StatusPill status={d.status} />
+            {d.location?.city && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text-muted)' }}>
+                <FiMapPin size={10} /> {d.location.city}, {d.location.state}
+              </span>
+            )}
+            {d.location?.pincode && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text-muted)' }}>
+                <FiHash size={10} /> {d.location.pincode}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
-      <h3 className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--qms-text-muted)' }}>Contact &amp; address</h3>
-      <div className="grid grid-cols-[90px_1fr] gap-y-1.5 text-[13px] mb-5" style={{ color: 'var(--qms-text)' }}>
-        <div className="flex items-center gap-1" style={{ color: 'var(--qms-text-muted)' }}><FiMail size={11} /> Email</div><div>{d.email || '—'}</div>
-        <div className="flex items-center gap-1" style={{ color: 'var(--qms-text-muted)' }}><FiPhone size={11} /> Mobile</div><div>{d.mobile || '—'}</div>
-        <div style={{ color: 'var(--qms-text-muted)' }}>Specialization</div><div>{d.specialization.toUpperCase()}</div>
-        <div className="flex items-center gap-1" style={{ color: 'var(--qms-text-muted)' }}><FiMapPin size={11} /> City</div><div>{d.location?.city || '—'}, {d.location?.state || '—'} · {d.location?.pincode || '—'}</div>
+      {/* Camps count is a real Camp.doctor filter, no aggregate endpoint exists yet; Patients/★/Engagement have no backend field at all — see md-files/ui-revisions.md. */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-5">
+        <div className="doc-id-kpi"><div className="l">Camps closed</div><div className="v">—</div><div className="s">— upcoming</div></div>
+        <div className="doc-id-kpi"><div className="l">Patients</div><div className="v">—</div><div className="s">— Rx</div></div>
+        <div className="doc-id-kpi"><div className="l">Avg ★</div><div className="v">—</div><div className="s">Patient feedback</div></div>
+        <div className="doc-id-kpi"><div className="l">Engagement</div><div className="v">—</div><div className="s">Score</div></div>
+      </div>
+
+      <div
+        className="rounded-xl px-3.5 py-3 mb-5"
+        style={{ background: 'linear-gradient(135deg, rgba(124,58,237,.07), rgba(59,109,255,.07))', border: '1px solid rgba(124,58,237,.2)' }}
+      >
+        <div className="flex items-center gap-1.5 text-[12px] font-extrabold mb-1.5" style={{ color: '#6d28d9' }}>
+          <FiActivity size={12} /> AI prediction
+        </div>
+        <p className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>
+          Not available — no scoring model exists yet (see md-files/ui-revisions.md).
+        </p>
+      </div>
+
+      <h3 className="text-[11px] font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5" style={{ color: 'var(--qms-text-muted)' }}>
+        <FiPhone size={11} /> Contact &amp; address
+      </h3>
+      <div className="doc-kv mb-5">
+        <div className="flex items-center gap-1" style={{ color: 'var(--qms-text-muted)' }}><FiMail size={11} /> Email</div><div style={{ color: 'var(--qms-text)' }}>{d.email || '—'}</div>
+        <div className="flex items-center gap-1" style={{ color: 'var(--qms-text-muted)' }}><FiPhone size={11} /> Mobile</div><div style={{ color: 'var(--qms-text)' }}>{d.mobile || '—'}</div>
+        <div className="flex items-center gap-1" style={{ color: 'var(--qms-text-muted)' }}><FiLayers size={11} /> Specialization</div><div style={{ color: 'var(--qms-text)' }}>{d.specialization.toUpperCase()}</div>
+        <div className="flex items-center gap-1" style={{ color: 'var(--qms-text-muted)' }}><FiMapPin size={11} /> City</div><div style={{ color: 'var(--qms-text)' }}>{d.location?.city || '—'}, {d.location?.state || '—'} · {d.location?.pincode || '—'}</div>
         {mapsLink && (
           <>
             <div style={{ color: 'var(--qms-text-muted)' }}>Map</div>

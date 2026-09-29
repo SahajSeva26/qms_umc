@@ -43,11 +43,11 @@ const SpecialtiesTab = ({ doctors, onSelectSpecialization }: SpecialtiesTabProps
             style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}
           >
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${color}1a`, color }}>
+              <div className="w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0 text-white" style={{ background: color }}>
                 <FiLayers size={16} />
               </div>
               <div className="min-w-0">
-                <div className="text-[13.5px] font-bold truncate" style={{ color: 'var(--qms-text)' }}>{SPECIALIZATION_LABEL[g.specialization]}</div>
+                <div className="text-[14px] font-extrabold truncate" style={{ color: 'var(--qms-text)' }}>{SPECIALIZATION_LABEL[g.specialization]}</div>
                 <div className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>{g.docs.length} doctor{g.docs.length === 1 ? '' : 's'}</div>
               </div>
             </div>

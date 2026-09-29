@@ -21,6 +21,8 @@ import { RoleService } from '../../access-management/role/role.service';
 import { ContactService } from '../contact/contact.service';
 import { TENANT_TYPE } from '../../access-management/tenant/tenant.constants';
 import { TestMasterService } from '../../operations/testMaster/testMaster.service';
+import { CampModel } from '../../operations/camp/camp.model';
+import { CAMP_STATUSES } from '../../operations/camp/camp.constants';
 
 type ProjectDocument = HydratedDocument<IProject> | null;
 
@@ -206,23 +208,56 @@ const search = async (filters: ISearchProjectQuery, ctx: RequestContext, options
 
     const [count, items] = await Promise.all([countPromise, dataPromise]);
 
-    //5: optional report — per-type project breakdown over the same (scoped + filtered) set.
-    // `type` is an array, so a multi-type project is counted once per type it carries.
+    //5: optional report — a per-type breakdown over the whole (scoped + filtered) set, plus
+    // per-project executed-camp counts for the rows on this page.
     let report;
+    let stats;
     if (filters.report === 'true') {
-        const typeGroups = await Project.aggregate([
-            { $match: where },
-            { $unwind: '$type' },
-            { $group: { _id: '$type', count: { $sum: 1 } } },
+        const [typeGroups, projectStats] = await Promise.all([
+            Project.aggregate([
+                { $match: where },
+                { $unwind: '$type' },
+                { $group: { _id: '$type', count: { $sum: 1 } } },
+            ]),
+            getProjectCampStats(items),
         ]);
         const typeCounts = new Map<string, number>(typeGroups.map((g: any) => [g._id, g.count]));
         report = {
             total: count,
             byType: Object.values(PROJECT_TYPES).map((type) => ({ type, count: typeCounts.get(type) || 0 })),
         };
+        stats = projectStats;
     }
 
-    return { count, items, report };
+    return { count, items, report, stats };
+};
+
+// per-project rollup: executed camps (closed + cancelled_charged) — the "done" count shown against
+// the project's totalCamps quota. One query for all projects on the page.
+type ProjectStats = {
+    executedCamps: number;
+};
+const EXECUTED_CAMP_STATUSES: string[] = [CAMP_STATUSES.CLOSED, CAMP_STATUSES.CANCELLED_CHARGED];
+
+const getProjectCampStats = async (projects: HydratedDocument<IProject>[]): Promise<Record<string, ProjectStats>> => {
+    const projectIds = projects.map((p) => p._id);
+
+    const campGroups = await CampModel.aggregate([
+        { $match: { project: { $in: projectIds }, status: { $in: EXECUTED_CAMP_STATUSES } } },
+        { $group: { _id: '$project', executed: { $sum: 1 } } },
+    ]);
+
+    const stats: Record<string, ProjectStats> = {};
+    for (const id of projectIds) {
+        stats[id.toString()] = { executedCamps: 0 };
+    }
+    for (const g of campGroups) {
+        const entry = stats[g._id?.toString()];
+        if (entry) {
+            entry.executedCamps = g.executed;
+        }
+    }
+    return stats;
 };
 
 const create = async (model: ICreateProjectPayload, ctx: RequestContext): Promise<HydratedDocument<IProject>> => {

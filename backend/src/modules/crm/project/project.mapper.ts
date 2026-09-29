@@ -68,7 +68,7 @@ export const ProjectMapper = {
         };
         return result;
     },
-    toSearchResponse: (data: { count: number; items: any[]; report?: any }, ctx: RequestContext) => {
+    toSearchResponse: (data: { count: number; items: any[]; report?: any; stats?: any }, ctx: RequestContext) => {
         const result: any = {
             count: data?.count || 0,
             items: [] as any[],
@@ -76,6 +76,7 @@ export const ProjectMapper = {
         if (data?.report) {
             result.report = data.report;
         }
+        const stats = data?.stats;
         for (const project of data?.items || []) {
             // NOTE: independent from toResponse on purpose — mirrors it field-for-field for now (incl. same permission gating) so nothing breaks; search rows can be trimmed later without affecting GET /:id.
             const item: any = {
@@ -141,6 +142,10 @@ export const ProjectMapper = {
                 createdAt: project.createdAt,
                 updatedAt: project.updatedAt,
             };
+            // present only when the caller requested report=true
+            if (stats) {
+                item.stats = stats[project._id?.toString()] ?? { executedCamps: 0 };
+            }
             result.items.push(item);
         }
         return result;

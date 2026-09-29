@@ -57,7 +57,52 @@ export const AppointmentMapper = {
             items: [] as any[],
         };
         for (const appointment of data?.items || []) {
-            result.items.push(AppointmentMapper.toResponse(appointment, ctx));
+            // NOTE: independent from toResponse on purpose — mirrors it field-for-field for now (incl. same permission gating) so nothing breaks; search rows can be trimmed later without affecting GET /:id.
+            const item: any = {
+                id: appointment._id?.toString(),
+                code: appointment.code,
+                tenant: appointment.tenant,
+                division: appointment.division,
+                type: appointment.type,
+                salesPerson: appointment.salesPerson,
+                contactPerson: appointment.contactPerson,
+                internalMembers: (appointment.internalMembers || []).map((inv: any) => ({
+                    role: inv.role,
+                    status: inv.status,
+                    note: inv.note,
+                    createdAt: inv.createdAt,
+                    updatedAt: inv.updatedAt,
+                })),
+                lead: appointment.lead,
+                parent: appointment.parent,
+                mode: appointment.mode,
+                destinationLink: appointment.destinationLink,
+                duration: {
+                    startTime: appointment.duration?.startTime,
+                    endTime: appointment.duration?.endTime,
+                },
+                agenda: {
+                    public: appointment.agenda?.public,
+                    private: appointment.agenda?.private,
+                },
+                status: appointment.status,
+                mom: {
+                    details: appointment.mom?.details,
+                    submittedAt: appointment.mom?.submittedAt,
+                    submissionDeadline: appointment.mom?.submissionDeadline,
+                },
+                stageHistory: (appointment.stageHistory || []).map((entry: any) => ({
+                    from: entry.from,
+                    to: entry.to,
+                    reason: entry.reason,
+                    nextSteps: entry.nextSteps,
+                    actor: entry.actor,
+                    createdAt: entry.createdAt,
+                })),
+                createdAt: appointment.createdAt,
+                updatedAt: appointment.updatedAt,
+            };
+            result.items.push(item);
         }
         return result;
     },

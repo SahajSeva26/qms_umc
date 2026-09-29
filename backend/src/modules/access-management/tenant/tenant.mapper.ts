@@ -28,7 +28,26 @@ export const TenantMapper = {
         };
         const stats = data?.stats;
         for (const t of data?.items || []) {
-            const item = TenantMapper.toResponse(t, ctx);
+            // NOTE: independent from toResponse on purpose — search rows can be
+            // trimmed to a lighter subset later without affecting GET /:id.
+            // For now this mirrors toResponse field-for-field (incl. the same
+            // permission gating) so nothing breaks.
+            const item: any = {
+                id: t._id?.toString(),
+                code: t.code,
+                name: t.name,
+                address: t.address ?? null,
+                businessLifetime: t.businessLifetime ?? null,
+                gst: t.gst ?? null,
+            };
+            if (ctx.hasAnyPermissions([SYSTEM_PERMISSIONS.MANAGE.code])) {
+                item.status = t.status;
+                item.owner = t.owner;
+                item.salesPerson = t.salesPerson ?? null;
+                item.createdAt = t.createdAt;
+                item.updatedAt = t.updatedAt;
+                item.type = t.type;
+            }
             // only present when the caller requested report=true
             if (stats) {
                 item.stats = stats[t._id?.toString()] ?? {

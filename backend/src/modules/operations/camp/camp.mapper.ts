@@ -56,7 +56,54 @@ export const CampMapper = {
             items: [] as any[],
         };
         for (const camp of data?.items || []) {
-            result.items.push(CampMapper.toResponse(camp, ctx));
+            // NOTE: independent from toResponse on purpose — search rows can be
+            // trimmed to a lighter subset later without affecting GET /:id.
+            // For now this mirrors toResponse field-for-field so nothing breaks.
+            const item: any = {
+                id: camp._id?.toString(),
+                code: camp.code,
+
+                // links (derived from project)
+                tenant: camp.tenant,
+                division: camp.division,
+                project: camp.project,
+                doctor: camp.doctor,
+
+                // classification
+                type: camp.type,
+                billingType: camp.billingType,
+                patientExpectation: camp.patientExpectation,
+
+                // field-force assignment
+                fo: camp.fo,
+                mr: camp.mr,
+                asm: camp.asm,
+                rsm: camp.rsm,
+
+                // slot & location
+                date: camp.date,
+                timeSlot: camp.timeSlot || null,
+                location: camp.location || null,
+
+                // devices & confirmation
+                devices: camp.devices || [],
+                notes: camp.notes,
+                conscentPath: camp.conscentPath,
+
+                // lifecycle
+                status: camp.status,
+                stageHistory: (camp.stageHistory || []).map((entry: any) => ({
+                    from: entry.from,
+                    to: entry.to,
+                    reason: entry.reason,
+                    actor: entry.actor,
+                    createdAt: entry.createdAt,
+                })),
+
+                createdAt: camp.createdAt,
+                updatedAt: camp.updatedAt,
+            };
+            result.items.push(item);
         }
         return result;
     },

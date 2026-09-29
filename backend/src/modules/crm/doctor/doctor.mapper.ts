@@ -39,7 +39,35 @@ export const DoctorMapper = {
             items: [] as any[],
         };
         for (const doctor of data?.items || []) {
-            result.items.push(DoctorMapper.toResponse(doctor, ctx));
+            // NOTE: independent from toResponse on purpose — mirrors it field-for-field for now (incl. same permission gating) so nothing breaks; search rows can be trimmed later without affecting GET /:id.
+            const item: any = {
+                id: doctor._id?.toString(),
+
+                // owning tenant (populated { name, code } when requested, else the raw id)
+                tenant: doctor.tenant,
+
+                // owning division (populated { name, code, therapy } when requested, else the raw id)
+                division: doctor.division,
+
+                // identity
+                pharmaCode: doctor.pharmaCode,
+                name: doctor.name,
+                specialization: doctor.specialization,
+
+                // contact
+                mobile: doctor.mobile,
+                email: doctor.email,
+
+                // full postal address + geo point (embedded, same shape as camp's location)
+                location: doctor.location || null,
+
+                createdAt: doctor.createdAt,
+                updatedAt: doctor.updatedAt,
+            };
+            if (ctx.hasAnyPermissions([DOCTOR_PERMISSIONS.MANAGE.code])) {
+                item.status = doctor.status;
+            }
+            result.items.push(item);
         }
         return result;
     },

@@ -37,7 +37,32 @@ export const DivisionMapper = {
             items: [] as any[],
         };
         for (const d of data?.items || []) {
-            result.items.push(DivisionMapper.toResponse(d, ctx));
+            // NOTE: independent from toResponse on purpose — mirrors it field-for-field for now (incl. same permission gating) so nothing breaks; search rows can be trimmed later without affecting GET /:id.
+            const item: any = {
+                id: d._id?.toString(),
+                code: d?.code,
+                name: d?.name,
+                therapy: d?.therapy,
+                mrCount: d?.mrCount,
+                tenant: d?.tenant,
+
+                owner: d?.owner,
+
+                createdAt: d.createdAt,
+                updatedAt: d.updatedAt,
+            };
+
+            if (ctx.hasAnyPermissions([DIVISION_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.ADMIN.code])) {
+                item.status = d.status;
+                // the division head role — mapped through RoleMapper when populated (get/search;
+                // a populated role carries `code`), bare id otherwise (create response)
+                if (d.owner?.code) {
+                    item.owner = RoleMapper.toResponse(d.owner);
+                } else {
+                    item.owner = d.owner?._id ?? d.owner;
+                }
+            }
+            result.items.push(item);
         }
         return result;
     },

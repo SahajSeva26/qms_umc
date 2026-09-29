@@ -26,7 +26,24 @@ export const ContactMapper = {
             items: [] as any[],
         };
         for (const contact of data?.items || []) {
-            result.items.push(ContactMapper.toResponse(contact, ctx));
+            // NOTE: independent from toResponse on purpose — mirrors it field-for-field for now (incl. same permission gating) so nothing breaks; search rows can be trimmed later without affecting GET /:id.
+            const item: any = {
+                id: contact._id?.toString(),
+                tenant: contact.tenant,
+                division: contact.division || null,
+                name: contact.name,
+                designation: contact.designation,
+                email: contact.email,
+                phone: contact.phone,
+                location: contact.location,
+                type: contact.type,
+                user: contact.user || null,
+                hasLogin: Boolean(contact.user),
+                status: contact.status,
+                createdAt: contact.createdAt,
+                updatedAt: contact.updatedAt,
+            };
+            result.items.push(item);
         }
         return result;
     },

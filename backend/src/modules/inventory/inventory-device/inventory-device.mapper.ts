@@ -54,10 +54,40 @@ export const InventoryDeviceMapper = {
         createdAt: device.createdAt,
         updatedAt: device.updatedAt,
     }),
-    toSearchResponse: (data: { count: number; items: any[] }) => ({
-        count: data?.count || 0,
-        items: (data?.items || []).map(InventoryDeviceMapper.toResponse),
-    }),
+    toSearchResponse: (data: { count: number; items: any[] }) => {
+        // NOTE: independent from toResponse on purpose — mirrors it field-for-field for now (incl. same permission gating) so nothing breaks; search rows can be trimmed later without affecting GET /:id.
+        const result = {
+            count: data?.count || 0,
+            items: [] as any[],
+        };
+        for (const device of data?.items || []) {
+            result.items.push({
+                id: device._id?.toString(),
+
+                // catalog item this unit is an instance of
+                item: mapItem(device.item),
+
+                // vendor this unit was purchased from
+                vendor: mapVendor(device.vendor),
+
+                // unit identity + lifecycle
+                serialNumber: device.serialNumber,
+                status: device.status,
+
+                // shelf life / warranty
+                manufacturingDate: device.manufacturingDate,
+                warrantyExpiryDate: device.warrantyExpiryDate,
+
+                // calibration
+                lastCalibrationDate: device.lastCalibrationDate,
+                nextCalibrationDate: device.nextCalibrationDate,
+
+                createdAt: device.createdAt,
+                updatedAt: device.updatedAt,
+            });
+        }
+        return result;
+    },
 
     toReportResponse: (report: any) => {
         const byStatus = new Map<string, number>((report?.deviceByStatus || []).map((r: any) => [r._id, r.count]));

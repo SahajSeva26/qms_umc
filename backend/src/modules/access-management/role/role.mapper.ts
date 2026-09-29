@@ -22,7 +22,23 @@ export const RoleMapper = {
             items: [] as any[],
         };
         for (const r of data?.items) {
-            result.items.push(RoleMapper.toResponse(r));
+            // NOTE: independent from toResponse on purpose — mirrors it field-for-field for now (incl. same permission gating) so nothing breaks; search rows can be trimmed later without affecting GET /:id.
+            const item: any = {
+                id: r._id,
+                code: r.code,
+                name: r.name,
+                description: r.description,
+                permissions: r.permissions,
+                status: r.status,
+                type: r.type,
+                user: r.user,
+                tenant: r.tenant,
+                division: r.division,
+                supervisor: r.supervisor,
+                createdAt: r.createdAt,
+                updatedAt: r.updatedAt,
+            };
+            result.items.push(item);
         }
         return result;
     },

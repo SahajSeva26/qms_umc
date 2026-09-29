@@ -21,6 +21,8 @@ import { CampModel } from '../../operations/camp/camp.model';
 import { CAMP_STATUSES, CAMP_TYPES } from '../../operations/camp/camp.constants';
 import { RoleModel } from '../role/role.model';
 import { RoleTypeModel } from '../role-type/roleType.model';
+import { InvoiceModel } from '../../finance/invoice/invoice.model';
+import { INVOICE_STATUS } from '../../finance/invoice/invoice.constants';
 
 type TenantDocument = HydratedDocument<ITenant> | null;
 const populate: any[] = [];
@@ -158,7 +160,7 @@ const search = async (filters: ISearchTenantQuery, ctx: RequestContext, options?
     };
 };
 
-// per-tenant rollup: total & live projects, total & live camps, total MRs
+// per-tenant rollup: total & live projects, total & live camps, total MRs, total invoiced
 type TenantStats = {
     totalProjects: number;
     liveProjects: number;
@@ -167,13 +169,14 @@ type TenantStats = {
     screeningCamps: number;
     dietCamps: number;
     mrs: number;
+    billed: number;
 };
 
 // aggregate project & camp stats per tenant for the given tenants (one query each for the whole page)
 const getTenantStats = async (tenants: HydratedDocument<ITenant>[]): Promise<Record<string, TenantStats>> => {
     const tenantIds = tenants.map((t) => t._id);
 
-    const [projectGroups, campGroups, mrGroups] = await Promise.all([
+    const [projectGroups, campGroups, mrGroups, invoiceGroups] = await Promise.all([
         Project.aggregate([
             { $match: { tenant: { $in: tenantIds } } },
             {
@@ -196,8 +199,8 @@ const getTenantStats = async (tenants: HydratedDocument<ITenant>[]): Promise<Rec
                 },
             },
         ]),
-        // MR count per tenant: roles whose role-type is this tenant's `pharma-mr` type.
-        // role-types are per-tenant, so we resolve the type via $lookup rather than a shared id.
+        // MR count per tenant: roles whose role-type is this tenant's `pharma-mr` type
+        // (role-types are per-tenant, so resolve the type via $lookup, not a shared id)
         RoleModel.aggregate([
             { $match: { tenant: { $in: tenantIds } } },
             {
@@ -212,6 +215,16 @@ const getTenantStats = async (tenants: HydratedDocument<ITenant>[]): Promise<Rec
             { $match: { 'roleType.code': ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR } },
             { $group: { _id: '$tenant', total: { $sum: 1 } } },
         ]),
+        // total invoiced per tenant — excludes draft (not yet billed) and cancelled (un-billed)
+        InvoiceModel.aggregate([
+            {
+                $match: {
+                    tenant: { $in: tenantIds },
+                    status: { $nin: [INVOICE_STATUS.DRAFT, INVOICE_STATUS.CANCELLED] },
+                },
+            },
+            { $group: { _id: '$tenant', billed: { $sum: '$total' } } },
+        ]),
     ]);
 
     // seed every tenant with zeros, then fold each aggregation in
@@ -225,6 +238,7 @@ const getTenantStats = async (tenants: HydratedDocument<ITenant>[]): Promise<Rec
             screeningCamps: 0,
             dietCamps: 0,
             mrs: 0,
+            billed: 0,
         };
     }
     for (const g of projectGroups) {
@@ -247,6 +261,12 @@ const getTenantStats = async (tenants: HydratedDocument<ITenant>[]): Promise<Rec
         const entry = stats[g._id.toString()];
         if (entry) {
             entry.mrs = g.total;
+        }
+    }
+    for (const g of invoiceGroups) {
+        const entry = stats[g._id.toString()];
+        if (entry) {
+            entry.billed = g.billed;
         }
     }
     return stats;

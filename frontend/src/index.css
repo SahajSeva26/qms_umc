@@ -432,6 +432,36 @@
   border-radius: 10px;
 }
 
+/* ── Prototype-matching doctor card/drawer (doctors-manager.js .doc-card, styles.css .kv/.id-kpi) ── */
+.doc-card {
+  padding: 14px; border-radius: 14px; cursor: pointer;
+  background: var(--qms-surface); border: 1px solid var(--qms-border);
+  display: flex; flex-direction: column; gap: 10px;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.doc-card:hover { transform: translateY(-2px); box-shadow: var(--qms-shadow-md, 0 8px 24px rgba(0,0,0,.08)); }
+.doc-card .h { display: flex; gap: 10px; align-items: center; }
+.doc-card .av {
+  width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 700; font-size: 14px;
+  background: linear-gradient(135deg, #3b6dff, #8b5cf6);
+}
+.doc-card .nm { font-size: 14px; font-weight: 700; color: var(--qms-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-card .sp { font-size: 11px; color: var(--qms-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-card .ct { font-size: 11px; color: var(--qms-text-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-card .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.doc-card .stat { padding: 6px; border-radius: 8px; text-align: center; background: rgba(59,109,255,.05); }
+.doc-card .stat b { display: block; font-size: 14px; color: var(--qms-brand); }
+.doc-card .stat .l { font-size: 9px; text-transform: uppercase; letter-spacing: .04em; color: var(--qms-text-muted); }
+
+.doc-kv { display: grid; grid-template-columns: 130px 1fr; row-gap: 6px; column-gap: 8px; font-size: 13px; background: var(--qms-surface); border: 1px solid var(--qms-border); border-radius: 14px; padding: 12px 14px; }
+
+.doc-id-kpi { padding: 12px; border-radius: 14px; background: var(--qms-surface); border: 1px solid var(--qms-border); }
+.doc-id-kpi .l { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--qms-text-muted); margin-bottom: 2px; }
+.doc-id-kpi .v { font-size: 18px; font-weight: 800; color: var(--qms-text); }
+.doc-id-kpi .s { font-size: 10px; color: var(--qms-text-muted); }
+
 /* ── Base ── */
 @layer base {
   * { @apply border-border outline-ring/50; }

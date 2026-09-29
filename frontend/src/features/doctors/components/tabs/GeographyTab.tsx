@@ -43,8 +43,11 @@ const GeographyTab = ({ doctors, onSelectCityState }: GeographyTabProps) => {
   return (
     <div className="grid gap-3" style={{ gridTemplateColumns: '1fr 1fr' }}>
       <div className="rounded-xl border p-3.5" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
-        <div className="flex items-center gap-2 text-[13px] font-bold mb-3" style={{ color: 'var(--qms-text)' }}>
-          <FiMap size={15} style={{ color: 'var(--qms-brand)' }} /> By state
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-7.5 h-7.5 rounded-lg flex items-center justify-center text-white shrink-0" style={{ background: '#3b6dff' }}>
+            <FiMap size={14} />
+          </div>
+          <span className="text-[13px] font-bold" style={{ color: 'var(--qms-text)' }}>By state</span>
         </div>
         {byState.map((s) => (
           <div key={s.state} className="mb-2.5">
@@ -59,8 +62,11 @@ const GeographyTab = ({ doctors, onSelectCityState }: GeographyTabProps) => {
       </div>
 
       <div className="rounded-xl border p-3.5" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
-        <div className="flex items-center gap-2 text-[13px] font-bold mb-3" style={{ color: 'var(--qms-text)' }}>
-          <FiMap size={15} style={{ color: 'var(--qms-teal)' }} /> By city
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-7.5 h-7.5 rounded-lg flex items-center justify-center text-white shrink-0" style={{ background: '#10b981' }}>
+            <FiMap size={14} />
+          </div>
+          <span className="text-[13px] font-bold" style={{ color: 'var(--qms-text)' }}>By city</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-[12px]">

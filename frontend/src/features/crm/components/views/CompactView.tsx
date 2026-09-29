@@ -19,7 +19,7 @@ const CompactView = ({ leads, onSelectStatus }: CompactViewProps) => (
         <button
           key={status}
           onClick={() => onSelectStatus(status)}
-          className="text-left rounded-2xl border p-4 transition-all hover:-translate-y-0.5"
+          className="text-left rounded-[20px] border p-4 transition-all hover:-translate-y-0.5 hover:shadow-md"
           style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}
         >
           <div className="flex items-center gap-2 mb-3">

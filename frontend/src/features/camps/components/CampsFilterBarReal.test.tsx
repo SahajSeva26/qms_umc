@@ -37,7 +37,7 @@ describe('CampsFilterBarReal', () => {
     expect(screen.queryByText('Type')).not.toBeInTheDocument()
     expect(screen.getByText('Status')).toBeInTheDocument()
     expect(screen.getByText('Billing')).toBeInTheDocument()
-    expect(screen.getByPlaceholderText('City...')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Search by city...')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('State...')).toBeInTheDocument()
     expect(container.querySelectorAll('input[type="date"]')).toHaveLength(2)
     expect(screen.getByRole('button', { name: /reset/i })).toBeInTheDocument()

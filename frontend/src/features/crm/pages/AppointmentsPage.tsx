@@ -87,12 +87,16 @@ const AppointmentsPage = () => {
   return (
     <div className="w-full">
       <div className="mb-4">
+        <div className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>Sales · Appointments</div>
         <h1 className="text-2xl font-bold" style={{ color: 'var(--qms-text)' }}>Appointments</h1>
+        {/* Matches the prototype's .chip (neutral surface + pulsing dot). The other 2
+            prototype chips describe features we don't have — see ui-revisions.md. */}
         <div className="flex flex-wrap gap-1.5 mt-2">
-          <span className="text-[10px] font-semibold px-2 py-1 rounded-full" style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text-muted)' }}>
-            Sales · Appointments
-          </span>
-          <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-success-soft text-success">
+          <span
+            className="flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1.5 rounded-full border"
+            style={{ background: 'var(--qms-surface-strong)', borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#10b981' }} />
             Calendar · live
           </span>
         </div>
@@ -156,13 +160,17 @@ const AppointmentsPage = () => {
             <AppointmentMonthGrid
               cursor={cursor}
               appointments={appointments}
-              // Opens New Appointment directly, prefilled with the clicked
-              // day — matches week view's own one-click behavior instead of
-              // making the user land on week view and click a second time.
-              // Month cells have no hour granularity, so this reuses the
-              // dialog's own no-prefill default start hour (10:00, see
-              // NewAppointmentDialog.tsx).
-              onPickDate={(date) => handleSlotClick(date, 10)}
+              // A day WITH appointments opens the first one's drawer (sorted
+              // by start time via appointmentSortKey) — previously this
+              // silently ignored existing appointments and always opened a
+              // blank create form, with no way to reach them from Month view
+              // at all. An empty day still opens New Appointment directly
+              // (1-click create), prefilled to that date — month cells have
+              // no hour granularity, so this reuses the dialog's own
+              // no-prefill default start hour (10:00, see NewAppointmentDialog.tsx).
+              onPickDate={(date, dayAppointments) =>
+                dayAppointments.length > 0 ? setOpenAppointmentId(dayAppointments[0].id) : handleSlotClick(date, 10)
+              }
             />
           )}
           {view === 'list' && <AppointmentList appointments={weekAppointments} onOpen={setOpenAppointmentId} />}

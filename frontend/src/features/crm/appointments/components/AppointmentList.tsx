@@ -52,7 +52,7 @@ const AppointmentList = ({ appointments, onOpen }: AppointmentListProps) => {
             </div>
             <span
               className="text-[10px] font-bold px-2 py-1 rounded-full shrink-0"
-              style={{ background: `${statusColor}22`, color: statusColor }}
+              style={{ background: `color-mix(in srgb, ${statusColor} 12%, transparent)`, color: statusColor }}
             >
               {APPOINTMENT_STATUS_LABEL[a.status]}
             </span>

@@ -7,6 +7,7 @@ import RecordsDrawer from '@/features/crm/components/RecordsDrawer'
 
 interface BottomInsightsRowProps {
   leads: LeadEntity[]
+  onOpenLead: (id: string) => void
 }
 
 type Drill = { title: string; exportSlug: string; leads: LeadEntity[] } | null
@@ -40,7 +41,7 @@ function topRepsByWon(leads: LeadEntity[]) {
   return [...byRep.values()].sort((a, b) => b.total - a.total).slice(0, 5)
 }
 
-const BottomInsightsRow = ({ leads }: BottomInsightsRowProps) => {
+const BottomInsightsRow = ({ leads, onOpenLead }: BottomInsightsRowProps) => {
   const [drill, setDrill] = useState<Drill>(null)
 
   const dormant = leads.filter((l) => l.status !== 'won' && l.status !== 'lost' && daysSince(l.updatedAt) > 20)
@@ -89,7 +90,16 @@ const BottomInsightsRow = ({ leads }: BottomInsightsRowProps) => {
       </div>
 
       {drill && (
-        <RecordsDrawer title={drill.title} exportSlug={drill.exportSlug} leads={drill.leads} onClose={() => setDrill(null)} />
+        <RecordsDrawer
+          title={drill.title}
+          exportSlug={drill.exportSlug}
+          leads={drill.leads}
+          onClose={() => setDrill(null)}
+          onOpenLead={(id) => {
+            setDrill(null)
+            onOpenLead(id)
+          }}
+        />
       )}
     </div>
   )

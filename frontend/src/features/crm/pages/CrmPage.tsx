@@ -41,12 +41,11 @@ const CrmPage = () => {
   const canManageLeads = hasAnyPermission(['lead:manage', 'tenant:manage'])
   const { filters, setFilter, reset } = useCrmFilters()
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
-  // status/title are real, backend-supported filters — sending them server-side
-  // is what makes pagination correct while filtered (count/totalPages must
-  // reflect the FILTERED total, not the whole tenant's leads). fyFrom/fyTo are
-  // sent ahead of the backend accepting them (see SearchLeadQuery's own note)
-  // — harmless no-op server-side today; matchesFilters below still applies
-  // them client-side so the picker works now.
+  // status/title/fyFrom/fyTo are all real, backend-supported filters — sending
+  // them server-side is what makes pagination correct while filtered (count/
+  // totalPages must reflect the FILTERED total, not the whole tenant's leads).
+  // matchesFilters below still re-applies them client-side too, as a harmless
+  // defense-in-depth check against whatever page is already loaded.
   const { leads, count, isLoading, error, moveStage, updateLead } = useLeads({
     status: filters.status || undefined,
     title: filters.q || undefined,
@@ -58,7 +57,11 @@ const CrmPage = () => {
   // Unfiltered — always whole-tenant, independent of the table's own filters below.
   const { report, isLoading: reportLoading, error: reportError } = useLeadReport({}, canManageLeads)
 
-  const [view, setView] = useState<ViewMode>('list')
+  // Prototype default: a rep-level (non-managing) caller lands on Compact;
+  // everyone else lands on List (crm.js's role check, ported to this app's
+  // own permission flag rather than a role-name string — see canManageLeads
+  // above).
+  const [view, setView] = useState<ViewMode>(canManageLeads ? 'list' : 'compact')
   const [openLeadId, setOpenLeadId] = useState<string | null>(null)
   const [wizardOpen, setWizardOpen] = useState(false)
   const [statusDrill, setStatusDrill] = useState<LeadStatus | null>(null)
@@ -177,7 +180,7 @@ const CrmPage = () => {
 
           <PaginationControls page={page} totalPages={totalPages(count)} onPageChange={setPage} />
 
-          <BottomInsightsRow leads={leads} />
+          <BottomInsightsRow leads={leads} onOpenLead={setOpenLeadId} />
         </>
       )}
 

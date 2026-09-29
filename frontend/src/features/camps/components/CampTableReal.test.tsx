@@ -77,11 +77,11 @@ describe('CampTableReal', () => {
     expect(onOpen).toHaveBeenCalledWith('camp-1')
   })
 
-  it('shows UNASSIGNED for a camp with no FO', () => {
+  it('shows a "Missing FO" warning for a camp with no FO', () => {
     mockSessionTenantType('platform')
     render(<CampTableReal camps={[campFixture({ fo: null })]} onOpen={vi.fn()} />)
 
-    expect(screen.getByText('UNASSIGNED')).toBeInTheDocument()
+    expect(screen.getByText('Missing FO')).toBeInTheDocument()
   })
 
   it('shows the empty state when there are no camps', () => {

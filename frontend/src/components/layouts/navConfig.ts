@@ -177,7 +177,8 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
     section: 'Sales & CRM',
     subs: [
       { title: 'Pipeline', items: ['appointments', 'crm', 'tenants'].map((id) => NAV_BY_ID[id]) },
-      { title: 'Delivery', items: ['projects', 'gantt'].map((id) => NAV_BY_ID[id]) },
+      // 'gantt' commented out, not deleted — no prototype equivalent exists to re-skin against; page itself still works.
+      { title: 'Delivery', items: ['projects'/* , 'gantt' */].map((id) => NAV_BY_ID[id]) },
     ],
   },
   {

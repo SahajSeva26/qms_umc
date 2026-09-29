@@ -13,7 +13,7 @@ const ELIGIBLE_STATUSES: CampStatus[] = ['closed', 'cancelled_charged']
 // billed on a live invoice can only be confirmed by the create/add call
 // itself (a 409). Treat this list as "probably eligible," not authoritative.
 //
-// KNOWN, DEFERRED LIMITATION: neither GenerateInvoiceDialog nor
+// KNOWN, DEFERRED LIMITATION: neither GenerateInvoiceTab nor
 // AddCampToInvoiceDialog excludes camps already billed on a DIFFERENT,
 // still-live invoice for this same project — this hook has no way to know
 // that without an N+1 query (one invoice-line-item lookup per camp), which

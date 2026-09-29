@@ -19,6 +19,8 @@ import { Project } from '../../crm/project/project.model';
 import { PROJECT_STATUS } from '../../crm/project/project.constants';
 import { CampModel } from '../../operations/camp/camp.model';
 import { CAMP_STATUSES, CAMP_TYPES } from '../../operations/camp/camp.constants';
+import { RoleModel } from '../role/role.model';
+import { RoleTypeModel } from '../role-type/roleType.model';
 
 type TenantDocument = HydratedDocument<ITenant> | null;
 const populate: any[] = [];
@@ -156,7 +158,7 @@ const search = async (filters: ISearchTenantQuery, ctx: RequestContext, options?
     };
 };
 
-// per-tenant rollup: total & live projects, total & live camps
+// per-tenant rollup: total & live projects, total & live camps, total MRs
 type TenantStats = {
     totalProjects: number;
     liveProjects: number;
@@ -164,13 +166,14 @@ type TenantStats = {
     liveCamps: number;
     screeningCamps: number;
     dietCamps: number;
+    mrs: number;
 };
 
 // aggregate project & camp stats per tenant for the given tenants (one query each for the whole page)
 const getTenantStats = async (tenants: HydratedDocument<ITenant>[]): Promise<Record<string, TenantStats>> => {
     const tenantIds = tenants.map((t) => t._id);
 
-    const [projectGroups, campGroups] = await Promise.all([
+    const [projectGroups, campGroups, mrGroups] = await Promise.all([
         Project.aggregate([
             { $match: { tenant: { $in: tenantIds } } },
             {
@@ -193,6 +196,22 @@ const getTenantStats = async (tenants: HydratedDocument<ITenant>[]): Promise<Rec
                 },
             },
         ]),
+        // MR count per tenant: roles whose role-type is this tenant's `pharma-mr` type.
+        // role-types are per-tenant, so we resolve the type via $lookup rather than a shared id.
+        RoleModel.aggregate([
+            { $match: { tenant: { $in: tenantIds } } },
+            {
+                $lookup: {
+                    from: RoleTypeModel.collection.name,
+                    localField: 'type',
+                    foreignField: '_id',
+                    as: 'roleType',
+                },
+            },
+            { $unwind: '$roleType' },
+            { $match: { 'roleType.code': ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR } },
+            { $group: { _id: '$tenant', total: { $sum: 1 } } },
+        ]),
     ]);
 
     // seed every tenant with zeros, then fold each aggregation in
@@ -205,6 +224,7 @@ const getTenantStats = async (tenants: HydratedDocument<ITenant>[]): Promise<Rec
             liveCamps: 0,
             screeningCamps: 0,
             dietCamps: 0,
+            mrs: 0,
         };
     }
     for (const g of projectGroups) {
@@ -221,6 +241,12 @@ const getTenantStats = async (tenants: HydratedDocument<ITenant>[]): Promise<Rec
             entry.liveCamps = g.live;
             entry.screeningCamps = g.screening;
             entry.dietCamps = g.diet;
+        }
+    }
+    for (const g of mrGroups) {
+        const entry = stats[g._id.toString()];
+        if (entry) {
+            entry.mrs = g.total;
         }
     }
     return stats;

@@ -57,6 +57,7 @@ export const TenantMapper = {
                     liveCamps: 0,
                     screeningCamps: 0,
                     dietCamps: 0,
+                    mrs: 0,
                 };
             }
             result.items.push(item);

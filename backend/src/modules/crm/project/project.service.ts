@@ -7,7 +7,7 @@ import {
     ISearchProjectQuery,
     IUpdateProjectPayload,
 } from './project.validators';
-import { PROJECT_COUNTER_ENTITY, PROJECT_PERMISSIONS, PROJECT_TRANSITION_MAP } from './project.constants';
+import { PROJECT_COUNTER_ENTITY, PROJECT_PERMISSIONS, PROJECT_TRANSITION_MAP, PROJECT_TYPES } from './project.constants';
 import { canTransition } from '../lead/lead.validators';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
 import { CounterService } from '../../counter/counter.service';
@@ -206,7 +206,23 @@ const search = async (filters: ISearchProjectQuery, ctx: RequestContext, options
 
     const [count, items] = await Promise.all([countPromise, dataPromise]);
 
-    return { count, items };
+    //5: optional report — per-type project breakdown over the same (scoped + filtered) set.
+    // `type` is an array, so a multi-type project is counted once per type it carries.
+    let report;
+    if (filters.report === 'true') {
+        const typeGroups = await Project.aggregate([
+            { $match: where },
+            { $unwind: '$type' },
+            { $group: { _id: '$type', count: { $sum: 1 } } },
+        ]);
+        const typeCounts = new Map<string, number>(typeGroups.map((g: any) => [g._id, g.count]));
+        report = {
+            total: count,
+            byType: Object.values(PROJECT_TYPES).map((type) => ({ type, count: typeCounts.get(type) || 0 })),
+        };
+    }
+
+    return { count, items, report };
 };
 
 const create = async (model: ICreateProjectPayload, ctx: RequestContext): Promise<HydratedDocument<IProject>> => {

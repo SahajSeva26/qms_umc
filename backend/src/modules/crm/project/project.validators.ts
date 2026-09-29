@@ -143,6 +143,8 @@ export const SearchProjectQuerySchema = z.object({
     division: objectId('Division').optional(),
     lead: objectId('Lead').optional(),
     salesRep: objectId('Sales rep').optional(),
+    // when 'true', the search also returns a per-type project breakdown scoped to the same filters
+    report: z.string().optional().openapi({ example: 'true' }),
     page: z.string().optional().openapi({ example: '1' }),
     limit: z.string().optional().openapi({ example: '10' }),
 });

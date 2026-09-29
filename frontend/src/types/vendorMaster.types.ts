@@ -1,5 +1,4 @@
 // Matches backend/vendor-master exactly — a global, platform-only registry (no tenant scoping).
-// Deliberately unrelated to the older mock-data scorecard in features/inventory/inventory.types.ts.
 import type { LocationValue } from '@/types/location.types'
 
 export type VendorStatus = 'active' | 'inactive'

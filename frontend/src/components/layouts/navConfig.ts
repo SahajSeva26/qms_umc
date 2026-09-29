@@ -108,8 +108,6 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { id: 'pharma',       label: 'Pharma Portal',               icon: 'Briefcase',     path: PHARMA_ROUTES.PHARMA },
 
   // Resources
-  { id: 'inventory',    label: 'Inventory & Devices',         icon: 'Package',       path: ADMIN_ROUTES.ADMIN_INVENTORY },
-
   { id: 'itemmaster',   label: 'Item Master',                 icon: 'BookOpen',      path: ADMIN_ROUTES.ADMIN_INVENTORY_MASTERS },
 
   { id: 'inventoryitems', label: 'Inventory Items',           icon: 'Cpu',           path: ADMIN_ROUTES.ADMIN_INVENTORY_ITEMS },
@@ -191,8 +189,8 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
   {
     section: 'Resources',
     subs: [
-      // 'inventory'/'assets'/'kpi' are deliberately hidden from nav, not deleted —
-      // only these four are backend-wired today.
+      // 'assets'/'kpi' are deliberately hidden from nav, not deleted — the
+      // mock 'inventory' item was fully removed (see md-files, inventory cleanup).
       { title: '', items: ['itemmaster', 'inventoryitems', 'inventoryops', 'vendormasters'].map((id) => NAV_BY_ID[id]) },
     ],
   },

@@ -1,5 +1,4 @@
-// Matches backend/inventory-master exactly — deliberately separate from the
-// older, richer mock-data type in inventory.types.ts. The two are unrelated models; never merge or cross-import them.
+// Matches backend/inventory-master exactly.
 
 // 'accessory'/'other' are dead, commented-out backend constants — offering
 // them here let the type filter send a value the backend 400s on, stalling the list.
@@ -40,9 +39,8 @@ export interface InventoryMasterEntity {
   minStock: number
   createdAt: string
   updatedAt: string
-  // Key is ABSENT (not null/undefined-but-present) unless the caller holds
-  // `inventory-master:manage` — inventory-master.mapper.ts only sets this
-  // field conditionally, so a plain-read caller gets no `status` key at all.
+  // Key is ABSENT unless the caller holds `inventory-master:manage` — the
+  // mapper only sets this field conditionally.
   status?: InventoryMasterStatus
 }
 
@@ -68,9 +66,8 @@ export interface CreateInventoryMasterPayload {
 }
 
 export interface UpdateInventoryMasterPayload {
-  // `code` is intentionally absent — inventory-master.service.ts's set()
-  // never reads it from the update payload, so the natural key is immutable
-  // post-create even if a caller sent it.
+  // `code` is intentionally absent — the service never reads it from the
+  // update payload, so the natural key is immutable post-create.
   name?: string
   description?: string
   sku?: string

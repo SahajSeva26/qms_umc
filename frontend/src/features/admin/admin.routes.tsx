@@ -5,7 +5,6 @@ export const ADMIN_ROUTES = {
   ADMIN:              '/admin',
   ADMIN_HQ:           '/admin/hq',
   ADMIN_REMINDERS:    '/admin/reminders',
-  ADMIN_INVENTORY:    '/admin/inventory',
   ADMIN_INVENTORY_MASTERS: '/admin/inventory-masters',
   ADMIN_INVENTORY_ITEMS: '/admin/inventory-items',
   ADMIN_INVENTORY_OPERATIONS: '/admin/inventory-operations',
@@ -34,7 +33,6 @@ export const adminRoutes: RouteObject[] = [
   { path: ADMIN_ROUTES.ADMIN,           lazy: adminPage },
   { path: ADMIN_ROUTES.ADMIN_HQ,        lazy: lazyRoute(() => import('@/features/hq/pages/HqPage')) },
   { path: ADMIN_ROUTES.ADMIN_REMINDERS, lazy: lazyRoute(() => import('@/features/reminders/pages/RemindersPage')) },
-  { path: ADMIN_ROUTES.ADMIN_INVENTORY, lazy: lazyRoute(() => import('@/features/inventory/pages/InventoryPage')) },
   {
     path: ADMIN_ROUTES.ADMIN_INVENTORY_MASTERS,
     lazy: lazyRoute(() => import('@/features/inventory/real/pages/InventoryMastersPage'), INVENTORY_MASTERS_VIEW_PERMISSIONS),

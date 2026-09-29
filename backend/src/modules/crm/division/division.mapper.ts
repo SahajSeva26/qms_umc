@@ -36,6 +36,7 @@ export const DivisionMapper = {
             count: data?.count || 0,
             items: [] as any[],
         };
+        const stats = data?.stats;
         for (const d of data?.items || []) {
             // NOTE: independent from toResponse on purpose — mirrors it field-for-field for now (incl. same permission gating) so nothing breaks; search rows can be trimmed later without affecting GET /:id.
             const item: any = {
@@ -61,6 +62,10 @@ export const DivisionMapper = {
                 } else {
                     item.owner = d.owner?._id ?? d.owner;
                 }
+            }
+            // present only when the caller requested report=true
+            if (stats) {
+                item.stats = stats[d._id?.toString()] ?? { totalProjects: 0, liveProjects: 0 };
             }
             result.items.push(item);
         }

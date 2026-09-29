@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { FiPlus } from 'react-icons/fi'
+import { FiPlus, FiSun } from 'react-icons/fi'
 import { useCampsReal } from '@/features/camps/hooks/useCampsReal'
 import { useCampReport } from '@/features/camps/hooks/useCampReport'
 import { useCampsRealFilters } from '@/features/camps/hooks/useCampsRealFilters'
@@ -8,6 +8,9 @@ import { usePermission } from '@/hooks/usePermission'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import CampsFilterBarReal from '@/features/camps/components/CampsFilterBarReal'
 import CampsKpiStripReal from '@/features/camps/components/CampsKpiStripReal'
+import CampsTabStrip from '@/features/camps/components/CampsTabStrip'
+import CampsTypeBreakdownChips from '@/features/camps/components/CampsTypeBreakdownChips'
+import CampCardReal from '@/features/camps/components/CampCardReal'
 import CampTableReal from '@/features/camps/components/CampTableReal'
 import CampDrawer from '@/features/camps/components/CampDrawer'
 import PaginationControls from '@/components/ui/PaginationControls'
@@ -26,6 +29,10 @@ const CAMP_REPORT_PERMISSIONS = ['camp:manage', 'tenant:manage']
 
 const PAGE_SIZE = 10
 const ALL_STATUSES: CampStatus[] = ['requested', 'confirmed', 'live', 'closed', 'cancelled', 'cancelled_charged']
+
+// Matches the prototype's per-tab view choice (camps.js:499-507): cards for the "in-flight"
+// requested/upcoming/live stages, a denser table for the "settled" stages.
+const CARD_VIEW_STATUSES = new Set<CampStatus>(['requested', 'confirmed', 'live'])
 
 const CampsPageReal = () => {
   const navigate = useNavigate()
@@ -81,12 +88,27 @@ const CampsPageReal = () => {
     <div className="w-full">
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
+          <div className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>Operations · Camp Management</div>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--qms-text)' }}>
             Camp Management
           </h1>
-          <p className="text-[13px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>
-            {!isLoading && !error ? `${totalCount} total` : 'Screening / Diet / Lab camps, wired to the real backend.'}
-          </p>
+          {/* Prototype's "QR-tracked" chip and "Camp copilot" AI banner are both skipped —
+              neither has any real logic behind it (no QR generation, an unwired banner button). */}
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            <span
+              className="inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1.5 rounded-full border"
+              style={{ background: 'var(--qms-surface-strong)', borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }}
+            >
+              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#10b981' }} />
+              Live operations
+            </span>
+            <span
+              className="inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1.5 rounded-full border"
+              style={{ background: 'var(--qms-surface-strong)', borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }}
+            >
+              <FiSun size={12} /> Screening · Diet · Lab
+            </span>
+          </div>
         </div>
         {canWrite && (
           <Button
@@ -98,6 +120,10 @@ const CampsPageReal = () => {
           </Button>
         )}
       </div>
+
+      {!isLoading && !error && (
+        <p className="text-[12px] mb-3" style={{ color: 'var(--qms-text-muted)' }}>{totalCount} total</p>
+      )}
 
       {canViewReport && (
         <QueryStateBlock
@@ -116,17 +142,50 @@ const CampsPageReal = () => {
         </QueryStateBlock>
       )}
 
+      <CampsTabStrip
+        active={activeStatus}
+        onSelect={(tab) => handleFilterChange('status', tab)}
+      />
+
       <CampsFilterBarReal filters={filters} setFilter={handleFilterChange} reset={handleReset} />
 
+      {activeStatus !== 'ALL' && CARD_VIEW_STATUSES.has(activeStatus) && !isLoading && !error && (
+        <CampsTypeBreakdownChips camps={camps} totalCount={totalCount} />
+      )}
+
       <QueryStateBlock isLoading={isLoading} error={error} loadingLabel="Loading camps…" errorLabel="Failed to load camps. Please try again." onRetry={refetch}>
-        <CampTableReal
-          camps={camps}
-          onOpen={(id) => {
-            const next = new URLSearchParams(searchParams)
-            next.set('camp', id)
-            setSearchParams(next)
-          }}
-        />
+        {activeStatus !== 'ALL' && CARD_VIEW_STATUSES.has(activeStatus) ? (
+          <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))' }}>
+            {camps.map((camp) => (
+              <CampCardReal
+                key={camp.id}
+                camp={camp}
+                onOpen={(id) => {
+                  const next = new URLSearchParams(searchParams)
+                  next.set('camp', id)
+                  setSearchParams(next)
+                }}
+              />
+            ))}
+            {camps.length === 0 && (
+              <div
+                className="col-span-full px-4 py-10 text-center text-[13px] rounded-xl border"
+                style={{ color: 'var(--qms-text-muted)', borderColor: 'var(--qms-border)' }}
+              >
+                No camps found.
+              </div>
+            )}
+          </div>
+        ) : (
+          <CampTableReal
+            camps={camps}
+            onOpen={(id) => {
+              const next = new URLSearchParams(searchParams)
+              next.set('camp', id)
+              setSearchParams(next)
+            }}
+          />
+        )}
         <PaginationControls page={page} totalPages={totalPages(totalCount)} onPageChange={setPage} />
       </QueryStateBlock>
 

@@ -1,3 +1,4 @@
+import { Building2 } from 'lucide-react'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { useTenantsFilters } from '@/features/access-management/tenant/hooks/useTenantsFilters'
 import TenantsTable from '@/features/access-management/tenant/components/TenantsTable'
@@ -47,18 +48,49 @@ const TenantsListPage = () => {
   }
 
   return (
-    <div className="w-full">
-      <div className="mb-5 flex items-start justify-between gap-4">
+    // --cm-accent: prototype's --violet-500, scoped to this page only — --qms-brand stays untouched.
+    <div className="w-full" style={{ ['--cm-accent' as string]: '#8b5cf6' }}>
+      {/* Shell header (prototype's cm-tpl template) — distinct from the view-level crumbs/H2 below. */}
+      <div className="mb-1 text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>
+        Master · Client Management
+      </div>
+      <div className="mb-4 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--qms-text)' }}>
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--qms-text)', letterSpacing: '-0.02em' }}>
             Client Management
           </h1>
-          <p className="text-[13px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>
-            {!isLoading && !error ? `${totalCount} total` : 'Manage your clients.'}
-          </p>
+          <div className="flex items-center gap-2 mt-1.5">
+            {/* Matches the prototype's generic .chip (styles.css) — dot is always green, never page accent. */}
+            <span
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[12px] font-medium"
+              style={{ background: 'var(--qms-surface-strong)', border: '1px solid var(--qms-border)', color: 'var(--qms-text-soft)' }}
+            >
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#10b981', boxShadow: '0 0 0 4px rgba(16,185,129,.18)' }} />
+              Read-only analytics
+            </span>
+            <span
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[12px] font-medium"
+              style={{ background: 'var(--qms-surface-strong)', border: '1px solid var(--qms-border)', color: 'var(--qms-text-soft)' }}
+            >
+              <Building2 className="w-3 h-3" />
+              Clients · Divisions · MRs
+            </span>
+          </div>
         </div>
         {canManageTenant && <CreateTenantDialog />}
       </div>
+
+      {/* Prototype's .cm-crumbs — styled like a link even though this IS the root view (no nav target). */}
+      <div className="text-[12px] mb-3.5">
+        <span className="font-bold" style={{ color: 'var(--cm-accent)' }}>Clients</span>
+      </div>
+
+      <h2 className="text-[19px] font-extrabold mb-0.5" style={{ color: 'var(--qms-text)' }}>
+        All Clients
+      </h2>
+      <p className="text-[12px] mb-3" style={{ color: 'var(--qms-text-muted)' }}>
+        {!isLoading && !error ? `${totalCount} client(s) · click a row to open the profile` : 'Manage your clients.'}
+      </p>
 
       <TenantsFilterBar filters={filters} setFilter={handleFilterChange} reset={handleReset} canFilterByType={canFilterByType} />
 

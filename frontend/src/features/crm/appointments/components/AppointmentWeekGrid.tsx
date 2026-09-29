@@ -171,7 +171,9 @@ const AppointmentWeekGrid = ({ weekStart, appointments, onOpen, onSlotClick }: A
                         <div className="text-[10px] font-bold truncate">
                           {APPOINTMENT_TYPE_LABEL[a.type]} · {APPOINTMENT_STATUS_LABEL[a.status]}
                         </div>
-                        <div className="text-[11px] font-semibold truncate">{appointmentRefName(a.contactPerson) ?? 'Contact'}</div>
+                        <div className="text-[11px] font-semibold truncate">
+                          {appointmentRefName(a.tenant) ?? 'Company'} · {appointmentRefName(a.contactPerson) ?? 'Contact'}
+                        </div>
                         <div className="text-[10px] opacity-90 truncate">
                           {start.toTimeString().slice(0, 5)}–{end.toTimeString().slice(0, 5)}
                         </div>

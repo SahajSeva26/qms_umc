@@ -120,7 +120,9 @@ const ExistingFieldOfficerPicker = ({ tenant, foTypeId, value, onChange }: Exist
         <div className="space-y-1.5 max-h-72 overflow-y-auto">
           {items.map((role) => {
             const user = populatedUser(role)
-            const active = value === (user?._id ?? null)
+            // Compare against a real id only — `value === null` must never match an unusable row's
+            // `user?._id ?? null`, or every unpickable row looks selected before anything is clicked.
+            const active = !!user?._id && value === user._id
             return (
               <div key={role.id}>
                 <button

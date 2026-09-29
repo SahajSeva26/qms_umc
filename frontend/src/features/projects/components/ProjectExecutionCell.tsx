@@ -34,9 +34,10 @@ const ProjectExecutionCell = ({ project }: ProjectExecutionCellProps) => {
 
   return (
     <div>
+      {/* Prototype's .mode-pill — 6px radius (not full pill), 2px/8px padding, 10px/700 text, 1px border. */}
       <span
-        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold"
-        style={{ background: `${color}18`, color }}
+        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[6px] text-[10px] font-bold"
+        style={{ background: `${color}1a`, color, border: `1px solid ${color}2e` }}
       >
         <Icon size={11} />
         {EXECUTION_MODE_LABEL[mode].split(' ')[0]}

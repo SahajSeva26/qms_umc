@@ -104,10 +104,17 @@ describe('ExistingFieldOfficerPicker', () => {
 
     // roleLabel AND the email-fallback both read role.code when there's no populated user —
     // the row's button is the more targeted, unambiguous query.
-    await user.click(screen.getByRole('button', { name: /fo-dangling/i }))
+    const row = screen.getByRole('button', { name: /fo-dangling/i })
+    // regression (QUP-470 S6): before ANY click, `value === null` must never match this row's
+    // unusable `user?._id ?? null` (also null) — it must not render as already selected.
+    expect(row).toHaveAttribute('aria-pressed', 'false')
+
+    await user.click(row)
 
     expect(onChange).not.toHaveBeenCalled()
     expect(screen.getByText(/linked user no longer exists/i)).toBeInTheDocument()
+    // Still not selected after the click either — it was blocked, not picked.
+    expect(row).toHaveAttribute('aria-pressed', 'false')
   })
 
   it('blocks a row whose user is still a raw (unpopulated) string id, with a distinct "could not be loaded" message — told apart from the dangling-reference case above', async () => {
@@ -118,10 +125,15 @@ describe('ExistingFieldOfficerPicker', () => {
     const user = userEvent.setup()
     render(<ExistingFieldOfficerPicker tenant="t-1" foTypeId="rt-fo" value={null} onChange={onChange} />)
 
-    await user.click(screen.getByRole('button', { name: /fo-unpopulated/i }))
+    const row = screen.getByRole('button', { name: /fo-unpopulated/i })
+    // regression (QUP-470 S7): same false-selected defect as the dangling-user case above.
+    expect(row).toHaveAttribute('aria-pressed', 'false')
+
+    await user.click(row)
 
     expect(onChange).not.toHaveBeenCalled()
     expect(screen.getByText(/details could not be loaded/i)).toBeInTheDocument()
+    expect(row).toHaveAttribute('aria-pressed', 'false')
   })
 
   it('shows a clear inline error on a search failure, not a silent empty list', () => {

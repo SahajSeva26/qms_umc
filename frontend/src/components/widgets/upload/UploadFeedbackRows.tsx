@@ -1,4 +1,4 @@
-import { FiRefreshCw } from 'react-icons/fi'
+import { FiRefreshCw, FiX } from 'react-icons/fi'
 import { Button } from '@/components/ui/button'
 import { callSafely } from '@/components/widgets/upload/callSafely'
 
@@ -8,6 +8,17 @@ import { callSafely } from '@/components/widgets/upload/callSafely'
 export const ErrorBanner = ({ message }: { message: string }) => (
   <div className="text-[11px] rounded-lg px-2.5 py-1.5 bg-danger-soft border border-danger text-danger wrap-break-word">
     {message}
+  </div>
+)
+
+// Non-blocking: the replacement itself recovered (e.g. the old file was confirmed restored), so this
+// is dismissible on its own — but cleanup may still need action, shown separately via CleanupLine.
+export const WarningBanner = ({ message, onDismiss }: { message: string; onDismiss: () => void }) => (
+  <div className="flex items-start gap-2 text-[11px] rounded-lg px-2.5 py-1.5 bg-warning-soft border border-warning text-warning wrap-break-word">
+    <span className="flex-1">{message}</span>
+    <button type="button" onClick={onDismiss} aria-label="Dismiss" className="shrink-0 opacity-70 hover:opacity-100">
+      <FiX size={13} />
+    </button>
   </div>
 )
 

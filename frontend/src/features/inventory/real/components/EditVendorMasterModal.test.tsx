@@ -27,6 +27,10 @@ function vendorFixture(overrides: Partial<VendorMasterEntity> = {}): VendorMaste
   }
 }
 
+function soloContactFixture(): VendorMasterEntity {
+  return vendorFixture({ contacts: [{ name: 'Solo Person', number: undefined, email: 'solo@example.com', designation: undefined }] })
+}
+
 describe('EditVendorMasterModal', () => {
   beforeEach(() => {
     vi.resetAllMocks()
@@ -79,5 +83,49 @@ describe('EditVendorMasterModal', () => {
       return call[1]
     })
     expect(payload.name).toBe('New Vendor Name')
+  })
+
+  it('edit mode: removing a vendor\'s only contact sends contacts:[] instead of omitting the key', async () => {
+    const { vendorMasterService } = await import('@/features/inventory/real/vendorMaster.service')
+    const EditVendorMasterModal = (await import('@/features/inventory/real/components/EditVendorMasterModal')).default
+    const queryClient = makeQueryClient()
+    const user = userEvent.setup()
+    const vendor = soloContactFixture()
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <EditVendorMasterModal vendor={vendor} onClose={vi.fn()} canManageStatus={false} />
+      </QueryClientProvider>,
+    )
+
+    await user.click(screen.getByRole('button', { name: /remove contact/i }))
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    const payload = await vi.waitFor(() => {
+      const call = vi.mocked(vendorMasterService.updateVendorMaster).mock.calls[0]
+      if (!call) throw new Error('not called yet')
+      return call[1]
+    })
+    expect(payload.contacts).toEqual([])
+  })
+
+  it('shows a contact email-format error, not just the name error, when both are invalid', async () => {
+    const EditVendorMasterModal = (await import('@/features/inventory/real/components/EditVendorMasterModal')).default
+    const queryClient = makeQueryClient()
+    const user = userEvent.setup()
+    const vendor = soloContactFixture()
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <EditVendorMasterModal vendor={vendor} onClose={vi.fn()} canManageStatus={false} />
+      </QueryClientProvider>,
+    )
+
+    const emailInput = screen.getByDisplayValue('solo@example.com')
+    await user.clear(emailInput)
+    await user.type(emailInput, 'not-an-email')
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    expect(await screen.findByText('Enter a valid email.')).toBeInTheDocument()
   })
 })

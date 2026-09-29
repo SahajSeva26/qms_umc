@@ -1,9 +1,5 @@
-// Real backend-wired Inventory Device types — matches
-// backend/src/modules/inventory/inventory-device exactly. A device is an
-// individual physical unit (unique serialNumber) of an InventoryMaster
-// catalog item — separate from features/inventory/inventory.types.ts, which
-// is the older, mock-data device model the still-mock Inventory & Devices
-// tabs use.
+// Matches backend/inventory-device exactly. A device is an individual
+// physical unit (unique serialNumber) of an InventoryMaster catalog item.
 
 export type InventoryDeviceStatus = 'available' | 'in-transit' | 'assigned' | 'maintainance' | 'lost' | 'damaged'
 
@@ -35,10 +31,8 @@ export interface InventoryDeviceItemRef {
   unit?: string
 }
 
-// vendor is populated to {id, code, name} when hydrated, {id} only when not
-// (inventory-device.mapper.ts's mapVendor()). null on any device created
-// before `vendor` became a required field — the backend only enforces
-// required-ness on save, not retroactively on existing documents.
+// Populated to {id, code, name} when hydrated, {id} only when not. Can be
+// null — legacy stored records may lack the reference despite it being required now.
 export interface InventoryDeviceVendorRef {
   id: string
   code?: string

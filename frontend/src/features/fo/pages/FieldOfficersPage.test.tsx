@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
@@ -45,6 +46,27 @@ vi.mock('@/features/geo-profile/hooks/useGeoProfiles', () => ({
 vi.mock('@/features/access-management/role/hooks/useCreateRole', () => ({
   useCreateRole: () => ({ mutate: vi.fn(), isPending: false, isError: false, isSuccess: false, error: null, reset: vi.fn() }),
 }))
+// These hit real GET /camps, /inventory-assignments, /employees — stubbed so
+// this file stays a pure page-wiring test.
+vi.mock('@/features/fo/hooks/useFoRosterCamps', () => ({
+  useFoRosterCamps: () => ({}),
+}))
+vi.mock('@/features/fo/hooks/useFoRosterDevices', () => ({
+  useFoRosterDevices: () => ({}),
+}))
+vi.mock('@/features/fo/hooks/useFoTodayCamps', () => ({
+  useFoTodayCamps: () => ({ camps: [], totalCount: 0, liveCamps: [], unassignedCamps: [], truncated: false, isLoading: false, error: null, refetch: vi.fn() }),
+  useFoActiveCount: () => ({ totalActive: 1, idleCount: 1, roleTruncated: false, isLoading: false }),
+}))
+// FoRealDrawer independently fetches useRole/useGeoProfiles/useFoEmployee/etc.
+// — stubbed to a no-op so opening it in a test never fires real network hooks.
+vi.mock('@/features/fo/components/FoRealDrawer', () => ({
+  default: ({ roleId }: { roleId: string | null }) => (roleId ? <div>Drawer open for {roleId}</div> : null),
+}))
+
+function makeQueryClient() {
+  return new QueryClient({ defaultOptions: { queries: { retry: false } } })
+}
 
 async function renderPage(
   session: { tenant: { type: 'platform' | 'customer'; id?: string } } | null,
@@ -54,17 +76,19 @@ async function renderPage(
   vi.mocked(usePermission).mockReturnValue({ session, hasAnyPermission } as unknown as ReturnType<typeof usePermission>)
   const FieldOfficersPage = (await import('./FieldOfficersPage')).default
   return render(
-    <MemoryRouter initialEntries={['/field-officers']}>
-      <Routes>
-        <Route path="/field-officers" element={<FieldOfficersPage />} />
-        <Route path="/unauthorized" element={<div>Unauthorized page</div>} />
-      </Routes>
-    </MemoryRouter>,
+    <QueryClientProvider client={makeQueryClient()}>
+      <MemoryRouter initialEntries={['/field-officers']}>
+        <Routes>
+          <Route path="/field-officers" element={<FieldOfficersPage />} />
+          <Route path="/unauthorized" element={<div>Unauthorized page</div>} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
   )
 }
 
 describe('FieldOfficersPage — platform-tenant gate is a lightweight outer check, not an after-the-fact one', () => {
-  it('a platform-tenant session renders the roster and fires the role-type/role/geo-profile queries', async () => {
+  it('a platform-tenant session renders the roster card grid and fires the role-type/role/geo-profile queries', async () => {
     vi.clearAllMocks()
     await renderPage({ tenant: { type: 'platform' } })
 
@@ -105,12 +129,14 @@ describe('FieldOfficersPage — a GeoProfile-only failure does not blank the ros
     const FieldOfficersPage = (await import('./FieldOfficersPage')).default
 
     render(
-      <MemoryRouter initialEntries={['/field-officers']}>
-        <Routes>
-          <Route path="/field-officers" element={<FieldOfficersPage />} />
-          <Route path="/unauthorized" element={<div>Unauthorized page</div>} />
-        </Routes>
-      </MemoryRouter>,
+      <QueryClientProvider client={makeQueryClient()}>
+        <MemoryRouter initialEntries={['/field-officers']}>
+          <Routes>
+            <Route path="/field-officers" element={<FieldOfficersPage />} />
+            <Route path="/unauthorized" element={<div>Unauthorized page</div>} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
     )
 
     expect(await screen.findByText('Jane FO')).toBeInTheDocument()
@@ -121,13 +147,30 @@ describe('FieldOfficersPage — a GeoProfile-only failure does not blank the ros
   })
 })
 
-describe('FieldOfficersPage — a roster row is keyboard-reachable, not mouse-only', () => {
-  it('renders the FO name/code as a real link to its detail route, not just a clickable <tr>', async () => {
+describe('FieldOfficersPage — a roster card opens the real drawer, not a table link', () => {
+  it('clicking a roster card opens FoRealDrawer for that role id', async () => {
     vi.clearAllMocks()
+    const user = userEvent.setup()
     await renderPage({ tenant: { type: 'platform' } })
 
-    const link = await screen.findByRole('link', { name: /Jane FO/i })
-    expect(link).toHaveAttribute('href', '/field-officers/role-1')
+    await user.click(await screen.findByText('Jane FO'))
+
+    expect(await screen.findByText('Drawer open for role-1')).toBeInTheDocument()
+  })
+})
+
+describe('FieldOfficersPage — Roster/Devices tab switch', () => {
+  it('defaults to the Roster tab and switches to Devices on click', async () => {
+    vi.clearAllMocks()
+    const user = userEvent.setup()
+    await renderPage({ tenant: { type: 'platform' } })
+
+    expect(await screen.findByText('Jane FO')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /devices/i }))
+
+    expect(screen.getByText('Field Officer')).toBeInTheDocument()
+    expect(screen.getByText('Devices handed over')).toBeInTheDocument()
   })
 })
 

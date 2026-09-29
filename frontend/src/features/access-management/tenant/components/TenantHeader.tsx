@@ -34,6 +34,7 @@ const TENANT_LOGO_COPY = {
   previousNoun: 'previous logo',
   linkConflictMessage: 'Another logo was just activated for this tenant.',
   restoreFailedMessage: "We couldn't restore the previous logo — a manual fix may be needed. Retrying won't necessarily fix this on its own.",
+  restoredAfterFailureMessage: "The new logo couldn't be saved. Your previous logo has been restored. You can choose a file to try again.",
 }
 
 const TenantHeader = ({
@@ -70,16 +71,14 @@ const TenantHeader = ({
   })
 
   return (
-    <div
-      className="rounded-xl border p-5 mb-5"
-      style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}
-    >
+    <div className="mb-5">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 min-w-0">
           {logoColumn}
 
           <div className="min-w-0 max-w-[220px] sm:max-w-none text-center sm:text-left">
-            <div className="text-lg font-bold truncate" style={{ color: 'var(--qms-text)' }}>
+            {/* Prototype's .cm-pagehdr h2/.ph-sub — 19px/800 name, 12px muted subtitle, no card chrome. */}
+            <div className="text-[19px] font-extrabold truncate" style={{ color: 'var(--qms-text)' }}>
               {tenant.name}
             </div>
             <div className="text-[13px] truncate mb-2" style={{ color: 'var(--qms-text-muted)' }}>
@@ -136,9 +135,8 @@ const TenantHeader = ({
         </Button>
       </div>
 
-      {/* Row 2 — full card width, only rendered when there's genuinely long feedback content.
-          A true sibling row, never nested in the w-32 column, so it can never force the first
-          row wider. Independent of progressCaption — can render alongside an active caption. */}
+      {/* Row 2 — only rendered when there's genuinely long feedback content. A true sibling
+          row, never nested in the w-32 column, so it can never force the first row wider. */}
       {hasLongFeedback && (
         <div className="mt-3 pt-3 border-t flex flex-col gap-2" style={{ borderColor: 'var(--qms-border)' }}>
           {logoFeedback}

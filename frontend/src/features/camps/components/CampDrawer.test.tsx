@@ -107,10 +107,13 @@ describe('CampDrawer', () => {
 
     expect(screen.getAllByText('cmp-000001').length).toBeGreaterThan(0)
     expect(screen.getByText('Requested')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /move stage/i })).toBeInTheDocument()
-    // Company/Division/etc. read-only rows are present in Overview.
-    expect(screen.getByText('Migration Test Client')).toBeInTheDocument()
-    expect(screen.getByText('Cardio Division')).toBeInTheDocument()
+    // 'requested's legal next stages each render their own named button, not a single
+    // generic "Move stage" control.
+    expect(screen.getByRole('button', { name: 'Confirm' })).toBeInTheDocument()
+    // Company/Division/etc. appear in both the header chip row and the Notes section's
+    // detail rows — present, possibly more than once, not absent.
+    expect(screen.getAllByText('Migration Test Client').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Cardio Division').length).toBeGreaterThan(0)
     expect(screen.getByText('Ravi Kumar')).toBeInTheDocument()
   })
 

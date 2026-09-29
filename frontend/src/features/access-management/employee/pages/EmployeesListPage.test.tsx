@@ -111,6 +111,12 @@ describe('EmployeesListPage', () => {
     await waitFor(() => expect(screen.getByTestId('search-params-probe')).toHaveTextContent(''))
   })
 
+  it('regression (QUP-468 S18): GET /tenants is called with a high limit, not the API\'s default page-1-of-10, so the Company filter can list every tenant', async () => {
+    await renderPage(sessionFixture('admin', 'platform'), ['tenant:manage'])
+    await screen.findByText('Employees')
+    expect(useTenantsSpy).toHaveBeenCalledWith(expect.objectContaining({ limit: '500' }), true)
+  })
+
   it('GET /role-types and GET /tenants are permission-gated independently, not by canOnboard || canLink', async () => {
     // tenant:admin satisfies GET /role-types but NOT GET /tenants (tenant:search/tenant:manage only).
     await renderPage(sessionFixture('admin', 'platform'), ['tenant:admin'])

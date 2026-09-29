@@ -29,6 +29,7 @@ const PROFILE_PICTURE_COPY = {
   // No frontend UI offers an admin-on-behalf fix for a profile picture — unlike tenant logo's
   // wording, this must not suggest a "manual fix" support path the user could actually reach.
   restoreFailedMessage: "We couldn't restore your previous picture. Please try uploading again.",
+  restoredAfterFailureMessage: "The new picture couldn't be saved. Your previous picture has been restored. You can choose a file to try again.",
 }
 
 function getInitials(firstName?: string, lastName?: string): string {

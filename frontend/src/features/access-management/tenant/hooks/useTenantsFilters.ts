@@ -3,6 +3,8 @@ import type { TenantStatus, TenantType } from '@/types/accessManagement.types'
 
 export interface TenantsFilterState {
   search: string
+  city: string
+  state: string
   status: TenantStatus | 'ALL'
   // Only shown/settable for system:manage — others stay hard-defaulted to 'customer'.
   type: TenantType | 'ALL'
@@ -10,6 +12,8 @@ export interface TenantsFilterState {
 
 const DEFAULT_FILTERS: TenantsFilterState = {
   search: '',
+  city: '',
+  state: '',
   status: 'ALL',
   type: 'customer',
 }

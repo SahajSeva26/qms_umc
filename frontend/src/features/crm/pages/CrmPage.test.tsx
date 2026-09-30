@@ -36,6 +36,7 @@ function reportFixture() {
     byStatus: [],
     byProjectType: [],
     trends: { newLeads: { from: '2026-08-01', to: '2026-09-01', data: [] } },
+    kpis: { pipelineValue: 0, wonValue: 0, wonCount: 0, avgDealSize: 0, winRate: 0, salesVelocityDays: 0, topRep: null },
   }
 }
 

@@ -3,12 +3,12 @@ import { FiChevronRight, FiMapPin } from 'react-icons/fi'
 import type { Tenant } from '@/types/accessManagement.types'
 import { TENANT_ROUTES } from '@/features/access-management/tenant/tenant.routes'
 import TenantStatusPill from '@/features/access-management/tenant/components/TenantStatusPill'
+import { formatINR } from '@/utils/formatters'
 
 // Prototype's .cm-row: no shared header row, each stat self-labels (value + kicker underneath).
-// Divisions/Billing are placeholders — real data needs the backend work in md-files/ui-revisions.md.
-// MRs is intentionally NOT shown here (see md-files/ui-revisions.md) — a real per-tenant MR count
-// on a 10-row list page is an N+1 problem without a batched backend aggregation (unlike the single
-// -tenant Detail page, where the 2-call resolve is cheap and already wired).
+// Divisions is a placeholder — no batched per-tenant division count exists yet (see md-files/ui-revisions.md).
+// Projects/Camps/MRs/Billing all come from the same batched report=true tenant stats aggregation
+// (getTenantStats) already fetched for the list page — no N+1.
 
 interface TenantsTableProps {
   tenants: Tenant[]
@@ -94,7 +94,19 @@ const TenantsTable = ({ tenants }: TenantsTableProps) => {
             label="Camps"
           />
           <Stat
-            value={<span className="text-[10px] font-bold italic" style={{ color: 'var(--cm-accent, var(--qms-brand))' }}>Coming soon</span>}
+            value={
+              tenant.stats
+                ? <>{tenant.stats.mrs}</>
+                : <span style={{ color: 'var(--qms-text-muted)' }}>—</span>
+            }
+            label="MRs"
+          />
+          <Stat
+            value={
+              tenant.stats
+                ? <>{formatINR(tenant.stats.billed)}</>
+                : <span style={{ color: 'var(--qms-text-muted)' }}>—</span>
+            }
             label="Billing"
           />
 

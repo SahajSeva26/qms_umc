@@ -86,6 +86,7 @@ export interface CampEntity {
 export type CampMutationResponseEntity = Omit<CampEntity, 'devices'> & { devices: string[] }
 
 export interface SearchCampQuery {
+  code?: string
   project?: string
   division?: string
   doctor?: string

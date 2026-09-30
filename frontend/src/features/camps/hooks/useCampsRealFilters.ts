@@ -5,6 +5,7 @@ export interface CampsRealFilterState {
   status: CampStatus | 'ALL'
   type: CampType | 'ALL'
   billingType: BillingType | 'ALL'
+  code: string
   city: string
   state: string
   dateFrom: string
@@ -15,6 +16,7 @@ const DEFAULT_FILTERS: CampsRealFilterState = {
   status: 'ALL',
   type: 'ALL',
   billingType: 'ALL',
+  code: '',
   city: '',
   state: '',
   dateFrom: '',

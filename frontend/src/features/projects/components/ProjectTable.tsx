@@ -74,7 +74,9 @@ const ProjectTable = ({ projects, canWrite, onOpenDetail, onEdit, onChangeStatus
                 <span className="text-[10px] font-bold italic" style={{ color: 'var(--qms-brand)' }}>Upcoming</span>
               </td>
               <td className="px-3 py-2.5 align-top text-center whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>
-                {project.totalCamps}
+                {project.stats
+                  ? <>{project.stats.executedCamps}<span style={{ color: 'var(--qms-text-muted)' }}>/{project.totalCamps}</span></>
+                  : project.totalCamps}
               </td>
               <td className="px-3 py-2.5 align-top text-center font-bold whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>
                 {formatINR(valueAfterGST)}

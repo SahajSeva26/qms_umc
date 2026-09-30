@@ -8,6 +8,7 @@ function filtersFixture(overrides: Partial<CampsRealFilterState> = {}): CampsRea
     status: 'ALL',
     type: 'ALL',
     billingType: 'ALL',
+    code: '',
     city: '',
     state: '',
     dateFrom: '',

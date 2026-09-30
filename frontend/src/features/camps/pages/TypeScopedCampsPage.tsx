@@ -35,6 +35,7 @@ const TypeScopedCampsPage = ({ type, title }: TypeScopedCampsPageProps) => {
   const canWrite = hasAnyPermission(CAMP_WRITE_PERMISSIONS)
   const { filters, setFilter, reset } = useCampsRealFilters()
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
+  const debouncedCode = useDebouncedValue(filters.code, 300)
   const debouncedCity = useDebouncedValue(filters.city, 300)
   const debouncedState = useDebouncedValue(filters.state, 300)
 
@@ -42,6 +43,7 @@ const TypeScopedCampsPage = ({ type, title }: TypeScopedCampsPageProps) => {
     status: filters.status === 'ALL' ? undefined : filters.status,
     type,
     billingType: filters.billingType === 'ALL' ? undefined : (filters.billingType as BillingType),
+    code: debouncedCode || undefined,
     city: debouncedCity || undefined,
     state: debouncedState || undefined,
     dateFrom: filters.dateFrom || undefined,

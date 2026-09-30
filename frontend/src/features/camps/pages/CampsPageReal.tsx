@@ -43,6 +43,7 @@ const CampsPageReal = () => {
   const canViewReport = hasAnyPermission(CAMP_REPORT_PERMISSIONS)
   const { filters, setFilter, reset } = useCampsRealFilters()
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
+  const debouncedCode = useDebouncedValue(filters.code, 300)
   const debouncedCity = useDebouncedValue(filters.city, 300)
   const debouncedState = useDebouncedValue(filters.state, 300)
 
@@ -52,6 +53,7 @@ const CampsPageReal = () => {
     status: activeStatus === 'ALL' ? undefined : activeStatus,
     type: filters.type === 'ALL' ? undefined : (filters.type as CampType),
     billingType: filters.billingType === 'ALL' ? undefined : (filters.billingType as BillingType),
+    code: debouncedCode || undefined,
     city: debouncedCity || undefined,
     state: debouncedState || undefined,
     dateFrom: filters.dateFrom || undefined,

@@ -1,11 +1,10 @@
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { FiArrowLeft, FiDownload, FiPlus } from 'react-icons/fi'
 import { useTenant } from '@/features/access-management/tenant/hooks/useTenant'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { useRole } from '@/features/access-management/role/hooks/useRole'
-import { useRoles } from '@/features/access-management/role/hooks/useRoles'
-import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRoleTypes'
 import { useDivisions } from '@/features/crm/divisions/hooks/useDivisions'
 import { useDivisionsFilters } from '@/features/crm/divisions/hooks/useDivisionsFilters'
 import DivisionsFilterBar from '@/features/crm/divisions/components/DivisionsFilterBar'
@@ -24,6 +23,7 @@ import { Button } from '@/components/ui/button'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { toast } from '@/components/ui/sonner'
 import { getApiErrorMessage } from '@/utils/apiError'
+import { formatINR } from '@/utils/formatters'
 import type { DivisionEntity } from '@/types/crm.types'
 import type { RolePopulatedUser, Tenant } from '@/types/accessManagement.types'
 
@@ -49,13 +49,6 @@ const TenantDetailPage = () => {
   const canManageTenant = hasPermission('tenant:manage')
   const canManageSystem = hasPermission('system:manage')
   const canViewRole = hasAnyPermission(['role:get', 'role:search', 'role:manage'])
-  // The MR KPI needs BOTH GET /role-types (role-type.routes.ts: tenant:admin/tenant:manage ONLY —
-  // no role:* permission accepted) AND GET /roles search (role.routes.ts: tenant:admin/
-  // tenant:manage/role:search). Gating on role:search alone (or any single-call requirement) lets a
-  // role:search-only actor pass this check, then get a real 403 from GET /role-types — which
-  // silently renders as "Coming soon" instead of a permission error. So this must be the
-  // intersection both calls actually accept: tenant:admin or tenant:manage only.
-  const canSearchRoles = hasAnyPermission(['tenant:admin', 'tenant:manage'])
   const canViewDivisions = hasAnyPermission(['division:manage', 'tenant:admin', 'lead:manage'])
   const canSeeInactiveDivisions = hasAnyPermission(['division:manage', 'tenant:manage'])
 
@@ -106,35 +99,53 @@ const TenantDetailPage = () => {
       ? Math.round((activeDivisionCount / (activeDivisionCount + inactiveDivisionCount)) * 100)
       : null
 
-  // Total MRs — role-type is per-tenant (no shared "pharma-mr" id across tenants), so the id
-  // must be resolved first before it can filter GET /roles. Both calls are count-only (limit: '1').
-  const { data: mrRoleTypeData } = useRoleTypes(
-    { code: 'pharma-mr', tenant: tenant?.id, limit: '1' },
-    canSearchRoles && !!tenant?.id,
-  )
-  const mrRoleTypeId = mrRoleTypeData?.data?.items[0]?.id
-  const { data: mrRolesData } = useRoles(
-    { type: mrRoleTypeId, limit: '1' },
-    canSearchRoles && !!mrRoleTypeId,
-  )
-  const totalMrCount = mrRolesData?.data?.count
-
-  // Projects — reuses the same report=true per-tenant aggregation the list page uses (search.ts
-  // getTenantStats). Tenant search has no id/tenant filter, so this is scoped via `code` instead —
-  // BUT the backend's code filter is an UNANCHORED regex ($regex, no ^$), so e.g. code "acme" also
-  // matches "acme-pharma". Picking items[0] blindly can silently show a DIFFERENT tenant's project
-  // count. Mitigated here by matching the exact code client-side within the (report-capped, max 20)
-  // result page — genuinely safe only when the real match is within that page; a tenant whose code
-  // collides with 20+ others sorted newer would still be missed. The correct fix is a backend exact
-  // -match contract (an `id`/`tenant` filter on GET /tenants, or an anchored code match) — not done
-  // here, logged in md-files/ui-revisions.md. Also requires tenant:search/tenant:manage (see the
-  // canSearchProjectsKpi gate below) even though this page itself only needs tenant:get to load.
-  const canSearchProjectsKpi = hasAnyPermission(['tenant:search', 'tenant:manage'])
-  const { data: tenantReportData } = useTenants(
+  // Projects/MRs/Billing — reuse the same report=true per-tenant aggregation the list page uses
+  // (search.ts getTenantStats, now includes `mrs` and `billed` alongside project/camp counts).
+  // Tenant search has no id/tenant filter, so this is scoped via `code` instead — BUT the backend's
+  // code filter is an UNANCHORED regex ($regex, no ^$), so e.g. code "acme" also matches
+  // "acme-pharma". Picking items[0] blindly can silently show a DIFFERENT tenant's stats. Mitigated
+  // here by matching the exact code client-side within the (report-capped, max 20) result page —
+  // genuinely safe only when the real match is within that page; a tenant whose code collides with
+  // 20+ others sorted newer would still be missed. The correct fix is a backend exact-match contract
+  // (an `id`/`tenant` filter on GET /tenants, or an anchored code match) — not done here, logged in
+  // md-files/ui-revisions.md. Also requires tenant:search/tenant:manage (see the canSearchTenantKpis
+  // gate below) even though this page itself only needs tenant:get to load.
+  const canSearchTenantKpis = hasAnyPermission(['tenant:search', 'tenant:manage'])
+  const { data: tenantReportData, isLoading: tenantKpisLoading, isError: tenantKpisErrored, refetch: refetchTenantKpis } = useTenants(
     { code: tenant?.code, report: 'true', limit: String(REPORT_MAX_LIMIT) },
-    canSearchProjectsKpi && !!tenant?.code,
+    canSearchTenantKpis && !!tenant?.code,
   )
-  const totalProjectCount = tenantReportData?.data?.items.find((t) => t.code === tenant?.code)?.stats?.totalProjects
+  const tenantStats = tenantReportData?.data?.items.find((t) => t.code === tenant?.code)?.stats
+  const totalProjectCount = tenantStats?.totalProjects
+  const totalMrCount = tenantStats?.mrs
+  const totalBilled = tenantStats?.billed
+  // Distinguishes "genuinely not built yet" (Outstanding/Project Types) from this fetch's own
+  // loading/error/no-exact-match states — a failed or in-flight report=true request must not
+  // silently read as "Coming soon" (that phrase should mean unbuilt functionality, not a fetch
+  // problem). "No exact match" is the documented unanchored-code-regex limitation (see the comment
+  // above) — still surfaced honestly rather than folded into a generic error.
+  const tenantKpiTileValue = (value: number | undefined, format: (v: number) => ReactNode = (v) => v) => {
+    if (!canSearchTenantKpis) {
+      return <span style={{ color: 'var(--qms-text-muted)' }} className="italic text-[14px] font-bold">Restricted</span>
+    }
+    if (tenantKpisLoading) {
+      return <span style={{ color: 'var(--qms-text-muted)' }} className="italic text-[14px] font-bold">Loading…</span>
+    }
+    if (tenantKpisErrored) {
+      return (
+        <button
+          onClick={() => void refetchTenantKpis()}
+          className="italic text-[14px] font-bold underline decoration-dotted text-danger"
+        >
+          Unable to load — retry
+        </button>
+      )
+    }
+    if (value === undefined) {
+      return <span style={{ color: 'var(--qms-text-muted)' }} className="italic text-[14px] font-bold">No exact match</span>
+    }
+    return format(value)
+  }
 
   const [exportingDivisions, setExportingDivisions] = useState(false)
   // Exports the whole tenant's division set — both statuses, not just whatever
@@ -201,31 +212,21 @@ const TenantDetailPage = () => {
             onEditClick={() => setEditOpen(true)}
           />
 
-          {/* Prototype's "Client KPIs" strip — Active Divisions/Total MRs/Projects are real;
-              Billing/Outstanding/Project Types need backend work logged in md-files/ui-revisions.md. */}
+          {/* Prototype's "Client KPIs" strip — Active Divisions/Projects/Total MRs/Billing are real;
+              Outstanding/Project Types need backend work logged in md-files/ui-revisions.md. */}
           <TenantSectionLabel>Client KPIs</TenantSectionLabel>
           <TenantKpiGrid>
             <TenantKpiTile
               label="Active Divisions"
               value={canSeeInactiveDivisions && activeDivisionCount !== undefined ? activeDivisionCount : totalDivisions}
             />
+            <TenantKpiTile label="Projects" value={tenantKpiTileValue(totalProjectCount)} />
+            <TenantKpiTile label="Total MRs" value={tenantKpiTileValue(totalMrCount)} />
             <TenantKpiTile
-              label="Projects"
-              value={
-                !canSearchProjectsKpi
-                  ? <span style={{ color: 'var(--qms-text-muted)' }} className="italic text-[14px] font-bold">Restricted</span>
-                  : totalProjectCount !== undefined ? totalProjectCount : <span style={{ color: '#8b5cf6' }} className="italic text-[14px] font-bold">Coming soon</span>
-              }
+              label="Billing"
+              sub="Excludes draft/cancelled"
+              value={tenantKpiTileValue(totalBilled, formatINR)}
             />
-            <TenantKpiTile
-              label="Total MRs"
-              value={
-                !canSearchRoles
-                  ? <span style={{ color: 'var(--qms-text-muted)' }} className="italic text-[14px] font-bold">Restricted</span>
-                  : totalMrCount !== undefined ? totalMrCount : <span style={{ color: '#8b5cf6' }} className="italic text-[14px] font-bold">Coming soon</span>
-              }
-            />
-            <TenantKpiTile label="Billing" value={<span style={{ color: '#8b5cf6' }} className="italic text-[14px] font-bold">Coming soon</span>} />
             <TenantKpiTile label="Outstanding" value={<span style={{ color: '#8b5cf6' }} className="italic text-[14px] font-bold">Coming soon</span>} />
             <TenantMiniBreakdown
               label="Project Types"

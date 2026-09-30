@@ -1,5 +1,5 @@
 import type { IconType } from 'react-icons'
-import { FiBriefcase, FiCheckCircle, FiXCircle, FiTarget, FiActivity } from 'react-icons/fi'
+import { FiBriefcase, FiCheckCircle, FiXCircle, FiTarget, FiActivity, FiDollarSign, FiClock } from 'react-icons/fi'
 import type { KpiTile as KpiTileData } from '@/types/crm.types'
 import { formatINR, formatPercent } from '@/utils/formatters'
 import KpiTile, { type KpiTone } from '@/components/ui/KpiTile'
@@ -9,6 +9,8 @@ const ICON_MAP: Record<string, IconType> = {
   CheckCircle: FiCheckCircle,
   XCircle: FiXCircle,
   Target: FiTarget,
+  DollarSign: FiDollarSign,
+  Clock: FiClock,
 }
 
 // tile.tone (crm.kpis.ts) already uses the prototype's own tone names

@@ -95,8 +95,15 @@ const CampsFilterBarReal = ({ filters, setFilter, reset, hideType = false }: Cam
         className={`w-28 ${FIELD_CLASS}`}
       />
 
-      {/* Prototype's search matches camp ID/doctor/city/client (camps.js:168-172) — ours is
-          city-only, since SearchCampQuerySchema has no free-text match across the other fields. */}
+      {/* Prototype's search matches camp ID/doctor/city/client (camps.js:168-172) — ours matches
+          code + city (both real backend filters); doctor/client name have no free-text match on
+          SearchCampQuerySchema (only id-based filters), so those aren't offered here. */}
+      <SearchInput
+        value={filters.code}
+        onChange={(v) => setFilter('code', v)}
+        placeholder="Search by code..."
+        className={`w-36 ${FIELD_CLASS}`}
+      />
       <SearchInput
         value={filters.city}
         onChange={(v) => setFilter('city', v)}

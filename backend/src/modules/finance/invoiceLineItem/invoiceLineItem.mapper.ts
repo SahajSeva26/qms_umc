@@ -19,7 +19,16 @@ export const InvoiceLineItemMapper = {
             items: [] as any[],
         };
         for (const lineItem of data?.items || []) {
-            result.items.push(InvoiceLineItemMapper.toResponse(lineItem, ctx));
+            // NOTE: independent from toResponse on purpose — mirrors it field-for-field for now (incl. same permission gating) so nothing breaks; search rows can be trimmed later without affecting GET /:id.
+            const item: any = {
+                id: lineItem._id?.toString(),
+                invoice: lineItem.invoice,
+                camp: lineItem.camp,
+                amount: lineItem.amount,
+                createdAt: lineItem.createdAt,
+                updatedAt: lineItem.updatedAt,
+            };
+            result.items.push(item);
         }
         return result;
     },

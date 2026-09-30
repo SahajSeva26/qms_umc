@@ -58,8 +58,34 @@ export const InventoryLedgerMapper = {
 
         createdAt: row.createdAt,
     }),
-    toSearchResponse: (data: { count: number; items: any[] }) => ({
-        count: data?.count || 0,
-        items: (data?.items || []).map(InventoryLedgerMapper.toResponse),
-    }),
+    toSearchResponse: (data: { count: number; items: any[] }) => {
+        // NOTE: independent from toResponse on purpose — mirrors it field-for-field for now (incl. same permission gating) so nothing breaks; search rows can be trimmed later without affecting GET /:id.
+        const result = {
+            count: data?.count || 0,
+            items: [] as any[],
+        };
+        for (const row of data?.items || []) {
+            result.items.push({
+                id: row._id?.toString(),
+
+                source: row.source,
+                request: mapRequest(row.request),
+                requestType: row.requestType,
+
+                // what moved, how much, and in which direction
+                inventoryType: row.inventoryType,
+                inventory: mapInventory(row.inventoryType, row.inventory),
+                quantity: row.quantity,
+                from: row.from,
+                to: row.to,
+
+                // the FO on the field side of the movement + who performed it
+                assignee: mapRole(row.assignee),
+                actor: row.actor,
+
+                createdAt: row.createdAt,
+            });
+        }
+        return result;
+    },
 };

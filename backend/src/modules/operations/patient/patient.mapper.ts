@@ -43,8 +43,30 @@ export const PatientMapper = {
             count: data?.count || 0,
             items: [] as any[],
         };
+        // NOTE: independent from toResponse on purpose — mirrors it field-for-field for now (incl. same permission gating) so nothing breaks; search rows can be trimmed later without affecting GET /:id.
         for (const patient of data?.items || []) {
-            result.items.push(PatientMapper.toResponse(patient, ctx));
+            const item: any = {
+                id: patient._id?.toString(),
+
+                code: patient.code,
+                firstName: patient.firstName,
+                middleName: patient.middleName,
+                lastName: patient.lastName,
+                dateOfBirth: patient.dateOfBirth,
+                gender: patient.gender,
+                mobile: patient.mobile,
+                email: patient.email,
+                address: patient.address,
+
+                createdBy: mapCreatedBy(patient.createdBy),
+                createdAt: patient.createdAt,
+                updatedAt: patient.updatedAt,
+            };
+            // status (incl. inactive/soft-deleted patients) is only exposed to a manage-level actor
+            if (ctx.hasAnyPermissions([PATIENT_PERMISSIONS.MANAGE.code])) {
+                item.status = patient.status;
+            }
+            result.items.push(item);
         }
         return result;
     },

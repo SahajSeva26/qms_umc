@@ -32,8 +32,30 @@ export const InventoryMasterMapper = {
             count: data?.count || 0,
             items: [] as any[],
         };
+        // NOTE: independent from toResponse on purpose — mirrors it field-for-field for now (incl. same permission gating) so nothing breaks; search rows can be trimmed later without affecting GET /:id.
         for (const item of data?.items || []) {
-            result.items.push(InventoryMasterMapper.toResponse(item, ctx));
+            const row: any = {
+                id: item._id?.toString(),
+
+                // identity
+                code: item.code,
+                name: item.name,
+                description: item.description,
+                type: item.type,
+                sku: item.sku,
+                unit: item.unit,
+
+                // stock thresholds (reorder policy)
+                minStock: item.minStock,
+
+                createdAt: item.createdAt,
+                updatedAt: item.updatedAt,
+            };
+            // status (incl. inactive items) is only exposed to a manage-level actor
+            if (ctx.hasAnyPermissions([INVENTORY_MASTER_PERMISSIONS.MANAGE.code])) {
+                row.status = item.status;
+            }
+            result.items.push(row);
         }
         return result;
     },

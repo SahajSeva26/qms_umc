@@ -41,10 +41,30 @@ export const InventoryAssignmentMapper = {
         createdAt: assignment.createdAt,
         updatedAt: assignment.updatedAt,
     }),
-    toSearchResponse: (data: { count: number; items: any[] }) => ({
-        count: data?.count || 0,
-        items: (data?.items || []).map(InventoryAssignmentMapper.toResponse),
-    }),
+    toSearchResponse: (data: { count: number; items: any[] }) => {
+        // NOTE: independent from toResponse on purpose — mirrors it field-for-field for now (incl. same permission gating) so nothing breaks; search rows can be trimmed later without affecting GET /:id.
+        const result = {
+            count: data?.count || 0,
+            items: [] as any[],
+        };
+        for (const assignment of data?.items || []) {
+            result.items.push({
+                id: assignment._id?.toString(),
+
+                // the role holding the inventory
+                assignee: mapAssignee(assignment.assignee),
+
+                // the single holding on this row
+                inventoryType: assignment.inventoryType,
+                inventory: mapInventory(assignment.inventoryType, assignment.inventory),
+                quantity: assignment.quantity,
+
+                createdAt: assignment.createdAt,
+                updatedAt: assignment.updatedAt,
+            });
+        }
+        return result;
+    },
 
     // Each FO's _id is surfaced as `role`; counts default to 0.
     toReportResponse: (report: any) => ({

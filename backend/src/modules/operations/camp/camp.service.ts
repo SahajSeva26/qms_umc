@@ -121,10 +121,7 @@ const assertFoAvailableForSlot = async (
     excludeCampId?: any,
 ): Promise<void> => {
     if (await isFoBookedForSlot(foRoleId, date, timeSlot, ctx, excludeCampId)) {
-        return throwAppError(
-            'Field officer is already booked on another camp on this date and time slot',
-            StatusCodes.CONFLICT,
-        );
+        return throwAppError('Field officer is already booked on another camp on this date and time slot', StatusCodes.CONFLICT);
     }
 };
 
@@ -138,12 +135,7 @@ const dateKey = (date: Date | string | number): string => startOfUTCDay(date).to
 // role ids of FOs already booked (confirmed/live) on another camp on the same UTC day in any slot
 // that OVERLAPS `timeSlot` (daytime slots block each other; see overlappingSlots / SLOT_OVERLAPS).
 // GLOBAL (not ctx-scoped) — same reasoning as isFoBookedForSlot: FO clashes span all pharma tenants.
-const bookedFoRoleIdsOnDate = async (
-    date: Date,
-    timeSlot: CampTimeSlot,
-    ctx: RequestContext,
-    excludeCampId: any,
-): Promise<string[]> => {
+const bookedFoRoleIdsOnDate = async (date: Date, timeSlot: CampTimeSlot, ctx: RequestContext, excludeCampId: any): Promise<string[]> => {
     const camps = await CampModel.find({
         _id: { $ne: excludeCampId },
         fo: { $ne: null },
@@ -197,10 +189,7 @@ const resolveNearestFreeFoRole = async (camp: HydratedDocument<ICamp>, ctx: Requ
     const booked = await bookedFoRoleIdsOnDate(camp.date, (camp as any).timeSlot, ctx, camp._id);
     const free = items.find((profile: any) => !booked.includes(profile.role?.toString()));
     if (!free) {
-        return throwAppError(
-            'All field officers near this camp are already booked on this date and time slot',
-            StatusCodes.CONFLICT,
-        );
+        return throwAppError('All field officers near this camp are already booked on this date and time slot', StatusCodes.CONFLICT);
     }
 
     return free.role;
@@ -325,20 +314,45 @@ const search = async (filters: ISearchCampQuery, ctx: RequestContext, options?: 
     if (filters.tenant && !where.tenant && ctx.hasAnyPermissions([CAMP_PERMISSIONS.MANAGE.code])) {
         where.tenant = filters.tenant;
     }
-    if (filters.project) where.project = filters.project;
-    if (filters.division) where.division = filters.division;
-    if (filters.doctor) where.doctor = filters.doctor;
-    if (filters.fo) where.fo = filters.fo;
-    if (filters.status) where.status = filters.status;
-    if (filters.type) where.type = filters.type;
-    if (filters.billingType) where.billingType = filters.billingType;
-    if (filters.city) where['location.city'] = { $regex: filters.city, $options: 'i' };
-    if (filters.state) where['location.state'] = { $regex: filters.state, $options: 'i' };
+    if (filters.code) {
+        where.code = { $regex: filters.code, $options: 'i' };
+    }
+    if (filters.project) {
+        where.project = filters.project;
+    }
+    if (filters.division) {
+        where.division = filters.division;
+    }
+    if (filters.doctor) {
+        where.doctor = filters.doctor;
+    }
+    if (filters.fo) {
+        where.fo = filters.fo;
+    }
+    if (filters.status) {
+        where.status = filters.status;
+    }
+    if (filters.type) {
+        where.type = filters.type;
+    }
+    if (filters.billingType) {
+        where.billingType = filters.billingType;
+    }
+    if (filters.city) {
+        where['location.city'] = { $regex: filters.city, $options: 'i' };
+    }
+    if (filters.state) {
+        where['location.state'] = { $regex: filters.state, $options: 'i' };
+    }
     // date range — dateTo is snapped to end-of-day (UTC) so the whole end day is included
     if (filters.dateFrom || filters.dateTo) {
         where.date = {};
-        if (filters.dateFrom) where.date.$gte = filters.dateFrom;
-        if (filters.dateTo) where.date.$lte = endOfUTCDay(filters.dateTo);
+        if (filters.dateFrom) {
+            where.date.$gte = filters.dateFrom;
+        }
+        if (filters.dateTo) {
+            where.date.$lte = endOfUTCDay(filters.dateTo);
+        }
     }
 
     const countPromise = CampModel.countDocuments(where);
@@ -482,10 +496,7 @@ const moveStage = async (id: string, model: IMoveStagePayload, ctx: RequestConte
     if (to === CAMP_STATUSES.CONFIRMED && camp.fo) {
         const booked = await bookedFoRoleIdsOnDate(camp.date, (camp as any).timeSlot, ctx, camp._id);
         if (booked.includes(camp.fo.toString())) {
-            return throwAppError(
-                'Field officer is already booked on another camp on this date and time slot',
-                StatusCodes.CONFLICT,
-            );
+            return throwAppError('Field officer is already booked on another camp on this date and time slot', StatusCodes.CONFLICT);
         }
     }
 
@@ -693,10 +704,7 @@ const bookingAvailability = async (model: IBookingAvailabilityPayload, ctx: Requ
     }
     const spanDays = Math.round((dateTo.getTime() - dateFrom.getTime()) / (24 * 60 * 60 * 1000)) + 1;
     if (spanDays > MAX_AVAILABILITY_RANGE_DAYS) {
-        return throwAppError(
-            `The date range cannot exceed ${MAX_AVAILABILITY_RANGE_DAYS} days`,
-            StatusCodes.BAD_REQUEST,
-        );
+        return throwAppError(`The date range cannot exceed ${MAX_AVAILABILITY_RANGE_DAYS} days`, StatusCodes.BAD_REQUEST);
     }
 
     //2: eligible FOs — nearest active FOs whose OWN coverage radius reaches the point (GLOBAL — FOs

@@ -106,12 +106,15 @@ filter extended to match contactPerson/tenant-name/therapy.
 
 ## Appointments (`/crm/appointments`)
 
-**MOM 24-hr SLA auto-block + RM-release workflow.** Needs `blockedAt`/`blockReason`/`releasedBy`/
-`releasedAt`/`releaseReason` fields on `Appointment`, server-side (or scheduled-job) logic to flip
-`planned→blocked` after 24 working hours past the meeting end time with no MOM submitted, a 5th
-`AppointmentStatus` value (`blocked`), and a `blocked→released` transition (RM/admin-gated,
-justification required, audit-logged). `AppointmentMom.submissionDeadline` and the overdue-badge UI
-already exist and would slot into this — only the state machine is missing.
+**MOM 24-hr SLA auto-block + RM-release workflow.** ❌ **INVALID — will not be built.** This pointer
+is built around a 5th `AppointmentStatus` value (`blocked`) and a `planned→blocked` auto-transition.
+But the `blocked` status was **entirely removed from the Appointment status enum by an earlier explicit
+requirement** (2026-08-11 — "Removed the `blocked` status per user request"). Reintroducing it would
+reverse that decision, so this whole auto-block/release workflow is void as written. (Original brief
+text, kept for reference: needed `blockedAt`/`blockReason`/`releasedBy`/`releasedAt`/`releaseReason`
+fields, scheduled-job logic to flip `planned→blocked` 24 working hours past the meeting end with no
+MOM, and a `blocked→released` RM/admin-gated transition. `AppointmentMom.submissionDeadline` + the
+overdue-badge UI exist, but the state machine this depended on is intentionally absent.)
 
 **Peer overlay ("BUSY, agenda hidden" for teammates' meetings).** Needs the search endpoint to
 return a redacted shape (owner + time range only, no agenda/contact/company) for appointments the
@@ -324,8 +327,9 @@ this file). Nothing committed today — **commit before or at start of next sess
 **Next up (tomorrow):**
 1. (optional) e2e-verify the uncommitted CRM lead changes on live rs0, then commit.
 2. **Frontend wiring** owed for the KPI strip (re-add tiles + `kpis` on `LeadReportResponse`) — frontend team's task.
-3. **Next module: Appointments** (largest remaining — Weekly-planning panel needs its own data model;
-   also MOM SLA auto-block, peer overlay, leads calendar, availability badges, free-text location).
+3. **Next module: Appointments** — free-text `location` field ✅ DONE (2026-09-30). MOM SLA auto-block
+   ❌ INVALID (depends on the removed `blocked` status). Remaining: peer overlay, leads calendar,
+   availability badges, and the Weekly-planning panel (largest — needs its own data model).
    Then Camp Management, CRM Invoicing, Inventory. Full list in PART 2 below.
 
 ---
@@ -454,7 +458,9 @@ Legend: ✅ DONE · 🟡 PARTIAL · ⬜ NOT DONE
 
 ## Appointments — ⬜ NOT STARTED
 
-- MOM 24-hr SLA auto-block + RM-release workflow — ⬜ NOT DONE.
+- MOM 24-hr SLA auto-block + RM-release workflow — ❌ INVALID (will not be built). Depends on a 5th
+  `blocked` status that was entirely removed by an earlier requirement (2026-08-11). Reintroducing it
+  would reverse that decision. Void as written.
 - Peer overlay ("BUSY, agenda hidden") — ⬜ NOT DONE.
 - Leads calendar view — ⬜ NOT DONE.
 - Weekly planning panel — ⬜ NOT DONE (largest gap; needs its own data model).

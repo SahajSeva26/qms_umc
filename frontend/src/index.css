@@ -462,6 +462,18 @@
 .doc-id-kpi .v { font-size: 18px; font-weight: 800; color: var(--qms-text); }
 .doc-id-kpi .s { font-size: 10px; color: var(--qms-text-muted); }
 
+/* ── Prototype-matching booking flow (camp-booking.js's intro row + one card per numbered section + a final confirm card, not sticky) ── */
+.booking-intro { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.booking-intro h2 { font-size: 15px; font-weight: 800; color: var(--qms-text); }
+.booking-intro p { font-size: 12px; color: var(--qms-text-muted); }
+.booking-section { border-radius: 16px; background: var(--qms-surface-card); border: 1px solid var(--qms-border); padding: 16px 18px; }
+.booking-section + .booking-section { margin-top: 14px; }
+.booking-footer {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-top: 14px; padding: 12px 16px; border-radius: 14px;
+  background: var(--qms-surface-card); border: 1px solid var(--qms-border);
+}
+
 /* ── Base ── */
 @layer base {
   * { @apply border-border outline-ring/50; }

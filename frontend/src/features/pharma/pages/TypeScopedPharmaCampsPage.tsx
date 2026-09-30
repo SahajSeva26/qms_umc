@@ -13,9 +13,12 @@ import ProjectStatusPill from '@/features/projects/components/ProjectStatusPill'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import PaginationControls from '@/components/ui/PaginationControls'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { usePagination } from '@/hooks/usePagination'
 import { useSession } from '@/hooks/useSession'
+import { parsePatientExpectation } from '@/features/pharma/utils/patientExpectation'
 import { allowedCampTypesForProjectTypes, type WhoCanBookCampCode } from '@/types/project.types'
 import { CAMP_TYPE_LABEL } from '@/types/campReal.types'
 
@@ -40,6 +43,7 @@ const TypeScopedPharmaCampsContent = ({ type, title }: TypeScopedPharmaCampsPage
   const navigate = useNavigate()
   const { session } = useSession()
   const [bookOpen, setBookOpen] = useState(false)
+  const [patientExpectationInput, setPatientExpectationInput] = useState('')
   const { page, setPage, totalPages } = usePagination(PAGE_SIZE)
 
   const { data: projectData, isLoading: projectLoading, error: projectError } = usePharmaProject(id)
@@ -53,7 +57,7 @@ const TypeScopedPharmaCampsContent = ({ type, title }: TypeScopedPharmaCampsPage
   const camps = campsData?.data?.items ?? []
   const totalCamps = campsData?.data?.count ?? 0
 
-  // Only HO/RSM/ASM book on behalf of a downline MR.
+  // Every non-MR pharma role (HO, RSM, ASM, division head) books on behalf of a downline MR.
   const needsMrPicker = session?.roleType?.code !== 'pharma-mr'
   // preferType keeps "Your projects" on the same camp category for the next pick (see pharmaCamps.routing.ts).
   const backRoute = `${getPharmaRoleMeta(session?.roleType?.code)?.portalPath ?? PHARMA_ROUTES.PHARMA}?preferType=${type}`
@@ -68,20 +72,27 @@ const TypeScopedPharmaCampsContent = ({ type, title }: TypeScopedPharmaCampsPage
   const projectAllowsThisType = project ? allowedCampTypesForProjectTypes(project.type).includes(type) : false
   const roleCanBook = !project || project.whoCanBookCamp.length === 0 || project.whoCanBookCamp.includes((session?.roleType?.code ?? '') as WhoCanBookCampCode)
   const hasSlots = !!project && project.campTimeSlots.length > 0
-  const canBook = roleCanBook && hasSlots && projectAllowsThisType
-  const cannotBookReason = !projectAllowsThisType
-    ? `This project isn't configured for ${typeLabel.toLowerCase()} camps.`
-    : !roleCanBook
-      ? 'Your role cannot book camps on this project.'
-      : !hasSlots
-        ? 'This project has no configured time slots.'
-        : null
+  // Matches the prototype's live-project rule (backend doesn't enforce it — see ui-revisions.md).
+  // Reachable via direct URL, so this check can't rely on the picker's own status filter alone.
+  const isLive = !!project && project.status === 'live'
+  const canBook = roleCanBook && hasSlots && projectAllowsThisType && isLive
+  const cannotBookReason = !isLive
+    ? 'This project is not live.'
+    : !projectAllowsThisType
+      ? `This project isn't configured for ${typeLabel.toLowerCase()} camps.`
+      : !roleCanBook
+        ? 'Your role cannot book camps on this project.'
+        : !hasSlots
+          ? 'This project has no configured time slots.'
+          : null
 
   // Cache invalidation lives in useBookCamp itself — this only handles UI feedback.
   const handleBooked = () => {
     setBookOpen(false)
+    setPatientExpectationInput('')
     toast.success('Camp requested')
   }
+  const { value: patientExpectation, error: patientExpectationError } = parsePatientExpectation(patientExpectationInput)
 
   return (
     <div className="w-full">
@@ -158,10 +169,25 @@ const TypeScopedPharmaCampsContent = ({ type, title }: TypeScopedPharmaCampsPage
                 <DialogTitle>New {typeLabel.toLowerCase()} camp</DialogTitle>
                 <DialogDescription>Book a {typeLabel.toLowerCase()} camp against {project.name}.</DialogDescription>
               </DialogHeader>
+              <div className="mb-3">
+                <Label htmlFor="typeScopedCampPatientExpectation" className="text-[10px] font-semibold tracking-widest uppercase mb-1.5 block text-qms-text-muted">
+                  Expected patients
+                </Label>
+                <Input
+                  id="typeScopedCampPatientExpectation"
+                  type="number"
+                  className="text-[13px]"
+                  value={patientExpectationInput}
+                  onChange={(e) => setPatientExpectationInput(e.target.value)}
+                />
+                {patientExpectationError && <p className="text-[11px] mt-1 text-danger">{patientExpectationError}</p>}
+              </div>
               <BookCampForm
                 needsMrPicker={needsMrPicker}
                 type={type}
                 project={{ id: project.id, name: project.name, campTimeSlots: project.campTimeSlots }}
+                patientExpectation={patientExpectation}
+                patientExpectationInvalid={!!patientExpectationError}
                 onBooked={handleBooked}
                 onCancel={() => setBookOpen(false)}
               />

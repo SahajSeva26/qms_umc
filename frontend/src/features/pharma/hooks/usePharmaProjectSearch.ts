@@ -1,42 +1,38 @@
 import { useState } from 'react'
 import { useEntityQuery } from '@/hooks/useEntityQuery'
-import { createEntityKeys } from '@/hooks/entityQueryKeys'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
-import { accessManagementService } from '@/features/access-management/accessManagement.service'
-import type { RoleEntity, SearchDownlineMrQuery } from '@/types/accessManagement.types'
+import { pharmaProjectKeys } from '@/features/pharma/hooks/usePharmaProjects'
+import { pharmaProjectsService } from '@/features/pharma/pharmaProjects.service'
+import type { ProjectEntity, SearchProjectQuery } from '@/types/project.types'
 import type { PaginatedResponse } from '@/types/common.types'
 
-const downlineMrKeys = createEntityKeys<SearchDownlineMrQuery>('downline-mrs', 'downline-mr')
 const PAGE_SIZE = 10
 
 interface Accumulated {
   query: string
   page: number
-  items: RoleEntity[]
+  items: ProjectEntity[]
   count: number
   // Tells a page-1 response apart from "no response consumed yet" —
   // both would otherwise show `page === 1`.
-  consumedResponse: PaginatedResponse<RoleEntity> | undefined
+  consumedResponse: PaginatedResponse<ProjectEntity> | undefined
 }
 
 const EMPTY_ACCUMULATED = (query: string): Accumulated => ({ query, page: 1, items: [], count: 0, consumedResponse: undefined })
 
 // Keyed by id, not appended — a background refetch of an already-loaded
 // page redelivers the same rows as a new response object, which would duplicate them.
-function mergeById(existing: RoleEntity[], incoming: RoleEntity[]): RoleEntity[] {
-  const byId = new Map(existing.map((mr) => [mr.id, mr]))
-  for (const mr of incoming) byId.set(mr.id, mr)
+function mergeById(existing: ProjectEntity[], incoming: ProjectEntity[]): ProjectEntity[] {
+  const byId = new Map(existing.map((p) => [p.id, p]))
+  for (const p of incoming) byId.set(p.id, p)
   return Array.from(byId.values())
 }
 
-// `enabled` gates on the dropdown being open AND a non-empty query — mirrors
-// DoctorDistancePicker/WizardStep0's "type to search" rather than an eager unfiltered fetch.
-export const useEligibleMrs = (name: string, enabled: boolean) => {
+// Same accumulate/load-more/typeahead-limit shape as useEligibleMrs.
+export const usePharmaProjectSearch = (name: string, enabled: boolean) => {
   const debouncedName = useDebouncedValue(name, 300)
   const hasQuery = debouncedName.trim().length > 0
   const [page, setPage] = useState(1)
-  // `items`/`count` are always read from the same accumulated snapshot —
-  // never a fresh `data.count` paired with stale `items`.
   const [accumulated, setAccumulated] = useState<Accumulated>(() => EMPTY_ACCUMULATED(debouncedName))
 
   if (accumulated.query !== debouncedName) {
@@ -46,22 +42,23 @@ export const useEligibleMrs = (name: string, enabled: boolean) => {
     if (page !== 1) setPage(1)
   }
 
-  const query: SearchDownlineMrQuery = {
+  const query: SearchProjectQuery = {
     name: debouncedName.trim() || undefined,
+    // Matches the prototype's own booking restriction to live projects — the backend doesn't
+    // enforce this itself yet (see md-files/ui-revisions.md), so it's filtered here.
+    status: 'live',
     page: String(page),
     limit: String(PAGE_SIZE),
   }
 
   const { data, isLoading, isFetching, error, refetch } = useEntityQuery(
-    downlineMrKeys,
-    (q) => accessManagementService.searchDownlineMrs(q),
+    pharmaProjectKeys,
+    (q) => pharmaProjectsService.searchScopedProjects(q),
     query,
     { enabled: enabled && hasQuery },
   )
 
   if (data && accumulated.query === debouncedName && accumulated.consumedResponse !== data) {
-    // Covers page 1's first arrival, a later page, and a background refetch
-    // of an already-loaded page alike — mergeById makes all three safe.
     const freshItems = data.data?.items ?? []
     const freshCount = data.data?.count ?? 0
     setAccumulated((prev) => ({
@@ -74,13 +71,12 @@ export const useEligibleMrs = (name: string, enabled: boolean) => {
   }
 
   const isCurrent = accumulated.query === debouncedName
-  const mrs = isCurrent ? accumulated.items : []
+  const projects = isCurrent ? accumulated.items : []
   const count = isCurrent ? accumulated.count : 0
-  const hasMore = mrs.length < count
+  const hasMore = projects.length < count
 
   return {
-    mrs,
-    count,
+    projects,
     isLoading,
     isFetching,
     error,

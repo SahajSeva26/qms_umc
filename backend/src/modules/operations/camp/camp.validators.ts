@@ -122,6 +122,7 @@ export type IMoveStagePayload = z.infer<typeof MoveStagePayloadSchema>;
 
 //4: search ====================================>
 export const SearchCampQuerySchema = z.object({
+    code: z.string().optional().openapi({ example: 'cmp-000123' }),
     tenant: objectId('Tenant').optional(),
     project: objectId('Project').optional(),
     division: objectId('Division').optional(),

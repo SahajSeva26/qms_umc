@@ -327,13 +327,13 @@ this file). Nothing committed today — **commit before or at start of next sess
 **Next up (tomorrow):**
 1. (optional) e2e-verify the uncommitted CRM lead changes on live rs0, then commit.
 2. **Frontend wiring** owed for the KPI strip (re-add tiles + `kpis` on `LeadReportResponse`) — frontend team's task.
-3. **Appointments module — 2/6 done, 1 invalid, 3 remaining (2026-09-30):**
+3. **Appointments module — DONE for this pass (2026-09-30):** 2 built, 1 invalid, 3 deferred.
    - ✅ free-text `location` field
    - ✅ Leads calendar view (as per-lead activity counts via `report=true` on lead search)
    - ❌ MOM SLA auto-block (INVALID — depends on the removed `blocked` status)
-   - ⏸️ Peer overlay + availability badges — DEFERRED (save for later, same busy/free engine)
-   - ⬜ **Weekly-planning panel — NEXT UP** (largest; needs its own new data model — design pass first)
-   Then Camp Management, CRM Invoicing, Inventory. Full list in PART 2 below.
+   - ⏸️ Peer overlay + availability badges — DEFERRED (same busy/free engine, save for later)
+   - ⏸️ Weekly-planning panel — DEFERRED / LATER TODO (largest; new `weekPlan` entity — design pass first)
+4. **NEXT MODULE: Camp Management** (9 pointers — see PART 2). Then CRM Invoicing, Inventory.
 
 ---
 
@@ -486,18 +486,38 @@ Legend: ✅ DONE · 🟡 PARTIAL · ⬜ NOT DONE
 - Peer overlay ("BUSY, agenda hidden") — ⬜ NOT DONE (deferred — save for later, user's call 2026-09-30).
 - InternalMembersPicker live-availability badges — ⬜ NOT DONE (deferred — save for later, user's call
   2026-09-30; same busy/free engine as Peer overlay).
-- Weekly planning panel — ⬜ NOT DONE (largest gap; needs its own data model). **Next up.**
+- Weekly planning panel — ⏸️ DEFERRED / LATER TODO (user's call 2026-09-30). Largest gap — a brand-new
+  `weekPlan` entity (per-rep weekly targets + submit→approve→completed state machine, Sales-Head-gated
+  approval). Needs a data-model design pass before any code; parked for a dedicated future session.
 
-## Camp Management — ⬜ NOT STARTED
+## Camp Management — 🟡 IN PROGRESS (1 done, 2 deferred-TODO, 1 later-refactor, rest blocked)
 
 - 9-way stage taxonomy (needs completion-tracking fields) — ⬜ NOT DONE.
 - Multi-role staffing + "Missing `<Role>`" warnings — ⬜ NOT DONE.
-- Bulk upload (historical CLOSED camps) — ⬜ NOT DONE.
+- Bulk upload (historical CLOSED camps) — ⏸️ DEFERRED / TODO (user's call 2026-09-30). NOT a simple
+  clone of the doctor/MR bulk upload: camp create requires 5 ObjectId refs (tenant/division/doctor/
+  **required mr**/optional project) + full `location` with **coordinates**, and has side effects we
+  must NOT run for history (FO geo auto-allocation, slot-overlap checks) and starts at `requested`
+  not `closed`. Needs a dedicated historical-import path (human-readable code/name → id resolution,
+  skip allocation + overlap, land directly as `closed`) + 3 decisions first: (1) refs by code or
+  name? (2) is `mr` required for historical camps? (3) are coordinates required? Design pass owed.
 - `report()` vs `search()` own-scope inconsistency — ⬜ DEFERRED (**LATER REFACTOR**, same as Projects #4).
 - BCA scale flag + device-fault "ON HOLD" pill — ⬜ NOT DONE.
-- Filter bar search scope (free-text cross-field) — ⬜ NOT DONE.
+- Filter bar search scope (free-text cross-field) — ✅ DONE (2026-09-30, via separate filters — no
+  combined `q` box, same pattern as the lead/project pointers). Added a **`code` regex filter**
+  (case-insensitive) to `SearchCampQuerySchema` + `search()`. Camp search now offers `code` + the
+  already-existing `tenant`(client)/`project`/`division`/`doctor`/`fo`/`status`/`type`/`billingType`/
+  `city`/`state`/`dateFrom`/`dateTo` — the frontend drives its single search box by matching `code`
+  + `city` directly and resolving **doctor-name / client-name → id client-side** then using the
+  existing `doctor`/`tenant` id filters (same name→id resolution choice as the project client-name
+  pointer; doctor/client names aren't stored on the camp, only their ids). Also tidied `search()`'s
+  filter block to braces-on-every-`if` (style only, no behavior change). `tsc` clean.
+  Files: `camp.validators.ts`, `camp.service.ts`.
 - Tele Consultation tab (no teleconsult type/flag) — ⬜ NOT DONE.
-- Per-tab type-breakdown status-scoped report — ⬜ NOT DONE.
+- Per-tab type-breakdown status-scoped report — ⏸️ DEFERRED / TODO (user's call 2026-09-30). Solution
+  is known + small: add an optional `status` param to `CampReportQuerySchema` + `report()`'s `$match`
+  so the byType chips scope to the current tab (frontend then calls report twice — once unscoped for
+  the tab strip, once with `?status=<tab>` for the chip row). Parked, not built.
 - Camp drawer 4-tile KPI row (patients/rx/feedback/FO rating fields) — ⬜ NOT DONE.
 
 ## CRM Invoicing — ⬜ NOT STARTED

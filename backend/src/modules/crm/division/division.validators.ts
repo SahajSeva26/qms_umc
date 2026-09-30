@@ -85,6 +85,8 @@ export const SearchDivisionQuerySchema = z.object({
         .enum([DIVISION_STATUS.ACTIVE, DIVISION_STATUS.INACTIVE])
         .optional()
         .openapi({ example: 'active' }),
+    // when 'true', include each division's project counts (totalProjects/liveProjects) in the result
+    report: z.enum(['true', 'false']).optional().openapi({ example: 'true' }),
     page: z.string().optional().openapi({ example: '1' }),
     limit: z.string().optional().openapi({ example: '10' }),
 });

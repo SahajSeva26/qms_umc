@@ -26,7 +26,22 @@ export const PermissionGroupMapper = {
             items: [] as any[],
         };
         for (const pg of data?.items) {
-            result.items.push(PermissionGroupMapper.toResponse(pg, ctx));
+            // NOTE: independent from toResponse on purpose — mirrors it field-for-field for now (incl. same permission gating) so nothing breaks; search rows can be trimmed later without affecting GET /:id.
+            const item: any = {
+                id: pg._id,
+                code: pg.code,
+                name: pg.name,
+                description: pg.description,
+                tenant: pg.tenant,
+                createdAt: pg.createdAt,
+                updatedAt: pg.updatedAt,
+            };
+            if (ctx.hasAnyPermissions([SYSTEM_PERMISSIONS.MANAGE.code,TENANT_PERMISSIONS.ADMIN.code])) {
+                // Add permissions if user has view permission
+                item.status = pg.status;
+                item.permissions = pg.permissions ?? [];
+            }
+            result.items.push(item);
         }
         return result;
     },

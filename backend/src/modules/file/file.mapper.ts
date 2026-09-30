@@ -64,7 +64,59 @@ export const FileMapper = {
             items: [] as any[],
         };
         for (const file of data?.items || []) {
-            result.items.push(FileMapper.toResponse(file, ctx));
+            // NOTE: independent from toResponse on purpose — mirrors it field-for-field for now (incl. same permission gating) so nothing breaks; search rows can be trimmed later without affecting GET /:id.
+            const canManage = ctx?.hasAnyPermissions([FILE_PERMISSIONS.MANAGE.code]) ?? false;
+
+            const item: any = {
+                id: file._id?.toString(),
+
+                // owning tenant (populated { name, code } when requested, else the raw id)
+                tenant: file.tenant,
+
+                // the record this file hangs off, and in what role
+                entity: {
+                    id: file.entity?.id,
+                    type: file.entity?.type,
+                    relation: file.entity?.relation,
+                },
+
+                // classification + lifecycle
+                type: file.type,
+                status: file.status,
+
+                // the role that registered the file (populated { name, code } when requested, else raw id)
+                owner: file.owner,
+
+                // storage metadata — raw coordinates (provider/path/identifier) are file:manage only
+                content: file.content
+                    ? {
+                          ...(canManage
+                              ? {
+                                    provider: file.content.provider,
+                                    path: file.content.path,
+                                    identifier: file.content.identifier,
+                                }
+                              : {}),
+                          originalName: file.content.originalName,
+                          displayName: file.content.displayName,
+                          mimeType: file.content.mimeType,
+                          extension: file.content.extension,
+                          size: file.content.size,
+                      }
+                    : null,
+
+                // short-lived presigned read URL — attached by the service (FileService withUrl)
+                url: file.url ?? null,
+
+                // short-lived presigned PUT URL for the client to upload the bytes — present on create only
+                ...(file.uploadUrl ? { uploadUrl: file.uploadUrl } : {}),
+
+                tags: file.tags || [],
+
+                createdAt: file.createdAt,
+                updatedAt: file.updatedAt,
+            };
+            result.items.push(item);
         }
         return result;
     },

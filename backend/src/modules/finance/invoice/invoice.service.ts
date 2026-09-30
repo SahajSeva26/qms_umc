@@ -116,6 +116,10 @@ const search = async (filters: ISearchInvoiceQuery, ctx: RequestContext, options
     const where: mongoose.QueryFilter<IInvoice> = { ...ctx.where() };
 
     //2: add search filters
+    // a customer actor is already tenant-pinned by ctx.where(); the filter can't override it
+    if (filters.tenant && !where.tenant) {
+        where.tenant = filters.tenant;
+    }
     if (filters.project) where.project = filters.project;
     if (filters.status) where.status = filters.status;
     // issue-date range — dateTo is snapped to end-of-day (UTC) so the whole end day is included

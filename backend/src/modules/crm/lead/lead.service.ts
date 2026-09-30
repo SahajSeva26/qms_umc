@@ -28,6 +28,8 @@ import { TenantService } from '../../access-management/tenant/tenant.service';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
 import { CounterService } from '../../counter/counter.service';
 import { endOfUTCDay, startOfUTCDay } from '../../../shared/utils/dates';
+import { AppointmentModel } from '../appointment/appointment.model';
+import { APPOINTMENT_TYPES } from '../appointment/appointment.constants';
 
 type LeadDocument = HydratedDocument<ILead> | null;
 
@@ -127,6 +129,13 @@ const search = async (filters: ISearchLeadQuery, ctx: RequestContext, options?: 
     if (filters.title) {
         where.title = { $regex: filters.title, $options: 'i' };
     }
+    if (filters.code) {
+        where.code = { $regex: filters.code, $options: 'i' };
+    }
+    if (filters.focusTherapy) {
+        // regex against an array field — Mongo matches if any element matches
+        where.focusTherapy = { $regex: filters.focusTherapy, $options: 'i' };
+    }
     if (filters.status) {
         where.status = filters.status;
     }
@@ -165,7 +174,52 @@ const search = async (filters: ISearchLeadQuery, ctx: RequestContext, options?: 
 
     const [count, items] = await Promise.all([countPromise, dataPromise]);
 
-    return { count, items };
+    //5: optional report — per-lead activity rollup (appointments / MoMs / follow-ups) for this page
+    const stats = filters.report === 'true' ? await getLeadActivityStats(items) : undefined;
+
+    return { count, items, stats };
+};
+
+// per-lead activity rollup over the linked appointments:
+//   appointments = every appointment linked to the lead (all statuses/types)
+//   moms         = those with a MoM actually submitted (mom.submittedAt set)
+//   followUps    = those of type 'follow-up' specifically (not all linked appointments)
+// One aggregate for the whole page (batched $in), so no N+1.
+type LeadStats = {
+    appointments: number;
+    moms: number;
+    followUps: number;
+};
+
+const getLeadActivityStats = async (leads: HydratedDocument<ILead>[]): Promise<Record<string, LeadStats>> => {
+    const leadIds = leads.map((l) => l._id);
+
+    const groups = await AppointmentModel.aggregate([
+        { $match: { lead: { $in: leadIds } } },
+        {
+            $group: {
+                _id: '$lead',
+                appointments: { $sum: 1 },
+                // a Date is truthy; a missing/null submittedAt → false → not counted
+                moms: { $sum: { $cond: [{ $ifNull: ['$mom.submittedAt', false] }, 1, 0] } },
+                followUps: { $sum: { $cond: [{ $eq: ['$type', APPOINTMENT_TYPES.FOLLOW_UP] }, 1, 0] } },
+            },
+        },
+    ]);
+
+    const stats: Record<string, LeadStats> = {};
+    for (const id of leadIds) {
+        stats[id.toString()] = { appointments: 0, moms: 0, followUps: 0 };
+    }
+    for (const g of groups) {
+        const entry = stats[g._id?.toString()];
+        if (entry) {
+            entry.appointments = g.appointments;
+            entry.moms = g.moms;
+            entry.followUps = g.followUps;
+        }
+    }
+    return stats;
 };
 
 const create = async (model: ICreateLeadPayload, ctx: RequestContext): Promise<HydratedDocument<ILead>> => {
@@ -350,6 +404,56 @@ const report = async (filters: ILeadReportQuery, ctx: RequestContext) => {
                     },
                     { $sort: { _id: 1 } },
                 ],
+                // KPI strip facets — all scoped to `where` (same as the summary). Value tiles use
+                // estimatedValue; windowed tiles (won/lost in range) use the from/to INPUT range;
+                // velocity + topRep are all-time. Avg AI Score omitted (no scoring model exists).
+                pipelineValue: [
+                    { $match: { status: { $nin: [LEAD_STATUSES.WON, LEAD_STATUSES.LOST] } } },
+                    { $group: { _id: null, value: { $sum: '$estimatedValue' } } },
+                ],
+                avgDealSize: [
+                    { $match: { status: LEAD_STATUSES.WON } },
+                    { $group: { _id: null, value: { $avg: '$estimatedValue' } } },
+                ],
+                // won leads whose WON transition happened within [from, to]
+                wonInRange: [
+                    { $match: { stageHistory: { $elemMatch: { to: LEAD_STATUSES.WON, createdAt: { $gte: from, $lte: to } } } } },
+                    { $group: { _id: null, count: { $sum: 1 }, value: { $sum: '$estimatedValue' } } },
+                ],
+                // lost leads whose LOST transition happened within [from, to] — feeds win rate
+                lostInRange: [
+                    { $match: { stageHistory: { $elemMatch: { to: LEAD_STATUSES.LOST, createdAt: { $gte: from, $lte: to } } } } },
+                    { $count: 'count' },
+                ],
+                // all-time avg days from lead creation to its WON transition
+                salesVelocity: [
+                    { $match: { stageHistory: { $elemMatch: { to: LEAD_STATUSES.WON } } } },
+                    {
+                        $addFields: {
+                            wonEntry: {
+                                $first: {
+                                    $filter: {
+                                        input: '$stageHistory',
+                                        as: 'h',
+                                        cond: { $eq: ['$$h.to', LEAD_STATUSES.WON] },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                    { $addFields: { days: { $divide: [{ $subtract: ['$wonEntry.createdAt', '$createdAt'] }, 86400000] } } },
+                    { $group: { _id: null, avgDays: { $avg: '$days' } } },
+                ],
+                // all-time top rep by total won value (+ display name via a roles lookup)
+                topRep: [
+                    { $match: { status: LEAD_STATUSES.WON } },
+                    { $group: { _id: '$salesPerson', wonValue: { $sum: '$estimatedValue' }, wonCount: { $sum: 1 } } },
+                    { $sort: { wonValue: -1 } },
+                    { $limit: 1 },
+                    { $lookup: { from: 'roles', localField: '_id', foreignField: '_id', as: 'rep' } },
+                    { $unwind: { path: '$rep', preserveNullAndEmptyArrays: true } },
+                    { $project: { _id: 0, salesPerson: '$_id', name: '$rep.name', wonValue: 1, wonCount: 1 } },
+                ],
             },
         },
     ]);
@@ -368,10 +472,27 @@ const report = async (filters: ILeadReportQuery, ctx: RequestContext) => {
     const closed = TERMINAL_LEAD_STATUSES.reduce((sum, status) => sum + (statusCounts.get(status) || 0), 0);
     const open = totalLeads - closed;
 
+    //4: KPI strip — value + stage-timed tiles derived from the facets above
+    const wonCountInRange = result?.wonInRange?.[0]?.count || 0;
+    const lostCountInRange = result?.lostInRange?.[0]?.count || 0;
+    const decidedInRange = wonCountInRange + lostCountInRange;
+    const velocityDays = result?.salesVelocity?.[0]?.avgDays;
+    const round1 = (n: number) => Math.round(n * 10) / 10;
+    const kpis = {
+        pipelineValue: result?.pipelineValue?.[0]?.value || 0, // Σ estimatedValue, open leads
+        wonValue: result?.wonInRange?.[0]?.value || 0, // Σ estimatedValue, won within [from,to]
+        wonCount: wonCountInRange, // # won within [from,to]
+        avgDealSize: round1(result?.avgDealSize?.[0]?.value || 0), // avg estimatedValue, won (all-time)
+        winRate: decidedInRange > 0 ? round1((wonCountInRange / decidedInRange) * 100) : 0, // % within [from,to]
+        salesVelocityDays: velocityDays ? round1(velocityDays) : 0, // avg days created→won (all-time)
+        topRep: result?.topRep?.[0] || null, // { salesPerson, name, wonValue, wonCount } | null (all-time)
+    };
+
     return {
         ...result,
         newLeadsTrend,
         summary: { totalLeads, converted, lost, open },
+        kpis,
         meta: { from, to },
     };
 };

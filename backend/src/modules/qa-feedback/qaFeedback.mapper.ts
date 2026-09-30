@@ -27,7 +27,26 @@ export const QaFeedbackMapper = {
             items: [] as any[],
         };
         for (const f of data?.items || []) {
-            result.items.push(QaFeedbackMapper.toResponse(f, ctx));
+            // NOTE: independent from toResponse on purpose — mirrors it field-for-field for now (incl. same permission gating) so nothing breaks; search rows can be trimmed later without affecting GET /:id.
+            const reportedBy = f.reportedBy;
+            const item: any = {
+                id: f._id?.toString(),
+                pageRoute: f.pageRoute,
+                pageTitle: f.pageTitle,
+                pinXPercent: f.pinXPercent,
+                pinYPercent: f.pinYPercent,
+                comment: f.comment,
+                issueKey: f.issueKey,
+                reportedBy:
+                    reportedBy && typeof reportedBy === 'object'
+                        ? { id: reportedBy._id?.toString(), firstName: reportedBy.firstName, lastName: reportedBy.lastName, email: reportedBy.email }
+                        : reportedBy,
+                status: f.status,
+                resolutionNote: f.resolutionNote,
+                createdAt: f.createdAt,
+                updatedAt: f.updatedAt,
+            };
+            result.items.push(item);
         }
         return result;
     },

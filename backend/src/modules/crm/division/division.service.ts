@@ -19,6 +19,8 @@ import { CreateRolePayloadSchema, ICreateRolePayload } from '../../access-manage
 import { RoleTypeService } from '../../access-management/role-type/roleType.service';
 import { IRegisterUserPayload } from '../../auth/auth.validators';
 import { processInBatches } from '../../../shared/utils/batchProcessor';
+import { Project } from '../project/project.model';
+import { PROJECT_STATUS } from '../project/project.constants';
 
 type DivisionDocument = HydratedDocument<IDivision> | null;
 const populate: any[] = [
@@ -111,7 +113,45 @@ const search = async (filters: ISearchDivisionQuery, ctx: RequestContext, option
 
     const [count, items] = await Promise.all([countPromise, dataPromise]);
 
-    return { count, items };
+    //4: optional report — per-division project counts for this result page
+    const stats = filters.report === 'true' ? await getDivisionStats(items) : undefined;
+
+    return { count, items, stats };
+};
+
+// per-division rollup: total & live projects
+type DivisionStats = {
+    totalProjects: number;
+    liveProjects: number;
+};
+
+// aggregate project counts per division for the given divisions (one query for the whole page)
+const getDivisionStats = async (divisions: HydratedDocument<IDivision>[]): Promise<Record<string, DivisionStats>> => {
+    const divisionIds = divisions.map((d) => d._id);
+
+    const projectGroups = await Project.aggregate([
+        { $match: { division: { $in: divisionIds } } },
+        {
+            $group: {
+                _id: '$division',
+                total: { $sum: 1 },
+                live: { $sum: { $cond: [{ $eq: ['$status', PROJECT_STATUS.LIVE] }, 1, 0] } },
+            },
+        },
+    ]);
+
+    const stats: Record<string, DivisionStats> = {};
+    for (const id of divisionIds) {
+        stats[id.toString()] = { totalProjects: 0, liveProjects: 0 };
+    }
+    for (const g of projectGroups) {
+        const entry = stats[g._id?.toString()];
+        if (entry) {
+            entry.totalProjects = g.total;
+            entry.liveProjects = g.live;
+        }
+    }
+    return stats;
 };
 
 const create = async (model: ICreateDivisionPayload, ctx: RequestContext): Promise<HydratedDocument<IDivision>> => {

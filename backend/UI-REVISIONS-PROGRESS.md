@@ -333,7 +333,13 @@ this file). Nothing committed today — **commit before or at start of next sess
    - ❌ MOM SLA auto-block (INVALID — depends on the removed `blocked` status)
    - ⏸️ Peer overlay + availability badges — DEFERRED (same busy/free engine, save for later)
    - ⏸️ Weekly-planning panel — DEFERRED / LATER TODO (largest; new `weekPlan` entity — design pass first)
-4. **NEXT MODULE: Camp Management** (9 pointers — see PART 2). Then CRM Invoicing, Inventory.
+4. **Camp Management — PARTIAL, parked (2026-09-30):** ✅ filter-bar search (added `code` regex filter;
+   doctor/client-name → id resolved frontend-side, same as project). ⏸️ per-tab status-scoped report +
+   historical bulk upload = TODO. ⏸️ report()-vs-search() own-scope = later refactor. 🗣️ 9-way taxonomy,
+   multi-role staffing, camp drawer 4-tile KPI, tele-consult tab, BCA/device-fault = NEED DISCUSSION
+   (blocked on new Camp outcome/staffing fields — resolve in a future session; most unblock together
+   once actual-patient-count + completion/Rx/rating/staffing fields are added).
+5. **NEXT MODULE: CRM Invoicing** (see PART 2). Then Inventory.
 
 ---
 
@@ -490,10 +496,22 @@ Legend: ✅ DONE · 🟡 PARTIAL · ⬜ NOT DONE
   `weekPlan` entity (per-rep weekly targets + submit→approve→completed state machine, Sales-Head-gated
   approval). Needs a data-model design pass before any code; parked for a dedicated future session.
 
-## Camp Management — 🟡 IN PROGRESS (1 done, 2 deferred-TODO, 1 later-refactor, rest blocked)
+## Camp Management — 🟡 PARTIAL (1 done · 2 deferred-TODO · 1 later-refactor · 4 need-discussion)
+<!-- Standing here for now (2026-09-30). Done: filter-bar search (code filter). Deferred/TODO: per-tab
+     status-scoped report, historical bulk upload. Later refactor: report()-vs-search() own-scope.
+     NEEDS DISCUSSION (blocked on new Camp fields / missing features, resolve in a future session):
+     9-way taxonomy, multi-role staffing, camp drawer 4-tile KPI row, tele-consult tab, BCA/device-fault.
+     Most of these unblock together once outcome fields (actual patient count + completion marker,
+     Rx, ratings, staffing roles) are added to the Camp model — a field-addition design decision. -->
 
-- 9-way stage taxonomy (needs completion-tracking fields) — ⬜ NOT DONE.
-- Multi-role staffing + "Missing `<Role>`" warnings — ⬜ NOT DONE.
+
+- 9-way stage taxonomy (needs completion-tracking fields) — 🗣️ NEEDS DISCUSSION → resolve later
+  (user's call 2026-09-30). Blocked on new Camp fields: a completion marker (was patient-count/photo
+  data captured?) to split `closed` → Completed vs Completed·Pending, and an FO-assigned distinction
+  to split Requested vs Upcoming. Requires a field-addition decision before any code.
+- Multi-role staffing + "Missing `<Role>`" warnings — 🗣️ NEEDS DISCUSSION → resolve later
+  (user's call 2026-09-30). Camp has only a single `fo` field; needs new staffing fields (dietitian /
+  lab-tech / manpower) or a separate staffing-assignment model. Field/model decision owed.
 - Bulk upload (historical CLOSED camps) — ⏸️ DEFERRED / TODO (user's call 2026-09-30). NOT a simple
   clone of the doctor/MR bulk upload: camp create requires 5 ObjectId refs (tenant/division/doctor/
   **required mr**/optional project) + full `location` with **coordinates**, and has side effects we
@@ -502,7 +520,8 @@ Legend: ✅ DONE · 🟡 PARTIAL · ⬜ NOT DONE
   skip allocation + overlap, land directly as `closed`) + 3 decisions first: (1) refs by code or
   name? (2) is `mr` required for historical camps? (3) are coordinates required? Design pass owed.
 - `report()` vs `search()` own-scope inconsistency — ⬜ DEFERRED (**LATER REFACTOR**, same as Projects #4).
-- BCA scale flag + device-fault "ON HOLD" pill — ⬜ NOT DONE.
+- BCA scale flag + device-fault "ON HOLD" pill — 🗣️ NEEDS DISCUSSION → resolve later (user's call
+  2026-09-30). Depends on device-calibration/fault-tracking concepts not present in the backend.
 - Filter bar search scope (free-text cross-field) — ✅ DONE (2026-09-30, via separate filters — no
   combined `q` box, same pattern as the lead/project pointers). Added a **`code` regex filter**
   (case-insensitive) to `SearchCampQuerySchema` + `search()`. Camp search now offers `code` + the
@@ -513,12 +532,17 @@ Legend: ✅ DONE · 🟡 PARTIAL · ⬜ NOT DONE
   pointer; doctor/client names aren't stored on the camp, only their ids). Also tidied `search()`'s
   filter block to braces-on-every-`if` (style only, no behavior change). `tsc` clean.
   Files: `camp.validators.ts`, `camp.service.ts`.
-- Tele Consultation tab (no teleconsult type/flag) — ⬜ NOT DONE.
+- Tele Consultation tab (no teleconsult type/flag) — 🗣️ NEEDS DISCUSSION → resolve later (user's call
+  2026-09-30). No teleconsultation type or flag exists on the Camp model (`CampType` = screening/diet/
+  lab only). A real missing feature, not a filter to add. Field/type decision owed.
 - Per-tab type-breakdown status-scoped report — ⏸️ DEFERRED / TODO (user's call 2026-09-30). Solution
   is known + small: add an optional `status` param to `CampReportQuerySchema` + `report()`'s `$match`
   so the byType chips scope to the current tab (frontend then calls report twice — once unscoped for
   the tab strip, once with `?status=<tab>` for the chip row). Parked, not built.
-- Camp drawer 4-tile KPI row (patients/rx/feedback/FO rating fields) — ⬜ NOT DONE.
+- Camp drawer 4-tile KPI row (patients/rx/feedback/FO rating fields) — 🗣️ NEEDS DISCUSSION → resolve
+  later (user's call 2026-09-30). Needs 4 new Camp fields (patients done / Rx count / patient feedback
+  rating / FO rating); only `patientExpectation` (the target) exists today. Shares the patient-count
+  root with the 9-way taxonomy + the CRM Invoicing additional-patient-billing pointer. Field decision owed.
 
 ## CRM Invoicing — ⬜ NOT STARTED
 

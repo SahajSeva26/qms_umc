@@ -24,6 +24,7 @@ export const AppointmentMapper = {
             parent: appointment.parent,
             mode: appointment.mode,
             destinationLink: appointment.destinationLink,
+            location: appointment.location,
             duration: {
                 startTime: appointment.duration?.startTime,
                 endTime: appointment.duration?.endTime,
@@ -77,6 +78,7 @@ export const AppointmentMapper = {
                 parent: appointment.parent,
                 mode: appointment.mode,
                 destinationLink: appointment.destinationLink,
+                location: appointment.location,
                 duration: {
                     startTime: appointment.duration?.startTime,
                     endTime: appointment.duration?.endTime,

@@ -108,13 +108,8 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { id: 'pharma',       label: 'Pharma Portal',               icon: 'Briefcase',     path: PHARMA_ROUTES.PHARMA },
 
   // Resources
-  { id: 'itemmaster',   label: 'Item Master',                 icon: 'BookOpen',      path: ADMIN_ROUTES.ADMIN_INVENTORY_MASTERS },
-
-  { id: 'inventoryitems', label: 'Inventory Items',           icon: 'Cpu',           path: ADMIN_ROUTES.ADMIN_INVENTORY_ITEMS },
-
-  { id: 'inventoryops', label: 'Inventory Operations',        icon: 'UserCheck',     path: ADMIN_ROUTES.ADMIN_INVENTORY_OPERATIONS },
-
-  { id: 'vendormasters', label: 'Vendor Master',              icon: 'Truck',         path: ADMIN_ROUTES.ADMIN_VENDOR_MASTERS },
+  // One page, one nav entry — Item Master/Devices/Consumables/etc. are tabs inside it now.
+  { id: 'inventory',    label: 'Inventory Management',        icon: 'BookOpen',      path: ADMIN_ROUTES.ADMIN_INVENTORY },
 
   { id: 'assets',       label: 'Asset Management',            icon: 'Box',           path: ADMIN_ROUTES.ADMIN_ASSETS },
 
@@ -191,7 +186,7 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
     subs: [
       // 'assets'/'kpi' are deliberately hidden from nav, not deleted — the
       // mock 'inventory' item was fully removed (see md-files, inventory cleanup).
-      { title: '', items: ['itemmaster', 'inventoryitems', 'inventoryops', 'vendormasters'].map((id) => NAV_BY_ID[id]) },
+      { title: '', items: ['inventory'].map((id) => NAV_BY_ID[id]) },
     ],
   },
   {

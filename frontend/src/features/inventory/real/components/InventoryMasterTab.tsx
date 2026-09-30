@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { FiBox, FiCheckCircle, FiEdit2, FiLayers, FiPlus, FiSearch, FiXCircle } from 'react-icons/fi'
+import { FiCheckCircle, FiLayers, FiPlus, FiSearch, FiXCircle } from 'react-icons/fi'
 import { usePermission } from '@/hooks/usePermission'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { useInventoryMasters } from '@/features/inventory/real/hooks/useInventoryMasters'
@@ -17,11 +17,13 @@ import PaginationControls from '@/components/ui/PaginationControls'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import CopyButton from '@/components/ui/CopyButton'
 import EditInventoryMasterModal from '@/features/inventory/real/components/EditInventoryMasterModal'
+import InventoryMasterDetailDrawer from '@/features/inventory/real/components/InventoryMasterDetailDrawer'
 import InventoryReportKpiStrip, { type InventoryReportTile } from '@/features/inventory/real/components/InventoryReportKpiStrip'
+import InventoryMasterTypeStrip from '@/features/inventory/real/components/InventoryMasterTypeStrip'
+import { INVENTORY_MASTER_TYPE_META } from '@/features/inventory/real/utils/inventoryMasterTypeMeta'
 import { usePagination } from '@/hooks/usePagination'
 import { truncateIdentifier } from '@/features/inventory/real/utils/truncateIdentifier'
 
-const TYPE_TONE: Record<InventoryMasterType, 'brand' | 'teal'> = { device: 'brand', consumable: 'teal' }
 const STATUS_TONE: Record<InventoryMasterStatus, 'emerald' | 'rose'> = { active: 'emerald', inactive: 'rose' }
 
 const PAGE_SIZE = 10
@@ -37,6 +39,8 @@ const InventoryMasterTab = () => {
   const [statusFilter, setStatusFilter] = useState<InventoryMasterStatus>('active')
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
   const [editModal, setEditModal] = useState<{ open: boolean; item: InventoryMasterEntity | null }>({ open: false, item: null })
+  // Row click opens the read-only detail drawer (open to any reader) — Edit lives inside it, not a row-end button.
+  const [detailItem, setDetailItem] = useState<InventoryMasterEntity | null>(null)
 
   const { data, isLoading, error, refetch } = useInventoryMasters({
     name: debouncedSearch || undefined,
@@ -49,19 +53,23 @@ const InventoryMasterTab = () => {
   const totalCount = data?.data?.count ?? 0
 
   const { report, isLoading: reportLoading, error: reportError } = useInventoryMasterReport(canManage)
+  // Real counts per type, from the same report query the KPI strip already
+  // fetches — undefined while loading/unauthorized (shown as "—", not 0).
+  const typeCounts = useMemo<Record<InventoryMasterType, number> | undefined>(() => {
+    if (!report) return undefined
+    const byType = new Map(report.catalog.byType.map((t) => [t.type, t.count]))
+    return {
+      device: byType.get('device') ?? 0,
+      consumable: byType.get('consumable') ?? 0,
+    }
+  }, [report])
+  // Type breakdown lives in InventoryMasterTypeStrip below (also doubles as
+  // the type filter) — this strip covers only totals the type-strip doesn't.
   const reportTiles = useMemo<InventoryReportTile[]>(() => {
     if (!report) return []
-    const byType = new Map(report.catalog.byType.map((t) => [t.type, t.count]))
     const byStatus = new Map(report.catalog.byStatus.map((s) => [s.status, s.count]))
     return [
       { key: 'catalogItems', label: 'Catalog Items', value: report.summary.catalogItems, tone: 'brand', icon: FiLayers },
-      ...INVENTORY_MASTER_TYPES.map((t) => ({
-        key: `type-${t}`,
-        label: INVENTORY_MASTER_TYPE_LABEL[t],
-        value: byType.get(t) ?? 0,
-        tone: TYPE_TONE[t],
-        icon: FiBox,
-      })),
       {
         key: 'status-active',
         label: INVENTORY_MASTER_STATUS_LABEL.active,
@@ -104,9 +112,19 @@ const InventoryMasterTab = () => {
         error={reportError}
         canView={canManage}
         skeletonCount={5}
+        extraTiles={
+          <InventoryMasterTypeStrip
+            counts={typeCounts}
+            activeType={type}
+            onSelectType={(t) => { setType(t); resetToFirstPage() }}
+          />
+        }
       />
 
-      <div className="flex flex-wrap items-center gap-2 mb-3">
+      <div
+        className="flex flex-wrap items-center gap-2 mb-3 rounded-xl border p-2.5"
+        style={{ background: 'var(--qms-surface-card)', borderColor: 'var(--qms-border)' }}
+      >
         <div className="relative flex-1 min-w-[220px] max-w-xs">
           <FiSearch size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--qms-text-muted)' }} />
           <Input
@@ -148,10 +166,10 @@ const InventoryMasterTab = () => {
             <table className="w-full text-[13px]">
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--qms-border)' }}>
-                  {['Code', 'Name', 'Type', 'SKU', 'Unit', ...(canManage ? ['Status'] : []), 'Min stock', ...(canManage ? [''] : [])].map((h, i) => (
+                  {['Code', 'Name', 'Type', 'SKU', 'Unit', ...(canManage ? ['Status'] : []), 'Min stock'].map((h, i) => (
                     <th
                       key={`${h}-${i}`}
-                      className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5"
+                      className={`font-bold text-[11px] uppercase tracking-wider px-4 py-2 ${h === 'Min stock' ? 'text-right' : 'text-left'}`}
                       style={{ color: 'var(--qms-text-muted)' }}
                     >
                       {h}
@@ -163,22 +181,36 @@ const InventoryMasterTab = () => {
                 {items.map((item) => (
                   <tr
                     key={item.id}
-                    onClick={() => canManage && setEditModal({ open: true, item })}
-                    className={canManage ? 'cursor-pointer transition-colors hover:bg-(--qms-surface-hover)' : ''}
+                    onClick={() => setDetailItem(item)}
+                    className="cursor-pointer transition-colors hover:bg-(--qms-surface-hover)"
                     style={{ borderBottom: '1px solid var(--qms-border)' }}
                   >
-                    <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>
+                    <td className="px-4 py-2" style={{ color: 'var(--qms-text)' }}>
                       <div className="flex items-center gap-1.5">
                         <span className="font-mono font-semibold" title={item.code}>{truncateIdentifier(item.code)}</span>
                         <CopyButton value={item.code} label="Code" />
                       </div>
                     </td>
-                    <td className="px-4 py-2.5 max-w-xs truncate" style={{ color: 'var(--qms-text)' }} title={item.name}>{item.name}</td>
-                    <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{INVENTORY_MASTER_TYPE_LABEL[item.type]}</td>
-                    <td className="px-4 py-2.5 max-w-xs truncate" style={{ color: 'var(--qms-text-muted)' }} title={item.sku}>{item.sku}</td>
-                    <td className="px-4 py-2.5 max-w-xs truncate" style={{ color: 'var(--qms-text-muted)' }} title={item.unit}>{item.unit}</td>
+                    <td className="px-4 py-2 max-w-xs truncate" style={{ color: 'var(--qms-text)' }} title={item.name}>{item.name}</td>
+                    <td className="px-4 py-2">
+                      {(() => {
+                        const meta = INVENTORY_MASTER_TYPE_META[item.type]
+                        const Icon = meta.icon
+                        return (
+                          <span
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full"
+                            style={{ background: `color-mix(in srgb, ${meta.color} 10%, transparent)`, color: meta.color }}
+                          >
+                            <Icon size={11} />
+                            {INVENTORY_MASTER_TYPE_LABEL[item.type]}
+                          </span>
+                        )
+                      })()}
+                    </td>
+                    <td className="px-4 py-2 max-w-xs truncate" style={{ color: 'var(--qms-text-muted)' }} title={item.sku}>{item.sku}</td>
+                    <td className="px-4 py-2 max-w-xs truncate" style={{ color: 'var(--qms-text-muted)' }} title={item.unit}>{item.unit}</td>
                     {canManage && (
-                      <td className="px-4 py-2.5">
+                      <td className="px-4 py-2">
                         <span
                           className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${item.status === 'active' ? 'bg-success-soft text-success' : ''}`}
                           style={item.status !== 'active' ? { background: 'var(--qms-surface-strong)', color: 'var(--qms-text-muted)' } : undefined}
@@ -187,22 +219,7 @@ const InventoryMasterTab = () => {
                         </span>
                       </td>
                     )}
-                    <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{item.minStock}</td>
-                    {canManage && (
-                      <td className="px-4 py-2.5">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setEditModal({ open: true, item })
-                          }}
-                          className="flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg border transition-colors hover:bg-(--qms-surface-hover)"
-                          style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-soft)' }}
-                        >
-                          <FiEdit2 size={12} /> Edit
-                        </button>
-                      </td>
-                    )}
+                    <td className="px-4 py-2 text-right font-mono" style={{ color: 'var(--qms-text-muted)' }}>{item.minStock}</td>
                   </tr>
                 ))}
               </tbody>
@@ -222,6 +239,18 @@ const InventoryMasterTab = () => {
         <EditInventoryMasterModal
           item={editModal.item}
           onClose={() => setEditModal({ open: false, item: null })}
+        />
+      )}
+
+      {detailItem && (
+        <InventoryMasterDetailDrawer
+          item={detailItem}
+          canManage={canManage}
+          onClose={() => setDetailItem(null)}
+          onEdit={() => {
+            setEditModal({ open: true, item: detailItem })
+            setDetailItem(null)
+          }}
         />
       )}
     </div>

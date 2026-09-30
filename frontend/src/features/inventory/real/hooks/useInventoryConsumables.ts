@@ -5,8 +5,6 @@ import type { SearchInventoryConsumableQuery } from '@/types/inventoryConsumable
 
 export const inventoryConsumableKeys = createEntityKeys<SearchInventoryConsumableQuery>('inventory-consumables')
 
-// Reads are open to any authenticated user on the backend (search defaults
-// to active-only lots for non-managers) — no permission gate needed here,
-// only on the write hooks.
-export const useInventoryConsumables = (query: SearchInventoryConsumableQuery) =>
-  useEntityQuery(inventoryConsumableKeys, (q) => inventoryConsumableService.searchInventoryConsumables(q), query)
+// Reads are open to any authenticated user — `enabled` is only for a caller already gating its own render elsewhere.
+export const useInventoryConsumables = (query: SearchInventoryConsumableQuery, enabled = true) =>
+  useEntityQuery(inventoryConsumableKeys, (q) => inventoryConsumableService.searchInventoryConsumables(q), query, { enabled })

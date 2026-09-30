@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { FiUsers, FiLayers, FiMap, FiMoon, FiPlus, FiCheckCircle } from 'react-icons/fi'
+import { FiUsers, FiLayers, FiMap, FiMoon, FiPlus, FiCheckCircle, FiMapPin } from 'react-icons/fi'
 import KpiTile from '@/components/ui/KpiTile'
 import PaginationControls from '@/components/ui/PaginationControls'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
@@ -121,8 +121,16 @@ const DoctorsPage = () => {
     <div className="w-full">
       <div className="flex items-start justify-between gap-3 mb-4 flex-wrap">
         <div>
-          <div className="text-[12px] mb-1" style={{ color: 'var(--qms-text-muted)' }}>Operations · Field Network · Doctor Management</div>
+          <div className="text-[12px] mb-1" style={{ color: 'var(--qms-text-muted)' }}>Network · Doctor Management</div>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--qms-text)' }}>Doctor Management</h1>
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full" style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text-muted)' }}>
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--success)' }} /> Doctor master · live
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full" style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text-muted)' }}>
+              <FiMapPin size={11} /> Geo-mapped
+            </span>
+          </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {/* Hide create entry point rather than let a 403 hit on submit. */}

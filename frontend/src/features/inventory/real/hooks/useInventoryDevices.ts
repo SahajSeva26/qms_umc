@@ -5,7 +5,6 @@ import type { SearchInventoryDeviceQuery } from '@/types/inventoryDevice.types'
 
 export const inventoryDeviceKeys = createEntityKeys<SearchInventoryDeviceQuery>('inventory-devices')
 
-// Reads are open to any authenticated user on the backend — no permission
-// gate needed here, only on the write hooks.
-export const useInventoryDevices = (query: SearchInventoryDeviceQuery) =>
-  useEntityQuery(inventoryDeviceKeys, (q) => inventoryDeviceService.searchInventoryDevices(q), query)
+// Reads are open to any authenticated user — `enabled` is only for a caller already gating its own render elsewhere.
+export const useInventoryDevices = (query: SearchInventoryDeviceQuery, enabled = true) =>
+  useEntityQuery(inventoryDeviceKeys, (q) => inventoryDeviceService.searchInventoryDevices(q), query, { enabled })

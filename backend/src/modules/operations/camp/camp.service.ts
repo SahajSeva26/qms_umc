@@ -30,6 +30,11 @@ import { ALLOWED_ROLETYPE_CODES } from '../../access-management/role-type/roleTy
 import { RoleModel } from '../../access-management/role/role.model';
 import { TENANT_TYPE } from '../../access-management/tenant/tenant.constants';
 import { InventoryMasterService } from '../../inventory/inventory-master/inventory-master.service';
+import { Project } from '../../crm/project/project.model';
+import { TestMasterModel } from '../testMaster/testMaster.model';
+import { InventoryMasterModel } from '../../inventory/inventory-master/inventory-master.model';
+import { InventoryAssignmentModel } from '../../inventory/inventory-assignment/inventory-assignment.model';
+import { ITEM_TYPES } from '../../inventory/inventory-master/inventory-master.constants';
 
 type CampDocument = HydratedDocument<ICamp> | null;
 
@@ -173,6 +178,31 @@ const nearestFoProfilesGlobal = async (lng: number, lat: number, limit = 100): P
 
 // nearest FO within their own coverage who is not already booked that day. 422 (no coordinates /
 // nobody covers) or 409 (everyone nearby booked) on failure. FO lookup + clash are both GLOBAL.
+// The device catalog items (InventoryMaster ids) a project's camp needs to run — gathered from the
+// consumption list of every TestMaster the project uses, then narrowed to DEVICES only (consumables
+// aren't gated here; they're drawn down at test time). Empty ⇒ the project imposes no device need.
+const projectRequiredDeviceItemIds = async (projectId: any): Promise<string[]> => {
+    if (!projectId) {
+        return [];
+    }
+    const project: any = await Project.findById(projectId).select('tests').lean();
+    const testIds: any[] = project?.tests || [];
+    if (!testIds.length) {
+        return [];
+    }
+    const tests = await TestMasterModel.find({ _id: { $in: testIds } }).select('consumption').lean();
+    const itemIds = [
+        ...new Set(
+            tests.flatMap((test: any) => (test.consumption || []).map((line: any) => line.item?.toString()).filter(Boolean)),
+        ),
+    ];
+    if (!itemIds.length) {
+        return [];
+    }
+    const devices = await InventoryMasterModel.find({ _id: { $in: itemIds }, type: ITEM_TYPES.DEVICE }).select('_id').lean();
+    return devices.map((device: any) => device._id.toString());
+};
+
 const resolveNearestFreeFoRole = async (camp: HydratedDocument<ICamp>, ctx: RequestContext): Promise<any> => {
     const coordinates = (camp.location as any)?.coordinates as number[] | undefined;
     if (!coordinates || coordinates.length !== 2) {
@@ -186,13 +216,52 @@ const resolveNearestFreeFoRole = async (camp: HydratedDocument<ICamp>, ctx: Requ
         return throwAppError('No field officer covers this camp location', StatusCodes.UNPROCESSABLE_ENTITY);
     }
 
+    // nearest FOs (distance order) not already booked on this date + overlapping slot
     const booked = await bookedFoRoleIdsOnDate(camp.date, (camp as any).timeSlot, ctx, camp._id);
-    const free = items.find((profile: any) => !booked.includes(profile.role?.toString()));
-    if (!free) {
+    const freeProfiles = items.filter((profile: any) => !booked.includes(profile.role?.toString()));
+    if (!freeProfiles.length) {
         return throwAppError('All field officers near this camp are already booked on this date and time slot', StatusCodes.CONFLICT);
     }
 
-    return free.role;
+    // device gate — the auto-allocated FO must physically hold EVERY device the project's tests need.
+    // (Only this auto-allocation path is gated; an FO supplied explicitly by internal staff is trusted.)
+    // No device requirement ⇒ nearest free FO wins, exactly as before.
+    const requiredDeviceItems = await projectRequiredDeviceItemIds(camp.project);
+    if (!requiredDeviceItems.length) {
+        return freeProfiles[0].role;
+    }
+
+    // one batched read of the free FOs' assigned devices → roleId → set of device catalog-item ids
+    const assignments = await InventoryAssignmentModel.find({
+        assignee: { $in: freeProfiles.map((profile: any) => profile.role) },
+        inventoryType: 'InventoryDevice',
+    })
+        .populate({ path: 'inventory', select: 'item' })
+        .lean();
+
+    const heldByRole = new Map<string, Set<string>>();
+    for (const assignment of assignments) {
+        const roleId = assignment.assignee?.toString();
+        const itemId = (assignment.inventory as any)?.item?.toString();
+        if (!roleId || !itemId) {
+            continue;
+        }
+        if (!heldByRole.has(roleId)) {
+            heldByRole.set(roleId, new Set());
+        }
+        heldByRole.get(roleId)!.add(itemId);
+    }
+
+    // nearest free FO whose assigned devices cover every required item
+    const equipped = freeProfiles.find((profile: any) => {
+        const held = heldByRole.get(profile.role?.toString());
+        return held && requiredDeviceItems.every((itemId) => held.has(itemId));
+    });
+    if (!equipped) {
+        return throwAppError('No nearby field officer holds all the devices this project requires', StatusCodes.CONFLICT);
+    }
+
+    return equipped.role;
 };
 
 // resolve an MR + its chain (asm = mr.supervisor, rsm = asm.supervisor). Loaded under ctx.where()

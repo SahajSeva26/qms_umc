@@ -83,7 +83,7 @@ export const LeadMapper = {
             };
             // present only when the caller requested report=true
             if (stats) {
-                item.stats = stats[lead._id?.toString()] ?? { followUps: 0 };
+                item.stats = stats[lead._id?.toString()] ?? { appointments: 0, moms: 0, followUps: 0 };
             }
             result.items.push(item);
         }

@@ -327,9 +327,12 @@ this file). Nothing committed today — **commit before or at start of next sess
 **Next up (tomorrow):**
 1. (optional) e2e-verify the uncommitted CRM lead changes on live rs0, then commit.
 2. **Frontend wiring** owed for the KPI strip (re-add tiles + `kpis` on `LeadReportResponse`) — frontend team's task.
-3. **Next module: Appointments** — free-text `location` field ✅ DONE (2026-09-30). MOM SLA auto-block
-   ❌ INVALID (depends on the removed `blocked` status). Remaining: peer overlay, leads calendar,
-   availability badges, and the Weekly-planning panel (largest — needs its own data model).
+3. **Appointments module — 2/6 done, 1 invalid, 3 remaining (2026-09-30):**
+   - ✅ free-text `location` field
+   - ✅ Leads calendar view (as per-lead activity counts via `report=true` on lead search)
+   - ❌ MOM SLA auto-block (INVALID — depends on the removed `blocked` status)
+   - ⏸️ Peer overlay + availability badges — DEFERRED (save for later, same busy/free engine)
+   - ⬜ **Weekly-planning panel — NEXT UP** (largest; needs its own new data model — design pass first)
    Then Camp Management, CRM Invoicing, Inventory. Full list in PART 2 below.
 
 ---
@@ -456,16 +459,34 @@ Legend: ✅ DONE · 🟡 PARTIAL · ⬜ NOT DONE
   project client-name pointer). Note: param is `focusTherapy` (matches the model field), not `therapy`.
   `tsc` clean. Files: `lead.validators.ts`, `lead.service.ts`.
 
-## Appointments — ⬜ NOT STARTED
+## Appointments — 🟡 IN PROGRESS (2/6 done, 1 invalid, 3 remaining)
 
+- Free-text `location` field on Appointment — ✅ DONE (2026-09-30). Added a free-text `location` string
+  to the model (default `''`), independent of `mode`/`destinationLink` — an online meeting can still
+  carry a location. Accepted on create + update (optional), applied in `set()` (`!== undefined` guard,
+  so it can be set or cleared), surfaced in both `toResponse` + `toSearchResponse`. Controller/routes
+  untouched (schema-driven; Swagger auto-derives). Aligns the frontend's previously-stale
+  `AppointmentEntity.location?` type with a real backend field. `tsc` clean.
+  Files: `appointment.{model,validators,service,mapper}.ts`.
+- Leads calendar view — ✅ DONE (2026-09-30, as per-lead activity counts). Built by broadening the
+  existing `report=true` per-row stats helper on **lead SEARCH** (same mechanism as tenant's
+  `getTenantStats` + the earlier follow-ups work — NOT the standalone `GET /leads/report` facet).
+  Renamed `getLeadFollowUpStats` → `getLeadActivityStats`; the single batched `$in:leadIds` aggregate
+  over `AppointmentModel` now returns per row `stats: { appointments, moms, followUps }` —
+  `appointments` = all linked appointments; `moms` = those with `mom.submittedAt` set;
+  **`followUps` = only `type:'follow-up'` appointments** (user's call — was previously all linked).
+  **`payment-touches` DROPPED** (no payment→lead relation exists — unbacked, same class of gap as
+  Avg AI Score). No N+1, own-scoped via the list's `where`. ⚠️ NOTE: this delivers per-lead activity
+  **counts**, not a true date-gridded calendar — if the frontend needs meetings placed on specific
+  days, that's a separate date-bucketed query. `tsc` clean.
+  Files: `lead.service.ts`, `lead.mapper.ts`.
 - MOM 24-hr SLA auto-block + RM-release workflow — ❌ INVALID (will not be built). Depends on a 5th
   `blocked` status that was entirely removed by an earlier requirement (2026-08-11). Reintroducing it
   would reverse that decision. Void as written.
-- Peer overlay ("BUSY, agenda hidden") — ⬜ NOT DONE.
-- Leads calendar view — ⬜ NOT DONE.
-- Weekly planning panel — ⬜ NOT DONE (largest gap; needs its own data model).
-- InternalMembersPicker live-availability badges — ⬜ NOT DONE.
-- Free-text `location` field on Appointment — ⬜ NOT DONE.
+- Peer overlay ("BUSY, agenda hidden") — ⬜ NOT DONE (deferred — save for later, user's call 2026-09-30).
+- InternalMembersPicker live-availability badges — ⬜ NOT DONE (deferred — save for later, user's call
+  2026-09-30; same busy/free engine as Peer overlay).
+- Weekly planning panel — ⬜ NOT DONE (largest gap; needs its own data model). **Next up.**
 
 ## Camp Management — ⬜ NOT STARTED
 

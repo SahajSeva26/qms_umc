@@ -29,6 +29,7 @@ import { withTransaction } from '../../../shared/helpers/transactionHelper';
 import { CounterService } from '../../counter/counter.service';
 import { endOfUTCDay, startOfUTCDay } from '../../../shared/utils/dates';
 import { AppointmentModel } from '../appointment/appointment.model';
+import { APPOINTMENT_TYPES } from '../appointment/appointment.constants';
 
 type LeadDocument = HydratedDocument<ILead> | null;
 
@@ -173,34 +174,49 @@ const search = async (filters: ISearchLeadQuery, ctx: RequestContext, options?: 
 
     const [count, items] = await Promise.all([countPromise, dataPromise]);
 
-    //5: optional report — per-lead follow-up count (every appointment linked to the lead) for this page
-    const stats = filters.report === 'true' ? await getLeadFollowUpStats(items) : undefined;
+    //5: optional report — per-lead activity rollup (appointments / MoMs / follow-ups) for this page
+    const stats = filters.report === 'true' ? await getLeadActivityStats(items) : undefined;
 
     return { count, items, stats };
 };
 
-// per-lead rollup: total follow-ups = every appointment linked to the lead (all statuses).
+// per-lead activity rollup over the linked appointments:
+//   appointments = every appointment linked to the lead (all statuses/types)
+//   moms         = those with a MoM actually submitted (mom.submittedAt set)
+//   followUps    = those of type 'follow-up' specifically (not all linked appointments)
 // One aggregate for the whole page (batched $in), so no N+1.
 type LeadStats = {
+    appointments: number;
+    moms: number;
     followUps: number;
 };
 
-const getLeadFollowUpStats = async (leads: HydratedDocument<ILead>[]): Promise<Record<string, LeadStats>> => {
+const getLeadActivityStats = async (leads: HydratedDocument<ILead>[]): Promise<Record<string, LeadStats>> => {
     const leadIds = leads.map((l) => l._id);
 
     const groups = await AppointmentModel.aggregate([
         { $match: { lead: { $in: leadIds } } },
-        { $group: { _id: '$lead', count: { $sum: 1 } } },
+        {
+            $group: {
+                _id: '$lead',
+                appointments: { $sum: 1 },
+                // a Date is truthy; a missing/null submittedAt → false → not counted
+                moms: { $sum: { $cond: [{ $ifNull: ['$mom.submittedAt', false] }, 1, 0] } },
+                followUps: { $sum: { $cond: [{ $eq: ['$type', APPOINTMENT_TYPES.FOLLOW_UP] }, 1, 0] } },
+            },
+        },
     ]);
 
     const stats: Record<string, LeadStats> = {};
     for (const id of leadIds) {
-        stats[id.toString()] = { followUps: 0 };
+        stats[id.toString()] = { appointments: 0, moms: 0, followUps: 0 };
     }
     for (const g of groups) {
         const entry = stats[g._id?.toString()];
         if (entry) {
-            entry.followUps = g.count;
+            entry.appointments = g.appointments;
+            entry.moms = g.moms;
+            entry.followUps = g.followUps;
         }
     }
     return stats;

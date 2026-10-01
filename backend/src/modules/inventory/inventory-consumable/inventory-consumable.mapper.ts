@@ -103,6 +103,15 @@ export const InventoryConsumableMapper = {
             consumables: {
                 warehouseQuantity,
                 expiredByDate: report?.expiredByDate || 0,
+                // FEFO expiry-band counts for the KPI cards (collection-wide, not per-row)
+                expiryBands: report?.expiryBands || {
+                    expired: 0,
+                    within30: 0,
+                    within30to90: 0,
+                    within90to180: 0,
+                    beyond180: 0,
+                    noExpiry: 0,
+                },
                 byStatus: Object.values(INVENTORY_CONSUMABLE_STATUS).map((status) => ({ status, count: byStatus.get(status) || 0 })),
             },
         };

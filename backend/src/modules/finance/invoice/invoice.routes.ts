@@ -4,18 +4,35 @@ import { InvoiceController } from './invoice.controller';
 import { registry } from '../../../shared/config/swagger/swagger.registry';
 import {
     CreateInvoicePayloadSchema,
+    InvoiceReportQuerySchema,
     MoveStagePayloadSchema,
     SearchInvoiceQuerySchema,
     UpdateInvoicePayloadSchema,
 } from './invoice.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
 import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { reportRateLimiter } from '../../../shared/middlewares/rateLimiter';
 import { INVOICE_PERMISSIONS } from './invoice.constants';
 import { TENANT_PERMISSIONS } from '../../access-management/tenant/tenant.constants';
 
 export const InvoiceRouter = express.Router();
 
 InvoiceRouter.use(AuthMiddleware);
+
+// invoice report (tenant-wide billing totals + per-status breakdown — global for platform actors)
+registry.registerPath({
+    method: 'get',
+    path: '/invoices/report',
+    tags: ['INVOICE'],
+    summary: 'Invoice pipeline report (total invoiced + per-status counts/amounts; optional tenant/project/date scope)',
+    request: {
+        query: InvoiceReportQuerySchema,
+    },
+    responses: {
+        200: { description: 'Invoice report generated successfully' },
+        400: { description: 'Validation error' },
+    },
+});
 
 // get invoice
 registry.registerPath({
@@ -115,6 +132,14 @@ registry.registerPath({
 // =======================================================================
 // ======================= EXPORT INVOICE ROUTES =========================
 // =======================================================================
+
+// report must be registered BEFORE '/:id' so "report" isn't captured as an invoice id
+InvoiceRouter.get(
+    '/report',
+    reportRateLimiter,
+    AuthorizeMiddleware([INVOICE_PERMISSIONS.SEARCH.code, INVOICE_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
+    InvoiceController.report,
+);
 
 InvoiceRouter.get(
     '/:id',

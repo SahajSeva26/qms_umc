@@ -39,11 +39,12 @@ export const InvoiceMapper = {
         };
         return result;
     },
-    toSearchResponse: (data: { count: number; items: any[] }, ctx: RequestContext) => {
+    toSearchResponse: (data: { count: number; items: any[]; lineItemCounts?: Record<string, number> }, ctx: RequestContext) => {
         const result = {
             count: data?.count || 0,
             items: [] as any[],
         };
+        const lineItemCounts = data?.lineItemCounts || {};
         for (const invoice of data?.items || []) {
             // NOTE: independent from toResponse on purpose — mirrors it field-for-field for now (incl. same permission gating) so nothing breaks; search rows can be trimmed later without affecting GET /:id.
             const item: any = {
@@ -76,6 +77,9 @@ export const InvoiceMapper = {
                     actor: entry.actor,
                     createdAt: entry.createdAt,
                 })),
+
+                // per-invoice line-item (billed-camp) count — feeds the card's "N camps" stat
+                lineItemCount: lineItemCounts[invoice._id?.toString()] || 0,
 
                 createdAt: invoice.createdAt,
                 updatedAt: invoice.updatedAt,

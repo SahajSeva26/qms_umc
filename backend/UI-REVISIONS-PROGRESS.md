@@ -593,10 +593,18 @@ Legend: ✅ DONE · 🟡 PARTIAL · ⬜ NOT DONE
   `?status=<tab>` for that tab's chip row. Controller already parsed+passed the query (was an empty
   schema), routes schema-driven → no change there. Files: `camp.validators.ts`, `camp.service.ts`.
   ⬜ Frontend wires the second `?status=` call for the chip row.
-- Camp drawer 4-tile KPI row (patients/rx/feedback/FO rating fields) — 🗣️ NEEDS DISCUSSION → resolve
-  later (user's call 2026-09-30). Needs 4 new Camp fields (patients done / Rx count / patient feedback
-  rating / FO rating); only `patientExpectation` (the target) exists today. Shares the patient-count
-  root with the 9-way taxonomy + the CRM Invoicing additional-patient-billing pointer. Field decision owed.
+- Camp drawer 4-tile KPI row (patients/rx/feedback/FO rating fields) — 🟡 PARTIAL (2026-10-01).
+  **KEY FINDING: the brief was wrong that actual patient count needs a new Camp field.** The backend
+  already has a `screening` module (one `Screening` = one patient at a camp, unique per tenant/patient/
+  camp) — so **actual patients are DERIVABLE, no schema change.** ✅ DONE (UNCOMMITTED, `tsc` clean):
+  opt-in `report=true` on camp SEARCH → each row carries `stats:{patients, patientsCompleted}` via one
+  batched `ScreeningModel.aggregate([{$match:{camp:{$in:ids}}}, {$group:...}])` (`patients` = all
+  screenings, `patientsCompleted` = status `completed`); same per-row pattern as doctor/invoice, no N+1,
+  scoping inherited from the page. This unblocks the drawer "Patients done/expected + %", the card "Done %",
+  Doctor "Patients" stat, Pharma "Total Patients", AND the CRM additional-patient-billing dependency.
+  Files: `camp.{validators,service,mapper}.ts`. ⬜ Still genuinely blocked (no model): **Rx count** (no
+  prescription model — tests ≠ Rx), **★ feedback/FO rating** (no rating model), **camp photos/report URLs**.
+  ⬜ Frontend reads `stats` into the tiles.
 
 ## CRM Invoicing — 🟡 IN PROGRESS (2 done 2026-10-01; rest blocked/deferred)
 

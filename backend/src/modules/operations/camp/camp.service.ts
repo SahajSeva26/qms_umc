@@ -33,6 +33,8 @@ import { InventoryMasterService } from '../../inventory/inventory-master/invento
 import { Project } from '../../crm/project/project.model';
 import { PROJECT_STATUS } from '../../crm/project/project.constants';
 import { TestMasterModel } from '../testMaster/testMaster.model';
+import { ScreeningModel } from '../screening/screening.model';
+import { SCREENING_STATUS } from '../screening/screening.constants';
 import { InventoryMasterModel } from '../../inventory/inventory-master/inventory-master.model';
 import { InventoryAssignmentModel } from '../../inventory/inventory-assignment/inventory-assignment.model';
 import { ITEM_TYPES } from '../../inventory/inventory-master/inventory-master.constants';
@@ -434,7 +436,45 @@ const search = async (filters: ISearchCampQuery, ctx: RequestContext, options?: 
 
     const [count, items] = await Promise.all([countPromise, dataPromise]);
 
-    return { count, items };
+    //  optional report — per-camp patient counts (from screenings) for this page, one batched aggregate
+    const stats = filters.report === 'true' ? await getCampPatientStats(items) : undefined;
+
+    return { count, items, stats };
+};
+
+// per-camp patient counts from the screenings collection — one screening = one patient at that camp
+// (unique per tenant,patient,camp). The camp ids come from the already-scoped search page, and a
+// screening's camp is within the same tenant, so a plain $in can't leak another tenant's screenings.
+type CampStats = { patients: number; patientsCompleted: number };
+const getCampPatientStats = async (camps: HydratedDocument<ICamp>[]): Promise<Record<string, CampStats>> => {
+    const campIds = camps.map((c) => c._id);
+    const stats: Record<string, CampStats> = {};
+    for (const id of campIds) {
+        stats[id.toString()] = { patients: 0, patientsCompleted: 0 };
+    }
+    if (!campIds.length) {
+        return stats;
+    }
+    const groups = await ScreeningModel.aggregate([
+        { $match: { camp: { $in: campIds } } },
+        {
+            $group: {
+                _id: '$camp',
+                patients: { $sum: 1 },
+                patientsCompleted: {
+                    $sum: { $cond: [{ $eq: ['$status', SCREENING_STATUS.COMPLETED] }, 1, 0] },
+                },
+            },
+        },
+    ]);
+    for (const g of groups) {
+        const entry = stats[g._id?.toString()];
+        if (entry) {
+            entry.patients = g.patients;
+            entry.patientsCompleted = g.patientsCompleted;
+        }
+    }
+    return stats;
 };
 
 const create = async (model: ICreateCampPayload, ctx: RequestContext): Promise<HydratedDocument<ICamp>> => {

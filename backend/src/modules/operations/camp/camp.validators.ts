@@ -136,6 +136,8 @@ export const SearchCampQuerySchema = z.object({
     // date range — either bound is optional, so you can filter from a date, up to a date, or between
     dateFrom: z.coerce.date().optional().openapi({ example: '2026-08-01' }),
     dateTo: z.coerce.date().optional().openapi({ example: '2026-08-31' }),
+    // opt-in: attach per-camp patient counts (from screenings) to each row — one batched aggregate, no N+1
+    report: z.enum(['true']).optional().openapi({ example: 'true' }),
     page: z.string().optional().openapi({ example: '1' }),
     limit: z.string().optional().openapi({ example: '10' }),
 });

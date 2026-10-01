@@ -50,11 +50,12 @@ export const CampMapper = {
         };
         return result;
     },
-    toSearchResponse: (data: { count: number; items: any[] }, ctx: RequestContext) => {
+    toSearchResponse: (data: { count: number; items: any[]; stats?: Record<string, { patients: number; patientsCompleted: number }> | undefined }, ctx: RequestContext) => {
         const result = {
             count: data?.count || 0,
             items: [] as any[],
         };
+        const stats = data?.stats;
         for (const camp of data?.items || []) {
             // NOTE: independent from toResponse on purpose — search rows can be
             // trimmed to a lighter subset later without affecting GET /:id.
@@ -103,6 +104,10 @@ export const CampMapper = {
                 createdAt: camp.createdAt,
                 updatedAt: camp.updatedAt,
             };
+            // opt-in patient counts (only present when the search was called with report=true)
+            if (stats) {
+                item.stats = stats[camp._id?.toString()] || { patients: 0, patientsCompleted: 0 };
+            }
             result.items.push(item);
         }
         return result;

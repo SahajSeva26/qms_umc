@@ -310,7 +310,53 @@ existing update endpoint is an acceptable stand-in — not built either way this
 
 ---
 
-# ⏸️ RESUME HERE (paused 2026-09-29, continue 2026-09-30)
+# ⏸️ RESUME HERE (paused 2026-10-01 — continue 2026-10-02)
+
+**Update 2026-10-01 — latest frontend brief reconciled + first bug fixed.** A newer frontend brief
+arrived with two whole new modules (**Pharma Portals** — MR portal only, and **Doctor Management**) and
+a much-expanded **Inventory** list, plus TWO bugs found on work we'd marked "done": (1) the Project
+Types breakdown ObjectId-cast bug — **✅ FIXED today** (see Client Management #4 below; `project.service.ts`
+`tenant`/`division`/`lead`/`salesRep` filters now `toObjectId()`-wrapped, `tsc` clean, UNCOMMITTED), and
+(2) a CRM follow-ups own-scope gap (`getLeadActivityStats()` has NO appointment-level permission scoping —
+any `lead:search` caller gets full appointment counts) — **WON'T FIX for now (user decision 2026-10-01):**
+they're aggregate counts, not real appointment data; accepted (revisit only if the tiles become
+click-through to the appointments). Also done today: the Project `report()`-vs-`search()` own-scope
+inconsistency (narrow-the-report). The full new-module gap list lives in memory `ui-revisions-tracker.md`;
+this progress doc's "done" pointers were left intact per the user. **Also done 2026-10-01 (all committed
+except where noted):** Pharma non-live-booking block (`POST /camps/book` rejects a non-`live` project with
+409 — committed `b4cdf1e`); Project ObjectId cast fix (committed `6d17659`) + Project `report()` own-scope
+(committed `808fcdf`); **CRM Invoicing `/invoices/report`** (global-by-default pipeline totals + per-status
+breakdown) **and Invoice-card subtitle/`lineItemCount`** (partial — Client·Division·PO + N-camps done; addl
+patients/void/FOC blocked on missing fields) — these two invoice items are the current UNCOMMITTED set.
+Pharma Portals + Doctor Management + expanded Inventory are new modules from the latest brief and live only
+in memory `ui-revisions-tracker.md` (this on-disk doc predates them). Next buildable invoice-direct item:
+FOC camps (`foc`/`focReason` on InvoiceLineItem).
+
+**── 2026-10-01 full session done-list (authoritative) ──**
+*Committed:* `6d17659` Project ObjectId cast · `808fcdf` Project `report()` own-scope · `b4cdf1e` Camp
+non-live booking block (409) · `73304b5` Invoice `/invoices/report` + card subtitle/`lineItemCount`.
+*Uncommitted (`tsc` clean):*
+- **Camp status-scoped report** — optional `status` on `CampReportQuerySchema` → `report()` `$match` (byType chips scope to a tab).
+- **Camp patient-count stat** — `report=true` on camp search → per-row `stats:{patients,patientsCompleted}` from the **screening** collection (KEY FINDING: actual patients are derivable, not a missing Camp field). Unblocks camp drawer/card patients, CRM additional-patient-billing dependency.
+- **Doctor camp count + patients** — `report=true` on doctor search → per-row `stats:{camps,patients,patientsCompleted}`; camps via `Camp.doctor`, patients via a 2-hop `$lookup` camps→screenings.
+*Decisions/deferrals today:* CRM follow-ups appointment-scope → **WON'T FIX** (counts only); Inventory device-calibration → **DEFERRED** (frontend uses the existing `update` endpoint; the movement ledger genuinely doesn't fit a calibration event); Tally/`tallyInvoiceNo` → deferred; FOC camps → not started (next invoice-direct item).
+*Still blocked (no model):* Rx count, ★ ratings, camp photos — surface across camp drawer / doctor card / pharma dashboard.
+
+**── NEXT (resume 2026-10-02) ──**
+*First thing:* commit the uncommitted batch (5 backend changes below + this doc + memory). All `tsc` clean.
+Uncommitted files: `camp.{validators,service,mapper}.ts`, `doctor.{validators,service,mapper}.ts`,
+`inventory-consumable.{service,mapper}.ts`.
+*Easy ones remaining (both parked):* consumable `storage` field (trivial, user said "later"); camp
+tests-performed count (not actually in the brief — skip unless wanted). **The easy vein is otherwise done.**
+*Medium (next real work):* **FOC camps** (line-add path first — `foc`/`focReason` on InvoiceLineItem,
+`amount=0`; problem statement already written below under CRM Invoicing); **additional-patient billing**
+(now partially unblocked — patient count is derivable from screenings; still needs `addlPatientRate` on
+Project + a 2nd line-item kind).
+*Large / decision:* **Multi-PO** (Project model change — also unblocks invoice PO-matching/VOID);
+**Item Master drawer Option A vs B** (needs a product decision, not code).
+*Key finding to remember:* actual patient/test counts are **derivable from the `screening`/`test` modules**
+— NOT missing Camp fields (the brief assumed they were). Rx/★/photos remain truly modelless.
+
 
 **Done this session (backend, branch `fixes/feedback`, ALL UNCOMMITTED, `tsc` clean):**
 - **Client Management** — module complete (already committed earlier: MR count, invoice tenant filter,
@@ -390,10 +436,21 @@ Legend: ✅ DONE · 🟡 PARTIAL · ⬜ NOT DONE
    can't override their own scope). ⬜ NOT DONE: an accurate billed/outstanding *total number*
    (needs an `/invoices/report` aggregation — see the CRM Invoicing pointer).
    Files: `invoice.validators.ts`, `invoice.service.ts`.
-4. **Project Types breakdown** — ✅ DONE. Added a `report=true` flag to **project search** →
-   top-level `report.byType` (count per `PROJECT_TYPES` value, over the whole scoped/filtered set;
-   multi-type project counted once per type it carries). Frontend maps the 5 values onto its
-   Screening/Diet/Lab/Mixed tiles.
+4. **Project Types breakdown** — ✅ DONE, **+ bug fixed 2026-10-01**. Added a `report=true` flag to
+   **project search** → top-level `report.byType` (count per `PROJECT_TYPES` value, over the whole
+   scoped/filtered set; multi-type project counted once per type it carries). Frontend maps the 5
+   values onto its Screening/Diet/Lab/Mixed tiles.
+   **BUG (found by frontend, confirmed + fixed 2026-10-01, UNCOMMITTED, `tsc` clean):** `search()`
+   assigned ObjectId-field filters as RAW STRINGS. `Project.find()` auto-casts (so the list query was
+   fine), but `report.byType`'s `Project.aggregate([{ $match: where }])` does NOT auto-cast → the
+   `$match` compared a string against ObjectId fields and matched nothing → `byType` silently returned
+   all-zero counts for any `tenant`-scoped `report=true` call (live repro: a tenant showed "Projects: 2"
+   in the KPI strip but "No projects yet" in the Project Types tile — the KPI number comes from the
+   correctly-cast `getTenantStats()`, the tile from this uncast search-report path). Fixed by wrapping
+   the ObjectId-field filters in the file's existing `toObjectId()` helper — `tenant` (line ~181),
+   `division` (~196), `lead` (~199), `salesRep` (~202); `status`/`therapy` left as-is (string fields,
+   no cast needed). `stats.executedCamps` was never affected (it keys off already-fetched project ids).
+   Frontend's tile (reverted to "Coming soon" until this landed) re-wires once confirmed.
    Files: `project.validators.ts`, `project.service.ts`, `project.mapper.ts`.
 5. **Search by city** — ✅ DONE (+ state). Added separate `city` and `state` regex filters to tenant
    search (`address.city` / `address.state`, case-insensitive).
@@ -433,10 +490,19 @@ Legend: ✅ DONE · 🟡 PARTIAL · ⬜ NOT DONE
    a company name matching more tenants than that cap would silently drop those projects. Make the
    no-limit explicit (or fetch ids with a lean scoped query) before shipping this.
    Files (if built): `project.validators.ts`, `project.service.ts`.
-4. **`report()` vs `search()` own-scope inconsistency** — ⬜ DEFERRED (**LATER REFACTOR**, user's call
-   2026-09-29). Standalone `report()` (`project.service.ts:354`) matches only `ctx.where()`; `search()`
-   applies `applyOwnScope()`. Recommended fix when picked up: make `report()` also apply
-   `applyOwnScope()` (align KPIs to the table) — ~2 lines. Same bug also open in Camp Management (below).
+4. **`report()` vs `search()` own-scope inconsistency** — ✅ DONE (2026-10-01, UNCOMMITTED, `tsc` clean).
+   Standalone `report()` (`project.service.ts:354`) matched only `ctx.where()`; `search()` also applies
+   `applyOwnScope()`, so a scoped user's KPI tiles counted projects wider than the list they could see
+   (customer actor narrowed to own division / non-manager platform rep narrowed to own salesRep — but
+   only the list narrowed, not the report). Reachable by `project:manage` OR `tenant:manage` (route
+   guard is OR); a plain `project:manage` actor is a no-op for `applyOwnScope` so was never affected —
+   the real cases are a **customer `tenant:manage`** actor and a **platform `tenant:manage`-without-
+   `project:manage`** actor. Fixed by building the `where` the same way `search()` does
+   (`{ ...ctx.where() }` + `applyOwnScope(where, ctx)`) and `$match`-ing on it — reuses the list's exact
+   own-scoping (no new logic; can only make report MORE consistent, never diverge) and is ObjectId-safe
+   (`applyOwnScope` already `toObjectId()`-casts). Chose narrow-the-report over widen-the-search: the
+   security-safe direction (never exposes more rows to a scoped user). **Same bug still open in Camp
+   Management** (`camp.report()`) — left for the Camp module pass. File: `project.service.ts`.
 
 ## CRM — ⬜ NOT STARTED
 
@@ -458,6 +524,16 @@ Legend: ✅ DONE · 🟡 PARTIAL · ⬜ NOT DONE
   Own-scoped via the same `where` as the list. No model change (`Appointment.lead` ref already exists).
   Note: this is on the **search** endpoint, distinct from the existing `GET /leads/report` summary
   facet. `tsc` clean. Files: `lead.validators.ts`, `lead.service.ts`, `lead.mapper.ts`.
+  **Follow-ups own-scope (appointment-level permission) — WON'T FIX for now (user decision 2026-10-01).**
+  The newer frontend brief flagged that `getLeadActivityStats()` applies NO appointment-level permission
+  scoping — any `lead:search` caller gets full appointment/MoM/follow-up counts regardless of
+  appointment-read authority (an `appointment:search`-only rep would normally see only appointments they
+  own/attend). **User's call: leave it** — these are aggregate COUNTS (a number), not actual appointment
+  data (no agenda/contact/notes exposed), and the counts only ever appear on leads the caller can already
+  see (leads stay own-scoped). It's a count-level exposure only, accepted. ⚠️ REVISIT IF the count tiles
+  ever become click-through/drill-downs to the real appointments — that would expose real data and the
+  3-way scope check (manager → full / `appointment:search`-only → own+attended / no-appointment-read →
+  omit) becomes necessary. No code change.
 - Filter bar search scope — ✅ DONE (2026-09-29). Added **separate** `code` (regex) + `focusTherapy`
   (regex, matches any therapy in the lead's list) search filters to lead search (`title` already
   existed). **NO combined `q`/`$or` box** — frontend combines the fields client-side. Ref-name matching
@@ -535,33 +611,70 @@ Legend: ✅ DONE · 🟡 PARTIAL · ⬜ NOT DONE
 - Tele Consultation tab (no teleconsult type/flag) — 🗣️ NEEDS DISCUSSION → resolve later (user's call
   2026-09-30). No teleconsultation type or flag exists on the Camp model (`CampType` = screening/diet/
   lab only). A real missing feature, not a filter to add. Field/type decision owed.
-- Per-tab type-breakdown status-scoped report — ⏸️ DEFERRED / TODO (user's call 2026-09-30). Solution
-  is known + small: add an optional `status` param to `CampReportQuerySchema` + `report()`'s `$match`
-  so the byType chips scope to the current tab (frontend then calls report twice — once unscoped for
-  the tab strip, once with `?status=<tab>` for the chip row). Parked, not built.
-- Camp drawer 4-tile KPI row (patients/rx/feedback/FO rating fields) — 🗣️ NEEDS DISCUSSION → resolve
-  later (user's call 2026-09-30). Needs 4 new Camp fields (patients done / Rx count / patient feedback
-  rating / FO rating); only `patientExpectation` (the target) exists today. Shares the patient-count
-  root with the 9-way taxonomy + the CRM Invoicing additional-patient-billing pointer. Field decision owed.
+- Per-tab type-breakdown status-scoped report — ✅ DONE (2026-10-01, UNCOMMITTED, `tsc` clean). Added
+  an optional `status` to `CampReportQuerySchema` + folded it into `report()`'s `$match`
+  (`{ ...ctx.where(), ...(status ? { status } : {}) }`) so the whole report (incl. the byType chip row)
+  scopes to one tab. Frontend calls report twice — once unscoped for the tab-strip totals, once with
+  `?status=<tab>` for that tab's chip row. Controller already parsed+passed the query (was an empty
+  schema), routes schema-driven → no change there. Files: `camp.validators.ts`, `camp.service.ts`.
+  ⬜ Frontend wires the second `?status=` call for the chip row.
+- Camp drawer 4-tile KPI row (patients/rx/feedback/FO rating fields) — 🟡 PARTIAL (2026-10-01).
+  **KEY FINDING: the brief was wrong that actual patient count needs a new Camp field.** The backend
+  already has a `screening` module (one `Screening` = one patient at a camp, unique per tenant/patient/
+  camp) — so **actual patients are DERIVABLE, no schema change.** ✅ DONE (UNCOMMITTED, `tsc` clean):
+  opt-in `report=true` on camp SEARCH → each row carries `stats:{patients, patientsCompleted}` via one
+  batched `ScreeningModel.aggregate([{$match:{camp:{$in:ids}}}, {$group:...}])` (`patients` = all
+  screenings, `patientsCompleted` = status `completed`); same per-row pattern as doctor/invoice, no N+1,
+  scoping inherited from the page. This unblocks the drawer "Patients done/expected + %", the card "Done %",
+  Doctor "Patients" stat, Pharma "Total Patients", AND the CRM additional-patient-billing dependency.
+  Files: `camp.{validators,service,mapper}.ts`. ⬜ Still genuinely blocked (no model): **Rx count** (no
+  prescription model — tests ≠ Rx), **★ feedback/FO rating** (no rating model), **camp photos/report URLs**.
+  ⬜ Frontend reads `stats` into the tiles.
 
-## CRM Invoicing — ⬜ NOT STARTED
+## CRM Invoicing — 🟡 IN PROGRESS (2 done 2026-10-01; rest blocked/deferred)
 
+- Pipeline KPI strip totals (`/invoices/report`) — ✅ DONE (2026-10-01, UNCOMMITTED, `tsc` clean).
+  New `GET /invoices/report` mirroring `project.report()`/`camp.report()` — one `$facet` aggregation
+  returning `{ totalInvoices, totalInvoiced, statusCounts:[{status,count,total}] }`. **Global by default
+  for a platform actor** (`ctx.where()` returns `{}` for PLATFORM tenant type) / own-tenant for a customer;
+  **optional** `tenant`/`project`/`dateFrom`/`dateTo` filters narrow it for detail views (Option A, user's
+  call) — `tenant` honoured only if not already pinned, `tenant`/`project` `toObjectId()`-cast for the
+  `$match`. Route registered BEFORE `/:id`, guard `[invoice:search, invoice:manage, tenant:manage]` +
+  `reportRateLimiter`. Shape verified against `InvoicePipelineKpiStrip.tsx` — its 4 tiles (Total invoiced /
+  Pending approval / Payment outstanding / Payment cleared) all derive from `statusCounts` + `totalInvoiced`.
+  ⬜ Frontend still wires it (switch the strip from page-array sums to the report). Files:
+  `invoice.{validators,service,controller,routes}.ts`.
+- Invoice card richer subtitle + stats line — 🟡 PARTIAL (2026-10-01, UNCOMMITTED, `tsc` clean).
+  **Done (backable):** extended the invoice `project` populate to `name code status division executionMode`
+  + nested-populate `division {name,code}` → feeds the card's **Client · Division · PO** subtitle (Client =
+  already-populated `tenant`, Division = `project.division`, PO = `project.executionMode.poNumber`); added a
+  batched per-invoice **`lineItemCount`** (one `InvoiceLineItemModel` aggregate grouped by invoice, no N+1) →
+  the card's **N camps** stat. Tally = existing `syncToTally`. **Blocked (card omits these — no backing
+  field):** N addl patients (needs Camp actual-patient-count), N void (needs Multi-PO/VOID), N FOC (needs the
+  FOC field — pointer below). ⬜ Frontend extends `InvoicePopulatedProject` type (division/executionMode) +
+  reads `lineItemCount`. Files: `invoice.service.ts`, `invoice.mapper.ts`.
+- Tally invoice number capture (`tallyInvoiceNo`) — ⏸️ DEFERRED (user's call 2026-10-01: Tally is "for
+  later" — both the `syncToTally` push and the number capture stay pending).
 - PO-quantity matching + VOID overflow — ⬜ NOT DONE (depends on Multi-PO model).
-- FOC camps — ⬜ NOT DONE.
-- Additional-patient billing — ⬜ NOT DONE.
-- Chargeability-approval workflow — ⬜ NOT DONE.
-- Tally invoice number capture (`tallyInvoiceNo`) — ⬜ NOT DONE.
-- GRN signed-copy capture — ⬜ NOT DONE.
-- Per-camp remarks thread — ⬜ NOT DONE.
+- FOC camps — ⬜ NOT DONE (next buildable invoice-direct item: `foc`/`focReason` on InvoiceLineItem).
+- Additional-patient billing — ⬜ NOT DONE (needs Camp patient-count + Project rate).
+- Chargeability-approval workflow — ⬜ NOT DONE (new state machine on Camp).
+- GRN signed-copy capture — ⬜ NOT DONE (finance-flow adjacent; maybe deferred with Tally).
+- Per-camp remarks thread — ⬜ NOT DONE (on Camp model).
 - Excel / photo-collage export (client-side; no backend) — ⬜ NOT DONE.
-- Pipeline KPI strip totals (`/invoices/report`) — ⬜ NOT DONE.
-- Invoice card richer subtitle + stats line — ⬜ NOT DONE.
 
 ## Inventory Management — ⬜ NOT STARTED
 
 - Vendor scorecard (scores/complaint/price-history) — ⬜ NOT DONE (no backing model).
-- Device calibration action (`PATCH .../calibrate` + ledger entry) — ⬜ NOT DONE. (Ledger module
-  exists and can be reused.)
+- Device calibration action (`PATCH .../calibrate` + ledger entry) — ⏸️ DEFERRED (user decision
+  2026-10-01): **frontend will handle it via the existing `update` endpoint** (send
+  `lastCalibrationDate`/`nextCalibrationDate` through `PUT /inventory-devices/:id` — both are already
+  editable there). Not necessary to build a dedicated action now. **Correction to the brief's "reuse
+  the existing ledger" suggestion:** the `InventoryLedger` is a STOCK-MOVEMENT record — it *requires*
+  `quantity`/`fromLocation`/`toLocation`/`type`(refill/return)/`itemType`/`inventory`. A calibration is
+  not a movement, so it does NOT fit the ledger without faking those fields; if an audit trail is ever
+  wanted, a small dedicated calibration-log is the right home, not the movement ledger. No backend
+  change this pass.
 
 ---
 

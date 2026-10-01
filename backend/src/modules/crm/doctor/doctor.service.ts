@@ -18,6 +18,9 @@ import { IServiceOptions } from '../../../shared/types/service.types';
 import { TENANT_TYPE } from '../../access-management/tenant/tenant.constants';
 import { TenantService } from '../../access-management/tenant/tenant.service';
 import { DivisionService } from '../division/division.service';
+import { CampModel } from '../../operations/camp/camp.model';
+import { ScreeningModel } from '../../operations/screening/screening.model';
+import { SCREENING_STATUS } from '../../operations/screening/screening.constants';
 import { CsvHelper } from '../../../shared/helpers/csvHelper';
 import { processInBatches } from '../../../shared/utils/batchProcessor';
 
@@ -146,7 +149,66 @@ const search = async (filters: ISearchDoctorQuery, ctx: RequestContext, options?
 
     const [count, items] = await Promise.all([countPromise, dataPromise]);
 
-    return { count, items };
+    //6: optional report — per-doctor camp + patient counts for this page (one batched aggregate, no N+1)
+    const stats = filters.report === 'true' ? await getDoctorStats(items) : undefined;
+
+    return { count, items, stats };
+};
+
+// per-doctor camp count + patients-seen for the doctors on the page. The doctor ids are already
+// tenant/division-scoped (ctx.where + own-scope), and a doctor belongs to exactly one tenant, so a
+// plain $in over Camp.doctor can't leak another tenant's data. Camps = all camps referencing the
+// doctor; patients = screenings across those camps (one screening = one patient at a camp).
+type DoctorStats = { camps: number; patients: number; patientsCompleted: number };
+const getDoctorStats = async (doctors: HydratedDocument<IDoctor>[]): Promise<Record<string, DoctorStats>> => {
+    const doctorIds = doctors.map((d) => d._id);
+    const stats: Record<string, DoctorStats> = {};
+    for (const id of doctorIds) {
+        stats[id.toString()] = { camps: 0, patients: 0, patientsCompleted: 0 };
+    }
+    if (!doctorIds.length) {
+        return stats;
+    }
+    // base the pipeline on the doctor's camps, then pull in each camp's screenings — bounded to a page
+    // of doctors' camps, not a scan of the whole screenings collection.
+    const groups = await CampModel.aggregate([
+        { $match: { doctor: { $in: doctorIds } } },
+        {
+            $lookup: {
+                from: ScreeningModel.collection.name,
+                localField: '_id',
+                foreignField: 'camp',
+                as: 'screenings',
+            },
+        },
+        {
+            $group: {
+                _id: '$doctor',
+                camps: { $sum: 1 },
+                patients: { $sum: { $size: '$screenings' } },
+                patientsCompleted: {
+                    $sum: {
+                        $size: {
+                            $filter: {
+                                input: '$screenings',
+                                as: 's',
+                                cond: { $eq: ['$$s.status', SCREENING_STATUS.COMPLETED] },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    ]);
+    for (const g of groups) {
+        const entry = stats[g._id?.toString()];
+        if (entry) {
+            entry.camps = g.camps;
+            entry.patients = g.patients;
+            entry.patientsCompleted = g.patientsCompleted;
+        }
+    }
+    return stats;
 };
 
 // findNearest returns doctors within a FIXED 35km radius of the target point, nearest first.

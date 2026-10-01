@@ -30,6 +30,14 @@ import { ALLOWED_ROLETYPE_CODES } from '../../access-management/role-type/roleTy
 import { RoleModel } from '../../access-management/role/role.model';
 import { TENANT_TYPE } from '../../access-management/tenant/tenant.constants';
 import { InventoryMasterService } from '../../inventory/inventory-master/inventory-master.service';
+import { Project } from '../../crm/project/project.model';
+import { PROJECT_STATUS } from '../../crm/project/project.constants';
+import { TestMasterModel } from '../testMaster/testMaster.model';
+import { ScreeningModel } from '../screening/screening.model';
+import { SCREENING_STATUS } from '../screening/screening.constants';
+import { InventoryMasterModel } from '../../inventory/inventory-master/inventory-master.model';
+import { InventoryAssignmentModel } from '../../inventory/inventory-assignment/inventory-assignment.model';
+import { ITEM_TYPES } from '../../inventory/inventory-master/inventory-master.constants';
 
 type CampDocument = HydratedDocument<ICamp> | null;
 
@@ -173,6 +181,31 @@ const nearestFoProfilesGlobal = async (lng: number, lat: number, limit = 100): P
 
 // nearest FO within their own coverage who is not already booked that day. 422 (no coordinates /
 // nobody covers) or 409 (everyone nearby booked) on failure. FO lookup + clash are both GLOBAL.
+// The device catalog items (InventoryMaster ids) a project's camp needs to run — gathered from the
+// consumption list of every TestMaster the project uses, then narrowed to DEVICES only (consumables
+// aren't gated here; they're drawn down at test time). Empty ⇒ the project imposes no device need.
+const projectRequiredDeviceItemIds = async (projectId: any): Promise<string[]> => {
+    if (!projectId) {
+        return [];
+    }
+    const project: any = await Project.findById(projectId).select('tests').lean();
+    const testIds: any[] = project?.tests || [];
+    if (!testIds.length) {
+        return [];
+    }
+    const tests = await TestMasterModel.find({ _id: { $in: testIds } }).select('consumption').lean();
+    const itemIds = [
+        ...new Set(
+            tests.flatMap((test: any) => (test.consumption || []).map((line: any) => line.item?.toString()).filter(Boolean)),
+        ),
+    ];
+    if (!itemIds.length) {
+        return [];
+    }
+    const devices = await InventoryMasterModel.find({ _id: { $in: itemIds }, type: ITEM_TYPES.DEVICE }).select('_id').lean();
+    return devices.map((device: any) => device._id.toString());
+};
+
 const resolveNearestFreeFoRole = async (camp: HydratedDocument<ICamp>, ctx: RequestContext): Promise<any> => {
     const coordinates = (camp.location as any)?.coordinates as number[] | undefined;
     if (!coordinates || coordinates.length !== 2) {
@@ -186,13 +219,52 @@ const resolveNearestFreeFoRole = async (camp: HydratedDocument<ICamp>, ctx: Requ
         return throwAppError('No field officer covers this camp location', StatusCodes.UNPROCESSABLE_ENTITY);
     }
 
+    // nearest FOs (distance order) not already booked on this date + overlapping slot
     const booked = await bookedFoRoleIdsOnDate(camp.date, (camp as any).timeSlot, ctx, camp._id);
-    const free = items.find((profile: any) => !booked.includes(profile.role?.toString()));
-    if (!free) {
+    const freeProfiles = items.filter((profile: any) => !booked.includes(profile.role?.toString()));
+    if (!freeProfiles.length) {
         return throwAppError('All field officers near this camp are already booked on this date and time slot', StatusCodes.CONFLICT);
     }
 
-    return free.role;
+    // device gate — the auto-allocated FO must physically hold EVERY device the project's tests need.
+    // (Only this auto-allocation path is gated; an FO supplied explicitly by internal staff is trusted.)
+    // No device requirement ⇒ nearest free FO wins, exactly as before.
+    const requiredDeviceItems = await projectRequiredDeviceItemIds(camp.project);
+    if (!requiredDeviceItems.length) {
+        return freeProfiles[0].role;
+    }
+
+    // one batched read of the free FOs' assigned devices → roleId → set of device catalog-item ids
+    const assignments = await InventoryAssignmentModel.find({
+        assignee: { $in: freeProfiles.map((profile: any) => profile.role) },
+        inventoryType: 'InventoryDevice',
+    })
+        .populate({ path: 'inventory', select: 'item' })
+        .lean();
+
+    const heldByRole = new Map<string, Set<string>>();
+    for (const assignment of assignments) {
+        const roleId = assignment.assignee?.toString();
+        const itemId = (assignment.inventory as any)?.item?.toString();
+        if (!roleId || !itemId) {
+            continue;
+        }
+        if (!heldByRole.has(roleId)) {
+            heldByRole.set(roleId, new Set());
+        }
+        heldByRole.get(roleId)!.add(itemId);
+    }
+
+    // nearest free FO whose assigned devices cover every required item
+    const equipped = freeProfiles.find((profile: any) => {
+        const held = heldByRole.get(profile.role?.toString());
+        return held && requiredDeviceItems.every((itemId) => held.has(itemId));
+    });
+    if (!equipped) {
+        return throwAppError('No nearby field officer holds all the devices this project requires', StatusCodes.CONFLICT);
+    }
+
+    return equipped.role;
 };
 
 // resolve an MR + its chain (asm = mr.supervisor, rsm = asm.supervisor). Loaded under ctx.where()
@@ -364,7 +436,45 @@ const search = async (filters: ISearchCampQuery, ctx: RequestContext, options?: 
 
     const [count, items] = await Promise.all([countPromise, dataPromise]);
 
-    return { count, items };
+    //  optional report — per-camp patient counts (from screenings) for this page, one batched aggregate
+    const stats = filters.report === 'true' ? await getCampPatientStats(items) : undefined;
+
+    return { count, items, stats };
+};
+
+// per-camp patient counts from the screenings collection — one screening = one patient at that camp
+// (unique per tenant,patient,camp). The camp ids come from the already-scoped search page, and a
+// screening's camp is within the same tenant, so a plain $in can't leak another tenant's screenings.
+type CampStats = { patients: number; patientsCompleted: number };
+const getCampPatientStats = async (camps: HydratedDocument<ICamp>[]): Promise<Record<string, CampStats>> => {
+    const campIds = camps.map((c) => c._id);
+    const stats: Record<string, CampStats> = {};
+    for (const id of campIds) {
+        stats[id.toString()] = { patients: 0, patientsCompleted: 0 };
+    }
+    if (!campIds.length) {
+        return stats;
+    }
+    const groups = await ScreeningModel.aggregate([
+        { $match: { camp: { $in: campIds } } },
+        {
+            $group: {
+                _id: '$camp',
+                patients: { $sum: 1 },
+                patientsCompleted: {
+                    $sum: { $cond: [{ $eq: ['$status', SCREENING_STATUS.COMPLETED] }, 1, 0] },
+                },
+            },
+        },
+    ]);
+    for (const g of groups) {
+        const entry = stats[g._id?.toString()];
+        if (entry) {
+            entry.patients = g.patients;
+            entry.patientsCompleted = g.patientsCompleted;
+        }
+    }
+    return stats;
 };
 
 const create = async (model: ICreateCampPayload, ctx: RequestContext): Promise<HydratedDocument<ICamp>> => {
@@ -627,6 +737,11 @@ const book = async (model: IBookCampPayload, ctx: RequestContext): Promise<Hydra
     if (!project) {
         return throwAppError('Project not found', StatusCodes.NOT_FOUND);
     }
+    // only a LIVE project accepts bookings — a new/hold/closed project is not bookable (its state can
+    // change later, so this is a conflict, not a permission denial). Pharma booking path only.
+    if (project.status !== PROJECT_STATUS.LIVE) {
+        return throwAppError('This project is not live and cannot be booked', StatusCodes.CONFLICT);
+    }
     assertRoleTypeCanBookProject(project, ctx);
 
     //5: hand off to create() — tenant from ctx, division from the MR, only the MR passed through
@@ -652,9 +767,13 @@ const book = async (model: IBookCampPayload, ctx: RequestContext): Promise<Hydra
 
 const report = async (filters: ICampReportQuery, ctx: RequestContext) => {
     //1: single aggregation, single collection scan — every branch is independent, computed off the
-    // same scoped input set.
+    // same scoped input set. An optional `status` narrows the whole report (incl. byType) to one tab.
+    const where: any = { ...ctx.where() };
+    if (filters.status) {
+        where.status = filters.status;
+    }
     const [result] = await CampModel.aggregate([
-        { $match: ctx.where() },
+        { $match: where },
         {
             $facet: {
                 totalCamps: [{ $count: 'count' }],

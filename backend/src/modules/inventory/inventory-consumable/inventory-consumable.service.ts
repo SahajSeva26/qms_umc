@@ -209,6 +209,11 @@ const adjustQuantity = async (id: string, delta: number, ctx: RequestContext): P
 //    INDEPENDENT of the stored `expired` status, so an active lot past its expiry still counts. $lt (not $lte).
 const report = async (_filters: IInventoryConsumableReportQuery, _ctx: RequestContext) => {
     const now = new Date();
+    // FEFO expiry-band boundaries — computed here, passed into the aggregation as fixed dates
+    const DAY = 24 * 60 * 60 * 1000;
+    const in30 = new Date(now.getTime() + 30 * DAY);
+    const in90 = new Date(now.getTime() + 90 * DAY);
+    const in180 = new Date(now.getTime() + 180 * DAY);
 
     const [result] = await InventoryConsumableModel.aggregate([
         {
@@ -219,7 +224,14 @@ const report = async (_filters: IInventoryConsumableReportQuery, _ctx: RequestCo
                     { $match: { status: INVENTORY_CONSUMABLE_STATUS.ACTIVE } },
                     { $group: { _id: null, total: { $sum: '$quantity' } } },
                 ],
+                // FEFO expiry bands — count all lots (no status filter, matching expiredByDate). A lot
+                // with no expiryDate is NOT placed in any date band; it's reported separately as noExpiry.
                 expiredByDate: [{ $match: { expiryDate: { $lt: now } } }, { $count: 'count' }],
+                within30: [{ $match: { expiryDate: { $gte: now, $lt: in30 } } }, { $count: 'count' }],
+                within30to90: [{ $match: { expiryDate: { $gte: in30, $lt: in90 } } }, { $count: 'count' }],
+                within90to180: [{ $match: { expiryDate: { $gte: in90, $lt: in180 } } }, { $count: 'count' }],
+                beyond180: [{ $match: { expiryDate: { $gte: in180 } } }, { $count: 'count' }],
+                noExpiry: [{ $match: { expiryDate: null } }, { $count: 'count' }],
             },
         },
     ]);
@@ -229,6 +241,15 @@ const report = async (_filters: IInventoryConsumableReportQuery, _ctx: RequestCo
         consumableByStatus: result?.byStatus || [],
         warehouseConsumableQuantity: result?.activeQuantity?.[0]?.total || 0,
         expiredByDate: result?.expiredByDate?.[0]?.count || 0,
+        // the 5 FEFO expiry bands + a separate no-expiry count
+        expiryBands: {
+            expired: result?.expiredByDate?.[0]?.count || 0,
+            within30: result?.within30?.[0]?.count || 0,
+            within30to90: result?.within30to90?.[0]?.count || 0,
+            within90to180: result?.within90to180?.[0]?.count || 0,
+            beyond180: result?.beyond180?.[0]?.count || 0,
+            noExpiry: result?.noExpiry?.[0]?.count || 0,
+        },
     };
 };
 

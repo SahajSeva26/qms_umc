@@ -332,6 +332,16 @@ Pharma Portals + Doctor Management + expanded Inventory are new modules from the
 in memory `ui-revisions-tracker.md` (this on-disk doc predates them). Next buildable invoice-direct item:
 FOC camps (`foc`/`focReason` on InvoiceLineItem).
 
+**── 2026-10-01 full session done-list (authoritative) ──**
+*Committed:* `6d17659` Project ObjectId cast · `808fcdf` Project `report()` own-scope · `b4cdf1e` Camp
+non-live booking block (409) · `73304b5` Invoice `/invoices/report` + card subtitle/`lineItemCount`.
+*Uncommitted (`tsc` clean):*
+- **Camp status-scoped report** — optional `status` on `CampReportQuerySchema` → `report()` `$match` (byType chips scope to a tab).
+- **Camp patient-count stat** — `report=true` on camp search → per-row `stats:{patients,patientsCompleted}` from the **screening** collection (KEY FINDING: actual patients are derivable, not a missing Camp field). Unblocks camp drawer/card patients, CRM additional-patient-billing dependency.
+- **Doctor camp count + patients** — `report=true` on doctor search → per-row `stats:{camps,patients,patientsCompleted}`; camps via `Camp.doctor`, patients via a 2-hop `$lookup` camps→screenings.
+*Decisions/deferrals today:* CRM follow-ups appointment-scope → **WON'T FIX** (counts only); Inventory device-calibration → **DEFERRED** (frontend uses the existing `update` endpoint; the movement ledger genuinely doesn't fit a calibration event); Tally/`tallyInvoiceNo` → deferred; FOC camps → not started (next invoice-direct item).
+*Still blocked (no model):* Rx count, ★ ratings, camp photos — surface across camp drawer / doctor card / pharma dashboard.
+
 
 **Done this session (backend, branch `fixes/feedback`, ALL UNCOMMITTED, `tsc` clean):**
 - **Client Management** — module complete (already committed earlier: MR count, invoice tenant filter,

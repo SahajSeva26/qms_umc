@@ -33,7 +33,7 @@ export const DoctorMapper = {
         }
         return result;
     },
-    toSearchResponse: (data: { count: number; items: any[]; stats?: Record<string, { camps: number }> | undefined }, ctx: RequestContext) => {
+    toSearchResponse: (data: { count: number; items: any[]; stats?: Record<string, { camps: number; patients: number; patientsCompleted: number }> | undefined }, ctx: RequestContext) => {
         const result = {
             count: data?.count || 0,
             items: [] as any[],
@@ -70,7 +70,7 @@ export const DoctorMapper = {
             }
             // opt-in camp-count stat (only present when the search was called with report=true)
             if (stats) {
-                item.stats = stats[doctor._id?.toString()] || { camps: 0 };
+                item.stats = stats[doctor._id?.toString()] || { camps: 0, patients: 0, patientsCompleted: 0 };
             }
             result.items.push(item);
         }

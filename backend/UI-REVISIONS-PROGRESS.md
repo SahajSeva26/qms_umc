@@ -317,10 +317,16 @@ arrived with two whole new modules (**Pharma Portals** — MR portal only, and *
 a much-expanded **Inventory** list, plus TWO bugs found on work we'd marked "done": (1) the Project
 Types breakdown ObjectId-cast bug — **✅ FIXED today** (see Client Management #4 below; `project.service.ts`
 `tenant`/`division`/`lead`/`salesRep` filters now `toObjectId()`-wrapped, `tsc` clean, UNCOMMITTED), and
-(2) a CRM follow-ups own-scope gap (`getLeadActivityStats()` has NO permission scoping — any `lead:search`
-caller gets full appointment counts) — **NOT yet fixed**, tracked in memory `ui-revisions-tracker.md`.
-The full new-module gap list lives in that memory file; this progress doc's "done" pointers were left
-intact per the user. Next easy candidates: the CRM scope bug, then the Pharma non-live-booking block.
+(2) a CRM follow-ups own-scope gap (`getLeadActivityStats()` has NO appointment-level permission scoping —
+any `lead:search` caller gets full appointment counts) — **WON'T FIX for now (user decision 2026-10-01):**
+they're aggregate counts, not real appointment data; accepted (revisit only if the tiles become
+click-through to the appointments). Also done today: the Project `report()`-vs-`search()` own-scope
+inconsistency (narrow-the-report). The full new-module gap list lives in memory `ui-revisions-tracker.md`;
+this progress doc's "done" pointers were left intact per the user. **Also fixed 2026-10-01: Pharma
+non-live-booking block** — `POST /camps/book` now rejects a non-`live` project with 409 (status gate in
+`book()` before the role-type check; `create()` untouched). Pharma Portals + Doctor Management + expanded
+Inventory are new modules from the latest brief and live only in memory `ui-revisions-tracker.md` (this
+on-disk doc predates them). Next easy candidate: CRM Invoicing small additive fields.
 
 
 **Done this session (backend, branch `fixes/feedback`, ALL UNCOMMITTED, `tsc` clean):**
@@ -489,6 +495,16 @@ Legend: ✅ DONE · 🟡 PARTIAL · ⬜ NOT DONE
   Own-scoped via the same `where` as the list. No model change (`Appointment.lead` ref already exists).
   Note: this is on the **search** endpoint, distinct from the existing `GET /leads/report` summary
   facet. `tsc` clean. Files: `lead.validators.ts`, `lead.service.ts`, `lead.mapper.ts`.
+  **Follow-ups own-scope (appointment-level permission) — WON'T FIX for now (user decision 2026-10-01).**
+  The newer frontend brief flagged that `getLeadActivityStats()` applies NO appointment-level permission
+  scoping — any `lead:search` caller gets full appointment/MoM/follow-up counts regardless of
+  appointment-read authority (an `appointment:search`-only rep would normally see only appointments they
+  own/attend). **User's call: leave it** — these are aggregate COUNTS (a number), not actual appointment
+  data (no agenda/contact/notes exposed), and the counts only ever appear on leads the caller can already
+  see (leads stay own-scoped). It's a count-level exposure only, accepted. ⚠️ REVISIT IF the count tiles
+  ever become click-through/drill-downs to the real appointments — that would expose real data and the
+  3-way scope check (manager → full / `appointment:search`-only → own+attended / no-appointment-read →
+  omit) becomes necessary. No code change.
 - Filter bar search scope — ✅ DONE (2026-09-29). Added **separate** `code` (regex) + `focusTherapy`
   (regex, matches any therapy in the lead's list) search filters to lead search (`title` already
   existed). **NO combined `q`/`$or` box** — frontend combines the fields client-side. Ref-name matching

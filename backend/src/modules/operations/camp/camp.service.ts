@@ -31,6 +31,7 @@ import { RoleModel } from '../../access-management/role/role.model';
 import { TENANT_TYPE } from '../../access-management/tenant/tenant.constants';
 import { InventoryMasterService } from '../../inventory/inventory-master/inventory-master.service';
 import { Project } from '../../crm/project/project.model';
+import { PROJECT_STATUS } from '../../crm/project/project.constants';
 import { TestMasterModel } from '../testMaster/testMaster.model';
 import { InventoryMasterModel } from '../../inventory/inventory-master/inventory-master.model';
 import { InventoryAssignmentModel } from '../../inventory/inventory-assignment/inventory-assignment.model';
@@ -695,6 +696,11 @@ const book = async (model: IBookCampPayload, ctx: RequestContext): Promise<Hydra
     const project = await ProjectService.get(model.project, ctx);
     if (!project) {
         return throwAppError('Project not found', StatusCodes.NOT_FOUND);
+    }
+    // only a LIVE project accepts bookings — a new/hold/closed project is not bookable (its state can
+    // change later, so this is a conflict, not a permission denial). Pharma booking path only.
+    if (project.status !== PROJECT_STATUS.LIVE) {
+        return throwAppError('This project is not live and cannot be booked', StatusCodes.CONFLICT);
     }
     assertRoleTypeCanBookProject(project, ctx);
 

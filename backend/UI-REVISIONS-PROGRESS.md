@@ -310,7 +310,7 @@ existing update endpoint is an acceptable stand-in — not built either way this
 
 ---
 
-# ⏸️ RESUME HERE (paused 2026-09-29, continue 2026-09-30)
+# ⏸️ RESUME HERE (paused 2026-10-01 — continue 2026-10-02)
 
 **Update 2026-10-01 — latest frontend brief reconciled + first bug fixed.** A newer frontend brief
 arrived with two whole new modules (**Pharma Portals** — MR portal only, and **Doctor Management**) and
@@ -341,6 +341,21 @@ non-live booking block (409) · `73304b5` Invoice `/invoices/report` + card subt
 - **Doctor camp count + patients** — `report=true` on doctor search → per-row `stats:{camps,patients,patientsCompleted}`; camps via `Camp.doctor`, patients via a 2-hop `$lookup` camps→screenings.
 *Decisions/deferrals today:* CRM follow-ups appointment-scope → **WON'T FIX** (counts only); Inventory device-calibration → **DEFERRED** (frontend uses the existing `update` endpoint; the movement ledger genuinely doesn't fit a calibration event); Tally/`tallyInvoiceNo` → deferred; FOC camps → not started (next invoice-direct item).
 *Still blocked (no model):* Rx count, ★ ratings, camp photos — surface across camp drawer / doctor card / pharma dashboard.
+
+**── NEXT (resume 2026-10-02) ──**
+*First thing:* commit the uncommitted batch (5 backend changes below + this doc + memory). All `tsc` clean.
+Uncommitted files: `camp.{validators,service,mapper}.ts`, `doctor.{validators,service,mapper}.ts`,
+`inventory-consumable.{service,mapper}.ts`.
+*Easy ones remaining (both parked):* consumable `storage` field (trivial, user said "later"); camp
+tests-performed count (not actually in the brief — skip unless wanted). **The easy vein is otherwise done.**
+*Medium (next real work):* **FOC camps** (line-add path first — `foc`/`focReason` on InvoiceLineItem,
+`amount=0`; problem statement already written below under CRM Invoicing); **additional-patient billing**
+(now partially unblocked — patient count is derivable from screenings; still needs `addlPatientRate` on
+Project + a 2nd line-item kind).
+*Large / decision:* **Multi-PO** (Project model change — also unblocks invoice PO-matching/VOID);
+**Item Master drawer Option A vs B** (needs a product decision, not code).
+*Key finding to remember:* actual patient/test counts are **derivable from the `screening`/`test` modules**
+— NOT missing Camp fields (the brief assumed they were). Rx/★/photos remain truly modelless.
 
 
 **Done this session (backend, branch `fixes/feedback`, ALL UNCOMMITTED, `tsc` clean):**

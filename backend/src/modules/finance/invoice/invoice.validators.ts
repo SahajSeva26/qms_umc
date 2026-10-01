@@ -53,3 +53,14 @@ export const SearchInvoiceQuerySchema = z.object({
     limit: z.string().optional().openapi({ example: '10' }),
 });
 export type ISearchInvoiceQuery = z.infer<typeof SearchInvoiceQuerySchema>;
+
+//5: report ====================================>
+// tenant-wide (scoped) totals + per-status breakdown for the pipeline KPI strip. Same scoping filters
+// as search MINUS status (the report IS the status breakdown) and pagination.
+export const InvoiceReportQuerySchema = z.object({
+    tenant: objectId('Tenant').optional(),
+    project: objectId('Project').optional(),
+    dateFrom: z.coerce.date().optional().openapi({ example: '2026-08-01' }),
+    dateTo: z.coerce.date().optional().openapi({ example: '2026-08-31' }),
+});
+export type IInvoiceReportQuery = z.infer<typeof InvoiceReportQuerySchema>;

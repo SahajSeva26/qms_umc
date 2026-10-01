@@ -322,11 +322,15 @@ any `lead:search` caller gets full appointment counts) — **WON'T FIX for now (
 they're aggregate counts, not real appointment data; accepted (revisit only if the tiles become
 click-through to the appointments). Also done today: the Project `report()`-vs-`search()` own-scope
 inconsistency (narrow-the-report). The full new-module gap list lives in memory `ui-revisions-tracker.md`;
-this progress doc's "done" pointers were left intact per the user. **Also fixed 2026-10-01: Pharma
-non-live-booking block** — `POST /camps/book` now rejects a non-`live` project with 409 (status gate in
-`book()` before the role-type check; `create()` untouched). Pharma Portals + Doctor Management + expanded
-Inventory are new modules from the latest brief and live only in memory `ui-revisions-tracker.md` (this
-on-disk doc predates them). Next easy candidate: CRM Invoicing small additive fields.
+this progress doc's "done" pointers were left intact per the user. **Also done 2026-10-01 (all committed
+except where noted):** Pharma non-live-booking block (`POST /camps/book` rejects a non-`live` project with
+409 — committed `b4cdf1e`); Project ObjectId cast fix (committed `6d17659`) + Project `report()` own-scope
+(committed `808fcdf`); **CRM Invoicing `/invoices/report`** (global-by-default pipeline totals + per-status
+breakdown) **and Invoice-card subtitle/`lineItemCount`** (partial — Client·Division·PO + N-camps done; addl
+patients/void/FOC blocked on missing fields) — these two invoice items are the current UNCOMMITTED set.
+Pharma Portals + Doctor Management + expanded Inventory are new modules from the latest brief and live only
+in memory `ui-revisions-tracker.md` (this on-disk doc predates them). Next buildable invoice-direct item:
+FOC camps (`foc`/`focReason` on InvoiceLineItem).
 
 
 **Done this session (backend, branch `fixes/feedback`, ALL UNCOMMITTED, `tsc` clean):**
@@ -591,18 +595,37 @@ Legend: ✅ DONE · 🟡 PARTIAL · ⬜ NOT DONE
   rating / FO rating); only `patientExpectation` (the target) exists today. Shares the patient-count
   root with the 9-way taxonomy + the CRM Invoicing additional-patient-billing pointer. Field decision owed.
 
-## CRM Invoicing — ⬜ NOT STARTED
+## CRM Invoicing — 🟡 IN PROGRESS (2 done 2026-10-01; rest blocked/deferred)
 
+- Pipeline KPI strip totals (`/invoices/report`) — ✅ DONE (2026-10-01, UNCOMMITTED, `tsc` clean).
+  New `GET /invoices/report` mirroring `project.report()`/`camp.report()` — one `$facet` aggregation
+  returning `{ totalInvoices, totalInvoiced, statusCounts:[{status,count,total}] }`. **Global by default
+  for a platform actor** (`ctx.where()` returns `{}` for PLATFORM tenant type) / own-tenant for a customer;
+  **optional** `tenant`/`project`/`dateFrom`/`dateTo` filters narrow it for detail views (Option A, user's
+  call) — `tenant` honoured only if not already pinned, `tenant`/`project` `toObjectId()`-cast for the
+  `$match`. Route registered BEFORE `/:id`, guard `[invoice:search, invoice:manage, tenant:manage]` +
+  `reportRateLimiter`. Shape verified against `InvoicePipelineKpiStrip.tsx` — its 4 tiles (Total invoiced /
+  Pending approval / Payment outstanding / Payment cleared) all derive from `statusCounts` + `totalInvoiced`.
+  ⬜ Frontend still wires it (switch the strip from page-array sums to the report). Files:
+  `invoice.{validators,service,controller,routes}.ts`.
+- Invoice card richer subtitle + stats line — 🟡 PARTIAL (2026-10-01, UNCOMMITTED, `tsc` clean).
+  **Done (backable):** extended the invoice `project` populate to `name code status division executionMode`
+  + nested-populate `division {name,code}` → feeds the card's **Client · Division · PO** subtitle (Client =
+  already-populated `tenant`, Division = `project.division`, PO = `project.executionMode.poNumber`); added a
+  batched per-invoice **`lineItemCount`** (one `InvoiceLineItemModel` aggregate grouped by invoice, no N+1) →
+  the card's **N camps** stat. Tally = existing `syncToTally`. **Blocked (card omits these — no backing
+  field):** N addl patients (needs Camp actual-patient-count), N void (needs Multi-PO/VOID), N FOC (needs the
+  FOC field — pointer below). ⬜ Frontend extends `InvoicePopulatedProject` type (division/executionMode) +
+  reads `lineItemCount`. Files: `invoice.service.ts`, `invoice.mapper.ts`.
+- Tally invoice number capture (`tallyInvoiceNo`) — ⏸️ DEFERRED (user's call 2026-10-01: Tally is "for
+  later" — both the `syncToTally` push and the number capture stay pending).
 - PO-quantity matching + VOID overflow — ⬜ NOT DONE (depends on Multi-PO model).
-- FOC camps — ⬜ NOT DONE.
-- Additional-patient billing — ⬜ NOT DONE.
-- Chargeability-approval workflow — ⬜ NOT DONE.
-- Tally invoice number capture (`tallyInvoiceNo`) — ⬜ NOT DONE.
-- GRN signed-copy capture — ⬜ NOT DONE.
-- Per-camp remarks thread — ⬜ NOT DONE.
+- FOC camps — ⬜ NOT DONE (next buildable invoice-direct item: `foc`/`focReason` on InvoiceLineItem).
+- Additional-patient billing — ⬜ NOT DONE (needs Camp patient-count + Project rate).
+- Chargeability-approval workflow — ⬜ NOT DONE (new state machine on Camp).
+- GRN signed-copy capture — ⬜ NOT DONE (finance-flow adjacent; maybe deferred with Tally).
+- Per-camp remarks thread — ⬜ NOT DONE (on Camp model).
 - Excel / photo-collage export (client-side; no backend) — ⬜ NOT DONE.
-- Pipeline KPI strip totals (`/invoices/report`) — ⬜ NOT DONE.
-- Invoice card richer subtitle + stats line — ⬜ NOT DONE.
 
 ## Inventory Management — ⬜ NOT STARTED
 

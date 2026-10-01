@@ -586,10 +586,13 @@ Legend: ✅ DONE · 🟡 PARTIAL · ⬜ NOT DONE
 - Tele Consultation tab (no teleconsult type/flag) — 🗣️ NEEDS DISCUSSION → resolve later (user's call
   2026-09-30). No teleconsultation type or flag exists on the Camp model (`CampType` = screening/diet/
   lab only). A real missing feature, not a filter to add. Field/type decision owed.
-- Per-tab type-breakdown status-scoped report — ⏸️ DEFERRED / TODO (user's call 2026-09-30). Solution
-  is known + small: add an optional `status` param to `CampReportQuerySchema` + `report()`'s `$match`
-  so the byType chips scope to the current tab (frontend then calls report twice — once unscoped for
-  the tab strip, once with `?status=<tab>` for the chip row). Parked, not built.
+- Per-tab type-breakdown status-scoped report — ✅ DONE (2026-10-01, UNCOMMITTED, `tsc` clean). Added
+  an optional `status` to `CampReportQuerySchema` + folded it into `report()`'s `$match`
+  (`{ ...ctx.where(), ...(status ? { status } : {}) }`) so the whole report (incl. the byType chip row)
+  scopes to one tab. Frontend calls report twice — once unscoped for the tab-strip totals, once with
+  `?status=<tab>` for that tab's chip row. Controller already parsed+passed the query (was an empty
+  schema), routes schema-driven → no change there. Files: `camp.validators.ts`, `camp.service.ts`.
+  ⬜ Frontend wires the second `?status=` call for the chip row.
 - Camp drawer 4-tile KPI row (patients/rx/feedback/FO rating fields) — 🗣️ NEEDS DISCUSSION → resolve
   later (user's call 2026-09-30). Needs 4 new Camp fields (patients done / Rx count / patient feedback
   rating / FO rating); only `patientExpectation` (the target) exists today. Shares the patient-count
@@ -630,8 +633,15 @@ Legend: ✅ DONE · 🟡 PARTIAL · ⬜ NOT DONE
 ## Inventory Management — ⬜ NOT STARTED
 
 - Vendor scorecard (scores/complaint/price-history) — ⬜ NOT DONE (no backing model).
-- Device calibration action (`PATCH .../calibrate` + ledger entry) — ⬜ NOT DONE. (Ledger module
-  exists and can be reused.)
+- Device calibration action (`PATCH .../calibrate` + ledger entry) — ⏸️ DEFERRED (user decision
+  2026-10-01): **frontend will handle it via the existing `update` endpoint** (send
+  `lastCalibrationDate`/`nextCalibrationDate` through `PUT /inventory-devices/:id` — both are already
+  editable there). Not necessary to build a dedicated action now. **Correction to the brief's "reuse
+  the existing ledger" suggestion:** the `InventoryLedger` is a STOCK-MOVEMENT record — it *requires*
+  `quantity`/`fromLocation`/`toLocation`/`type`(refill/return)/`itemType`/`inventory`. A calibration is
+  not a movement, so it does NOT fit the ledger without faking those fields; if an audit trail is ever
+  wanted, a small dedicated calibration-log is the right home, not the movement ledger. No backend
+  change this pass.
 
 ---
 

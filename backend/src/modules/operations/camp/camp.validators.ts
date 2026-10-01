@@ -153,7 +153,9 @@ export const BookingAvailabilityPayloadSchema = z.object({
 export type IBookingAvailabilityPayload = z.infer<typeof BookingAvailabilityPayloadSchema>;
 
 //5: report ====================================>
-// no filters required by the current reporting requirement — scoping is handled entirely by
-// ctx.where() in the service, same as get()/search().
-export const CampReportQuerySchema = z.object({});
+// scoping is handled by ctx.where() in the service (same as get()/search()); an optional `status`
+// narrows the whole report (incl. the byType chip-row) to one status tab.
+export const CampReportQuerySchema = z.object({
+    status: z.enum(Object.values(CAMP_STATUSES)).optional().openapi({ example: 'closed' }),
+});
 export type ICampReportQuery = z.infer<typeof CampReportQuerySchema>;

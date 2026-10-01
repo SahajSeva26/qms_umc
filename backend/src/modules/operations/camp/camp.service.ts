@@ -727,9 +727,13 @@ const book = async (model: IBookCampPayload, ctx: RequestContext): Promise<Hydra
 
 const report = async (filters: ICampReportQuery, ctx: RequestContext) => {
     //1: single aggregation, single collection scan — every branch is independent, computed off the
-    // same scoped input set.
+    // same scoped input set. An optional `status` narrows the whole report (incl. byType) to one tab.
+    const where: any = { ...ctx.where() };
+    if (filters.status) {
+        where.status = filters.status;
+    }
     const [result] = await CampModel.aggregate([
-        { $match: ctx.where() },
+        { $match: where },
         {
             $facet: {
                 totalCamps: [{ $count: 'count' }],

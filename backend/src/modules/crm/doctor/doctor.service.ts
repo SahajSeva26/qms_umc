@@ -18,6 +18,7 @@ import { IServiceOptions } from '../../../shared/types/service.types';
 import { TENANT_TYPE } from '../../access-management/tenant/tenant.constants';
 import { TenantService } from '../../access-management/tenant/tenant.service';
 import { DivisionService } from '../division/division.service';
+import { CampModel } from '../../operations/camp/camp.model';
 import { CsvHelper } from '../../../shared/helpers/csvHelper';
 import { processInBatches } from '../../../shared/utils/batchProcessor';
 
@@ -146,7 +147,36 @@ const search = async (filters: ISearchDoctorQuery, ctx: RequestContext, options?
 
     const [count, items] = await Promise.all([countPromise, dataPromise]);
 
-    return { count, items };
+    //6: optional report — per-doctor camp count for this page (one batched aggregate, no N+1)
+    const stats = filters.report === 'true' ? await getDoctorCampStats(items) : undefined;
+
+    return { count, items, stats };
+};
+
+// per-doctor camp count for the doctors on the page. The doctor ids are already tenant/division-scoped
+// (ctx.where + own-scope), and a doctor belongs to exactly one tenant, so a plain $in over Camp.doctor
+// can't leak another tenant's camps. Counts all camps referencing the doctor (every status).
+type DoctorStats = { camps: number };
+const getDoctorCampStats = async (doctors: HydratedDocument<IDoctor>[]): Promise<Record<string, DoctorStats>> => {
+    const doctorIds = doctors.map((d) => d._id);
+    const stats: Record<string, DoctorStats> = {};
+    for (const id of doctorIds) {
+        stats[id.toString()] = { camps: 0 };
+    }
+    if (!doctorIds.length) {
+        return stats;
+    }
+    const groups = await CampModel.aggregate([
+        { $match: { doctor: { $in: doctorIds } } },
+        { $group: { _id: '$doctor', camps: { $sum: 1 } } },
+    ]);
+    for (const g of groups) {
+        const entry = stats[g._id?.toString()];
+        if (entry) {
+            entry.camps = g.camps;
+        }
+    }
+    return stats;
 };
 
 // findNearest returns doctors within a FIXED 35km radius of the target point, nearest first.

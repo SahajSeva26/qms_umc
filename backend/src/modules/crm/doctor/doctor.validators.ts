@@ -94,6 +94,8 @@ export const SearchDoctorQuerySchema = z.object({
     city: z.string().optional().openapi({ example: 'Haldwani' }),
     state: z.string().optional().openapi({ example: 'Uttarakhand' }),
     pharmaCode: z.string().optional().openapi({ example: 'DOC-0012' }),
+    // opt-in: attach a per-doctor camp count to each row (one batched aggregate, no N+1)
+    report: z.enum(['true']).optional().openapi({ example: 'true' }),
     page: z.string().optional().openapi({ example: '1' }),
     limit: z.string().optional().openapi({ example: '10' }),
 });

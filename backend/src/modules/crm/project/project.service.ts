@@ -178,7 +178,7 @@ const search = async (filters: ISearchProjectQuery, ctx: RequestContext, options
     // tenant filter (switch tenants) is only honoured for a `project:manage` actor that isn't already
     // tenant-pinned by ctx.where() — a customer actor stays locked to their own tenant regardless.
     if (filters.tenant && !where.tenant && ctx.hasAnyPermissions([PROJECT_PERMISSIONS.MANAGE.code])) {
-        where.tenant = filters.tenant;
+        where.tenant = toObjectId(filters.tenant);
     }
     if (filters.name) {
         where.name = { $regex: filters.name, $options: 'i' };
@@ -193,13 +193,13 @@ const search = async (filters: ISearchProjectQuery, ctx: RequestContext, options
         where.therapy = filters.therapy;
     }
     if (filters.division) {
-        where.division = filters.division;
+        where.division = toObjectId(filters.division);
     }
     if (filters.lead) {
-        where.lead = filters.lead;
+        where.lead = toObjectId(filters.lead);
     }
     if (filters.salesRep) {
-        where.salesRep = filters.salesRep;
+        where.salesRep = toObjectId(filters.salesRep);
     }
 
     //3: apply own-scope LAST so a filter can't widen past the actor's own visibility

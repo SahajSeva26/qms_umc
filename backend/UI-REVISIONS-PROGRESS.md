@@ -312,6 +312,17 @@ existing update endpoint is an acceptable stand-in — not built either way this
 
 # ⏸️ RESUME HERE (paused 2026-09-29, continue 2026-09-30)
 
+**Update 2026-10-01 — latest frontend brief reconciled + first bug fixed.** A newer frontend brief
+arrived with two whole new modules (**Pharma Portals** — MR portal only, and **Doctor Management**) and
+a much-expanded **Inventory** list, plus TWO bugs found on work we'd marked "done": (1) the Project
+Types breakdown ObjectId-cast bug — **✅ FIXED today** (see Client Management #4 below; `project.service.ts`
+`tenant`/`division`/`lead`/`salesRep` filters now `toObjectId()`-wrapped, `tsc` clean, UNCOMMITTED), and
+(2) a CRM follow-ups own-scope gap (`getLeadActivityStats()` has NO permission scoping — any `lead:search`
+caller gets full appointment counts) — **NOT yet fixed**, tracked in memory `ui-revisions-tracker.md`.
+The full new-module gap list lives in that memory file; this progress doc's "done" pointers were left
+intact per the user. Next easy candidates: the CRM scope bug, then the Pharma non-live-booking block.
+
+
 **Done this session (backend, branch `fixes/feedback`, ALL UNCOMMITTED, `tsc` clean):**
 - **Client Management** — module complete (already committed earlier: MR count, invoice tenant filter,
   project type breakdown, tenant city/state, division stats).
@@ -390,10 +401,21 @@ Legend: ✅ DONE · 🟡 PARTIAL · ⬜ NOT DONE
    can't override their own scope). ⬜ NOT DONE: an accurate billed/outstanding *total number*
    (needs an `/invoices/report` aggregation — see the CRM Invoicing pointer).
    Files: `invoice.validators.ts`, `invoice.service.ts`.
-4. **Project Types breakdown** — ✅ DONE. Added a `report=true` flag to **project search** →
-   top-level `report.byType` (count per `PROJECT_TYPES` value, over the whole scoped/filtered set;
-   multi-type project counted once per type it carries). Frontend maps the 5 values onto its
-   Screening/Diet/Lab/Mixed tiles.
+4. **Project Types breakdown** — ✅ DONE, **+ bug fixed 2026-10-01**. Added a `report=true` flag to
+   **project search** → top-level `report.byType` (count per `PROJECT_TYPES` value, over the whole
+   scoped/filtered set; multi-type project counted once per type it carries). Frontend maps the 5
+   values onto its Screening/Diet/Lab/Mixed tiles.
+   **BUG (found by frontend, confirmed + fixed 2026-10-01, UNCOMMITTED, `tsc` clean):** `search()`
+   assigned ObjectId-field filters as RAW STRINGS. `Project.find()` auto-casts (so the list query was
+   fine), but `report.byType`'s `Project.aggregate([{ $match: where }])` does NOT auto-cast → the
+   `$match` compared a string against ObjectId fields and matched nothing → `byType` silently returned
+   all-zero counts for any `tenant`-scoped `report=true` call (live repro: a tenant showed "Projects: 2"
+   in the KPI strip but "No projects yet" in the Project Types tile — the KPI number comes from the
+   correctly-cast `getTenantStats()`, the tile from this uncast search-report path). Fixed by wrapping
+   the ObjectId-field filters in the file's existing `toObjectId()` helper — `tenant` (line ~181),
+   `division` (~196), `lead` (~199), `salesRep` (~202); `status`/`therapy` left as-is (string fields,
+   no cast needed). `stats.executedCamps` was never affected (it keys off already-fetched project ids).
+   Frontend's tile (reverted to "Coming soon" until this landed) re-wires once confirmed.
    Files: `project.validators.ts`, `project.service.ts`, `project.mapper.ts`.
 5. **Search by city** — ✅ DONE (+ state). Added separate `city` and `state` regex filters to tenant
    search (`address.city` / `address.state`, case-insensitive).
@@ -433,10 +455,19 @@ Legend: ✅ DONE · 🟡 PARTIAL · ⬜ NOT DONE
    a company name matching more tenants than that cap would silently drop those projects. Make the
    no-limit explicit (or fetch ids with a lean scoped query) before shipping this.
    Files (if built): `project.validators.ts`, `project.service.ts`.
-4. **`report()` vs `search()` own-scope inconsistency** — ⬜ DEFERRED (**LATER REFACTOR**, user's call
-   2026-09-29). Standalone `report()` (`project.service.ts:354`) matches only `ctx.where()`; `search()`
-   applies `applyOwnScope()`. Recommended fix when picked up: make `report()` also apply
-   `applyOwnScope()` (align KPIs to the table) — ~2 lines. Same bug also open in Camp Management (below).
+4. **`report()` vs `search()` own-scope inconsistency** — ✅ DONE (2026-10-01, UNCOMMITTED, `tsc` clean).
+   Standalone `report()` (`project.service.ts:354`) matched only `ctx.where()`; `search()` also applies
+   `applyOwnScope()`, so a scoped user's KPI tiles counted projects wider than the list they could see
+   (customer actor narrowed to own division / non-manager platform rep narrowed to own salesRep — but
+   only the list narrowed, not the report). Reachable by `project:manage` OR `tenant:manage` (route
+   guard is OR); a plain `project:manage` actor is a no-op for `applyOwnScope` so was never affected —
+   the real cases are a **customer `tenant:manage`** actor and a **platform `tenant:manage`-without-
+   `project:manage`** actor. Fixed by building the `where` the same way `search()` does
+   (`{ ...ctx.where() }` + `applyOwnScope(where, ctx)`) and `$match`-ing on it — reuses the list's exact
+   own-scoping (no new logic; can only make report MORE consistent, never diverge) and is ObjectId-safe
+   (`applyOwnScope` already `toObjectId()`-casts). Chose narrow-the-report over widen-the-search: the
+   security-safe direction (never exposes more rows to a scoped user). **Same bug still open in Camp
+   Management** (`camp.report()`) — left for the Camp module pass. File: `project.service.ts`.
 
 ## CRM — ⬜ NOT STARTED
 

@@ -352,8 +352,14 @@ const moveStage = async (id: string, model: IMoveStagePayload, ctx: RequestConte
 
 
 const report = async (filters: IProjectReportQuery, ctx: RequestContext) => {
+    // scope the report exactly like search() — ctx.where() (tenant pin) + own-scope (division for a
+    // customer actor, salesRep for a non-manager platform rep) — so the KPI tiles always match the
+    // list the user actually sees, not a wider tenant-wide total.
+    const where = { ...ctx.where() };
+    applyOwnScope(where, ctx);
+
     const [result] = await Project.aggregate([
-        { $match: ctx.where() },
+        { $match: where },
         { $addFields: { estimatedRevenue: { $multiply: ['$campCost', '$totalCamps'] } } },
         {
             $facet: {

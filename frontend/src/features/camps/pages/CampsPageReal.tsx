@@ -20,18 +20,19 @@ import { usePagination } from '@/hooks/usePagination'
 import type { BillingType, CampStatus, CampType } from '@/types/campReal.types'
 import { EMPTY_ARRAY } from '@/utils/emptyArray'
 
-// Matches /camps/new's own route guard exactly — a camp:create-only actor
-// can reach that route directly and must also see the button that leads there.
+// Matches /camps/new's own route guard — a camp:create-only actor must also see the button that leads there.
 const CAMP_WRITE_PERMISSIONS = ['camp:create', 'camp:manage', 'tenant:manage']
-// GET /camps/report requires this exact set — stricter than camp:search, which
-// can view/list camps but 403s on the report endpoint.
+// GET /camps/report requires this exact set — stricter than camp:search, which 403s on the report endpoint.
 const CAMP_REPORT_PERMISSIONS = ['camp:manage', 'tenant:manage']
+// The `tenant` search filter is honored server-side only for camp:manage, NOT tenant:manage (camp.service.ts).
+const CAMP_CLIENT_FILTER_PERMISSIONS = ['camp:manage']
+// TenantAsyncPicker calls GET /tenants (tenant:search/tenant:manage) — required before offering the Client search box.
+const TENANT_LOOKUP_PERMISSIONS = ['tenant:search', 'tenant:manage']
 
 const PAGE_SIZE = 10
 const ALL_STATUSES: CampStatus[] = ['requested', 'confirmed', 'live', 'closed', 'cancelled', 'cancelled_charged']
 
-// Matches the prototype's per-tab view choice (camps.js:499-507): cards for the "in-flight"
-// requested/upcoming/live stages, a denser table for the "settled" stages.
+// Cards for the "in-flight" requested/upcoming/live stages, a denser table for the "settled" stages.
 const CARD_VIEW_STATUSES = new Set<CampStatus>(['requested', 'confirmed', 'live'])
 
 const CampsPageReal = () => {
@@ -41,6 +42,7 @@ const CampsPageReal = () => {
   const { hasAnyPermission } = usePermission()
   const canWrite = hasAnyPermission(CAMP_WRITE_PERMISSIONS)
   const canViewReport = hasAnyPermission(CAMP_REPORT_PERMISSIONS)
+  const canFilterByClient = hasAnyPermission(CAMP_CLIENT_FILTER_PERMISSIONS) && hasAnyPermission(TENANT_LOOKUP_PERMISSIONS)
   const { filters, setFilter, reset } = useCampsRealFilters()
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
   const debouncedCode = useDebouncedValue(filters.code, 300)
@@ -56,10 +58,14 @@ const CampsPageReal = () => {
     code: debouncedCode || undefined,
     city: debouncedCity || undefined,
     state: debouncedState || undefined,
+    doctor: filters.doctorId || undefined,
+    tenant: canFilterByClient && filters.clientId ? filters.clientId : undefined,
     dateFrom: filters.dateFrom || undefined,
     dateTo: filters.dateTo || undefined,
     page: String(page),
     limit: String(PAGE_SIZE),
+    // Drives CampCardReal's real Patients/Done% stat — no extra permission gate on this flag.
+    report: 'true',
   })
   const camps = data?.data?.items ?? EMPTY_ARRAY
   const totalCount = data?.data?.count ?? 0
@@ -75,6 +81,17 @@ const CampsPageReal = () => {
     return result
   }, [reportQuery.data])
   const totalCamps = reportQuery.data?.data?.summary.totalCamps ?? 0
+
+  // CampReportQuerySchema accepts only `status` — once any other filter narrows the table, the
+  // chips would silently go global-for-this-status again, so track it to hide/relabel instead.
+  const hasNonStatusFilter = !!(
+    debouncedCode || debouncedCity || debouncedState || filters.doctorId ||
+    (canFilterByClient && filters.clientId) || filters.dateFrom || filters.dateTo ||
+    filters.type !== 'ALL' || filters.billingType !== 'ALL'
+  )
+  const tabTypeReportQuery = useCampReport(canViewReport && !hasNonStatusFilter, activeStatus === 'ALL' ? undefined : activeStatus)
+  const tabTypeBreakdown = tabTypeReportQuery.data?.data?.byType ?? EMPTY_ARRAY
+  const tabTotalCamps = tabTypeReportQuery.data?.data?.summary.totalCamps ?? totalCount
 
   const handleFilterChange = <K extends keyof typeof filters>(key: K, value: (typeof filters)[K]) => {
     setFilter(key, value)
@@ -94,8 +111,6 @@ const CampsPageReal = () => {
           <h1 className="text-2xl font-bold" style={{ color: 'var(--qms-text)' }}>
             Camp Management
           </h1>
-          {/* Prototype's "QR-tracked" chip and "Camp copilot" AI banner are both skipped —
-              neither has any real logic behind it (no QR generation, an unwired banner button). */}
           <div className="flex flex-wrap gap-1.5 mt-2">
             <span
               className="inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1.5 rounded-full border"
@@ -149,10 +164,18 @@ const CampsPageReal = () => {
         onSelect={(tab) => handleFilterChange('status', tab)}
       />
 
-      <CampsFilterBarReal filters={filters} setFilter={handleFilterChange} reset={handleReset} />
+      <CampsFilterBarReal filters={filters} setFilter={handleFilterChange} reset={handleReset} canFilterByClient={canFilterByClient} />
 
-      {activeStatus !== 'ALL' && CARD_VIEW_STATUSES.has(activeStatus) && !isLoading && !error && (
-        <CampsTypeBreakdownChips camps={camps} totalCount={totalCount} />
+      {activeStatus !== 'ALL' && CARD_VIEW_STATUSES.has(activeStatus) && (
+        <CampsTypeBreakdownChips
+          byType={tabTypeBreakdown}
+          totalCount={tabTotalCamps}
+          isLoading={canViewReport && !hasNonStatusFilter && tabTypeReportQuery.isLoading}
+          error={!hasNonStatusFilter ? tabTypeReportQuery.error : undefined}
+          onRetry={() => void tabTypeReportQuery.refetch()}
+          canView={canViewReport}
+          unavailableWhileFiltered={hasNonStatusFilter}
+        />
       )}
 
       <QueryStateBlock isLoading={isLoading} error={error} loadingLabel="Loading camps…" errorLabel="Failed to load camps. Please try again." onRetry={refetch}>
@@ -194,9 +217,7 @@ const CampsPageReal = () => {
       <CampDrawer
         campId={selectedCampId}
         onClose={() => {
-          // Clears only `camp` (preserving any other query state) and replaces
-          // the current history entry instead of pushing a new one — otherwise
-          // Back after closing would reopen the drawer instead of leaving the page.
+          // Replaces, not pushes — otherwise Back after closing would reopen the drawer.
           const next = new URLSearchParams(searchParams)
           next.delete('camp')
           setSearchParams(next, { replace: true })

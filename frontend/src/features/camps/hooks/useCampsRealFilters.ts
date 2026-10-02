@@ -10,6 +10,11 @@ export interface CampsRealFilterState {
   state: string
   dateFrom: string
   dateTo: string
+  // Resolved via DoctorAsyncPicker/TenantAsyncPicker (name→id) — real ObjectId filters server-side.
+  doctorId: string
+  doctorLabel: string
+  clientId: string
+  clientLabel: string
 }
 
 const DEFAULT_FILTERS: CampsRealFilterState = {
@@ -21,6 +26,10 @@ const DEFAULT_FILTERS: CampsRealFilterState = {
   state: '',
   dateFrom: '',
   dateTo: '',
+  doctorId: '',
+  doctorLabel: '',
+  clientId: '',
+  clientLabel: '',
 }
 
 export const useCampsRealFilters = () => useFilterState<CampsRealFilterState>(DEFAULT_FILTERS)

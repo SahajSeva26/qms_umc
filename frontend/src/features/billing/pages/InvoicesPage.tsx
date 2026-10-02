@@ -3,6 +3,7 @@ import { FiFilePlus, FiGitMerge } from 'react-icons/fi'
 import { useInvoices } from '@/features/billing/hooks/useInvoices'
 import { useInvoice } from '@/features/billing/hooks/useInvoice'
 import { useInvoiceLineItems } from '@/features/billing/hooks/useInvoiceLineItems'
+import { useInvoiceReport } from '@/features/billing/hooks/useInvoiceReport'
 import BillingProjectPicker from '@/features/billing/components/BillingProjectPicker'
 import GenerateInvoiceTab from '@/features/billing/components/GenerateInvoiceTab'
 import InvoicePipelineKpiStrip from '@/features/billing/components/InvoicePipelineKpiStrip'
@@ -16,15 +17,13 @@ import { usePermission } from '@/hooks/usePermission'
 
 type InvoicingTab = 'generate' | 'pipeline'
 
-// Matches the prototype's 2-tab shell (crm-invoicing.html: "Generate Invoice"
-// / "Invoices & Pipeline") — Generate Invoice is now a tab, not a modal;
-// Invoices & Pipeline is a card list with an inline stage stepper, not a flat table.
 const InvoicesPage = () => {
   const { hasAnyPermission } = usePermission()
   const canCreate = hasAnyPermission(['invoice:create', 'invoice:manage'])
   const canMoveStage = hasAnyPermission(['invoice:manage', 'tenant:manage'])
-  // Defaults to Pipeline for a viewer who can't generate — mirrors the
-  // prototype's role-based default tab (crm-invoicing.js:72).
+  // GET /invoices/:id requires invoice:get/invoice:manage/tenant:manage, distinct from invoice:search which reaches this list.
+  // /billing/crm's own route guard (system:manage only, temporary) currently masks this; gated anyway for when that's widened.
+  const canViewDetail = hasAnyPermission(['invoice:get', 'invoice:manage', 'tenant:manage'])
   const [tab, setTab] = useState<InvoicingTab>(canCreate ? 'generate' : 'pipeline')
 
   const [filterProjectId, setFilterProjectId] = useState('')
@@ -42,8 +41,11 @@ const InvoicesPage = () => {
   const invoices = data?.data?.items ?? []
   const count = data?.data?.count ?? 0
 
-  // Needed for MoveInvoiceStageDialog's lineItemCount prop — only fetched
-  // when the dialog is actually open, not per-card in the list.
+  // Scoped to the same project filter as the list so switching the picker narrows both consistently.
+  const reportQuery = useMemo(() => (filterProjectId ? { project: filterProjectId } : {}), [filterProjectId])
+  const { report, isLoading: isReportLoading, error: reportError } = useInvoiceReport(reportQuery, tab === 'pipeline')
+
+  // Only fetched when the dialog is actually open, not per-card in the list.
   const { data: stageDialogInvoiceData } = useInvoice(stageDialogInvoiceId ?? undefined)
   const stageDialogInvoice = stageDialogInvoiceData?.data ?? null
   const canReadLines = hasAnyPermission(['invoice-line-item:search', 'invoice-line-item:manage', 'tenant:manage'])
@@ -51,10 +53,7 @@ const InvoicesPage = () => {
     { invoice: stageDialogInvoiceId ?? '', limit: '1' },
     !!stageDialogInvoiceId && canReadLines,
   )
-  // Falls back to 1 (a safe non-zero placeholder) if this viewer can't read
-  // line items at all — the dialog's own submit still hits the real
-  // moveStage endpoint, which is authoritative either way; this only
-  // affects whether "Approved" is offered in the dropdown.
+  // Falls back to 1 if this viewer can't read line items — only affects whether "Approved" shows in the dropdown.
   const stageDialogLineItemCount = canReadLines ? (stageDialogLineItemsData?.data?.count ?? 0) : 1
 
   const handleFilterProjectChange = (projectId: string, projectLabel: string) => {
@@ -106,9 +105,7 @@ const InvoicesPage = () => {
             <BillingProjectPicker value={filterProjectId} label={filterProjectLabel} onChange={handleFilterProjectChange} />
           </div>
 
-          {!isLoading && !error && (
-            <InvoicePipelineKpiStrip invoices={invoices} totalCount={count} />
-          )}
+          <InvoicePipelineKpiStrip report={report} isLoading={isReportLoading} error={reportError} />
 
           <QueryStateBlock isLoading={isLoading} error={error} loadingLabel="Loading invoices…" errorLabel="Failed to load invoices. Please try again." onRetry={() => refetch()}>
             {invoices.length === 0 && (
@@ -125,6 +122,8 @@ const InvoicesPage = () => {
                     onOpenDetail={setOpenDetailId}
                     onChangeStatus={setStageDialogInvoiceId}
                     canMoveStage={canMoveStage}
+                    canExport={canReadLines}
+                    canViewDetail={canViewDetail}
                   />
                 ))}
                 <PaginationControls page={page} totalPages={totalPages(count)} onPageChange={setPage} disabled={isLoading} />

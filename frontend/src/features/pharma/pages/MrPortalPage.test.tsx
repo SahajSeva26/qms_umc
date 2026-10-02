@@ -13,6 +13,12 @@ vi.mock('@/features/pharma/pages/PharmaProjectsPage', () => ({
 vi.mock('@/features/pharma/components/MrBookCampTab', () => ({
   default: () => <div>Book camp tab content</div>,
 }))
+vi.mock('@/features/pharma/components/PharmaDashboardTab', () => ({
+  default: () => <div>Dashboard tab content</div>,
+}))
+vi.mock('@/features/pharma/components/PharmaDoctorsTab', () => ({
+  default: () => <div>Doctors tab content</div>,
+}))
 
 function sessionFixture(): SessionResponse {
   return {
@@ -53,12 +59,24 @@ describe('MrPortalPage', () => {
     vi.resetAllMocks()
   })
 
-  it('defaults to the Your projects tab', async () => {
+  it('defaults to the Dashboard tab', async () => {
     await mockSettledSession()
     await renderPage()
 
-    expect(await screen.findByText('Projects tab content')).toBeInTheDocument()
+    expect(await screen.findByText('Dashboard tab content')).toBeInTheDocument()
+    expect(screen.queryByText('Projects tab content')).not.toBeInTheDocument()
     expect(screen.queryByText('Book camp tab content')).not.toBeInTheDocument()
+  })
+
+  it('clicking Your projects switches tabs', async () => {
+    await mockSettledSession()
+    const user = userEvent.setup()
+    await renderPage()
+
+    await user.click(await screen.findByRole('button', { name: /your projects/i }))
+
+    expect(screen.getByText('Projects tab content')).toBeInTheDocument()
+    expect(screen.queryByText('Dashboard tab content')).not.toBeInTheDocument()
   })
 
   it('clicking Book camp switches to the booking tab', async () => {
@@ -72,7 +90,17 @@ describe('MrPortalPage', () => {
     expect(screen.queryByText('Projects tab content')).not.toBeInTheDocument()
   })
 
-  it('a non-MR pharma role is redirected away by PharmaRoleGate, never seeing either tab', async () => {
+  it('clicking Doctors switches to the doctors tab', async () => {
+    await mockSettledSession()
+    const user = userEvent.setup()
+    await renderPage()
+
+    await user.click(await screen.findByRole('button', { name: /^doctors$/i }))
+
+    expect(screen.getByText('Doctors tab content')).toBeInTheDocument()
+  })
+
+  it('a non-MR pharma role is redirected away by PharmaRoleGate, never seeing any tab', async () => {
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
       session: { ...sessionFixture(), roleType: { id: 'rt-2', code: 'pharma-rsm', name: 'pharma-rsm' } },
@@ -82,6 +110,7 @@ describe('MrPortalPage', () => {
 
     await renderPage()
 
+    expect(screen.queryByText('Dashboard tab content')).not.toBeInTheDocument()
     expect(screen.queryByText('Projects tab content')).not.toBeInTheDocument()
     expect(screen.queryByText('Book camp tab content')).not.toBeInTheDocument()
   })

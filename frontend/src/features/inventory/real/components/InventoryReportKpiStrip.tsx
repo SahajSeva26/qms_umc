@@ -11,10 +11,11 @@ export interface InventoryReportTile {
 }
 
 // Static lookup, never a template-literal class — a computed `lg:grid-cols-${n}` would vanish from Tailwind's build.
-const GRID_COLS: Record<2 | 4 | 5, string> = {
+const GRID_COLS: Record<2 | 4 | 5 | 6, string> = {
   2: 'grid-cols-2 sm:grid-cols-2 lg:grid-cols-2',
   4: 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4',
   5: 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5',
+  6: 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-6',
 }
 
 interface InventoryReportKpiStripProps {
@@ -23,7 +24,9 @@ interface InventoryReportKpiStripProps {
   error: unknown
   canView: boolean
   /** Real eventual tile count — needed since `tiles` is still `[]` while loading. */
-  skeletonCount: 2 | 4 | 5
+  skeletonCount: 2 | 4 | 5 | 6
+  /** Optional heading override — defaults to the org-wide-overview copy. */
+  heading?: string
   /**
    * Extra tiles rendered in the SAME grid as `tiles` (e.g. a clickable
    * type-filter strip) — so the whole row reads as one continuous KPI set
@@ -32,7 +35,7 @@ interface InventoryReportKpiStripProps {
   extraTiles?: ReactNode
 }
 
-const InventoryReportKpiStrip = ({ tiles, isLoading, error, canView, skeletonCount, extraTiles }: InventoryReportKpiStripProps) => {
+const InventoryReportKpiStrip = ({ tiles, isLoading, error, canView, skeletonCount, extraTiles, heading }: InventoryReportKpiStripProps) => {
   const gridCols = GRID_COLS[skeletonCount]
 
   if (!canView) {
@@ -68,7 +71,7 @@ const InventoryReportKpiStrip = ({ tiles, isLoading, error, canView, skeletonCou
   return (
     <div className="mb-4">
       <p className="text-[11px] font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-        Organisation-wide overview — unaffected by list filters
+        {heading ?? 'Organisation-wide overview — unaffected by list filters'}
       </p>
       <div className={`grid gap-2.5 ${gridCols}`}>
         {tiles.map((tile) => (

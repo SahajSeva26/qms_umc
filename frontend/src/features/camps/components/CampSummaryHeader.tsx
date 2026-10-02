@@ -1,4 +1,4 @@
-import CampStatusPillReal from '@/features/camps/components/CampStatusPillReal'
+import CampStatusPillReal from '@/components/widgets/camp/CampStatusPillReal'
 import type { CampEntity, CampPopulatedDivision, CampPopulatedDoctor, CampPopulatedProject } from '@/types/campReal.types'
 
 type RefValue<T> = T | string | null | undefined

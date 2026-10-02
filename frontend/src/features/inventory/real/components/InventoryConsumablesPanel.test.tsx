@@ -38,6 +38,7 @@ vi.mock('@/features/inventory/real/inventoryConsumable.service', () => ({
         consumables: {
           warehouseQuantity: 900,
           expiredByDate: 5,
+          expiryBands: { expired: 11, within30: 13, within30to90: 14, within90to180: 16, beyond180: 120, noExpiry: 14 },
           byStatus: [
             { status: 'active', count: 40 },
             { status: 'expired', count: 2 },
@@ -139,7 +140,11 @@ describe('InventoryConsumablesPanel', () => {
     // 42 (consumableLots) only appears in the report — the paginated list fixture has count: 1
     expect(screen.getByText('42')).toBeInTheDocument()
     expect(screen.getByText('900')).toBeInTheDocument()
-    expect(screen.getByText('5')).toBeInTheDocument()
+    expect(screen.getByText('Expired (by date)')).toBeInTheDocument()
+    // FEFO expiry-band strip — distinct values from the fixture above, no collisions.
+    await screen.findByText('FEFO expiry outlook — all lots')
+    expect(screen.getByText('11')).toBeInTheDocument()
+    expect(screen.getByText('120')).toBeInTheDocument()
   })
 })
 

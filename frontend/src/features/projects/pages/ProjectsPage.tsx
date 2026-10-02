@@ -13,25 +13,29 @@ import EditProjectModal from '@/features/projects/components/EditProjectModal'
 import NewProjectWizard from '@/features/projects/components/wizard/NewProjectWizard'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import TenantAsyncPicker from '@/components/ui/TenantAsyncPicker'
 import PaginationControls from '@/components/ui/PaginationControls'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { usePagination } from '@/hooks/usePagination'
 
 type Tab = 'all' | ProjectStatus
 
-// Prototype's search covers ID/name/client/PO in one field; `name` and `code` are real backend
-// filters (SearchProjectQuerySchema); Client has no server-side name-match yet (needs a name→tenant-id
-// resolution step, deferred — see md-files/ui-revisions.md), so it stays a disabled option.
+// The `tenant` search filter is honored server-side only for project:manage, NOT tenant:manage (project.service.ts).
+const PROJECT_CLIENT_FILTER_PERMISSIONS = ['project:manage']
+// TenantAsyncPicker calls GET /tenants (tenant:search/tenant:manage) — required before offering the Client search box.
+const TENANT_LOOKUP_PERMISSIONS = ['tenant:search', 'tenant:manage']
+
+// `tenant` is an ObjectId filter, not free text — "Client" resolves a typed company name to its tenant id client-side.
 type SearchBy = 'name' | 'code' | 'client'
-const SEARCH_BY_OPTIONS: { value: SearchBy; label: string; disabled?: boolean }[] = [
+const SEARCH_BY_OPTIONS: { value: SearchBy; label: string }[] = [
   { value: 'name', label: 'Name' },
   { value: 'code', label: 'Code' },
-  { value: 'client', label: 'Client', disabled: true },
+  { value: 'client', label: 'Client' },
 ]
 const SEARCH_BY_PLACEHOLDER: Record<SearchBy, string> = {
   name: 'Search by project name...',
   code: 'Search by code...',
-  client: 'Search by client — not available yet',
+  client: '',
 }
 
 const TABS: { id: Tab; label: string }[] = [
@@ -44,8 +48,7 @@ const TABS: { id: Tab; label: string }[] = [
 
 const PAGE_SIZE = 10
 
-// Prototype's page-head chips (pages/projects.html) — copy matched verbatim; "Lifecycle · live"
-// is the prototype's exact wording (a static badge, not describing our specific status set).
+// "Lifecycle · live" is a static badge, not describing our specific status set.
 const HEADER_CHIPS = [
   { icon: null, label: 'Lifecycle · live', live: true },
   { icon: FiFileText, label: 'PO · Agreement · Mail-conf' },
@@ -56,9 +59,9 @@ const HEADER_CHIPS = [
 const ProjectsPage = () => {
   const { hasAnyPermission } = usePermission()
   const canWrite = hasAnyPermission(PROJECT_WRITE_PERMISSIONS)
-  // GET /projects/report needs the same permission set — hide counts rather than let it 403
-  // (mirrors ProjectGanttPage's own canViewReport gate for the same endpoint).
+  // GET /projects/report needs the same permission set — hide counts rather than let it 403.
   const canViewReport = canWrite
+  const canFilterByClient = hasAnyPermission(PROJECT_CLIENT_FILTER_PERMISSIONS) && hasAnyPermission(TENANT_LOOKUP_PERMISSIONS)
   const { report } = useProjectReport(canViewReport)
   const tabCounts = report
     ? Object.fromEntries(report.byStatus.map((entry) => [entry.status, entry.count]))
@@ -68,6 +71,9 @@ const ProjectsPage = () => {
   const [searchBy, setSearchBy] = useState<SearchBy>('name')
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search, 300)
+  // Kept separate from `search` since it's a selected id (via TenantAsyncPicker), not a live-typed string.
+  const [clientId, setClientId] = useState('')
+  const [clientLabel, setClientLabel] = useState('')
   const [openDetailId, setOpenDetailId] = useState<string | null>(null)
   const [statusChangeId, setStatusChangeId] = useState<string | null>(null)
   const [editId, setEditId] = useState<string | null>(null)
@@ -89,18 +95,24 @@ const ProjectsPage = () => {
     resetToFirstPage()
   }
 
+  const handleClientChange = (id: string, label: string) => {
+    setClientId(id)
+    setClientLabel(label)
+    resetToFirstPage()
+  }
+
   const query = useMemo(
     () => ({
       ...(tab !== 'all' ? { status: tab } : {}),
       ...(searchBy === 'name' && debouncedSearch ? { name: debouncedSearch } : {}),
       ...(searchBy === 'code' && debouncedSearch ? { code: debouncedSearch } : {}),
-      // Drives ProjectTable's Executed/Total camps column (per-row stats.executedCamps) and the
-      // type breakdown chips below (top-level report.byType, over the whole filtered set).
+      ...(searchBy === 'client' && clientId && canFilterByClient ? { tenant: clientId } : {}),
+      // Drives ProjectTable's Executed/Total camps column and the type breakdown chips below.
       report: 'true' as const,
       page: String(page),
       limit: String(PAGE_SIZE),
     }),
-    [tab, searchBy, debouncedSearch, page]
+    [tab, searchBy, debouncedSearch, clientId, canFilterByClient, page]
   )
 
   const { data, isLoading, error } = useProjects(query)
@@ -125,8 +137,7 @@ const ProjectsPage = () => {
                 className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full"
                 style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text-muted)' }}
               >
-                {/* Prototype's .chip .dot (styles.css) — hardcoded emerald-500, not the app's
-                    --success token (which is a different green in both themes). */}
+                {/* Hardcoded emerald-500, not the app's --success token (a different green in both themes). */}
                 {chip.live ? <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#10b981', boxShadow: '0 0 0 4px rgba(16,185,129,.18)' }} /> : chip.icon && <chip.icon size={11} />}
                 {chip.label}
               </span>
@@ -163,21 +174,25 @@ const ProjectsPage = () => {
             </SelectTrigger>
             <SelectContent>
               {SEARCH_BY_OPTIONS.map((o) => (
-                <SelectItem key={o.value} value={o.value} disabled={o.disabled}>{o.label}</SelectItem>
+                <SelectItem key={o.value} value={o.value} disabled={o.value === 'client' && !canFilterByClient}>{o.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-          {/* Matches the prototype's .input (styles.css:178-188), overriding the shared
-              Input's own (different) defaults for this page specifically. */}
-          <Input
-            type="text"
-            value={search}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            disabled={searchBy === 'client'}
-            placeholder={SEARCH_BY_PLACEHOLDER[searchBy]}
-            className="h-auto text-[14px] w-72 py-3 px-3.5 rounded-[14px]"
-            style={{ background: 'var(--qms-surface-strong)', borderColor: 'var(--qms-border-strong)' }}
-          />
+          {/* Client search swaps in TenantAsyncPicker — `tenant` filter honored server-side only for project:manage. */}
+          {searchBy === 'client' ? (
+            <div className="w-72">
+              <TenantAsyncPicker value={clientId} label={clientLabel} onChange={handleClientChange} />
+            </div>
+          ) : (
+            <Input
+              type="text"
+              value={search}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder={SEARCH_BY_PLACEHOLDER[searchBy]}
+              className="h-auto text-[14px] w-72 py-3 px-3.5 rounded-[14px]"
+              style={{ background: 'var(--qms-surface-strong)', borderColor: 'var(--qms-border-strong)' }}
+            />
+          )}
           {canWrite && (
             <button
               onClick={() => setWizardOpen(true)}

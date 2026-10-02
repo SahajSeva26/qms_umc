@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { FiPlus, FiLayers, FiPackage, FiAlertCircle, FiCheckCircle, FiXCircle } from 'react-icons/fi'
+import { FiPlus, FiLayers, FiPackage, FiAlertCircle, FiCheckCircle, FiXCircle, FiClock, FiHelpCircle } from 'react-icons/fi'
 import { usePermission } from '@/hooks/usePermission'
 import { useInventoryConsumables } from '@/features/inventory/real/hooks/useInventoryConsumables'
 import { useInventoryConsumableReport } from '@/features/inventory/real/hooks/useInventoryConsumableReport'
@@ -23,13 +23,11 @@ import { truncateIdentifier } from '@/features/inventory/real/utils/truncateIden
 
 const PAGE_SIZE = 10
 
-// status is only visible for a manage-level caller — search silently
-// defaults to active-only otherwise. Rows must render in API order: FEFO (expiryDate ascending) is server-enforced, never re-sort client-side.
+// Rows must render in API order: FEFO (expiryDate ascending) is server-enforced, never re-sort client-side.
 const InventoryConsumablesPanel = () => {
   const { hasAnyPermission } = usePermission()
   const canManage = hasAnyPermission(['inventory-consumable:manage'])
-  // Independent of inventory-consumable:manage — the History trigger must show for anyone
-  // holding inventory-ledger:manage, whether or not they can edit this lot.
+  // Independent of inventory-consumable:manage — History shows for anyone holding inventory-ledger:manage.
   const canViewLedger = hasAnyPermission(['inventory-ledger:manage'])
 
   const [searchBar, setSearchBar] = useState<InventoryConsumableSearchBarValue>({ batch: '', item: null })
@@ -37,8 +35,7 @@ const InventoryConsumablesPanel = () => {
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
   const [editModal, setEditModal] = useState<{ open: boolean; lot: InventoryConsumableEntity | null }>({ open: false, lot: null })
   const [historySource, setHistorySource] = useState<InventoryMovementHistorySource | null>(null)
-  // Row click opens the read-only detail drawer — Edit and Movement history
-  // both live inside it, matching the prototype's drawer-first pattern.
+  // Row click opens the read-only detail drawer — Edit and Movement history both live inside it.
   const [detailLot, setDetailLot] = useState<InventoryConsumableEntity | null>(null)
 
   const { data, isLoading, error, refetch } = useInventoryConsumables({
@@ -57,14 +54,26 @@ const InventoryConsumablesPanel = () => {
     const byStatus = new Map(report.consumables.byStatus.map((s) => [s.status, s.count]))
     return [
       { key: 'lots', label: 'Consumable Lots', value: report.summary.consumableLots, tone: 'brand', icon: FiLayers },
-      // "Active stock units", not "Warehouse Qty" — there's no
-      // warehouse/location filter; it's the same value as summary.warehouseConsumableQuantity.
+      // "Active stock units", not "Warehouse Qty" — there's no warehouse/location filter.
       { key: 'stock-units', label: 'Active stock units', value: report.consumables.warehouseQuantity, tone: 'teal', icon: FiPackage },
-      // Distinct from the 'expired' status tile below: this is a date-based
-      // count (past expiryDate), not the lot's own status field.
+      // Distinct from the 'expired' status tile below: date-based (past expiryDate), not the lot's own status field.
       { key: 'expired-by-date', label: 'Expired (by date)', value: report.consumables.expiredByDate, tone: 'amber', icon: FiAlertCircle },
       { key: 'status-active', label: INVENTORY_CONSUMABLE_STATUS_LABEL.active, value: byStatus.get('active') ?? 0, tone: 'emerald', icon: FiCheckCircle },
       { key: 'status-expired', label: INVENTORY_CONSUMABLE_STATUS_LABEL.expired, value: byStatus.get('expired') ?? 0, tone: 'rose', icon: FiXCircle },
+    ]
+  }, [report])
+
+  // Collection-wide breakdown, same band taxonomy/colors as ExpiryBandPill's per-row bands.
+  const expiryBandTiles = useMemo<InventoryReportTile[]>(() => {
+    if (!report?.consumables.expiryBands) return []
+    const bands = report.consumables.expiryBands
+    return [
+      { key: 'band-expired', label: 'Expired', value: bands.expired, tone: 'rose', icon: FiXCircle },
+      { key: 'band-30', label: '< 30 days', value: bands.within30, tone: 'rose', icon: FiAlertCircle },
+      { key: 'band-30-90', label: '30–90 days', value: bands.within30to90, tone: 'amber', icon: FiClock },
+      { key: 'band-90-180', label: '90–180 days', value: bands.within90to180, tone: 'amber', icon: FiClock },
+      { key: 'band-180', label: '180+ days', value: bands.beyond180, tone: 'emerald', icon: FiCheckCircle },
+      { key: 'band-none', label: 'No expiry set', value: bands.noExpiry, tone: 'brand', icon: FiHelpCircle },
     ]
   }, [report])
 
@@ -92,6 +101,17 @@ const InventoryConsumablesPanel = () => {
         canView={canManage}
         skeletonCount={5}
       />
+
+      {canManage && (
+        <InventoryReportKpiStrip
+          tiles={expiryBandTiles}
+          isLoading={reportLoading}
+          error={reportError}
+          canView={canManage}
+          skeletonCount={6}
+          heading="FEFO expiry outlook — all lots"
+        />
+      )}
 
       <div
         className="flex flex-wrap items-center gap-2 mb-3 rounded-xl border p-2.5"

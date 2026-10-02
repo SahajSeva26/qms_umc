@@ -8,6 +8,7 @@ import { usePharmaCamps } from '@/features/pharma/hooks/usePharmaCamps'
 import { PHARMA_ROUTES, getPharmaRoleMeta } from '@/features/pharma/pharma.constants'
 import PharmaCampTable from '@/features/pharma/components/PharmaCampTable'
 import PharmaCampsNav from '@/features/pharma/components/PharmaCampsNav'
+import PharmaCampDetailDrawer from '@/features/pharma/components/PharmaCampDetailDrawer'
 import BookCampForm from '@/features/pharma/components/BookCampForm'
 import ProjectStatusPill from '@/features/projects/components/ProjectStatusPill'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
@@ -21,6 +22,7 @@ import { useSession } from '@/hooks/useSession'
 import { parsePatientExpectation } from '@/features/pharma/utils/patientExpectation'
 import { allowedCampTypesForProjectTypes, type WhoCanBookCampCode } from '@/types/project.types'
 import { CAMP_TYPE_LABEL } from '@/types/campReal.types'
+import type { CampEntity } from '@/types/campReal.types'
 
 const PAGE_SIZE = 10
 
@@ -44,6 +46,7 @@ const TypeScopedPharmaCampsContent = ({ type, title }: TypeScopedPharmaCampsPage
   const { session } = useSession()
   const [bookOpen, setBookOpen] = useState(false)
   const [patientExpectationInput, setPatientExpectationInput] = useState('')
+  const [openCamp, setOpenCamp] = useState<CampEntity | null>(null)
   const { page, setPage, totalPages } = usePagination(PAGE_SIZE)
 
   const { data: projectData, isLoading: projectLoading, error: projectError } = usePharmaProject(id)
@@ -72,8 +75,7 @@ const TypeScopedPharmaCampsContent = ({ type, title }: TypeScopedPharmaCampsPage
   const projectAllowsThisType = project ? allowedCampTypesForProjectTypes(project.type).includes(type) : false
   const roleCanBook = !project || project.whoCanBookCamp.length === 0 || project.whoCanBookCamp.includes((session?.roleType?.code ?? '') as WhoCanBookCampCode)
   const hasSlots = !!project && project.campTimeSlots.length > 0
-  // Matches the prototype's live-project rule (backend doesn't enforce it — see ui-revisions.md).
-  // Reachable via direct URL, so this check can't rely on the picker's own status filter alone.
+  // Proactive UX check, not the only guard — POST /camps/book itself 409s on a non-live project.
   const isLive = !!project && project.status === 'live'
   const canBook = roleCanBook && hasSlots && projectAllowsThisType && isLive
   const cannotBookReason = !isLive
@@ -158,10 +160,12 @@ const TypeScopedPharmaCampsContent = ({ type, title }: TypeScopedPharmaCampsPage
                 {emptyCampsText}
               </div>
             ) : (
-              <PharmaCampTable camps={camps} />
+              <PharmaCampTable camps={camps} onOpenCamp={setOpenCamp} />
             )}
             <PaginationControls page={page} totalPages={totalPages(totalCamps)} onPageChange={setPage} />
           </QueryStateBlock>
+
+          <PharmaCampDetailDrawer camp={openCamp} onClose={() => setOpenCamp(null)} />
 
           <Dialog open={bookOpen} onOpenChange={setBookOpen}>
             <DialogContent className="sm:max-w-lg">

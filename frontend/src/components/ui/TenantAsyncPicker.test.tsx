@@ -14,8 +14,6 @@ function makeQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } })
 }
 
-// The platform's own tenant (type: 'platform') must never be selectable here —
-// this picker is scoped to real customer companies only.
 describe('TenantAsyncPicker', () => {
   beforeEach(() => {
     vi.resetAllMocks()
@@ -71,5 +69,29 @@ describe('TenantAsyncPicker', () => {
     await user.click(option)
 
     expect(onChange).toHaveBeenCalledWith('tenant-cipla', 'Cipla (cipla)')
+  })
+
+  it('shows an error state with a working Retry on a failed search, instead of silently reading as "no results"', async () => {
+    searchTenants.mockRejectedValue(new Error('network error'))
+    const user = userEvent.setup()
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <TenantAsyncPicker value="" label="" onChange={vi.fn()} />
+      </QueryClientProvider>,
+    )
+
+    await user.type(screen.getByPlaceholderText(/search company by name/i), 'Cipla')
+
+    expect(await screen.findByText(/couldn't search companies/i)).toBeInTheDocument()
+    expect(screen.queryByText(/no matching companies found/i)).not.toBeInTheDocument()
+
+    searchTenants.mockResolvedValue({
+      success: true,
+      message: '',
+      data: { count: 1, items: [{ id: 'tenant-cipla', name: 'Cipla', code: 'cipla' }] },
+    })
+    await user.click(screen.getByRole('button', { name: /retry/i }))
+
+    expect(await screen.findByText('Cipla (cipla)')).toBeInTheDocument()
   })
 })

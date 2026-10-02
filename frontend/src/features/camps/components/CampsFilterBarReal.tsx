@@ -2,9 +2,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import SearchInput from '@/components/ui/SearchInput'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import DoctorAsyncPicker from '@/components/widgets/doctor/DoctorAsyncPicker'
+import TenantAsyncPicker from '@/components/ui/TenantAsyncPicker'
 import type { CampsRealFilterState } from '@/features/camps/hooks/useCampsRealFilters'
 import type { BillingType, CampStatus, CampType } from '@/types/campReal.types'
-import { CAMP_STATUS_LABEL } from '@/features/camps/components/CampStatusPillReal'
+import { CAMP_STATUS_LABEL } from '@/components/widgets/camp/campStatus.constants'
 
 const STATUS_OPTIONS: CampStatus[] = ['requested', 'confirmed', 'live', 'closed', 'cancelled', 'cancelled_charged']
 
@@ -25,16 +27,13 @@ interface CampsFilterBarRealProps {
   reset: () => void
   // Set by pages already scoped to a single fixed type (e.g. Screening/Diet).
   hideType?: boolean
+  // The `tenant` filter is only honored server-side for camp:manage (camp.service.ts) — hidden for anyone else.
+  canFilterByClient?: boolean
 }
 
-// project/division/doctor/fo are also real query params but are ObjectId-based
-// and left out of this quick filter bar — no picker UI for them yet.
-//
-// Matches the prototype's .filterbar sizing (camps.js:265-305, styles.css:973-985); applied
-// per-instance rather than changing the shared Input/Select components.
 const FIELD_CLASS = 'h-auto rounded-lg px-2.5 py-1.5 text-[12px]'
 
-const CampsFilterBarReal = ({ filters, setFilter, reset, hideType = false }: CampsFilterBarRealProps) => {
+const CampsFilterBarReal = ({ filters, setFilter, reset, hideType = false, canFilterByClient = false }: CampsFilterBarRealProps) => {
   return (
     <div
       className="flex flex-wrap items-center gap-2 px-3 py-2.5 mb-3 rounded-[14px] border"
@@ -95,9 +94,6 @@ const CampsFilterBarReal = ({ filters, setFilter, reset, hideType = false }: Cam
         className={`w-28 ${FIELD_CLASS}`}
       />
 
-      {/* Prototype's search matches camp ID/doctor/city/client (camps.js:168-172) — ours matches
-          code + city (both real backend filters); doctor/client name have no free-text match on
-          SearchCampQuerySchema (only id-based filters), so those aren't offered here. */}
       <SearchInput
         value={filters.code}
         onChange={(v) => setFilter('code', v)}
@@ -108,8 +104,24 @@ const CampsFilterBarReal = ({ filters, setFilter, reset, hideType = false }: Cam
         value={filters.city}
         onChange={(v) => setFilter('city', v)}
         placeholder="Search by city..."
-        className={`min-w-52 flex-1 ${FIELD_CLASS}`}
+        className={`min-w-40 flex-1 ${FIELD_CLASS}`}
       />
+      <div className="w-48">
+        <DoctorAsyncPicker
+          value={filters.doctorId}
+          label={filters.doctorLabel}
+          onChange={(id, l) => { setFilter('doctorId', id); setFilter('doctorLabel', l) }}
+        />
+      </div>
+      {canFilterByClient && (
+        <div className="w-48">
+          <TenantAsyncPicker
+            value={filters.clientId}
+            label={filters.clientLabel}
+            onChange={(id, l) => { setFilter('clientId', id); setFilter('clientLabel', l) }}
+          />
+        </div>
+      )}
 
       <Button variant="outline" size="sm" onClick={reset}>
         Reset

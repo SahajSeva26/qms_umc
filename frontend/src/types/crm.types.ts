@@ -80,6 +80,13 @@ export interface DivisionEntity {
   status?: DivisionStatus
   // Same gate as `status`. Bare id when unpopulated (e.g. echoed from create).
   owner?: DivisionPopulatedOwnerRole | string
+  // Only present when search() was called with report=true.
+  stats?: DivisionStats
+}
+
+export interface DivisionStats {
+  totalProjects: number
+  liveProjects: number
 }
 
 export interface SearchDivisionQuery {
@@ -95,6 +102,8 @@ export interface SearchDivisionQuery {
   owner?: string
   page?: string
   limit?: string
+  // When 'true', each item gets a `stats` object (see DivisionStats).
+  report?: 'true' | 'false'
 }
 
 export interface CreateDivisionPayload {
@@ -200,10 +209,8 @@ export const LEAD_STATUS_COLOR: Record<LeadStatus, string> = {
   lost: 'var(--danger)',
 }
 
-// Text color for a pill label on a pale LEAD_STATUS_COLOR tint — each stage's raw
-// hue fails 4.5:1 as its own text on its own tint, so this is a darkened (light
-// mode) or already-legible (dark mode) variant of that SAME stage's color, not a
-// shared generic ink — keeps every stage visually distinct, matching won/lost.
+// Each stage's raw hue fails 4.5:1 as its own text on its own tint, so this is a
+// darkened/legible variant of that SAME stage's color — keeps every stage visually distinct.
 export const LEAD_STATUS_TEXT_COLOR: Record<LeadStatus, string> = {
   new: 'var(--qms-lead-stage-new-text)',
   qualified: 'var(--qms-lead-stage-qualified-text)',

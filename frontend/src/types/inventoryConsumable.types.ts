@@ -10,11 +10,22 @@ export const INVENTORY_CONSUMABLE_STATUS_LABEL: Record<InventoryConsumableStatus
 
 // GET /inventory-consumables/report, gated on inventory-consumable:manage.
 // summary/consumables both surface warehouseQuantity — same value, twice.
+export interface InventoryConsumableExpiryBands {
+  expired: number
+  within30: number
+  within30to90: number
+  within90to180: number
+  beyond180: number
+  noExpiry: number
+}
+
 export interface InventoryConsumableReportResponse {
   summary: { consumableLots: number; warehouseConsumableQuantity: number }
   consumables: {
     warehouseQuantity: number
     expiredByDate: number
+    // FEFO expiry-band counts, collection-wide (not per-row) — mirrors ExpiryBandPill's bands.
+    expiryBands: InventoryConsumableExpiryBands
     byStatus: { status: InventoryConsumableStatus; count: number }[]
   }
 }

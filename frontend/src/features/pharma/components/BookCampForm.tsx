@@ -14,7 +14,7 @@ import type { LocationValue } from '@/types/location.types'
 import type { LocationResolutionState } from '@/components/widgets/location-picker/location.types'
 import DoctorDistancePicker from '@/features/pharma/components/DoctorDistancePicker'
 import MrPicker from '@/features/pharma/components/MrPicker'
-import EditDoctorModal from '@/features/doctors/components/EditDoctorModal'
+import { EditDoctorModal } from '@/features/doctors'
 import DayStripAvailability from '@/features/pharma/components/DayStripAvailability'
 import LocationPicker from '@/components/widgets/location-picker/LocationPicker'
 import LocationAddressFields from '@/components/widgets/location-picker/LocationAddressFields'
@@ -80,24 +80,15 @@ interface BookCampFormProps {
   needsMrPicker: boolean
   /** Locked context from the caller's page, never user-editable — no Camp type picker shown. */
   type: CampType | null
-  /** Locked context from the caller's page, never user-editable — not part of RHF/Zod form state,
-   * just used directly to build the booking payload. Null before the caller's own project/
-   * camp-type picker (e.g. MrBookCampTab) has a selection — the form stays mounted, with the
-   * sections that need it disabled and showing a placeholder. */
+  /** Locked context from the caller's page — null until the caller's own project/camp-type picker has a selection. */
   project: { id: string; name: string; campTimeSlots: CampTimeSlotValue[] } | null
-  /** Owned by the caller's own "Project & camp" section (matches the prototype's field placement,
-   * not this form's own sections) — passed through untouched into the booking payload. */
+  /** Owned by the caller's own "Project & camp" section — passed through untouched into the booking payload. */
   patientExpectation: number | undefined
-  /** True when the caller's own externally-owned patientExpectation input is currently invalid
-   * (e.g. negative/decimal) — blocks the submit button here too, since that field has no
-   * validation of its own inside this form's RHF/Zod pipeline and would otherwise fail silently
-   * deep in onSubmit with no rendered error. */
+  /** True when the caller's externally-owned patientExpectation input is invalid — blocks submit here too. */
   patientExpectationInvalid?: boolean
-  /** Called on mutation success with the created camp — the caller closes its dialog (or resets
-   * its inline form, for MR Portal, which has no dialog) and refetches. */
+  /** Called on mutation success — the caller closes its dialog (or resets its inline form) and refetches. */
   onBooked: (camp: ApiResponse<CampMutationResponseEntity>) => void
-  /** Called when the user cancels out of the form — the caller owns closing its own dialog, or
-   * resetting its own inline state if it has no dialog (MR Portal). */
+  /** Called when the user cancels — the caller owns closing its own dialog or resetting its inline state. */
   onCancel: () => void
 }
 
@@ -122,11 +113,9 @@ const BookCampForm = ({ needsMrPicker, type, project, patientExpectation, patien
   const [locationHint, setLocationHint] = useState<string | null>(null)
 
   // /doctors/nearest scopes to the CALLING session's own division, never the picked MR's — an
-  // MR's division can drift from their supervisor's (see role.service.ts's handleSupervisor).
+  // MR's division can drift from their supervisor's.
   const [mrDivisionId, setMrDivisionId] = useState<string | null>(null)
   const actingDivisionId = session?.role.division ?? null
-  // "Unknown" division blocks like a genuine mismatch, but only once an MR is actually picked —
-  // before that, mrDivisionId being null just means "not chosen yet."
 
   const {
     register,

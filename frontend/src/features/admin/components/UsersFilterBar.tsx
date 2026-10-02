@@ -24,11 +24,13 @@ interface UsersFilterBarProps {
   tenantOptions: TenantOption[]
   /** Fired the first time the Company dropdown is opened — lets the page lazy-load its options instead of fetching them on every mount. */
   onCompanyDropdownOpen?: () => void
+  // False when the caller lacks role:search (plus tenant:admin/tenant:manage) or tenant:search/
+  // tenant:manage — the lookups behind this filter never fire.
+  canFilterByCompany: boolean
 }
 
-// Status has no "All" option (backend can't return every status in one call);
-// Tenant keeps "All" since it's filtered client-side over the fetched page.
-const UsersFilterBar = ({ filters, setFilter, reset, tenantOptions, onCompanyDropdownOpen }: UsersFilterBarProps) => {
+// Status has no "All" option (backend can't return every status in one call).
+const UsersFilterBar = ({ filters, setFilter, reset, tenantOptions, onCompanyDropdownOpen, canFilterByCompany }: UsersFilterBarProps) => {
   const tenantLabelById = new Map(tenantOptions.map((t) => [t.id, t.label]))
 
   return (
@@ -57,9 +59,10 @@ const UsersFilterBar = ({ filters, setFilter, reset, tenantOptions, onCompanyDro
           value={filters.tenant}
           onValueChange={(v) => setFilter('tenant', v ?? 'ALL')}
           onOpenChange={(open) => open && onCompanyDropdownOpen?.()}
+          disabled={!canFilterByCompany}
         >
           <SelectTrigger className="text-[12px]">
-            <SelectValue>{(v: string) => (v === 'ALL' ? 'Company' : (tenantLabelById.get(v) ?? 'Company'))}</SelectValue>
+            <SelectValue>{(v: string) => (!canFilterByCompany ? "Can't filter by company" : v === 'ALL' ? 'Company' : (tenantLabelById.get(v) ?? 'Company'))}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="ALL">All</SelectItem>

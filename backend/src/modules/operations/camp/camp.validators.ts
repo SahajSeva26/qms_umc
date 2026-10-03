@@ -96,10 +96,10 @@ export const BookCampPayloadSchema = z.object({
 export type IBookCampPayload = z.infer<typeof BookCampPayloadSchema>;
 
 //2: update ====================================>
-// project/tenant/division/status are NOT editable here — status moves through moveStage()
+// project/tenant/division/status/type are NOT editable here — status moves through moveStage(), and
+// type is immutable after creation (it decides the camp's worker kind).
 export const UpdateCampPayloadSchema = z.object({
     doctor: objectId('Doctor').optional(),
-    type: z.enum(Object.values(CAMP_TYPES)).optional(),
     billingType: z.enum(Object.values(BILLING_TYPES)).optional(),
     patientExpectation: z.number().int().nonnegative().optional(),
     fo: objectId('FO').optional(),

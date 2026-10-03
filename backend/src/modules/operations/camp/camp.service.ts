@@ -532,6 +532,11 @@ const create = async (model: ICreateCampPayload, ctx: RequestContext): Promise<H
         if (projectDoc.tenant.toString() !== model.tenant) {
             return throwAppError('The selected project does not belong to the selected client', StatusCodes.BAD_REQUEST);
         }
+        // the camp's type must be one the project offers (project.type is an array of offerings)
+        const campType = model.type ?? CAMP_TYPES.SCREENING;
+        if (!((projectDoc.type as string[]) || []).includes(campType)) {
+            return throwAppError(`This project does not offer ${campType} camps`, StatusCodes.BAD_REQUEST);
+        }
         project = projectDoc._id;
         divisionId = projectDoc.division;
     }

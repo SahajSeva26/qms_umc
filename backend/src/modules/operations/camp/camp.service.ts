@@ -37,6 +37,7 @@ import { ScreeningModel } from '../screening/screening.model';
 import { SCREENING_STATUS } from '../screening/screening.constants';
 import { InventoryMasterModel } from '../../inventory/inventory-master/inventory-master.model';
 import { InventoryAssignmentModel } from '../../inventory/inventory-assignment/inventory-assignment.model';
+import { INVENTORY_DEVICE_STATUS } from '../../inventory/inventory-device/inventory-device.constants';
 import { ITEM_TYPES } from '../../inventory/inventory-master/inventory-master.constants';
 
 type CampDocument = HydratedDocument<ICamp> | null;
@@ -239,14 +240,17 @@ const resolveNearestFreeFoRole = async (camp: HydratedDocument<ICamp>, ctx: Requ
         assignee: { $in: freeProfiles.map((profile: any) => profile.role) },
         inventoryType: 'InventoryDevice',
     })
-        .populate({ path: 'inventory', select: 'item' })
+        .populate({ path: 'inventory', select: 'item status' })
         .lean();
 
     const heldByRole = new Map<string, Set<string>>();
     for (const assignment of assignments) {
         const roleId = assignment.assignee?.toString();
-        const itemId = (assignment.inventory as any)?.item?.toString();
-        if (!roleId || !itemId) {
+        const device = assignment.inventory as any;
+        const itemId = device?.item?.toString();
+        // only an operational, in-hand unit counts — a lost/damaged/maintenance (or not-yet-received)
+        // device doesn't actually equip the FO for the camp.
+        if (!roleId || !itemId || device?.status !== INVENTORY_DEVICE_STATUS.ASSIGNED) {
             continue;
         }
         if (!heldByRole.has(roleId)) {

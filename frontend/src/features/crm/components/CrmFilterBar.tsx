@@ -45,11 +45,27 @@ const CrmFilterBar = ({ filters, setFilter, reset }: CrmFilterBarProps) => (
     </div>
 
     <SearchInput
+      value={filters.code}
+      onChange={(v) => setFilter('code', v)}
+      placeholder="Search code..."
+      className="text-[12px]"
+      wrapperClassName="w-32 ml-auto"
+    />
+
+    <SearchInput
+      value={filters.focusTherapy}
+      onChange={(v) => setFilter('focusTherapy', v)}
+      placeholder="Search therapy..."
+      className="text-[12px]"
+      wrapperClassName="w-36"
+    />
+
+    <SearchInput
       value={filters.q}
       onChange={(v) => setFilter('q', v)}
       placeholder="Search title..."
       className="text-[12px]"
-      wrapperClassName="w-56 ml-auto"
+      wrapperClassName="w-56"
     />
 
     <Button variant="outline" size="sm" onClick={reset}>↺ Reset</Button>

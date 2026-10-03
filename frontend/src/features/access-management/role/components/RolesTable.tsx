@@ -3,22 +3,12 @@ import type { RoleEntity, RolePopulatedRoleType, RolePopulatedTenant, RolePopula
 import { ROLE_ROUTES } from '@/features/access-management/role/role.routes'
 import RoleStatusPill from '@/features/access-management/role/components/RoleStatusPill'
 
-// Hand-built table matching `@/features/access-management/role-type/components/RoleTypesTable.tsx`
-// / `@/features/admin/components/UsersTable.tsx` exactly: var(--qms-*) custom
-// properties, no shadcn Table, row-click navigates to the detail route,
-// inline empty state. Columns per the task: code, name, role type name,
-// bound user name/email, status — a Role is the "ID card" binding one user to
-// one RoleType, so those two populated relations are the interesting columns
-// beyond the role's own fields.
-//
-// RoleEntity['type']/['user'] are typed as `Populated | string` (see
-// accessManagement.types.ts) because create/update responses return raw ObjectIds while
-// GET-by-id/search populate them — search results (what this table renders)
-// are always populated, but the helpers below tolerate the raw-string shape
-// defensively rather than assuming.
+// RoleEntity['type']/['user'] are `Populated | string`: create/update return raw ObjectIds, search/get populate them.
 
 interface RolesTableProps {
   roles: RoleEntity[]
+  // GET /roles/:id requires tenant:admin/tenant:manage/role:get — role:search alone (enough for the list) 403s. Non-navigable when false.
+  canOpenDetail: boolean
 }
 
 function roleTypeLabel(type: RoleEntity['type']): string {
@@ -44,91 +34,72 @@ function userEmail(user: RoleEntity['user']): string {
   return (user as RolePopulatedUser)?.email ?? ''
 }
 
-const RolesTable = ({ roles }: RolesTableProps) => {
+function initial(name: string): string {
+  return name.trim().charAt(0).toUpperCase() || '?'
+}
+
+const RolesTable = ({ roles, canOpenDetail }: RolesTableProps) => {
   const navigate = useNavigate()
 
-  return (
-    <div
-      className="rounded-xl border overflow-hidden"
-      style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}
-    >
-      <div className="overflow-x-auto">
-        <table className="w-full text-[13px]">
-          <thead>
-            <tr style={{ borderBottom: '1px solid var(--qms-border)' }}>
-              <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                Code
-              </th>
-              <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                Name
-              </th>
-              <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                Company
-              </th>
-              <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                Role Type
-              </th>
-              <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                User
-              </th>
-              <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                Status
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {roles.map((role) => (
-              <tr
-                key={role.id}
-                onClick={() => navigate(ROLE_ROUTES.ROLE_DETAIL.replace(':id', role.id))}
-                className="cursor-pointer transition-colors hover:bg-(--qms-surface-hover)"
-                style={{ borderBottom: '1px solid var(--qms-border)' }}
-              >
-                <td className="px-4 py-2.5">
-                  <span className="font-semibold font-mono" style={{ color: 'var(--qms-text)' }}>
-                    {role.code}
-                  </span>
-                </td>
-                <td className="px-4 py-2.5">
-                  <div className="font-semibold truncate" style={{ color: 'var(--qms-text)' }}>
-                    {role.name}
-                  </div>
-                  {role.description && (
-                    <div className="text-[11px] truncate" style={{ color: 'var(--qms-text-muted)' }}>
-                      {role.description}
-                    </div>
-                  )}
-                </td>
-                <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                  {tenantLabel(role.tenant)}
-                </td>
-                <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>
-                  {roleTypeLabel(role.type)}
-                </td>
-                <td className="px-4 py-2.5">
-                  <div className="font-semibold truncate" style={{ color: 'var(--qms-text)' }}>
-                    {userName(role.user)}
-                  </div>
-                  {userEmail(role.user) && (
-                    <div className="text-[11px] truncate" style={{ color: 'var(--qms-text-muted)' }}>
-                      {userEmail(role.user)}
-                    </div>
-                  )}
-                </td>
-                <td className="px-4 py-2.5">
-                  <RoleStatusPill status={role.status} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+  if (roles.length === 0) {
+    return (
+      <div className="px-4 py-10 text-center text-[13px] rounded-xl border border-dashed" style={{ color: 'var(--qms-text-muted)', borderColor: 'var(--qms-border)' }}>
+        No roles found.
       </div>
+    )
+  }
 
-      {roles.length === 0 && (
-        <div className="px-4 py-10 text-center text-[13px]" style={{ color: 'var(--qms-text-muted)' }}>
-          No roles found.
+  return (
+    <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
+      {roles.map((role) => (
+        <div
+          key={role.id}
+          onClick={canOpenDetail ? () => navigate(ROLE_ROUTES.ROLE_DETAIL.replace(':id', role.id)) : undefined}
+          onKeyDown={canOpenDetail ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(ROLE_ROUTES.ROLE_DETAIL.replace(':id', role.id)) } } : undefined}
+          role={canOpenDetail ? 'button' : undefined}
+          tabIndex={canOpenDetail ? 0 : undefined}
+          className={`rounded-xl border p-4 transition-transform ${canOpenDetail ? 'cursor-pointer hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--qms-brand)' : ''}`}
+          style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)', backdropFilter: 'blur(20px) saturate(140%)' }}
+        >
+          <div className="flex items-start gap-3 mb-3">
+            <div
+              className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 font-extrabold text-white"
+              style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
+            >
+              {initial(role.name)}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <div className="font-bold text-[14px] truncate" style={{ color: 'var(--qms-text)' }}>{role.name}</div>
+                <RoleStatusPill status={role.status} />
+              </div>
+              <div className="text-[11px] font-mono truncate" style={{ color: 'var(--qms-text-muted)' }}>{role.code}</div>
+              {role.description && (
+                <div className="text-[11px] truncate mt-0.5" style={{ color: 'var(--qms-text-muted)' }}>{role.description}</div>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 p-2.5 rounded-lg mb-2.5" style={{ background: 'var(--qms-surface-strong)', border: '1px solid var(--qms-border)' }}>
+            <div>
+              <div className="text-[12px] font-extrabold truncate" style={{ color: 'var(--qms-text)' }}>{tenantLabel(role.tenant)}</div>
+              <div className="text-[9px] uppercase tracking-wide" style={{ color: 'var(--qms-text-muted)' }}>Company</div>
+            </div>
+            <div>
+              <div className="text-[12px] font-extrabold truncate" style={{ color: 'var(--qms-text)' }}>{roleTypeLabel(role.type)}</div>
+              <div className="text-[9px] uppercase tracking-wide" style={{ color: 'var(--qms-text-muted)' }}>Role type</div>
+            </div>
+            <div>
+              <div className="text-[12px] font-extrabold truncate" style={{ color: 'var(--qms-text)' }}>{userName(role.user)}</div>
+              <div className="text-[9px] uppercase tracking-wide" style={{ color: 'var(--qms-text-muted)' }}>User</div>
+            </div>
+          </div>
+
+          {userEmail(role.user) && (
+            <div className="text-[11px] truncate" style={{ color: 'var(--qms-text-muted)' }}>{userEmail(role.user)}</div>
+          )}
         </div>
-      )}
+      ))}
     </div>
   )
 }

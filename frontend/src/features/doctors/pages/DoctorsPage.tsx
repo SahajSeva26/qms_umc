@@ -26,10 +26,10 @@ const TABS: { id: TabId; label: string; icon: typeof FiUsers }[] = [
   { id: 'inactive', label: 'Inactive', icon: FiMoon },
 ]
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 10
 
-// Specialties/Geography tabs aggregate over only this many active doctors —
-// pending a backend aggregation endpoint, not adjustable by raising this value.
+// Specialties/Geography tabs' city/specialization counts aggregate over only this many active
+// doctors (pending a backend aggregation endpoint) — labeled as a sample in the UI, not presented as whole-dataset metrics.
 const AGGREGATE_LIMIT = 10
 
 const DoctorsPage = () => {
@@ -56,21 +56,26 @@ const DoctorsPage = () => {
       state: debouncedState || undefined,
       page: String(page),
       limit: String(PAGE_SIZE),
+      report: 'true',
     },
     { keepPreviousData: true },
   )
   const doctors = data?.data?.items ?? EMPTY_ARRAY
   const totalCount = data?.data?.count ?? 0
 
-  // search() defaults to status=active for everyone, so this covers exactly
-  // the "normal" doctor-master view Specialties/Geography summarize.
-  const { data: activeData } = useDoctors({ limit: String(AGGREGATE_LIMIT) })
+  // activeDoctors is only a sample for the Specialties/Geography breakdown — the response's own
+  // `count` (the real whole-dataset total) backs the KPI tiles instead.
+  const needsActiveSample = tab === 'specialties' || tab === 'geography'
+  const { data: activeData, isLoading: activeLoading, error: activeError, refetch: refetchActive } = useDoctors({
+    limit: String(AGGREGATE_LIMIT),
+    report: needsActiveSample ? 'true' : undefined,
+  })
   const activeDoctors = activeData?.data?.items ?? EMPTY_ARRAY
+  const activeTotalCount = activeData?.data?.count ?? 0
 
-  // Needs its own query (not client-side filtering of the roster/active
-  // list) since the backend only returns inactive doctors on explicit request.
-  const { data: inactiveData } = useDoctors(
-    canSeeInactive ? { status: 'inactive', page: String(inactivePage), limit: String(PAGE_SIZE) } : { limit: '0' },
+  // Needs its own query since the backend only returns inactive doctors on explicit request.
+  const { data: inactiveData, isLoading: inactiveLoading, error: inactiveError, refetch: refetchInactive } = useDoctors(
+    canSeeInactive ? { status: 'inactive', page: String(inactivePage), limit: String(PAGE_SIZE), report: tab === 'inactive' ? 'true' : undefined } : { limit: '0' },
     { enabled: canSeeInactive, keepPreviousData: true },
   )
   const inactiveDoctors = canSeeInactive ? inactiveData?.data?.items ?? EMPTY_ARRAY : EMPTY_ARRAY
@@ -86,13 +91,13 @@ const DoctorsPage = () => {
     resetToFirstPage()
   }
 
-  // `inactive` uses the response's `count`, not `inactiveDoctors.length`,
-  // since that array is just the current page of the Inactive tab.
+  // `active`/`inactive` use the response's own `count`; `cities`/`specializations` are still genuinely
+  // sampled (no backend aggregate for them) — surfaced as `isSample: true` so the UI can label them.
   const kpis = useMemo(() => {
     const cities = new Set(activeDoctors.map((d) => d.location?.city).filter(Boolean)).size
     const specializations = new Set(activeDoctors.map((d) => d.specialization)).size
-    return { cities, specializations, active: activeDoctors.length, inactive: inactiveTotalCount }
-  }, [activeDoctors, inactiveTotalCount])
+    return { cities, specializations, active: activeTotalCount, inactive: inactiveTotalCount, isSample: activeTotalCount > AGGREGATE_LIMIT }
+  }, [activeDoctors, activeTotalCount, inactiveTotalCount])
 
   const allKnownDoctors = [...doctors, ...activeDoctors, ...inactiveDoctors]
   const openDoctor = allKnownDoctors.find((d) => d.id === openDoctorId) ?? null
@@ -103,8 +108,7 @@ const DoctorsPage = () => {
     setTab('roster')
   }
 
-  // Bumped on every jump so StateCityFilter (remounted via this key) re-seeds even when the
-  // same city/state is clicked twice in a row.
+  // Bumped on every jump so StateCityFilter re-seeds even when the same city/state is clicked twice in a row.
   const [geographySeedKey, setGeographySeedKey] = useState(0)
   const [geographySeed, setGeographySeed] = useState<{ city: string; state: string } | null>(null)
 
@@ -147,12 +151,40 @@ const DoctorsPage = () => {
       </div>
 
       <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(168px, 1fr))' }}>
-        {/* Hidden without doctor:manage — backend can't scope this query to inactive for such callers. */}
+        {/* These are always-visible, independent queries — a failed/loading fetch must not silently read as "0 doctors". */}
         {canSeeInactive && (
-          <KpiTile label="Total doctors" value={String(kpis.active + kpis.inactive)} sub={`${kpis.cities} cities · ${kpis.specializations} specializations`} tone="brand" icon={FiUsers} />
+          <KpiTile
+            label="Total doctors"
+            value={
+              activeError || inactiveError ? '—'
+                : activeLoading || inactiveLoading ? '…'
+                  : String(kpis.active + kpis.inactive)
+            }
+            sub={
+              activeError ? 'Failed to load'
+                : activeLoading ? 'Loading…'
+                  : `${kpis.cities} cities · ${kpis.specializations} specializations${kpis.isSample ? ' (sample)' : ''}`
+            }
+            tone="brand"
+            icon={FiUsers}
+          />
         )}
-        <KpiTile label="Active" value={String(kpis.active)} tone="emerald" icon={FiCheckCircle} />
-        {canSeeInactive && <KpiTile label="Inactive" value={String(kpis.inactive)} tone="rose" icon={FiMoon} />}
+        <KpiTile
+          label="Active"
+          value={activeError ? '—' : activeLoading ? '…' : String(kpis.active)}
+          sub={activeError ? 'Failed to load' : activeLoading ? 'Loading…' : undefined}
+          tone="emerald"
+          icon={FiCheckCircle}
+        />
+        {canSeeInactive && (
+          <KpiTile
+            label="Inactive"
+            value={inactiveError ? '—' : inactiveLoading ? '…' : String(kpis.inactive)}
+            sub={inactiveError ? 'Failed to load' : inactiveLoading ? 'Loading…' : undefined}
+            tone="rose"
+            icon={FiMoon}
+          />
+        )}
       </div>
 
       <div className="flex flex-wrap gap-1 mb-4 border-b overflow-x-auto" style={{ borderColor: 'var(--qms-border)' }}>
@@ -174,9 +206,10 @@ const DoctorsPage = () => {
         })}
       </div>
 
-      <QueryStateBlock isLoading={isLoading} error={error} loadingLabel="Loading doctors…" errorLabel="Failed to load doctors. Please try again." onRetry={refetch}>
+      {/* Each tab has its own independent query — a failed/loading secondary query must not render as empty/zero under a different tab. */}
+      <>
         {tab === 'roster' && (
-          <>
+          <QueryStateBlock isLoading={isLoading} error={error} loadingLabel="Loading doctors…" errorLabel="Failed to load doctors. Please try again." onRetry={refetch}>
             <RosterTab
               doctors={doctors}
               filters={filters}
@@ -187,24 +220,28 @@ const DoctorsPage = () => {
               geographySeed={geographySeed}
             />
             <PaginationControls page={page} totalPages={totalPages(totalCount)} onPageChange={setPage} />
-          </>
+          </QueryStateBlock>
         )}
 
         {tab === 'specialties' && (
-          <SpecialtiesTab doctors={activeDoctors} onSelectSpecialization={handleGoToRosterWithSpecialization} />
+          <QueryStateBlock isLoading={activeLoading} error={activeError} loadingLabel="Loading specialties…" errorLabel="Failed to load doctors. Please try again." onRetry={refetchActive}>
+            <SpecialtiesTab doctors={activeDoctors} onSelectSpecialization={handleGoToRosterWithSpecialization} isSample={kpis.isSample} />
+          </QueryStateBlock>
         )}
 
         {tab === 'geography' && (
-          <GeographyTab doctors={activeDoctors} onSelectCityState={handleGoToRosterWithCityState} />
+          <QueryStateBlock isLoading={activeLoading} error={activeError} loadingLabel="Loading geography…" errorLabel="Failed to load doctors. Please try again." onRetry={refetchActive}>
+            <GeographyTab doctors={activeDoctors} onSelectCityState={handleGoToRosterWithCityState} isSample={kpis.isSample} />
+          </QueryStateBlock>
         )}
 
         {tab === 'inactive' && (
-          <>
+          <QueryStateBlock isLoading={inactiveLoading} error={inactiveError} loadingLabel="Loading inactive doctors…" errorLabel="Failed to load doctors. Please try again." onRetry={refetchInactive}>
             <InactiveTab doctors={inactiveDoctors} onOpenDoctor={setOpenDoctorId} />
             <PaginationControls page={inactivePage} totalPages={inactiveTotalPagesFor(inactiveTotalCount)} onPageChange={setInactivePage} />
-          </>
+          </QueryStateBlock>
         )}
-      </QueryStateBlock>
+      </>
 
       <DoctorDrawer
         doctor={openDoctor}

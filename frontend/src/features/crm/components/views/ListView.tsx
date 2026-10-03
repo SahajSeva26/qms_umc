@@ -11,9 +11,8 @@ import UserAvatar from '@/components/ui/UserAvatar'
 import StagePill from '@/features/crm/components/StagePill'
 import LeadAdvanceModal from '@/features/crm/components/LeadAdvanceModal'
 
-// Matches the prototype's column order/copy. "Follow-ups" has no real count
-// source (no lead<->meeting relation on our Lead model — see ui-revisions.md)
-// so it renders '—' rather than a fabricated number.
+// Matches the prototype's column order/copy. "Follow-ups" = lead.stats.followUps
+// (only present when the search was called with report=true).
 const COLUMNS = ['Lead', 'Company', 'Division', 'Person', 'Therapy', 'Status', 'Value', 'Follow-ups', 'Age', 'Status action', 'Owner']
 
 function daysSince(date: string): number {
@@ -90,8 +89,8 @@ const ListView = ({ leads, onOpen, onMoveStage, canManage }: ListViewProps) => {
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap"><StagePill status={lead.status} /></td>
                 <td className="px-3 py-2 whitespace-nowrap font-bold text-right" style={{ color: 'var(--qms-text)' }}>{formatINR(lead.estimatedValue)}</td>
-                <td className="px-3 py-2 whitespace-nowrap text-center">
-                  <span className="text-[10px] font-bold italic" style={{ color: 'var(--qms-brand)' }}>Coming soon</span>
+                <td className="px-3 py-2 whitespace-nowrap text-center" style={{ color: 'var(--qms-text)' }}>
+                  {lead.stats ? lead.stats.followUps : <span style={{ color: 'var(--qms-text-muted)' }}>—</span>}
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>{daysSince(lead.createdAt)}d</td>
                 <td className="px-3 py-2 whitespace-nowrap">

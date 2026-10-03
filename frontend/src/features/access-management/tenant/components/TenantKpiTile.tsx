@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react'
 
-// Prototype's .cm-tile/.cm-mini (client-management.js) — violet accent, translucent surface.
 const ACCENT = '#8b5cf6'
 
 interface TenantKpiTileProps {
@@ -11,7 +10,7 @@ interface TenantKpiTileProps {
 
 export const TenantKpiTile = ({ label, value, sub }: TenantKpiTileProps) => (
   <div
-    className="p-2.5 rounded-[11px] border transition-[border-color,transform] duration-100 hover:-translate-y-px"
+    className="p-2.5 rounded-[11px] border transition-transform duration-100 hover:-translate-y-px"
     style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}
     onMouseEnter={(e) => (e.currentTarget.style.borderColor = ACCENT)}
     onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--qms-border)')}
@@ -35,7 +34,6 @@ interface TenantMiniBreakdownProps {
   rows: { name: string; value: ReactNode }[]
 }
 
-// Prototype's .cm-mini — spans 2 grid columns, a labeled list instead of one big number.
 export const TenantMiniBreakdown = ({ label, rows }: TenantMiniBreakdownProps) => (
   <div
     className="p-2.5 rounded-[11px] border col-span-2"
@@ -57,13 +55,12 @@ export const TenantMiniBreakdown = ({ label, rows }: TenantMiniBreakdownProps) =
   </div>
 )
 
-export const TenantKpiGrid = ({ children }: { children: ReactNode }) => (
-  <div className="grid gap-2.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(168px, 1fr))' }}>
+export const TenantKpiGrid = ({ children, className }: { children: ReactNode; className?: string }) => (
+  <div className={`grid gap-2.5 ${className ?? ''}`} style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(168px, 1fr))' }}>
     {children}
   </div>
 )
 
-// Prototype's .cm-cat — uppercase label with a violet left accent bar (::before).
 export const TenantSectionLabel = ({ children }: { children: ReactNode }) => (
   <div className="flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-wide mb-2.5 mt-1" style={{ color: 'var(--qms-text-muted)', letterSpacing: '.08em' }}>
     <span className="w-1 h-3.5 rounded-sm shrink-0" style={{ background: ACCENT }} />

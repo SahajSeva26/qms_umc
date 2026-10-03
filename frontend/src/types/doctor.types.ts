@@ -22,10 +22,8 @@ export interface DoctorEntity {
   specialization: DoctorSpecialization
   mobile: string
   email: string
-  // Only search()/search-populated results resolve this to { _id, name, code, therapy } — a raw
-  // GET /doctors/:id (no populate:true passed by the controller) returns the bare id. Optional +
-  // nullable: a pre-division-scoping doctor record has no division key at all (omitted in JSON,
-  // not `null`), and a populated-but-hard-deleted Division resolves to a real `null` via Mongoose.
+  // Only search() populates this; GET /doctors/:id returns the bare id. A pre-division-scoping
+  // doctor has no key at all; a populated-but-hard-deleted Division resolves to a real `null`.
   division?: DoctorDivision | null
   // Doctors created before location was added have no location at all — the mapper returns
   // `doctor.location || null`, never assume this is always present.
@@ -35,9 +33,16 @@ export interface DoctorEntity {
   status?: DoctorStatus
   // Populated only on search() — create/update/get return the raw ObjectId string.
   tenant: string | { _id?: string; name: string; code: string }
-  // Only present on /doctors/nearest results — rounded meters, or explicitly null (never omitted
-  // on that endpoint) when the aggregation produced no numeric distance.
+  // Only present on /doctors/nearest results — rounded meters, or null when no numeric distance was produced.
   distanceMeters?: number | null
+  // Only present when search() was called with report=true.
+  stats?: DoctorStats
+}
+
+export interface DoctorStats {
+  camps: number
+  patients: number
+  patientsCompleted: number
 }
 
 export interface SearchDoctorQuery {
@@ -55,6 +60,8 @@ export interface SearchDoctorQuery {
   // Only honored server-side for a platform caller — a customer caller is
   // always hard-scoped to their own tenant regardless of this filter.
   tenant?: string
+  // When 'true', each item gets a `stats` object (see DoctorStats).
+  report?: 'true' | 'false'
 }
 
 // The 35km radius is server-fixed — no radius/range param exists.
@@ -65,9 +72,7 @@ export interface NearestDoctorQuery {
   limit?: string
 }
 
-// pharmaCode is the immutable natural key — required on create, never editable afterwards.
-// division is required going forward on every new create, even though existing entities may lack it.
-// email is REQUIRED on create — CreateDoctorPayloadSchema's `email: z.email()` has no `.optional()`.
+// pharmaCode is the immutable natural key. email is REQUIRED on create (no `.optional()` in the schema).
 export interface CreateDoctorPayload {
   pharmaCode: string
   name: string
@@ -93,9 +98,7 @@ export interface UpdateDoctorPayload {
   status?: DoctorStatus
 }
 
-// `tenant` is only sent/needed for a PLATFORM-type session — a customer
-// session is always pinned to its own tenant server-side. `division` is required — one upload
-// targets one division for every row in the file.
+// `tenant` is only sent/needed for a platform-type session. `division` is required — one upload targets one division.
 export interface BulkDoctorPayload {
   tenant?: string
   division: string

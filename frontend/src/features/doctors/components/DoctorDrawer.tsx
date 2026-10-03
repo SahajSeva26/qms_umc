@@ -13,8 +13,7 @@ interface DoctorDrawerProps {
   onEdit: () => void
 }
 
-// Camps/Patients/★/Engagement and the AI prediction panel have no backend equivalent (shown as —,
-// see md-files/ui-revisions.md); empanelment/MR-coverage/camp-history sections are dropped entirely.
+// Camps/Patients are real (report=true on doctor search); ★/Engagement and the AI prediction panel have no backend field yet.
 const DoctorDrawer = ({ doctor, canEdit, onClose, onEdit }: DoctorDrawerProps) => {
   if (!doctor) return <SideDrawer open={false} title="" onClose={onClose}>{null}</SideDrawer>
 
@@ -55,10 +54,9 @@ const DoctorDrawer = ({ doctor, canEdit, onClose, onEdit }: DoctorDrawerProps) =
         </div>
       </div>
 
-      {/* Camps count is a real Camp.doctor filter, no aggregate endpoint exists yet; Patients/★/Engagement have no backend field at all — see md-files/ui-revisions.md. */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-5">
-        <div className="doc-id-kpi"><div className="l">Camps closed</div><div className="v">—</div><div className="s">— upcoming</div></div>
-        <div className="doc-id-kpi"><div className="l">Patients</div><div className="v">—</div><div className="s">— Rx</div></div>
+        <div className="doc-id-kpi"><div className="l">Camps</div><div className="v">{d.stats ? d.stats.camps : '—'}</div><div className="s">total</div></div>
+        <div className="doc-id-kpi"><div className="l">Patients</div><div className="v">{d.stats ? d.stats.patientsCompleted : '—'}</div><div className="s">{d.stats ? `of ${d.stats.patients}` : '—'}</div></div>
         <div className="doc-id-kpi"><div className="l">Avg ★</div><div className="v">—</div><div className="s">Patient feedback</div></div>
         <div className="doc-id-kpi"><div className="l">Engagement</div><div className="v">—</div><div className="s">Score</div></div>
       </div>
@@ -71,7 +69,7 @@ const DoctorDrawer = ({ doctor, canEdit, onClose, onEdit }: DoctorDrawerProps) =
           <FiActivity size={12} /> AI prediction
         </div>
         <p className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>
-          Not available — no scoring model exists yet (see md-files/ui-revisions.md).
+          Not available — no scoring model exists yet.
         </p>
       </div>
 
@@ -98,8 +96,7 @@ const DoctorDrawer = ({ doctor, canEdit, onClose, onEdit }: DoctorDrawerProps) =
       <div className="flex items-center gap-2 flex-wrap mt-3">
         {d.mobile && <Button variant="outline" onClick={handleWhatsApp}><FiMessageCircle size={13} /> WhatsApp</Button>}
         {d.email && <Button variant="outline" onClick={handleEmail}><FiMail size={13} /> Email</Button>}
-        {/* PUT /doctors/:id is gated on doctor:manage server-side — hide the
-            entry point rather than let an edit attempt hit a 403. */}
+        {/* PUT /doctors/:id is gated on doctor:manage server-side. */}
         {canEdit && <Button onClick={onEdit}><FiEdit2 size={13} /> Edit</Button>}
         <Button variant="outline" className="ml-auto" onClick={onClose}>Close</Button>
       </div>

@@ -20,11 +20,11 @@ interface PermissionGroupsFilterBarProps {
   setFilter: <K extends keyof PermissionGroupsFilterState>(key: K, value: PermissionGroupsFilterState[K]) => void
   reset: () => void
   tenantOptions: TenantOption[]
+  // False when the caller lacks tenant:search/tenant:manage — the Company lookup never fires.
+  canFilterByTenant: boolean
 }
 
-// Trigger shows the dimension name ("Status", "Tenant") at "ALL", switching
-// to the selected option's label once something specific is picked.
-const PermissionGroupsFilterBar = ({ filters, setFilter, reset, tenantOptions }: PermissionGroupsFilterBarProps) => {
+const PermissionGroupsFilterBar = ({ filters, setFilter, reset, tenantOptions, canFilterByTenant }: PermissionGroupsFilterBarProps) => {
   const tenantLabelById = new Map(tenantOptions.map((t) => [t.id, t.label]))
 
   return (
@@ -50,9 +50,9 @@ const PermissionGroupsFilterBar = ({ filters, setFilter, reset, tenantOptions }:
           </SelectContent>
         </Select>
 
-        <Select value={filters.tenant} onValueChange={(v) => setFilter('tenant', v ?? 'ALL')}>
+        <Select value={filters.tenant} onValueChange={(v) => setFilter('tenant', v ?? 'ALL')} disabled={!canFilterByTenant}>
           <SelectTrigger className="text-[12px]">
-            <SelectValue>{(v: string) => (v === 'ALL' ? 'Company' : (tenantLabelById.get(v) ?? 'Company'))}</SelectValue>
+            <SelectValue>{(v: string) => (!canFilterByTenant ? "Can't filter by company" : v === 'ALL' ? 'Company' : (tenantLabelById.get(v) ?? 'Company'))}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="ALL">All</SelectItem>

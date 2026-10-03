@@ -24,9 +24,13 @@ const TenantsListPage = () => {
   const canFilterByType = hasPermission('system:manage')
 
   const debouncedSearch = useDebouncedValue(filters.search, 300)
+  const debouncedCity = useDebouncedValue(filters.city, 300)
+  const debouncedState = useDebouncedValue(filters.state, 300)
 
   const { data, isLoading, error, refetch } = useTenants({
     name: debouncedSearch || undefined,
+    city: debouncedCity || undefined,
+    state: debouncedState || undefined,
     status: filters.status === 'ALL' ? undefined : (filters.status as TenantStatus),
     type: canFilterByType ? (filters.type === 'ALL' ? undefined : filters.type) : 'customer',
     page: String(page),

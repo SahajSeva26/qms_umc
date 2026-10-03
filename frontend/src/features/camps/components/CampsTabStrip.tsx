@@ -1,10 +1,8 @@
 import type { IconType } from 'react-icons'
 import { FiInbox, FiCalendar, FiPlayCircle, FiCheckCircle, FiXCircle, FiAlertTriangle, FiList } from 'react-icons/fi'
 import type { CampStatus } from '@/types/campReal.types'
-import { CAMP_STATUS_LABEL } from '@/features/camps/components/CampStatusPillReal'
+import { CAMP_STATUS_LABEL } from '@/components/widgets/camp/campStatus.constants'
 
-// Prototype's 9-tab strip (camps.html:51-61) — "Completed · Data Pending" and "Tele Consultation"
-// have no real equivalent here (see md-files/ui-revisions.md); the other 7 tabs, incl. "All Camps", are kept.
 export type CampsTab = CampStatus | 'ALL'
 
 const TAB_ORDER: CampsTab[] = ['requested', 'confirmed', 'live', 'closed', 'cancelled', 'cancelled_charged', 'ALL']
@@ -30,8 +28,6 @@ interface CampsTabStripProps {
   onSelect: (tab: CampsTab) => void
 }
 
-// Prototype's .page-tabs/.page-tab (styles.css:1155-1178) — horizontally-scrollable row,
-// bottom-border active indicator in brand color, no background fill on the active tab.
 const CampsTabStrip = ({ active, onSelect }: CampsTabStripProps) => {
   return (
     <div className="flex overflow-x-auto mb-4" style={{ borderBottom: '1px solid var(--qms-border)' }}>

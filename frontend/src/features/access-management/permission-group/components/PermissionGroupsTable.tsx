@@ -3,96 +3,74 @@ import type { PermissionGroupEntity } from '@/types/accessManagement.types'
 import { PERMISSION_GROUP_ROUTES } from '@/features/access-management/permission-group/permission-group.routes'
 import PermissionGroupStatusPill from '@/features/access-management/permission-group/components/PermissionGroupStatusPill'
 
-// Hand-built table matching `@/features/access-management/tenant/components/TenantsTable.tsx`
-// exactly: var(--qms-*) custom properties, no shadcn Table, row-click
-// navigates to the detail route, inline empty state.
-
 interface PermissionGroupsTableProps {
   groups: PermissionGroupEntity[]
-  // group.tenant is a raw ObjectId string (never populated server-side —
-  // PermissionGroupEntity's own type comment), so the caller resolves it to
-  // a display name via this map (built from the same tenant list it already
-  // fetches for the page's Tenant filter dropdown) — falls back to the raw
-  // id if a tenant isn't found (e.g. deleted/inaccessible).
+  // group.tenant is a raw ObjectId; caller resolves it to a name via this map, falling back to the raw id.
   tenantLabelById?: Map<string, string>
+  // GET /permission-groups/:id requires permission-group:get — distinct from
+  // permission-group:search/tenant:admin, which is enough to reach this list.
+  canOpenDetail: boolean
 }
 
-const PermissionGroupsTable = ({ groups, tenantLabelById }: PermissionGroupsTableProps) => {
+function initial(name: string): string {
+  return name.trim().charAt(0).toUpperCase() || '?'
+}
+
+const PermissionGroupsTable = ({ groups, tenantLabelById, canOpenDetail }: PermissionGroupsTableProps) => {
   const navigate = useNavigate()
 
-  return (
-    <div
-      className="rounded-xl border overflow-hidden"
-      style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}
-    >
-      <div className="overflow-x-auto">
-        <table className="w-full text-[13px]">
-          <thead>
-            <tr style={{ borderBottom: '1px solid var(--qms-border)' }}>
-              <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                Code
-              </th>
-              <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                Name
-              </th>
-              <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                Company
-              </th>
-              <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                Status
-              </th>
-              <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                Permissions
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {groups.map((group) => (
-              <tr
-                key={group.id}
-                onClick={() => navigate(PERMISSION_GROUP_ROUTES.PERMISSION_GROUP_DETAIL.replace(':id', group.id))}
-                className="cursor-pointer transition-colors hover:bg-(--qms-surface-hover)"
-                style={{ borderBottom: '1px solid var(--qms-border)' }}
-              >
-                <td className="px-4 py-2.5">
-                  <span className="font-semibold" style={{ color: 'var(--qms-text)' }}>
-                    {group.code}
-                  </span>
-                </td>
-                <td className="px-4 py-2.5">
-                  <div className="font-semibold truncate" style={{ color: 'var(--qms-text)' }}>
-                    {group.name}
-                  </div>
-                  {group.description && (
-                    <div className="text-[11px] truncate" style={{ color: 'var(--qms-text-muted)' }}>
-                      {group.description}
-                    </div>
-                  )}
-                </td>
-                <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                  {tenantLabelById?.get(group.tenant) ?? group.tenant}
-                </td>
-                <td className="px-4 py-2.5">
-                  <PermissionGroupStatusPill status={group.status} />
-                </td>
-                <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>
-                  {/* `permissions` is only present server-side when the caller
-                      holds `system:manage` or `tenant:admin` (mapper gate) —
-                      show a neutral placeholder when it's absent rather than
-                      implying a count of zero. */}
-                  {group.permissions ? group.permissions.length : '—'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+  if (groups.length === 0) {
+    return (
+      <div className="px-4 py-10 text-center text-[13px] rounded-xl border border-dashed" style={{ color: 'var(--qms-text-muted)', borderColor: 'var(--qms-border)' }}>
+        No permission groups found.
       </div>
+    )
+  }
 
-      {groups.length === 0 && (
-        <div className="px-4 py-10 text-center text-[13px]" style={{ color: 'var(--qms-text-muted)' }}>
-          No permission groups found.
+  return (
+    <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
+      {groups.map((group) => (
+        <div
+          key={group.id}
+          onClick={canOpenDetail ? () => navigate(PERMISSION_GROUP_ROUTES.PERMISSION_GROUP_DETAIL.replace(':id', group.id)) : undefined}
+          onKeyDown={canOpenDetail ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(PERMISSION_GROUP_ROUTES.PERMISSION_GROUP_DETAIL.replace(':id', group.id)) } } : undefined}
+          role={canOpenDetail ? 'button' : undefined}
+          tabIndex={canOpenDetail ? 0 : undefined}
+          className={`rounded-xl border p-4 transition-transform ${canOpenDetail ? 'cursor-pointer hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--qms-brand)' : ''}`}
+          style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)', backdropFilter: 'blur(20px) saturate(140%)' }}
+        >
+          <div className="flex items-start gap-3 mb-3">
+            <div
+              className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 font-extrabold text-white"
+              style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
+            >
+              {initial(group.name)}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <div className="font-bold text-[14px] truncate" style={{ color: 'var(--qms-text)' }}>{group.name}</div>
+                <PermissionGroupStatusPill status={group.status} />
+              </div>
+              <div className="text-[11px] font-mono truncate" style={{ color: 'var(--qms-text-muted)' }}>{group.code}</div>
+              {group.description && (
+                <div className="text-[11px] truncate mt-0.5" style={{ color: 'var(--qms-text-muted)' }}>{group.description}</div>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 p-2.5 rounded-lg" style={{ background: 'var(--qms-surface-strong)', border: '1px solid var(--qms-border)' }}>
+            <div>
+              <div className="text-[12px] font-extrabold truncate" style={{ color: 'var(--qms-text)' }}>{tenantLabelById?.get(group.tenant) ?? group.tenant}</div>
+              <div className="text-[9px] uppercase tracking-wide" style={{ color: 'var(--qms-text-muted)' }}>Company</div>
+            </div>
+            <div>
+              {/* permissions omitted server-side without system:manage/tenant:admin — show '—', not a false 0. */}
+              <div className="text-[12px] font-extrabold" style={{ color: 'var(--qms-text)' }}>{group.permissions ? group.permissions.length : '—'}</div>
+              <div className="text-[9px] uppercase tracking-wide" style={{ color: 'var(--qms-text-muted)' }}>Permissions</div>
+            </div>
+          </div>
         </div>
-      )}
+      ))}
     </div>
   )
 }

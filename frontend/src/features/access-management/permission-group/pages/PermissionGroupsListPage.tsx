@@ -1,24 +1,26 @@
 import { usePermissionGroups } from '@/features/access-management/permission-group/hooks/usePermissionGroups'
 import { usePermissionGroupsFilters } from '@/features/access-management/permission-group/hooks/usePermissionGroupsFilters'
-import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
+import { useTenants } from '@/features/access-management/tenant'
 import PermissionGroupsTable from '@/features/access-management/permission-group/components/PermissionGroupsTable'
 import PermissionGroupsFilterBar from '@/features/access-management/permission-group/components/PermissionGroupsFilterBar'
 import PaginationControls from '@/components/ui/PaginationControls'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { usePagination } from '@/hooks/usePagination'
+import { usePermission } from '@/hooks/usePermission'
 import type { PermissionGroupStatus } from '@/types/accessManagement.types'
 
 const PAGE_SIZE = 10
 
-// Filters feed the react-query hook directly; pagination is server-side since
-// status/tenant/search are all applied in the backend's where-clause.
 const PermissionGroupsListPage = () => {
   const { filters, setFilter, reset } = usePermissionGroupsFilters()
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
+  const { hasAnyPermission } = usePermission()
+  // GET /permission-groups/:id needs permission-group:get — distinct from the list's search/tenant:admin gate.
+  const canOpenDetail = hasAnyPermission(['permission-group:get'])
+  // GET /tenants (Company filter) needs tenant:search/tenant:manage — permission-group:search alone lacks both.
+  const canFilterByTenant = hasAnyPermission(['tenant:search', 'tenant:manage'])
 
-  // Debounced so each keystroke doesn't fire its own request — only the
-  // value still present 300ms after typing stops flows into the query below.
   const debouncedSearch = useDebouncedValue(filters.search, 300)
 
   const { data, isLoading, error, refetch } = usePermissionGroups({
@@ -31,7 +33,7 @@ const PermissionGroupsListPage = () => {
   const groups = data?.data?.items ?? []
   const totalCount = data?.data?.count ?? 0
 
-  const { data: tenantsData } = useTenants({})
+  const { data: tenantsData } = useTenants({}, canFilterByTenant)
   const tenantOptions = (tenantsData?.data?.items ?? []).map((t) => ({ id: t.id, label: t.name }))
   const tenantLabelById = new Map(tenantOptions.map((t) => [t.id, t.label]))
 
@@ -56,10 +58,10 @@ const PermissionGroupsListPage = () => {
         </p>
       </div>
 
-      <PermissionGroupsFilterBar filters={filters} setFilter={handleFilterChange} reset={handleReset} tenantOptions={tenantOptions} />
+      <PermissionGroupsFilterBar filters={filters} setFilter={handleFilterChange} reset={handleReset} tenantOptions={tenantOptions} canFilterByTenant={canFilterByTenant} />
 
       <QueryStateBlock isLoading={isLoading} error={error} loadingLabel="Loading permission groups…" errorLabel="Failed to load permission groups. Please try again." onRetry={refetch}>
-        <PermissionGroupsTable groups={groups} tenantLabelById={tenantLabelById} />
+        <PermissionGroupsTable groups={groups} tenantLabelById={tenantLabelById} canOpenDetail={canOpenDetail} />
         <PaginationControls page={page} totalPages={totalPages(totalCount)} onPageChange={setPage} />
       </QueryStateBlock>
     </div>

@@ -1,10 +1,12 @@
-import CampStatusPillReal from '@/features/camps/components/CampStatusPillReal'
+import CampStatusPillReal from '@/components/widgets/camp/CampStatusPillReal'
 import CopyButton from '@/components/ui/CopyButton'
 import type { CampEntity, CampPopulatedDoctor, CampPopulatedRole } from '@/types/campReal.types'
 import { CAMP_TIME_SLOT_LABEL } from '@/types/campTimeSlot.constants'
 
 interface PharmaCampTableProps {
   camps: CampEntity[]
+  /** Opens the read-only detail drawer — mark-complete/cancel need camp:manage, which pharma field force doesn't hold. */
+  onOpenCamp?: (camp: CampEntity) => void
 }
 
 const doctorName = (doctor: CampEntity['doctor']) =>
@@ -13,7 +15,7 @@ const doctorName = (doctor: CampEntity['doctor']) =>
 const mrName = (mr: CampEntity['mr']) =>
   mr && typeof mr !== 'string' ? (mr as CampPopulatedRole).name : (mr ?? '—')
 
-const PharmaCampTable = ({ camps }: PharmaCampTableProps) => (
+const PharmaCampTable = ({ camps, onOpenCamp }: PharmaCampTableProps) => (
   <div
     className="rounded-xl border overflow-hidden"
     style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}
@@ -33,7 +35,15 @@ const PharmaCampTable = ({ camps }: PharmaCampTableProps) => (
         </thead>
         <tbody>
           {camps.map((camp) => (
-            <tr key={camp.id} style={{ borderBottom: '1px solid var(--qms-border)' }}>
+            <tr
+              key={camp.id}
+              onClick={onOpenCamp ? () => onOpenCamp(camp) : undefined}
+              onKeyDown={onOpenCamp ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenCamp(camp) } } : undefined}
+              role={onOpenCamp ? 'button' : undefined}
+              tabIndex={onOpenCamp ? 0 : undefined}
+              className={onOpenCamp ? 'cursor-pointer transition-colors hover:bg-(--qms-surface-hover) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--qms-brand)' : undefined}
+              style={{ borderBottom: '1px solid var(--qms-border)' }}
+            >
               <td className="px-4 py-2.5 font-mono" style={{ color: 'var(--qms-text)' }}>
                 <div className="flex items-center gap-1.5">
                   {camp.code}

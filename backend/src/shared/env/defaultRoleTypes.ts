@@ -196,6 +196,26 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
             INVENTORY_REQUEST_PERMISSIONS.UPDATE.code,
         ],
     },
+    {
+        // diet-camp field worker — diet-side counterpart to the field officer (consumption deferred,
+        // so patient/screening/test perms are omitted for now).
+        code: ALLOWED_ROLETYPE_CODES.PLATFORM.DIETITIAN,
+        name: 'Dietitian',
+        description: 'Dietitian',
+        permissions: [
+            // see the diet camps they are assigned to
+            CAMP_PERMISSIONS.SEARCH.code,
+            CAMP_PERMISSIONS.GET.code,
+            APPOINTMENT_PERMISSIONS.SEARCH.code,
+            APPOINTMENT_PERMISSIONS.GET.code,
+            APPOINTMENT_PERMISSIONS.RSVP.code,
+            // raise and manage their own refill/return requests (progressing the stage is manage-only)
+            INVENTORY_REQUEST_PERMISSIONS.CREATE.code,
+            INVENTORY_REQUEST_PERMISSIONS.GET.code,
+            INVENTORY_REQUEST_PERMISSIONS.SEARCH.code,
+            INVENTORY_REQUEST_PERMISSIONS.UPDATE.code,
+        ],
+    },
 ];
 
 // FINANCE ROLE TYPES

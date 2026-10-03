@@ -21,6 +21,7 @@ export const CampMapper = {
 
             // field-force assignment
             fo: camp.fo,
+            dietitian: camp.dietitian,
             mr: camp.mr,
             asm: camp.asm,
             rsm: camp.rsm,

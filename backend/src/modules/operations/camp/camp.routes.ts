@@ -176,18 +176,19 @@ registry.registerPath({
     },
 });
 
-// allocate field officer (nearest-FO auto-assign)
+// allocate the camp's field worker (nearest-free auto-assign) — a field officer for screening/lab
+// camps, a dietitian for diet camps (decided by the camp's type).
 registry.registerPath({
     method: 'post',
     path: '/camps/{id}/allocate',
     tags: ['CAMP'],
     summary:
-        "Auto-allocate the nearest available field officer to the camp (based on the camp's coordinates)",
+        "Auto-allocate the nearest available field worker (field officer, or dietitian for diet camps) to the camp (based on the camp's coordinates)",
     parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
     responses: {
-        200: { description: 'Field officer allocated successfully' },
+        200: { description: 'Field worker allocated successfully' },
         404: { description: 'Camp not found' },
-        422: { description: 'Camp has no coordinates, or no field officer covers this location' },
+        422: { description: 'Camp has no coordinates, or no field worker covers this location' },
     },
 });
 
@@ -236,7 +237,7 @@ CampRouter.post(
         CAMP_PERMISSIONS.MANAGE.code,
         TENANT_PERMISSIONS.MANAGE.code,
     ]),
-    CampController.allocateFo,
+    CampController.allocateWorker,
 );
 
 CampRouter.get(

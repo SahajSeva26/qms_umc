@@ -182,7 +182,7 @@ const moveStage = async (req: any, res: any) => {
     }
 };
 
-const allocateFo = async (req: any, res: any) => {
+const allocateWorker = async (req: any, res: any) => {
     try {
         const ctx: RequestContext = req.context;
         const { id } = req?.params;
@@ -190,13 +190,13 @@ const allocateFo = async (req: any, res: any) => {
             return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Camp ID is required', null);
         }
 
-        const camp = await CampService.allocateFo(id, ctx);
+        const camp = await CampService.allocateWorker(id, ctx);
 
         return ResponseHandler.appResponse(
             res,
             StatusCodes.OK,
             true,
-            'Field officer allocated successfully',
+            'Field worker allocated successfully',
             CampMapper.toResponse(camp, ctx),
         );
     } catch (error: any) {
@@ -263,7 +263,7 @@ export const CampController = {
     book,
     update,
     moveStage,
-    allocateFo,
+    allocateWorker,
     report,
     bookingAvailability,
 };

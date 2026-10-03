@@ -152,7 +152,13 @@ const campSchema = new mongoose.Schema(
         },
         // fo is NOT set at creation — a camp is born `requested` with no field officer.
         // It is filled by the allocate step (nearest-FO), which in turn gates confirmation.
+        // Screening/lab camps are staffed here; a diet camp is staffed via `dietitian` instead.
         fo: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Role',
+        },
+        // diet-camp counterpart to `fo` — a camp uses one of the two, decided by its `type`.
+        dietitian: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Role',
         },

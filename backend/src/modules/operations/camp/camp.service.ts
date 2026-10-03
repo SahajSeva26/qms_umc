@@ -361,14 +361,26 @@ const set = async (model: any, entity: HydratedDocument<ICamp>, ctx: RequestCont
         entity.rsm = rsm?._id ?? null;
     }
 
-    if (model.type) entity.type = model.type;
-    if (model.billingType) entity.billingType = model.billingType;
-    if (model.patientExpectation !== undefined) entity.patientExpectation = model.patientExpectation;
+    if (model.type) {
+        entity.type = model.type;
+    }
+    if (model.billingType) {
+        entity.billingType = model.billingType;
+    }
+    if (model.patientExpectation !== undefined) {
+        entity.patientExpectation = model.patientExpectation;
+    }
 
-    if (model.date) entity.date = model.date;
-    if (model.timeSlot) (entity as any).timeSlot = model.timeSlot;
+    if (model.date) {
+        entity.date = model.date;
+    }
+    if (model.timeSlot) {
+        (entity as any).timeSlot = model.timeSlot;
+    }
     // location is replaced wholesale (validated as a full object in the validators)
-    if (model.location) entity.location = model.location;
+    if (model.location) {
+        entity.location = model.location;
+    }
 
     // each device must reference an existing catalog item (InventoryMaster)
     if (model.devices) {
@@ -380,8 +392,12 @@ const set = async (model: any, entity: HydratedDocument<ICamp>, ctx: RequestCont
         }
         entity.devices = model.devices;
     }
-    if (model.notes !== undefined) entity.notes = model.notes;
-    if (model.conscentPath !== undefined) entity.conscentPath = model.conscentPath;
+    if (model.notes !== undefined) {
+        entity.notes = model.notes;
+    }
+    if (model.conscentPath !== undefined) {
+        entity.conscentPath = model.conscentPath;
+    }
 
     return entity;
 };

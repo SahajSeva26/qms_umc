@@ -1,6 +1,6 @@
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import { useRolesFilters } from '@/features/access-management/role/hooks/useRolesFilters'
-import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
+import { useTenants } from '@/features/access-management/tenant'
 import RolesTable from '@/features/access-management/role/components/RolesTable'
 import RolesFilterBar from '@/features/access-management/role/components/RolesFilterBar'
 import CreateRoleModal from '@/features/access-management/role/components/CreateRoleModal'
@@ -15,10 +15,13 @@ const PAGE_SIZE = 10
 
 const RolesListPage = () => {
   const { filters, setFilter, reset } = useRolesFilters()
-  // Page is reachable by role:get/role:search alone, but POST /roles requires
-  // tenant:admin/tenant:manage — gate the button so a read-only viewer can't 403.
+  // POST /roles requires tenant:admin/tenant:manage; role:get/search alone can reach this page.
   const { hasAnyPermission } = usePermission()
   const canCreateRole = hasAnyPermission(['tenant:admin', 'tenant:manage'])
+  // GET /roles/:id needs tenant:admin/tenant:manage/role:get — distinct from role:search, enough for the list.
+  const canOpenRoleDetail = hasAnyPermission(['tenant:admin', 'tenant:manage', 'role:get'])
+  // GET /tenants (Company filter) needs tenant:search/tenant:manage — role:search alone lacks both.
+  const canFilterByTenant = hasAnyPermission(['tenant:search', 'tenant:manage'])
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
 
   const debouncedSearch = useDebouncedValue(filters.search, 300)
@@ -33,7 +36,7 @@ const RolesListPage = () => {
   const roles = data?.data?.items ?? []
   const totalCount = data?.data?.count ?? 0
 
-  const { data: tenantsData } = useTenants({})
+  const { data: tenantsData } = useTenants({}, canFilterByTenant)
   const tenantOptions = (tenantsData?.data?.items ?? []).map((t) => ({ id: t.id, label: t.name }))
 
   const handleFilterChange = <K extends keyof typeof filters>(key: K, value: (typeof filters)[K]) => {
@@ -60,10 +63,10 @@ const RolesListPage = () => {
         {canCreateRole && <CreateRoleModal />}
       </div>
 
-      <RolesFilterBar filters={filters} setFilter={handleFilterChange} reset={handleReset} tenantOptions={tenantOptions} />
+      <RolesFilterBar filters={filters} setFilter={handleFilterChange} reset={handleReset} tenantOptions={tenantOptions} canFilterByTenant={canFilterByTenant} />
 
       <QueryStateBlock isLoading={isLoading} error={error} loadingLabel="Loading roles…" errorLabel="Failed to load roles. Please try again." onRetry={refetch}>
-        <RolesTable roles={roles} />
+        <RolesTable roles={roles} canOpenDetail={canOpenRoleDetail} />
         <PaginationControls page={page} totalPages={totalPages(totalCount)} onPageChange={setPage} />
       </QueryStateBlock>
     </div>

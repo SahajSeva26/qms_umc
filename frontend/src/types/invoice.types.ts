@@ -38,11 +38,19 @@ export interface InvoicePopulatedTenant {
   code: string
 }
 
+export interface InvoicePopulatedDivision {
+  _id?: string
+  name: string
+  code: string
+}
+
 export interface InvoicePopulatedProject {
   _id?: string
   name: string
   code: string
   status?: string
+  division?: InvoicePopulatedDivision | string
+  executionMode?: { poNumber?: string; poDate?: string; poExpiry?: string } & Record<string, unknown>
 }
 
 export interface InvoiceStageActor {
@@ -59,9 +67,7 @@ export interface InvoiceStageHistoryEntry {
   createdAt: string
 }
 
-// get()/search() populate tenant/project; create()/update()/moveStage() echo
-// back bare ObjectId strings (no re-fetch with populate before responding) —
-// same duality pattern as ProjectEntity's own reference fields.
+// get()/search() populate tenant/project; create()/update()/moveStage() echo back bare ObjectId strings.
 export interface InvoiceEntity {
   id: string
   code: string
@@ -76,17 +82,41 @@ export interface InvoiceEntity {
   status: InvoiceStatus
   syncToTally: boolean
   stageHistory: InvoiceStageHistoryEntry[]
+  // search()-only: count of billed camps (InvoiceLineItems) on this invoice. Absent on get()/create().
+  lineItemCount?: number
   createdAt: string
   updatedAt: string
 }
 
 export interface SearchInvoiceQuery {
+  tenant?: string
   project?: string
   status?: InvoiceStatus
   dateFrom?: string
   dateTo?: string
   page?: string
   limit?: string
+}
+
+// GET /invoices/report — global-by-default for a platform actor, own-tenant for a customer.
+// Optional tenant/project/date filters narrow it for detail views.
+export interface InvoiceReportQuery {
+  tenant?: string
+  project?: string
+  dateFrom?: string
+  dateTo?: string
+}
+
+export interface InvoiceReportStatusCount {
+  status: InvoiceStatus
+  count: number
+  total: number
+}
+
+export interface InvoiceReportResponse {
+  totalInvoices: number
+  totalInvoiced: number
+  statusCounts: InvoiceReportStatusCount[]
 }
 
 export interface CreateInvoicePayload {

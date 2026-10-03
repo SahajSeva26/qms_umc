@@ -48,8 +48,8 @@ vi.mock('@/features/doctors/doctors.service', () => ({
   },
 }))
 
-// dayKey (local YYYY-MM-DD) of "today", matching how the availability grid
-// derives its own default fetch window.
+// dayKey (local YYYY-MM-DD) of "today", matching how the availability day
+// strip derives its own default fetch window.
 function todayKey(): string {
   const d = new Date()
   const pad = (n: number) => String(n).padStart(2, '0')
@@ -128,28 +128,25 @@ function makeQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 5 * 60 * 1000 } } })
 }
 
-// Drives BookCampForm's wizard to submission — identical across Screening/Diet. Assumes a
-// pharma-mr (self-booking) session, so there's no step 0 — it starts directly at Location.
+// Fills BookCampForm's sections (all visible at once — no step wizard) and submits. Identical
+// across Screening/Diet. Assumes a pharma-mr (self-booking) session, so there's no MR field.
 async function fillAndSubmitBookCampForm(user: ReturnType<typeof userEvent.setup>, doctorName: string) {
-  // Step 1 — where.
+  // Location.
   await user.type(await screen.findByLabelText(/^address line 1$/i), '221 Baker Street')
   await user.type(screen.getByLabelText(/^city$/i), 'Pune')
   await user.type(screen.getByLabelText(/^state$/i), 'Maharashtra')
   await user.type(screen.getByLabelText(/^pincode$/i), '411001')
   await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
-  await user.click(screen.getByRole('button', { name: /^next$/i }))
 
-  // Step 2 — doctor (distance-sorted, coordinates now set).
+  // Doctor (distance-sorted, unlocked once coordinates are set).
   await user.type(await screen.findByPlaceholderText(/search doctor by name/i), doctorName.split(' ')[0])
   const doctorOption = await screen.findByText(new RegExp(doctorName.replace('.', '\\.'), 'i'), {}, { timeout: 3000 })
   await user.click(doctorOption)
-  await user.click(screen.getByRole('button', { name: /^next$/i }))
 
-  // Step 3 — today is the only mocked-available day. With two months now visible, today's digit
-  // can match twice — index 0 is always today's own (first) month, never ambiguous here.
+  // Date & slot — today is the only mocked-available day, first in the day-strip.
   const today = new Date()
-  const todayCells = await screen.findAllByRole('gridcell', { name: String(today.getDate()) })
-  await user.click(todayCells[0].querySelector('button')!)
+  const todayBtn = (await screen.findByText(String(today.getDate()))).closest('button')!
+  await user.click(todayBtn)
   await user.click(await screen.findByRole('button', { name: /9 AM – 1 PM/i }))
 
   await user.click(screen.getByRole('button', { name: /^book camp$/i }))
@@ -261,6 +258,24 @@ describe('PharmaScreeningCampsPage / PharmaDietCampsPage — separate routes, sh
     await waitFor(() => expect(pharmaCampsService.searchScopedCamps).toHaveBeenCalledWith(
       expect.objectContaining({ project: 'proj-1', type: 'diet' }),
     ))
+  })
+
+  it('a non-live project blocks booking with a clear reason, even though its camps are still viewable — matches the prototype\'s live-project booking rule', async () => {
+    const { useSession } = await import('@/hooks/useSession')
+    vi.mocked(useSession).mockReturnValue({
+      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-mr'), hasPermission: () => false,
+    } as unknown as ReturnType<typeof useSession>)
+
+    const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
+    const { pharmaCampsService } = await import('@/features/pharma/pharmaCamps.service')
+    vi.mocked(pharmaProjectsService.getProject).mockResolvedValue({ success: true, message: '', data: projectFixture({ status: 'hold' }) })
+    vi.mocked(pharmaCampsService.searchScopedCamps).mockResolvedValue({ success: true, message: '', data: { items: [], count: 0 } })
+
+    await renderScreeningPage()
+
+    expect(await screen.findByText(/no screening camps assigned to you on this project yet/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /new camp/i })).toBeDisabled()
+    expect(screen.getByText(/this project is not live/i)).toBeInTheDocument()
   })
 
   it('the Screening page shows Diet camps ALREADY on the project too — viewing is never restricted by the project\'s configured type, only booking is', async () => {

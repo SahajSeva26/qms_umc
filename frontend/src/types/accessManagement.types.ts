@@ -31,6 +31,10 @@ export interface TenantStats {
   liveCamps: number
   screeningCamps: number
   dietCamps: number
+  mrs: number
+  // Sum of invoice totals excluding draft/cancelled — NOT the same as "outstanding"
+  // (no unpaid/overdue aggregation exists yet, see md-files/ui-revisions.md).
+  billed: number
 }
 
 // Fields below `name` (except `address`) are optional: only present when the caller holds
@@ -58,6 +62,8 @@ export interface Tenant {
 export interface SearchTenantQuery {
   name?: string
   code?: string
+  city?: string
+  state?: string
   // No permission gate on this filter (backend's own TODO to add one) —
   // any caller can filter by type even though only system:manage sees it in the response.
   type?: TenantType

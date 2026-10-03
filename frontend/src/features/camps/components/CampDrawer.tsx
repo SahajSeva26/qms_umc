@@ -1,24 +1,31 @@
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { FiEdit2 } from 'react-icons/fi'
+import { FiEdit2, FiUser, FiTruck, FiCpu, FiFileText } from 'react-icons/fi'
 import { useCampReal } from '@/features/camps/hooks/useCampReal'
+import { useCampsReal } from '@/features/camps/hooks/useCampsReal'
 import { useCampRefNames } from '@/features/camps/hooks/useCampRefNames'
 import { campRefId, canRunScreening } from '@/features/camps/campsReal.utils'
 import { usePermission } from '@/hooks/usePermission'
 import SideDrawer from '@/components/ui/SideDrawer'
-import CampStatusPillReal from '@/features/camps/components/CampStatusPillReal'
-import CampStageMovePanel from '@/features/camps/components/CampStageMovePanel'
+import CampStatusPillReal from '@/components/widgets/camp/CampStatusPillReal'
+import CampStageActionRow from '@/features/camps/components/CampStageActionRow'
+import CampDrawerKpiRow from '@/features/camps/components/CampDrawerKpiRow'
 import CampStageHistoryList from '@/features/camps/components/CampStageHistoryList'
 import { Button } from '@/components/ui/button'
+import { useAllocateFo } from '@/features/camps/hooks/useAllocateFo'
+import type { CampType } from '@/types/campReal.types'
+import { CAMP_TYPE_LABEL } from '@/types/campReal.types'
 import { CAMP_TIME_SLOT_LABEL } from '@/types/campTimeSlot.constants'
 
 const TABS = ['Overview', 'Stage history'] as const
 type Tab = (typeof TABS)[number]
 
-const TYPE_LABEL: Record<string, string> = {
-  screening: 'Screening',
-  diet: 'Diet',
-  lab: 'Lab',
+// Same 3 type colors already used app-wide for camp type pills/cards.
+const TYPE_COLOR: Record<CampType, string> = {
+  screening: '#3b6dff',
+  diet: '#10b981',
+  lab: '#8b5cf6',
 }
 
 const CAMP_UPDATE_PERMISSIONS = ['camp:update', 'camp:manage', 'tenant:manage']
@@ -46,6 +53,13 @@ interface CampDrawerContentProps {
   onClose: () => void
 }
 
+const SectionHeader = ({ icon: Icon, children }: { icon: typeof FiUser; children: ReactNode }) => (
+  <div className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-[.06em] mt-4 mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+    <Icon size={13} />
+    {children}
+  </div>
+)
+
 const CampDrawerContent = ({ campId, onClose }: CampDrawerContentProps) => {
   const navigate = useNavigate()
   const location = useLocation()
@@ -58,6 +72,13 @@ const CampDrawerContent = ({ campId, onClose }: CampDrawerContentProps) => {
 
   const { data, isLoading, error } = useCampReal(campId)
   const camp = data?.data ?? null
+  const allocateFo = useAllocateFo(campId)
+
+  // GET /camps/:id has no `stats` — only search does, and there's no exact-id filter (only a `code`
+  // regex), so this searches by code with report=true and matches the exact id within the results.
+  const statsQuery = useCampsReal({ code: camp?.code, report: 'true', limit: '50' }, !!camp?.code)
+  const campStats = statsQuery.data?.data?.items?.find((item) => item.id === campId)?.stats
+  const isStatsNotFound = !statsQuery.isLoading && !statsQuery.error && !!camp?.code && !campStats
 
   const { doctorName, divisionName, projectName, roleName } = useCampRefNames({
     doctors: true,
@@ -65,6 +86,9 @@ const CampDrawerContent = ({ campId, onClose }: CampDrawerContentProps) => {
     projects: hasAnyPermission(PROJECT_READ_PERMISSIONS),
     roles: hasAnyPermission(ROLE_READ_PERMISSIONS),
   })
+
+  const doctor = camp?.doctor && typeof camp.doctor !== 'string' ? camp.doctor : null
+  const fo = camp?.fo && typeof camp.fo !== 'string' ? camp.fo : null
 
   return (
     <SideDrawer open title={camp?.code ?? 'Camp'} onClose={onClose} widthClassName="max-w-lg">
@@ -82,35 +106,55 @@ const CampDrawerContent = ({ campId, onClose }: CampDrawerContentProps) => {
 
       {camp && !isLoading && (
         <>
-          <div className="mb-4">
-            <div className="flex items-start justify-between gap-2">
-              <div className="text-[15px] font-bold truncate" style={{ color: 'var(--qms-text)' }}>{camp.code}</div>
-              {canUpdate && (
-                <button
-                  onClick={() => {
-                    // Strip `camp` so Save returns to whichever page this drawer was opened over.
-                    const returnParams = new URLSearchParams(location.search)
-                    returnParams.delete('camp')
-                    const query = returnParams.toString()
-                    const from = encodeURIComponent(`${location.pathname}${query ? `?${query}` : ''}`)
-                    navigate(`/camps/${camp.id}/edit?from=${from}`, { state: { fromDrawer: true } })
-                  }}
-                  aria-label="Edit camp"
-                  className="shrink-0 rounded-lg border p-1.5 transition-colors hover:bg-(--qms-surface-hover)"
-                  style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-soft)' }}
-                >
-                  <FiEdit2 size={13} />
-                </button>
-              )}
+          <div className="flex items-start gap-3 mb-4">
+            <div
+              className="w-14 h-14 rounded-2xl flex items-center justify-center text-white shrink-0"
+              style={{ background: `linear-gradient(135deg, ${TYPE_COLOR[camp.type]}, #14b8a6)` }}
+            >
+              <span className="text-[18px] font-extrabold">{CAMP_TYPE_LABEL[camp.type][0]}</span>
             </div>
-            <div className="text-[12px] truncate mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-              {doctorName(camp.doctor)} · {camp.location ? `${camp.location.city}, ${camp.location.state}` : 'Location unavailable'}
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              <CampStatusPillReal status={camp.status} />
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text-muted)' }}>
-                {new Date(camp.date).toLocaleDateString()} · {camp.timeSlot ? CAMP_TIME_SLOT_LABEL[camp.timeSlot] : '—'}
-              </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start justify-between gap-2">
+                <div className="font-bold text-[15px] truncate" style={{ color: 'var(--qms-text)' }}>
+                  {camp.code} · {CAMP_TYPE_LABEL[camp.type]} Camp
+                </div>
+                {canUpdate && (
+                  <button
+                    onClick={() => {
+                      // Strip `camp` so Save returns to whichever page this drawer was opened over.
+                      const returnParams = new URLSearchParams(location.search)
+                      returnParams.delete('camp')
+                      const query = returnParams.toString()
+                      const from = encodeURIComponent(`${location.pathname}${query ? `?${query}` : ''}`)
+                      navigate(`/camps/${camp.id}/edit?from=${from}`, { state: { fromDrawer: true } })
+                    }}
+                    aria-label="Edit camp"
+                    className="shrink-0 rounded-lg border p-1.5 transition-colors hover:bg-(--qms-surface-hover)"
+                    style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-soft)' }}
+                  >
+                    <FiEdit2 size={13} />
+                  </button>
+                )}
+              </div>
+              <div className="text-[12px] truncate" style={{ color: 'var(--qms-text-muted)' }}>
+                {camp.location ? `${camp.location.city}, ${camp.location.state}` : 'Location unavailable'} · {new Date(camp.date).toLocaleDateString()} · {camp.timeSlot ? CAMP_TIME_SLOT_LABEL[camp.timeSlot] : '—'}
+              </div>
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                <CampStatusPillReal status={camp.status} />
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border" style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }}>
+                  {camp.tenant && typeof camp.tenant !== 'string' ? camp.tenant.name : campRefId(camp.tenant) ?? '—'}
+                </span>
+                {camp.division && typeof camp.division !== 'string' && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border" style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }}>
+                    {divisionName(camp.division)}
+                  </span>
+                )}
+                {camp.project && typeof camp.project !== 'string' && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border" style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }}>
+                    {projectName(camp.project)}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -132,28 +176,84 @@ const CampDrawerContent = ({ campId, onClose }: CampDrawerContentProps) => {
           </div>
 
           {tab === 'Overview' && (
-            <div className="space-y-4">
-              <div className="flex flex-wrap gap-2">
-                {camp.status === 'live' && canRunScreening(camp, session?.role.id, session?.roleType.code, canManageScreening) && (
-                  <Button variant="outline" onClick={() => navigate(`/camps/${camp.id}/screening`)}>
-                    Run screening
-                  </Button>
+            <div>
+              <CampDrawerKpiRow
+                stats={campStats}
+                notFound={isStatsNotFound}
+                error={statsQuery.error}
+                onRetry={() => void statsQuery.refetch()}
+                patientExpectation={camp.patientExpectation}
+              />
+
+              <SectionHeader icon={FiUser}>Doctor</SectionHeader>
+              <div className="rounded-[14px] border p-3 space-y-1.5" style={{ borderColor: 'var(--qms-border)' }}>
+                <OverviewRow label="Name" value={doctorName(camp.doctor)} />
+                <OverviewRow label="Pharma code" value={doctor?.pharmaCode || '—'} />
+                <OverviewRow label="Specialization" value={doctor?.specialization || '—'} />
+              </div>
+
+              <SectionHeader icon={FiTruck}>Field Officer</SectionHeader>
+              <div className="rounded-[14px] border p-3" style={{ borderColor: 'var(--qms-border)' }}>
+                {fo ? (
+                  <OverviewRow label="FO" value={roleName(camp.fo)} />
+                ) : (
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[12px] font-semibold text-danger">Unassigned</span>
+                    {canUpdate && (
+                      <Button variant="outline" size="sm" onClick={() => allocateFo.mutate()} disabled={allocateFo.isPending}>
+                        {allocateFo.isPending ? 'Allocating…' : 'Assign FO'}
+                      </Button>
+                    )}
+                  </div>
+                )}
+                {allocateFo.isError && (
+                  <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger mt-2">
+                    {(allocateFo.error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Could not allocate an FO.'}
+                  </div>
+                )}
+                <OverviewRow label="MR" value={camp.mr ? roleName(camp.mr) : '—'} />
+              </div>
+
+              <SectionHeader icon={FiCpu}>Devices allocated ({camp.devices.length})</SectionHeader>
+              <div className="rounded-[14px] border p-3" style={{ borderColor: 'var(--qms-border)' }}>
+                {camp.devices.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {camp.devices.map((d) => (
+                      <div key={d._id} className="flex items-center justify-between text-[13px] pb-1.5" style={{ borderBottom: '1px dashed var(--qms-border)' }}>
+                        <div>
+                          <div className="font-semibold" style={{ color: 'var(--qms-text)' }}>{d.type}</div>
+                          <div className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>{d.name} · {d.code}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>No devices allocated yet</span>
                 )}
               </div>
 
-              <CampStageMovePanel camp={camp} canWrite={canUpdate} canMoveStage={canMoveStage} />
-
-              <div className="rounded-xl border p-4 space-y-2.5" style={{ borderColor: 'var(--qms-border)' }}>
+              <SectionHeader icon={FiFileText}>Notes</SectionHeader>
+              <div className="rounded-[14px] border p-3 space-y-2" style={{ borderColor: 'var(--qms-border)' }}>
                 <OverviewRow label="Company" value={camp.tenant && typeof camp.tenant !== 'string' ? camp.tenant.name : campRefId(camp.tenant) ?? '—'} />
-                <OverviewRow label="Division" value={divisionName(camp.division)} />
-                <OverviewRow label="Project" value={camp.project ? projectName(camp.project) : '—'} />
-                <OverviewRow label="Type" value={TYPE_LABEL[camp.type] ?? camp.type} />
                 <OverviewRow label="Billing" value={camp.billingType === 'billable' ? 'Billable' : 'Void'} />
                 <OverviewRow label="Patient expectation" value={String(camp.patientExpectation)} />
-                <OverviewRow label="Field Officer" value={camp.fo ? roleName(camp.fo) : 'Unassigned'} />
-                <OverviewRow label="MR" value={camp.mr ? roleName(camp.mr) : '—'} />
-                <OverviewRow label="Devices" value={camp.devices.length > 0 ? camp.devices.map((d) => d.name).join(', ') : '—'} />
                 <OverviewRow label="Notes" value={camp.notes || '—'} />
+              </div>
+
+              <div className="mt-4">
+                <CampStageActionRow
+                  camp={camp}
+                  canMoveStage={canMoveStage}
+                  extraAction={
+                    camp.status === 'live' && canRunScreening(camp, session?.role.id, session?.roleType.code, canManageScreening)
+                      ? (
+                        <Button variant="outline" onClick={() => navigate(`/camps/${camp.id}/screening`)}>
+                          Run screening
+                        </Button>
+                      )
+                      : null
+                  }
+                />
               </div>
             </div>
           )}

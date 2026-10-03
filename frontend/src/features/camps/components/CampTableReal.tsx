@@ -1,8 +1,8 @@
 import { Fragment, useState, type ReactNode } from 'react'
-import { FiChevronDown, FiChevronUp } from 'react-icons/fi'
+import { FiChevronDown, FiChevronUp, FiAlertTriangle } from 'react-icons/fi'
 import type { CampEntity } from '@/types/campReal.types'
 import CopyButton from '@/components/ui/CopyButton'
-import CampStatusPillReal from '@/features/camps/components/CampStatusPillReal'
+import CampStatusPillReal from '@/components/widgets/camp/CampStatusPillReal'
 import { useCampRefNames } from '@/features/camps/hooks/useCampRefNames'
 import { usePermission } from '@/hooks/usePermission'
 import { CAMP_TIME_SLOT_LABEL } from '@/types/campTimeSlot.constants'
@@ -48,7 +48,7 @@ const CampTableReal = ({ camps, onOpen }: CampTableRealProps) => {
               {columns.map((h) => (
                 <th
                   key={h}
-                  className={`font-bold text-[11px] uppercase tracking-wider px-4 py-2.5 ${h === 'Row details' ? 'text-right' : 'text-left'}`}
+                  className={`font-bold text-[11px] uppercase tracking-[.06em] px-4 py-2.5 ${h === 'Row details' ? 'text-right' : 'text-left'}`}
                   style={{ color: 'var(--qms-text-muted)' }}
                 >
                   {h === 'Row details' ? <span className="sr-only">{h}</span> : h}
@@ -97,7 +97,11 @@ const CampTableReal = ({ camps, onOpen }: CampTableRealProps) => {
                       {camp.fo ? (
                         <span style={{ color: 'var(--qms-text)' }}>{roleName(camp.fo)}</span>
                       ) : (
-                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-danger-soft text-danger">UNASSIGNED</span>
+                        // Matches the prototype's "⚠ Missing <Role>" staffing tag (camps.js:379-409),
+                        // FO-only since our real Camp model has no dietitian/lab-tech staffing concept.
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-danger-soft text-danger">
+                          <FiAlertTriangle size={10} /> Missing FO
+                        </span>
                       )}
                     </td>
                     <td className="px-4 py-2.5"><CampStatusPillReal status={camp.status} /></td>

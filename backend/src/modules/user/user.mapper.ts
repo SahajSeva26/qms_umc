@@ -33,7 +33,27 @@ export const UserMapper = {
             items: [] as any[],
         };
         for (const u of data?.items || []) {
-            result.items.push(UserMapper.toResponse(u, ctx));
+            // NOTE: independent from toResponse on purpose — mirrors it field-for-field for now (incl. same permission gating) so nothing breaks; search rows can be trimmed later without affecting GET /:id.
+            const item: any = {
+                id: u?._id?.toString(),
+                email: u?.email,
+                firstName: u?.firstName,
+                lastName: u?.lastName,
+                avatar: u?.avatar,
+            };
+
+            // for admin, and superior role add permissions
+            if (ctx.hasAllPermissions([SYSTEM_PERMISSIONS.MANAGE.code])) {
+                item.phone = u?.phone;
+                item.status = u?.status;
+                item.gender = u?.gender;
+                item.loginAttempts = u?.loginAttempts;
+                item.lockUntil = u?.lockUntil;
+                item.meta = u?.meta;
+                item.createdAt = u?.createdAt;
+            }
+
+            result.items.push(item);
         }
         return result;
     },

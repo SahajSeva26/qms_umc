@@ -1,22 +1,29 @@
+import { FiChevronRight, FiPackage } from 'react-icons/fi'
 import type { DivisionEntity } from '@/types/crm.types'
 import { DIVISION_THERAPY_LABEL } from '@/types/crm.types'
 
-// Hand-built table matching RoleTypesTable.tsx / PermissionGroupsTable.tsx
-// exactly: var(--qms-*) custom properties, no shadcn Table, inline empty
-// state. Rows navigate to DivisionDetailPage on click (same as RolesTable's
-// own row-click pattern) — creation still stays a modal (CreateDivisionModal,
-// "for creating we will have modal" scope), only editing moved to a page.
-
+// "Projects per division" needs the caller to have passed report=true on its own useDivisions() search.
 function ownerName(owner: DivisionEntity['owner']): string | null {
   if (!owner || typeof owner === 'string') return null
   if (!owner.user) return null
   return [owner.user.firstName, owner.user.lastName].filter(Boolean).join(' ')
 }
 
-function tenantName(tenant: DivisionEntity['tenant']): string | null {
-  if (!tenant || typeof tenant === 'string') return null
-  return tenant.name
+interface StatProps {
+  value: React.ReactNode
+  label: string
 }
+
+const Stat = ({ value, label }: StatProps) => (
+  <div className="w-16 shrink-0">
+    <div className="text-[13px] font-extrabold leading-tight whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>
+      {value}
+    </div>
+    <div className="text-[9px] font-bold uppercase tracking-wide mt-0.5 whitespace-nowrap" style={{ color: 'var(--qms-text-muted)', letterSpacing: '.04em' }}>
+      {label}
+    </div>
+  </div>
+)
 
 interface DivisionsTableProps {
   divisions: DivisionEntity[]
@@ -24,80 +31,66 @@ interface DivisionsTableProps {
 }
 
 const DivisionsTable = ({ divisions, onRowClick }: DivisionsTableProps) => {
+  // pt-px: the first row's hover:-translate-y-px would otherwise clip its own top border against this container's edge.
   return (
-    <div
-      className="rounded-xl border overflow-hidden"
-      style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}
-    >
-      <div className="overflow-x-auto">
-        <table className="w-full text-[13px]">
-          <thead>
-            <tr style={{ borderBottom: '1px solid var(--qms-border)' }}>
-              <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                Code
-              </th>
-              <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                Name
-              </th>
-              <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                Therapy
-              </th>
-              <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                Tenant
-              </th>
-              <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                Head
-              </th>
-              <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                Status
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {divisions.map((division) => (
-              <tr
-                key={division.id}
-                onClick={() => onRowClick(division)}
-                className="cursor-pointer transition-colors hover:bg-(--qms-surface-hover)"
-                style={{ borderBottom: '1px solid var(--qms-border)' }}
+    <div className="flex flex-col gap-2 overflow-x-auto pt-px">
+      {divisions.map((division) => (
+        <div
+          key={division.id}
+          onClick={() => onRowClick(division)}
+          className="flex items-center gap-3 px-4 py-3 min-w-150 rounded-[11px] border cursor-pointer transition-transform duration-100 hover:-translate-y-px"
+          style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}
+          onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#8b5cf6')}
+          onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--qms-border)')}
+        >
+          <div className="flex-1 min-w-32">
+            <div className="text-[14px] font-extrabold truncate" style={{ color: 'var(--qms-text)' }}>
+              {division.name}
+            </div>
+            <div className="flex items-center gap-1 text-[11px] mt-0.5 truncate" style={{ color: 'var(--qms-text-muted)' }}>
+              <FiPackage className="shrink-0" size={11} />
+              <span className="truncate">
+                {division.therapy.map((t) => DIVISION_THERAPY_LABEL[t]).join(', ') || 'General'} · {division.code}
+              </span>
+            </div>
+          </div>
+
+          <Stat
+            value={
+              division.stats
+                ? division.stats.totalProjects
+                : <span className="text-[10px] font-bold italic" style={{ color: 'var(--qms-text-muted)' }}>—</span>
+            }
+            label="Projects"
+          />
+          <Stat value={division.mrCount} label="MRs" />
+
+          <div className="w-28 shrink-0 text-[11px] truncate" style={{ color: 'var(--qms-text-muted)' }}>
+            {ownerName(division.owner) ?? '—'}
+          </div>
+
+          <div className="w-16 shrink-0">
+            {division.status ? (
+              <span
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${division.status === 'active' ? 'bg-success-soft text-success' : ''}`}
+                style={division.status !== 'active' ? { background: 'var(--qms-surface-strong)', color: 'var(--qms-text-muted)' } : undefined}
               >
-                <td className="px-4 py-2.5">
-                  <span className="font-semibold font-mono" style={{ color: 'var(--qms-text)' }}>
-                    {division.code}
-                  </span>
-                </td>
-                <td className="px-4 py-2.5 font-semibold" style={{ color: 'var(--qms-text)' }}>
-                  {division.name}
-                </td>
-                <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                  {division.therapy.map((t) => DIVISION_THERAPY_LABEL[t]).join(', ')}
-                </td>
-                <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                  {tenantName(division.tenant) ?? '—'}
-                </td>
-                <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                  {ownerName(division.owner) ?? '—'}
-                </td>
-                <td className="px-4 py-2.5">
-                  {division.status ? (
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${division.status === 'active' ? 'bg-success-soft text-success' : ''}`}
-                      style={division.status !== 'active' ? { background: 'var(--qms-surface-strong)', color: 'var(--qms-text-muted)' } : undefined}
-                    >
-                      {division.status === 'active' ? 'ACTIVE' : 'INACTIVE'}
-                    </span>
-                  ) : (
-                    <span style={{ color: 'var(--qms-text-muted)' }}>—</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                {division.status === 'active' ? 'ACTIVE' : 'INACTIVE'}
+              </span>
+            ) : (
+              <span style={{ color: 'var(--qms-text-muted)' }}>—</span>
+            )}
+          </div>
+
+          <FiChevronRight className="shrink-0" size={16} style={{ color: 'var(--qms-text-muted)' }} />
+        </div>
+      ))}
 
       {divisions.length === 0 && (
-        <div className="px-4 py-10 text-center text-[13px]" style={{ color: 'var(--qms-text-muted)' }}>
+        <div
+          className="px-4 py-10 text-center text-[13px] rounded-xl border border-dashed"
+          style={{ color: 'var(--qms-text-muted)', borderColor: 'var(--qms-border)' }}
+        >
           No divisions found.
         </div>
       )}

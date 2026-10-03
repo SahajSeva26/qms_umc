@@ -1,7 +1,7 @@
 // Invoice Service
 import mongoose, { HydratedDocument } from 'mongoose';
 import { InvoiceModel, IInvoice } from './invoice.model';
-import { ICreateInvoicePayload, IMoveStagePayload, ISearchInvoiceQuery, IUpdateInvoicePayload } from './invoice.validators';
+import { ICreateInvoicePayload, IInvoiceReportQuery, IMoveStagePayload, ISearchInvoiceQuery, IUpdateInvoicePayload } from './invoice.validators';
 import { INVOICE_COUNTER_ENTITY, INVOICE_STATUS, INVOICE_TRANSITION_MAP } from './invoice.constants';
 import { InvoiceLineItemModel } from '../invoiceLineItem/invoiceLineItem.model';
 import { canTransition } from '../../crm/lead/lead.validators';
@@ -10,7 +10,7 @@ import { CounterService } from '../../counter/counter.service';
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
-import { isValidObjectID } from '../../../shared/utils/strings';
+import { isValidObjectID, toObjectId } from '../../../shared/utils/strings';
 import { endOfUTCDay } from '../../../shared/utils/dates';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { ProjectService } from '../../crm/project/project.service';
@@ -21,7 +21,8 @@ type InvoiceDocument = HydratedDocument<IInvoice> | null;
 
 const populate: any[] = [
     { path: 'tenant', select: 'name code' },
-    { path: 'project', select: 'name code status' },
+    // division + executionMode (PO) feed the invoice card's "Client · Division · PO" subtitle
+    { path: 'project', select: 'name code status division executionMode', populate: { path: 'division', select: 'name code' } },
 ];
 
 // The single formula for an invoice's payable total. Exported so the line-item service can reuse
@@ -116,6 +117,10 @@ const search = async (filters: ISearchInvoiceQuery, ctx: RequestContext, options
     const where: mongoose.QueryFilter<IInvoice> = { ...ctx.where() };
 
     //2: add search filters
+    // a customer actor is already tenant-pinned by ctx.where(); the filter can't override it
+    if (filters.tenant && !where.tenant) {
+        where.tenant = filters.tenant;
+    }
     if (filters.project) where.project = filters.project;
     if (filters.status) where.status = filters.status;
     // issue-date range — dateTo is snapped to end-of-day (UTC) so the whole end day is included
@@ -135,7 +140,34 @@ const search = async (filters: ISearchInvoiceQuery, ctx: RequestContext, options
 
     const [count, items] = await Promise.all([countPromise, dataPromise]);
 
-    return { count, items };
+    //4: per-invoice line-item (camp) count for the page — one batched aggregate, no N+1. Feeds the
+    // invoice card's "N camps" stat.
+    const lineItemCounts = await getLineItemCounts(items);
+
+    return { count, items, lineItemCounts };
+};
+
+// batched count of line items (one per billed camp) per invoice, for the invoices on the page.
+const getLineItemCounts = async (invoices: HydratedDocument<IInvoice>[]): Promise<Record<string, number>> => {
+    const invoiceIds = invoices.map((i) => i._id);
+    const counts: Record<string, number> = {};
+    if (!invoiceIds.length) {
+        return counts;
+    }
+    const groups = await InvoiceLineItemModel.aggregate([
+        { $match: { invoice: { $in: invoiceIds } } },
+        { $group: { _id: '$invoice', count: { $sum: 1 } } },
+    ]);
+    for (const id of invoiceIds) {
+        counts[id.toString()] = 0;
+    }
+    for (const g of groups) {
+        const key = g._id?.toString();
+        if (key in counts) {
+            counts[key] = g.count;
+        }
+    }
+    return counts;
 };
 
 const create = async (model: ICreateInvoicePayload, ctx: RequestContext): Promise<HydratedDocument<IInvoice>> => {
@@ -245,10 +277,49 @@ const moveStage = async (id: string, model: IMoveStagePayload, ctx: RequestConte
     return invoice;
 };
 
+// tenant-wide (scoped) billing totals + per-status breakdown — feeds the pipeline KPI strip, which
+// otherwise can only sum the current page. Global for a platform actor (ctx.where() returns {}),
+// own-tenant for a customer; optional tenant/project/date filters narrow it for detail views.
+const report = async (filters: IInvoiceReportQuery, ctx: RequestContext) => {
+    const where: mongoose.QueryFilter<IInvoice> = { ...ctx.where() };
+
+    // a customer actor is already tenant-pinned by ctx.where(); the filter can't override it.
+    // cast to ObjectId — this is an aggregation $match, which (unlike find()) does NOT auto-cast.
+    if (filters.tenant && !where.tenant) where.tenant = toObjectId(filters.tenant);
+    if (filters.project) where.project = toObjectId(filters.project);
+    if (filters.dateFrom || filters.dateTo) {
+        where.issueDate = {};
+        if (filters.dateFrom) where.issueDate.$gte = filters.dateFrom;
+        if (filters.dateTo) where.issueDate.$lte = endOfUTCDay(filters.dateTo);
+    }
+
+    const [result] = await InvoiceModel.aggregate([
+        { $match: where },
+        {
+            $facet: {
+                totals: [{ $group: { _id: null, count: { $sum: 1 }, total: { $sum: '$total' } } }],
+                statusCounts: [{ $group: { _id: '$status', count: { $sum: 1 }, total: { $sum: '$total' } } }],
+            },
+        },
+    ]);
+
+    const totals = result?.totals?.[0] || { count: 0, total: 0 };
+    return {
+        totalInvoices: totals.count,
+        totalInvoiced: totals.total,
+        statusCounts: (result?.statusCounts || []).map((s: any) => ({
+            status: s._id,
+            count: s.count,
+            total: s.total,
+        })),
+    };
+};
+
 export const InvoiceService = {
     get,
     search,
     create,
     update,
     moveStage,
+    report,
 };

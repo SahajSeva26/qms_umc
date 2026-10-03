@@ -5,11 +5,7 @@ export const ADMIN_ROUTES = {
   ADMIN:              '/admin',
   ADMIN_HQ:           '/admin/hq',
   ADMIN_REMINDERS:    '/admin/reminders',
-  ADMIN_INVENTORY:    '/admin/inventory',
-  ADMIN_INVENTORY_MASTERS: '/admin/inventory-masters',
-  ADMIN_INVENTORY_ITEMS: '/admin/inventory-items',
-  ADMIN_INVENTORY_OPERATIONS: '/admin/inventory-operations',
-  ADMIN_VENDOR_MASTERS: '/admin/vendor-masters',
+  ADMIN_INVENTORY: '/admin/inventory',
   ADMIN_ASSETS:       '/admin/assets',
   ADMIN_KPI:          '/admin/kpi',
   ADMIN_SETTINGS:     '/admin/settings',
@@ -20,11 +16,6 @@ export const ADMIN_ROUTES = {
 
 const USERS_VIEW_PERMISSIONS = ['user:get', 'user:search', 'user:update']
 // `:get` is deliberately excluded — the list page only calls search, which needs `:search`/`:manage`.
-const VENDOR_MASTERS_VIEW_PERMISSIONS = ['vendor-master:search', 'vendor-master:manage']
-// Neither has a :search code — the backend read routes are :manage-gated too,
-// so this route guard mirrors the same real boundary Sidebar.tsx's nav gate uses.
-const INVENTORY_MASTERS_VIEW_PERMISSIONS = ['inventory-master:manage']
-const INVENTORY_ITEMS_VIEW_PERMISSIONS = ['inventory-device:manage', 'inventory-consumable:manage']
 
 // HQ/Reminders/Inventory are separate features mounted under /admin/* for
 // nav purposes only — same cross-feature-routing pattern as billing.routes.tsx.
@@ -34,19 +25,10 @@ export const adminRoutes: RouteObject[] = [
   { path: ADMIN_ROUTES.ADMIN,           lazy: adminPage },
   { path: ADMIN_ROUTES.ADMIN_HQ,        lazy: lazyRoute(() => import('@/features/hq/pages/HqPage')) },
   { path: ADMIN_ROUTES.ADMIN_REMINDERS, lazy: lazyRoute(() => import('@/features/reminders/pages/RemindersPage')) },
-  { path: ADMIN_ROUTES.ADMIN_INVENTORY, lazy: lazyRoute(() => import('@/features/inventory/pages/InventoryPage')) },
   {
-    path: ADMIN_ROUTES.ADMIN_INVENTORY_MASTERS,
-    lazy: lazyRoute(() => import('@/features/inventory/real/pages/InventoryMastersPage'), INVENTORY_MASTERS_VIEW_PERMISSIONS),
-  },
-  {
-    path: ADMIN_ROUTES.ADMIN_INVENTORY_ITEMS,
-    lazy: lazyRoute(() => import('@/features/inventory/real/pages/InventoryItemsPage'), INVENTORY_ITEMS_VIEW_PERMISSIONS),
-  },
-  { path: ADMIN_ROUTES.ADMIN_INVENTORY_OPERATIONS, lazy: lazyRoute(() => import('@/features/inventory/real/pages/InventoryOperationsPage')) },
-  {
-    path: ADMIN_ROUTES.ADMIN_VENDOR_MASTERS,
-    lazy: lazyRoute(() => import('@/features/inventory/real/pages/VendorMastersPage'), VENDOR_MASTERS_VIEW_PERMISSIONS),
+    // No route-level guard — InventoryManagementPage gates restricted tabs before mounting them.
+    path: ADMIN_ROUTES.ADMIN_INVENTORY,
+    lazy: lazyRoute(() => import('@/features/inventory/real/pages/InventoryManagementPage')),
   },
   { path: ADMIN_ROUTES.ADMIN_ASSETS,    lazy: adminPage },
   { path: ADMIN_ROUTES.ADMIN_KPI,       lazy: adminPage },

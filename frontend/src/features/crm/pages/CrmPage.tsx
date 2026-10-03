@@ -6,7 +6,7 @@ import { useLeads } from '@/features/crm/hooks/useLeads'
 import { useLeadReport } from '@/features/crm/hooks/useLeadReport'
 import { useCrmFilters } from '@/features/crm/hooks/useCrmFilters'
 import { matchesFilters } from '@/features/crm/crm.filter'
-import { computeKpis } from '@/features/crm/crm.kpis'
+import { computeKpis, computeValueKpis } from '@/features/crm/crm.kpis'
 import { downloadLeadsCsv } from '@/features/crm/crm.export'
 import { usePagination } from '@/hooks/usePagination'
 import { Button } from '@/components/ui/button'
@@ -41,30 +41,35 @@ const CrmPage = () => {
   const canManageLeads = hasAnyPermission(['lead:manage', 'tenant:manage'])
   const { filters, setFilter, reset } = useCrmFilters()
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
-  // status/title are real, backend-supported filters — sending them server-side
-  // is what makes pagination correct while filtered (count/totalPages must
-  // reflect the FILTERED total, not the whole tenant's leads). fyFrom/fyTo are
-  // sent ahead of the backend accepting them (see SearchLeadQuery's own note)
-  // — harmless no-op server-side today; matchesFilters below still applies
-  // them client-side so the picker works now.
+  // All 6 filters are real, backend-supported params — needed server-side so count/totalPages
+  // reflect the filtered total. matchesFilters below only re-applies status/title/date client-side.
+  // report=true drives each row's stats.followUps (ListView only).
   const { leads, count, isLoading, error, moveStage, updateLead } = useLeads({
     status: filters.status || undefined,
     title: filters.q || undefined,
+    code: filters.code || undefined,
+    focusTherapy: filters.focusTherapy || undefined,
     fyFrom: filters.fyFrom || undefined,
     fyTo: filters.fyTo || undefined,
     page: String(page),
     limit: String(PAGE_SIZE),
+    report: 'true',
   })
   // Unfiltered — always whole-tenant, independent of the table's own filters below.
   const { report, isLoading: reportLoading, error: reportError } = useLeadReport({}, canManageLeads)
 
-  const [view, setView] = useState<ViewMode>('list')
+  // Prototype default: a rep-level (non-managing) caller lands on Compact;
+  // everyone else lands on List (crm.js's role check, ported to this app's
+  // own permission flag rather than a role-name string — see canManageLeads
+  // above).
+  const [view, setView] = useState<ViewMode>(canManageLeads ? 'list' : 'compact')
   const [openLeadId, setOpenLeadId] = useState<string | null>(null)
   const [wizardOpen, setWizardOpen] = useState(false)
   const [statusDrill, setStatusDrill] = useState<LeadStatus | null>(null)
 
   const filtered = useMemo(() => leads.filter((l) => matchesFilters(l, filters)), [leads, filters])
   const kpis = useMemo(() => computeKpis(report), [report])
+  const valueKpis = useMemo(() => computeValueKpis(report), [report])
 
   const openLead = leads.find((l) => l.id === openLeadId) ?? null
 
@@ -155,6 +160,16 @@ const CrmPage = () => {
                 All lead statistics
               </p>
               <CrmKpiStrip tiles={kpis} />
+              <p className="text-[11px] font-bold uppercase tracking-wider mb-2 mt-3" style={{ color: 'var(--qms-text-muted)' }}>
+                Pipeline value
+              </p>
+              <CrmKpiStrip tiles={valueKpis} />
+              {report.kpis.topRep && (
+                <p className="text-[12px] mt-2" style={{ color: 'var(--qms-text-muted)' }}>
+                  Top rep (all-time): <span className="font-semibold" style={{ color: 'var(--qms-text)' }}>{report.kpis.topRep.name}</span>
+                  {' · '}{report.kpis.topRep.wonCount} won
+                </p>
+              )}
             </>
           )}
 
@@ -177,7 +192,7 @@ const CrmPage = () => {
 
           <PaginationControls page={page} totalPages={totalPages(count)} onPageChange={setPage} />
 
-          <BottomInsightsRow leads={leads} />
+          <BottomInsightsRow leads={leads} onOpenLead={setOpenLeadId} />
         </>
       )}
 

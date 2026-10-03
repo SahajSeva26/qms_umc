@@ -1,10 +1,10 @@
-// HQ Mapping & Serviceability — TanStack Query wrapper over hq.service.ts,
-// following the same shape as features/fo/hooks/useFo.ts: thin useQuery reads
-// + useMutation writes that invalidate the same key. This screen's "writes"
-// are limited to the HQ master list (saveHqs) — classification itself is a
-// pure derivation recomputed on every render from the live people/camps/
-// devices data, exactly like the prototype's classifyAll() (minus its 4s
-// cache, per hq.service.ts's own comment: React Query already handles this).
+// HQ Mapping & Serviceability — TanStack Query wrapper over hq.service.ts:
+// thin useQuery reads + useMutation writes that invalidate the same key.
+// This screen's "writes" are limited to the HQ master list (saveHqs) —
+// classification itself is a pure derivation recomputed on every render from
+// the live people/camps/devices data, exactly like the prototype's
+// classifyAll() (minus its 4s cache, per hq.service.ts's own comment: React
+// Query already handles this).
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as hqService from '@/features/hq/hq.service'
 import type { HqRecord } from '@/features/hq/hq.types'

@@ -39,13 +39,53 @@ export const LeadMapper = {
         };
         return result;
     },
-    toSearchResponse: (data: { count: number; items: any[] }, ctx: RequestContext) => {
+    toSearchResponse: (data: { count: number; items: any[]; stats?: any }, ctx: RequestContext) => {
         const result = {
             count: data?.count || 0,
             items: [] as any[],
         };
+        const stats = data?.stats;
         for (const lead of data?.items || []) {
-            result.items.push(LeadMapper.toResponse(lead, ctx));
+            // NOTE: independent from toResponse on purpose — mirrors it field-for-field for now (incl. same permission gating) so nothing breaks; search rows can be trimmed later without affecting GET /:id.
+            const item: any = {
+                id: lead._id?.toString(),
+                code: lead.code,
+                tenant: lead.tenant,
+                division: lead.division,
+                contactPerson: lead.contactPerson,
+                focusTherapy: lead.focusTherapy || [],
+                focusTherapyDoctor: lead.focusTherapyDoctor || [],
+                title: lead.title,
+                problemStatement: lead.problemStatement,
+                numberOfMRS: lead.numberOfMRS,
+                currentlyDoing: lead.currentlyDoing || [],
+                notes: lead.notes,
+                projectType: lead.projectType,
+                offers: (lead.offers || []).map((offer: any) => ({
+                    code: offer.code,
+                    subOffer: offer.subOffer,
+                    reason: offer.reason,
+                })),
+                estimatedValue: lead.estimatedValue,
+                followUpDate: lead.followUpDate,
+                confidence: lead.confidence,
+                salesPerson: lead.salesPerson,
+                status: lead.status,
+                stageHistory: (lead.stageHistory || []).map((entry: any) => ({
+                    from: entry.from,
+                    to: entry.to,
+                    reason: entry.reason,
+                    actor: entry.actor,
+                    createdAt: entry.createdAt,
+                })),
+                createdAt: lead.createdAt,
+                updatedAt: lead.updatedAt,
+            };
+            // present only when the caller requested report=true
+            if (stats) {
+                item.stats = stats[lead._id?.toString()] ?? { appointments: 0, moms: 0, followUps: 0 };
+            }
+            result.items.push(item);
         }
         return result;
     },
@@ -57,6 +97,8 @@ export const LeadMapper = {
 
         return {
             summary: report?.summary,
+            // KPI strip: pipelineValue, wonValue/wonCount, avgDealSize, winRate, salesVelocityDays, topRep
+            kpis: report?.kpis,
             byStatus: Object.values(LEAD_STATUSES).map((status) => ({
                 status,
                 count: statusCounts.get(status) || 0,

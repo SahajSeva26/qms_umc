@@ -1,6 +1,6 @@
 import { FiMapPin } from 'react-icons/fi'
 import { useCampReport } from '@/features/camps/hooks/useCampReport'
-import { CAMP_STATUS_COLOR, CAMP_STATUS_LABEL } from '@/features/camps/components/CampStatusPillReal'
+import { CAMP_STATUS_COLOR, CAMP_STATUS_LABEL } from '@/components/widgets/camp/campStatus.constants'
 import { usePermission } from '@/hooks/usePermission'
 import type { CampType, BillingType } from '@/types/campReal.types'
 import SectionCard from '@/features/dashboard/components/SectionCard'

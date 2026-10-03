@@ -41,7 +41,7 @@ export interface CampStageHistoryEntry {
   createdAt: string
 }
 
-/** Whether a field is populated or a bare ObjectId depends on the service call: get()/search() populate, create/update/moveStage/allocateFo don't. */
+/** get()/search() populate; create/update/moveStage/allocateFo return bare ObjectIds. */
 export interface CampPopulatedTenant { _id?: string; code: string; name: string }
 export interface CampPopulatedDivision { _id?: string; code: string; name: string; therapy?: string }
 // tests is the Project's configured Test Master id list, not automatically
@@ -79,6 +79,14 @@ export interface CampEntity {
   stageHistory: CampStageHistoryEntry[]
   createdAt: string
   updatedAt: string
+  // Only present when the search was called with report=true — derived from the screening
+  // collection (one Screening = one patient at this camp), not a stored Camp field.
+  stats?: CampStats
+}
+
+export interface CampStats {
+  patients: number
+  patientsCompleted: number
 }
 
 /** create/update/moveStage/allocateFo return the unpopulated document — only
@@ -86,6 +94,8 @@ export interface CampEntity {
 export type CampMutationResponseEntity = Omit<CampEntity, 'devices'> & { devices: string[] }
 
 export interface SearchCampQuery {
+  code?: string
+  tenant?: string
   project?: string
   division?: string
   doctor?: string
@@ -99,6 +109,8 @@ export interface SearchCampQuery {
   dateTo?: string
   page?: string
   limit?: string
+  // When 'true', each item gets a `stats` object (see CampStats).
+  report?: 'true' | 'false'
 }
 
 export interface CreateCampPayload {

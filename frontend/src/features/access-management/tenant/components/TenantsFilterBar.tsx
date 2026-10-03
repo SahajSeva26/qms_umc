@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import SearchInput from '@/components/ui/SearchInput'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import StateCityFilter from '@/components/widgets/location-picker/StateCityFilter'
 import type { TenantsFilterState } from '@/features/access-management/tenant/hooks/useTenantsFilters'
 import type { TenantStatus, TenantType } from '@/types/accessManagement.types'
 
@@ -26,18 +28,38 @@ interface TenantsFilterBarProps {
 
 // Status filter is only honored server-side for callers with tenant:manage;
 // others are hard-scoped to status=active regardless of this UI's state.
+// Bumped on Reset to remount StateCityFilter (it doesn't sync props into state via an effect, so
+// a prop change alone wouldn't clear its text) — same pattern as DoctorFilterBar.
 const TenantsFilterBar = ({ filters, setFilter, reset, canFilterByType }: TenantsFilterBarProps) => {
+  const [resetKey, setResetKey] = useState(0)
+
+  const handleReset = () => {
+    setResetKey((k) => k + 1)
+    reset()
+  }
+
   return (
     <div
       className="flex flex-wrap items-center justify-between gap-2 p-2.5 mb-3 rounded-xl border"
       style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}
     >
-      <SearchInput
-        value={filters.search}
-        onChange={(v) => setFilter('search', v)}
-        placeholder="Search by name..."
-        className="w-56 text-[12px]"
-      />
+      <div className="flex flex-wrap items-center gap-2">
+        <SearchInput
+          value={filters.search}
+          onChange={(v) => setFilter('search', v)}
+          placeholder="Search by name..."
+          className="w-56 text-[12px]"
+        />
+        <StateCityFilter
+          key={resetKey}
+          city={filters.city}
+          state={filters.state}
+          onChange={({ city, state }) => {
+            setFilter('city', city)
+            setFilter('state', state)
+          }}
+        />
+      </div>
 
       <div className="flex flex-wrap items-center gap-2">
         {canFilterByType && (
@@ -62,7 +84,7 @@ const TenantsFilterBar = ({ filters, setFilter, reset, canFilterByType }: Tenant
           </SelectContent>
         </Select>
 
-        <Button variant="outline" size="sm" onClick={reset}>
+        <Button variant="outline" size="sm" onClick={handleReset}>
           Reset
         </Button>
       </div>

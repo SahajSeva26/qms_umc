@@ -22,7 +22,7 @@ import { unwrapId } from '@/utils/unwrapId'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from '@/components/ui/sonner'
 import NewLeadWizard from '@/features/crm/components/NewLeadWizard'
-import { latestAppointmentNextSteps } from '@/features/crm/appointments/appointmentsReal.utils'
+import { APPOINTMENT_TYPE_COLOR, latestAppointmentNextSteps } from '@/features/crm/appointments/appointmentsReal.utils'
 import { getApiErrorMessage } from '@/utils/apiError'
 
 const STATUS_COLOR: Record<AppointmentStatus, string> = {
@@ -47,8 +47,10 @@ const NEXT_STEPS_OTHER = 'Other'
 const labelClasses = 'block text-[10px] font-semibold tracking-widest uppercase mb-2'
 const labelStyle = { color: 'var(--qms-text-muted)' }
 
+// Matches the prototype's status-pill formula (color-mix(...12%,transparent)),
+// used identically in its drawer/list/leads views (sales-calendar.js).
 const Pill = ({ color, children }: { color: string; children: ReactNode }) => (
-  <span className="text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: `${color}22`, color }}>
+  <span className="text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: `color-mix(in srgb, ${color} 12%, transparent)`, color }}>
     {children}
   </span>
 )
@@ -248,7 +250,9 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
         <span className="text-[10px] font-bold px-2 py-1 rounded-full font-mono" style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text-muted)' }}>
           {appointment.code}
         </span>
-        <Pill color="var(--qms-brand)">{APPOINTMENT_TYPE_LABEL[appointment.type]}</Pill>
+        {/* Matches the prototype's tm.color per-type pill (typeMeta, sales-calendar.js) — was
+            hardcoded to the app's brand color regardless of type. */}
+        <Pill color={APPOINTMENT_TYPE_COLOR[appointment.type]}>{APPOINTMENT_TYPE_LABEL[appointment.type]}</Pill>
         <Pill color={statusColor}>{APPOINTMENT_STATUS_LABEL[appointment.status] ?? appointment.status}</Pill>
       </div>
 
@@ -269,6 +273,7 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
           },
           { label: 'Mode', value: APPOINTMENT_MODE_LABEL[appointment.mode] },
           { label: 'Link', value: appointment.destinationLink || undefined },
+          { label: 'Location', value: appointment.location || undefined },
           { label: 'Linked lead', value: appointment.lead ? leadRefName(appointment.lead) : undefined },
           { label: 'Parent appointment', value: appointment.parent ? refName(appointment.parent) : undefined },
         ]}
@@ -314,7 +319,9 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
           <div className="space-y-1.5">
             {appointment.internalMembers.map((m, i) => {
               const roleId = unwrapId(m.role)
-              const color = m.status === 'accepted' ? '#10b981' : m.status === 'declined' ? '#f43f5e' : '#f59e0b'
+              // Matches the prototype's invite-status colors (ACCEPTED/REJECTED/PENDING) —
+              // our 'declined' is the closest match to its 'REJECTED'; it has no 'modified' state.
+              const color = m.status === 'accepted' ? '#047857' : m.status === 'declined' ? '#b91c1c' : '#1d4ed8'
               return (
                 <div key={roleId ?? i} className="flex items-center justify-between text-[12px] rounded-lg border px-2.5 py-1.5" style={{ borderColor: 'var(--qms-border)' }}>
                   <span style={{ color: 'var(--qms-text)' }}>{refName(m.role)}</span>

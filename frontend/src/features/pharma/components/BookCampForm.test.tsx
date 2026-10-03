@@ -139,32 +139,22 @@ async function mockSession(roleId?: string, hasDoctorManage = false) {
   } as unknown as ReturnType<typeof useSession>)
 }
 
-function renderForm(props: { needsMrPicker?: boolean; type?: 'screening' | 'diet' } = {}) {
+function renderForm(props: { needsMrPicker?: boolean; type?: 'screening' | 'diet'; patientExpectation?: number } = {}) {
   return async () => {
     const BookCampForm = (await import('@/features/pharma/components/BookCampForm')).default
     const onBooked = vi.fn()
     const onCancel = vi.fn()
     render(
       <QueryClientProvider client={makeQueryClient()}>
-        <BookCampForm needsMrPicker={props.needsMrPicker ?? false} type={props.type ?? 'screening'} project={TEST_PROJECT} onBooked={onBooked} onCancel={onCancel} />
+        <BookCampForm needsMrPicker={props.needsMrPicker ?? false} type={props.type ?? 'screening'} project={TEST_PROJECT} patientExpectation={props.patientExpectation} onBooked={onBooked} onCancel={onCancel} />
       </QueryClientProvider>,
     )
     return { onBooked, onCancel }
   }
 }
 
-// Doctor is now step 2, coordinates-gated (DoctorDistancePicker via /doctors/nearest) — must run
-// AFTER Location (step 1) is completed, not before.
-async function pickDoctor(user: ReturnType<typeof userEvent.setup>) {
-  const { doctorsService } = await import('@/features/doctors/doctors.service')
-  vi.mocked(doctorsService.nearestDoctors).mockResolvedValue({
-    success: true, message: '', data: { items: [doctorFixture()], count: 1 },
-  })
-  await user.type(await screen.findByPlaceholderText(/search doctor by name/i), 'Priya')
-  const option = await screen.findByText(/Dr\. Priya Sharma/i, {}, { timeout: 3000 })
-  await user.click(option)
-}
-
+// All sections render at once now (2026-09-30 restyle, matches the prototype's single-page
+// layout) — no Back/Next, no step gating. These helpers just fill each real section directly.
 async function pickMr(user: ReturnType<typeof userEvent.setup>, mr: RoleEntity = mrFixture()) {
   const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
   vi.mocked(accessManagementService.searchDownlineMrs).mockResolvedValue({
@@ -175,16 +165,42 @@ async function pickMr(user: ReturnType<typeof userEvent.setup>, mr: RoleEntity =
   await user.click(option)
 }
 
-// Step 0 (MR) -> step 1 (Location) for an RSM/ASM session (withMr). A self-booking MR session
-// has no step 0 at all (starts at Location), so this is a no-op when withMr is false.
-async function completeStep1(user: ReturnType<typeof userEvent.setup>, { withMr = false, mr }: { withMr?: boolean; mr?: RoleEntity } = {}) {
-  if (!withMr) return
-  await pickMr(user, mr)
-  await user.click(screen.getByRole('button', { name: /^next$/i }))
+async function fillLocation(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(screen.getByLabelText(/^address line 1$/i), '221 Baker Street')
+  await user.type(screen.getByLabelText(/^city$/i), 'Pune')
+  await user.type(screen.getByLabelText(/^state$/i), 'Maharashtra')
+  await user.type(screen.getByLabelText(/^pincode$/i), '411001')
+  await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
 }
 
-// Fills EditDoctorModal's own Location card (required on create) — same real
-// LocationAddressFields inputs as Camp's own step 1, scoped to the open dialog.
+async function pickDoctor(user: ReturnType<typeof userEvent.setup>) {
+  const { doctorsService } = await import('@/features/doctors/doctors.service')
+  vi.mocked(doctorsService.nearestDoctors).mockResolvedValue({
+    success: true, message: '', data: { items: [doctorFixture()], count: 1 },
+  })
+  await user.type(await screen.findByPlaceholderText(/search doctor by name/i), 'Priya')
+  const option = await screen.findByText(/Dr\. Priya Sharma/i, {}, { timeout: 3000 })
+  await user.click(option)
+}
+
+// Picks today's date (the only mocked-available day, first in the day-strip) then its first slot.
+async function pickDateAndSlot(user: ReturnType<typeof userEvent.setup>) {
+  const todayBtn = (await screen.findByText(String(startOfToday().getDate()))).closest('button')!
+  await user.click(todayBtn)
+  const slotPill = await screen.findByRole('button', { name: /9 AM – 1 PM/i })
+  await user.click(slotPill)
+}
+
+// Fills every real section: MR (if needed) -> Location -> Doctor -> Date/slot.
+async function fillWholeForm(user: ReturnType<typeof userEvent.setup>, opts: { withMr?: boolean; mr?: RoleEntity } = {}) {
+  if (opts.withMr) await pickMr(user, opts.mr)
+  await fillLocation(user)
+  await pickDoctor(user)
+  await pickDateAndSlot(user)
+}
+
+// Fills new doctor's own Location card (required on create) — same real LocationAddressFields
+// inputs as the main form's own location section, scoped to the open dialog.
 async function fillNewDoctorLocation(user: ReturnType<typeof userEvent.setup>) {
   const dialog = screen.getByRole('dialog')
   await user.type(within(dialog).getByLabelText(/^address line 1$/i), '221 Baker Street')
@@ -194,41 +210,7 @@ async function fillNewDoctorLocation(user: ReturnType<typeof userEvent.setup>) {
   await user.click(within(dialog).getByRole('button', { name: /set test coordinates/i }))
 }
 
-// Step 1 (Location) -> step 2 (Doctor), filling location and resolving coordinates.
-async function completeStep2(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(await screen.findByLabelText(/^address line 1$/i), '221 Baker Street')
-  await user.type(screen.getByLabelText(/^city$/i), 'Pune')
-  await user.type(screen.getByLabelText(/^state$/i), 'Maharashtra')
-  await user.type(screen.getByLabelText(/^pincode$/i), '411001')
-  await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
-  await user.click(screen.getByRole('button', { name: /^next$/i }))
-}
-
-// Step 2 (Doctor) -> step 3 (Date/slot + patient expectation).
-async function completeStep3(user: ReturnType<typeof userEvent.setup>) {
-  await pickDoctor(user)
-  await user.click(screen.getByRole('button', { name: /^next$/i }))
-}
-
-// Step 3: pick today's date (the only mocked-available day) then its first slot. With two months
-// now visible, today's digit can match twice — index 0 is always today's own (first) month.
-async function pickDateAndSlot(user: ReturnType<typeof userEvent.setup>) {
-  const todayCells = await screen.findAllByRole('gridcell', { name: String(startOfToday().getDate()) })
-  const todayBtn = todayCells[0].querySelector('button')!
-  await user.click(todayBtn)
-  const slotPill = await screen.findByRole('button', { name: /9 AM – 1 PM/i })
-  await user.click(slotPill)
-}
-
-// Full happy-path flow up to (not including) the final submit click. 4 screens with withMr, 3 without.
-async function fillWholeForm(user: ReturnType<typeof userEvent.setup>, opts: { withMr?: boolean } = {}) {
-  await completeStep1(user, { withMr: opts.withMr })
-  await completeStep2(user)
-  await completeStep3(user)
-  await pickDateAndSlot(user)
-}
-
-describe('BookCampForm — step 0 (who)', () => {
+describe('BookCampForm — session/identity guards', () => {
   beforeEach(() => {
     vi.resetAllMocks()
   })
@@ -245,9 +227,9 @@ describe('BookCampForm — step 0 (who)', () => {
     expect(campsRealService.bookCamp).not.toHaveBeenCalled()
   })
 
-  it('when missingSelfMrId is true, the warning banner is visible and submit stays blocked throughout the form', async () => {
-    // No resolvable session role id — the missingSelfMrId banner must stay visible everywhere
-    // and the final submit button must stay disabled regardless of step.
+  it('when missingSelfMrId is true, the warning banner is visible and submit stays blocked', async () => {
+    // No resolvable session role id — the missingSelfMrId banner must stay visible and the
+    // submit button must stay disabled regardless of what else is filled.
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
       session: { ...sessionFixture(), role: { id: '', code: 'pharma-mr', name: 'MR' } },
@@ -257,7 +239,6 @@ describe('BookCampForm — step 0 (who)', () => {
     await renderForm()()
 
     expect(screen.getByText(/couldn't resolve your mr identity/i)).toBeInTheDocument()
-    // Starts directly at Location (step 1), not a dead step-0 screen.
     expect(await screen.findByLabelText(/^address line 1$/i)).toBeInTheDocument()
 
     await fillWholeForm(user)
@@ -265,120 +246,161 @@ describe('BookCampForm — step 0 (who)', () => {
     expect(screen.getByRole('button', { name: /book camp/i })).toBeDisabled()
   })
 
-  it('blocks Next with no MR selected when needsMrPicker is true', async () => {
+  it('shows an MR-required error only after a submit attempt with no MR selected', async () => {
     await mockSession()
     const user = userEvent.setup()
     await renderForm({ needsMrPicker: true })()
 
-    await user.click(screen.getByRole('button', { name: /^next$/i }))
+    await user.click(screen.getByRole('button', { name: /book camp/i }))
 
     expect(await screen.findByText(/mr is required/i)).toBeInTheDocument()
-    expect(screen.queryByLabelText(/^address line 1$/i)).not.toBeInTheDocument()
+    const { campsRealService } = await import('@/features/camps/campsReal.service')
+    expect(campsRealService.bookCamp).not.toHaveBeenCalled()
   })
 })
 
-describe('BookCampForm — step 1 (where)', () => {
+describe('BookCampForm — all sections visible at once', () => {
   beforeEach(() => {
     vi.resetAllMocks()
   })
 
-  it('clicking Next with an incomplete address shows its errors and does not advance', async () => {
+  it('Location, Doctor, Date & time slot, and Notes all render simultaneously — no step gating', async () => {
+    await mockSession()
+    await renderForm()()
+
+    expect(screen.getByLabelText(/^address line 1$/i)).toBeInTheDocument()
+    expect(screen.getByText(/pick a location above to see availability/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/^notes$/i)).toBeInTheDocument()
+  })
+
+  it('Doctor renders before Camp location in the DOM, matching the prototype\'s section order (2 · Doctor, 3 · Camp location)', async () => {
+    await mockSession()
+    await renderForm()()
+
+    const doctorHeading = screen.getByText(/^2 · doctor$/i)
+    const locationHeading = screen.getByText(/^3 · camp location$/i)
+    expect(doctorHeading.compareDocumentPosition(locationHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('the Doctor picker is disabled with a "pick a location first" placeholder until coordinates resolve', async () => {
+    await mockSession()
+    await renderForm()()
+
+    expect(screen.getByPlaceholderText(/pick a location first/i)).toBeInTheDocument()
+    expect(screen.getByPlaceholderText(/pick a location first/i)).toBeDisabled()
+  })
+
+  it('picking a location unlocks the Doctor picker and the availability day-strip', async () => {
     await mockSession()
     const user = userEvent.setup()
     await renderForm()()
 
-    await completeStep1(user)
+    await fillLocation(user)
+
+    expect(await screen.findByPlaceholderText(/search doctor by name/i)).toBeInTheDocument()
+    expect(await screen.findByText(/pick a date — \d+ fos? can run this camp/i)).toBeInTheDocument()
+    expect(screen.queryByText(/pick a location above to see availability/i)).not.toBeInTheDocument()
+  })
+
+  it('clicking Book camp with an incomplete address shows its errors and never advances anything else', async () => {
+    await mockSession()
+    const user = userEvent.setup()
+    await renderForm()()
+
     // Only address line 1 + city filled — state/pincode left blank.
     await user.type(screen.getByLabelText(/^address line 1$/i), '221 Baker Street')
     await user.type(screen.getByLabelText(/^city$/i), 'Pune')
     await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
-    await user.click(screen.getByRole('button', { name: /^next$/i }))
+    await user.click(screen.getByRole('button', { name: /book camp/i }))
 
     const stateSpan = await screen.findByText('State is required.')
     const pincodeSpan = await screen.findByText('Pincode is required.')
     expect(stateSpan.tagName).toBe('SPAN')
     expect(pincodeSpan.tagName).toBe('SPAN')
-    // Still on step 1 — the Doctor field hasn't rendered.
-    expect(screen.queryByPlaceholderText(/search doctor by name/i)).not.toBeInTheDocument()
   })
 
-  it('clicking Next while location is resolving is blocked with the resolving message, then clears once resolved', async () => {
+  it('resolving-location submit is blocked with the resolving message, then clears once resolved', async () => {
     await mockSession()
     const user = userEvent.setup()
     await renderForm()()
 
-    await completeStep1(user)
-    await user.type(screen.getByLabelText(/^address line 1$/i), '221 Baker Street')
-    await user.type(screen.getByLabelText(/^city$/i), 'Pune')
-    await user.type(screen.getByLabelText(/^state$/i), 'Maharashtra')
-    await user.type(screen.getByLabelText(/^pincode$/i), '411001')
-    await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
+    await fillLocation(user)
+    await pickDoctor(user)
+    await pickDateAndSlot(user)
     await user.click(screen.getByRole('button', { name: /simulate location resolving/i }))
 
-    await user.click(screen.getByRole('button', { name: /^next$/i }))
+    // Submit is disabled while resolving, so fire the form's own submit directly to exercise
+    // onSubmit's own guard, same as a submit that raced in just as resolution started.
+    const resolvingButton = screen.getByRole('button', { name: /resolving location/i })
+    const form = resolvingButton.closest('form')
+    if (!form) throw new Error('form not found')
+    fireEvent.submit(form)
     expect(await screen.findByText(/still resolving the picked location/i)).toBeInTheDocument()
-    expect(screen.queryByPlaceholderText(/search doctor by name/i)).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /simulate location resolved/i }))
-    await user.click(screen.getByRole('button', { name: /^next$/i }))
-
-    // Stale error is gone, and we've genuinely advanced to step 2 (Doctor).
-    expect(screen.queryByText(/still resolving the picked location/i)).not.toBeInTheDocument()
-    expect(await screen.findByPlaceholderText(/search doctor by name/i)).toBeInTheDocument()
+    // The error clears on the NEXT submit attempt once resolution is idle again — same
+    // real contract as before (it isn't cleared just by resolution state changing on its own).
+    fireEvent.submit(form)
+    await waitFor(() => expect(screen.queryByText(/still resolving the picked location/i)).not.toBeInTheDocument())
   })
 
-  it('a step-3 (date/slot) field error is never shown just because an earlier Next was attempted', async () => {
+  it('a real refetch that reports the picked date/slot is no longer available clears the selection instead of leaving it stale', async () => {
     await mockSession()
+    const { campsRealService } = await import('@/features/camps/campsReal.service')
     const user = userEvent.setup()
-    await renderForm()()
+    const queryClient = makeQueryClient()
+    const BookCampForm = (await import('@/features/pharma/components/BookCampForm')).default
+    render(
+      <QueryClientProvider client={queryClient}>
+        <BookCampForm needsMrPicker={false} type="screening" project={TEST_PROJECT} patientExpectation={undefined} onBooked={vi.fn()} onCancel={vi.fn()} />
+      </QueryClientProvider>,
+    )
 
-    await completeStep1(user)
-    // Address filled but city/state/pincode blank — Next fails validation, stays on step 1.
-    await user.type(screen.getByLabelText(/^address line 1$/i), '221 Baker Street')
-    await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
-    await user.click(screen.getByRole('button', { name: /^next$/i }))
-    await screen.findByText(/city is required/i)
+    await fillWholeForm(user)
+    expect(screen.getByRole('button', { name: /9 AM – 1 PM/i })).toBeInTheDocument()
 
-    // No step-3-only text ("Date is required"/"Time slot is required") should appear.
-    expect(screen.queryByText(/date is required/i)).not.toBeInTheDocument()
-    expect(screen.queryByText(/time slot is required/i)).not.toBeInTheDocument()
+    // The next fetch now reports today as fully booked, then force a genuine refetch — the same
+    // effect a real trigger (window refocus, remount, retry) would have.
+    vi.mocked(campsRealService.getBookingAvailability).mockResolvedValue({
+      success: true, message: '',
+      data: { eligibleFoCount: 0, dateFrom: TODAY_KEY, dateTo: TODAY_KEY, dates: { [TODAY_KEY]: { available: false, slots: { '9am-1pm': false, '10am-2pm': false } } } },
+    })
+    await queryClient.refetchQueries()
+
+    // The stale slot pill is gone — the date/slot selection was cleared, not left pointing at a
+    // now-unavailable booking.
+    await waitFor(() => expect(screen.queryByRole('button', { name: /9 AM – 1 PM/i })).not.toBeInTheDocument())
   })
+
+  it('submit is blocked while the availability fetch for the picked date/slot is genuinely loading or has errored', async () => {
+    await mockSession()
+    const { campsRealService } = await import('@/features/camps/campsReal.service')
+    const user = userEvent.setup()
+    const queryClient = makeQueryClient()
+    const BookCampForm = (await import('@/features/pharma/components/BookCampForm')).default
+    render(
+      <QueryClientProvider client={queryClient}>
+        <BookCampForm needsMrPicker={false} type="screening" project={TEST_PROJECT} patientExpectation={undefined} onBooked={vi.fn()} onCancel={vi.fn()} />
+      </QueryClientProvider>,
+    )
+
+    await fillWholeForm(user)
+    const submitButton = screen.getByRole('button', { name: /book camp/i })
+    expect(submitButton).not.toBeDisabled()
+
+    // A slow refetch that never resolves — a real "still loading" state, not a resolving-
+    // location detour (which the test above already covers as its own, separate guard).
+    vi.mocked(campsRealService.getBookingAvailability).mockImplementation(() => new Promise(() => {}))
+    queryClient.refetchQueries()
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /book camp/i })).toBeDisabled())
+  })
+
 })
 
-describe('BookCampForm — step 2 (doctor)', () => {
+describe('BookCampForm — MR-on-behalf-of division scoping', () => {
   beforeEach(() => {
     vi.resetAllMocks()
-  })
-
-  it('clicking Next with no doctor selected shows the error and does not advance', async () => {
-    await mockSession()
-    const user = userEvent.setup()
-    await renderForm()()
-
-    await completeStep1(user)
-    await completeStep2(user)
-    await user.click(screen.getByRole('button', { name: /^next$/i }))
-
-    expect(await screen.findByText(/doctor is required/i)).toBeInTheDocument()
-    // Still on step 2 — the calendar hasn't rendered.
-    expect(screen.queryByRole('gridcell')).not.toBeInTheDocument()
-  })
-
-  it('Back returns to step 1 (location) without losing the picked doctor when navigating forward again', async () => {
-    await mockSession()
-    const user = userEvent.setup()
-    await renderForm()()
-
-    await completeStep1(user)
-    await completeStep2(user)
-    await pickDoctor(user)
-    await user.click(screen.getByRole('button', { name: /^back$/i }))
-    // Coordinates were cleared going back? No — Back doesn't reset the form, only the step.
-    // Re-advance to confirm the doctor selection survived the round trip.
-    await user.click(screen.getByRole('button', { name: /^next$/i }))
-
-    // A selected doctor renders as a plain label span, not an input.
-    expect(screen.getByText(/Dr\. Priya Sharma/i)).toBeInTheDocument()
   })
 
   it("blocks doctor selection with a mismatch error when the picked MR's division differs from the acting user's own", async () => {
@@ -387,13 +409,13 @@ describe('BookCampForm — step 2 (doctor)', () => {
     const user = userEvent.setup()
     await renderForm({ needsMrPicker: true })()
 
-    await completeStep1(user, { withMr: true, mr: mrFixture({ division: 'div-2' }) })
-    await completeStep2(user)
+    await pickMr(user, mrFixture({ division: 'div-2' }))
 
     expect(screen.getByText(/this mr's division doesn't match your own/i)).toBeInTheDocument()
     // The doctor picker itself must not render while blocked — no wrongly-scoped search possible.
     expect(screen.queryByPlaceholderText(/search doctor by name/i)).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^next$/i })).toBeDisabled()
+    expect(screen.queryByPlaceholderText(/pick a location first/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /book camp/i })).toBeDisabled()
   })
 
   it("blocks doctor selection (treats it the same as a mismatch) when the picked MR's division is unreadable/absent", async () => {
@@ -402,12 +424,11 @@ describe('BookCampForm — step 2 (doctor)', () => {
     await renderForm({ needsMrPicker: true })()
 
     // No `division` field at all on this MR — mrDivisionId resolves to null.
-    await completeStep1(user, { withMr: true, mr: { ...mrFixture(), division: undefined } })
-    await completeStep2(user)
+    await pickMr(user, { ...mrFixture(), division: undefined })
 
     expect(screen.getByText(/can't confirm this mr's division/i)).toBeInTheDocument()
     expect(screen.queryByPlaceholderText(/search doctor by name/i)).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^next$/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /book camp/i })).toBeDisabled()
   })
 
   it('does NOT block doctor selection when the picked MR is in the same division as the acting user', async () => {
@@ -417,53 +438,40 @@ describe('BookCampForm — step 2 (doctor)', () => {
     const user = userEvent.setup()
     await renderForm({ needsMrPicker: true })()
 
-    await completeStep1(user, { withMr: true })
-    await completeStep2(user)
+    await pickMr(user)
+    await fillLocation(user)
 
     expect(screen.queryByText(/this mr's division doesn't match your own/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/can't confirm this mr's division/i)).not.toBeInTheDocument()
-    expect(screen.getByPlaceholderText(/search doctor by name/i)).toBeInTheDocument()
+    expect(await screen.findByPlaceholderText(/search doctor by name/i)).toBeInTheDocument()
   })
 })
 
-describe('BookCampForm — step 3 (when & details) and submit', () => {
+describe('BookCampForm — availability day-strip', () => {
   beforeEach(() => {
     vi.resetAllMocks()
   })
 
-  it('the calendar shows a project-filtered slot row once a bookable date is picked, not all 4 slots', async () => {
+  it('the day-strip shows a project-filtered slot row once a bookable date is picked, not all 4 slots', async () => {
     await mockSession()
     const user = userEvent.setup()
     await renderForm()()
 
-    await completeStep1(user)
-    await completeStep2(user)
-    await completeStep3(user)
+    await fillLocation(user)
 
-    const todayCells = await screen.findAllByRole('gridcell', { name: String(startOfToday().getDate()) })
-    await user.click(todayCells[0].querySelector('button')!)
+    const todayBtn = (await screen.findByText(String(startOfToday().getDate()))).closest('button')!
+    await user.click(todayBtn)
 
     expect(await screen.findByRole('button', { name: /9 AM – 1 PM/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /10 AM – 2 PM/i })).toBeInTheDocument()
     expect(screen.queryByText(/11 AM – 3 PM/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/6 PM – 10 PM/i)).not.toBeInTheDocument()
   })
+})
 
-  it('selecting a date, then navigating to a different month, clears the picked date and slot', async () => {
-    await mockSession()
-    const user = userEvent.setup()
-    await renderForm()()
-
-    await completeStep1(user)
-    await completeStep2(user)
-    await completeStep3(user)
-    await pickDateAndSlot(user)
-
-    // Navigate forward a month via the dropdown-free chevron nav react-day-picker renders.
-    await user.click(screen.getByRole('button', { name: /next month/i }))
-
-    // The slot row (which only renders once selectedDate is truthy) should be gone.
-    expect(screen.queryByRole('button', { name: /9 AM – 1 PM/i })).not.toBeInTheDocument()
+describe('BookCampForm — submit', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
   })
 
   it('submits the session\'s own role id as mr when needsMrPicker is false', async () => {
@@ -505,11 +513,11 @@ describe('BookCampForm — step 3 (when & details) and submit', () => {
     expect(vi.mocked(campsRealService.bookCamp).mock.calls[0][0].mr).toBe('mr-1')
   })
 
-  it('submits patientExpectation as omitted when left blank, but preserves a genuine 0', async () => {
+  it('submits patientExpectation as omitted when the caller passes undefined (its own section 1 field was left blank)', async () => {
     await mockSession()
     const { campsRealService } = await import('@/features/camps/campsReal.service')
     const user = userEvent.setup()
-    await renderForm()()
+    await renderForm({ patientExpectation: undefined })()
 
     await fillWholeForm(user)
     await user.click(screen.getByRole('button', { name: /book camp/i }))
@@ -518,21 +526,20 @@ describe('BookCampForm — step 3 (when & details) and submit', () => {
     expect(vi.mocked(campsRealService.bookCamp).mock.calls[0][0].patientExpectation).toBeUndefined()
   })
 
-  it('preserves patientExpectation: 0 rather than treating it as blank', async () => {
+  it('passes the caller-owned patientExpectation straight through into the booking payload — preserves a genuine 0', async () => {
     await mockSession()
     const { campsRealService } = await import('@/features/camps/campsReal.service')
     const user = userEvent.setup()
-    await renderForm()()
+    await renderForm({ patientExpectation: 0 })()
 
     await fillWholeForm(user)
-    await user.type(screen.getByLabelText(/patients expected/i), '0')
     await user.click(screen.getByRole('button', { name: /book camp/i }))
 
     await waitFor(() => expect(campsRealService.bookCamp).toHaveBeenCalledTimes(1))
     expect(vi.mocked(campsRealService.bookCamp).mock.calls[0][0].patientExpectation).toBe(0)
   })
 
-  it('calls onBooked with the created camp on success, and resets the form back to step 0', async () => {
+  it('calls onBooked with the created camp on success, and resets the form', async () => {
     await mockSession()
     const user = userEvent.setup()
     const { onBooked } = await renderForm({ needsMrPicker: true })()
@@ -543,24 +550,17 @@ describe('BookCampForm — step 3 (when & details) and submit', () => {
     await waitFor(() => expect(onBooked).toHaveBeenCalledTimes(1))
     expect(onBooked.mock.calls[0][0].data.code).toBe('cmp-000001')
     expect(screen.queryByText(/camp requested/i)).not.toBeInTheDocument()
-    // Reset lands back on step 0 — the MR field is visible again, empty.
+    // Reset clears the MR field back to empty.
     expect(screen.getByPlaceholderText(/search mr by name/i)).toBeInTheDocument()
   })
 
-  it('Cancel/Back never submit the form as a side effect (type="button" regression)', async () => {
+  it('Cancel never submits the form as a side effect', async () => {
     await mockSession()
     const { campsRealService } = await import('@/features/camps/campsReal.service')
     const user = userEvent.setup()
     await renderForm()()
 
-    // A self-booking MR starts at step 1 (Location), where the button is "Cancel" not "Back".
     await user.click(screen.getByRole('button', { name: /^cancel$/i }))
-    expect(campsRealService.bookCamp).not.toHaveBeenCalled()
-
-    // Re-advance all the way to step 3, then Back from there too.
-    await completeStep2(user)
-    await completeStep3(user)
-    await user.click(screen.getByRole('button', { name: /^back$/i }))
     expect(campsRealService.bookCamp).not.toHaveBeenCalled()
   })
 
@@ -585,8 +585,6 @@ describe('BookCampForm — step 3 (when & details) and submit', () => {
     resolveBooking(bookCampResponseFixture())
     await waitFor(() => expect(onBooked).toHaveBeenCalledTimes(1))
   })
-
-  // The "blocks submit while location resolving" case is covered by the step-1 test above — LocationPicker isn't mounted on step 2.
 
   it('blocks a true rapid double-submit to exactly one mutation call', async () => {
     await mockSession()
@@ -624,7 +622,7 @@ describe('BookCampForm — zero configured slots', () => {
 
     render(
       <QueryClientProvider client={makeQueryClient()}>
-        <BookCampForm needsMrPicker={false} type="screening" project={{ id: 'proj-2', name: 'Empty Project', campTimeSlots: [] }} onBooked={vi.fn()} onCancel={vi.fn()} />
+        <BookCampForm needsMrPicker={false} type="screening" project={{ id: 'proj-2', name: 'Empty Project', campTimeSlots: [] }} patientExpectation={undefined} onBooked={vi.fn()} onCancel={vi.fn()} />
       </QueryClientProvider>,
     )
 
@@ -643,8 +641,7 @@ describe('BookCampForm — inline doctor creation (dormant until doctor:manage i
     const user = userEvent.setup()
     await renderForm()()
 
-    await completeStep1(user)
-    await completeStep2(user)
+    await fillLocation(user)
 
     expect(screen.queryByRole('button', { name: /new doctor/i })).not.toBeInTheDocument()
   })
@@ -659,10 +656,9 @@ describe('BookCampForm — inline doctor creation (dormant until doctor:manage i
     const user = userEvent.setup()
     await renderForm()()
 
-    await completeStep1(user)
-    await completeStep2(user)
+    await fillLocation(user)
 
-    await user.click(screen.getByRole('button', { name: /new doctor/i }))
+    await user.click(await screen.findByRole('button', { name: /new doctor/i }))
     await screen.findByRole('dialog')
     expect(screen.getByText(/locked to the camp being booked/i)).toBeInTheDocument()
     // Division is forced from the acting user's own session, not a project — distinct wording
@@ -699,12 +695,11 @@ describe('BookCampForm — inline doctor creation (dormant until doctor:manage i
     const user = userEvent.setup()
     await renderForm()()
 
-    await completeStep1(user)
-    await completeStep2(user)
-    await user.click(screen.getByRole('button', { name: /^next$/i }))
+    await fillLocation(user)
+    await user.click(screen.getByRole('button', { name: /book camp/i }))
     await waitFor(() => expect(screen.getByText(/doctor is required/i)).toBeInTheDocument())
 
-    await user.click(screen.getByRole('button', { name: /new doctor/i }))
+    await user.click(await screen.findByRole('button', { name: /new doctor/i }))
     await screen.findByRole('dialog')
     const codeLabel = screen.getByText(/pharma doctor code/i)
     await user.type(codeLabel.parentElement!.querySelector('input')!, 'DOC-NEW')
@@ -727,10 +722,9 @@ describe('BookCampForm — inline doctor creation (dormant until doctor:manage i
     const user = userEvent.setup()
     await renderForm()()
 
-    await completeStep1(user)
-    await completeStep2(user)
+    await fillLocation(user)
 
-    await user.click(screen.getByRole('button', { name: /new doctor/i }))
+    await user.click(await screen.findByRole('button', { name: /new doctor/i }))
     await screen.findByRole('dialog')
     await user.click(screen.getByRole('button', { name: /^cancel$/i }))
 

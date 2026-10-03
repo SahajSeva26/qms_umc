@@ -34,15 +34,15 @@ function getInMonthDayCell(dayNumber: string): HTMLElement {
 }
 
 describe('AppointmentMonthGrid', () => {
-  it('renders a color bar for an appointment on its start-time day', () => {
+  it('renders a "Type · Contact" chip for an appointment on its start-time day', () => {
     const appointment = appointmentFixture({ duration: { startTime: '2026-09-09T10:00:00.000Z' } })
     render(<AppointmentMonthGrid cursor={new Date(2026, 8, 1)} appointments={[appointment]} onPickDate={vi.fn()} />)
 
     const dayCell = getInMonthDayCell('9')
-    expect(dayCell.querySelector('.h-1.rounded-full')).toBeInTheDocument()
+    expect(dayCell).toHaveTextContent('New')
   })
 
-  it('clicking a day calls onPickDate with that date (no modal — Appointments navigates instead)', async () => {
+  it('clicking an empty day calls onPickDate with that date and an empty appointments array', async () => {
     const user = userEvent.setup()
     const onPickDate = vi.fn()
     render(<AppointmentMonthGrid cursor={new Date(2026, 8, 1)} appointments={[]} onPickDate={onPickDate} />)
@@ -51,8 +51,21 @@ describe('AppointmentMonthGrid', () => {
 
     expect(onPickDate).toHaveBeenCalledTimes(1)
     expect(onPickDate.mock.calls[0][0].getDate()).toBe(15)
+    expect(onPickDate.mock.calls[0][1]).toEqual([])
     // No day-detail modal exists on this component — confirm nothing resembling one opened.
     expect(screen.queryByText('Close')).not.toBeInTheDocument()
+  })
+
+  it('clicking a day with appointments calls onPickDate with that day\'s appointments', async () => {
+    const user = userEvent.setup()
+    const onPickDate = vi.fn()
+    const appointment = appointmentFixture({ duration: { startTime: '2026-09-09T10:00:00.000Z' } })
+    render(<AppointmentMonthGrid cursor={new Date(2026, 8, 1)} appointments={[appointment]} onPickDate={onPickDate} />)
+
+    await user.click(getInMonthDayCell('9'))
+
+    expect(onPickDate).toHaveBeenCalledTimes(1)
+    expect(onPickDate.mock.calls[0][1]).toEqual([appointment])
   })
 
   // Regression guard for the exact drift that motivated the shared-component

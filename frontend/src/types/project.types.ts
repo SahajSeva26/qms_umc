@@ -266,10 +266,32 @@ export interface ProjectEntity {
   sops: string
   createdAt: string
   updatedAt: string
+  // Only present when the search was called with report=true — per-project rollup for
+  // this result page only (see SearchProjectQuery.report).
+  stats?: ProjectStats
+}
+
+export interface ProjectStats {
+  // Camps in `closed` + `cancelled_charged` — the "done" count against `totalCamps`'s quota.
+  executedCamps: number
+}
+
+export interface ProjectTypeBreakdownEntry {
+  type: ProjectType
+  count: number
+}
+
+// Only present when the search was called with report=true — a breakdown over the whole
+// scoped/filtered result set (not just the current page). A multi-type project is counted
+// once per type it carries.
+export interface ProjectSearchReport {
+  total: number
+  byType: ProjectTypeBreakdownEntry[]
 }
 
 export interface SearchProjectQuery {
   name?: string
+  code?: string
   status?: ProjectStatus
   therapy?: ProjectTherapy
   tenant?: string
@@ -278,6 +300,9 @@ export interface SearchProjectQuery {
   salesRep?: string
   page?: string
   limit?: string
+  // When 'true', each item gets a `stats` object and the response gets a top-level `report`
+  // (ProjectSearchReport). Unlike tenant's report mode, the backend does NOT cap `limit` here.
+  report?: 'true' | 'false'
 }
 
 // Matches CreateProjectPayloadSchema exactly — tenant/division/status are NOT

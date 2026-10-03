@@ -62,8 +62,32 @@ export const ScreeningMapper = {
             count: data?.count || 0,
             items: [] as any[],
         };
+        // NOTE: independent from toResponse on purpose — mirrors it field-for-field for now (incl. same permission gating) so nothing breaks; search rows can be trimmed later without affecting GET /:id.
         for (const screening of data?.items || []) {
-            result.items.push(ScreeningMapper.toResponse(screening, ctx));
+            const item: any = {
+                id: screening._id?.toString(),
+
+                tenant: mapRef(screening.tenant, (t) => ({ name: t.name, code: t.code })),
+                patient: mapRef(screening.patient, (p) => ({
+                    code: p.code,
+                    firstName: p.firstName,
+                    middleName: p.middleName,
+                    lastName: p.lastName,
+                    mobile: p.mobile,
+                })),
+                camp: mapRef(screening.camp, (c) => ({ code: c.code, date: c.date, status: c.status })),
+                performedBy: mapRef(screening.performedBy, (r) => ({ name: r.name, code: r.code })),
+
+                symptoms: screening.symptoms || [],
+                referral: screening.referral,
+                consent: mapConsent(screening.consent),
+                status: screening.status,
+                stageHistory: (screening.stageHistory || []).map(mapStageEntry),
+
+                createdAt: screening.createdAt,
+                updatedAt: screening.updatedAt,
+            };
+            result.items.push(item);
         }
         return result;
     },

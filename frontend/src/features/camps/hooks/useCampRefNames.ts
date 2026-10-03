@@ -1,7 +1,7 @@
 import { useDoctorSearch as useDoctors } from '@/hooks/useDoctorSearch'
 import { useDivisions } from '@/features/crm/divisions/hooks/useDivisions'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
-import { useProjects } from '@/features/projects/hooks/useProjects'
+import { useProjects } from '@/features/projects'
 import { campRefId, campRefName } from '@/features/camps/campsReal.utils'
 import type { CampPopulatedDivision, CampPopulatedDoctor, CampPopulatedProject, CampPopulatedRole } from '@/types/campReal.types'
 

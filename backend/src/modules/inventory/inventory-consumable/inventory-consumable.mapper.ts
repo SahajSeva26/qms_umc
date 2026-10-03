@@ -61,8 +61,31 @@ export const InventoryConsumableMapper = {
             count: data?.count || 0,
             items: [] as any[],
         };
+        // NOTE: independent from toResponse on purpose — mirrors it field-for-field for now (incl. same permission gating) so nothing breaks; search rows can be trimmed later without affecting GET /:id.
         for (const lot of data?.items || []) {
-            result.items.push(InventoryConsumableMapper.toResponse(lot, ctx));
+            const row: any = {
+                id: lot._id?.toString(),
+
+                // catalog item this lot is stock of
+                item: mapItem(lot.item),
+
+                // vendor this lot was purchased from
+                vendor: mapVendor(lot.vendor),
+
+                // lot identity + shelf life
+                batch: lot.batch,
+                manufacturingDate: lot.manufacturingDate,
+                expiryDate: lot.expiryDate,
+                quantity: lot.quantity,
+
+                createdAt: lot.createdAt,
+                updatedAt: lot.updatedAt,
+            };
+            // status (incl. expired lots) is only exposed to a manage-level actor
+            if (ctx.hasAnyPermissions([INVENTORY_CONSUMABLE_PERMISSIONS.MANAGE.code])) {
+                row.status = lot.status;
+            }
+            result.items.push(row);
         }
         return result;
     },
@@ -80,6 +103,15 @@ export const InventoryConsumableMapper = {
             consumables: {
                 warehouseQuantity,
                 expiredByDate: report?.expiredByDate || 0,
+                // FEFO expiry-band counts for the KPI cards (collection-wide, not per-row)
+                expiryBands: report?.expiryBands || {
+                    expired: 0,
+                    within30: 0,
+                    within30to90: 0,
+                    within90to180: 0,
+                    beyond180: 0,
+                    noExpiry: 0,
+                },
                 byStatus: Object.values(INVENTORY_CONSUMABLE_STATUS).map((status) => ({ status, count: byStatus.get(status) || 0 })),
             },
         };

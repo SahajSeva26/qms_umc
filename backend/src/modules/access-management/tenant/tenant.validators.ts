@@ -113,6 +113,9 @@ export const SearchTenantQuerySchema = z.object({
         .enum([TENANT_STATUS.ACTIVE, TENANT_STATUS.INACTIVE])
         .optional()
         .openapi({ example: 'active' }),
+    // regex-matched against the tenant's embedded address
+    city: z.string().optional().openapi({ example: 'Mumbai' }),
+    state: z.string().optional().openapi({ example: 'Maharashtra' }),
     page: z.string().optional().openapi({ example: '1' }),
 
     limit: z.string().optional().openapi({ example: '10' }),

@@ -122,6 +122,7 @@ export type IMoveStagePayload = z.infer<typeof MoveStagePayloadSchema>;
 
 //4: search ====================================>
 export const SearchCampQuerySchema = z.object({
+    code: z.string().optional().openapi({ example: 'cmp-000123' }),
     tenant: objectId('Tenant').optional(),
     project: objectId('Project').optional(),
     division: objectId('Division').optional(),
@@ -135,6 +136,8 @@ export const SearchCampQuerySchema = z.object({
     // date range — either bound is optional, so you can filter from a date, up to a date, or between
     dateFrom: z.coerce.date().optional().openapi({ example: '2026-08-01' }),
     dateTo: z.coerce.date().optional().openapi({ example: '2026-08-31' }),
+    // opt-in: attach per-camp patient counts (from screenings) to each row — one batched aggregate, no N+1
+    report: z.enum(['true']).optional().openapi({ example: 'true' }),
     page: z.string().optional().openapi({ example: '1' }),
     limit: z.string().optional().openapi({ example: '10' }),
 });
@@ -152,7 +155,9 @@ export const BookingAvailabilityPayloadSchema = z.object({
 export type IBookingAvailabilityPayload = z.infer<typeof BookingAvailabilityPayloadSchema>;
 
 //5: report ====================================>
-// no filters required by the current reporting requirement — scoping is handled entirely by
-// ctx.where() in the service, same as get()/search().
-export const CampReportQuerySchema = z.object({});
+// scoping is handled by ctx.where() in the service (same as get()/search()); an optional `status`
+// narrows the whole report (incl. the byType chip-row) to one status tab.
+export const CampReportQuerySchema = z.object({
+    status: z.enum(Object.values(CAMP_STATUSES)).optional().openapi({ example: 'closed' }),
+});
 export type ICampReportQuery = z.infer<typeof CampReportQuerySchema>;

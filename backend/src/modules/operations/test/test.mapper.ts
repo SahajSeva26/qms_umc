@@ -45,8 +45,22 @@ export const TestMapper = {
             count: data?.count || 0,
             items: [] as any[],
         };
+        // NOTE: independent from toResponse on purpose — mirrors it field-for-field for now (incl. same permission gating) so nothing breaks; search rows can be trimmed later without affecting GET /:id.
         for (const test of data?.items || []) {
-            result.items.push(TestMapper.toResponse(test, ctx));
+            const item: any = {
+                id: test._id?.toString(),
+
+                tenant: mapRef(test.tenant, (t) => ({ name: t.name, code: t.code })),
+                screening: mapRef(test.screening, (s) => ({ status: s.status })),
+                type: mapRef(test.type, (t) => ({ code: t.code, name: t.name, therapy: t.therapy })),
+
+                result: mapResult(test.result),
+                performedBy: mapRef(test.performedBy, (r) => ({ name: r.name, code: r.code })),
+
+                createdAt: test.createdAt,
+                updatedAt: test.updatedAt,
+            };
+            result.items.push(item);
         }
         return result;
     },

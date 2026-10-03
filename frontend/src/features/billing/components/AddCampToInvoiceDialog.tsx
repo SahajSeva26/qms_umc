@@ -24,7 +24,7 @@ interface AddCampToInvoiceDialogProps {
   onSubmittingChange?: (submitting: boolean) => void
 }
 
-// Single-select only, unlike GenerateInvoiceDialog — POST /invoice-line-items
+// Single-select only, unlike GenerateInvoiceTab — POST /invoice-line-items
 // adds one line per call, so multi-add here would risk a partially-failed draft.
 const AddCampToInvoiceDialog = ({ invoice, project, isInvoiceDraft, onClose, onSubmittingChange }: AddCampToInvoiceDialogProps) => {
   const queryClient = useQueryClient()

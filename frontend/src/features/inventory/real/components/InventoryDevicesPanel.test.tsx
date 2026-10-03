@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { InventoryDeviceEntity } from '@/types/inventoryDevice.types'
 
 vi.mock('@/hooks/usePermission')
@@ -42,6 +43,10 @@ vi.mock('@/features/inventory/real/inventoryDevice.service', () => ({
         },
       },
     })),
+    // Unused by these tests (no form submit) — present only so
+    // EditInventoryDeviceModal's mutation hooks can mount without throwing.
+    createInventoryDevice: vi.fn(),
+    updateInventoryDevice: vi.fn(),
   },
 }))
 
@@ -93,5 +98,49 @@ describe('InventoryDevicesPanel — report gating', () => {
     expect(screen.getByText('35')).toBeInTheDocument()
     // Needs attention = maintainance(6) + lost(2) + damaged(2) = 10, a client-side sum not present verbatim in the fixture.
     expect(screen.getByText('10')).toBeInTheDocument()
+  })
+})
+
+// Card click opens a read-only detail drawer — Edit lives inside it, only for a manage-level viewer.
+describe('InventoryDevicesPanel — card click opens a detail drawer, Edit lives inside it', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  it('a non-manager can still open the drawer by clicking a card, but sees no Edit button inside it', async () => {
+    const user = userEvent.setup()
+    const { usePermission } = await import('@/hooks/usePermission')
+    vi.mocked(usePermission).mockReturnValue({ hasAnyPermission: () => false } as unknown as ReturnType<typeof usePermission>)
+    const InventoryDevicesPanel = (await import('@/features/inventory/real/components/InventoryDevicesPanel')).default
+
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <InventoryDevicesPanel />
+      </QueryClientProvider>,
+    )
+
+    await user.click(await screen.findByText('SN-0099'))
+    expect(await screen.findByRole('heading', { name: 'Infusion pump' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument()
+  })
+
+  it('a manager clicks a card to open the drawer, then Edit inside it to open the edit modal', async () => {
+    const user = userEvent.setup()
+    const { usePermission } = await import('@/hooks/usePermission')
+    vi.mocked(usePermission).mockReturnValue({ hasAnyPermission: () => true } as unknown as ReturnType<typeof usePermission>)
+    const InventoryDevicesPanel = (await import('@/features/inventory/real/components/InventoryDevicesPanel')).default
+
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <InventoryDevicesPanel />
+      </QueryClientProvider>,
+    )
+
+    await user.click(await screen.findByText('SN-0099'))
+    const editButton = await screen.findByRole('button', { name: /^edit$/i })
+    await user.click(editButton)
+
+    expect(await screen.findByRole('heading', { name: /^edit device$/i })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Infusion pump' })).not.toBeInTheDocument()
   })
 })

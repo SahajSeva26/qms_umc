@@ -12,12 +12,13 @@ interface RecordsDrawerProps {
   exportSlug: string
   leads: LeadEntity[]
   onClose: () => void
+  onOpenLead: (id: string) => void
 }
 
 // Shared by the KPI drill-down and the AI Insights / Top Reps click-to-drill —
 // mirrors the prototype's openRawData(): a titled drawer listing the exact
 // lead records behind a summary number, with a CSV export of that same set.
-const RecordsDrawer = ({ title, exportSlug, leads, onClose }: RecordsDrawerProps) => {
+const RecordsDrawer = ({ title, exportSlug, leads, onClose, onOpenLead }: RecordsDrawerProps) => {
   const total = leads.reduce((sum, l) => sum + l.estimatedValue, 0)
 
   const handleExport = () => downloadLeadsCsv(leads, `crm-${exportSlug}-${new Date().toISOString().slice(0, 10)}.csv`)
@@ -35,7 +36,12 @@ const RecordsDrawer = ({ title, exportSlug, leads, onClose }: RecordsDrawerProps
       </div>
       <div className="space-y-2">
         {leads.map((lead) => (
-          <div key={lead.id} className="rounded-lg p-2.5" style={{ background: 'var(--qms-surface-strong)' }}>
+          <button
+            key={lead.id}
+            onClick={() => onOpenLead(lead.id)}
+            className="w-full text-left rounded-lg p-2.5 transition-colors hover:bg-(--qms-surface-hover)"
+            style={{ background: 'var(--qms-surface-strong)' }}
+          >
             <div className="flex items-center justify-between mb-1">
               <span className="text-[12px] font-bold" style={{ color: 'var(--qms-text)' }}>{lead.title}</span>
             </div>
@@ -43,7 +49,7 @@ const RecordsDrawer = ({ title, exportSlug, leads, onClose }: RecordsDrawerProps
               <StagePill status={lead.status} />
               <span className="text-[12px] font-semibold" style={{ color: 'var(--qms-text-muted)' }}>{formatINR(lead.estimatedValue)}</span>
             </div>
-          </div>
+          </button>
         ))}
         {leads.length === 0 && (
           <p className="text-[13px]" style={{ color: 'var(--qms-text-muted)' }}>No matching records.</p>

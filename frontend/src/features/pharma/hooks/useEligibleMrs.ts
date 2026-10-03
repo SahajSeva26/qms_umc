@@ -30,7 +30,7 @@ function mergeById(existing: RoleEntity[], incoming: RoleEntity[]): RoleEntity[]
 }
 
 // `enabled` gates on the dropdown being open AND a non-empty query — mirrors
-// DoctorPicker/WizardStep0's "type to search" rather than an eager unfiltered fetch.
+// DoctorDistancePicker/WizardStep0's "type to search" rather than an eager unfiltered fetch.
 export const useEligibleMrs = (name: string, enabled: boolean) => {
   const debouncedName = useDebouncedValue(name, 300)
   const hasQuery = debouncedName.trim().length > 0

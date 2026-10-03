@@ -16,11 +16,50 @@ interface CrmFilterBarProps {
 
 // The filter state uses '' for "all", but empty-string SelectItem values are
 // disallowed — map '' <-> the 'ALL' sentinel at the Select boundary.
+// Layout mirrors the prototype's .filterbar ("Filter" label → stage select →
+// ... → search → ↺ Reset); search placeholder stays scoped to title-only
+// matching (our actual filter), not the prototype's broader copy.
 const CrmFilterBar = ({ filters, setFilter, reset }: CrmFilterBarProps) => (
   <div
-    className="flex flex-wrap items-center justify-between gap-2 p-2.5 mb-3 rounded-xl border"
+    className="flex flex-wrap items-center gap-2 p-2.5 mb-3 rounded-xl border"
     style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}
   >
+    <span className="text-[11px] font-bold uppercase tracking-wider mr-1" style={{ color: 'var(--qms-text-muted)' }}>
+      Filter
+    </span>
+
+    <Select value={filters.status || 'ALL'} onValueChange={(v) => setFilter('status', (v as string) === 'ALL' ? '' : (v as LeadStatus))}>
+      <SelectTrigger className="text-[12px]"><SelectValue placeholder="All stages" /></SelectTrigger>
+      <SelectContent>
+        <SelectItem value="ALL">All stages</SelectItem>
+        {STATUSES.map((s) => (
+          <SelectItem key={s} value={s}>{LEAD_STATUS_LABEL[s]}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+
+    <div className="flex items-center gap-1.5">
+      <DatePicker value={filters.fyFrom} onChange={(v) => setFilter('fyFrom', v)} placeholder="FY from" className="w-32" />
+      <span className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>–</span>
+      <DatePicker value={filters.fyTo} onChange={(v) => setFilter('fyTo', v)} placeholder="FY to" className="w-32" />
+    </div>
+
+    <SearchInput
+      value={filters.code}
+      onChange={(v) => setFilter('code', v)}
+      placeholder="Search code..."
+      className="text-[12px]"
+      wrapperClassName="w-32 ml-auto"
+    />
+
+    <SearchInput
+      value={filters.focusTherapy}
+      onChange={(v) => setFilter('focusTherapy', v)}
+      placeholder="Search therapy..."
+      className="text-[12px]"
+      wrapperClassName="w-36"
+    />
+
     <SearchInput
       value={filters.q}
       onChange={(v) => setFilter('q', v)}
@@ -29,25 +68,7 @@ const CrmFilterBar = ({ filters, setFilter, reset }: CrmFilterBarProps) => (
       wrapperClassName="w-56"
     />
 
-    <div className="flex flex-wrap items-center gap-2">
-      <Select value={filters.status || 'ALL'} onValueChange={(v) => setFilter('status', (v as string) === 'ALL' ? '' : (v as LeadStatus))}>
-        <SelectTrigger className="text-[12px]"><SelectValue placeholder="All statuses" /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value="ALL">All statuses</SelectItem>
-          {STATUSES.map((s) => (
-            <SelectItem key={s} value={s}>{LEAD_STATUS_LABEL[s]}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      <div className="flex items-center gap-1.5">
-        <DatePicker value={filters.fyFrom} onChange={(v) => setFilter('fyFrom', v)} placeholder="FY from" className="w-32" />
-        <span className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>–</span>
-        <DatePicker value={filters.fyTo} onChange={(v) => setFilter('fyTo', v)} placeholder="FY to" className="w-32" />
-      </div>
-
-      <Button variant="outline" size="sm" onClick={reset}>Reset</Button>
-    </div>
+    <Button variant="outline" size="sm" onClick={reset}>↺ Reset</Button>
   </div>
 )
 

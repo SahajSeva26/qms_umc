@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { FiArrowLeft } from 'react-icons/fi'
 import AnyPharmaRoleGate from '@/features/pharma/components/AnyPharmaRoleGate'
@@ -6,11 +7,13 @@ import { usePharmaCamps } from '@/features/pharma/hooks/usePharmaCamps'
 import { PHARMA_ROUTES, getPharmaRoleMeta } from '@/features/pharma/pharma.constants'
 import PharmaCampTable from '@/features/pharma/components/PharmaCampTable'
 import PharmaCampsNav from '@/features/pharma/components/PharmaCampsNav'
+import PharmaCampDetailDrawer from '@/features/pharma/components/PharmaCampDetailDrawer'
 import ProjectStatusPill from '@/features/projects/components/ProjectStatusPill'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import PaginationControls from '@/components/ui/PaginationControls'
 import { usePagination } from '@/hooks/usePagination'
 import { useSession } from '@/hooks/useSession'
+import type { CampEntity } from '@/types/campReal.types'
 
 const PAGE_SIZE = 10
 
@@ -27,6 +30,7 @@ const PharmaProjectCampsContent = () => {
   const navigate = useNavigate()
   const { session } = useSession()
   const { page, setPage, totalPages } = usePagination(PAGE_SIZE)
+  const [openCamp, setOpenCamp] = useState<CampEntity | null>(null)
 
   const { data: projectData, isLoading: projectLoading, error: projectError } = usePharmaProject(id)
   const project = projectData?.data ?? null
@@ -97,12 +101,14 @@ const PharmaProjectCampsContent = () => {
                 {emptyCampsText}
               </div>
             ) : (
-              <PharmaCampTable camps={camps} />
+              <PharmaCampTable camps={camps} onOpenCamp={setOpenCamp} />
             )}
             <PaginationControls page={page} totalPages={totalPages(totalCamps)} onPageChange={setPage} />
           </QueryStateBlock>
         </>
       )}
+
+      <PharmaCampDetailDrawer camp={openCamp} onClose={() => setOpenCamp(null)} />
     </div>
   )
 }

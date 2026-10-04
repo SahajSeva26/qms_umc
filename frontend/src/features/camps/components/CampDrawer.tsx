@@ -3,11 +3,12 @@ import type { ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { FiEdit2, FiUser, FiTruck, FiCpu, FiFileText } from 'react-icons/fi'
 import { useCampReal } from '@/features/camps/hooks/useCampReal'
+import { useCampsReal } from '@/features/camps/hooks/useCampsReal'
 import { useCampRefNames } from '@/features/camps/hooks/useCampRefNames'
 import { campRefId, canRunScreening } from '@/features/camps/campsReal.utils'
 import { usePermission } from '@/hooks/usePermission'
 import SideDrawer from '@/components/ui/SideDrawer'
-import CampStatusPillReal from '@/features/camps/components/CampStatusPillReal'
+import CampStatusPillReal from '@/components/widgets/camp/CampStatusPillReal'
 import CampStageActionRow from '@/features/camps/components/CampStageActionRow'
 import CampDrawerKpiRow from '@/features/camps/components/CampDrawerKpiRow'
 import CampStageHistoryList from '@/features/camps/components/CampStageHistoryList'
@@ -52,8 +53,6 @@ interface CampDrawerContentProps {
   onClose: () => void
 }
 
-// Prototype's drawer sections (camps.js:535-606) — matches the .form-section-h pattern
-// already used elsewhere (e.g. NewAppointmentDialog's SectionHeader).
 const SectionHeader = ({ icon: Icon, children }: { icon: typeof FiUser; children: ReactNode }) => (
   <div className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-[.06em] mt-4 mb-2" style={{ color: 'var(--qms-text-muted)' }}>
     <Icon size={13} />
@@ -74,6 +73,12 @@ const CampDrawerContent = ({ campId, onClose }: CampDrawerContentProps) => {
   const { data, isLoading, error } = useCampReal(campId)
   const camp = data?.data ?? null
   const allocateFo = useAllocateFo(campId)
+
+  // GET /camps/:id has no `stats` — only search does, and there's no exact-id filter (only a `code`
+  // regex), so this searches by code with report=true and matches the exact id within the results.
+  const statsQuery = useCampsReal({ code: camp?.code, report: 'true', limit: '50' }, !!camp?.code)
+  const campStats = statsQuery.data?.data?.items?.find((item) => item.id === campId)?.stats
+  const isStatsNotFound = !statsQuery.isLoading && !statsQuery.error && !!camp?.code && !campStats
 
   const { doctorName, divisionName, projectName, roleName } = useCampRefNames({
     doctors: true,
@@ -101,8 +106,6 @@ const CampDrawerContent = ({ campId, onClose }: CampDrawerContentProps) => {
 
       {camp && !isLoading && (
         <>
-          {/* Prototype's icon-tile header (camps.js:536-552). Teleconsult toggle chip skipped —
-              no teleconsult concept exists on our real Camp model (see md-files/ui-revisions.md). */}
           <div className="flex items-start gap-3 mb-4">
             <div
               className="w-14 h-14 rounded-2xl flex items-center justify-center text-white shrink-0"
@@ -174,7 +177,13 @@ const CampDrawerContent = ({ campId, onClose }: CampDrawerContentProps) => {
 
           {tab === 'Overview' && (
             <div>
-              <CampDrawerKpiRow />
+              <CampDrawerKpiRow
+                stats={campStats}
+                notFound={isStatsNotFound}
+                error={statsQuery.error}
+                onRetry={() => void statsQuery.refetch()}
+                patientExpectation={camp.patientExpectation}
+              />
 
               <SectionHeader icon={FiUser}>Doctor</SectionHeader>
               <div className="rounded-[14px] border p-3 space-y-1.5" style={{ borderColor: 'var(--qms-border)' }}>
@@ -231,8 +240,6 @@ const CampDrawerContent = ({ campId, onClose }: CampDrawerContentProps) => {
                 <OverviewRow label="Notes" value={camp.notes || '—'} />
               </div>
 
-              {/* Prototype's action row is last (camps.js:595-605) — Confirm/Start/Close/Cancel
-                  plus Run screening, all below every read-only section, not above them. */}
               <div className="mt-4">
                 <CampStageActionRow
                   camp={camp}

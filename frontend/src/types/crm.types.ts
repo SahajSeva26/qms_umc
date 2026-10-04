@@ -80,6 +80,13 @@ export interface DivisionEntity {
   status?: DivisionStatus
   // Same gate as `status`. Bare id when unpopulated (e.g. echoed from create).
   owner?: DivisionPopulatedOwnerRole | string
+  // Only present when search() was called with report=true.
+  stats?: DivisionStats
+}
+
+export interface DivisionStats {
+  totalProjects: number
+  liveProjects: number
 }
 
 export interface SearchDivisionQuery {
@@ -95,6 +102,8 @@ export interface SearchDivisionQuery {
   owner?: string
   page?: string
   limit?: string
+  // When 'true', each item gets a `stats` object (see DivisionStats).
+  report?: 'true' | 'false'
 }
 
 export interface CreateDivisionPayload {
@@ -200,10 +209,8 @@ export const LEAD_STATUS_COLOR: Record<LeadStatus, string> = {
   lost: 'var(--danger)',
 }
 
-// Text color for a pill label on a pale LEAD_STATUS_COLOR tint — each stage's raw
-// hue fails 4.5:1 as its own text on its own tint, so this is a darkened (light
-// mode) or already-legible (dark mode) variant of that SAME stage's color, not a
-// shared generic ink — keeps every stage visually distinct, matching won/lost.
+// Each stage's raw hue fails 4.5:1 as its own text on its own tint, so this is a
+// darkened/legible variant of that SAME stage's color — keeps every stage visually distinct.
 export const LEAD_STATUS_TEXT_COLOR: Record<LeadStatus, string> = {
   new: 'var(--qms-lead-stage-new-text)',
   qualified: 'var(--qms-lead-stage-qualified-text)',
@@ -326,21 +333,37 @@ export interface LeadEntity {
   stageHistory: LeadStageHistoryEntry[]
   createdAt: string
   updatedAt: string
+  // Only present when the search was called with report=true — per-lead activity rollup
+  // for this result page only (see SearchLeadQuery.report).
+  stats?: LeadStats
+}
+
+export interface LeadStats {
+  // Appointments visible to the caller, any status.
+  appointments: number
+  // Of those, with mom.submittedAt set.
+  moms: number
+  // Of those, type:'follow-up' only.
+  followUps: number
 }
 
 export interface SearchLeadQuery {
   title?: string
+  code?: string
+  // Regex-matched against the lead's focusTherapy list — matches if any therapy in the list matches.
+  focusTherapy?: string
   status?: LeadStatus
   projectType?: LeadProjectType
   division?: string
   salesPerson?: string
-  // ISO date strings (YYYY-MM-DD). Not yet read by the backend's
-  // SearchLeadQuerySchema — sent ahead of that support so the frontend needs
-  // no further change once it's added. See TODO.md.
+  // ISO date strings (YYYY-MM-DD) — financial-year range bound to the lead's createdAt.
   fyFrom?: string
   fyTo?: string
   page?: string
   limit?: string
+  // When 'true', each item gets a `stats` object (see LeadStats) — no top-level report block
+  // (distinct from the standalone GET /leads/report facet).
+  report?: 'true' | 'false'
 }
 
 export interface CreateLeadPayload {
@@ -433,6 +456,25 @@ export interface LeadReportTrendPoint {
   count: number
 }
 
+export interface LeadReportTopRep {
+  salesPerson: string
+  name: string
+  wonValue: number
+  wonCount: number
+}
+
+// windowed (pipelineValue/avgDealSize are all-time; wonValue/wonCount/winRate are bound to the
+// endpoint's own from/to; salesVelocityDays/topRep are all-time) — see backend lead.service.ts report().
+export interface LeadReportKpis {
+  pipelineValue: number
+  wonValue: number
+  wonCount: number
+  avgDealSize: number
+  winRate: number
+  salesVelocityDays: number
+  topRep: LeadReportTopRep | null
+}
+
 export interface LeadReportResponse {
   summary: LeadReportSummary
   byStatus: LeadReportByStatus[]
@@ -440,4 +482,5 @@ export interface LeadReportResponse {
   trends: {
     newLeads: { from: string; to: string; data: LeadReportTrendPoint[] }
   }
+  kpis: LeadReportKpis
 }

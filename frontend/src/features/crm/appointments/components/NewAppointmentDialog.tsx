@@ -116,6 +116,7 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
   const [durationHours, setDurationHours] = useState(1)
   const endTime = addDuration(startTime, durationHours)
   const [destinationLink, setDestinationLink] = useState('')
+  const [location, setLocation] = useState('')
   const [leadId, setLeadId] = useState('')
   const [leadLabel, setLeadLabel] = useState('')
   const [parentId, setParentId] = useState('')
@@ -163,6 +164,7 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
     setStartTime('10:00')
     setDurationHours(1)
     setDestinationLink('')
+    setLocation('')
     setLeadId('')
     setLeadLabel('')
     setParentId('')
@@ -213,6 +215,7 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
         parent: parentId.trim() || undefined,
         mode,
         destinationLink: destinationLink.trim() || undefined,
+        location: location.trim() || undefined,
         startTime: startAt.toISOString(),
         endTime: endAt.toISOString(),
         agenda: { public: agendaPublic.trim(), private: agendaPrivate.trim() || undefined },
@@ -446,6 +449,16 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
                   />
                 </div>
               )}
+              <div>
+                <Label className={labelClasses} style={labelStyle}>Location</Label>
+                <Input
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  className={fieldInputClassName}
+                  style={fieldInputStyle}
+                  placeholder="e.g. HQ Andheri, Café..."
+                />
+              </div>
             </div>
           </div>
 

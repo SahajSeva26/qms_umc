@@ -23,8 +23,8 @@ const TenantAsyncPicker = ({ value, label, onChange }: TenantAsyncPickerProps) =
   const debouncedQuery = useDebouncedValue(query, 300)
   const { open, setOpen, containerRef } = useAsyncPickerState()
 
-  const { data, isFetching } = useTenants(
-    { name: debouncedQuery.trim(), status: 'active', type: 'customer', limit: '20' },
+  const { data, isFetching, isError, refetch } = useTenants(
+    { name: debouncedQuery.trim(), status: 'active', type: 'customer', limit: '10' },
     open && !!debouncedQuery.trim(),
   )
   const results = data?.data?.items ?? []
@@ -41,6 +41,9 @@ const TenantAsyncPicker = ({ value, label, onChange }: TenantAsyncPickerProps) =
       containerRef={containerRef}
       results={results}
       isFetching={isFetching}
+      isError={isError}
+      errorText="Couldn't search companies. Try again."
+      onRetry={() => void refetch()}
       getId={(t) => t.id}
       getLabel={tenantLabel}
       searchPlaceholder="Search company by name..."

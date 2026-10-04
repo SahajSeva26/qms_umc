@@ -24,18 +24,15 @@ interface DoctorFilterBarProps {
   geographySeed?: { city: string; state: string } | null
 }
 
-// `status` is only honored server-side for callers with doctor:manage;
-// others are hard-scoped to active regardless, so the control is rendered
-// unconditionally but silently no-ops for them.
+// `status` is only honored server-side for callers with doctor:manage; others stay hard-scoped to active.
 const DoctorFilterBar = ({ filters, setFilter, reset, geographySeedKey, geographySeed }: DoctorFilterBarProps) => {
-  // Bumped on Reset to remount StateCityFilter (it doesn't sync props into state via an effect, so
-  // a prop change alone wouldn't clear its text) — combined with geographySeedKey for the same reason.
+  // Bumped on Reset to remount StateCityFilter, which doesn't sync props into state via an effect.
   const [resetKey, setResetKey] = useState(0)
   const stateCityKey = `${resetKey}-${geographySeedKey ?? 0}`
 
   return (
     <div
-      className="flex flex-wrap items-center justify-between gap-2 p-2.5 mb-3 rounded-xl border"
+      className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-2 p-2.5 mb-3 rounded-xl border backdrop-blur-xl"
       style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}
     >
       <SearchInput

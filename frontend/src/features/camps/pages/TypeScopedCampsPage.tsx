@@ -16,6 +16,10 @@ import { EMPTY_ARRAY } from '@/utils/emptyArray'
 
 // Matches /camps/new's own route guard — a create-only actor must also see the button that leads there.
 const CAMP_WRITE_PERMISSIONS = ['camp:create', 'camp:manage', 'tenant:manage']
+// The `tenant` search filter is honored server-side only for camp:manage, NOT tenant:manage (camp.service.ts).
+const CAMP_CLIENT_FILTER_PERMISSIONS = ['camp:manage']
+// TenantAsyncPicker calls GET /tenants (tenant:search/tenant:manage) — required before offering the Client search box.
+const TENANT_LOOKUP_PERMISSIONS = ['tenant:search', 'tenant:manage']
 
 const PAGE_SIZE = 10
 
@@ -25,7 +29,6 @@ interface TypeScopedCampsPageProps {
   title: string
 }
 
-// Parallel, parameterized copy of CampsPageReal.tsx's logic — that combined page stays untouched.
 // No KPI strip: GET /camps/report can't be scoped by type, so it would show misleading all-type counts here.
 const TypeScopedCampsPage = ({ type, title }: TypeScopedCampsPageProps) => {
   const navigate = useNavigate()
@@ -33,8 +36,10 @@ const TypeScopedCampsPage = ({ type, title }: TypeScopedCampsPageProps) => {
   const selectedCampId = searchParams.get('camp')
   const { hasAnyPermission } = usePermission()
   const canWrite = hasAnyPermission(CAMP_WRITE_PERMISSIONS)
+  const canFilterByClient = hasAnyPermission(CAMP_CLIENT_FILTER_PERMISSIONS) && hasAnyPermission(TENANT_LOOKUP_PERMISSIONS)
   const { filters, setFilter, reset } = useCampsRealFilters()
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
+  const debouncedCode = useDebouncedValue(filters.code, 300)
   const debouncedCity = useDebouncedValue(filters.city, 300)
   const debouncedState = useDebouncedValue(filters.state, 300)
 
@@ -42,8 +47,11 @@ const TypeScopedCampsPage = ({ type, title }: TypeScopedCampsPageProps) => {
     status: filters.status === 'ALL' ? undefined : filters.status,
     type,
     billingType: filters.billingType === 'ALL' ? undefined : (filters.billingType as BillingType),
+    code: debouncedCode || undefined,
     city: debouncedCity || undefined,
     state: debouncedState || undefined,
+    doctor: filters.doctorId || undefined,
+    tenant: canFilterByClient && filters.clientId ? filters.clientId : undefined,
     dateFrom: filters.dateFrom || undefined,
     dateTo: filters.dateTo || undefined,
     page: String(page),
@@ -76,7 +84,7 @@ const TypeScopedCampsPage = ({ type, title }: TypeScopedCampsPageProps) => {
         {canWrite && (
           <Button
             onClick={() => {
-              // Lets /camps/new autofill+lock Type and return here on cancel/success (see CampDetailPageReal.tsx).
+              // Lets /camps/new autofill+lock Type and return here on cancel/success.
               const params = new URLSearchParams({ type, from: `${window.location.pathname}${window.location.search}` })
               navigate(`/camps/new?${params.toString()}`)
             }}
@@ -88,7 +96,7 @@ const TypeScopedCampsPage = ({ type, title }: TypeScopedCampsPageProps) => {
         )}
       </div>
 
-      <CampsFilterBarReal filters={filters} setFilter={handleFilterChange} reset={handleReset} hideType />
+      <CampsFilterBarReal filters={filters} setFilter={handleFilterChange} reset={handleReset} hideType canFilterByClient={canFilterByClient} />
 
       <QueryStateBlock isLoading={isLoading} error={error} loadingLabel="Loading camps…" errorLabel="Failed to load camps. Please try again." onRetry={refetch}>
         <CampTableReal

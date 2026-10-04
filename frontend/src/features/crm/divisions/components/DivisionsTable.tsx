@@ -2,9 +2,7 @@ import { FiChevronRight, FiPackage } from 'react-icons/fi'
 import type { DivisionEntity } from '@/types/crm.types'
 import { DIVISION_THERAPY_LABEL } from '@/types/crm.types'
 
-// Prototype's .cm-row division row (client-management.js renderProfile()) — self-labeled stat
-// blocks, no shared header. "Projects per division" isn't fetched on this page — placeholder.
-
+// "Projects per division" needs the caller to have passed report=true on its own useDivisions() search.
 function ownerName(owner: DivisionEntity['owner']): string | null {
   if (!owner || typeof owner === 'string') return null
   if (!owner.user) return null
@@ -33,13 +31,14 @@ interface DivisionsTableProps {
 }
 
 const DivisionsTable = ({ divisions, onRowClick }: DivisionsTableProps) => {
+  // pt-px: the first row's hover:-translate-y-px would otherwise clip its own top border against this container's edge.
   return (
-    <div className="flex flex-col gap-2 overflow-x-auto">
+    <div className="flex flex-col gap-2 overflow-x-auto pt-px">
       {divisions.map((division) => (
         <div
           key={division.id}
           onClick={() => onRowClick(division)}
-          className="flex items-center gap-3 px-4 py-3 min-w-150 rounded-[11px] border cursor-pointer transition-[border-color,transform] duration-100 hover:-translate-y-px"
+          className="flex items-center gap-3 px-4 py-3 min-w-150 rounded-[11px] border cursor-pointer transition-transform duration-100 hover:-translate-y-px"
           style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}
           onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#8b5cf6')}
           onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--qms-border)')}
@@ -57,7 +56,11 @@ const DivisionsTable = ({ divisions, onRowClick }: DivisionsTableProps) => {
           </div>
 
           <Stat
-            value={<span className="text-[10px] font-bold italic" style={{ color: '#8b5cf6' }}>Coming soon</span>}
+            value={
+              division.stats
+                ? division.stats.totalProjects
+                : <span className="text-[10px] font-bold italic" style={{ color: 'var(--qms-text-muted)' }}>—</span>
+            }
             label="Projects"
           />
           <Stat value={division.mrCount} label="MRs" />

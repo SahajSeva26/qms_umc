@@ -31,11 +31,11 @@ describe('useCampReport — query key shares campRealKeys.all so real-camp mutat
     vi.clearAllMocks()
   })
 
-  it('is keyed under [...campRealKeys.all, "report"]', () => {
+  it('is keyed under [...campRealKeys.all, "report", status]', () => {
     const { wrapper } = makeWrapper()
     const { result } = renderHook(() => useCampReport(), { wrapper })
     expect(result.current).toBeDefined()
-    expect([...campRealKeys.all, 'report']).toEqual(['campsReal', 'report'])
+    expect([...campRealKeys.all, 'report', 'all']).toEqual(['campsReal', 'report', 'all'])
   })
 
   it('is invalidated/refetched after a real camp is created, without waiting for staleTime', async () => {
@@ -53,6 +53,6 @@ describe('useCampReport — query key shares campRealKeys.all so real-camp mutat
     // invalidateQueries marks the report query stale and, since it's still
     // observed by reportResult, triggers a real refetch.
     await waitFor(() => expect(campsRealService.getCampReport).toHaveBeenCalledTimes(2))
-    expect(queryClient.getQueryData([...campRealKeys.all, 'report'])).toBeDefined()
+    expect(queryClient.getQueryData([...campRealKeys.all, 'report', 'all'])).toBeDefined()
   })
 })

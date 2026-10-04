@@ -9,7 +9,7 @@ import { useUsersFilters } from '@/features/admin/hooks/useUsersFilters'
 import PaginationControls from '@/components/ui/PaginationControls'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
-import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
+import { useTenants } from '@/features/access-management/tenant'
 import { usePermission } from '@/hooks/usePermission'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { usePagination } from '@/hooks/usePagination'
@@ -22,9 +22,13 @@ const PAGE_SIZE = 10
 const CLIENT_SIDE_FETCH_LIMIT = 200
 
 const UsersPage = () => {
-  const { hasPermission } = usePermission()
+  const { hasPermission, hasAnyPermission } = usePermission()
   const canViewReport = hasPermission('user:manage')
   const reportQuery = useUserReport({}, canViewReport)
+  // GET /users/:id requires user:get, distinct from user:search which reaches this list.
+  const canOpenUserDetail = hasPermission('user:get')
+  // Company filter needs both GET /roles (to resolve a user's tenant) and GET /tenants permissions.
+  const canFilterByCompany = hasAnyPermission(['role:search', 'tenant:admin', 'tenant:manage']) && hasAnyPermission(['tenant:search', 'tenant:manage'])
 
   const { filters, setFilter, reset } = useUsersFilters()
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
@@ -55,8 +59,7 @@ const UsersPage = () => {
   const [companyFilterTouched, setCompanyFilterTouched] = useState(false)
 
   // Only way to resolve a user's tenant (User itself has no tenant field).
-  // A 403 here (lacking role search access) is handled as "unknown, show nothing".
-  const { data: rolesData } = useRoles({ limit: String(CLIENT_SIDE_FETCH_LIMIT) }, companyFilterTouched)
+  const { data: rolesData } = useRoles({ limit: String(CLIENT_SIDE_FETCH_LIMIT) }, companyFilterTouched && canFilterByCompany)
   const roles = rolesData?.data?.items ?? EMPTY_ARRAY
 
   // role.tenant carries Mongoose's raw `_id`, not the mapped `id` on the top-level Tenant entity.
@@ -70,7 +73,7 @@ const UsersPage = () => {
     return map
   }, [roles])
 
-  const { data: tenantsData } = useTenants({ limit: String(CLIENT_SIDE_FETCH_LIMIT) }, companyFilterTouched)
+  const { data: tenantsData } = useTenants({ limit: String(CLIENT_SIDE_FETCH_LIMIT) }, companyFilterTouched && canFilterByCompany)
   const tenantOptions = useMemo(
     () => (tenantsData?.data?.items ?? []).map((t) => ({ id: t.id, label: t.name })),
     [tenantsData],
@@ -90,6 +93,10 @@ const UsersPage = () => {
   const totalCount = needsClientSidePagination
     ? (tenantFiltered ?? []).length
     : (singleStatusQuery.data?.data?.count ?? 0)
+
+  // Company filter paginates over one capped fetch — flag when the real total exceeds it rather than silently truncating.
+  const realTotalUserCount = clientSideQuery.data?.data?.count ?? 0
+  const isCompanyFilterTruncated = needsClientSidePagination && realTotalUserCount > CLIENT_SIDE_FETCH_LIMIT
 
   const handleFilterChange = <K extends keyof typeof filters>(key: K, value: (typeof filters)[K]) => {
     setFilter(key, value)
@@ -130,10 +137,17 @@ const UsersPage = () => {
         reset={handleReset}
         tenantOptions={tenantOptions}
         onCompanyDropdownOpen={() => setCompanyFilterTouched(true)}
+        canFilterByCompany={canFilterByCompany}
       />
 
+      {isCompanyFilterTruncated && (
+        <p className="text-[12px] mb-3" style={{ color: 'var(--qms-text-muted)' }}>
+          Company filter is scoped to the latest {CLIENT_SIDE_FETCH_LIMIT} of {realTotalUserCount} users — not the complete set.
+        </p>
+      )}
+
       <QueryStateBlock isLoading={isLoading} error={isError} loadingLabel="Loading users…" errorLabel="Failed to load users. Please try again." onRetry={refetchUsers}>
-        <UsersTable users={users} />
+        <UsersTable users={users} canOpenDetail={canOpenUserDetail} />
         <PaginationControls page={page} totalPages={totalPages(totalCount)} onPageChange={setPage} />
       </QueryStateBlock>
     </div>

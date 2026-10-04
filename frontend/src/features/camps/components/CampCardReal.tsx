@@ -4,18 +4,16 @@ import type { CampEntity, CampType } from '@/types/campReal.types'
 import { CAMP_TYPE_LABEL } from '@/types/campReal.types'
 import { CAMP_TIME_SLOT_LABEL } from '@/types/campTimeSlot.constants'
 import { useCampRefNames } from '@/features/camps/hooks/useCampRefNames'
-import CampStatusPillReal from '@/features/camps/components/CampStatusPillReal'
+import CampStatusPillReal from '@/components/widgets/camp/CampStatusPillReal'
 
-// Matches the prototype's per-type icon tile gradient (camps.js:345 — linear-gradient(135deg,
-// <typeColor>, #14b8a6)). Same 3 type colors already used app-wide for camp type pills.
+// Same 3 type colors already used app-wide for camp type pills.
 const TYPE_COLOR: Record<CampType, string> = {
   screening: '#3b6dff',
   diet: '#10b981',
   lab: '#8b5cf6',
 }
 
-// FiHeart already matches this codebase's own Diet nav-icon convention (navConfig.ts) — FiActivity
-// and FiDroplet are the closest react-icons/fi equivalents to the prototype's tent/flask-conical.
+// FiHeart matches this codebase's own Diet nav-icon convention (navConfig.ts).
 const TYPE_ICON: Record<CampType, IconType> = {
   screening: FiActivity,
   diet: FiHeart,
@@ -30,8 +28,7 @@ interface CampCardRealProps {
   onOpen: (id: string) => void
 }
 
-// Prototype's campCard() (camps.js:332-420) / .dev-card (styles.css:1495-1529). Two real gaps
-// logged in md-files/ui-revisions.md: no done-patient-count field, staffing is FO-only.
+// Patients/Done% are derived from the screening collection via report=true on the page's own camp search.
 const CampCardReal = ({ camp, onOpen }: CampCardRealProps) => {
   const { doctorName } = useCampRefNames()
   const tenantName = camp.tenant && typeof camp.tenant !== 'string' ? camp.tenant.name : '—'
@@ -78,7 +75,9 @@ const CampCardReal = ({ camp, onOpen }: CampCardRealProps) => {
         style={{ background: 'var(--qms-surface-strong)', borderColor: 'var(--qms-border)' }}
       >
         <div>
-          <div className="font-extrabold text-[13px]" style={{ color: 'var(--qms-text)' }}>0/{camp.patientExpectation}</div>
+          <div className="font-extrabold text-[13px]" style={{ color: 'var(--qms-text)' }}>
+            {camp.stats ? camp.stats.patientsCompleted : 0}/{camp.stats?.patients || camp.patientExpectation}
+          </div>
           <div className="text-[9px] font-bold uppercase tracking-wide" style={{ color: 'var(--qms-text-muted)' }}>Patients</div>
         </div>
         <div>
@@ -86,9 +85,10 @@ const CampCardReal = ({ camp, onOpen }: CampCardRealProps) => {
           <div className="text-[9px] font-bold uppercase tracking-wide" style={{ color: 'var(--qms-text-muted)' }}>Devices</div>
         </div>
         <div>
-          {/* No executed-patient-count field exists anywhere in the API to compute a real
-              percentage from — shown as "—", not a misleading fake "0%". */}
-          <div className="font-extrabold text-[13px]" style={{ color: 'var(--qms-text-muted)' }}>—</div>
+          {/* "—" while stats are still loading/absent, rather than a fake 0%. */}
+          <div className="font-extrabold text-[13px]" style={{ color: camp.stats && camp.stats.patients > 0 ? 'var(--qms-text)' : 'var(--qms-text-muted)' }}>
+            {camp.stats && camp.stats.patients > 0 ? `${Math.round((camp.stats.patientsCompleted / camp.stats.patients) * 100)}%` : '—'}
+          </div>
           <div className="text-[9px] font-bold uppercase tracking-wide" style={{ color: 'var(--qms-text-muted)' }}>Done</div>
         </div>
       </div>

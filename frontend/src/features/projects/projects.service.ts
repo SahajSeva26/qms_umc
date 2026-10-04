@@ -7,9 +7,14 @@ import type {
   ProjectEntity,
   ProjectReportQuery,
   ProjectReportResponse,
+  ProjectSearchReport,
   SearchProjectQuery,
   UpdateProjectPayload,
 } from '@/types/project.types'
+
+// PaginatedResponse<T> has no room for a top-level report block — only present when the
+// caller passes report=true (see SearchProjectQuery.report).
+export type ProjectSearchResponse = PaginatedResponse<ProjectEntity> & { data: { report?: ProjectSearchReport } }
 
 // Follows the exact pattern of accessManagementService: same shared `api`
 // axios instance, same ApiResponse/PaginatedResponse envelope typing, a plain
@@ -21,7 +26,7 @@ import type {
 const DEFAULT_LIMIT = '10'
 
 const searchProjects = async (query: SearchProjectQuery) => {
-  const res = await api.get<PaginatedResponse<ProjectEntity>>('/projects', {
+  const res = await api.get<ProjectSearchResponse>('/projects', {
     params: { limit: DEFAULT_LIMIT, ...query },
   })
   return res.data

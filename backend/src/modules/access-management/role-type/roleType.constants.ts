@@ -34,6 +34,7 @@ export const ALLOWED_ROLETYPE_CODES = {
         FINANCE_MANAGER: 'finance-manager',
 
         FIELD_OFFICER: 'field-officer',
+        DIETITIAN: 'dietitian',
     },
     CUSTOMER: {
         // PHARMA_HO: 'pharma-ho',

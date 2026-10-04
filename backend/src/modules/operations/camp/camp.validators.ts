@@ -48,6 +48,8 @@ export const CreateCampPayloadSchema = z.object({
     // `mr` is REQUIRED and is the ONLY pharma-chain reference a caller supplies; its supervisor
     // chain (asm → rsm) is DERIVED from the MR in the service, never accepted from the payload.
     fo: objectId('FO').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8c' }),
+    // diet-camp counterpart of `fo` (override the auto-pick on a diet camp); only one applies, by type.
+    dietitian: objectId('Dietitian').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8e' }),
     mr: objectId('MR').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8d' }),
 
     // slot & location — location.coordinates [lng, lat] is the point FO allocation searches around
@@ -94,13 +96,15 @@ export const BookCampPayloadSchema = z.object({
 export type IBookCampPayload = z.infer<typeof BookCampPayloadSchema>;
 
 //2: update ====================================>
-// project/tenant/division/status are NOT editable here — status moves through moveStage()
+// project/tenant/division/status/type are NOT editable here — status moves through moveStage(), and
+// type is immutable after creation (it decides the camp's worker kind).
 export const UpdateCampPayloadSchema = z.object({
     doctor: objectId('Doctor').optional(),
-    type: z.enum(Object.values(CAMP_TYPES)).optional(),
     billingType: z.enum(Object.values(BILLING_TYPES)).optional(),
     patientExpectation: z.number().int().nonnegative().optional(),
     fo: objectId('FO').optional(),
+    // diet-camp counterpart of `fo` (see create) — only one applies, decided by the camp's type.
+    dietitian: objectId('Dietitian').optional(),
     // like create: only `mr` is accepted; asm/rsm are derived from it in the service.
     mr: objectId('MR').optional(),
     date: z.coerce.date().optional(),
@@ -128,6 +132,7 @@ export const SearchCampQuerySchema = z.object({
     division: objectId('Division').optional(),
     doctor: objectId('Doctor').optional(),
     fo: objectId('FO').optional(),
+    dietitian: objectId('Dietitian').optional(),
     status: z.enum(Object.values(CAMP_STATUSES)).optional().openapi({ example: 'confirmed' }),
     type: z.enum(Object.values(CAMP_TYPES)).optional().openapi({ example: 'screening' }),
     billingType: z.enum(Object.values(BILLING_TYPES)).optional().openapi({ example: 'billable' }),
@@ -147,6 +152,8 @@ export type ISearchCampQuery = z.infer<typeof SearchCampQuerySchema>;
 // checks slot availability for a project around a location within a date range.
 export const BookingAvailabilityPayloadSchema = z.object({
     projectID: objectId('Project').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
+    // which worker to check availability for; defaults to screening (FO), pass 'diet' for dietitian.
+    type: z.enum(Object.values(CAMP_TYPES)).optional().openapi({ example: 'screening' }),
     lat: z.number().min(-90).max(90).openapi({ example: 29.2183 }),
     lng: z.number().min(-180).max(180).openapi({ example: 79.513 }),
     dateFrom: z.coerce.date().openapi({ example: '2026-08-01' }),

@@ -72,7 +72,7 @@ export const CreateEmployeePayloadSchema = z.object({
     user: z.string().min(1).openapi({ example: '64f1a2b3c4d5e6f7a8b9c0d1' }),
     email: z.email().toLowerCase().openapi({ example: 'john.doe@example.com' }),
     phone: z.string().min(1).openapi({ example: '+919876543210' }),
-    type: z.enum([EMPLOYEE_TYPES.FIELD_OFFICER]).openapi({ example: 'field-officer' }),
+    type: z.enum(Object.values(EMPLOYEE_TYPES)).openapi({ example: 'full-time' }),
     doj: z.coerce.date().openapi({ example: '2026-01-15' }),
     dol: z.coerce.date().optional().openapi({ example: '2026-12-31' }),
     reason: z.string().optional().openapi({ example: 'Resigned' }),
@@ -107,7 +107,7 @@ export type ICreateEmployeePayload = z.infer<typeof CreateEmployeePayloadSchema>
 // tenant, user and email are identity — not editable here.
 export const UpdateEmployeePayloadSchema = z.object({
     phone: z.string().min(1).optional().openapi({ example: '+919876543210' }),
-    type: z.enum([EMPLOYEE_TYPES.FIELD_OFFICER]).optional().openapi({ example: 'field-officer' }),
+    type: z.enum(Object.values(EMPLOYEE_TYPES)).optional().openapi({ example: 'full-time' }),
     doj: z.coerce.date().optional().openapi({ example: '2026-01-15' }),
     dol: z.coerce.date().optional().openapi({ example: '2026-12-31' }),
     reason: z.string().optional().openapi({ example: 'Resigned' }),
@@ -140,7 +140,7 @@ export const SearchEmployeeQuerySchema = z.object({
     // free-text over profile first/last name
     name: z.string().optional().openapi({ example: 'john' }),
     email: z.string().optional().openapi({ example: 'john.doe@example.com' }),
-    type: z.enum([EMPLOYEE_TYPES.FIELD_OFFICER]).optional().openapi({ example: 'field-officer' }),
+    type: z.enum(Object.values(EMPLOYEE_TYPES)).optional().openapi({ example: 'full-time' }),
     status: z
         .enum([EMPLOYEE_STATUS.ACTIVE, EMPLOYEE_STATUS.INACTIVE, EMPLOYEE_STATUS.TERMINATED])
         .optional()

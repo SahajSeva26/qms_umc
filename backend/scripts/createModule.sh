@@ -7,7 +7,12 @@ if [ -z "$1" ]; then
 fi
 
 ENTITY=$1
-BASE_PATH="src/modules/$ENTITY"
+
+# Resolve paths from the script's own location (backend root = the scripts/ folder's parent),
+# so the module always lands in the real src/modules regardless of the current working directory.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(dirname "$SCRIPT_DIR")"
+BASE_PATH="$ROOT_DIR/src/modules/$ENTITY"
 
 # Create directory
 mkdir -p $BASE_PATH

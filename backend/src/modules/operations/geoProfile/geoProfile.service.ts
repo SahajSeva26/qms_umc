@@ -13,7 +13,7 @@ import { RequestContext } from '../../../shared/utils/contextBuilder';
 import { isValidObjectID } from '../../../shared/utils/strings';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { RoleService } from '../../access-management/role/role.service';
-import { GEO_ALLOCATION_MAX_DISTANCE, GEO_PROFILE_PERMISSIONS, GEO_PROFILE_STATUS } from './geoProfile.constants';
+import { GEO_ALLOCATION_MAX_DISTANCE, GEO_PROFILE_PERMISSIONS, GEO_PROFILE_STATUS, GEO_PROFILE_TYPES } from './geoProfile.constants';
 import { CampModel } from '../camp/camp.model';
 import { CAMP_STATUSES } from '../camp/camp.constants';
 import { utcDayRange } from '../../../shared/utils/dates';
@@ -32,21 +32,47 @@ const populate: any[] = [
 // role + tenant are the immutable link — seeded in create(), never touched here, so update()
 // can never reassign the profile to a different person or company.
 const set = async (model: any, entity: HydratedDocument<IGeoProfile>, ctx: RequestContext) => {
-    if (model.type) entity.type = model.type;
-    if (model.status) entity.status = model.status;
-    if (model.coordinates) entity.coordinates = model.coordinates;
-    if (model.coverageRadius !== undefined) entity.coverageRadius = model.coverageRadius;
-    if (model.meta !== undefined) entity.meta = model.meta;
+    if (model.type) {
+        entity.type = model.type;
+    }
+    if (model.status) {
+        entity.status = model.status;
+    }
+    if (model.coordinates) {
+        entity.coordinates = model.coordinates;
+    }
+    if (model.coverageRadius !== undefined) {
+        entity.coverageRadius = model.coverageRadius;
+    }
+    if (model.meta !== undefined) {
+        entity.meta = model.meta;
+    }
 
     // address fields — spread flat; each applied individually when supplied
-    if (model.addressLine1 !== undefined) entity.addressLine1 = model.addressLine1;
-    if (model.addressLine2 !== undefined) entity.addressLine2 = model.addressLine2;
-    if (model.locality !== undefined) entity.locality = model.locality;
-    if (model.city !== undefined) entity.city = model.city;
-    if (model.state !== undefined) entity.state = model.state;
-    if (model.country !== undefined) entity.country = model.country;
-    if (model.pincode !== undefined) entity.pincode = model.pincode;
-    if (model.googlePlaceId !== undefined) entity.googlePlaceId = model.googlePlaceId;
+    if (model.addressLine1 !== undefined) {
+        entity.addressLine1 = model.addressLine1;
+    }
+    if (model.addressLine2 !== undefined) {
+        entity.addressLine2 = model.addressLine2;
+    }
+    if (model.locality !== undefined) {
+        entity.locality = model.locality;
+    }
+    if (model.city !== undefined) {
+        entity.city = model.city;
+    }
+    if (model.state !== undefined) {
+        entity.state = model.state;
+    }
+    if (model.country !== undefined) {
+        entity.country = model.country;
+    }
+    if (model.pincode !== undefined) {
+        entity.pincode = model.pincode;
+    }
+    if (model.googlePlaceId !== undefined) {
+        entity.googlePlaceId = model.googlePlaceId;
+    }
 
     return entity;
 };
@@ -166,24 +192,25 @@ const findNearest = async (filters: INearestGeoProfileQuery, ctx: RequestContext
         { $limit: limit },
     ]);
 
-    // optional availability check — only when a date + time slot are both supplied.
-    // A returned FO is "busy" if their role is already on a camp that day + slot whose status is
-    // not cancelled/cancelled_charged (those free the slot up); everyone else is `available`.
+    // optional availability check (date + slot) — a worker is busy if already on a non-cancelled camp
+    // then. The camp field to check depends on the profile type (diet camps staff a dietitian).
     if (filters.date && filters.timeSlot) {
+        const campField = filters.type === GEO_PROFILE_TYPES.DIETITIAN ? 'dietitian' : 'fo';
         const roleIds = items.map((item: any) => item.role).filter(Boolean);
 
         const busyRoleIds = new Set<string>();
         if (roleIds.length) {
             const occupyingCamps = await CampModel.find({
-                fo: { $in: roleIds },
+                [campField]: { $in: roleIds },
                 date: utcDayRange(filters.date),
                 timeSlot: filters.timeSlot,
                 status: { $nin: [CAMP_STATUSES.CANCELLED, CAMP_STATUSES.CANCELLED_CHARGED] },
-            }).select('fo');
+            }).select(campField);
 
             for (const camp of occupyingCamps) {
-                if (camp.fo) {
-                    busyRoleIds.add(camp.fo.toString());
+                const roleId = (camp as any)[campField];
+                if (roleId) {
+                    busyRoleIds.add(roleId.toString());
                 }
             }
         }

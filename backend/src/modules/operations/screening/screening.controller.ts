@@ -123,6 +123,24 @@ const moveStage = async (req: any, res: any) => {
     }
 };
 
+const requestConsentOtp = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+        const { id } = req?.params;
+        if (!id) {
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Screening ID is required', null);
+        }
+
+        const otp = await ScreeningService.requestConsentOtp(id, ctx);
+
+        // TEMP: no delivery channel exists yet, so return the generated code in the response for
+        // testing. Remove once an SMS/WhatsApp/email sender is wired in.
+        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Consent OTP sent', { code: (otp as any).code });
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
 const verifyConsent = async (req: any, res: any) => {
     try {
         const ctx: RequestContext = req.context;
@@ -153,5 +171,6 @@ export const ScreeningController = {
     create,
     update,
     moveStage,
+    requestConsentOtp,
     verifyConsent,
 };

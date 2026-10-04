@@ -10,7 +10,16 @@ import {
     ISearchCampQuery,
     IUpdateCampPayload,
 } from './camp.validators';
-import { CAMP_COUNTER_ENTITY, CAMP_PERMISSIONS, CAMP_STATUSES, CAMP_TIME_SLOTS, CAMP_TRANSITION_MAP, CampTimeSlot } from './camp.constants';
+import {
+    CAMP_COUNTER_ENTITY,
+    CAMP_PERMISSIONS,
+    CAMP_STATUSES,
+    CAMP_TIME_SLOTS,
+    CAMP_TRANSITION_MAP,
+    CAMP_TYPES,
+    CampTimeSlot,
+} from './camp.constants';
+import { CampDocument, CampStats, FieldWorker } from './camp.types';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
 import { CounterService } from '../../counter/counter.service';
 import { geoProfileModel } from '../geoProfile/geoProfile.model';
@@ -37,9 +46,8 @@ import { ScreeningModel } from '../screening/screening.model';
 import { SCREENING_STATUS } from '../screening/screening.constants';
 import { InventoryMasterModel } from '../../inventory/inventory-master/inventory-master.model';
 import { InventoryAssignmentModel } from '../../inventory/inventory-assignment/inventory-assignment.model';
+import { INVENTORY_DEVICE_STATUS } from '../../inventory/inventory-device/inventory-device.constants';
 import { ITEM_TYPES } from '../../inventory/inventory-master/inventory-master.constants';
-
-type CampDocument = HydratedDocument<ICamp> | null;
 
 const populate: any[] = [
     { path: 'tenant', select: 'name code' },
@@ -47,6 +55,7 @@ const populate: any[] = [
     { path: 'project', select: 'name status tests' },
     { path: 'doctor', select: 'name specialization pharmaCode' },
     { path: 'fo' },
+    { path: 'dietitian' },
     { path: 'mr' },
     { path: 'asm' },
     { path: 'rsm' },
@@ -55,8 +64,26 @@ const populate: any[] = [
 
 // ================================ HELPERS ================================
 
+// FieldWorker (camp.types) is the only place the FO/dietitian difference lives; every helper reads it.
+const FO_WORKER: FieldWorker = {
+    field: 'fo',
+    geoType: GEO_PROFILE_TYPES.FO,
+    roleTypeCode: ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER,
+    label: 'field officer',
+};
+
+const DIETITIAN_WORKER: FieldWorker = {
+    field: 'dietitian',
+    geoType: GEO_PROFILE_TYPES.DIETITIAN,
+    roleTypeCode: ALLOWED_ROLETYPE_CODES.PLATFORM.DIETITIAN,
+    label: 'dietitian',
+};
+
+// the single branch for the whole feature: pick the worker kind from a camp type.
+const workerFor = (campType?: string): FieldWorker => (campType === CAMP_TYPES.DIET ? DIETITIAN_WORKER : FO_WORKER);
+
 // field-force slots; a search-only actor sees a camp only if they fill one of these on it.
-const ASSIGNMENT_FIELDS = ['fo', 'mr', 'asm', 'rsm'] as const;
+const ASSIGNMENT_FIELDS = ['fo', 'dietitian', 'mr', 'asm', 'rsm'] as const;
 
 const applyOwnScope = (where: any, ctx: RequestContext) => {
     // a pharma division head sees every camp in their division
@@ -93,21 +120,11 @@ const SLOT_OVERLAPS: Record<CampTimeSlot, CampTimeSlot[]> = {
 // overlaps). Single source of truth for the overlapping condition — reused everywhere overlap matters.
 const overlappingSlots = (slot: CampTimeSlot): CampTimeSlot[] => SLOT_OVERLAPS[slot] || [slot];
 
-// decoupled reusable overlap check: is `foRoleId` already committed (confirmed/live) to a camp on the
-// same UTC day in a slot that OVERLAPS `timeSlot`? excludeCampId skips a camp from the check (itself).
-// Reused by create (hard block) and by the availability / allocation helpers below.
-// GLOBAL (not ctx-scoped): an FO is shared platform staff, so a clash with ANY pharma tenant's camp
-// must count — otherwise the same FO could be booked by two clients for the same slot. `ctx` is kept
-// in the signature for call-site symmetry but no longer scopes the query.
-const isFoBookedForSlot = async (
-    foRoleId: string,
-    date: Date,
-    timeSlot: CampTimeSlot,
-    ctx: RequestContext,
-    excludeCampId?: any,
-): Promise<boolean> => {
+// is `roleId` (in camp field `field`) already committed (confirmed/live) to an overlapping slot that
+// day? GLOBAL — field staff are shared, so a clash with any tenant's camp counts.
+const isWorkerBooked = async (field: string, roleId: string, date: Date, timeSlot: CampTimeSlot, excludeCampId?: any): Promise<boolean> => {
     const where: any = {
-        fo: toObjectId(foRoleId),
+        [field]: toObjectId(roleId),
         status: { $in: FO_BOOKING_STATUSES },
         date: utcDayRange(date),
         timeSlot: { $in: overlappingSlots(timeSlot) },
@@ -119,17 +136,16 @@ const isFoBookedForSlot = async (
     return Boolean(clash);
 };
 
-// throwing wrapper for the write paths (create/confirm) — 409 when the FO is already booked on an
-// overlapping slot that day.
-const assertFoAvailableForSlot = async (
-    foRoleId: string,
+// throwing wrapper for write paths — 409 when the worker is already booked on an overlapping slot.
+const assertWorkerFree = async (
+    worker: FieldWorker,
+    roleId: string,
     date: Date,
     timeSlot: CampTimeSlot,
-    ctx: RequestContext,
     excludeCampId?: any,
 ): Promise<void> => {
-    if (await isFoBookedForSlot(foRoleId, date, timeSlot, ctx, excludeCampId)) {
-        return throwAppError('Field officer is already booked on another camp on this date and time slot', StatusCodes.CONFLICT);
+    if (await isWorkerBooked(worker.field, roleId, date, timeSlot, excludeCampId)) {
+        return throwAppError(`The ${worker.label} is already booked on another camp on this date and time slot`, StatusCodes.CONFLICT);
     }
 };
 
@@ -140,27 +156,25 @@ const MAX_AVAILABILITY_RANGE_DAYS = 30;
 // YYYY-MM-DD key for the UTC day a date falls on — the availability tree is keyed by this.
 const dateKey = (date: Date | string | number): string => startOfUTCDay(date).toISOString().slice(0, 10);
 
-// role ids of FOs already booked (confirmed/live) on another camp on the same UTC day in any slot
-// that OVERLAPS `timeSlot` (daytime slots block each other; see overlappingSlots / SLOT_OVERLAPS).
-// GLOBAL (not ctx-scoped) — same reasoning as isFoBookedForSlot: FO clashes span all pharma tenants.
-const bookedFoRoleIdsOnDate = async (date: Date, timeSlot: CampTimeSlot, ctx: RequestContext, excludeCampId: any): Promise<string[]> => {
+// role ids of workers (in camp field `field`) booked (confirmed/live) on an overlapping slot that day.
+// GLOBAL — clashes span all tenants.
+const bookedWorkerIds = async (field: string, date: Date, timeSlot: CampTimeSlot, excludeCampId: any): Promise<string[]> => {
     const camps = await CampModel.find({
         _id: { $ne: excludeCampId },
-        fo: { $ne: null },
+        [field]: { $ne: null },
         status: { $in: FO_BOOKING_STATUSES },
         date: utcDayRange(date),
         timeSlot: { $in: overlappingSlots(timeSlot) },
     })
-        .select('fo')
+        .select(field)
         .lean();
 
-    return camps.map((c: any) => c.fo?.toString()).filter(Boolean);
+    return camps.map((c: any) => c[field]?.toString()).filter(Boolean);
 };
 
-// GLOBAL nearest active FO profiles whose OWN coverage radius reaches the point. FOs are QMS platform
-// staff serving every pharma tenant, so this lookup is intentionally NOT ctx-scoped (a customer-scoped
-// query would match zero platform FOs). Shared by auto-allocation and booking-availability.
-const nearestFoProfilesGlobal = async (lng: number, lat: number, limit = 100): Promise<any[]> => {
+// nearest active profiles of a geo-profile type whose own coverage reaches the point. GLOBAL (field
+// staff serve every tenant) — shared by auto-allocation and booking-availability.
+const nearestProfiles = async (geoType: string, lng: number, lat: number, limit = 100): Promise<any[]> => {
     return geoProfileModel.aggregate([
         {
             $geoNear: {
@@ -169,21 +183,18 @@ const nearestFoProfilesGlobal = async (lng: number, lat: number, limit = 100): P
                 spherical: true,
                 // hard outer cap — a mis-set coverageRadius can never pull in a far-away worker
                 maxDistance: GEO_ALLOCATION_MAX_DISTANCE,
-                query: { type: GEO_PROFILE_TYPES.FO, status: GEO_PROFILE_STATUS.ACTIVE },
+                query: { type: geoType, status: GEO_PROFILE_STATUS.ACTIVE },
             },
         },
-        // keep only FOs whose own coverage radius reaches the point
+        // keep only staff whose own coverage radius reaches the point
         { $match: { $expr: { $lte: ['$distance', '$coverageRadius'] } } },
         { $limit: limit },
         { $project: { role: 1 } },
     ]);
 };
 
-// nearest FO within their own coverage who is not already booked that day. 422 (no coordinates /
-// nobody covers) or 409 (everyone nearby booked) on failure. FO lookup + clash are both GLOBAL.
-// The device catalog items (InventoryMaster ids) a project's camp needs to run — gathered from the
-// consumption list of every TestMaster the project uses, then narrowed to DEVICES only (consumables
-// aren't gated here; they're drawn down at test time). Empty ⇒ the project imposes no device need.
+// device catalog items (InventoryMaster ids) a project's tests need — narrowed to DEVICES only.
+// Empty ⇒ the project imposes no device requirement.
 const projectRequiredDeviceItemIds = async (projectId: any): Promise<string[]> => {
     if (!projectId) {
         return [];
@@ -193,20 +204,23 @@ const projectRequiredDeviceItemIds = async (projectId: any): Promise<string[]> =
     if (!testIds.length) {
         return [];
     }
-    const tests = await TestMasterModel.find({ _id: { $in: testIds } }).select('consumption').lean();
+    const tests = await TestMasterModel.find({ _id: { $in: testIds } })
+        .select('consumption')
+        .lean();
     const itemIds = [
-        ...new Set(
-            tests.flatMap((test: any) => (test.consumption || []).map((line: any) => line.item?.toString()).filter(Boolean)),
-        ),
+        ...new Set(tests.flatMap((test: any) => (test.consumption || []).map((line: any) => line.item?.toString()).filter(Boolean))),
     ];
     if (!itemIds.length) {
         return [];
     }
-    const devices = await InventoryMasterModel.find({ _id: { $in: itemIds }, type: ITEM_TYPES.DEVICE }).select('_id').lean();
+    const devices = await InventoryMasterModel.find({ _id: { $in: itemIds }, type: ITEM_TYPES.DEVICE })
+        .select('_id')
+        .lean();
     return devices.map((device: any) => device._id.toString());
 };
 
-const resolveNearestFreeFoRole = async (camp: HydratedDocument<ICamp>, ctx: RequestContext): Promise<any> => {
+// nearest worker of `worker`'s kind within coverage, not already booked that day. 422/409 on failure.
+const resolveNearestFreeWorker = async (camp: HydratedDocument<ICamp>, worker: FieldWorker, ctx: RequestContext): Promise<any> => {
     const coordinates = (camp.location as any)?.coordinates as number[] | undefined;
     if (!coordinates || coordinates.length !== 2) {
         return throwAppError('Camp has no location coordinates to allocate from', StatusCodes.UNPROCESSABLE_ENTITY);
@@ -214,39 +228,41 @@ const resolveNearestFreeFoRole = async (camp: HydratedDocument<ICamp>, ctx: Requ
 
     const lng = coordinates[0] as number;
     const lat = coordinates[1] as number;
-    const items = await nearestFoProfilesGlobal(lng, lat, 100);
+    const items = await nearestProfiles(worker.geoType, lng, lat, 100);
     if (!items.length) {
-        return throwAppError('No field officer covers this camp location', StatusCodes.UNPROCESSABLE_ENTITY);
+        return throwAppError(`No ${worker.label} covers this camp location`, StatusCodes.UNPROCESSABLE_ENTITY);
     }
 
-    // nearest FOs (distance order) not already booked on this date + overlapping slot
-    const booked = await bookedFoRoleIdsOnDate(camp.date, (camp as any).timeSlot, ctx, camp._id);
+    // nearest workers (distance order) not already booked on this date + overlapping slot
+    const booked = await bookedWorkerIds(worker.field, camp.date, (camp as any).timeSlot, camp._id);
     const freeProfiles = items.filter((profile: any) => !booked.includes(profile.role?.toString()));
     if (!freeProfiles.length) {
-        return throwAppError('All field officers near this camp are already booked on this date and time slot', StatusCodes.CONFLICT);
+        return throwAppError(`All ${worker.label}s near this camp are already booked on this date and time slot`, StatusCodes.CONFLICT);
     }
 
-    // device gate — the auto-allocated FO must physically hold EVERY device the project's tests need.
-    // (Only this auto-allocation path is gated; an FO supplied explicitly by internal staff is trusted.)
-    // No device requirement ⇒ nearest free FO wins, exactly as before.
+    // device gate — the auto-allocated worker must hold every device the project's tests need (explicit
+    // internal-staff picks are trusted). No requirement ⇒ nearest free worker wins.
     const requiredDeviceItems = await projectRequiredDeviceItemIds(camp.project);
     if (!requiredDeviceItems.length) {
         return freeProfiles[0].role;
     }
 
-    // one batched read of the free FOs' assigned devices → roleId → set of device catalog-item ids
+    // one batched read of the free workers' assigned devices → roleId → set of device catalog-item ids
     const assignments = await InventoryAssignmentModel.find({
         assignee: { $in: freeProfiles.map((profile: any) => profile.role) },
         inventoryType: 'InventoryDevice',
     })
-        .populate({ path: 'inventory', select: 'item' })
+        .populate({ path: 'inventory', select: 'item status' })
         .lean();
 
     const heldByRole = new Map<string, Set<string>>();
     for (const assignment of assignments) {
         const roleId = assignment.assignee?.toString();
-        const itemId = (assignment.inventory as any)?.item?.toString();
-        if (!roleId || !itemId) {
+        const device = assignment.inventory as any;
+        const itemId = device?.item?.toString();
+        // only an operational, in-hand unit counts — a lost/damaged/maintenance (or not-yet-received)
+        // device doesn't actually equip the worker for the camp.
+        if (!roleId || !itemId || device?.status !== INVENTORY_DEVICE_STATUS.ASSIGNED) {
             continue;
         }
         if (!heldByRole.has(roleId)) {
@@ -255,16 +271,28 @@ const resolveNearestFreeFoRole = async (camp: HydratedDocument<ICamp>, ctx: Requ
         heldByRole.get(roleId)!.add(itemId);
     }
 
-    // nearest free FO whose assigned devices cover every required item
+    // nearest free worker whose assigned devices cover every required item
     const equipped = freeProfiles.find((profile: any) => {
         const held = heldByRole.get(profile.role?.toString());
         return held && requiredDeviceItems.every((itemId) => held.has(itemId));
     });
     if (!equipped) {
-        return throwAppError('No nearby field officer holds all the devices this project requires', StatusCodes.CONFLICT);
+        return throwAppError(`No nearby ${worker.label} holds all the devices this project requires`, StatusCodes.CONFLICT);
     }
 
     return equipped.role;
+};
+
+// validate a supplied override: the role must exist and be the worker's role type. GLOBAL lookup
+// (field staff are platform staff, never in a customer caller's tenant).
+const assertWorkerRole = async (roleId: string, worker: FieldWorker): Promise<void> => {
+    const role: any = await RoleModel.findById(roleId).populate('type');
+    if (!role) {
+        return throwAppError('The selected role was not found', StatusCodes.NOT_FOUND);
+    }
+    if (role.type?.code !== worker.roleTypeCode) {
+        return throwAppError(`The selected role is not a ${worker.label}`, StatusCodes.BAD_REQUEST);
+    }
 };
 
 // resolve an MR + its chain (asm = mr.supervisor, rsm = asm.supervisor). Loaded under ctx.where()
@@ -287,13 +315,18 @@ const resolveMrChain = async (mrId: string, ctx: RequestContext): Promise<{ mr: 
 // ================================ CORE FUNCTIONS ================================
 
 const set = async (model: any, entity: HydratedDocument<ICamp>, ctx: RequestContext) => {
-    // fo + date are the booking key — only editable while `requested`, locked once confirmed/live
+    // the worker this camp uses, from its effective type (a type change in this same payload wins).
+    const effectiveType = model.type ?? entity.type;
+    const worker = workerFor(effectiveType);
+
+    // assignee (fo/dietitian) + date are the booking key — only editable while `requested`
     if (entity.status !== CAMP_STATUSES.REQUESTED) {
-        const changingFo = model.fo && model.fo !== entity.fo?.toString();
+        const supplied = model[worker.field];
+        const changingAssignee = supplied && supplied !== (entity as any)[worker.field]?.toString();
         const changingDate = model.date && new Date(model.date).getTime() !== entity.date?.getTime();
-        if (changingFo || changingDate) {
+        if (changingAssignee || changingDate) {
             return throwAppError(
-                'Field officer and date can only be changed while the camp is in the requested stage',
+                `The ${worker.label} and date can only be changed while the camp is in the requested stage`,
                 StatusCodes.CONFLICT,
             );
         }
@@ -308,18 +341,17 @@ const set = async (model: any, entity: HydratedDocument<ICamp>, ctx: RequestCont
         entity.doctor = model.doctor;
     }
 
-    if (model.fo) {
-        // GLOBAL validation — an FO is QMS platform staff, never in the (customer) caller's tenant, so
-        // this must NOT run under ctx.where() (RoleService.get would 404 the platform FO for a pharma
-        // caller). Also assert the role really is a field officer.
-        const fo: any = await RoleModel.findById(model.fo).populate('type');
-        if (!fo) {
-            return throwAppError('FO not found', StatusCodes.NOT_FOUND);
-        }
-        if (fo.type?.code !== ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER) {
-            return throwAppError('The selected role is not a field officer', StatusCodes.BAD_REQUEST);
-        }
-        entity.fo = model.fo;
+    // worker override — only the field matching the camp's type is accepted; the other kind is rejected.
+    const otherWorker = worker === FO_WORKER ? DIETITIAN_WORKER : FO_WORKER;
+    if (model[otherWorker.field]) {
+        return throwAppError(
+            `This camp is staffed by a ${worker.label}; the ${otherWorker.label} field does not apply`,
+            StatusCodes.BAD_REQUEST,
+        );
+    }
+    if (model[worker.field]) {
+        await assertWorkerRole(model[worker.field], worker);
+        (entity as any)[worker.field] = model[worker.field];
     }
     // mr is the only pharma-chain ref accepted; asm/rsm are derived from it (reset when the MR changes)
     if (model.mr) {
@@ -329,14 +361,26 @@ const set = async (model: any, entity: HydratedDocument<ICamp>, ctx: RequestCont
         entity.rsm = rsm?._id ?? null;
     }
 
-    if (model.type) entity.type = model.type;
-    if (model.billingType) entity.billingType = model.billingType;
-    if (model.patientExpectation !== undefined) entity.patientExpectation = model.patientExpectation;
+    if (model.type) {
+        entity.type = model.type;
+    }
+    if (model.billingType) {
+        entity.billingType = model.billingType;
+    }
+    if (model.patientExpectation !== undefined) {
+        entity.patientExpectation = model.patientExpectation;
+    }
 
-    if (model.date) entity.date = model.date;
-    if (model.timeSlot) (entity as any).timeSlot = model.timeSlot;
+    if (model.date) {
+        entity.date = model.date;
+    }
+    if (model.timeSlot) {
+        (entity as any).timeSlot = model.timeSlot;
+    }
     // location is replaced wholesale (validated as a full object in the validators)
-    if (model.location) entity.location = model.location;
+    if (model.location) {
+        entity.location = model.location;
+    }
 
     // each device must reference an existing catalog item (InventoryMaster)
     if (model.devices) {
@@ -348,8 +392,12 @@ const set = async (model: any, entity: HydratedDocument<ICamp>, ctx: RequestCont
         }
         entity.devices = model.devices;
     }
-    if (model.notes !== undefined) entity.notes = model.notes;
-    if (model.conscentPath !== undefined) entity.conscentPath = model.conscentPath;
+    if (model.notes !== undefined) {
+        entity.notes = model.notes;
+    }
+    if (model.conscentPath !== undefined) {
+        entity.conscentPath = model.conscentPath;
+    }
 
     return entity;
 };
@@ -401,6 +449,9 @@ const search = async (filters: ISearchCampQuery, ctx: RequestContext, options?: 
     if (filters.fo) {
         where.fo = filters.fo;
     }
+    if (filters.dietitian) {
+        where.dietitian = filters.dietitian;
+    }
     if (filters.status) {
         where.status = filters.status;
     }
@@ -445,7 +496,6 @@ const search = async (filters: ISearchCampQuery, ctx: RequestContext, options?: 
 // per-camp patient counts from the screenings collection — one screening = one patient at that camp
 // (unique per tenant,patient,camp). The camp ids come from the already-scoped search page, and a
 // screening's camp is within the same tenant, so a plain $in can't leak another tenant's screenings.
-type CampStats = { patients: number; patientsCompleted: number };
 const getCampPatientStats = async (camps: HydratedDocument<ICamp>[]): Promise<Record<string, CampStats>> => {
     const campIds = camps.map((c) => c._id);
     const stats: Record<string, CampStats> = {};
@@ -498,6 +548,11 @@ const create = async (model: ICreateCampPayload, ctx: RequestContext): Promise<H
         if (projectDoc.tenant.toString() !== model.tenant) {
             return throwAppError('The selected project does not belong to the selected client', StatusCodes.BAD_REQUEST);
         }
+        // the camp's type must be one the project offers (project.type is an array of offerings)
+        const campType = model.type ?? CAMP_TYPES.SCREENING;
+        if (!((projectDoc.type as string[]) || []).includes(campType)) {
+            return throwAppError(`This project does not offer ${campType} camps`, StatusCodes.BAD_REQUEST);
+        }
         project = projectDoc._id;
         divisionId = projectDoc.division;
     }
@@ -506,33 +561,32 @@ const create = async (model: ICreateCampPayload, ctx: RequestContext): Promise<H
     const entity = new CampModel({ tenant: division.tenant, division: divisionId, project });
     let camp = await set(model, entity, ctx);
 
-    //3b: a caller-supplied FO must be free for this camp's date + slot (overlap-aware). Hard 409.
-    // (The no-FO auto-assign path below already resolves a free FO, so it needs no separate check.)
-    if (camp.fo) {
-        await assertFoAvailableForSlot(camp.fo.toString(), camp.date, (camp as any).timeSlot, ctx, camp._id);
+    // the worker this camp is staffed by, decided by its type
+    const worker = workerFor(camp.type);
+
+    //3b: a caller-supplied worker must be free for this camp's date + slot (overlap-aware). Hard 409.
+    if ((camp as any)[worker.field]) {
+        await assertWorkerFree(worker, (camp as any)[worker.field].toString(), camp.date, (camp as any).timeSlot, camp._id);
     }
 
-    //4: best-effort auto-assign the nearest free FO when none supplied. On failure the camp stays
-    // requested with no FO — moveStage guard 3b then blocks it leaving requested until one is set.
-    if (!camp.fo) {
+    //4: best-effort auto-assign the nearest free worker when none supplied; on failure the camp stays
+    // requested with no assignee (moveStage then blocks it leaving requested).
+    if (!(camp as any)[worker.field]) {
         try {
-            const foRole = await resolveNearestFreeFoRole(camp, ctx);
-            camp = await set({ fo: foRole.toString() }, camp, ctx);
+            const role = await resolveNearestFreeWorker(camp, worker, ctx);
+            camp = await set({ [worker.field]: role.toString() }, camp, ctx);
         } catch (error: any) {
-            ctx.logger.warn({ err: error }, 'No field officer could be auto-allocated; camp stays in requested with no FO');
+            ctx.logger.warn({ err: error }, `No ${worker.label} could be auto-allocated; camp stays in requested with no assignee`);
         }
     }
 
-    //4b: once an FO is on the camp — whether supplied (3b, verified free) or auto-allocated (4,
-    // resolved free) — auto-confirm it. The FO is already known free, so we skip moveStage's clash
-    // re-check and move straight to confirmed, recording the requested→confirmed transition in the
-    // stage journal (mirrors moveStage).
-    if (camp.fo) {
+    //4b: with a worker on the camp (already known free) auto-confirm, recording the transition.
+    if ((camp as any)[worker.field]) {
         const actorName = `${ctx.user?.firstName || ''} ${ctx.user?.lastName || ''}`.trim();
         camp.stageHistory.push({
             from: CAMP_STATUSES.REQUESTED,
             to: CAMP_STATUSES.CONFIRMED,
-            reason: 'Auto-confirmed on field officer allocation',
+            reason: `Auto-confirmed on ${worker.label} allocation`,
             actor: {
                 roleId: ctx.role?._id || ctx.role?.id,
                 name: actorName || undefined,
@@ -565,10 +619,11 @@ const update = async (id: string, model: IUpdateCampPayload, ctx: RequestContext
 
     camp = await set(model, camp, ctx);
 
-    // fo/date/slot can all change here — the assigned FO must stay free for the (possibly new)
-    // date + slot (overlap-aware). Hard 409. Excludes this camp from the check.
-    if (camp.fo) {
-        await assertFoAvailableForSlot(camp.fo.toString(), camp.date, (camp as any).timeSlot, ctx, camp._id);
+    // assignee/date/slot can all change here — the assigned worker must stay free for the (possibly
+    // new) date + slot (overlap-aware). Hard 409. Excludes this camp from the check.
+    const worker = workerFor(camp.type);
+    if ((camp as any)[worker.field]) {
+        await assertWorkerFree(worker, (camp as any)[worker.field].toString(), camp.date, (camp as any).timeSlot, camp._id);
     }
 
     camp = await camp.save();
@@ -593,20 +648,24 @@ const moveStage = async (id: string, model: IMoveStagePayload, ctx: RequestConte
         return throwAppError(`Invalid stage transition from '${from}' to '${to}'`, StatusCodes.BAD_REQUEST);
     }
 
-    // a camp cannot leave `requested` without an FO (cancellation is exempt)
+    // the worker this camp uses + its currently-assigned role id
+    const worker = workerFor(camp.type);
+    const assignee = (camp as any)[worker.field];
+
+    // a camp cannot leave `requested` without its assigned worker (cancellation is exempt)
     const isCancel = to === CAMP_STATUSES.CANCELLED || to === CAMP_STATUSES.CANCELLED_CHARGED;
-    if (from === CAMP_STATUSES.REQUESTED && !isCancel && !camp.fo) {
+    if (from === CAMP_STATUSES.REQUESTED && !isCancel && !assignee) {
         return throwAppError(
-            'A field officer must be assigned before this camp can leave the requested stage',
+            `A ${worker.label} must be assigned before this camp can leave the requested stage`,
             StatusCodes.UNPROCESSABLE_ENTITY,
         );
     }
 
-    // a camp cannot be confirmed if its FO is already booked on another camp the same day AND slot
-    if (to === CAMP_STATUSES.CONFIRMED && camp.fo) {
-        const booked = await bookedFoRoleIdsOnDate(camp.date, (camp as any).timeSlot, ctx, camp._id);
-        if (booked.includes(camp.fo.toString())) {
-            return throwAppError('Field officer is already booked on another camp on this date and time slot', StatusCodes.CONFLICT);
+    // a camp cannot be confirmed if its worker is already booked on another camp the same day AND slot
+    if (to === CAMP_STATUSES.CONFIRMED && assignee) {
+        const booked = await bookedWorkerIds(worker.field, camp.date, (camp as any).timeSlot, camp._id);
+        if (booked.includes(assignee.toString())) {
+            return throwAppError(`The ${worker.label} is already booked on another camp on this date and time slot`, StatusCodes.CONFLICT);
         }
     }
 
@@ -628,23 +687,23 @@ const moveStage = async (id: string, model: IMoveStagePayload, ctx: RequestConte
     return camp;
 };
 
-// manual/retry counterpart to create()'s auto-assign: re-runs the nearest-free-FO search and
-// assigns THROUGH update() so all update-path rules apply.
-const allocateFo = async (id: string, ctx: RequestContext) => {
+// manual/retry counterpart to create()'s auto-assign — allocates the worker the camp's type uses.
+const allocateWorker = async (id: string, ctx: RequestContext) => {
     const camp = await CampService.get(id, ctx);
     if (!camp) {
         return throwAppError('Camp not found', StatusCodes.NOT_FOUND);
     }
 
-    // FO (re)allocation is only allowed while `requested`; checked up front so we skip the geo
-    // search when locked. update() still backstops this.
+    const worker = workerFor(camp.type);
+
+    // (re)allocation is only allowed while `requested`; update() still backstops this.
     if (camp.status !== CAMP_STATUSES.REQUESTED) {
-        return throwAppError('A field officer can only be allocated while the camp is in the requested stage', StatusCodes.CONFLICT);
+        return throwAppError(`A ${worker.label} can only be allocated while the camp is in the requested stage`, StatusCodes.CONFLICT);
     }
 
-    const foRole = await resolveNearestFreeFoRole(camp, ctx);
+    const role = await resolveNearestFreeWorker(camp, worker, ctx);
 
-    return CampService.update(id, { fo: foRole.toString() }, ctx);
+    return CampService.update(id, { [worker.field]: role.toString() } as any, ctx);
 };
 
 // authorize a pharma booker against the target MR by the caller's own role type:
@@ -813,6 +872,10 @@ const bookingAvailability = async (model: IBookingAvailabilityPayload, ctx: Requ
         return throwAppError('Project does not belong to your account', StatusCodes.FORBIDDEN);
     }
 
+    // which field worker to report availability for — the caller states the camp type (a project can
+    // be both screening and diet); defaults to screening → field-officer availability.
+    const worker = workerFor(model.type);
+
     const { lat, lng } = model;
     const dateFrom = startOfUTCDay(model.dateFrom);
     const dateTo = startOfUTCDay(model.dateTo);
@@ -826,37 +889,37 @@ const bookingAvailability = async (model: IBookingAvailabilityPayload, ctx: Requ
         return throwAppError(`The date range cannot exceed ${MAX_AVAILABILITY_RANGE_DAYS} days`, StatusCodes.BAD_REQUEST);
     }
 
-    //2: eligible FOs — nearest active FOs whose OWN coverage radius reaches the point (GLOBAL — FOs
-    // are platform staff, never tenant-scoped). Only their role ids are needed downstream. Cap is high
-    // so a dense area isn't silently truncated when computing availability.
-    const nearbyFos = await nearestFoProfilesGlobal(lng, lat, 500);
+    //2: eligible workers — nearest active workers (of the requested kind) whose OWN coverage radius
+    // reaches the point (GLOBAL — field staff are platform staff, never tenant-scoped). Only their role
+    // ids are needed downstream. Cap is high so a dense area isn't silently truncated.
+    const nearby = await nearestProfiles(worker.geoType, lng, lat, 500);
 
-    const eligibleFoIds: string[] = nearbyFos.map((p: any) => p.role?.toString()).filter(Boolean);
+    const eligibleIds: string[] = nearby.map((p: any) => p.role?.toString()).filter(Boolean);
 
-    //3: pull the confirmed/live camps for those FOs across the whole range in one query, then build
-    // the tree: date -> slot -> Set(blocked FO ids). Only FOs that actually have a camp appear here.
+    //3: pull the confirmed/live camps for those workers across the whole range in one query, then build
+    // the tree: date -> slot -> Set(blocked role ids). Only workers that actually have a camp appear here.
     const tree = new Map<string, Map<CampTimeSlot, Set<string>>>();
 
-    if (eligibleFoIds.length) {
-        // NOT tenant-scoped: an FO booked (confirmed/live) by ANY pharma tenant is unavailable to
-        // every other tenant, so availability must consider that FO's camps across all tenants. Only
+    if (eligibleIds.length) {
+        // NOT tenant-scoped: a worker booked (confirmed/live) by ANY pharma tenant is unavailable to
+        // every other tenant, so availability must consider that worker's camps across all tenants. Only
         // per-slot booleans are returned, so no cross-tenant camp detail leaks.
         const camps = await CampModel.find({
-            fo: { $in: eligibleFoIds },
+            [worker.field]: { $in: eligibleIds },
             status: { $in: FO_BOOKING_STATUSES },
             date: { $gte: dateFrom, $lte: endOfUTCDay(dateTo) },
         })
-            .select('fo date timeSlot')
+            .select(`${worker.field} date timeSlot`)
             .lean();
 
         for (const camp of camps) {
-            const foId = (camp as any).fo?.toString();
-            if (!foId) {
+            const roleId = (camp as any)[worker.field]?.toString();
+            if (!roleId) {
                 continue;
             }
             const key = dateKey((camp as any).date);
             const slot = (camp as any).timeSlot as CampTimeSlot;
-            // a camp blocks its FO for every slot it overlaps (daytime slots block each other)
+            // a camp blocks its worker for every slot it overlaps (daytime slots block each other)
             const overlaps = overlappingSlots(slot);
 
             let slotMap = tree.get(key);
@@ -870,7 +933,7 @@ const bookingAvailability = async (model: IBookingAvailabilityPayload, ctx: Requ
                     blocked = new Set();
                     slotMap.set(overlappingSlot, blocked);
                 }
-                blocked.add(foId);
+                blocked.add(roleId);
             }
         }
     }
@@ -892,7 +955,7 @@ const bookingAvailability = async (model: IBookingAvailabilityPayload, ctx: Requ
         const slots: Record<string, boolean> = {};
         for (const slot of projectSlots) {
             const blocked = slotMap?.get(slot);
-            slots[slot] = eligibleFoIds.some((id) => !blocked || !blocked.has(id));
+            slots[slot] = eligibleIds.some((id) => !blocked || !blocked.has(id));
         }
 
         // a date is available if any of its offered slots is available
@@ -901,7 +964,8 @@ const bookingAvailability = async (model: IBookingAvailabilityPayload, ctx: Requ
     }
 
     return {
-        eligibleFoCount: eligibleFoIds.length,
+        // count of eligible workers of the requested kind (field officers by default, or dietitians)
+        eligibleFoCount: eligibleIds.length,
         dateFrom,
         dateTo,
         dates,
@@ -914,8 +978,11 @@ export const CampService = {
     create,
     update,
     moveStage,
-    allocateFo,
+    allocateWorker,
     book,
     report,
     bookingAvailability,
+    // exposed so the camp-day flow (screening/test) resolves the camp's worker kind (FO/dietitian)
+    // from the same single branch, instead of duplicating the diet-vs-screening decision.
+    workerFor,
 };

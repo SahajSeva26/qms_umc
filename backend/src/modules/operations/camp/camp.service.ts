@@ -24,6 +24,8 @@ import { withTransaction } from '../../../shared/helpers/transactionHelper';
 import { CounterService } from '../../counter/counter.service';
 import { geoProfileModel } from '../geoProfile/geoProfile.model';
 import { GEO_ALLOCATION_MAX_DISTANCE, GEO_PROFILE_STATUS, GEO_PROFILE_TYPES } from '../geoProfile/geoProfile.constants';
+import { mapsManager } from '../../../shared/providers/maps/maps';
+import { GOOGLE_MAPS } from '../../../shared/providers/maps/google/google.provider';
 import { canTransition } from '../../crm/lead/lead.validators';
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
@@ -186,10 +188,11 @@ const nearestProfiles = async (geoType: string, lng: number, lat: number, limit 
                 query: { type: geoType, status: GEO_PROFILE_STATUS.ACTIVE },
             },
         },
-        // keep only staff whose own coverage radius reaches the point
+        // keep only staff whose own coverage radius reaches the point (straight-line pre-filter —
+        // road distance is always ≥ straight-line, so this never drops a road-eligible worker)
         { $match: { $expr: { $lte: ['$distance', '$coverageRadius'] } } },
         { $limit: limit },
-        { $project: { role: 1 } },
+        { $project: { role: 1, coordinates: 1, coverageRadius: 1, distance: 1 } },
     ]);
 };
 
@@ -219,6 +222,48 @@ const projectRequiredDeviceItemIds = async (projectId: any): Promise<string[]> =
     return devices.map((device: any) => device._id.toString());
 };
 
+// Among candidate geo-profiles (already free + equipped, straight-line ordered), keep those within
+// their coverage radius by actual ROAD distance and return the nearest one's role — one matrix call.
+// Falls back to the straight-line nearest on a maps outage (profiles are already distance-ordered) so
+// allocation isn't blocked by a transient failure; 422 if the maps lookup succeeds but none are
+// road-reachable within coverage.
+const pickNearestByRoad = async (profiles: any[], lat: number, lng: number, worker: FieldWorker): Promise<any> => {
+    const candidates = profiles
+        .map((p: any) => {
+            const coords = p.coordinates as number[] | undefined;
+            if (!p.role || !coords || coords.length !== 2) {
+                return null;
+            }
+            // geoProfile coordinates are GeoJSON [lng, lat]
+            return { role: p.role, lat: Number(coords[1]), lng: Number(coords[0]), coverageRadius: Number(p.coverageRadius ?? 0) };
+        })
+        .filter(Boolean) as { role: any; lat: number; lng: number; coverageRadius: number }[];
+
+    // no usable coordinates to refine by — fall back to the straight-line nearest
+    if (!candidates.length) {
+        return profiles[0]?.role;
+    }
+
+    let distances;
+    try {
+        distances = await mapsManager
+            .get(GOOGLE_MAPS)
+            .computeDistanceMatrix({ lat, lng }, candidates.map((c) => ({ lat: c.lat, lng: c.lng })));
+    } catch {
+        return profiles[0]?.role;
+    }
+
+    const within = candidates
+        .map((c, i) => ({ role: c.role, distance: distances[i]?.distanceMeters ?? Infinity, coverageRadius: c.coverageRadius }))
+        .filter((c) => c.distance <= c.coverageRadius)
+        .sort((a, b) => a.distance - b.distance);
+
+    if (!within.length) {
+        return throwAppError(`No ${worker.label} is within road-distance coverage of this camp`, StatusCodes.UNPROCESSABLE_ENTITY);
+    }
+    return within[0]?.role;
+};
+
 // nearest worker of `worker`'s kind within coverage, not already booked that day. 422/409 on failure.
 const resolveNearestFreeWorker = async (camp: HydratedDocument<ICamp>, worker: FieldWorker, ctx: RequestContext): Promise<any> => {
     const coordinates = (camp.location as any)?.coordinates as number[] | undefined;
@@ -235,52 +280,51 @@ const resolveNearestFreeWorker = async (camp: HydratedDocument<ICamp>, worker: F
 
     // nearest workers (distance order) not already booked on this date + overlapping slot
     const booked = await bookedWorkerIds(worker.field, camp.date, (camp as any).timeSlot, camp._id);
-    const freeProfiles = items.filter((profile: any) => !booked.includes(profile.role?.toString()));
+    let freeProfiles = items.filter((profile: any) => !booked.includes(profile.role?.toString()));
     if (!freeProfiles.length) {
         return throwAppError(`All ${worker.label}s near this camp are already booked on this date and time slot`, StatusCodes.CONFLICT);
     }
 
-    // device gate — the auto-allocated worker must hold every device the project's tests need (explicit
-    // internal-staff picks are trusted). No requirement ⇒ nearest free worker wins.
+    // device gate — narrow to workers who hold every device the project's tests need. No requirement ⇒
+    // any free worker qualifies.
     const requiredDeviceItems = await projectRequiredDeviceItemIds(camp.project);
-    if (!requiredDeviceItems.length) {
-        return freeProfiles[0].role;
-    }
+    if (requiredDeviceItems.length) {
+        // one batched read of the free workers' assigned devices → roleId → set of device catalog-item ids
+        const assignments = await InventoryAssignmentModel.find({
+            assignee: { $in: freeProfiles.map((profile: any) => profile.role) },
+            inventoryType: 'InventoryDevice',
+        })
+            .populate({ path: 'inventory', select: 'item status' })
+            .lean();
 
-    // one batched read of the free workers' assigned devices → roleId → set of device catalog-item ids
-    const assignments = await InventoryAssignmentModel.find({
-        assignee: { $in: freeProfiles.map((profile: any) => profile.role) },
-        inventoryType: 'InventoryDevice',
-    })
-        .populate({ path: 'inventory', select: 'item status' })
-        .lean();
-
-    const heldByRole = new Map<string, Set<string>>();
-    for (const assignment of assignments) {
-        const roleId = assignment.assignee?.toString();
-        const device = assignment.inventory as any;
-        const itemId = device?.item?.toString();
-        // only an operational, in-hand unit counts — a lost/damaged/maintenance (or not-yet-received)
-        // device doesn't actually equip the worker for the camp.
-        if (!roleId || !itemId || device?.status !== INVENTORY_DEVICE_STATUS.ASSIGNED) {
-            continue;
+        const heldByRole = new Map<string, Set<string>>();
+        for (const assignment of assignments) {
+            const roleId = assignment.assignee?.toString();
+            const device = assignment.inventory as any;
+            const itemId = device?.item?.toString();
+            // only an operational, in-hand unit counts — a lost/damaged/maintenance (or not-yet-received)
+            // device doesn't actually equip the worker for the camp.
+            if (!roleId || !itemId || device?.status !== INVENTORY_DEVICE_STATUS.ASSIGNED) {
+                continue;
+            }
+            if (!heldByRole.has(roleId)) {
+                heldByRole.set(roleId, new Set());
+            }
+            heldByRole.get(roleId)!.add(itemId);
         }
-        if (!heldByRole.has(roleId)) {
-            heldByRole.set(roleId, new Set());
+
+        freeProfiles = freeProfiles.filter((profile: any) => {
+            const held = heldByRole.get(profile.role?.toString());
+            return held && requiredDeviceItems.every((itemId) => held.has(itemId));
+        });
+        if (!freeProfiles.length) {
+            return throwAppError(`No nearby ${worker.label} holds all the devices this project requires`, StatusCodes.CONFLICT);
         }
-        heldByRole.get(roleId)!.add(itemId);
     }
 
-    // nearest free worker whose assigned devices cover every required item
-    const equipped = freeProfiles.find((profile: any) => {
-        const held = heldByRole.get(profile.role?.toString());
-        return held && requiredDeviceItems.every((itemId) => held.has(itemId));
-    });
-    if (!equipped) {
-        return throwAppError(`No nearby ${worker.label} holds all the devices this project requires`, StatusCodes.CONFLICT);
-    }
-
-    return equipped.role;
+    // ROAD precision — among the qualified free workers, keep those within their coverage radius by
+    // actual road distance and pick the nearest by road.
+    return pickNearestByRoad(freeProfiles, lat, lng, worker);
 };
 
 // validate a supplied override: the role must exist and be the worker's role type. GLOBAL lookup
@@ -890,11 +934,40 @@ const bookingAvailability = async (model: IBookingAvailabilityPayload, ctx: Requ
     }
 
     //2: eligible workers — nearest active workers (of the requested kind) whose OWN coverage radius
-    // reaches the point (GLOBAL — field staff are platform staff, never tenant-scoped). Only their role
-    // ids are needed downstream. Cap is high so a dense area isn't silently truncated.
+    // reaches the point (GLOBAL — field staff are platform staff, never tenant-scoped). The $geoNear
+    // pre-filter uses straight-line distance; we then refine by ROAD distance below. Cap is high so a
+    // dense area isn't silently truncated.
     const nearby = await nearestProfiles(worker.geoType, lng, lat, 500);
 
-    const eligibleIds: string[] = nearby.map((p: any) => p.role?.toString()).filter(Boolean);
+    //2a: a worker is eligible only if the ROAD distance from the camp point to their base is within
+    // their coverage radius (straight-line already passed above). All road distances are fetched in a
+    // SINGLE matrix call. If the maps lookup fails, fall back to the straight-line result (already
+    // within coverage) so a transient maps outage doesn't zero out availability.
+    // geoProfile coordinates are GeoJSON [lng, lat].
+    const candidates = nearby
+        .map((p: any) => {
+            const roleId = p.role?.toString();
+            const coords = p.coordinates as number[] | undefined;
+            if (!roleId || !coords || coords.length !== 2) {
+                return null;
+            }
+            return { roleId, lat: Number(coords[1]), lng: Number(coords[0]), coverageRadius: Number(p.coverageRadius ?? 0) };
+        })
+        .filter(Boolean) as { roleId: string; lat: number; lng: number; coverageRadius: number }[];
+
+    let eligibleIds: string[] = [];
+    if (candidates.length) {
+        try {
+            const distances = await mapsManager
+                .get(GOOGLE_MAPS)
+                .computeDistanceMatrix({ lat, lng }, candidates.map((c) => ({ lat: c.lat, lng: c.lng })));
+            eligibleIds = candidates
+                .filter((c, i) => (distances[i]?.distanceMeters ?? Infinity) <= c.coverageRadius)
+                .map((c) => c.roleId);
+        } catch {
+            eligibleIds = candidates.map((c) => c.roleId);
+        }
+    }
 
     //3: pull the confirmed/live camps for those workers across the whole range in one query, then build
     // the tree: date -> slot -> Set(blocked role ids). Only workers that actually have a camp appear here.

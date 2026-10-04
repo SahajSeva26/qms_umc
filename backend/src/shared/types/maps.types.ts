@@ -13,5 +13,8 @@ export interface IRouteDistance {
 
 export interface IMapsProvider {
     // road distance + travel time between two coordinates
-    distanceBetween: (origin: ILatLng, destination: ILatLng) => Promise<IRouteDistance>;
+    computeDistance: (origin: ILatLng, destination: ILatLng) => Promise<IRouteDistance>;
+    // road distance + travel time from one origin to many destinations, in ONE call.
+    // Results are aligned to the `destinations` order; an unreachable destination yields distanceMeters = Infinity.
+    computeDistanceMatrix: (origin: ILatLng, destinations: ILatLng[]) => Promise<IRouteDistance[]>;
 }

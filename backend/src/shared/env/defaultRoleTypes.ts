@@ -197,8 +197,9 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
         ],
     },
     {
-        // diet-camp field worker — diet-side counterpart to the field officer (consumption deferred,
-        // so patient/screening/test perms are omitted for now).
+        // diet-camp field worker — diet-side counterpart to the field officer. Runs the full camp-day
+        // clinical flow on a diet camp (patient → screening → consent → test w/ stock deduction),
+        // exactly as the FO does on a screening camp. The camp's type decides which worker is allowed.
         code: ALLOWED_ROLETYPE_CODES.PLATFORM.DIETITIAN,
         name: 'Dietitian',
         description: 'Dietitian',
@@ -209,6 +210,24 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
             APPOINTMENT_PERMISSIONS.SEARCH.code,
             APPOINTMENT_PERMISSIONS.GET.code,
             APPOINTMENT_PERMISSIONS.RSVP.code,
+            // read the test catalog (needed to run camp tests) — read-only, no manage
+            TEST_MASTER_PERMISSIONS.SEARCH.code,
+            TEST_MASTER_PERMISSIONS.GET.code,
+            // register + look up + amend patients at the camp (own-scoped reads)
+            PATIENT_PERMISSIONS.CREATE.code,
+            PATIENT_PERMISSIONS.GET.code,
+            PATIENT_PERMISSIONS.SEARCH.code,
+            PATIENT_PERMISSIONS.UPDATE.code,
+            // start + progress + read back screenings at a live camp they are assigned to
+            SCREENING_PERMISSIONS.CREATE.code,
+            SCREENING_PERMISSIONS.UPDATE.code,
+            SCREENING_PERMISSIONS.GET.code,
+            SCREENING_PERMISSIONS.SEARCH.code,
+            // record + correct + read back patient test results after the screening is completed
+            TEST_PERMISSIONS.CREATE.code,
+            TEST_PERMISSIONS.UPDATE.code,
+            TEST_PERMISSIONS.GET.code,
+            TEST_PERMISSIONS.SEARCH.code,
             // raise and manage their own refill/return requests (progressing the stage is manage-only)
             INVENTORY_REQUEST_PERMISSIONS.CREATE.code,
             INVENTORY_REQUEST_PERMISSIONS.GET.code,

@@ -1,6 +1,7 @@
 // Screening Service
 import mongoose, { HydratedDocument } from 'mongoose';
 import { ScreeningModel, ScreeningDocument as IScreening } from './screening.model';
+import { ScreeningDoc } from './screening.types';
 import {
     ICreateScreeningPayload,
     IMoveStagePayload,
@@ -18,9 +19,6 @@ import { OtpHandler } from '../../../shared/utils/otp';
 import { CampService } from '../camp/camp.service';
 import { CAMP_STATUSES } from '../camp/camp.constants';
 import { PatientService } from '../patient/patient.service';
-import { ALLOWED_ROLETYPE_CODES } from '../../access-management/role-type/roleType.constants';
-
-type ScreeningDoc = HydratedDocument<IScreening> | null;
 
 const populate: any[] = [
     { path: 'tenant', select: 'name code' },
@@ -31,36 +29,35 @@ const populate: any[] = [
 
 // ================================ HELPERS ================================
 
-// A non-manage actor may only create/mutate a screening for a camp they are the assigned FO of:
-// their role must be a field-officer type AND camp.fo must equal their role id. manage-level actors
-// (screening:manage / system) bypass this restriction.
-const assertAssignedFoOrManage = (camp: any, ctx: RequestContext) => {
+// A non-manage actor may only create/mutate a screening for a camp they are the assigned worker of
+// (diet → dietitian, else FO, via CampService.workerFor); manage actors bypass this.
+const assertAssignedWorkerOrManage = (camp: any, ctx: RequestContext) => {
     if (ctx.hasAnyPermissions([SCREENING_PERMISSIONS.MANAGE.code])) {
         return;
     }
-    const isFoType = ctx.role?.type?.code === ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER;
-    // camp.fo may be a populated role doc or a raw ObjectId — normalise to an id before comparing
-    const foId = camp?.fo?._id ?? camp?.fo;
-    const isAssigned = foId && ctx.role?._id && foId.toString() === ctx.role._id.toString();
-    if (!isFoType || !isAssigned) {
-        return throwAppError('Only the field officer assigned to this camp can screen its patients', StatusCodes.FORBIDDEN);
+    const worker = CampService.workerFor(camp?.type);
+    const isWorkerType = ctx.role?.type?.code === worker.roleTypeCode;
+    // assignee may be a populated doc or a raw ObjectId — normalise to an id before comparing
+    const assignee = camp?.[worker.field];
+    const assigneeId = assignee?._id ?? assignee;
+    const isAssigned = assigneeId && ctx.role?._id && assigneeId.toString() === ctx.role._id.toString();
+    if (!isWorkerType || !isAssigned) {
+        return throwAppError(`Only the ${worker.label} assigned to this camp can screen its patients`, StatusCodes.FORBIDDEN);
     }
 };
 
-// Load the camp for a screening action and authorize the actor. Reuses CampService.get — which
-// applies tenant + field-force scope AND populates fo — then asserts the actor is the assigned FO
-// (or a manage actor). Shared by create + every mutation so the rule lives in one place (DRY).
+// Load the camp (reuses CampService.get — scope + populated fo/dietitian) and assert the actor is
+// the assigned worker (or manage). Shared by create + every mutation so the rule lives in one place.
 const loadCampForAction = async (campId: any, ctx: RequestContext) => {
     const camp = await CampService.get(campId.toString(), ctx, { populate: true });
     if (!camp) {
         return throwAppError('Camp not found', StatusCodes.NOT_FOUND);
     }
-    assertAssignedFoOrManage(camp, ctx);
+    assertAssignedWorkerOrManage(camp, ctx);
     return camp;
 };
 
-// A non-manage actor (e.g. the assigned field officer) sees only the screenings they performed.
-// A manage actor (screening:manage / system) sees them all.
+// non-manage actor sees only the screenings they performed; manage sees all
 const applyOwnScope = (where: any, ctx: RequestContext) => {
     if (!ctx.hasAnyPermissions([SCREENING_PERMISSIONS.MANAGE.code])) {
         where.performedBy = ctx.role?._id;
@@ -123,8 +120,7 @@ const search = async (filters: ISearchScreeningQuery, ctx: RequestContext, optio
     if (filters.camp) {
         where.camp = filters.camp;
     }
-    // performedBy filter (see other FOs' screenings) is only honoured for a screening:manage actor —
-    // a non-manage actor is pinned to their own by applyOwnScope below regardless.
+    // performedBy filter is honoured only for a screening:manage actor (others are own-scoped above)
     if (filters.performedBy && ctx.hasAnyPermissions([SCREENING_PERMISSIONS.MANAGE.code])) {
         where.performedBy = filters.performedBy;
     }
@@ -148,20 +144,22 @@ const search = async (filters: ISearchScreeningQuery, ctx: RequestContext, optio
 };
 
 const create = async (model: ICreateScreeningPayload, ctx: RequestContext): Promise<HydratedDocument<IScreening>> => {
-    //1: load the camp (reuses CampService.get — scope + populated fo) and authorize the actor as
-    // the assigned FO (or manage). The screening inherits its tenant from the camp.
+    //1: load the camp + authorize the actor as the assigned worker (or manage); screening inherits
+    // its tenant from the camp
     const camp: any = await loadCampForAction(model.camp, ctx);
 
-    // a screening can only start once the camp is live (i.e. actually running on the day)
+    // a screening can only start once the camp is live
     if (camp.status !== CAMP_STATUSES.LIVE) {
         return throwAppError('Screenings can only be created for a camp that is live', StatusCodes.CONFLICT);
     }
 
-    // the performing FO is the camp's assigned FO. A live camp always has one (a camp cannot go
-    // live without an FO) — guard anyway so a bad state fails clearly, not as a Mongoose error.
-    const performedBy = camp.fo?._id ?? camp.fo;
+    // performedBy = the camp's assigned worker (dietitian/FO per type); a live camp always has one,
+    // guard anyway so a bad state fails clearly rather than as a Mongoose error
+    const worker = CampService.workerFor(camp.type);
+    const assignee = camp[worker.field];
+    const performedBy = assignee?._id ?? assignee;
     if (!performedBy) {
-        return throwAppError('The camp has no assigned field officer', StatusCodes.CONFLICT);
+        return throwAppError(`The camp has no assigned ${worker.label}`, StatusCodes.CONFLICT);
     }
 
     //2: patient must exist (global registry)
@@ -179,8 +177,7 @@ const create = async (model: ICreateScreeningPayload, ctx: RequestContext): Prom
         return throwAppError('This patient has already been screened at this camp', StatusCodes.CONFLICT);
     }
 
-    //4: build entity — tenant from camp, performedBy = the camp's assigned FO, consent OTP
-    // generated server-side, seed the created entry
+    //4: build entity — tenant from camp, server-generated consent OTP, seed the created entry
     const entity = new ScreeningModel({
         tenant: camp.tenant?._id ?? camp.tenant,
         patient: patient._id,
@@ -213,7 +210,7 @@ const update = async (id: string, model: IUpdateScreeningPayload, ctx: RequestCo
         return throwAppError('Screening not found', StatusCodes.NOT_FOUND);
     }
 
-    // only the FO assigned to this screening's camp (or a manage actor) may mutate it
+    // only the assigned worker (or a manage actor) may mutate it
     await loadCampForAction(entity.camp, ctx);
 
     // a screening is only editable while pending; once completed/cancelled it is locked
@@ -234,7 +231,7 @@ const moveStage = async (id: string, model: IMoveStagePayload, ctx: RequestConte
         return throwAppError('Screening not found', StatusCodes.NOT_FOUND);
     }
 
-    // only the FO assigned to this screening's camp (or a manage actor) may move its stage
+    // only the assigned worker (or a manage actor) may move its stage
     await loadCampForAction(screening.camp, ctx);
 
     const from = screening.status as string;
@@ -272,7 +269,7 @@ const verifyConsent = async (id: string, model: IVerifyConsentPayload, ctx: Requ
         return throwAppError('Screening not found', StatusCodes.NOT_FOUND);
     }
 
-    // only the FO assigned to this screening's camp (or a manage actor) may verify consent
+    // only the assigned worker (or a manage actor) may verify consent
     await loadCampForAction(screening.camp, ctx);
 
     if (screening.consent?.verified) {

@@ -982,4 +982,7 @@ export const CampService = {
     book,
     report,
     bookingAvailability,
+    // exposed so the camp-day flow (screening/test) resolves the camp's worker kind (FO/dietitian)
+    // from the same single branch, instead of duplicating the diet-vs-screening decision.
+    workerFor,
 };

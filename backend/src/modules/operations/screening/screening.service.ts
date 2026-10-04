@@ -20,7 +20,6 @@ import { CAMP_STATUSES } from '../camp/camp.constants';
 import { PatientService } from '../patient/patient.service';
 import { OtpService } from '../../otp/otp.service';
 import { OTP_CHANNELS, OTP_ENTITY_TYPE, OTP_PURPOSES } from '../../otp/otp.constants';
-import { withTransaction } from '../../../shared/helpers/transactionHelper';
 
 // OTP purpose + entity relation for screening consent — owned by the OTP module
 const CONSENT_OTP = OTP_PURPOSES[OTP_ENTITY_TYPE.SCREENING].CONSENT;
@@ -212,21 +211,7 @@ const create = async (model: ICreateScreeningPayload, ctx: RequestContext): Prom
     });
 
     let screening = await set(model, entity, ctx);
-
-    //5: save the screening and issue its consent OTP atomically — the OTP is sent to the patient's
-    // mobile and linked back to this screening so verify-consent can match it later.
-    screening = await withTransaction(async () => {
-        const saved = await screening.save();
-        await OtpService.request(
-            {
-                purpose: CONSENT_OTP.purpose,
-                channel: { type: OTP_CHANNELS.SMS, value: patient.mobile },
-                entity: consentOtpEntity(saved._id),
-            },
-            ctx,
-        );
-        return saved;
-    });
+    screening = await screening.save();
 
     return screening;
 };
@@ -288,6 +273,37 @@ const moveStage = async (id: string, model: IMoveStagePayload, ctx: RequestConte
     return screening;
 };
 
+// issue (or reissue) the consent OTP for a screening, delivered to the patient. Only the assigned
+// worker (or a manage actor) may trigger it.
+const requestConsentOtp = async (id: string, ctx: RequestContext) => {
+    const screening = await ScreeningService.get(id, ctx);
+    if (!screening) {
+        return throwAppError('Screening not found', StatusCodes.NOT_FOUND);
+    }
+
+    await loadCampForAction(screening.camp, ctx);
+
+    if (screening.consent?.verified) {
+        return throwAppError('Consent has already been verified', StatusCodes.BAD_REQUEST);
+    }
+
+    const patient = await PatientService.get(screening.patient.toString(), ctx);
+    if (!patient?.mobile) {
+        return throwAppError('Patient has no mobile number to send the consent OTP', StatusCodes.CONFLICT);
+    }
+
+    const otp = await OtpService.request(
+        {
+            purpose: CONSENT_OTP.purpose,
+            channel: { type: OTP_CHANNELS.SMS, value: patient.mobile },
+            entity: consentOtpEntity(screening._id),
+        },
+        ctx,
+    );
+
+    return otp;
+};
+
 // verify the patient's consent by matching the OTP against the stored one. An optional signature
 // captured at the same time is stored alongside.
 const verifyConsent = async (id: string, model: IVerifyConsentPayload, ctx: RequestContext) => {
@@ -330,5 +346,6 @@ export const ScreeningService = {
     create,
     update,
     moveStage,
+    requestConsentOtp,
     verifyConsent,
 };

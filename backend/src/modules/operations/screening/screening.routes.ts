@@ -110,6 +110,20 @@ registry.registerPath({
     },
 });
 
+// request consent OTP
+registry.registerPath({
+    method: 'post',
+    path: '/screenings/{id}/request-consent-otp',
+    tags: ['SCREENING'],
+    summary: 'Issue (or reissue) the consent OTP for a screening',
+    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+    responses: {
+        200: { description: 'Consent OTP sent' },
+        400: { description: 'Consent already verified' },
+        404: { description: 'Screening not found' },
+    },
+});
+
 // =======================================================================
 // ====================== EXPORT SCREENING ROUTES ========================
 // =======================================================================
@@ -121,4 +135,5 @@ ScreeningRouter.get('/', AuthorizeMiddleware([SCREENING_PERMISSIONS.SEARCH.code,
 ScreeningRouter.post('/', AuthorizeMiddleware([SCREENING_PERMISSIONS.CREATE.code, SCREENING_PERMISSIONS.MANAGE.code], 'OR'), ScreeningController.create);
 ScreeningRouter.put('/:id', AuthorizeMiddleware([SCREENING_PERMISSIONS.UPDATE.code, SCREENING_PERMISSIONS.MANAGE.code], 'OR'), ScreeningController.update);
 ScreeningRouter.patch('/:id/stage', AuthorizeMiddleware([SCREENING_PERMISSIONS.UPDATE.code, SCREENING_PERMISSIONS.MANAGE.code], 'OR'), ScreeningController.moveStage);
+ScreeningRouter.post('/:id/request-consent-otp', AuthorizeMiddleware([SCREENING_PERMISSIONS.UPDATE.code, SCREENING_PERMISSIONS.MANAGE.code], 'OR'), ScreeningController.requestConsentOtp);
 ScreeningRouter.post('/:id/verify-consent', AuthorizeMiddleware([SCREENING_PERMISSIONS.UPDATE.code, SCREENING_PERMISSIONS.MANAGE.code], 'OR'), ScreeningController.verifyConsent);

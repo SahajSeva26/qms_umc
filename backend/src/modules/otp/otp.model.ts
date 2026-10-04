@@ -1,8 +1,7 @@
 import mongoose from "mongoose"
 import { OTP_CHANNELS, OTP_STATUS } from "./otp.constants"
 
-// how + where the OTP is delivered: the channel type (sms/whatsapp/email) and the destination value
-// (phone number for sms/whatsapp, email address for email).
+// how + where the OTP is delivered: channel type + the destination (phone/email) value
 const channelSchema = new mongoose.Schema(
     {
       type: {
@@ -18,8 +17,7 @@ const channelSchema = new mongoose.Schema(
     { _id: false },
 )
 
-// optional link back to the record this OTP was issued for, so it can be retrieved by what it belongs
-// to (e.g. find the pending OTP for this screening / user) rather than only by its code.
+// optional link back to the record this OTP was issued for, so it can be retrieved by what it belongs to
 const entitySchema = new mongoose.Schema(
     {
       type: { type: String },
@@ -35,12 +33,10 @@ const otpSchema= new mongoose.Schema({
       required: true,
       index: true,
     },
-    // delivery channel this OTP is sent over — { type, value }
     channel: {
       type: channelSchema,
       required: true,
     },
-    // optional — present only when the OTP is tied to a specific record
     entity: {
       type: entitySchema,
       required: false,
@@ -78,8 +74,7 @@ const otpSchema= new mongoose.Schema({
     timestamps:true
 })
 
-// index the entity link so "find the OTP(s) for this record" is fast; partial so OTPs without an
-// entity (e.g. a bare phone/email OTP) aren't indexed.
+// index the entity link for fast lookup; partial so OTPs without an entity aren't indexed
 otpSchema.index(
     { 'entity.type': 1, 'entity.relation': 1, 'entity.id': 1 },
     { partialFilterExpression: { 'entity.id': { $exists: true } } },

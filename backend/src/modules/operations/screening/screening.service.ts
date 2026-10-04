@@ -15,10 +15,15 @@ import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
 import { IServiceOptions } from '../../../shared/types/service.types';
-import { OtpHandler } from '../../../shared/utils/otp';
 import { CampService } from '../camp/camp.service';
 import { CAMP_STATUSES } from '../camp/camp.constants';
 import { PatientService } from '../patient/patient.service';
+import { OtpService } from '../../otp/otp.service';
+import { OTP_CHANNELS, OTP_ENTITY_TYPE, OTP_PURPOSES } from '../../otp/otp.constants';
+import { withTransaction } from '../../../shared/helpers/transactionHelper';
+
+// OTP purpose + entity relation for screening consent — owned by the OTP module
+const CONSENT_OTP = OTP_PURPOSES[OTP_ENTITY_TYPE.SCREENING].CONSENT;
 
 const populate: any[] = [
     { path: 'tenant', select: 'name code' },
@@ -73,6 +78,14 @@ const actorSnapshot = (ctx: RequestContext) => {
         email: ctx.user?.email,
     };
 };
+
+// the OTP entity link for a screening's consent — the same shape is used to issue the OTP and to
+// verify it, so OtpService locates it identically both times.
+const consentOtpEntity = (screeningId: any) => ({
+    type: OTP_ENTITY_TYPE.SCREENING,
+    relation: CONSENT_OTP.relation,
+    id: screeningId.toString(),
+});
 
 // ================================ CORE FUNCTIONS ================================
 
@@ -177,14 +190,14 @@ const create = async (model: ICreateScreeningPayload, ctx: RequestContext): Prom
         return throwAppError('This patient has already been screened at this camp', StatusCodes.CONFLICT);
     }
 
-    //4: build entity — tenant from camp, server-generated consent OTP, seed the created entry
+    //4: build entity — tenant from camp, seed the created entry. The consent OTP is issued separately
+    // through the OTP module; the screening only tracks verified + signature.
     const entity = new ScreeningModel({
         tenant: camp.tenant?._id ?? camp.tenant,
         patient: patient._id,
         camp: camp._id,
         performedBy,
         consent: {
-            otp: OtpHandler.generate(),
             signature: model.signature,
             verified: false,
         },
@@ -199,7 +212,21 @@ const create = async (model: ICreateScreeningPayload, ctx: RequestContext): Prom
     });
 
     let screening = await set(model, entity, ctx);
-    screening = await screening.save();
+
+    //5: save the screening and issue its consent OTP atomically — the OTP is sent to the patient's
+    // mobile and linked back to this screening so verify-consent can match it later.
+    screening = await withTransaction(async () => {
+        const saved = await screening.save();
+        await OtpService.request(
+            {
+                purpose: CONSENT_OTP.purpose,
+                channel: { type: OTP_CHANNELS.SMS, value: patient.mobile },
+                entity: consentOtpEntity(saved._id),
+            },
+            ctx,
+        );
+        return saved;
+    });
 
     return screening;
 };
@@ -275,10 +302,20 @@ const verifyConsent = async (id: string, model: IVerifyConsentPayload, ctx: Requ
     if (screening.consent?.verified) {
         return throwAppError('Consent has already been verified', StatusCodes.BAD_REQUEST);
     }
-    if (!screening.consent || model.otp !== screening.consent.otp) {
-        return throwAppError('Invalid consent OTP', StatusCodes.BAD_REQUEST);
-    }
 
+    // delegate the code match to the OTP module (throws on invalid / expired / blocked)
+    await OtpService.verify(
+        {
+            purpose: CONSENT_OTP.purpose,
+            code: model.otp,
+            entity: consentOtpEntity(screening._id),
+        },
+        ctx,
+    );
+
+    if (!screening.consent) {
+        return throwAppError('Consent record is missing on this screening', StatusCodes.CONFLICT);
+    }
     screening.consent.verified = true;
     if (model.signature) {
         screening.consent.signature = model.signature;

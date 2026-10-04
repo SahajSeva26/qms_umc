@@ -8,58 +8,38 @@ const objectId = (label: string) =>
         message: `${label} must be a valid id`,
     });
 
-//1: create / generate ====================================>
-// The caller states what the OTP is FOR (purpose + an optional entity link) and, optionally, how long
-// it should live (minutes; the service falls back to its default when omitted). The code is always 6
-// digits and status/attempts are pinned by the service — never accepted from the client. The entity
-// ref is three flat fields, folded into a nested `entity` so the service sees model.entity.* (all
-// optional; the whole block is dropped when none are supplied).
-export const CreateOtpPayloadSchema = z
+// optional link back to the record the OTP is issued for — used to retrieve/verify it later
+const EntityRefSchema = z
     .object({
-        purpose: z.string().min(1).openapi({ example: 'screening-consent' }),
-        channel: z
-            .object({
-                type: z.enum(Object.values(OTP_CHANNELS)).openapi({ example: 'sms' }),
-                value: z.string().min(1).openapi({ example: '+919876543210' }),
-            })
-            .openapi({ example: { type: 'sms', value: '+919876543210' } }),
-        expiresInMinutes: z.number().int().positive().optional().openapi({ example: 5 }),
-        entityId: objectId('Entity').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
-        entityType: z.string().min(1).optional().openapi({ example: 'screening' }),
-        entityRelation: z.string().min(1).optional().openapi({ example: 'consent' }),
+        type: z.string().min(1).optional().openapi({ example: 'screening' }),
+        relation: z.string().min(1).optional().openapi({ example: 'consent' }),
+        id: objectId('Entity').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
     })
-    .transform((v) => ({
-        purpose: v.purpose,
-        channel: v.channel,
-        expiresInMinutes: v.expiresInMinutes,
-        entity:
-            v.entityId || v.entityType || v.entityRelation
-                ? { id: v.entityId, type: v.entityType, relation: v.entityRelation }
-                : undefined,
-    }));
+    .openapi({ example: { type: 'screening', relation: 'consent', id: '665f0c3a1a2b3c4d5e6f7a8a' } });
+
+//1: create / generate ====================================>
+// purpose + channel are required; expiry (minutes) + entity are optional. Code/status/attempts are
+// pinned by the service, never accepted here.
+export const CreateOtpPayloadSchema = z.object({
+    purpose: z.string().min(1).openapi({ example: 'screening-consent' }),
+    channel: z
+        .object({
+            type: z.enum(Object.values(OTP_CHANNELS)).openapi({ example: 'sms' }),
+            value: z.string().min(1).openapi({ example: '+919876543210' }),
+        })
+        .openapi({ example: { type: 'sms', value: '+919876543210' } }),
+    expiresInMinutes: z.number().int().positive().optional().openapi({ example: 5 }),
+    entity: EntityRefSchema.optional(),
+});
 export type ICreateOtpPayload = z.infer<typeof CreateOtpPayloadSchema>;
 
 //2: verify ====================================>
-// Match a submitted code against an OTP looked up by purpose (+ the optional entity it was issued for).
-// The entity ref is the same three flat fields as create, folded into a nested `entity` so the service
-// locates the OTP the same way it was stored. The service then checks status, expiry and the attempt
-// count, and marks it verified / blocked accordingly.
-export const VerifyOtpPayloadSchema = z
-    .object({
-        purpose: z.string().min(1).openapi({ example: 'screening-consent' }),
-        code: z.string().min(1).openapi({ example: '483920' }),
-        entityId: objectId('Entity').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
-        entityType: z.string().min(1).optional().openapi({ example: 'screening' }),
-        entityRelation: z.string().min(1).optional().openapi({ example: 'consent' }),
-    })
-    .transform((v) => ({
-        purpose: v.purpose,
-        code: v.code,
-        entity:
-            v.entityId || v.entityType || v.entityRelation
-                ? { id: v.entityId, type: v.entityType, relation: v.entityRelation }
-                : undefined,
-    }));
+// a code matched against the OTP found by purpose (+ optional entity)
+export const VerifyOtpPayloadSchema = z.object({
+    purpose: z.string().min(1).openapi({ example: 'screening-consent' }),
+    code: z.string().min(1).openapi({ example: '483920' }),
+    entity: EntityRefSchema.optional(),
+});
 export type IVerifyOtpPayload = z.infer<typeof VerifyOtpPayloadSchema>;
 
 //3: search ====================================>

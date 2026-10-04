@@ -175,7 +175,7 @@ const session = async (ctx: RequestContext) => {
         return throwAppError('Unauthorized', StatusCodes.UNAUTHORIZED);
     }
 
-    const user = await UserService.get(userId, ctx);
+    const user = await UserService.get(userId, ctx, { populate: true });
     if (!user) {
         return throwAppError('User not found', StatusCodes.NOT_FOUND);
     }

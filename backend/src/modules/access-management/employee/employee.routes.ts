@@ -16,14 +16,14 @@ export const EmployeeRouter = express.Router();
 const { PLATFORM } = ALLOWED_ROLETYPE_CODES;
 
 // who may touch the employee registry (gated by role TYPE, not permission):
-//   - manage (create / update) → admin + both ops managers, who onboard field officers
-//   - read (get / search)      → the managers above + field officers (own record only, via own-scope)
+//   - manage (create / update) → admin + both ops managers, who onboard field officers + dietitians
+//   - read (get / search)      → the managers above + field officers / dietitians (own record only, via own-scope)
 const EMPLOYEE_MANAGE_ROLES = [
     PLATFORM.ADMIN,
     PLATFORM.OPERATION_MANAGER_SCREENING,
     PLATFORM.OPERATION_MANAGER_DIET,
 ];
-const EMPLOYEE_READ_ROLES = [...EMPLOYEE_MANAGE_ROLES, PLATFORM.FIELD_OFFICER];
+const EMPLOYEE_READ_ROLES = [...EMPLOYEE_MANAGE_ROLES, PLATFORM.FIELD_OFFICER, PLATFORM.DIETITIAN];
 
 EmployeeRouter.use(AuthMiddleware);
 

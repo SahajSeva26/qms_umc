@@ -7,9 +7,14 @@ export const OTP_STATUS = {
     BLOCKED: 'blocked',
 }
 
+// delivery channel the OTP is sent over
+export const OTP_CHANNELS = {
+    SMS: 'sms',
+    WHATSAPP: 'whatsapp',
+    EMAIL: 'email',
+}
+
 // service defaults, applied when the caller doesn't override them
 export const OTP_DEFAULTS = {
-    CODE_LENGTH: 6,
-    EXPIRY_MINUTES: 10,
-    MAX_ATTEMPTS: 5,
+    EXPIRY_MINUTES: 5,
 }

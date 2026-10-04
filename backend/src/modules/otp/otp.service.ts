@@ -42,11 +42,11 @@ const set = (model: any, entity: HydratedDocument<IOtp>) => {
     if (model.purpose) {
         entity.purpose = model.purpose;
     }
+    if (model.channel) {
+        entity.channel = model.channel;
+    }
     if (model.entity !== undefined) {
         entity.entity = model.entity;
-    }
-    if (model.maxAttempts) {
-        entity.maxAttempts = model.maxAttempts;
     }
     // lifecycle fields — driven by verify(), not accepted from a client payload
     if (model.status) {
@@ -109,15 +109,15 @@ const search = async (filters: ISearchOtpQuery, ctx: RequestContext, options?: I
 // generate a fresh OTP for a purpose (+ optional entity). Any still-pending OTP for the same
 // purpose+entity is expired first, so only one OTP is ever live for a given target.
 const create = async (model: ICreateOtpPayload, ctx: RequestContext): Promise<HydratedDocument<IOtp>> => {
-    return await withTransaction(async () => {
+    const otp = await withTransaction(async () => {
         //1: expire any prior live OTP for the same target so verify never faces ambiguity
         const lookup = buildLookup(model.purpose, model.entity);
         lookup.status = OTP_STATUS.PENDING;
         await OtpModel.updateMany(lookup, { $set: { status: OTP_STATUS.EXPIRED } });
 
-        //2: code is generated server-side; expiry is derived from now + the (optional) TTL
+        //2: code is a server-generated 6-digit value; expiry is now + the TTL (caller's or default)
         const expiryMinutes = model.expiresInMinutes ?? OTP_DEFAULTS.EXPIRY_MINUTES;
-        const code = OtpHandler.generate(OTP_DEFAULTS.CODE_LENGTH);
+        const code = OtpHandler.generate();
         const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000);
 
         //3: pin the server-derived fields, apply the caller-settable ones via set()
@@ -127,6 +127,8 @@ const create = async (model: ICreateOtpPayload, ctx: RequestContext): Promise<Hy
 
         return entity;
     });
+
+    return otp;
 };
 
 const update = async (id: string, model: any, ctx: RequestContext): Promise<HydratedDocument<IOtp>> => {

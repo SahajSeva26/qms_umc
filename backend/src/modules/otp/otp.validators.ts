@@ -1,7 +1,7 @@
 // Otp Validators
 import { z } from 'zod';
 import { isValidObjectID } from '../../shared/utils/strings';
-import { OTP_STATUS } from './otp.constants';
+import { OTP_CHANNELS, OTP_STATUS } from './otp.constants';
 
 const objectId = (label: string) =>
     z.string().refine((val) => isValidObjectID(val), {
@@ -9,28 +9,33 @@ const objectId = (label: string) =>
     });
 
 //1: create / generate ====================================>
-// The caller states what the OTP is FOR (purpose + an optional entity link). The code, status, expiry
-// and attempt counters are derived/pinned by the service — never accepted from the client. The entity
+// The caller states what the OTP is FOR (purpose + an optional entity link) and, optionally, how long
+// it should live (minutes; the service falls back to its default when omitted). The code is always 6
+// digits and status/attempts are pinned by the service — never accepted from the client. The entity
 // ref is three flat fields, folded into a nested `entity` so the service sees model.entity.* (all
-// optional; the whole block is dropped when none are supplied). `expiresInMinutes`/`maxAttempts` are
-// optional overrides — the service applies its defaults when omitted.
+// optional; the whole block is dropped when none are supplied).
 export const CreateOtpPayloadSchema = z
     .object({
         purpose: z.string().min(1).openapi({ example: 'screening-consent' }),
+        channel: z
+            .object({
+                type: z.enum(Object.values(OTP_CHANNELS)).openapi({ example: 'sms' }),
+                value: z.string().min(1).openapi({ example: '+919876543210' }),
+            })
+            .openapi({ example: { type: 'sms', value: '+919876543210' } }),
+        expiresInMinutes: z.number().int().positive().optional().openapi({ example: 5 }),
         entityId: objectId('Entity').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
         entityType: z.string().min(1).optional().openapi({ example: 'screening' }),
         entityRelation: z.string().min(1).optional().openapi({ example: 'consent' }),
-        expiresInMinutes: z.number().int().positive().optional().openapi({ example: 10 }),
-        maxAttempts: z.number().int().positive().optional().openapi({ example: 5 }),
     })
     .transform((v) => ({
         purpose: v.purpose,
+        channel: v.channel,
+        expiresInMinutes: v.expiresInMinutes,
         entity:
             v.entityId || v.entityType || v.entityRelation
                 ? { id: v.entityId, type: v.entityType, relation: v.entityRelation }
                 : undefined,
-        expiresInMinutes: v.expiresInMinutes,
-        maxAttempts: v.maxAttempts,
     }));
 export type ICreateOtpPayload = z.infer<typeof CreateOtpPayloadSchema>;
 

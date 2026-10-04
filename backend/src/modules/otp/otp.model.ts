@@ -1,5 +1,22 @@
 import mongoose from "mongoose"
-import { OTP_STATUS } from "./otp.constants"
+import { OTP_CHANNELS, OTP_STATUS } from "./otp.constants"
+
+// how + where the OTP is delivered: the channel type (sms/whatsapp/email) and the destination value
+// (phone number for sms/whatsapp, email address for email).
+const channelSchema = new mongoose.Schema(
+    {
+      type: {
+        type: String,
+        enum: Object.values(OTP_CHANNELS),
+        required: true,
+      },
+      value: {
+        type: String,
+        required: true,
+      },
+    },
+    { _id: false },
+)
 
 // optional link back to the record this OTP was issued for, so it can be retrieved by what it belongs
 // to (e.g. find the pending OTP for this screening / user) rather than only by its code.
@@ -17,6 +34,11 @@ const otpSchema= new mongoose.Schema({
       type: String,
       required: true,
       index: true,
+    },
+    // delivery channel this OTP is sent over — { type, value }
+    channel: {
+      type: channelSchema,
+      required: true,
     },
     // optional — present only when the OTP is tied to a specific record
     entity: {

@@ -34,6 +34,10 @@ const populate: any[] = [
     { path: 'projectCoordinator' },
     { path: 'marketingContact' },
     { path: 'tests', select: 'name code therapy' },
+    // execution-mode document refs → file module
+    { path: 'executionMode.po.purchaseOrders.file' },
+    { path: 'executionMode.agreement.file' },
+    { path: 'executionMode.mail.file' },
 ];
 
 // ========================================================================================
@@ -113,8 +117,8 @@ const set = async (model: any, entity: HydratedDocument<IProject>, ctx: RequestC
         entity.tests = model.tests;
     }
 
-    // execution — `mode` is a nested sub-schema; InferSchemaType doesn't surface it, so cast
-    if (model.mode) (entity as any).mode = model.mode;
+    // execution — the whole grouped subdoc (mode + po/agreement/mail) is replaced wholesale
+    if (model.executionMode) (entity as any).executionMode = model.executionMode;
 
     // financials
     if (model.campCost !== undefined) entity.campCost = model.campCost;

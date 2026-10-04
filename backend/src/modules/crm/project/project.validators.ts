@@ -17,19 +17,36 @@ import { isValidObjectID } from '../../../shared/utils/strings';
 const objectId = (label: string) =>
     z.string().refine((val) => isValidObjectID(val), { message: `${label} must be a valid id` });
 
-// nested: execution mode (PO / agreement / mail confirmation)
+// nested: execution mode (PO / agreement / mail confirmation), grouped per mode. PO supports many.
+const PurchaseOrderSchema = z.object({
+    number: z.string().optional().openapi({ example: 'PO-2026-0012' }),
+    date: z.coerce.date().optional().openapi({ example: '2026-07-01' }),
+    expiry: z.coerce.date().optional().openapi({ example: '2027-06-30' }),
+    file: objectId('File').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
+});
+
 const ExecutionModeSchema = z.object({
     mode: z.enum(Object.values(PROJECT_EXECUTION_MODES)).openapi({ example: 'po' }),
-    poNumber: z.string().optional().openapi({ example: 'PO-2026-0012' }),
-    poDate: z.coerce.date().optional().openapi({ example: '2026-07-01' }),
-    poExpiry: z.coerce.date().optional().openapi({ example: '2027-06-30' }),
-    agreementNumber: z.string().optional().openapi({ example: 'AGR-88' }),
-    agreementStartDate: z.coerce.date().optional().openapi({ example: '2026-07-01' }),
-    agreementEndDate: z.coerce.date().optional().openapi({ example: '2027-06-30' }),
-    duration: z.number().int().nonnegative().optional().openapi({ example: 12 }),
-    agreementDocument: z.string().optional().openapi({ example: 'https://cdn/agr-88.pdf' }),
-    emailReference: z.string().optional().openapi({ example: 'RE: Camp confirmation' }),
-    emailDocument: z.string().optional().openapi({ example: 'https://cdn/mail.eml' }),
+    po: z
+        .object({
+            purchaseOrders: z.array(PurchaseOrderSchema).optional(),
+        })
+        .optional(),
+    agreement: z
+        .object({
+            number: z.string().optional().openapi({ example: 'AGR-88' }),
+            startDate: z.coerce.date().optional().openapi({ example: '2026-07-01' }),
+            endDate: z.coerce.date().optional().openapi({ example: '2027-06-30' }),
+            duration: z.number().int().nonnegative().optional().openapi({ example: 12 }),
+            file: objectId('File').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
+        })
+        .optional(),
+    mail: z
+        .object({
+            reference: z.string().optional().openapi({ example: 'RE: Camp confirmation' }),
+            file: objectId('File').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
+        })
+        .optional(),
 });
 
 const GoLiveScopeSchema = z.object({
@@ -52,7 +69,7 @@ export const CreateProjectPayloadSchema = z.object({
     tests: z.array(objectId('TestMaster')).optional().openapi({ example: ['665f0c3a1a2b3c4d5e6f7a8a'] }),
 
     // execution
-    mode: ExecutionModeSchema.optional(),
+    executionMode: ExecutionModeSchema.optional(),
 
     // financials
     campCost: z.number().nonnegative().optional().openapi({ example: 15000 }),
@@ -100,7 +117,7 @@ export const UpdateProjectPayloadSchema = z.object({
     therapy: z.enum(Object.values(PROJECT_THERAPY_TYPES)).optional(),
     type: z.array(z.enum(Object.values(PROJECT_TYPES))).min(1).optional(),
     tests: z.array(objectId('TestMaster')).optional(),
-    mode: ExecutionModeSchema.optional(),
+    executionMode: ExecutionModeSchema.optional(),
     campCost: z.number().nonnegative().optional(),
     totalCamps: z.number().int().nonnegative().optional(),
     gst: z.number().min(0).max(100).optional(),

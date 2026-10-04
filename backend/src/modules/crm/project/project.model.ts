@@ -20,47 +20,63 @@ const executionModeSchema = new mongoose.Schema(
             enum: Object.values(PROJECT_EXECUTION_MODES),
             required: [true, 'Execution mode is required'],
         },
-        // po based
-        poNumber: {
-            type: String,
-            default: null,
-        },
-        poDate: {
-            type: Date,
-            default: null,
-        },
-        poExpiry: {
-            type: Date,
-            default: null,
+
+        // po based — supports multiple purchase orders
+        po: {
+            purchaseOrders: [
+                {
+                    number: {
+                        type: String,
+                        trim: true,
+                    },
+                    date: {
+                        type: Date,
+                    },
+                    expiry: {
+                        type: Date,
+                    },
+                    // uploaded PO document — ref to the file module for population
+                    file: {
+                        type: mongoose.Schema.Types.ObjectId,
+                        ref: 'File',
+                    },
+                },
+            ],
         },
 
         // agreement based
-        agreementNumber: {
-            type: String,
-            default: null,
-        },
-        agreementStartDate: {
-            type: Date,
-            default: null,
-        },
-        agreementEndDate: {
-            type: Date,
-            default: null,
-        },
-        duration: {
-            type: Number,
-            default: null,
-        },
-        agreementDocument: {
-            type: String,
-            default: null,
+        agreement: {
+            number: {
+                type: String,
+                trim: true,
+            },
+            startDate: {
+                type: Date,
+            },
+            endDate: {
+                type: Date,
+            },
+            duration: {
+                type: Number,
+            },
+            // uploaded agreement document — ref to the file module for population
+            file: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'File',
+            },
         },
 
         // mail confirmation based
-        emailReference: String,
-        emailDocument: {
-            type: String,
-            default: null,
+        mail: {
+            reference: {
+                type: String,
+                trim: true,
+            },
+            // uploaded mail document — ref to the file module for population
+            file: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'File',
+            },
         },
     },
     {

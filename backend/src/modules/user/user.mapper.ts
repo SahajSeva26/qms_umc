@@ -11,6 +11,7 @@ export const UserMapper = {
             firstName: user?.firstName,
             lastName: user?.lastName,
             avatar: user?.avatar,
+            profilePicture: user?.profilePicture ?? null,
         };
 
         // for admin, and superior role add permissions
@@ -40,6 +41,7 @@ export const UserMapper = {
                 firstName: u?.firstName,
                 lastName: u?.lastName,
                 avatar: u?.avatar,
+                profilePicture: u?.profilePicture ?? null,
             };
 
             // for admin, and superior role add permissions

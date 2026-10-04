@@ -49,6 +49,12 @@ const userSchema = new mongoose.Schema(
             },
         },
 
+        // uploaded profile picture — ref to the file module (entity user→profile_picture) for population
+        profilePicture: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'File',
+        },
+
         status: {
             type: String,
             enum: [USER_STATUS.ACTIVE, USER_STATUS.INACTIVE, USER_STATUS.SUSPENDED, USER_STATUS.DELETED],

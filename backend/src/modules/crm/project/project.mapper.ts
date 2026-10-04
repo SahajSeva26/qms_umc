@@ -17,7 +17,7 @@ export const ProjectMapper = {
             tests: project.tests || [],
 
             // execution
-            mode: project.mode || null,
+            executionMode: project.executionMode || null,
 
             // financials
             campCost: project.campCost,
@@ -93,7 +93,7 @@ export const ProjectMapper = {
                 tests: project.tests || [],
 
                 // execution
-                mode: project.mode || null,
+                executionMode: project.executionMode || null,
 
                 // financials
                 campCost: project.campCost,

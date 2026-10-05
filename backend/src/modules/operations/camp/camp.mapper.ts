@@ -51,11 +51,15 @@ export const CampMapper = {
         };
         return result;
     },
-    toSearchResponse: (data: { count: number; items: any[]; stats?: Record<string, { patients: number; patientsCompleted: number }> | undefined }, ctx: RequestContext) => {
-        const result = {
+    toSearchResponse: (data: { count: number; items: any[]; stats?: Record<string, { patients: number; patientsCompleted: number }> | undefined; summary?: any }, ctx: RequestContext) => {
+        const result: any = {
             count: data?.count || 0,
             items: [] as any[],
         };
+        // opt-in top-level summary (only present on "my camps") — total + status/type counts
+        if (data?.summary) {
+            result.summary = data.summary;
+        }
         const stats = data?.stats;
         for (const camp of data?.items || []) {
             // NOTE: independent from toResponse on purpose — search rows can be

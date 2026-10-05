@@ -554,11 +554,41 @@ const search = async (filters: ISearchCampQuery, ctx: RequestContext, options?: 
     return { count, items, stats };
 };
 
+// a top-level summary of the caller's own camps — total + counts by status and by type. Computed over
+// the same own-scoped set (not the current page/filters), so it's a stable header for the "my camps"
+// view. One aggregate, single collection scan.
+const getMyCampSummary = async (ctx: RequestContext) => {
+    const where: any = { ...ctx.where() };
+    applyOwnScope(where, ctx);
+
+    const [result] = await CampModel.aggregate([
+        { $match: where },
+        {
+            $facet: {
+                totalCamps: [{ $count: 'count' }],
+                statusCounts: [{ $group: { _id: '$status', count: { $sum: 1 } } }],
+                typeCounts: [{ $group: { _id: '$type', count: { $sum: 1 } } }],
+            },
+        },
+    ]);
+
+    return {
+        totalCamps: result?.totalCamps?.[0]?.count || 0,
+        statusCounts: (result?.statusCounts || []).map((s: any) => ({ status: s._id, count: s.count })),
+        typeCounts: (result?.typeCounts || []).map((t: any) => ({ type: t._id, count: t.count })),
+    };
+};
+
 // "my camps" — field-force (FO / dietitian / MR) list only the camps assigned to them. Thin wrapper
 // over search: these are all non-manage roles, so applyOwnScope pins the result to the caller's own
-// slot (fo/dietitian/mr = their role id).
+// slot (fo/dietitian/mr = their role id). Always includes per-camp patient stats (report=true) plus a
+// top-level summary (total + status/type counts) over all the caller's camps.
 const myCamps = async (filters: ISearchCampQuery, ctx: RequestContext, options?: IServiceOptions) => {
-    return search(filters, ctx, options);
+    const [result, summary] = await Promise.all([
+        search({ ...filters, report: 'true' }, ctx, options),
+        getMyCampSummary(ctx),
+    ]);
+    return { ...result, summary };
 };
 
 // per-camp patient counts from the screenings collection — one screening = one patient at that camp

@@ -95,6 +95,32 @@ export const BookCampPayloadSchema = z.object({
 });
 export type IBookCampPayload = z.infer<typeof BookCampPayloadSchema>;
 
+//1c: void camp ====================================>
+// Internal-team record of a camp that happened WITHOUT a PO (WF-4). Same shape as create but `mr`
+// is optional (a void camp is often standalone) and `billingType` is NOT accepted — the service
+// forces it to 'void'. The camp is created WITHOUT the normal lifecycle: no FO auto-allocation,
+// no slot-clash check, no auto-confirm; it simply lands in `requested` for later reconciliation.
+export const VoidCampPayloadSchema = CreateCampPayloadSchema.omit({ billingType: true }).extend({
+    mr: objectId('MR').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8d' }),
+    // free-form metadata bag, but a void camp MUST carry a mail link (its execution basis is a mail).
+    meta: z
+        .record(z.string(), z.any())
+        .refine((m) => typeof m?.mailUrl === 'string' && m.mailUrl.trim().length > 0, {
+            message: 'meta.mailUrl is required for a void camp',
+        })
+        .openapi({ example: { mailUrl: 'https://cdn/void-mail-123.pdf' } }),
+});
+export type IVoidCampPayload = z.infer<typeof VoidCampPayloadSchema>;
+
+//2d: approve void camp ====================================>
+// A void camp uses only requested → closed; approval (the close) is the single update it allows.
+// Only the reason is supplied; the approver + timestamp come from the stageHistory entry (actor +
+// createdAt), so no separate approvedBy/approvedAt fields are needed.
+export const ApproveVoidCampPayloadSchema = z.object({
+    reason: z.string().min(1).openapi({ example: 'Mail verified; void camp approved and closed' }),
+});
+export type IApproveVoidCampPayload = z.infer<typeof ApproveVoidCampPayloadSchema>;
+
 //2: update ====================================>
 // project/tenant/division/status/type are NOT editable here — status moves through moveStage(), and
 // type is immutable after creation (it decides the camp's worker kind).

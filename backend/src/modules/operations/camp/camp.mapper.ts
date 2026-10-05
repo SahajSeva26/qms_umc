@@ -35,6 +35,7 @@ export const CampMapper = {
             devices: camp.devices || [],
             notes: camp.notes,
             conscentPath: camp.conscentPath,
+            meta: camp.meta ?? null,
 
             // lifecycle
             status: camp.status,
@@ -94,6 +95,7 @@ export const CampMapper = {
                 devices: camp.devices || [],
                 notes: camp.notes,
                 conscentPath: camp.conscentPath,
+                meta: camp.meta ?? null,
 
                 // lifecycle
                 status: camp.status,

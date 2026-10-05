@@ -2,6 +2,7 @@
 import { ResponseHandler } from '../../../shared/utils/responseHandler';
 import { formatZodError } from '../../../shared/utils/error';
 import {
+    ApproveVoidCampPayloadSchema,
     BookCampPayloadSchema,
     BookingAvailabilityPayloadSchema,
     CampReportQuerySchema,
@@ -9,6 +10,7 @@ import {
     MoveStagePayloadSchema,
     SearchCampQuerySchema,
     UpdateCampPayloadSchema,
+    VoidCampPayloadSchema,
 } from './camp.validators';
 import { StatusCodes } from 'http-status-codes';
 import { CampService } from './camp.service';
@@ -145,6 +147,64 @@ const book = async (req: any, res: any) => {
             StatusCodes.CREATED,
             true,
             'Camp booked successfully',
+            CampMapper.toResponse(camp, ctx),
+        );
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
+// void camp — internal team records a camp done without a PO (no lifecycle / allocation / clash)
+const voidCamp = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+
+        const { data, success, error } = VoidCampPayloadSchema.safeParse(req.body);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                fields: validationErrors,
+            });
+        }
+
+        const camp = await CampService.voidCamp(data, ctx);
+
+        return ResponseHandler.appResponse(
+            res,
+            StatusCodes.CREATED,
+            true,
+            'Void camp created successfully',
+            CampMapper.toResponse(camp, ctx),
+        );
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
+// approve a void camp — moves it requested → closed (camp:manage only)
+const approveVoidCamp = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+        const { id } = req?.params;
+        if (!id) {
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Camp ID is required', null);
+        }
+
+        const { data, success, error } = ApproveVoidCampPayloadSchema.safeParse(req.body);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                fields: validationErrors,
+            });
+        }
+
+        const camp = await CampService.approveVoidCamp(id, data, ctx);
+
+        return ResponseHandler.appResponse(
+            res,
+            StatusCodes.OK,
+            true,
+            'Void camp approved successfully',
             CampMapper.toResponse(camp, ctx),
         );
     } catch (error: any) {
@@ -291,6 +351,8 @@ export const CampController = {
     search,
     myCamps,
     create,
+    voidCamp,
+    approveVoidCamp,
     book,
     update,
     moveStage,

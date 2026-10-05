@@ -78,6 +78,8 @@ export interface CampEntity {
   devices: CampPopulatedDevice[]
   notes?: string
   conscentPath?: string
+  /** Free-form metadata bag — null unless set. A void camp requires meta.mailUrl (its execution basis is a pharma confirmation mail, not a PO). */
+  meta: Record<string, unknown> | null
   status: CampStatus
   stageHistory: CampStageHistoryEntry[]
   createdAt: string
@@ -138,6 +140,35 @@ export interface CreateCampPayload {
   devices?: string[]
   notes?: string
   conscentPath?: string
+}
+
+/** Mirrors VoidCampPayloadSchema (WF-4) — an internal-team record of a camp executed WITHOUT a PO,
+ * on the basis of a pharma confirmation mail. Deliberately skips the normal create() lifecycle: no FO
+ * auto-allocation, no slot-clash check, no auto-confirm; the camp lands in `requested` for later
+ * reconciliation via a separate approve-void call. `billingType` is NOT accepted — the backend forces
+ * it to 'void'. `mr` is optional (a void camp is often standalone). */
+export interface VoidCampPayload {
+  tenant: string
+  division: string
+  project?: string
+  doctor: string
+  type?: CampType
+  patientExpectation?: number
+  mr?: string
+  date: string
+  timeSlot: CampTimeSlotValue
+  location: LocationValue
+  devices?: string[]
+  notes?: string
+  conscentPath?: string
+  /** Required — mailUrl is the void camp's execution basis and must be a non-empty string. */
+  meta: { mailUrl: string } & Record<string, unknown>
+}
+
+/** Mirrors ApproveVoidCampPayloadSchema — the only update a void camp allows, moving it
+ * requested → closed. The approver + timestamp come from the stageHistory entry itself. */
+export interface ApproveVoidCampPayload {
+  reason: string
 }
 
 /** Mirrors BookCampPayloadSchema — the pharma field-force booking path.

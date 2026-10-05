@@ -2,7 +2,52 @@
 // tenant server-side; a platform caller must supply one explicitly.
 import type { LocationValue } from '@/types/location.types'
 
-export type DoctorSpecialization = 'cp' | 'gp'
+// Mirrors DOCTOR_SPECIALIZATION (backend doctor.constants.ts) exactly.
+export type DoctorSpecialization =
+  | 'cp'
+  | 'gp'
+  | 'endocrinologist'
+  | 'cardiologist'
+  | 'pulmonologist'
+  | 'orthopedic'
+  | 'gynecologist'
+  | 'neurologist'
+  | 'hepatologist'
+  | 'ophthalmologist'
+  | 'chest_physician'
+  | 'nephrologist'
+
+// Single source of truth for every specialization picker/filter/label in the app — cp/gp keep
+// their established short label, the rest are spelled out. Lives here (not a feature's own ui.ts)
+// so both feature-owned and cross-feature/shared widget components can import it without
+// violating the project's feature-boundary convention.
+export const SPECIALIZATION_OPTIONS: { value: DoctorSpecialization; label: string }[] = [
+  { value: 'cp', label: 'CP' },
+  { value: 'gp', label: 'GP' },
+  { value: 'endocrinologist', label: 'Endocrinologist' },
+  { value: 'cardiologist', label: 'Cardiologist' },
+  { value: 'pulmonologist', label: 'Pulmonologist' },
+  { value: 'orthopedic', label: 'Orthopedic' },
+  { value: 'gynecologist', label: 'Gynecologist' },
+  { value: 'neurologist', label: 'Neurologist' },
+  { value: 'hepatologist', label: 'Hepatologist' },
+  { value: 'ophthalmologist', label: 'Ophthalmologist' },
+  { value: 'chest_physician', label: 'Chest Physician' },
+  { value: 'nephrologist', label: 'Nephrologist' },
+]
+
+export const SPECIALIZATION_LABEL: Record<DoctorSpecialization, string> = Object.fromEntries(
+  SPECIALIZATION_OPTIONS.map((o) => [o.value, o.label]),
+) as Record<DoctorSpecialization, string>
+
+// For a populate-shape `specialization?: string` (e.g. CampPopulatedDoctor) rather than the
+// proper DoctorSpecialization union — falls back to the raw value for a stale/unrecognized one
+// instead of crashing or silently showing nothing.
+export function specializationLabel(value: string | null | undefined): string {
+  if (!value) return '—'
+  return SPECIALIZATION_LABEL[value as DoctorSpecialization] ?? value
+}
+
 export type DoctorStatus = 'active' | 'inactive'
 
 // coordinates is guaranteed present here, unlike the shared LocationValue (which keeps it
@@ -63,6 +108,11 @@ export interface SearchDoctorQuery {
   // When 'true', each item gets a `stats` object (see DoctorStats).
   report?: 'true' | 'false'
 }
+
+// Mirrors DOCTOR_NEAREST_MAX_DISTANCE (doctor.constants.ts) in km, for a client-side
+// "is this doctor within range of this camp location" check (e.g. after overriding the camp
+// location away from the picked doctor's own address) — no backend round-trip needed for that.
+export const DOCTOR_RANGE_KM = 35
 
 // The 35km radius is server-fixed — no radius/range param exists.
 export interface NearestDoctorQuery {

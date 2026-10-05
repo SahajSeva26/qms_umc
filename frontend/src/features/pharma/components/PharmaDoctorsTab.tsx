@@ -12,6 +12,7 @@ import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import { Button } from '@/components/ui/button'
 import { EditDoctorModal } from '@/features/doctors'
 import type { DoctorEntity, DoctorStatus } from '@/types/doctor.types'
+import { SPECIALIZATION_LABEL } from '@/types/doctor.types'
 import { EMPTY_ARRAY } from '@/utils/emptyArray'
 
 const PAGE_SIZE = 10
@@ -95,7 +96,7 @@ const PharmaDoctorsTab = () => {
                   <div className="min-w-0">
                     <div className="font-bold text-[13px] truncate" style={{ color: 'var(--qms-text)' }}>{doctor.name}</div>
                     <div className="text-[11px] mt-0.5" style={{ color: 'var(--qms-text-muted)' }}>
-                      {doctor.pharmaCode} · {doctor.specialization.toUpperCase()}
+                      {doctor.pharmaCode} · {doctor.specialization ? SPECIALIZATION_LABEL[doctor.specialization] : '—'}
                     </div>
                   </div>
                   <StatusPill status={doctor.status} classes={STATUS_CLASSES} labels={STATUS_LABEL} />

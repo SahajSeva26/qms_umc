@@ -3,7 +3,7 @@ import type { DoctorEntity } from '@/types/doctor.types'
 import SideDrawer from '@/components/ui/SideDrawer'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/sonner'
-import { initials } from '@/features/doctors/doctors.ui'
+import { initials, SPECIALIZATION_LABEL } from '@/features/doctors/doctors.ui'
 import StatusPill from '@/features/doctors/components/StatusPill'
 
 interface DoctorDrawerProps {
@@ -37,7 +37,7 @@ const DoctorDrawer = ({ doctor, canEdit, onClose, onEdit }: DoctorDrawerProps) =
         </div>
         <div className="min-w-0 flex-1">
           <div className="text-[18px] font-extrabold" style={{ color: 'var(--qms-text)' }}>{d.name}</div>
-          <div className="text-[13px]" style={{ color: 'var(--qms-text-soft)' }}>{d.specialization.toUpperCase()} · {d.pharmaCode}</div>
+          <div className="text-[13px]" style={{ color: 'var(--qms-text-soft)' }}>{d.specialization ? SPECIALIZATION_LABEL[d.specialization] : '—'} · {d.pharmaCode}</div>
           <div className="flex flex-wrap gap-1.5 mt-2">
             <StatusPill status={d.status} />
             {d.location?.city && (
@@ -79,7 +79,7 @@ const DoctorDrawer = ({ doctor, canEdit, onClose, onEdit }: DoctorDrawerProps) =
       <div className="doc-kv mb-5">
         <div className="flex items-center gap-1" style={{ color: 'var(--qms-text-muted)' }}><FiMail size={11} /> Email</div><div style={{ color: 'var(--qms-text)' }}>{d.email || '—'}</div>
         <div className="flex items-center gap-1" style={{ color: 'var(--qms-text-muted)' }}><FiPhone size={11} /> Mobile</div><div style={{ color: 'var(--qms-text)' }}>{d.mobile || '—'}</div>
-        <div className="flex items-center gap-1" style={{ color: 'var(--qms-text-muted)' }}><FiLayers size={11} /> Specialization</div><div style={{ color: 'var(--qms-text)' }}>{d.specialization.toUpperCase()}</div>
+        <div className="flex items-center gap-1" style={{ color: 'var(--qms-text-muted)' }}><FiLayers size={11} /> Specialization</div><div style={{ color: 'var(--qms-text)' }}>{d.specialization ? SPECIALIZATION_LABEL[d.specialization] : '—'}</div>
         <div className="flex items-center gap-1" style={{ color: 'var(--qms-text-muted)' }}><FiMapPin size={11} /> City</div><div style={{ color: 'var(--qms-text)' }}>{d.location?.city || '—'}, {d.location?.state || '—'} · {d.location?.pincode || '—'}</div>
         {mapsLink && (
           <>

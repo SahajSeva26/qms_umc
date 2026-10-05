@@ -2,7 +2,7 @@ import type { DoctorEntity } from '@/types/doctor.types'
 import type { DoctorsFilterState } from '@/features/doctors/hooks/useDoctorsFilters'
 import DoctorFilterBar from '@/features/doctors/components/DoctorFilterBar'
 import StatusPill from '@/features/doctors/components/StatusPill'
-import { initials } from '@/features/doctors/doctors.ui'
+import { initials, SPECIALIZATION_LABEL } from '@/features/doctors/doctors.ui'
 
 interface RosterTabProps {
   doctors: DoctorEntity[]
@@ -33,7 +33,7 @@ const RosterTab = ({ doctors, filters, setFilter, reset, onOpenDoctor, geography
             <div className="av">{initials(d.name)}</div>
             <div className="min-w-0 flex-1">
               <div className="nm">{d.name}</div>
-              <div className="sp">{d.specialization.toUpperCase()}</div>
+              <div className="sp">{d.specialization ? SPECIALIZATION_LABEL[d.specialization] : '—'}</div>
               <div className="ct">{d.pharmaCode} · {d.location ? `${d.location.city}, ${d.location.state}` : '—'}</div>
             </div>
             <StatusPill status={d.status} />

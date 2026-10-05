@@ -1,6 +1,10 @@
 import { z } from 'zod'
 import type { DefaultValues, FieldNamesMarkedBoolean } from 'react-hook-form'
-import type { CreateDoctorPayload, DoctorLocation, UpdateDoctorPayload } from '@/types/doctor.types'
+import type { CreateDoctorPayload, DoctorLocation, DoctorSpecialization, UpdateDoctorPayload } from '@/types/doctor.types'
+import { SPECIALIZATION_OPTIONS } from '@/features/doctors/doctors.ui'
+
+// Derived, not hand-copied — mirrors DOCTOR_SPECIALIZATION via the single shared options list.
+const SPECIALIZATION_VALUES = SPECIALIZATION_OPTIONS.map((o) => o.value) as [DoctorSpecialization, ...DoctorSpecialization[]]
 
 const doctorLocationSchema = z.object({
   addressLine1: z.string().trim().min(1, 'Address is required.'),
@@ -24,7 +28,7 @@ const doctorLocationSchema = z.object({
 export const createDoctorFormSchema = z.object({
   pharmaCode: z.string().trim().min(1, 'Pharma doctor code is required'),
   name: z.string().trim().min(1, 'Doctor name is required'),
-  specialization: z.enum(['cp', 'gp']),
+  specialization: z.enum(SPECIALIZATION_VALUES),
   mobile: z.string().trim().min(10, 'Mobile number must be at least 10 characters'),
   email: z.string().trim().min(1, 'Email is required').email('Enter a valid email'),
   location: doctorLocationSchema,
@@ -60,7 +64,7 @@ export const emptyCreateDoctorFormValues: DefaultValues<CreateDoctorFormValues> 
 // location (clearing an existing one must block, not silently no-op).
 export const editDoctorFormSchema = z.object({
   name: z.string().trim().min(1, 'Doctor name is required'),
-  specialization: z.enum(['cp', 'gp']),
+  specialization: z.enum(SPECIALIZATION_VALUES),
   // No min(10) here — an untouched legacy mobile under 10 chars must not block an unrelated edit.
   mobile: z.string(),
   status: z.enum(['active', 'inactive']),
@@ -104,7 +108,7 @@ export function toUpdateDoctorPayload(
 
 export function fromDoctorEntity(doctor: {
   name: string
-  specialization: 'cp' | 'gp'
+  specialization: DoctorSpecialization
   mobile: string
   email: string
   location: DoctorLocation | null

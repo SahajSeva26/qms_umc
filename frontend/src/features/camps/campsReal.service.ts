@@ -1,6 +1,7 @@
 import api from '@/lib/api/api'
 import type { ApiResponse, PaginatedResponse } from '@/types/common.types'
 import type {
+  ApproveVoidCampPayload,
   BookCampPayload,
   BookingAvailabilityPayload,
   BookingAvailabilityResponse,
@@ -11,6 +12,7 @@ import type {
   MoveCampStagePayload,
   SearchCampQuery,
   UpdateCampPayload,
+  VoidCampPayload,
 } from '@/types/campReal.types'
 import type { CampReport } from '@/types/campReport.types'
 
@@ -34,6 +36,19 @@ const createCamp = async (payload: CreateCampPayload) => {
 // Pharma field-force booking path — POST /camps/book, not /camps.
 const bookCamp = async (payload: BookCampPayload) => {
   const res = await api.post<ApiResponse<CampMutationResponseEntity>>('/camps/book', payload)
+  return res.data
+}
+
+// Internal-team void-camp record (WF-4) — POST /camps/void-camp, not /camps. Lands in `requested`
+// with no lifecycle (no FO allocation/slot-clash/auto-confirm).
+const voidCamp = async (payload: VoidCampPayload) => {
+  const res = await api.post<ApiResponse<CampMutationResponseEntity>>('/camps/void-camp', payload)
+  return res.data
+}
+
+// Approves a void camp, moving it requested -> closed. camp:manage OR tenant:manage.
+const approveVoidCamp = async (id: string, payload: ApproveVoidCampPayload) => {
+  const res = await api.patch<ApiResponse<CampMutationResponseEntity>>(`/camps/${id}/approve-void`, payload)
   return res.data
 }
 
@@ -74,6 +89,8 @@ export const campsRealService = {
   getCamp,
   createCamp,
   bookCamp,
+  voidCamp,
+  approveVoidCamp,
   updateCamp,
   moveCampStage,
   allocateFo,

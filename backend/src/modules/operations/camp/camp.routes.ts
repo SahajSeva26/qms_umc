@@ -13,9 +13,11 @@ import {
 } from './camp.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
 import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { RoleGuard } from '../../../shared/middlewares/roleGuard';
 import { reportRateLimiter } from '../../../shared/middlewares/rateLimiter';
 import { CAMP_PERMISSIONS } from './camp.constants';
 import { TENANT_PERMISSIONS } from '../../access-management/tenant/tenant.constants';
+import { ALLOWED_ROLETYPE_CODES } from '../../access-management/role-type/roleType.constants';
 
 export const CampRouter = express.Router();
 
@@ -33,6 +35,21 @@ registry.registerPath({
     responses: {
         200: { description: 'Camp report generated successfully' },
         400: { description: 'Validation error' },
+        403: { description: 'Forbidden' },
+    },
+});
+
+// my camps — field-force (FO / dietitian / MR) see only camps assigned to them
+registry.registerPath({
+    method: 'get',
+    path: '/camps/my',
+    tags: ['CAMP'],
+    summary: 'List the camps assigned to the calling field-force user (FO / dietitian / MR)',
+    request: {
+        query: SearchCampQuerySchema,
+    },
+    responses: {
+        200: { description: 'My camps fetched successfully' },
         403: { description: 'Forbidden' },
     },
 });
@@ -203,6 +220,17 @@ CampRouter.get(
     reportRateLimiter,
     AuthorizeMiddleware(GUARD),
     CampController.report
+);
+
+// my camps — role-gated to field-force; MUST be before '/:id' so '/my' isn't treated as an id
+CampRouter.get(
+    '/my',
+    RoleGuard([
+        ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER,
+        ALLOWED_ROLETYPE_CODES.PLATFORM.DIETITIAN,
+        ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR,
+    ]),
+    CampController.myCamps,
 );
 
 CampRouter.get(

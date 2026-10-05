@@ -87,6 +87,14 @@ const workerFor = (campType?: string): FieldWorker => (campType === CAMP_TYPES.D
 // field-force slots; a search-only actor sees a camp only if they fill one of these on it.
 const ASSIGNMENT_FIELDS = ['fo', 'dietitian', 'mr', 'asm', 'rsm'] as const;
 
+// a field-force role type is scoped to the single camp field it occupies — an FO to `fo`, a
+// dietitian to `dietitian`, an MR to `mr`. Keeps "my camps" precise instead of matching any slot.
+const OWN_SCOPE_FIELD_BY_ROLE_TYPE: Record<string, string> = {
+    [ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER]: 'fo',
+    [ALLOWED_ROLETYPE_CODES.PLATFORM.DIETITIAN]: 'dietitian',
+    [ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR]: 'mr',
+};
+
 const applyOwnScope = (where: any, ctx: RequestContext) => {
     // a pharma division head sees every camp in their division
     if (ctx.role?.type?.code === ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_DIVISION_HEAD) {
@@ -94,11 +102,20 @@ const applyOwnScope = (where: any, ctx: RequestContext) => {
         return where;
     }
 
-    // any other non-manage actor is scoped to camps they occupy a field-force slot on
-    if (!ctx.hasAnyPermissions([CAMP_PERMISSIONS.MANAGE.code])) {
-        where.$or = ASSIGNMENT_FIELDS.map((field) => ({ [field]: ctx.role?._id }));
+    // a manage actor is unscoped
+    if (ctx.hasAnyPermissions([CAMP_PERMISSIONS.MANAGE.code])) {
+        return where;
     }
 
+    // FO / dietitian / MR are scoped to the specific slot their role type fills
+    const field = OWN_SCOPE_FIELD_BY_ROLE_TYPE[ctx.role?.type?.code];
+    if (field) {
+        where[field] = ctx.role?._id;
+        return where;
+    }
+
+    // any other non-manage actor (e.g. asm/rsm) is scoped to camps they occupy any field-force slot on
+    where.$or = ASSIGNMENT_FIELDS.map((f) => ({ [f]: ctx.role?._id }));
     return where;
 };
 
@@ -222,6 +239,48 @@ const projectRequiredDeviceItemIds = async (projectId: any): Promise<string[]> =
     return devices.map((device: any) => device._id.toString());
 };
 
+// Among candidate role ids, return the subset that holds EVERY required device as an operational
+// (status 'assigned') in-hand unit. One batched read. Shared by auto-allocation and booking-
+// availability so both apply the identical device gate. Call only when requiredDeviceItems is non-empty.
+const rolesHoldingAllDevices = async (roleIds: any[], requiredDeviceItems: string[]): Promise<Set<string>> => {
+    const qualified = new Set<string>();
+    if (!roleIds.length || !requiredDeviceItems.length) {
+        return qualified;
+    }
+    // one batched read of the candidates' assigned devices → roleId → set of device catalog-item ids
+    const assignments = await InventoryAssignmentModel.find({
+        assignee: { $in: roleIds },
+        inventoryType: 'InventoryDevice',
+    })
+        .populate({ path: 'inventory', select: 'item status' })
+        .lean();
+
+    const heldByRole = new Map<string, Set<string>>();
+    for (const assignment of assignments) {
+        const roleId = assignment.assignee?.toString();
+        const device = assignment.inventory as any;
+        const itemId = device?.item?.toString();
+        // only an operational, in-hand unit counts — a lost/damaged/maintenance (or not-yet-received)
+        // device doesn't actually equip the worker for the camp.
+        if (!roleId || !itemId || device?.status !== INVENTORY_DEVICE_STATUS.ASSIGNED) {
+            continue;
+        }
+        if (!heldByRole.has(roleId)) {
+            heldByRole.set(roleId, new Set());
+        }
+        heldByRole.get(roleId)!.add(itemId);
+    }
+
+    // a role qualifies only if it holds ALL required device catalog-items
+    for (const roleId of roleIds.map((r) => r.toString())) {
+        const held = heldByRole.get(roleId);
+        if (held && requiredDeviceItems.every((itemId) => held.has(itemId))) {
+            qualified.add(roleId);
+        }
+    }
+    return qualified;
+};
+
 // Among candidate geo-profiles (already free + equipped, straight-line ordered), keep those within
 // their coverage radius by actual ROAD distance and return the nearest one's role — one matrix call.
 // Falls back to the straight-line nearest on a maps outage (profiles are already distance-ordered) so
@@ -289,34 +348,8 @@ const resolveNearestFreeWorker = async (camp: HydratedDocument<ICamp>, worker: F
     // any free worker qualifies.
     const requiredDeviceItems = await projectRequiredDeviceItemIds(camp.project);
     if (requiredDeviceItems.length) {
-        // one batched read of the free workers' assigned devices → roleId → set of device catalog-item ids
-        const assignments = await InventoryAssignmentModel.find({
-            assignee: { $in: freeProfiles.map((profile: any) => profile.role) },
-            inventoryType: 'InventoryDevice',
-        })
-            .populate({ path: 'inventory', select: 'item status' })
-            .lean();
-
-        const heldByRole = new Map<string, Set<string>>();
-        for (const assignment of assignments) {
-            const roleId = assignment.assignee?.toString();
-            const device = assignment.inventory as any;
-            const itemId = device?.item?.toString();
-            // only an operational, in-hand unit counts — a lost/damaged/maintenance (or not-yet-received)
-            // device doesn't actually equip the worker for the camp.
-            if (!roleId || !itemId || device?.status !== INVENTORY_DEVICE_STATUS.ASSIGNED) {
-                continue;
-            }
-            if (!heldByRole.has(roleId)) {
-                heldByRole.set(roleId, new Set());
-            }
-            heldByRole.get(roleId)!.add(itemId);
-        }
-
-        freeProfiles = freeProfiles.filter((profile: any) => {
-            const held = heldByRole.get(profile.role?.toString());
-            return held && requiredDeviceItems.every((itemId) => held.has(itemId));
-        });
+        const qualified = await rolesHoldingAllDevices(freeProfiles.map((profile: any) => profile.role), requiredDeviceItems);
+        freeProfiles = freeProfiles.filter((profile: any) => qualified.has(profile.role?.toString()));
         if (!freeProfiles.length) {
             return throwAppError(`No nearby ${worker.label} holds all the devices this project requires`, StatusCodes.CONFLICT);
         }
@@ -535,6 +568,43 @@ const search = async (filters: ISearchCampQuery, ctx: RequestContext, options?: 
     const stats = filters.report === 'true' ? await getCampPatientStats(items) : undefined;
 
     return { count, items, stats };
+};
+
+// a top-level summary of the caller's own camps — total + counts by status and by type. Computed over
+// the same own-scoped set (not the current page/filters), so it's a stable header for the "my camps"
+// view. One aggregate, single collection scan.
+const getMyCampSummary = async (ctx: RequestContext) => {
+    const where: any = { ...ctx.where() };
+    applyOwnScope(where, ctx);
+
+    const [result] = await CampModel.aggregate([
+        { $match: where },
+        {
+            $facet: {
+                totalCamps: [{ $count: 'count' }],
+                statusCounts: [{ $group: { _id: '$status', count: { $sum: 1 } } }],
+                typeCounts: [{ $group: { _id: '$type', count: { $sum: 1 } } }],
+            },
+        },
+    ]);
+
+    return {
+        totalCamps: result?.totalCamps?.[0]?.count || 0,
+        statusCounts: (result?.statusCounts || []).map((s: any) => ({ status: s._id, count: s.count })),
+        typeCounts: (result?.typeCounts || []).map((t: any) => ({ type: t._id, count: t.count })),
+    };
+};
+
+// "my camps" — field-force (FO / dietitian / MR) list only the camps assigned to them. Thin wrapper
+// over search: these are all non-manage roles, so applyOwnScope pins the result to the caller's own
+// slot (fo/dietitian/mr = their role id). Always includes per-camp patient stats (report=true) plus a
+// top-level summary (total + status/type counts) over all the caller's camps.
+const myCamps = async (filters: ISearchCampQuery, ctx: RequestContext, options?: IServiceOptions) => {
+    const [result, summary] = await Promise.all([
+        search({ ...filters, report: 'true' }, ctx, options),
+        getMyCampSummary(ctx),
+    ]);
+    return { ...result, summary };
 };
 
 // per-camp patient counts from the screenings collection — one screening = one patient at that camp
@@ -969,6 +1039,16 @@ const bookingAvailability = async (model: IBookingAvailabilityPayload, ctx: Requ
         }
     }
 
+    //2b: device gate — narrow the eligible workers to those who hold EVERY device the project's tests
+    // require (operational 'assigned' units only). Mirrors the allocation gate in resolveNearestFreeWorker
+    // so availability never shows a worker that booking/allocation would later reject. No requirement ⇒
+    // no narrowing.
+    const requiredDeviceItems = await projectRequiredDeviceItemIds(project._id || (project as any).id);
+    if (requiredDeviceItems.length && eligibleIds.length) {
+        const qualified = await rolesHoldingAllDevices(eligibleIds, requiredDeviceItems);
+        eligibleIds = eligibleIds.filter((id) => qualified.has(id));
+    }
+
     //3: pull the confirmed/live camps for those workers across the whole range in one query, then build
     // the tree: date -> slot -> Set(blocked role ids). Only workers that actually have a camp appear here.
     const tree = new Map<string, Map<CampTimeSlot, Set<string>>>();
@@ -1048,6 +1128,7 @@ const bookingAvailability = async (model: IBookingAvailabilityPayload, ctx: Requ
 export const CampService = {
     get,
     search,
+    myCamps,
     create,
     update,
     moveStage,

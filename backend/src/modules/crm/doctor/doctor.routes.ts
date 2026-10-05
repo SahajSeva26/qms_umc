@@ -138,9 +138,12 @@ DoctorRouter.get('/nearest', AuthorizeMiddleware([CAMP_PERMISSIONS.BOOK.code]), 
 DoctorRouter.get('/:id', DoctorController.get);
 DoctorRouter.get('/', DoctorController.search);
 
+// create — a lighter doctor:create is enough (e.g. pharma MR adding a doctor in their own
+// division); doctor:manage also satisfies it. The service forces a customer/field-force actor's
+// doctor into their OWN division regardless of what's sent.
 DoctorRouter.post(
     '/',
-    AuthorizeMiddleware([DOCTOR_PERMISSIONS.MANAGE.code]),
+    AuthorizeMiddleware([DOCTOR_PERMISSIONS.CREATE.code, DOCTOR_PERMISSIONS.MANAGE.code], 'OR'),
     DoctorController.create,
 );
 

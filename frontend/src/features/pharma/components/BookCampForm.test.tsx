@@ -12,6 +12,8 @@ import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
 vi.mock('@/hooks/useSession')
 
 // Mocks the map (needs real Google Maps creds) with buttons firing the same onChange/onResolutionStateChange contract.
+// A second "Set FAR test coordinates" button exercises the out-of-range re-pick flow without
+// needing real map interaction.
 vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
   default: ({ value, onChange, onResolutionStateChange }: {
     value: unknown
@@ -24,6 +26,12 @@ vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
         onClick={() => onChange({ ...(value as object ?? {}), coordinates: [73.8567, 18.5204] })}
       >
         Set test coordinates
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange({ ...(value as object ?? {}), coordinates: [77.0266, 28.4595] })}
+      >
+        Set FAR test coordinates
       </button>
       {/* Simulates the real widget's "pin moved / search result picked, still
           resolving" window — the gap between a pick and onChange actually firing. */}
@@ -104,6 +112,10 @@ function doctorFixture(overrides: Partial<DoctorEntity> = {}): DoctorEntity {
   } as DoctorEntity
 }
 
+// The mocked LocationPicker's "Set FAR test coordinates" button uses [77.0266, 28.4595]
+// (Gurugram), ~1150km from doctorFixture()'s Pune coordinates — well past DOCTOR_RANGE_KM (35km),
+// used to exercise the out-of-range re-pick flow.
+
 function bookCampResponseFixture(overrides: Partial<CampMutationResponseEntity> = {}): ApiResponse<CampMutationResponseEntity> {
   return {
     success: true,
@@ -170,12 +182,14 @@ async function fillLocation(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/^city$/i), 'Pune')
   await user.type(screen.getByLabelText(/^state$/i), 'Maharashtra')
   await user.type(screen.getByLabelText(/^pincode$/i), '411001')
-  await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
+  await user.click(screen.getByRole('button', { name: /^set test coordinates$/i }))
 }
 
+// Doctor-picking is now a plain division-scoped name search (DoctorNameDivisionPicker,
+// GET /doctors) — no location dependency, unlike the old nearest-doctor picker.
 async function pickDoctor(user: ReturnType<typeof userEvent.setup>) {
   const { doctorsService } = await import('@/features/doctors/doctors.service')
-  vi.mocked(doctorsService.nearestDoctors).mockResolvedValue({
+  vi.mocked(doctorsService.searchDoctors).mockResolvedValue({
     success: true, message: '', data: { items: [doctorFixture()], count: 1 },
   })
   await user.type(await screen.findByPlaceholderText(/search doctor by name/i), 'Priya')
@@ -191,10 +205,11 @@ async function pickDateAndSlot(user: ReturnType<typeof userEvent.setup>) {
   await user.click(slotPill)
 }
 
-// Fills every real section: MR (if needed) -> Location -> Doctor -> Date/slot.
+// Fills every real section in the new order: MR (if needed) -> Doctor -> Date/slot.
+// Doctor-picking defaults the camp location from the doctor's own address (doctorFixture's Pune
+// coordinates) — no separate fillLocation call needed, matching the real flow.
 async function fillWholeForm(user: ReturnType<typeof userEvent.setup>, opts: { withMr?: boolean; mr?: RoleEntity } = {}) {
   if (opts.withMr) await pickMr(user, opts.mr)
-  await fillLocation(user)
   await pickDoctor(user)
   await pickDateAndSlot(user)
 }
@@ -228,8 +243,9 @@ describe('BookCampForm — session/identity guards', () => {
   })
 
   it('when missingSelfMrId is true, the warning banner is visible and submit stays blocked', async () => {
-    // No resolvable session role id — the missingSelfMrId banner must stay visible and the
-    // submit button must stay disabled regardless of what else is filled.
+    // No resolvable session role id (and no division either) — the missingSelfMrId banner must
+    // stay visible and the submit button must stay disabled regardless of what else is filled.
+    // No division also means the doctor picker itself can't search — fill only what's reachable.
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
       session: { ...sessionFixture(), role: { id: '', code: 'pharma-mr', name: 'MR' } },
@@ -241,7 +257,8 @@ describe('BookCampForm — session/identity guards', () => {
     expect(screen.getByText(/couldn't resolve your mr identity/i)).toBeInTheDocument()
     expect(await screen.findByLabelText(/^address line 1$/i)).toBeInTheDocument()
 
-    await fillWholeForm(user)
+    await fillLocation(user)
+    await pickDateAndSlot(user)
     expect(screen.getByText(/couldn't resolve your mr identity/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /book camp/i })).toBeDisabled()
   })
@@ -264,16 +281,16 @@ describe('BookCampForm — all sections visible at once', () => {
     vi.resetAllMocks()
   })
 
-  it('Location, Doctor, Date & time slot, and Notes all render simultaneously — no step gating', async () => {
+  it('Doctor, Location, Date & time slot, and Notes all render simultaneously — no step gating', async () => {
     await mockSession()
     await renderForm()()
 
-    expect(screen.getByLabelText(/^address line 1$/i)).toBeInTheDocument()
+    expect(screen.getByPlaceholderText(/search doctor by name/i)).toBeInTheDocument()
     expect(screen.getByText(/pick a location above to see availability/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/^notes$/i)).toBeInTheDocument()
   })
 
-  it('Doctor renders before Camp location in the DOM, matching the prototype\'s section order (2 · Doctor, 3 · Camp location)', async () => {
+  it("Doctor renders before Camp location in the DOM, matching the user's described MR→Doctor→Location→FO→Date flow", async () => {
     await mockSession()
     await renderForm()()
 
@@ -282,24 +299,52 @@ describe('BookCampForm — all sections visible at once', () => {
     expect(doctorHeading.compareDocumentPosition(locationHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
-  it('the Doctor picker is disabled with a "pick a location first" placeholder until coordinates resolve', async () => {
+  it('the Doctor picker is NOT location-gated — it is searchable and enabled with no location picked yet', async () => {
     await mockSession()
     await renderForm()()
 
-    expect(screen.getByPlaceholderText(/pick a location first/i)).toBeInTheDocument()
-    expect(screen.getByPlaceholderText(/pick a location first/i)).toBeDisabled()
+    const doctorInput = screen.getByPlaceholderText(/search doctor by name/i)
+    expect(doctorInput).toBeInTheDocument()
+    expect(doctorInput).toBeEnabled()
   })
 
-  it('picking a location unlocks the Doctor picker and the availability day-strip', async () => {
+  it('picking a doctor defaults the camp location to the doctor\'s own address, still editable afterwards', async () => {
     await mockSession()
     const user = userEvent.setup()
     await renderForm()()
 
-    await fillLocation(user)
+    await pickDoctor(user)
 
-    expect(await screen.findByPlaceholderText(/search doctor by name/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/^address line 1$/i)).toHaveValue('221 Baker Street')
+    expect(screen.getByLabelText(/^city$/i)).toHaveValue('Pune')
+    expect(screen.getByLabelText(/^state$/i)).toHaveValue('Maharashtra')
+    expect(screen.getByLabelText(/^pincode$/i)).toHaveValue('411001')
     expect(await screen.findByText(/pick a date — \d+ fos? can run this camp/i)).toBeInTheDocument()
-    expect(screen.queryByText(/pick a location above to see availability/i)).not.toBeInTheDocument()
+
+    // Still editable — a manual edit within range doesn't clear the doctor.
+    await user.clear(screen.getByLabelText(/^city$/i))
+    await user.type(screen.getByLabelText(/^city$/i), 'Pune City')
+    expect(screen.getByText(/Dr\. Priya Sharma/i)).toBeInTheDocument()
+  })
+
+  it('manually overriding the location far from the picked doctor clears the doctor and switches to a distance-sorted re-pick', async () => {
+    await mockSession()
+    const { doctorsService } = await import('@/features/doctors/doctors.service')
+    const user = userEvent.setup()
+    await renderForm()()
+
+    await pickDoctor(user)
+    expect(screen.getByText(/Dr\. Priya Sharma/i)).toBeInTheDocument()
+
+    vi.mocked(doctorsService.nearestDoctors).mockResolvedValue({
+      success: true, message: '', data: { items: [doctorFixture({ id: 'doc-2', name: 'Dr. Far Away' })], count: 1 },
+    })
+    await user.click(screen.getByRole('button', { name: /^set far test coordinates$/i }))
+
+    expect(await screen.findByText(/isn't within 35km of this camp location/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Dr\. Priya Sharma/i)).not.toBeInTheDocument()
+    // Re-pick is now the distance-sorted picker, scoped to the NEW far-away location.
+    expect(screen.getByPlaceholderText(/search doctor by name/i)).toBeInTheDocument()
   })
 
   it('clicking Book camp with an incomplete address shows its errors and never advances anything else', async () => {
@@ -310,7 +355,7 @@ describe('BookCampForm — all sections visible at once', () => {
     // Only address line 1 + city filled — state/pincode left blank.
     await user.type(screen.getByLabelText(/^address line 1$/i), '221 Baker Street')
     await user.type(screen.getByLabelText(/^city$/i), 'Pune')
-    await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
+    await user.click(screen.getByRole('button', { name: /^set test coordinates$/i }))
     await user.click(screen.getByRole('button', { name: /book camp/i }))
 
     const stateSpan = await screen.findByText('State is required.')
@@ -324,7 +369,6 @@ describe('BookCampForm — all sections visible at once', () => {
     const user = userEvent.setup()
     await renderForm()()
 
-    await fillLocation(user)
     await pickDoctor(user)
     await pickDateAndSlot(user)
     await user.click(screen.getByRole('button', { name: /simulate location resolving/i }))
@@ -414,7 +458,6 @@ describe('BookCampForm — MR-on-behalf-of division scoping', () => {
     expect(screen.getByText(/this mr's division doesn't match your own/i)).toBeInTheDocument()
     // The doctor picker itself must not render while blocked — no wrongly-scoped search possible.
     expect(screen.queryByPlaceholderText(/search doctor by name/i)).not.toBeInTheDocument()
-    expect(screen.queryByPlaceholderText(/pick a location first/i)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /book camp/i })).toBeDisabled()
   })
 
@@ -439,7 +482,6 @@ describe('BookCampForm — MR-on-behalf-of division scoping', () => {
     await renderForm({ needsMrPicker: true })()
 
     await pickMr(user)
-    await fillLocation(user)
 
     expect(screen.queryByText(/this mr's division doesn't match your own/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/can't confirm this mr's division/i)).not.toBeInTheDocument()

@@ -1,12 +1,24 @@
 import { useState, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
-import { FiFlag, FiX, FiSend } from 'react-icons/fi'
+import { FiFlag, FiX, FiSend, FiList, FiPlus } from 'react-icons/fi'
 import { useQaFeedback } from '@/features/qa-feedback/hooks/useQaFeedback'
+import FeedbackCard from '@/features/qa-feedback/components/FeedbackCard'
+import { usePagination } from '@/hooks/usePagination'
+import PaginationControls from '@/components/ui/PaginationControls'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 
 
-type Phase = 'idle' | 'picking' | 'commenting'
+// 'menu' = the two-choice popover (View tickets here / New ticket); 'viewing' = this page's own
+// ticket list, read-only. 'picking'/'commenting' are the existing create flow, now entered via menu.
+type Phase = 'idle' | 'menu' | 'viewing' | 'picking' | 'commenting'
+
+// Escapes a route for safe use inside the backend's unanchored $regex pageRoute filter, then anchors
+// it — otherwise "/camps" (a substring match) would also return "/camps/new"'s and "/camps/screening"'s
+// tickets, not just this exact page's.
+const exactPageRouteFilter = (pathname: string) => `^${pathname.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`
+
+const PAGE_TICKETS_SIZE = 10
 
 const FeedbackWidget = () => {
   const location = useLocation()
@@ -14,6 +26,15 @@ const FeedbackWidget = () => {
   const [phase, setPhase] = useState<Phase>('idle')
   const [pin, setPin] = useState<{ xPercent: number; yPercent: number; clientX: number; clientY: number } | null>(null)
   const [comment, setComment] = useState('')
+  // Standard limit:10 page size (matches the rest of the app), with real pagination controls — the
+  // count is server-side and honest, never silently truncated past a hidden cap.
+  const { page: pageTicketsPage, setPage: setPageTicketsPage, totalPages: pageTicketsTotalPages, resetToFirstPage: resetPageTicketsPage } = usePagination(PAGE_TICKETS_SIZE)
+  // Enabled only while actually viewing the list, so navigating away or staying idle never fires an
+  // unused query.
+  const { items: pageItems, count: pageItemsCount, isLoading: pageItemsLoading, error: pageItemsError } = useQaFeedback(
+    { pageRoute: exactPageRouteFilter(location.pathname), limit: String(PAGE_TICKETS_SIZE), page: String(pageTicketsPage) },
+    phase === 'viewing',
+  )
 
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null)
   const dragState = useRef<{ offsetX: number; offsetY: number } | null>(null)
@@ -39,12 +60,12 @@ const FeedbackWidget = () => {
   }
 
   const handleTriggerClick = () => {
-    // A drag that moved the button shouldn't also open picking mode.
+    // A drag that moved the button shouldn't also open the menu.
     if (justDragged.current) {
       justDragged.current = false
       return
     }
-    setPhase('picking')
+    setPhase('menu')
   }
 
   const reset = () => {
@@ -105,6 +126,73 @@ const FeedbackWidget = () => {
         </button>
       )}
 
+      {phase === 'menu' && (
+        <>
+          <div className="fixed inset-0 z-90" onClick={reset} />
+          <div
+            className="fixed z-100 bottom-20 right-5 w-56 rounded-xl border p-1.5 shadow-xl"
+            style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}
+          >
+            <button
+              onClick={() => { resetPageTicketsPage(); setPhase('viewing') }}
+              className="w-full flex items-center gap-2 rounded-lg px-2.5 py-2 text-[13px] font-semibold text-left transition-colors hover:bg-(--qms-surface-hover)"
+              style={{ color: 'var(--qms-text)' }}
+            >
+              <FiList size={14} /> View tickets on this page
+            </button>
+            <button
+              onClick={() => setPhase('picking')}
+              className="w-full flex items-center gap-2 rounded-lg px-2.5 py-2 text-[13px] font-semibold text-left transition-colors hover:bg-(--qms-surface-hover)"
+              style={{ color: 'var(--qms-text)' }}
+            >
+              <FiPlus size={14} /> New ticket
+            </button>
+          </div>
+        </>
+      )}
+
+      {phase === 'viewing' && (
+        <>
+          <div className="fixed inset-0 z-90" onClick={reset} />
+          <div
+            className="fixed z-100 bottom-20 right-5 w-96 max-h-[70vh] rounded-xl border shadow-xl flex flex-col"
+            style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-3 py-2.5 border-b shrink-0" style={{ borderColor: 'var(--qms-border)' }}>
+              <span className="text-[13px] font-bold" style={{ color: 'var(--qms-text)' }}>
+                Tickets on this page{!pageItemsLoading && !pageItemsError ? ` (${pageItemsCount})` : ''}
+              </span>
+              <button onClick={reset} aria-label="Close" className="rounded-lg p-1 hover:bg-(--qms-surface-hover)">
+                <FiX size={15} style={{ color: 'var(--qms-text-muted)' }} />
+              </button>
+            </div>
+            <div className="overflow-y-auto p-2.5 space-y-2">
+              {pageItemsLoading ? (
+                <div className="text-[12px] py-6 text-center" style={{ color: 'var(--qms-text-muted)' }}>Loading tickets…</div>
+              ) : pageItemsError ? (
+                <div className="text-[12px] py-6 text-center rounded-lg bg-danger-soft border border-danger text-danger">
+                  Failed to load tickets for this page.
+                </div>
+              ) : pageItems.length === 0 ? (
+                <div className="text-[12px] py-6 text-center rounded-lg border" style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }}>
+                  No tickets raised on this page yet.
+                </div>
+              ) : (
+                <>
+                  {pageItems.map((report) => <FeedbackCard key={report.id} report={report} compact />)}
+                  <PaginationControls
+                    page={pageTicketsPage}
+                    totalPages={pageTicketsTotalPages(pageItemsCount)}
+                    onPageChange={setPageTicketsPage}
+                  />
+                </>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
       {phase === 'picking' && (
         <>
           <div className="fixed top-0 inset-x-0 z-100 flex items-center justify-between px-4 py-2.5" style={{ background: 'var(--qms-brand)' }}>
@@ -113,7 +201,7 @@ const FeedbackWidget = () => {
               <FiX size={16} className="text-white" />
             </button>
           </div>
-          <div className="fixed inset-0 z-90 cursor-crosshair" onClick={handlePick} />
+          <div data-testid="feedback-pick-surface" className="fixed inset-0 z-90 cursor-crosshair" onClick={handlePick} />
         </>
       )}
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { FiUser, FiMapPin, FiUserCheck, FiCalendar, FiFileText } from 'react-icons/fi'
+import { FiUser, FiMapPin, FiUserCheck, FiCalendar, FiFileText, FiAlertTriangle } from 'react-icons/fi'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { useReshapingResolver } from '@/hooks/useReshapingResolver'
 import { bookCampPayloadSchema, type BookCampFormPayload } from '@/features/pharma/schemas/bookCamp.schemas'
@@ -7,12 +7,16 @@ import { useBookCamp } from '@/features/camps/hooks/useBookCamp'
 import { useDayRangeAvailability } from '@/features/camps/hooks/useDayRangeAvailability'
 import { usePermission } from '@/hooks/usePermission'
 import { getApiErrorMessage } from '@/utils/apiError'
+import { haversineDistanceKm } from '@/utils/geo'
 import type { BookCampPayload, CampMutationResponseEntity, CampType } from '@/types/campReal.types'
 import type { ApiResponse } from '@/types/common.types'
 import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
 import type { LocationValue } from '@/types/location.types'
 import type { LocationResolutionState } from '@/components/widgets/location-picker/location.types'
+import type { DoctorEntity } from '@/types/doctor.types'
+import { DOCTOR_RANGE_KM } from '@/types/doctor.types'
 import DoctorDistancePicker from '@/features/pharma/components/DoctorDistancePicker'
+import DoctorNameDivisionPicker from '@/features/pharma/components/DoctorNameDivisionPicker'
 import MrPicker from '@/features/pharma/components/MrPicker'
 import { EditDoctorModal } from '@/features/doctors'
 import DayStripAvailability from '@/features/pharma/components/DayStripAvailability'
@@ -103,9 +107,19 @@ const BookCampForm = ({ needsMrPicker, type, project, patientExpectation, patien
   const [locationError, setLocationError] = useState<string | null>(null)
   const [locationHint, setLocationHint] = useState<string | null>(null)
 
-  // /doctors/nearest scopes to the CALLING session's own division, not the picked MR's — they can drift.
+  // Doctor search (both the division name-search and /doctors/nearest) scopes to the CALLING
+  // session's own division, not the picked MR's — they can drift.
   const [mrDivisionId, setMrDivisionId] = useState<string | null>(null)
   const actingDivisionId = session?.role.division ?? null
+  const doctorDivisionId = mrDivisionId ?? actingDivisionId
+
+  // The picked doctor's OWN location, captured at pick time — the camp location defaults to this.
+  // Once the doctor is cleared (or location is manually pushed out of range) this is cleared too.
+  const [doctorLocation, setDoctorLocation] = useState<LocationValue | null>(null)
+  // Set once a manual location edit pushes the already-picked doctor more than DOCTOR_RANGE_KM
+  // away — switches the Doctor section into "out of range, re-pick" mode (distance-sorted,
+  // scoped to the NEW location) instead of silently keeping a doctor who can't serve this camp.
+  const [doctorOutOfRange, setDoctorOutOfRange] = useState(false)
 
   const {
     register,
@@ -129,22 +143,47 @@ const BookCampForm = ({ needsMrPicker, type, project, patientExpectation, patien
 
   const mrDivisionMismatch = needsMrPicker && !!watchedMrId && (mrDivisionId === null || mrDivisionId !== actingDivisionId)
 
-  // Keyed on the coordinate pair, not object identity — LocationPicker can re-fire onChange
+// Keyed on the coordinate pair, not object identity — LocationPicker can re-fire onChange
   // with a new reference for the same point (e.g. an address-only edit).
-  const coordKey = location?.coordinates ? `${location.coordinates[0]},${location.coordinates[1]}` : null
-  const prevCoordKeyRef = useRef<string | null>(coordKey)
-  useEffect(() => {
-    if (prevCoordKeyRef.current !== null && coordKey !== null && prevCoordKeyRef.current !== coordKey) {
+  const coordKeyOf = (v: LocationValue | null) => (v?.coordinates ? `${v.coordinates[0]},${v.coordinates[1]}` : null)
+
+  const handleSelectDoctor = (doctor: DoctorEntity | null) => {
+    setDoctorOutOfRange(false)
+    if (!doctor?.location) {
+      setDoctorLocation(null)
+      return
+    }
+    setDoctorLocation(doctor.location)
+    // Defaults the camp location to the doctor's own address — still fully editable afterwards.
+    // Goes straight through setValue, NOT handleLocationChange below — this is the doctor-driven
+    // default itself, so it must never immediately re-trigger its own out-of-range check.
+    setValue('location', doctor.location, { shouldDirty: true, shouldTouch: true, shouldValidate: true })
+  }
+
+  // Shared by both the map picker and the manual address fields — whichever one the user actually
+  // used to change the location. Only a call to THIS function (never handleSelectDoctor's direct
+  // setValue above) re-checks the picked doctor's range, since only this path is a genuine
+  // user-driven location edit.
+  const handleLocationChange = (next: LocationValue) => {
+    const prevCoordKey = coordKeyOf(location ?? null)
+    const nextCoordKey = coordKeyOf(next)
+    setValue('location', next, { shouldDirty: true, shouldTouch: true, shouldValidate: true })
+    if (nextCoordKey === prevCoordKey) return
+    // Clears date/slot too — availability depends on location.
+    if (prevCoordKey !== null && nextCoordKey !== null) {
       setValue('date', '', { shouldDirty: true })
       setValue('timeSlot', '', { shouldDirty: true })
     }
-    if (prevCoordKeyRef.current !== coordKey) {
-      setValue('doctorId', '', { shouldDirty: true })
-      setValue('doctorLabel', '')
+    if (next.coordinates && doctorLocation?.coordinates) {
+      const kmAway = haversineDistanceKm(doctorLocation.coordinates, next.coordinates)
+      if (kmAway > DOCTOR_RANGE_KM) {
+        setValue('doctorId', '', { shouldDirty: true })
+        setValue('doctorLabel', '')
+        setDoctorLocation(null)
+        setDoctorOutOfRange(true)
+      }
     }
-    prevCoordKeyRef.current = coordKey
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [coordKey])
+  }
 
   const availabilityBasePayload = (() => {
     // A pin-drag/search pick can still be resolving even with coordinates already set.
@@ -273,6 +312,8 @@ const BookCampForm = ({ needsMrPicker, type, project, patientExpectation, patien
                   // A newly-picked MR may resolve to a different division — the old doctor pick could be stale.
                   setValue('doctorId', '', { shouldDirty: true })
                   setValue('doctorLabel', '')
+                  setDoctorLocation(null)
+                  setDoctorOutOfRange(false)
                 }}
               />
             )}
@@ -294,28 +335,48 @@ const BookCampForm = ({ needsMrPicker, type, project, patientExpectation, patien
               : "This MR's division doesn't match your own — doctor search is scoped to your division and may not be accurate for this booking."}
           </div>
         ) : (
-          <div className="flex items-center gap-2">
-            <div className="flex-1 min-w-0">
-              <Controller
-                control={control}
-                name="doctorId"
-                render={({ field }) => (
-                  <DoctorDistancePicker
-                    value={field.value}
-                    label={doctorLabel}
-                    coordinates={location?.coordinates}
-                    onChange={(id, l) => { field.onChange(id); setValue('doctorLabel', l) }}
-                    disabled={!projectReady || !locationReady}
-                  />
-                )}
-              />
-            </div>
-            {/* No "New doctor" button when the acting user has no division — the create would just 403. */}
-            {canManageDoctors && session && actingDivisionId && (
-              <Button type="button" variant="outline" disabled={!projectReady || !locationReady} onClick={() => setShowNewDoctor(true)}>
-                New doctor
-              </Button>
+          <div className="space-y-1.5">
+            {doctorOutOfRange && (
+              <div className="flex items-start gap-1.5 text-[12px] rounded-lg px-3 py-2 bg-danger-soft border border-danger text-danger">
+                <FiAlertTriangle size={13} className="mt-0.5 shrink-0" />
+                <span>The previously picked doctor isn't within {DOCTOR_RANGE_KM}km of this camp location — pick a doctor near the new location instead.</span>
+              </div>
             )}
+            <div className="flex items-center gap-2">
+              <div className="flex-1 min-w-0">
+                <Controller
+                  control={control}
+                  name="doctorId"
+                  render={({ field }) =>
+                    doctorOutOfRange ? (
+                      <DoctorDistancePicker
+                        value={field.value}
+                        label={doctorLabel}
+                        coordinates={location?.coordinates}
+                        onChange={(id, l) => { field.onChange(id); setValue('doctorLabel', l) }}
+                        onSelectDoctor={handleSelectDoctor}
+                        disabled={!projectReady || !locationReady}
+                      />
+                    ) : (
+                      <DoctorNameDivisionPicker
+                        value={field.value}
+                        label={doctorLabel}
+                        division={doctorDivisionId}
+                        onChange={(id, l) => { field.onChange(id); setValue('doctorLabel', l) }}
+                        onSelectDoctor={handleSelectDoctor}
+                        disabled={!projectReady}
+                      />
+                    )
+                  }
+                />
+              </div>
+              {/* No "New doctor" button when the acting user has no division — the create would just 403. */}
+              {canManageDoctors && session && actingDivisionId && (
+                <Button type="button" variant="outline" disabled={!projectReady} onClick={() => setShowNewDoctor(true)}>
+                  New doctor
+                </Button>
+              )}
+            </div>
           </div>
         )}
         {fieldError('doctorId') && <p className="text-[11px] mt-1 text-danger">{fieldError('doctorId')}</p>}
@@ -329,6 +390,7 @@ const BookCampForm = ({ needsMrPicker, type, project, patientExpectation, patien
             onCreated={(created) => {
               setValue('doctorId', created.id, { shouldDirty: true, shouldTouch: true, shouldValidate: true })
               setValue('doctorLabel', `${created.name} (${created.pharmaCode})`)
+              handleSelectDoctor(created)
             }}
             onClose={() => setShowNewDoctor(false)}
           />
@@ -342,6 +404,11 @@ const BookCampForm = ({ needsMrPicker, type, project, patientExpectation, patien
             Select a project and camp type above first.
           </p>
         )}
+        {projectReady && !location?.coordinates && (
+          <p className="text-[12px] rounded-lg px-3 py-2 mb-2 bg-muted/50" style={{ color: 'var(--qms-text-muted)' }}>
+            Defaults to the picked doctor's address — pick a doctor above, or set a location directly.
+          </p>
+        )}
         <Controller
           control={control}
           name="location"
@@ -349,14 +416,14 @@ const BookCampForm = ({ needsMrPicker, type, project, patientExpectation, patien
             <div className="space-y-2">
               <LocationPicker
                 value={field.value}
-                onChange={field.onChange}
+                onChange={handleLocationChange}
                 onResolutionStateChange={setLocationResolution}
                 onLocationHintChange={setLocationHint}
                 defaultCountry="India"
                 countryCode="IN"
                 disabled={!projectReady}
               />
-              <LocationAddressFields value={field.value} onChange={field.onChange} defaultCountry="India" locationHint={locationHint} disabled={!projectReady} />
+              <LocationAddressFields value={field.value} onChange={handleLocationChange} defaultCountry="India" locationHint={locationHint} disabled={!projectReady} />
             </div>
           )}
         />

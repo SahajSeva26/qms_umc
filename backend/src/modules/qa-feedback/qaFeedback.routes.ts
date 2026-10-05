@@ -105,18 +105,13 @@ registry.registerPath({
 QaFeedbackRouter.post('/webhook/jira', QaFeedbackController.jiraWebhook);
 QaFeedbackRouter.use(AuthMiddleware);
 
-// Deliberately no AuthorizeMiddleware here
+// Deliberately no AuthorizeMiddleware on create/get/search — any authenticated user may report
+// feedback AND read it back (per-page ticket lists are shown on the page they were raised on, not
+// just the central review page, so any user viewing that page needs to see its tickets). Only
+// update (resolving/noting a ticket) stays manage-gated.
 QaFeedbackRouter.post('/', QaFeedbackController.create);
-QaFeedbackRouter.get(
-    '/:id',
-    AuthorizeMiddleware([QA_FEEDBACK_PERMISSIONS.MANAGE.code]),
-    QaFeedbackController.get,
-);
-QaFeedbackRouter.get(
-    '/',
-    AuthorizeMiddleware([QA_FEEDBACK_PERMISSIONS.MANAGE.code]),
-    QaFeedbackController.search,
-);
+QaFeedbackRouter.get('/:id', QaFeedbackController.get);
+QaFeedbackRouter.get('/', QaFeedbackController.search);
 QaFeedbackRouter.put(
     '/:id',
     AuthorizeMiddleware([QA_FEEDBACK_PERMISSIONS.MANAGE.code]),

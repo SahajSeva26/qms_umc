@@ -22,6 +22,11 @@ export function isScreeningProject(project: ProjectEntity): boolean {
 // excludes `project:create`, which no route guard ever references.
 export const PROJECT_WRITE_PERMISSIONS = ['project:manage', 'tenant:manage']
 
+// Mirrors camp.routes.ts's void-camp/approve-void guard exactly (camp:manage, not project:manage) —
+// a project:manage-only actor can see/edit the project but gets a 403 on every void-camp action;
+// a camp:manage-only actor has no project write access at all but can still fully manage void camps.
+export const VOID_CAMP_WRITE_PERMISSIONS = ['camp:manage', 'tenant:manage']
+
 // Single source of truth for per-type accent colors, shared by WizardStep1,
 // EditProjectModal, and ProjectTypePill.
 export const PROJECT_TYPE_COLOR: Record<ProjectType, string> = {

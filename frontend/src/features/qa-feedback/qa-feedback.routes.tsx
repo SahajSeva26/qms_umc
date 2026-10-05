@@ -5,13 +5,10 @@ export const QA_FEEDBACK_ROUTES = {
   QA_FEEDBACK_REVIEW: '/admin/qa-feedback',
 }
 
-// Matches the backend's own AuthorizeMiddleware([QA_FEEDBACK_PERMISSIONS.MANAGE.code])
-// on GET /qa-feedback (qaFeedback.routes.ts) — only reviewers see this page;
-// POST /qa-feedback (submitting a report) has no permission gate of its own
-// beyond being logged in, so every tester can use the FeedbackWidget trigger
-// regardless of whether they can reach this review screen. FeedbackWidget
-// itself is mounted directly by AppLayout (not through this routes file), so
-// lazy-loading this review page doesn't affect the widget's own eagerness.
+// Frontend-only gate — the backend's GET/POST /qa-feedback are open to any authenticated user (the
+// per-page FeedbackWidget popover needs to read tickets too), but this full admin dashboard (with
+// Add Note / resolve actions) stays reviewer-only by choice. FeedbackWidget itself is mounted
+// directly by AppLayout (not through this routes file), so this gate doesn't affect its own eagerness.
 const QA_FEEDBACK_VIEW_PERMISSIONS = ['qa-feedback:manage']
 
 export const qaFeedbackRoutes: RouteObject[] = [

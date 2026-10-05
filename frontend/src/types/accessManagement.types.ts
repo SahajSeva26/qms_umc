@@ -25,6 +25,7 @@ export type TenantStatus = 'active' | 'inactive'
 // Only present when the search was called with report=true (see SearchTenantQuery.report) —
 // a per-tenant rollup for the current result page only.
 export interface TenantStats {
+  totalDivisions: number
   totalProjects: number
   liveProjects: number
   totalCamps: number

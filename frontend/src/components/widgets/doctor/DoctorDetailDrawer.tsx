@@ -1,5 +1,6 @@
 import { FiMail, FiPhone, FiMapPin, FiExternalLink } from 'react-icons/fi'
 import type { DoctorEntity, DoctorStatus } from '@/types/doctor.types'
+import { SPECIALIZATION_LABEL } from '@/types/doctor.types'
 import SideDrawer from '@/components/ui/SideDrawer'
 import { Button } from '@/components/ui/button'
 import SharedStatusPill from '@/components/ui/StatusPill'
@@ -46,7 +47,7 @@ const DoctorDetailDrawer = ({ doctor, onClose }: DoctorDetailDrawerProps) => {
         </div>
         <div className="min-w-0 flex-1">
           <div className="text-[16px] font-extrabold" style={{ color: 'var(--qms-text)' }}>{d.name}</div>
-          <div className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>{d.specialization.toUpperCase()} · {d.location?.city ?? '—'}</div>
+          <div className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>{d.specialization ? SPECIALIZATION_LABEL[d.specialization] : '—'} · {d.location?.city ?? '—'}</div>
           <div className="mt-2"><SharedStatusPill status={d.status} classes={STATUS_CLASSES} labels={STATUS_LABEL} /></div>
         </div>
       </div>
@@ -55,7 +56,7 @@ const DoctorDetailDrawer = ({ doctor, onClose }: DoctorDetailDrawerProps) => {
       <div className="grid grid-cols-[90px_1fr] gap-y-1.5 text-[13px] mb-5" style={{ color: 'var(--qms-text)' }}>
         <div className="flex items-center gap-1" style={{ color: 'var(--qms-text-muted)' }}><FiMail size={11} /> Email</div><div>{d.email || '—'}</div>
         <div className="flex items-center gap-1" style={{ color: 'var(--qms-text-muted)' }}><FiPhone size={11} /> Mobile</div><div>{d.mobile || '—'}</div>
-        <div style={{ color: 'var(--qms-text-muted)' }}>Specialization</div><div>{d.specialization.toUpperCase()}</div>
+        <div style={{ color: 'var(--qms-text-muted)' }}>Specialization</div><div>{d.specialization ? SPECIALIZATION_LABEL[d.specialization] : '—'}</div>
         <div className="flex items-center gap-1" style={{ color: 'var(--qms-text-muted)' }}><FiMapPin size={11} /> City</div><div>{d.location?.city || '—'}, {d.location?.state || '—'} · {d.location?.pincode || '—'}</div>
         {mapsLink && (
           <>

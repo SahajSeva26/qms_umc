@@ -5,8 +5,8 @@ import { TENANT_ROUTES } from '@/features/access-management/tenant/tenant.routes
 import TenantStatusPill from '@/features/access-management/tenant/components/TenantStatusPill'
 import { formatINR } from '@/utils/formatters'
 
-// Divisions is a placeholder — no batched per-tenant division count exists yet.
-// Projects/Camps/MRs/Billing come from the batched report=true tenant stats aggregation (getTenantStats).
+// Divisions/Projects/Camps/MRs/Billing all come from the batched report=true tenant stats
+// aggregation (getTenantStats).
 
 interface TenantsTableProps {
   tenants: Tenant[]
@@ -66,7 +66,11 @@ const TenantsTable = ({ tenants }: TenantsTableProps) => {
           </div>
 
           <Stat
-            value={<span className="text-[10px] font-bold italic" style={{ color: 'var(--cm-accent, var(--qms-brand))' }}>Coming soon</span>}
+            value={
+              tenant.stats
+                ? <>{tenant.stats.totalDivisions}</>
+                : <span style={{ color: 'var(--qms-text-muted)' }}>—</span>
+            }
             label="Divisions"
           />
           <Stat

@@ -64,6 +64,11 @@ export interface SearchDoctorQuery {
   report?: 'true' | 'false'
 }
 
+// Mirrors DOCTOR_NEAREST_MAX_DISTANCE (doctor.constants.ts) in km, for a client-side
+// "is this doctor within range of this camp location" check (e.g. after overriding the camp
+// location away from the picked doctor's own address) — no backend round-trip needed for that.
+export const DOCTOR_RANGE_KM = 35
+
 // The 35km radius is server-fixed — no radius/range param exists.
 export interface NearestDoctorQuery {
   lng: number

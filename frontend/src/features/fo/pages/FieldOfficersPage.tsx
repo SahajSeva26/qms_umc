@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
-import { FiPlus, FiUsers, FiCalendar, FiActivity, FiClock, FiShield, FiCpu, FiUpload, FiDownload, FiFileText, FiZap } from 'react-icons/fi'
-import { toast } from '@/components/ui/sonner'
+import { FiPlus, FiUsers, FiCalendar, FiActivity, FiClock, FiShield, FiCpu, FiFileText, FiZap, FiCheckSquare } from 'react-icons/fi'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRoleTypes'
 import { useGeoProfiles } from '@/features/geo-profile/hooks/useGeoProfiles'
@@ -15,6 +14,7 @@ import { useFoTodayCamps, useFoActiveCount } from '@/features/fo/hooks/useFoToda
 import CreateFoModal from '@/features/fo/components/CreateFoModal'
 import FoRosterCard from '@/features/fo/components/FoRosterCard'
 import FoDevicesTable from '@/features/fo/components/FoDevicesTable'
+import FoAssignmentsWeekGrid from '@/features/fo/components/FoAssignmentsWeekGrid'
 import FoRealDrawer from '@/features/fo/components/FoRealDrawer'
 import KpiTile from '@/components/ui/KpiTile'
 import { Button } from '@/components/ui/button'
@@ -27,7 +27,7 @@ import type { RoleStatus } from '@/types/accessManagement.types'
 
 const PAGE_SIZE = 10
 
-type FoTab = 'roster' | 'devices'
+type FoTab = 'roster' | 'assignments' | 'devices'
 
 interface FieldOfficersFilterState {
   search: string
@@ -151,20 +151,6 @@ const FieldOfficersContent = () => {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={() => toast.info('Import would open here')}
-            className="flex items-center gap-1.5 text-[13px] font-semibold px-3 py-2 rounded-xl border transition-colors"
-            style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-soft)' }}
-          >
-            <FiUpload size={13} /> Import
-          </button>
-          <button
-            onClick={() => toast.info('Export would download here')}
-            className="flex items-center gap-1.5 text-[13px] font-semibold px-3 py-2 rounded-xl border transition-colors"
-            style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-soft)' }}
-          >
-            <FiDownload size={13} /> Export
-          </button>
           {canCreateFo && tenantId && foTypeId && <CreateFoModal tenantId={tenantId} foTypeId={foTypeId} />}
           {canCreateFo && !(tenantId && foTypeId) && (
             <Button disabled className="shrink-0"><FiPlus size={14} /> Add FO</Button>
@@ -248,6 +234,13 @@ const FieldOfficersContent = () => {
           <FiShield size={13} /> Roster
         </button>
         <button
+          onClick={() => setTab('assignments')}
+          className="flex items-center gap-1.5 px-3 py-2 text-[13px] font-semibold border-b-2 -mb-px transition-colors"
+          style={{ borderColor: tab === 'assignments' ? 'var(--qms-brand)' : 'transparent', color: tab === 'assignments' ? 'var(--qms-brand)' : 'var(--qms-text-muted)' }}
+        >
+          <FiCheckSquare size={13} /> Assignments
+        </button>
+        <button
           onClick={() => setTab('devices')}
           className="flex items-center gap-1.5 px-3 py-2 text-[13px] font-semibold border-b-2 -mb-px transition-colors"
           style={{ borderColor: tab === 'devices' ? 'var(--qms-brand)' : 'transparent', color: tab === 'devices' ? 'var(--qms-brand)' : 'var(--qms-text-muted)' }}
@@ -312,6 +305,8 @@ const FieldOfficersContent = () => {
               ))}
             </div>
           )
+        ) : tab === 'assignments' ? (
+          <FoAssignmentsWeekGrid roles={fos} geoByRole={geoByRole} onOpen={setOpenRoleId} />
         ) : (
           <FoDevicesTable roles={fos} geoByRole={geoByRole} devicesByRole={devicesByRole} onOpen={setOpenRoleId} />
         )}

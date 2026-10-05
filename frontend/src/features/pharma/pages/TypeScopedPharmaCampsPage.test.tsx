@@ -79,7 +79,8 @@ vi.mock('@/features/camps/campsReal.service', () => ({
 function sessionFixture(roleTypeCode: string): SessionResponse {
   return {
     user: { id: 'u-1', email: 'a@example.com', firstName: 'a', lastName: 'b' },
-    role: { id: 'role-1', code: 'role-code', name: 'Role' },
+    // division is required for the Doctor picker (DoctorNameDivisionPicker) to search at all.
+    role: { id: 'role-1', code: 'role-code', name: 'Role', division: 'div-1' },
     roleType: { id: 'rt-1', code: roleTypeCode, name: roleTypeCode },
     tenant: { id: 't-1', code: 'tenant-1', name: 'Tenant', type: 'customer' },
     permissions: ['camp:book'],
@@ -126,17 +127,15 @@ function makeQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 5 * 60 * 1000 } } })
 }
 
-// Assumes a pharma-mr (self-booking) session, so there's no MR field.
+// Assumes a pharma-mr (self-booking) session, so there's no MR field. Doctor-picking now comes
+// BEFORE location (defaults it from the doctor's own address) — "Set test coordinates" still
+// confirms/overrides to the same fixture point so the day-strip availability mock stays valid.
 async function fillAndSubmitBookCampForm(user: ReturnType<typeof userEvent.setup>, doctorName: string) {
-  await user.type(await screen.findByLabelText(/^address line 1$/i), '221 Baker Street')
-  await user.type(screen.getByLabelText(/^city$/i), 'Pune')
-  await user.type(screen.getByLabelText(/^state$/i), 'Maharashtra')
-  await user.type(screen.getByLabelText(/^pincode$/i), '411001')
-  await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
-
   await user.type(await screen.findByPlaceholderText(/search doctor by name/i), doctorName.split(' ')[0])
   const doctorOption = await screen.findByText(new RegExp(doctorName.replace('.', '\\.'), 'i'), {}, { timeout: 3000 })
   await user.click(doctorOption)
+
+  await user.click(await screen.findByRole('button', { name: /set test coordinates/i }))
 
   // Today is the only mocked-available day, first in the day-strip.
   const today = new Date()
@@ -431,7 +430,7 @@ describe('PharmaScreeningCampsPage / PharmaDietCampsPage — separate routes, sh
         ? { items: [campFixture({ code: 'cmp-000002', type: 'diet' })], count: 1 }
         : { items: [], count: 0 },
     }))
-    vi.mocked(doctorsService.nearestDoctors).mockResolvedValue({
+    vi.mocked(doctorsService.searchDoctors).mockResolvedValue({
       success: true, message: '', data: { items: [doctorFixture()], count: 1 },
     })
     vi.mocked(campsRealService.bookCamp).mockImplementationOnce(async () => {
@@ -470,7 +469,7 @@ describe('PharmaScreeningCampsPage / PharmaDietCampsPage — separate routes, sh
     const { campsRealService } = await import('@/features/camps/campsReal.service')
 
     vi.mocked(pharmaProjectsService.getProject).mockResolvedValue({ success: true, message: '', data: projectFixture() })
-    vi.mocked(doctorsService.nearestDoctors).mockResolvedValue({
+    vi.mocked(doctorsService.searchDoctors).mockResolvedValue({
       success: true, message: '', data: { items: [doctorFixture()], count: 1 },
     })
     // A mutable flag, not a fixed once-queue: invalidation also refetches Screening's own query.

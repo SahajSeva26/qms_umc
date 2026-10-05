@@ -4,12 +4,13 @@ import type { ProjectStatus } from '@/types/project.types'
 import { PROJECT_TYPE_LABEL } from '@/types/project.types'
 import { useProjects } from '@/features/projects/hooks/useProjects'
 import { useProjectReport } from '@/features/projects/hooks/useProjectReport'
-import { PROJECT_WRITE_PERMISSIONS, PROJECT_TYPE_COLOR } from '@/features/projects/projects.utils'
+import { PROJECT_WRITE_PERMISSIONS, VOID_CAMP_WRITE_PERMISSIONS, PROJECT_TYPE_COLOR } from '@/features/projects/projects.utils'
 import { usePermission } from '@/hooks/usePermission'
 import ProjectTable from '@/features/projects/components/ProjectTable'
 import ProjectDetailDrawer from '@/features/projects/components/ProjectDetailDrawer'
 import StatusChangeDialog from '@/features/projects/components/StatusChangeDialog'
 import EditProjectModal from '@/features/projects/components/EditProjectModal'
+import VoidCampDialog from '@/features/projects/components/VoidCampDialog'
 import NewProjectWizard from '@/features/projects/components/wizard/NewProjectWizard'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -61,6 +62,10 @@ const ProjectsPage = () => {
   const canWrite = hasAnyPermission(PROJECT_WRITE_PERMISSIONS)
   // GET /projects/report needs the same permission set — hide counts rather than let it 403.
   const canViewReport = canWrite
+  // Independent of canWrite — POST /camps/void-camp and PATCH /:id/approve-void are gated on
+  // camp:manage/tenant:manage, not project:manage, so a project-only manager must not see an
+  // action that would 403, and a camp manager without project:manage must still see it.
+  const canManageVoidCamps = hasAnyPermission(VOID_CAMP_WRITE_PERMISSIONS)
   const canFilterByClient = hasAnyPermission(PROJECT_CLIENT_FILTER_PERMISSIONS) && hasAnyPermission(TENANT_LOOKUP_PERMISSIONS)
   const { report } = useProjectReport(canViewReport)
   const tabCounts = report
@@ -77,6 +82,7 @@ const ProjectsPage = () => {
   const [openDetailId, setOpenDetailId] = useState<string | null>(null)
   const [statusChangeId, setStatusChangeId] = useState<string | null>(null)
   const [editId, setEditId] = useState<string | null>(null)
+  const [voidCampsId, setVoidCampsId] = useState<string | null>(null)
   const [wizardOpen, setWizardOpen] = useState(false)
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
 
@@ -123,6 +129,7 @@ const ProjectsPage = () => {
   const openDetail = projects.find((p) => p.id === openDetailId) ?? null
   const statusChangeProject = projects.find((p) => p.id === statusChangeId) ?? null
   const editProject = projects.find((p) => p.id === editId) ?? null
+  const voidCampsProject = projects.find((p) => p.id === voidCampsId) ?? null
 
   return (
     <div className="w-full">
@@ -241,9 +248,11 @@ const ProjectsPage = () => {
           <ProjectTable
             projects={projects}
             canWrite={canWrite}
+            canManageVoidCamps={canManageVoidCamps}
             onOpenDetail={setOpenDetailId}
             onEdit={setEditId}
             onChangeStatus={setStatusChangeId}
+            onVoidCamps={setVoidCampsId}
           />
           <PaginationControls page={page} totalPages={totalPages(count)} onPageChange={setPage} />
         </>
@@ -257,6 +266,10 @@ const ProjectsPage = () => {
 
       {editProject && (
         <EditProjectModal project={editProject} onClose={() => setEditId(null)} />
+      )}
+
+      {voidCampsProject && (
+        <VoidCampDialog project={voidCampsProject} onClose={() => setVoidCampsId(null)} />
       )}
 
       {wizardOpen && (

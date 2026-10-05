@@ -1,4 +1,4 @@
-import type { ProjectEntity, ProjectReportResponse, ProjectType } from '@/types/project.types'
+import type { ProjectEntity, ProjectReportResponse, ProjectType, PurchaseOrder } from '@/types/project.types'
 
 // Frontend-only UI cap — the backend's daysToBookBefore validator is
 // nonnegative-only with no upper bound, so a direct API caller can submit more.
@@ -11,9 +11,8 @@ export function asZeroWhenBlank(value: unknown): number {
   return value === '' || !Number.isFinite(parsed) ? 0 : parsed
 }
 
-// `mixed` deliberately appears in both lists.
-export const SCREENING_MODE_TYPES: ProjectType[] = ['screening_camp', 'mixed']
-export const DIET_MODE_TYPES: ProjectType[] = ['diet', 'teleconsultation_diet', 'mixed']
+export const SCREENING_MODE_TYPES: ProjectType[] = ['screening']
+export const DIET_MODE_TYPES: ProjectType[] = ['diet', 'teleconsultation_diet']
 
 export function isScreeningProject(project: ProjectEntity): boolean {
   return project.type.some((t) => SCREENING_MODE_TYPES.includes(t))
@@ -26,11 +25,10 @@ export const PROJECT_WRITE_PERMISSIONS = ['project:manage', 'tenant:manage']
 // Single source of truth for per-type accent colors, shared by WizardStep1,
 // EditProjectModal, and ProjectTypePill.
 export const PROJECT_TYPE_COLOR: Record<ProjectType, string> = {
-  screening_camp: '#3b6dff',
+  screening: '#3b6dff',
   diet: '#14b8a6',
   teleconsultation_diet: '#7c3aed',
-  lab_test: '#a855f7',
-  mixed: '#f59e0b',
+  lab: '#a855f7',
 }
 
 // Moved to types/project.types.ts (shared with Pharma) — re-exported here for existing imports.
@@ -74,17 +72,29 @@ export function computeProjectKpis(report: ProjectReportResponse | null | undefi
   }
 }
 
-export function projectNearestExpiry(project: ProjectEntity): string | null {
-  if (!project.mode) return null
-  return project.mode.poExpiry ?? project.mode.agreementEndDate ?? null
+// "Nearest expiry" is the soonest-expiring PO still carrying an expiry — it's the one that
+// actually constrains the project's runway next.
+function soonestPoExpiry(purchaseOrders: PurchaseOrder[] | undefined): string | null {
+  const expiries = (purchaseOrders ?? [])
+    .map((po) => po.expiry)
+    .filter((e): e is string => !!e)
+    .sort()
+  return expiries[0] ?? null
 }
 
-// PO- and agreement-mode projects carry a start/end pair nested under `mode`;
-// mail-confirmation mode (or `mode` unset) has no date range.
+export function projectNearestExpiry(project: ProjectEntity): string | null {
+  if (!project.executionMode) return null
+  return soonestPoExpiry(project.executionMode.po?.purchaseOrders) ?? project.executionMode.agreement?.endDate ?? null
+}
+
+// For PO mode with multiple POs, the range spans the earliest PO date to the soonest expiry
+// (the project's current runway), not any single PO's own span.
 export function projectDateRange(project: ProjectEntity): { start: string; end: string } | null {
-  if (!project.mode) return null
-  const start = project.mode.poDate ?? project.mode.agreementStartDate ?? null
-  const end = project.mode.poExpiry ?? project.mode.agreementEndDate ?? null
+  if (!project.executionMode) return null
+  const purchaseOrders = project.executionMode.po?.purchaseOrders ?? []
+  const poDates = purchaseOrders.map((po) => po.date).filter((d): d is string => !!d).sort()
+  const start = poDates[0] ?? project.executionMode.agreement?.startDate ?? null
+  const end = soonestPoExpiry(purchaseOrders) ?? project.executionMode.agreement?.endDate ?? null
   if (!start || !end) return null
   return { start, end }
 }

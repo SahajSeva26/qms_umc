@@ -65,17 +65,17 @@ function projectToForm(p: ProjectEntity): WizardFormState {
     type: p.type,
     tests: p.tests,
 
-    mode: p.mode?.mode ?? 'po',
-    poNumber: p.mode?.poNumber ?? '',
-    poDate: p.mode?.poDate ?? formatIsoDateLocal(new Date()),
-    poExpiry: p.mode?.poExpiry ?? '',
-    agreementNumber: p.mode?.agreementNumber ?? '',
-    agreementStartDate: p.mode?.agreementStartDate ?? '',
-    agreementEndDate: p.mode?.agreementEndDate ?? '',
-    duration: p.mode?.duration ?? 12,
-    agreementDocument: p.mode?.agreementDocument ?? '',
-    emailReference: p.mode?.emailReference ?? '',
-    emailDocument: p.mode?.emailDocument ?? '',
+    mode: p.executionMode?.mode ?? 'po',
+    purchaseOrders: p.executionMode?.po?.purchaseOrders?.length
+      ? p.executionMode.po.purchaseOrders
+      : [{ number: '', date: formatIsoDateLocal(new Date()), expiry: '' }],
+    agreementNumber: p.executionMode?.agreement?.number ?? '',
+    agreementStartDate: p.executionMode?.agreement?.startDate ?? '',
+    agreementEndDate: p.executionMode?.agreement?.endDate ?? '',
+    duration: p.executionMode?.agreement?.duration ?? 12,
+    agreementDocument: p.executionMode?.agreement?.file ?? '',
+    emailReference: p.executionMode?.mail?.reference ?? '',
+    emailDocument: p.executionMode?.mail?.file ?? '',
 
     campCost: p.campCost,
     totalCamps: p.totalCamps,
@@ -202,11 +202,8 @@ const NewProjectWizard = ({ editProject, onClose, onSaved }: NewProjectWizardPro
 
   const handleBack = () => setStep((s) => Math.max(0, s - 1))
 
-  // Jumping back to an already-completed step is always safe — its fields
-  // were already validated on the way in. Jumping forward must still
-  // validate every step in between, since submit only re-checks the last
-  // step's own fields — without this, clicking straight to "Reports &
-  // Review" could skip every earlier step's required fields.
+  // Jumping forward must validate every step in between — submit only re-checks the last
+  // step's own fields, so skipping ahead could otherwise bypass earlier required fields.
   const handleStepClick = async (target: number) => {
     if (target === step) return
     if (target < step) {
@@ -225,22 +222,23 @@ const NewProjectWizard = ({ editProject, onClose, onSaved }: NewProjectWizardPro
   }
 
   const onSubmit = async (values: WizardFormState) => {
-    const mode: ExecutionMode = {
+    const executionMode: ExecutionMode = {
       mode: values.mode,
-      ...(values.mode === 'po' ? { poNumber: values.poNumber, poDate: values.poDate, poExpiry: values.poExpiry || undefined } : {}),
-      ...(values.mode === 'agreement'
-        ? { agreementNumber: values.agreementNumber || undefined, agreementStartDate: values.agreementStartDate, agreementEndDate: values.agreementEndDate || undefined, duration: values.duration || undefined, agreementDocument: values.agreementDocument || undefined }
+      ...(values.mode === 'po'
+        ? { po: { purchaseOrders: values.purchaseOrders.map((po) => ({ number: po.number || undefined, date: po.date || undefined, expiry: po.expiry || undefined, file: po.file || undefined })) } }
         : {}),
-      ...(values.mode === 'mail_confirmation' ? { emailReference: values.emailReference, emailDocument: values.emailDocument || undefined } : {}),
+      ...(values.mode === 'agreement'
+        ? { agreement: { number: values.agreementNumber || undefined, startDate: values.agreementStartDate, endDate: values.agreementEndDate || undefined, duration: values.duration || undefined, file: values.agreementDocument || undefined } }
+        : {}),
+      ...(values.mode === 'mail_confirmation' ? { mail: { reference: values.emailReference, file: values.emailDocument || undefined } } : {}),
     }
 
-    // Every field common to both Create and Update.
     const commonFields = {
       name: values.name,
       therapy: values.therapy as ProjectTherapy,
       type: values.type,
       tests: values.tests,
-      mode,
+      executionMode,
       campCost: values.campCost,
       totalCamps: values.totalCamps,
       gst: values.gst,

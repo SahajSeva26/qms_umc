@@ -7,6 +7,7 @@ import type {
   PaymentTerms,
   ProjectTherapy,
   ProjectType,
+  PurchaseOrder,
   WhoCanBookCampCode,
 } from '@/types/project.types'
 import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
@@ -31,11 +32,10 @@ export interface WizardFormState {
   // Test._id references, filtered by the selected therapy.
   tests: string[]
 
-  // Step 2 — Execution
+  // Step 2 — Execution. `purchaseOrders` supports multiple POs (2026-10 backend change) — each row's
+  // dates stay plain strings (not Date), same convention as every other date field in this form.
   mode: ExecutionModeType
-  poNumber: string
-  poDate: string
-  poExpiry: string
+  purchaseOrders: PurchaseOrder[]
   agreementNumber: string
   agreementStartDate: string
   agreementEndDate: string
@@ -93,9 +93,7 @@ export const DEFAULT_WIZARD_FORM: WizardFormState = {
   tests: [],
 
   mode: 'po',
-  poNumber: '',
-  poDate: '',
-  poExpiry: '',
+  purchaseOrders: [{ number: '', date: '', expiry: '' }],
   agreementNumber: '',
   agreementStartDate: '',
   agreementEndDate: '',
@@ -134,5 +132,5 @@ export const DEFAULT_WIZARD_FORM: WizardFormState = {
 }
 
 export function createDefaultWizardForm(): WizardFormState {
-  return { ...DEFAULT_WIZARD_FORM, poDate: formatIsoDateLocal(new Date()) }
+  return { ...DEFAULT_WIZARD_FORM, purchaseOrders: [{ number: '', date: formatIsoDateLocal(new Date()), expiry: '' }] }
 }

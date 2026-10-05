@@ -8,7 +8,7 @@ function projectFixture(overrides: Partial<ProjectEntity> = {}): ProjectEntity {
   return {
     id: 'proj-1', code: 'prj-000001', name: 'Test Project',
     tenant: 't-1', division: { _id: 'div-1', name: 'Div', code: 'div-1', therapy: [] },
-    therapy: 'cardiology', type: ['screening_camp'], tests: [], lead: null, mode: null,
+    therapy: 'cardiology', type: ['screening'], tests: [], lead: null, executionMode: null,
     campCost: 0, totalCamps: 0, gst: 0, valueBeforeGST: 0, additionalCost: 0,
     campTimeSlots: ['9am-1pm'], freeCancelHours: 0, cancellationAllowed: 0,
     campCostDeductionOnChargableCancel: 0, goLiveScope: null, whoCanBookCamp: [],

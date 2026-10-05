@@ -8,15 +8,13 @@ export const isValidLongitude = (lng: number): boolean => {
   return Number.isFinite(lng) && lng >= -180 && lng <= 180
 }
 
-// A GeoProfile.role must actually be a field-officer-typed Role when the
-// profile's own type is 'fo' — the backend never enforces this (confirmed),
-// so the form is the only place this mismatch can be caught. 'dietitian' has
-// no corresponding RoleType at all (confirmed against ALLOWED_ROLETYPE_CODES
-// — GeoProfile's type is deliberately decoupled from role-type), so there is
-// nothing to filter/validate against for that case; it's left unfiltered.
-//
-// role.type populates to `null` for a dangling RoleType ref (confirmed in
-// live data) — treated as "not a field officer" rather than thrown on.
+// The backend never enforces that role.type matches the profile's type, so the form is the
+// only place this mismatch is caught. role.type can populate to `null` for a dangling ref —
+// treated as "not a match" rather than thrown on.
 export function isFieldOfficerRole(role: RoleEntity): boolean {
   return typeof role.type === 'object' && role.type !== null && role.type.code === 'field-officer'
+}
+
+export function isDietitianRole(role: RoleEntity): boolean {
+  return typeof role.type === 'object' && role.type !== null && role.type.code === 'dietitian'
 }

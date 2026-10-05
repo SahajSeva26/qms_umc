@@ -37,13 +37,11 @@ vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
       >
         Pick a location with address details
       </button>
-      {/* Simulates the Maps-down manual lat/lng fallback — address is preserved
-          (real onChange is a no-op here), only the callback signal is what's tested. */}
+      {/* Only the callback signal is tested; real onChange is a no-op here. */}
       <button type="button" onClick={() => onManualCoordinateEntry?.()}>
         Simulate manual coordinate entry
       </button>
-      {/* Simulates the real widget's "pin moved, reverse-geocode still resolving"
-          window — the gap between a drag/click and onChange actually firing. */}
+      {/* Simulates the gap between a drag/click and onChange actually firing. */}
       <button type="button" onClick={() => onResolutionStateChange?.('loading')}>
         Simulate location resolving
       </button>
@@ -65,8 +63,7 @@ vi.mock('@/features/geo-profile/geoProfile.service', () => ({
   },
 }))
 
-// role-1 is field-officer-typed; role-2 is Sales Rep — the exact "any role
-// can be picked for a fo-typed profile" gap the filtering below closes.
+// role-1 is field-officer-typed, role-2 is Sales Rep, role-3 is dietitian-typed.
 vi.mock('@/features/access-management/accessManagement.service', () => ({
   accessManagementService: {
     searchRoles: vi.fn(async () => ({
@@ -76,8 +73,9 @@ vi.mock('@/features/access-management/accessManagement.service', () => ({
         items: [
           { id: 'role-1', name: 'FO One', code: 'fo-001', type: { name: 'Field Officer', code: 'field-officer' } },
           { id: 'role-2', name: 'Sales Rep One', code: 'sr-001', type: { name: 'Sales Rep', code: 'sales-rep' } },
+          { id: 'role-3', name: 'Dietitian One', code: 'diet-001', type: { name: 'Dietitian', code: 'dietitian' } },
         ],
-        count: 2,
+        count: 3,
       },
     })),
     getRole: vi.fn(async () => ({ success: true, message: '', data: { id: 'role-1', name: 'FO One', code: 'fo-001' } })),
@@ -144,12 +142,10 @@ describe('GeoProfileDetailPage — create mode', () => {
     const user = userEvent.setup()
     await renderCreatePage()
 
-    await user.click(screen.getByRole('combobox', { name: /role/i }))
-    await user.click(await screen.findByText(/fo one/i))
     await user.click(screen.getByRole('combobox', { name: /type/i }))
     await user.click(await screen.findByText(/field officer/i))
-    // Location deliberately never picked.
-
+    await user.click(screen.getByRole('combobox', { name: /role/i }))
+    await user.click(await screen.findByText(/fo one/i))
     await user.click(screen.getByRole('button', { name: /create geo profile/i }))
 
     expect(await screen.findByText(/pick a location on the map/i)).toBeInTheDocument()
@@ -162,11 +158,11 @@ describe('GeoProfileDetailPage — create mode', () => {
     const user = userEvent.setup()
     await renderCreatePage()
 
-    await user.click(screen.getByRole('combobox', { name: /role/i }))
-    await user.click(await screen.findByText(/fo one/i))
-
     await user.click(screen.getByRole('combobox', { name: /type/i }))
     await user.click(await screen.findByText(/field officer/i))
+
+    await user.click(screen.getByRole('combobox', { name: /role/i }))
+    await user.click(await screen.findByText(/fo one/i))
 
     await user.click(screen.getByRole('button', { name: /pick a location with address details/i }))
     await user.click(screen.getByRole('button', { name: /create geo profile/i }))
@@ -187,17 +183,15 @@ describe('GeoProfileDetailPage — create mode', () => {
   })
 
   it('disables Save (relabeled "Resolving location…") while the picked pin is still resolving, so createGeoProfile is never called', async () => {
-    // The button is disabled outright here; the next test (error state,
-    // where Save stays enabled) is what actually exercises handleSave's guard.
     await mockPermission(true)
     const { geoProfileService } = await import('@/features/geo-profile/geoProfile.service')
     const user = userEvent.setup()
     await renderCreatePage()
 
-    await user.click(screen.getByRole('combobox', { name: /role/i }))
-    await user.click(await screen.findByText(/fo one/i))
     await user.click(screen.getByRole('combobox', { name: /type/i }))
     await user.click(await screen.findByText(/field officer/i))
+    await user.click(screen.getByRole('combobox', { name: /role/i }))
+    await user.click(await screen.findByText(/fo one/i))
 
     await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
     await user.click(screen.getByRole('button', { name: /simulate location resolving/i }))
@@ -213,10 +207,10 @@ describe('GeoProfileDetailPage — create mode', () => {
     const user = userEvent.setup()
     await renderCreatePage()
 
-    await user.click(screen.getByRole('combobox', { name: /role/i }))
-    await user.click(await screen.findByText(/fo one/i))
     await user.click(screen.getByRole('combobox', { name: /type/i }))
     await user.click(await screen.findByText(/field officer/i))
+    await user.click(screen.getByRole('combobox', { name: /role/i }))
+    await user.click(await screen.findByText(/fo one/i))
 
     await user.click(screen.getByRole('button', { name: /pick a location with address details/i }))
     await user.click(screen.getByRole('button', { name: /simulate location resolve error/i }))
@@ -232,10 +226,10 @@ describe('GeoProfileDetailPage — create mode', () => {
     const user = userEvent.setup()
     await renderCreatePage()
 
-    await user.click(screen.getByRole('combobox', { name: /role/i }))
-    await user.click(await screen.findByText(/fo one/i))
     await user.click(screen.getByRole('combobox', { name: /type/i }))
     await user.click(await screen.findByText(/field officer/i))
+    await user.click(screen.getByRole('combobox', { name: /role/i }))
+    await user.click(await screen.findByText(/fo one/i))
 
     await user.click(screen.getByRole('button', { name: /pick a location with address details/i }))
     await user.click(screen.getByRole('button', { name: /simulate location resolving/i }))
@@ -251,10 +245,10 @@ describe('GeoProfileDetailPage — create mode', () => {
     const user = userEvent.setup()
     await renderCreatePage()
 
-    await user.click(screen.getByRole('combobox', { name: /role/i }))
-    await user.click(await screen.findByText(/fo one/i))
     await user.click(screen.getByRole('combobox', { name: /type/i }))
     await user.click(await screen.findByText(/field officer/i))
+    await user.click(screen.getByRole('combobox', { name: /role/i }))
+    await user.click(await screen.findByText(/fo one/i))
 
     await user.click(screen.getByRole('button', { name: /pick a location with address details/i }))
     expect(await screen.findByLabelText(/address line 1/i)).toHaveValue('Kartavya Path')
@@ -274,10 +268,10 @@ describe('GeoProfileDetailPage — create mode', () => {
     const user = userEvent.setup()
     await renderCreatePage()
 
-    await user.click(screen.getByRole('combobox', { name: /role/i }))
-    await user.click(await screen.findByText(/fo one/i))
     await user.click(screen.getByRole('combobox', { name: /type/i }))
     await user.click(await screen.findByText(/field officer/i))
+    await user.click(screen.getByRole('combobox', { name: /role/i }))
+    await user.click(await screen.findByText(/fo one/i))
 
     await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
     await user.click(screen.getByRole('button', { name: /create geo profile/i }))
@@ -285,17 +279,28 @@ describe('GeoProfileDetailPage — create mode', () => {
     await waitFor(() => expect(geoProfileService.createGeoProfile).toHaveBeenCalledTimes(1))
   })
 
-  it('Role options are always limited to field-officer-typed roles, regardless of the selected type — Sales Rep One is never offered', async () => {
+  it('Role is disabled with no options until a type is picked', async () => {
+    await mockPermission(true)
+    await renderCreatePage()
+
+    expect(screen.getByRole('combobox', { name: /role/i })).toBeDisabled()
+  })
+
+  it('selecting type "fo" scopes Role options to field-officer-typed roles only — Sales Rep One and Dietitian One are never offered', async () => {
     await mockPermission(true)
     const user = userEvent.setup()
     await renderCreatePage()
 
+    await user.click(screen.getByRole('combobox', { name: /type/i }))
+    await user.click(await screen.findByText(/field officer/i))
     await user.click(screen.getByRole('combobox', { name: /role/i }))
+
     expect(await screen.findByText(/fo one/i)).toBeInTheDocument()
     expect(screen.queryByText(/sales rep one/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/dietitian one/i)).not.toBeInTheDocument()
   })
 
-  it('selecting type "dietitian" does not change the Role options — still Field Officer only, since no dietitian RoleType exists', async () => {
+  it('selecting type "dietitian" scopes Role options to dietitian-typed roles only — FO One and Sales Rep One are never offered', async () => {
     await mockPermission(true)
     const user = userEvent.setup()
     await renderCreatePage()
@@ -304,13 +309,30 @@ describe('GeoProfileDetailPage — create mode', () => {
     await user.click(await screen.findByText(/dietitian/i))
     await user.click(screen.getByRole('combobox', { name: /role/i }))
 
-    expect(await screen.findByText(/fo one/i)).toBeInTheDocument()
+    expect(await screen.findByText(/dietitian one/i)).toBeInTheDocument()
+    expect(screen.queryByText(/fo one/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/sales rep one/i)).not.toBeInTheDocument()
   })
 
-  // handleSave's own non-FO-role guard has no independent UI path to reach
-  // it — the dropdown itself only ever offers field-officer-typed roles now.
-  // Covered directly instead via geoProfile.utils.test.ts's isFieldOfficerRole tests.
+  it('clears a previously-picked Role when the type changes, since the old role may no longer match', async () => {
+    await mockPermission(true)
+    const user = userEvent.setup()
+    await renderCreatePage()
+
+    await user.click(screen.getByRole('combobox', { name: /type/i }))
+    await user.click(await screen.findByText(/field officer/i))
+    await user.click(screen.getByRole('combobox', { name: /role/i }))
+    await user.click(await screen.findByText(/fo one/i))
+    expect(screen.getByRole('combobox', { name: /role/i })).toHaveTextContent(/fo one/i)
+
+    await user.click(screen.getByRole('combobox', { name: /type/i }))
+    await user.click(await screen.findByText(/dietitian/i))
+
+    expect(screen.getByRole('combobox', { name: /role/i })).not.toHaveTextContent(/fo one/i)
+  })
+
+  // handleSave's role/type-mismatch guard is covered via geoProfile.utils.test.ts instead,
+  // since the dropdown here is already scoped so the mismatch can't be reached through the UI.
 })
 
 describe('GeoProfileDetailPage — edit mode', () => {
@@ -327,9 +349,7 @@ describe('GeoProfileDetailPage — edit mode', () => {
   })
 
   it('shows the loaded profile\'s real address fields in the Location section', async () => {
-    // Regression guard: this display was initially wired into the read-only
-    // view only — a caller who can manage (lands on THIS edit form, not the
-    // read-only view) saw no address at all until that gap was found and fixed.
+    // Regression guard: address display was previously wired only into the read-only view.
     await mockPermission(true)
     await renderEditPage(geoProfileFixture({
       coordinates: [77.2090, 28.6139],
@@ -415,7 +435,6 @@ describe('GeoProfileDetailPage — edit mode', () => {
   })
 
   it('disables Save (relabeled "Resolving location…") while the picked pin is still resolving, so updateGeoProfile is never called', async () => {
-    // Mirrors the create-mode test above — Save is disabled outright here.
     await mockPermission(true)
     const { geoProfileService } = await import('@/features/geo-profile/geoProfile.service')
     const user = userEvent.setup()

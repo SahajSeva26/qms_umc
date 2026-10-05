@@ -35,7 +35,11 @@ const baseTest: TestEntity = {
   duration: 15,
   price: 250,
   status: 'active',
-  consumption: [{ item: 'd-1', rate: 0 }, { item: 'd-2', rate: 0 }, { item: 'c-1', rate: 1 }],
+  consumption: [
+    { item: { id: 'd-1', code: 'DEV-1', name: 'Glucometer', type: 'device' }, rate: 0 },
+    { item: { id: 'd-2', code: 'DEV-2', name: 'BP Monitor', type: 'device' }, rate: 0 },
+    { item: { id: 'c-1', code: 'CON-1', name: 'Gloves', type: 'consumable' }, rate: 1 },
+  ],
 }
 
 describe('TestForm — create mode', () => {
@@ -328,16 +332,25 @@ describe('TestForm — edit mode', () => {
     vi.resetAllMocks()
   })
 
-  it('shows the code as plain read-only text (not a form input), disables therapy, and shows a single merged resource count, not a picker or per-item labels', async () => {
+  it('shows the code as plain read-only text (not a form input), disables therapy, and shows the real device/consumable names instead of a picker', async () => {
     await renderForm(baseTest)
 
     expect(screen.queryByLabelText(/code/i)).not.toBeInTheDocument()
     expect(screen.getByText('tst-000001')).toBeInTheDocument()
     expect(screen.getByLabelText(/therapy/i)).toBeDisabled()
     expect(screen.getByLabelText(/camp type/i)).toBeDisabled()
-    expect(screen.getByText(/3 resources/i)).toBeInTheDocument()
+    expect(screen.getByText('Glucometer')).toBeInTheDocument()
+    expect(screen.getByText('BP Monitor')).toBeInTheDocument()
+    expect(screen.getByText('Gloves')).toBeInTheDocument()
+    expect(screen.getByText('DEV-1')).toBeInTheDocument()
     expect(screen.queryByPlaceholderText(/search devices/i)).not.toBeInTheDocument()
     expect(screen.queryByText('d-1')).not.toBeInTheDocument()
+  })
+
+  it('shows a consumable\'s required quantity next to its name, but not for a device', async () => {
+    await renderForm(baseTest)
+
+    expect(screen.getByText(/qty 1/i)).toBeInTheDocument()
   })
 
   it('renders duration and price as editable inputs, seeded with the existing values', async () => {

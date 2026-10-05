@@ -1,18 +1,24 @@
 import { useState } from 'react'
 import { Controller, useFormContext } from 'react-hook-form'
 import type { TestFormValues } from '@/features/test-master/schemas/test.schemas'
+import type { TestConsumptionLine } from '@/features/test-master/testMaster.types'
 import InventoryMasterMultiPicker from '@/features/inventory/real/components/InventoryMasterMultiPicker'
+import { INVENTORY_MASTER_TYPE_LABEL } from '@/types/inventoryMaster.types'
 import FieldLabel from '@/components/ui/FieldLabel'
 import { Input } from '@/components/ui/input'
 
 interface TestResourcePickerProps {
   isEdit: boolean
-  resourceCount: number
+  // Edit mode only — GET /:id populates each line's item ({id,code,name,type});
+  // search/create responses leave it unpopulated, but edit mode always loads via GET /:id first.
+  consumption: TestConsumptionLine[]
 }
 
-// Edit mode shows a read-only count instead of a picker — the backend's
-// mapper never returns resource-line item names, so there's no label to show.
-const TestResourcePicker = ({ isEdit, resourceCount }: TestResourcePickerProps) => {
+// Edit mode shows a read-only list (names, codes, device/consumable type, consumable rate) —
+// only create-mode gets the pickers. This is a frontend limitation, not a backend one: the
+// update endpoint's payload schema does accept `consumption`, this UI just doesn't expose
+// editing it yet (see UpdateTestPayload, which omits it for the same reason).
+const TestResourcePicker = ({ isEdit, consumption }: TestResourcePickerProps) => {
   const { control, formState: { errors } } = useFormContext<TestFormValues>()
 
   // Display-only labels for the create-mode pickers — never submitted.
@@ -20,10 +26,37 @@ const TestResourcePicker = ({ isEdit, resourceCount }: TestResourcePickerProps) 
   const [consumableLabels, setConsumableLabels] = useState<Record<string, string>>({})
 
   if (isEdit) {
+    if (consumption.length === 0) {
+      return (
+        <div className="rounded-xl border p-3 text-[12px]" style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }}>
+          No devices or consumables required for this test.
+        </div>
+      )
+    }
     return (
-      <div className="rounded-xl border p-3 space-y-1 text-[12px]" style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }}>
-        <div>{resourceCount} resource{resourceCount === 1 ? '' : 's'}</div>
-        <p className="mt-1">Devices/consumables can be set when a test is created; editing an existing test's resource list isn't supported yet.</p>
+      <div>
+        <FieldLabel>Devices &amp; consumables required</FieldLabel>
+        <div className="rounded-xl border divide-y text-[12px]" style={{ borderColor: 'var(--qms-border)' }}>
+          {consumption.map((line, index) => (
+            <div key={line.item.id || index} className="flex items-center justify-between gap-2 px-3 py-2">
+              <div className="min-w-0">
+                <div className="font-medium truncate" style={{ color: 'var(--qms-text)' }}>
+                  {line.item.name ?? line.item.id}
+                </div>
+                {line.item.code && (
+                  <div className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>{line.item.code}</div>
+                )}
+              </div>
+              <div className="flex items-center gap-2 shrink-0" style={{ color: 'var(--qms-text-muted)' }}>
+                {line.item.type && <span>{INVENTORY_MASTER_TYPE_LABEL[line.item.type as keyof typeof INVENTORY_MASTER_TYPE_LABEL] ?? line.item.type}</span>}
+                {line.item.type === 'consumable' && <span>· qty {line.rate}</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+        <p className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
+          Devices/consumables can be set when a test is created; editing an existing test's resource list isn't supported yet.
+        </p>
       </div>
     )
   }

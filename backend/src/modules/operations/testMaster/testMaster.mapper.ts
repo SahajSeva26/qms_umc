@@ -2,8 +2,17 @@
 import { RequestContext } from '../../../shared/utils/contextBuilder';
 import { TEST_MASTER_PERMISSIONS } from './testMaster.constants';
 
+// item is populated (InventoryMaster) on GET /:id → {id, code, name, type};
+// unpopulated (search/create/update) → {id} only.
 const mapConsumptionLine = (line: any) => ({
-    item: line?.item?._id ? line.item._id.toString() : line?.item?.toString(),
+    item: line?.item?._id
+        ? {
+              id: line.item._id.toString(),
+              code: line.item.code,
+              name: line.item.name,
+              type: line.item.type,
+          }
+        : { id: line?.item?.toString() },
     rate: line?.rate,
 });
 

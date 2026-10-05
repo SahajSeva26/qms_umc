@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route, useSearchParams } from 'react-router-dom'
 import { usePermission } from '@/hooks/usePermission'
 
@@ -17,10 +18,14 @@ vi.mock('@/features/access-management/employee/hooks/useEmployees', () => ({
   useEmployees: (query: unknown) => { searchEmployees(query); return { data: { data: { count: 0, items: [] } }, isLoading: false, error: null, refetch: vi.fn() } },
 }))
 const useRoleTypesSpy = vi.fn()
+// Query-aware (not a single fixed fixture) — EmployeesListPage calls this twice, once per worker
+// kind (field-officer/dietitian), and a test overriding one kind's result must not affect the other.
+let roleTypesMockImpl: (query: { code: string }) => { data: unknown; isLoading: boolean; isError: boolean; refetch: () => void } =
+  (query) => ({ data: { data: { items: [{ id: `rt-${query.code}`, code: query.code }] } }, isLoading: false, isError: false, refetch: vi.fn() })
 vi.mock('@/features/access-management/role-type/hooks/useRoleTypes', () => ({
-  useRoleTypes: (query: unknown, enabled: boolean) => {
+  useRoleTypes: (query: { code: string }, enabled: boolean) => {
     useRoleTypesSpy(query, enabled)
-    return { data: { data: { items: [{ id: 'rt-fo', code: 'field-officer' }] } }, isLoading: false, error: null }
+    return roleTypesMockImpl(query)
   },
 }))
 const useTenantsSpy = vi.fn()
@@ -59,6 +64,7 @@ async function renderPage(session: ReturnType<typeof sessionFixture> | null, per
 describe('EmployeesListPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    roleTypesMockImpl = (query) => ({ data: { data: { items: [{ id: `rt-${query.code}`, code: query.code }] } }, isLoading: false, isError: false, refetch: vi.fn() })
   })
 
   it('paginates with the established limit=10 convention', async () => {
@@ -94,6 +100,42 @@ describe('EmployeesListPage', () => {
   it('a system:manage session sees the button regardless of role-type code', async () => {
     await renderPage(sessionFixture('sales-rep'), ['system:manage'])
     expect(await screen.findByRole('button', { name: /new employee/i })).toBeInTheDocument()
+  })
+
+  it('shows a loading state (not a silently-missing button) while both worker-role lookups are in flight', async () => {
+    roleTypesMockImpl = () => ({ data: undefined, isLoading: true, isError: false, refetch: vi.fn() })
+    await renderPage(sessionFixture('admin'), ['tenant:admin'])
+
+    expect(await screen.findByText(/loading worker roles/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /new employee/i })).not.toBeInTheDocument()
+  })
+
+  it('shows a retryable error — not a silently-missing button — when BOTH worker-role lookups fail', async () => {
+    const refetch = vi.fn()
+    roleTypesMockImpl = () => ({ data: undefined, isLoading: false, isError: true, refetch })
+    await renderPage(sessionFixture('admin'), ['tenant:admin'])
+
+    expect(await screen.findByText(/couldn't load worker roles/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /new employee/i })).not.toBeInTheDocument()
+
+    await userEvent.setup().click(screen.getByRole('button', { name: /retry/i }))
+    expect(refetch).toHaveBeenCalled()
+  })
+
+  it('a FAILED dietitian lookup does not silently drop the option — the button still renders (field-officer is fine), with a visible retryable notice instead of nothing', async () => {
+    const refetchDietitian = vi.fn()
+    roleTypesMockImpl = (query) =>
+      query.code === 'dietitian'
+        ? { data: undefined, isLoading: false, isError: true, refetch: refetchDietitian }
+        : { data: { data: { items: [{ id: 'rt-field-officer', code: 'field-officer' }] } }, isLoading: false, isError: false, refetch: vi.fn() }
+    await renderPage(sessionFixture('admin'), ['tenant:admin'])
+
+    // The button still renders — field officer onboarding works even though dietitian lookup failed.
+    expect(await screen.findByRole('button', { name: /new employee/i })).toBeInTheDocument()
+    expect(screen.getByText(/couldn't load dietitian — retry/i)).toBeInTheDocument()
+
+    await userEvent.setup().click(screen.getByText(/couldn't load dietitian — retry/i))
+    expect(refetchDietitian).toHaveBeenCalled()
   })
 
   it('strips ?onboard=new from the URL even when the session cannot use it (canOnboardNewPerson is false) — it must not linger even though nothing opens', async () => {

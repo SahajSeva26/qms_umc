@@ -423,7 +423,15 @@ export interface SessionPermissions {
 // ---------------------------------------------------------------------------
 
 export type EmployeeStatus = 'active' | 'inactive' | 'terminated'
-export type EmployeeType = 'field-officer'
+// Employment type — how the person is engaged, NOT their system role (that lives on the linked
+// user's Role/RoleType — e.g. 'field-officer'). Mirrors the backend's EMPLOYEE_TYPES exactly.
+export type EmployeeType = 'full-time' | 'part-time' | 'contractual' | 'freelance'
+export const EMPLOYEE_TYPE_LABEL: Record<EmployeeType, string> = {
+  'full-time': 'Full-time',
+  'part-time': 'Part-time',
+  contractual: 'Contractual',
+  freelance: 'Freelance',
+}
 export type EmployeeGender = 'male' | 'female' | 'other'
 export type DaRuleType = 'fixed' | 'percentage'
 

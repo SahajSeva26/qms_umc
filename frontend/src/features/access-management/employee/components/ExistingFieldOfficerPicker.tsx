@@ -15,17 +15,17 @@ export interface PickedFieldOfficer {
 
 interface ExistingFieldOfficerPickerProps {
   tenant: string | undefined
-  foTypeId: string | undefined
+  roleTypeId: string | undefined
+  /** Drives placeholder/empty-state wording only — the actual search is already scoped by roleTypeId. */
+  workerLabel: 'field officer' | 'dietitian'
   value: string | null
   onChange: (picked: PickedFieldOfficer) => void
 }
 
 const MIN_SEARCH_LENGTH = 2
 
-// Returns the populated User, or null if the Role's user is either a raw (unpopulated) id or a
-// genuine dangling reference (the linked User was hard-deleted — Mongoose resolves that to
-// `role.user: null`). Both cases mean "no usable user data," but blockReason below surfaces them
-// with different messages, since only one of them is a real data-integrity problem.
+// Mongoose resolves a hard-deleted linked User to `role.user: null`, distinct from an unpopulated
+// string id — blockReason surfaces these two cases with different messages.
 function populatedUser(role: RoleEntity): RolePopulatedUser | null {
   if (role.user === null || typeof role.user === 'string') return null
   return role.user
@@ -55,12 +55,13 @@ function blockReason(role: RoleEntity): string | null {
   return null
 }
 
-const ExistingFieldOfficerPicker = ({ tenant, foTypeId, value, onChange }: ExistingFieldOfficerPickerProps) => {
+const ExistingFieldOfficerPicker = ({ tenant, roleTypeId, workerLabel, value, onChange }: ExistingFieldOfficerPickerProps) => {
   const [search, setSearch] = useState('')
   const [blockedRoleId, setBlockedRoleId] = useState<string | null>(null)
 
   const { items, isFetching, isFetchingNextPage, error, hasNextPage, fetchNextPage, isDebouncing, hasSearchableQuery } =
-    useFieldOfficerRolePicker(search, tenant, foTypeId, true)
+    useFieldOfficerRolePicker(search, tenant, roleTypeId, true)
+  const workerLabelPlural = workerLabel === 'dietitian' ? 'dietitians' : 'field officers'
 
   const handleSelect = (role: RoleEntity) => {
     const reason = blockReason(role)
@@ -71,9 +72,7 @@ const ExistingFieldOfficerPicker = ({ tenant, foTypeId, value, onChange }: Exist
     setBlockedRoleId(null)
     const user = populatedUser(role)
     if (!user) {
-      // Unreachable given blockReason above, but this is an external, nullable relation — never
-      // trust that invariant silently via a forced assertion. If it ever does drift, surface it
-      // the same way every other unlinkable row is surfaced, not a silent no-op click.
+      // Unreachable given blockReason above, but don't trust that via a forced assertion on this external relation.
       setBlockedRoleId(role.id)
       return
     }
@@ -94,7 +93,7 @@ const ExistingFieldOfficerPicker = ({ tenant, foTypeId, value, onChange }: Exist
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search field officers by name or email…"
+          placeholder={`Search ${workerLabelPlural} by name or email…`}
           className="pl-8"
         />
       </div>
@@ -108,11 +107,11 @@ const ExistingFieldOfficerPicker = ({ tenant, foTypeId, value, onChange }: Exist
         <p className="text-[12px] py-3 text-center" style={{ color: 'var(--qms-text-muted)' }}>Searching…</p>
       )}
       {hasSearchableQuery && !isDebouncing && error && (
-        <p className="text-[12px] text-danger">Couldn't search field officers — try again.</p>
+        <p className="text-[12px] text-danger">Couldn't search {workerLabelPlural} — try again.</p>
       )}
       {hasSearchableQuery && !isDebouncing && !isFetching && !error && items.length === 0 && (
         <p className="text-[12px] py-3 text-center rounded-xl border" style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }}>
-          No field officers match "{search.trim()}".
+          No {workerLabelPlural} match "{search.trim()}".
         </p>
       )}
 

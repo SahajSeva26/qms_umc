@@ -28,7 +28,7 @@ const ROLE_PAYLOAD: CreateRolePayload = {
   user: { firstName: 'Ravi', lastName: 'Kumar', email: 'ravi@example.com', password: 'Password1', phone: '9876543210' },
 }
 
-const EMPLOYEE_FIELDS = { type: 'field-officer' as const, doj: '2026-01-01' }
+const EMPLOYEE_FIELDS = { type: 'full-time' as const, doj: '2026-01-01' }
 
 function networkError() {
   const err = new AxiosError('Network Error')
@@ -328,7 +328,7 @@ describe('useOnboardFieldOfficer', () => {
     } as never)
     vi.mocked(accessManagementService.createEmployee).mockResolvedValueOnce({ success: true, message: '', data: { id: 'emp-recovered' } } as never)
 
-    const updatedFields = { type: 'field-officer' as const, doj: '2026-02-01', salary: 50000 }
+    const updatedFields = { type: 'full-time' as const, doj: '2026-02-01', salary: 50000 }
     await act(async () => {
       await result.current.checkIfAccountExists(updatedFields)
     })

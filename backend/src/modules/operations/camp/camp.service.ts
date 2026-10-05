@@ -2,6 +2,7 @@
 import mongoose, { HydratedDocument } from 'mongoose';
 import { CampModel, ICamp } from './camp.model';
 import {
+    IApproveVoidCampPayload,
     IBookCampPayload,
     IBookingAvailabilityPayload,
     ICampReportQuery,
@@ -9,8 +10,10 @@ import {
     IMoveStagePayload,
     ISearchCampQuery,
     IUpdateCampPayload,
+    IVoidCampPayload,
 } from './camp.validators';
 import {
+    BILLING_TYPES,
     CAMP_COUNTER_ENTITY,
     CAMP_PERMISSIONS,
     CAMP_STATUSES,
@@ -475,6 +478,10 @@ const set = async (model: any, entity: HydratedDocument<ICamp>, ctx: RequestCont
     if (model.conscentPath !== undefined) {
         entity.conscentPath = model.conscentPath;
     }
+    // free-form metadata bag (e.g. a void camp's mailUrl)
+    if (model.meta !== undefined) {
+        entity.meta = model.meta;
+    }
 
     return entity;
 };
@@ -717,6 +724,95 @@ const create = async (model: ICreateCampPayload, ctx: RequestContext): Promise<H
     });
 
     return saved;
+};
+
+// voidCamp — internal-team record of a camp that happened WITHOUT a PO (WF-4). Deliberately skips
+// the whole create() lifecycle: no FO auto-allocation, no slot-clash check, no auto-confirm. The camp
+// lands in `requested` (model default) with billingType forced to 'void', to be reconciled later
+// (upline approval → PO mapped → flipped to billable). Same tenant/division/project validation as create.
+const voidCamp = async (model: IVoidCampPayload, ctx: RequestContext): Promise<HydratedDocument<ICamp>> => {
+    //1: division must exist (scoped) and belong to the selected client (tenant)
+    const division = await DivisionService.get(model.division, ctx);
+    if (!division) {
+        return throwAppError('Division not found', StatusCodes.NOT_FOUND);
+    }
+    if (division.tenant.toString() !== model.tenant) {
+        return throwAppError('The selected division does not belong to the selected client', StatusCodes.BAD_REQUEST);
+    }
+
+    //2: optional project link — when linked it must belong to the same client; its division wins, and
+    // the camp's type must be one the project offers (same rules as create)
+    let project: any = null;
+    let divisionId: any = division._id;
+    if (model.project) {
+        const projectDoc = await ProjectService.get(model.project, ctx);
+        if (!projectDoc) {
+            return throwAppError('Project not found', StatusCodes.NOT_FOUND);
+        }
+        if (projectDoc.tenant.toString() !== model.tenant) {
+            return throwAppError('The selected project does not belong to the selected client', StatusCodes.BAD_REQUEST);
+        }
+        const campType = model.type ?? CAMP_TYPES.SCREENING;
+        if (!((projectDoc.type as string[]) || []).includes(campType)) {
+            return throwAppError(`This project does not offer ${campType} camps`, StatusCodes.BAD_REQUEST);
+        }
+        project = projectDoc._id;
+        divisionId = projectDoc.division;
+    }
+
+    //3: build + apply fields via set(). set() validates a supplied worker role but does NOT run the
+    // slot-clash check (that lives in create()) — exactly what we want for a historical void camp.
+    const entity = new CampModel({ tenant: division.tenant, division: divisionId, project });
+    let camp = await set(model, entity, ctx);
+
+    //4: force the void billing type — a void camp is never accepted as billable at creation.
+    camp.billingType = BILLING_TYPES.VOID;
+
+    //5: NO auto-allocation / auto-confirm — the camp stays `requested` (model default). Reserve the
+    // sequential code + persist in a txn.
+    const saved = await withTransaction(async () => {
+        camp.code = await CounterService.next(CAMP_COUNTER_ENTITY, ctx);
+        return await camp.save();
+    });
+
+    return saved;
+};
+
+// approveVoidCamp — the single update a void camp allows: approve it, moving requested → closed.
+// Void camps use ONLY requested + closed (not the normal requested→confirmed→live→closed machine),
+// so this handles that requested→closed transition directly. Route-gated to camp:manage. The approver
+// and time are captured by the stageHistory entry's actor + createdAt (no separate approvedBy/At fields).
+const approveVoidCamp = async (id: string, model: IApproveVoidCampPayload, ctx: RequestContext) => {
+    let camp = await CampService.get(id, ctx);
+    if (!camp) {
+        return throwAppError('Camp not found', StatusCodes.NOT_FOUND);
+    }
+
+    // only a void camp can be approved through this path
+    if (camp.billingType !== BILLING_TYPES.VOID) {
+        return throwAppError('This camp is not a void camp', StatusCodes.BAD_REQUEST);
+    }
+
+    // a void camp can only be approved from `requested` → `closed`
+    if (camp.status !== CAMP_STATUSES.REQUESTED) {
+        return throwAppError('Only a requested void camp can be approved', StatusCodes.CONFLICT);
+    }
+
+    const actorName = `${ctx.user?.firstName || ''} ${ctx.user?.lastName || ''}`.trim();
+    camp.stageHistory.push({
+        from: CAMP_STATUSES.REQUESTED,
+        to: CAMP_STATUSES.CLOSED,
+        reason: model.reason,
+        actor: {
+            roleId: ctx.role?._id || ctx.role?.id,
+            name: actorName || undefined,
+            email: ctx.user?.email,
+        },
+    } as any);
+    camp.status = CAMP_STATUSES.CLOSED;
+    camp = await camp.save();
+
+    return camp;
 };
 
 const update = async (id: string, model: IUpdateCampPayload, ctx: RequestContext) => {
@@ -1130,6 +1226,8 @@ export const CampService = {
     search,
     myCamps,
     create,
+    voidCamp,
+    approveVoidCamp,
     update,
     moveStage,
     allocateWorker,

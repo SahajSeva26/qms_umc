@@ -3,6 +3,7 @@ import express from 'express';
 import { CampController } from './camp.controller';
 import { registry } from '../../../shared/config/swagger/swagger.registry';
 import {
+    ApproveVoidCampPayloadSchema,
     BookCampPayloadSchema,
     BookingAvailabilityPayloadSchema,
     CampReportQuerySchema,
@@ -10,6 +11,7 @@ import {
     MoveStagePayloadSchema,
     SearchCampQuerySchema,
     UpdateCampPayloadSchema,
+    VoidCampPayloadSchema,
 } from './camp.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
 import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
@@ -98,6 +100,28 @@ registry.registerPath({
     },
     responses: {
         201: { description: 'Camp created successfully' },
+        400: { description: 'Validation error' },
+        404: { description: 'Project or division not found' },
+    },
+});
+
+// void camp (internal team — record a camp done without a PO, no lifecycle)
+registry.registerPath({
+    method: 'post',
+    path: '/camps/void-camp',
+    tags: ['CAMP'],
+    summary: 'Record a void camp (done without a PO) — internal team only; no lifecycle/allocation, billingType forced to void, lands in requested',
+    request: {
+        body: {
+            content: {
+                'application/json': {
+                    schema: VoidCampPayloadSchema,
+                },
+            },
+        },
+    },
+    responses: {
+        201: { description: 'Void camp created successfully' },
         400: { description: 'Validation error' },
         404: { description: 'Project or division not found' },
     },
@@ -193,6 +217,30 @@ registry.registerPath({
     },
 });
 
+// approve a void camp (requested → closed) — internal team only
+registry.registerPath({
+    method: 'patch',
+    path: '/camps/{id}/approve-void',
+    tags: ['CAMP'],
+    summary: 'Approve a void camp — moves it requested → closed (camp:manage only; records reason + approver in stage history)',
+    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+    request: {
+        body: {
+            content: {
+                'application/json': {
+                    schema: ApproveVoidCampPayloadSchema,
+                },
+            },
+        },
+    },
+    responses: {
+        200: { description: 'Void camp approved successfully' },
+        400: { description: 'Not a void camp / validation error' },
+        404: { description: 'Camp not found' },
+        409: { description: 'Void camp is not in the requested stage' },
+    },
+});
+
 // allocate the camp's field worker (nearest-free auto-assign) — a field officer for screening/lab
 // camps, a dietitian for diet camps (decided by the camp's type).
 registry.registerPath({
@@ -258,6 +306,13 @@ CampRouter.patch(
     CampController.moveStage,
 );
 
+// approve a void camp (requested → closed) — camp:manage (ops) / tenant:manage only
+CampRouter.patch(
+    '/:id/approve-void',
+    AuthorizeMiddleware([CAMP_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
+    CampController.approveVoidCamp,
+);
+
 CampRouter.post(
     '/:id/allocate',
     AuthorizeMiddleware([
@@ -287,6 +342,14 @@ CampRouter.post(
         TENANT_PERMISSIONS.MANAGE.code,
     ]),
     CampController.create,
+);
+
+// void camp — internal team records a camp done without a PO (no lifecycle). Gated to camp:manage
+// (ops managers) / tenant:manage, never to pharma field-force (no camp:book here).
+CampRouter.post(
+    '/void-camp',
+    AuthorizeMiddleware([CAMP_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
+    CampController.voidCamp,
 );
 
 // booking availability — a pre-booking check for the pharma field-force. Entry is limited to

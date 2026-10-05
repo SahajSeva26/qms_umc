@@ -15,6 +15,10 @@ export class GoogleMapsProvider implements IMapsProvider {
     // road distance + travel time between two coordinates (DRIVE mode). The Routes API requires a
     // field mask header naming the fields to return.
     async computeDistance(origin: ILatLng, destination: ILatLng): Promise<IRouteDistance> {
+        // Initialize the gRPC client HERE (awaited) so a credential/auth failure rejects THIS promise
+        // — which the caller's try/catch handles — instead of escaping as an unhandled rejection.
+        await this.client.initialize();
+
         const [response] = await this.client.computeRoutes(
             {
                 origin: { location: { latLng: { latitude: origin.lat, longitude: origin.lng } } },
@@ -41,6 +45,13 @@ export class GoogleMapsProvider implements IMapsProvider {
         if (!destinations.length) {
             return results;
         }
+
+        // CRITICAL: initialize the gRPC client HERE, awaited, BEFORE the streaming call. computeRouteMatrix
+        // internally does `this.initialize().catch(err => { throw err })` (routes_client.js:450) — a
+        // fire-and-forget whose throw becomes an UNHANDLED promise rejection that crashes the process and
+        // bypasses the caller's try/catch around the stream. Awaiting init first turns a bad/missing API
+        // key into a normal rejection of THIS method, which callers catch and fall back to straight-line.
+        await this.client.initialize();
 
         const stream = this.client.computeRouteMatrix(
             {

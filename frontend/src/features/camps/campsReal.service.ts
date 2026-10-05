@@ -60,9 +60,10 @@ const getCampReport = async (status?: CampStatus) => {
 
 // Backend requires the payload key spelled `projectID` — translated here only.
 const getBookingAvailability = async (payload: BookingAvailabilityPayload) => {
-  const { projectId, ...rest } = payload
+  const { projectId, type, ...rest } = payload
   const res = await api.post<ApiResponse<BookingAvailabilityResponse>>('/camps/booking-availability', {
     projectID: projectId,
+    ...(type ? { type } : {}),
     ...rest,
   })
   return res.data

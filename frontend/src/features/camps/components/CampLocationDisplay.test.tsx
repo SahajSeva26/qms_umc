@@ -26,7 +26,7 @@ function legacyCampFixture(): CampEntity {
   return {
     id: 'camp-legacy', code: 'cmp-000001', tenant: 't-1', division: 'div-1', project: null,
     doctor: 'doc-1', type: 'screening', billingType: 'billable', patientExpectation: 0,
-    fo: null, mr: null, asm: null, rsm: null, date: '2026-09-15', timeSlot: '9am-1pm',
+    fo: null, dietitian: null, mr: null, asm: null, rsm: null, date: '2026-09-15', timeSlot: '9am-1pm',
     location: null,
     devices: [], status: 'requested', stageHistory: [],
     createdAt: '', updatedAt: '',

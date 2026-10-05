@@ -21,9 +21,8 @@ const CampEditPageReal = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
-  // Set by CampDrawer's Edit button to whichever page the drawer was opened over.
   const returnTo = searchParams.get('from') || (id ? `/camps?camp=${id}` : '/camps')
-  // Real back when we arrived via a drawer push; a direct/bookmarked load has no entry to pop back to.
+  // A direct/bookmarked load has no history entry to pop back to, so it can't use navigate(-1).
   const arrivedFromDrawer = (location.state as { fromDrawer?: boolean } | null)?.fromDrawer === true
   const goBackToCamp = () => {
     if (arrivedFromDrawer) navigate(-1)
@@ -74,11 +73,12 @@ const CampEditForm = ({ camp, returnTo }: CampEditFormProps) => {
   const canWrite = hasAnyPermission(CAMP_UPDATE_PERMISSIONS)
 
   const { draft, setField } = useCampDraft(camp)
-  const { doctor, fo, mr, date, timeSlot, location, devices, notes, type, billingType, patientExpectation } = draft
+  const { doctor, fo, dietitian, mr, date, timeSlot, location, devices, notes, billingType, patientExpectation } = draft
 
   const [locationResolution, setLocationResolution] = useState<LocationResolutionState>('idle')
   const [mrLabel, setMrLabel] = useState(() => campRefName(camp.mr) ?? '')
   const [foLabel, setFoLabel] = useState(() => campRefName(camp.fo) ?? '')
+  const [dietitianLabel, setDietitianLabel] = useState(() => campRefName(camp.dietitian) ?? '')
   const [deviceLabels, setDeviceLabels] = useState<Record<string, string>>(() =>
     Object.fromEntries(camp.devices.map((d) => [d._id, `${d.name} (${d.code})`])),
   )
@@ -93,7 +93,7 @@ const CampEditForm = ({ camp, returnTo }: CampEditFormProps) => {
     return effectiveTenant ? 'Select doctor' : 'Select company first'
   }
 
-  // camp.project is a slim populate (no campTimeSlots) — fetch the full project to scope the time-slot Select.
+  // camp.project is a slim populate (no campTimeSlots) — refetch the full project for the time-slot Select.
   const { data: editProjectData } = useProject(camp.project ? campRefId(camp.project) ?? undefined : undefined)
   const editProject = editProjectData?.data ?? null
   const bookableSlots = editProject?.campTimeSlots ?? []
@@ -120,22 +120,22 @@ const CampEditForm = ({ camp, returnTo }: CampEditFormProps) => {
     updateCamp.mutate(
       {
         doctor: doctor || undefined,
-        fo: fo || undefined,
+        // A legacy diet camp can carry a historic `fo` from before dietitian support — send only the matching field.
+        ...(camp.type === 'diet' ? { dietitian: dietitian || undefined } : { fo: fo || undefined }),
         mr: mr || undefined,
         date: date || undefined,
         timeSlot: timeSlot || undefined,
         // Omitted (not null) when unset, so an untouched legacy-null location stays alone.
         location: location ?? undefined,
-        // Send raw string (not `notes || undefined`) so clearing the textarea to '' actually clears it.
+        // Raw string, not `notes || undefined` — clearing the textarea to '' must actually clear it.
         notes,
-        // Backend leaves an absent key unchanged — omit unless the final value actually differs from the original.
-        ...(type !== camp.type ? { type } : {}),
+        // Backend leaves an absent key unchanged — omit unless the final value differs from the original.
         ...(billingType !== camp.billingType ? { billingType } : {}),
         ...(patientExpectationNum !== camp.patientExpectation ? { patientExpectation: patientExpectationNum } : {}),
         ...(sortedIds(deviceIds) !== originalDeviceIds ? { devices: deviceIds } : {}),
       },
       {
-        // replace, not push — a save shouldn't leave the edit page as a Back-able history step.
+        // replace: a save shouldn't leave the edit page as a Back-able history step.
         onSuccess: () => navigate(withCampParam(returnTo, camp.id), { replace: true }),
       },
     )
@@ -164,6 +164,8 @@ const CampEditForm = ({ camp, returnTo }: CampEditFormProps) => {
         setMrLabel={setMrLabel}
         foLabel={foLabel}
         setFoLabel={setFoLabel}
+        dietitianLabel={dietitianLabel}
+        setDietitianLabel={setDietitianLabel}
         deviceLabels={deviceLabels}
         onDevicesChange={(ids, labels) => { setField('devices', ids.join(', ')); setDeviceLabels(labels) }}
         onLocationResolutionChange={setLocationResolution}

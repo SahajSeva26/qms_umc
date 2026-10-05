@@ -88,7 +88,10 @@ const CampDrawerContent = ({ campId, onClose }: CampDrawerContentProps) => {
   })
 
   const doctor = camp?.doctor && typeof camp.doctor !== 'string' ? camp.doctor : null
+  const isDiet = camp?.type === 'diet'
   const fo = camp?.fo && typeof camp.fo !== 'string' ? camp.fo : null
+  const dietitian = camp?.dietitian && typeof camp.dietitian !== 'string' ? camp.dietitian : null
+  const worker = isDiet ? dietitian : fo
 
   return (
     <SideDrawer open title={camp?.code ?? 'Camp'} onClose={onClose} widthClassName="max-w-lg">
@@ -192,23 +195,23 @@ const CampDrawerContent = ({ campId, onClose }: CampDrawerContentProps) => {
                 <OverviewRow label="Specialization" value={doctor?.specialization || '—'} />
               </div>
 
-              <SectionHeader icon={FiTruck}>Field Officer</SectionHeader>
+              <SectionHeader icon={FiTruck}>{isDiet ? 'Dietitian' : 'Field Officer'}</SectionHeader>
               <div className="rounded-[14px] border p-3" style={{ borderColor: 'var(--qms-border)' }}>
-                {fo ? (
-                  <OverviewRow label="FO" value={roleName(camp.fo)} />
+                {worker ? (
+                  <OverviewRow label={isDiet ? 'Dietitian' : 'FO'} value={roleName(isDiet ? camp.dietitian : camp.fo)} />
                 ) : (
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[12px] font-semibold text-danger">Unassigned</span>
                     {canUpdate && (
                       <Button variant="outline" size="sm" onClick={() => allocateFo.mutate()} disabled={allocateFo.isPending}>
-                        {allocateFo.isPending ? 'Allocating…' : 'Assign FO'}
+                        {allocateFo.isPending ? 'Allocating…' : isDiet ? 'Assign dietitian' : 'Assign FO'}
                       </Button>
                     )}
                   </div>
                 )}
                 {allocateFo.isError && (
                   <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger mt-2">
-                    {(allocateFo.error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Could not allocate an FO.'}
+                    {(allocateFo.error as { response?: { data?: { message?: string } } })?.response?.data?.message || `Could not allocate a${isDiet ? ' dietitian' : 'n FO'}.`}
                   </div>
                 )}
                 <OverviewRow label="MR" value={camp.mr ? roleName(camp.mr) : '—'} />

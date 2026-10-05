@@ -14,6 +14,7 @@ export interface CampDraft {
   billingType: BillingType
   patientExpectation: string
   fo: string
+  dietitian: string
   mr: string
   date: string
   timeSlot: CampTimeSlotValue | ''
@@ -37,12 +38,12 @@ function buildInitialDraft(camp: CampEntity | null, initialType?: CampType): Cam
     billingType: camp?.billingType ?? 'billable',
     patientExpectation: camp ? String(camp.patientExpectation ?? '') : '',
     fo: campRefId(camp?.fo) ?? '',
+    dietitian: campRefId(camp?.dietitian) ?? '',
     mr: campRefId(camp?.mr) ?? '',
     date: camp?.date ? camp.date.slice(0, 10) : '',
     timeSlot: camp?.timeSlot && (CAMP_TIME_SLOT_VALUES as string[]).includes(camp.timeSlot) ? camp.timeSlot : '',
     location: camp?.location ?? null,
-    // camp.devices is always populated sub-docs on a fetched camp, never bare
-    // id strings — .join() alone would have produced "[object Object]" here.
+    // camp.devices is always populated sub-docs, never bare id strings — .join() alone would give "[object Object]".
     devices: (camp?.devices ?? []).map((d) => d._id).join(', '),
     notes: camp?.notes ?? '',
   }

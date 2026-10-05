@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { FiArrowLeft, FiLock } from 'react-icons/fi'
 import { GEO_PROFILE_ROUTES, GEO_PROFILE_TYPE_OPTIONS, GEO_PROFILE_STATUS_LABEL, GEO_PROFILE_STATUS_OPTIONS } from '@/features/geo-profile/geoProfile.constants'
 import { profileToLocationValue, locationValueToCoordinates, locationValueToAddressPayload } from '@/features/geo-profile/utils/geoProfileLocationAdapter'
-import { isFieldOfficerRole } from '@/features/geo-profile/utils/geoProfile.utils'
+import { isFieldOfficerRole, isDietitianRole } from '@/features/geo-profile/utils/geoProfile.utils'
 import { useGeoProfile } from '@/features/geo-profile/hooks/useGeoProfile'
 import { useCreateGeoProfile } from '@/features/geo-profile/hooks/useCreateGeoProfile'
 import { useUpdateGeoProfile } from '@/features/geo-profile/hooks/useUpdateGeoProfile'
@@ -42,8 +42,7 @@ function locationMissingRequiredAddress(location: LocationValue | null): boolean
   return REQUIRED_ADDRESS_FIELDS.some((f) => !location[f.key].trim())
 }
 
-// `role` is required on create and immutable afterward (1:1 link, unique).
-// Coordinates are stored [lng, lat] (GeoJSON order); the form collects lat/lng separately and assembles the tuple on submit.
+// `role` is immutable after create (1:1 link). Coordinates are stored [lng, lat] (GeoJSON order).
 const GeoProfileDetailPage = () => {
   const { id } = useParams<{ id: string }>()
   const isCreateMode = !id
@@ -54,8 +53,7 @@ const GeoProfileDetailPage = () => {
   const { data, isLoading, error } = useGeoProfile(id)
   const geoProfile = data?.data ?? null
 
-  // A caller lacking permission for this lookup gets a 403, surfaced below
-  // as "Restricted" instead of a raw ObjectId.
+  // A 403 here is surfaced as "Restricted" instead of a raw ObjectId.
   const { data: rolesData, error: rolesError } = useRoles({ status: 'active', limit: '500' })
   const roles = rolesData?.data?.items ?? []
   const roleName = (r: string) => roles.find((x) => x.id === r)?.name ?? (rolesError ? 'Restricted' : r)
@@ -90,7 +88,6 @@ const GeoProfileDetailPage = () => {
 
       {isCreateMode && canManage && <CreateGeoProfileForm roles={roles} roleName={roleName} />}
 
-      {/* key={geoProfile.id} forces a fresh mount/draft per record so a background refetch never clobbers an in-progress edit. */}
       {!isCreateMode && geoProfile && !isLoading && (
         canManage
           ? <EditGeoProfileForm key={geoProfile.id} geoProfile={geoProfile} roleName={roleName} />
@@ -168,27 +165,23 @@ const CreateGeoProfileForm = ({ roles, roleName }: RoleNameLookupProps) => {
   const [role, setRole] = useState('')
   const [type, setType] = useState<GeoProfileType | ''>('')
   const [location, setLocation] = useState<LocationValue | null>(null)
-  // `location` isn't authoritative while this is anything but 'idle' — the
-  // pin can visibly move well before (or without ever) firing onChange.
+  // `location` isn't authoritative until this is 'idle' — the pin can move before onChange fires.
   const [locationResolution, setLocationResolution] = useState<LocationResolutionState>('idle')
   const [locationHint, setLocationHint] = useState<string | null>(null)
   const [coverageRadiusKm, setCoverageRadiusKm] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
 
-  // A GeoProfile only ever backs a Field Officer or a Dietitian — never show
-  // unrelated roles (Admin, Sales Rep, MR, etc.) in this picker at all. No
-  // dietitian RoleType exists in this system yet (confirmed against the
-  // backend's RoleType catalog), so for now this only shows Field Officers.
-  const roleOptions = roles.filter(isFieldOfficerRole)
+  const roleMatchesType = type === 'dietitian' ? isDietitianRole : isFieldOfficerRole
+  const roleOptions = type ? roles.filter(roleMatchesType) : []
 
   const handleSave = () => {
     const radiusKm = Number(coverageRadiusKm)
 
-    if (!role) { setFormError('Role is required'); return }
     if (!type) { setFormError('Type is required'); return }
+    if (!role) { setFormError('Role is required'); return }
     const selectedRole = roles.find((r) => r.id === role)
-    if (!selectedRole || !isFieldOfficerRole(selectedRole)) {
-      setFormError('Selected role is not a Field Officer — pick a different role')
+    if (!selectedRole || !roleMatchesType(selectedRole)) {
+      setFormError(`Selected role is not a ${type === 'dietitian' ? 'Dietitian' : 'Field Officer'} — pick a different role`)
       return
     }
     if (locationResolution === 'loading') { setFormError('Still resolving the picked location — wait a moment and try again'); return }
@@ -236,15 +229,44 @@ const CreateGeoProfileForm = ({ roles, roleName }: RoleNameLookupProps) => {
         <div className="space-y-4">
           <div>
             <Label
+              htmlFor="type"
+              className="text-[10px] font-semibold tracking-widest uppercase mb-2"
+              style={{ color: 'var(--qms-text-muted)' }}
+            >
+              Type
+            </Label>
+            <Select
+              value={type}
+              onValueChange={(v) => {
+                const next = v as GeoProfileType
+                setType(next)
+                setRole('')
+              }}
+            >
+              <SelectTrigger id="type" className="w-full">
+                <SelectValue placeholder="Select type">
+                  {(v) => GEO_PROFILE_TYPE_OPTIONS.find((t) => t.value === v)?.label ?? 'Select type'}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {GEO_PROFILE_TYPE_OPTIONS.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label
               htmlFor="role"
               className="text-[10px] font-semibold tracking-widest uppercase mb-2"
               style={{ color: 'var(--qms-text-muted)' }}
             >
               Role
             </Label>
-            <Select value={role} onValueChange={(v) => setRole(v ?? '')}>
+            <Select value={role} onValueChange={(v) => setRole(v ?? '')} disabled={!type}>
               <SelectTrigger id="role" className="w-full">
-                <SelectValue placeholder="Select role">
+                <SelectValue placeholder={type ? 'Select role' : 'Select type first'}>
                   {(v) => roleName(v as string)}
                 </SelectValue>
               </SelectTrigger>
@@ -257,30 +279,12 @@ const CreateGeoProfileForm = ({ roles, roleName }: RoleNameLookupProps) => {
               </SelectContent>
             </Select>
             <p className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
-              Only field-officer-typed roles are shown here. A role may back at most one geo profile — this link is immutable after create.
+              {type === 'dietitian'
+                ? 'Only dietitian-typed roles are shown here.'
+                : type === 'fo'
+                  ? 'Only field-officer-typed roles are shown here.'
+                  : 'Pick a type to see matching roles.'} A role may back at most one geo profile — this link is immutable after create.
             </p>
-          </div>
-
-          <div>
-            <Label
-              htmlFor="type"
-              className="text-[10px] font-semibold tracking-widest uppercase mb-2"
-              style={{ color: 'var(--qms-text-muted)' }}
-            >
-              Type
-            </Label>
-            <Select value={type} onValueChange={(v) => setType(v as GeoProfileType)}>
-              <SelectTrigger id="type" className="w-full">
-                <SelectValue placeholder="Select type">
-                  {(v) => GEO_PROFILE_TYPE_OPTIONS.find((t) => t.value === v)?.label ?? 'Select type'}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {GEO_PROFILE_TYPE_OPTIONS.map((t) => (
-                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
 
           <div>
@@ -360,19 +364,15 @@ const EditGeoProfileForm = ({ geoProfile, roleName }: EditGeoProfileFormProps) =
 
   const [type, setType] = useState<GeoProfileType>(geoProfile.type)
   const [location, setLocation] = useState<LocationValue | null>(profileToLocationValue(geoProfile))
-  // Seeding `location` from the loaded profile alone would resend those same
-  // coordinates on every save — only include them when actually touched.
+  // Only send coordinates/address when actually touched, so an untouched load doesn't resend them.
   const [locationDirty, setLocationDirty] = useState(false)
-  // Higher-stakes than create mode: a save mid-resolution would submit
-  // NOTHING for coordinates while showing a plain "Saved." success.
   const [locationResolution, setLocationResolution] = useState<LocationResolutionState>('idle')
   const [locationHint, setLocationHint] = useState<string | null>(null)
   const [coverageRadiusKm, setCoverageRadiusKm] = useState(String(geoProfile.coverageRadius / 1000))
   const [status, setStatus] = useState<GeoProfileStatus>(geoProfile.status)
   const [formError, setFormError] = useState<string | null>(null)
-  // No geocoder confirmed this pin — the (possibly untouched) address may no
-  // longer match it. Distinct from staleAddressRisk, which only fires when the
-  // address is actually blank; this can fire even when it still looks complete.
+  // Distinct from staleAddressRisk: this fires even when the address still looks complete,
+  // since manual entry means no geocoder actually confirmed it against the pin.
   const [manualCoordinateEntry, setManualCoordinateEntry] = useState(false)
 
   const handleLocationChange = (value: LocationValue) => {
@@ -380,11 +380,9 @@ const EditGeoProfileForm = ({ geoProfile, roleName }: EditGeoProfileFormProps) =
     setLocationDirty(true)
   }
 
-  // ANY prior address data (not just a complete one — a lone `city` is still
-  // real data that would go stale) makes a since-blanked address a real risk.
+  // A lone field (e.g. just `city`) still counts as prior data that could go stale.
   const hadAddress = REQUIRED_ADDRESS_FIELDS.some((f) => !!geoProfile[f.key])
-  // "Use this pin" or manual entry (Maps down) can leave the address blank/stale
-  // next to a moved pin. Address is optional server-side, so this warns, never blocks.
+  // Address is optional server-side, so this only warns, never blocks.
   const staleAddressRisk = hadAddress && locationDirty && locationMissingRequiredAddress(location)
 
   const handleSave = () => {
@@ -399,8 +397,6 @@ const EditGeoProfileForm = ({ geoProfile, roleName }: EditGeoProfileFormProps) =
       coordinates: locationDirty ? locationValueToCoordinates(location) : undefined,
       coverageRadius: coverageRadiusKm ? radiusKm * 1000 : undefined,
       status: status || undefined,
-      // Same dirty-gating as coordinates — a background reload of `location`
-      // shouldn't resend the same address fields on every unrelated save.
       ...(locationDirty ? locationValueToAddressPayload(location) : {}),
     })
   }

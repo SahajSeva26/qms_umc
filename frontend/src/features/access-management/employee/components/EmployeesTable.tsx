@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import type { EmployeeEntity, EmployeePopulatedTenant, EmployeePopulatedUser } from '@/types/accessManagement.types'
+import { EMPLOYEE_TYPE_LABEL, type EmployeeEntity, type EmployeePopulatedTenant, type EmployeePopulatedUser } from '@/types/accessManagement.types'
 import { EMPLOYEE_ROUTES } from '@/features/access-management/employee/employee.routes'
 import EmployeeStatusPill from '@/features/access-management/employee/components/EmployeeStatusPill'
 
@@ -22,10 +22,6 @@ function userName(employee: EmployeeEntity): string {
 function tenantLabel(tenant: EmployeeEntity['tenant']): string {
   if (typeof tenant === 'string') return '—'
   return (tenant as EmployeePopulatedTenant)?.name ?? '—'
-}
-
-const TYPE_LABEL: Record<string, string> = {
-  'field-officer': 'Field Officer',
 }
 
 const EmployeesTable = ({ employees }: EmployeesTableProps) => {
@@ -77,7 +73,7 @@ const EmployeesTable = ({ employees }: EmployeesTableProps) => {
                   {tenantLabel(employee.tenant)}
                 </td>
                 <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>
-                  {TYPE_LABEL[employee.type] ?? employee.type}
+                  {EMPLOYEE_TYPE_LABEL[employee.type] ?? employee.type}
                 </td>
                 <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
                   {new Date(employee.doj).toLocaleDateString()}

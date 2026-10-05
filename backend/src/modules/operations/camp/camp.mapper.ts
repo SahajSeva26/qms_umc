@@ -19,9 +19,9 @@ export const CampMapper = {
             billingType: camp.billingType,
             patientExpectation: camp.patientExpectation,
 
-            // field-force assignment
-            fo: camp.fo,
-            dietitian: camp.dietitian,
+            // normalized to null — model has no default, so an unassigned camp's field is `undefined` otherwise
+            fo: camp.fo ?? null,
+            dietitian: camp.dietitian ?? null,
             mr: camp.mr,
             asm: camp.asm,
             rsm: camp.rsm,
@@ -58,9 +58,7 @@ export const CampMapper = {
         };
         const stats = data?.stats;
         for (const camp of data?.items || []) {
-            // NOTE: independent from toResponse on purpose — search rows can be
-            // trimmed to a lighter subset later without affecting GET /:id.
-            // For now this mirrors toResponse field-for-field so nothing breaks.
+            // independent from toResponse on purpose — search rows can be trimmed later without affecting GET /:id
             const item: any = {
                 id: camp._id?.toString(),
                 code: camp.code,
@@ -76,8 +74,9 @@ export const CampMapper = {
                 billingType: camp.billingType,
                 patientExpectation: camp.patientExpectation,
 
-                // field-force assignment
-                fo: camp.fo,
+                // field-force assignment — see toResponse's identical note on the fo/dietitian default gap.
+                fo: camp.fo ?? null,
+                dietitian: camp.dietitian ?? null,
                 mr: camp.mr,
                 asm: camp.asm,
                 rsm: camp.rsm,

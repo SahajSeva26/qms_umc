@@ -8,6 +8,8 @@ import type { ScreeningEntity } from '@/features/clinical/screening/screening.ty
 vi.mock('@/features/clinical/screening/screening.service', () => ({
   screeningService: {
     updateScreening: vi.fn(async () => ({ success: true, message: '', data: {} })),
+    requestConsentOtp: vi.fn(async () => ({ success: true, message: '', data: { code: '004213' } })),
+    verifyConsent: vi.fn(async () => ({ success: true, message: '', data: {} })),
   },
 }))
 
@@ -101,5 +103,96 @@ describe('ScreeningDetail', () => {
 
     // The newer, unsaved text must survive — not get overwritten back to the first save's snapshot.
     expect(textarea).toHaveValue('fever, cough')
+  })
+
+  describe('consent', () => {
+    it('shows "Verified" and no OTP controls once consent.verified is true', () => {
+      renderDetail({ consent: { verified: true } })
+
+      expect(screen.getByText('Verified')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /send otp/i })).not.toBeInTheDocument()
+    })
+
+    it('shows the Send OTP action when consent is unverified and canWrite', () => {
+      renderDetail({ consent: { verified: false } })
+
+      expect(screen.getByText('Not yet verified')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /^send otp$/i })).toBeInTheDocument()
+    })
+
+    it('hides every consent action when canWrite is false, even while unverified', () => {
+      const queryClient = makeQueryClient()
+      const screening = screeningFixture({ consent: { verified: false } })
+      render(
+        <QueryClientProvider client={queryClient}>
+          <ScreeningDetail screening={screening} canWrite={false} canMoveStage={false} onClose={vi.fn()} />
+        </QueryClientProvider>,
+      )
+
+      expect(screen.getByText('Not yet verified')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /send otp/i })).not.toBeInTheDocument()
+    })
+
+    it('requesting an OTP shows the TEMP code inline (no delivery sender exists yet) and relabels the button to Resend', async () => {
+      const { screeningService } = await import('@/features/clinical/screening/screening.service')
+      const user = userEvent.setup()
+      renderDetail({ consent: { verified: false } })
+
+      await user.click(screen.getByRole('button', { name: /^send otp$/i }))
+
+      expect(screeningService.requestConsentOtp).toHaveBeenCalledWith('scr-1')
+      expect(await screen.findByText('004213')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /^resend otp$/i })).toBeInTheDocument()
+    })
+
+    it('Verify is disabled until a code is typed, then calls verifyConsent with it', async () => {
+      const { screeningService } = await import('@/features/clinical/screening/screening.service')
+      const user = userEvent.setup()
+      renderDetail({ consent: { verified: false } })
+
+      expect(screen.getByRole('button', { name: /^verify$/i })).toBeDisabled()
+
+      await user.type(screen.getByPlaceholderText(/6-digit code/i), '004213')
+      expect(screen.getByRole('button', { name: /^verify$/i })).toBeEnabled()
+
+      await user.click(screen.getByRole('button', { name: /^verify$/i }))
+      expect(screeningService.verifyConsent).toHaveBeenCalledWith('scr-1', { otp: '004213' })
+    })
+
+    it('clears the typed code after a successful verify', async () => {
+      const user = userEvent.setup()
+      renderDetail({ consent: { verified: false } })
+
+      const otpInput = screen.getByPlaceholderText(/6-digit code/i)
+      await user.type(otpInput, '004213')
+      await user.click(screen.getByRole('button', { name: /^verify$/i }))
+
+      await vi.waitFor(() => expect(otpInput).toHaveValue(''))
+    })
+
+    it('shows the backend\'s own error message on a failed verify (e.g. wrong code), not a generic one', async () => {
+      const { screeningService } = await import('@/features/clinical/screening/screening.service')
+      vi.mocked(screeningService.verifyConsent).mockRejectedValueOnce({
+        response: { data: { message: "That code didn't match. Try again." } },
+      })
+      const user = userEvent.setup()
+      renderDetail({ consent: { verified: false } })
+
+      await user.type(screen.getByPlaceholderText(/6-digit code/i), '000000')
+      await user.click(screen.getByRole('button', { name: /^verify$/i }))
+
+      expect(await screen.findByText(/that code didn.t match/i)).toBeInTheDocument()
+    })
+
+    it('shows a visible error when requesting the OTP itself fails', async () => {
+      const { screeningService } = await import('@/features/clinical/screening/screening.service')
+      vi.mocked(screeningService.requestConsentOtp).mockRejectedValueOnce(new Error('network error'))
+      const user = userEvent.setup()
+      renderDetail({ consent: { verified: false } })
+
+      await user.click(screen.getByRole('button', { name: /^send otp$/i }))
+
+      expect(await screen.findByText(/couldn.t send the otp/i)).toBeInTheDocument()
+    })
   })
 })

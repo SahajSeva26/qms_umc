@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form'
-import { FiActivity, FiHeart, FiVideo, FiDroplet, FiShuffle, FiTag, FiInfo } from 'react-icons/fi'
+import { FiActivity, FiHeart, FiVideo, FiDroplet, FiTag, FiInfo } from 'react-icons/fi'
 import type { WizardFormState } from '@/features/projects/wizard.types'
 import type { ProjectTherapy, ProjectType } from '@/types/project.types'
 import { PROJECT_THERAPY_LABEL, PROJECT_TYPE_LABEL } from '@/types/project.types'
@@ -18,18 +18,17 @@ import { labelClasses, labelStyle, fieldClasses } from '@/features/projects/comp
 import { useWizardFieldError } from '@/features/projects/components/wizard/WizardValidationContext'
 
 const TYPE_ICONS: Record<ProjectType, typeof FiActivity> = {
-  screening_camp: FiActivity,
+  screening: FiActivity,
   diet: FiHeart,
   teleconsultation_diet: FiVideo,
-  lab_test: FiDroplet,
-  mixed: FiShuffle,
+  lab: FiDroplet,
 }
 
 const THERAPY_OPTIONS = Object.keys(PROJECT_THERAPY_LABEL) as ProjectTherapy[]
 const TYPE_OPTIONS = Object.keys(PROJECT_TYPE_LABEL) as ProjectType[]
 
 // Client/division aren't picked here — derived server-side from the Step
-// 0-selected lead. `mixed` can be picked alongside any other type.
+// 0-selected lead. Picking multiple types IS "mixed" — there's no separate value for it.
 const WizardStep1 = () => {
   const { control, setValue } = useFormContext<WizardFormState>()
   const fieldError = useWizardFieldError()

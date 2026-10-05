@@ -3,12 +3,12 @@ import { resolveProjectCampsRoute } from './pharmaCamps.routing'
 import type { ProjectEntity } from '@/types/project.types'
 
 function projectFixture(overrides: Partial<ProjectEntity> = {}): ProjectEntity {
-  return { id: 'proj-1', type: ['screening_camp', 'diet'], ...overrides } as ProjectEntity
+  return { id: 'proj-1', type: ['screening', 'diet'], ...overrides } as ProjectEntity
 }
 
 describe('resolveProjectCampsRoute', () => {
   it('defaults to Screening when no preferred type is given and the project allows it', () => {
-    const project = projectFixture({ id: 'p1', type: ['screening_camp', 'diet'] })
+    const project = projectFixture({ id: 'p1', type: ['screening', 'diet'] })
     expect(resolveProjectCampsRoute(project)).toBe('/pharma/projects/p1/camps/screening')
   })
 
@@ -17,23 +17,23 @@ describe('resolveProjectCampsRoute', () => {
     expect(resolveProjectCampsRoute(project)).toBe('/pharma/projects/p2/camps/diet')
   })
 
-  it('falls back to the unrestricted All-camps route when neither Screening nor Diet is allowed (e.g. lab_test-only)', () => {
-    const project = projectFixture({ id: 'p3', type: ['lab_test'] })
+  it('falls back to the unrestricted All-camps route when neither Screening nor Diet is allowed (e.g. lab-only)', () => {
+    const project = projectFixture({ id: 'p3', type: ['lab'] })
     expect(resolveProjectCampsRoute(project)).toBe('/pharma/projects/p3/camps')
   })
 
-  it('a mixed-type project (allows all 3) defaults to Screening', () => {
-    const project = projectFixture({ id: 'p4', type: ['mixed'] })
+  it('a project with multiple real types selected (allows all 3 — there is no separate "mixed" value) defaults to Screening', () => {
+    const project = projectFixture({ id: 'p4', type: ['screening', 'diet', 'lab'] })
     expect(resolveProjectCampsRoute(project)).toBe('/pharma/projects/p4/camps/screening')
   })
 
   it('honors a preferred type when the project allows it', () => {
-    const project = projectFixture({ id: 'p5', type: ['screening_camp', 'diet'] })
+    const project = projectFixture({ id: 'p5', type: ['screening', 'diet'] })
     expect(resolveProjectCampsRoute(project, 'diet')).toBe('/pharma/projects/p5/camps/diet')
   })
 
   it('ignores a preferred type the project does not allow, falling back to the normal priority', () => {
-    const project = projectFixture({ id: 'p6', type: ['screening_camp'] })
+    const project = projectFixture({ id: 'p6', type: ['screening'] })
     expect(resolveProjectCampsRoute(project, 'diet')).toBe('/pharma/projects/p6/camps/screening')
   })
 

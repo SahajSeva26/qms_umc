@@ -12,9 +12,7 @@ interface CampTableRealProps {
   onOpen: (id: string) => void
 }
 
-// city/state can each independently be an empty string from an unresolved
-// geocode — join only the present parts so a partial address never renders
-// a bare or dangling comma.
+// city/state can independently be empty from an unresolved geocode — join only present parts to avoid a dangling comma.
 const formatCityState = (location: CampEntity['location']) =>
   location ? [location.city, location.state].filter(Boolean).join(', ') : ''
 
@@ -28,13 +26,11 @@ const CampTableReal = ({ camps, onOpen }: CampTableRealProps) => {
   const showCompanyColumn = session?.tenant.type === 'platform'
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
-  // 'Row details' is the toggle column — a trailing action column (after
-  // Status), not part of the camp's own identity — included here (not left
-  // out) so columns.length, used below for colSpan, always matches the real
-  // header count, including the platform-only Company column.
+  // 'Row details' is included so columns.length (used below for colSpan) matches the real header count.
+  // "Staff" is neutral since a mixed-type list has both FO- and dietitian-staffed rows under one column.
   const columns = showCompanyColumn
-    ? ['Code', 'Schedule', 'Doctor', 'Company', 'Location', 'FO', 'Status', 'Row details']
-    : ['Code', 'Schedule', 'Doctor', 'Location', 'FO', 'Status', 'Row details']
+    ? ['Code', 'Schedule', 'Doctor', 'Company', 'Location', 'Staff', 'Status', 'Row details']
+    : ['Code', 'Schedule', 'Doctor', 'Location', 'Staff', 'Status', 'Row details']
 
   return (
     <div
@@ -94,13 +90,13 @@ const CampTableReal = ({ camps, onOpen }: CampTableRealProps) => {
                     )}
                     <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{formatCityState(camp.location) || 'Location unavailable'}</td>
                     <td className="px-4 py-2.5">
-                      {camp.fo ? (
-                        <span style={{ color: 'var(--qms-text)' }}>{roleName(camp.fo)}</span>
+                      {/* Diet camps are staffed by a dietitian instead of an FO (camp.dietitian, not camp.fo). */}
+                      {(camp.type === 'diet' ? camp.dietitian : camp.fo) ? (
+                        <span style={{ color: 'var(--qms-text)' }}>{roleName(camp.type === 'diet' ? camp.dietitian : camp.fo)}</span>
                       ) : (
-                        // Matches the prototype's "⚠ Missing <Role>" staffing tag (camps.js:379-409),
-                        // FO-only since our real Camp model has no dietitian/lab-tech staffing concept.
+                        // Matches the prototype's "⚠ Missing <Role>" staffing tag (camps.js:379-409).
                         <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-danger-soft text-danger">
-                          <FiAlertTriangle size={10} /> Missing FO
+                          <FiAlertTriangle size={10} /> Missing {camp.type === 'diet' ? 'Dietitian' : 'FO'}
                         </span>
                       )}
                     </td>
@@ -204,7 +200,10 @@ const CampRowDetailPanel = ({ id, camp, doctorName, divisionName, roleName, proj
         <DetailField label="Project" value={camp.project ? projectName(camp.project) : undefined} />
         <DetailField label="Doctor" value={doctorName(camp.doctor)} />
         <DetailField label="Specialization" value={doctor?.specialization} />
-        <DetailField label="FO" value={camp.fo ? roleName(camp.fo) : undefined} />
+        <DetailField
+          label={camp.type === 'diet' ? 'Dietitian' : 'FO'}
+          value={(camp.type === 'diet' ? camp.dietitian : camp.fo) ? roleName(camp.type === 'diet' ? camp.dietitian : camp.fo) : undefined}
+        />
       </div>
 
       <div>

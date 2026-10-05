@@ -6,10 +6,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { AxiosError } from 'axios'
 import CreateEmployeeModal from './CreateEmployeeModal'
 
-// LocationPicker/LocationAddressFields are Google Maps/geocoder-backed and awkward to render in
-// jsdom — EmployeeFieldsSection's Location card (a manually-filled residential address) always
-// mounts at the Employee-details step in every mode, so these are stubbed here the same way
-// EditEmployeeEditor.test.tsx does, purely to keep these form-wiring tests isolated from the map.
+// LocationPicker/LocationAddressFields are Google Maps/geocoder-backed and awkward to render in jsdom — stubbed per EditEmployeeEditor.test.tsx.
 vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({ default: () => null }))
 vi.mock('@/components/widgets/location-picker/LocationAddressFields', () => ({ default: () => null }))
 
@@ -26,8 +23,9 @@ function networkError() {
 }
 
 vi.mock('@/features/access-management/employee/components/ExistingFieldOfficerPicker', () => ({
-  default: ({ onChange }: { onChange: (v: unknown) => void }) => (
+  default: ({ roleTypeId, workerLabel, onChange }: { roleTypeId: string; workerLabel: string; onChange: (v: unknown) => void }) => (
     <div>
+      <p>picker for {workerLabel} ({roleTypeId})</p>
       <button type="button" onClick={() => onChange({ userId: 'user-existing', email: 'existing@example.com', phone: '9999999999', gender: 'male', label: 'Existing FO' })}>
         Pick existing FO
       </button>
@@ -38,8 +36,7 @@ vi.mock('@/features/access-management/employee/components/ExistingFieldOfficerPi
   ),
 }))
 
-// The real DatePicker's react-day-picker Popover+Calendar is awkward to exercise through userEvent
-// in jsdom — stubbed with the same value/onChange contract to keep this a pure form-wiring test.
+// react-day-picker's Popover+Calendar is awkward to exercise through userEvent in jsdom — stubbed with the same contract.
 vi.mock('@/components/ui/DatePicker', () => ({
   default: ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
     <input aria-label="date-stub" value={value} onChange={(e) => onChange(e.target.value)} />
@@ -68,7 +65,7 @@ function renderModal(props: Partial<React.ComponentProps<typeof CreateEmployeeMo
       <MemoryRouter>
         <CreateEmployeeModal
           tenantId="t-platform-1"
-          foTypeId="rt-fo-1"
+          roleTypeIds={{ 'field-officer': 'rt-fo-1', dietitian: 'rt-diet-1' }}
           canOnboardNewPerson
           canLinkExistingAccount
           {...props}
@@ -111,6 +108,8 @@ describe('CreateEmployeeModal', () => {
     await user.type(screen.getByLabelText(/^phone/i), '9876543210')
     await user.click(screen.getByRole('button', { name: /^next$/i }))
 
+    await user.click(screen.getByRole('combobox', { name: /employment type/i }))
+    await user.click(await screen.findByRole('option', { name: /full-time/i }))
     await user.type(screen.getAllByLabelText('date-stub')[0], '2026-01-15')
 
     await user.click(screen.getByRole('button', { name: /create employee/i }))
@@ -120,6 +119,69 @@ describe('CreateEmployeeModal', () => {
       user: expect.objectContaining({ email: 'ravi@example.com', phone: '9876543210' }),
     }))
     expect(createEmployee).toHaveBeenCalledWith(expect.objectContaining({ email: 'ravi@example.com', phone: '9876543210', user: 'user-1' }))
+  })
+
+  it('Mode A defaults the Role\'s type to the field-officer RoleType id, and switching the worker-kind toggle to Dietitian sends the dietitian RoleType id instead', async () => {
+    const user = userEvent.setup()
+    renderModal()
+    await user.click(screen.getByRole('button', { name: /new employee/i }))
+    await user.click(screen.getByRole('button', { name: /^onboard a new person$/i }))
+
+    // Switch BEFORE filling anything else — the toggle must repoint roleType before fields are touched.
+    await user.click(screen.getByRole('button', { name: /^dietitian$/i }))
+
+    await user.type(screen.getByLabelText('Code'), 'diet-anita')
+    await user.type(screen.getByLabelText('Name'), 'Anita Rao')
+    await user.click(screen.getByRole('button', { name: /^next$/i }))
+
+    await user.type(screen.getByLabelText('First name'), 'Anita')
+    await user.type(screen.getByLabelText('Email'), 'anita@example.com')
+    await user.type(screen.getByLabelText('Password'), 'Password1')
+    await user.type(screen.getByLabelText(/^phone/i), '9111111111')
+    await user.click(screen.getByRole('button', { name: /^next$/i }))
+
+    await user.click(screen.getByRole('combobox', { name: /employment type/i }))
+    await user.click(await screen.findByRole('option', { name: /full-time/i }))
+    await user.type(screen.getAllByLabelText('date-stub')[0], '2026-01-15')
+    await user.click(screen.getByRole('button', { name: /create employee/i }))
+
+    await waitFor(() => expect(createEmployee).toHaveBeenCalled())
+    expect(createRole).toHaveBeenCalledWith(expect.objectContaining({ type: 'rt-diet-1' }))
+  })
+
+  it('switching the worker-kind toggle back to Field officer after Dietitian restores the field-officer RoleType id', async () => {
+    const user = userEvent.setup()
+    renderModal()
+    await user.click(screen.getByRole('button', { name: /new employee/i }))
+    await user.click(screen.getByRole('button', { name: /^onboard a new person$/i }))
+
+    await user.click(screen.getByRole('button', { name: /^dietitian$/i }))
+    await user.click(screen.getByRole('button', { name: /^field officer$/i }))
+
+    await user.type(screen.getByLabelText('Code'), 'fo-ravi')
+    await user.type(screen.getByLabelText('Name'), 'Ravi Kumar')
+    await user.click(screen.getByRole('button', { name: /^next$/i }))
+    await user.type(screen.getByLabelText('First name'), 'Ravi')
+    await user.type(screen.getByLabelText('Email'), 'ravi@example.com')
+    await user.type(screen.getByLabelText('Password'), 'Password1')
+    await user.type(screen.getByLabelText(/^phone/i), '9876543210')
+    await user.click(screen.getByRole('button', { name: /^next$/i }))
+
+    await user.click(screen.getByRole('combobox', { name: /employment type/i }))
+    await user.click(await screen.findByRole('option', { name: /full-time/i }))
+    await user.type(screen.getAllByLabelText('date-stub')[0], '2026-01-15')
+    await user.click(screen.getByRole('button', { name: /create employee/i }))
+
+    await waitFor(() => expect(createEmployee).toHaveBeenCalled())
+    expect(createRole).toHaveBeenCalledWith(expect.objectContaining({ type: 'rt-fo-1' }))
+  })
+
+  it('does not show the worker-kind toggle when only one RoleType id is available', () => {
+    renderModal({ roleTypeIds: { 'field-officer': 'rt-fo-1' } })
+    fireEvent.click(screen.getByRole('button', { name: /new employee/i }))
+
+    expect(screen.queryByRole('button', { name: /^dietitian$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^field officer$/i })).not.toBeInTheDocument()
   })
 
   it('skips the mode toggle entirely when only canLinkExistingAccount is true', async () => {
@@ -148,6 +210,8 @@ describe('CreateEmployeeModal', () => {
     await user.click(screen.getByRole('button', { name: /^pick existing fo$/i }))
     await user.click(screen.getByRole('button', { name: /^next$/i }))
 
+    await user.click(screen.getByRole('combobox', { name: /employment type/i }))
+    await user.click(await screen.findByRole('option', { name: /full-time/i }))
     await user.type(screen.getAllByLabelText('date-stub')[0], '2026-01-15')
     await user.click(screen.getByRole('button', { name: /create employee/i }))
 
@@ -162,6 +226,8 @@ describe('CreateEmployeeModal', () => {
 
     await user.click(screen.getByRole('button', { name: /^pick existing fo$/i }))
     await user.click(screen.getByRole('button', { name: /^next$/i }))
+    await user.click(screen.getByRole('combobox', { name: /employment type/i }))
+    await user.click(await screen.findByRole('option', { name: /full-time/i }))
     await user.type(screen.getAllByLabelText('date-stub')[0], '2026-01-15')
 
     const createCall = pending<Awaited<ReturnType<typeof createEmployee>>>()
@@ -175,8 +241,7 @@ describe('CreateEmployeeModal', () => {
     createCall.resolve({ success: true, message: '', data: { id: 'emp-linked' } })
 
     await waitFor(() => expect(screen.queryByText('New employee')).not.toBeInTheDocument())
-    // Exactly one dispatch despite the 3 rapid clicks — no duplicate/rejected follow-up call landed
-    // after the success and clobbered the UI into a false-failure state.
+    // Exactly one dispatch despite the 3 rapid clicks — no duplicate follow-up clobbered the UI.
     expect(createEmployee).toHaveBeenCalledTimes(1)
   })
 
@@ -214,6 +279,8 @@ describe('CreateEmployeeModal', () => {
     await user.type(screen.getByLabelText(/^phone/i), '9876543210')
     await user.click(screen.getByRole('button', { name: /^next$/i }))
 
+    await user.click(screen.getByRole('combobox', { name: /employment type/i }))
+    await user.click(await screen.findByRole('option', { name: /full-time/i }))
     await user.type(screen.getAllByLabelText('date-stub')[0], '2026-01-15')
     await user.click(screen.getByRole('button', { name: /create employee/i }))
   }
@@ -312,8 +379,7 @@ describe('CreateEmployeeModal', () => {
 
     await user.click(screen.getByRole('button', { name: /check again/i }))
 
-    // regression (QUP-469 S15): this is a real, specific Error (not an axios error), so its own
-    // .message is shown verbatim, not the generic fallback the old substring-gated check produced.
+    // regression (QUP-469 S15): a specific non-axios Error's .message is shown verbatim, not the generic fallback.
     expect(await screen.findByText(/no account found for this code/i)).toBeInTheDocument()
     expect(createEmployee).not.toHaveBeenCalled()
   })
@@ -436,10 +502,7 @@ describe('CreateEmployeeModal', () => {
     expect(await screen.findByText(/account created for ravi/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^create employee$/i })).not.toBeDisabled()
 
-    // The retry's Employee POST is deferred — while it's in flight, a second rapid click must be a
-    // no-op. If retryEmployee were still fire-and-forget, submittingRef would release as soon as
-    // submitNewPerson returns (immediately after dispatching the retry, not after it settles),
-    // reopening the exact race this guard exists to close.
+    // While the retry's Employee POST is in flight, a second rapid click must be a no-op (retryEmployee must await settlement, not fire-and-forget).
     const retryCall = pending<Awaited<ReturnType<typeof createEmployee>>>()
     createEmployee.mockImplementationOnce(() => retryCall.promise)
 
@@ -489,13 +552,8 @@ describe('CreateEmployeeModal', () => {
     const checkCall = pending<SearchEmployeesResult>()
     vi.mocked(searchEmployees).mockImplementationOnce(() => checkCall.promise)
 
-    // This handler's re-entrancy check (onboard.checkIfEmployeeExists's `state.step !== ...` guard)
-    // sits behind almost no async work before its setState — by the time a second fireEvent.click
-    // would fire, React has already synchronously re-rendered the button as disabled, so a real
-    // DOM double-click can't reach the handler twice here (confirmed: that version of this test
-    // passed even without the fix). Dispatching the click handler directly, twice, without
-    // awaiting the first, reproduces the actual race the fix closes — two calls starting before
-    // either's setState commits — independent of how fast the DOM happens to re-render.
+    // A real DOM double-click can't reach the handler twice (React re-renders the button disabled too fast);
+    // dispatching the click handler directly, twice, without awaiting the first, reproduces the actual race.
     const clickAgain = () => screen.getByRole('button', { name: /check again/i }).click()
     act(() => {
       clickAgain()
@@ -514,11 +572,7 @@ describe('CreateEmployeeModal', () => {
     searchRoles.mockClear()
 
     const form = document.querySelector('form')!
-    // RHF's handleSubmit runs its (async) Zod resolver before invoking the inner submit handler,
-    // which itself calls submitNewPerson/submitExisting fire-and-forget — wrapping in a flushed
-    // act() (rather than a bare fireEvent + an empty waitFor tick) actually drains that whole
-    // microtask chain before the assertions below run, so this would genuinely fail if the guard
-    // were ever removed instead of just racing ahead of it.
+    // Flushed act() drains RHF's async resolver + submit microtask chain before assertions run.
     await act(async () => {
       fireEvent.submit(form)
       await Promise.resolve()
@@ -711,6 +765,8 @@ describe('CreateEmployeeModal', () => {
     const user = userEvent.setup()
     await goToModeBEmployeeStep(user)
 
+    await user.click(screen.getByRole('combobox', { name: /employment type/i }))
+    await user.click(await screen.findByRole('option', { name: /full-time/i }))
     await user.type(screen.getAllByLabelText('date-stub')[0], '2026-01-15')
     await user.click(screen.getByRole('button', { name: /create employee/i }))
 
@@ -718,6 +774,24 @@ describe('CreateEmployeeModal', () => {
     expect(createEmployee).toHaveBeenCalledWith(expect.objectContaining({
       profile: expect.objectContaining({ gender: 'male' }),
     }))
+  })
+
+  it('Mode B (link existing account) defaults to searching field officers, and switching the worker-kind toggle to Dietitian re-scopes the picker AND clears a pending pick', async () => {
+    const user = userEvent.setup()
+    renderModal({ canOnboardNewPerson: false, canLinkExistingAccount: true })
+    await user.click(screen.getByRole('button', { name: /new employee/i }))
+
+    expect(screen.getByText('picker for field officer (rt-fo-1)')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /^pick existing fo$/i }))
+    expect(screen.getByRole('button', { name: /^next$/i })).toBeEnabled()
+
+    await user.click(screen.getByRole('button', { name: /^dietitian$/i }))
+
+    // Re-scoped to the dietitian RoleType id, not the field-officer one.
+    expect(screen.getByText('picker for dietitian (rt-diet-1)')).toBeInTheDocument()
+    // The FO pick made under the old kind is gone — Next is disabled again until a new pick is made.
+    expect(screen.getByRole('button', { name: /^next$/i })).toBeDisabled()
   })
 
   it('Mode B: switching from FO A (has a gender) to FO B (no gender) clears it — no stale carry-over', async () => {
@@ -729,6 +803,8 @@ describe('CreateEmployeeModal', () => {
     await user.click(screen.getByRole('button', { name: /pick second fo/i }))
     await user.click(screen.getByRole('button', { name: /^next$/i }))
 
+    await user.click(screen.getByRole('combobox', { name: /employment type/i }))
+    await user.click(await screen.findByRole('option', { name: /full-time/i }))
     await user.type(screen.getAllByLabelText('date-stub')[0], '2026-01-15')
     await user.click(screen.getByRole('button', { name: /create employee/i }))
 
@@ -754,6 +830,8 @@ describe('CreateEmployeeModal', () => {
     await user.type(screen.getByLabelText(/^phone/i), '9111111111')
     await user.click(screen.getByRole('button', { name: /^next$/i }))
 
+    await user.click(screen.getByRole('combobox', { name: /employment type/i }))
+    await user.click(await screen.findByRole('option', { name: /full-time/i }))
     await user.type(screen.getAllByLabelText('date-stub')[0], '2026-01-15')
     await user.click(screen.getByRole('button', { name: /create employee/i }))
 

@@ -34,7 +34,7 @@ function sessionFixture(roleTypeCode: string): SessionResponse {
 function projectFixture(overrides: Partial<ProjectEntity> = {}): ProjectEntity {
   return {
     id: 'proj-1', code: 'PRJ-1', name: 'Cardio Screening Drive', tenant: 't-1', division: 'div-1',
-    therapy: 'cardiology', type: ['screening_camp', 'diet'], tests: [], lead: null, mode: null, campCost: 0, totalCamps: 0,
+    therapy: 'cardiology', type: ['screening', 'diet'], tests: [], lead: null, executionMode: null, campCost: 0, totalCamps: 0,
     gst: 0, valueBeforeGST: 0, additionalCost: 0, campTimeSlots: ['9am-1pm', '10am-2pm'], freeCancelHours: 0,
     cancellationAllowed: 0, campCostDeductionOnChargableCancel: 0, goLiveScope: null,
     whoCanBookCamp: [], salesRep: null, projectCoordinator: null, status: 'live',
@@ -118,9 +118,8 @@ describe('PharmaProjectCampsPage — unrestricted "All camps" view', () => {
 
     const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
     const { pharmaCampsService } = await import('@/features/pharma/pharmaCamps.service')
-    // A Screening-only project can still have a stray Lab (or any other type)
-    // camp attached — the backend doesn't enforce project-type-to-camp-type.
-    vi.mocked(pharmaProjectsService.getProject).mockResolvedValue({ success: true, message: '', data: projectFixture({ type: ['screening_camp'] }) })
+    // The backend doesn't enforce project-type-to-camp-type, so a Lab camp can attach to a Screening-only project.
+    vi.mocked(pharmaProjectsService.getProject).mockResolvedValue({ success: true, message: '', data: projectFixture({ type: ['screening'] }) })
     vi.mocked(pharmaCampsService.searchScopedCamps).mockResolvedValue({
       success: true, message: '', data: { items: [campFixture({ type: 'lab' }), campFixture({ id: 'camp-2', code: 'cmp-000002', type: 'screening' })], count: 2 },
     })

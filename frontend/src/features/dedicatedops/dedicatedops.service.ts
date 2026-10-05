@@ -7,9 +7,8 @@ import { SEED_PROJECT_CONFIG, SEED_ASSIGNMENTS, SEED_ATTENDANCE, SEED_SCREENINGS
 import type { ProjectEntity } from '@/types/project.types'
 
 // TODO: replace with real API calls once backend endpoints exist.
-// Storage keys mirror the prototype's dedicated-data.js exactly
-// (qms.dedicated.* prefix) — a configurable overlay, never mutating the
-// shared Projects master directly (see isDedicated()'s dual-path check).
+// Keys mirror the prototype's dedicated-data.js (qms.dedicated.* prefix) — a configurable
+// overlay, never mutating the shared Projects master directly.
 const KEYS = {
   PROJ: 'qms.dedicated.projectConfig',
   ASN: 'qms.dedicated.assignments',
@@ -34,17 +33,9 @@ export class StorageWriteError extends Error {
   }
 }
 
-// A failed write must not look like a successful one. This used to swallow
-// every failure in a bare `catch {}`, so a full-quota or blocked write still
-// resolved as if it had saved — the mutation's onSuccess would fire and
-// invalidate the query, and the UI would show the change as persisted when
-// nothing was written. Throwing makes the write reject, which the mutation
-// layer (useDedicatedOps.ts) now surfaces to the component. This mirrors the
-// real behaviour an API call already has (a failed POST rejects), so nothing
-// here changes when the backend lands — see features/diet/services/
-// dietStorage.ts for the same fix applied to that feature; not imported
-// directly since it's Diet-internal (features communicate only through
-// shared types/hooks/lib, never another feature's service internals).
+// Throws rather than swallowing the error — a bare `catch {}` used to let a full-quota/blocked
+// write resolve as if it had saved, so the mutation's onSuccess fired and the UI showed the
+// change as persisted when nothing was written.
 function persist<T>(key: string, value: T) {
   try {
     localStorage.setItem(key, JSON.stringify(value))
@@ -73,12 +64,8 @@ function loadScreenings(): Screening[] {
   return load(KEYS.SCR, SEED_SCREENINGS)
 }
 
-// isDedicated() — the overlay config's own `type` flag is the real signal.
-// The old mock's second check (base project's own `type` field literally
-// saying "dedicated") never had a real backend equivalent — the real
-// ProjectType enum (screening_camp/diet/teleconsultation_diet/lab_test/
-// mixed) has no "dedicated" value at all, so that branch is dropped rather
-// than kept as permanently-dead code.
+// Only the overlay config's own `type` flag is checked — the real ProjectType enum has no
+// "dedicated" value, so the old mock's second check (project.type === "dedicated") never applied.
 export function isDedicated(project: ProjectEntity, configs: Record<string, DedicatedProjectConfig>): boolean {
   const cfg = configs[project.id]
   return cfg?.type === 'Dedicated'
@@ -134,8 +121,7 @@ export async function resetSopConfig(projectId: string): Promise<Record<string, 
   return configs
 }
 
-// assignFoToProject — keyed 1:1 by foId, so an FO can only be on one project
-// at a time (overwrites any prior assignment, matching the prototype exactly).
+// Keyed 1:1 by foId, so an FO can only be on one project at a time (overwrites any prior assignment).
 export async function assignFoToProject(
   foId: string,
   projectId: string,
@@ -168,19 +154,8 @@ export function fosOnProject(assignments: Record<string, Assignment>, projectId:
   return Object.values(assignments).filter((a) => a.projectId === projectId)
 }
 
-// complianceFor() — the literal 6-item SOP-gating checklist + overdue rule,
-// ported exactly from dedicated-data.js:440-471.
-//
-// TAKES PRE-RESOLVED INPUTS, NOT FULL ARRAYS. This used to take the whole
-// `attendance`/`screenings` arrays and do its own `.find()`/`.filter()` per
-// call — correct, but it meant every caller that ran this once per assignment
-// re-scanned both arrays in full each time (O(F × (A + S)) for F assignments).
-// The only caller (DedicatedOpsPage, via useDedicatedOpsCompliance.ts) now
-// builds a Map/index over `attendance` and `screenings` ONCE and passes this
-// function the already-resolved attendance record and today's screening
-// count — the checklist/overdue FORMULA below is byte-for-byte unchanged,
-// only how its two inputs are looked up changed. `assignment` is still
-// nullable so the "no assignment for this FO" outcome is preserved exactly.
+// Ported from dedicated-data.js:440-471. Takes pre-resolved attendance/count (not full arrays) —
+// the caller indexes attendance/screenings once rather than re-scanning per assignment (was O(F × (A+S))).
 export function complianceFor(
   assignment: Assignment | undefined,
   att: Attendance | undefined,
@@ -223,8 +198,7 @@ export function toCsv<T extends object>(rows: T[], columns: (keyof T)[]): string
     columns.map((c) => {
       const v = r[c]
       let s = typeof v === 'object' ? JSON.stringify(v) : String(v ?? '')
-      // A leading =/+/-/@ is executed as a formula by Excel/Sheets on open,
-      // even inside quotes — prefix with a quote character to force plain-text.
+      // A leading =/+/-/@ is executed as a formula by Excel/Sheets on open, even inside quotes.
       if (/^[=+\-@]/.test(s)) s = `'${s}`
       return `"${s.replace(/"/g, '""')}"`
     }).join(',')

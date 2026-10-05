@@ -45,9 +45,7 @@ function makeWrapper() {
   )
 }
 
-// Every existing test that exercises a real fetch passes a full "ready" set
-// (coordinates + date + timeSlot) via this default — gating tests below
-// override individual fields back to undefined to exercise the gate itself.
+// Default "ready" set; gating tests below override individual fields back to undefined to exercise the gate itself.
 const READY_PROPS = { coordinates: [77.02, 28.52] as [number, number], date: '2026-09-20', timeSlot: '9am-1pm' as const }
 
 function renderPicker(props: Partial<React.ComponentProps<typeof CampFoPicker>> = {}) {
@@ -112,6 +110,26 @@ describe('CampFoPicker — coverage-radius eligibility, availability shown as a 
       ),
     )
     expect(await screen.findByText(/Gurugram FO \(fo-001\) — 12\.0 km/)).toBeInTheDocument()
+  })
+
+  it('workerType="dietitian" queries type: dietitian and uses dietitian-labeled placeholder/text, not FO wording', async () => {
+    const { geoProfileService } = await import('@/features/geo-profile/geoProfile.service')
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    vi.mocked(accessManagementService.getRole).mockResolvedValue({
+      success: true, message: '', data: roleFixture({ name: 'Gurugram Dietitian', code: 'diet-001', type: { name: 'Dietitian', code: 'dietitian' } }),
+    })
+    const user = userEvent.setup()
+    renderPicker({ workerType: 'dietitian' })
+
+    expect(screen.getByPlaceholderText('Search dietitian by name…')).toBeInTheDocument()
+    await user.click(screen.getByPlaceholderText('Search dietitian by name…'))
+
+    await waitFor(() =>
+      expect(geoProfileService.nearestGeoProfiles).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'dietitian', lng: 77.02, lat: 28.52, date: '2026-09-20', timeSlot: '9am-1pm' }),
+      ),
+    )
+    expect(await screen.findByText(/Gurugram Dietitian \(diet-001\) — 12\.0 km/)).toBeInTheDocument()
   })
 
   it('an in-range FO whose `available` is false still shows (for context), tagged Unavailable, and cannot be picked', async () => {
@@ -222,7 +240,7 @@ describe('CampFoPicker — coverage-radius eligibility, availability shown as a 
     renderPicker()
     await user.click(screen.getByPlaceholderText('Search FO by name…'))
 
-    expect(await screen.findByText(/some in-range FOs may not be listed/i)).toBeInTheDocument()
+    expect(await screen.findByText(/some in-range ones may not be listed/i)).toBeInTheDocument()
   })
 
   it('does not show the truncation note when the result count is below the limit', async () => {
@@ -231,6 +249,6 @@ describe('CampFoPicker — coverage-radius eligibility, availability shown as a 
     await user.click(screen.getByPlaceholderText('Search FO by name…'))
     await screen.findByText(/Gurugram FO/)
 
-    expect(screen.queryByText(/some in-range FOs may not be listed/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/some in-range ones may not be listed/i)).not.toBeInTheDocument()
   })
 })

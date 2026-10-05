@@ -13,10 +13,13 @@ export const TEST_STATUS_LABEL: Record<TestStatus, string> = {
   inactive: 'Inactive',
 }
 
-// Matches mapConsumptionLine exactly — it never returns itemName/itemCode
-// even when populated server-side, so don't add optional name fields here.
+// Matches mapConsumptionLine exactly. GET /:id populates item -> {id,code,name,type};
+// search/create/update leave it unpopulated -> {id} only. Always check for the
+// populated shape rather than assuming either one.
+export type TestConsumptionLineItem = { id: string; code?: string; name?: string; type?: string }
+
 export interface TestConsumptionLine {
-  item: string
+  item: TestConsumptionLineItem
   rate: number
 }
 
@@ -56,8 +59,8 @@ export interface TestEntity {
   // Absent entirely (not null) unless the caller holds test-master:manage —
   // the mapper only sets this field conditionally.
   status?: TestStatus
-  // A device and a consumable both live in this one array — distinguished
-  // only server-side, never in this response shape.
+  // A device and a consumable both live in this one array — distinguished via
+  // each line's populated item.type (device/consumable), see TestConsumptionLineItem.
   consumption: TestConsumptionLine[]
   // Optional/absent on older records — means "no result fields authored
   // yet," not an error.

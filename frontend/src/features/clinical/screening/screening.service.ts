@@ -3,9 +3,11 @@ import type { ApiResponse, PaginatedResponse } from '@/types/common.types'
 import type {
   CreateScreeningPayload,
   MoveScreeningStagePayload,
+  RequestConsentOtpResponse,
   ScreeningEntity,
   SearchScreeningQuery,
   UpdateScreeningPayload,
+  VerifyConsentPayload,
 } from '@/features/clinical/screening/screening.types'
 
 const searchScreenings = async (query: SearchScreeningQuery) => {
@@ -33,8 +35,16 @@ const moveScreeningStage = async (id: string, payload: MoveScreeningStagePayload
   return res.data
 }
 
-// verifyConsent is deliberately not wired — the backend never returns the OTP
-// in any response, so no UI can populate the form this would back.
+// TEMP: returns the generated code directly — no delivery sender exists yet.
+const requestConsentOtp = async (id: string) => {
+  const res = await api.post<ApiResponse<RequestConsentOtpResponse>>(`/screenings/${id}/request-consent-otp`)
+  return res.data
+}
+
+const verifyConsent = async (id: string, payload: VerifyConsentPayload) => {
+  const res = await api.post<ApiResponse<ScreeningEntity>>(`/screenings/${id}/verify-consent`, payload)
+  return res.data
+}
 
 export const screeningService = {
   searchScreenings,
@@ -42,4 +52,6 @@ export const screeningService = {
   createScreening,
   updateScreening,
   moveScreeningStage,
+  requestConsentOtp,
+  verifyConsent,
 }

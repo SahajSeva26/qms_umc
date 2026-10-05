@@ -23,7 +23,7 @@ function campFixture(overrides: Partial<CampEntity> = {}): CampEntity {
   return {
     id: 'camp-1', code: 'cmp-000001', tenant: 't-1', division: 'div-1', project: null,
     doctor: 'doc-1', type: 'screening', billingType: 'billable', patientExpectation: 0,
-    fo, mr: null, date: '2026-09-15', timeSlot: '9am-1pm',
+    fo, dietitian: null, mr: null, date: '2026-09-15', timeSlot: '9am-1pm',
     location: {
       addressLine1: '221 Baker Street', city: 'Pune', state: 'Maharashtra',
       pincode: '411001', coordinates: [73.8567, 18.5204],
@@ -94,8 +94,7 @@ describe('CampScreeningPage — gating', () => {
   }, 15000)
 
   it('blocks a matching role id whose roleType is not field-officer — id equality alone must never be enough', async () => {
-    // Mirrors the backend's assertAssignedFoOrManage, which requires isFoType
-    // AND isAssigned together, not id equality alone.
+    // Mirrors the backend's assertAssignedFoOrManage: requires isFoType AND isAssigned together.
     await mockSession('r-fo', ['screening:create', 'screening:get', 'screening:search', 'screening:update'], 'sales-rep')
     await renderPage(campFixture())
 
@@ -108,6 +107,43 @@ describe('CampScreeningPage — gating', () => {
     await renderPage(campFixture({ status: 'requested' }))
 
     expect(await screen.findByText(/this camp is not live/i, {}, { timeout: 10000 })).toBeInTheDocument()
+    expect(screen.queryByText(/no screenings yet/i)).not.toBeInTheDocument()
+  }, 15000)
+
+  // Mirrors the backend's CampService.workerFor(camp.type) — diet camps use dietitian, not fo.
+  function dietCampFixture(overrides: Partial<CampEntity> = {}): CampEntity {
+    const dietitian: CampPopulatedRole = { _id: 'r-diet', code: 'diet-001', name: 'Dietitian One', status: 'active' }
+    return campFixture({ type: 'diet', fo: null, dietitian, ...overrides })
+  }
+
+  it('allows the diet camp\'s assigned dietitian through to the screening list', async () => {
+    await mockSession('r-diet', ['screening:create', 'screening:get', 'screening:search', 'screening:update'], 'dietitian')
+    await renderPage(dietCampFixture())
+
+    expect(await screen.findByText(/no screenings yet/i, {}, { timeout: 10000 })).toBeInTheDocument()
+  }, 15000)
+
+  it('blocks a non-assigned dietitian on a diet camp, with a dietitian-worded message', async () => {
+    await mockSession('r-someone-else', ['screening:create', 'screening:get', 'screening:search', 'screening:update'], 'dietitian')
+    await renderPage(dietCampFixture())
+
+    expect(await screen.findByText(/only the dietitian assigned to this camp/i, {}, { timeout: 10000 })).toBeInTheDocument()
+    expect(screen.queryByText(/no screenings yet/i)).not.toBeInTheDocument()
+  }, 15000)
+
+  it('blocks a field officer on a diet camp, even one whose id happens to match camp.dietitian — role type must match the camp\'s worker kind', async () => {
+    await mockSession('r-diet', ['screening:create', 'screening:get', 'screening:search', 'screening:update'], 'field-officer')
+    await renderPage(dietCampFixture())
+
+    expect(await screen.findByText(/only the dietitian assigned to this camp/i, {}, { timeout: 10000 })).toBeInTheDocument()
+    expect(screen.queryByText(/no screenings yet/i)).not.toBeInTheDocument()
+  }, 15000)
+
+  it('blocks a dietitian on a screening camp, even one whose id happens to match camp.fo — role type must match the camp\'s worker kind', async () => {
+    await mockSession('r-fo', ['screening:create', 'screening:get', 'screening:search', 'screening:update'], 'dietitian')
+    await renderPage(campFixture())
+
+    expect(await screen.findByText(/only the field officer assigned to this camp/i, {}, { timeout: 10000 })).toBeInTheDocument()
     expect(screen.queryByText(/no screenings yet/i)).not.toBeInTheDocument()
   }, 15000)
 })

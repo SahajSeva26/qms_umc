@@ -16,6 +16,7 @@ import { provisionDefaultRoleTypes } from '../../../shared/env/roleTypeProvision
 import { SYSTEM_PERMISSIONS } from '../../../shared/env/permissions';
 import { IUser, UserModel } from '../../user/user.model';
 import { Project } from '../../crm/project/project.model';
+import { DivisionModel } from '../../crm/division/division.model';
 import { PROJECT_STATUS } from '../../crm/project/project.constants';
 import { CampModel } from '../../operations/camp/camp.model';
 import { CAMP_STATUSES, CAMP_TYPES } from '../../operations/camp/camp.constants';
@@ -168,6 +169,7 @@ const search = async (filters: ISearchTenantQuery, ctx: RequestContext, options?
 
 // per-tenant rollup: total & live projects, total & live camps, total MRs, total invoiced
 type TenantStats = {
+    totalDivisions: number;
     totalProjects: number;
     liveProjects: number;
     totalCamps: number;
@@ -182,7 +184,12 @@ type TenantStats = {
 const getTenantStats = async (tenants: HydratedDocument<ITenant>[]): Promise<Record<string, TenantStats>> => {
     const tenantIds = tenants.map((t) => t._id);
 
-    const [projectGroups, campGroups, mrGroups, invoiceGroups] = await Promise.all([
+    const [divisionGroups, projectGroups, campGroups, mrGroups, invoiceGroups] = await Promise.all([
+        // total divisions per tenant
+        DivisionModel.aggregate([
+            { $match: { tenant: { $in: tenantIds } } },
+            { $group: { _id: '$tenant', total: { $sum: 1 } } },
+        ]),
         Project.aggregate([
             { $match: { tenant: { $in: tenantIds } } },
             {
@@ -237,6 +244,7 @@ const getTenantStats = async (tenants: HydratedDocument<ITenant>[]): Promise<Rec
     const stats: Record<string, TenantStats> = {};
     for (const id of tenantIds) {
         stats[id.toString()] = {
+            totalDivisions: 0,
             totalProjects: 0,
             liveProjects: 0,
             totalCamps: 0,
@@ -246,6 +254,12 @@ const getTenantStats = async (tenants: HydratedDocument<ITenant>[]): Promise<Rec
             mrs: 0,
             billed: 0,
         };
+    }
+    for (const g of divisionGroups) {
+        const entry = stats[g._id.toString()];
+        if (entry) {
+            entry.totalDivisions = g.total;
+        }
     }
     for (const g of projectGroups) {
         const entry = stats[g._id.toString()];

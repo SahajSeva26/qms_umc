@@ -70,6 +70,36 @@ const search = async (req: any, res: any) => {
     }
 };
 
+// "my camps" — field-force (FO / dietitian / MR) see only the camps they're assigned to. Delegates
+// to CampService.myCamps, which own-scopes these non-manage roles to their own slot (fo/dietitian/mr).
+const myCamps = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+
+        const { data: filters, success, error } = SearchCampQuerySchema.safeParse(req.query);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                errors: validationErrors,
+            });
+        }
+
+        const pagination = RequestHandler.getPagination(filters);
+
+        const result = await CampService.myCamps(filters, ctx, { pagination });
+
+        return ResponseHandler.appResponse(
+            res,
+            StatusCodes.OK,
+            true,
+            'My camps fetched successfully',
+            CampMapper.toSearchResponse(result, ctx),
+        );
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
 const create = async (req: any, res: any) => {
     try {
         const ctx: RequestContext = req.context;
@@ -259,6 +289,7 @@ const bookingAvailability = async (req: any, res: any) => {
 export const CampController = {
     get,
     search,
+    myCamps,
     create,
     book,
     update,

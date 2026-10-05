@@ -87,6 +87,14 @@ const workerFor = (campType?: string): FieldWorker => (campType === CAMP_TYPES.D
 // field-force slots; a search-only actor sees a camp only if they fill one of these on it.
 const ASSIGNMENT_FIELDS = ['fo', 'dietitian', 'mr', 'asm', 'rsm'] as const;
 
+// a field-force role type is scoped to the single camp field it occupies — an FO to `fo`, a
+// dietitian to `dietitian`, an MR to `mr`. Keeps "my camps" precise instead of matching any slot.
+const OWN_SCOPE_FIELD_BY_ROLE_TYPE: Record<string, string> = {
+    [ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER]: 'fo',
+    [ALLOWED_ROLETYPE_CODES.PLATFORM.DIETITIAN]: 'dietitian',
+    [ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR]: 'mr',
+};
+
 const applyOwnScope = (where: any, ctx: RequestContext) => {
     // a pharma division head sees every camp in their division
     if (ctx.role?.type?.code === ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_DIVISION_HEAD) {
@@ -94,11 +102,20 @@ const applyOwnScope = (where: any, ctx: RequestContext) => {
         return where;
     }
 
-    // any other non-manage actor is scoped to camps they occupy a field-force slot on
-    if (!ctx.hasAnyPermissions([CAMP_PERMISSIONS.MANAGE.code])) {
-        where.$or = ASSIGNMENT_FIELDS.map((field) => ({ [field]: ctx.role?._id }));
+    // a manage actor is unscoped
+    if (ctx.hasAnyPermissions([CAMP_PERMISSIONS.MANAGE.code])) {
+        return where;
     }
 
+    // FO / dietitian / MR are scoped to the specific slot their role type fills
+    const field = OWN_SCOPE_FIELD_BY_ROLE_TYPE[ctx.role?.type?.code];
+    if (field) {
+        where[field] = ctx.role?._id;
+        return where;
+    }
+
+    // any other non-manage actor (e.g. asm/rsm) is scoped to camps they occupy any field-force slot on
+    where.$or = ASSIGNMENT_FIELDS.map((f) => ({ [f]: ctx.role?._id }));
     return where;
 };
 
@@ -535,6 +552,13 @@ const search = async (filters: ISearchCampQuery, ctx: RequestContext, options?: 
     const stats = filters.report === 'true' ? await getCampPatientStats(items) : undefined;
 
     return { count, items, stats };
+};
+
+// "my camps" — field-force (FO / dietitian / MR) list only the camps assigned to them. Thin wrapper
+// over search: these are all non-manage roles, so applyOwnScope pins the result to the caller's own
+// slot (fo/dietitian/mr = their role id).
+const myCamps = async (filters: ISearchCampQuery, ctx: RequestContext, options?: IServiceOptions) => {
+    return search(filters, ctx, options);
 };
 
 // per-camp patient counts from the screenings collection — one screening = one patient at that camp
@@ -1048,6 +1072,7 @@ const bookingAvailability = async (model: IBookingAvailabilityPayload, ctx: Requ
 export const CampService = {
     get,
     search,
+    myCamps,
     create,
     update,
     moveStage,

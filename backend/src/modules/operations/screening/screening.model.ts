@@ -2,16 +2,12 @@
 import mongoose from 'mongoose';
 import { SCREENING_STATUS } from './screening.constants';
 
+// the OTP code itself lives in the OTP module (issued + verified via OtpService); the screening only
+// tracks whether consent has been verified and the captured signature.
 const consentSchema = new mongoose.Schema(
     {
-        otp: {
-            type: String,
-            required: true,
-        },
         signature: String,
         verified: {
-            //only verify after otp is entered
-            //make separate route for this verification
             type: Boolean,
             default: false,
         },

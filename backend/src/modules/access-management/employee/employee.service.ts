@@ -22,11 +22,15 @@ const populate: any[] = [
 // SCOPING HELPERS
 // ========================================================================================
 
-// A field officer may only ever see their OWN employee record; anyone else allowed onto these
-// routes (admin / ops managers) sees every employee within their tenant scope. Layered on top of
-// ctx.where() so the tenant boundary is still enforced.
+// Field staff (a field officer or a dietitian) may only ever see their OWN employee record; anyone
+// else allowed onto these routes (admin / ops managers) sees every employee within their tenant scope.
+// Layered on top of ctx.where() so the tenant boundary is still enforced.
+const SELF_ONLY_ROLE_TYPES: string[] = [
+    ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER,
+    ALLOWED_ROLETYPE_CODES.PLATFORM.DIETITIAN,
+];
 const ownScope = (ctx: RequestContext): Record<string, any> => {
-    if (ctx.role?.type?.code === ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER) {
+    if (SELF_ONLY_ROLE_TYPES.includes(ctx.role?.type?.code)) {
         return { user: ctx.user?._id };
     }
     return {};

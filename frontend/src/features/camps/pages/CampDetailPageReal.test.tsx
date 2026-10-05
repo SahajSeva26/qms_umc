@@ -14,11 +14,8 @@ vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
     onResolutionStateChange?: (status: 'idle' | 'loading' | 'error') => void
   }) => (
     <>
-      {/* Simulates picking a real point on the map — needed for CampFoPicker's
-          coverage-radius-based eligibility (coordinates), AND for EditDoctorModal's own
-          save-time completeness check (which additionally requires addressLine1/city/state/
-          pincode, unlike Camp's own location) — this mock is shared across both modals since
-          it's a module-path mock, not scoped to one caller. */}
+      {/* Shared mock (module-path, not caller-scoped): supplies coordinates for CampFoPicker
+          and the fuller address EditDoctorModal's own completeness check needs. */}
       <button
         type="button"
         onClick={() => onChange({
@@ -30,8 +27,7 @@ vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
       >
         Set test coordinates
       </button>
-      {/* Simulates the real widget's "pin moved, reverse-geocode still resolving"
-          window — the gap between a drag/click and onChange actually firing. */}
+      {/* Simulates the gap between a drag/click and onChange firing (reverse-geocode resolving). */}
       <button type="button" onClick={() => onResolutionStateChange?.('loading')}>
         Simulate location resolving
       </button>
@@ -138,8 +134,7 @@ async function pickCompany(user: ReturnType<typeof userEvent.setup>, name: strin
   await user.click(option)
 }
 
-// Division now precedes Project in the field order — the default divisionService mock above
-// resolves one division ("Cardiology"), which is what this helper picks.
+// Default divisionService mock resolves one division ("Cardiology"), which this helper picks.
 async function pickDivision(user: ReturnType<typeof userEvent.setup>, name = 'Cardiology') {
   const divisionLabel = await screen.findByText(/^Division \*/i)
   const trigger = divisionLabel.parentElement!.querySelector('[role="combobox"]')!
@@ -148,8 +143,6 @@ async function pickDivision(user: ReturnType<typeof userEvent.setup>, name = 'Ca
   await user.click(option)
 }
 
-// "New doctor" is disabled until a Division is picked — a doctor must always be scoped to a
-// real division, never created via an unconstrained tenant-wide picker.
 async function mockProjectWithDivision() {
   const { projectsService } = await import('@/features/projects/projects.service')
   vi.mocked(projectsService.searchProjects).mockResolvedValue({
@@ -190,9 +183,7 @@ describe('CampDetailPageReal — create mode, inline doctor creation', () => {
     vi.resetAllMocks()
   })
 
-  // Locates each input via its own label text's sibling — this modal's labels aren't
-  // htmlFor-associated with their inputs. Assumes a Division is already picked, so
-  // EditDoctorModal receives forcedDivision and shows no division picker of its own.
+  // This modal's labels aren't htmlFor-associated with their inputs, hence the sibling lookup.
   async function fillNewDoctorRequiredFields(user: ReturnType<typeof userEvent.setup>) {
     const codeLabel = screen.getByText(/pharma doctor code/i)
     const codeInput = codeLabel.parentElement!.querySelector('input')!
@@ -202,17 +193,16 @@ describe('CampDetailPageReal — create mode, inline doctor creation', () => {
     const nameInput = nameLabel.parentElement!.querySelector('input')!
     await user.type(nameInput, 'Dr. New')
 
-    // Mobile is required on create (CreateDoctorPayloadSchema.mobile has no .optional(), min 10).
+    // Required on create per CreateDoctorPayloadSchema (no .optional(), min 10).
     const mobileLabel = screen.getByText(/^mobile$/i)
     const mobileInput = mobileLabel.parentElement!.querySelector('input')!
     await user.type(mobileInput, '9876543210')
 
-    // Email is required on create (CreateDoctorPayloadSchema.email has no .optional()).
+    // Required on create per CreateDoctorPayloadSchema (no .optional()).
     const emailLabel = screen.getByText(/^email$/i)
     const emailInput = emailLabel.parentElement!.querySelector('input')!
     await user.type(emailInput, 'newdoc@example.com')
 
-    // Location is required on create — the mocked LocationPicker's button supplies a complete one.
     await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
   }
 
@@ -233,8 +223,7 @@ describe('CampDetailPageReal — create mode, inline doctor creation', () => {
 
     await screen.findByText(/^Company \*/i)
     expect(screen.getByRole('button', { name: /new doctor/i })).toBeDisabled()
-    // The Doctor field (CampDoctorSearchPicker) is gated on Division, not Company directly —
-    // before any Company is picked, Division is also empty, so this is what actually renders.
+    // Doctor field is gated on Division, not Company — Division is also empty at this point.
     expect(screen.getByPlaceholderText(/select a division first/i)).toBeInTheDocument()
   })
 
@@ -270,14 +259,12 @@ describe('CampDetailPageReal — create mode, inline doctor creation', () => {
     await pickDivision(user)
     await pickProject(user)
 
-    // Some in-progress draft state (Notes) set before creating the doctor — proves opening and
-    // closing the inline doctor modal doesn't wipe unrelated Camp draft state.
+    // Proves opening/closing the inline doctor modal doesn't wipe unrelated Camp draft state.
     const notes = screen.getByPlaceholderText('Optional')
     await user.type(notes, 'Keep this camp note')
 
     await user.click(screen.getByRole('button', { name: /new doctor/i }))
     await screen.findByRole('dialog')
-    // Company and Division are both locked/read-only inside the modal, not editable pickers.
     expect(screen.getByText(/locked to the camp being booked/i)).toBeInTheDocument()
     expect(screen.getByText(/locked to the selected division/i)).toBeInTheDocument()
 
@@ -295,8 +282,7 @@ describe('CampDetailPageReal — create mode, inline doctor creation', () => {
 
   it('clears the selected doctor and any locally-added doctor when the Company changes', async () => {
     await mockSessionWithPermission(true)
-    // Both companies mocked upfront — useTenants fetches once (no search term
-    // to key a refetch off), so a mid-test mock swap wouldn't be reflected.
+    // Both companies mocked upfront — useTenants fetches once, so a mid-test mock swap wouldn't be reflected.
     await mockTenants([
       { id: 't-cipla', name: 'Cipla', code: 'cipla', type: 'customer' },
       { id: 't-sun', name: 'Sun Pharma', code: 'sunpharma', type: 'customer' },
@@ -326,7 +312,6 @@ describe('CampDetailPageReal — create mode, inline doctor creation', () => {
     const otherOption = await screen.findByRole('option', { name: /sun pharma/i })
     await user.click(otherOption)
 
-    // Doctor and ProjectPicker share the same no-division placeholder text — assert both.
     expect(screen.queryByText(/dr\. new/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/select company first/i)).not.toBeInTheDocument()
     expect(screen.getAllByPlaceholderText(/select a division first/i)).toHaveLength(2)
@@ -359,8 +344,7 @@ describe('CampDetailPageReal — Division/Project field interplay', () => {
     vi.resetAllMocks()
   })
 
-  // A second division, so a genuine mismatch (project.division !== the picked Division) can be
-  // constructed — the default divisionService mock elsewhere in this file only ever resolves one.
+  // Lets a genuine project.division !== picked Division mismatch be constructed (default mock has only one).
   async function mockTwoDivisions() {
     const { divisionService } = await import('@/features/crm/divisions/division.service')
     vi.mocked(divisionService.searchDivisions).mockResolvedValue({
@@ -381,8 +365,7 @@ describe('CampDetailPageReal — Division/Project field interplay', () => {
     await mockTenants([{ id: 't-cipla', name: 'Cipla', code: 'cipla', type: 'customer' }])
     await mockTwoDivisions()
     const { projectsService } = await import('@/features/projects/projects.service')
-    // Project belongs to div-2 (Oncology) — the user is about to pick div-1 (Cardiology) instead.
-    // "Cipla" in the name matches pickProject's own hardcoded search term/assertion.
+    // Project belongs to div-2 (Oncology); the user is about to pick div-1 (Cardiology) instead.
     vi.mocked(projectsService.searchProjects).mockResolvedValue({
       success: true,
       message: '',
@@ -396,8 +379,6 @@ describe('CampDetailPageReal — Division/Project field interplay', () => {
     await pickProject(user)
 
     expect(await screen.findByText(/doesn't belong to the selected division/i)).toBeInTheDocument()
-    // The mismatched project must NOT be accepted — Division stays exactly what was picked,
-    // not silently overwritten to the project's own division.
     const divisionLabel = screen.getByText(/^Division \*/i)
     const divisionTrigger = divisionLabel.parentElement!.querySelector('[role="combobox"]')!
     expect(divisionTrigger).toHaveTextContent(/cardiology/i)
@@ -452,8 +433,6 @@ describe('CampDetailPageReal — Division/Project field interplay', () => {
     await pickProject(user)
     expect(await screen.findByText(/cipla project cardio/i)).toBeInTheDocument()
 
-    // Fill MR, FO, Doctor, and Time slot — all four must be genuinely populated so the
-    // test can actually distinguish "cleared" from "was never set" for each.
     const mrSearchInput = await screen.findByPlaceholderText(/search mr by name/i)
     await user.type(mrSearchInput, 'Cipla')
     await user.click(await screen.findByText(/cipla mr/i, {}, { timeout: 3000 }))
@@ -479,13 +458,10 @@ describe('CampDetailPageReal — Division/Project field interplay', () => {
     expect(screen.getByText(/cipla fo/i)).toBeInTheDocument()
     expect(screen.getByText(/dr\. cardio doe/i)).toBeInTheDocument()
 
-    // Switch Division — the now-stale project/doctor/time slot (scoped to the old division)
-    // must clear, but MR/FO (not division-scoped) must survive untouched.
     await pickDivision(user, 'Oncology')
 
     expect(screen.queryByText(/cipla project cardio/i)).not.toBeInTheDocument()
     expect(screen.getByPlaceholderText(/search or browse projects/i)).toBeInTheDocument()
-    // Doctor is cleared but re-scoped to the NEW division — a live search box, not the no-division placeholder.
     expect(screen.queryByText(/dr\. cardio doe/i)).not.toBeInTheDocument()
     expect(screen.getByPlaceholderText(/search doctor by name/i)).toBeInTheDocument()
     // SelectValue's placeholder is a render-prop, never lands in the DOM as text — assert disabled+empty instead.
@@ -495,7 +471,6 @@ describe('CampDetailPageReal — Division/Project field interplay', () => {
     expect(clearedTimeSlotTrigger).toHaveAttribute('data-placeholder')
     expect(clearedTimeSlotTrigger).not.toHaveTextContent(/9am|am-1pm/i)
 
-    // MR and FO both survive the Division change — neither is division-scoped.
     expect(screen.getByText(/cipla mr/i)).toBeInTheDocument()
     expect(screen.getByText(/cipla fo/i)).toBeInTheDocument()
   })
@@ -512,17 +487,54 @@ describe('CampDetailPageReal — Division/Project field interplay', () => {
     await pickProject(user)
     expect(await screen.findByText(/cipla project/i)).toBeInTheDocument()
 
-    // Clear the project via its picker's own clear control.
     const projectLabel = screen.getByText(/^Project \*/i)
     const clearButton = projectLabel.parentElement!.querySelector('[aria-label="Clear selected project"]')
     expect(clearButton).not.toBeNull()
     await user.click(clearButton!)
 
-    // Division must stay picked — it's no longer derived FROM the project.
     const divisionLabel = screen.getByText(/^Division \*/i)
     const divisionTrigger = divisionLabel.parentElement!.querySelector('[role="combobox"]')!
     expect(divisionTrigger).toHaveTextContent(/cardiology/i)
     expect(screen.getByPlaceholderText(/search or browse projects/i)).toBeInTheDocument()
+  })
+
+  it('picking a project narrows the Type select to only what the project offers, matching the backend\'s own hard 400 (project.type.includes(campType))', async () => {
+    await mockSessionWithPermission(true)
+    await mockTenants([{ id: 't-cipla', name: 'Cipla', code: 'cipla', type: 'customer' }])
+    const { projectsService } = await import('@/features/projects/projects.service')
+    // A diet-only project — Screening/Lab must disappear from the Type picker once it's chosen.
+    vi.mocked(projectsService.searchProjects).mockResolvedValue({
+      success: true,
+      message: '',
+      data: { items: [{ id: 'proj-1', code: 'prj-001', name: 'Cipla Project', status: 'new', division: 'div-1', campTimeSlots: ['9am-1pm'], tests: [], type: ['diet'] }], count: 1 },
+    } as never)
+
+    const user = userEvent.setup()
+    await renderCreatePage()
+    await pickCompany(user, 'Cipla')
+    await pickDivision(user)
+
+    const typeLabel = screen.getByText(/^Type$/i)
+    const typeTrigger = typeLabel.parentElement!.querySelector('[role="combobox"]')!
+
+    // Before any project is picked, every real camp type is still offered.
+    await user.click(typeTrigger)
+    expect(await screen.findByRole('option', { name: /^Screening$/i })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: /^Diet$/i })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: /^Lab$/i })).toBeInTheDocument()
+    await user.click(screen.getByRole('option', { name: /^Screening$/i }))
+
+    await pickProject(user)
+
+    // The draft's type (Screening) is no longer valid for this diet-only project — auto-corrected
+    // to the project's own first offered type (Diet), not left silently invalid.
+    expect(typeTrigger).toHaveTextContent(/^Diet/i)
+
+    // And the picker itself now only offers what the project actually allows.
+    await user.click(typeTrigger)
+    expect(await screen.findByRole('option', { name: /^Diet$/i })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: /^Screening$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: /^Lab$/i })).not.toBeInTheDocument()
   })
 })
 
@@ -602,7 +614,9 @@ describe('CampDetailPageReal — create mode, MR/FO pickers', () => {
       data: {
         items: [{
           id: 'proj-1', code: 'prj-001', name: 'Cipla Project', status: 'new',
-          division: 'div-1', campTimeSlots: ['9am-1pm'], tests: [],
+          // Offers both screening and diet — some tests using this fixture switch the camp's own
+          // Type between the two (see the dietitian worker-switch test below).
+          division: 'div-1', campTimeSlots: ['9am-1pm'], tests: [], type: ['screening', 'diet'],
         }],
         count: 1,
       },
@@ -690,6 +704,47 @@ describe('CampDetailPageReal — create mode, MR/FO pickers', () => {
     expect(await screen.findByPlaceholderText(/search mr by name/i)).toBeInTheDocument()
     // Company change also clears timeSlot now, so FO's date+slot eligibility gate re-closes.
     expect(await screen.findByPlaceholderText(/pick a date and time slot first/i)).toBeInTheDocument()
+  })
+
+  it('switching Type from Screening to Diet clears a picked FO (and its label) rather than sending both fo and dietitian', async () => {
+    await mockSessionWithPermission(true)
+    await mockTenants([{ id: 't-cipla', name: 'Cipla', code: 'cipla', type: 'customer' }])
+    await mockRoleTypesAndRoles({
+      'pharma-mr': [{ id: 'mr-cipla', code: 'phr-001', name: 'Cipla MR', permissions: [], status: 'active', type: 'rt-pharma-mr', user: 'u-2', tenant: 't-cipla', createdAt: '', updatedAt: '' } as RoleEntity],
+    })
+    await mockNearestFo({ id: 'fo-cipla', code: 'fo-001', name: 'Cipla FO', permissions: [], status: 'active', type: 'rt-field-officer', user: 'u-3', tenant: 't-cipla', createdAt: '', updatedAt: '' } as RoleEntity)
+    await mockProjectWithSlots()
+
+    const user = userEvent.setup()
+    await renderCreatePage()
+    await pickCompany(user, 'Cipla')
+    await pickDivision(user)
+    await pickProject(user)
+
+    await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
+    const dateLabel = screen.getByText(/^date$/i)
+    const dateInput = dateLabel.parentElement!.querySelector('input[type="date"]')!
+    await user.type(dateInput, '2026-09-20')
+    const timeSlotLabel = screen.getByText(/time slot \*/i)
+    const timeSlotTrigger = timeSlotLabel.parentElement!.querySelector('[role="combobox"]')!
+    await user.click(timeSlotTrigger)
+    await user.click((await screen.findAllByRole('option'))[0])
+
+    const foSearchInput = await screen.findByPlaceholderText(/search fo by name/i)
+    await user.click(foSearchInput)
+    await user.click(await screen.findByText(/cipla fo/i, {}, { timeout: 3000 }))
+    expect(screen.getByText(/cipla fo/i)).toBeInTheDocument()
+
+    const typeLabel = screen.getByText(/^Type$/i)
+    const typeTrigger = typeLabel.parentElement!.querySelector('[role="combobox"]')!
+    await user.click(typeTrigger)
+    await user.click(await screen.findByRole('option', { name: /^Diet$/i }))
+
+    // The FO's label is gone — the field swapped to the (empty) Dietitian picker.
+    // Date/timeSlot/location stay intact, so the picker reaches its own "Search…" state (not the gate placeholder).
+    expect(screen.queryByText(/cipla fo/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/^Dietitian \(optional/i)).toBeInTheDocument()
+    expect(await screen.findByPlaceholderText(/search dietitian by name/i)).toBeInTheDocument()
   })
 
   it('the FO picker is disabled until a Company is selected', async () => {

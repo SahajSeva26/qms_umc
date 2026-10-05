@@ -1,6 +1,10 @@
 // Employee Constants
+// employment type — how the employee is engaged (NOT their system role, which lives on the linked user)
 export const EMPLOYEE_TYPES = {
-    FIELD_OFFICER: 'field-officer',
+    FULL_TIME: 'full-time',
+    PART_TIME: 'part-time',
+    CONTRACTUAL: 'contractual',
+    FREELANCE: 'freelance',
 } as const;
 
 export const EMPLOYEE_STATUS = {

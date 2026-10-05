@@ -39,11 +39,15 @@ const wizardFormBaseSchema = z.object({
   type: z.array(z.enum(TYPE_VALUES)),
   tests: z.array(z.string()),
 
-  // Step 2 — Execution
+  // Step 2 — Execution. Each PO row's own required-ness (number/date) is enforced per-row in the
+  // superRefine below, not here, since a brand-new empty row must not block typing into a prior one.
   mode: z.enum(['po', 'agreement', 'mail_confirmation']),
-  poNumber: z.string(),
-  poDate: z.string(),
-  poExpiry: z.string(),
+  purchaseOrders: z.array(z.object({
+    number: z.string().optional(),
+    date: z.string().optional(),
+    expiry: z.string().optional(),
+    file: z.string().optional(),
+  })),
   agreementNumber: z.string(),
   agreementStartDate: z.string(),
   agreementEndDate: z.string(),
@@ -98,11 +102,18 @@ function applySharedWizardRefinements<T extends typeof wizardFormBaseSchema>(sch
     })
     // Step 2 — mode-conditional required fields
     .superRefine((v, ctx) => {
-      if (v.mode === 'po' && v.poNumber.trim().length === 0) {
-        ctx.addIssue({ code: 'custom', message: 'PO number is required for PO-based projects.', path: ['poNumber'] })
-      }
-      if (v.mode === 'po' && v.poDate.trim().length === 0) {
-        ctx.addIssue({ code: 'custom', message: 'PO date is required for PO-based projects.', path: ['poDate'] })
+      if (v.mode === 'po') {
+        if (v.purchaseOrders.length === 0) {
+          ctx.addIssue({ code: 'custom', message: 'Add at least one purchase order.', path: ['purchaseOrders'] })
+        }
+        v.purchaseOrders.forEach((po, i) => {
+          if (!po.number?.trim()) {
+            ctx.addIssue({ code: 'custom', message: 'PO number is required.', path: ['purchaseOrders', i, 'number'] })
+          }
+          if (!po.date?.trim()) {
+            ctx.addIssue({ code: 'custom', message: 'PO date is required.', path: ['purchaseOrders', i, 'date'] })
+          }
+        })
       }
       if (v.mode === 'agreement' && v.agreementStartDate.trim().length === 0) {
         ctx.addIssue({ code: 'custom', message: 'Agreement start date is required.', path: ['agreementStartDate'] })
@@ -136,7 +147,7 @@ export type WizardFormValues = z.infer<typeof wizardFormBaseSchema>
 export const CREATE_STEP_FIELD_NAMES: (keyof WizardFormState)[][] = [
   ['leadId'],
   ['name', 'therapy', 'type'],
-  ['mode', 'poNumber', 'poDate', 'agreementStartDate', 'duration', 'emailReference'],
+  ['mode', 'purchaseOrders', 'agreementStartDate', 'duration', 'emailReference'],
   ['campCost', 'totalCamps', 'valueBeforeGST', 'gst', 'additionalCost'],
   ['campTimeSlots', 'freeCancelHours', 'cancellationAllowed', 'campCostDeductionOnChargableCancel', 'goLiveScopeCode', 'goLiveScopeValues', 'whoCanBookCamp'],
   ['salesRep', 'projectCoordinator', 'marketingContact', 'paymentTerms'],

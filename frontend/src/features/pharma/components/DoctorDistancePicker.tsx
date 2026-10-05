@@ -10,6 +10,9 @@ interface DoctorDistancePickerProps {
   label: string
   coordinates?: [number, number]
   onChange: (doctorId: string, doctorLabel: string) => void
+  // Fires alongside onChange with the full picked entity (or null on clear) — lets a caller
+  // default the camp location to the doctor's own location without a second lookup.
+  onSelectDoctor?: (doctor: DoctorEntity | null) => void
   disabled?: boolean
 }
 
@@ -19,7 +22,7 @@ const doctorLabel = (doctor: DoctorEntity) => `${doctor.name} (${doctor.pharmaCo
 
 // Pharma-side: distance-sorted via /doctors/nearest, division-scoped server-side to the caller's
 // own role — no division param needed. See CampDoctorSearchPicker for the platform equivalent.
-const DoctorDistancePicker = ({ value, label, coordinates, onChange, disabled }: DoctorDistancePickerProps) => {
+const DoctorDistancePicker = ({ value, label, coordinates, onChange, onSelectDoctor, disabled }: DoctorDistancePickerProps) => {
   const [query, setQuery] = useState('')
   const { open, setOpen, containerRef } = useAsyncPickerState()
 
@@ -48,12 +51,17 @@ const DoctorDistancePicker = ({ value, label, coordinates, onChange, disabled }:
     forbidden ? "Your account isn't assigned to a division." : "Couldn't search doctors. Try again.",
   )
 
+  const handleChange = (doctorId: string, doctorLabel: string) => {
+    onChange(doctorId, doctorLabel)
+    onSelectDoctor?.(filteredDoctors.find((d) => d.id === doctorId) ?? null)
+  }
+
   return (
     <div>
       <AsyncPicker<DoctorEntity>
         value={value}
         label={label}
-        onChange={onChange}
+        onChange={handleChange}
         query={query}
         onQueryChange={setQuery}
         open={open}

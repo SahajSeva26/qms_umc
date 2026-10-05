@@ -10,6 +10,9 @@ interface CampDoctorSearchPickerProps {
   label: string
   division: string | undefined
   onChange: (doctorId: string, doctorLabel: string) => void
+  // Fires alongside onChange with the full picked entity (or null on clear) — lets a caller
+  // default the camp location to the doctor's own location without a second lookup.
+  onSelectDoctor?: (doctor: DoctorEntity | null) => void
   disabled?: boolean
 }
 
@@ -17,7 +20,7 @@ interface CampDoctorSearchPickerProps {
 // distance-sorted equivalent (/doctors/nearest is gated to camp:book, not reachable here).
 const doctorLabel = (doctor: DoctorEntity) => `${doctor.name} (${doctor.pharmaCode})`
 
-const CampDoctorSearchPicker = ({ value, label, division, onChange, disabled }: CampDoctorSearchPickerProps) => {
+const CampDoctorSearchPicker = ({ value, label, division, onChange, onSelectDoctor, disabled }: CampDoctorSearchPickerProps) => {
   const [query, setQuery] = useState('')
   const debouncedQuery = useDebouncedValue(query, 300)
   const { open, setOpen, containerRef } = useAsyncPickerState()
@@ -28,11 +31,16 @@ const CampDoctorSearchPicker = ({ value, label, division, onChange, disabled }: 
   })
   const results = data?.data?.items ?? []
 
+  const handleChange = (doctorId: string, doctorLabel: string) => {
+    onChange(doctorId, doctorLabel)
+    onSelectDoctor?.(results.find((d) => d.id === doctorId) ?? null)
+  }
+
   return (
     <AsyncPicker<DoctorEntity>
       value={value}
       label={label}
-      onChange={onChange}
+      onChange={handleChange}
       query={query}
       onQueryChange={setQuery}
       open={open}

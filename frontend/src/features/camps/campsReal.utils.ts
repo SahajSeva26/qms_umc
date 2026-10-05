@@ -11,16 +11,22 @@ export function campRefName(value: { name?: string } | string | null | undefined
   return value.name ?? null
 }
 
-// Mirrors the backend's assertAssignedFoOrManage — id match alone isn't enough, roleType must be 'field-officer'.
+// Mirrors backend's assertAssignedWorkerOrManage — id match alone isn't enough, role type must match the camp's worker kind (fo vs dietitian).
 export function canRunScreening(
-  camp: { fo: { _id?: string; id?: string } | string | null },
+  camp: {
+    type: string
+    fo: { _id?: string; id?: string } | string | null
+    dietitian: { _id?: string; id?: string } | string | null
+  },
   viewerRoleId: string | undefined,
   viewerRoleTypeCode: string | undefined,
   canManageScreening: boolean,
 ): boolean {
   if (canManageScreening) return true
-  if (!viewerRoleId || viewerRoleTypeCode !== 'field-officer') return false
-  return campRefId(camp.fo) === viewerRoleId
+  if (!viewerRoleId) return false
+  const isDiet = camp.type === 'diet'
+  if (viewerRoleTypeCode !== (isDiet ? 'dietitian' : 'field-officer')) return false
+  return campRefId(isDiet ? camp.dietitian : camp.fo) === viewerRoleId
 }
 
 // Replaces any existing `camp` param on the return path rather than appending a second one.

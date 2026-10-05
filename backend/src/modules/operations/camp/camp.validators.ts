@@ -48,6 +48,8 @@ export const CreateCampPayloadSchema = z.object({
     // `mr` is REQUIRED and is the ONLY pharma-chain reference a caller supplies; its supervisor
     // chain (asm → rsm) is DERIVED from the MR in the service, never accepted from the payload.
     fo: objectId('FO').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8c' }),
+    // diet-camp counterpart of `fo` (override the auto-pick on a diet camp); only one applies, by type.
+    dietitian: objectId('Dietitian').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8e' }),
     mr: objectId('MR').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8d' }),
 
     // slot & location — location.coordinates [lng, lat] is the point FO allocation searches around
@@ -93,14 +95,42 @@ export const BookCampPayloadSchema = z.object({
 });
 export type IBookCampPayload = z.infer<typeof BookCampPayloadSchema>;
 
+//1c: void camp ====================================>
+// Internal-team record of a camp that happened WITHOUT a PO (WF-4). Same shape as create but `mr`
+// is optional (a void camp is often standalone) and `billingType` is NOT accepted — the service
+// forces it to 'void'. The camp is created WITHOUT the normal lifecycle: no FO auto-allocation,
+// no slot-clash check, no auto-confirm; it simply lands in `requested` for later reconciliation.
+export const VoidCampPayloadSchema = CreateCampPayloadSchema.omit({ billingType: true }).extend({
+    mr: objectId('MR').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8d' }),
+    // free-form metadata bag, but a void camp MUST carry a mail link (its execution basis is a mail).
+    meta: z
+        .record(z.string(), z.any())
+        .refine((m) => typeof m?.mailUrl === 'string' && m.mailUrl.trim().length > 0, {
+            message: 'meta.mailUrl is required for a void camp',
+        })
+        .openapi({ example: { mailUrl: 'https://cdn/void-mail-123.pdf' } }),
+});
+export type IVoidCampPayload = z.infer<typeof VoidCampPayloadSchema>;
+
+//2d: approve void camp ====================================>
+// A void camp uses only requested → closed; approval (the close) is the single update it allows.
+// Only the reason is supplied; the approver + timestamp come from the stageHistory entry (actor +
+// createdAt), so no separate approvedBy/approvedAt fields are needed.
+export const ApproveVoidCampPayloadSchema = z.object({
+    reason: z.string().min(1).openapi({ example: 'Mail verified; void camp approved and closed' }),
+});
+export type IApproveVoidCampPayload = z.infer<typeof ApproveVoidCampPayloadSchema>;
+
 //2: update ====================================>
-// project/tenant/division/status are NOT editable here — status moves through moveStage()
+// project/tenant/division/status/type are NOT editable here — status moves through moveStage(), and
+// type is immutable after creation (it decides the camp's worker kind).
 export const UpdateCampPayloadSchema = z.object({
     doctor: objectId('Doctor').optional(),
-    type: z.enum(Object.values(CAMP_TYPES)).optional(),
     billingType: z.enum(Object.values(BILLING_TYPES)).optional(),
     patientExpectation: z.number().int().nonnegative().optional(),
     fo: objectId('FO').optional(),
+    // diet-camp counterpart of `fo` (see create) — only one applies, decided by the camp's type.
+    dietitian: objectId('Dietitian').optional(),
     // like create: only `mr` is accepted; asm/rsm are derived from it in the service.
     mr: objectId('MR').optional(),
     date: z.coerce.date().optional(),
@@ -128,6 +158,7 @@ export const SearchCampQuerySchema = z.object({
     division: objectId('Division').optional(),
     doctor: objectId('Doctor').optional(),
     fo: objectId('FO').optional(),
+    dietitian: objectId('Dietitian').optional(),
     status: z.enum(Object.values(CAMP_STATUSES)).optional().openapi({ example: 'confirmed' }),
     type: z.enum(Object.values(CAMP_TYPES)).optional().openapi({ example: 'screening' }),
     billingType: z.enum(Object.values(BILLING_TYPES)).optional().openapi({ example: 'billable' }),
@@ -147,6 +178,8 @@ export type ISearchCampQuery = z.infer<typeof SearchCampQuerySchema>;
 // checks slot availability for a project around a location within a date range.
 export const BookingAvailabilityPayloadSchema = z.object({
     projectID: objectId('Project').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
+    // which worker to check availability for; defaults to screening (FO), pass 'diet' for dietitian.
+    type: z.enum(Object.values(CAMP_TYPES)).optional().openapi({ example: 'screening' }),
     lat: z.number().min(-90).max(90).openapi({ example: 29.2183 }),
     lng: z.number().min(-180).max(180).openapi({ example: 79.513 }),
     dateFrom: z.coerce.date().openapi({ example: '2026-08-01' }),

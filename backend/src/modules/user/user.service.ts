@@ -18,7 +18,7 @@ import { IServiceOptions } from '../../shared/types/service.types';
 import { endOfUTCDay, startOfUTCDay } from '../../shared/utils/dates';
 
 type UserDocument = HydratedDocument<IUser> | null;
-const populate: any[] = [];
+const populate: any[] = [{ path: 'profilePicture' }];
 // ========================================================================================
 // CORE FUNCTIONS
 // ========================================================================================
@@ -38,6 +38,9 @@ const set = async (model: any, entity: HydratedDocument<IUser>, ctx: RequestCont
     }
     if (model.status && ctx.hasAllPermissions([USER_PERMISSIONS.MANAGE.code])) {
         entity.status = model.status;
+    }
+    if (model.profilePicture) {
+        entity.profilePicture = model.profilePicture;
     }
 
     return entity;
@@ -159,7 +162,7 @@ const update = async (id: string, model: IUpdateUserPayload, ctx: RequestContext
 // dedicated method for auth flows only — accepts a user id or email
 const getUserWithPassword = async (identifier: string) => {
     const where = mongoose.isValidObjectId(identifier) ? { _id: identifier } : { email: identifier };
-    return await UserModel.findOne(where).select('+password');
+    return await UserModel.findOne(where).select('+password').populate('profilePicture');
 };
 
 

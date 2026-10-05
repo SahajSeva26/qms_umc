@@ -19,8 +19,9 @@ export const CampMapper = {
             billingType: camp.billingType,
             patientExpectation: camp.patientExpectation,
 
-            // field-force assignment
-            fo: camp.fo,
+            // normalized to null — model has no default, so an unassigned camp's field is `undefined` otherwise
+            fo: camp.fo ?? null,
+            dietitian: camp.dietitian ?? null,
             mr: camp.mr,
             asm: camp.asm,
             rsm: camp.rsm,
@@ -34,6 +35,7 @@ export const CampMapper = {
             devices: camp.devices || [],
             notes: camp.notes,
             conscentPath: camp.conscentPath,
+            meta: camp.meta ?? null,
 
             // lifecycle
             status: camp.status,
@@ -50,16 +52,18 @@ export const CampMapper = {
         };
         return result;
     },
-    toSearchResponse: (data: { count: number; items: any[]; stats?: Record<string, { patients: number; patientsCompleted: number }> | undefined }, ctx: RequestContext) => {
-        const result = {
+    toSearchResponse: (data: { count: number; items: any[]; stats?: Record<string, { patients: number; patientsCompleted: number }> | undefined; summary?: any }, ctx: RequestContext) => {
+        const result: any = {
             count: data?.count || 0,
             items: [] as any[],
         };
+        // opt-in top-level summary (only present on "my camps") — total + status/type counts
+        if (data?.summary) {
+            result.summary = data.summary;
+        }
         const stats = data?.stats;
         for (const camp of data?.items || []) {
-            // NOTE: independent from toResponse on purpose — search rows can be
-            // trimmed to a lighter subset later without affecting GET /:id.
-            // For now this mirrors toResponse field-for-field so nothing breaks.
+            // independent from toResponse on purpose — search rows can be trimmed later without affecting GET /:id
             const item: any = {
                 id: camp._id?.toString(),
                 code: camp.code,
@@ -75,8 +79,9 @@ export const CampMapper = {
                 billingType: camp.billingType,
                 patientExpectation: camp.patientExpectation,
 
-                // field-force assignment
-                fo: camp.fo,
+                // field-force assignment — see toResponse's identical note on the fo/dietitian default gap.
+                fo: camp.fo ?? null,
+                dietitian: camp.dietitian ?? null,
                 mr: camp.mr,
                 asm: camp.asm,
                 rsm: camp.rsm,
@@ -90,6 +95,7 @@ export const CampMapper = {
                 devices: camp.devices || [],
                 notes: camp.notes,
                 conscentPath: camp.conscentPath,
+                meta: camp.meta ?? null,
 
                 // lifecycle
                 status: camp.status,

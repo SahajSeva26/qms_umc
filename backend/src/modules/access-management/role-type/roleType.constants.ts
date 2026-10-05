@@ -34,6 +34,7 @@ export const ALLOWED_ROLETYPE_CODES = {
         FINANCE_MANAGER: 'finance-manager',
 
         FIELD_OFFICER: 'field-officer',
+        DIETITIAN: 'dietitian',
     },
     CUSTOMER: {
         // PHARMA_HO: 'pharma-ho',
@@ -86,6 +87,7 @@ export const DEFAULT_PHARMA_ROLE_TYPES = [
         code: ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR,
         name: 'Pharma MR',
         description: 'Pharma MR',
-        permissions: [...PHARMA_CAMP_PERMISSIONS, ...PHARMA_BRAND_PERMISSIONS] as string[],
+        // MR may add a doctor (doctor:create) — the service pins it to the MR's own division
+        permissions: [...PHARMA_CAMP_PERMISSIONS, ...PHARMA_BRAND_PERMISSIONS, DOCTOR_PERMISSIONS.CREATE.code] as string[],
     },
 ];

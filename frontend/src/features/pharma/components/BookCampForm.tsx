@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { FiUser, FiMapPin, FiUserCheck, FiCalendar, FiFileText } from 'react-icons/fi'
+import { FiUser, FiMapPin, FiUserCheck, FiCalendar, FiFileText, FiAlertTriangle } from 'react-icons/fi'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { useReshapingResolver } from '@/hooks/useReshapingResolver'
 import { bookCampPayloadSchema, type BookCampFormPayload } from '@/features/pharma/schemas/bookCamp.schemas'
@@ -7,12 +7,16 @@ import { useBookCamp } from '@/features/camps/hooks/useBookCamp'
 import { useDayRangeAvailability } from '@/features/camps/hooks/useDayRangeAvailability'
 import { usePermission } from '@/hooks/usePermission'
 import { getApiErrorMessage } from '@/utils/apiError'
+import { haversineDistanceKm } from '@/utils/geo'
 import type { BookCampPayload, CampMutationResponseEntity, CampType } from '@/types/campReal.types'
 import type { ApiResponse } from '@/types/common.types'
 import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
 import type { LocationValue } from '@/types/location.types'
 import type { LocationResolutionState } from '@/components/widgets/location-picker/location.types'
+import type { DoctorEntity } from '@/types/doctor.types'
+import { DOCTOR_RANGE_KM } from '@/types/doctor.types'
 import DoctorDistancePicker from '@/features/pharma/components/DoctorDistancePicker'
+import DoctorNameDivisionPicker from '@/features/pharma/components/DoctorNameDivisionPicker'
 import MrPicker from '@/features/pharma/components/MrPicker'
 import { EditDoctorModal } from '@/features/doctors'
 import DayStripAvailability from '@/features/pharma/components/DayStripAvailability'
@@ -44,14 +48,12 @@ const EMPTY_FORM_VALUES: FormValues = {
   notes: '',
 }
 
-// selfMrId is spliced in as `mr` when the caller IS the MR. `type`/`patientExpectation` are locked
-// context from the caller's page — never user-editable here.
+// selfMrId is spliced in as `mr` when the caller IS the MR.
 const useBookCampFormResolver = (needsMrPicker: boolean, selfMrId: string | undefined, type: CampType, patientExpectation: number | undefined) =>
   useReshapingResolver<FormValues, BookCampFormPayload>({
     schema: bookCampPayloadSchema,
     toPayload: (values) => ({
-      // Sent as '' when unresolved, never undefined, so Zod's min(1)/enum
-      // checks produce a friendly required message instead of a generic type error.
+      // '' rather than undefined, so Zod's min(1)/enum checks give a friendly required message.
       mr: ((needsMrPicker ? values.mrId : selfMrId) || '') as string,
       doctor: values.doctorId,
       type,
@@ -61,10 +63,8 @@ const useBookCampFormResolver = (needsMrPicker: boolean, selfMrId: string | unde
       location: values.location as LocationValue,
       notes: values.notes.trim() || undefined,
       devices: undefined,
-      // conscentPath omitted — no consent-file upload UI/infra exists yet.
     }),
-    // Maps payload keys to this form's differently-named fields, so a Zod
-    // error lands on the field actually rendered.
+    // Maps payload keys to this form's differently-named fields, so a Zod error lands on the right field.
     topLevelFieldMap: { mr: 'mrId', doctor: 'doctorId' },
     nestedFieldMaps: {
       location: {
@@ -92,30 +92,34 @@ interface BookCampFormProps {
   onCancel: () => void
 }
 
-// Shared across 3 pharma portal entry pages (MR Portal, Screening Camps, Diet Camps) — only
-// whether the MR picker renders differs per role; the submitted payload is identical either way.
+// Shared across 3 pharma portal entry pages — only whether the MR picker renders differs per role.
 const BookCampForm = ({ needsMrPicker, type, project, patientExpectation, patientExpectationInvalid, onBooked, onCancel }: BookCampFormProps) => {
   const { session, hasPermission } = usePermission()
   const selfMrId = session?.role.id
   const canManageDoctors = hasPermission('doctor:manage')
   const [showNewDoctor, setShowNewDoctor] = useState(false)
-  // A null type only matters for gating below — 'screening' is a harmless resolver placeholder,
-  // never actually submitted (onSubmit's own project-required guard blocks that).
+  // A null type is just a resolver placeholder ('screening') — onSubmit's project-required guard blocks submit.
   const { resolver, parsePayload } = useBookCampFormResolver(needsMrPicker, selfMrId, type ?? 'screening', patientExpectation)
   const bookCamp = useBookCamp()
-  // isPending flips true only once mutate is called, but parsePayload's own
-  // re-parse runs before that — this ref closes that race window synchronously.
+  // Closes the race window before isPending flips true, since parsePayload's re-parse runs first.
   const submittingRef = useRef(false)
-  // Covers the map pin's reverse-geocode AND the search box's async place
-  // selection — either can still be in flight when Submit is clicked.
   const [locationResolution, setLocationResolution] = useState<LocationResolutionState>('idle')
   const [locationError, setLocationError] = useState<string | null>(null)
   const [locationHint, setLocationHint] = useState<string | null>(null)
 
-  // /doctors/nearest scopes to the CALLING session's own division, never the picked MR's — an
-  // MR's division can drift from their supervisor's.
+  // Doctor search (both the division name-search and /doctors/nearest) scopes to the CALLING
+  // session's own division, not the picked MR's — they can drift.
   const [mrDivisionId, setMrDivisionId] = useState<string | null>(null)
   const actingDivisionId = session?.role.division ?? null
+  const doctorDivisionId = mrDivisionId ?? actingDivisionId
+
+  // The picked doctor's OWN location, captured at pick time — the camp location defaults to this.
+  // Once the doctor is cleared (or location is manually pushed out of range) this is cleared too.
+  const [doctorLocation, setDoctorLocation] = useState<LocationValue | null>(null)
+  // Set once a manual location edit pushes the already-picked doctor more than DOCTOR_RANGE_KM
+  // away — switches the Doctor section into "out of range, re-pick" mode (distance-sorted,
+  // scoped to the NEW location) instead of silently keeping a doctor who can't serve this camp.
+  const [doctorOutOfRange, setDoctorOutOfRange] = useState(false)
 
   const {
     register,
@@ -129,8 +133,7 @@ const BookCampForm = ({ needsMrPicker, type, project, patientExpectation, patien
     mode: 'onChange',
     defaultValues: EMPTY_FORM_VALUES,
   })
-  // useWatch, not watch() — watch() returns a function React Compiler can't
-  // memoize safely and skips optimizing this whole component for.
+  // useWatch, not watch() — watch() returns a function React Compiler can't memoize safely.
   const watchedMrId = useWatch({ control, name: 'mrId' })
   const mrLabel = useWatch({ control, name: 'mrLabel' })
   const doctorLabel = useWatch({ control, name: 'doctorLabel' })
@@ -140,46 +143,65 @@ const BookCampForm = ({ needsMrPicker, type, project, patientExpectation, patien
 
   const mrDivisionMismatch = needsMrPicker && !!watchedMrId && (mrDivisionId === null || mrDivisionId !== actingDivisionId)
 
-  // Keyed on the actual coordinate pair, not `location` object identity — LocationPicker can
-  // re-fire onChange with a new object reference for the same point (e.g. an address-only edit).
-  const coordKey = location?.coordinates ? `${location.coordinates[0]},${location.coordinates[1]}` : null
-  const prevCoordKeyRef = useRef<string | null>(coordKey)
-  useEffect(() => {
-    if (prevCoordKeyRef.current !== null && coordKey !== null && prevCoordKeyRef.current !== coordKey) {
+// Keyed on the coordinate pair, not object identity — LocationPicker can re-fire onChange
+  // with a new reference for the same point (e.g. an address-only edit).
+  const coordKeyOf = (v: LocationValue | null) => (v?.coordinates ? `${v.coordinates[0]},${v.coordinates[1]}` : null)
+
+  const handleSelectDoctor = (doctor: DoctorEntity | null) => {
+    setDoctorOutOfRange(false)
+    if (!doctor?.location) {
+      setDoctorLocation(null)
+      return
+    }
+    setDoctorLocation(doctor.location)
+    // Defaults the camp location to the doctor's own address — still fully editable afterwards.
+    // Goes straight through setValue, NOT handleLocationChange below — this is the doctor-driven
+    // default itself, so it must never immediately re-trigger its own out-of-range check.
+    setValue('location', doctor.location, { shouldDirty: true, shouldTouch: true, shouldValidate: true })
+  }
+
+  // Shared by both the map picker and the manual address fields — whichever one the user actually
+  // used to change the location. Only a call to THIS function (never handleSelectDoctor's direct
+  // setValue above) re-checks the picked doctor's range, since only this path is a genuine
+  // user-driven location edit.
+  const handleLocationChange = (next: LocationValue) => {
+    const prevCoordKey = coordKeyOf(location ?? null)
+    const nextCoordKey = coordKeyOf(next)
+    setValue('location', next, { shouldDirty: true, shouldTouch: true, shouldValidate: true })
+    if (nextCoordKey === prevCoordKey) return
+    // Clears date/slot too — availability depends on location.
+    if (prevCoordKey !== null && nextCoordKey !== null) {
       setValue('date', '', { shouldDirty: true })
       setValue('timeSlot', '', { shouldDirty: true })
     }
-    // Doctor is coordinates-gated — clear it on any coordinate change, including becoming absent.
-    if (prevCoordKeyRef.current !== coordKey) {
-      setValue('doctorId', '', { shouldDirty: true })
-      setValue('doctorLabel', '')
+    if (next.coordinates && doctorLocation?.coordinates) {
+      const kmAway = haversineDistanceKm(doctorLocation.coordinates, next.coordinates)
+      if (kmAway > DOCTOR_RANGE_KM) {
+        setValue('doctorId', '', { shouldDirty: true })
+        setValue('doctorLabel', '')
+        setDoctorLocation(null)
+        setDoctorOutOfRange(true)
+      }
     }
-    prevCoordKeyRef.current = coordKey
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [coordKey])
+  }
 
-  // All sections render at once — every effect/handler below reacts to real data readiness
-  // (coordinates present, resolution idle), never to "which step is active."
-
-  // React Compiler auto-memoizes this — no manual useMemo/deps array needed.
   const availabilityBasePayload = (() => {
-    // Coordinates can be stale/missing, or a pin-drag/search pick can still be resolving even
-    // with coordinates already set — querying mid-resolution risks a stale-location fetch.
+    // A pin-drag/search pick can still be resolving even with coordinates already set.
     if (!project || !location?.coordinates || locationResolution !== 'idle') return null
     return {
       projectId: project.id,
       lat: location.coordinates[1],
       lng: location.coordinates[0],
+      // Server defaults to screening (FO) availability when type is omitted.
+      ...(type ? { type } : {}),
     }
   })()
 
-  // Fixed 30-day rolling window from today, matching the prototype's day-strip — no month
-  // navigation, so no stale-selection-on-month-change concern either.
   const availabilityQuery = useDayRangeAvailability(availabilityBasePayload)
   const availability = availabilityQuery.dates
 
-  // A background refetch can disconfirm an already-picked date/slot — clear it. Gated on
-  // availabilityBasePayload being non-null, or a disabled query's empty `availability` reads as a false disconfirmation.
+  // Gated on availabilityBasePayload being non-null, or a disabled query's empty `availability`
+  // reads as a false disconfirmation of an already-picked date/slot.
   useEffect(() => {
     if (!watchedDate || !availabilityBasePayload || availabilityQuery.isLoading || availabilityQuery.error) return
     const day = availability[watchedDate]
@@ -190,36 +212,29 @@ const BookCampForm = ({ needsMrPicker, type, project, patientExpectation, patien
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [availability, availabilityBasePayload, availabilityQuery.isLoading, availabilityQuery.error])
 
-  // Same "unknown state" risk DayStripAvailability guards against visually — block submit too.
   const availabilityIndeterminate = !!watchedDate && !!availabilityBasePayload && (availabilityQuery.isLoading || !!availabilityQuery.error)
 
   const onDateSelect = (date: string) => {
     if (date === watchedDate) return
     setValue('date', date, { shouldDirty: true, shouldTouch: true, shouldValidate: true })
-    // Changing the date invalidates any slot picked for a DIFFERENT date.
     setValue('timeSlot', '', { shouldDirty: true })
   }
   const onSlotSelect = (slot: CampTimeSlotValue) => {
     setValue('timeSlot', slot, { shouldDirty: true, shouldTouch: true, shouldValidate: true })
   }
 
-  // Simple touched-or-submitted gating now that every section renders at once — no per-step
-  // "attempted" tracking needed, since there's no step transition to gate on.
   const fieldError = (field: keyof FormValues) => {
     if (touchedFields[field] || isSubmitted) return errors[field]?.message
     return undefined
   }
 
-  // Should be unreachable for a genuine pharma MR session — fails safely
-  // instead of submitting `mr: undefined` if it happens anyway.
+  // Should be unreachable for a genuine pharma MR session — fails safely instead of
+  // submitting `mr: undefined` if it happens anyway.
   const missingSelfMrId = !needsMrPicker && !selfMrId
 
   const onSubmit = async (values: FormValues) => {
-    // Should be unreachable (submit is disabled for all of these) — never build a payload on any
-    // of them if it happens anyway, e.g. a stray Enter-key submit.
+    // Should be unreachable (submit is disabled on all of these) — guards a stray Enter-key submit.
     if (!project || !type || patientExpectationInvalid || availabilityIndeterminate) return
-    // Same failure mode GeoProfileDetailPage guards: the pin/search result can
-    // still be resolving (or have failed) when Submit is clicked.
     if (locationResolution !== 'idle') {
       setLocationError(
         locationResolution === 'loading'
@@ -230,8 +245,7 @@ const BookCampForm = ({ needsMrPicker, type, project, patientExpectation, patien
     }
     setLocationError(null)
     const formPayload = await parsePayload(values)
-    // project is context, not form state — assembled here, never claimed as
-    // the resolver's own output type (see BookCampFormPayload).
+    // project is context, not form state, so it's added here rather than via the resolver.
     const payload: BookCampPayload = { ...formPayload, project: project.id }
     const res = await bookCamp.mutateAsync(payload)
     reset(EMPTY_FORM_VALUES)
@@ -239,8 +253,7 @@ const BookCampForm = ({ needsMrPicker, type, project, patientExpectation, patien
     onBooked(res)
   }
 
-  // React Compiler flags a ref read inside handleSubmit's callback, so the
-  // guard wraps the callback's invocation instead of living inside it.
+  // React Compiler flags a ref read inside handleSubmit's callback, so the guard wraps it instead.
   const onFormSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (submittingRef.current) return
@@ -258,15 +271,10 @@ const BookCampForm = ({ needsMrPicker, type, project, patientExpectation, patien
     )
   }
 
-  // No location yet (or a pick is still resolving) — Doctor/Date&Slot sections show a
-  // "pick a location first" placeholder instead of querying against a stale/missing point.
   const locationReady = !!project && !!location?.coordinates && locationResolution === 'idle'
-  // No project/camp-type selected yet (MrBookCampTab's own pickers) — every dependent section
-  // below stays mounted, but disabled with an honest placeholder instead of unmounting.
   const projectReady = !!project && !!type
 
-  // Continues MrBookCampTab's "1 · Project & camp" numbering — MR (if shown) is 2, then Doctor,
-  // Location, Date/slot, Notes, matching the prototype's own section order.
+  // Continues MrBookCampTab's "1 · Project & camp" numbering.
   const mrSectionNumber = 2
   const doctorSectionNumber = needsMrPicker ? 3 : 2
   const locationSectionNumber = doctorSectionNumber + 1
@@ -301,10 +309,11 @@ const BookCampForm = ({ needsMrPicker, type, project, patientExpectation, patien
                   field.onChange(id)
                   setValue('mrLabel', l)
                   setMrDivisionId(divisionId)
-                  // A newly-picked MR may resolve to a different division than the one the
-                  // previous MR resolved to — a stale doctor selection could be wrong-division.
+                  // A newly-picked MR may resolve to a different division — the old doctor pick could be stale.
                   setValue('doctorId', '', { shouldDirty: true })
                   setValue('doctorLabel', '')
+                  setDoctorLocation(null)
+                  setDoctorOutOfRange(false)
                 }}
               />
             )}
@@ -326,28 +335,48 @@ const BookCampForm = ({ needsMrPicker, type, project, patientExpectation, patien
               : "This MR's division doesn't match your own — doctor search is scoped to your division and may not be accurate for this booking."}
           </div>
         ) : (
-          <div className="flex items-center gap-2">
-            <div className="flex-1 min-w-0">
-              <Controller
-                control={control}
-                name="doctorId"
-                render={({ field }) => (
-                  <DoctorDistancePicker
-                    value={field.value}
-                    label={doctorLabel}
-                    coordinates={location?.coordinates}
-                    onChange={(id, l) => { field.onChange(id); setValue('doctorLabel', l) }}
-                    disabled={!projectReady || !locationReady}
-                  />
-                )}
-              />
-            </div>
-            {/* No "New doctor" button when the acting user has no division — the create would just 403. */}
-            {canManageDoctors && session && actingDivisionId && (
-              <Button type="button" variant="outline" disabled={!projectReady || !locationReady} onClick={() => setShowNewDoctor(true)}>
-                New doctor
-              </Button>
+          <div className="space-y-1.5">
+            {doctorOutOfRange && (
+              <div className="flex items-start gap-1.5 text-[12px] rounded-lg px-3 py-2 bg-danger-soft border border-danger text-danger">
+                <FiAlertTriangle size={13} className="mt-0.5 shrink-0" />
+                <span>The previously picked doctor isn't within {DOCTOR_RANGE_KM}km of this camp location — pick a doctor near the new location instead.</span>
+              </div>
             )}
+            <div className="flex items-center gap-2">
+              <div className="flex-1 min-w-0">
+                <Controller
+                  control={control}
+                  name="doctorId"
+                  render={({ field }) =>
+                    doctorOutOfRange ? (
+                      <DoctorDistancePicker
+                        value={field.value}
+                        label={doctorLabel}
+                        coordinates={location?.coordinates}
+                        onChange={(id, l) => { field.onChange(id); setValue('doctorLabel', l) }}
+                        onSelectDoctor={handleSelectDoctor}
+                        disabled={!projectReady || !locationReady}
+                      />
+                    ) : (
+                      <DoctorNameDivisionPicker
+                        value={field.value}
+                        label={doctorLabel}
+                        division={doctorDivisionId}
+                        onChange={(id, l) => { field.onChange(id); setValue('doctorLabel', l) }}
+                        onSelectDoctor={handleSelectDoctor}
+                        disabled={!projectReady}
+                      />
+                    )
+                  }
+                />
+              </div>
+              {/* No "New doctor" button when the acting user has no division — the create would just 403. */}
+              {canManageDoctors && session && actingDivisionId && (
+                <Button type="button" variant="outline" disabled={!projectReady} onClick={() => setShowNewDoctor(true)}>
+                  New doctor
+                </Button>
+              )}
+            </div>
           </div>
         )}
         {fieldError('doctorId') && <p className="text-[11px] mt-1 text-danger">{fieldError('doctorId')}</p>}
@@ -361,6 +390,7 @@ const BookCampForm = ({ needsMrPicker, type, project, patientExpectation, patien
             onCreated={(created) => {
               setValue('doctorId', created.id, { shouldDirty: true, shouldTouch: true, shouldValidate: true })
               setValue('doctorLabel', `${created.name} (${created.pharmaCode})`)
+              handleSelectDoctor(created)
             }}
             onClose={() => setShowNewDoctor(false)}
           />
@@ -374,6 +404,11 @@ const BookCampForm = ({ needsMrPicker, type, project, patientExpectation, patien
             Select a project and camp type above first.
           </p>
         )}
+        {projectReady && !location?.coordinates && (
+          <p className="text-[12px] rounded-lg px-3 py-2 mb-2 bg-muted/50" style={{ color: 'var(--qms-text-muted)' }}>
+            Defaults to the picked doctor's address — pick a doctor above, or set a location directly.
+          </p>
+        )}
         <Controller
           control={control}
           name="location"
@@ -381,14 +416,14 @@ const BookCampForm = ({ needsMrPicker, type, project, patientExpectation, patien
             <div className="space-y-2">
               <LocationPicker
                 value={field.value}
-                onChange={field.onChange}
+                onChange={handleLocationChange}
                 onResolutionStateChange={setLocationResolution}
                 onLocationHintChange={setLocationHint}
                 defaultCountry="India"
                 countryCode="IN"
                 disabled={!projectReady}
               />
-              <LocationAddressFields value={field.value} onChange={field.onChange} defaultCountry="India" locationHint={locationHint} disabled={!projectReady} />
+              <LocationAddressFields value={field.value} onChange={handleLocationChange} defaultCountry="India" locationHint={locationHint} disabled={!projectReady} />
             </div>
           )}
         />
@@ -409,6 +444,7 @@ const BookCampForm = ({ needsMrPicker, type, project, patientExpectation, patien
             error={availabilityQuery.error}
             onRetry={availabilityQuery.refetch}
             eligibleFoCount={availabilityQuery.eligibleFoCount}
+            workerLabel={type === 'diet' ? 'Dietitian' : 'FO'}
             city={location?.city}
           />
         ) : (

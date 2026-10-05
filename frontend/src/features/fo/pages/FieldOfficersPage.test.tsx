@@ -54,6 +54,9 @@ vi.mock('@/features/fo/hooks/useFoRosterCamps', () => ({
 vi.mock('@/features/fo/hooks/useFoRosterDevices', () => ({
   useFoRosterDevices: () => ({}),
 }))
+vi.mock('@/features/fo/hooks/useFoWeekCamps', () => ({
+  useFoWeekCamps: () => ({}),
+}))
 vi.mock('@/features/fo/hooks/useFoTodayCamps', () => ({
   useFoTodayCamps: () => ({ camps: [], totalCount: 0, liveCamps: [], unassignedCamps: [], truncated: false, isLoading: false, error: null, refetch: vi.fn() }),
   useFoActiveCount: () => ({ totalActive: 1, idleCount: 1, roleTruncated: false, isLoading: false }),
@@ -159,7 +162,7 @@ describe('FieldOfficersPage — a roster card opens the real drawer, not a table
   })
 })
 
-describe('FieldOfficersPage — Roster/Devices tab switch', () => {
+describe('FieldOfficersPage — Roster/Assignments/Devices tab switch', () => {
   it('defaults to the Roster tab and switches to Devices on click', async () => {
     vi.clearAllMocks()
     const user = userEvent.setup()
@@ -169,8 +172,20 @@ describe('FieldOfficersPage — Roster/Devices tab switch', () => {
 
     await user.click(screen.getByRole('button', { name: /devices/i }))
 
-    expect(screen.getByText('Field Officer')).toBeInTheDocument()
-    expect(screen.getByText('Devices handed over')).toBeInTheDocument()
+    expect(screen.getByText('Jane FO')).toBeInTheDocument()
+  })
+
+  it('switches to the Assignments tab and renders the weekly grid', async () => {
+    vi.clearAllMocks()
+    const user = userEvent.setup()
+    await renderPage({ tenant: { type: 'platform' } })
+
+    expect(await screen.findByText('Jane FO')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /assignments/i }))
+
+    expect(screen.getByText('This week')).toBeInTheDocument()
+    expect(screen.getByText('FO')).toBeInTheDocument()
   })
 })
 

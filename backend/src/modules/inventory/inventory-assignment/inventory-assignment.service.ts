@@ -32,6 +32,12 @@ type InventoryAssignmentDocument = HydratedDocument<IInventoryAssignment> | null
 
 const populate: any[] = [{ path: 'assignee' }, { path: 'inventory' }];
 
+// role types that may hold inventory in the field (field officer + dietitian); add new ones here.
+const ASSIGNABLE_ROLE_TYPE_CODES: string[] = [
+    ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER,
+    ALLOWED_ROLETYPE_CODES.PLATFORM.DIETITIAN,
+];
+
 // ========================================================================================
 // HELPERS
 // ========================================================================================
@@ -123,9 +129,9 @@ const create = async (
         return throwAppError('The assignee does not exist', StatusCodes.NOT_FOUND);
     }
 
-    //1b: only a field officer can hold an inventory assignment
-    if ((assignee.type as any)?.code !== ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER) {
-        return throwAppError('The assignee must be a field officer', StatusCodes.BAD_REQUEST);
+    //1b: only an assignable field role (field officer or dietitian) can hold an inventory assignment
+    if (!ASSIGNABLE_ROLE_TYPE_CODES.includes((assignee.type as any)?.code)) {
+        return throwAppError('The assignee must be a field officer or dietitian', StatusCodes.BAD_REQUEST);
     }
 
     //2: the referenced inventory item must exist
@@ -227,14 +233,15 @@ const adjustHolding = async (
     return await row.save();
 };
 
-// The assignee of a direct assignment must exist and be a field officer (same rule as create()).
-const assertFieldOfficer = async (foId: string, ctx: RequestContext) => {
+// The assignee of a direct assignment must exist and be an assignable field role — a field officer
+// or a dietitian (same rule as create()).
+const assertAssignableFieldStaff = async (foId: string, ctx: RequestContext) => {
     const fo = await RoleService.get(foId, ctx, { populate: true });
     if (!fo) {
         return throwAppError('The assignee does not exist', StatusCodes.NOT_FOUND);
     }
-    if ((fo.type as any)?.code !== ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER) {
-        return throwAppError('The assignee must be a field officer', StatusCodes.BAD_REQUEST);
+    if (!ASSIGNABLE_ROLE_TYPE_CODES.includes((fo.type as any)?.code)) {
+        return throwAppError('The assignee must be a field officer or dietitian', StatusCodes.BAD_REQUEST);
     }
     return fo;
 };
@@ -262,8 +269,8 @@ const logDirect = (assignee: string, inventoryType: string, inventory: string, q
 // Every move decrements the warehouse, updates the FO holding, and logs a DIRECT ledger row — all in
 // ONE transaction, so an unavailable device or short consumable stock rolls the whole assignment back.
 const directAssign = async (foId: string, payload: IDirectAssignmentPayload, ctx: RequestContext) => {
-    //1: the target must be a field officer
-    await assertFieldOfficer(foId, ctx);
+    //1: the target must be an assignable field role (field officer or dietitian)
+    await assertAssignableFieldStaff(foId, ctx);
 
     const devices = payload.devices || [];
     const consumables = payload.consumables || [];

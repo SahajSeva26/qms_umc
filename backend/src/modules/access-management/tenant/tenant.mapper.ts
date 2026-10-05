@@ -51,6 +51,7 @@ export const TenantMapper = {
             // only present when the caller requested report=true
             if (stats) {
                 item.stats = stats[t._id?.toString()] ?? {
+                    totalDivisions: 0,
                     totalProjects: 0,
                     liveProjects: 0,
                     totalCamps: 0,

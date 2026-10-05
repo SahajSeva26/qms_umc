@@ -15,7 +15,7 @@ vi.mock('@/features/pharma/pharmaProjects.service', () => ({
 function projectFixture(overrides: Partial<ProjectEntity> = {}): ProjectEntity {
   return {
     id: 'proj-1', code: 'PRJ-1', name: 'Cardio Screening Drive', tenant: 't-1', division: 'div-1',
-    therapy: 'cardiology', type: ['screening_camp', 'diet'], tests: [], lead: null, mode: null, campCost: 0, totalCamps: 0,
+    therapy: 'cardiology', type: ['screening', 'diet'], tests: [], lead: null, executionMode: null, campCost: 0, totalCamps: 0,
     gst: 0, valueBeforeGST: 0, additionalCost: 0, campTimeSlots: ['9am-1pm', '10am-2pm'], freeCancelHours: 0,
     cancellationAllowed: 0, campCostDeductionOnChargableCancel: 0, goLiveScope: null,
     whoCanBookCamp: [], salesRep: null, projectCoordinator: null, status: 'live',
@@ -75,8 +75,7 @@ describe('PharmaProjectsPage', () => {
     expect(await screen.findByText('Cardio Screening Drive')).toBeInTheDocument()
     expect(screen.getByText('PRJ-1')).toBeInTheDocument()
 
-    // Division scoping is backend-derived from ctx.role.division for a pharma
-    // caller — the frontend must never send its own division param.
+    // Division scoping is backend-derived from ctx.role.division — never sent as a param.
     const query = vi.mocked(pharmaProjectsService.searchScopedProjects).mock.calls[0][0]
     expect(query).not.toHaveProperty('division')
   })
@@ -136,7 +135,7 @@ describe('PharmaProjectsPage', () => {
   it('a project allowing both screening and diet defaults to Screening (not the combined All-camps page)', async () => {
     const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
     vi.mocked(pharmaProjectsService.searchScopedProjects).mockResolvedValue({
-      success: true, message: '', data: { items: [projectFixture({ id: 'proj-42', type: ['screening_camp', 'diet'] })], count: 1 },
+      success: true, message: '', data: { items: [projectFixture({ id: 'proj-42', type: ['screening', 'diet'] })], count: 1 },
     })
 
     const user = userEvent.setup()
@@ -164,7 +163,7 @@ describe('PharmaProjectsPage', () => {
   it('a lab-only project opens the unrestricted All-camps view, not a nonexistent Lab page', async () => {
     const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
     vi.mocked(pharmaProjectsService.searchScopedProjects).mockResolvedValue({
-      success: true, message: '', data: { items: [projectFixture({ id: 'proj-lab', type: ['lab_test'] })], count: 1 },
+      success: true, message: '', data: { items: [projectFixture({ id: 'proj-lab', type: ['lab'] })], count: 1 },
     })
 
     const user = userEvent.setup()
@@ -178,7 +177,7 @@ describe('PharmaProjectsPage', () => {
   it('arriving with ?preferType=diet opens Diet for a project that allows both, instead of defaulting to Screening', async () => {
     const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
     vi.mocked(pharmaProjectsService.searchScopedProjects).mockResolvedValue({
-      success: true, message: '', data: { items: [projectFixture({ id: 'proj-42', type: ['screening_camp', 'diet'] })], count: 1 },
+      success: true, message: '', data: { items: [projectFixture({ id: 'proj-42', type: ['screening', 'diet'] })], count: 1 },
     })
 
     const user = userEvent.setup()
@@ -192,7 +191,7 @@ describe('PharmaProjectsPage', () => {
   it('?preferType=diet still falls back to Screening for a screening-only project (the preferred type isn\'t allowed there)', async () => {
     const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
     vi.mocked(pharmaProjectsService.searchScopedProjects).mockResolvedValue({
-      success: true, message: '', data: { items: [projectFixture({ id: 'proj-screen', type: ['screening_camp'] })], count: 1 },
+      success: true, message: '', data: { items: [projectFixture({ id: 'proj-screen', type: ['screening'] })], count: 1 },
     })
 
     const user = userEvent.setup()

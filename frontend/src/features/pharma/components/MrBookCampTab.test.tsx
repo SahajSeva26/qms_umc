@@ -15,8 +15,7 @@ vi.mock('@/features/pharma/pharmaProjects.service', () => ({
   },
 }))
 
-// Stub BookCampForm (its own 28 tests cover it) — assert only that this tab wires the right
-// props in. Stateful, so a remount regression test can prove `key={projectId}` actually loses state.
+// Stub is stateful so a remount regression test can prove `key={projectId}` actually loses state.
 vi.mock('@/features/pharma/components/BookCampForm', () => ({
   default: function MockBookCampForm({ type, project, needsMrPicker, patientExpectation, patientExpectationInvalid }: {
     type: string | null; project: { name: string } | null; needsMrPicker: boolean
@@ -36,7 +35,7 @@ vi.mock('@/features/pharma/components/BookCampForm', () => ({
 function projectFixture(overrides: Partial<ProjectEntity> = {}): ProjectEntity {
   return {
     id: 'proj-1', code: 'PRJ-1', name: 'Cardio Screening Drive', tenant: 't-1', division: 'div-1',
-    therapy: 'cardiology', type: ['screening_camp'], tests: [], lead: null, mode: null, campCost: 0, totalCamps: 0,
+    therapy: 'cardiology', type: ['screening'], tests: [], lead: null, executionMode: null, campCost: 0, totalCamps: 0,
     gst: 0, valueBeforeGST: 0, additionalCost: 0, campTimeSlots: ['9am-1pm', '10am-2pm'], freeCancelHours: 0,
     cancellationAllowed: 0, campCostDeductionOnChargableCancel: 0, goLiveScope: null,
     whoCanBookCamp: [], salesRep: null, projectCoordinator: null, status: 'live',
@@ -128,8 +127,7 @@ describe('MrBookCampTab — real searchable project picker', () => {
     expect(await screen.findByText(/cardio screening drive \(prj-1\)/i)).toBeInTheDocument()
     vi.mocked(pharmaProjectsService.searchScopedProjects).mockClear()
 
-    // If the picker's query were still enabled post-pick, a background refetch would fire here —
-    // it doesn't, since AsyncPicker only fetches while open.
+    // AsyncPicker only fetches while open, so no background refetch should fire post-pick.
     await new Promise((resolve) => setTimeout(resolve, 50))
     expect(pharmaProjectsService.searchScopedProjects).not.toHaveBeenCalled()
     expect(screen.getByText(/cardio screening drive \(prj-1\)/i)).toBeInTheDocument()
@@ -165,8 +163,7 @@ describe('MrBookCampTab — real searchable project picker', () => {
     await user.click(await screen.findByRole('option', { name: 'Screening' }))
     expect(await screen.findByText(/booking form mounted · type: screening · project: project a/i)).toBeInTheDocument()
 
-    // Prove the mounted BookCampForm can actually hold state before asserting it's gone —
-    // a stateless mock would pass this test even if the real `key={projectId}` remount broke.
+    // A stateless mock would pass this test even if the real remount broke.
     const doctorDraftInput = screen.getByPlaceholderText(/doctor draft/i)
     await user.type(doctorDraftInput, 'Dr. Stale From Project A')
     expect(doctorDraftInput).toHaveValue('Dr. Stale From Project A')
@@ -174,8 +171,6 @@ describe('MrBookCampTab — real searchable project picker', () => {
     await user.click(screen.getByRole('button', { name: /clear selected project/i }))
     await pickProject(user, projectFixture({ id: 'proj-b', name: 'Project B', code: 'PRJ-B' }))
 
-    // BookCampForm remounted fresh (new key) — the doctor draft typed for project A is gone,
-    // not carried over into project B's booking, and no camp type carried over either.
     expect(await screen.findByText(/booking form mounted · type: none · project: none/i)).toBeInTheDocument()
     expect(screen.getByPlaceholderText(/doctor draft/i)).toHaveValue('')
   })

@@ -21,5 +21,10 @@ export const DOCTOR_PERMISSIONS = {
         name: 'Manage Doctor',
         description: 'Manage doctors (full visibility, incl. inactive)',
     } as const,
+    CREATE: {
+        code: 'doctor:create',
+        name: 'Create Doctor',
+        description: 'Create a doctor (scoped to own division for customer/field-force actors)',
+    } as const,
 
 };

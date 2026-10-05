@@ -239,6 +239,48 @@ const projectRequiredDeviceItemIds = async (projectId: any): Promise<string[]> =
     return devices.map((device: any) => device._id.toString());
 };
 
+// Among candidate role ids, return the subset that holds EVERY required device as an operational
+// (status 'assigned') in-hand unit. One batched read. Shared by auto-allocation and booking-
+// availability so both apply the identical device gate. Call only when requiredDeviceItems is non-empty.
+const rolesHoldingAllDevices = async (roleIds: any[], requiredDeviceItems: string[]): Promise<Set<string>> => {
+    const qualified = new Set<string>();
+    if (!roleIds.length || !requiredDeviceItems.length) {
+        return qualified;
+    }
+    // one batched read of the candidates' assigned devices → roleId → set of device catalog-item ids
+    const assignments = await InventoryAssignmentModel.find({
+        assignee: { $in: roleIds },
+        inventoryType: 'InventoryDevice',
+    })
+        .populate({ path: 'inventory', select: 'item status' })
+        .lean();
+
+    const heldByRole = new Map<string, Set<string>>();
+    for (const assignment of assignments) {
+        const roleId = assignment.assignee?.toString();
+        const device = assignment.inventory as any;
+        const itemId = device?.item?.toString();
+        // only an operational, in-hand unit counts — a lost/damaged/maintenance (or not-yet-received)
+        // device doesn't actually equip the worker for the camp.
+        if (!roleId || !itemId || device?.status !== INVENTORY_DEVICE_STATUS.ASSIGNED) {
+            continue;
+        }
+        if (!heldByRole.has(roleId)) {
+            heldByRole.set(roleId, new Set());
+        }
+        heldByRole.get(roleId)!.add(itemId);
+    }
+
+    // a role qualifies only if it holds ALL required device catalog-items
+    for (const roleId of roleIds.map((r) => r.toString())) {
+        const held = heldByRole.get(roleId);
+        if (held && requiredDeviceItems.every((itemId) => held.has(itemId))) {
+            qualified.add(roleId);
+        }
+    }
+    return qualified;
+};
+
 // Among candidate geo-profiles (already free + equipped, straight-line ordered), keep those within
 // their coverage radius by actual ROAD distance and return the nearest one's role — one matrix call.
 // Falls back to the straight-line nearest on a maps outage (profiles are already distance-ordered) so
@@ -306,34 +348,8 @@ const resolveNearestFreeWorker = async (camp: HydratedDocument<ICamp>, worker: F
     // any free worker qualifies.
     const requiredDeviceItems = await projectRequiredDeviceItemIds(camp.project);
     if (requiredDeviceItems.length) {
-        // one batched read of the free workers' assigned devices → roleId → set of device catalog-item ids
-        const assignments = await InventoryAssignmentModel.find({
-            assignee: { $in: freeProfiles.map((profile: any) => profile.role) },
-            inventoryType: 'InventoryDevice',
-        })
-            .populate({ path: 'inventory', select: 'item status' })
-            .lean();
-
-        const heldByRole = new Map<string, Set<string>>();
-        for (const assignment of assignments) {
-            const roleId = assignment.assignee?.toString();
-            const device = assignment.inventory as any;
-            const itemId = device?.item?.toString();
-            // only an operational, in-hand unit counts — a lost/damaged/maintenance (or not-yet-received)
-            // device doesn't actually equip the worker for the camp.
-            if (!roleId || !itemId || device?.status !== INVENTORY_DEVICE_STATUS.ASSIGNED) {
-                continue;
-            }
-            if (!heldByRole.has(roleId)) {
-                heldByRole.set(roleId, new Set());
-            }
-            heldByRole.get(roleId)!.add(itemId);
-        }
-
-        freeProfiles = freeProfiles.filter((profile: any) => {
-            const held = heldByRole.get(profile.role?.toString());
-            return held && requiredDeviceItems.every((itemId) => held.has(itemId));
-        });
+        const qualified = await rolesHoldingAllDevices(freeProfiles.map((profile: any) => profile.role), requiredDeviceItems);
+        freeProfiles = freeProfiles.filter((profile: any) => qualified.has(profile.role?.toString()));
         if (!freeProfiles.length) {
             return throwAppError(`No nearby ${worker.label} holds all the devices this project requires`, StatusCodes.CONFLICT);
         }
@@ -1021,6 +1037,16 @@ const bookingAvailability = async (model: IBookingAvailabilityPayload, ctx: Requ
         } catch {
             eligibleIds = candidates.map((c) => c.roleId);
         }
+    }
+
+    //2b: device gate — narrow the eligible workers to those who hold EVERY device the project's tests
+    // require (operational 'assigned' units only). Mirrors the allocation gate in resolveNearestFreeWorker
+    // so availability never shows a worker that booking/allocation would later reject. No requirement ⇒
+    // no narrowing.
+    const requiredDeviceItems = await projectRequiredDeviceItemIds(project._id || (project as any).id);
+    if (requiredDeviceItems.length && eligibleIds.length) {
+        const qualified = await rolesHoldingAllDevices(eligibleIds, requiredDeviceItems);
+        eligibleIds = eligibleIds.filter((id) => qualified.has(id));
     }
 
     //3: pull the confirmed/live camps for those workers across the whole range in one query, then build

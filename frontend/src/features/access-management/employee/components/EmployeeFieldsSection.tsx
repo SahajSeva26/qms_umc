@@ -51,6 +51,37 @@ const EmployeeFieldsSection = <TFormValues extends FieldValues & EmployeeFieldsV
       <div className="rounded-xl border p-5" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}>
         <h2 className="text-sm font-bold mb-4" style={{ color: 'var(--qms-text)' }}>Employment</h2>
         <div className="space-y-4">
+          {mode === 'create' && (
+            <div>
+              <FieldLabel htmlFor="employmentType">Employment type</FieldLabel>
+              <Controller
+                control={control}
+                name={field('type')}
+                render={({ field: typeField }) => (
+                  <Select
+                    key={(typeField.value as string) || 'empty'}
+                    value={(typeField.value as string) || undefined}
+                    onValueChange={typeField.onChange}
+                  >
+                    <SelectTrigger id="employmentType" className="w-full">
+                      <SelectValue placeholder="Select employment type">
+                        {(v: string) => ({ 'full-time': 'Full-time', 'part-time': 'Part-time', contractual: 'Contractual', freelance: 'Freelance' }[v] ?? 'Select employment type')}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="full-time">Full-time</SelectItem>
+                      <SelectItem value="part-time">Part-time</SelectItem>
+                      <SelectItem value="contractual">Contractual</SelectItem>
+                      <SelectItem value="freelance">Freelance</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {showErrors && fieldError('type') && (
+                <p className="text-xs text-danger mt-1.5">{fieldError('type')?.message as string}</p>
+              )}
+            </div>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <FieldLabel>Date of joining</FieldLabel>

@@ -96,9 +96,9 @@ const CampCardReal = ({ camp, onOpen }: CampCardRealProps) => {
       <div className="flex items-center gap-1.5 mt-3 text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>
         <FiBriefcase size={11} className="shrink-0" />
         <span className="truncate">{tenantName}</span>
-        {!camp.fo && (
+        {!(camp.type === 'diet' ? camp.dietitian : camp.fo) && (
           <span className="inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded-full bg-danger-soft text-danger shrink-0">
-            <FiAlertTriangle size={10} /> Missing FO
+            <FiAlertTriangle size={10} /> Missing {camp.type === 'diet' ? 'Dietitian' : 'FO'}
           </span>
         )}
       </div>
@@ -111,13 +111,13 @@ const CampCardReal = ({ camp, onOpen }: CampCardRealProps) => {
         >
           <FiEye size={12} /> Details
         </button>
-        {!camp.fo && (
+        {!(camp.type === 'diet' ? camp.dietitian : camp.fo) && (
           <button
             onClick={() => onOpen(camp.id)}
             className="inline-flex items-center gap-1.5 text-[12px] font-semibold px-2.5 py-1.5 rounded-lg transition-colors"
             style={{ color: 'var(--qms-brand)', background: 'color-mix(in srgb, var(--qms-brand) 10%, transparent)' }}
           >
-            <FiUserPlus size={12} /> Assign FO
+            <FiUserPlus size={12} /> Assign {camp.type === 'diet' ? 'Dietitian' : 'FO'}
           </button>
         )}
       </div>

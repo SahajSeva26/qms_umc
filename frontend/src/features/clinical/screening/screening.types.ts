@@ -1,6 +1,4 @@
-// Screening is the Camp<->Patient join, tenant derived from the camp. One-way
-// workflow: pending -> completed | cancelled, changed only via moveStage.
-
+// One-way workflow: pending -> completed | cancelled, changed only via moveStage.
 export type ScreeningStatus = 'pending' | 'completed' | 'cancelled'
 
 export const SCREENING_STATUS_LABEL: Record<ScreeningStatus, string> = {
@@ -37,8 +35,7 @@ export interface ScreeningPopulatedTenant extends ScreeningPopulatedRef {
   code: string
 }
 
-// The OTP is deliberately absent from this type — the backend never returns
-// it in any response, so there is no interactive OTP entry UI.
+// The OTP code lives in the backend's separate otp module, never stored here.
 export interface ScreeningConsent {
   verified: boolean
   signature?: string
@@ -79,8 +76,7 @@ export interface SearchScreeningQuery {
   limit?: string
 }
 
-// tenant is derived from the camp — never supplied. performedBy is pinned
-// server-side to the camp's assigned FO. consent.otp is generated server-side.
+// tenant is derived from the camp; performedBy is pinned server-side to the camp's assigned FO.
 export interface CreateScreeningPayload {
   patient: string
   camp: string
@@ -89,8 +85,7 @@ export interface CreateScreeningPayload {
   signature?: string
 }
 
-// patient/camp/tenant/performedBy are immutable; consent flows through
-// verify-consent (not wired, see above); status flows through moveStage only.
+// patient/camp/tenant/performedBy are immutable; status flows through moveStage only.
 export interface UpdateScreeningPayload {
   symptoms?: string[]
   referral?: boolean
@@ -99,4 +94,14 @@ export interface UpdateScreeningPayload {
 export interface MoveScreeningStagePayload {
   to: ScreeningStatus
   reason: string
+}
+
+// TEMP: no delivery sender exists yet — remove `code` once a real sender exists.
+export interface RequestConsentOtpResponse {
+  code: string
+}
+
+export interface VerifyConsentPayload {
+  otp: string
+  signature?: string
 }

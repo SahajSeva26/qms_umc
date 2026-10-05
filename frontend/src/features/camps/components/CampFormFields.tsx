@@ -36,15 +36,15 @@ interface CampFormFieldsProps {
   isLocked: boolean
   // Locks only the Type select, independent of isLocked (which disables the whole form).
   lockedType?: boolean
+  // Narrows Type to the picked project's offered types — matches the backend's hard 400 on project.type.includes(campType).
+  allowedTypes?: readonly CampType[]
   // edit-mode only — the pre-fetched doctors list for the plain <Select>.
   doctors?: DoctorEntity[]
   // create mode: plain label string (matches mrLabel/foLabel). edit mode: id->label resolver.
   doctorLabel: string | ((id: string) => string)
   setDoctorLabel?: (label: string) => void
   showNewDoctorButton: boolean
-  // A new doctor must be created scoped to a known division — until one is picked
-  // (create mode: the Division field), "New doctor" would fall back to an
-  // unconstrained tenant-wide division picker instead of staying camp-scoped.
+  // Until a Division is picked, "New doctor" would fall back to an unconstrained tenant-wide picker instead of staying camp-scoped.
   newDoctorDisabled?: boolean
   onNewDoctor: () => void
   bookableSlots: CampTimeSlotValue[]
@@ -53,6 +53,11 @@ interface CampFormFieldsProps {
   setMrLabel: (label: string) => void
   foLabel: string
   setFoLabel: (label: string) => void
+  dietitianLabel: string
+  setDietitianLabel: (label: string) => void
+  /** Called whenever the Type select changes (create mode only — edit mode locks it) so the
+   * caller can clear the now-irrelevant worker field (fo or dietitian) and its label. */
+  onTypeChange?: (type: CampType) => void
   deviceLabels: Record<string, string>
   onDevicesChange: (ids: string[], labels: Record<string, string>) => void
   onLocationResolutionChange: (state: LocationResolutionState) => void
@@ -65,6 +70,7 @@ const CampFormFields = ({
   effectiveTenant,
   isLocked,
   lockedType = false,
+  allowedTypes = CAMP_TYPE_VALUES,
   doctors = [],
   doctorLabel,
   setDoctorLabel,
@@ -77,11 +83,15 @@ const CampFormFields = ({
   setMrLabel,
   foLabel,
   setFoLabel,
+  dietitianLabel,
+  setDietitianLabel,
+  onTypeChange,
   deviceLabels,
   onDevicesChange,
   onLocationResolutionChange,
 }: CampFormFieldsProps) => {
-  const { doctor, division, type, billingType, patientExpectation, date, timeSlot, location, fo, mr, devices, notes } = draft
+  const { doctor, division, type, billingType, patientExpectation, date, timeSlot, location, fo, dietitian, mr, devices, notes } = draft
+  const isDiet = type === 'diet'
   const deviceIds = devices ? devices.split(',').map((d) => d.trim()).filter(Boolean) : []
   const [locationHint, setLocationHint] = useState<string | null>(null)
 
@@ -96,13 +106,28 @@ const CampFormFields = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Type</Label>
-          <Select value={type} onValueChange={(v) => setField('type', v as CampType)} disabled={isLocked || lockedType}>
+          {/* Immutable after create (backend's update schema has no type field at all) — always
+              locked in edit mode, not just when isLocked/lockedType. */}
+          <Select
+            value={type}
+            onValueChange={(v) => { const next = v as CampType; setField('type', next); onTypeChange?.(next) }}
+            disabled={isLocked || lockedType || mode === 'edit'}
+          >
             <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
             <SelectContent>
-              {TYPE_OPTIONS.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+              {TYPE_OPTIONS
+                // Always include the camp's CURRENT type even if the project no longer offers it (e.g.
+                // editing a camp whose project's offerings changed since) — never hide the selected value.
+                .filter((t) => allowedTypes.includes(t.value) || t.value === type)
+                .map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
             </SelectContent>
           </Select>
-          {lockedType && !isLocked && (
+          {mode === 'edit' && !isLocked && (
+            <p className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
+              Type can't be changed after a camp is created.
+            </p>
+          )}
+          {mode === 'create' && lockedType && !isLocked && (
             <p className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
               Set from the page you booked this camp from.
             </p>
@@ -163,7 +188,7 @@ const CampFormFields = ({
         <LocationAddressFields value={location} onChange={(v: LocationValue) => setField('location', v)} disabled={isLocked} defaultCountry="India" locationHint={locationHint} />
       </div>
       <p className="text-[11px] -mt-2" style={{ color: 'var(--qms-text-muted)' }}>
-        Used to auto-allocate the nearest available field officer if none is picked below.
+        Used to auto-allocate the nearest available {isDiet ? 'dietitian' : 'field officer'} if none is picked below.
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -199,17 +224,30 @@ const CampFormFields = ({
         </div>
         <div>
           <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-            Field Officer (optional — auto-assigned if blank)
+            {isDiet ? 'Dietitian' : 'Field Officer'} (optional — auto-assigned if blank)
           </Label>
-          <CampFoPicker
-            value={fo}
-            label={foLabel}
-            coordinates={location?.coordinates}
-            date={date}
-            timeSlot={timeSlot}
-            onChange={(id, l) => { setField('fo', id); setFoLabel(l) }}
-            disabled={isLocked || !effectiveTenant}
-          />
+          {isDiet ? (
+            <CampFoPicker
+              workerType="dietitian"
+              value={dietitian}
+              label={dietitianLabel}
+              coordinates={location?.coordinates}
+              date={date}
+              timeSlot={timeSlot}
+              onChange={(id, l) => { setField('dietitian', id); setDietitianLabel(l) }}
+              disabled={isLocked || !effectiveTenant}
+            />
+          ) : (
+            <CampFoPicker
+              value={fo}
+              label={foLabel}
+              coordinates={location?.coordinates}
+              date={date}
+              timeSlot={timeSlot}
+              onChange={(id, l) => { setField('fo', id); setFoLabel(l) }}
+              disabled={isLocked || !effectiveTenant}
+            />
+          )}
         </div>
         <div>
           <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>MR *</Label>

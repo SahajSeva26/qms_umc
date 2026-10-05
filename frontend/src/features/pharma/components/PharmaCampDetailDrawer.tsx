@@ -34,7 +34,10 @@ const PharmaCampDetailDrawer = ({ camp, onClose }: PharmaCampDetailDrawerProps) 
           { label: 'Location', value: camp.location ? `${camp.location.city}, ${camp.location.state}` : undefined },
           { label: 'Expected patients', value: camp.patientExpectation },
           { label: 'MR', value: roleName(camp.mr) },
-          { label: 'Field Officer', value: roleName(camp.fo) ?? 'Not yet assigned' },
+          {
+            label: camp.type === 'diet' ? 'Dietitian' : 'Field Officer',
+            value: roleName(camp.type === 'diet' ? camp.dietitian : camp.fo) ?? 'Not yet assigned',
+          },
         ]}
       />
 

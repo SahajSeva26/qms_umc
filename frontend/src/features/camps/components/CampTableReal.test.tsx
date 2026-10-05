@@ -30,6 +30,7 @@ function campFixture(overrides: Partial<CampEntity> = {}): CampEntity {
     doctor: { _id: 'doc-1', name: 'Dr. Aarav Mehta' },
     type: 'screening', billingType: 'billable', patientExpectation: 40,
     fo: { _id: 'fo-1', code: 'fo-001', name: 'Ravi Kumar' },
+    dietitian: null,
     mr: null, asm: null, rsm: null,
     date: '2026-09-20', timeSlot: '9am-1pm',
     location: { addressLine1: '1 MG Road', city: 'Mumbai', state: 'Maharashtra', country: 'India', pincode: '400001', coordinates: [72.87, 19.07] },
@@ -39,7 +40,7 @@ function campFixture(overrides: Partial<CampEntity> = {}): CampEntity {
 }
 
 describe('CampTableReal', () => {
-  it('renders Code, Schedule, Doctor, Location, FO, Status but no Company column for a tenant-scoped viewer', () => {
+  it('renders Code, Schedule, Doctor, Location, Staff, Status but no Company column for a tenant-scoped viewer', () => {
     mockSessionTenantType('customer')
     render(<CampTableReal camps={[campFixture()]} onOpen={vi.fn()} />)
 
@@ -47,7 +48,8 @@ describe('CampTableReal', () => {
     expect(screen.getByRole('columnheader', { name: 'Schedule' })).toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: 'Doctor' })).toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: 'Location' })).toBeInTheDocument()
-    expect(screen.getByRole('columnheader', { name: 'FO' })).toBeInTheDocument()
+    // Neutral header — a mixed-type list has both FO- and dietitian-staffed rows under one column.
+    expect(screen.getByRole('columnheader', { name: 'Staff' })).toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: 'Status' })).toBeInTheDocument()
     expect(screen.queryByRole('columnheader', { name: 'Company' })).not.toBeInTheDocument()
     // No independent Division or Slot columns — folded into Doctor/Schedule respectively.
@@ -82,6 +84,43 @@ describe('CampTableReal', () => {
     render(<CampTableReal camps={[campFixture({ fo: null })]} onOpen={vi.fn()} />)
 
     expect(screen.getByText('Missing FO')).toBeInTheDocument()
+  })
+
+  it('a diet camp with no dietitian shows "Missing Dietitian" (not FO), even with a stale camp.fo present', () => {
+    mockSessionTenantType('platform')
+    render(<CampTableReal camps={[campFixture({ type: 'diet', fo: { _id: 'fo-1', code: 'fo-001', name: 'Ravi Kumar' }, dietitian: null })]} onOpen={vi.fn()} />)
+
+    expect(screen.getByText('Missing Dietitian')).toBeInTheDocument()
+    expect(screen.queryByText('Missing FO')).not.toBeInTheDocument()
+  })
+
+  it('a diet camp with a dietitian assigned shows the dietitian name, not the stale FO', () => {
+    mockSessionTenantType('platform')
+    render(
+      <CampTableReal
+        camps={[campFixture({ type: 'diet', fo: { _id: 'fo-1', code: 'fo-001', name: 'Ravi Kumar' }, dietitian: { _id: 'diet-1', code: 'diet-001', name: 'Anita Rao' } })]}
+        onOpen={vi.fn()}
+      />,
+    )
+
+    expect(screen.queryByText(/Missing (Dietitian|FO)/)).not.toBeInTheDocument()
+  })
+
+  it('the expanded detail panel labels the staffing row "Dietitian" (not "FO") for a diet camp', async () => {
+    mockSessionTenantType('platform')
+    const user = userEvent.setup()
+    render(
+      <CampTableReal
+        camps={[campFixture({ type: 'diet', fo: null, dietitian: { _id: 'diet-1', code: 'diet-001', name: 'Anita Rao' } })]}
+        onOpen={vi.fn()}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Expand details for cmp-000001' }))
+
+    const panel = screen.getByText('People & assignments').parentElement as HTMLElement
+    expect(within(panel).getByText('Dietitian')).toBeInTheDocument()
+    expect(within(panel).queryByText('FO')).not.toBeInTheDocument()
   })
 
   it('shows the empty state when there are no camps', () => {

@@ -33,7 +33,7 @@ const WizardStep6 = () => {
   const type = useWatch({ control, name: 'type' })
   const therapy = useWatch({ control, name: 'therapy' })
   const mode = useWatch({ control, name: 'mode' })
-  const poNumber = useWatch({ control, name: 'poNumber' })
+  const purchaseOrders = useWatch({ control, name: 'purchaseOrders' })
   const valueBeforeGST = useWatch({ control, name: 'valueBeforeGST' })
   const gst = useWatch({ control, name: 'gst' })
   const totalCamps = useWatch({ control, name: 'totalCamps' })
@@ -126,7 +126,10 @@ const WizardStep6 = () => {
           <ReviewField label="Company" value={leadTenantName || '—'} />
           <ReviewField label="Division" value={leadDivisionName || '—'} />
           <ReviewField label="Type / Therapy" value={`${type.map((t) => PROJECT_TYPE_LABEL[t]).join(', ') || '—'} / ${therapy ? PROJECT_THERAPY_LABEL[therapy] : '—'}`} />
-          <ReviewField label="Execution" value={`${mode}${mode === 'po' && poNumber ? ` · ${poNumber}` : ''}`} />
+          <ReviewField
+            label="Execution"
+            value={`${mode}${mode === 'po' && purchaseOrders.length ? ` · ${purchaseOrders.map((po) => po.number).filter(Boolean).join(', ')}` : ''}`}
+          />
           <ReviewField label="Total value" value={formatINR(valueAfterGST)} />
           <ReviewField label="Camps" value={totalCamps ? String(totalCamps) : '—'} />
           <ReviewField label="Slots" value={campTimeSlots.length ? `${campTimeSlots.length} selected` : '—'} />

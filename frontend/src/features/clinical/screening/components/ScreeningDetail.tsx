@@ -1,8 +1,11 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { useUpdateScreening } from '@/features/clinical/screening/hooks/useUpdateScreening'
+import { useRequestConsentOtp } from '@/features/clinical/screening/hooks/useRequestConsentOtp'
+import { useVerifyConsent } from '@/features/clinical/screening/hooks/useVerifyConsent'
 import ScreeningStageHistoryList from '@/features/clinical/screening/components/ScreeningStageHistoryList'
 import ScreeningMoveStagePanel from '@/features/clinical/screening/components/ScreeningMoveStagePanel'
 import { SCREENING_STATUS_LABEL, type ScreeningEntity } from '@/features/clinical/screening/screening.types'
@@ -20,13 +23,18 @@ const patientName = (screening: ScreeningEntity) => {
   return [patient.firstName, patient.middleName, patient.lastName].filter(Boolean).join(' ')
 }
 
-// Symptoms have no fixed vocabulary, so a comma-separated textarea is used
-// instead of a dedicated tag-chip editor for this one consumer.
+// Symptoms have no fixed vocabulary, hence a comma-separated textarea rather than a tag-chip editor.
 const ScreeningDetail = ({ screening, canWrite, canMoveStage, onClose }: ScreeningDetailProps) => {
   const isPending = screening.status === 'pending'
   const [symptomsText, setSymptomsText] = useState(screening.symptoms.join(', '))
   const [referral, setReferral] = useState(screening.referral)
   const updateMutation = useUpdateScreening(screening.id)
+
+  const requestOtp = useRequestConsentOtp(screening.id)
+  const verifyConsent = useVerifyConsent(screening.id)
+  const [otpInput, setOtpInput] = useState('')
+  // TEMP: no delivery sender exists yet, so request-consent-otp returns the code directly.
+  const issuedCode = requestOtp.data?.data?.code
 
   const handleSave = () => {
     const submittedText = symptomsText
@@ -34,8 +42,7 @@ const ScreeningDetail = ({ screening, canWrite, canMoveStage, onClose }: Screeni
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean)
-    // Re-sync only if the textarea still matches what was submitted — it stays editable during
-    // the request, so a fresher edit typed while in flight must never be clobbered on response.
+    // Re-sync only if the textarea still matches what was submitted — a fresher in-flight edit must survive.
     updateMutation.mutate(
       { symptoms, referral },
       { onSuccess: () => setSymptomsText((current) => (current === submittedText ? symptoms.join(', ') : current)) },
@@ -96,12 +103,55 @@ const ScreeningDetail = ({ screening, canWrite, canMoveStage, onClose }: Screeni
         {screening.consent?.verified ? (
           <span className="font-semibold" style={{ color: 'var(--success)' }}>Verified</span>
         ) : (
-          <>
+          <div className="space-y-2">
             <span className="font-semibold" style={{ color: 'var(--qms-text-muted)' }}>Not yet verified</span>
-            <p className="text-[11px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>
-              Consent verification requires SMS delivery, not yet available.
-            </p>
-          </>
+
+            {canWrite && (
+              <>
+                <div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => requestOtp.mutate()}
+                    disabled={requestOtp.isPending}
+                  >
+                    {requestOtp.isPending ? 'Sending…' : issuedCode ? 'Resend OTP' : 'Send OTP'}
+                  </Button>
+                </div>
+                {requestOtp.isError && (
+                  <p className="text-[11px] text-danger">Couldn't send the OTP. Try again.</p>
+                )}
+                {issuedCode && (
+                  <p className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>
+                    No SMS/WhatsApp delivery is wired up yet — the code is shown here directly for
+                    testing: <span className="font-mono font-bold" style={{ color: 'var(--qms-text)' }}>{issuedCode}</span>
+                  </p>
+                )}
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="6-digit code"
+                    value={otpInput}
+                    onChange={(e) => setOtpInput(e.target.value)}
+                    className="h-auto py-1.5 text-[13px] max-w-32"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={() => verifyConsent.mutate({ otp: otpInput }, { onSuccess: () => setOtpInput('') })}
+                    disabled={!otpInput.trim() || verifyConsent.isPending}
+                  >
+                    {verifyConsent.isPending ? 'Verifying…' : 'Verify'}
+                  </Button>
+                </div>
+                {verifyConsent.isError && (
+                  <p className="text-[11px] text-danger">
+                    {(verifyConsent.error as { response?: { data?: { message?: string } } })?.response?.data?.message || "That code didn't match. Try again."}
+                  </p>
+                )}
+              </>
+            )}
+          </div>
         )}
       </div>
 

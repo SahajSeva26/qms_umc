@@ -60,7 +60,7 @@ describe('WizardStep1 — therapy + project-type-filtered tests', () => {
   it('does not query tests at all while no therapy is selected', async () => {
     const { testService } = await import('@/features/test-master/test.service')
 
-    await renderStep({ therapy: '', type: ['screening_camp'] })
+    await renderStep({ therapy: '', type: ['screening'] })
 
     expect(screen.getByText(/select a therapy to see available tests/i)).toBeInTheDocument()
     expect(testService.searchTests).not.toHaveBeenCalled()
@@ -75,11 +75,11 @@ describe('WizardStep1 — therapy + project-type-filtered tests', () => {
     expect(testService.searchTests).not.toHaveBeenCalled()
   })
 
-  it('queries only the camp type(s) derived from the selected project type — screening_camp scopes to campType=screening only', async () => {
+  it('queries only the camp type(s) derived from the selected project type — screening scopes to campType=screening only', async () => {
     const { testService } = await import('@/features/test-master/test.service')
     vi.mocked(testService.searchTests).mockResolvedValue(testsResponse([ecgTest]))
 
-    await renderStep({ therapy: 'cardiology', type: ['screening_camp'] })
+    await renderStep({ therapy: 'cardiology', type: ['screening'] })
 
     await waitFor(() => expect(testService.searchTests).toHaveBeenCalledWith(expect.objectContaining({ therapy: 'cardiology', campType: 'screening', status: 'active' })))
     expect(testService.searchTests).not.toHaveBeenCalledWith(expect.objectContaining({ campType: 'diet' }))
@@ -88,11 +88,11 @@ describe('WizardStep1 — therapy + project-type-filtered tests', () => {
     expect(testService.searchTests).toHaveBeenCalledTimes(1)
   })
 
-  it('queries every camp type when project type is "mixed" — mixed is a real, selectable type, not removed', async () => {
+  it('queries every camp type when all three real project types are selected — there is no separate "mixed" value, picking multiple types IS mixed', async () => {
     const { testService } = await import('@/features/test-master/test.service')
     vi.mocked(testService.searchTests).mockResolvedValue(testsResponse([]))
 
-    await renderStep({ therapy: 'cardiology', type: ['mixed'] })
+    await renderStep({ therapy: 'cardiology', type: ['screening', 'diet', 'lab'] })
 
     await waitFor(() => {
       expect(testService.searchTests).toHaveBeenCalledWith(expect.objectContaining({ campType: 'screening' }))
@@ -101,11 +101,11 @@ describe('WizardStep1 — therapy + project-type-filtered tests', () => {
     })
   })
 
-  it('merges camp types across more than one selected project type (diet + lab_test → diet and lab, not screening)', async () => {
+  it('merges camp types across more than one selected project type (diet + lab → diet and lab, not screening)', async () => {
     const { testService } = await import('@/features/test-master/test.service')
     vi.mocked(testService.searchTests).mockResolvedValue(testsResponse([]))
 
-    await renderStep({ therapy: 'cardiology', type: ['diet', 'lab_test'] })
+    await renderStep({ therapy: 'cardiology', type: ['diet', 'lab'] })
 
     await waitFor(() => {
       expect(testService.searchTests).toHaveBeenCalledWith(expect.objectContaining({ campType: 'diet' }))
@@ -119,7 +119,7 @@ describe('WizardStep1 — therapy + project-type-filtered tests', () => {
     vi.mocked(testService.searchTests).mockResolvedValue(testsResponse([ecgTest]))
 
     const user = userEvent.setup()
-    await renderStep({ therapy: 'cardiology', type: ['screening_camp'] })
+    await renderStep({ therapy: 'cardiology', type: ['screening'] })
 
     const chip = await screen.findByRole('button', { name: 'ECG' })
     await user.click(chip)
@@ -132,7 +132,7 @@ describe('WizardStep1 — therapy + project-type-filtered tests', () => {
     vi.mocked(testService.searchTests).mockResolvedValue(testsResponse([ecgTest]))
 
     const user = userEvent.setup()
-    await renderStep({ therapy: 'cardiology', type: ['screening_camp'], tests: [ecgTest.id] })
+    await renderStep({ therapy: 'cardiology', type: ['screening'], tests: [ecgTest.id] })
 
     const ecgChipBefore = await screen.findByRole('button', { name: 'ECG' })
     expect(ecgChipBefore).toHaveStyle({ background: 'var(--qms-brand)' })
@@ -151,7 +151,7 @@ describe('WizardStep1 — therapy + project-type-filtered tests', () => {
     vi.mocked(testService.searchTests).mockResolvedValue(testsResponse([ecgTest]))
 
     const user = userEvent.setup()
-    await renderStep({ therapy: 'cardiology', type: ['screening_camp'], tests: [ecgTest.id] })
+    await renderStep({ therapy: 'cardiology', type: ['screening'], tests: [ecgTest.id] })
 
     const ecgChipBefore = await screen.findByRole('button', { name: 'ECG' })
     expect(ecgChipBefore).toHaveStyle({ background: 'var(--qms-brand)' })
@@ -167,7 +167,7 @@ describe('WizardStep1 — therapy + project-type-filtered tests', () => {
     const { testService } = await import('@/features/test-master/test.service')
     vi.mocked(testService.searchTests).mockRejectedValue(new Error('network error'))
 
-    await renderStep({ therapy: 'cardiology', type: ['screening_camp'] })
+    await renderStep({ therapy: 'cardiology', type: ['screening'] })
 
     expect(await screen.findByText(/couldn.t load tests/i)).toBeInTheDocument()
     expect(screen.queryByText(/no tests configured/i)).not.toBeInTheDocument()
@@ -181,7 +181,7 @@ describe('WizardStep1 — therapy + project-type-filtered tests', () => {
       .mockResolvedValueOnce(testsResponse([ecgTest]))
 
     const user = userEvent.setup()
-    await renderStep({ therapy: 'cardiology', type: ['screening_camp'] })
+    await renderStep({ therapy: 'cardiology', type: ['screening'] })
 
     await user.click(await screen.findByRole('button', { name: /retry/i }))
 
@@ -200,7 +200,7 @@ describe('WizardStep1 — therapy + project-type-filtered tests', () => {
 
     expect(await screen.findByRole('button', { name: 'Diet Plan Review' })).toBeInTheDocument()
 
-    await rerenderWithForm({ therapy: 'cardiology', type: ['screening_camp'] })
+    await rerenderWithForm({ therapy: 'cardiology', type: ['screening'] })
 
     expect(await screen.findByRole('button', { name: 'ECG' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Diet Plan Review' })).not.toBeInTheDocument()
@@ -216,7 +216,7 @@ describe('WizardStep1 — therapy + project-type-filtered tests', () => {
     })
 
     const user = userEvent.setup()
-    await renderStep({ therapy: 'cardiology', type: ['screening_camp'] })
+    await renderStep({ therapy: 'cardiology', type: ['screening'] })
 
     expect(await screen.findByRole('button', { name: 'ECG 0' })).toBeInTheDocument()
     const loadMore = screen.getByRole('button', { name: /load more tests/i })
@@ -229,7 +229,7 @@ describe('WizardStep1 — therapy + project-type-filtered tests', () => {
   it('shows a permission message instead of querying the test catalog when the actor lacks test-master:search/manage', async () => {
     const { testService } = await import('@/features/test-master/test.service')
 
-    await renderStep({ therapy: 'cardiology', type: ['screening_camp'] }, false)
+    await renderStep({ therapy: 'cardiology', type: ['screening'] }, false)
 
     expect(await screen.findByText(/don't have permission to browse the test catalog/i)).toBeInTheDocument()
     expect(testService.searchTests).not.toHaveBeenCalled()
@@ -239,13 +239,13 @@ describe('WizardStep1 — therapy + project-type-filtered tests', () => {
     const { testService } = await import('@/features/test-master/test.service')
     vi.mocked(testService.searchTests).mockResolvedValue(testsResponse([ecgTest]))
 
-    const { rerenderWithForm } = await renderStep({ therapy: 'cardiology', type: ['screening_camp'], tests: ['t-1'] })
+    const { rerenderWithForm } = await renderStep({ therapy: 'cardiology', type: ['screening'], tests: ['t-1'] })
     const chip = await screen.findByRole('button', { name: 'ECG' })
     expect(chip).toHaveStyle({ background: 'var(--qms-brand)' })
 
     // Simulate a session refetch revoking the permission mid-wizard.
     await mockPermission(false)
-    await rerenderWithForm({ therapy: 'cardiology', type: ['screening_camp'], tests: ['t-1'] })
+    await rerenderWithForm({ therapy: 'cardiology', type: ['screening'], tests: ['t-1'] })
 
     expect(await screen.findByText(/don't have permission to browse the test catalog/i)).toBeInTheDocument()
   })

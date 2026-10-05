@@ -18,6 +18,8 @@ interface CampFoPickerProps {
   timeSlot?: CampTimeSlotValue | ''
   onChange: (foRoleId: string, foLabel: string) => void
   disabled?: boolean
+  /** Which field-staff kind to search — 'fo' (screening/lab camps) or 'dietitian' (diet camps). Defaults to 'fo'. */
+  workerType?: 'fo' | 'dietitian'
 }
 
 interface NearFoResult {
@@ -33,36 +35,21 @@ const NEAREST_LIMIT = 20
 
 const foLabel = (fo: RoleEntity) => `${fo.name} (${fo.code})`
 
-// Unlike MR (required), an empty selection is valid — but only means
-// "auto-assign nearest FO" on create; on edit it just leaves the FO unchanged.
-//
-// Coverage radius is a HARD filter — a camp in Bihar must never even list a
-// Gurugram-based FO, regardless of availability (the same rule auto-allocation,
-// GET /geo-profiles/nearest, already enforces). Availability (busy on this
-// exact date + time slot) is a SOFT filter by design: an in-range-but-busy FO
-// still shows, for context, with an Available/Unavailable pill next to their
-// distance — but can't be picked (see AsyncPicker's isResultDisabled). This
-// intentionally diverges from CampMrPicker, which stays a plain tenant-scoped
-// name search (MR eligibility was never about geography or scheduling).
-const CampFoPicker = ({ value, label, coordinates, date, timeSlot, onChange, disabled }: CampFoPickerProps) => {
+// Doubles as the Dietitian picker via `workerType`. Coverage radius is a HARD filter (never list an out-of-range worker); availability is SOFT (shown disabled, not hidden) — unlike CampMrPicker, which has no geo/schedule constraint.
+// Empty selection is valid: means "auto-assign nearest worker" on create, "leave unchanged" on edit.
+const CampFoPicker = ({ value, label, coordinates, date, timeSlot, onChange, disabled, workerType = 'fo' }: CampFoPickerProps) => {
   const [query, setQuery] = useState('')
   const { open, setOpen, containerRef } = useAsyncPickerState()
 
   const [lng, lat] = coordinates ?? []
   const hasCoordinates = Number.isFinite(lng) && Number.isFinite(lat)
   const hasDateAndSlot = !!date && !!timeSlot
-  // Coverage alone isn't enough to call an FO eligible — they also need to be
-  // free on this exact date + slot (the backend's own availability check,
-  // now that /geo-profiles/nearest can annotate results with `available`).
-  // Require date + timeSlot before this field is even usable, same as it
-  // already requires a location — mirrors Company/Project gating Doctor.
+  // Requires date + timeSlot, not just coordinates — mirrors Company/Project gating Doctor.
   const isReady = hasCoordinates && hasDateAndSlot
 
-  // Gate on `open` too, not just coordinates/date/slot — dragging the map pin
-  // or editing address fields must never fire this fetch while the FO
-  // dropdown itself isn't even open (see feedback_roletype_scoping_and_call_minimization).
+  // Gate on `open` too — dragging the map pin must never fire this fetch while the dropdown isn't open.
   const nearestQuery: NearestGeoProfileQuery | null = open && isReady
-    ? { type: 'fo', lng: lng as number, lat: lat as number, limit: String(NEAREST_LIMIT), date, timeSlot: timeSlot as CampTimeSlotValue }
+    ? { type: workerType, lng: lng as number, lat: lat as number, limit: String(NEAREST_LIMIT), date, timeSlot: timeSlot as CampTimeSlotValue }
     : null
 
   const { data: nearestData, isFetching: isFetchingNearest, error: nearestError, refetch: refetchNearest } = useNearestGeoProfiles(nearestQuery)
@@ -105,14 +92,16 @@ const CampFoPicker = ({ value, label, coordinates, date, timeSlot, onChange, dis
   const isFetching = isFetchingNearest || isFetchingRoles
   const error = nearestError || roleQueryError
 
+  const workerLabel = workerType === 'dietitian' ? 'dietitian' : 'FO'
+  const workerLabelPlural = workerType === 'dietitian' ? 'dietitians' : 'field officers'
   const searchPlaceholder = !hasCoordinates
     ? 'Pick a location first'
     : !hasDateAndSlot
       ? 'Pick a date and time slot first'
-      : 'Search FO by name…'
+      : `Search ${workerLabel} by name…`
   const noResultsText = !trimmedQuery
-    ? "No field officers' coverage reaches this location."
-    : 'No in-range field officers match that name.'
+    ? `No ${workerLabelPlural}' coverage reaches this location.`
+    : `No in-range ${workerLabelPlural} match that name.`
 
   return (
     <div>
@@ -130,7 +119,7 @@ const CampFoPicker = ({ value, label, coordinates, date, timeSlot, onChange, dis
         getId={(item) => item.role.id}
         getLabel={(item) => foLabel(item.role)}
         searchPlaceholder={searchPlaceholder}
-        clearAriaLabel="Clear selected FO"
+        clearAriaLabel={`Clear selected ${workerLabel}`}
         noResultsText={noResultsText}
         renderResult={(item) => (
           <>
@@ -140,14 +129,14 @@ const CampFoPicker = ({ value, label, coordinates, date, timeSlot, onChange, dis
         )}
         isResultDisabled={(item) => !item.available}
         isError={!!error}
-        errorText="Couldn't search field officers. Try again."
+        errorText={`Couldn't search ${workerLabelPlural}. Try again.`}
         onRetry={() => { refetchNearest(); roleQueries.forEach((q) => q.refetch()) }}
         hasMore={false}
         disabled={disabled || !isReady}
       />
       {nearestTruncated && !error && (
         <p className="text-[11px] mt-1.5" style={{ color: 'var(--qms-text-muted)' }}>
-          Showing the {NEAREST_LIMIT} nearest field officers — some in-range FOs may not be listed.
+          Showing the {NEAREST_LIMIT} nearest {workerLabelPlural} — some in-range ones may not be listed.
         </p>
       )}
     </div>

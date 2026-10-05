@@ -63,7 +63,10 @@ export interface CampEntity {
   type: CampType
   billingType: BillingType
   patientExpectation: number
+  /** Screening/lab camps are staffed here; a diet camp is staffed via `dietitian` instead — only one applies, decided by `type`. */
   fo: CampPopulatedRole | string | null
+  /** Diet-camp counterpart of `fo` — only one applies, by type. */
+  dietitian: CampPopulatedRole | string | null
   mr: CampPopulatedRole | string | null
   asm: CampPopulatedRole | string | null
   rsm: CampPopulatedRole | string | null
@@ -100,6 +103,7 @@ export interface SearchCampQuery {
   division?: string
   doctor?: string
   fo?: string
+  dietitian?: string
   status?: CampStatus
   type?: CampType
   billingType?: BillingType
@@ -121,8 +125,10 @@ export interface CreateCampPayload {
   type?: CampType
   billingType?: BillingType
   patientExpectation?: number
-  /** Optional — when omitted, the backend best-effort auto-assigns the nearest FO from `coordinates`; the camp still creates with no FO if none can be resolved. */
+  /** Optional — when omitted, the backend best-effort auto-assigns the nearest available worker (FO or dietitian, by `type`) from `coordinates`; the camp still creates unassigned if none can be resolved. */
   fo?: string
+  /** Diet-camp counterpart of `fo` — only one applies, by `type`; supplying the wrong one for the camp's type 400s. */
+  dietitian?: string
   /** Required. asm/rsm are no longer accepted — the backend derives them server-side from this MR's own supervisor chain (resolveMrChain). */
   mr: string
   date: string
@@ -141,6 +147,7 @@ export interface BookCampPayload {
   /** Required — every booker (including an MR booking for themselves) must name the MR explicitly. */
   mr: string
   doctor: string
+  /** No `fo`/`dietitian` override field exists here — pharma booking always auto-allocates the nearest free worker (FO or dietitian, by `type`). */
   type?: CampType
   patientExpectation?: number
   date: string
@@ -153,11 +160,13 @@ export interface BookCampPayload {
 
 export interface UpdateCampPayload {
   doctor?: string
-  type?: CampType
+  /** No `type` field — the backend's UpdateCampPayloadSchema has none at all; type is immutable after create (it decides the camp's worker kind). A supplied type is silently stripped, not rejected. */
   billingType?: BillingType
   patientExpectation?: number
   /** All fields here are locked once status !== 'requested' — the backend 409s the whole update, not just fo/date. */
   fo?: string
+  /** Diet-camp counterpart of `fo` — see CreateCampPayload. */
+  dietitian?: string
   /** asm/rsm are no longer accepted — the backend re-derives them from this MR whenever it's set. */
   mr?: string
   date?: string
@@ -184,6 +193,8 @@ export interface BookingAvailabilityPayload {
   /** YYYY-MM-DD — never a JS Date; the backend coerces the string itself. */
   dateFrom: string
   dateTo: string
+  /** Which worker kind to check availability for — defaults to 'screening' (FO) when omitted; pass 'diet' to check dietitian availability instead. */
+  type?: CampType
 }
 
 export interface BookingAvailabilityDayEntry {

@@ -20,12 +20,12 @@ import type { ProjectEntity } from '@/types/project.types'
 import type { LocationValue } from '@/types/location.types'
 import type { LocationResolutionState } from '@/components/widgets/location-picker/location.types'
 import { CAMP_TYPE_VALUES, type CampType } from '@/types/campReal.types'
+import { allowedCampTypesForProjectTypes } from '@/types/project.types'
 
 // Matches useDoctorCreateScope's own CLIENT_SIDE_FETCH_LIMIT convention.
 const CLIENT_SIDE_FETCH_LIMIT = 200
 
-// create (camp:create) is a distinct backend permission from update — this
-// page only ever handles creation, so only the create code is checked here.
+// camp:create is a distinct backend permission from update; this page only handles creation.
 const CAMP_CREATE_PERMISSIONS = ['camp:create', 'camp:manage', 'tenant:manage']
 
 const CampDetailPageReal = () => {
@@ -35,21 +35,20 @@ const CampDetailPageReal = () => {
   const canWrite = hasAnyPermission(CAMP_CREATE_PERMISSIONS)
   const canManageDoctors = hasPermission('doctor:manage')
 
-  // From a type-scoped page's "New camp" button — autofills+locks Type, routes back on cancel/success.
   const rawType = searchParams.get('type')
   const isValidCampType = (v: string): v is CampType => (CAMP_TYPE_VALUES as readonly string[]).includes(v)
   const lockedTypeValue = rawType && isValidCampType(rawType) ? rawType : null
   const returnTo = searchParams.get('from') || '/camps'
 
   const { draft, setField } = useCampDraft(null, lockedTypeValue ?? undefined)
-  const { tenant, division, project, doctor, mr, date, timeSlot, location, devices, notes, type, billingType, patientExpectation, fo } = draft
+  const { tenant, division, project, doctor, mr, date, timeSlot, location, devices, notes, type, billingType, patientExpectation, fo, dietitian } = draft
 
-  // A caller-facing pin can visibly move well before (or without ever) firing
-  // onChange — Save must block until the picker settles, same as GeoProfileDetailPage.
+  // Pin can visibly move before (or without ever) firing onChange — Save must block until it settles.
   const [locationResolution, setLocationResolution] = useState<LocationResolutionState>('idle')
 
   const [mrLabel, setMrLabel] = useState('')
   const [foLabel, setFoLabel] = useState('')
+  const [dietitianLabel, setDietitianLabel] = useState('')
   const [projectLabel, setProjectLabelState] = useState('')
   const [doctorLabelState, setDoctorLabelState] = useState('')
   const [deviceLabels, setDeviceLabels] = useState<Record<string, string>>({})
@@ -72,10 +71,11 @@ const CampDetailPageReal = () => {
   // A 403 means the actor lacks division:manage/tenant:admin/lead:manage — retrying never helps.
   const divisionsForbidden = isForbiddenError(divisionsError)
   const bookableSlots = pickedProject?.campTimeSlots ?? []
+  // Backend hard-400s create() when camp.type isn't in project.type[] (camp.service.ts) — narrow here to match.
+  const allowedCampTypes = pickedProject ? allowedCampTypesForProjectTypes(pickedProject.type) : CAMP_TYPE_VALUES
 
   const handleProjectChange = (p: ProjectEntity) => {
-    // A picked project must belong to the already-chosen Division — reject rather than
-    // silently overwrite division out from under the user (defensive; ProjectPicker already filters).
+    // Defensive: ProjectPicker already filters by division, but reject rather than silently overwrite it.
     if (campRefId(p.division) !== division) {
       setProjectMismatchError("This project doesn't belong to the selected division.")
       return
@@ -84,8 +84,9 @@ const CampDetailPageReal = () => {
     setField('project', p.id)
     setProjectLabelState(p.name)
     setPickedProject(p)
-    // The previously-selected slot may not be valid for the new project.
     if (timeSlot && !p.campTimeSlots.includes(timeSlot)) setField('timeSlot', '')
+    const nextAllowedTypes = allowedCampTypesForProjectTypes(p.type)
+    if (!nextAllowedTypes.includes(type) && nextAllowedTypes[0]) setField('type', nextAllowedTypes[0])
   }
 
   const createCamp = useCreateCamp()
@@ -120,7 +121,8 @@ const CampDetailPageReal = () => {
         type,
         billingType,
         patientExpectation: patientExpectationNum,
-        fo: fo || undefined,
+        // Backend 400s if both fo and dietitian are present — only send the one matching type.
+        ...(type === 'diet' ? { dietitian: dietitian || undefined } : { fo: fo || undefined }),
         mr,
         date,
         timeSlot: timeSlot as CampTimeSlotValue,
@@ -166,16 +168,16 @@ const CampDetailPageReal = () => {
                 setProjectLabelState('')
                 setPickedProject(null)
                 setProjectMismatchError(null)
-                // A doctor (fetched or just-created) scoped to the old company is no longer valid.
                 setField('doctor', '')
                 setDoctorLabelState('')
                 setField('timeSlot', '')
-                // MR is scoped to the old company, no longer valid. FO is global platform staff
-                // (not company-scoped) but is cleared too, conservatively, on a company change.
+                // FO is global platform staff (not company-scoped) but is cleared too, conservatively.
                 setField('mr', '')
                 setMrLabel('')
                 setField('fo', '')
                 setFoLabel('')
+                setField('dietitian', '')
+                setDietitianLabel('')
               }}
             />
           </div>
@@ -236,7 +238,6 @@ const CampDetailPageReal = () => {
                 setProjectLabelState('')
                 setPickedProject(null)
                 setProjectMismatchError(null)
-                // Division was picked independently, before Project — retain it on a Project clear.
                 setField('timeSlot', '')
               }}
             />
@@ -266,10 +267,10 @@ const CampDetailPageReal = () => {
             effectiveTenant={effectiveTenant}
             isLocked={false}
             lockedType={!!lockedTypeValue}
+            allowedTypes={allowedCampTypes}
             doctorLabel={doctorLabelState}
             setDoctorLabel={setDoctorLabelState}
             showNewDoctorButton={canManageDoctors}
-            // A new doctor must be scoped to the camp's own division — see forcedDivision above.
             newDoctorDisabled={!division}
             onNewDoctor={() => setShowNewDoctor(true)}
             bookableSlots={bookableSlots}
@@ -278,6 +279,13 @@ const CampDetailPageReal = () => {
             setMrLabel={setMrLabel}
             foLabel={foLabel}
             setFoLabel={setFoLabel}
+            dietitianLabel={dietitianLabel}
+            setDietitianLabel={setDietitianLabel}
+            onTypeChange={(nextType) => {
+              // Clear the worker field that no longer applies, so a stale id isn't sent alongside the new type.
+              if (nextType === 'diet') { setField('fo', ''); setFoLabel('') }
+              else { setField('dietitian', ''); setDietitianLabel('') }
+            }}
             deviceLabels={deviceLabels}
             onDevicesChange={(ids, labels) => { setField('devices', ids.join(', ')); setDeviceLabels(labels) }}
             onLocationResolutionChange={setLocationResolution}

@@ -7,8 +7,7 @@ import SideDrawer from '@/components/ui/SideDrawer'
 import ProjectStatusPill from '@/features/projects/components/ProjectStatusPill'
 import ProjectTypePills from '@/features/projects/components/ProjectTypePill'
 
-// Prototype's dv() (projects-manager.js:1965) — stacked label-over-value pair, no divider line,
-// rendered in a 2-column grid (see RowGrid below).
+// Prototype's dv() (projects-manager.js:1965)
 const Row = ({ label, value }: { label: string; value: ReactNode }) => (
   <div>
     <div className="text-[10px] font-bold uppercase tracking-[.04em]" style={{ color: 'var(--qms-text-muted)' }}>{label}</div>
@@ -40,22 +39,15 @@ const KpiTile = ({ label, value }: { label: string; value: ReactNode }) => (
   </div>
 )
 
-// All 3 helpers below guard against `null`/`undefined` even though
-// salesRep/projectCoordinator/marketingContact/lead are all `required: true`
-// in project.model.ts — that only enforces new saves, it doesn't retroactively
-// backfill older documents, and a populate() can also resolve to null if the
-// referenced doc was since deleted or the field held a stale/pre-migration
-// reference (e.g. marketingContact's Role→Contact switch, 2026-08-03). Found
-// live 2026-08-04: "Independent audit repro project" crashed the whole page
-// with "Cannot read properties of null (reading 'name')" on marketingContact.
+// Guard against null even though these fields are `required: true` — populate() can
+// resolve to null for deleted/stale refs (crashed live on 2026-08-04 without this guard).
 function roleName(role: ProjectEntity['salesRep']): string {
   if (!role) return '—'
   return typeof role === 'string' ? role : role.name
 }
 
-// marketingContact is a Contact reference, not a Role — switched 2026-08-03
-// (project.model.ts's marketingContact.ref) — separate helper since Contact
-// and Role are different populated shapes, even though both expose `.name`.
+// marketingContact is a Contact reference, not a Role — separate helper since the two
+// populated shapes differ even though both expose `.name`.
 function contactName(contact: ProjectEntity['marketingContact']): string {
   if (!contact) return '—'
   return typeof contact === 'string' ? contact : contact.name
@@ -71,8 +63,7 @@ interface ProjectDetailDrawerProps {
   onClose: () => void
 }
 
-// Rebuilt against the real populated relations — Purchase-orders (no pos[] array), Void camps,
-// and Camps done have no equivalent on our Project model (see md-files/ui-revisions.md).
+// Purchase-orders/Void camps/Camps-done from the prototype have no equivalent on our Project model.
 const ProjectDetailDrawer = ({ project, onClose }: ProjectDetailDrawerProps) => {
   const gst = project ? computeGstBreakdown(project.valueBeforeGST, project.gst) : null
   // Prototype's drawer subtitle is "{id} · {client} · {division} · {type}" under the name
@@ -102,8 +93,17 @@ const ProjectDetailDrawer = ({ project, onClose }: ProjectDetailDrawerProps) => 
               <Row label="Division" value={projectDivisionName(project)} />
               <Row label="Source lead" value={leadTitle(project.lead)} />
               <Row label="Therapy" value={PROJECT_THERAPY_LABEL[project.therapy] ?? project.therapy} />
-              <Row label="Execution mode" value={project.mode ? EXECUTION_MODE_LABEL[project.mode.mode] : '—'} />
-              {project.mode?.mode === 'po' && <Row label="PO number" value={project.mode.poNumber || '—'} />}
+              <Row label="Execution mode" value={project.executionMode ? EXECUTION_MODE_LABEL[project.executionMode.mode] : '—'} />
+              {project.executionMode?.mode === 'po' && (
+                <Row
+                  label={`Purchase order${(project.executionMode.po?.purchaseOrders?.length ?? 0) > 1 ? 's' : ''}`}
+                  value={
+                    project.executionMode.po?.purchaseOrders?.length
+                      ? project.executionMode.po.purchaseOrders.map((po) => po.number || '—').join(', ')
+                      : '—'
+                  }
+                />
+              )}
             </RowGrid>
           </div>
 

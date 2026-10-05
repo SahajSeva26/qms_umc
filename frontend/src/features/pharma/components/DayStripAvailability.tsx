@@ -21,19 +21,19 @@ interface DayStripAvailabilityProps {
   isLoading: boolean
   error: unknown
   onRetry: () => void
-  /** Real project-level count from the booking-availability response — not a per-day/per-slot
-   * count (the backend doesn't expose that), so the "pick a date" hint stays honest. */
+  /** Project-level count only — the backend doesn't expose a per-day/per-slot count. */
   eligibleFoCount: number
+  /** Which field-staff kind this count/availability describes — 'FO' (screening/lab) or 'dietitian' (diet). Defaults to 'FO'. */
+  workerLabel?: string
   city?: string
 }
 
 const RANGE_DAYS = 30
 
-// Matches the prototype's day-strip (30-day date pills, click reveals its slot row) — real
-// green/red availability only, no fabricated per-day/per-slot FO counts (see ui-revisions.md).
+// Real green/red availability only — no fabricated per-day/per-slot worker counts.
 const DayStripAvailability = ({
   availability, campTimeSlots, selectedDate, selectedSlot, onDateSelect, onSlotSelect,
-  isLoading, error, onRetry, eligibleFoCount, city,
+  isLoading, error, onRetry, eligibleFoCount, workerLabel = 'FO', city,
 }: DayStripAvailabilityProps) => {
   const today = startOfToday()
   const days = Array.from({ length: RANGE_DAYS }, (_, i) => {
@@ -48,7 +48,7 @@ const DayStripAvailability = ({
     <div>
       <div className="flex items-center gap-4 mb-2 text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>
         <span className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-success-soft" /> FO free
+          <span className="w-2.5 h-2.5 rounded-full bg-success-soft" /> {workerLabel} free
         </span>
         <span className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-full bg-danger-soft" /> all booked
@@ -59,8 +59,7 @@ const DayStripAvailability = ({
         {days.map((day) => {
           const key = dayKeyOf(day)
           const entry = availability[key]
-          // While loading/erroring, a day has no entry yet — "not known" must never render as a
-          // confirmed "closed" day (a failed request would then look like a fully-booked range).
+          // "not known" must never render as "closed" — a failed request would look fully-booked.
           const known = !isLoading && !error && entry !== undefined
           const available = entry?.available === true
           const picked = selectedDate === key
@@ -128,7 +127,7 @@ const DayStripAvailability = ({
         </div>
       ) : (
         <p className="text-[12px] mt-2 text-center rounded-lg px-3 py-2 bg-muted/50" style={{ color: 'var(--qms-text-muted)' }}>
-          ↑ Pick a date — {eligibleFoCount} FO{eligibleFoCount === 1 ? '' : 's'} can run this camp{city ? ` near ${city}` : ''}
+          ↑ Pick a date — {eligibleFoCount} {workerLabel}{eligibleFoCount === 1 ? '' : 's'} can run this camp{city ? ` near ${city}` : ''}
         </p>
       )}
 

@@ -2,6 +2,7 @@ import { FiFileText, FiFile, FiMail } from 'react-icons/fi'
 import type { ExecutionModeType, ProjectEntity } from '@/types/project.types'
 import { EXECUTION_MODE_LABEL } from '@/types/project.types'
 import { formatDate } from '@/utils/formatters'
+import { projectNearestExpiry } from '@/features/projects/projects.utils'
 
 const ICONS: Record<ExecutionModeType, typeof FiFileText> = {
   po: FiFile,
@@ -19,18 +20,18 @@ interface ProjectExecutionCellProps {
   project: ProjectEntity
 }
 
-// Backend's `mode` is a nested object (project.model.ts's executionModeSchema),
-// not a bare string — dots into `project.mode.mode`/`.poNumber`/`.poExpiry`
-// throughout, unlike the old mock which treated executionMode as if it WERE
-// the string discriminator.
+// `po` mode supports multiple purchase orders — shows the first PO's number as "primary" plus
+// the soonest expiry across all of them, with a "+N more" hint.
 const ProjectExecutionCell = ({ project }: ProjectExecutionCellProps) => {
-  if (!project.mode) {
+  if (!project.executionMode) {
     return <span className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>—</span>
   }
 
-  const { mode, poNumber, poExpiry } = project.mode
+  const { mode, po } = project.executionMode
   const Icon = ICONS[mode]
   const color = COLORS[mode]
+  const purchaseOrders = po?.purchaseOrders ?? []
+  const nearestExpiry = projectNearestExpiry(project)
 
   return (
     <div>
@@ -42,11 +43,14 @@ const ProjectExecutionCell = ({ project }: ProjectExecutionCellProps) => {
         <Icon size={11} />
         {EXECUTION_MODE_LABEL[mode].split(' ')[0]}
       </span>
-      {mode === 'po' && poNumber && (
-        <div className="text-[11px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>{poNumber}</div>
+      {mode === 'po' && purchaseOrders[0]?.number && (
+        <div className="text-[11px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>
+          {purchaseOrders[0].number}
+          {purchaseOrders.length > 1 && ` +${purchaseOrders.length - 1} more`}
+        </div>
       )}
-      {mode === 'po' && poExpiry && (
-        <div className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>expires {formatDate(poExpiry)}</div>
+      {mode === 'po' && nearestExpiry && (
+        <div className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>expires {formatDate(nearestExpiry)}</div>
       )}
     </div>
   )

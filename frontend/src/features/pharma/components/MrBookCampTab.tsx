@@ -10,6 +10,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import PharmaProjectPicker from '@/features/pharma/components/PharmaProjectPicker'
 import BookCampForm from '@/features/pharma/components/BookCampForm'
 import ProjectStatusPill from '@/features/projects/components/ProjectStatusPill'
+import ProjectDevicesRequiredCard from '@/components/widgets/camp/ProjectDevicesRequiredCard'
 import { parsePatientExpectation } from '@/features/pharma/utils/patientExpectation'
 import { allowedCampTypesForProjectTypes, type WhoCanBookCampCode } from '@/types/project.types'
 import { CAMP_TYPE_LABEL, type CampType } from '@/types/campReal.types'
@@ -38,7 +39,10 @@ const MrBookCampTab = () => {
     setProjectId(id)
     setProjectLabel(label)
     setSelectedProject(project)
-    setCampType('')
+    // Mirrors CampDetailPageReal's same default — picks the project's only allowed camp type when
+    // unambiguous, leaves the Select for the MR to choose when a project offers more than one.
+    const nextAllowedTypes = project ? allowedCampTypesForProjectTypes(project.type) : []
+    setCampType(nextAllowedTypes.length === 1 ? nextAllowedTypes[0] : '')
     // Project A's patient count must never carry into project B's booking.
     setPatientExpectationInput('')
   }
@@ -116,6 +120,7 @@ const MrBookCampTab = () => {
             {patientExpectationError && <p className="text-[11px] mt-1 text-danger">{patientExpectationError}</p>}
           </div>
         </div>
+        {selectedProject && <ProjectDevicesRequiredCard testIds={selectedProject.tests} campType={campType} />}
       </div>
 
       {/* Keyed on projectId — BookCampForm owns its own RHF state (location/doctor/date/slot/

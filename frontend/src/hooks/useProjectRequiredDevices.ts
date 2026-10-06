@@ -2,14 +2,10 @@ import { useTestMastersByIds } from '@/features/test-master/hooks/useTestMasters
 import type { TestConsumptionLineItem } from '@/features/test-master/testMaster.types'
 import type { ProjectPopulatedTest } from '@/types/project.types'
 
-// Derives "devices this project's camps will need" straight from real data — a project's own
-// tests[] (TestMaster ids), each test's consumption[] narrowed to items of type 'device'. No
-// separate "camp package"/template concept exists (or is needed): this is the same consumption
-// data that already gates FO allocation (camp.service.ts's rolesHoldingAllDevices) and drives
-// stock deduction at test-recording time, just surfaced here for the booking form to show up front.
+// Derives required devices from Project.tests[] -> TestMaster.consumption — same data that
+// gates FO allocation, not a separate "camp package" concept.
 export function useProjectRequiredDevices(projectTests: (ProjectPopulatedTest | string)[], enabled: boolean) {
-  // GET /projects populates tests[] into {_id,code,name,therapy} (same pattern as
-  // tenant/division/lead) — normalize either shape down to the bare id this hook needs.
+  // GET /projects populates tests[] into objects, not bare ids — normalize either shape.
   const testIds = projectTests.map((t) => (typeof t === 'string' ? t : t._id)).filter((id): id is string => !!id)
   const { items: tests, isLoading, isError } = useTestMastersByIds(testIds, enabled)
 

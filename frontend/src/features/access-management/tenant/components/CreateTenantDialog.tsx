@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { FormProvider, useForm } from 'react-hook-form'
+import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
+import { FormProvider, useForm, useFormContext, useWatch } from 'react-hook-form'
 import { FiArrowLeft, FiPlus } from 'react-icons/fi'
 import { useNavigate } from 'react-router-dom'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
@@ -8,13 +8,38 @@ import { useCreateTenant } from '@/features/access-management/tenant/hooks/useCr
 import { useTenantSalesRepPicker } from '@/features/access-management/tenant/hooks/useTenantSalesRepPicker'
 import { useCreateTenantLogoFlow } from '@/features/access-management/tenant/hooks/useCreateTenantLogoFlow'
 import { CREATE_TENANT_STEP_FIELD_NAMES, EMPTY_FORM_VALUES, useTenantFormResolver, type TenantFormValues } from '@/features/access-management/tenant/tenant.wizard'
+import { useTenantDraftStore, stripPassword, type TenantDraftSnapshot } from '@/features/access-management/tenant/tenantDraft.store'
+import { useDebouncedDraftSync } from '@/hooks/useDebouncedDraftSync'
+import type { createDraftStore } from '@/hooks/useDraftStore'
 import type { LocationResolutionState } from '@/components/widgets/location-picker/location.types'
 import { TENANT_ROUTES } from '@/features/access-management/tenant/tenant.routes'
 import { TenantWizardValidationProvider } from '@/features/access-management/tenant/components/wizard/TenantWizardValidationContext'
+import DraftLoadingPlaceholder from '@/components/ui/DraftLoadingPlaceholder'
+import DraftResumeDecision from '@/components/ui/DraftResumeDecision'
 import TenantBasicsStep from '@/features/access-management/tenant/components/wizard/TenantBasicsStep'
 import TenantLocationStep from '@/features/access-management/tenant/components/wizard/TenantLocationStep'
 import TenantOwnerStep from '@/features/access-management/tenant/components/wizard/TenantOwnerStep'
 import CreateTenantLogoFlow from '@/features/access-management/tenant/components/wizard/CreateTenantLogoFlow'
+
+type DraftMode = 'disabled' | 'loading' | 'pending-decision' | 'active'
+
+// Isolated so useWatch() only re-renders this, not the whole dialog — mirrors
+// NewProjectWizard's own ProjectDraftSync exactly.
+function TenantDraftSync({
+  store,
+  onStopChange,
+}: {
+  store: ReturnType<typeof createDraftStore<TenantDraftSnapshot>>
+  onStopChange: Dispatch<SetStateAction<(() => void) | null>>
+}) {
+  const { control, formState: { isDirty } } = useFormContext<TenantFormValues>()
+  const values = useWatch({ control })
+  const stop = useDebouncedDraftSync(stripPassword(values as TenantFormValues), isDirty, (v) => store.getState().setDraft(v))
+  useEffect(() => {
+    onStopChange(() => stop)
+  }, [onStopChange, stop])
+  return null
+}
 
 const CreateTenantDialog = () => {
   const [open, setOpen] = useState(false)
@@ -48,6 +73,38 @@ const CreateTenantDialog = () => {
   })
   const { handleSubmit, reset, trigger } = methods
 
+  // Only enabled while the dialog is actually open — the trigger button (and this component) is
+  // always mounted, so without this gate the store/debounce would run even while closed.
+  const { status: draftStatus, store: draftStore } = useTenantDraftStore({ enabled: open })
+  const [draftMode, setDraftMode] = useState<DraftMode>('loading')
+  const [stopSync, setStopSync] = useState<(() => void) | null>(null)
+
+  // Reacts to draftStatus actually changing (not just the first render) — otherwise
+  // reopening after a close leaves draftMode stuck at 'disabled' forever.
+  if (draftMode === 'disabled' && draftStatus !== 'disabled') {
+    setDraftMode('loading')
+  } else if (draftMode === 'loading' && draftStatus === 'disabled') {
+    setDraftMode('disabled')
+  } else if (draftMode === 'loading' && draftStatus === 'ready') {
+    setDraftMode(draftStore.getState().draft ? 'pending-decision' : 'active')
+  }
+
+  const handleResumeDraft = () => {
+    if (!draftStore) return
+    const draft = draftStore.getState().draft
+    // Merged against fresh defaults so a missing newer field doesn't resume undefined.
+    if (draft) reset({ ...EMPTY_FORM_VALUES, ...draft, ownerPassword: '' })
+    setDraftMode('active')
+  }
+
+  const handleDiscardDraft = () => {
+    draftStore?.getState().clearDraft()
+    reset(EMPTY_FORM_VALUES)
+    setDraftMode('active')
+  }
+
+  // Closes the dialog (X / backdrop / Cancel) WITHOUT touching the draft — same as Lead/Project,
+  // an in-progress draft must survive a close so Resume has something to offer next time.
   const resetAndClose = () => {
     reset(EMPTY_FORM_VALUES)
     setStep(0)
@@ -57,7 +114,15 @@ const CreateTenantDialog = () => {
     setLocationResolutionError(null)
     createTenant.reset()
     logoFlow.reset()
+    setDraftMode('loading')
     setOpen(false)
+  }
+
+  // Only the success path (tenant actually created) clears the draft — stop the debounced sync
+  // first, or its flush-on-unmount could re-write the draft right after it's cleared.
+  const clearDraftOnSuccess = () => {
+    stopSync?.()
+    draftStore?.getState().clearDraft()
   }
 
   // Step 0 -> 1: validate only the company-basics fields that render on step 0.
@@ -89,6 +154,7 @@ const CreateTenantDialog = () => {
     createTenant.mutate(payload, {
       onSuccess: (res) => {
         if (!res.data?.id) return
+        clearDraftOnSuccess()
         if (!logoFlow.pickedLogoFile) {
           resetAndClose()
           navigate(TENANT_ROUTES.TENANT_DETAIL.replace(':id', res.data.id))
@@ -126,7 +192,14 @@ const CreateTenantDialog = () => {
         </DialogHeader>
 
         <FormProvider {...methods}>
+          {draftMode === 'active' && <TenantDraftSync store={draftStore!} onStopChange={setStopSync} />}
           <TenantWizardValidationProvider value={{ advanceAttempted }}>
+            {draftMode === 'loading' && <DraftLoadingPlaceholder />}
+            {draftMode === 'pending-decision' && (
+              <DraftResumeDecision itemLabel="company" onResume={handleResumeDraft} onDiscard={handleDiscardDraft} />
+            )}
+
+            {(draftMode === 'active' || draftMode === 'disabled') && (
             <form onSubmit={handleSubmit(onSubmit)} noValidate>
               <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
                 {!isPostCreateFlowActive && step === 0 && (
@@ -193,6 +266,7 @@ const CreateTenantDialog = () => {
                 </DialogFooter>
               )}
             </form>
+            )}
           </TenantWizardValidationProvider>
         </FormProvider>
       </DialogContent>

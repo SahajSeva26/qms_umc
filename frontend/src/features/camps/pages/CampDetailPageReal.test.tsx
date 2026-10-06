@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
+import { useAuthStore } from '@/features/auth/store'
 import type { RoleEntity } from '@/types/accessManagement.types'
 
 vi.mock('@/hooks/useSession')
@@ -162,10 +163,18 @@ function makeQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } })
 }
 
+// useCampDraftStore keys off the real useAuthStore — a fresh id per render keeps drafts isolated.
+let draftTestUserCounter = 0
+function nextDraftTestUserId() {
+  draftTestUserCounter += 1
+  return `camp-draft-test-user-${draftTestUserCounter}`
+}
+
 async function renderCreatePage(initialPath = '/camps/new') {
+  useAuthStore.getState().setAuth({ id: nextDraftTestUserId(), email: 'system@gmail.com', firstName: 'System', lastName: 'User' })
   const CampDetailPageReal = (await import('./CampDetailPageReal')).default
   const queryClient = makeQueryClient()
-  return render(
+  const utils = render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[initialPath]}>
         <Routes>
@@ -176,11 +185,17 @@ async function renderCreatePage(initialPath = '/camps/new') {
       </MemoryRouter>
     </QueryClientProvider>,
   )
+  // Every render starts on a fresh user with no saved draft — waits past the brief
+  // "Checking for a saved draft…" loading placeholder into the real form content.
+  await screen.findByText(/^Company \*/i)
+  return utils
 }
 
 describe('CampDetailPageReal — create mode, inline doctor creation', () => {
   beforeEach(() => {
     vi.resetAllMocks()
+    sessionStorage.clear()
+    useAuthStore.getState().clearAuth()
   })
 
   // This modal's labels aren't htmlFor-associated with their inputs, hence the sibling lookup.
@@ -342,6 +357,8 @@ describe('CampDetailPageReal — create mode, inline doctor creation', () => {
 describe('CampDetailPageReal — Division/Project field interplay', () => {
   beforeEach(() => {
     vi.resetAllMocks()
+    sessionStorage.clear()
+    useAuthStore.getState().clearAuth()
   })
 
   // Lets a genuine project.division !== picked Division mismatch be constructed (default mock has only one).
@@ -541,6 +558,8 @@ describe('CampDetailPageReal — Division/Project field interplay', () => {
 describe('CampDetailPageReal — arriving from a type-scoped page (Screening/Diet Camps)', () => {
   beforeEach(() => {
     vi.resetAllMocks()
+    sessionStorage.clear()
+    useAuthStore.getState().clearAuth()
   })
 
   it('with no type/from params (plain "Camp Management" → New camp), Type is editable and Back goes to /camps', async () => {
@@ -590,6 +609,8 @@ describe('CampDetailPageReal — arriving from a type-scoped page (Screening/Die
 describe('CampDetailPageReal — create mode, MR/FO pickers', () => {
   beforeEach(() => {
     vi.resetAllMocks()
+    sessionStorage.clear()
+    useAuthStore.getState().clearAuth()
   })
 
   async function mockRoleTypesAndRoles(rolesByCode: Record<string, RoleEntity[]>) {
@@ -794,5 +815,227 @@ describe('CampDetailPageReal — create mode, MR/FO pickers', () => {
     await waitFor(() => expect(geoProfileService.nearestGeoProfiles).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'fo', lng: 77.02, lat: 28.52, date: '2026-09-20' }),
     ))
+  })
+})
+
+describe('CampDetailPageReal — draft persistence', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    sessionStorage.clear()
+    useAuthStore.getState().clearAuth()
+  })
+
+  // Mirrors campDraft.store.ts's own key format exactly — a mismatch here would silently
+  // seed a draft the page's own store instance never reads.
+  function draftStorageKey(userId: string) {
+    return `qms:draft:new-camp:v1:${userId}`
+  }
+
+  function seedDraft(userId: string, snapshot: Record<string, unknown>) {
+    sessionStorage.setItem(draftStorageKey(userId), JSON.stringify({ state: { draft: snapshot, savedAt: Date.now() }, version: 1 }))
+  }
+
+  // Draft-seeding tests pick their own userId first, so they can't use renderCreatePage().
+  async function renderWithUser(userId: string, initialPath = '/camps/new') {
+    useAuthStore.getState().setAuth({ id: userId, email: 'system@gmail.com', firstName: 'System', lastName: 'User' })
+    const CampDetailPageReal = (await import('./CampDetailPageReal')).default
+    const queryClient = makeQueryClient()
+    return render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={[initialPath]}>
+          <Routes>
+            <Route path="/camps/new" element={<CampDetailPageReal />} />
+            <Route path="/camps" element={<div>Camp Management page</div>} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+  }
+
+  it('shows no resume decision view and the real form when no draft exists', async () => {
+    await mockSessionWithPermission(true)
+    await mockTenants([])
+    await renderWithUser('camp-draft-user-1')
+
+    expect(await screen.findByText(/^Company \*/i)).toBeInTheDocument()
+    expect(screen.queryByText(/unsaved camp from earlier/i)).not.toBeInTheDocument()
+  })
+
+  it('shows the resume decision view (not the editable form) when a draft exists, and does not overwrite it while undecided', async () => {
+    await mockSessionWithPermission(true)
+    await mockTenants([])
+    const userId = 'camp-draft-user-2'
+    seedDraft(userId, { draft: { tenant: 't-cipla' }, projectLabel: '', doctorLabel: '', mrLabel: '', foLabel: '', dietitianLabel: '', deviceLabels: {} })
+
+    await renderWithUser(userId)
+
+    expect(await screen.findByText(/unsaved camp from earlier/i)).toBeInTheDocument()
+    expect(screen.queryByText(/^Company \*/i)).not.toBeInTheDocument()
+
+    const raw = sessionStorage.getItem(draftStorageKey(userId))
+    expect(JSON.parse(raw as string).state.draft.draft.tenant).toBe('t-cipla')
+  })
+
+  it('Resume restores the saved company label into the live form', async () => {
+    await mockSessionWithPermission(true)
+    await mockTenants([{ id: 't-cipla', name: 'Cipla', code: 'cipla', type: 'customer' }])
+    const userId = 'camp-draft-user-3'
+    seedDraft(userId, {
+      draft: { tenant: 't-cipla', division: '', project: '', doctor: '', type: 'screening', billingType: 'billable', patientExpectation: '', fo: '', dietitian: '', mr: '', date: '', timeSlot: '', location: null, devices: '', notes: '' },
+      projectLabel: '', doctorLabel: '', mrLabel: '', foLabel: '', dietitianLabel: '', deviceLabels: {},
+    })
+
+    await renderWithUser(userId)
+    await userEvent.setup().click(await screen.findByRole('button', { name: /^Resume$/i }))
+
+    await screen.findByText(/^Company \*/i)
+    expect(screen.getByText(/^Cipla/)).toBeInTheDocument()
+  })
+
+  it('Discard clears the draft and starts fresh — reopening shows no decision view', async () => {
+    await mockSessionWithPermission(true)
+    await mockTenants([])
+    const userId = 'camp-draft-user-4'
+    seedDraft(userId, { draft: { tenant: 't-cipla' }, projectLabel: '', doctorLabel: '', mrLabel: '', foLabel: '', dietitianLabel: '', deviceLabels: {} })
+    const { unmount } = await renderWithUser(userId)
+
+    await userEvent.setup().click(await screen.findByRole('button', { name: /^Discard$/i }))
+    await screen.findByText(/^Company \*/i)
+    expect(sessionStorage.getItem(draftStorageKey(userId))).toBeNull()
+
+    unmount()
+    await renderWithUser(userId)
+    expect(await screen.findByText(/^Company \*/i)).toBeInTheDocument()
+    expect(screen.queryByText(/unsaved camp from earlier/i)).not.toBeInTheDocument()
+  })
+
+  it('a real interaction, closing, and reopening offers Resume with the exact value — end-to-end debounce→persist→rehydrate', async () => {
+    await mockSessionWithPermission(true)
+    await mockTenants([{ id: 't-cipla', name: 'Cipla', code: 'cipla', type: 'customer' }])
+    const userId = 'camp-draft-user-5'
+    const user = userEvent.setup()
+    const { unmount } = await renderWithUser(userId)
+    await screen.findByText(/^Company \*/i)
+
+    await pickCompany(user, 'Cipla')
+
+    await waitFor(
+      () => {
+        const raw = sessionStorage.getItem(draftStorageKey(userId))
+        expect(raw).not.toBeNull()
+        expect(JSON.parse(raw as string).state.draft.draft.tenant).toBe('t-cipla')
+      },
+      { timeout: 2000 },
+    )
+
+    unmount()
+    await renderWithUser(userId)
+    expect(await screen.findByText(/unsaved camp from earlier/i)).toBeInTheDocument()
+
+    await user.click(await screen.findByRole('button', { name: /^Resume$/i }))
+    await screen.findByText(/^Company \*/i)
+    expect(screen.getByText(/^Cipla/)).toBeInTheDocument()
+  })
+
+  it('Resume re-fetches the picked project by id — unblocks the time-slot picker instead of leaving it stuck disabled', async () => {
+    await mockSessionWithPermission(true)
+    await mockTenants([{ id: 't-cipla', name: 'Cipla', code: 'cipla', type: 'customer' }])
+    const { projectsService } = await import('@/features/projects/projects.service')
+    vi.mocked(projectsService.getProject).mockResolvedValue({
+      success: true, message: '',
+      data: { id: 'proj-1', code: 'prj-001', name: 'Cipla Project', status: 'live', division: 'div-1', campTimeSlots: ['9am-1pm'], tests: [], type: ['screening'] },
+    } as never)
+
+    const userId = 'camp-draft-user-6'
+    // Only project id/label were ever persisted (useCampDraft's own CampDraft shape has no
+    // slot for the full ProjectEntity) — this is the exact gap the resume fetch must cover.
+    seedDraft(userId, {
+      draft: { tenant: 't-cipla', division: 'div-1', project: 'proj-1', doctor: '', type: 'screening', billingType: 'billable', patientExpectation: '', fo: '', dietitian: '', mr: '', date: '', timeSlot: '', location: null, devices: '', notes: '' },
+      projectLabel: 'Cipla Project', doctorLabel: '', mrLabel: '', foLabel: '', dietitianLabel: '', deviceLabels: {},
+    })
+
+    await renderWithUser(userId)
+    await userEvent.setup().click(await screen.findByRole('button', { name: /^Resume$/i }))
+
+    await waitFor(() => expect(projectsService.getProject).toHaveBeenCalledWith('proj-1'))
+
+    // Time Slot was disabled ("Select a project first") before the fetch resolved pickedProject —
+    // it must become the real, enabled picker once the project is rehydrated.
+    const timeSlotLabel = await screen.findByText(/time slot \*/i)
+    await waitFor(() => {
+      const trigger = timeSlotLabel.parentElement!.querySelector('[role="combobox"]')
+      expect(trigger).not.toBeDisabled()
+    })
+  })
+
+  it('a draft saved for one camp type cannot flip a type-locked route\'s camp type on resume', async () => {
+    await mockSessionWithPermission(true)
+    await mockTenants([{ id: 't-cipla', name: 'Cipla', code: 'cipla', type: 'customer' }])
+
+    const userId = 'camp-draft-user-7'
+    // Saved while booking a screening camp from the generic /camps/new flow.
+    seedDraft(userId, {
+      draft: { tenant: 't-cipla', division: '', project: '', doctor: '', type: 'screening', billingType: 'billable', patientExpectation: '', fo: '', dietitian: '', mr: '', date: '', timeSlot: '', location: null, devices: '', notes: '' },
+      projectLabel: '', doctorLabel: '', mrLabel: '', foLabel: '', dietitianLabel: '', deviceLabels: {},
+    })
+
+    // Resumed from the Diet Camps page's own type-locked route instead.
+    await renderWithUser(userId, '/camps/new?type=diet')
+    await userEvent.setup().click(await screen.findByRole('button', { name: /^Resume$/i }))
+
+    await screen.findByText(/^Company \*/i)
+    const typeLabel = screen.getByText(/^Type$/i)
+    const typeTrigger = typeLabel.parentElement!.querySelector('[role="combobox"]')!
+    // The locked type must win — not the draft's saved 'screening'.
+    expect(typeTrigger).toHaveTextContent(/diet/i)
+    expect(typeTrigger).toBeDisabled()
+  })
+
+  it('a resumed project incompatible with a type-locked route is cleared with an explicit message, not silently submitted', async () => {
+    await mockSessionWithPermission(true)
+    await mockTenants([{ id: 't-cipla', name: 'Cipla', code: 'cipla', type: 'customer' }])
+    const { projectsService } = await import('@/features/projects/projects.service')
+    // Screening-only project — incompatible with the ?type=diet route below.
+    vi.mocked(projectsService.getProject).mockResolvedValue({
+      success: true, message: '',
+      data: { id: 'proj-1', code: 'prj-001', name: 'Cipla Project', status: 'live', division: 'div-1', campTimeSlots: ['9am-1pm'], tests: [], type: ['screening'] },
+    } as never)
+
+    const userId = 'camp-draft-user-8'
+    seedDraft(userId, {
+      draft: { tenant: 't-cipla', division: 'div-1', project: 'proj-1', doctor: '', type: 'screening', billingType: 'billable', patientExpectation: '', fo: '', dietitian: '', mr: '', date: '', timeSlot: '', location: null, devices: '', notes: '' },
+      projectLabel: 'Cipla Project', doctorLabel: '', mrLabel: '', foLabel: '', dietitianLabel: '', deviceLabels: {},
+    })
+
+    await renderWithUser(userId, '/camps/new?type=diet')
+    await userEvent.setup().click(await screen.findByRole('button', { name: /^Resume$/i }))
+
+    await screen.findByText(/doesn't support this camp type/i)
+    // The project field must be cleared, not left showing the incompatible project as picked.
+    expect(screen.queryByText('Cipla Project')).not.toBeInTheDocument()
+    expect(screen.queryByText(/devices required/i)).not.toBeInTheDocument()
+  })
+
+  it('a resumed project that fails to load (deleted/no access) is cleared with an explicit error, not left silently stuck', async () => {
+    await mockSessionWithPermission(true)
+    await mockTenants([{ id: 't-cipla', name: 'Cipla', code: 'cipla', type: 'customer' }])
+    const { projectsService } = await import('@/features/projects/projects.service')
+    vi.mocked(projectsService.getProject).mockRejectedValue(new Error('404'))
+
+    const userId = 'camp-draft-user-9'
+    seedDraft(userId, {
+      draft: { tenant: 't-cipla', division: 'div-1', project: 'proj-deleted', doctor: '', type: 'screening', billingType: 'billable', patientExpectation: '', fo: '', dietitian: '', mr: '', date: '', timeSlot: '', location: null, devices: '', notes: '' },
+      projectLabel: 'Deleted Project', doctorLabel: '', mrLabel: '', foLabel: '', dietitianLabel: '', deviceLabels: {},
+    })
+
+    await renderWithUser(userId)
+    await userEvent.setup().click(await screen.findByRole('button', { name: /^Resume$/i }))
+
+    await screen.findByText(/couldn't load this draft's project/i)
+    expect(screen.queryByText('Deleted Project')).not.toBeInTheDocument()
+    // Time Slot stays correctly gated — no stale-looking "picked" project left behind.
+    const timeSlotLabel = screen.getByText(/time slot \*/i)
+    const trigger = timeSlotLabel.parentElement!.querySelector('[role="combobox"]')
+    expect(trigger).toBeDisabled()
   })
 })

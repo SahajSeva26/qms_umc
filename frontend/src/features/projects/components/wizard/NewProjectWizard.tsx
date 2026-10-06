@@ -63,7 +63,9 @@ function projectToForm(p: ProjectEntity): WizardFormState {
     name: p.name,
     therapy: p.therapy,
     type: p.type,
-    tests: p.tests,
+    // Populated-or-raw-id, same as tenant/division/lead above — the wizard's test-picker step
+    // only needs the bare ids to know which tests were already chosen.
+    tests: p.tests.map((t) => unwrapId(t)).filter(Boolean),
 
     mode: p.executionMode?.mode ?? 'po',
     purchaseOrders: p.executionMode?.po?.purchaseOrders?.length

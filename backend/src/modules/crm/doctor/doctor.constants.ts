@@ -2,6 +2,16 @@
 export const DOCTOR_SPECIALIZATION = {
     CP: 'cp',
     GP: 'gp',
+    ENDOCRINOLOGIST: 'endocrinologist',
+    CARDIOLOGIST: 'cardiologist',
+    PULMONOLOGIST: 'pulmonologist',
+    ORTHOPEDIC: 'orthopedic',
+    GYNECOLOGIST: 'gynecologist',
+    NEUROLOGIST: 'neurologist',
+    HEPATOLOGIST: 'hepatologist',
+    OPHTHALMOLOGIST: 'ophthalmologist',
+    CHEST_PHYSICIAN: 'chest_physician',
+    NEPHROLOGIST: 'nephrologist',
 } as const;
 
 export const DOCTOR_STATUS = {

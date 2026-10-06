@@ -1,5 +1,6 @@
 import type { DoctorEntity } from '@/types/doctor.types'
 import StatusPill from '@/features/doctors/components/StatusPill'
+import { SPECIALIZATION_LABEL } from '@/features/doctors/doctors.ui'
 
 interface InactiveTabProps {
   doctors: DoctorEntity[]
@@ -45,7 +46,7 @@ const InactiveTab = ({ doctors, onOpenDoctor }: InactiveTabProps) => {
                 style={{ borderColor: 'var(--qms-border)' }}
               >
                 <td className="px-2.5 py-2 font-semibold" style={{ color: 'var(--qms-text)' }}>{d.name}</td>
-                <td className="px-2.5 py-2" style={{ color: 'var(--qms-text-soft)' }}>{d.specialization.toUpperCase()}</td>
+                <td className="px-2.5 py-2" style={{ color: 'var(--qms-text-soft)' }}>{d.specialization ? SPECIALIZATION_LABEL[d.specialization] : '—'}</td>
                 <td className="px-2.5 py-2" style={{ color: 'var(--qms-text-soft)' }}>{d.location?.city ?? '—'}</td>
                 <td className="px-2.5 py-2"><StatusPill status={d.status} /></td>
               </tr>

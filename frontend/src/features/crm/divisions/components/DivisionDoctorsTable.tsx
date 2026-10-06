@@ -1,4 +1,5 @@
 import type { DoctorEntity } from '@/types/doctor.types'
+import { SPECIALIZATION_LABEL } from '@/types/doctor.types'
 
 interface DivisionDoctorsTableProps {
   doctors: DoctorEntity[]
@@ -52,7 +53,7 @@ const DivisionDoctorsTable = ({ doctors, onView }: DivisionDoctorsTableProps) =>
                   {doctor.pharmaCode}
                 </td>
                 <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                  {doctor.specialization.toUpperCase()}
+                  {doctor.specialization ? SPECIALIZATION_LABEL[doctor.specialization] : '—'}
                 </td>
                 <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
                   {doctor.location ? `${doctor.location.city}, ${doctor.location.state}` : '—'}

@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button'
 import { useAllocateFo } from '@/features/camps/hooks/useAllocateFo'
 import type { CampType } from '@/types/campReal.types'
 import { CAMP_TYPE_LABEL } from '@/types/campReal.types'
+import { specializationLabel } from '@/types/doctor.types'
 import { CAMP_TIME_SLOT_LABEL } from '@/types/campTimeSlot.constants'
 
 const TABS = ['Overview', 'Stage history'] as const
@@ -192,7 +193,7 @@ const CampDrawerContent = ({ campId, onClose }: CampDrawerContentProps) => {
               <div className="rounded-[14px] border p-3 space-y-1.5" style={{ borderColor: 'var(--qms-border)' }}>
                 <OverviewRow label="Name" value={doctorName(camp.doctor)} />
                 <OverviewRow label="Pharma code" value={doctor?.pharmaCode || '—'} />
-                <OverviewRow label="Specialization" value={doctor?.specialization || '—'} />
+                <OverviewRow label="Specialization" value={specializationLabel(doctor?.specialization)} />
               </div>
 
               <SectionHeader icon={FiTruck}>{isDiet ? 'Dietitian' : 'Field Officer'}</SectionHeader>

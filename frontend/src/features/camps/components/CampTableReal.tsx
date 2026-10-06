@@ -5,6 +5,7 @@ import CopyButton from '@/components/ui/CopyButton'
 import CampStatusPillReal from '@/components/widgets/camp/CampStatusPillReal'
 import { useCampRefNames } from '@/features/camps/hooks/useCampRefNames'
 import { usePermission } from '@/hooks/usePermission'
+import { specializationLabel } from '@/types/doctor.types'
 import { CAMP_TIME_SLOT_LABEL } from '@/types/campTimeSlot.constants'
 
 interface CampTableRealProps {
@@ -199,7 +200,7 @@ const CampRowDetailPanel = ({ id, camp, doctorName, divisionName, roleName, proj
         <SectionTitle>People &amp; assignments</SectionTitle>
         <DetailField label="Project" value={camp.project ? projectName(camp.project) : undefined} />
         <DetailField label="Doctor" value={doctorName(camp.doctor)} />
-        <DetailField label="Specialization" value={doctor?.specialization} />
+        <DetailField label="Specialization" value={doctor?.specialization ? specializationLabel(doctor.specialization) : undefined} />
         <DetailField
           label={camp.type === 'diet' ? 'Dietitian' : 'FO'}
           value={(camp.type === 'diet' ? camp.dietitian : camp.fo) ? roleName(camp.type === 'diet' ? camp.dietitian : camp.fo) : undefined}

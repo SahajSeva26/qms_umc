@@ -218,6 +218,15 @@ export interface ProjectPopulatedLead {
   status: string
 }
 
+// GET /projects populates each tests[] entry this far (not the full TestEntity) — backend
+// mirrors tenant/division/lead's own populate-or-raw-id pattern here too.
+export interface ProjectPopulatedTest {
+  _id?: string
+  code: string
+  name: string
+  therapy?: string
+}
+
 // Reused for salesRep/projectCoordinator (both populate as the full Role
 // document; only the fields consumed here are typed). marketingContact is a
 // Contact reference instead — see LeadPopulatedContact import.
@@ -243,8 +252,10 @@ export interface ProjectEntity {
   division: ProjectPopulatedDivision | string | null
   therapy: ProjectTherapy
   type: ProjectType[]
-  // Test._id references — resolve against GET /test-masters to display names.
-  tests: string[]
+  // Populated to ProjectPopulatedTest (not the full TestEntity) — same populate-or-raw-id
+  // pattern as tenant/division/lead above. A caller needing the full TestEntity (e.g. its
+  // consumption[]) still resolves the id against GET /test-masters.
+  tests: (ProjectPopulatedTest | string)[]
   lead: ProjectPopulatedLead | string | null
   executionMode: ExecutionMode | null
   campCost: number

@@ -107,7 +107,7 @@ const TestForm = ({ test, onClose, hasRecordedResults = false }: TestFormProps) 
 
       <TestConfigInputsEditor hasRecordedResults={hasRecordedResults} />
 
-      <TestResourcePicker isEdit={isEdit} resourceCount={test?.consumption.length ?? 0} />
+      <TestResourcePicker isEdit={isEdit} consumption={test?.consumption ?? []} />
 
       <MutationStatusBanner mutation={mutation} errorFallback="Could not save this test — try again." showSuccess={false} />
 

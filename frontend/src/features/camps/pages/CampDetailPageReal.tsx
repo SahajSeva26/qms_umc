@@ -10,6 +10,7 @@ import { usePermission } from '@/hooks/usePermission'
 import { isForbiddenError } from '@/utils/apiError'
 import ProjectPicker from '@/features/camps/components/ProjectPicker'
 import CampFormFields from '@/features/camps/components/CampFormFields'
+import ProjectDevicesRequiredCard from '@/components/widgets/camp/ProjectDevicesRequiredCard'
 import { EditDoctorModal } from '@/features/doctors'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -245,6 +246,8 @@ const CampDetailPageReal = () => {
               <p className="text-[11px] text-danger mt-1.5">{projectMismatchError}</p>
             )}
           </div>
+
+          {pickedProject && <ProjectDevicesRequiredCard testIds={pickedProject.tests} campType={type} />}
 
           {showNewDoctor && (
             <EditDoctorModal

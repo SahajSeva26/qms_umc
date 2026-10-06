@@ -35,6 +35,11 @@ const DatePicker = ({ value, onChange, placeholder = 'Pick a date', className }:
         <Calendar
           mode="single"
           selected={selected}
+          captionLayout="dropdown"
+          // A DOB-style range back to 120 years ago — react-day-picker's dropdown
+          // defaults to a much narrower window otherwise.
+          startMonth={new Date(new Date().getFullYear() - 120, 0)}
+          endMonth={new Date()}
           onSelect={(date) => {
             onChange(date ? format(date, 'yyyy-MM-dd') : '')
             setOpen(false)

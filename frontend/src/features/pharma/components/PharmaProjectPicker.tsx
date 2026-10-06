@@ -40,9 +40,9 @@ const PharmaProjectPicker = ({ value, label, onChange }: PharmaProjectPickerProp
       isFetching={isFetching && projects.length === 0}
       getId={(project) => project.id}
       getLabel={projectLabel}
-      searchPlaceholder="Search projects by name…"
+      searchPlaceholder="Search or browse projects…"
       clearAriaLabel="Clear selected project"
-      emptyQueryText="Start typing to search your division's projects."
+      emptyResultsText="No live projects found."
       noResultsText="No matching projects found."
       renderResult={(project) => (
         <span className="flex items-center gap-2">

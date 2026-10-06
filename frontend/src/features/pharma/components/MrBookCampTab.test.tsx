@@ -76,7 +76,7 @@ async function pickProject(user: ReturnType<typeof userEvent.setup>, project: Pr
   vi.mocked(pharmaProjectsService.searchScopedProjects).mockResolvedValue({
     success: true, message: '', data: { items: [project], count: 1 },
   })
-  await user.type(screen.getByPlaceholderText(/search projects by name/i), 'Cardio')
+  await user.type(screen.getByPlaceholderText(/search or browse projects/i), 'Cardio')
   const option = await screen.findByText(new RegExp(project.name, 'i'), {}, { timeout: 3000 })
   await user.click(option)
 }
@@ -146,7 +146,7 @@ describe('MrBookCampTab — real searchable project picker', () => {
     vi.mocked(pharmaProjectsService.searchScopedProjects).mockResolvedValue({
       success: true, message: '', data: { items: [], count: 0 },
     })
-    await user.type(screen.getByPlaceholderText(/search projects by name/i), 'zzz-no-match')
+    await user.type(screen.getByPlaceholderText(/search or browse projects/i), 'zzz-no-match')
 
     await waitFor(() => expect(pharmaProjectsService.searchScopedProjects).toHaveBeenCalled())
     expect(screen.queryByText(/old project \(prj-old\)/i)).not.toBeInTheDocument()
@@ -184,23 +184,41 @@ describe('MrBookCampTab — real searchable project picker', () => {
     const user = userEvent.setup()
     await renderTab()
 
-    await user.type(screen.getByPlaceholderText(/search projects by name/i), 'Cardio')
+    await user.type(screen.getByPlaceholderText(/search or browse projects/i), 'Cardio')
 
     await waitFor(() => expect(pharmaProjectsService.searchScopedProjects).toHaveBeenCalled())
     const lastCall = vi.mocked(pharmaProjectsService.searchScopedProjects).mock.calls.at(-1)?.[0]
     expect(lastCall?.limit).toBe('10')
   })
 
-  it('opening the picker with no query typed fetches nothing — an unfiltered project list is never requested just because the dropdown is open', async () => {
+  it('opening the picker with no query typed browses the MR\'s own live projects immediately — matches ProjectPicker\'s system-side behavior, not a "start typing" gate', async () => {
     await mockSession()
     const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
+    vi.mocked(pharmaProjectsService.searchScopedProjects).mockResolvedValue({
+      success: true, message: '', data: { items: [projectFixture()], count: 1 },
+    })
     const user = userEvent.setup()
     await renderTab()
 
-    await user.click(screen.getByPlaceholderText(/search projects by name/i))
+    await user.click(screen.getByPlaceholderText(/search or browse projects/i))
 
-    expect(screen.getByText(/start typing to search your division's projects/i)).toBeInTheDocument()
-    expect(pharmaProjectsService.searchScopedProjects).not.toHaveBeenCalled()
+    expect(await screen.findByText(/cardio screening drive \(prj-1\)/i)).toBeInTheDocument()
+    expect(pharmaProjectsService.searchScopedProjects).toHaveBeenCalledWith(expect.objectContaining({ name: undefined, status: 'live' }))
+  })
+
+  it('a division with zero live projects, once the browse-all fetch completes, shows the real empty-results copy, not "start typing"', async () => {
+    await mockSession()
+    const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
+    vi.mocked(pharmaProjectsService.searchScopedProjects).mockResolvedValue({
+      success: true, message: '', data: { items: [], count: 0 },
+    })
+    const user = userEvent.setup()
+    await renderTab()
+
+    await user.click(screen.getByPlaceholderText(/search or browse projects/i))
+
+    expect(await screen.findByText(/no live projects found/i)).toBeInTheDocument()
+    expect(screen.queryByText(/start typing to search/i)).not.toBeInTheDocument()
   })
 })
 

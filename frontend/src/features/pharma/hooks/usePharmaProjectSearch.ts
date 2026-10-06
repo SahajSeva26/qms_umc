@@ -28,10 +28,11 @@ function mergeById(existing: ProjectEntity[], incoming: ProjectEntity[]): Projec
   return Array.from(byId.values())
 }
 
-// Same accumulate/load-more/typeahead-limit shape as useEligibleMrs.
+// Browses all of the MR's own live projects the moment the picker opens (no query required) —
+// matches ProjectPicker/useProjectPicker's system-side behavior, which fetches as soon as its
+// scope (tenant+division) is known rather than gating on a typed query.
 export const usePharmaProjectSearch = (name: string, enabled: boolean) => {
   const debouncedName = useDebouncedValue(name, 300)
-  const hasQuery = debouncedName.trim().length > 0
   const [page, setPage] = useState(1)
   const [accumulated, setAccumulated] = useState<Accumulated>(() => EMPTY_ACCUMULATED(debouncedName))
 
@@ -55,7 +56,7 @@ export const usePharmaProjectSearch = (name: string, enabled: boolean) => {
     pharmaProjectKeys,
     (q) => pharmaProjectsService.searchScopedProjects(q),
     query,
-    { enabled: enabled && hasQuery },
+    { enabled },
   )
 
   if (data && accumulated.query === debouncedName && accumulated.consumedResponse !== data) {

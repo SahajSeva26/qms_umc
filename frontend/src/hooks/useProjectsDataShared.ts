@@ -1,4 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
+import { useGetEntity } from '@/hooks/useGetEntity'
+import { projectKeys } from '@/hooks/projectKeys'
 import { projectsService } from '@/features/projects/projects.service'
 import type { ProjectEntity } from '@/types/project.types'
 
@@ -48,3 +50,7 @@ export const useProjectsDataShared = () => {
   })
   return { projects: data ?? [], isLoading, error }
 }
+
+// Single-project read, same cache entry as features/projects/hooks/useProject — only a
+// name/import-path difference, so features/projects/ internals stay un-imported elsewhere.
+export const useProjectDetailShared = (id: string | undefined) => useGetEntity(projectKeys.detail, projectsService.getProject, id)

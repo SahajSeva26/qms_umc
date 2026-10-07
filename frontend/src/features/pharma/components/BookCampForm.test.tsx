@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { format } from 'date-fns'
+import { addDays, format } from 'date-fns'
 import type { RoleEntity, SessionResponse } from '@/types/accessManagement.types'
 import type { DoctorEntity } from '@/types/doctor.types'
 import type { ApiResponse } from '@/types/common.types'
@@ -139,7 +139,7 @@ function makeQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } })
 }
 
-const TEST_PROJECT: { id: string; name: string; campTimeSlots: CampTimeSlotValue[] } = { id: 'proj-1', name: 'Cardio Screening Drive', campTimeSlots: ['9am-1pm', '10am-2pm'] }
+const TEST_PROJECT: { id: string; name: string; campTimeSlots: CampTimeSlotValue[]; daysToBookBefore: number } = { id: 'proj-1', name: 'Cardio Screening Drive', campTimeSlots: ['9am-1pm', '10am-2pm'], daysToBookBefore: 0 }
 
 async function mockSession(roleId?: string, hasDoctorManage = false) {
   const { useSession } = await import('@/hooks/useSession')
@@ -151,14 +151,14 @@ async function mockSession(roleId?: string, hasDoctorManage = false) {
   } as unknown as ReturnType<typeof useSession>)
 }
 
-function renderForm(props: { needsMrPicker?: boolean; type?: 'screening' | 'diet'; patientExpectation?: number } = {}) {
+function renderForm(props: { needsMrPicker?: boolean; type?: 'screening' | 'diet'; patientExpectation?: number; project?: typeof TEST_PROJECT } = {}) {
   return async () => {
     const BookCampForm = (await import('@/features/pharma/components/BookCampForm')).default
     const onBooked = vi.fn()
     const onCancel = vi.fn()
     render(
       <QueryClientProvider client={makeQueryClient()}>
-        <BookCampForm needsMrPicker={props.needsMrPicker ?? false} type={props.type ?? 'screening'} project={TEST_PROJECT} patientExpectation={props.patientExpectation} onBooked={onBooked} onCancel={onCancel} />
+        <BookCampForm needsMrPicker={props.needsMrPicker ?? false} type={props.type ?? 'screening'} project={props.project ?? TEST_PROJECT} patientExpectation={props.patientExpectation} onBooked={onBooked} onCancel={onCancel} />
       </QueryClientProvider>,
     )
     return { onBooked, onCancel }
@@ -494,6 +494,62 @@ describe('BookCampForm — availability day-strip', () => {
     vi.resetAllMocks()
   })
 
+  it('a failed infinite-scroll batch shows "couldn\'t load more dates" (not the initial-load banner), and its own Retry re-fetches the next batch — driven end-to-end through the real hook, not a hand-fed prop', async () => {
+    // jsdom's global stub (test/setup.ts) is a no-op — install a controllable fake so the
+    // sentinel's real scroll-into-view can be simulated through the actual DOM ref/effect wiring.
+    const observeCallbackRef: { current: IntersectionObserverCallback | null } = { current: null }
+    const observeMock = vi.fn()
+    class FakeIntersectionObserver {
+      constructor(cb: IntersectionObserverCallback) { observeCallbackRef.current = cb }
+      observe = observeMock
+      disconnect = vi.fn()
+      unobserve = vi.fn()
+      takeRecords = vi.fn(() => [])
+      root = null
+      rootMargin = ''
+      thresholds: number[] = []
+    }
+    vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver)
+
+    await mockSession()
+    const { campsRealService } = await import('@/features/camps/campsReal.service')
+    const user = userEvent.setup()
+    await renderForm()()
+
+    await fillLocation(user)
+    await screen.findByText(String(startOfToday().getDate()))
+    await waitFor(() => expect(observeMock).toHaveBeenCalled())
+
+    // Next batch (fetchNextPage) genuinely rejects — a real network/service failure, not a prop.
+    vi.mocked(campsRealService.getBookingAvailability).mockRejectedValueOnce(new Error('network down'))
+    observeCallbackRef.current?.([{ isIntersecting: true } as IntersectionObserverEntry], null as unknown as IntersectionObserver)
+
+    const loadMoreBanner = await screen.findByText(/couldn't load more dates/i)
+    expect(loadMoreBanner).toBeInTheDocument()
+    // The initial-load banner must NOT also render — the two are mutually exclusive.
+    expect(screen.queryByText(/couldn't load availability for this range/i)).not.toBeInTheDocument()
+
+    // Retrying must call fetchNextPage (requests batch 1, starting today+10) — NOT refetch
+    // (which would re-request every already-loaded page from scratch, starting again at batch 0 /
+    // today). Asserting the requested dateFrom, not just an extra call, is what actually
+    // distinguishes the two: both would produce "one more call."
+    vi.mocked(campsRealService.getBookingAvailability).mockImplementation(async (payload) => ({
+      success: true, message: '',
+      data: { eligibleFoCount: 1, dateFrom: payload.dateFrom, dateTo: payload.dateTo, dates: {} },
+    }))
+    const callsBeforeRetry = vi.mocked(campsRealService.getBookingAvailability).mock.calls.length
+    await user.click(screen.getByRole('button', { name: /retry/i }))
+
+    await waitFor(() => expect(screen.queryByText(/couldn't load more dates/i)).not.toBeInTheDocument())
+    const callsAfterRetry = vi.mocked(campsRealService.getBookingAvailability).mock.calls
+    expect(callsAfterRetry.length).toBeGreaterThan(callsBeforeRetry)
+    const retryCallDateFroms = callsAfterRetry.slice(callsBeforeRetry).map((c) => c[0].dateFrom)
+    // refetch() would re-request batch 0 (dateFrom = today); fetchNextPage() requests batch 1
+    // (dateFrom = today+10). Only the latter may appear among the retry's actual calls.
+    expect(retryCallDateFroms).not.toContain(TODAY_KEY)
+    expect(retryCallDateFroms).toContain(format(addDays(startOfToday(), 10), 'yyyy-MM-dd'))
+  })
+
   it('the day-strip shows a project-filtered slot row once a bookable date is picked, not all 4 slots', async () => {
     await mockSession()
     const user = userEvent.setup()
@@ -508,6 +564,23 @@ describe('BookCampForm — availability day-strip', () => {
     expect(screen.getByRole('button', { name: /10 AM – 2 PM/i })).toBeInTheDocument()
     expect(screen.queryByText(/11 AM – 3 PM/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/6 PM – 10 PM/i)).not.toBeInTheDocument()
+  })
+
+  it('the first availability batch shifts to match the lead-time-shifted day-strip, and stays within the backend\'s 30-day span cap', async () => {
+    await mockSession()
+    const { campsRealService } = await import('@/features/camps/campsReal.service')
+    const user = userEvent.setup()
+    await renderForm({ project: { ...TEST_PROJECT, daysToBookBefore: 5 } })()
+
+    await fillLocation(user)
+
+    await waitFor(() => expect(campsRealService.getBookingAvailability).toHaveBeenCalled())
+    const call = vi.mocked(campsRealService.getBookingAvailability).mock.calls[0][0]
+    // One 10-day batch, not a single 30-day request — infinite scroll fetches the rest on demand.
+    const expectedFrom = format(addDays(startOfToday(), 5), 'yyyy-MM-dd')
+    const expectedTo = format(addDays(startOfToday(), 5 + 9), 'yyyy-MM-dd')
+    expect(call.dateFrom).toBe(expectedFrom)
+    expect(call.dateTo).toBe(expectedTo)
   })
 })
 
@@ -664,7 +737,7 @@ describe('BookCampForm — zero configured slots', () => {
 
     render(
       <QueryClientProvider client={makeQueryClient()}>
-        <BookCampForm needsMrPicker={false} type="screening" project={{ id: 'proj-2', name: 'Empty Project', campTimeSlots: [] }} patientExpectation={undefined} onBooked={vi.fn()} onCancel={vi.fn()} />
+        <BookCampForm needsMrPicker={false} type="screening" project={{ id: 'proj-2', name: 'Empty Project', campTimeSlots: [], daysToBookBefore: 0 }} patientExpectation={undefined} onBooked={vi.fn()} onCancel={vi.fn()} />
       </QueryClientProvider>,
     )
 

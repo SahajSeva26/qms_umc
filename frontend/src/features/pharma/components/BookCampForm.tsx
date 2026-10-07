@@ -81,7 +81,7 @@ interface BookCampFormProps {
   /** Locked context from the caller's page, never user-editable — no Camp type picker shown. */
   type: CampType | null
   /** Locked context from the caller's page — null until the caller's own project/camp-type picker has a selection. */
-  project: { id: string; name: string; campTimeSlots: CampTimeSlotValue[] } | null
+  project: { id: string; name: string; campTimeSlots: CampTimeSlotValue[]; daysToBookBefore: number } | null
   /** Owned by the caller's own "Project & camp" section — passed through untouched into the booking payload. */
   patientExpectation: number | undefined
   /** True when the caller's externally-owned patientExpectation input is invalid — blocks submit here too. */
@@ -197,7 +197,7 @@ const BookCampForm = ({ needsMrPicker, type, project, patientExpectation, patien
     }
   })()
 
-  const availabilityQuery = useDayRangeAvailability(availabilityBasePayload)
+  const availabilityQuery = useDayRangeAvailability(availabilityBasePayload, project?.daysToBookBefore)
   const availability = availabilityQuery.dates
 
   // Gated on availabilityBasePayload being non-null, or a disabled query's empty `availability`
@@ -436,6 +436,7 @@ const BookCampForm = ({ needsMrPicker, type, project, patientExpectation, patien
           <DayStripAvailability
             availability={availability}
             campTimeSlots={project.campTimeSlots}
+            daysToBookBefore={project.daysToBookBefore}
             selectedDate={watchedDate}
             selectedSlot={watchedTimeSlot}
             onDateSelect={onDateSelect}
@@ -443,6 +444,10 @@ const BookCampForm = ({ needsMrPicker, type, project, patientExpectation, patien
             isLoading={availabilityQuery.isLoading}
             error={availabilityQuery.error}
             onRetry={availabilityQuery.refetch}
+            hasNextPage={availabilityQuery.hasNextPage}
+            isFetchingNextPage={availabilityQuery.isFetchingNextPage}
+            isFetchNextPageError={availabilityQuery.isFetchNextPageError}
+            onLoadMore={availabilityQuery.fetchNextPage}
             eligibleFoCount={availabilityQuery.eligibleFoCount}
             workerLabel={type === 'diet' ? 'Dietitian' : 'FO'}
             city={location?.city}

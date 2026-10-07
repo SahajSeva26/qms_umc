@@ -327,7 +327,7 @@ Update this table at the end of every session.
 | Admin / RBAC / Audit | ✅ | ✅ (access-management) | ✅ access-management pages (real) | ⬜ | Full RBAC live; audit-log pending |
 | Appointments / Contacts | ✅ | ✅ (`appointment`,`contact`) | ✅ pages (contacts real) | ⬜ | Backend built |
 | QA Feedback | — | ✅ (`qa-feedback`) | ✅ review page (real) | ⬜ | Backend + web wired |
-| Notifications Engine | ✅ | ⬜ | ⬜ | ⬜ | Not started |
+| Notifications Engine | ✅ | 🔄 (`notification`) | ⬜ | ⬜ | Backend scaffold built + wired (model + `GET /notifications/me`); NO event triggers + NO delivery sender yet → never populated. See `backend/CLAUDE.md` |
 
 Legend: ✅ Done | 🔄 In Progress / Partial | ⬜ Not started
 

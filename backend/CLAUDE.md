@@ -18,6 +18,7 @@ src/modules/
   vendor-master/            global platform-only vendor/supplier registry
   file/                     generic file/attachment store — presigned direct-to-S3 upload flow
   otp/                      global OTP issue/verify store — SERVICE-ONLY (no routes/controller/HTTP)
+  notification/             per-user notification inbox — 🔄 scaffold (GET /me only; no triggers/sender yet)
   access-management/        tenant, role, role-type, permission-group (RBAC), employee (HR registry)
   crm/                      division, brand, lead, project, appointment, contact, doctor (tenant-scoped registry)
   operations/               camp, geoProfile (field-staff geo + camp allocation),
@@ -384,15 +385,24 @@ import { PERMISSIONS, PERMISSIONS_ARRAY } from '../../shared/env/permissions'
 
 Never return a raw Mongoose document to the client. Always strip through a mapper.
 
+**`toSearchResponse` MUST be decoupled from `toResponse`** — inline the search-row fields
+independently, do NOT call `toResponse` from inside it. This lets a module trim its search-row
+shape (lighter list payloads) later without changing `GET /:id`. All 31 existing mappers were
+decoupled this way on 2026-09-29 (commit `8b3c7dc`); follow this for every new mapper.
+
 ```typescript
 export const FooMapper = {
     toResponse: (doc: HydratedDocument<IFoo>) => ({
         id: doc._id.toString(),
         // only safe, public fields
     }),
+    // decoupled — fields inlined, NOT `data.items.map(FooMapper.toResponse)`
     toSearchResponse: (data: { count: number; items: HydratedDocument<IFoo>[] }) => ({
         count: data.count,
-        items: data.items.map(FooMapper.toResponse),
+        items: data.items.map((doc) => ({
+            id: doc._id.toString(),
+            // same safe, public fields — or a trimmed subset for list views
+        })),
     }),
 }
 ```
@@ -459,6 +469,8 @@ All modules follow the layered convention above; all are wired in `src/bin/app.t
 | — | file | `/files` | generic tenant-scoped file/attachment store — **presigned direct-to-S3** flow (no bytes through the API). `POST /files` takes JSON metadata `{tenant, entity{type,relation,id?}, tags?, files:[{fileName,fileSize,fileType}]}` → one **draft** doc per file + a presigned **PUT** `uploadUrl` each; client PUTs bytes to S3; `PUT /files/:id {entityId}` one-time entity link (cap-checked, 409 if already linked); `POST /files/activate {fileIds}` bulk draft→active; also `PATCH /files/:id/status` (state machine), `GET /files/:id`, `GET /files`. Storage **key** = `{entityType}/{entityRelation}/{fileId}.{ext}` — embeds the doc `_id` (1:1 object↔doc), no leading slash. Lifecycle `draft→active/inactive/discarded` (`FILE_TRANSITION_MAP`; discarded = terminal soft-delete, a cron reclaims S3 objects later, not inline). **Activation gate** (`assertObjectUploaded`): going active ALWAYS verifies the key embeds this doc's `_id` **and** a real S3 `HeadObject` says the object exists (else 409). `bulkActivate` checks transition + object UPFRONT (outside the txn), then caps + saves INSIDE one all-or-nothing txn. Caps = max ACTIVE per entity+relation (`ENTITY_RELATION` defines only `user→profile_picture` + `tenant→logo`, cap 1 each; other `ENTITY_TYPE`s are placeholders); read-then-write, no unique index. Tenant-scoped via `ctx.where()` (customer own-tenant, platform any). **Routes open to ANY authenticated user (no route permission guard)** — `file:manage` only gates discarded-file visibility in `search` + raw storage-coords (provider/path/identifier) in the mapper. `content` (provider/path/identifier/originalName/displayName/mimeType/extension/size) fully derived server-side. Perms: only `file:manage`. ⚠️ `FileService.get` is reused by update/changeStatus/bulkActivate on DRAFT files — do NOT add a read-visibility status filter to it (would 404 the drafts those flows act on). **Storage provider** (`shared/providers/storage/`; `IStorageProvider` = **`upload`/`getUrl`/`delete`/`headObject`**): `upload(IPresignedUploadInput)→IPresignedUpload` = presigned **PUT** URL (client uploads directly); `getUrl(id)→{url}` = presigned **GET** URL (read); `delete(id)` = real idempotent `DeleteObjectCommand`; `headObject(id)→{exists,size?,contentType?}`. Refactored 2026-09-22: dropped `getPresignedUrl`/`getPresignedUploadUrl`/`download`/`IUploadInput` — their logic folded into `getUrl`/`upload`. Cloudinary provider = stubs. Built + e2e (24/24 faked S3, 13/13 real LocalStack) on branch `feature/file-upload`; the storage-provider refactor is on branch `test`, uncommitted |
 
 | — | otp | — (service-only) | **global OTP issue/verify store — NO routes/controller/mapper/HTTP; invoked service-to-service** (e.g. screening consent). Public surface = `OtpService.request` / `resend` / `verify`; `get`/`search`/`create`/`update` are internal raw CRUD (CRUD does only the raw op; all business rules live in request/resend/verify). Model: `purpose`, `channel {type(sms/whatsapp/email), value}`, optional `entity {type,relation,id}` (partial 2dsphere-free index for lookup), `code` (6-digit, server-gen), `status` (pending/verified/expired/blocked), `expiresAt`, `attempts`, `maxAttempts` (5), `verifiedAt`. **request**: expire prior pending for the target → generate code + expiry (now + TTL, default 5 min) → raw create (atomic). **resend**: requires a prior OTP + a `RESEND_COOLDOWN_SECONDS` (60) gap, then reuses request. **verify**: find latest pending by purpose+entity → expired(400)/out-of-attempts(429/block)/wrong-code(400,++attempts,block on last)/match(verified). Purposes centralized in `OTP_PURPOSES` keyed by `OTP_ENTITY_TYPE` (file-module shape; each entry `{purpose, relation}`). NOT wired into `app.ts`/swagger/permissions by design. ⚠️ no delivery sender yet (channel recorded, nothing sends). |
+
+| — | notification | `/notifications` | **🔄 IN PROGRESS — scaffold only, not functional end-to-end.** Full layered module, wired (`app.ts` + swagger). Model: `recipient` (User, req), optional `tenant`, embedded `entity {id,type,event}`, `type` (enum — only `camp.create`/`camp.approved` so far), `channel` (email/in-app/whatsapp/sms), `subject`/`body`, `status` (pending/sent/failed), `attempts`/`error`/`sentAt`, `read`/`readAt`. Service `get`/`search`/`create`/`update` (`create` = bare save; intended to be called internally by the events that raise a notification). **Only ONE route: `GET /notifications/me`** — auth-only (NO permission guard), returns the caller's own notifications (recipient pinned from `ctx`, never accepted from client). No create/update route exposed; no mark-as-read route (service `update` toggles `read` but isn't wired). **⚠️ Two gaps make it non-functional:** (1) **nothing triggers it** — no service anywhere calls `NotificationService.create` (so it's never populated despite the type constants), (2) **no delivery sender** — `status`/`channel`/`attempts`/`sentAt`/`error` exist but nothing sends (same as otp). No `*_PERMISSIONS` registered. **Mapper convention:** follows the convention (both `toResponse`/`toSearchResponse`, strips internals — `recipient`/`tenant`/`attempts`/`error` omitted), with minor deviations — typed `any` instead of `HydratedDocument<INotification>`, threads an unused `ctx` param, and `toSearchResponse` loops calling `toResponse` (matches the documented convention but NOT the 2026-09-29 decoupling the other 31 mappers got). |
 
 Cross-cutting: `AuthMiddleware` + `AuthorizeMiddleware` (AND/OR permission guards), system-user
 seeding + per-tenant default-role-type provisioning on boot, `PERMISSIONS`/`PERMISSIONS_ARRAY`

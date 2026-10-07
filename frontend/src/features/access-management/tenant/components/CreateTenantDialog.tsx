@@ -172,7 +172,7 @@ const CreateTenantDialog = () => {
       <Button
         onClick={() => setOpen(true)}
         className="text-white shrink-0"
-        style={{ background: 'var(--cm-accent, #8b5cf6)' }}
+        style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
       >
         <FiPlus size={14} /> New Client
       </Button>

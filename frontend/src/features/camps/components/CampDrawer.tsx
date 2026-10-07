@@ -3,11 +3,12 @@ import type { ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { FiEdit2, FiUser, FiTruck, FiCpu, FiFileText } from 'react-icons/fi'
 import { useCampReal } from '@/features/camps/hooks/useCampReal'
+import { useCampsReal } from '@/features/camps/hooks/useCampsReal'
 import { useCampRefNames } from '@/features/camps/hooks/useCampRefNames'
 import { campRefId, canRunScreening } from '@/features/camps/campsReal.utils'
 import { usePermission } from '@/hooks/usePermission'
 import SideDrawer from '@/components/ui/SideDrawer'
-import CampStatusPillReal from '@/features/camps/components/CampStatusPillReal'
+import CampStatusPillReal from '@/components/widgets/camp/CampStatusPillReal'
 import CampStageActionRow from '@/features/camps/components/CampStageActionRow'
 import CampDrawerKpiRow from '@/features/camps/components/CampDrawerKpiRow'
 import CampStageHistoryList from '@/features/camps/components/CampStageHistoryList'
@@ -15,6 +16,7 @@ import { Button } from '@/components/ui/button'
 import { useAllocateFo } from '@/features/camps/hooks/useAllocateFo'
 import type { CampType } from '@/types/campReal.types'
 import { CAMP_TYPE_LABEL } from '@/types/campReal.types'
+import { specializationLabel } from '@/types/doctor.types'
 import { CAMP_TIME_SLOT_LABEL } from '@/types/campTimeSlot.constants'
 
 const TABS = ['Overview', 'Stage history'] as const
@@ -52,8 +54,6 @@ interface CampDrawerContentProps {
   onClose: () => void
 }
 
-// Prototype's drawer sections (camps.js:535-606) — matches the .form-section-h pattern
-// already used elsewhere (e.g. NewAppointmentDialog's SectionHeader).
 const SectionHeader = ({ icon: Icon, children }: { icon: typeof FiUser; children: ReactNode }) => (
   <div className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-[.06em] mt-4 mb-2" style={{ color: 'var(--qms-text-muted)' }}>
     <Icon size={13} />
@@ -75,6 +75,12 @@ const CampDrawerContent = ({ campId, onClose }: CampDrawerContentProps) => {
   const camp = data?.data ?? null
   const allocateFo = useAllocateFo(campId)
 
+  // GET /camps/:id has no `stats` — only search does, and there's no exact-id filter (only a `code`
+  // regex), so this searches by code with report=true and matches the exact id within the results.
+  const statsQuery = useCampsReal({ code: camp?.code, report: 'true', limit: '50' }, !!camp?.code)
+  const campStats = statsQuery.data?.data?.items?.find((item) => item.id === campId)?.stats
+  const isStatsNotFound = !statsQuery.isLoading && !statsQuery.error && !!camp?.code && !campStats
+
   const { doctorName, divisionName, projectName, roleName } = useCampRefNames({
     doctors: true,
     divisions: hasAnyPermission(DIVISION_READ_PERMISSIONS),
@@ -83,7 +89,10 @@ const CampDrawerContent = ({ campId, onClose }: CampDrawerContentProps) => {
   })
 
   const doctor = camp?.doctor && typeof camp.doctor !== 'string' ? camp.doctor : null
+  const isDiet = camp?.type === 'diet'
   const fo = camp?.fo && typeof camp.fo !== 'string' ? camp.fo : null
+  const dietitian = camp?.dietitian && typeof camp.dietitian !== 'string' ? camp.dietitian : null
+  const worker = isDiet ? dietitian : fo
 
   return (
     <SideDrawer open title={camp?.code ?? 'Camp'} onClose={onClose} widthClassName="max-w-lg">
@@ -101,8 +110,6 @@ const CampDrawerContent = ({ campId, onClose }: CampDrawerContentProps) => {
 
       {camp && !isLoading && (
         <>
-          {/* Prototype's icon-tile header (camps.js:536-552). Teleconsult toggle chip skipped —
-              no teleconsult concept exists on our real Camp model (see md-files/ui-revisions.md). */}
           <div className="flex items-start gap-3 mb-4">
             <div
               className="w-14 h-14 rounded-2xl flex items-center justify-center text-white shrink-0"
@@ -174,32 +181,38 @@ const CampDrawerContent = ({ campId, onClose }: CampDrawerContentProps) => {
 
           {tab === 'Overview' && (
             <div>
-              <CampDrawerKpiRow />
+              <CampDrawerKpiRow
+                stats={campStats}
+                notFound={isStatsNotFound}
+                error={statsQuery.error}
+                onRetry={() => void statsQuery.refetch()}
+                patientExpectation={camp.patientExpectation}
+              />
 
               <SectionHeader icon={FiUser}>Doctor</SectionHeader>
               <div className="rounded-[14px] border p-3 space-y-1.5" style={{ borderColor: 'var(--qms-border)' }}>
                 <OverviewRow label="Name" value={doctorName(camp.doctor)} />
                 <OverviewRow label="Pharma code" value={doctor?.pharmaCode || '—'} />
-                <OverviewRow label="Specialization" value={doctor?.specialization || '—'} />
+                <OverviewRow label="Specialization" value={specializationLabel(doctor?.specialization)} />
               </div>
 
-              <SectionHeader icon={FiTruck}>Field Officer</SectionHeader>
+              <SectionHeader icon={FiTruck}>{isDiet ? 'Dietitian' : 'Field Officer'}</SectionHeader>
               <div className="rounded-[14px] border p-3" style={{ borderColor: 'var(--qms-border)' }}>
-                {fo ? (
-                  <OverviewRow label="FO" value={roleName(camp.fo)} />
+                {worker ? (
+                  <OverviewRow label={isDiet ? 'Dietitian' : 'FO'} value={roleName(isDiet ? camp.dietitian : camp.fo)} />
                 ) : (
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[12px] font-semibold text-danger">Unassigned</span>
                     {canUpdate && (
                       <Button variant="outline" size="sm" onClick={() => allocateFo.mutate()} disabled={allocateFo.isPending}>
-                        {allocateFo.isPending ? 'Allocating…' : 'Assign FO'}
+                        {allocateFo.isPending ? 'Allocating…' : isDiet ? 'Assign dietitian' : 'Assign FO'}
                       </Button>
                     )}
                   </div>
                 )}
                 {allocateFo.isError && (
                   <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger mt-2">
-                    {(allocateFo.error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Could not allocate an FO.'}
+                    {(allocateFo.error as { response?: { data?: { message?: string } } })?.response?.data?.message || `Could not allocate a${isDiet ? ' dietitian' : 'n FO'}.`}
                   </div>
                 )}
                 <OverviewRow label="MR" value={camp.mr ? roleName(camp.mr) : '—'} />
@@ -231,8 +244,6 @@ const CampDrawerContent = ({ campId, onClose }: CampDrawerContentProps) => {
                 <OverviewRow label="Notes" value={camp.notes || '—'} />
               </div>
 
-              {/* Prototype's action row is last (camps.js:595-605) — Confirm/Start/Close/Cancel
-                  plus Run screening, all below every read-only section, not above them. */}
               <div className="mt-4">
                 <CampStageActionRow
                   camp={camp}

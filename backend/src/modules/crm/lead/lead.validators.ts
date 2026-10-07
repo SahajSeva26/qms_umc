@@ -71,12 +71,17 @@ export type IMoveStagePayload = z.infer<typeof MoveStagePayloadSchema>;
 export const SearchLeadQuerySchema = z
     .object({
         title: z.string().optional().openapi({ example: 'Cardio' }),
+        code: z.string().optional().openapi({ example: 'ld-000123' }),
+        // regex-matched against the lead's focusTherapy list (matches if any therapy in the list matches)
+        focusTherapy: z.string().optional().openapi({ example: 'cardiology' }),
         status: z.enum(Object.values(LEAD_STATUSES)).optional().openapi({ example: 'qualified' }),
         projectType: z.enum(Object.values(LEAD_PROJECT_TYPES)).optional().openapi({ example: 'screening' }),
         division: objectId('Division').optional(),
         salesPerson: objectId('Sales person').optional(),
         fyFrom: z.coerce.date().optional().openapi({ example: '2026-04-01' }),
         fyTo: z.coerce.date().optional().openapi({ example: '2027-03-31' }),
+        // when 'true', each row also carries a `stats.followUps` count (appointments linked to the lead)
+        report: z.string().optional().openapi({ example: 'true' }),
         page: z.string().optional().openapi({ example: '1' }),
         limit: z.string().optional().openapi({ example: '10' }),
     })

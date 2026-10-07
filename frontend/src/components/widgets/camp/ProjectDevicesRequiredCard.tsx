@@ -1,0 +1,65 @@
+import { FiWind } from 'react-icons/fi'
+import { useProjectRequiredDevices } from '@/hooks/useProjectRequiredDevices'
+import type { ProjectPopulatedTest } from '@/types/project.types'
+import { CAMP_TYPE_LABEL, type CampType } from '@/types/campReal.types'
+
+interface ProjectDevicesRequiredCardProps {
+  testIds: (ProjectPopulatedTest | string)[]
+  campType?: CampType | ''
+}
+
+// Matches the prototype's camp-package card styling (dashed/tinted, typeColor()) without a
+// package concept — tinted by the camp type instead.
+const TYPE_COLOR: Record<CampType, string> = {
+  screening: '#3b6dff',
+  diet: '#10b981',
+  lab: '#a855f7',
+}
+
+const ProjectDevicesRequiredCard = ({ testIds, campType }: ProjectDevicesRequiredCardProps) => {
+  const { devices, isLoading, isError } = useProjectRequiredDevices(testIds, testIds.length > 0)
+
+  if (testIds.length === 0 || isLoading || isError || devices.length === 0) {
+    return null
+  }
+
+  const color = (campType && TYPE_COLOR[campType]) || 'var(--qms-brand)'
+
+  return (
+    <div
+      className="rounded-[10px] px-3 py-2.5 mt-2"
+      style={{
+        border: `1px dashed color-mix(in srgb, ${color} 40%, transparent)`,
+        background: `color-mix(in srgb, ${color} 7%, transparent)`,
+      }}
+    >
+      <div className="flex items-center gap-2 flex-wrap">
+        <FiWind size={15} style={{ color }} />
+        {campType && (
+          <span
+            className="text-[12px] font-bold px-2.5 py-1 rounded-full"
+            style={{ background: `color-mix(in srgb, ${color} 14%, transparent)`, color }}
+          >
+            {CAMP_TYPE_LABEL[campType]}
+          </span>
+        )}
+      </div>
+      <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+        <span className="text-[11px] font-bold" style={{ color: 'var(--qms-text-muted)' }}>
+          Devices required:
+        </span>
+        {devices.map((d) => (
+          <span
+            key={d.id}
+            className="text-[12px] font-bold px-2.5 py-1 rounded-full"
+            style={{ background: `color-mix(in srgb, ${color} 12%, transparent)`, color: 'var(--qms-text-soft)' }}
+          >
+            {d.name ?? d.code ?? d.id}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+export default ProjectDevicesRequiredCard

@@ -116,7 +116,10 @@ const InventoryRequestsPanel = () => {
         </div>
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-2 mb-3 sm:justify-end">
+          <div
+            className="flex flex-wrap items-center gap-2 mb-3 sm:justify-end rounded-xl border p-2.5"
+            style={{ background: 'var(--qms-surface-card)', borderColor: 'var(--qms-border)' }}
+          >
             <Select value={typeFilter} onValueChange={(v) => { setTypeFilter(v as InventoryRequestType | 'ALL'); resetToFirstPage() }}>
               <SelectTrigger className="w-36 text-[13px]">
                 <SelectValue>{() => (typeFilter === 'ALL' ? 'All types' : INVENTORY_REQUEST_TYPE_LABEL[typeFilter])}</SelectValue>
@@ -149,7 +152,7 @@ const InventoryRequestsPanel = () => {
                       {['Type', 'Status', 'Requested by', 'Lines', 'Created', 'Actions'].map((h) => (
                         <th
                           key={h}
-                          className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5"
+                          className={`font-bold text-[11px] uppercase tracking-wider px-4 py-2 ${h === 'Lines' ? 'text-right' : 'text-left'}`}
                           style={{ color: 'var(--qms-text-muted)' }}
                         >
                           {h}
@@ -171,18 +174,18 @@ const InventoryRequestsPanel = () => {
                           className={editable ? 'cursor-pointer transition-colors hover:bg-(--qms-surface-hover)' : ''}
                           style={{ borderBottom: '1px solid var(--qms-border)' }}
                         >
-                          <td className="px-4 py-2.5" style={{ color: 'var(--qms-text)' }}>{INVENTORY_REQUEST_TYPE_LABEL[request.type]}</td>
-                          <td className="px-4 py-2.5">
+                          <td className="px-4 py-2" style={{ color: 'var(--qms-text)' }}>{INVENTORY_REQUEST_TYPE_LABEL[request.type]}</td>
+                          <td className="px-4 py-2">
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: sc.bg, color: sc.fg }}>
                               {INVENTORY_REQUEST_STATUS_LABEL[request.status].toUpperCase()}
                             </span>
                           </td>
-                          <td className="px-4 py-2.5 max-w-xs truncate" style={{ color: 'var(--qms-text-muted)' }} title={request.requestedBy.name}>
+                          <td className="px-4 py-2 max-w-xs truncate" style={{ color: 'var(--qms-text-muted)' }} title={request.requestedBy.name}>
                             {request.requestedBy.name ?? request.requestedBy.id}
                           </td>
-                          <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{request.lineItems.length}</td>
-                          <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>{request.createdAt.slice(0, 10)}</td>
-                          <td className="px-4 py-2.5">
+                          <td className="px-4 py-2 text-right font-mono" style={{ color: 'var(--qms-text-muted)' }}>{request.lineItems.length}</td>
+                          <td className="px-4 py-2" style={{ color: 'var(--qms-text-muted)' }}>{request.createdAt.slice(0, 10)}</td>
+                          <td className="px-4 py-2">
                             <div className="flex flex-wrap items-center gap-1" onClick={(e) => e.stopPropagation()}>
                               {canUpdate && actions.map((to) => (
                                 <button

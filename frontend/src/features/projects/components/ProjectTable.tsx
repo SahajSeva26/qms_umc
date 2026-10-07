@@ -1,5 +1,5 @@
 import type { ProjectEntity } from '@/types/project.types'
-import { PROJECT_THERAPY_LABEL } from '@/types/project.types'
+import { PROJECT_THERAPY_LABEL, allowedCampTypesForProjectTypes } from '@/types/project.types'
 import CopyButton from '@/components/ui/CopyButton'
 import { formatINR } from '@/utils/formatters'
 import { computeGstBreakdown, projectDivisionName, projectSalesRepName, projectTenantName } from '@/features/projects/projects.utils'
@@ -18,14 +18,18 @@ interface ProjectTableProps {
   // Required, not optional, so a future caller can't silently render write
   // controls by omitting it. Mirrors the backend's project:manage/tenant:manage guard.
   canWrite: boolean
+  // Separate from canWrite — void-camp actions are gated on camp:manage/tenant:manage, not
+  // project:manage (see projects.utils.ts's VOID_CAMP_WRITE_PERMISSIONS).
+  canManageVoidCamps: boolean
   onOpenDetail: (id: string) => void
   onEdit: (id: string) => void
   onChangeStatus: (id: string) => void
+  onVoidCamps: (id: string) => void
 }
 
 // Prototype's .tbl (styles.css) — 13px base, 10px/12px cell padding, 11px/700/.06em uppercase
 // header, no header background fill (just a border), row hover → --qms-surface-strong.
-const ProjectTable = ({ projects, canWrite, onOpenDetail, onEdit, onChangeStatus }: ProjectTableProps) => (
+const ProjectTable = ({ projects, canWrite, canManageVoidCamps, onOpenDetail, onEdit, onChangeStatus, onVoidCamps }: ProjectTableProps) => (
   <div className="overflow-x-auto rounded-xl border backdrop-blur-xl" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface)' }}>
     <table className="w-full text-[13px]">
       <thead>
@@ -44,6 +48,9 @@ const ProjectTable = ({ projects, canWrite, onOpenDetail, onEdit, onChangeStatus
       <tbody>
         {projects.map((project) => {
           const { valueAfterGST } = computeGstBreakdown(project.valueBeforeGST, project.gst)
+          // A teleconsultation-only project hosts no physical camp type at all — its void-camp
+          // form could never submit (no Type to pick), so hide the action entirely for it.
+          const projectSupportsVoidCamps = allowedCampTypesForProjectTypes(project.type).length > 0
           return (
             <tr
               key={project.id}
@@ -74,7 +81,9 @@ const ProjectTable = ({ projects, canWrite, onOpenDetail, onEdit, onChangeStatus
                 <span className="text-[10px] font-bold italic" style={{ color: 'var(--qms-brand)' }}>Upcoming</span>
               </td>
               <td className="px-3 py-2.5 align-top text-center whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>
-                {project.totalCamps}
+                {project.stats
+                  ? <>{project.stats.executedCamps}<span style={{ color: 'var(--qms-text-muted)' }}>/{project.totalCamps}</span></>
+                  : project.totalCamps}
               </td>
               <td className="px-3 py-2.5 align-top text-center font-bold whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>
                 {formatINR(valueAfterGST)}
@@ -88,9 +97,11 @@ const ProjectTable = ({ projects, canWrite, onOpenDetail, onEdit, onChangeStatus
               <td className="px-1 py-2.5 align-top whitespace-nowrap">
                 <ProjectRowMenu
                   canWrite={canWrite}
+                  canManageVoidCamps={canManageVoidCamps && projectSupportsVoidCamps}
                   onViewDetail={() => onOpenDetail(project.id)}
                   onEdit={() => onEdit(project.id)}
                   onChangeStatus={() => onChangeStatus(project.id)}
+                  onVoidCamps={() => onVoidCamps(project.id)}
                 />
               </td>
             </tr>

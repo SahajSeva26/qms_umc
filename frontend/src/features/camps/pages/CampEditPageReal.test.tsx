@@ -13,8 +13,7 @@ vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
     onResolutionStateChange?: (status: 'idle' | 'loading' | 'error') => void
   }) => (
     <>
-      {/* Simulates the real widget's "pin moved, reverse-geocode still resolving"
-          window — the gap between a drag/click and onChange actually firing. */}
+      {/* Simulates the gap between a drag/click and onChange firing (reverse-geocode resolving). */}
       <button type="button" onClick={() => onResolutionStateChange?.('loading')}>
         Simulate location resolving
       </button>
@@ -180,7 +179,6 @@ describe('CampEditPageReal — MR field', () => {
     await screen.findByText(/edit camp/i)
     expect(await screen.findByText(/original mr/i)).toBeInTheDocument()
 
-    // Clicking the chip itself clears the selection, same as the explicit X button.
     await user.click(screen.getByText(/original mr/i))
 
     expect(screen.queryByText(/original mr/i)).not.toBeInTheDocument()
@@ -282,29 +280,23 @@ describe('CampEditPageReal — snapshot-vs-final dirty gating', () => {
     expect(payload).not.toHaveProperty('devices')
   })
 
-  it('picking a device then clearing it back to the original empty set omits devices, but a genuine change to Type is still included', async () => {
+  it('picking a device then clearing it back to the original empty set omits devices from the payload', async () => {
     await mockSessionAndPermission()
     const { campsRealService } = await import('@/features/camps/campsReal.service')
 
     const user = userEvent.setup()
-    // camp starts with devices: [] — add then remove nets back to the original set.
     await renderEditPage(campFixture({ type: 'screening' }))
     await screen.findByText(/edit camp/i)
 
     await user.click(screen.getByRole('button', { name: /pick a device/i }))
     await user.click(screen.getByRole('button', { name: /clear devices/i }))
 
-    const typeLabel = screen.getByText(/^Type$/i)
-    const typeTrigger = typeLabel.parentElement!.querySelector('[role="combobox"]')!
-    await user.click(typeTrigger)
-    await user.click(await screen.findByRole('option', { name: /^Diet$/i }))
-
     await user.click(screen.getByRole('button', { name: /save changes/i }))
 
     await waitFor(() => expect(campsRealService.updateCamp).toHaveBeenCalledTimes(1))
     const [, payload] = vi.mocked(campsRealService.updateCamp).mock.calls[0]
     expect(payload).not.toHaveProperty('devices')
-    expect(payload).toHaveProperty('type', 'diet')
+    expect(payload).not.toHaveProperty('type')
     expect(payload).not.toHaveProperty('billingType')
     expect(payload).not.toHaveProperty('patientExpectation')
   })
@@ -329,7 +321,7 @@ describe('CampEditPageReal — snapshot-vs-final dirty gating', () => {
     expect(payload).not.toHaveProperty('patientExpectation')
   })
 
-  it('changing Type then reverting it back to the original value omits type from the payload', async () => {
+  it('Type is locked in edit mode — the backend update schema has no type field at all, so it must never be sent', async () => {
     await mockSessionAndPermission()
     const { campsRealService } = await import('@/features/camps/campsReal.service')
 
@@ -339,12 +331,8 @@ describe('CampEditPageReal — snapshot-vs-final dirty gating', () => {
 
     const typeLabel = screen.getByText(/^Type$/i)
     const typeTrigger = typeLabel.parentElement!.querySelector('[role="combobox"]')!
-
-    await user.click(typeTrigger)
-    await user.click(await screen.findByRole('option', { name: /^Diet$/i }))
-
-    await user.click(typeTrigger)
-    await user.click(await screen.findByRole('option', { name: /^Screening$/i }))
+    expect(typeTrigger).toBeDisabled()
+    expect(screen.getByText(/type can't be changed after a camp is created/i)).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /save changes/i }))
 
@@ -354,5 +342,25 @@ describe('CampEditPageReal — snapshot-vs-final dirty gating', () => {
     expect(payload).not.toHaveProperty('billingType')
     expect(payload).not.toHaveProperty('patientExpectation')
     expect(payload).not.toHaveProperty('devices')
+  })
+
+  it('a legacy diet camp (type=diet, still carrying a historic camp.fo from before dietitian support) sends only dietitian, never fo', async () => {
+    await mockSessionAndPermission()
+    const { campsRealService } = await import('@/features/camps/campsReal.service')
+
+    const user = userEvent.setup()
+    await renderEditPage(campFixture({
+      type: 'diet',
+      fo: { _id: 'fo-legacy', code: 'fo-001', name: 'Legacy FO', status: 'active' } as CampPopulatedRole,
+      dietitian: null,
+    }))
+    await screen.findByText(/edit camp/i)
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => expect(campsRealService.updateCamp).toHaveBeenCalledTimes(1))
+    const [, payload] = vi.mocked(campsRealService.updateCamp).mock.calls[0]
+    expect(payload).not.toHaveProperty('fo')
+    expect(payload).toHaveProperty('dietitian', undefined)
   })
 })

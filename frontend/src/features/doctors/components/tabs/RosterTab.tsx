@@ -2,7 +2,7 @@ import type { DoctorEntity } from '@/types/doctor.types'
 import type { DoctorsFilterState } from '@/features/doctors/hooks/useDoctorsFilters'
 import DoctorFilterBar from '@/features/doctors/components/DoctorFilterBar'
 import StatusPill from '@/features/doctors/components/StatusPill'
-import { initials } from '@/features/doctors/doctors.ui'
+import { initials, SPECIALIZATION_LABEL } from '@/features/doctors/doctors.ui'
 
 interface RosterTabProps {
   doctors: DoctorEntity[]
@@ -26,27 +26,24 @@ const RosterTab = ({ doctors, filters, setFilter, reset, onOpenDoctor, geography
       geographySeed={geographySeed}
     />
 
-    <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
+    <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
       {doctors.map((d) => (
-        <div
-          key={d.id}
-          onClick={() => onOpenDoctor(d.id)}
-          className="rounded-2xl border p-4 cursor-pointer transition-all hover:-translate-y-0.5"
-          style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}
-        >
-          <div className="flex items-start gap-3">
-            <div
-              className="w-11 h-11 rounded-xl flex items-center justify-center text-white font-bold shrink-0"
-              style={{ background: 'linear-gradient(135deg,#3b6dff,#8b5cf6)' }}
-            >
-              {initials(d.name)}
-            </div>
+        <div key={d.id} onClick={() => onOpenDoctor(d.id)} className="doc-card">
+          <div className="h">
+            <div className="av">{initials(d.name)}</div>
             <div className="min-w-0 flex-1">
-              <div className="text-[13px] font-bold truncate" style={{ color: 'var(--qms-text)' }}>{d.name}</div>
-              <div className="text-[11px] truncate" style={{ color: 'var(--qms-text-muted)' }}>{d.specialization.toUpperCase()}</div>
-              <div className="text-[10.5px] truncate" style={{ color: 'var(--qms-text-soft)' }}>{d.pharmaCode} · {d.location ? `${d.location.city}, ${d.location.state}` : '—'}</div>
+              <div className="nm">{d.name}</div>
+              <div className="sp">{d.specialization ? SPECIALIZATION_LABEL[d.specialization] : '—'}</div>
+              <div className="ct">{d.pharmaCode} · {d.location ? `${d.location.city}, ${d.location.state}` : '—'}</div>
             </div>
             <StatusPill status={d.status} />
+          </div>
+          {/* Camps is a real Camp.doctor filter, no per-doctor aggregate exists yet; Patients/Rx/★ have no backend field at all — see md-files/ui-revisions.md. */}
+          <div className="stats">
+            <div className="stat"><b>—</b><div className="l">Camps</div></div>
+            <div className="stat"><b>—</b><div className="l">Patients</div></div>
+            <div className="stat"><b>—</b><div className="l">Rx</div></div>
+            <div className="stat"><b>—</b><div className="l">★</div></div>
           </div>
         </div>
       ))}

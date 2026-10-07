@@ -79,6 +79,11 @@ const ENV = {
             S3Bucket: process.env.AWS_S3_BUCKET || '',
             S3Endpoint: process.env.AWS_S3_ENDPOINT || '',
         },
+
+        // Google Maps — geocoding / places. Key is a secret; no fallback.
+        GoogleMaps: {
+            ApiKey: process.env.GOOGLE_MAPS_API_KEY || '',
+        },
     },
 
     RateLimit: {

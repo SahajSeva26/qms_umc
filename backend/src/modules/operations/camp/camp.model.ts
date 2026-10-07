@@ -115,7 +115,8 @@ const campSchema = new mongoose.Schema(
         mr: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Role',
-            required:true
+            // optional at the model level — a void camp (recorded internally) may have no MR. The
+            // normal create/book validators still REQUIRE mr, so ordinary camps always carry one.
         },
         asm: {
             type: mongoose.Schema.Types.ObjectId,
@@ -152,7 +153,13 @@ const campSchema = new mongoose.Schema(
         },
         // fo is NOT set at creation — a camp is born `requested` with no field officer.
         // It is filled by the allocate step (nearest-FO), which in turn gates confirmation.
+        // Screening/lab camps are staffed here; a diet camp is staffed via `dietitian` instead.
         fo: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Role',
+        },
+        // diet-camp counterpart to `fo` — a camp uses one of the two, decided by its `type`.
+        dietitian: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Role',
         },
@@ -172,6 +179,11 @@ const campSchema = new mongoose.Schema(
         conscentPath: {
             type: String,
             trim: true,
+        },
+        // free-form metadata bag (Mixed — no fixed structure). Optional at the model level; the
+        // void-camp route's validator requires `meta.mailUrl` (a void camp's execution basis is a mail).
+        meta: {
+            type: mongoose.Schema.Types.Mixed,
         },
 
         //status handling

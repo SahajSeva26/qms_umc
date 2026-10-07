@@ -31,7 +31,31 @@ export const EmployeeMapper = {
             items: [] as any[],
         };
         for (const employee of data?.items || []) {
-            result.items.push(EmployeeMapper.toResponse(employee));
+            // NOTE: independent from toResponse on purpose — mirrors it field-for-field for now (incl. same permission gating) so nothing breaks; search rows can be trimmed later without affecting GET /:id.
+            const item: any = {
+                id: employee._id,
+                tenant: employee.tenant,
+                user: employee.user,
+                email: employee.email,
+                phone: employee.phone,
+                type: employee.type,
+                doj: employee.doj,
+                dol: employee.dol,
+                reason: employee.reason,
+                profile: employee.profile,
+                salary: employee.salary,
+                daRule: employee.daRule,
+                aadharNumber: employee.aadharNumber,
+                panNumber: employee.panNumber,
+                bankDetails: employee.bankDetails,
+                location: employee.location,
+                supervisor: employee.supervisor,
+                status: employee.status,
+                meta: employee.meta,
+                createdAt: employee.createdAt,
+                updatedAt: employee.updatedAt,
+            };
+            result.items.push(item);
         }
         return result;
     },

@@ -130,6 +130,12 @@ const appointmentSchema = new mongoose.Schema(
             type: String,
             default: '',
         },
+        location: {
+            // free-text place for offline/call meetings (e.g. "HQ Andheri", "Café"),
+            // independent of mode/destinationLink
+            type: String,
+            default: '',
+        },
         duration: {
             startTime: {
                 type: Date,

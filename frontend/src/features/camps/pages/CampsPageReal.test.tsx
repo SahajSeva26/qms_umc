@@ -187,6 +187,56 @@ describe('CampsPageReal — KPI strip backed by GET /camps/report', () => {
   })
 })
 
+describe('CampsPageReal — type-breakdown chip row unavailable-while-filtered gating', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    mockCampsRealList()
+    mockRefNames()
+  })
+
+  it('hides the chip row behind an explicit message when the Type filter narrows the table', async () => {
+    mockPermission(true)
+    vi.mocked(useCampReport).mockReturnValue({
+      data: reportFixture(), isLoading: false, isError: false, refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useCampReport>)
+
+    const { default: userEvent } = await import('@testing-library/user-event')
+    const user = userEvent.setup()
+    await renderPage()
+
+    // Filter bar's comboboxes in render order: Status, Type, Billing. Status 'requested' is a
+    // CARD_VIEW_STATUSES entry — the chip row only renders there.
+    const [statusCombo, typeCombo] = screen.getAllByRole('combobox')
+    await user.click(statusCombo)
+    await user.click(await screen.findByRole('option', { name: 'Requested' }))
+
+    await user.click(typeCombo)
+    await user.click(await screen.findByRole('option', { name: 'Screening' }))
+
+    expect(await screen.findByText(/type breakdown isn't available while filters are active/i)).toBeInTheDocument()
+  })
+
+  it('hides the chip row behind an explicit message when the Billing filter narrows the table', async () => {
+    mockPermission(true)
+    vi.mocked(useCampReport).mockReturnValue({
+      data: reportFixture(), isLoading: false, isError: false, refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useCampReport>)
+
+    const { default: userEvent } = await import('@testing-library/user-event')
+    const user = userEvent.setup()
+    await renderPage()
+
+    const [statusCombo, , billingCombo] = screen.getAllByRole('combobox')
+    await user.click(statusCombo)
+    await user.click(await screen.findByRole('option', { name: 'Requested' }))
+
+    await user.click(billingCombo)
+    await user.click(await screen.findByRole('option', { name: 'Billable' }))
+
+    expect(await screen.findByText(/type breakdown isn't available while filters are active/i)).toBeInTheDocument()
+  })
+})
+
 describe('CampsPageReal — drawer URL/history behavior', () => {
   beforeEach(() => {
     vi.resetAllMocks()

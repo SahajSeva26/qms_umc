@@ -21,10 +21,17 @@ import type { CreateRolePayload } from '@/types/accessManagement.types'
 import { getApiErrorMessage } from '@/utils/apiError'
 
 type Mode = 'new' | 'existing'
+type WorkerKind = 'field-officer' | 'dietitian'
+
+const WORKER_KIND_LABEL: Record<WorkerKind, string> = {
+  'field-officer': 'Field officer',
+  dietitian: 'Dietitian',
+}
 
 interface CreateEmployeeModalProps {
   tenantId: string
-  foTypeId: string
+  /** RoleType id for each onboardable worker kind — undefined kinds are not offered. */
+  roleTypeIds: Partial<Record<WorkerKind, string>>
   canOnboardNewPerson: boolean
   canLinkExistingAccount: boolean
   /** Opens straight into Mode A, skipping the mode toggle — used by the `?onboard=new` handoff. */
@@ -40,7 +47,7 @@ const USER_STEP_FIELDS: (keyof CreateRoleFormValues)[] = ['userFirstName', 'user
 
 const CreateEmployeeModal = ({
   tenantId,
-  foTypeId,
+  roleTypeIds,
   canOnboardNewPerson,
   canLinkExistingAccount,
   autoOpenNewPerson,
@@ -50,12 +57,14 @@ const CreateEmployeeModal = ({
   const [open, setOpen] = useState(false)
   const bothModesAvailable = canOnboardNewPerson && canLinkExistingAccount
   const [mode, setMode] = useState<Mode>(canOnboardNewPerson ? 'new' : 'existing')
+  // Resolved dynamically, never pinned to field-officer — defaults to whichever kind has an id available.
+  const [workerKind, setWorkerKind] = useState<WorkerKind>(roleTypeIds['field-officer'] ? 'field-officer' : 'dietitian')
+  const workerTypeId = roleTypeIds[workerKind]
+  const availableWorkerKinds = (Object.keys(roleTypeIds) as WorkerKind[]).filter((k) => roleTypeIds[k])
   const [step, setStep] = useState(0)
   const [stepAttempted, setStepAttempted] = useState([false, false, false])
   const [picked, setPicked] = useState<PickedFieldOfficer | null>(null)
-  // Synchronous guard against a rapid double-submit firing two creates before isBusy's React state
-  // re-renders onto the button — mirrors EditEmployeeEditor.tsx's submittingRef pattern. isBusy is
-  // still kept as the render-time disabled/label source, but this ref is the actual gate.
+  // Guards a rapid double-submit before isBusy's React state re-renders onto the button; mirrors EditEmployeeEditor.tsx.
   const submittingRef = useRef(false)
 
   useEffect(() => {
@@ -71,10 +80,10 @@ const CreateEmployeeModal = ({
   const roleForm = useForm<CreateRoleFormValues>({
     resolver: roleResolver,
     mode: 'onChange',
-    defaultValues: { ...EMPTY_CREATE_FORM_VALUES, tenant: tenantId, roleType: foTypeId },
+    defaultValues: { ...EMPTY_CREATE_FORM_VALUES, tenant: tenantId, roleType: workerTypeId },
   })
 
-  const { resolver: employeeResolver, parsePayload: parseEmployeeFields } = useEmployeeFieldsResolver()
+  const { resolver: employeeResolver, parsePayload: parseEmployeeFields } = useEmployeeFieldsResolver('create')
   const employeeForm = useForm<EmployeeFieldsValues>({
     resolver: employeeResolver,
     mode: 'onChange',
@@ -84,16 +93,10 @@ const CreateEmployeeModal = ({
   const onboard = useOnboardFieldOfficer()
   const createEmployee = useCreateEmployee()
 
-  // Destructured so the effect below can depend on the stable method reference itself, not the
-  // whole employeeForm object — depending on employeeForm directly would pull in RHF's broader
-  // (and less stable) form/control object as a dep, risking extra reruns.
+  // Destructured so the effect depends on the stable method reference, not RHF's broader (less stable) form object.
   const { setValue: setEmployeeField } = employeeForm
 
-  // Prefills gender from the picked Role's populated User (already in hand, no fetch needed) —
-  // resets to undefined for a switched-to FO with no gender on file, never leaves a previous pick's
-  // value in place. Location is NOT sourced this way: it's the person's own residential address
-  // (see EmployeeFieldsSection's Location card), unrelated to GeoProfile's operating-base data, and
-  // is always filled in manually.
+  // Prefills gender from the picked Role's populated User; Location is NOT sourced this way (always filled manually).
   useEffect(() => {
     if (mode !== 'existing' || !picked) return
     setEmployeeField('profile.gender', picked.gender ?? undefined)
@@ -102,8 +105,7 @@ const CreateEmployeeModal = ({
   const stepTitles = mode === 'new' ? STEP_TITLES_NEW : STEP_TITLES_EXISTING
   const lastStepIndex = stepTitles.length - 1
 
-  // The Role/User row exists in the DB (confirmed or reasonably assumed) — editing the Role/User
-  // step's fields now would drift from what was persisted, or (uncertain states) risk a duplicate.
+  // Role/User row exists in the DB (confirmed or assumed) — editing those fields now would drift from what was persisted.
   const isAccountCommittedOrPending =
     onboard.state.step === 'account-created' ||
     onboard.state.step === 'account-creation-uncertain' ||
@@ -123,12 +125,11 @@ const CreateEmployeeModal = ({
     onboard.state.step === 'creating-employee' ||
     isRecoveryPending
 
-  // Unsafe to abandon the flow (Back/Next, or closing the dialog) — isAccountCommittedOrPending
-  // plus the in-flight creates, where a request may still commit after state is discarded.
+  // Unsafe to abandon the flow — a request may still commit after state is discarded.
   const isFlowLocked = isBusy || isAccountCommittedOrPending
 
   const resetAndClose = () => {
-    roleForm.reset({ ...EMPTY_CREATE_FORM_VALUES, tenant: tenantId, roleType: foTypeId })
+    roleForm.reset({ ...EMPTY_CREATE_FORM_VALUES, tenant: tenantId, roleType: workerTypeId })
     employeeForm.reset(EMPTY_EMPLOYEE_FIELDS_VALUES)
     setStep(0)
     setStepAttempted([false, false, false])
@@ -141,16 +142,23 @@ const CreateEmployeeModal = ({
   const markStepAttempted = (index: number) => setStepAttempted((prev) => prev.map((v, i) => (i === index ? true : v)))
 
   const handleModeChange = (nextMode: Mode) => {
-    // Clicking the already-active segment must be a no-op — without this, a user who already
-    // picked an FO could click the still-highlighted "Link an existing account" segment and
-    // unexpectedly wipe their own selection for no reason.
+    // No-op on the already-active segment, else a user with an FO picked could wipe their own selection.
     if (nextMode === mode) return
     setMode(nextMode)
     setStep(0)
-    // Prevents a picked FO's gender from leaking into the other mode's flow if the user switches
-    // without closing the dialog.
+    // Prevents a picked FO's gender from leaking into the other mode's flow.
     setPicked(null)
     employeeForm.reset(EMPTY_EMPLOYEE_FIELDS_VALUES)
+  }
+
+  const handleWorkerKindChange = (nextKind: WorkerKind) => {
+    if (nextKind === workerKind) return
+    setWorkerKind(nextKind)
+    const nextTypeId = roleTypeIds[nextKind]
+    // Mode A's Role form carries the worker's RoleType directly — re-point it at the new kind's id.
+    roleForm.setValue('roleType', nextTypeId ?? '', { shouldValidate: true, shouldDirty: true })
+    // Mode B's pick is scoped to the OLD kind's roster — meaningless once searching the other kind.
+    setPicked(null)
   }
 
   const handleNext = async () => {
@@ -178,13 +186,10 @@ const CreateEmployeeModal = ({
   }
 
   const submitNewPerson = async (employeeValues: EmployeeFieldsValues) => {
-    // Backstop against any submit path that bypasses the button's own disabled={isBusy} (e.g. a
-    // stray Enter-key submit) — every busy/uncertain state must be a pure no-op here; "Check
-    // again" in the banner is the only intentional way to trigger a recovery lookup.
+    // Backstop against a submit path bypassing disabled={isBusy} (e.g. a stray Enter-key submit).
     if (isBusy) return
     const employeeFields = await parseEmployeeFields(employeeValues)
-    // Role+User already succeeded (a prior Employee-creation attempt failed) — retry ONLY the
-    // Employee POST, never re-touch Role/User creation (useOnboardFieldOfficer's whole point).
+    // Role+User already succeeded — retry ONLY the Employee POST, never re-touch Role/User creation.
     if (onboard.state.step === 'account-created') {
       const rolePayload = roleForm.getValues()
       await onboard.retryEmployee(rolePayload.userEmail, rolePayload.userPhone, toEmployeeFieldsPayload(employeeFields))
@@ -195,11 +200,8 @@ const CreateEmployeeModal = ({
     await onboard.start(rolePayload, toEmployeeFieldsPayload(employeeFields))
   }
 
-  // The Employee-fields step stays editable while uncertain, so recovery uses what's on screen
-  // NOW. trigger() first so an invalid edit surfaces as a field error, not an unhandled rejection.
-  // Guarded by the same submittingRef as the main submit — state.step-based re-entrancy guards
-  // inside useOnboardFieldOfficer read state through closure, so a rapid double-click can pass
-  // both invocations before the first's setState commits; the synchronous ref closes that gap.
+  // Guarded by submittingRef: state.step-based re-entrancy guards read state through closure, so a
+  // rapid double-click can pass both invocations before the first's setState commits.
   const handleCheckIfAccountExists = async () => {
     if (submittingRef.current) return
     submittingRef.current = true
@@ -213,8 +215,7 @@ const CreateEmployeeModal = ({
     }
   }
 
-  // Same guard, for the employee-uncertain recovery path — previously called inline with no
-  // wrapper at all, so it had no re-entrancy protection whatsoever.
+  // Same guard, for the employee-uncertain recovery path.
   const handleCheckIfEmployeeExists = async () => {
     if (submittingRef.current) return
     submittingRef.current = true
@@ -228,8 +229,7 @@ const CreateEmployeeModal = ({
   const submitExisting = async (employeeValues: EmployeeFieldsValues) => {
     if (!picked) return
     const employeeFields = await parseEmployeeFields(employeeValues)
-    // mutateAsync (not mutate) so the caller can await settlement — guardedFinalSubmit's ref guard
-    // must stay held until this either resolves or rejects, not just until it's dispatched.
+    // mutateAsync (not mutate) so the caller can await settlement; the ref guard must stay held until resolved/rejected.
     try {
       const res = await createEmployee.mutateAsync({
         ...toEmployeeFieldsPayload(employeeFields),
@@ -241,29 +241,24 @@ const CreateEmployeeModal = ({
       resetAndClose()
       if (res.data?.id) navigate(EMPLOYEE_ROUTES.EMPLOYEE_DETAIL.replace(':id', res.data.id))
     } catch {
-      // createEmployee.isError (rendered below) is what surfaces the failure to the user.
+      // createEmployee.isError (rendered below) surfaces the failure to the user.
     }
   }
 
-  /* eslint-disable react-hooks/refs -- handleSubmit(...) only invokes these callbacks later, on an
-     actual submit event; submittingRef.current is never read during render. */
+  /* eslint-disable react-hooks/refs -- submittingRef.current is never read during render. */
   const guardedFinalSubmit = employeeForm.handleSubmit(
     (values) => {
-      // Synchronous guard: a rapid double-submit must not re-enter while the first is still in
-      // flight, including Mode A's account-created -> retryEmployee path — retryEmployee now returns
-      // its underlying promise specifically so this await captures the true end of the attempt.
+      // Synchronous guard: a rapid double-submit must not re-enter while the first is still in flight.
       if (submittingRef.current) return
       submittingRef.current = true
       markStepAttempted(lastStepIndex)
       const run = mode === 'new' ? submitNewPerson(values) : submitExisting(values)
-      // Errors are swallowed here, not left to become unhandled rejections — onboard.state /
-      // createEmployee's own mutation state (rendered below) is what surfaces the failure to the user.
+      // Swallowed here, not left as unhandled rejections — onboard.state/createEmployee's mutation state surfaces it.
       run.catch(() => {}).finally(() => {
         submittingRef.current = false
       })
     },
-    // react-hook-form only calls the success callback above when validation PASSES — an invalid
-    // submit needs its own path to still flip showErrors on, or field messages never appear at all.
+    // RHF only calls the success callback when validation passes — invalid submits need this to flip showErrors on.
     () => markStepAttempted(lastStepIndex),
   )
   /* eslint-enable react-hooks/refs */
@@ -303,6 +298,16 @@ const CreateEmployeeModal = ({
             Step {step + 1} of {stepTitles.length} — {stepTitles[step]}.
           </DialogDescription>
         </DialogHeader>
+
+        {step === 0 && availableWorkerKinds.length > 1 && (
+          <SegRow>
+            {availableWorkerKinds.map((kind) => (
+              <SegButton key={kind} active={workerKind === kind} onClick={() => handleWorkerKindChange(kind)}>
+                {WORKER_KIND_LABEL[kind]}
+              </SegButton>
+            ))}
+          </SegRow>
+        )}
 
         {bothModesAvailable && step === 0 && (
           <SegRow>
@@ -362,7 +367,8 @@ const CreateEmployeeModal = ({
             {mode === 'existing' && step === 0 && (
               <ExistingFieldOfficerPicker
                 tenant={tenantId}
-                foTypeId={foTypeId}
+                roleTypeId={workerTypeId}
+                workerLabel={workerKind === 'dietitian' ? 'dietitian' : 'field officer'}
                 value={picked?.userId ?? null}
                 onChange={setPicked}
               />
@@ -382,8 +388,7 @@ const CreateEmployeeModal = ({
               <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
                 {(() => {
                   const err = onboard.state.error
-                  // A real 4xx's text lives at err.response.data.message, not err.message — AxiosError
-                  // IS an Error instance, so it must be excluded from the internalMessage check below.
+                  // AxiosError IS an Error instance, so it must be excluded from the internalMessage check below.
                   const backendMessage = getApiErrorMessage(err, '')
                   const internalMessage = !axios.isAxiosError(err) && err instanceof Error ? err.message : ''
                   return backendMessage || internalMessage

@@ -1,4 +1,4 @@
-import { employeeFieldsSchema, type EmployeeFieldsValues } from '@/features/access-management/employee/schemas/employee.schemas'
+import { employeeFieldsSchema, createEmployeeFieldsSchema, type EmployeeFieldsValues } from '@/features/access-management/employee/schemas/employee.schemas'
 import { useReshapingResolver } from '@/hooks/useReshapingResolver'
 import type { BankDetails, EmployeeProfile } from '@/types/accessManagement.types'
 import type { LocationValue } from '@/types/location.types'
@@ -14,6 +14,7 @@ export function dropBlankStrings<T extends object>(obj: T | undefined): T | unde
 }
 
 export const EMPTY_EMPLOYEE_FIELDS_VALUES: EmployeeFieldsValues = {
+  type: undefined,
   phone: '',
   doj: '',
   dol: '',
@@ -28,11 +29,11 @@ export const EMPTY_EMPLOYEE_FIELDS_VALUES: EmployeeFieldsValues = {
   profile: undefined,
 }
 
-// `daRule` needs special handling: register('daRule.value', {valueAsNumber:true}) on an untouched
-// form creates `{ value: NaN }` rather than `undefined`, so its `.optional()` never triggers.
-export const useEmployeeFieldsResolver = () =>
+// register('daRule.value', {valueAsNumber:true}) on an untouched form creates `{ value: NaN }`
+// rather than `undefined`, so its `.optional()` never triggers without this reshaping.
+export const useEmployeeFieldsResolver = (mode: 'create' | 'edit' = 'edit') =>
   useReshapingResolver<EmployeeFieldsValues, EmployeeFieldsValues>({
-    schema: employeeFieldsSchema,
+    schema: mode === 'create' ? createEmployeeFieldsSchema : employeeFieldsSchema,
     toPayload: (values) => ({
       ...values,
       phone: values.phone || undefined,
@@ -48,7 +49,8 @@ export const useEmployeeFieldsResolver = () =>
 // send '' where the backend's Zod schema requires undefined.
 export function toEmployeeFieldsPayload(values: EmployeeFieldsValues) {
   return {
-    type: 'field-officer' as const,
+    // Required on create; caller's required-field check keeps this from reaching here undefined.
+    type: values.type!,
     doj: values.doj,
     dol: values.dol || undefined,
     reason: values.reason || undefined,

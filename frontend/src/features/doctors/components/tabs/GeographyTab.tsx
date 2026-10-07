@@ -6,9 +6,12 @@ import DoBar from '@/components/ui/DoBar'
 interface GeographyTabProps {
   doctors: DoctorEntity[]
   onSelectCityState: (city: string, state: string) => void
+  /** True when `doctors` is a capped sample, not the full active-doctor set — no backend
+   * aggregate exists for a true city/state breakdown yet (see DoctorsPage's AGGREGATE_LIMIT). */
+  isSample?: boolean
 }
 
-const GeographyTab = ({ doctors, onSelectCityState }: GeographyTabProps) => {
+const GeographyTab = ({ doctors, onSelectCityState, isSample }: GeographyTabProps) => {
   const byState = useMemo(() => {
     const map = new Map<string, number>()
     doctors.forEach((d) => {
@@ -20,8 +23,7 @@ const GeographyTab = ({ doctors, onSelectCityState }: GeographyTabProps) => {
   }, [doctors])
 
   const byCity = useMemo(() => {
-    // Keyed on (city, state) — two same-named cities in different states (a real, common case in
-    // India) must stay distinct rows, not silently merge into one aggregate.
+    // Keyed on (city, state) — two same-named cities in different states must stay distinct rows.
     const map = new Map<string, { city: string; state: string; count: number }>()
     doctors.forEach((d) => {
       const city = d.location?.city
@@ -41,10 +43,19 @@ const GeographyTab = ({ doctors, onSelectCityState }: GeographyTabProps) => {
   const maxState = Math.max(1, ...byState.map((s) => s.count))
 
   return (
-    <div className="grid gap-3" style={{ gridTemplateColumns: '1fr 1fr' }}>
+    <div>
+      {isSample && (
+        <p className="text-[12px] mb-3" style={{ color: 'var(--qms-text-muted)' }}>
+          Based on a sample of {doctors.length} active doctors — not the full roster (no aggregate endpoint yet).
+        </p>
+      )}
+      <div className="grid gap-3" style={{ gridTemplateColumns: '1fr 1fr' }}>
       <div className="rounded-xl border p-3.5" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
-        <div className="flex items-center gap-2 text-[13px] font-bold mb-3" style={{ color: 'var(--qms-text)' }}>
-          <FiMap size={15} style={{ color: 'var(--qms-brand)' }} /> By state
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-7.5 h-7.5 rounded-lg flex items-center justify-center text-white shrink-0" style={{ background: '#3b6dff' }}>
+            <FiMap size={14} />
+          </div>
+          <span className="text-[13px] font-bold" style={{ color: 'var(--qms-text)' }}>By state</span>
         </div>
         {byState.map((s) => (
           <div key={s.state} className="mb-2.5">
@@ -59,8 +70,11 @@ const GeographyTab = ({ doctors, onSelectCityState }: GeographyTabProps) => {
       </div>
 
       <div className="rounded-xl border p-3.5" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
-        <div className="flex items-center gap-2 text-[13px] font-bold mb-3" style={{ color: 'var(--qms-text)' }}>
-          <FiMap size={15} style={{ color: 'var(--qms-teal)' }} /> By city
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-7.5 h-7.5 rounded-lg flex items-center justify-center text-white shrink-0" style={{ background: '#10b981' }}>
+            <FiMap size={14} />
+          </div>
+          <span className="text-[13px] font-bold" style={{ color: 'var(--qms-text)' }}>By city</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-[12px]">
@@ -90,6 +104,7 @@ const GeographyTab = ({ doctors, onSelectCityState }: GeographyTabProps) => {
             </tbody>
           </table>
         </div>
+      </div>
       </div>
     </div>
   )

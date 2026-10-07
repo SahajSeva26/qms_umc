@@ -34,8 +34,24 @@ const EmployeesListContent = () => {
   const canSearchRoleTypes = permissions.includes('tenant:admin') || permissions.includes('tenant:manage') || permissions.includes('system:manage')
   const canSearchTenants = permissions.includes('tenant:search') || permissions.includes('tenant:manage') || permissions.includes('system:manage')
 
-  const { data: foTypeData } = useRoleTypes({ code: 'field-officer', status: 'active' }, canSearchRoleTypes)
+  const {
+    data: foTypeData,
+    isLoading: foTypeLoading,
+    isError: foTypeErrored,
+    refetch: refetchFoType,
+  } = useRoleTypes({ code: 'field-officer', status: 'active' }, canSearchRoleTypes)
+  const {
+    data: dietitianTypeData,
+    isLoading: dietitianTypeLoading,
+    isError: dietitianTypeErrored,
+    refetch: refetchDietitianType,
+  } = useRoleTypes({ code: 'dietitian', status: 'active' }, canSearchRoleTypes)
   const foTypeId = foTypeData?.data?.items[0]?.id
+  const dietitianTypeId = dietitianTypeData?.data?.items[0]?.id
+  // Only meaningful once canSearchRoleTypes is true — an unauthorized actor's queries stay
+  // permanently disabled/idle, which must not be read as a failure.
+  const roleTypesLoading = canSearchRoleTypes && (foTypeLoading || dietitianTypeLoading)
+  const roleTypesErrored = canSearchRoleTypes && (foTypeErrored || dietitianTypeErrored)
 
   const canOnboard = canOnboardNewPerson(session?.roleType.code, permissions)
   const canLink = canLinkExistingAccount(session?.roleType.code, permissions)
@@ -90,18 +106,48 @@ const EmployeesListContent = () => {
             Employees
           </h1>
           <p className="text-[13px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>
-            {!isLoading && !error ? `${totalCount} total` : 'Field officer HR records.'}
+            {!isLoading && !error ? `${totalCount} total` : 'Field officer / dietitian HR records.'}
           </p>
         </div>
-        {tenantId && foTypeId && (canOnboard || canLink) && (
-          <CreateEmployeeModal
-            tenantId={tenantId}
-            foTypeId={foTypeId}
-            canOnboardNewPerson={canOnboard}
-            canLinkExistingAccount={canLink}
-            autoOpenNewPerson={shouldAutoOpen}
-            onAutoOpenHandled={handleAutoOpenHandled}
-          />
+        {tenantId && (canOnboard || canLink) && (
+          roleTypesLoading ? (
+            <p className="text-[13px]" style={{ color: 'var(--qms-text-muted)' }}>Loading worker roles…</p>
+          ) : roleTypesErrored && !foTypeId && !dietitianTypeId ? (
+            // Both lookups failed (or the only one that mattered did) — nothing to onboard against at
+            // all, so this replaces the button rather than silently hiding it with no explanation.
+            <div className="flex items-center gap-2">
+              <p className="text-[13px] text-danger">Couldn't load worker roles.</p>
+              <button
+                type="button"
+                onClick={() => { void refetchFoType(); void refetchDietitianType() }}
+                className="text-[13px] font-semibold underline decoration-dotted underline-offset-2 hover:no-underline"
+              >
+                Retry
+              </button>
+            </div>
+          ) : (foTypeId || dietitianTypeId) && (
+            <div className="flex flex-col items-end gap-1">
+              <CreateEmployeeModal
+                tenantId={tenantId}
+                roleTypeIds={{ 'field-officer': foTypeId, dietitian: dietitianTypeId }}
+                canOnboardNewPerson={canOnboard}
+                canLinkExistingAccount={canLink}
+                autoOpenNewPerson={shouldAutoOpen}
+                onAutoOpenHandled={handleAutoOpenHandled}
+              />
+              {/* One kind failed to load but the other is usable — surface it rather than silently
+                  dropping that option with no explanation (the original bug this fixes). */}
+              {roleTypesErrored && (
+                <button
+                  type="button"
+                  onClick={() => { void refetchFoType(); void refetchDietitianType() }}
+                  className="text-[11px] font-semibold text-danger underline decoration-dotted underline-offset-2 hover:no-underline"
+                >
+                  {!foTypeId ? "Couldn't load Field officer — retry" : "Couldn't load Dietitian — retry"}
+                </button>
+              )}
+            </div>
+          )
         )}
       </div>
 

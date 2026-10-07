@@ -38,34 +38,58 @@ describe('campRefName', () => {
 })
 
 describe('canRunScreening', () => {
-  const campWithPopulatedFo = { fo: { _id: 'r-fo', id: 'r-fo' } }
-  const campWithStringFo = { fo: 'r-fo' }
-  const campWithNoFo = { fo: null }
+  const screeningCampWithPopulatedFo = { type: 'screening', fo: { _id: 'r-fo', id: 'r-fo' }, dietitian: null }
+  const screeningCampWithStringFo = { type: 'screening', fo: 'r-fo', dietitian: null }
+  const screeningCampWithNoFo = { type: 'screening', fo: null, dietitian: null }
 
   it('a screening:manage/system:manage holder always qualifies, regardless of camp.fo or their own role', () => {
-    expect(canRunScreening(campWithNoFo, undefined, undefined, true)).toBe(true)
-    expect(canRunScreening(campWithPopulatedFo, 'someone-else', 'sales-rep', true)).toBe(true)
+    expect(canRunScreening(screeningCampWithNoFo, undefined, undefined, true)).toBe(true)
+    expect(canRunScreening(screeningCampWithPopulatedFo, 'someone-else', 'sales-rep', true)).toBe(true)
   })
 
   it('qualifies a matching role id whose roleType IS field-officer', () => {
-    expect(canRunScreening(campWithPopulatedFo, 'r-fo', 'field-officer', false)).toBe(true)
+    expect(canRunScreening(screeningCampWithPopulatedFo, 'r-fo', 'field-officer', false)).toBe(true)
   })
 
   it('qualifies a matching role id even when camp.fo is a bare string id, not a populated object', () => {
-    expect(canRunScreening(campWithStringFo, 'r-fo', 'field-officer', false)).toBe(true)
+    expect(canRunScreening(screeningCampWithStringFo, 'r-fo', 'field-officer', false)).toBe(true)
   })
 
   it('blocks a matching role id whose roleType is NOT field-officer — id equality alone is never enough', () => {
-    expect(canRunScreening(campWithPopulatedFo, 'r-fo', 'sales-rep', false)).toBe(false)
-    expect(canRunScreening(campWithStringFo, 'r-fo', 'sales-rep', false)).toBe(false)
+    expect(canRunScreening(screeningCampWithPopulatedFo, 'r-fo', 'sales-rep', false)).toBe(false)
+    expect(canRunScreening(screeningCampWithStringFo, 'r-fo', 'sales-rep', false)).toBe(false)
   })
 
   it('blocks a non-matching role id even with the correct roleType', () => {
-    expect(canRunScreening(campWithPopulatedFo, 'r-someone-else', 'field-officer', false)).toBe(false)
+    expect(canRunScreening(screeningCampWithPopulatedFo, 'r-someone-else', 'field-officer', false)).toBe(false)
   })
 
   it('blocks when the viewer role id is missing entirely', () => {
-    expect(canRunScreening(campWithPopulatedFo, undefined, 'field-officer', false)).toBe(false)
+    expect(canRunScreening(screeningCampWithPopulatedFo, undefined, 'field-officer', false)).toBe(false)
+  })
+
+  // Diet camps are staffed by a dietitian (camp.dietitian), not an FO (camp.fo) — mirrors backend's workerFor(camp.type).
+  const dietCampWithPopulatedDietitian = { type: 'diet', fo: null, dietitian: { _id: 'r-diet', id: 'r-diet' } }
+  const dietCampWithStringDietitian = { type: 'diet', fo: null, dietitian: 'r-diet' }
+
+  it('a diet camp qualifies a matching role id whose roleType IS dietitian', () => {
+    expect(canRunScreening(dietCampWithPopulatedDietitian, 'r-diet', 'dietitian', false)).toBe(true)
+  })
+
+  it('a diet camp qualifies a matching role id even when camp.dietitian is a bare string id', () => {
+    expect(canRunScreening(dietCampWithStringDietitian, 'r-diet', 'dietitian', false)).toBe(true)
+  })
+
+  it('a diet camp blocks a field-officer, even one whose id happens to match camp.fo on a screening camp — the role type must match the CAMP TYPE\'s worker kind', () => {
+    expect(canRunScreening(dietCampWithPopulatedDietitian, 'r-diet', 'field-officer', false)).toBe(false)
+  })
+
+  it('a screening camp blocks a dietitian, even one whose id happens to match camp.dietitian on a diet camp', () => {
+    expect(canRunScreening(screeningCampWithPopulatedFo, 'r-fo', 'dietitian', false)).toBe(false)
+  })
+
+  it('a diet camp blocks a non-matching dietitian role id', () => {
+    expect(canRunScreening(dietCampWithPopulatedDietitian, 'r-someone-else', 'dietitian', false)).toBe(false)
   })
 })
 

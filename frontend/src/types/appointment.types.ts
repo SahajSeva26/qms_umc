@@ -170,6 +170,8 @@ export interface AppointmentEntity {
   parent?: AppointmentPopulatedParent | string
   mode: AppointmentMode
   destinationLink?: string
+  // Free-text place for offline/call meetings (e.g. "HQ Andheri", "Café") — independent of mode/destinationLink.
+  location?: string
   duration: AppointmentDuration
   agenda: AppointmentAgenda
   status: AppointmentStatus
@@ -208,6 +210,7 @@ export interface CreateAppointmentPayload {
   parent?: string
   mode?: AppointmentMode
   destinationLink?: string
+  location?: string
   startTime: string
   endTime?: string
   agenda?: AppointmentAgenda
@@ -223,6 +226,7 @@ export interface UpdateAppointmentPayload {
   lead?: string
   mode?: AppointmentMode
   destinationLink?: string
+  location?: string
   startTime?: string
   endTime?: string
   agenda?: AppointmentAgenda

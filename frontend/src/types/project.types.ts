@@ -3,7 +3,7 @@
 
 import type { DivisionTherapy, LeadPopulatedContact } from './crm.types'
 import type { CampTimeSlotValue } from './campTimeSlot.constants'
-import { CAMP_TYPE_VALUES, type CampType } from './campReal.types'
+import type { CampType } from './campReal.types'
 
 // ---------------------------------------------------------------------------
 // Enums / constants
@@ -33,28 +33,29 @@ export const PROJECT_THERAPY_LABEL: Record<ProjectTherapy, string> = {
   nephrology: 'Nephrology',
 }
 
-// Array-valued field — a project can be more than one type at once.
-export type ProjectType = 'screening_camp' | 'diet' | 'teleconsultation_diet' | 'lab_test' | 'mixed'
+// Array-valued field — a project can be more than one type at once (that's how "mixed" is
+// expressed; the backend dropped a separate `mixed` value since `type` is already an array).
+export type ProjectType = 'screening' | 'diet' | 'lab' | 'teleconsultation_diet'
 
 export const PROJECT_TYPE_LABEL: Record<ProjectType, string> = {
-  screening_camp: 'Screening Camp',
+  screening: 'Screening Camp',
   diet: 'Diet',
+  lab: 'Lab Test',
   teleconsultation_diet: 'Teleconsultation Diet',
-  lab_test: 'Lab Test',
-  mixed: 'Mixed',
 }
 
-// No backend rule links Project type to Camp type — frontend-only advisory mapping, shared across features.
+// `teleconsultation_diet` maps to an EMPTY array deliberately, not `['diet']` — the backend does a
+// literal string match against `project.type`, and `teleconsultation_diet` !== `diet`, so a project
+// whose ONLY offering is teleconsultation_diet hosts no physical camp of any type.
 export const PROJECT_TYPE_CAMP_TYPES: Record<ProjectType, CampType[]> = {
-  screening_camp: ['screening'],
+  screening: ['screening'],
   diet: ['diet'],
-  teleconsultation_diet: ['diet'],
-  lab_test: ['lab'],
-  mixed: [...CAMP_TYPE_VALUES],
+  lab: ['lab'],
+  teleconsultation_diet: [],
 }
 
-export function allowedCampTypesForProjectTypes(types: ProjectType[]): CampType[] {
-  return [...new Set(types.flatMap((t) => PROJECT_TYPE_CAMP_TYPES[t]))]
+export function allowedCampTypesForProjectTypes(types: ProjectType[] | undefined | null): CampType[] {
+  return [...new Set((types ?? []).flatMap((t) => PROJECT_TYPE_CAMP_TYPES[t]))]
 }
 
 export type ExecutionModeType = 'po' | 'agreement' | 'mail_confirmation'
@@ -113,9 +114,8 @@ export const CLIENT_REPORT_CADENCE_LABEL: Record<ClientReportCadence, string> = 
   yearly: 'Yearly',
 }
 
-// Currently a single value — kept Record-driven so a future backend addition
-// only needs a new type member + label entry here, not a UI rebuild. Still
-// requires a frontend code change and deploy, just a localized one.
+// Currently a single value — kept Record-driven so a future backend addition only needs a
+// new type member + label entry, not a UI rebuild.
 export type AvailablePointer = 'camp_executed'
 
 export const AVAILABLE_POINTER_LABEL: Record<AvailablePointer, string> = {
@@ -138,25 +138,34 @@ export type WhoCanBookCampCode = 'pharma-division-head' | 'pharma-asm' | 'pharma
 // Nested value objects (plain shapes, not entities — no `id`)
 // ---------------------------------------------------------------------------
 
-// One flat object (the backend models this as one sub-document, not a TS
-// discriminated union). Fields besides `mode` are optional, meaningful only
-// for their own mode (po / agreement / mail_confirmation).
+// `file` is a File module ObjectId ref — NOT wired on the frontend yet (the backend's file module
+// has no ENTITY_RELATION entry for 'project' sub-documents); left as a plain optional id string.
+export interface PurchaseOrder {
+  number?: string
+  date?: string
+  expiry?: string
+  file?: string
+}
+
+// `po` supports MULTIPLE purchase orders; `agreement`/`mail` are still single sub-objects.
 export interface ExecutionMode {
   mode: ExecutionModeType
-  // po
-  poNumber?: string
-  poDate?: string
-  poExpiry?: string
-  // agreement
-  agreementNumber?: string
-  agreementStartDate?: string
-  agreementEndDate?: string
-  duration?: number
-  // No file-upload endpoint exists — plain string URL fields, not a base64 blob.
-  agreementDocument?: string
-  // mail_confirmation
-  emailReference?: string
-  emailDocument?: string
+  po?: {
+    purchaseOrders?: PurchaseOrder[]
+  }
+  agreement?: {
+    number?: string
+    startDate?: string
+    endDate?: string
+    duration?: number
+    // Not wired — see PurchaseOrder.file's note.
+    file?: string
+  }
+  mail?: {
+    reference?: string
+    // Not wired — see PurchaseOrder.file's note.
+    file?: string
+  }
 }
 
 export interface GoLiveScope {
@@ -209,6 +218,15 @@ export interface ProjectPopulatedLead {
   status: string
 }
 
+// GET /projects populates each tests[] entry this far (not the full TestEntity) — backend
+// mirrors tenant/division/lead's own populate-or-raw-id pattern here too.
+export interface ProjectPopulatedTest {
+  _id?: string
+  code: string
+  name: string
+  therapy?: string
+}
+
 // Reused for salesRep/projectCoordinator (both populate as the full Role
 // document; only the fields consumed here are typed). marketingContact is a
 // Contact reference instead — see LeadPopulatedContact import.
@@ -234,10 +252,12 @@ export interface ProjectEntity {
   division: ProjectPopulatedDivision | string | null
   therapy: ProjectTherapy
   type: ProjectType[]
-  // Test._id references — resolve against GET /test-masters to display names.
-  tests: string[]
+  // Populated to ProjectPopulatedTest (not the full TestEntity) — same populate-or-raw-id
+  // pattern as tenant/division/lead above. A caller needing the full TestEntity (e.g. its
+  // consumption[]) still resolves the id against GET /test-masters.
+  tests: (ProjectPopulatedTest | string)[]
   lead: ProjectPopulatedLead | string | null
-  mode: ExecutionMode | null
+  executionMode: ExecutionMode | null
   campCost: number
   totalCamps: number
   gst: number
@@ -266,10 +286,32 @@ export interface ProjectEntity {
   sops: string
   createdAt: string
   updatedAt: string
+  // Only present when the search was called with report=true — per-project rollup for
+  // this result page only (see SearchProjectQuery.report).
+  stats?: ProjectStats
+}
+
+export interface ProjectStats {
+  // Camps in `closed` + `cancelled_charged` — the "done" count against `totalCamps`'s quota.
+  executedCamps: number
+}
+
+export interface ProjectTypeBreakdownEntry {
+  type: ProjectType
+  count: number
+}
+
+// Only present when the search was called with report=true — a breakdown over the whole
+// scoped/filtered result set (not just the current page). A multi-type project is counted
+// once per type it carries.
+export interface ProjectSearchReport {
+  total: number
+  byType: ProjectTypeBreakdownEntry[]
 }
 
 export interface SearchProjectQuery {
   name?: string
+  code?: string
   status?: ProjectStatus
   therapy?: ProjectTherapy
   tenant?: string
@@ -278,6 +320,9 @@ export interface SearchProjectQuery {
   salesRep?: string
   page?: string
   limit?: string
+  // When 'true', each item gets a `stats` object and the response gets a top-level `report`
+  // (ProjectSearchReport). Unlike tenant's report mode, the backend does NOT cap `limit` here.
+  report?: 'true' | 'false'
 }
 
 // Matches CreateProjectPayloadSchema exactly — tenant/division/status are NOT
@@ -288,7 +333,7 @@ export interface CreateProjectPayload {
   therapy: ProjectTherapy
   type: ProjectType[]
   tests?: string[]
-  mode?: ExecutionMode
+  executionMode?: ExecutionMode
   campCost?: number
   totalCamps?: number
   gst?: number
@@ -321,7 +366,7 @@ export interface UpdateProjectPayload {
   therapy?: ProjectTherapy
   type?: ProjectType[]
   tests?: string[]
-  mode?: ExecutionMode
+  executionMode?: ExecutionMode
   campCost?: number
   totalCamps?: number
   gst?: number

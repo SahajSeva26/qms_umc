@@ -27,7 +27,22 @@ export const RoleTypeMapper = {
             items: [] as any[],
         };
         for (const r of data?.items) {
-            result.items.push(RoleTypeMapper.toResponse(r, ctx));
+            // NOTE: independent from toResponse on purpose — mirrors it field-for-field for now (incl. same permission gating) so nothing breaks; search rows can be trimmed later without affecting GET /:id.
+            const item: any = {
+                id: r._id,
+                code: r.code,
+                name: r.name,
+                description: r.description,
+                permissions: r.permissions,
+                isSystem: r.isSystem,
+                tenant: r.tenant,
+                createdAt: r.createdAt,
+                updatedAt: r.updatedAt,
+            };
+            if (ctx.hasAnyPermissions([TENANT_PERMISSIONS.ADMIN.code, TENANT_PERMISSIONS.MANAGE.code])) {
+                item.status = r.status;
+            }
+            result.items.push(item);
         }
         return result;
     },

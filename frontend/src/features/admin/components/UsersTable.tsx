@@ -3,13 +3,13 @@ import type { User } from '@/types/user.types'
 import UserAvatar from '@/components/ui/UserAvatar'
 import StatusPill from '@/features/admin/components/StatusPill'
 
-// Literal path (not imported from admin.routes.tsx) — that file imports
-// UsersPage, which imports this component, so importing back from it here
-// would be a circular module dependency (same pattern as CampDrawer.tsx).
+// Literal path to avoid a circular import back through admin.routes.tsx (same pattern as CampDrawer.tsx).
 const ADMIN_USER_DETAIL_PATH = '/admin/users/:id'
 
 interface UsersTableProps {
   users: User[]
+  // GET /users/:id requires user:get, distinct from user:search which reaches this list.
+  canOpenDetail: boolean
 }
 
 function formatJoined(createdAt?: string): string {
@@ -19,67 +19,43 @@ function formatJoined(createdAt?: string): string {
   return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-const UsersTable = ({ users }: UsersTableProps) => {
+const UsersTable = ({ users, canOpenDetail }: UsersTableProps) => {
   const navigate = useNavigate()
 
-  return (
-    <div
-      className="rounded-xl border overflow-hidden"
-      style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}
-    >
-      <div className="overflow-x-auto">
-        <table className="w-full text-[13px]">
-          <thead>
-            <tr style={{ borderBottom: '1px solid var(--qms-border)' }}>
-              <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                User
-              </th>
-              <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                Status
-              </th>
-              <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                Joined
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((user) => (
-              <tr
-                key={user._id}
-                onClick={() => navigate(ADMIN_USER_DETAIL_PATH.replace(':id', user._id))}
-                className="cursor-pointer transition-colors hover:bg-(--qms-surface-hover)"
-                style={{ borderBottom: '1px solid var(--qms-border)' }}
-              >
-                <td className="px-4 py-2.5">
-                  <div className="flex items-center gap-2.5">
-                    <UserAvatar firstName={user.firstName} lastName={user.lastName} tone={user.avatarTone} size="sm" />
-                    <div className="min-w-0">
-                      <div className="font-semibold truncate" style={{ color: 'var(--qms-text)' }}>
-                        {user.firstName} {user.lastName}
-                      </div>
-                      <div className="text-[11px] truncate" style={{ color: 'var(--qms-text-muted)' }}>
-                        {user.email}
-                      </div>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-4 py-2.5">
-                  <StatusPill status={user.status} />
-                </td>
-                <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                  {formatJoined(user.createdAt)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+  if (users.length === 0) {
+    return (
+      <div className="px-4 py-10 text-center text-[13px] rounded-xl border border-dashed" style={{ color: 'var(--qms-text-muted)', borderColor: 'var(--qms-border)' }}>
+        No users found.
       </div>
+    )
+  }
 
-      {users.length === 0 && (
-        <div className="px-4 py-10 text-center text-[13px]" style={{ color: 'var(--qms-text-muted)' }}>
-          No users found.
+  return (
+    <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
+      {users.map((user) => (
+        <div
+          key={user._id}
+          onClick={canOpenDetail ? () => navigate(ADMIN_USER_DETAIL_PATH.replace(':id', user._id)) : undefined}
+          onKeyDown={canOpenDetail ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(ADMIN_USER_DETAIL_PATH.replace(':id', user._id)) } } : undefined}
+          role={canOpenDetail ? 'button' : undefined}
+          tabIndex={canOpenDetail ? 0 : undefined}
+          className={`rounded-xl border p-4 transition-transform ${canOpenDetail ? 'cursor-pointer hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--qms-brand)' : ''}`}
+          style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)', backdropFilter: 'blur(20px) saturate(140%)' }}
+        >
+          <div className="flex items-center gap-3 mb-3">
+            <UserAvatar firstName={user.firstName} lastName={user.lastName} tone={user.avatarTone} size="md" />
+            <div className="min-w-0 flex-1">
+              <div className="font-bold text-[14px] truncate" style={{ color: 'var(--qms-text)' }}>{user.firstName} {user.lastName}</div>
+              <div className="text-[11px] truncate" style={{ color: 'var(--qms-text-muted)' }}>{user.email}</div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between gap-2">
+            <StatusPill status={user.status} />
+            <span className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>Joined {formatJoined(user.createdAt)}</span>
+          </div>
         </div>
-      )}
+      ))}
     </div>
   )
 }

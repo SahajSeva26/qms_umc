@@ -9,6 +9,7 @@ export const AuthMapper = {
             firstName: user.firstName,
             lastName: user.lastName,
             avatar: user.avatar,
+            profilePicture: (user as any).profilePicture ?? null,
         };
     },
 

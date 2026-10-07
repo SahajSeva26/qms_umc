@@ -1,23 +1,42 @@
-import type { InvoiceEntity } from '@/types/invoice.types'
+import type { InvoiceReportResponse } from '@/types/invoice.types'
 import { formatINRFull } from '@/utils/formatters'
 
 interface InvoicePipelineKpiStripProps {
-  invoices: InvoiceEntity[]
-  totalCount: number
+  report: InvoiceReportResponse | null | undefined
+  isLoading: boolean
+  error: unknown
 }
 
-// Matches the prototype's 4-tile pipeline summary (crm-invoicing.js:430-435),
-// but computed from real fields only — no paymentStatus concept exists on
-// our Invoice model, so "outstanding/cleared" is honestly re-derived from
-// the real status enum: paid = cleared, everything else non-cancelled = outstanding.
-const InvoicePipelineKpiStrip = ({ invoices, totalCount }: InvoicePipelineKpiStripProps) => {
-  const totalInvoiced = invoices.reduce((sum, inv) => sum + inv.total, 0)
-  const pendingApproval = invoices.filter((inv) => inv.status === 'draft').length
-  const outstanding = invoices.filter((inv) => inv.status !== 'paid' && inv.status !== 'cancelled').reduce((sum, inv) => sum + inv.total, 0)
-  const cleared = invoices.filter((inv) => inv.status === 'paid').reduce((sum, inv) => sum + inv.total, 0)
+// Sourced from GET /invoices/report (tenant-wide, unaffected by list pagination). No paymentStatus
+// field on Invoice, so "outstanding/cleared" is derived from status alone.
+const InvoicePipelineKpiStrip = ({ report, isLoading, error }: InvoicePipelineKpiStripProps) => {
+  if (isLoading) {
+    return (
+      <div className="grid gap-2.5 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' }}>
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="rounded-xl border p-3 h-16 animate-pulse" style={{ background: 'var(--qms-surface-strong)', borderColor: 'var(--qms-border)' }} />
+        ))}
+      </div>
+    )
+  }
+
+  if (error || !report) {
+    return (
+      <p className="text-[13px] mb-4" style={{ color: 'var(--qms-text-muted)' }}>
+        Couldn't load pipeline totals.
+      </p>
+    )
+  }
+
+  const byStatus = new Map(report.statusCounts.map((s) => [s.status, s]))
+  const pendingApproval = byStatus.get('draft')?.count ?? 0
+  const outstanding = report.statusCounts
+    .filter((s) => s.status !== 'paid' && s.status !== 'cancelled')
+    .reduce((sum, s) => sum + s.total, 0)
+  const cleared = byStatus.get('paid')?.total ?? 0
 
   const tiles = [
-    { label: 'Total invoiced', value: formatINRFull(totalInvoiced), sub: `${totalCount} invoice${totalCount === 1 ? '' : 's'}`, color: 'var(--qms-text)' },
+    { label: 'Total invoiced', value: formatINRFull(report.totalInvoiced), sub: `${report.totalInvoices} invoice${report.totalInvoices === 1 ? '' : 's'}`, color: 'var(--qms-text)' },
     { label: 'Pending approval', value: String(pendingApproval), sub: 'draft invoices', color: '#0ea5e9' },
     { label: 'Payment outstanding', value: formatINRFull(outstanding), sub: undefined, color: '#f43f5e' },
     { label: 'Payment cleared', value: formatINRFull(cleared), sub: undefined, color: '#10b981' },

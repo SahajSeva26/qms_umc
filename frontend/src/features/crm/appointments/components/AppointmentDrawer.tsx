@@ -273,6 +273,7 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
           },
           { label: 'Mode', value: APPOINTMENT_MODE_LABEL[appointment.mode] },
           { label: 'Link', value: appointment.destinationLink || undefined },
+          { label: 'Location', value: appointment.location || undefined },
           { label: 'Linked lead', value: appointment.lead ? leadRefName(appointment.lead) : undefined },
           { label: 'Parent appointment', value: appointment.parent ? refName(appointment.parent) : undefined },
         ]}

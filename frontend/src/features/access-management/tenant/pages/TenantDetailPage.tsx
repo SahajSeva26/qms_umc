@@ -1,22 +1,26 @@
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { FiArrowLeft, FiDownload, FiPlus } from 'react-icons/fi'
 import { useTenant } from '@/features/access-management/tenant/hooks/useTenant'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { useRole } from '@/features/access-management/role/hooks/useRole'
-import { useRoles } from '@/features/access-management/role/hooks/useRoles'
-import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRoleTypes'
-import { useDivisions } from '@/features/crm/divisions/hooks/useDivisions'
-import { useDivisionsFilters } from '@/features/crm/divisions/hooks/useDivisionsFilters'
-import DivisionsFilterBar from '@/features/crm/divisions/components/DivisionsFilterBar'
-import DivisionsTable from '@/features/crm/divisions/components/DivisionsTable'
-import CreateDivisionModal from '@/features/crm/divisions/components/CreateDivisionModal'
+import { useProjects } from '@/features/projects'
+import { PROJECT_TYPE_LABEL } from '@/types/project.types'
+import { useInvoiceReport } from '@/features/billing'
+import { useDivisionsShared } from '@/hooks/useDivisionsShared'
+import {
+  useDivisionsFilters,
+  DivisionsFilterBar,
+  DivisionsTable,
+  CreateDivisionModal,
+  DIVISION_ROUTES,
+  divisionService,
+  downloadDivisionsCsv,
+} from '@/features/crm/divisions'
 import EditTenantModal from '@/features/access-management/tenant/components/EditTenantModal'
 import TenantHeader from '@/features/access-management/tenant/components/TenantHeader'
 import { TenantKpiGrid, TenantKpiTile, TenantMiniBreakdown, TenantSectionLabel } from '@/features/access-management/tenant/components/TenantKpiTile'
-import { DIVISION_ROUTES } from '@/features/crm/divisions/divisions.routes'
-import { divisionService } from '@/features/crm/divisions/division.service'
-import { downloadDivisionsCsv } from '@/features/crm/divisions/division.export'
 import { warnIfExportTruncated } from '@/utils/csvExport'
 import { usePermission } from '@/hooks/usePermission'
 import { TENANT_ROUTES } from '@/features/access-management/tenant/tenant.routes'
@@ -24,12 +28,11 @@ import { Button } from '@/components/ui/button'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { toast } from '@/components/ui/sonner'
 import { getApiErrorMessage } from '@/utils/apiError'
+import { formatINR } from '@/utils/formatters'
 import type { DivisionEntity } from '@/types/crm.types'
 import type { RolePopulatedUser, Tenant } from '@/types/accessManagement.types'
 
-// Mirrors the backend's own REPORT_MAX_LIMIT (tenant.service.ts) — the largest page report=true
-// will serve in one call, used here to fetch as wide a result set as possible before matching the
-// exact code client-side (see the Projects KPI comment below for why an exact match is needed).
+// Mirrors the backend's REPORT_MAX_LIMIT (tenant.service.ts) — widest page report=true allows.
 const REPORT_MAX_LIMIT = 20
 
 function formatTenantAddress(address: Tenant['address']): string | null {
@@ -49,15 +52,15 @@ const TenantDetailPage = () => {
   const canManageTenant = hasPermission('tenant:manage')
   const canManageSystem = hasPermission('system:manage')
   const canViewRole = hasAnyPermission(['role:get', 'role:search', 'role:manage'])
-  // The MR KPI needs BOTH GET /role-types (role-type.routes.ts: tenant:admin/tenant:manage ONLY —
-  // no role:* permission accepted) AND GET /roles search (role.routes.ts: tenant:admin/
-  // tenant:manage/role:search). Gating on role:search alone (or any single-call requirement) lets a
-  // role:search-only actor pass this check, then get a real 403 from GET /role-types — which
-  // silently renders as "Coming soon" instead of a permission error. So this must be the
-  // intersection both calls actually accept: tenant:admin or tenant:manage only.
-  const canSearchRoles = hasAnyPermission(['tenant:admin', 'tenant:manage'])
+  // Matches GET /divisions's own route guard exactly (division:manage/tenant:admin/lead:manage).
   const canViewDivisions = hasAnyPermission(['division:manage', 'tenant:admin', 'lead:manage'])
-  const canSeeInactiveDivisions = hasAnyPermission(['division:manage', 'tenant:manage'])
+  // division.service.ts's `tenant` filter is honored only for lead:manage/division:manage — a
+  // tenant:admin-only caller's filter is silently dropped server-side, so hide the section instead of showing all tenants.
+  const canFilterDivisionsByTenant = hasAnyPermission(['lead:manage', 'division:manage'])
+  // division.service.ts's `status` filter is honored only for division:manage/tenant:admin, not tenant:manage.
+  const canSeeInactiveDivisions = hasAnyPermission(['division:manage', 'tenant:admin'])
+  // POST /divisions requires division:manage only, not lead:manage — gated separately so a lead:manage-only viewer doesn't 403 on click.
+  const canCreateDivision = hasPermission('division:manage')
 
   const { data: ownerRoleData } = useRole(tenant?.owner)
   const ownerRole = ownerRoleData?.data ?? null
@@ -73,7 +76,7 @@ const TenantDetailPage = () => {
   const debouncedSearch = useDebouncedValue(filters.search, 300)
   const debouncedCode = useDebouncedValue(filters.code, 300)
 
-  const { data: divisionsData, isLoading: divisionsLoading, error: divisionsError } = useDivisions(
+  const { data: divisionsData, isLoading: divisionsLoading, error: divisionsError } = useDivisionsShared(
     {
       tenant: tenant?.id,
       name: filters.searchBy === 'name' ? debouncedSearch || undefined : undefined,
@@ -81,23 +84,21 @@ const TenantDetailPage = () => {
       therapy: filters.therapy === 'ALL' ? undefined : filters.therapy,
       status: filters.status,
       limit: '10',
+      report: 'true',
     },
-    canViewDivisions && !!tenant?.id,
+    canViewDivisions && canFilterDivisionsByTenant && !!tenant?.id,
   )
   const divisions = divisionsData?.data?.items ?? []
   const totalDivisions = divisionsData?.data?.count ?? 0
 
-  // Independent of the filtered/paginated list above (whose own `count` shifts with
-  // whatever status filter the table's own dropdown is set to) — count-only, `limit:
-  // '1'`, so this never fetches the actual rows twice. Only division:manage/tenant:admin
-  // can even see the inactive count at all, so the metric is gated the same way.
-  const { data: activeDivisionsData } = useDivisions(
+  // Separate count-only fetch (limit:'1') so this is independent of the filtered/paginated table above.
+  const { data: activeDivisionsData } = useDivisionsShared(
     { tenant: tenant?.id, status: 'active', limit: '1' },
-    canSeeInactiveDivisions && !!tenant?.id,
+    canSeeInactiveDivisions && canFilterDivisionsByTenant && !!tenant?.id,
   )
-  const { data: inactiveDivisionsData } = useDivisions(
+  const { data: inactiveDivisionsData } = useDivisionsShared(
     { tenant: tenant?.id, status: 'inactive', limit: '1' },
-    canSeeInactiveDivisions && !!tenant?.id,
+    canSeeInactiveDivisions && canFilterDivisionsByTenant && !!tenant?.id,
   )
   const activeDivisionCount = activeDivisionsData?.data?.count
   const inactiveDivisionCount = inactiveDivisionsData?.data?.count
@@ -106,45 +107,85 @@ const TenantDetailPage = () => {
       ? Math.round((activeDivisionCount / (activeDivisionCount + inactiveDivisionCount)) * 100)
       : null
 
-  // Total MRs — role-type is per-tenant (no shared "pharma-mr" id across tenants), so the id
-  // must be resolved first before it can filter GET /roles. Both calls are count-only (limit: '1').
-  const { data: mrRoleTypeData } = useRoleTypes(
-    { code: 'pharma-mr', tenant: tenant?.id, limit: '1' },
-    canSearchRoles && !!tenant?.id,
-  )
-  const mrRoleTypeId = mrRoleTypeData?.data?.items[0]?.id
-  const { data: mrRolesData } = useRoles(
-    { type: mrRoleTypeId, limit: '1' },
-    canSearchRoles && !!mrRoleTypeId,
-  )
-  const totalMrCount = mrRolesData?.data?.count
-
-  // Projects — reuses the same report=true per-tenant aggregation the list page uses (search.ts
-  // getTenantStats). Tenant search has no id/tenant filter, so this is scoped via `code` instead —
-  // BUT the backend's code filter is an UNANCHORED regex ($regex, no ^$), so e.g. code "acme" also
-  // matches "acme-pharma". Picking items[0] blindly can silently show a DIFFERENT tenant's project
-  // count. Mitigated here by matching the exact code client-side within the (report-capped, max 20)
-  // result page — genuinely safe only when the real match is within that page; a tenant whose code
-  // collides with 20+ others sorted newer would still be missed. The correct fix is a backend exact
-  // -match contract (an `id`/`tenant` filter on GET /tenants, or an anchored code match) — not done
-  // here, logged in md-files/ui-revisions.md. Also requires tenant:search/tenant:manage (see the
-  // canSearchProjectsKpi gate below) even though this page itself only needs tenant:get to load.
-  const canSearchProjectsKpi = hasAnyPermission(['tenant:search', 'tenant:manage'])
-  const { data: tenantReportData } = useTenants(
+  // Tenant search has no id filter, so this is scoped via `code` — but the backend's code filter is
+  // an unanchored regex, so items[0] isn't safe; exact-matched client-side below instead.
+  const canSearchTenantKpis = hasAnyPermission(['tenant:search', 'tenant:manage'])
+  const { data: tenantReportData, isLoading: tenantKpisLoading, isError: tenantKpisErrored, refetch: refetchTenantKpis } = useTenants(
     { code: tenant?.code, report: 'true', limit: String(REPORT_MAX_LIMIT) },
-    canSearchProjectsKpi && !!tenant?.code,
+    canSearchTenantKpis && !!tenant?.code,
   )
-  const totalProjectCount = tenantReportData?.data?.items.find((t) => t.code === tenant?.code)?.stats?.totalProjects
+  const tenantStats = tenantReportData?.data?.items.find((t) => t.code === tenant?.code)?.stats
+  const totalProjectCount = tenantStats?.totalProjects
+  const totalMrCount = tenantStats?.mrs
+  const totalBilled = tenantStats?.billed
+  // Keeps loading/error/no-exact-match distinct from "Coming soon" (unbuilt), since this is a live fetch that can fail.
+  const tenantKpiTileValue = (value: number | undefined, format: (v: number) => ReactNode = (v) => v) => {
+    if (!canSearchTenantKpis) {
+      return <span style={{ color: 'var(--qms-text-muted)' }} className="italic text-[14px] font-bold">Restricted</span>
+    }
+    if (tenantKpisLoading) {
+      return <span style={{ color: 'var(--qms-text-muted)' }} className="italic text-[14px] font-bold">Loading…</span>
+    }
+    if (tenantKpisErrored) {
+      return (
+        <button
+          onClick={() => void refetchTenantKpis()}
+          className="italic text-[14px] font-bold underline decoration-dotted text-danger"
+        >
+          Unable to load — retry
+        </button>
+      )
+    }
+    if (value === undefined) {
+      return <span style={{ color: 'var(--qms-text-muted)' }} className="italic text-[14px] font-bold">No exact match</span>
+    }
+    return format(value)
+  }
+
+  // Separate from tenantKpiTileValue above — a different query (useInvoiceReport, id-filtered, no code-regex ambiguity).
+  const outstandingTileValue = (): ReactNode => {
+    if (!canViewInvoiceReport) {
+      return <span style={{ color: 'var(--qms-text-muted)' }} className="italic text-[14px] font-bold">Restricted</span>
+    }
+    if (outstandingLoading) {
+      return <span style={{ color: 'var(--qms-text-muted)' }} className="italic text-[14px] font-bold">Loading…</span>
+    }
+    if (outstandingError) {
+      return (
+        <button
+          onClick={() => void refetchOutstanding()}
+          className="italic text-[14px] font-bold underline decoration-dotted text-danger"
+        >
+          Unable to load — retry
+        </button>
+      )
+    }
+    return formatINR(totalOutstanding ?? 0)
+  }
+
+  // `tenant` search filter is honored only for project:manage (see project.service.ts) — matches
+  // ProjectsPage's own PROJECT_CLIENT_FILTER_PERMISSIONS gate for the same filter.
+  const canFilterProjectsByTenant = hasPermission('project:manage')
+  const { data: projectReportData, isLoading: projectTypesLoading, isError: projectTypesErrored } = useProjects(
+    { tenant: tenant?.id, report: 'true', limit: '1' },
+    canFilterProjectsByTenant && !!tenant?.id,
+  )
+  const projectTypeBreakdown = (projectReportData?.data?.report?.byType ?? []).filter((entry) => entry.count > 0)
+
+  // Gated to match GET /invoices/report's own AuthorizeMiddleware, independent of the frontend's /billing/crm route guard.
+  const canViewInvoiceReport = hasAnyPermission(['invoice:search', 'invoice:manage', 'tenant:manage'])
+  const { report: invoiceReport, isLoading: outstandingLoading, error: outstandingError, refetch: refetchOutstanding } = useInvoiceReport(
+    { tenant: tenant?.id },
+    canViewInvoiceReport && !!tenant?.id,
+  )
+  const totalOutstanding = invoiceReport
+    ? invoiceReport.statusCounts
+        .filter((s) => s.status !== 'paid' && s.status !== 'cancelled')
+        .reduce((sum, s) => sum + s.total, 0)
+    : undefined
 
   const [exportingDivisions, setExportingDivisions] = useState(false)
-  // Exports the whole tenant's division set — both statuses, not just whatever
-  // the on-screen filter happens to show, and not just the current
-  // filtered/paginated page (the table itself caps at limit:'10' with no page
-  // control). The backend defaults an unfiltered search to active-only
-  // (division.service.ts), so "the whole set" needs an explicit fetch per
-  // status; canSeeInactiveDivisions gates whether the inactive half is even
-  // visible to this caller (matches the same gate already used for the
-  // Divisions table's own status filter/penetration metric on this page).
+  // Exports both statuses explicitly — an unfiltered search defaults to active-only (division.service.ts).
   const handleExportDivisions = async () => {
     if (!tenant) return
     setExportingDivisions(true)
@@ -201,39 +242,45 @@ const TenantDetailPage = () => {
             onEditClick={() => setEditOpen(true)}
           />
 
-          {/* Prototype's "Client KPIs" strip — Active Divisions/Total MRs/Projects are real;
-              Billing/Outstanding/Project Types need backend work logged in md-files/ui-revisions.md. */}
           <TenantSectionLabel>Client KPIs</TenantSectionLabel>
-          <TenantKpiGrid>
+          <TenantKpiGrid className="mb-5">
             <TenantKpiTile
               label="Active Divisions"
               value={canSeeInactiveDivisions && activeDivisionCount !== undefined ? activeDivisionCount : totalDivisions}
             />
+            <TenantKpiTile label="Projects" value={tenantKpiTileValue(totalProjectCount)} />
+            <TenantKpiTile label="Total MRs" value={tenantKpiTileValue(totalMrCount)} />
             <TenantKpiTile
-              label="Projects"
-              value={
-                !canSearchProjectsKpi
-                  ? <span style={{ color: 'var(--qms-text-muted)' }} className="italic text-[14px] font-bold">Restricted</span>
-                  : totalProjectCount !== undefined ? totalProjectCount : <span style={{ color: '#8b5cf6' }} className="italic text-[14px] font-bold">Coming soon</span>
-              }
+              label="Billing"
+              sub="Excludes draft/cancelled"
+              value={tenantKpiTileValue(totalBilled, formatINR)}
             />
-            <TenantKpiTile
-              label="Total MRs"
-              value={
-                !canSearchRoles
-                  ? <span style={{ color: 'var(--qms-text-muted)' }} className="italic text-[14px] font-bold">Restricted</span>
-                  : totalMrCount !== undefined ? totalMrCount : <span style={{ color: '#8b5cf6' }} className="italic text-[14px] font-bold">Coming soon</span>
-              }
-            />
-            <TenantKpiTile label="Billing" value={<span style={{ color: '#8b5cf6' }} className="italic text-[14px] font-bold">Coming soon</span>} />
-            <TenantKpiTile label="Outstanding" value={<span style={{ color: '#8b5cf6' }} className="italic text-[14px] font-bold">Coming soon</span>} />
+            <TenantKpiTile label="Outstanding" sub="Non-paid, non-cancelled invoices" value={outstandingTileValue()} />
             <TenantMiniBreakdown
               label="Project Types"
-              rows={[{ name: 'Screening / Diet / Lab / Mixed', value: <span className="italic">Coming soon</span> }]}
+              rows={
+                !canFilterProjectsByTenant
+                  ? [{ name: 'Screening / Diet / Lab / Mixed', value: <span className="italic">Restricted</span> }]
+                  : projectTypesLoading
+                    ? [{ name: 'Screening / Diet / Lab / Mixed', value: <span className="italic">Loading…</span> }]
+                    : projectTypesErrored
+                      ? [{ name: 'Screening / Diet / Lab / Mixed', value: <span className="italic">Unable to load</span> }]
+                      : projectTypeBreakdown.length === 0
+                        ? [{ name: 'Screening / Diet / Lab / Mixed', value: <span className="italic">No projects yet</span> }]
+                        : projectTypeBreakdown.map((entry) => ({ name: PROJECT_TYPE_LABEL[entry.type] ?? entry.type, value: entry.count }))
+              }
             />
           </TenantKpiGrid>
 
-          {canViewDivisions && (
+          {canViewDivisions && !canFilterDivisionsByTenant && (
+            <div className="px-4 py-6 text-center text-[13px] rounded-xl border" style={{ color: 'var(--qms-text-muted)', borderColor: 'var(--qms-border)' }}>
+              Divisions can't be scoped to this specific company with your current permissions
+              (needs division:manage or lead:manage) — hidden rather than showing an incorrectly
+              wide list.
+            </div>
+          )}
+
+          {canViewDivisions && canFilterDivisionsByTenant && (
             <div>
               <div className="mb-3 flex items-start justify-between gap-4">
                 <div>
@@ -257,13 +304,15 @@ const TenantDetailPage = () => {
                   >
                     <FiDownload size={14} /> {exportingDivisions ? 'Exporting…' : 'Export'}
                   </Button>
-                  <Button
-                    onClick={() => setCreateDivisionOpen(true)}
-                    className="text-white"
-                    style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
-                  >
-                    <FiPlus size={14} /> New Division
-                  </Button>
+                  {canCreateDivision && (
+                    <Button
+                      onClick={() => setCreateDivisionOpen(true)}
+                      className="text-white"
+                      style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
+                    >
+                      <FiPlus size={14} /> New Division
+                    </Button>
+                  )}
                 </div>
               </div>
 
@@ -299,7 +348,7 @@ const TenantDetailPage = () => {
             />
           )}
 
-          {createDivisionOpen && (
+          {createDivisionOpen && canCreateDivision && (
             <CreateDivisionModal onClose={() => setCreateDivisionOpen(false)} defaultTenantId={tenant.id} />
           )}
         </>

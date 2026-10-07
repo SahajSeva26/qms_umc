@@ -12,12 +12,12 @@ export const PROJECT_THERAPY_TYPES = {
     NEPHROLOGY: 'nephrology',
 } as const;
 
+// a project can span multiple offerings — `type` is an array, so "mixed" is just more than one entry.
 export const PROJECT_TYPES = {
-    SCREENING_CAMP: 'screening_camp',
+    SCREENING: 'screening',
     DIET: 'diet',
+    LAB: 'lab',
     TELECONSULTATION_DIET: 'teleconsultation_diet',
-    LAB_TEST: 'lab_test',
-    MIXED: 'mixed',
 } as const;
 
 export const PROJECT_TEST_TYPES = {

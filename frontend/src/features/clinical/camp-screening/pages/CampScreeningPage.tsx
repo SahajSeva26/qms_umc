@@ -9,8 +9,7 @@ import ScreeningDetail from '@/features/clinical/screening/components/ScreeningD
 import TestRecordingSection from '@/features/clinical/test-result/components/TestRecordingSection'
 import { useScreening } from '@/features/clinical/screening/hooks/useScreening'
 
-// The route only checks "can this role touch Screening at all" — this page
-// does the precise assigned-FO check, since it needs the camp's own `fo` field.
+// Route only checks "can this role touch Screening at all"; this page does the assigned-worker check.
 const CampScreeningPage = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -61,7 +60,7 @@ const CampScreeningPage = () => {
             </div>
           ) : !canWrite ? (
             <div className="text-[13px] rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
-              Only the field officer assigned to this camp (or a screening manager) can run its screenings.
+              Only the {camp.type === 'diet' ? 'dietitian' : 'field officer'} assigned to this camp (or a screening manager) can run its screenings.
             </div>
           ) : openScreening ? (
             openScreening.status === 'completed' ? (

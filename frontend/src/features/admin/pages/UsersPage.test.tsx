@@ -6,20 +6,25 @@ import { usePermission } from '@/hooks/usePermission'
 import { useUsers } from '@/features/admin/hooks/useUsers'
 import { useUserReport } from '@/features/admin/hooks/useUserReport'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
-import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
+import { useTenants } from '@/features/access-management/tenant'
 
 vi.mock('@/hooks/usePermission')
 vi.mock('@/features/admin/hooks/useUsers')
 vi.mock('@/features/admin/hooks/useUserReport')
 vi.mock('@/features/access-management/role/hooks/useRoles')
-vi.mock('@/features/access-management/tenant/hooks/useTenants')
+vi.mock('@/features/access-management/tenant', () => ({
+  useTenants: vi.fn(),
+  TENANT_ROUTES: { TENANT_DETAIL: '/admin/tenants/:id' },
+  CreateTenantDialog: () => null,
+}))
 vi.mock('@/features/admin/admin.service', () => ({
   adminService: { searchUsers: vi.fn(async () => ({ success: true, message: '', data: { count: 0, items: [] } })) },
 }))
 
-function mockPermission(canViewReport: boolean) {
+function mockPermission(canViewReport: boolean, extraCodes: string[] = []) {
   vi.mocked(usePermission).mockReturnValue({
-    hasPermission: (code: string) => (code === 'user:manage' ? canViewReport : false),
+    hasPermission: (code: string) => (code === 'user:manage' ? canViewReport : extraCodes.includes(code)),
+    hasAnyPermission: (codes: string[]) => codes.some((c) => c === 'user:manage' ? canViewReport : extraCodes.includes(c)),
   } as unknown as ReturnType<typeof usePermission>)
 }
 

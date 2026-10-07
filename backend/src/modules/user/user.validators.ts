@@ -1,11 +1,17 @@
 import { z } from 'zod';
 
 import { USER_GENDERS, USER_REPORT_GRANULARITY, USER_STATUS } from './user.constants';
+import { isValidObjectID } from '../../shared/utils/strings';
+
+const objectId = (label: string) =>
+    z.string().refine((val) => isValidObjectID(val), { message: `${label} must be a valid id` });
 
 //1: update ====================================>
 export const UpdateUserPayloadSchema = z.object({
     firstName: z.string().optional().openapi({ example: 'john' }),
     lastName: z.string().optional().openapi({ example: 'doe' }),
+    // profile picture — a file id from the file module (entity user→profile_picture)
+    profilePicture: objectId('File').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
     status: z
         .enum([
             USER_STATUS.ACTIVE,

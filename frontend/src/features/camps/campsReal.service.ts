@@ -1,21 +1,22 @@
 import api from '@/lib/api/api'
 import type { ApiResponse, PaginatedResponse } from '@/types/common.types'
 import type {
+  ApproveVoidCampPayload,
   BookCampPayload,
   BookingAvailabilityPayload,
   BookingAvailabilityResponse,
   CampEntity,
   CampMutationResponseEntity,
+  CampStatus,
   CreateCampPayload,
   MoveCampStagePayload,
   SearchCampQuery,
   UpdateCampPayload,
+  VoidCampPayload,
 } from '@/types/campReal.types'
 import type { CampReport } from '@/types/campReport.types'
 
-// Real API calls against backend/src/modules/operations/camp/**. Deliberately
-// separate from `camps.service.ts`, the old mock store other files still depend on.
-
+// Deliberately separate from `camps.service.ts`, the old mock store other files still depend on.
 const searchCamps = async (query: SearchCampQuery) => {
   const res = await api.get<PaginatedResponse<CampEntity>>('/camps', { params: query })
   return res.data
@@ -26,17 +27,28 @@ const getCamp = async (id: string) => {
   return res.data
 }
 
-// Mutations return the unpopulated in-memory document (CampMutationResponseEntity,
-// not CampEntity) — never read `.devices` off these as populated; fetch/refetch the camp instead.
+// Mutations return the unpopulated in-memory document — fetch/refetch the camp for populated fields.
 const createCamp = async (payload: CreateCampPayload) => {
   const res = await api.post<ApiResponse<CampMutationResponseEntity>>('/camps', payload)
   return res.data
 }
 
-// Pharma field-force booking path — POST /camps/book, not /camps. Uses the
-// same create path server-side, so it returns the same unpopulated shape.
+// Pharma field-force booking path — POST /camps/book, not /camps.
 const bookCamp = async (payload: BookCampPayload) => {
   const res = await api.post<ApiResponse<CampMutationResponseEntity>>('/camps/book', payload)
+  return res.data
+}
+
+// Internal-team void-camp record (WF-4) — POST /camps/void-camp, not /camps. Lands in `requested`
+// with no lifecycle (no FO allocation/slot-clash/auto-confirm).
+const voidCamp = async (payload: VoidCampPayload) => {
+  const res = await api.post<ApiResponse<CampMutationResponseEntity>>('/camps/void-camp', payload)
+  return res.data
+}
+
+// Approves a void camp, moving it requested -> closed. camp:manage OR tenant:manage.
+const approveVoidCamp = async (id: string, payload: ApproveVoidCampPayload) => {
+  const res = await api.patch<ApiResponse<CampMutationResponseEntity>>(`/camps/${id}/approve-void`, payload)
   return res.data
 }
 
@@ -55,17 +67,18 @@ const allocateFo = async (id: string) => {
   return res.data
 }
 
-const getCampReport = async () => {
-  const res = await api.get<ApiResponse<CampReport>>('/camps/report')
+// Optional `status` scopes the whole report (incl. byType) to one status tab.
+const getCampReport = async (status?: CampStatus) => {
+  const res = await api.get<ApiResponse<CampReport>>('/camps/report', { params: status ? { status } : undefined })
   return res.data
 }
 
-// Backend requires the payload key spelled `projectID` — translated here
-// only, so no other caller in the app has to know about that spelling.
+// Backend requires the payload key spelled `projectID` — translated here only.
 const getBookingAvailability = async (payload: BookingAvailabilityPayload) => {
-  const { projectId, ...rest } = payload
+  const { projectId, type, ...rest } = payload
   const res = await api.post<ApiResponse<BookingAvailabilityResponse>>('/camps/booking-availability', {
     projectID: projectId,
+    ...(type ? { type } : {}),
     ...rest,
   })
   return res.data
@@ -76,6 +89,8 @@ export const campsRealService = {
   getCamp,
   createCamp,
   bookCamp,
+  voidCamp,
+  approveVoidCamp,
   updateCamp,
   moveCampStage,
   allocateFo,

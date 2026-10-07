@@ -25,12 +25,17 @@ export type TenantStatus = 'active' | 'inactive'
 // Only present when the search was called with report=true (see SearchTenantQuery.report) —
 // a per-tenant rollup for the current result page only.
 export interface TenantStats {
+  totalDivisions: number
   totalProjects: number
   liveProjects: number
   totalCamps: number
   liveCamps: number
   screeningCamps: number
   dietCamps: number
+  mrs: number
+  // Sum of invoice totals excluding draft/cancelled — NOT the same as "outstanding"
+  // (no unpaid/overdue aggregation exists yet, see md-files/ui-revisions.md).
+  billed: number
 }
 
 // Fields below `name` (except `address`) are optional: only present when the caller holds
@@ -58,6 +63,8 @@ export interface Tenant {
 export interface SearchTenantQuery {
   name?: string
   code?: string
+  city?: string
+  state?: string
   // No permission gate on this filter (backend's own TODO to add one) —
   // any caller can filter by type even though only system:manage sees it in the response.
   type?: TenantType
@@ -417,7 +424,15 @@ export interface SessionPermissions {
 // ---------------------------------------------------------------------------
 
 export type EmployeeStatus = 'active' | 'inactive' | 'terminated'
-export type EmployeeType = 'field-officer'
+// Employment type — how the person is engaged, NOT their system role (that lives on the linked
+// user's Role/RoleType — e.g. 'field-officer'). Mirrors the backend's EMPLOYEE_TYPES exactly.
+export type EmployeeType = 'full-time' | 'part-time' | 'contractual' | 'freelance'
+export const EMPLOYEE_TYPE_LABEL: Record<EmployeeType, string> = {
+  'full-time': 'Full-time',
+  'part-time': 'Part-time',
+  contractual: 'Contractual',
+  freelance: 'Freelance',
+}
 export type EmployeeGender = 'male' | 'female' | 'other'
 export type DaRuleType = 'fixed' | 'percentage'
 

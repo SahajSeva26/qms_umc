@@ -3,6 +3,21 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
+import { useAuthStore } from '@/features/auth/store'
+import { EMPTY_FORM_VALUES } from '@/features/access-management/tenant/tenant.wizard'
+
+// useTenantDraftStore needs a real settled session + setAuth() to leave its loading placeholder.
+const sessionResponse = {
+  success: true,
+  message: '',
+  data: {
+    user: { id: 'user-1', email: 'system@gmail.com', firstName: 'System', lastName: 'User' },
+    role: { id: 'role-1', code: 'admin', name: 'System' },
+    roleType: { id: 'rt-1', code: 'system', name: 'System' },
+    tenant: { id: 'tenant-1', name: 'QMS', code: 'qms', type: 'platform' as const },
+    permissions: ['system:manage'],
+  },
+}
 
 // File-local, not global — these multi-step tests exceeded the default 5s under CPU contention
 // even with userEvent's { delay: null } applied below.
@@ -57,6 +72,7 @@ vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
 
 vi.mock('@/features/access-management/accessManagement.service', () => ({
   accessManagementService: {
+    getMe: vi.fn(async () => sessionResponse),
     searchTenants: vi.fn(async () => ({ success: true, message: '', data: { items: [{ id: 't-platform', name: 'QMS Platform', code: 'qms-platform', type: 'platform', address: null }], count: 1 } })),
     searchRoleTypes: vi.fn(async () => ({ success: true, message: '', data: { items: [{ id: 'rt-sales-rep', code: 'sales-rep' }], count: 1 } })),
     searchRoles: vi.fn(async () => ({ success: true, message: '', data: { items: [{ id: 'role-sales-rep-1', code: 'sr-001', name: 'Sales Rep One' }], count: 1 } })),
@@ -68,7 +84,15 @@ function makeQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } })
 }
 
+// A fresh userId per render keeps each test's draft sessionStorage entry isolated.
+let draftTestUserCounter = 0
+function nextDraftTestUserId() {
+  draftTestUserCounter += 1
+  return `tenant-draft-test-user-${draftTestUserCounter}`
+}
+
 async function renderDialog() {
+  useAuthStore.getState().setAuth({ id: nextDraftTestUserId(), email: 'system@gmail.com', firstName: 'System', lastName: 'User' })
   const CreateTenantDialog = (await import('./CreateTenantDialog')).default
   return render(
     <QueryClientProvider client={makeQueryClient()}>
@@ -90,8 +114,14 @@ async function fillStep0AndAdvance(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('CreateTenantDialog — address', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.resetAllMocks()
+    sessionStorage.clear()
+    useAuthStore.getState().clearAuth()
+    // resetAllMocks() wipes getMe's inline implementation along with its call history — every
+    // describe block that renders the dialog needs it re-registered, or useSession never settles.
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    vi.mocked(accessManagementService.getMe).mockResolvedValue(sessionResponse)
   })
 
   it('creates a company with NO address at all — address is optional end-to-end', async () => {
@@ -279,8 +309,12 @@ async function fillStep1AndSubmit(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('CreateTenantDialog — logo', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.resetAllMocks()
+    sessionStorage.clear()
+    useAuthStore.getState().clearAuth()
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    vi.mocked(accessManagementService.getMe).mockResolvedValue(sessionResponse)
     window.URL.createObjectURL = vi.fn(() => 'blob:mock-preview-url')
     window.URL.revokeObjectURL = vi.fn()
   })
@@ -1039,5 +1073,162 @@ describe('CreateTenantDialog — logo', () => {
 
     await user.click(screen.getByRole('button', { name: /continue anyway/i }))
     await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/admin/tenants/new-tenant-id'))
+  })
+})
+
+describe('CreateTenantDialog — draft persistence', () => {
+  beforeEach(async () => {
+    vi.resetAllMocks()
+    sessionStorage.clear()
+    useAuthStore.getState().clearAuth()
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    vi.mocked(accessManagementService.getMe).mockResolvedValue(sessionResponse)
+    vi.mocked(accessManagementService.searchTenants).mockResolvedValue({ success: true, message: '', data: { items: [], count: 0 } } as never)
+    vi.mocked(accessManagementService.searchRoleTypes).mockResolvedValue({ success: true, message: '', data: { items: [{ id: 'rt-sales-rep', code: 'sales-rep' }], count: 1 } } as never)
+    vi.mocked(accessManagementService.searchRoles).mockResolvedValue({ success: true, message: '', data: { items: [{ id: 'role-sales-rep-1', code: 'sr-001', name: 'Sales Rep One' }], count: 1 } } as never)
+  })
+
+  // tenantDraft.store.ts's own key format — a mismatch here would silently seed a draft the
+  // dialog's own store instance never reads.
+  function draftStorageKey(userId: string) {
+    return `qms:draft:new-tenant:v1:${userId}`
+  }
+
+  function seedDraft(userId: string, snapshot: Record<string, unknown>) {
+    sessionStorage.setItem(draftStorageKey(userId), JSON.stringify({ state: { draft: snapshot, savedAt: Date.now() }, version: 1 }))
+  }
+
+  async function renderWithUser(userId: string) {
+    useAuthStore.getState().setAuth({ id: userId, email: 'system@gmail.com', firstName: 'System', lastName: 'User' })
+    const CreateTenantDialog = (await import('./CreateTenantDialog')).default
+    return render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <MemoryRouter>
+          <CreateTenantDialog />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+  }
+
+  it('shows no resume decision view and the real step 0 content when no draft exists', async () => {
+    const userId = 'tenant-draft-user-1'
+    await renderWithUser(userId)
+    await userEvent.setup().click(await screen.findByRole('button', { name: /new client/i }))
+
+    expect(await screen.findByLabelText(/code \*/i)).toBeInTheDocument()
+    expect(screen.queryByText(/unsaved company from earlier/i)).not.toBeInTheDocument()
+  })
+
+  it('shows the resume decision view (not the editable form) when a draft exists, and does not overwrite it while undecided', async () => {
+    const userId = 'tenant-draft-user-2'
+    seedDraft(userId, { ...EMPTY_FORM_VALUES, code: 'acme-pharma', name: 'Acme Pharma' })
+    await renderWithUser(userId)
+    await userEvent.setup().click(await screen.findByRole('button', { name: /new client/i }))
+
+    expect(await screen.findByText(/unsaved company from earlier/i)).toBeInTheDocument()
+    expect(screen.queryByLabelText(/code \*/i)).not.toBeInTheDocument()
+
+    const raw = sessionStorage.getItem(draftStorageKey(userId))
+    expect(JSON.parse(raw as string).state.draft.code).toBe('acme-pharma')
+  })
+
+  it('Resume restores the saved values into the live form', async () => {
+    const userId = 'tenant-draft-user-3'
+    seedDraft(userId, { ...EMPTY_FORM_VALUES, code: 'acme-pharma', name: 'Acme Pharma' })
+    await renderWithUser(userId)
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: /new client/i }))
+
+    await user.click(await screen.findByRole('button', { name: /^Resume$/i }))
+
+    expect(await screen.findByDisplayValue('acme-pharma')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Acme Pharma')).toBeInTheDocument()
+  })
+
+  it('a saved draft never carries a password back into the resumed form, even if one somehow ended up in storage', async () => {
+    const userId = 'tenant-draft-user-4'
+    // Simulates a stale/tampered entry — the resumed form must stay blank regardless.
+    // salesPerson is required to advance past step 0, to reach the password field.
+    seedDraft(userId, { ...EMPTY_FORM_VALUES, code: 'acme-pharma', name: 'Acme Pharma', salesPerson: 'role-sales-rep-1', ownerPassword: 'leaked-secret' })
+    await renderWithUser(userId)
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: /new client/i }))
+    await user.click(await screen.findByRole('button', { name: /^Resume$/i }))
+
+    await user.click(screen.getByRole('button', { name: /^next$/i }))
+    await user.click(screen.getByRole('button', { name: /^next$/i }))
+    expect(await screen.findByLabelText(/^password \*$/i)).toHaveValue('')
+  })
+
+  it('Discard clears the draft and starts fresh — reopening shows no decision view', async () => {
+    const userId = 'tenant-draft-user-5'
+    seedDraft(userId, { ...EMPTY_FORM_VALUES, code: 'acme-pharma', name: 'Acme Pharma' })
+    const { unmount } = await renderWithUser(userId)
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: /new client/i }))
+
+    await user.click(await screen.findByRole('button', { name: /^Discard$/i }))
+    await screen.findByLabelText(/code \*/i)
+    expect(sessionStorage.getItem(draftStorageKey(userId))).toBeNull()
+
+    unmount()
+    await renderWithUser(userId)
+    await userEvent.setup().click(await screen.findByRole('button', { name: /new client/i }))
+    expect(await screen.findByLabelText(/code \*/i)).toBeInTheDocument()
+    expect(screen.queryByText(/unsaved company from earlier/i)).not.toBeInTheDocument()
+  })
+
+  it('closing the dialog (Cancel) preserves the draft — it is not cleared until the company is actually created', async () => {
+    const userId = 'tenant-draft-user-6'
+    const user = userEvent.setup()
+    const { unmount } = await renderWithUser(userId)
+    await user.click(await screen.findByRole('button', { name: /new client/i }))
+    await screen.findByLabelText(/code \*/i)
+
+    await user.type(screen.getByLabelText(/code \*/i), 'acme-pharma')
+
+    await waitFor(
+      () => {
+        const raw = sessionStorage.getItem(draftStorageKey(userId))
+        expect(raw).not.toBeNull()
+        expect(JSON.parse(raw as string).state.draft.code).toBe('acme-pharma')
+      },
+      { timeout: 2000 },
+    )
+
+    await user.click(screen.getByRole('button', { name: /^cancel$/i }))
+    expect(sessionStorage.getItem(draftStorageKey(userId))).not.toBeNull()
+
+    unmount()
+    await renderWithUser(userId)
+    await user.click(await screen.findByRole('button', { name: /new client/i }))
+    expect(await screen.findByText(/unsaved company from earlier/i)).toBeInTheDocument()
+  })
+
+  it('a real interaction, closing, and reopening offers Resume with the exact value — end-to-end debounce→persist→rehydrate', async () => {
+    const userId = 'tenant-draft-user-7'
+    const user = userEvent.setup()
+    const { unmount } = await renderWithUser(userId)
+    await user.click(await screen.findByRole('button', { name: /new client/i }))
+    await screen.findByLabelText(/code \*/i)
+
+    await user.type(screen.getByLabelText(/^name \*$/i), 'Acme Pharma')
+
+    await waitFor(
+      () => {
+        const raw = sessionStorage.getItem(draftStorageKey(userId))
+        expect(raw).not.toBeNull()
+        expect(JSON.parse(raw as string).state.draft.name).toBe('Acme Pharma')
+      },
+      { timeout: 2000 },
+    )
+
+    unmount()
+    await renderWithUser(userId)
+    await user.click(await screen.findByRole('button', { name: /new client/i }))
+    expect(await screen.findByText(/unsaved company from earlier/i)).toBeInTheDocument()
+
+    await user.click(await screen.findByRole('button', { name: /^Resume$/i }))
+    expect(await screen.findByDisplayValue('Acme Pharma')).toBeInTheDocument()
   })
 })

@@ -140,7 +140,7 @@ describe('NewProjectWizard — navigation', () => {
     await renderWizard()
 
     await advanceThroughLeadAndBasics(user)
-    await waitFor(() => expect(fieldByName('poNumber')).toBeInTheDocument())
+    await waitFor(() => expect(fieldByName('purchaseOrders.0.number')).toBeInTheDocument())
 
     await user.click(screen.getByRole('button', { name: /Back/i }))
     expect(screen.getByDisplayValue('My Test Project')).toBeInTheDocument()
@@ -158,7 +158,7 @@ describe('NewProjectWizard — clickable step pills', () => {
     await renderWizard()
 
     await advanceThroughLeadAndBasics(user)
-    await waitFor(() => expect(fieldByName('poNumber')).toBeInTheDocument())
+    await waitFor(() => expect(fieldByName('purchaseOrders.0.number')).toBeInTheDocument())
 
     // Jump directly from Execution (step 2) back to Lead (step 0),
     // skipping Basics — mirrors going from a later page straight to page 1.
@@ -208,15 +208,15 @@ describe('NewProjectWizard — execution mode switching preserves other modes\' 
     const user = userEvent.setup()
     await renderWizard()
     await advanceThroughLeadAndBasics(user)
-    await waitFor(() => expect(fieldByName('poNumber')).toBeInTheDocument())
+    await waitFor(() => expect(fieldByName('purchaseOrders.0.number')).toBeInTheDocument())
 
-    await user.type(fieldByName('poNumber'), 'PO-999')
+    await user.type(fieldByName('purchaseOrders.0.number'), 'PO-999')
 
     await user.click(screen.getByRole('button', { name: /Agreement Based/i }))
-    expect(queryFieldByName('poNumber')).not.toBeInTheDocument()
+    expect(queryFieldByName('purchaseOrders.0.number')).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /PO Based/i }))
-    expect(fieldByName('poNumber')).toHaveValue('PO-999')
+    expect(fieldByName('purchaseOrders.0.number')).toHaveValue('PO-999')
   })
 })
 
@@ -230,9 +230,9 @@ describe('NewProjectWizard — numeric field NaN-safety', () => {
     const user = userEvent.setup()
     await renderWizard()
     await advanceThroughLeadAndBasics(user)
-    await waitFor(() => expect(fieldByName('poNumber')).toBeInTheDocument())
-    await user.type(fieldByName('poNumber'), 'PO-1')
-    await user.click(screen.getByRole('button', { name: /^Next/i })) // Step 2 -> Step 3 (Financials); PO mode already has poDate defaulted
+    await waitFor(() => expect(fieldByName('purchaseOrders.0.number')).toBeInTheDocument())
+    await user.type(fieldByName('purchaseOrders.0.number'), 'PO-1')
+    await user.click(screen.getByRole('button', { name: /^Next/i })) // Step 2 -> Step 3 (Financials); PO mode already has date defaulted
 
     const campCostInput = await waitFor(() => fieldByName('campCost'))
     await user.clear(campCostInput)
@@ -254,8 +254,8 @@ describe('NewProjectWizard — step-scoped validation actually blocks Next', () 
     const user = userEvent.setup()
     await renderWizard()
     await advanceThroughLeadAndBasics(user)
-    await waitFor(() => expect(fieldByName('poNumber')).toBeInTheDocument())
-    await user.type(fieldByName('poNumber'), 'PO-1')
+    await waitFor(() => expect(fieldByName('purchaseOrders.0.number')).toBeInTheDocument())
+    await user.type(fieldByName('purchaseOrders.0.number'), 'PO-1')
     await user.click(screen.getByRole('button', { name: /^Next/i })) // Step 2 -> Step 3 (Financials)
 
     // Sets valueBeforeGST directly so this isolates campCost's OWN validation,
@@ -280,13 +280,13 @@ describe('NewProjectWizard — step-scoped validation actually blocks Next', () 
     const user = userEvent.setup()
     await renderWizard()
     await advanceThroughLeadAndBasics(user)
-    await waitFor(() => expect(fieldByName('poNumber')).toBeInTheDocument())
-    await user.type(fieldByName('poNumber'), 'PO-1')
-    await user.clear(fieldByName('poDate'))
+    await waitFor(() => expect(fieldByName('purchaseOrders.0.number')).toBeInTheDocument())
+    await user.type(fieldByName('purchaseOrders.0.number'), 'PO-1')
+    await user.clear(fieldByName('purchaseOrders.0.date'))
     await user.click(screen.getByRole('button', { name: /^Next/i }))
 
     // queryFieldByName (not fieldByName) so a wrongful advance fails cleanly.
-    expect(queryFieldByName('poNumber')).toBeInTheDocument()
+    expect(queryFieldByName('purchaseOrders.0.number')).toBeInTheDocument()
     expect(queryFieldByName('campCost')).not.toBeInTheDocument()
     expect(await screen.findByText(/po date is required/i)).toBeInTheDocument()
   })
@@ -391,8 +391,8 @@ describe('NewProjectWizard — draft persistence', () => {
 
     const editProject = {
       id: 'proj-1', name: 'Existing Project', lead: 'lead-1', tenant: 'tenant-1', division: 'div-1',
-      therapy: 'cardiology', type: ['screening_camp'], tests: [],
-      mode: { mode: 'po', poNumber: 'PO-EXIST', poDate: '2026-01-01' },
+      therapy: 'cardiology', type: ['screening'], tests: [],
+      executionMode: { mode: 'po', po: { purchaseOrders: [{ number: 'PO-EXIST', date: '2026-01-01' }] } },
       campCost: 1000, totalCamps: 1, valueBeforeGST: 1000, gst: 18, additionalCost: 0,
       campTimeSlots: ['9am-1pm'], freeCancelHours: 24, cancellationAllowed: 10, campCostDeductionOnChargableCancel: 50,
       goLiveScope: { code: 'pan', values: [] }, whoCanBookCamp: ['pharma-asm'],
@@ -456,8 +456,8 @@ describe('NewProjectWizard — draft persistence', () => {
     await screen.findByText(/pick the source lead/i)
 
     await advanceThroughLeadAndBasics(user)
-    await waitFor(() => expect(fieldByName('poNumber')).toBeInTheDocument())
-    await user.type(fieldByName('poNumber'), 'PO-1')
+    await waitFor(() => expect(fieldByName('purchaseOrders.0.number')).toBeInTheDocument())
+    await user.type(fieldByName('purchaseOrders.0.number'), 'PO-1')
     await user.click(screen.getByRole('button', { name: /^Next/i })) // -> Financials
 
     // Wait for a draft to actually persist first, so this proves removal,

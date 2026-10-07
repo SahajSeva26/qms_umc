@@ -3,12 +3,10 @@ import { FiChevronRight, FiMapPin } from 'react-icons/fi'
 import type { Tenant } from '@/types/accessManagement.types'
 import { TENANT_ROUTES } from '@/features/access-management/tenant/tenant.routes'
 import TenantStatusPill from '@/features/access-management/tenant/components/TenantStatusPill'
+import { formatINR } from '@/utils/formatters'
 
-// Prototype's .cm-row: no shared header row, each stat self-labels (value + kicker underneath).
-// Divisions/Billing are placeholders — real data needs the backend work in md-files/ui-revisions.md.
-// MRs is intentionally NOT shown here (see md-files/ui-revisions.md) — a real per-tenant MR count
-// on a 10-row list page is an N+1 problem without a batched backend aggregation (unlike the single
-// -tenant Detail page, where the 2-call resolve is cheap and already wired).
+// Divisions/Projects/Camps/MRs/Billing all come from the batched report=true tenant stats
+// aggregation (getTenantStats).
 
 interface TenantsTableProps {
   tenants: Tenant[]
@@ -21,7 +19,6 @@ function formatCreated(createdAt?: string): string {
   return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-// Prototype's clientRowData(): [city, state].filter(Boolean).join(', ') || '—'.
 function formatLocation(tenant: Tenant): string {
   const parts = [tenant.address?.city, tenant.address?.state].filter(Boolean)
   return parts.length > 0 ? parts.join(', ') : '—'
@@ -32,7 +29,6 @@ interface StatProps {
   label: string
 }
 
-// Prototype's .rt-stat: bold value (.v) + small uppercase kicker label (.k) directly underneath.
 const Stat = ({ value, label }: StatProps) => (
   <div className="w-16 shrink-0">
     <div className="text-[13px] font-extrabold leading-tight whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>
@@ -48,18 +44,14 @@ const TenantsTable = ({ tenants }: TenantsTableProps) => {
   const navigate = useNavigate()
 
   return (
-    // Each row needs ~700px+ (name block + 5 stat blocks + status/created/chevron) — overflow-x-auto
-    // + a row min-width keeps it usable on narrow panes instead of squeezing/wrapping the stats.
-    <div className="flex flex-col gap-2 overflow-x-auto">
+    // pt-px: the first row's hover:-translate-y-px would otherwise clip its own top border against this container's edge.
+    <div className="flex flex-col gap-2 overflow-x-auto pt-px">
       {tenants.map((tenant) => (
         <div
           key={tenant.id}
           onClick={() => navigate(TENANT_ROUTES.TENANT_DETAIL.replace(':id', tenant.id))}
-          className="flex items-center gap-3 px-4 py-3 min-w-175 rounded-[11px] border cursor-pointer transition-[border-color,transform] duration-100 hover:-translate-y-px"
-          style={{
-            background: 'var(--qms-surface)',
-            borderColor: 'var(--qms-border)',
-          }}
+          className="flex items-center gap-3 px-4 py-3 min-w-175 rounded-[11px] border cursor-pointer transition-transform duration-100 hover:-translate-y-px"
+          style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}
           onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--cm-accent, var(--qms-brand))')}
           onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--qms-border)')}
         >
@@ -74,7 +66,11 @@ const TenantsTable = ({ tenants }: TenantsTableProps) => {
           </div>
 
           <Stat
-            value={<span className="text-[10px] font-bold italic" style={{ color: 'var(--cm-accent, var(--qms-brand))' }}>Coming soon</span>}
+            value={
+              tenant.stats
+                ? <>{tenant.stats.totalDivisions}</>
+                : <span style={{ color: 'var(--qms-text-muted)' }}>—</span>
+            }
             label="Divisions"
           />
           <Stat
@@ -94,7 +90,19 @@ const TenantsTable = ({ tenants }: TenantsTableProps) => {
             label="Camps"
           />
           <Stat
-            value={<span className="text-[10px] font-bold italic" style={{ color: 'var(--cm-accent, var(--qms-brand))' }}>Coming soon</span>}
+            value={
+              tenant.stats
+                ? <>{tenant.stats.mrs}</>
+                : <span style={{ color: 'var(--qms-text-muted)' }}>—</span>
+            }
+            label="MRs"
+          />
+          <Stat
+            value={
+              tenant.stats
+                ? <>{formatINR(tenant.stats.billed)}</>
+                : <span style={{ color: 'var(--qms-text-muted)' }}>—</span>
+            }
             label="Billing"
           />
 

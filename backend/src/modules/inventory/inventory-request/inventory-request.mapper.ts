@@ -68,10 +68,40 @@ export const InventoryRequestMapper = {
         createdAt: request.createdAt,
         updatedAt: request.updatedAt,
     }),
-    toSearchResponse: (data: { count: number; items: any[] }) => ({
-        count: data?.count || 0,
-        items: (data?.items || []).map(InventoryRequestMapper.toResponse),
-    }),
+    toSearchResponse: (data: { count: number; items: any[] }) => {
+        // NOTE: independent from toResponse on purpose — mirrors it field-for-field for now (incl. same permission gating) so nothing breaks; search rows can be trimmed later without affecting GET /:id.
+        const result = {
+            count: data?.count || 0,
+            items: [] as any[],
+        };
+        for (const request of data?.items || []) {
+            result.items.push({
+                id: request._id?.toString(),
+
+                type: request.type,
+                status: request.status,
+
+                // the field officer who raised the request, and whoever processed it
+                requestedBy: mapRole(request.requestedBy),
+                processedBy: mapRole(request.processedBy),
+
+                // requested lines (polymorphic — master for refill, device/consumable for return)
+                lineItems: (request.lineItems || []).map(mapLine),
+
+                // append-only lifecycle journal
+                stageHistory: (request.stageHistory || []).map((entry: any) => ({
+                    from: entry.from,
+                    to: entry.to,
+                    reason: entry.reason,
+                    actor: entry.actor,
+                })),
+
+                createdAt: request.createdAt,
+                updatedAt: request.updatedAt,
+            });
+        }
+        return result;
+    },
 
     toReportResponse: (report: any) => {
         const byStatus = new Map<string, number>((report?.requestByStatus || []).map((r: any) => [r._id, r.count]));

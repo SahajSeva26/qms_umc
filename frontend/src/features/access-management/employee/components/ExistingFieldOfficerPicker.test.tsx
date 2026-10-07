@@ -36,7 +36,7 @@ describe('ExistingFieldOfficerPicker', () => {
 
   it('shows the "type at least 2 characters" prompt below the search threshold', () => {
     vi.mocked(useFieldOfficerRolePicker).mockReturnValue(pickerReturn({ hasSearchableQuery: false }))
-    render(<ExistingFieldOfficerPicker tenant="t-1" foTypeId="rt-fo" value={null} onChange={vi.fn()} />)
+    render(<ExistingFieldOfficerPicker tenant="t-1" roleTypeId="rt-fo" workerLabel="field officer" value={null} onChange={vi.fn()} />)
 
     expect(screen.getByText(/type at least 2 characters/i)).toBeInTheDocument()
   })
@@ -45,7 +45,7 @@ describe('ExistingFieldOfficerPicker', () => {
     vi.mocked(useFieldOfficerRolePicker).mockReturnValue(pickerReturn({ items: [roleFixture()] }))
     const onChange = vi.fn()
     const user = userEvent.setup()
-    render(<ExistingFieldOfficerPicker tenant="t-1" foTypeId="rt-fo" value={null} onChange={onChange} />)
+    render(<ExistingFieldOfficerPicker tenant="t-1" roleTypeId="rt-fo" workerLabel="field officer" value={null} onChange={onChange} />)
 
     await user.click(screen.getByText('Ravi Kumar'))
 
@@ -54,14 +54,14 @@ describe('ExistingFieldOfficerPicker', () => {
 
   it('highlights the row matching the linked user\'s id (not the role\'s own id) via aria-pressed', () => {
     vi.mocked(useFieldOfficerRolePicker).mockReturnValue(pickerReturn({ items: [roleFixture()] }))
-    render(<ExistingFieldOfficerPicker tenant="t-1" foTypeId="rt-fo" value="user-1" onChange={vi.fn()} />)
+    render(<ExistingFieldOfficerPicker tenant="t-1" roleTypeId="rt-fo" workerLabel="field officer" value="user-1" onChange={vi.fn()} />)
 
     expect(screen.getByRole('button', { name: /ravi kumar/i })).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('does not highlight any row when value is the role\'s own id (the original bug\'s input) — proves the comparison targets the user id specifically', () => {
     vi.mocked(useFieldOfficerRolePicker).mockReturnValue(pickerReturn({ items: [roleFixture()] }))
-    render(<ExistingFieldOfficerPicker tenant="t-1" foTypeId="rt-fo" value="role-1" onChange={vi.fn()} />)
+    render(<ExistingFieldOfficerPicker tenant="t-1" roleTypeId="rt-fo" workerLabel="field officer" value="role-1" onChange={vi.fn()} />)
 
     expect(screen.getByRole('button', { name: /ravi kumar/i })).toHaveAttribute('aria-pressed', 'false')
   })
@@ -72,7 +72,7 @@ describe('ExistingFieldOfficerPicker', () => {
     }))
     const onChange = vi.fn()
     const user = userEvent.setup()
-    render(<ExistingFieldOfficerPicker tenant="t-1" foTypeId="rt-fo" value={null} onChange={onChange} />)
+    render(<ExistingFieldOfficerPicker tenant="t-1" roleTypeId="rt-fo" workerLabel="field officer" value={null} onChange={onChange} />)
 
     await user.click(screen.getByText('NoPhone'))
 
@@ -86,7 +86,7 @@ describe('ExistingFieldOfficerPicker', () => {
     }))
     const onChange = vi.fn()
     const user = userEvent.setup()
-    render(<ExistingFieldOfficerPicker tenant="t-1" foTypeId="rt-fo" value={null} onChange={onChange} />)
+    render(<ExistingFieldOfficerPicker tenant="t-1" roleTypeId="rt-fo" workerLabel="field officer" value={null} onChange={onChange} />)
 
     await user.click(screen.getByText('Bad'))
 
@@ -100,7 +100,7 @@ describe('ExistingFieldOfficerPicker', () => {
     }))
     const onChange = vi.fn()
     const user = userEvent.setup()
-    render(<ExistingFieldOfficerPicker tenant="t-1" foTypeId="rt-fo" value={null} onChange={onChange} />)
+    render(<ExistingFieldOfficerPicker tenant="t-1" roleTypeId="rt-fo" workerLabel="field officer" value={null} onChange={onChange} />)
 
     // roleLabel AND the email-fallback both read role.code when there's no populated user —
     // the row's button is the more targeted, unambiguous query.
@@ -123,7 +123,7 @@ describe('ExistingFieldOfficerPicker', () => {
     }))
     const onChange = vi.fn()
     const user = userEvent.setup()
-    render(<ExistingFieldOfficerPicker tenant="t-1" foTypeId="rt-fo" value={null} onChange={onChange} />)
+    render(<ExistingFieldOfficerPicker tenant="t-1" roleTypeId="rt-fo" workerLabel="field officer" value={null} onChange={onChange} />)
 
     const row = screen.getByRole('button', { name: /fo-unpopulated/i })
     // regression (QUP-470 S7): same false-selected defect as the dangling-user case above.
@@ -138,7 +138,7 @@ describe('ExistingFieldOfficerPicker', () => {
 
   it('shows a clear inline error on a search failure, not a silent empty list', () => {
     vi.mocked(useFieldOfficerRolePicker).mockReturnValue(pickerReturn({ error: new Error('403') }))
-    render(<ExistingFieldOfficerPicker tenant="t-1" foTypeId="rt-fo" value={null} onChange={vi.fn()} />)
+    render(<ExistingFieldOfficerPicker tenant="t-1" roleTypeId="rt-fo" workerLabel="field officer" value={null} onChange={vi.fn()} />)
 
     expect(screen.getByText(/couldn't search field officers/i)).toBeInTheDocument()
   })
@@ -147,11 +147,26 @@ describe('ExistingFieldOfficerPicker', () => {
     const fetchNextPage = vi.fn()
     vi.mocked(useFieldOfficerRolePicker).mockReturnValue(pickerReturn({ items: [roleFixture()], hasNextPage: true, fetchNextPage }))
     const user = userEvent.setup()
-    render(<ExistingFieldOfficerPicker tenant="t-1" foTypeId="rt-fo" value={null} onChange={vi.fn()} />)
+    render(<ExistingFieldOfficerPicker tenant="t-1" roleTypeId="rt-fo" workerLabel="field officer" value={null} onChange={vi.fn()} />)
 
     await user.click(screen.getByRole('button', { name: /load more/i }))
 
     expect(fetchNextPage).toHaveBeenCalled()
     expect(screen.getByText('Ravi Kumar')).toBeInTheDocument()
+  })
+
+  it('workerLabel="dietitian" uses dietitian-worded placeholder/empty-state/error text, not field-officer wording', () => {
+    vi.mocked(useFieldOfficerRolePicker).mockReturnValue(pickerReturn({ error: new Error('403') }))
+    render(<ExistingFieldOfficerPicker tenant="t-1" roleTypeId="rt-diet" workerLabel="dietitian" value={null} onChange={vi.fn()} />)
+
+    expect(screen.getByPlaceholderText(/search dietitians by name or email/i)).toBeInTheDocument()
+    expect(screen.getByText(/couldn't search dietitians/i)).toBeInTheDocument()
+  })
+
+  it('passes roleTypeId straight through to the underlying picker hook — the search is scoped by id, workerLabel only drives text', () => {
+    vi.mocked(useFieldOfficerRolePicker).mockReturnValue(pickerReturn())
+    render(<ExistingFieldOfficerPicker tenant="t-1" roleTypeId="rt-diet-123" workerLabel="dietitian" value={null} onChange={vi.fn()} />)
+
+    expect(useFieldOfficerRolePicker).toHaveBeenCalledWith('', 't-1', 'rt-diet-123', true)
   })
 })

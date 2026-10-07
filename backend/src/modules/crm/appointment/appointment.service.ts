@@ -115,6 +115,9 @@ const set = async (model: any, entity: any, ctx: RequestContext): Promise<Hydrat
     if (model.destinationLink !== undefined) {
         entity.destinationLink = model.destinationLink;
     }
+    if (model.location !== undefined) {
+        entity.location = model.location;
+    }
 
     if (model.startTime || model.endTime !== undefined) {
         entity.duration = entity.duration || ({} as any);

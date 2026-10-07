@@ -48,8 +48,7 @@ vi.mock('@/features/doctors/doctors.service', () => ({
   },
 }))
 
-// dayKey (local YYYY-MM-DD) of "today", matching how the availability grid
-// derives its own default fetch window.
+// Matches how the availability day strip derives its own default fetch window.
 function todayKey(): string {
   const d = new Date()
   const pad = (n: number) => String(n).padStart(2, '0')
@@ -80,7 +79,8 @@ vi.mock('@/features/camps/campsReal.service', () => ({
 function sessionFixture(roleTypeCode: string): SessionResponse {
   return {
     user: { id: 'u-1', email: 'a@example.com', firstName: 'a', lastName: 'b' },
-    role: { id: 'role-1', code: 'role-code', name: 'Role' },
+    // division is required for the Doctor picker (DoctorNameDivisionPicker) to search at all.
+    role: { id: 'role-1', code: 'role-code', name: 'Role', division: 'div-1' },
     roleType: { id: 'rt-1', code: roleTypeCode, name: roleTypeCode },
     tenant: { id: 't-1', code: 'tenant-1', name: 'Tenant', type: 'customer' },
     permissions: ['camp:book'],
@@ -90,7 +90,7 @@ function sessionFixture(roleTypeCode: string): SessionResponse {
 function projectFixture(overrides: Partial<ProjectEntity> = {}): ProjectEntity {
   return {
     id: 'proj-1', code: 'PRJ-1', name: 'Cardio Screening Drive', tenant: 't-1', division: 'div-1',
-    therapy: 'cardiology', type: ['screening_camp', 'diet'], tests: [], lead: null, mode: null, campCost: 0, totalCamps: 0,
+    therapy: 'cardiology', type: ['screening', 'diet'], tests: [], lead: null, executionMode: null, campCost: 0, totalCamps: 0,
     gst: 0, valueBeforeGST: 0, additionalCost: 0, campTimeSlots: ['9am-1pm', '10am-2pm'], freeCancelHours: 0,
     cancellationAllowed: 0, campCostDeductionOnChargableCancel: 0, goLiveScope: null,
     whoCanBookCamp: [], salesRep: null, projectCoordinator: null, status: 'live',
@@ -122,34 +122,25 @@ function doctorFixture(overrides: Partial<DoctorEntity> = {}): DoctorEntity {
   }
 }
 
-// Matches production's 5-minute staleTime (queryClient.ts) — a 0 default
-// would refetch on remount regardless of invalidation, masking the cache bug.
+// Matches production's 5-minute staleTime — a 0 default would mask the cache bug under test.
 function makeQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 5 * 60 * 1000 } } })
 }
 
-// Drives BookCampForm's wizard to submission — identical across Screening/Diet. Assumes a
-// pharma-mr (self-booking) session, so there's no step 0 — it starts directly at Location.
+// Assumes a pharma-mr (self-booking) session, so there's no MR field. Doctor-picking now comes
+// BEFORE location (defaults it from the doctor's own address) — "Set test coordinates" still
+// confirms/overrides to the same fixture point so the day-strip availability mock stays valid.
 async function fillAndSubmitBookCampForm(user: ReturnType<typeof userEvent.setup>, doctorName: string) {
-  // Step 1 — where.
-  await user.type(await screen.findByLabelText(/^address line 1$/i), '221 Baker Street')
-  await user.type(screen.getByLabelText(/^city$/i), 'Pune')
-  await user.type(screen.getByLabelText(/^state$/i), 'Maharashtra')
-  await user.type(screen.getByLabelText(/^pincode$/i), '411001')
-  await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
-  await user.click(screen.getByRole('button', { name: /^next$/i }))
-
-  // Step 2 — doctor (distance-sorted, coordinates now set).
   await user.type(await screen.findByPlaceholderText(/search doctor by name/i), doctorName.split(' ')[0])
   const doctorOption = await screen.findByText(new RegExp(doctorName.replace('.', '\\.'), 'i'), {}, { timeout: 3000 })
   await user.click(doctorOption)
-  await user.click(screen.getByRole('button', { name: /^next$/i }))
 
-  // Step 3 — today is the only mocked-available day. With two months now visible, today's digit
-  // can match twice — index 0 is always today's own (first) month, never ambiguous here.
+  await user.click(await screen.findByRole('button', { name: /set test coordinates/i }))
+
+  // Today is the only mocked-available day, first in the day-strip.
   const today = new Date()
-  const todayCells = await screen.findAllByRole('gridcell', { name: String(today.getDate()) })
-  await user.click(todayCells[0].querySelector('button')!)
+  const todayBtn = (await screen.findByText(String(today.getDate()))).closest('button')!
+  await user.click(todayBtn)
   await user.click(await screen.findByRole('button', { name: /9 AM – 1 PM/i }))
 
   await user.click(screen.getByRole('button', { name: /^book camp$/i }))
@@ -263,6 +254,24 @@ describe('PharmaScreeningCampsPage / PharmaDietCampsPage — separate routes, sh
     ))
   })
 
+  it('a non-live project blocks booking with a clear reason, even though its camps are still viewable — matches the prototype\'s live-project booking rule', async () => {
+    const { useSession } = await import('@/hooks/useSession')
+    vi.mocked(useSession).mockReturnValue({
+      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-mr'), hasPermission: () => false,
+    } as unknown as ReturnType<typeof useSession>)
+
+    const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
+    const { pharmaCampsService } = await import('@/features/pharma/pharmaCamps.service')
+    vi.mocked(pharmaProjectsService.getProject).mockResolvedValue({ success: true, message: '', data: projectFixture({ status: 'hold' }) })
+    vi.mocked(pharmaCampsService.searchScopedCamps).mockResolvedValue({ success: true, message: '', data: { items: [], count: 0 } })
+
+    await renderScreeningPage()
+
+    expect(await screen.findByText(/no screening camps assigned to you on this project yet/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /new camp/i })).toBeDisabled()
+    expect(screen.getByText(/this project is not live/i)).toBeInTheDocument()
+  })
+
   it('the Screening page shows Diet camps ALREADY on the project too — viewing is never restricted by the project\'s configured type, only booking is', async () => {
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
@@ -308,7 +317,7 @@ describe('PharmaScreeningCampsPage / PharmaDietCampsPage — separate routes, sh
 
     const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
     const { pharmaCampsService } = await import('@/features/pharma/pharmaCamps.service')
-    vi.mocked(pharmaProjectsService.getProject).mockResolvedValue({ success: true, message: '', data: projectFixture({ type: ['screening_camp', 'diet'] }) })
+    vi.mocked(pharmaProjectsService.getProject).mockResolvedValue({ success: true, message: '', data: projectFixture({ type: ['screening', 'diet'] }) })
     vi.mocked(pharmaCampsService.searchScopedCamps).mockResolvedValue({ success: true, message: '', data: { items: [], count: 0 } })
 
     await renderScreeningPage()
@@ -328,7 +337,7 @@ describe('PharmaScreeningCampsPage / PharmaDietCampsPage — separate routes, sh
 
     const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
     const { pharmaCampsService } = await import('@/features/pharma/pharmaCamps.service')
-    vi.mocked(pharmaProjectsService.getProject).mockResolvedValue({ success: true, message: '', data: projectFixture({ type: ['screening_camp', 'diet'] }) })
+    vi.mocked(pharmaProjectsService.getProject).mockResolvedValue({ success: true, message: '', data: projectFixture({ type: ['screening', 'diet'] }) })
     vi.mocked(pharmaCampsService.searchScopedCamps).mockResolvedValue({ success: true, message: '', data: { items: [], count: 0 } })
 
     const user = userEvent.setup()
@@ -348,7 +357,7 @@ describe('PharmaScreeningCampsPage / PharmaDietCampsPage — separate routes, sh
 
     const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
     const { pharmaCampsService } = await import('@/features/pharma/pharmaCamps.service')
-    vi.mocked(pharmaProjectsService.getProject).mockResolvedValue({ success: true, message: '', data: projectFixture({ type: ['screening_camp'] }) })
+    vi.mocked(pharmaProjectsService.getProject).mockResolvedValue({ success: true, message: '', data: projectFixture({ type: ['screening'] }) })
     vi.mocked(pharmaCampsService.searchScopedCamps).mockResolvedValue({ success: true, message: '', data: { items: [], count: 0 } })
 
     await renderScreeningPage()
@@ -421,7 +430,7 @@ describe('PharmaScreeningCampsPage / PharmaDietCampsPage — separate routes, sh
         ? { items: [campFixture({ code: 'cmp-000002', type: 'diet' })], count: 1 }
         : { items: [], count: 0 },
     }))
-    vi.mocked(doctorsService.nearestDoctors).mockResolvedValue({
+    vi.mocked(doctorsService.searchDoctors).mockResolvedValue({
       success: true, message: '', data: { items: [doctorFixture()], count: 1 },
     })
     vi.mocked(campsRealService.bookCamp).mockImplementationOnce(async () => {
@@ -460,11 +469,10 @@ describe('PharmaScreeningCampsPage / PharmaDietCampsPage — separate routes, sh
     const { campsRealService } = await import('@/features/camps/campsReal.service')
 
     vi.mocked(pharmaProjectsService.getProject).mockResolvedValue({ success: true, message: '', data: projectFixture() })
-    vi.mocked(doctorsService.nearestDoctors).mockResolvedValue({
+    vi.mocked(doctorsService.searchDoctors).mockResolvedValue({
       success: true, message: '', data: { items: [doctorFixture()], count: 1 },
     })
-    // A mutable flag, not a fixed once-queue: the invalidation under test also
-    // refetches Screening's own query, one more call than a fixed sequence predicts.
+    // A mutable flag, not a fixed once-queue: invalidation also refetches Screening's own query.
     let booked = false
     vi.mocked(pharmaCampsService.searchScopedCamps).mockImplementation(async () => ({
       success: true,
@@ -487,7 +495,6 @@ describe('PharmaScreeningCampsPage / PharmaDietCampsPage — separate routes, sh
     expect(await screen.findByText('cmp-pre-existing')).toBeInTheDocument()
     expect(screen.queryByText('cmp-000002')).not.toBeInTheDocument()
 
-    // Back to Screening to book a new camp.
     await user.click(screen.getByRole('button', { name: /^screening$/i }))
     await screen.findByText('cmp-pre-existing')
 
@@ -497,8 +504,7 @@ describe('PharmaScreeningCampsPage / PharmaDietCampsPage — separate routes, sh
     await waitFor(() => expect(campsRealService.bookCamp).toHaveBeenCalled())
     await waitFor(() => expect(screen.queryByText(/booking for project/i)).not.toBeInTheDocument())
 
-    // Return to All-camps — without the fix (narrow invalidation), this would
-    // still show only the stale 1-item snapshot from the earlier visit.
+    // Without narrow invalidation, this would still show the stale 1-item snapshot.
     await user.click(screen.getByRole('button', { name: /all camps/i }))
     expect(await screen.findByText('cmp-000002')).toBeInTheDocument()
     expect(screen.getByText('cmp-pre-existing')).toBeInTheDocument()

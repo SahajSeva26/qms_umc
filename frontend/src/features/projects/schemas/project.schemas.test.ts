@@ -9,10 +9,9 @@ function validForm() {
     leadId: 'lead-1',
     name: 'Test Project',
     therapy: 'cardiology' as const,
-    type: ['screening_camp' as const],
+    type: ['screening' as const],
     mode: 'po' as const,
-    poNumber: 'PO-123',
-    poDate: '2026-01-01',
+    purchaseOrders: [{ number: 'PO-123', date: '2026-01-01', expiry: '' }],
     valueBeforeGST: 10000,
     gst: 18,
     campTimeSlots: ['9am-1pm' as const],
@@ -43,31 +42,36 @@ describe('createProjectWizardSchema', () => {
     expect(paths).toEqual(expect.arrayContaining(['name', 'therapy', 'type']))
   })
 
-  it('requires poNumber only when mode is po', () => {
-    const missingPo = createProjectWizardSchema.safeParse({ ...validForm(), mode: 'po', poNumber: '' })
+  it('requires each PO row\'s number only when mode is po', () => {
+    const missingPo = createProjectWizardSchema.safeParse({ ...validForm(), mode: 'po', purchaseOrders: [{ number: '', date: '2026-01-01', expiry: '' }] })
     expect(missingPo.success).toBe(false)
 
     const agreementModeWithoutPoNumber = createProjectWizardSchema.safeParse({
       ...validForm(),
       mode: 'agreement',
-      poNumber: '',
+      purchaseOrders: [{ number: '', date: '', expiry: '' }],
       agreementStartDate: '2026-01-01',
     })
     expect(agreementModeWithoutPoNumber.success).toBe(true)
   })
 
-  it('requires poDate only when mode is po', () => {
-    const missingPoDate = createProjectWizardSchema.safeParse({ ...validForm(), mode: 'po', poDate: '' })
+  it('requires each PO row\'s date only when mode is po', () => {
+    const missingPoDate = createProjectWizardSchema.safeParse({ ...validForm(), mode: 'po', purchaseOrders: [{ number: 'PO-123', date: '', expiry: '' }] })
     expect(missingPoDate.success).toBe(false)
-    expect(missingPoDate.success ? [] : missingPoDate.error.issues.map((i) => i.path[0])).toContain('poDate')
+    expect(missingPoDate.success ? [] : missingPoDate.error.issues.map((i) => i.path[0])).toContain('purchaseOrders')
 
     const agreementModeWithoutPoDate = createProjectWizardSchema.safeParse({
       ...validForm(),
       mode: 'agreement',
-      poDate: '',
+      purchaseOrders: [{ number: '', date: '', expiry: '' }],
       agreementStartDate: '2026-01-01',
     })
     expect(agreementModeWithoutPoDate.success).toBe(true)
+  })
+
+  it('requires at least one purchase order when mode is po', () => {
+    const result = createProjectWizardSchema.safeParse({ ...validForm(), mode: 'po', purchaseOrders: [] })
+    expect(result.success).toBe(false)
   })
 
   it('requires agreementStartDate only when mode is agreement', () => {

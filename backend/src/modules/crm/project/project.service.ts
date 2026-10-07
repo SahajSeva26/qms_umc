@@ -7,7 +7,7 @@ import {
     ISearchProjectQuery,
     IUpdateProjectPayload,
 } from './project.validators';
-import { PROJECT_COUNTER_ENTITY, PROJECT_PERMISSIONS, PROJECT_TRANSITION_MAP } from './project.constants';
+import { PROJECT_COUNTER_ENTITY, PROJECT_PERMISSIONS, PROJECT_TRANSITION_MAP, PROJECT_TYPES } from './project.constants';
 import { canTransition } from '../lead/lead.validators';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
 import { CounterService } from '../../counter/counter.service';
@@ -21,6 +21,8 @@ import { RoleService } from '../../access-management/role/role.service';
 import { ContactService } from '../contact/contact.service';
 import { TENANT_TYPE } from '../../access-management/tenant/tenant.constants';
 import { TestMasterService } from '../../operations/testMaster/testMaster.service';
+import { CampModel } from '../../operations/camp/camp.model';
+import { CAMP_STATUSES } from '../../operations/camp/camp.constants';
 
 type ProjectDocument = HydratedDocument<IProject> | null;
 
@@ -32,6 +34,10 @@ const populate: any[] = [
     { path: 'projectCoordinator' },
     { path: 'marketingContact' },
     { path: 'tests', select: 'name code therapy' },
+    // execution-mode document refs → file module
+    { path: 'executionMode.po.purchaseOrders.file' },
+    { path: 'executionMode.agreement.file' },
+    { path: 'executionMode.mail.file' },
 ];
 
 // ========================================================================================
@@ -111,8 +117,8 @@ const set = async (model: any, entity: HydratedDocument<IProject>, ctx: RequestC
         entity.tests = model.tests;
     }
 
-    // execution — `mode` is a nested sub-schema; InferSchemaType doesn't surface it, so cast
-    if (model.mode) (entity as any).mode = model.mode;
+    // execution — the whole grouped subdoc (mode + po/agreement/mail) is replaced wholesale
+    if (model.executionMode) (entity as any).executionMode = model.executionMode;
 
     // financials
     if (model.campCost !== undefined) entity.campCost = model.campCost;
@@ -176,10 +182,13 @@ const search = async (filters: ISearchProjectQuery, ctx: RequestContext, options
     // tenant filter (switch tenants) is only honoured for a `project:manage` actor that isn't already
     // tenant-pinned by ctx.where() — a customer actor stays locked to their own tenant regardless.
     if (filters.tenant && !where.tenant && ctx.hasAnyPermissions([PROJECT_PERMISSIONS.MANAGE.code])) {
-        where.tenant = filters.tenant;
+        where.tenant = toObjectId(filters.tenant);
     }
     if (filters.name) {
         where.name = { $regex: filters.name, $options: 'i' };
+    }
+    if (filters.code) {
+        where.code = { $regex: filters.code, $options: 'i' };
     }
     if (filters.status) {
         where.status = filters.status;
@@ -188,13 +197,13 @@ const search = async (filters: ISearchProjectQuery, ctx: RequestContext, options
         where.therapy = filters.therapy;
     }
     if (filters.division) {
-        where.division = filters.division;
+        where.division = toObjectId(filters.division);
     }
     if (filters.lead) {
-        where.lead = filters.lead;
+        where.lead = toObjectId(filters.lead);
     }
     if (filters.salesRep) {
-        where.salesRep = filters.salesRep;
+        where.salesRep = toObjectId(filters.salesRep);
     }
 
     //3: apply own-scope LAST so a filter can't widen past the actor's own visibility
@@ -206,7 +215,56 @@ const search = async (filters: ISearchProjectQuery, ctx: RequestContext, options
 
     const [count, items] = await Promise.all([countPromise, dataPromise]);
 
-    return { count, items };
+    //5: optional report — a per-type breakdown over the whole (scoped + filtered) set, plus
+    // per-project executed-camp counts for the rows on this page.
+    let report;
+    let stats;
+    if (filters.report === 'true') {
+        const [typeGroups, projectStats] = await Promise.all([
+            Project.aggregate([
+                { $match: where },
+                { $unwind: '$type' },
+                { $group: { _id: '$type', count: { $sum: 1 } } },
+            ]),
+            getProjectCampStats(items),
+        ]);
+        const typeCounts = new Map<string, number>(typeGroups.map((g: any) => [g._id, g.count]));
+        report = {
+            total: count,
+            byType: Object.values(PROJECT_TYPES).map((type) => ({ type, count: typeCounts.get(type) || 0 })),
+        };
+        stats = projectStats;
+    }
+
+    return { count, items, report, stats };
+};
+
+// per-project rollup: executed camps (closed + cancelled_charged) — the "done" count shown against
+// the project's totalCamps quota. One query for all projects on the page.
+type ProjectStats = {
+    executedCamps: number;
+};
+const EXECUTED_CAMP_STATUSES: string[] = [CAMP_STATUSES.CLOSED, CAMP_STATUSES.CANCELLED_CHARGED];
+
+const getProjectCampStats = async (projects: HydratedDocument<IProject>[]): Promise<Record<string, ProjectStats>> => {
+    const projectIds = projects.map((p) => p._id);
+
+    const campGroups = await CampModel.aggregate([
+        { $match: { project: { $in: projectIds }, status: { $in: EXECUTED_CAMP_STATUSES } } },
+        { $group: { _id: '$project', executed: { $sum: 1 } } },
+    ]);
+
+    const stats: Record<string, ProjectStats> = {};
+    for (const id of projectIds) {
+        stats[id.toString()] = { executedCamps: 0 };
+    }
+    for (const g of campGroups) {
+        const entry = stats[g._id?.toString()];
+        if (entry) {
+            entry.executedCamps = g.executed;
+        }
+    }
+    return stats;
 };
 
 const create = async (model: ICreateProjectPayload, ctx: RequestContext): Promise<HydratedDocument<IProject>> => {
@@ -298,8 +356,14 @@ const moveStage = async (id: string, model: IMoveStagePayload, ctx: RequestConte
 
 
 const report = async (filters: IProjectReportQuery, ctx: RequestContext) => {
+    // scope the report exactly like search() — ctx.where() (tenant pin) + own-scope (division for a
+    // customer actor, salesRep for a non-manager platform rep) — so the KPI tiles always match the
+    // list the user actually sees, not a wider tenant-wide total.
+    const where = { ...ctx.where() };
+    applyOwnScope(where, ctx);
+
     const [result] = await Project.aggregate([
-        { $match: ctx.where() },
+        { $match: where },
         { $addFields: { estimatedRevenue: { $multiply: ['$campCost', '$totalCamps'] } } },
         {
             $facet: {

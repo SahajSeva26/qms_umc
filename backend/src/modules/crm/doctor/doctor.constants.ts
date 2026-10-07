@@ -2,6 +2,16 @@
 export const DOCTOR_SPECIALIZATION = {
     CP: 'cp',
     GP: 'gp',
+    ENDOCRINOLOGIST: 'endocrinologist',
+    CARDIOLOGIST: 'cardiologist',
+    PULMONOLOGIST: 'pulmonologist',
+    ORTHOPEDIC: 'orthopedic',
+    GYNECOLOGIST: 'gynecologist',
+    NEUROLOGIST: 'neurologist',
+    HEPATOLOGIST: 'hepatologist',
+    OPHTHALMOLOGIST: 'ophthalmologist',
+    CHEST_PHYSICIAN: 'chest_physician',
+    NEPHROLOGIST: 'nephrologist',
 } as const;
 
 export const DOCTOR_STATUS = {
@@ -20,6 +30,11 @@ export const DOCTOR_PERMISSIONS = {
         code: 'doctor:manage',
         name: 'Manage Doctor',
         description: 'Manage doctors (full visibility, incl. inactive)',
+    } as const,
+    CREATE: {
+        code: 'doctor:create',
+        name: 'Create Doctor',
+        description: 'Create a doctor (scoped to own division for customer/field-force actors)',
     } as const,
 
 };

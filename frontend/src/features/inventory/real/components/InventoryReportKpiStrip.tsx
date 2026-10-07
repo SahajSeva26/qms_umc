@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import type { IconType } from 'react-icons'
 import KpiTile, { type KpiTone } from '@/components/ui/KpiTile'
 
@@ -9,13 +10,12 @@ export interface InventoryReportTile {
   icon: IconType
 }
 
-// Static lookup, never a template-literal class name — Tailwind's build
-// scans source files as plain text for literal class names, so a computed
-// `lg:grid-cols-${n}` would silently vanish from the production CSS.
-const GRID_COLS: Record<2 | 4 | 5, string> = {
+// Static lookup, never a template-literal class — a computed `lg:grid-cols-${n}` would vanish from Tailwind's build.
+const GRID_COLS: Record<2 | 4 | 5 | 6, string> = {
   2: 'grid-cols-2 sm:grid-cols-2 lg:grid-cols-2',
   4: 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4',
   5: 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5',
+  6: 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-6',
 }
 
 interface InventoryReportKpiStripProps {
@@ -24,10 +24,18 @@ interface InventoryReportKpiStripProps {
   error: unknown
   canView: boolean
   /** Real eventual tile count — needed since `tiles` is still `[]` while loading. */
-  skeletonCount: 2 | 4 | 5
+  skeletonCount: 2 | 4 | 5 | 6
+  /** Optional heading override — defaults to the org-wide-overview copy. */
+  heading?: string
+  /**
+   * Extra tiles rendered in the SAME grid as `tiles` (e.g. a clickable
+   * type-filter strip) — so the whole row reads as one continuous KPI set
+   * instead of two visually separate grids with their own headings/gaps.
+   */
+  extraTiles?: ReactNode
 }
 
-const InventoryReportKpiStrip = ({ tiles, isLoading, error, canView, skeletonCount }: InventoryReportKpiStripProps) => {
+const InventoryReportKpiStrip = ({ tiles, isLoading, error, canView, skeletonCount, extraTiles, heading }: InventoryReportKpiStripProps) => {
   const gridCols = GRID_COLS[skeletonCount]
 
   if (!canView) {
@@ -63,12 +71,13 @@ const InventoryReportKpiStrip = ({ tiles, isLoading, error, canView, skeletonCou
   return (
     <div className="mb-4">
       <p className="text-[11px] font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-        Organisation-wide overview — unaffected by list filters
+        {heading ?? 'Organisation-wide overview — unaffected by list filters'}
       </p>
       <div className={`grid gap-2.5 ${gridCols}`}>
         {tiles.map((tile) => (
           <KpiTile key={tile.key} label={tile.label} value={String(tile.value)} tone={tile.tone} icon={tile.icon} />
         ))}
+        {extraTiles}
       </div>
     </div>
   )

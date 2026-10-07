@@ -20,9 +20,11 @@ interface RolesFilterBarProps {
   setFilter: <K extends keyof RolesFilterState>(key: K, value: RolesFilterState[K]) => void
   reset: () => void
   tenantOptions: TenantOption[]
+  // False when the caller lacks tenant:search/tenant:manage — the Company lookup never fires.
+  canFilterByTenant: boolean
 }
 
-const RolesFilterBar = ({ filters, setFilter, reset, tenantOptions }: RolesFilterBarProps) => {
+const RolesFilterBar = ({ filters, setFilter, reset, tenantOptions, canFilterByTenant }: RolesFilterBarProps) => {
   const tenantLabelById = new Map(tenantOptions.map((t) => [t.id, t.label]))
 
   return (
@@ -48,9 +50,9 @@ const RolesFilterBar = ({ filters, setFilter, reset, tenantOptions }: RolesFilte
           </SelectContent>
         </Select>
 
-        <Select value={filters.tenant} onValueChange={(v) => setFilter('tenant', v ?? 'ALL')}>
+        <Select value={filters.tenant} onValueChange={(v) => setFilter('tenant', v ?? 'ALL')} disabled={!canFilterByTenant}>
           <SelectTrigger className="text-[12px]">
-            <SelectValue>{(v: string) => (v === 'ALL' ? 'Company' : (tenantLabelById.get(v) ?? 'Company'))}</SelectValue>
+            <SelectValue>{(v: string) => (!canFilterByTenant ? "Can't filter by company" : v === 'ALL' ? 'Company' : (tenantLabelById.get(v) ?? 'Company'))}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="ALL">All</SelectItem>

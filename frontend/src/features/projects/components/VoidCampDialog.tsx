@@ -24,6 +24,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import DatePicker from '@/components/ui/DatePicker'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { usePagination } from '@/hooks/usePagination'
@@ -32,6 +33,10 @@ import { EMPTY_ARRAY } from '@/utils/emptyArray'
 import type { CampEntity } from '@/types/campReal.types'
 
 const VOID_CAMPS_PAGE_SIZE = 10
+
+// Navigation range only — a void camp can record a date well in the past (caught up after the fact).
+const VOID_CAMP_DATE_START_MONTH = new Date(new Date().getFullYear() - 10, 0)
+const VOID_CAMP_DATE_END_MONTH = new Date(new Date().getFullYear() + 10, 11)
 
 interface VoidCampDialogProps {
   project: ProjectEntity
@@ -252,7 +257,13 @@ const VoidCampDialog = ({ project, onClose }: VoidCampDialogProps) => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label className="text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: 'var(--qms-text-muted)' }}>Camp date *</Label>
-                <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                <DatePicker
+                  value={date}
+                  onChange={setDate}
+                  className="w-full"
+                  startMonth={VOID_CAMP_DATE_START_MONTH}
+                  endMonth={VOID_CAMP_DATE_END_MONTH}
+                />
               </div>
               <div>
                 <Label className="text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: 'var(--qms-text-muted)' }}>Time slot *</Label>

@@ -28,6 +28,10 @@ interface EditLeadModalProps {
   onClose: () => void
 }
 
+// Navigation range only — DatePicker's own default caps at the current month, unreachable for a future follow-up.
+const FOLLOW_UP_DATE_START_MONTH = new Date(new Date().getFullYear() - 2, 0)
+const FOLLOW_UP_DATE_END_MONTH = new Date(new Date().getFullYear() + 5, 11)
+
 // tenant/division/status are deliberately absent: tenant/division are immutable
 // post-create, and status only ever moves through moveStage, never this form.
 interface EditFormState {
@@ -318,6 +322,8 @@ const EditLeadModal = ({ lead, onSave, onClose }: EditLeadModalProps) => {
                 value={form.followUpDate}
                 onChange={(iso) => setField('followUpDate', iso)}
                 className={`w-full ${fieldClasses}`}
+                startMonth={FOLLOW_UP_DATE_START_MONTH}
+                endMonth={FOLLOW_UP_DATE_END_MONTH}
               />
             </div>
             <div>

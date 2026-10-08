@@ -8,6 +8,7 @@ import InventoryMasterMultiPicker from '@/features/inventory/real/components/Inv
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import DatePicker from '@/components/ui/DatePicker'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { CAMP_TYPE_LABEL, CAMP_TYPE_VALUES } from '@/types/campReal.types'
@@ -23,6 +24,10 @@ import type { LocationResolutionState } from '@/components/widgets/location-pick
 import { haversineDistanceKm } from '@/utils/geo'
 
 const TYPE_OPTIONS: { value: CampType; label: string }[] = CAMP_TYPE_VALUES.map((value) => ({ value, label: CAMP_TYPE_LABEL[value] }))
+
+// Navigation range only, not a business rule — the backend has no min/max on this field.
+const CAMP_DATE_START_MONTH = new Date(new Date().getFullYear() - 10, 0)
+const CAMP_DATE_END_MONTH = new Date(new Date().getFullYear() + 10, 11)
 
 const BILLING_OPTIONS: { value: BillingType; label: string }[] = [
   { value: 'billable', label: 'Billable' },
@@ -294,7 +299,14 @@ const CampFormFields = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Date</Label>
-          <Input type="date" value={date} onChange={(e) => setField('date', e.target.value)} disabled={isLocked} />
+          <DatePicker
+            value={date}
+            onChange={(v) => setField('date', v)}
+            className="w-full"
+            disabled={isLocked}
+            startMonth={CAMP_DATE_START_MONTH}
+            endMonth={CAMP_DATE_END_MONTH}
+          />
         </div>
         <div>
           <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Time slot *</Label>

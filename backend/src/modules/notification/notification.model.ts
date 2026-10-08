@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { NOTIFICATION_TYPES, NOTIFICATION_CHANNELS, NOTIFICATION_STATUS } from './notification.constants';
+import { NOTIFICATION_CHANNELS, NOTIFICATION_STATUS } from './notification.constants';
 
 const notificationEntitySchema = new mongoose.Schema(
     {
@@ -39,9 +39,8 @@ const notificationSchema = new mongoose.Schema(
             type: notificationEntitySchema,
         },
 
-        type: {
+        event: {
             type: String,
-            enum: Object.values(NOTIFICATION_TYPES),
             required: true,
             index: true,
         },

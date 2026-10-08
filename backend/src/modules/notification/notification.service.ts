@@ -33,8 +33,8 @@ const set = (model: any, entity: HydratedDocument<INotification>) => {
     if (model.entity !== undefined) {
         entity.entity = model.entity;
     }
-    if (model.type) {
-        entity.type = model.type;
+    if (model.event) {
+        entity.event = model.event;
     }
     if (model.channel) {
         entity.channel = model.channel;
@@ -80,8 +80,8 @@ const search = async (filters: ISearchNotificationQuery, ctx: RequestContext, op
     }
 
     //2: plain filters
-    if (filters.type) {
-        where.type = filters.type;
+    if (filters.event) {
+        where.event = filters.event;
     }
     if (filters.channel) {
         where.channel = filters.channel;

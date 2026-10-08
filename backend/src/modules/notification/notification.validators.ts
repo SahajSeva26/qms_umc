@@ -1,6 +1,6 @@
 // Notification Validators
 import { z } from 'zod';
-import { NOTIFICATION_TYPES, NOTIFICATION_CHANNELS, NOTIFICATION_STATUS } from './notification.constants';
+import { NOTIFICATION_CHANNELS, NOTIFICATION_STATUS } from './notification.constants';
 import { isValidObjectID } from '../../shared/utils/strings';
 
 const objectId = (label: string) =>
@@ -22,7 +22,7 @@ export const CreateNotificationPayloadSchema = z.object({
     // optional — pass it when the caller already has the tenant in hand
     tenant: objectId('Tenant').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8b' }),
     entity: entitySchema.optional(),
-    type: z.enum(Object.values(NOTIFICATION_TYPES)).openapi({ example: 'camp.create' }),
+    event: z.string().min(1).openapi({ example: 'camp.create' }),
     channel: z.enum(Object.values(NOTIFICATION_CHANNELS)).openapi({ example: 'in-app' }),
     subject: z.string().optional().openapi({ example: 'New camp created' }),
     body: z.string().optional().openapi({ example: 'A new camp has been created for your division.' }),
@@ -38,7 +38,7 @@ export type IUpdateNotificationPayload = z.infer<typeof UpdateNotificationPayloa
 
 //3: search ====================================>
 export const SearchNotificationQuerySchema = z.object({
-    type: z.enum(Object.values(NOTIFICATION_TYPES)).optional().openapi({ example: 'camp.create' }),
+    event: z.string().optional().openapi({ example: 'camp.create' }),
     channel: z.enum(Object.values(NOTIFICATION_CHANNELS)).optional().openapi({ example: 'in-app' }),
     status: z.enum(Object.values(NOTIFICATION_STATUS)).optional().openapi({ example: 'pending' }),
     read: booleanish.optional().openapi({ example: 'false' }),

@@ -7,7 +7,7 @@ export const NotificationMapper = {
     toResponse: (notification: any, ctx: RequestContext) => ({
         id: notification._id?.toString(),
         entity: notification.entity || null,
-        type: notification.type,
+        event: notification.event,
         channel: notification.channel,
         subject: notification.subject,
         body: notification.body,
@@ -25,7 +25,7 @@ export const NotificationMapper = {
         items: (data?.items || []).map((notification: any) => ({
             id: notification._id?.toString(),
             entity: notification.entity || null,
-            type: notification.type,
+            event: notification.event,
             channel: notification.channel,
             subject: notification.subject,
             body: notification.body,

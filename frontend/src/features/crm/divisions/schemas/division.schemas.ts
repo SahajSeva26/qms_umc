@@ -1,9 +1,6 @@
 import { z } from 'zod'
 import { PASSWORD_MIN_LENGTH } from '@/features/access-management/accessManagement.constants'
 
-// Backend rejects uppercase codes rather than lowercasing them — normalize client-side before submit.
-const MONGO_OBJECT_ID_REGEX = /^[0-9a-fA-F]{24}$/
-
 // A division may span multiple therapy areas — non-empty, no duplicates.
 const THERAPY_VALUES = ['cardiology', 'diabetes', 'pulmonology', 'endocrine', 'orthopedics', 'gynaecology', 'neurology', 'hepatology', 'nephrology', 'ophthalmology', 'dermatology', 'oncology', 'pediatrics', 'wellness'] as const
 const therapyListSchema = z
@@ -13,15 +10,6 @@ const therapyListSchema = z
 
 export const createDivisionSchema = z.object({
   tenant: z.string().trim().min(1, 'Company is required.'),
-  code: z
-    .string()
-    .trim()
-    .min(3, 'Code must be at least 3 characters.')
-    .regex(/^\S+$/, 'Code cannot contain spaces.')
-    .toLowerCase()
-    .refine((val) => !MONGO_OBJECT_ID_REGEX.test(val), {
-      message: 'Code must not look like an ObjectId.',
-    }),
   name: z.string().trim().min(1, 'Name is required.'),
   therapy: therapyListSchema,
   mrCount: z.number().int('Must be a whole number.').nonnegative('Must be 0 or more.').optional(),

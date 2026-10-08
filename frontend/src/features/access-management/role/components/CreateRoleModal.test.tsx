@@ -207,7 +207,6 @@ describe('CreateRoleModal', () => {
     const user = userEvent.setup()
     await renderAndOpenModal(user, queryClient)
 
-    await user.type(screen.getByLabelText(/code/i), 'rsm-north')
     await user.type(screen.getByLabelText(/^name$/i), 'RSM North')
     await selectCompany(user, 'Acme', /Acme/i)
     await selectByLabel(user, /role type/i, /RSM/i)
@@ -369,7 +368,6 @@ describe('CreateRoleModal', () => {
     await renderAndOpenModal(user, queryClient)
 
     await selectCompany(user, 'Acme', /Acme/i)
-    await user.type(screen.getByLabelText(/^code$/i), 'sales-rep-jane')
     await user.type(screen.getByLabelText(/^name$/i), 'Sales Rep Jane')
     await selectByLabel(user, /role type/i, /Sales Rep/i)
 
@@ -415,7 +413,6 @@ describe('CreateRoleModal', () => {
     await renderAndOpenModal(user, queryClient)
 
     await selectCompany(user, 'Acme', /Acme/i)
-    await user.type(screen.getByLabelText(/^code$/i), 'sales-rep-phone-test')
     await user.type(screen.getByLabelText(/^name$/i), 'Sales Rep Phone Test')
     await selectByLabel(user, /role type/i, /Sales Rep/i)
     await user.click(screen.getByRole('button', { name: 'Next' }))

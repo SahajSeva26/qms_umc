@@ -12,8 +12,8 @@ type OnboardState =
   | { step: 'account-creation-failed'; error: unknown }
   // A network error/timeout/5xx — the transaction may have committed despite the lost response,
   // so a blind retry could hit a real duplicate-conflict; checkIfAccountExists() resolves this.
-  | { step: 'account-creation-uncertain'; tenant: string; code: string; type: string; email: string; employeeFields: EmployeeFieldsPayload }
-  | { step: 'checking-account'; tenant: string; code: string; type: string; email: string; employeeFields: EmployeeFieldsPayload }
+  | { step: 'account-creation-uncertain'; tenant: string; type: string; email: string; employeeFields: EmployeeFieldsPayload }
+  | { step: 'checking-account'; tenant: string; type: string; email: string; employeeFields: EmployeeFieldsPayload }
   | { step: 'account-created'; userId: string; userLabel: string; tenant: string }
   | { step: 'creating-employee'; userId: string; userLabel: string; tenant: string }
   | { step: 'employee-uncertain'; userId: string; userLabel: string; tenant: string }
@@ -47,13 +47,12 @@ export function useOnboardFieldOfficer() {
       // (the transaction may have committed despite the lost response), so it's treated as uncertain instead.
       const status = axios.isAxiosError(err) ? err.response?.status : undefined
       const isConfirmedRejection = status !== undefined && status >= 400 && status < 500
-      if (isConfirmedRejection || !rolePayload.code) {
+      if (isConfirmedRejection) {
         setState({ step: 'account-creation-failed', error: err })
       } else {
         setState({
           step: 'account-creation-uncertain',
           tenant: rolePayload.tenant,
-          code: rolePayload.code,
           type: rolePayload.type,
           email: rolePayload.user.email,
           employeeFields,
@@ -103,19 +102,22 @@ export function useOnboardFieldOfficer() {
     return submitEmployee(state.userId, state.userLabel, email, phone, employeeFields, state.tenant).catch(() => {})
   }
 
-  // If found, continues straight into Employee creation using that Role's linked user — but only
-  // when its email matches what was submitted, so this never attaches an Employee to a stranger's account.
+  // Searched by email (role code is server-generated, unknown in advance). The backend's `user`
+  // filter is fuzzy, not exact — scan all candidates for an exact email match, not just the first.
   const checkIfAccountExists = async (latestEmployeeFields?: EmployeeFieldsPayload) => {
     if (state.step !== 'account-creation-uncertain') return
-    const { tenant, code, type, email, employeeFields: capturedEmployeeFields } = state
+    const { tenant, type, email, employeeFields: capturedEmployeeFields } = state
     const employeeFields = latestEmployeeFields ?? capturedEmployeeFields
-    setState({ step: 'checking-account', tenant, code, type, email, employeeFields })
+    setState({ step: 'checking-account', tenant, type, email, employeeFields })
     try {
-      const res = await accessManagementService.searchRoles({ tenant, code, type, limit: '1' })
-      const existingRole = res.data?.items[0]
-      const user = existingRole ? (typeof existingRole.user === 'string' ? null : (existingRole.user as RolePopulatedUser)) : null
-      const emailMatches = !!user && user.email.toLowerCase() === email.toLowerCase()
-      if (existingRole && user?._id && emailMatches) {
+      const res = await accessManagementService.searchRoles({ tenant, user: email, type, limit: '20' })
+      const candidates = res.data?.items ?? []
+      const matchedRole = candidates.find((role) => {
+        const roleUser = typeof role.user === 'string' ? null : (role.user as RolePopulatedUser)
+        return roleUser?.email?.toLowerCase() === email.toLowerCase()
+      })
+      const user = matchedRole ? (matchedRole.user as RolePopulatedUser) : null
+      if (matchedRole && user?._id) {
         const userLabel = `${user.firstName} ${user.lastName ?? ''}`.trim()
         setState({ step: 'account-created', userId: user._id, userLabel, tenant })
         await submitEmployee(user._id, userLabel, user.email, user.phone, employeeFields, tenant)
@@ -123,15 +125,15 @@ export function useOnboardFieldOfficer() {
         setState({
           step: 'account-creation-failed',
           error: new Error(
-            existingRole && !emailMatches
-              ? 'A different account was found for this code — nothing was attached. Please retry.'
-              : 'No account found for this code — nothing was created.',
+            candidates.length > 0
+              ? 'A different account was found for this email — nothing was attached. Please retry.'
+              : 'No account found for this email — nothing was created.',
           ),
         })
       }
     } catch {
       // A failed check is not proof the account doesn't exist — stay uncertain, don't fall back to a blind retry.
-      setState({ step: 'account-creation-uncertain', tenant, code, type, email, employeeFields })
+      setState({ step: 'account-creation-uncertain', tenant, type, email, employeeFields })
     }
   }
 

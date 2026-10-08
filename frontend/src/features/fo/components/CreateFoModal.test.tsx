@@ -33,7 +33,6 @@ async function renderAndOpen(user: ReturnType<typeof userEvent.setup>) {
 
 // Fills step 0 (role details) and advances to step 1 (user account).
 async function fillRoleDetailsAndAdvance(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(screen.getByLabelText(/^code$/i), 'fo-ravi-kumar')
   await user.type(screen.getByLabelText(/^name$/i), 'field-officer role for Ravi')
   await user.click(screen.getByRole('button', { name: /^next$/i }))
   await screen.findByText(/step 2 of 2/i)
@@ -57,10 +56,10 @@ describe('CreateFoModal', () => {
     await renderAndOpen(user)
 
     expect(screen.getByText(/step 1 of 2/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/^code$/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/^name$/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/description/i)).toBeInTheDocument()
 
+    expect(screen.queryByLabelText(/^code$/i)).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/first name/i)).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/company/i)).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/^role type$/i)).not.toBeInTheDocument()
@@ -68,25 +67,23 @@ describe('CreateFoModal', () => {
     expect(screen.queryByLabelText(/supervisor/i)).not.toBeInTheDocument()
   })
 
-  it('blocks Next on step 1 with visible errors when code/name are blank', async () => {
+  it('blocks Next on step 1 with a visible error when name is blank', async () => {
     const user = userEvent.setup()
     await renderAndOpen(user)
 
     await user.click(screen.getByRole('button', { name: /^next$/i }))
 
-    expect(await screen.findByText('Code is required')).toBeInTheDocument()
-    expect(screen.getByText('Name is required')).toBeInTheDocument()
+    expect(await screen.findByText('Name is required')).toBeInTheDocument()
     expect(screen.getByText(/step 1 of 2/i)).toBeInTheDocument()
   })
 
-  it('advances to step 2 (user account) once code/name are valid', async () => {
+  it('advances to step 2 (user account) once name is valid', async () => {
     const user = userEvent.setup()
     await renderAndOpen(user)
 
     await fillRoleDetailsAndAdvance(user)
 
     expect(screen.getByLabelText(/first name/i)).toBeInTheDocument()
-    expect(screen.queryByLabelText(/^code$/i)).not.toBeInTheDocument()
   })
 
   it('Back returns to step 1 with the previously entered values intact', async () => {
@@ -97,7 +94,7 @@ describe('CreateFoModal', () => {
     await user.click(screen.getByRole('button', { name: /^back$/i }))
 
     expect(await screen.findByText(/step 1 of 2/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/^code$/i)).toHaveValue('fo-ravi-kumar')
+    expect(screen.getByLabelText(/^name$/i)).toHaveValue('field-officer role for Ravi')
   })
 
   it('blocks Create on step 2 with visible errors when user fields are blank', async () => {
@@ -123,9 +120,9 @@ describe('CreateFoModal', () => {
     expect(createRole).toHaveBeenCalledWith(expect.objectContaining({
       tenant: 't-platform-1',
       type: 'rt-fo-1',
-      code: 'fo-ravi-kumar',
       permissions: [],
     }))
+    expect(createRole).not.toHaveBeenCalledWith(expect.objectContaining({ code: expect.anything() }))
   })
 
   it('closes the dialog and shows a success toast after a successful create', async () => {

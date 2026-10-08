@@ -26,13 +26,6 @@ const TenantBasicsStep = ({ salesRepPicker, logoFlow }: TenantBasicsStepProps) =
       <div className="space-y-3">
         <CreateTenantLogoFlow flow={logoFlow} variant="picker" />
         <div>
-          <Label htmlFor="tenantCode" className="text-xs mb-1.5">
-            Code *
-          </Label>
-          <Input id="tenantCode" type="text" placeholder="e.g. acme-pharma" {...register('code')} />
-          {fieldError('code') && <p className="text-[11px] mt-1 text-danger">{fieldError('code')}</p>}
-        </div>
-        <div>
           <Label htmlFor="tenantName" className="text-xs mb-1.5">
             Name *
           </Label>

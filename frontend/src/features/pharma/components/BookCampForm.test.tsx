@@ -141,24 +141,25 @@ function makeQueryClient() {
 
 const TEST_PROJECT: { id: string; name: string; campTimeSlots: CampTimeSlotValue[]; daysToBookBefore: number } = { id: 'proj-1', name: 'Cardio Screening Drive', campTimeSlots: ['9am-1pm', '10am-2pm'], daysToBookBefore: 0 }
 
-async function mockSession(roleId?: string, hasDoctorManage = false) {
+async function mockSession(roleId?: string, grantedDoctorPermissions: string[] = []) {
   const { useSession } = await import('@/hooks/useSession')
   vi.mocked(useSession).mockReturnValue({
     session: sessionFixture(roleId),
-    // usePermission() (used for the dormant "New doctor" gate) wraps
-    // useSession() directly — hasPermission must be present on the mock.
-    hasPermission: (code: string) => (code === 'doctor:manage' ? hasDoctorManage : false),
+    // usePermission() (the "New doctor" gate) wraps useSession() directly —
+    // hasPermission/hasAnyPermission must both be present on the mock.
+    hasPermission: (code: string) => grantedDoctorPermissions.includes(code),
+    hasAnyPermission: (codes: string[]) => codes.some((c) => grantedDoctorPermissions.includes(c)),
   } as unknown as ReturnType<typeof useSession>)
 }
 
-function renderForm(props: { needsMrPicker?: boolean; type?: 'screening' | 'diet'; patientExpectation?: number; project?: typeof TEST_PROJECT } = {}) {
+function renderForm(props: { needsMrPicker?: boolean; type?: 'screening' | 'diet'; patientExpectation?: number; project?: typeof TEST_PROJECT | null } = {}) {
   return async () => {
     const BookCampForm = (await import('@/features/pharma/components/BookCampForm')).default
     const onBooked = vi.fn()
     const onCancel = vi.fn()
     render(
       <QueryClientProvider client={makeQueryClient()}>
-        <BookCampForm needsMrPicker={props.needsMrPicker ?? false} type={props.type ?? 'screening'} project={props.project ?? TEST_PROJECT} patientExpectation={props.patientExpectation} onBooked={onBooked} onCancel={onCancel} />
+        <BookCampForm needsMrPicker={props.needsMrPicker ?? false} type={props.type ?? 'screening'} project={'project' in props ? (props.project ?? null) : TEST_PROJECT} patientExpectation={props.patientExpectation} onBooked={onBooked} onCancel={onCancel} />
       </QueryClientProvider>,
     )
     return { onBooked, onCancel }
@@ -250,6 +251,7 @@ describe('BookCampForm — session/identity guards', () => {
     vi.mocked(useSession).mockReturnValue({
       session: { ...sessionFixture(), role: { id: '', code: 'pharma-mr', name: 'MR' } },
       hasPermission: () => false,
+      hasAnyPermission: () => false,
     } as unknown as ReturnType<typeof useSession>)
     const user = userEvent.setup()
     await renderForm()()
@@ -306,6 +308,17 @@ describe('BookCampForm — all sections visible at once', () => {
     const doctorInput = screen.getByPlaceholderText(/search doctor by name/i)
     expect(doctorInput).toBeInTheDocument()
     expect(doctorInput).toBeEnabled()
+  })
+
+  it('the Doctor picker is NOT project-gated — it is searchable and enabled before any project is picked, unlike Location/Date which still require one', async () => {
+    await mockSession()
+    await renderForm({ project: null })()
+
+    const doctorInput = screen.getByPlaceholderText(/search doctor by name/i)
+    expect(doctorInput).toBeInTheDocument()
+    expect(doctorInput).toBeEnabled()
+    // The rest of the form still correctly waits on a project.
+    expect(screen.getAllByText(/select a project and camp type above first/i).length).toBeGreaterThan(0)
   })
 
   it('picking a doctor defaults the camp location to the doctor\'s own address, still editable afterwards', async () => {
@@ -746,13 +759,13 @@ describe('BookCampForm — zero configured slots', () => {
   })
 })
 
-describe('BookCampForm — inline doctor creation (dormant until doctor:manage is granted)', () => {
+describe('BookCampForm — inline doctor creation (gated on doctor:create OR doctor:manage)', () => {
   beforeEach(() => {
     vi.resetAllMocks()
   })
 
-  it('hides the "New doctor" trigger without doctor:manage — the real state for every pharma role today', async () => {
-    await mockSession(undefined, false)
+  it('hides the "New doctor" trigger with neither doctor:create nor doctor:manage', async () => {
+    await mockSession(undefined, [])
     const user = userEvent.setup()
     await renderForm()()
 
@@ -761,8 +774,26 @@ describe('BookCampForm — inline doctor creation (dormant until doctor:manage i
     expect(screen.queryByRole('button', { name: /new doctor/i })).not.toBeInTheDocument()
   })
 
+  it('shows the "New doctor" trigger for a session holding only doctor:create — the configured default for new pharma-mr role types', async () => {
+    await mockSession(undefined, ['doctor:create'])
+    const user = userEvent.setup()
+    await renderForm()()
+
+    await fillLocation(user)
+
+    expect(await screen.findByRole('button', { name: /new doctor/i })).toBeInTheDocument()
+  })
+
+  it('shows the "New doctor" trigger before any project is picked — doctor creation is scoped by division alone, never by the project', async () => {
+    await mockSession(undefined, ['doctor:create'])
+    await renderForm({ project: null })()
+
+    expect(screen.getAllByText(/select a project and camp type above first/i).length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: /new doctor/i })).toBeInTheDocument()
+  })
+
   it('creating a doctor auto-selects it via the same field.onChange/doctorLabel pipe as a normal search pick', async () => {
-    await mockSession('self-role-42', true)
+    await mockSession('self-role-42', ['doctor:manage'])
     const { doctorsService } = await import('@/features/doctors/doctors.service')
     vi.mocked(doctorsService.createDoctor).mockResolvedValue({
       success: true, message: '',
@@ -801,7 +832,7 @@ describe('BookCampForm — inline doctor creation (dormant until doctor:manage i
   })
 
   it('clears a stale "Doctor is required" error once a doctor is created inline', async () => {
-    await mockSession('self-role-42', true)
+    await mockSession('self-role-42', ['doctor:manage'])
     const { doctorsService } = await import('@/features/doctors/doctors.service')
     vi.mocked(doctorsService.createDoctor).mockResolvedValue({
       success: true, message: '',
@@ -832,7 +863,7 @@ describe('BookCampForm — inline doctor creation (dormant until doctor:manage i
   })
 
   it('Cancel creates no doctor', async () => {
-    await mockSession(undefined, true)
+    await mockSession(undefined, ['doctor:manage'])
     const { doctorsService } = await import('@/features/doctors/doctors.service')
     const user = userEvent.setup()
     await renderForm()()

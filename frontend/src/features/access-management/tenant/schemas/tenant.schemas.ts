@@ -41,19 +41,7 @@ export const updateTenantSchema = z.object({
   gst: gstSchema,
 })
 
-// Backend rejects a tenant code shaped like a Mongo ObjectId (24 hex chars).
-const MONGO_OBJECT_ID_REGEX = /^[0-9a-fA-F]{24}$/
-
 export const createTenantSchema = z.object({
-  code: z
-    .string()
-    .trim()
-    .min(3, 'Company code must be at least 3 characters')
-    .regex(/^\S+$/, 'Company code cannot contain spaces.')
-    .toLowerCase()
-    .refine((val) => !MONGO_OBJECT_ID_REGEX.test(val), {
-      message: 'Company code must not look like an ObjectId',
-    }),
   name: z.string().trim().min(1, 'Company name is required'),
   salesPerson: z.string().min(1, 'Sales rep is required'),
   owner: z.object({

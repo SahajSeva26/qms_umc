@@ -1,7 +1,8 @@
 import mongoose, { HydratedDocument } from 'mongoose';
 import { IDivision, DivisionModel } from './division.model';
 import { IBulkMrPayload, ICreateDivisionPayload, ISearchDivisionQuery, IUpdateDivisionPayload } from './division.validators';
-import { DIVISION_PERMISSIONS, DIVISION_STATUS } from './division.constants';
+import { DIVISION_COUNTER_ENTITY, DIVISION_PERMISSIONS, DIVISION_STATUS } from './division.constants';
+import { CounterService } from '../../counter/counter.service';
 import { formatZodError, throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
@@ -163,13 +164,7 @@ const create = async (model: ICreateDivisionPayload, ctx: RequestContext): Promi
         return throwAppError('Tenant not found', StatusCodes.NOT_FOUND);
     }
 
-    //2: check for duplicate code
-    division = await DivisionService.get(model.code, ctx);
-    if (division) {
-        return throwAppError('Division with this code already exists', StatusCodes.CONFLICT);
-    }
-
-    //3: the head role needs the pharma-division-head role type, provisioned per CUSTOMER tenant.
+    //2: the head role needs the pharma-division-head role type, provisioned per CUSTOMER tenant.
     // resolve it up-front (scoped to THIS tenant, by _id so the role service can't mis-match it to
     // another tenant's copy) and fail fast if the tenant was onboarded before it was provisioned.
     const headRoleType = await RoleTypeModel.findOne({
@@ -180,17 +175,21 @@ const create = async (model: ICreateDivisionPayload, ctx: RequestContext): Promi
         return throwAppError('The pharma-division-head role type is not provisioned for this tenant', StatusCodes.CONFLICT);
     }
 
-    //4: create the division AND its head role in one transaction — roll back both if either fails
+    //3: create the division AND its head role in one transaction — roll back both if either fails
     division = await withTransaction(async () => {
-        //4.1: create division under the resolved tenant
+        //3.1: code is the immutable natural key — auto-generated from the global `division` counter
+        // (div-000001). The increment auto-joins this transaction, so it rolls back if any step fails.
+        const code: string = await CounterService.next(DIVISION_COUNTER_ENTITY, ctx);
+
+        //3.2: create division under the resolved tenant
         const entity = new DivisionModel({
-            code: model.code, //immutable
+            code, //immutable
             tenant: tenant._id,
         });
         let d = await set(model, entity, ctx);
         d = await d.save();
 
-        //4.2: mint the division head — RoleService.create registers a new (inactive) user from
+        //3.3: mint the division head — RoleService.create registers a new (inactive) user from
         // model.head and links it to a pharma-division-head role scoped to this division.
         const head = await RoleService.create(
             {
@@ -206,7 +205,7 @@ const create = async (model: ICreateDivisionPayload, ctx: RequestContext): Promi
             ctx,
         );
 
-        //4.3: point the division at its head role (mirrors Tenant.owner)
+        //3.4: point the division at its head role (mirrors Tenant.owner)
         d.owner = head._id;
         d = await d.save();
 

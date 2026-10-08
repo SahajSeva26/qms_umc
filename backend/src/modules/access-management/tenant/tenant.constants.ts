@@ -1,3 +1,6 @@
+// feeds the sequential tenant/client code (clt-000001) via the global counter module
+export const TENANT_COUNTER_ENTITY = 'tenant';
+
 export const TENANT_STATUS = {
     ACTIVE: 'active',
     INACTIVE: 'inactive',

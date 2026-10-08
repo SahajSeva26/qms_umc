@@ -1,9 +1,6 @@
 import { z } from 'zod';
 import { DIVISION_STATUS, DIVISION_THERAPY } from './division.constants';
-import {
-    isValidObjectID,
-    stripWhitespace,
-} from '../../../shared/utils/strings';
+import { isValidObjectID } from '../../../shared/utils/strings';
 import { RegisterUserPayloadSchema } from '../../auth/auth.validators';
 
 // a division may span one or more therapy areas — validated as a non-empty, duplicate-free list
@@ -19,18 +16,7 @@ const TherapyListSchema = z
 //1: create ====================================>
 export const CreateDivisionPayloadSchema = z.object({
     tenant: z.string().min(1).openapi({ example: 'sun-pharma' }),
-    code: z
-        .preprocess(
-            stripWhitespace,
-            z
-                .string()
-                .min(3)
-                .lowercase()
-                .refine((val) => !isValidObjectID(val), {
-                    message: 'Code must not be an ObjectId',
-                }),
-        )
-        .openapi({ example: 'sun-cardio' }),
+    // code is auto-generated from the global `division` counter (div-000001) — not caller-supplied
     name: z.string().min(1).openapi({ example: 'Cardio Care' }),
     // one or more therapy areas — a division may span several
     therapy: TherapyListSchema,

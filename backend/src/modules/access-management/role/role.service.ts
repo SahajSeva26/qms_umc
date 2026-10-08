@@ -14,7 +14,7 @@ import { IServiceOptions } from '../../../shared/types/service.types';
 import { PermissionGroupModel } from '../permission-group/permissionGroup.model';
 import { TENANT_PERMISSIONS, TENANT_TYPE } from '../tenant/tenant.constants';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
-import { isValidRoleSupervisor, ROLE_SUPERVISOR_TREE, PHARMA_FIELD_FORCE_TYPE_CODES, PHARMA_ROLE_COUNTER_ENTITY } from './role.constants';
+import { isValidRoleSupervisor, ROLE_SUPERVISOR_TREE, PHARMA_FIELD_FORCE_TYPE_CODES, PHARMA_ROLE_COUNTER_ENTITY, ROLE_COUNTER_ENTITY } from './role.constants';
 import { ALLOWED_ROLETYPE_CODES } from '../role-type/roleType.constants';
 import { CounterService } from '../../counter/counter.service';
 
@@ -61,10 +61,12 @@ const set = async (model: any, entity: HydratedDocument<IRoleDocument>, ctx: Req
         return cachedRoleType;
     };
 
-    // code: honor a supplied one; otherwise, on CREATE, auto-generate for pharma field-force roles
-    // (MR/ASM/RSM) from the universal pharma-role counter. next() runs inside the caller's
-    // transaction (create wraps set in withTransaction), so a failed create rolls the increment
-    // back — no burned code. Every other role type still requires an explicit code.
+    // code: honor a supplied one; otherwise, on CREATE, auto-generate. Pharma field-force roles
+    // (MR/ASM/RSM) use the universal pharma-role counter (phr-); every other role type falls back to
+    // the generic role counter (rol-). next() runs inside the caller's transaction (create wraps set
+    // in withTransaction), so a failed create rolls the increment back — no burned code. The tenant
+    // admin (`admin`), division head (`${division.code}-head`) and seeded system (`system`) roles
+    // pass explicit, meaningful codes, so they never hit this fallback.
     if (model.code) {
         entity.code = model.code;
     } else if (entity.isNew) {
@@ -72,7 +74,7 @@ const set = async (model: any, entity: HydratedDocument<IRoleDocument>, ctx: Req
         if (roleType && PHARMA_FIELD_FORCE_TYPE_CODES.includes(roleType.code)) {
             entity.code = await CounterService.next(PHARMA_ROLE_COUNTER_ENTITY, ctx);
         } else {
-            throwAppError('code is required', StatusCodes.BAD_REQUEST);
+            entity.code = await CounterService.next(ROLE_COUNTER_ENTITY, ctx);
         }
     }
     if (model.name) {

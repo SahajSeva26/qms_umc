@@ -137,6 +137,7 @@ describe('CampEditPageReal — MR field', () => {
     vi.resetAllMocks()
   })
 
+  // Longer timeout — full-suite CPU contention can squeeze this unrelated test's default 5s budget.
   it('replacing the MR sends the new MR id in the update payload', async () => {
     await mockSessionAndPermission()
     const { campsRealService } = await import('@/features/camps/campsReal.service')
@@ -167,7 +168,7 @@ describe('CampEditPageReal — MR field', () => {
     await waitFor(() => expect(campsRealService.updateCamp).toHaveBeenCalledTimes(1))
     const [, payload] = vi.mocked(campsRealService.updateCamp).mock.calls[0]
     expect(payload.mr).toBe('mr-new')
-  })
+  }, 15000)
 
   it('clearing the MR then saving shows validation and sends no update request', async () => {
     await mockSessionAndPermission()

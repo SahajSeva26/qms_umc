@@ -17,6 +17,10 @@ interface WizardStep4Props {
   setField: <K extends keyof WizardFormState>(key: K, value: WizardFormState[K]) => void
 }
 
+// Navigation range only — DatePicker's own default caps at the current month, unreachable for a future follow-up.
+const FOLLOW_UP_DATE_START_MONTH = new Date(new Date().getFullYear() - 2, 0)
+const FOLLOW_UP_DATE_END_MONTH = new Date(new Date().getFullYear() + 5, 11)
+
 const WizardStep4 = ({ form, setField }: WizardStep4Props) => {
   // limit: PLATFORM_TENANT_FETCH_LIMIT — see accessManagement.constants.ts;
   // the backend's default 10-result limit can silently exclude the `qms`
@@ -74,6 +78,8 @@ const WizardStep4 = ({ form, setField }: WizardStep4Props) => {
             value={form.followUpDate}
             onChange={(iso) => setField('followUpDate', iso)}
             className={`w-full ${fieldClasses}`}
+            startMonth={FOLLOW_UP_DATE_START_MONTH}
+            endMonth={FOLLOW_UP_DATE_END_MONTH}
           />
         </div>
       </div>

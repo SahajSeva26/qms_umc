@@ -17,9 +17,14 @@ import VendorMasterPicker from '@/features/inventory/real/components/VendorMaste
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import DatePicker from '@/components/ui/DatePicker'
 import FieldLabel from '@/components/ui/FieldLabel'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import MutationStatusBanner from '@/components/ui/MutationStatusBanner'
+
+// Navigation range only, not a business rule — the backend has no min/max on these dates.
+const DEVICE_DATE_START_MONTH = new Date(new Date().getFullYear() - 20, 0)
+const DEVICE_DATE_END_MONTH = new Date(new Date().getFullYear() + 10, 11)
 
 const Field = ({ label, error, children }: { label: string; error?: string; children: ReactNode }) => (
   <div>
@@ -155,19 +160,43 @@ const CreateForm = ({ onClose, mutation }: { onClose: () => void; mutation: Retu
 
           <div className="grid grid-cols-2 gap-2.5">
             <Field label="Manufacturing date">
-              <Input type="date" className="text-[13px]" {...register('manufacturingDate')} />
+              <Controller
+                control={control}
+                name="manufacturingDate"
+                render={({ field }) => (
+                  <DatePicker value={field.value ?? ''} onChange={field.onChange} className="w-full text-[13px]" startMonth={DEVICE_DATE_START_MONTH} endMonth={DEVICE_DATE_END_MONTH} />
+                )}
+              />
             </Field>
             <Field label="Warranty expiry">
-              <Input type="date" className="text-[13px]" {...register('warrantyExpiryDate')} />
+              <Controller
+                control={control}
+                name="warrantyExpiryDate"
+                render={({ field }) => (
+                  <DatePicker value={field.value ?? ''} onChange={field.onChange} className="w-full text-[13px]" startMonth={DEVICE_DATE_START_MONTH} endMonth={DEVICE_DATE_END_MONTH} />
+                )}
+              />
             </Field>
           </div>
 
           <div className="grid grid-cols-2 gap-2.5">
             <Field label="Last calibration">
-              <Input type="date" className="text-[13px]" {...register('lastCalibrationDate')} />
+              <Controller
+                control={control}
+                name="lastCalibrationDate"
+                render={({ field }) => (
+                  <DatePicker value={field.value ?? ''} onChange={field.onChange} className="w-full text-[13px]" startMonth={DEVICE_DATE_START_MONTH} endMonth={DEVICE_DATE_END_MONTH} />
+                )}
+              />
             </Field>
             <Field label="Next calibration">
-              <Input type="date" className="text-[13px]" {...register('nextCalibrationDate')} />
+              <Controller
+                control={control}
+                name="nextCalibrationDate"
+                render={({ field }) => (
+                  <DatePicker value={field.value ?? ''} onChange={field.onChange} className="w-full text-[13px]" startMonth={DEVICE_DATE_START_MONTH} endMonth={DEVICE_DATE_END_MONTH} />
+                )}
+              />
             </Field>
           </div>
 
@@ -193,7 +222,6 @@ const EditForm = ({
   mutation: ReturnType<typeof useUpdateInventoryDevice>
 }) => {
   const {
-    register,
     handleSubmit,
     control,
     formState: { dirtyFields },
@@ -257,19 +285,43 @@ const EditForm = ({
 
           <div className="grid grid-cols-2 gap-2.5">
             <Field label="Manufacturing date">
-              <Input type="date" className="text-[13px]" {...register('manufacturingDate')} />
+              <Controller
+                control={control}
+                name="manufacturingDate"
+                render={({ field }) => (
+                  <DatePicker value={field.value ?? ''} onChange={field.onChange} className="w-full text-[13px]" startMonth={DEVICE_DATE_START_MONTH} endMonth={DEVICE_DATE_END_MONTH} />
+                )}
+              />
             </Field>
             <Field label="Warranty expiry">
-              <Input type="date" className="text-[13px]" {...register('warrantyExpiryDate')} />
+              <Controller
+                control={control}
+                name="warrantyExpiryDate"
+                render={({ field }) => (
+                  <DatePicker value={field.value ?? ''} onChange={field.onChange} className="w-full text-[13px]" startMonth={DEVICE_DATE_START_MONTH} endMonth={DEVICE_DATE_END_MONTH} />
+                )}
+              />
             </Field>
           </div>
 
           <div className="grid grid-cols-2 gap-2.5">
             <Field label="Last calibration">
-              <Input type="date" className="text-[13px]" {...register('lastCalibrationDate')} />
+              <Controller
+                control={control}
+                name="lastCalibrationDate"
+                render={({ field }) => (
+                  <DatePicker value={field.value ?? ''} onChange={field.onChange} className="w-full text-[13px]" startMonth={DEVICE_DATE_START_MONTH} endMonth={DEVICE_DATE_END_MONTH} />
+                )}
+              />
             </Field>
             <Field label="Next calibration">
-              <Input type="date" className="text-[13px]" {...register('nextCalibrationDate')} />
+              <Controller
+                control={control}
+                name="nextCalibrationDate"
+                render={({ field }) => (
+                  <DatePicker value={field.value ?? ''} onChange={field.onChange} className="w-full text-[13px]" startMonth={DEVICE_DATE_START_MONTH} endMonth={DEVICE_DATE_END_MONTH} />
+                )}
+              />
             </Field>
           </div>
 

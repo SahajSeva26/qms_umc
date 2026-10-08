@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { format } from 'date-fns'
 import VoidCampDialog from './VoidCampDialog'
 import { useCampsReal } from '@/features/camps/hooks/useCampsReal'
 import { useVoidCamp } from '@/features/camps/hooks/useVoidCamp'
@@ -72,6 +73,20 @@ function voidCampFixture(overrides: Partial<CampEntity> = {}): CampEntity {
     location: null, devices: [], meta: { mailUrl: 'https://mail.example.com/abc' },
     status: 'requested', stageHistory: [], createdAt: '', updatedAt: '', ...overrides,
   } as CampEntity
+}
+
+// Camp date is the shared shadcn DatePicker now — drive it via trigger -> dropdown -> day-cell.
+async function pickVoidCampDate(user: ReturnType<typeof userEvent.setup>, isoDate: string) {
+  const trigger = screen.getByRole('button', { name: /pick a date/i })
+  await user.click(trigger)
+
+  const [year, month] = isoDate.split('-').map(Number)
+  await user.selectOptions(screen.getByRole('combobox', { name: /choose the month/i }), String(month - 1))
+  await user.selectOptions(screen.getByRole('combobox', { name: /choose the year/i }), String(year))
+
+  // react-day-picker's default day aria-label is date-fns's "PPPP" format.
+  const dayLabel = format(new Date(`${isoDate}T00:00:00`), 'PPPP')
+  await user.click(screen.getByRole('button', { name: new RegExp(`^${dayLabel}`, 'i') }))
 }
 
 function mockCampsRealList(items: CampEntity[] = [], overrides: Partial<ReturnType<typeof useCampsReal>> = {}) {
@@ -170,8 +185,7 @@ describe('VoidCampDialog', () => {
     render(<VoidCampDialog project={projectFixture()} onClose={vi.fn()} />)
 
     await user.type(screen.getByLabelText('Doctor'), 'doc-1')
-    const dateInput = document.querySelector('input[type="date"]') as HTMLInputElement
-    await user.type(dateInput, '2026-09-20')
+    await pickVoidCampDate(user, '2026-09-20')
     // Address line 1 comes from the (here unclicked) map picker — simulate a user who typed the
     // rest of the address fields by hand without ever dropping a pin, so addressLine1 stays blank
     // while city/state/pincode are filled. Still blocks submit — just on addressLine1 first.
@@ -196,8 +210,7 @@ describe('VoidCampDialog', () => {
     render(<VoidCampDialog project={projectFixture()} onClose={vi.fn()} />)
 
     await user.type(screen.getByLabelText('Doctor'), 'doc-1')
-    const dateInput = document.querySelector('input[type="date"]') as HTMLInputElement
-    await user.type(dateInput, '2026-09-20')
+    await pickVoidCampDate(user, '2026-09-20')
     await user.click(screen.getByRole('button', { name: /pick location/i }))
     await user.type(screen.getByLabelText('City'), 'Mumbai')
     await user.type(screen.getByLabelText('State'), 'Maharashtra')

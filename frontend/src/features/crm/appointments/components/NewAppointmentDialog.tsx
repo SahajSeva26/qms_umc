@@ -36,6 +36,10 @@ import EditContactModal from '@/features/contacts/components/EditContactModal'
 // and non-empty as base-ui's Select requires.
 const ADD_NEW_CONTACT_VALUE = '__add_new_contact__'
 
+// Navigation range only — DatePicker's own default caps at the current month, unreachable for a future appointment.
+const APPOINTMENT_DATE_START_MONTH = new Date(new Date().getFullYear() - 5, 0)
+const APPOINTMENT_DATE_END_MONTH = new Date(new Date().getFullYear() + 5, 11)
+
 const APPOINTMENT_TYPES: AppointmentType[] = ['new', 'follow-up', 'payment', 'spot']
 // Matches the prototype's MEETING_TYPES icons (sales-calendar-data.js) as closely as react-icons/fi
 // allows: user-plus/refresh-cw/banknote/zap → FiUserPlus/FiRefreshCw/FiDollarSign/FiZap.
@@ -479,6 +483,8 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
                 value={date}
                 onChange={setDate}
                 className={`w-full ${fieldInputClassName} border-(--qms-border-strong) bg-(--qms-surface-strong)`}
+                startMonth={APPOINTMENT_DATE_START_MONTH}
+                endMonth={APPOINTMENT_DATE_END_MONTH}
               />
             </div>
             <div>

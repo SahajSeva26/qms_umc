@@ -282,7 +282,8 @@ describe('NewProjectWizard — step-scoped validation actually blocks Next', () 
     await advanceThroughLeadAndBasics(user)
     await waitFor(() => expect(fieldByName('purchaseOrders.0.number')).toBeInTheDocument())
     await user.type(fieldByName('purchaseOrders.0.number'), 'PO-1')
-    await user.clear(fieldByName('purchaseOrders.0.date'))
+    // PO date defaults to today — DatePicker's clear (x) button blanks it back out.
+    await user.click(screen.getByRole('button', { name: /clear date/i }))
     await user.click(screen.getByRole('button', { name: /^Next/i }))
 
     // queryFieldByName (not fieldByName) so a wrongful advance fails cleanly.

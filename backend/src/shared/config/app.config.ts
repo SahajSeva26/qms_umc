@@ -85,6 +85,12 @@ const ENV = {
             Endpoint: process.env.AWS_S3_ENDPOINT || '',
         },
 
+        // AWS EventBridge — domain event publishing. Non-secret config, credentials live in AWS above.
+        AWS_EventBridge: {
+            EventBusName: process.env.AWS_EVENT_BRIDGE_BUS_NAME || 'default',
+            Source: process.env.AWS_EVENT_BRIDGE_SOURCE || 'qms.backend',
+        },
+
         // Google Maps — geocoding / places. Key is a secret; no fallback.
         GoogleMaps: {
             ApiKey: process.env.GOOGLE_MAPS_API_KEY || '',

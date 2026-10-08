@@ -1,10 +1,12 @@
+import { RequestContext } from '../utils/contextBuilder';
+
 // infrastructure/events/event.types.ts
 export interface IQmsEvent {
-    id: string;
     type: string;
-    source: string;
-    occurredAt: Date;
-    data: any;
+    data: object;
+    // Request context the event was raised in — used for request-scoped logging/tracing.
+    // NOT serialized into the EventBridge payload; only event.data is sent.
+    ctx?: RequestContext;
 }
 
 // infrastructure/events/event-publisher.interface.ts

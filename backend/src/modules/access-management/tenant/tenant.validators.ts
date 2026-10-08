@@ -1,9 +1,6 @@
 import { z } from 'zod';
 import { TENANT_STATUS, TENANT_TYPE } from './tenant.constants';
-import {
-    isValidObjectID,
-    stripWhitespace,
-} from '../../../shared/utils/strings';
+import { isValidObjectID } from '../../../shared/utils/strings';
 import { RegisterUserPayloadSchema } from '../../auth/auth.validators';
 
 // coordinates are stored GeoJSON-style: [longitude, latitude] (lng first)
@@ -40,18 +37,7 @@ const AddressSchema = z.object({
 
 //1: create ====================================>
 export const CreateTenantPayloadSchema = z.object({
-    code: z
-        .preprocess(
-            stripWhitespace,
-            z
-                .string()
-                .min(3)
-                .lowercase()
-                .refine((val) => !isValidObjectID(val), {
-                    message: 'Code must not be an ObjectId',
-                }),
-        )
-        .openapi({ example: 'cipla' }),
+    // code is auto-generated from the global `tenant` counter (clt-000001) — not caller-supplied
     name: z.string().min(1).openapi({ example: 'Cipla pvt ltd' }),
     description: z
         .string()

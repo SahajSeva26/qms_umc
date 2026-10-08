@@ -47,14 +47,15 @@ describe('CampsFilterBarReal', () => {
   })
 
   it('hides only the Type select when hideType is true — Status/Billing/City/State/dates still render', () => {
-    const { container } = renderWithQueryClient(<CampsFilterBarReal filters={filtersFixture()} setFilter={vi.fn()} reset={vi.fn()} hideType />)
+    renderWithQueryClient(<CampsFilterBarReal filters={filtersFixture()} setFilter={vi.fn()} reset={vi.fn()} hideType />)
 
     expect(screen.queryByText('Type')).not.toBeInTheDocument()
     expect(screen.getByText('Status')).toBeInTheDocument()
     expect(screen.getByText('Billing')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('Search by city...')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('State...')).toBeInTheDocument()
-    expect(container.querySelectorAll('input[type="date"]')).toHaveLength(2)
+    expect(screen.getByRole('button', { name: /date from/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /date to/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /reset/i })).toBeInTheDocument()
   })
 })

@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
+import { format } from 'date-fns'
 import { useAuthStore } from '@/features/auth/store'
 import type { RoleEntity } from '@/types/accessManagement.types'
 
@@ -161,6 +162,21 @@ async function pickProject(user: ReturnType<typeof userEvent.setup>) {
 
 function makeQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } })
+}
+
+// Date is the shared shadcn DatePicker now — drive it via trigger -> dropdown -> day-cell.
+async function pickCampDate(user: ReturnType<typeof userEvent.setup>, isoDate: string) {
+  const dateLabel = screen.getByText(/^date$/i)
+  const trigger = dateLabel.parentElement!.querySelector('button')!
+  await user.click(trigger)
+
+  const [year, month] = isoDate.split('-').map(Number)
+  await user.selectOptions(screen.getByRole('combobox', { name: /choose the month/i }), String(month - 1))
+  await user.selectOptions(screen.getByRole('combobox', { name: /choose the year/i }), String(year))
+
+  // react-day-picker's default day aria-label is date-fns's "PPPP" format.
+  const dayLabel = format(new Date(`${isoDate}T00:00:00`), 'PPPP')
+  await user.click(screen.getByRole('button', { name: new RegExp(`^${dayLabel}`, 'i') }))
 }
 
 // useCampDraftStore keys off the real useAuthStore — a fresh id per render keeps drafts isolated.
@@ -455,9 +471,7 @@ describe('CampDetailPageReal — Division/Project field interplay', () => {
     await user.click(await screen.findByText(/cipla mr/i, {}, { timeout: 3000 }))
 
     await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
-    const dateLabel = screen.getByText(/^date$/i)
-    const dateInput = dateLabel.parentElement!.querySelector('input[type="date"]')!
-    await user.type(dateInput, '2026-09-20')
+    await pickCampDate(user, '2026-09-20')
     const timeSlotLabel = screen.getByText(/time slot \*/i)
     const timeSlotTrigger = timeSlotLabel.parentElement!.querySelector('[role="combobox"]')!
     await user.click(timeSlotTrigger)
@@ -699,9 +713,7 @@ describe('CampDetailPageReal — create mode, MR/FO pickers', () => {
     // FO picker needs real coordinates AND date+timeSlot before it's usable at
     // all (coverage-radius + availability eligibility).
     await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
-    const dateLabel = screen.getByText(/^date$/i)
-    const dateInput = dateLabel.parentElement!.querySelector('input[type="date"]')!
-    await user.type(dateInput, '2026-09-20')
+    await pickCampDate(user, '2026-09-20')
     const timeSlotLabel = screen.getByText(/time slot \*/i)
     const timeSlotTrigger = timeSlotLabel.parentElement!.querySelector('[role="combobox"]')!
     await user.click(timeSlotTrigger)
@@ -743,9 +755,7 @@ describe('CampDetailPageReal — create mode, MR/FO pickers', () => {
     await pickProject(user)
 
     await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
-    const dateLabel = screen.getByText(/^date$/i)
-    const dateInput = dateLabel.parentElement!.querySelector('input[type="date"]')!
-    await user.type(dateInput, '2026-09-20')
+    await pickCampDate(user, '2026-09-20')
     const timeSlotLabel = screen.getByText(/time slot \*/i)
     const timeSlotTrigger = timeSlotLabel.parentElement!.querySelector('[role="combobox"]')!
     await user.click(timeSlotTrigger)
@@ -801,9 +811,7 @@ describe('CampDetailPageReal — create mode, MR/FO pickers', () => {
     await pickDivision(user)
     await pickProject(user)
     await user.click(screen.getByRole('button', { name: /set test coordinates/i }))
-    const dateLabel = screen.getByText(/^date$/i)
-    const dateInput = dateLabel.parentElement!.querySelector('input[type="date"]')!
-    await user.type(dateInput, '2026-09-20')
+    await pickCampDate(user, '2026-09-20')
     const timeSlotLabel = screen.getByText(/time slot \*/i)
     const timeSlotTrigger = timeSlotLabel.parentElement!.querySelector('[role="combobox"]')!
     await user.click(timeSlotTrigger)

@@ -1,3 +1,6 @@
+// feeds the sequential division code (div-000001) via the global counter module
+export const DIVISION_COUNTER_ENTITY = 'division';
+
 export const DIVISION_STATUS = {
     ACTIVE: 'active',
     INACTIVE: 'inactive',

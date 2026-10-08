@@ -16,6 +16,7 @@ import VendorMasterPicker from '@/features/inventory/real/components/VendorMaste
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import DatePicker from '@/components/ui/DatePicker'
 import FieldLabel from '@/components/ui/FieldLabel'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import MutationStatusBanner from '@/components/ui/MutationStatusBanner'
@@ -24,6 +25,10 @@ const STATUS_OPTIONS = [
   { value: 'active', label: 'Active' },
   { value: 'expired', label: 'Expired' },
 ] as const
+
+// Navigation range only, not a business rule — the backend has no min/max on these dates.
+const CONSUMABLE_DATE_START_MONTH = new Date(new Date().getFullYear() - 10, 0)
+const CONSUMABLE_DATE_END_MONTH = new Date(new Date().getFullYear() + 10, 11)
 
 const Field = ({ label, error, children }: { label: string; error?: string; children: ReactNode }) => (
   <div>
@@ -155,10 +160,22 @@ const CreateForm = ({ onClose, mutation }: { onClose: () => void; mutation: Retu
 
           <div className="grid grid-cols-2 gap-2.5">
             <Field label="Manufacturing date *" error={fieldError('manufacturingDate')}>
-              <Input type="date" className="text-[13px]" {...register('manufacturingDate')} />
+              <Controller
+                control={control}
+                name="manufacturingDate"
+                render={({ field }) => (
+                  <DatePicker value={field.value} onChange={field.onChange} className="w-full text-[13px]" startMonth={CONSUMABLE_DATE_START_MONTH} endMonth={CONSUMABLE_DATE_END_MONTH} />
+                )}
+              />
             </Field>
             <Field label="Expiry date" error={fieldError('expiryDate')}>
-              <Input type="date" className="text-[13px]" {...register('expiryDate')} />
+              <Controller
+                control={control}
+                name="expiryDate"
+                render={({ field }) => (
+                  <DatePicker value={field.value ?? ''} onChange={field.onChange} className="w-full text-[13px]" startMonth={CONSUMABLE_DATE_START_MONTH} endMonth={CONSUMABLE_DATE_END_MONTH} />
+                )}
+              />
             </Field>
           </div>
 
@@ -272,10 +289,22 @@ const EditForm = ({
 
           <div className="grid grid-cols-2 gap-2.5">
             <Field label="Manufacturing date *" error={fieldError('manufacturingDate')}>
-              <Input type="date" className="text-[13px]" {...register('manufacturingDate')} />
+              <Controller
+                control={control}
+                name="manufacturingDate"
+                render={({ field }) => (
+                  <DatePicker value={field.value} onChange={field.onChange} className="w-full text-[13px]" startMonth={CONSUMABLE_DATE_START_MONTH} endMonth={CONSUMABLE_DATE_END_MONTH} />
+                )}
+              />
             </Field>
             <Field label="Expiry date" error={fieldError('expiryDate')}>
-              <Input type="date" className="text-[13px]" {...register('expiryDate')} />
+              <Controller
+                control={control}
+                name="expiryDate"
+                render={({ field }) => (
+                  <DatePicker value={field.value ?? ''} onChange={field.onChange} className="w-full text-[13px]" startMonth={CONSUMABLE_DATE_START_MONTH} endMonth={CONSUMABLE_DATE_END_MONTH} />
+                )}
+              />
               {expiryBlanked && (
                 <p className="text-[11px] mt-1 text-danger">Can't be cleared once set — contact support.</p>
               )}

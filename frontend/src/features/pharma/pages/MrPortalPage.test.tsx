@@ -19,6 +19,9 @@ vi.mock('@/features/pharma/components/PharmaDashboardTab', () => ({
 vi.mock('@/features/pharma/components/PharmaDoctorsTab', () => ({
   default: () => <div>Doctors tab content</div>,
 }))
+vi.mock('@/features/pharma/components/MyCampScheduleTab', () => ({
+  default: () => <div>Camp schedule tab content</div>,
+}))
 
 function sessionFixture(): SessionResponse {
   return {
@@ -98,6 +101,17 @@ describe('MrPortalPage', () => {
     await user.click(await screen.findByRole('button', { name: /^doctors$/i }))
 
     expect(screen.getByText('Doctors tab content')).toBeInTheDocument()
+  })
+
+  it('clicking Camp schedule switches to the schedule tab', async () => {
+    await mockSettledSession()
+    const user = userEvent.setup()
+    await renderPage()
+
+    await user.click(await screen.findByRole('button', { name: /camp schedule/i }))
+
+    expect(screen.getByText('Camp schedule tab content')).toBeInTheDocument()
+    expect(screen.queryByText('Dashboard tab content')).not.toBeInTheDocument()
   })
 
   it('a non-MR pharma role is redirected away by PharmaRoleGate, never seeing any tab', async () => {

@@ -1,7 +1,8 @@
 import mongoose, { HydratedDocument } from 'mongoose';
 import { ITenant, TenantModel } from './tenant.model';
 import { ICreateTenantPayload, ISearchTenantQuery, IUpdateTenantPayload } from './tenant.validators';
-import { TENANT_PERMISSIONS, TENANT_STATUS, TENANT_TYPE } from './tenant.constants';
+import { TENANT_COUNTER_ENTITY, TENANT_PERMISSIONS, TENANT_STATUS, TENANT_TYPE } from './tenant.constants';
+import { CounterService } from '../../counter/counter.service';
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
@@ -295,15 +296,14 @@ const getTenantStats = async (tenants: HydratedDocument<ITenant>[]): Promise<Rec
 const create = async (model: ICreateTenantPayload, ctx: RequestContext): Promise<HydratedDocument<ITenant>> => {
     let tenant: TenantDocument = null;
 
-    //1: check existing tenant
-    tenant = await TenantService.get(model.code, ctx);
-    if (tenant) {
-        return throwAppError('Tenant with this code already exists', StatusCodes.CONFLICT);
-    }
+    //1: code is the immutable natural key — auto-generated from the global `tenant` counter
+    // (clt-000001). This runs inside createTenant's withTransaction, so the increment auto-joins
+    // that session and is rolled back if any later step fails (no burned code).
+    const code: string = await CounterService.next(TENANT_COUNTER_ENTITY, ctx);
 
     //2: create tenant
     const entity = new TenantModel({
-        code: model.code, //immutable
+        code, //immutable
     });
 
     //3: set remaining fields

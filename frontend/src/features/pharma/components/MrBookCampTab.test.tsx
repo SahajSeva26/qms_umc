@@ -106,12 +106,14 @@ describe('MrBookCampTab — real searchable project picker', () => {
     vi.resetAllMocks()
   })
 
-  it('typing a query shows real search results, and picking one keeps BookCampForm mounted with no type yet', async () => {
+  it('typing a query shows real search results, and picking a multi-type project keeps BookCampForm mounted with no type yet', async () => {
     await mockSession()
     const user = userEvent.setup()
     await renderTab()
 
-    await pickProject(user)
+    // A single-type project now auto-selects its one allowed camp type on pick — multi-type
+    // genuinely leaves no type picked yet, which is what this test is actually about.
+    await pickProject(user, projectFixture({ type: ['screening', 'diet'] }))
 
     expect(await screen.findByText(/cardio screening drive \(prj-1\)/i)).toBeInTheDocument()
     expect(screen.getByText(/booking form mounted · type: none · project: none/i)).toBeInTheDocument()
@@ -169,7 +171,9 @@ describe('MrBookCampTab — real searchable project picker', () => {
     expect(doctorDraftInput).toHaveValue('Dr. Stale From Project A')
 
     await user.click(screen.getByRole('button', { name: /clear selected project/i }))
-    await pickProject(user, projectFixture({ id: 'proj-b', name: 'Project B', code: 'PRJ-B' }))
+    // Multi-type so the repick genuinely leaves no type auto-selected — same reasoning as the
+    // single-vs-multi-type project fixture above.
+    await pickProject(user, projectFixture({ id: 'proj-b', name: 'Project B', code: 'PRJ-B', type: ['screening', 'diet'] }))
 
     expect(await screen.findByText(/booking form mounted · type: none · project: none/i)).toBeInTheDocument()
     expect(screen.getByPlaceholderText(/doctor draft/i)).toHaveValue('')

@@ -189,7 +189,7 @@ const TypeScopedPharmaCampsContent = ({ type, title }: TypeScopedPharmaCampsPage
               <BookCampForm
                 needsMrPicker={needsMrPicker}
                 type={type}
-                project={{ id: project.id, name: project.name, campTimeSlots: project.campTimeSlots }}
+                project={{ id: project.id, name: project.name, campTimeSlots: project.campTimeSlots, daysToBookBefore: project.daysToBookBefore }}
                 patientExpectation={patientExpectation}
                 patientExpectationInvalid={!!patientExpectationError}
                 onBooked={handleBooked}

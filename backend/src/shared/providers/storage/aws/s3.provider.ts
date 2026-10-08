@@ -18,15 +18,15 @@ export class S3Provider implements IStorageProvider {
 
     constructor() {
         this.client = new S3Client({
-            region: ENV.Providers.AWS_S3.Region,
-            endpoint: ENV.Providers.AWS_S3.S3Endpoint,
+            region: ENV.Providers.AWS.Region,
+            endpoint: ENV.Providers.AWS_S3.Endpoint,
             credentials: {
-                accessKeyId: ENV.Providers.AWS_S3.AccessKeyId,
-                secretAccessKey: ENV.Providers.AWS_S3.SecretAccessKey,
+                accessKeyId: ENV.Providers.AWS.AccessKeyId,
+                secretAccessKey: ENV.Providers.AWS.SecretAccessKey,
             },
             forcePathStyle: true,
         });
-        this.bucket = ENV.Providers.AWS_S3.S3Bucket;
+        this.bucket = ENV.Providers.AWS_S3.Bucket;
     }
 
     // Uploading to S3 is done client-side via a short-lived presigned PUT URL (no bytes through the

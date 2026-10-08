@@ -69,15 +69,20 @@ const ENV = {
             IssueType: process.env.JIRA_ISSUE_TYPE || 'Bug',
         },
 
-        // AWS S3 — file storage. Non-secret config (region/bucket/endpoint) keeps fallbacks;
-        // the access key + secret have no fallback on purpose so no credential lands in this
-        // git-tracked file. Endpoint is optional — set it for LocalStack/S3-compatible dev.
-        AWS_S3: {
+        // AWS — shared account credentials, used by every AWS service (S3, EventBridge, ...).
+        // Region is a non-secret fallback; the access key + secret have no fallback on purpose
+        // so no credential ever lands in this git-tracked file.
+        AWS: {
             Region: process.env.AWS_REGION || 'ap-south-1',
             AccessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
             SecretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-            S3Bucket: process.env.AWS_S3_BUCKET || '',
-            S3Endpoint: process.env.AWS_S3_ENDPOINT || '',
+        },
+
+        // AWS S3 — file storage, service-specific config only (credentials live in AWS above).
+        // Endpoint is optional — set it for LocalStack/S3-compatible dev.
+        AWS_S3: {
+            Bucket: process.env.AWS_S3_BUCKET || '',
+            Endpoint: process.env.AWS_S3_ENDPOINT || '',
         },
 
         // Google Maps — geocoding / places. Key is a secret; no fallback.

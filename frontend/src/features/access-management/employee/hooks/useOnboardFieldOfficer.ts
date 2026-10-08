@@ -102,11 +102,8 @@ export function useOnboardFieldOfficer() {
     return submitEmployee(state.userId, state.userLabel, email, phone, employeeFields, state.tenant).catch(() => {})
   }
 
-  // If found, continues straight into Employee creation using that Role's linked user — searched
-  // by email (role code is now server-generated, never known to the caller in advance). The
-  // backend's `user` filter is a fuzzy name/email substring match, not exact, so a single result
-  // can't be trusted: fetch a batch of candidates and scan all of them for an exact (case-
-  // insensitive) email match before concluding anything was or wasn't found.
+  // Searched by email (role code is server-generated, unknown in advance). The backend's `user`
+  // filter is fuzzy, not exact — scan all candidates for an exact email match, not just the first.
   const checkIfAccountExists = async (latestEmployeeFields?: EmployeeFieldsPayload) => {
     if (state.step !== 'account-creation-uncertain') return
     const { tenant, type, email, employeeFields: capturedEmployeeFields } = state

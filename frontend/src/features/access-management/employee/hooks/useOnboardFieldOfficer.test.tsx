@@ -21,7 +21,6 @@ function makeWrapper() {
 }
 
 const ROLE_PAYLOAD: CreateRolePayload = {
-  code: 'fo-ravi',
   name: 'Ravi Kumar',
   type: 'rt-fo',
   tenant: 't-platform',
@@ -262,7 +261,7 @@ describe('useOnboardFieldOfficer', () => {
     })
 
     expect(result.current.state).toEqual({
-      step: 'account-creation-uncertain', tenant: 't-platform', code: 'fo-ravi', type: 'rt-fo', email: 'ravi@example.com', employeeFields: EMPLOYEE_FIELDS,
+      step: 'account-creation-uncertain', tenant: 't-platform', type: 'rt-fo', email: 'ravi@example.com', employeeFields: EMPLOYEE_FIELDS,
     })
     expect(accessManagementService.createEmployee).not.toHaveBeenCalled()
   })
@@ -304,10 +303,41 @@ describe('useOnboardFieldOfficer', () => {
     })
 
     expect(result.current.state).toEqual({ step: 'done', employeeId: 'emp-recovered' })
-    expect(accessManagementService.searchRoles).toHaveBeenCalledWith({ tenant: 't-platform', code: 'fo-ravi', type: 'rt-fo', limit: '1' })
+    expect(accessManagementService.searchRoles).toHaveBeenCalledWith({ tenant: 't-platform', user: 'ravi@example.com', type: 'rt-fo', limit: '20' })
     expect(accessManagementService.createEmployee).toHaveBeenCalledWith(expect.objectContaining({ user: 'user-1', email: 'ravi@example.com', phone: '9876543210', tenant: 't-platform' }))
     // Never a second Role/User POST — the recovery reused the existing one.
     expect(accessManagementService.createRole).toHaveBeenCalledTimes(1)
+  })
+
+  it('a fuzzy false-positive ranked FIRST by the backend search does not block recovery — every candidate is scanned for an exact email match, not just the first', async () => {
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    vi.mocked(accessManagementService.createRole).mockRejectedValue(networkError())
+
+    const { result } = renderHook(() => useOnboardFieldOfficer(), { wrapper: makeWrapper() })
+
+    await act(async () => {
+      await expect(result.current.start(ROLE_PAYLOAD, EMPLOYEE_FIELDS)).rejects.toThrow()
+    })
+
+    // The backend's `user` filter is a fuzzy name/email substring match — a stranger whose email
+    // merely contains "ravi" can rank first, ahead of the real exact-email match further down.
+    vi.mocked(accessManagementService.searchRoles).mockResolvedValueOnce({
+      success: true, message: '', data: {
+        count: 2,
+        items: [
+          { id: 'role-fuzzy', code: 'fo-ravindra', user: { _id: 'user-fuzzy', firstName: 'Ravindra', lastName: 'Singh', email: 'ravindra.singh@example.com', phone: '2222222222' } },
+          { id: 'role-1', code: 'fo-ravi', user: { _id: 'user-1', firstName: 'Ravi', lastName: 'Kumar', email: 'ravi@example.com', phone: '9876543210' } },
+        ],
+      },
+    } as never)
+    vi.mocked(accessManagementService.createEmployee).mockResolvedValueOnce({ success: true, message: '', data: { id: 'emp-recovered' } } as never)
+
+    await act(async () => {
+      await result.current.checkIfAccountExists()
+    })
+
+    expect(result.current.state).toEqual({ step: 'done', employeeId: 'emp-recovered' })
+    expect(accessManagementService.createEmployee).toHaveBeenCalledWith(expect.objectContaining({ user: 'user-1', email: 'ravi@example.com' }))
   })
 
   it('a fresher employeeFields argument overrides the snapshot captured at the original failure — the Employee-fields step stays editable while uncertain', async () => {
@@ -346,8 +376,8 @@ describe('useOnboardFieldOfficer', () => {
       await expect(result.current.start(ROLE_PAYLOAD, EMPLOYEE_FIELDS)).rejects.toThrow()
     })
 
-    // A DIFFERENT role wound up with the same tenant+code+type — its linked user's email doesn't
-    // match what this flow actually submitted (ravi@example.com).
+    // A DIFFERENT role wound up matching the tenant+email+type search — its linked user's email
+    // doesn't actually match what this flow submitted (ravi@example.com).
     vi.mocked(accessManagementService.searchRoles).mockResolvedValueOnce({
       success: true, message: '', data: {
         count: 1,
@@ -400,7 +430,7 @@ describe('useOnboardFieldOfficer', () => {
     })
 
     expect(result.current.state).toEqual({
-      step: 'account-creation-uncertain', tenant: 't-platform', code: 'fo-ravi', type: 'rt-fo', email: 'ravi@example.com', employeeFields: EMPLOYEE_FIELDS,
+      step: 'account-creation-uncertain', tenant: 't-platform', type: 'rt-fo', email: 'ravi@example.com', employeeFields: EMPLOYEE_FIELDS,
     })
     expect(accessManagementService.createEmployee).not.toHaveBeenCalled()
     expect(accessManagementService.createRole).toHaveBeenCalledTimes(1)

@@ -80,7 +80,7 @@ describe('CreateEmployeeModal', () => {
     vi.clearAllMocks()
   })
 
-  it('Mode A\'s Role-details step requires code+name before advancing', async () => {
+  it('Mode A\'s Role-details step requires name before advancing', async () => {
     const user = userEvent.setup()
     renderModal()
     await user.click(screen.getByRole('button', { name: /new employee/i }))
@@ -88,7 +88,7 @@ describe('CreateEmployeeModal', () => {
 
     await user.click(screen.getByRole('button', { name: /^next$/i }))
 
-    expect(await screen.findByText(/code is required/i)).toBeInTheDocument()
+    expect(await screen.findByText(/name is required/i)).toBeInTheDocument()
     expect(screen.getByText('Step 1 of 3 — Role details.')).toBeInTheDocument()
   })
 
@@ -98,7 +98,6 @@ describe('CreateEmployeeModal', () => {
     await user.click(screen.getByRole('button', { name: /new employee/i }))
     await user.click(screen.getByRole('button', { name: /^onboard a new person$/i }))
 
-    await user.type(screen.getByLabelText('Code'), 'fo-ravi')
     await user.type(screen.getByLabelText('Name'), 'Ravi Kumar')
     await user.click(screen.getByRole('button', { name: /^next$/i }))
 
@@ -130,7 +129,6 @@ describe('CreateEmployeeModal', () => {
     // Switch BEFORE filling anything else — the toggle must repoint roleType before fields are touched.
     await user.click(screen.getByRole('button', { name: /^dietitian$/i }))
 
-    await user.type(screen.getByLabelText('Code'), 'diet-anita')
     await user.type(screen.getByLabelText('Name'), 'Anita Rao')
     await user.click(screen.getByRole('button', { name: /^next$/i }))
 
@@ -158,7 +156,6 @@ describe('CreateEmployeeModal', () => {
     await user.click(screen.getByRole('button', { name: /^dietitian$/i }))
     await user.click(screen.getByRole('button', { name: /^field officer$/i }))
 
-    await user.type(screen.getByLabelText('Code'), 'fo-ravi')
     await user.type(screen.getByLabelText('Name'), 'Ravi Kumar')
     await user.click(screen.getByRole('button', { name: /^next$/i }))
     await user.type(screen.getByLabelText('First name'), 'Ravi')
@@ -269,7 +266,6 @@ describe('CreateEmployeeModal', () => {
     await user.click(screen.getByRole('button', { name: /new employee/i }))
     await user.click(screen.getByRole('button', { name: /^onboard a new person$/i }))
 
-    await user.type(screen.getByLabelText('Code'), 'fo-ravi')
     await user.type(screen.getByLabelText('Name'), 'Ravi Kumar')
     await user.click(screen.getByRole('button', { name: /^next$/i }))
 
@@ -290,7 +286,6 @@ describe('CreateEmployeeModal', () => {
     renderModal()
     await user.click(screen.getByRole('button', { name: /new employee/i }))
     await user.click(screen.getByRole('button', { name: /^onboard a new person$/i }))
-    await user.type(screen.getByLabelText('Code'), 'fo-ravi')
     await user.type(screen.getByLabelText('Name'), 'Ravi Kumar')
     await user.click(screen.getByRole('button', { name: /^next$/i }))
     await user.type(screen.getByLabelText('First name'), 'Ravi')
@@ -380,7 +375,7 @@ describe('CreateEmployeeModal', () => {
     await user.click(screen.getByRole('button', { name: /check again/i }))
 
     // regression (QUP-469 S15): a specific non-axios Error's .message is shown verbatim, not the generic fallback.
-    expect(await screen.findByText(/no account found for this code/i)).toBeInTheDocument()
+    expect(await screen.findByText(/no account found for this email/i)).toBeInTheDocument()
     expect(createEmployee).not.toHaveBeenCalled()
   })
 
@@ -400,7 +395,7 @@ describe('CreateEmployeeModal', () => {
 
     await user.click(screen.getByRole('button', { name: /check again/i }))
 
-    expect(await screen.findByText(/a different account was found for this code/i)).toBeInTheDocument()
+    expect(await screen.findByText(/a different account was found for this email/i)).toBeInTheDocument()
     expect(createEmployee).not.toHaveBeenCalled()
   })
 
@@ -616,7 +611,7 @@ describe('CreateEmployeeModal', () => {
     await assertForcedSubmitIsNoOp()
 
     check.resolve({ success: true, message: '', data: { count: 0, items: [] } })
-    await screen.findByText(/no account found for this code/i)
+    await screen.findByText(/no account found for this email/i)
   })
 
   it('a forced submit is a pure no-op during checking-employee (the in-flight recovery lookup)', async () => {
@@ -707,7 +702,7 @@ describe('CreateEmployeeModal', () => {
     renderModal()
     await user.click(screen.getByRole('button', { name: /new employee/i }))
     await user.click(screen.getByRole('button', { name: /^onboard a new person$/i }))
-    await user.type(screen.getByLabelText('Code'), 'fo-ravi')
+    await user.type(screen.getByLabelText('Name'), 'Ravi Kumar')
 
     expect(screen.getByText('New employee')).toBeInTheDocument()
 
@@ -715,10 +710,10 @@ describe('CreateEmployeeModal', () => {
 
     expect(screen.queryByText('New employee')).not.toBeInTheDocument()
 
-    // Reopening starts fresh — resetAndClose actually ran, the Code field was not preserved.
+    // Reopening starts fresh — resetAndClose actually ran, the Name field was not preserved.
     await user.click(screen.getByRole('button', { name: /new employee/i }))
     await user.click(screen.getByRole('button', { name: /^onboard a new person$/i }))
-    expect(screen.getByLabelText('Code')).toHaveValue('')
+    expect(screen.getByLabelText('Name')).toHaveValue('')
   })
 
   it('checking-employee shows a disabled "Checking…" state in the same banner used for employee-uncertain', async () => {
@@ -821,7 +816,6 @@ describe('CreateEmployeeModal', () => {
     await user.click(screen.getByRole('button', { name: /^pick existing fo$/i }))
 
     await user.click(screen.getByRole('button', { name: /^onboard a new person$/i }))
-    await user.type(screen.getByLabelText('Code'), 'fo-new')
     await user.type(screen.getByLabelText('Name'), 'New Person')
     await user.click(screen.getByRole('button', { name: /^next$/i }))
     await user.type(screen.getByLabelText('First name'), 'New')

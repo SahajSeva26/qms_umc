@@ -42,7 +42,7 @@ interface CreateEmployeeModalProps {
 const STEP_TITLES_NEW = ['Role details', 'User account', 'Employee details']
 const STEP_TITLES_EXISTING = ['Select account', 'Employee details']
 
-const ROLE_STEP_FIELDS: (keyof CreateRoleFormValues)[] = ['code', 'name']
+const ROLE_STEP_FIELDS: (keyof CreateRoleFormValues)[] = ['name']
 const USER_STEP_FIELDS: (keyof CreateRoleFormValues)[] = ['userFirstName', 'userLastName', 'userEmail', 'userPassword', 'userPhone', 'userGender']
 
 const CreateEmployeeModal = ({
@@ -326,13 +326,6 @@ const CreateEmployeeModal = ({
               <div className="rounded-xl border p-5" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}>
                 <h2 className="text-sm font-bold mb-4" style={{ color: 'var(--qms-text)' }}>Role details</h2>
                 <div className="space-y-4">
-                  <div>
-                    <FieldLabel htmlFor="code">Code</FieldLabel>
-                    <Input id="code" type="text" placeholder="e.g. fo-ravi-kumar" {...roleForm.register('code')} />
-                    {stepAttempted[0] && roleForm.formState.errors.code && (
-                      <p className="text-xs text-danger mt-1.5">{roleForm.formState.errors.code.message}</p>
-                    )}
-                  </div>
                   <div>
                     <FieldLabel htmlFor="name">Name</FieldLabel>
                     <Input id="name" type="text" {...roleForm.register('name')} />

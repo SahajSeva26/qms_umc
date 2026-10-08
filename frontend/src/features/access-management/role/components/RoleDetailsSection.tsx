@@ -10,7 +10,6 @@ import type { DivisionEntity } from '@/types/crm.types'
 // Generic over the caller's form-values type (rather than RHF's FieldValues)
 // so register()/control still type-check field name literals without casts.
 interface RoleDetailsFields {
-  code?: string
   name: string
   description: string
   roleType: string
@@ -71,14 +70,6 @@ const RoleDetailsSection = <TFormValues extends FieldValues & RoleDetailsFields>
       </h2>
 
       <div className="space-y-4">
-        {isCreateMode && (
-          <div>
-            <FieldLabel htmlFor="code">Code</FieldLabel>
-            <Input id="code" type="text" placeholder="e.g. site-manager-john" {...register(field('code'))} />
-            {fieldTouched('code') && fieldError('code') && <p className="text-xs text-danger mt-1.5">{fieldError('code')?.message as string}</p>}
-          </div>
-        )}
-
         <div>
           <FieldLabel htmlFor="name">Name</FieldLabel>
           <Input id="name" type="text" {...register(field('name'))} />

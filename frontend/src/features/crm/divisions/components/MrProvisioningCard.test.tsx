@@ -161,7 +161,6 @@ describe('MrProvisioningCard — single add', () => {
 
     await waitFor(() => expect(accessManagementService.createRole).toHaveBeenCalledTimes(1))
     const payload = vi.mocked(accessManagementService.createRole).mock.calls[0][0]
-    expect(payload.code).toBeUndefined()
     expect(payload.type).toBe('rt-mr')
     expect(payload.permissions).toEqual([])
   })

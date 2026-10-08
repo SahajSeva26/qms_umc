@@ -32,7 +32,7 @@ const STEP_TITLES = ['Role details', 'User account']
 // fields once its Next/Create has been attempted — mirrors CreateRoleModal's
 // own STEP_FIELD_NAMES/touchedOverrideFor pattern for a two-step form.
 const STEP_FIELD_NAMES: (keyof CreateRoleFormValues)[][] = [
-  ['code', 'name'],
+  ['name'],
   ['userFirstName', 'userLastName', 'userEmail', 'userPassword', 'userPhone', 'userGender'],
 ]
 
@@ -49,7 +49,7 @@ const touchedOverrideFor = (
 // under the platform tenant — unlike the generic CreateRoleModal (company +
 // role-type picker + division/supervisor + permissions), every one of those
 // is fixed here, so this is a two-step form covering just role identity
-// (code/name/description) then the bound user's account fields.
+// (name/description, code is server-generated) then the bound user's account fields.
 const CreateFoModal = ({ tenantId, foTypeId }: CreateFoModalProps) => {
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState(0)
@@ -87,7 +87,7 @@ const CreateFoModal = ({ tenantId, foTypeId }: CreateFoModalProps) => {
 
   const handleNext = async () => {
     markStepAttempted(0)
-    const valid = await trigger(['code', 'name'])
+    const valid = await trigger(['name'])
     if (valid) setStep(1)
   }
 
@@ -114,7 +114,7 @@ const CreateFoModal = ({ tenantId, foTypeId }: CreateFoModalProps) => {
 
   const touchedFieldsForStep = (index: number) => touchedOverrideFor(index, stepAttempted[index], touchedFields)
 
-  const showError = (name: 'code' | 'name') => touchedFieldsForStep(0)[name] && errors[name]
+  const showError = (name: 'name') => touchedFieldsForStep(0)[name] && errors[name]
 
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? setOpen(true) : resetAndClose())}>
@@ -140,11 +140,6 @@ const CreateFoModal = ({ tenantId, foTypeId }: CreateFoModalProps) => {
               <div className="rounded-xl border p-5" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}>
                 <h2 className="text-sm font-bold mb-4" style={{ color: 'var(--qms-text)' }}>Role details</h2>
                 <div className="space-y-4">
-                  <div>
-                    <FieldLabel htmlFor="code">Code</FieldLabel>
-                    <Input id="code" type="text" placeholder="e.g. fo-ravi-kumar" {...register('code')} />
-                    {showError('code') && <p className="text-xs text-danger mt-1.5">{errors.code?.message}</p>}
-                  </div>
                   <div>
                     <FieldLabel htmlFor="name">Name</FieldLabel>
                     <Input id="name" type="text" {...register('name')} />

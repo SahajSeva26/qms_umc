@@ -91,6 +91,11 @@ const ENV = {
             Source: process.env.AWS_EVENT_BRIDGE_SOURCE || 'qms.backend',
         },
 
+        // AWS SQS — queues consumed by background workers. Credentials live in AWS above.
+        AWS_SQS: {
+            NotificationQueueUrl: process.env.AWS_SQS_NOTIFICATION_QUEUE_URL || '',
+        },
+
         // Google Maps — geocoding / places. Key is a secret; no fallback.
         GoogleMaps: {
             ApiKey: process.env.GOOGLE_MAPS_API_KEY || '',

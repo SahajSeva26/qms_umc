@@ -1,15 +1,10 @@
 import { RequestContext } from '../utils/contextBuilder';
 
-// infrastructure/events/event.types.ts
-export interface IQmsEvent {
-    type: string;
-    data: object;
-    // Request context the event was raised in — used for request-scoped logging/tracing.
-    // NOT serialized into the EventBridge payload; only event.data is sent.
-    ctx?: RequestContext;
-}
-
 // infrastructure/events/event-publisher.interface.ts
 export interface IEventProvider {
-    publish(event: IQmsEvent): Promise<void>;
+    // entity: the subject of the event (e.g. 'camp', 'invoice', 'lead')
+    // event:  what happened (e.g. 'create', 'update') → combined into DetailType `${entity}.${event}`
+    // data:   payload serialized into the EventBridge Detail
+    // ctx:    request context — used only for request-scoped logging, never serialized
+    publish(entity: string, event: string, data: object, ctx?: RequestContext): Promise<void>;
 }

@@ -57,12 +57,12 @@ const testPublish = async (req: any, res: any) => {
             });
         }
 
-        const event = { type: payload.type, data: payload.data ?? {}, ctx };
-        await eventManager.get('aws').publish(event);
+        const [entity = 'camp', event = 'create'] = (payload.type ?? 'camp.create').split('.');
+        await eventManager.get('aws').publish(entity, event, payload.data ?? {}, ctx);
 
         return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Test event published to EventBridge', {
-            type: event.type,
-            data: event.data,
+            type: payload.type,
+            data: payload.data ?? {},
         });
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);

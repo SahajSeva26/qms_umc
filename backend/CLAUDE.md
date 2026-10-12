@@ -477,10 +477,13 @@ seeding + per-tenant default-role-type provisioning on boot, `PERMISSIONS`/`PERM
 registry, pino logging (`pino-http`), rate limiting (global + auth), `withTransaction` helper.
 
 **Providers** (`src/shared/providers/`): storage (S3 — presigned, see `file` module) and **events**
-(`events/` — `eventManager.get('aws')` → `EventBridgeProvider`, `IEventProvider.publish(event)`).
-`IQmsEvent = { type, data, ctx? }` — `type`→EventBridge `DetailType`, `JSON.stringify(data)`→`Detail`,
+(`events/` — `eventManager.get('aws')` → `EventBridgeProvider`, `IEventProvider.publish(entity, event, data, ctx?)`).
+**Signature (2026-10-12):** `publish(entity: string, event: string, data: object, ctx?: RequestContext)` —
+`entity` is the subject (`'camp'`/`'invoice'`/`'lead'`), `event` is what happened (`'create'`/`'update'`),
+combined into EventBridge `DetailType` as `` `${entity}.${event}` ``; `JSON.stringify(data)`→`Detail`,
 plus configured `Source`/`EventBusName`; the optional `ctx` is used only for request-scoped logging
-(`ctx.logger`, never serialized into the payload). `publish()` inspects `FailedEntryCount` (PutEvents
+(`ctx.logger`, never serialized into the payload). (Replaced the old single-object `IQmsEvent = { type, data, ctx? }`
+param — `IQmsEvent` deleted.) `publish()` inspects `FailedEntryCount` (PutEvents
 returns 200 even on a rejected entry) and throws `throwAppError(500)` on failure. **Config shape
 (2026-10-08):** AWS credentials are shared in `ENV.Providers.AWS` (`Region`/`AccessKeyId`/
 `SecretAccessKey`); per-service config lives in siblings `ENV.Providers.AWS_S3` (`Bucket`/`Endpoint`)

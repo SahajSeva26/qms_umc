@@ -170,6 +170,8 @@ const ctx: RequestContext = req.context
 // ctx.requestID    → UUID per request
 // ctx.ipAddress    → client IP
 // ctx.logger       → scoped logger
+// ctx.meta         → { changes: string[] } — free per-request bag; `changes` holds the names
+//                    of fields changed this request (push onto it in services, e.g. for events)
 // ctx.setUser(userData)
 // ctx.setRole(role)
 // ctx.setTenant(tenant)

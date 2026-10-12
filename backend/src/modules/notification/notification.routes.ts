@@ -1,7 +1,7 @@
 import express from 'express';
 import { NotificationController } from './notification.controller';
 import { registry } from '../../shared/config/swagger/swagger.registry';
-import { SearchNotificationQuerySchema } from './notification.validators';
+import { SearchNotificationQuerySchema, TestPublishNotificationPayloadSchema } from './notification.validators';
 import { AuthMiddleware } from '../../shared/middlewares/authmiddleware';
 
 export const NotificationRouter = express.Router();
@@ -22,6 +22,27 @@ registry.registerPath({
     },
 });
 
+// TEMP (testing only) — publish an event to EventBridge to exercise the EventBridge→SQS→worker
+// path from an HTTP call. Remove before production.
+registry.registerPath({
+    method: 'post',
+    path: '/notifications/test-publish',
+    tags: ['NOTIFICATION'],
+    summary: 'TEMP: publish a test event to EventBridge (testing only)',
+    request: {
+        body: {
+            content: {
+                'application/json': {
+                    schema: TestPublishNotificationPayloadSchema,
+                },
+            },
+        },
+    },
+    responses: {
+        200: { description: 'Test event published to EventBridge' },
+    },
+});
+
 // =======================================================================
 // ======================= EXPORT NOTIFICATION ROUTES ====================
 // =======================================================================
@@ -29,3 +50,6 @@ registry.registerPath({
 // notifications (recipient taken from ctx). Notifications are created internally via
 // NotificationService.create by the events that trigger them.
 NotificationRouter.get('/me', NotificationController.me);
+
+// TEMP (testing only) — see swagger registration above. Remove before production.
+NotificationRouter.post('/test-publish', NotificationController.testPublish);

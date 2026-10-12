@@ -8,7 +8,8 @@
     "build": "tsc",
     "prestart": "npm run build",
     "start": "node dist/bin/server.js",
-    "seed:dummy": "tsx src/shared/env/script/seedDummyData.ts"
+    "seed:dummy": "tsx src/shared/env/script/seedDummyData.ts",
+    "worker:notification": "tsx watch src/workers/notification.worker.ts"
   },
   "engines": {
     "node": "22.x"

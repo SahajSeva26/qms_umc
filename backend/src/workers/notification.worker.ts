@@ -17,6 +17,7 @@ const queue = queueManager.get(SQS);
 // Seam for later: turn a consumed event into notifications and process/send it.
 // Deliberately does nothing but log for now — processing is added here.
 async function handleEvent(event: any): Promise<void> {
+    logger.info('handleEvent called');
     logger.info({ event }, 'Notification event consumed');
     // TODO: process the event (create + dispatch notifications)
 }

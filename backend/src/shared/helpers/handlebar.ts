@@ -1,4 +1,8 @@
 import Handlebars from 'handlebars';
+import { registerHelpers } from './handlebar.helpers';
+
+// Register custom helpers once, before any template is compiled/rendered.
+registerHelpers();
 
 export class HandlebarsHelper {
     // Cache compiled templates by source so the same template isn't recompiled on every render.

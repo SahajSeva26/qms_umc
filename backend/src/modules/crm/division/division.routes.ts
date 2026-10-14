@@ -132,12 +132,17 @@ registry.registerPath({
 // =======================================================================
 DivisionRouter.get(
     '/:id',
-    AuthorizeMiddleware([DIVISION_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.ADMIN.code]),
+    AuthorizeMiddleware([
+        DIVISION_PERMISSIONS.MANAGE.code,
+        DIVISION_PERMISSIONS.SEARCH.code,
+        DIVISION_PERMISSIONS.GET.code,
+        TENANT_PERMISSIONS.ADMIN.code,
+    ]),
     DivisionController.get,
 );
 DivisionRouter.put(
     '/:id',
-    AuthorizeMiddleware([DIVISION_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.ADMIN.code]),
+    AuthorizeMiddleware([DIVISION_PERMISSIONS.MANAGE.code, DIVISION_PERMISSIONS.UPDATE.code, TENANT_PERMISSIONS.ADMIN.code]),
     DivisionController.update,
 );
 
@@ -145,6 +150,7 @@ DivisionRouter.get(
     '/',
     AuthorizeMiddleware([
         DIVISION_PERMISSIONS.MANAGE.code,
+        DIVISION_PERMISSIONS.SEARCH.code,
         TENANT_PERMISSIONS.ADMIN.code,
         LEAD_PERMISSIONS.MANAGE.code,
     ]),
@@ -152,7 +158,7 @@ DivisionRouter.get(
 );
 DivisionRouter.post(
     '/',
-    AuthorizeMiddleware([DIVISION_PERMISSIONS.MANAGE.code]),
+    AuthorizeMiddleware([DIVISION_PERMISSIONS.MANAGE.code, DIVISION_PERMISSIONS.CREATE.code]),
     DivisionController.create,
 );
 

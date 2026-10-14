@@ -39,6 +39,12 @@ export const CRM_BUSINESS_ROLE_TYPES = [
             LEAD_PERMISSIONS.CREATE.code,
             LEAD_PERMISSIONS.UPDATE.code,
             LEAD_PERMISSIONS.GET.code,
+
+            // read-only — needed to pick a division when building a lead/appointment; no
+            // division:create/update/manage (that stays an admin/sales-head capability)
+            DIVISION_PERMISSIONS.SEARCH.code,
+            DIVISION_PERMISSIONS.GET.code,
+
             // appointments they own/attend — CRUD (search+get is what the service scopes own-visibility off)
             APPOINTMENT_PERMISSIONS.SEARCH.code,
             APPOINTMENT_PERMISSIONS.CREATE.code,

@@ -174,9 +174,6 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
         permissions: [
             CAMP_PERMISSIONS.SEARCH.code,
             CAMP_PERMISSIONS.GET.code,
-            APPOINTMENT_PERMISSIONS.SEARCH.code,
-            APPOINTMENT_PERMISSIONS.GET.code,
-            APPOINTMENT_PERMISSIONS.RSVP.code,
             // read the test catalog (needed to run camp tests) — read-only, no manage
             TEST_MASTER_PERMISSIONS.SEARCH.code,
             TEST_MASTER_PERMISSIONS.GET.code,

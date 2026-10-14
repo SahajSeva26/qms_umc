@@ -150,6 +150,12 @@ export const MoveStagePayloadSchema = z.object({
 });
 export type IMoveStagePayload = z.infer<typeof MoveStagePayloadSchema>;
 
+//3a: activate (field staff start their own confirmed camp → live) ====================================>
+export const ActivateCampPayloadSchema = z.object({
+    reason: z.string().optional().openapi({ example: 'Camp started on site' }),
+});
+export type IActivateCampPayload = z.infer<typeof ActivateCampPayloadSchema>;
+
 //4: search ====================================>
 export const SearchCampQuerySchema = z.object({
     code: z.string().optional().openapi({ example: 'cmp-000123' }),

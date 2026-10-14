@@ -1,18 +1,9 @@
 import type { RouteObject } from 'react-router-dom'
 import { lazyRoute } from '@/lib/router/lazyRoute'
+import * as AdminPaths from './admin.paths'
 
-export const ADMIN_ROUTES = {
-  ADMIN:              '/admin',
-  ADMIN_HQ:           '/admin/hq',
-  ADMIN_REMINDERS:    '/admin/reminders',
-  ADMIN_INVENTORY: '/admin/inventory',
-  ADMIN_ASSETS:       '/admin/assets',
-  ADMIN_KPI:          '/admin/kpi',
-  ADMIN_SETTINGS:     '/admin/settings',
-  ADMIN_USERS:        '/admin/users',
-  ADMIN_USER_DETAIL:  '/admin/users/:id',
-  ADMIN_TESTS:        '/admin/tests',
-}
+// A direct `export const` (not a bare re-export specifier) — see camps.routes.tsx for why.
+export const ADMIN_ROUTES = AdminPaths.ADMIN_ROUTES
 
 const USERS_VIEW_PERMISSIONS = ['user:get', 'user:search', 'user:update']
 // `:get` is deliberately excluded — the list page only calls search, which needs `:search`/`:manage`.

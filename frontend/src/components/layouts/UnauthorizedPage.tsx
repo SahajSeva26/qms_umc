@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { FiShieldOff } from 'react-icons/fi'
 import { Button } from '@/components/ui/button'
-import { DASHBOARD_ROUTES } from '@/features/dashboard/dashboard.routes'
+import { DASHBOARD_ROUTES } from '@/features/dashboard/dashboard.paths'
 
 // Dedicated destination for RequirePermission's route-level redirect —
 // distinct from AccessPermissionGate's in-page denial message: this is a

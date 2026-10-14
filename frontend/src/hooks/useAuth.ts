@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/features/auth/store'
-import { AUTH_ROUTES } from '@/features/auth/auth.routes'
+import { AUTH_ROUTES } from '@/features/auth/auth.paths'
 import { authService } from '@/features/auth/auth.service'
 
 export const useAuth = () => {

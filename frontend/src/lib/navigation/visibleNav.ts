@@ -1,4 +1,4 @@
-import { FULL_NAV_SECTIONS, type NavItem } from '@/components/layouts/navConfig'
+import { FULL_NAV_SECTIONS, type NavItem } from '@/lib/navigation/navRegistry'
 import { getPharmaRoleMeta } from '@/features/pharma/pharma.constants'
 import { canReadEmployees } from '@/lib/access/employeeAccess'
 

@@ -13,7 +13,7 @@ const TYPE_COLOR: Record<CampType, string> = {
   lab: '#8b5cf6',
 }
 
-// FiHeart matches this codebase's own Diet nav-icon convention (navConfig.ts).
+// FiHeart matches this codebase's own Diet nav-icon convention (navRegistry.ts).
 const TYPE_ICON: Record<CampType, IconType> = {
   screening: FiActivity,
   diet: FiHeart,

@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { useLogin } from '../hooks/useLogin'
 import { useServerHealth } from '@/hooks/useServerHealth'
-import { AUTH_ROUTES } from '@/features/auth/auth.routes'
+import { AUTH_ROUTES } from '@/features/auth/auth.paths'
 import LoginForm from './LoginForm'
 
 vi.mock('../hooks/useLogin')

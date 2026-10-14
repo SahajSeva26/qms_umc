@@ -1,13 +1,10 @@
 import type { RouteObject } from 'react-router-dom'
 import LoginPage from './pages/LoginPage'
 import AuthContinuePage from './pages/AuthContinuePage'
+import * as AuthPaths from './auth.paths'
 
-export const AUTH_ROUTES = {
-  ROOT: '/auth',
-  LOGIN: '/auth/login',
-  // Post-login landing resolver — see AuthContinuePage for why this exists instead of a hard-coded destination.
-  CONTINUE: '/auth/continue',
-}
+// A direct `export const` (not a bare re-export specifier) — see camps.routes.tsx for why.
+export const AUTH_ROUTES = AuthPaths.AUTH_ROUTES
 
 export const authRoutes: RouteObject[] = [
   {

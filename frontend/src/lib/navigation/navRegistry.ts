@@ -1,20 +1,24 @@
-import { AUTH_ROUTES }      from '@/features/auth/auth.routes'
-import { DASHBOARD_ROUTES } from '@/features/dashboard/dashboard.routes'
-import { CRM_ROUTES }       from '@/features/crm/crm.routes'
-import { ANALYTICS_ROUTES } from '@/features/analytics/analytics.routes'
-import { CAMPS_ROUTES }     from '@/features/camps/camps.routes'
-import { DIET_ROUTES }      from '@/features/diet/diet.routes'
-import { FO_ROUTES }        from '@/features/fo/fo.routes'
-import { DEDICATEDOPS_ROUTES } from '@/features/dedicatedops/dedicatedops.routes'
+// Data-only nav registry — imports ONLY dependency-free *.paths.ts route-constant modules (plus the
+// two features whose route constants already live in a standalone *.constants.ts), never a
+// *.routes.tsx route-object module, page, layout, or UI component. This boundary is what makes it
+// safe for both Sidebar.tsx (what to render) and the post-login resolver (lib/navigation/visibleNav.ts,
+// consumed by AuthContinuePage) to import without ever forming a cycle back into a page/route tree.
+import { DASHBOARD_ROUTES } from '@/features/dashboard/dashboard.paths'
+import { CRM_ROUTES }       from '@/features/crm/crm.paths'
+import { ANALYTICS_ROUTES } from '@/features/analytics/analytics.paths'
+import { CAMPS_ROUTES }     from '@/features/camps/camps.paths'
+import { DIET_ROUTES }      from '@/features/diet/diet.paths'
+import { FO_ROUTES }        from '@/features/fo/fo.paths'
+import { DEDICATEDOPS_ROUTES } from '@/features/dedicatedops/dedicatedops.paths'
 import { PHARMA_ROUTES }    from '@/features/pharma/pharma.constants'
-import { PROJECTS_ROUTES }  from '@/features/projects/projects.routes'
-import { DOCTORS_ROUTES }   from '@/features/doctors/doctors.routes'
+import { PROJECTS_ROUTES }  from '@/features/projects/projects.paths'
+import { DOCTORS_ROUTES }   from '@/features/doctors/doctors.paths'
 import { GEO_PROFILE_ROUTES } from '@/features/geo-profile/geoProfile.constants'
-import { BILLING_ROUTES }   from '@/features/billing/billing.routes'
-import { ADMIN_ROUTES }     from '@/features/admin/admin.routes'
-import { ACCESS_MANAGEMENT_ROUTES }      from '@/features/access-management/accessManagement.routes'
-import { EMPLOYEE_ROUTES }  from '@/features/access-management/employee/employee.routes'
-import { QA_FEEDBACK_ROUTES } from '@/features/qa-feedback/qa-feedback.routes'
+import { BILLING_ROUTES }   from '@/features/billing/billing.paths'
+import { ADMIN_ROUTES }     from '@/features/admin/admin.paths'
+import { ACCESS_MANAGEMENT_ROUTES }      from '@/features/access-management/accessManagement.paths'
+import { EMPLOYEE_ROUTES }  from '@/features/access-management/employee/employee.paths'
+import { QA_FEEDBACK_ROUTES } from '@/features/qa-feedback/qa-feedback.paths'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -36,8 +40,8 @@ export interface NavSection {
 }
 
 // ── Nav item registry ────────────────────────────────────────────────────────
-// Real visibility is enforced by Sidebar.tsx's system:manage section gate
-// and REAL_GATED_NAV_ITEMS per-item permission checks, not by anything here.
+// Real visibility is enforced by lib/navigation/visibleNav.ts (REAL_GATED_NAV_ITEMS/
+// isNavItemVisible), not by anything here.
 
 const ALL_NAV_ITEMS: NavItem[] = [
 
@@ -88,14 +92,14 @@ const ALL_NAV_ITEMS: NavItem[] = [
   // Operations — Field Network
   { id: 'fieldofficers', label: 'FO Management',              icon: 'Navigation',    path: FO_ROUTES.FIELD_OFFICERS },
 
-  // Gated by role TYPE (RoleGuard), not permission codes — see Sidebar.tsx's isNavItemVisible
+  // Gated by role TYPE (RoleGuard), not permission codes — see visibleNav.ts's isNavItemVisible
   // special case and employeeAccess.ts. Placed in Operations, not System (hidden without system:manage).
   { id: 'employees',    label: 'Employees',                   icon: 'Users',         path: EMPLOYEE_ROUTES.EMPLOYEES },
 
   // GET /doctors is open to any authenticated user server-side — no REAL_GATED_NAV_ITEMS entry.
   { id: 'doctors',      label: 'Doctor Management',           icon: 'Activity',      path: DOCTORS_ROUTES.DOCTORS },
 
-  // GET /geo-profiles is open to any authenticated user server-side, but Sidebar.tsx's
+  // GET /geo-profiles is open to any authenticated user server-side, but visibleNav.ts's
   // REAL_GATED_NAV_ITEMS still hides this item from a field-officer session (frontend-only gate).
   { id: 'geoprofiles',  label: 'Field Staff Coverage',        icon: 'MapPin',        path: GEO_PROFILE_ROUTES.GEO_PROFILES },
 
@@ -144,7 +148,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
 
 const NAV_BY_ID = Object.fromEntries(ALL_NAV_ITEMS.map((n) => [n.id, n]))
 
-// ── Full sectioned nav — rendered for every account, filtered by Sidebar.tsx's real permission gates ──
+// ── Full sectioned nav — rendered for every account, filtered by visibleNav.ts's real permission gates ──
 
 export const FULL_NAV_SECTIONS: NavSection[] = [
   {
@@ -204,12 +208,3 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
     ],
   },
 ]
-
-// ── Path constant re-exports ──────────────────────────────────────────────────
-// Import any route constant from here — no need to know which feature owns it.
-
-export {
-  AUTH_ROUTES,    DASHBOARD_ROUTES, CRM_ROUTES,      ANALYTICS_ROUTES,
-  CAMPS_ROUTES,   DIET_ROUTES,      FO_ROUTES,        PHARMA_ROUTES,
-  PROJECTS_ROUTES, DOCTORS_ROUTES,  BILLING_ROUTES,   ADMIN_ROUTES,
-}

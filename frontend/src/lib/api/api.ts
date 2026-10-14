@@ -1,6 +1,6 @@
 import axios from 'axios'
 import ENV from '@/config/env'
-import { AUTH_ROUTES } from '@/features/auth/auth.routes'
+import { AUTH_ROUTES } from '@/features/auth/auth.paths'
 
 const api = axios.create({
   baseURL: ENV.Api.BaseUrl+"/api/v1",

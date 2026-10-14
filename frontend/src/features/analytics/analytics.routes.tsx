@@ -1,13 +1,9 @@
 import type { RouteObject } from 'react-router-dom'
 import { lazyRoute } from '@/lib/router/lazyRoute'
+import * as AnalyticsPaths from './analytics.paths'
 
-export const ANALYTICS_ROUTES = {
-  ANALYTICS:           '/analytics',
-  ANALYTICS_SALES:     '/analytics/sales',
-  ANALYTICS_FO:        '/analytics/fo',
-  ANALYTICS_DOCTORS:   '/analytics/doctors',
-  ANALYTICS_FINANCIAL: '/analytics/financial',
-}
+// A direct `export const` (not a bare re-export specifier) — see camps.routes.tsx for why.
+export const ANALYTICS_ROUTES = AnalyticsPaths.ANALYTICS_ROUTES
 
 const analyticsPage = lazyRoute(() => import('./pages/AnalyticsPage'))
 

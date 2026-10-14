@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { FiCompass } from 'react-icons/fi'
 import { Button } from '@/components/ui/button'
-import { DASHBOARD_ROUTES } from '@/features/dashboard/dashboard.routes'
+import { DASHBOARD_ROUTES } from '@/features/dashboard/dashboard.paths'
 
 // Authenticated catch-all (`path: '*'`) — mounted as a child of AppLayout so
 // the sidebar/topbar stay visible for a bad in-app URL, matching

@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
 import { usePermission } from '@/hooks/usePermission'
 import { canReadEmployees } from '@/lib/access/employeeAccess'
-import { AUTH_ROUTES } from '@/features/auth/auth.routes'
+import { AUTH_ROUTES } from '@/features/auth/auth.paths'
 import SessionRecovery from './SessionRecovery'
 
 interface RequireEmployeeAccessProps {

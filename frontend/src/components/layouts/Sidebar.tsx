@@ -18,7 +18,7 @@ import {
   FULL_NAV_SECTIONS,
   type NavItem,
   type NavSection,
-} from './navConfig'
+} from '@/lib/navigation/navRegistry'
 
 interface SidebarProps {
   collapsed: boolean

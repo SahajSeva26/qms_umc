@@ -3,10 +3,10 @@ import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { useSession } from '@/hooks/useSession'
 import type { SessionResponse } from '@/types/accessManagement.types'
-import { CAMPS_ROUTES } from '@/features/camps/camps.routes'
+import { CAMPS_ROUTES } from '@/features/camps/camps.paths'
 import { PHARMA_ROUTES } from '@/features/pharma/pharma.constants'
-import { EMPLOYEE_ROUTES } from '@/features/access-management/employee/employee.routes'
-import { CRM_ROUTES } from '@/features/crm/crm.routes'
+import { EMPLOYEE_ROUTES } from '@/features/access-management/employee/employee.paths'
+import { CRM_ROUTES } from '@/features/crm/crm.paths'
 import AuthContinuePage from './AuthContinuePage'
 
 vi.mock('@/hooks/useSession')

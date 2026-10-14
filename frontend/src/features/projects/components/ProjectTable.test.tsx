@@ -160,3 +160,58 @@ describe('ProjectTable — write-permission gating', () => {
     expect(screen.queryByRole('button', { name: /add void camp/i })).not.toBeInTheDocument()
   })
 })
+
+describe('ProjectTable — camps progress bar', () => {
+  it('renders a fill bar sized to executedCamps/totalCamps and the fraction label', () => {
+    render(
+      <ProjectTable
+        projects={[projectFixture({ totalCamps: 80, stats: { executedCamps: 51 } as ProjectEntity['stats'] })]}
+        canWrite={false}
+        canManageVoidCamps={false}
+        onOpenDetail={vi.fn()}
+        onEdit={vi.fn()}
+        onChangeStatus={vi.fn()}
+        onVoidCamps={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('51/80')).toBeInTheDocument()
+    const fill = document.querySelector('[style*="linear-gradient"]') as HTMLElement
+    expect(fill).toBeInTheDocument()
+    expect(fill.style.width).toBe('64%')
+  })
+
+  it('caps the fill width at 100% even if executedCamps exceeds totalCamps', () => {
+    render(
+      <ProjectTable
+        projects={[projectFixture({ totalCamps: 40, stats: { executedCamps: 45 } as ProjectEntity['stats'] })]}
+        canWrite={false}
+        canManageVoidCamps={false}
+        onOpenDetail={vi.fn()}
+        onEdit={vi.fn()}
+        onChangeStatus={vi.fn()}
+        onVoidCamps={vi.fn()}
+      />,
+    )
+
+    const fill = document.querySelector('[style*="linear-gradient"]') as HTMLElement
+    expect(fill.style.width).toBe('100%')
+  })
+
+  it('falls back to a plain totalCamps count (no bar) when stats is absent', () => {
+    render(
+      <ProjectTable
+        projects={[projectFixture({ totalCamps: 120, stats: undefined })]}
+        canWrite={false}
+        canManageVoidCamps={false}
+        onOpenDetail={vi.fn()}
+        onEdit={vi.fn()}
+        onChangeStatus={vi.fn()}
+        onVoidCamps={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('120')).toBeInTheDocument()
+    expect(document.querySelector('[style*="linear-gradient"]')).not.toBeInTheDocument()
+  })
+})

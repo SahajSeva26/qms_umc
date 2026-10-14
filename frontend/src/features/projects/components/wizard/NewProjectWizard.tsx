@@ -11,6 +11,7 @@ import { useProjectDraftStore } from '@/features/projects/projectDraft.store'
 import { useDebouncedDraftSync } from '@/hooks/useDebouncedDraftSync'
 import type { createDraftStore } from '@/hooks/useDraftStore'
 import { toast } from '@/components/ui/sonner'
+import { getApiErrorMessage } from '@/utils/apiError'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import DraftLoadingPlaceholder from '@/components/ui/DraftLoadingPlaceholder'
@@ -281,8 +282,9 @@ const NewProjectWizard = ({ editProject, onClose, onSaved }: NewProjectWizardPro
         if (res.data) onSaved(res.data.id)
       }
       onClose()
-    } catch {
-      toast.error(isEdit ? 'Could not save changes — try again.' : 'Could not create the project — try again.')
+    } catch (err) {
+      const fallback = isEdit ? 'Could not save changes — try again.' : 'Could not create the project — try again.'
+      toast.error(getApiErrorMessage(err, fallback))
     }
   }
 

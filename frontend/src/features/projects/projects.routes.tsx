@@ -1,10 +1,9 @@
 import type { RouteObject } from 'react-router-dom'
 import { lazyRoute } from '@/lib/router/lazyRoute'
+import * as ProjectsPaths from './projects.paths'
 
-export const PROJECTS_ROUTES = {
-  PROJECTS:       '/projects',
-  PROJECTS_GANTT: '/projects/gantt',
-}
+// A direct `export const` (not a bare re-export specifier) — see camps.routes.tsx for why.
+export const PROJECTS_ROUTES = ProjectsPaths.PROJECTS_ROUTES
 
 // Matches project.routes.ts's real READ_GUARD exactly: project:search OR
 // project:manage OR tenant:manage. Found 2026-08-04: neither this route nor

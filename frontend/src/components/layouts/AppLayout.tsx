@@ -1,7 +1,7 @@
 import { Suspense, useState } from 'react'
 import { Outlet, Navigate, useLocation } from 'react-router-dom'
 import { useSession } from '@/hooks/useSession'
-import { AUTH_ROUTES } from '@/features/auth/auth.routes'
+import { AUTH_ROUTES } from '@/features/auth/auth.paths'
 import { getPharmaRoleMeta } from '@/features/pharma/pharma.constants'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'

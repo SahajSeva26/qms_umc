@@ -15,6 +15,9 @@ vi.mock('@/features/camps/hooks/useCampRefNames')
 vi.mock('@/features/camps/hooks/useMoveCampStage', () => ({
   useMoveCampStage: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
 }))
+vi.mock('@/features/camps/hooks/useActivateCamp', () => ({
+  useActivateCamp: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
+}))
 vi.mock('@/features/camps/hooks/useAllocateFo', () => ({
   useAllocateFo: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
 }))
@@ -25,8 +28,14 @@ vi.mock('react-router-dom', async () => {
   return { ...actual, useNavigate: () => navigateMock }
 })
 
-function mockPermission(overrides: Partial<{ canUpdate: boolean; canMoveStage: boolean; canManageScreening: boolean }> = {}) {
-  const { canUpdate = true, canMoveStage = true, canManageScreening = true } = overrides
+function mockPermission(overrides: Partial<{
+  canUpdate: boolean
+  canMoveStage: boolean
+  canManageScreening: boolean
+  roleId: string
+  roleTypeCode: string
+}> = {}) {
+  const { canUpdate = true, canMoveStage = true, canManageScreening = true, roleId = 'r-viewer', roleTypeCode = 'admin' } = overrides
   vi.mocked(usePermission).mockReturnValue({
     hasAnyPermission: (codes: string[]) => {
       if (codes.includes('screening:manage')) return canManageScreening
@@ -34,7 +43,7 @@ function mockPermission(overrides: Partial<{ canUpdate: boolean; canMoveStage: b
       if (codes.includes('camp:manage')) return canMoveStage
       return false
     },
-    session: { role: { id: 'r-viewer' }, roleType: { code: 'admin' } },
+    session: { role: { id: roleId }, roleType: { code: roleTypeCode } },
   } as unknown as ReturnType<typeof usePermission>)
 }
 
@@ -190,6 +199,32 @@ describe('CampDrawer', () => {
     renderDrawer('camp-1')
 
     expect(screen.getByText(/loading camp/i)).toBeInTheDocument()
+  })
+
+  it('shows Start (Live) for the camp\'s own assigned FO on a confirmed camp, without camp:manage', async () => {
+    mockPermission({ canMoveStage: false, roleId: 'fo-1', roleTypeCode: 'field-officer' })
+    mockCamp(campFixture({ status: 'confirmed', fo: { _id: 'fo-1', code: 'fo-001', name: 'Ravi Kumar' } }))
+    renderDrawer('camp-1')
+
+    expect(screen.getByRole('button', { name: /start \(live\)/i })).toBeInTheDocument()
+    // The manager-only Confirm/Cancel buttons must not appear for this viewer.
+    expect(screen.queryByRole('button', { name: 'Cancel (charged)' })).not.toBeInTheDocument()
+  })
+
+  it('hides Start (Live) from an FO who is not this camp\'s assigned worker', () => {
+    mockPermission({ canMoveStage: false, roleId: 'fo-2', roleTypeCode: 'field-officer' })
+    mockCamp(campFixture({ status: 'confirmed', fo: { _id: 'fo-1', code: 'fo-001', name: 'Ravi Kumar' } }))
+    renderDrawer('camp-1')
+
+    expect(screen.queryByRole('button', { name: /start \(live\)/i })).not.toBeInTheDocument()
+  })
+
+  it('hides Start (Live) for a non-confirmed camp even for the assigned FO', () => {
+    mockPermission({ canMoveStage: false, roleId: 'fo-1', roleTypeCode: 'field-officer' })
+    mockCamp(campFixture({ status: 'requested', fo: { _id: 'fo-1', code: 'fo-001', name: 'Ravi Kumar' } }))
+    renderDrawer('camp-1')
+
+    expect(screen.queryByRole('button', { name: /start \(live\)/i })).not.toBeInTheDocument()
   })
 
   it('only requests divisions/roles/projects ref data the viewer actually has permission for, mirroring each backend route\'s own read guard', () => {

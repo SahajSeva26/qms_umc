@@ -14,13 +14,22 @@ import InventoryFoInventoryPanel from '@/features/inventory/real/components/Inve
 import InventoryRequestsPanel from '@/features/inventory/real/components/InventoryRequestsPanel'
 import InventoryLedgerPanel from '@/features/inventory/real/components/InventoryLedgerPanel'
 import InventoryVendorsPanel from '@/features/inventory/real/components/InventoryVendorsPanel'
+import MyInventoryPanel from '@/features/inventory/real/components/MyInventoryPanel'
 
-type InventoryView = 'overview' | 'masters' | 'devices' | 'consumables' | 'expiry' | 'calibration' | 'assignments' | 'foinventory' | 'requests' | 'movements' | 'vendors'
+type InventoryView = 'overview' | 'masters' | 'devices' | 'consumables' | 'expiry' | 'calibration' | 'assignments' | 'foinventory' | 'myinventory' | 'requests' | 'movements' | 'vendors'
+
+// Identity, not permission — a field worker has no inventory-assignment:* code at all, but the
+// GET /inventory-assignments read endpoint has no permission gate server-side either, so this tab
+// is reachable without one. NOTE: the endpoint also has no own-scope enforcement (accepts any
+// `assignee` filter from any caller, not just their own id) — a pre-existing backend gap, not
+// something this tab's visibility check fixes or relies on for privacy. Mirrors the
+// field-officer/dietitian checks in campsReal.utils.ts (canActivateCamp/canRunScreening).
+const FIELD_WORKER_ROLE_TYPE_CODES = ['field-officer', 'dietitian']
 
 // One page, one route matching the prototype's flat page-tabs shell — this page gates restricted tabs
 // before mounting them (individual panels, e.g. InventoryFoInventoryPanel, have no local permission gate).
 const InventoryManagementPage = () => {
-  const { hasAnyPermission } = usePermission()
+  const { hasAnyPermission, session } = usePermission()
   const [searchParams, setSearchParams] = useSearchParams()
 
   const canViewVendors = hasAnyPermission(['vendor-master:search', 'vendor-master:manage'])
@@ -28,6 +37,7 @@ const InventoryManagementPage = () => {
   // :create is independent of :search/:manage — a create-only requester (e.g. an FO) must still see the tab.
   const canViewRequests = hasAnyPermission(['inventory-request:search', 'inventory-request:manage', 'inventory-request:create'])
   const canViewMovements = hasAnyPermission(['inventory-ledger:manage'])
+  const isFieldWorker = !!session?.roleType.code && FIELD_WORKER_ROLE_TYPE_CODES.includes(session.roleType.code)
 
   const tabs = useMemo<InventoryPageTab[]>(() => [
     { view: 'overview', label: 'Overview', icon: FiLayout },
@@ -38,10 +48,11 @@ const InventoryManagementPage = () => {
     { view: 'calibration', label: 'Calibration', icon: FiTool },
     ...(canViewAssignments ? [{ view: 'assignments' as const, label: 'Assignments', icon: FiUsers }] : []),
     ...(canViewAssignments ? [{ view: 'foinventory' as const, label: 'FO Inventory', icon: FiUserCheck }] : []),
+    ...(isFieldWorker ? [{ view: 'myinventory' as const, label: 'My Inventory', icon: FiUserCheck }] : []),
     ...(canViewRequests ? [{ view: 'requests' as const, label: 'Requests', icon: FiClipboard }] : []),
     ...(canViewMovements ? [{ view: 'movements' as const, label: 'Movements', icon: FiRepeat }] : []),
     ...(canViewVendors ? [{ view: 'vendors' as const, label: 'Vendor Master', icon: FiTruck }] : []),
-  ], [canViewAssignments, canViewRequests, canViewMovements, canViewVendors])
+  ], [canViewAssignments, isFieldWorker, canViewRequests, canViewMovements, canViewVendors])
 
   const requestedView = searchParams.get('view') as InventoryView | null
   const view: InventoryView = requestedView && tabs.some((t) => t.view === requestedView) ? requestedView : 'overview'
@@ -64,6 +75,7 @@ const InventoryManagementPage = () => {
       {view === 'calibration' && <InventoryCalibrationPanel />}
       {view === 'assignments' && canViewAssignments && <InventoryAssignmentsPanel />}
       {view === 'foinventory' && canViewAssignments && <InventoryFoInventoryPanel />}
+      {view === 'myinventory' && isFieldWorker && <MyInventoryPanel />}
       {view === 'requests' && canViewRequests && <InventoryRequestsPanel />}
       {view === 'movements' && canViewMovements && <InventoryLedgerPanel />}
       {view === 'vendors' && canViewVendors && <InventoryVendorsPanel />}

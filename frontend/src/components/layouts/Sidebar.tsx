@@ -13,38 +13,12 @@ import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { useSession } from '@/hooks/useSession'
 import { getPharmaRoleMeta } from '@/features/pharma/pharma.constants'
-import { canReadEmployees } from '@/features/access-management/employee/employeeAccess'
+import { isNavItemVisible as isNavItemReachable, type VisibleNavSession } from '@/lib/navigation/visibleNav'
 import {
   FULL_NAV_SECTIONS,
   type NavItem,
   type NavSection,
-} from './navConfig'
-
-// Hides nav items the viewer would otherwise click into and get bounced from.
-// 'pharma' is deliberately excluded — its visibility is identity-based, not permission-based; system:manage must not bypass it.
-const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
-  // Temporary v1 gate on system:manage, not invoice:manage: Finance Manager
-  // (the role that actually holds invoice:manage) lacks Project/Camp read perms the page's pickers need.
-  crminvoicing: ['system:manage'],
-  crm: ['lead:search', 'lead:manage', 'tenant:manage'],
-  tenants: ['tenant:get', 'tenant:search', 'tenant:manage'],
-  permissiongroups: ['permission-group:get', 'permission-group:search', 'tenant:admin'],
-  roletypes: ['tenant:manage', 'tenant:admin'],
-  roles: ['tenant:admin', 'tenant:manage', 'role:get', 'role:search'],
-  qafeedback: ['qa-feedback:manage'],
-  appointments: ['appointment:search', 'appointment:manage', 'tenant:manage'],
-  projects: ['project:search', 'project:manage', 'tenant:manage'],
-  gantt: ['project:search', 'project:manage', 'tenant:manage'],
-  camps: ['camp:search', 'camp:manage', 'tenant:manage'],
-  campsscreening: ['camp:search', 'camp:manage', 'tenant:manage'],
-  campsdiet: ['camp:search', 'camp:manage', 'tenant:manage'],
-  // Permission-code half only — isNavItemVisible() also requires a platform-tenant
-  // session for this specific item, since field-officer is a platform-only RoleType.
-  fieldofficers: ['tenant:manage', 'tenant:admin'],
-  users: ['user:get', 'user:search', 'user:update'],
-  // GET /geo-profiles has no permission gate server-side — gated instead on tenant/role read access.
-  geoprofiles: ['tenant:get', 'tenant:search', 'tenant:manage', 'tenant:admin', 'role:get', 'role:search'],
-}
+} from '@/lib/navigation/navRegistry'
 
 interface SidebarProps {
   collapsed: boolean
@@ -319,19 +293,14 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
     setCollapsedSections(readCollapsedSections())
   }, [user])
 
-  const isNavItemVisible = (item: NavItem): boolean => {
-    if (item.id === 'pharma') return isPharmaRoleType
-    // Gated by role TYPE (RoleGuard), not permission codes — same reasoning as employeeAccess.ts.
-    if (item.id === 'employees') return !isSettled ? false : canReadEmployees(session?.roleType?.code, permissions)
-    const requiredCodes = REAL_GATED_NAV_ITEMS[item.id]
-    if (!requiredCodes) return true
-    if (!isSettled) return false
-    const hasCode = isRealSystemManage || requiredCodes.some((code) => permissions.includes(code))
-    // field-officer lives only under the platform tenant — a customer-tenant admin holding the
-    // same permission codes must still not see this item, or they'd land on a confusing false "not found" error.
-    if (item.id === 'fieldofficers') return hasCode && session?.tenant.type === 'platform'
-    return hasCode
+  // Shared with the post-login resolver (lib/navigation/visibleNav.ts) so the two can't drift.
+  const visibleNavSession: VisibleNavSession = {
+    isSettled,
+    permissions,
+    roleTypeCode: session?.roleType.code,
+    tenantType: session?.tenant.type,
   }
+  const isNavItemVisible = (item: NavItem): boolean => isNavItemReachable(item, visibleNavSession)
 
   const visibleFullNavSections = FULL_NAV_SECTIONS
     .filter((section) => section.section !== 'System' || isRealSystemManage)

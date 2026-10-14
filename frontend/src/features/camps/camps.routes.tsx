@@ -1,17 +1,16 @@
 import type { RouteObject } from 'react-router-dom'
 import { lazyRoute } from '@/lib/router/lazyRoute'
 import TeleconsultationCampsStubPage from './pages/TeleconsultationCampsStubPage'
+import * as CampsPaths from './camps.paths'
 
-export const CAMPS_ROUTES = {
-  CAMPS:            '/camps',
-  CAMPS_SCREENING:  '/camps/screening',
-  CAMPS_DIET:       '/camps/diet',
-  CAMPS_TELE:       '/camps/tele',
-  CAMP_NEW:         '/camps/new',
-  CAMP_DETAIL:      '/camps/:id',
-  CAMP_EDIT:        '/camps/:id/edit',
-  CAMP_SCREENING:   '/camps/:id/screening',
-}
+// Re-exported via a direct `export const` (not a bare `export { CAMPS_ROUTES }` specifier) —
+// eslint-plugin-react-refresh's only-export-components check treats a bare re-export specifier as
+// a nameless export and falls back to matching the identifier's name against a component-name
+// pattern (anything starting uppercase, which an ALL_CAPS constant also satisfies), misreading this
+// as "this file's component." A direct `export const` is checked against its real initializer
+// instead, which correctly resolves as a plain object, same as it did before the constant moved
+// into its own camps.paths.ts module.
+export const CAMPS_ROUTES = CampsPaths.CAMPS_ROUTES
 
 // Only the NEW route is gated on write perms — viewing (the drawer, at CAMPS)
 // and editing (CAMP_EDIT) each check their own narrower permission internally.

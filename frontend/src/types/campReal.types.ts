@@ -222,6 +222,11 @@ export interface MoveCampStagePayload {
   reason: string
 }
 
+/** PATCH /camps/:id/activate — the camp's assigned FO/dietitian starts their own confirmed camp. */
+export interface ActivateCampPayload {
+  reason?: string
+}
+
 /** App-facing shape for POST /camps/booking-availability — `projectId`
  * (not the backend's required `projectID` spelling) and `[lng, lat]`
  * are translated to the wire shape inside campsReal.service.ts only. */

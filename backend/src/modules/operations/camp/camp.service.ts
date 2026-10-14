@@ -2,6 +2,7 @@
 import mongoose, { HydratedDocument } from 'mongoose';
 import { CampModel, ICamp } from './camp.model';
 import {
+    IActivateCampPayload,
     IApproveVoidCampPayload,
     IBookCampPayload,
     IBookingAvailabilityPayload,
@@ -897,6 +898,38 @@ const moveStage = async (id: string, model: IMoveStagePayload, ctx: RequestConte
     return camp;
 };
 
+// field staff start their OWN confirmed camp (confirmed → live) on/after its scheduled date.
+// Reuses workerFor (the shared FO/dietitian abstraction) for ownership + delegates the actual
+// transition to moveStage, so status changes stay in one place (unlike approveVoidCamp, which
+// copy-pastes the journal push). Route access is role-gated to FO/dietitian (RoleGuard).
+const activate = async (id: string, model: IActivateCampPayload, ctx: RequestContext) => {
+    const camp = await CampService.get(id, ctx); // own-scoped: FO→fo slot, dietitian→dietitian slot
+    if (!camp) {
+        return throwAppError('Camp not found', StatusCodes.NOT_FOUND);
+    }
+
+    // ownership — only the camp's assigned worker may start it (DRY via workerFor: FO for
+    // screening/lab, dietitian for diet). Belt-and-suspenders on top of the own-scoped get().
+    const worker = workerFor(camp.type);
+    const assignee = (camp as any)[worker.field];
+    if (!assignee || assignee.toString() !== (ctx.role?._id || ctx.role?.id)?.toString()) {
+        return throwAppError(`Only the assigned ${worker.label} can start this camp`, StatusCodes.FORBIDDEN);
+    }
+
+    // must be confirmed to start
+    if (camp.status !== CAMP_STATUSES.CONFIRMED) {
+        return throwAppError('Only a confirmed camp can be started', StatusCodes.CONFLICT);
+    }
+
+    // cannot start before the camp's scheduled date (same calendar day is allowed)
+    if (new Date() < startOfUTCDay(camp.date)) {
+        return throwAppError('A camp can only be started on or after its scheduled date', StatusCodes.UNPROCESSABLE_ENTITY);
+    }
+
+    // delegate the actual confirmed → live move to moveStage (single source of status truth)
+    return moveStage(id, { to: CAMP_STATUSES.LIVE, reason: model.reason || `Camp started by ${worker.label}` } as any, ctx);
+};
+
 // manual/retry counterpart to create()'s auto-assign — allocates the worker the camp's type uses.
 const allocateWorker = async (id: string, ctx: RequestContext) => {
     const camp = await CampService.get(id, ctx);
@@ -1230,6 +1263,7 @@ export const CampService = {
     approveVoidCamp,
     update,
     moveStage,
+    activate,
     allocateWorker,
     book,
     report,

@@ -3,6 +3,7 @@ import express from 'express';
 import { CampController } from './camp.controller';
 import { registry } from '../../../shared/config/swagger/swagger.registry';
 import {
+    ActivateCampPayloadSchema,
     ApproveVoidCampPayloadSchema,
     BookCampPayloadSchema,
     BookingAvailabilityPayloadSchema,
@@ -217,6 +218,31 @@ registry.registerPath({
     },
 });
 
+// start a camp (confirmed → live) — the camp's assigned field officer / dietitian only
+registry.registerPath({
+    method: 'patch',
+    path: '/camps/{id}/activate',
+    tags: ['CAMP'],
+    summary: 'Start a camp — moves it confirmed → live (assigned FO/dietitian only, on/after its scheduled date)',
+    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+    request: {
+        body: {
+            content: {
+                'application/json': {
+                    schema: ActivateCampPayloadSchema,
+                },
+            },
+        },
+    },
+    responses: {
+        200: { description: 'Camp started successfully' },
+        403: { description: 'Not the assigned field worker' },
+        404: { description: 'Camp not found' },
+        409: { description: 'Camp is not in the confirmed stage' },
+        422: { description: 'Camp cannot be started before its scheduled date' },
+    },
+});
+
 // approve a void camp (requested → closed) — internal team only
 registry.registerPath({
     method: 'patch',
@@ -304,6 +330,13 @@ CampRouter.patch(
     '/:id/stage',
     AuthorizeMiddleware([CAMP_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
     CampController.moveStage,
+);
+// start a camp (confirmed → live) — role-gated to the field staff who run it; ownership + stage +
+// scheduled-date are enforced in the service. NOT permission-gated (field staff, not managers).
+CampRouter.patch(
+    '/:id/activate',
+    RoleGuard([ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER, ALLOWED_ROLETYPE_CODES.PLATFORM.DIETITIAN]),
+    CampController.activate,
 );
 
 // approve a void camp (requested → closed) — camp:manage (ops) / tenant:manage only

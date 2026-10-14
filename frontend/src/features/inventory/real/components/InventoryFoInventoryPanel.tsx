@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { FiUsers, FiHardDrive, FiAlertTriangle } from 'react-icons/fi'
 import { useInventoryAssignmentReport } from '@/features/inventory/real/hooks/useInventoryAssignmentReport'
 import { useInventoryAssignments } from '@/features/inventory/real/hooks/useInventoryAssignments'
@@ -6,6 +6,7 @@ import { usePagination } from '@/hooks/usePagination'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import InventoryReportKpiStrip, { type InventoryReportTile } from '@/features/inventory/real/components/InventoryReportKpiStrip'
 import PaginationControls from '@/components/ui/PaginationControls'
+import FoInventoryDrawer from '@/features/inventory/real/components/FoInventoryDrawer'
 import { expiryBand } from '@/features/inventory/real/utils/expiryBand'
 
 const PAGE_SIZE = 10
@@ -17,6 +18,7 @@ const InventoryFoInventoryPanel = () => {
   const { report, isLoading: reportLoading, error: reportError, refetch: refetchReport } = useInventoryAssignmentReport(true)
   const { data: assignmentsData, isLoading: assignmentsLoading, error: assignmentsError, refetch: refetchAssignments } = useInventoryAssignments({ inventoryType: 'InventoryConsumable', limit: FETCH_LIMIT })
   const { page, setPage, totalPages } = usePagination(PAGE_SIZE)
+  const [selectedFo, setSelectedFo] = useState<{ role: string; name: string; code: string } | null>(null)
 
   const isLoading = reportLoading || assignmentsLoading
   const error = reportError || assignmentsError
@@ -89,8 +91,22 @@ const InventoryFoInventoryPanel = () => {
                 {paged.map((fo) => {
                   const expiringSoon = expiringSoonByAssignee.get(fo.role) ?? 0
                   return (
-                    <tr key={fo.role} style={{ borderBottom: '1px solid var(--qms-border)' }}>
-                      <td className="px-4 py-2 max-w-xs truncate" style={{ color: 'var(--qms-text)' }} title={fo.name}>{fo.name}</td>
+                    <tr
+                      key={fo.role}
+                      className="transition-colors hover:bg-(--qms-surface-hover)"
+                      style={{ borderBottom: '1px solid var(--qms-border)' }}
+                    >
+                      <td className="px-4 py-2 max-w-xs" style={{ color: 'var(--qms-text)' }}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedFo({ role: fo.role, name: fo.name, code: fo.code })}
+                          className="truncate text-left w-full cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-2"
+                          style={{ color: 'inherit', outlineColor: 'var(--qms-brand)' }}
+                          title={fo.name}
+                        >
+                          {fo.name}
+                        </button>
+                      </td>
                       <td className="px-4 py-2 font-mono" style={{ color: 'var(--qms-text-muted)' }}>{fo.code}</td>
                       <td className="px-4 py-2 text-right font-mono" style={{ color: 'var(--qms-text)' }}>{fo.devicesHeld}</td>
                       <td className="px-4 py-2 text-right font-mono" style={{ color: 'var(--qms-text)' }}>{fo.consumableUnitsHeld}</td>
@@ -120,6 +136,16 @@ const InventoryFoInventoryPanel = () => {
         </div>
         <PaginationControls page={page} totalPages={totalPages(rows.length)} onPageChange={setPage} />
       </QueryStateBlock>
+
+      {selectedFo && (
+        <FoInventoryDrawer
+          open
+          onClose={() => setSelectedFo(null)}
+          foRoleId={selectedFo.role}
+          foName={selectedFo.name}
+          foCode={selectedFo.code}
+        />
+      )}
     </div>
   )
 }

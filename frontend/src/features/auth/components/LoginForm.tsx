@@ -5,7 +5,7 @@ import { FiUser, FiLock, FiEye, FiEyeOff } from 'react-icons/fi'
 import { loginSchema, type LoginFormValues } from '../auth.schemas'
 import { useLogin } from '../hooks/useLogin'
 import ThemeToggle from '@/components/ui/ThemeToggle'
-import { ACCESS_MANAGEMENT_ROUTES } from '@/features/access-management/accessManagement.routes'
+import { AUTH_ROUTES } from '@/features/auth/auth.routes'
 import { useNavigate } from 'react-router-dom'
 import { getApiErrorMessage, isServerUnreachable, isServiceFailure } from '@/utils/apiError'
 import { useServerHealth } from '@/hooks/useServerHealth'
@@ -32,10 +32,9 @@ const LoginForm = () => {
 
   const onSubmit = (values: LoginFormValues) => {
     login(values, {
-      onSuccess: () => {
-        // TODO: revert to DASHBOARD_ROUTES.DASHBOARD once Dashboard is backend-wired and un-hidden from nav.
-        navigate(ACCESS_MANAGEMENT_ROUTES.TENANTS, { replace: true })
-      },
+      // AuthContinuePage resolves the real per-session landing page from the session query
+      // useLogin() already refetches — no second /auth/me call, no hard-coded destination.
+      onSuccess: () => navigate(AUTH_ROUTES.CONTINUE, { replace: true }),
       onError: (err) => {
         if (isServerUnreachable(err)) setUnreachable(true)
       },

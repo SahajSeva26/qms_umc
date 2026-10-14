@@ -8,7 +8,7 @@ import { useEmployees } from '@/features/access-management/employee/hooks/useEmp
 import { useEmployeesFilters } from '@/features/access-management/employee/hooks/useEmployeesFilters'
 import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRoleTypes'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
-import { canOnboardNewPerson, canLinkExistingAccount } from '@/features/access-management/employee/employeeAccess'
+import { canOnboardNewPerson, canLinkExistingAccount } from '@/lib/access/employeeAccess'
 import EmployeesTable from '@/features/access-management/employee/components/EmployeesTable'
 import EmployeesFilterBar from '@/features/access-management/employee/components/EmployeesFilterBar'
 import CreateEmployeeModal from '@/features/access-management/employee/components/CreateEmployeeModal'

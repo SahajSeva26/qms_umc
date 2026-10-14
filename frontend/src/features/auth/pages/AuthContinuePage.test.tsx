@@ -1,0 +1,144 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import { MemoryRouter, Routes, Route } from 'react-router-dom'
+import { useSession } from '@/hooks/useSession'
+import type { SessionResponse } from '@/types/accessManagement.types'
+import { CAMPS_ROUTES } from '@/features/camps/camps.routes'
+import { PHARMA_ROUTES } from '@/features/pharma/pharma.constants'
+import { EMPLOYEE_ROUTES } from '@/features/access-management/employee/employee.routes'
+import { CRM_ROUTES } from '@/features/crm/crm.routes'
+import AuthContinuePage from './AuthContinuePage'
+
+vi.mock('@/hooks/useSession')
+
+function sessionFixture(roleTypeCode: string, permissions: string[], tenantType: 'customer' | 'platform' = 'platform'): SessionResponse {
+  return {
+    user: { id: 'u-1', email: 'a@example.com', firstName: 'a', lastName: 'b' },
+    role: { id: 'role-1', code: 'role-code', name: 'Role' },
+    roleType: { id: 'rt-1', code: roleTypeCode, name: roleTypeCode },
+    tenant: { id: 't-1', code: 'tenant-1', name: 'Tenant', type: tenantType },
+    permissions,
+  } as unknown as SessionResponse
+}
+
+function mockSession(overrides: Partial<{
+  isSettled: boolean
+  isFetching: boolean
+  isError: boolean
+  isConfirmedUnauthenticated: boolean
+  session: SessionResponse | null
+  permissions: string[]
+}>) {
+  const {
+    isSettled = true,
+    isFetching = false,
+    isError = false,
+    isConfirmedUnauthenticated = false,
+    session = null,
+    permissions = session?.permissions ?? [],
+  } = overrides
+  vi.mocked(useSession).mockReturnValue({
+    isSettled, isFetching, isError, isConfirmedUnauthenticated, session, permissions,
+    refetchSession: vi.fn(),
+  } as unknown as ReturnType<typeof useSession>)
+}
+
+function renderContinuePage() {
+  return render(
+    <MemoryRouter initialEntries={['/auth/continue']}>
+      <Routes>
+        <Route path="/auth/continue" element={<AuthContinuePage />} />
+        <Route path="/auth/login" element={<div>Login page</div>} />
+        <Route path="*" element={<div>Landed: no specific match</div>} />
+        <Route path={CAMPS_ROUTES.CAMPS} element={<div>Landed: {CAMPS_ROUTES.CAMPS}</div>} />
+        <Route path={EMPLOYEE_ROUTES.EMPLOYEES} element={<div>Landed: {EMPLOYEE_ROUTES.EMPLOYEES}</div>} />
+        <Route path={PHARMA_ROUTES.PHARMA} element={<div>Landed: {PHARMA_ROUTES.PHARMA}</div>} />
+        <Route path={CRM_ROUTES.APPOINTMENTS} element={<div>Landed: {CRM_ROUTES.APPOINTMENTS}</div>} />
+      </Routes>
+    </MemoryRouter>,
+  )
+}
+
+describe('AuthContinuePage — resolves the post-login landing from the session, not a hard-coded page', () => {
+  beforeEach(() => vi.resetAllMocks())
+
+  it('renders nothing while the session has not settled yet (no guess, no flash)', () => {
+    mockSession({ isSettled: false })
+    const { container } = renderContinuePage()
+
+    expect(container.textContent).toBe('')
+  })
+
+  it('renders nothing (not "Nothing to show yet") while settled-but-session-null and a refetch is in flight — the exact post-login race window useLogin\'s refetchSession creates', () => {
+    // isSettled is a lifetime flag: it can stay true from an earlier resolved fetch while a NEW
+    // refetch (the one useLogin triggers right after this page mounts) is still in flight and
+    // session is momentarily null. Must not be read as "no access."
+    mockSession({ isSettled: true, isFetching: true, session: null })
+    const { container } = renderContinuePage()
+
+    expect(container.textContent).toBe('')
+    expect(screen.queryByText(/nothing to show yet/i)).not.toBeInTheDocument()
+  })
+
+  it('redirects to login on a confirmed 401', () => {
+    mockSession({ isConfirmedUnauthenticated: true, session: null })
+    renderContinuePage()
+
+    expect(screen.getByText('Login page')).toBeInTheDocument()
+  })
+
+  it('shows SessionRecovery (not a guessed route) on an inconclusive session failure', () => {
+    mockSession({ isError: true, session: null })
+    renderContinuePage()
+
+    expect(screen.getByText(/couldn't confirm your session/i)).toBeInTheDocument()
+  })
+
+  it('a field-officer session lands on Camp Management (camp:search satisfies the Camps gate)', () => {
+    const session = sessionFixture('field-officer', ['camp:search'], 'platform')
+    mockSession({ session, permissions: session.permissions })
+    renderContinuePage()
+
+    expect(screen.getByText(`Landed: ${CAMPS_ROUTES.CAMPS}`)).toBeInTheDocument()
+  })
+
+  it('a dietitian session (real default grants: camp:search/camp:get, appointment:search/get/rsvp — no camp:book) lands on Appointments, not the inaccessible tenant default the old FO-only hard-coded fix would have left them on', () => {
+    const session = sessionFixture('dietitian', ['camp:search', 'camp:get', 'appointment:search', 'appointment:get', 'appointment:rsvp'], 'platform')
+    mockSession({ session, permissions: session.permissions })
+    renderContinuePage()
+
+    expect(screen.getByText(`Landed: ${CRM_ROUTES.APPOINTMENTS}`)).toBeInTheDocument()
+  })
+
+  it('a pharma-identity session lands on its own portal path (identity routing, not permission routing)', () => {
+    const session = sessionFixture('pharma-mr', ['camp:book'], 'customer')
+    mockSession({ session, permissions: session.permissions })
+    renderContinuePage()
+
+    expect(screen.getByText(`Landed: ${PHARMA_ROUTES.PHARMA}`)).toBeInTheDocument()
+  })
+
+  it('a misconfigured pharma session (no camp:book) is treated as having no reachable item, not routed into a dead portal', () => {
+    const session = sessionFixture('pharma-mr', [], 'customer')
+    mockSession({ session, permissions: session.permissions })
+    renderContinuePage()
+
+    expect(screen.getByText(/nothing to show yet/i)).toBeInTheDocument()
+  })
+
+  it('a system:manage session lands on Appointments — the first section\'s first item, since system:manage bypasses every gate', () => {
+    const session = sessionFixture('system-admin', ['system:manage'], 'platform')
+    mockSession({ session, permissions: session.permissions })
+    renderContinuePage()
+
+    expect(screen.getByText(`Landed: ${CRM_ROUTES.APPOINTMENTS}`)).toBeInTheDocument()
+  })
+
+  it('even a role type with zero permission-gated grants still resolves somewhere, via the nav items open to any authenticated session (Employees is open to admin-family role types)', () => {
+    const session = sessionFixture('admin', [], 'customer')
+    mockSession({ session, permissions: session.permissions })
+    renderContinuePage()
+
+    expect(screen.getByText(`Landed: ${EMPLOYEE_ROUTES.EMPLOYEES}`)).toBeInTheDocument()
+  })
+})

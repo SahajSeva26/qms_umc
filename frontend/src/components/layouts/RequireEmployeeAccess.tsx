@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
 import { usePermission } from '@/hooks/usePermission'
-import { canReadEmployees } from '@/features/access-management/employee/employeeAccess'
+import { canReadEmployees } from '@/lib/access/employeeAccess'
 import { AUTH_ROUTES } from '@/features/auth/auth.routes'
 import SessionRecovery from './SessionRecovery'
 

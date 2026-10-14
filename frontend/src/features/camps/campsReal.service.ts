@@ -1,6 +1,7 @@
 import api from '@/lib/api/api'
 import type { ApiResponse, PaginatedResponse } from '@/types/common.types'
 import type {
+  ActivateCampPayload,
   ApproveVoidCampPayload,
   BookCampPayload,
   BookingAvailabilityPayload,
@@ -62,6 +63,13 @@ const moveCampStage = async (id: string, payload: MoveCampStagePayload) => {
   return res.data
 }
 
+// Role-gated (not camp:manage) — the camp's assigned FO/dietitian starts their own confirmed camp
+// on site. Distinct from moveCampStage, which only camp:manage/tenant:manage holders can call.
+const activateCamp = async (id: string, payload: ActivateCampPayload) => {
+  const res = await api.patch<ApiResponse<CampMutationResponseEntity>>(`/camps/${id}/activate`, payload)
+  return res.data
+}
+
 const allocateFo = async (id: string) => {
   const res = await api.post<ApiResponse<CampMutationResponseEntity>>(`/camps/${id}/allocate`)
   return res.data
@@ -93,6 +101,7 @@ export const campsRealService = {
   approveVoidCamp,
   updateCamp,
   moveCampStage,
+  activateCamp,
   allocateFo,
   getCampReport,
   getBookingAvailability,

@@ -5,7 +5,7 @@ import { FiEdit2, FiUser, FiTruck, FiCpu, FiFileText } from 'react-icons/fi'
 import { useCampReal } from '@/features/camps/hooks/useCampReal'
 import { useCampsReal } from '@/features/camps/hooks/useCampsReal'
 import { useCampRefNames } from '@/features/camps/hooks/useCampRefNames'
-import { campRefId, canRunScreening } from '@/features/camps/campsReal.utils'
+import { campRefId, canRunScreening, canActivateCamp } from '@/features/camps/campsReal.utils'
 import { usePermission } from '@/hooks/usePermission'
 import SideDrawer from '@/components/ui/SideDrawer'
 import CampStatusPillReal from '@/components/widgets/camp/CampStatusPillReal'
@@ -248,6 +248,7 @@ const CampDrawerContent = ({ campId, onClose }: CampDrawerContentProps) => {
                 <CampStageActionRow
                   camp={camp}
                   canMoveStage={canMoveStage}
+                  canActivate={canActivateCamp(camp, session?.role.id, session?.roleType.code)}
                   extraAction={
                     camp.status === 'live' && canRunScreening(camp, session?.role.id, session?.roleType.code, canManageScreening)
                       ? (

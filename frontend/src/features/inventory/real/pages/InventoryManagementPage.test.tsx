@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router-dom'
-import { ADMIN_ROUTES } from '@/features/admin/admin.routes'
+import { ADMIN_ROUTES } from '@/features/admin/admin.paths'
 
 vi.mock('@/hooks/usePermission')
 
@@ -17,6 +17,7 @@ vi.mock('@/features/inventory/real/components/InventoryFoInventoryPanel', () => 
 vi.mock('@/features/inventory/real/components/InventoryRequestsPanel', () => ({ default: () => <div>Requests panel content</div> }))
 vi.mock('@/features/inventory/real/components/InventoryLedgerPanel', () => ({ default: () => <div>Movements panel content</div> }))
 vi.mock('@/features/inventory/real/components/InventoryVendorsPanel', () => ({ default: () => <div>Vendors panel content</div> }))
+vi.mock('@/features/inventory/real/components/MyInventoryPanel', () => ({ default: () => <div>My Inventory panel content</div> }))
 // InventoryPageShell pulls in useInventoryOverviewKpis, which hits 5 real
 // report endpoints — stubbed so this file stays a pure page-wiring test.
 vi.mock('@/features/inventory/real/hooks/useInventoryOverviewKpis', () => ({
@@ -28,9 +29,17 @@ function LocationSpy({ onChange }: { onChange: (search: string) => void }) {
   return null
 }
 
-async function renderPage(hasAnyPermission: (perms: string[]) => boolean, initialPath = ADMIN_ROUTES.ADMIN_INVENTORY, onLocationChange?: (search: string) => void) {
+async function renderPage(
+  hasAnyPermission: (perms: string[]) => boolean,
+  initialPath = ADMIN_ROUTES.ADMIN_INVENTORY,
+  onLocationChange?: (search: string) => void,
+  roleTypeCode?: string,
+) {
   const { usePermission } = await import('@/hooks/usePermission')
-  vi.mocked(usePermission).mockReturnValue({ hasAnyPermission } as unknown as ReturnType<typeof usePermission>)
+  vi.mocked(usePermission).mockReturnValue({
+    hasAnyPermission,
+    session: roleTypeCode ? { roleType: { code: roleTypeCode } } : null,
+  } as unknown as ReturnType<typeof usePermission>)
   const InventoryManagementPage = (await import('./InventoryManagementPage')).default
   return render(
     <MemoryRouter initialEntries={[initialPath]}>
@@ -68,6 +77,38 @@ describe('InventoryManagementPage — one page, tabs gated by real per-area perm
 
     expect(screen.getByRole('button', { name: /^assignments$/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^fo inventory$/i })).toBeInTheDocument()
+  })
+
+  // My Inventory is gated on role-TYPE identity, not a permission code — the backend's
+  // GET /inventory-assignments read has no permission gate at all, so this is purely about
+  // surfacing the tab to the one identity it's actually relevant to.
+  it('a field-officer-shaped viewer sees My Inventory, even holding none of the manager-only permissions', async () => {
+    await renderPage((perms) => perms.every((p) => p.startsWith('inventory-request:')), ADMIN_ROUTES.ADMIN_INVENTORY, undefined, 'field-officer')
+
+    expect(screen.getByRole('button', { name: /^my inventory$/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^fo inventory$/i })).not.toBeInTheDocument()
+  })
+
+  it('a dietitian-shaped viewer also sees My Inventory', async () => {
+    await renderPage((perms) => perms.every((p) => p.startsWith('inventory-request:')), ADMIN_ROUTES.ADMIN_INVENTORY, undefined, 'dietitian')
+
+    expect(screen.getByRole('button', { name: /^my inventory$/i })).toBeInTheDocument()
+  })
+
+  it('a manager (inventory-assignment:manage, non-field-worker role type) does NOT see My Inventory — they have FO Inventory (the org-wide roster) instead', async () => {
+    await renderPage((perms) => perms.includes('inventory-assignment:manage'), ADMIN_ROUTES.ADMIN_INVENTORY, undefined, 'admin')
+
+    expect(screen.queryByRole('button', { name: /^my inventory$/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^fo inventory$/i })).toBeInTheDocument()
+  })
+
+  it('clicking My Inventory renders its panel content', async () => {
+    const user = userEvent.setup()
+    await renderPage((perms) => perms.every((p) => p.startsWith('inventory-request:')), ADMIN_ROUTES.ADMIN_INVENTORY, undefined, 'field-officer')
+
+    await user.click(screen.getByRole('button', { name: /^my inventory$/i }))
+
+    expect(screen.getByText('My Inventory panel content')).toBeInTheDocument()
   })
 
   it('clicking a visible tab switches the panel and updates the URL', async () => {

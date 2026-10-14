@@ -15,6 +15,7 @@ export const CAMP_TYPE_LABEL: Record<CampType, string> = {
 
 export type BillingType = 'billable' | 'void'
 export type CampStatus = 'requested' | 'confirmed' | 'live' | 'closed' | 'cancelled' | 'cancelled_charged'
+export const CAMP_STATUS_VALUES: CampStatus[] = ['requested', 'confirmed', 'live', 'closed', 'cancelled', 'cancelled_charged']
 
 /** CAMP_TRANSITION_MAP mirrored exactly from camp.constants.ts — the only legal next stages per status. */
 export const CAMP_TRANSITION_MAP: Record<CampStatus, CampStatus[]> = {
@@ -92,6 +93,13 @@ export interface CampEntity {
 export interface CampStats {
   patients: number
   patientsCompleted: number
+}
+
+/** GET /camps/my's top-level summary — totals over the caller's own camps, independent of the current page/filter. */
+export interface CampSummary {
+  totalCamps: number
+  statusCounts: { status: CampStatus; count: number }[]
+  typeCounts: { type: CampType; count: number }[]
 }
 
 /** create/update/moveStage/allocateFo return the unpopulated document — only

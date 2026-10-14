@@ -6,7 +6,6 @@ type CreateRoleSchemaPayload = Omit<CreateRolePayload, 'permissions'>
 type UpdateRoleSchemaPayload = Omit<UpdateRolePayload, 'permissions'>
 
 export interface CreateRoleFormValues {
-  code: string
   name: string
   description: string
   tenant: string
@@ -22,7 +21,6 @@ export interface CreateRoleFormValues {
 }
 
 export const EMPTY_CREATE_FORM_VALUES: CreateRoleFormValues = {
-  code: '',
   name: '',
   description: '',
   tenant: '',
@@ -72,7 +70,6 @@ export const useCreateRoleFormResolver = () =>
   useReshapingResolver<CreateRoleFormValues, CreateRoleSchemaPayload>({
     schema: createRoleSchema,
     toPayload: (values) => ({
-      code: values.code,
       name: values.name,
       description: values.description,
       type: values.roleType,

@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import DatePicker from '@/components/ui/DatePicker'
 import SearchInput from '@/components/ui/SearchInput'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import DoctorAsyncPicker from '@/components/widgets/doctor/DoctorAsyncPicker'
@@ -33,6 +34,10 @@ interface CampsFilterBarRealProps {
 
 const FIELD_CLASS = 'h-auto rounded-lg px-2.5 py-1.5 text-[12px]'
 
+// Navigation range only, not a business rule — camps can be filtered by date far outside "now".
+const FILTER_DATE_START_MONTH = new Date(new Date().getFullYear() - 10, 0)
+const FILTER_DATE_END_MONTH = new Date(new Date().getFullYear() + 10, 11)
+
 const CampsFilterBarReal = ({ filters, setFilter, reset, hideType = false, canFilterByClient = false }: CampsFilterBarRealProps) => {
   return (
     <div
@@ -41,17 +46,21 @@ const CampsFilterBarReal = ({ filters, setFilter, reset, hideType = false, canFi
     >
       <span className="text-[12px] font-semibold shrink-0" style={{ color: 'var(--qms-text-muted)' }}>Filters</span>
 
-      <Input
-        type="date"
+      <DatePicker
         value={filters.dateFrom}
-        onChange={(e) => setFilter('dateFrom', e.target.value)}
+        onChange={(v) => setFilter('dateFrom', v)}
+        placeholder="Date from"
         className={`w-36 ${FIELD_CLASS}`}
+        startMonth={FILTER_DATE_START_MONTH}
+        endMonth={FILTER_DATE_END_MONTH}
       />
-      <Input
-        type="date"
+      <DatePicker
         value={filters.dateTo}
-        onChange={(e) => setFilter('dateTo', e.target.value)}
+        onChange={(v) => setFilter('dateTo', v)}
+        placeholder="Date to"
         className={`w-36 ${FIELD_CLASS}`}
+        startMonth={FILTER_DATE_START_MONTH}
+        endMonth={FILTER_DATE_END_MONTH}
       />
 
       <Select value={filters.status} onValueChange={(v) => setFilter('status', (v ?? 'ALL') as CampsRealFilterState['status'])}>

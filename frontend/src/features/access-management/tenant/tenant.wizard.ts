@@ -4,7 +4,6 @@ import type { CreateTenantPayload } from '@/types/accessManagement.types'
 import type { LocationValue } from '@/types/location.types'
 
 export interface TenantFormValues {
-  code: string
   name: string
   salesPerson: string
   ownerFirstName: string
@@ -19,7 +18,6 @@ export interface TenantFormValues {
 }
 
 export const EMPTY_FORM_VALUES: TenantFormValues = {
-  code: '',
   name: '',
   salesPerson: '',
   ownerFirstName: '',
@@ -53,7 +51,6 @@ export const useTenantFormResolver = () =>
   useReshapingResolver<TenantFormValues, CreateTenantPayload>({
     schema: createTenantSchema,
     toPayload: (values) => ({
-      code: values.code,
       name: values.name,
       salesPerson: values.salesPerson,
       owner: {
@@ -73,7 +70,7 @@ export const useTenantFormResolver = () =>
 
 // Drives each step's trigger([...]) call on Next — one array per CreateTenantDialog step.
 export const CREATE_TENANT_STEP_FIELD_NAMES: (keyof TenantFormValues)[][] = [
-  ['code', 'name', 'salesPerson'],
+  ['name', 'salesPerson'],
   ['address'],
   ['ownerFirstName', 'ownerLastName', 'ownerEmail', 'ownerPassword', 'ownerPhone', 'ownerGender'],
 ]

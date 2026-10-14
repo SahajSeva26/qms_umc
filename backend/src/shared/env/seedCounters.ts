@@ -3,10 +3,12 @@ import { LEAD_COUNTER_ENTITY } from '../../modules/crm/lead/lead.constants';
 import { PROJECT_COUNTER_ENTITY } from '../../modules/crm/project/project.constants';
 import { CAMP_COUNTER_ENTITY } from '../../modules/operations/camp/camp.constants';
 import { APPOINTMENT_COUNTER_ENTITY } from '../../modules/crm/appointment/appointment.constants';
-import { PHARMA_ROLE_COUNTER_ENTITY } from '../../modules/access-management/role/role.constants';
+import { PHARMA_ROLE_COUNTER_ENTITY, ROLE_COUNTER_ENTITY } from '../../modules/access-management/role/role.constants';
 import { INVOICE_COUNTER_ENTITY } from '../../modules/finance/invoice/invoice.constants';
 import { TEST_MASTER_COUNTER_ENTITY } from '../../modules/operations/testMaster/testMaster.constants';
 import { PATIENT_COUNTER_ENTITY } from '../../modules/operations/patient/patient.constants';
+import { TENANT_COUNTER_ENTITY } from '../../modules/access-management/tenant/tenant.constants';
+import { DIVISION_COUNTER_ENTITY } from '../../modules/crm/division/division.constants';
 import logger from '../utils/logger';
 import { throwAppError } from '../utils/error';
 
@@ -53,6 +55,13 @@ const COUNTERS = [
         description: 'Sequential code for pharma field-force roles (phr-000001)',
     },
     {
+        entity: ROLE_COUNTER_ENTITY,
+        prefix: 'rol',
+        separator: '-',
+        padding: 6,
+        description: 'Generic fallback code for roles created without an explicit code (rol-000001)',
+    },
+    {
         entity: INVOICE_COUNTER_ENTITY,
         prefix: 'inv',
         separator: '-',
@@ -72,6 +81,20 @@ const COUNTERS = [
         separator: '-',
         padding: 6,
         description: 'Sequential code for patient registry records (pat-000001)',
+    },
+    {
+        entity: TENANT_COUNTER_ENTITY,
+        prefix: 'clt',
+        separator: '-',
+        padding: 6,
+        description: 'Sequential code for tenant/client records (clt-000001)',
+    },
+    {
+        entity: DIVISION_COUNTER_ENTITY,
+        prefix: 'div',
+        separator: '-',
+        padding: 6,
+        description: 'Sequential code for division records (div-000001)',
     },
 ];
 

@@ -1,4 +1,4 @@
-import { useFieldArray, useFormContext, useWatch } from 'react-hook-form'
+import { Controller, useFieldArray, useFormContext, useWatch } from 'react-hook-form'
 import { FiFile, FiFileText, FiMail, FiPlus, FiTrash2 } from 'react-icons/fi'
 import type { WizardFormState } from '@/features/projects/wizard.types'
 import type { ExecutionModeType } from '@/types/project.types'
@@ -8,11 +8,16 @@ import { PickCard, PickGrid } from '@/components/ui/PickCard'
 import SectionHeader from '@/components/ui/SectionHeader'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import DatePicker from '@/components/ui/DatePicker'
 import { labelClasses, labelStyle, fieldClasses } from '@/features/projects/components/wizard/wizard.styles'
 import { useWizardFieldError } from '@/features/projects/components/wizard/WizardValidationContext'
 
 const MODE_ICONS: Record<ExecutionModeType, typeof FiFile> = { po: FiFile, agreement: FiFileText, mail_confirmation: FiMail }
 const MODE_OPTIONS: ExecutionModeType[] = ['po', 'agreement', 'mail_confirmation']
+
+// Navigation range only, not a business rule — the backend has no min/max on these dates.
+const WIZARD_DATE_START_MONTH = new Date(new Date().getFullYear() - 10, 0)
+const WIZARD_DATE_END_MONTH = new Date(new Date().getFullYear() + 10, 11)
 
 // agreementDocument/emailDocument/each PO's file stay plain URL/id text fields — the backend's
 // file module has no ENTITY_RELATION entry for project sub-documents yet, so real upload is deferred.
@@ -80,10 +85,18 @@ const WizardStep2 = () => {
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <Label className={labelClasses} style={labelStyle}>PO date *</Label>
-                        <Input
-                          type="date"
-                          {...register(`purchaseOrders.${i}.date`, { onChange: (e) => autoFillExpiry(i, e.target.value) })}
-                          className={fieldClasses}
+                        <Controller
+                          control={control}
+                          name={`purchaseOrders.${i}.date`}
+                          render={({ field }) => (
+                            <DatePicker
+                              value={field.value ?? ''}
+                              onChange={(v) => { field.onChange(v); autoFillExpiry(i, v) }}
+                              className={`w-full ${fieldClasses}`}
+                              startMonth={WIZARD_DATE_START_MONTH}
+                              endMonth={WIZARD_DATE_END_MONTH}
+                            />
+                          )}
                         />
                         {errors.purchaseOrders?.[i]?.date && (
                           <p className="text-[11px] mt-1 text-danger">{errors.purchaseOrders[i]?.date?.message}</p>
@@ -91,7 +104,20 @@ const WizardStep2 = () => {
                       </div>
                       <div>
                         <Label className={labelClasses} style={labelStyle}>PO expiry</Label>
-                        <Input type="date" {...register(`purchaseOrders.${i}.expiry`)} className={fieldClasses} placeholder="blank → +12 months" />
+                        <Controller
+                          control={control}
+                          name={`purchaseOrders.${i}.expiry`}
+                          render={({ field }) => (
+                            <DatePicker
+                              value={field.value ?? ''}
+                              onChange={field.onChange}
+                              placeholder="blank → +12 months"
+                              className={`w-full ${fieldClasses}`}
+                              startMonth={WIZARD_DATE_START_MONTH}
+                              endMonth={WIZARD_DATE_END_MONTH}
+                            />
+                          )}
+                        />
                       </div>
                     </div>
                   </div>
@@ -122,36 +148,50 @@ const WizardStep2 = () => {
           <div className="grid grid-cols-3 gap-3">
             <div>
               <Label className={labelClasses} style={labelStyle}>Start date *</Label>
-              <Input
-                type="date"
-                {...register('agreementStartDate', {
-                  onChange: (e) => {
-                    if (agreementEndDate) {
-                      const months = monthsBetween(e.target.value, agreementEndDate)
-                      if (months !== null) setValue('duration', months, { shouldDirty: true })
-                    } else if (duration) {
-                      const endDate = addMonthsIso(e.target.value, duration)
-                      if (endDate) setValue('agreementEndDate', endDate, { shouldDirty: true })
-                    }
-                  },
-                })}
-                className={fieldClasses}
+              <Controller
+                control={control}
+                name="agreementStartDate"
+                render={({ field }) => (
+                  <DatePicker
+                    value={field.value}
+                    onChange={(v) => {
+                      field.onChange(v)
+                      if (agreementEndDate) {
+                        const months = monthsBetween(v, agreementEndDate)
+                        if (months !== null) setValue('duration', months, { shouldDirty: true })
+                      } else if (duration) {
+                        const endDate = addMonthsIso(v, duration)
+                        if (endDate) setValue('agreementEndDate', endDate, { shouldDirty: true })
+                      }
+                    }}
+                    className={`w-full ${fieldClasses}`}
+                    startMonth={WIZARD_DATE_START_MONTH}
+                    endMonth={WIZARD_DATE_END_MONTH}
+                  />
+                )}
               />
               {fieldError('agreementStartDate') && <p className="text-[11px] mt-1 text-danger">{fieldError('agreementStartDate')}</p>}
             </div>
             <div>
               <Label className={labelClasses} style={labelStyle}>Expiry date</Label>
-              <Input
-                type="date"
-                {...register('agreementEndDate', {
-                  onChange: (e) => {
-                    if (agreementStartDate) {
-                      const months = monthsBetween(agreementStartDate, e.target.value)
-                      if (months !== null) setValue('duration', months, { shouldDirty: true })
-                    }
-                  },
-                })}
-                className={fieldClasses}
+              <Controller
+                control={control}
+                name="agreementEndDate"
+                render={({ field }) => (
+                  <DatePicker
+                    value={field.value}
+                    onChange={(v) => {
+                      field.onChange(v)
+                      if (agreementStartDate) {
+                        const months = monthsBetween(agreementStartDate, v)
+                        if (months !== null) setValue('duration', months, { shouldDirty: true })
+                      }
+                    }}
+                    className={`w-full ${fieldClasses}`}
+                    startMonth={WIZARD_DATE_START_MONTH}
+                    endMonth={WIZARD_DATE_END_MONTH}
+                  />
+                )}
               />
             </div>
             <div>

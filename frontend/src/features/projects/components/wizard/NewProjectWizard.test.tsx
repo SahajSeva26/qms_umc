@@ -50,6 +50,9 @@ vi.mock('@/features/contacts/hooks/useContacts', () => ({
 vi.mock('@/hooks/usePermission', () => ({
   usePermission: vi.fn(() => ({ hasAnyPermission: () => true })),
 }))
+vi.mock('@/components/ui/sonner', () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
+}))
 
 function makeQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -282,7 +285,8 @@ describe('NewProjectWizard — step-scoped validation actually blocks Next', () 
     await advanceThroughLeadAndBasics(user)
     await waitFor(() => expect(fieldByName('purchaseOrders.0.number')).toBeInTheDocument())
     await user.type(fieldByName('purchaseOrders.0.number'), 'PO-1')
-    await user.clear(fieldByName('purchaseOrders.0.date'))
+    // PO date defaults to today — DatePicker's clear (x) button blanks it back out.
+    await user.click(screen.getByRole('button', { name: /clear date/i }))
     await user.click(screen.getByRole('button', { name: /^Next/i }))
 
     // queryFieldByName (not fieldByName) so a wrongful advance fails cleanly.
@@ -494,5 +498,49 @@ describe('NewProjectWizard — draft persistence', () => {
 
     await waitFor(() => expect(onSaved).toHaveBeenCalled())
     expect(sessionStorage.getItem(draftStorageKey(userId))).toBeNull()
+  }, 15000)
+
+  it('shows the backend\'s actual rejection reason (e.g. "A project already exists for this lead"), not a generic message', async () => {
+    const { projectsService } = await import('@/features/projects/projects.service')
+    const { toast } = await import('@/components/ui/sonner')
+    vi.mocked(projectsService.createProject).mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { data: { success: false, message: 'A project already exists for this lead' } },
+    })
+
+    const userId = nextDraftTestUserId()
+    const user = userEvent.setup()
+    await renderWizardRaw(userId)
+    await screen.findByText(/pick the source lead/i)
+
+    await advanceThroughLeadAndBasics(user)
+    await waitFor(() => expect(fieldByName('purchaseOrders.0.number')).toBeInTheDocument())
+    await user.type(fieldByName('purchaseOrders.0.number'), 'PO-1')
+    await user.click(screen.getByRole('button', { name: /^Next/i })) // -> Financials
+
+    const campCostInput = await waitFor(() => fieldByName('campCost'))
+    await user.clear(campCostInput)
+    await user.type(campCostInput, '500')
+    await user.clear(fieldByName('totalCamps'))
+    await user.type(fieldByName('totalCamps'), '2')
+    await user.click(screen.getByRole('button', { name: /^Next/i })) // -> Operations
+
+    await user.click(await screen.findByRole('button', { name: '9 AM – 1 PM' }))
+    await user.click(screen.getByRole('button', { name: 'PAN-India' }))
+    await user.click(screen.getByRole('button', { name: 'PHpharma-division-head' }))
+    await user.click(screen.getByRole('button', { name: /^Next/i })) // -> Team & Pay
+
+    await waitFor(() => expect(screen.getAllByRole('combobox').length).toBeGreaterThanOrEqual(3))
+    const comboCount = screen.getAllByRole('combobox').length
+    for (let i = 0; i < comboCount; i++) {
+      await user.click(screen.getAllByRole('combobox')[i])
+      const options = await screen.findAllByRole('option')
+      await user.click(options[0])
+    }
+    await user.click(screen.getByRole('button', { name: /^Next/i })) // -> Reports & Review
+
+    await user.click(await screen.findByRole('button', { name: /Create project/i }))
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('A project already exists for this lead'))
   }, 15000)
 })

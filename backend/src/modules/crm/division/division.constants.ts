@@ -1,3 +1,6 @@
+// feeds the sequential division code (div-000001) via the global counter module
+export const DIVISION_COUNTER_ENTITY = 'division';
+
 export const DIVISION_STATUS = {
     ACTIVE: 'active',
     INACTIVE: 'inactive',
@@ -25,4 +28,12 @@ export const DIVISION_THERAPY = {
 // ============================================================
 export const DIVISION_PERMISSIONS = {
     MANAGE: { code: 'division:manage', name: 'Manage Division', description: 'Manage divisions' } as const,
+
+    SEARCH: { code: 'division:search', name: 'Search Division', description: 'View/search divisions' } as const,
+
+    GET: { code: 'division:get', name: 'Get Division', description: 'Get a division' } as const,
+
+    CREATE: { code: 'division:create', name: 'Create Division', description: 'Create divisions' } as const,
+
+    UPDATE: { code: 'division:update', name: 'Update Division', description: 'Update divisions' } as const,
 };

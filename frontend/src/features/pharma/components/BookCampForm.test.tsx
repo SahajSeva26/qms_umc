@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { format } from 'date-fns'
+import { addDays, format } from 'date-fns'
 import type { RoleEntity, SessionResponse } from '@/types/accessManagement.types'
 import type { DoctorEntity } from '@/types/doctor.types'
 import type { ApiResponse } from '@/types/common.types'
@@ -139,26 +139,27 @@ function makeQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } })
 }
 
-const TEST_PROJECT: { id: string; name: string; campTimeSlots: CampTimeSlotValue[] } = { id: 'proj-1', name: 'Cardio Screening Drive', campTimeSlots: ['9am-1pm', '10am-2pm'] }
+const TEST_PROJECT: { id: string; name: string; campTimeSlots: CampTimeSlotValue[]; daysToBookBefore: number } = { id: 'proj-1', name: 'Cardio Screening Drive', campTimeSlots: ['9am-1pm', '10am-2pm'], daysToBookBefore: 0 }
 
-async function mockSession(roleId?: string, hasDoctorManage = false) {
+async function mockSession(roleId?: string, grantedDoctorPermissions: string[] = []) {
   const { useSession } = await import('@/hooks/useSession')
   vi.mocked(useSession).mockReturnValue({
     session: sessionFixture(roleId),
-    // usePermission() (used for the dormant "New doctor" gate) wraps
-    // useSession() directly — hasPermission must be present on the mock.
-    hasPermission: (code: string) => (code === 'doctor:manage' ? hasDoctorManage : false),
+    // usePermission() (the "New doctor" gate) wraps useSession() directly —
+    // hasPermission/hasAnyPermission must both be present on the mock.
+    hasPermission: (code: string) => grantedDoctorPermissions.includes(code),
+    hasAnyPermission: (codes: string[]) => codes.some((c) => grantedDoctorPermissions.includes(c)),
   } as unknown as ReturnType<typeof useSession>)
 }
 
-function renderForm(props: { needsMrPicker?: boolean; type?: 'screening' | 'diet'; patientExpectation?: number } = {}) {
+function renderForm(props: { needsMrPicker?: boolean; type?: 'screening' | 'diet'; patientExpectation?: number; project?: typeof TEST_PROJECT | null } = {}) {
   return async () => {
     const BookCampForm = (await import('@/features/pharma/components/BookCampForm')).default
     const onBooked = vi.fn()
     const onCancel = vi.fn()
     render(
       <QueryClientProvider client={makeQueryClient()}>
-        <BookCampForm needsMrPicker={props.needsMrPicker ?? false} type={props.type ?? 'screening'} project={TEST_PROJECT} patientExpectation={props.patientExpectation} onBooked={onBooked} onCancel={onCancel} />
+        <BookCampForm needsMrPicker={props.needsMrPicker ?? false} type={props.type ?? 'screening'} project={'project' in props ? (props.project ?? null) : TEST_PROJECT} patientExpectation={props.patientExpectation} onBooked={onBooked} onCancel={onCancel} />
       </QueryClientProvider>,
     )
     return { onBooked, onCancel }
@@ -250,6 +251,7 @@ describe('BookCampForm — session/identity guards', () => {
     vi.mocked(useSession).mockReturnValue({
       session: { ...sessionFixture(), role: { id: '', code: 'pharma-mr', name: 'MR' } },
       hasPermission: () => false,
+      hasAnyPermission: () => false,
     } as unknown as ReturnType<typeof useSession>)
     const user = userEvent.setup()
     await renderForm()()
@@ -306,6 +308,17 @@ describe('BookCampForm — all sections visible at once', () => {
     const doctorInput = screen.getByPlaceholderText(/search doctor by name/i)
     expect(doctorInput).toBeInTheDocument()
     expect(doctorInput).toBeEnabled()
+  })
+
+  it('the Doctor picker is NOT project-gated — it is searchable and enabled before any project is picked, unlike Location/Date which still require one', async () => {
+    await mockSession()
+    await renderForm({ project: null })()
+
+    const doctorInput = screen.getByPlaceholderText(/search doctor by name/i)
+    expect(doctorInput).toBeInTheDocument()
+    expect(doctorInput).toBeEnabled()
+    // The rest of the form still correctly waits on a project.
+    expect(screen.getAllByText(/select a project and camp type above first/i).length).toBeGreaterThan(0)
   })
 
   it('picking a doctor defaults the camp location to the doctor\'s own address, still editable afterwards', async () => {
@@ -494,6 +507,62 @@ describe('BookCampForm — availability day-strip', () => {
     vi.resetAllMocks()
   })
 
+  it('a failed infinite-scroll batch shows "couldn\'t load more dates" (not the initial-load banner), and its own Retry re-fetches the next batch — driven end-to-end through the real hook, not a hand-fed prop', async () => {
+    // jsdom's global stub (test/setup.ts) is a no-op — install a controllable fake so the
+    // sentinel's real scroll-into-view can be simulated through the actual DOM ref/effect wiring.
+    const observeCallbackRef: { current: IntersectionObserverCallback | null } = { current: null }
+    const observeMock = vi.fn()
+    class FakeIntersectionObserver {
+      constructor(cb: IntersectionObserverCallback) { observeCallbackRef.current = cb }
+      observe = observeMock
+      disconnect = vi.fn()
+      unobserve = vi.fn()
+      takeRecords = vi.fn(() => [])
+      root = null
+      rootMargin = ''
+      thresholds: number[] = []
+    }
+    vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver)
+
+    await mockSession()
+    const { campsRealService } = await import('@/features/camps/campsReal.service')
+    const user = userEvent.setup()
+    await renderForm()()
+
+    await fillLocation(user)
+    await screen.findByText(String(startOfToday().getDate()))
+    await waitFor(() => expect(observeMock).toHaveBeenCalled())
+
+    // Next batch (fetchNextPage) genuinely rejects — a real network/service failure, not a prop.
+    vi.mocked(campsRealService.getBookingAvailability).mockRejectedValueOnce(new Error('network down'))
+    observeCallbackRef.current?.([{ isIntersecting: true } as IntersectionObserverEntry], null as unknown as IntersectionObserver)
+
+    const loadMoreBanner = await screen.findByText(/couldn't load more dates/i)
+    expect(loadMoreBanner).toBeInTheDocument()
+    // The initial-load banner must NOT also render — the two are mutually exclusive.
+    expect(screen.queryByText(/couldn't load availability for this range/i)).not.toBeInTheDocument()
+
+    // Retrying must call fetchNextPage (requests batch 1, starting today+10) — NOT refetch
+    // (which would re-request every already-loaded page from scratch, starting again at batch 0 /
+    // today). Asserting the requested dateFrom, not just an extra call, is what actually
+    // distinguishes the two: both would produce "one more call."
+    vi.mocked(campsRealService.getBookingAvailability).mockImplementation(async (payload) => ({
+      success: true, message: '',
+      data: { eligibleFoCount: 1, dateFrom: payload.dateFrom, dateTo: payload.dateTo, dates: {} },
+    }))
+    const callsBeforeRetry = vi.mocked(campsRealService.getBookingAvailability).mock.calls.length
+    await user.click(screen.getByRole('button', { name: /retry/i }))
+
+    await waitFor(() => expect(screen.queryByText(/couldn't load more dates/i)).not.toBeInTheDocument())
+    const callsAfterRetry = vi.mocked(campsRealService.getBookingAvailability).mock.calls
+    expect(callsAfterRetry.length).toBeGreaterThan(callsBeforeRetry)
+    const retryCallDateFroms = callsAfterRetry.slice(callsBeforeRetry).map((c) => c[0].dateFrom)
+    // refetch() would re-request batch 0 (dateFrom = today); fetchNextPage() requests batch 1
+    // (dateFrom = today+10). Only the latter may appear among the retry's actual calls.
+    expect(retryCallDateFroms).not.toContain(TODAY_KEY)
+    expect(retryCallDateFroms).toContain(format(addDays(startOfToday(), 10), 'yyyy-MM-dd'))
+  })
+
   it('the day-strip shows a project-filtered slot row once a bookable date is picked, not all 4 slots', async () => {
     await mockSession()
     const user = userEvent.setup()
@@ -508,6 +577,23 @@ describe('BookCampForm — availability day-strip', () => {
     expect(screen.getByRole('button', { name: /10 AM – 2 PM/i })).toBeInTheDocument()
     expect(screen.queryByText(/11 AM – 3 PM/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/6 PM – 10 PM/i)).not.toBeInTheDocument()
+  })
+
+  it('the first availability batch shifts to match the lead-time-shifted day-strip, and stays within the backend\'s 30-day span cap', async () => {
+    await mockSession()
+    const { campsRealService } = await import('@/features/camps/campsReal.service')
+    const user = userEvent.setup()
+    await renderForm({ project: { ...TEST_PROJECT, daysToBookBefore: 5 } })()
+
+    await fillLocation(user)
+
+    await waitFor(() => expect(campsRealService.getBookingAvailability).toHaveBeenCalled())
+    const call = vi.mocked(campsRealService.getBookingAvailability).mock.calls[0][0]
+    // One 10-day batch, not a single 30-day request — infinite scroll fetches the rest on demand.
+    const expectedFrom = format(addDays(startOfToday(), 5), 'yyyy-MM-dd')
+    const expectedTo = format(addDays(startOfToday(), 5 + 9), 'yyyy-MM-dd')
+    expect(call.dateFrom).toBe(expectedFrom)
+    expect(call.dateTo).toBe(expectedTo)
   })
 })
 
@@ -664,7 +750,7 @@ describe('BookCampForm — zero configured slots', () => {
 
     render(
       <QueryClientProvider client={makeQueryClient()}>
-        <BookCampForm needsMrPicker={false} type="screening" project={{ id: 'proj-2', name: 'Empty Project', campTimeSlots: [] }} patientExpectation={undefined} onBooked={vi.fn()} onCancel={vi.fn()} />
+        <BookCampForm needsMrPicker={false} type="screening" project={{ id: 'proj-2', name: 'Empty Project', campTimeSlots: [], daysToBookBefore: 0 }} patientExpectation={undefined} onBooked={vi.fn()} onCancel={vi.fn()} />
       </QueryClientProvider>,
     )
 
@@ -673,13 +759,13 @@ describe('BookCampForm — zero configured slots', () => {
   })
 })
 
-describe('BookCampForm — inline doctor creation (dormant until doctor:manage is granted)', () => {
+describe('BookCampForm — inline doctor creation (gated on doctor:create OR doctor:manage)', () => {
   beforeEach(() => {
     vi.resetAllMocks()
   })
 
-  it('hides the "New doctor" trigger without doctor:manage — the real state for every pharma role today', async () => {
-    await mockSession(undefined, false)
+  it('hides the "New doctor" trigger with neither doctor:create nor doctor:manage', async () => {
+    await mockSession(undefined, [])
     const user = userEvent.setup()
     await renderForm()()
 
@@ -688,8 +774,26 @@ describe('BookCampForm — inline doctor creation (dormant until doctor:manage i
     expect(screen.queryByRole('button', { name: /new doctor/i })).not.toBeInTheDocument()
   })
 
+  it('shows the "New doctor" trigger for a session holding only doctor:create — the configured default for new pharma-mr role types', async () => {
+    await mockSession(undefined, ['doctor:create'])
+    const user = userEvent.setup()
+    await renderForm()()
+
+    await fillLocation(user)
+
+    expect(await screen.findByRole('button', { name: /new doctor/i })).toBeInTheDocument()
+  })
+
+  it('shows the "New doctor" trigger before any project is picked — doctor creation is scoped by division alone, never by the project', async () => {
+    await mockSession(undefined, ['doctor:create'])
+    await renderForm({ project: null })()
+
+    expect(screen.getAllByText(/select a project and camp type above first/i).length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: /new doctor/i })).toBeInTheDocument()
+  })
+
   it('creating a doctor auto-selects it via the same field.onChange/doctorLabel pipe as a normal search pick', async () => {
-    await mockSession('self-role-42', true)
+    await mockSession('self-role-42', ['doctor:manage'])
     const { doctorsService } = await import('@/features/doctors/doctors.service')
     vi.mocked(doctorsService.createDoctor).mockResolvedValue({
       success: true, message: '',
@@ -728,7 +832,7 @@ describe('BookCampForm — inline doctor creation (dormant until doctor:manage i
   })
 
   it('clears a stale "Doctor is required" error once a doctor is created inline', async () => {
-    await mockSession('self-role-42', true)
+    await mockSession('self-role-42', ['doctor:manage'])
     const { doctorsService } = await import('@/features/doctors/doctors.service')
     vi.mocked(doctorsService.createDoctor).mockResolvedValue({
       success: true, message: '',
@@ -759,7 +863,7 @@ describe('BookCampForm — inline doctor creation (dormant until doctor:manage i
   })
 
   it('Cancel creates no doctor', async () => {
-    await mockSession(undefined, true)
+    await mockSession(undefined, ['doctor:manage'])
     const { doctorsService } = await import('@/features/doctors/doctors.service')
     const user = userEvent.setup()
     await renderForm()()

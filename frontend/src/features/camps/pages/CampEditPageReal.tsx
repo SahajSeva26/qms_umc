@@ -4,7 +4,7 @@ import { FiArrowLeft } from 'react-icons/fi'
 import { useCampReal } from '@/features/camps/hooks/useCampReal'
 import { useUpdateCamp } from '@/features/camps/hooks/useUpdateCamp'
 import { useCampDraft } from '@/features/camps/hooks/useCampDraft'
-import { useProject } from '@/features/projects/hooks/useProject'
+import { useProjectDetailShared } from '@/hooks/useProjectsDataShared'
 import { useDoctorSearch as useDoctors } from '@/hooks/useDoctorSearch'
 import { campRefId, campRefName, saveErrorMessage, withCampParam } from '@/features/camps/campsReal.utils'
 import { usePermission } from '@/hooks/usePermission'
@@ -94,7 +94,7 @@ const CampEditForm = ({ camp, returnTo }: CampEditFormProps) => {
   }
 
   // camp.project is a slim populate (no campTimeSlots) — refetch the full project for the time-slot Select.
-  const { data: editProjectData } = useProject(camp.project ? campRefId(camp.project) ?? undefined : undefined)
+  const { data: editProjectData } = useProjectDetailShared(camp.project ? campRefId(camp.project) ?? undefined : undefined)
   const editProject = editProjectData?.data ?? null
   const bookableSlots = editProject?.campTimeSlots ?? []
 

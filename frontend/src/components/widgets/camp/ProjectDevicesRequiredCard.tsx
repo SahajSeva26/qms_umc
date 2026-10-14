@@ -8,10 +8,8 @@ interface ProjectDevicesRequiredCardProps {
   campType?: CampType | ''
 }
 
-// Prototype's camp-package picker (camp-booking.js packagePickerHtml) shows a dashed, tinted card
-// with a type pill + "Devices required" chips once a package is picked. We don't have a package
-// concept — this derives the same visual from real Project.tests[] -> TestMaster.consumption data
-// instead (see useProjectRequiredDevices), tinted by the camp type's own color (prototype's typeColor()).
+// Matches the prototype's camp-package card styling (dashed/tinted, typeColor()) without a
+// package concept — tinted by the camp type instead.
 const TYPE_COLOR: Record<CampType, string> = {
   screening: '#3b6dff',
   diet: '#10b981',

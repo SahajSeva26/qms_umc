@@ -131,7 +131,7 @@ const MrBookCampTab = () => {
         key={projectId}
         needsMrPicker={needsMrPicker}
         type={bookableProject ? (campType || null) : null}
-        project={bookableProject && campType ? { id: bookableProject.id, name: bookableProject.name, campTimeSlots: bookableProject.campTimeSlots } : null}
+        project={bookableProject && campType ? { id: bookableProject.id, name: bookableProject.name, campTimeSlots: bookableProject.campTimeSlots, daysToBookBefore: bookableProject.daysToBookBefore } : null}
         patientExpectation={patientExpectation}
         patientExpectationInvalid={!!patientExpectationError}
         onBooked={handleBooked}

@@ -98,4 +98,43 @@ describe('DivisionDetailPage', () => {
     await user.click(screen.getByRole('button', { name: 'MRs' }))
     await waitFor(() => expect(screen.getByText('MrsSection stub')).toBeInTheDocument())
   })
+
+  it('shows a Therapies card between the header and the tab strip, listing every therapy with its count', () => {
+    vi.mocked(useDivision).mockReturnValue({
+      data: { success: true, message: '', data: divisionFixture({ therapy: ['cardiology', 'oncology'] as never }) },
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useDivision>)
+
+    render(
+      <MemoryRouter initialEntries={['/crm/divisions/d-1']}>
+        <Routes>
+          <Route path="/crm/divisions/:id" element={<DivisionDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByText('Therapies (2)')).toBeInTheDocument()
+    expect(screen.getAllByText('Cardiology').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Oncology').length).toBeGreaterThan(0)
+  })
+
+  it('Therapies card shows an empty state when the division has no therapy tagged', () => {
+    vi.mocked(useDivision).mockReturnValue({
+      data: { success: true, message: '', data: divisionFixture({ therapy: [] as never }) },
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useDivision>)
+
+    render(
+      <MemoryRouter initialEntries={['/crm/divisions/d-1']}>
+        <Routes>
+          <Route path="/crm/divisions/:id" element={<DivisionDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByText('Therapies (0)')).toBeInTheDocument()
+    expect(screen.getByText('No therapy tagged on this division.')).toBeInTheDocument()
+  })
 })

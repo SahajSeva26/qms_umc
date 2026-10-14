@@ -2,7 +2,21 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { format } from 'date-fns'
 import type { InventoryDeviceEntity } from '@/types/inventoryDevice.types'
+
+// Dates are the shared shadcn DatePicker now — fieldIndex is document order (0=manufacturing, 1=warranty, 2=last calibration, 3=next calibration).
+async function pickDeviceDate(user: ReturnType<typeof userEvent.setup>, fieldIndex: number, isoDate: string) {
+  const triggers = screen.getAllByRole('button', { name: /^\d{2} \w{3} \d{4}$|^Pick a date$/ })
+  await user.click(triggers[fieldIndex]!)
+
+  const [year, month] = isoDate.split('-').map(Number)
+  await user.selectOptions(screen.getByRole('combobox', { name: /choose the month/i }), String(month - 1))
+  await user.selectOptions(screen.getByRole('combobox', { name: /choose the year/i }), String(year))
+
+  const dayLabel = format(new Date(`${isoDate}T00:00:00`), 'PPPP')
+  await user.click(screen.getByRole('button', { name: new RegExp(`^${dayLabel}`, 'i') }))
+}
 
 vi.mock('@/features/inventory/real/inventoryDevice.service', () => ({
   inventoryDeviceService: {
@@ -199,9 +213,7 @@ describe('EditInventoryDeviceModal', () => {
       </QueryClientProvider>,
     )
 
-    const dateInputs = document.querySelectorAll('input[type="date"]')
-    await user.clear(dateInputs[0] as HTMLInputElement)
-    await user.type(dateInputs[0] as HTMLInputElement, '2026-03-15')
+    await pickDeviceDate(user, 0, '2026-03-15')
     await user.click(screen.getByRole('button', { name: /save changes/i }))
 
     const payload = await vi.waitFor(() => {
@@ -229,9 +241,7 @@ describe('EditInventoryDeviceModal', () => {
       </QueryClientProvider>,
     )
 
-    const dateInputs = document.querySelectorAll('input[type="date"]')
-    await user.clear(dateInputs[1] as HTMLInputElement)
-    await user.type(dateInputs[1] as HTMLInputElement, '2027-06-01')
+    await pickDeviceDate(user, 1, '2027-06-01')
     await user.click(screen.getByRole('button', { name: /save changes/i }))
 
     const payload = await vi.waitFor(() => {
@@ -257,9 +267,7 @@ describe('EditInventoryDeviceModal', () => {
       </QueryClientProvider>,
     )
 
-    const dateInputs = document.querySelectorAll('input[type="date"]')
-    await user.clear(dateInputs[2] as HTMLInputElement)
-    await user.type(dateInputs[2] as HTMLInputElement, '2026-04-10')
+    await pickDeviceDate(user, 2, '2026-04-10')
     await user.click(screen.getByRole('button', { name: /save changes/i }))
 
     const payload = await vi.waitFor(() => {
@@ -285,9 +293,7 @@ describe('EditInventoryDeviceModal', () => {
       </QueryClientProvider>,
     )
 
-    const dateInputs = document.querySelectorAll('input[type="date"]')
-    await user.clear(dateInputs[3] as HTMLInputElement)
-    await user.type(dateInputs[3] as HTMLInputElement, '2026-09-20')
+    await pickDeviceDate(user, 3, '2026-09-20')
     await user.click(screen.getByRole('button', { name: /save changes/i }))
 
     const payload = await vi.waitFor(() => {

@@ -20,7 +20,6 @@ const registerOwnerSchema = z.object({
 })
 
 export const createRoleSchema = z.object({
-  code: z.string().trim().min(1, 'Code is required').toLowerCase(),
   name: z.string().trim().min(1, 'Name is required'),
   description: z.string().trim().optional(),
   type: z.string().trim().min(1, 'Role type is required'),

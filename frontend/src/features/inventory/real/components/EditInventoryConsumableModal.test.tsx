@@ -2,7 +2,27 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { format } from 'date-fns'
 import type { InventoryConsumableEntity } from '@/types/inventoryConsumable.types'
+
+// Dates are the shared shadcn DatePicker now — fieldIndex is document order (0=manufacturing, 1=expiry).
+async function pickConsumableDate(user: ReturnType<typeof userEvent.setup>, fieldIndex: number, isoDate: string) {
+  const triggers = screen.getAllByRole('button', { name: /^\d{2} \w{3} \d{4}$|^Pick a date$/ })
+  await user.click(triggers[fieldIndex]!)
+
+  const [year, month] = isoDate.split('-').map(Number)
+  await user.selectOptions(screen.getByRole('combobox', { name: /choose the month/i }), String(month - 1))
+  await user.selectOptions(screen.getByRole('combobox', { name: /choose the year/i }), String(year))
+
+  const dayLabel = format(new Date(`${isoDate}T00:00:00`), 'PPPP')
+  await user.click(screen.getByRole('button', { name: new RegExp(`^${dayLabel}`, 'i') }))
+}
+
+// Clicks the clear (x) button on the fieldIndex-th DatePicker that currently has a value set.
+async function clearConsumableDate(user: ReturnType<typeof userEvent.setup>, fieldIndex: number) {
+  const clearButtons = screen.getAllByRole('button', { name: /clear date/i })
+  await user.click(clearButtons[fieldIndex]!)
+}
 
 vi.mock('@/features/inventory/real/inventoryConsumable.service', () => ({
   inventoryConsumableService: {
@@ -104,12 +124,11 @@ describe('EditInventoryConsumableModal', () => {
     await user.type(screen.getByPlaceholderText(/search catalog item/i), 'Syr')
     await user.click(await screen.findByText(/Syringe 5ml \(syr-01\)/i))
 
-    // Batch/date/quantity have no accessible name of their own — target by input type/order.
+    // Batch has no accessible name of its own — target by input type/order.
     const textboxes = screen.getAllByRole('textbox').filter((el) => !el.hasAttribute('placeholder'))
     await user.type(textboxes[0], 'BATCH-999')
-    const dateInputs = document.querySelectorAll('input[type="date"]')
-    await user.type(dateInputs[0] as HTMLInputElement, '2026-01-01')
-    await user.type(dateInputs[1] as HTMLInputElement, '2027-01-01')
+    await pickConsumableDate(user, 0, '2026-01-01')
+    await pickConsumableDate(user, 1, '2027-01-01')
 
     await user.click(screen.getByRole('button', { name: /create lot/i }))
     await vi.waitFor(() => expect(inventoryConsumableService.createInventoryConsumable).not.toHaveBeenCalled())
@@ -135,10 +154,9 @@ describe('EditInventoryConsumableModal', () => {
       </QueryClientProvider>,
     )
 
-    const dateInputs = document.querySelectorAll('input[type="date"]')
     expect(screen.queryByText(/can't be cleared once set/i)).not.toBeInTheDocument()
 
-    await user.clear(dateInputs[1] as HTMLInputElement)
+    await clearConsumableDate(user, 1)
 
     expect(await screen.findByText(/can't be cleared once set/i)).toBeInTheDocument()
   })
@@ -156,8 +174,7 @@ describe('EditInventoryConsumableModal', () => {
       </QueryClientProvider>,
     )
 
-    const dateInputs = document.querySelectorAll('input[type="date"]')
-    await user.clear(dateInputs[1] as HTMLInputElement)
+    await clearConsumableDate(user, 1)
     await screen.findByText(/can't be cleared once set/i)
 
     const saveButton = screen.getByRole('button', { name: /save changes/i })

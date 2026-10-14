@@ -190,9 +190,12 @@ AppointmentRouter.put(
     ]),
     AppointmentController.update,
 );
+// the sales person moves their own appointment via appointment:update (same own-scope as PUT
+// above — moveStage's first step is the same scoped get(), so this can't reach another rep's
+// appointment). manage/tenant:manage see all.
 AppointmentRouter.patch(
     '/:id/stage',
-    AuthorizeMiddleware([APPOINTMENT_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
+    AuthorizeMiddleware([APPOINTMENT_PERMISSIONS.MANAGE.code, APPOINTMENT_PERMISSIONS.UPDATE.code, TENANT_PERMISSIONS.MANAGE.code]),
     AppointmentController.moveStage,
 );
 
@@ -205,4 +208,7 @@ AppointmentRouter.patch(
 );
 
 AppointmentRouter.get('/', AuthorizeMiddleware(READ_GUARD), AppointmentController.search);
-AppointmentRouter.post('/', AuthorizeMiddleware(GUARD), AppointmentController.create);
+// the sales person creates their own appointment via appointment:create — the role already
+// holds this but it was never wired into a route guard (dead permission, same shape as the
+// lead:create/update gap). manage/tenant:manage still create on behalf of anyone.
+AppointmentRouter.post('/', AuthorizeMiddleware([APPOINTMENT_PERMISSIONS.CREATE.code, ...GUARD]), AppointmentController.create);

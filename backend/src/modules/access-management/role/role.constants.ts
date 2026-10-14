@@ -32,6 +32,8 @@ export const ROLE_SUPERVISOR_TREE: any = {
 // its own derived `${division.code}-head` code and is minted through the division flow, so it is
 // intentionally NOT in this list.
 export const PHARMA_ROLE_COUNTER_ENTITY = 'pharma-role';
+// generic fallback counter for any non-field-force role created without an explicit code (rol-000001)
+export const ROLE_COUNTER_ENTITY = 'role';
 export const PHARMA_FIELD_FORCE_TYPE_CODES: string[] = [CUSTOMER.PHARMA_RSM, CUSTOMER.PHARMA_ASM, CUSTOMER.PHARMA_MR];
 
 export const isValidRoleSupervisor = (roleTypeCode: string, supervisorRoleTypeCode: string): boolean => {

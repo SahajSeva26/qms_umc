@@ -26,7 +26,7 @@ const STEP_TITLES = ['Company & role', 'User account', 'Permissions']
 // Fields grouped by step, used to force "touched" only for a step's own
 // fields once its Next/Submit has been attempted.
 const STEP_FIELD_NAMES: (keyof CreateRoleFormValues)[][] = [
-  ['code', 'name', 'roleType', 'division', 'supervisor'],
+  ['name', 'roleType', 'division', 'supervisor'],
   ['userFirstName', 'userLastName', 'userEmail', 'userPassword', 'userPhone', 'userGender'],
   [],
 ]
@@ -129,7 +129,7 @@ const CreateRoleModal = () => {
   const handleNext = async () => {
     markStepAttempted(step)
     if (step === 0) {
-      const valid = await trigger(['tenant', 'code', 'name', 'roleType'])
+      const valid = await trigger(['tenant', 'name', 'roleType'])
       if (!valid) return
       if (needsDivision && !division) return
       if (needsSupervisor && !supervisor) return

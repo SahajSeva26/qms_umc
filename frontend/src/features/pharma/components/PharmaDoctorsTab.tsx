@@ -29,8 +29,10 @@ const STATUS_LABEL: Record<DoctorStatus, string> = {
 // Doctor is division-scoped shared inventory, not owned by any one MR, so this shows "doctors in my division".
 const PharmaDoctorsTab = () => {
   const { session } = useSession()
-  const { hasPermission } = usePermission()
+  const { hasPermission, hasAnyPermission } = usePermission()
+  // Edit/update is doctor:manage-only server-side; create also accepts the lighter doctor:create — the configured default for new pharma-mr role types (existing tenants need a backend sync); doctor:manage also satisfies it.
   const canManageDoctors = hasPermission('doctor:manage')
+  const canCreateDoctors = hasAnyPermission(['doctor:create', 'doctor:manage'])
   const divisionId = session?.role.division ?? null
 
   const [search, setSearch] = useState('')
@@ -67,7 +69,7 @@ const PharmaDoctorsTab = () => {
     <div>
       <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
         <SearchInput value={search} onChange={handleSearchChange} placeholder="Search by name..." className="w-64 text-[13px]" />
-        {canManageDoctors && (
+        {canCreateDoctors && (
           <Button onClick={() => setEditModal({ open: true, doctor: null })}>
             <FiUserPlus size={14} /> New doctor
           </Button>

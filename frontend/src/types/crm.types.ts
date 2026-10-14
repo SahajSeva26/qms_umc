@@ -109,8 +109,7 @@ export interface SearchDivisionQuery {
 export interface CreateDivisionPayload {
   // Accepts a tenant code or ObjectId — every caller must say which company.
   tenant: string
-  // Backend rejects uppercase codes rather than lowercasing them.
-  code: string
+  // code is auto-generated server-side — never caller-supplied.
   name: string
   // Non-empty array — a division may span multiple therapy areas.
   therapy: DivisionTherapy[]

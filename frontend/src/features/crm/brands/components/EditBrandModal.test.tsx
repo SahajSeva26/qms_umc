@@ -88,7 +88,6 @@ describe('EditBrandModal — edit mode', () => {
 
     expect(screen.getByText('Cardiostat')).toBeInTheDocument()
     expect(screen.queryByDisplayValue('Cardiostat')).not.toBeInTheDocument()
-    expect(document.querySelector('input[type="text"]')).not.toBeInTheDocument()
   })
 
   it('saving without touching status omits it entirely — never resends a stale snapshot', async () => {
@@ -148,5 +147,83 @@ describe('EditBrandModal — edit mode', () => {
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /save changes/i })).not.toBeInTheDocument()
     expect(screen.getByText(/don't have permission/i)).toBeInTheDocument()
+  })
+
+  it('editing molecule includes only molecule in the payload', async () => {
+    const { brandService } = await import('@/features/crm/brands/brand.service')
+    const user = userEvent.setup()
+    await renderModal({ brand: brandFixture({ molecule: 'Folic Acid' }) })
+
+    const moleculeInput = screen.getByPlaceholderText(/folic acid/i)
+    await user.clear(moleculeInput)
+    await user.type(moleculeInput, 'Vitamin D3')
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    const payload = await vi.waitFor(() => {
+      const call = vi.mocked(brandService.updateBrand).mock.calls[0]
+      if (!call) throw new Error('not called yet')
+      return call[1]
+    })
+    expect(payload).toEqual({ molecule: 'Vitamin D3' })
+  })
+
+  it('leaving molecule unchanged omits it from the payload', async () => {
+    const { brandService } = await import('@/features/crm/brands/brand.service')
+    const user = userEvent.setup()
+    await renderModal({ brand: brandFixture({ molecule: 'Folic Acid', status: 'active' }) })
+
+    await user.click(screen.getByRole('combobox'))
+    await user.click(await screen.findByText('Inactive'))
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    const payload = await vi.waitFor(() => {
+      const call = vi.mocked(brandService.updateBrand).mock.calls[0]
+      if (!call) throw new Error('not called yet')
+      return call[1]
+    })
+    expect(payload).toEqual({ status: 'inactive' })
+  })
+
+  it('a caller without manage permission sees the molecule as read-only text, not an input', async () => {
+    await renderModal({ brand: brandFixture({ molecule: 'Folic Acid' }), canManage: false })
+
+    expect(screen.getByText('Folic Acid')).toBeInTheDocument()
+    expect(screen.queryByPlaceholderText(/folic acid/i)).not.toBeInTheDocument()
+  })
+
+  it('sends the trimmed molecule value, not the raw leading/trailing-space input', async () => {
+    const { brandService } = await import('@/features/crm/brands/brand.service')
+    const user = userEvent.setup()
+    await renderModal({ brand: brandFixture({ molecule: 'Folic Acid' }) })
+
+    const moleculeInput = screen.getByPlaceholderText(/folic acid/i)
+    await user.clear(moleculeInput)
+    await user.type(moleculeInput, '  Vitamin D3  ')
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    const payload = await vi.waitFor(() => {
+      const call = vi.mocked(brandService.updateBrand).mock.calls[0]
+      if (!call) throw new Error('not called yet')
+      return call[1]
+    })
+    expect(payload).toEqual({ molecule: 'Vitamin D3' })
+  })
+
+  it('clearing molecule to whitespace-only sends an empty string, not whitespace', async () => {
+    const { brandService } = await import('@/features/crm/brands/brand.service')
+    const user = userEvent.setup()
+    await renderModal({ brand: brandFixture({ molecule: 'Folic Acid' }) })
+
+    const moleculeInput = screen.getByPlaceholderText(/folic acid/i)
+    await user.clear(moleculeInput)
+    await user.type(moleculeInput, '   ')
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    const payload = await vi.waitFor(() => {
+      const call = vi.mocked(brandService.updateBrand).mock.calls[0]
+      if (!call) throw new Error('not called yet')
+      return call[1]
+    })
+    expect(payload).toEqual({ molecule: '' })
   })
 })

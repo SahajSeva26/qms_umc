@@ -106,6 +106,7 @@ export const PERMISSION_CATALOG = {
   },
   DOCTOR: {
     MANAGE: { code: 'doctor:manage', name: 'Manage Doctor', description: 'Manage doctors (full visibility, incl. inactive)' },
+    CREATE: { code: 'doctor:create', name: 'Create Doctor', description: 'Create a doctor (scoped to own division for customer/field-force actors)' },
   },
   GEO_PROFILE: {
     MANAGE: { code: 'geo-profile:manage', name: 'Manage Geo Profile', description: 'Manage geo profiles (field-staff location + coverage used for camp allocation)' },

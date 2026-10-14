@@ -11,7 +11,7 @@ import ProjectRowMenu from '@/features/projects/components/ProjectRowMenu'
 // Prototype splits "ID" (code + therapy) from "Project" (name + client · division). "POs" shown
 // as "Upcoming" — our Project model has no pos[] array to count from (md-files/ui-revisions.md).
 const COLUMNS = ['ID', 'Project', 'Type', 'Execution', 'POs', 'Total camps', 'Value', 'Status', 'Owner', '']
-const CENTERED_COLUMNS = new Set(['Type', 'Execution', 'POs', 'Total camps', 'Value'])
+const CENTERED_COLUMNS = new Set(['Type', 'Execution', 'POs', 'Value'])
 
 interface ProjectTableProps {
   projects: ProjectEntity[]
@@ -80,10 +80,25 @@ const ProjectTable = ({ projects, canWrite, canManageVoidCamps, onOpenDetail, on
               <td className="px-3 py-2.5 align-top text-center whitespace-nowrap">
                 <span className="text-[10px] font-bold italic" style={{ color: 'var(--qms-brand)' }}>Upcoming</span>
               </td>
-              <td className="px-3 py-2.5 align-top text-center whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>
-                {project.stats
-                  ? <>{project.stats.executedCamps}<span style={{ color: 'var(--qms-text-muted)' }}>/{project.totalCamps}</span></>
-                  : project.totalCamps}
+              <td className="px-3 py-2.5 align-top whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>
+                {project.stats ? (
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex-1 h-1.5 rounded-full overflow-hidden min-w-15" style={{ background: 'rgba(0,0,0,.06)' }}>
+                      <div
+                        className="h-full"
+                        style={{
+                          width: `${project.totalCamps ? Math.min(100, Math.round((project.stats.executedCamps / project.totalCamps) * 100)) : 0}%`,
+                          background: 'linear-gradient(90deg, var(--qms-brand), var(--qms-teal))',
+                        }}
+                      />
+                    </div>
+                    <span className="text-[11px] font-bold whitespace-nowrap">
+                      {project.stats.executedCamps}/{project.totalCamps}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="text-center">{project.totalCamps}</div>
+                )}
               </td>
               <td className="px-3 py-2.5 align-top text-center font-bold whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>
                 {formatINR(valueAfterGST)}

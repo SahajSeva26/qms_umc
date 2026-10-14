@@ -33,10 +33,11 @@ const EditBrandModal = ({ open, brand, divisionId, canManage, onClose }: EditBra
 const CreateForm = ({ divisionId, onClose }: { divisionId: string; onClose: () => void }) => {
   const createBrand = useCreateBrand()
   const [name, setName] = useState('')
+  const [molecule, setMolecule] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
 
   const handleSave = () => {
-    const result = createBrandSchema.safeParse({ division: divisionId, name })
+    const result = createBrandSchema.safeParse({ division: divisionId, name, molecule: molecule || undefined })
     if (!result.success) {
       setFormError(result.error.issues[0]?.message ?? 'Please complete the required fields.')
       return
@@ -58,6 +59,13 @@ const CreateForm = ({ divisionId, onClose }: { divisionId: string; onClose: () =
               Name *
             </Label>
             <Input type="text" value={name} onChange={(e) => setName(e.target.value)} className="text-[13px]" autoFocus />
+          </div>
+
+          <div>
+            <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+              Molecule
+            </Label>
+            <Input type="text" value={molecule} onChange={(e) => setMolecule(e.target.value)} className="text-[13px]" placeholder="e.g. Folic Acid + Vitamin D3" />
           </div>
 
           {createBrand.isError && (
@@ -88,20 +96,25 @@ const CreateForm = ({ divisionId, onClose }: { divisionId: string; onClose: () =
 const EditForm = ({ brand, canManage, onClose }: { brand: BrandEntity; canManage: boolean; onClose: () => void }) => {
   const updateBrand = useUpdateBrand(brand.id)
   const [status, setStatus] = useState<BrandStatus>(brand.status)
+  const [molecule, setMolecule] = useState(brand.molecule ?? '')
   const [formError, setFormError] = useState<string | null>(null)
 
   const handleSave = () => {
-    const result = updateBrandSchema.safeParse({ status })
+    const result = updateBrandSchema.safeParse({ status, molecule: molecule || undefined })
     if (!result.success) {
       setFormError(result.error.issues[0]?.message ?? 'Please complete the required fields.')
       return
     }
     setFormError(null)
     const data = result.data
+    // Zod-normalized (trimmed) value — a leading/trailing-space or whitespace-only edit must not
+    // bypass the schema's own trimming, so diff and send this, never the raw `molecule` state.
+    const normalizedMolecule = data.molecule ?? ''
     // Diff against the original snapshot (not "was ever touched") so a
     // reverted edit is never resent — same pattern as EditDivisionModal.tsx.
     const payload: typeof data = {
       ...(data.status !== undefined && data.status !== brand.status ? { status: data.status } : {}),
+      ...(normalizedMolecule !== (brand.molecule ?? '') ? { molecule: normalizedMolecule } : {}),
     }
     updateBrand.mutate(payload, { onSuccess: onClose })
   }
@@ -128,6 +141,24 @@ const EditForm = ({ brand, canManage, onClose }: { brand: BrandEntity; canManage
               <span className="truncate">{brand.name}</span>
             </div>
           </div>
+
+          {canManage && (
+            <div>
+              <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+                Molecule
+              </Label>
+              <Input type="text" value={molecule} onChange={(e) => setMolecule(e.target.value)} className="text-[13px]" placeholder="e.g. Folic Acid + Vitamin D3" />
+            </div>
+          )}
+
+          {!canManage && brand.molecule && (
+            <div>
+              <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+                Molecule
+              </Label>
+              <p className="text-[13px]" style={{ color: 'var(--qms-text)' }}>{brand.molecule}</p>
+            </div>
+          )}
 
           {canManage && (
             <div>

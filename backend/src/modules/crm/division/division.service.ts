@@ -62,13 +62,16 @@ const set = async (model: any, entity: HydratedDocument<IDivision>, ctx: Request
 };
 
 const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): Promise<DivisionDocument> => {
-    let query = null;
+    //1: default scoping — a customer actor can only resolve their own tenant's divisions
+    const where: mongoose.QueryFilter<IDivision> = { ...ctx.where() };
 
     if (isValidObjectID(id)) {
-        query = DivisionModel.findById(id);
+        where._id = id;
     } else {
-        query = DivisionModel.findOne({ code: id });
+        where.code = id;
     }
+
+    let query = DivisionModel.findOne(where);
 
     if (options?.populate) {
         query = query.populate(populate);
@@ -85,7 +88,10 @@ const search = async (filters: ISearchDivisionQuery, ctx: RequestContext, option
     where.status = DIVISION_STATUS.ACTIVE;
 
     //2: add search filters
-    if (filters.tenant && ctx.hasAnyPermissions([LEAD_PERMISSIONS.MANAGE.code, DIVISION_PERMISSIONS.MANAGE.code])) {
+    if (
+        filters.tenant &&
+        ctx.hasAnyPermissions([LEAD_PERMISSIONS.MANAGE.code, DIVISION_PERMISSIONS.MANAGE.code, DIVISION_PERMISSIONS.SEARCH.code])
+    ) {
         where.tenant = filters.tenant;
     }
     if (filters.owner) {

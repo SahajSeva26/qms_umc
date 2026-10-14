@@ -23,6 +23,9 @@ const BrandsTable = ({ brands, onOpen }: BrandsTableProps) => {
                 Code
               </th>
               <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
+                Molecule
+              </th>
+              <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
                 Status
               </th>
             </tr>
@@ -45,6 +48,9 @@ const BrandsTable = ({ brands, onOpen }: BrandsTableProps) => {
                 </td>
                 <td className="px-4 py-2.5 font-mono" style={{ color: 'var(--qms-text-muted)' }}>
                   {brand.code}
+                </td>
+                <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
+                  {brand.molecule || '—'}
                 </td>
                 <td className="px-4 py-2.5">
                   <BrandStatusPill status={brand.status} />

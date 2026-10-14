@@ -2,6 +2,7 @@
 import { ResponseHandler } from '../../../shared/utils/responseHandler';
 import { formatZodError } from '../../../shared/utils/error';
 import {
+    ActivateCampPayloadSchema,
     ApproveVoidCampPayloadSchema,
     BookCampPayloadSchema,
     BookingAvailabilityPayloadSchema,
@@ -272,6 +273,30 @@ const moveStage = async (req: any, res: any) => {
     }
 };
 
+const activate = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+        const { id } = req?.params;
+        if (!id) {
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Camp ID is required', null);
+        }
+
+        const { data, success, error } = ActivateCampPayloadSchema.safeParse(req.body);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                fields: validationErrors,
+            });
+        }
+
+        const camp = await CampService.activate(id, data, ctx);
+
+        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Camp started successfully', CampMapper.toResponse(camp, ctx));
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
 const allocateWorker = async (req: any, res: any) => {
     try {
         const ctx: RequestContext = req.context;
@@ -356,6 +381,7 @@ export const CampController = {
     book,
     update,
     moveStage,
+    activate,
     allocateWorker,
     report,
     bookingAvailability,

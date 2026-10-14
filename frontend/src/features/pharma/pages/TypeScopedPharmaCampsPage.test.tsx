@@ -219,7 +219,7 @@ describe('PharmaScreeningCampsPage / PharmaDietCampsPage — separate routes, sh
   it('Screening page queries camps scoped to type=screening only', async () => {
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
-      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-rsm'), hasPermission: () => false,
+      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-rsm'), hasPermission: () => false, hasAnyPermission: () => false,
     } as unknown as ReturnType<typeof useSession>)
 
     const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
@@ -238,7 +238,7 @@ describe('PharmaScreeningCampsPage / PharmaDietCampsPage — separate routes, sh
   it('Diet page queries camps scoped to type=diet only — a genuinely separate route, not a tab', async () => {
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
-      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-rsm'), hasPermission: () => false,
+      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-rsm'), hasPermission: () => false, hasAnyPermission: () => false,
     } as unknown as ReturnType<typeof useSession>)
 
     const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
@@ -257,7 +257,7 @@ describe('PharmaScreeningCampsPage / PharmaDietCampsPage — separate routes, sh
   it('a non-live project blocks booking with a clear reason, even though its camps are still viewable — matches the prototype\'s live-project booking rule', async () => {
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
-      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-mr'), hasPermission: () => false,
+      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-mr'), hasPermission: () => false, hasAnyPermission: () => false,
     } as unknown as ReturnType<typeof useSession>)
 
     const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
@@ -275,7 +275,7 @@ describe('PharmaScreeningCampsPage / PharmaDietCampsPage — separate routes, sh
   it('the Screening page shows Diet camps ALREADY on the project too — viewing is never restricted by the project\'s configured type, only booking is', async () => {
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
-      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-rsm'), hasPermission: () => false,
+      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-rsm'), hasPermission: () => false, hasAnyPermission: () => false,
     } as unknown as ReturnType<typeof useSession>)
 
     const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
@@ -294,7 +294,7 @@ describe('PharmaScreeningCampsPage / PharmaDietCampsPage — separate routes, sh
   it('booking is disabled on the Screening page when the project isn\'t configured for screening camps, with a clear reason', async () => {
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
-      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-mr'), hasPermission: () => false,
+      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-mr'), hasPermission: () => false, hasAnyPermission: () => false,
     } as unknown as ReturnType<typeof useSession>)
 
     const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
@@ -312,7 +312,7 @@ describe('PharmaScreeningCampsPage / PharmaDietCampsPage — separate routes, sh
   it('the cross-navigation row on Screening shows Diet and All camps as clickable links, and Screening itself as plain (non-clickable) text', async () => {
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
-      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-rsm'), hasPermission: () => false,
+      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-rsm'), hasPermission: () => false, hasAnyPermission: () => false,
     } as unknown as ReturnType<typeof useSession>)
 
     const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
@@ -332,7 +332,7 @@ describe('PharmaScreeningCampsPage / PharmaDietCampsPage — separate routes, sh
   it('clicking Diet from the Screening page navigates directly to Diet for the SAME project — no detour through "Your projects"', async () => {
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
-      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-rsm'), hasPermission: () => false,
+      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-rsm'), hasPermission: () => false, hasAnyPermission: () => false,
     } as unknown as ReturnType<typeof useSession>)
 
     const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
@@ -352,7 +352,7 @@ describe('PharmaScreeningCampsPage / PharmaDietCampsPage — separate routes, sh
   it('a screening-only project shows no Diet link at all — only Screening (plain text) and All camps', async () => {
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
-      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-rsm'), hasPermission: () => false,
+      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-rsm'), hasPermission: () => false, hasAnyPermission: () => false,
     } as unknown as ReturnType<typeof useSession>)
 
     const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
@@ -371,7 +371,7 @@ describe('PharmaScreeningCampsPage / PharmaDietCampsPage — separate routes, sh
   it('"All camps" link navigates to the unrestricted All-camps page', async () => {
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
-      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-rsm'), hasPermission: () => false,
+      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-rsm'), hasPermission: () => false, hasAnyPermission: () => false,
     } as unknown as ReturnType<typeof useSession>)
 
     const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
@@ -391,7 +391,7 @@ describe('PharmaScreeningCampsPage / PharmaDietCampsPage — separate routes, sh
   it('"Back to projects" carries ?preferType=screening so picking a different project stays on Screening', async () => {
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
-      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-rsm'), hasPermission: () => false,
+      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-rsm'), hasPermission: () => false, hasAnyPermission: () => false,
     } as unknown as ReturnType<typeof useSession>)
 
     const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
@@ -412,7 +412,7 @@ describe('PharmaScreeningCampsPage / PharmaDietCampsPage — separate routes, sh
   it('post-booking on Diet: closes the dialog and shows the newly booked camp in the refreshed list', async () => {
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
-      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-mr'), hasPermission: () => false,
+      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-mr'), hasPermission: () => false, hasAnyPermission: () => false,
     } as unknown as ReturnType<typeof useSession>)
 
     const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')
@@ -460,7 +460,7 @@ describe('PharmaScreeningCampsPage / PharmaDietCampsPage — separate routes, sh
   it('booking on Screening invalidates the All-camps page\'s cache too — navigating there afterward shows the fresh list, not a stale pre-booking snapshot', async () => {
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
-      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-mr'), hasPermission: () => false,
+      isSettled: true, isConfirmedUnauthenticated: false, session: sessionFixture('pharma-mr'), hasPermission: () => false, hasAnyPermission: () => false,
     } as unknown as ReturnType<typeof useSession>)
 
     const { pharmaProjectsService } = await import('@/features/pharma/pharmaProjects.service')

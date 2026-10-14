@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { FiArrowLeft, FiEdit2 } from 'react-icons/fi'
+import { FiArrowLeft, FiEdit2, FiActivity } from 'react-icons/fi'
 import { useDivision } from '@/features/crm/divisions/hooks/useDivision'
 import { TENANT_ROUTES } from '@/features/access-management/tenant/tenant.routes'
 import { DIVISION_THERAPY_LABEL } from '@/types/crm.types'
@@ -85,6 +85,32 @@ const DivisionDetailPage = () => {
             <Button variant="outline" size="sm" className="shrink-0" onClick={() => setEditOpen(true)}>
               <FiEdit2 size={14} /> Edit division
             </Button>
+          </div>
+
+          <div
+            className="rounded-xl border p-4 mb-5"
+            style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}
+          >
+            <div className="flex items-center gap-1.5 text-xs font-extrabold mb-2.5" style={{ color: 'var(--qms-text)' }}>
+              <FiActivity size={12} />
+              Therapies ({division.therapy.length})
+            </div>
+            {division.therapy.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {division.therapy.map((t) => (
+                  <span
+                    key={t}
+                    className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-success-soft text-success"
+                  >
+                    {DIVISION_THERAPY_LABEL[t]}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <div className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>
+                No therapy tagged on this division.
+              </div>
+            )}
           </div>
 
           <div

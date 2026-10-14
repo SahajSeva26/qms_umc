@@ -105,7 +105,6 @@ async function renderDialog() {
 
 // Advances from step 0 (company basics) to step 1 (location) only.
 async function fillStep0AndAdvance(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(screen.getByLabelText(/code \*/i), 'acme-pharma')
   await user.type(screen.getByLabelText(/^name \*$/i), 'Acme Pharma')
   await user.click(screen.getByRole('combobox', { name: /sales rep/i }))
   const option = await screen.findByText(/sales rep one/i)
@@ -269,8 +268,8 @@ describe('CreateTenantDialog — address', () => {
     expect(screen.getByText(/step 2 of 3/i)).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /^back$/i }))
-    // Back on step 0 — code/name fields visible again, values preserved from before.
-    expect(screen.getByLabelText(/code \*/i)).toHaveValue('acme-pharma')
+    // Back on step 0 — name field visible again, value preserved from before.
+    expect(screen.getByLabelText(/^name \*$/i)).toHaveValue('Acme Pharma')
 
     // Advance forward again through both steps — values are already filled, just re-click Next twice.
     await user.click(screen.getByRole('button', { name: /^next$/i }))
@@ -290,7 +289,6 @@ function makeFile(name = 'logo.png', type = 'image/png', size = 1024) {
 }
 
 async function fillStep0Simple(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(screen.getByLabelText(/code \*/i), 'acme-pharma')
   await user.type(screen.getByLabelText(/^name \*$/i), 'Acme Pharma')
   await user.click(screen.getByRole('combobox', { name: /sales rep/i }))
   await user.click(await screen.findByText(/sales rep one/i))
@@ -1115,41 +1113,40 @@ describe('CreateTenantDialog — draft persistence', () => {
     await renderWithUser(userId)
     await userEvent.setup().click(await screen.findByRole('button', { name: /new client/i }))
 
-    expect(await screen.findByLabelText(/code \*/i)).toBeInTheDocument()
+    expect(await screen.findByLabelText(/^name \*$/i)).toBeInTheDocument()
     expect(screen.queryByText(/unsaved company from earlier/i)).not.toBeInTheDocument()
   })
 
   it('shows the resume decision view (not the editable form) when a draft exists, and does not overwrite it while undecided', async () => {
     const userId = 'tenant-draft-user-2'
-    seedDraft(userId, { ...EMPTY_FORM_VALUES, code: 'acme-pharma', name: 'Acme Pharma' })
+    seedDraft(userId, { ...EMPTY_FORM_VALUES, name: 'Acme Pharma' })
     await renderWithUser(userId)
     await userEvent.setup().click(await screen.findByRole('button', { name: /new client/i }))
 
     expect(await screen.findByText(/unsaved company from earlier/i)).toBeInTheDocument()
-    expect(screen.queryByLabelText(/code \*/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/^name \*$/i)).not.toBeInTheDocument()
 
     const raw = sessionStorage.getItem(draftStorageKey(userId))
-    expect(JSON.parse(raw as string).state.draft.code).toBe('acme-pharma')
+    expect(JSON.parse(raw as string).state.draft.name).toBe('Acme Pharma')
   })
 
   it('Resume restores the saved values into the live form', async () => {
     const userId = 'tenant-draft-user-3'
-    seedDraft(userId, { ...EMPTY_FORM_VALUES, code: 'acme-pharma', name: 'Acme Pharma' })
+    seedDraft(userId, { ...EMPTY_FORM_VALUES, name: 'Acme Pharma' })
     await renderWithUser(userId)
     const user = userEvent.setup()
     await user.click(await screen.findByRole('button', { name: /new client/i }))
 
     await user.click(await screen.findByRole('button', { name: /^Resume$/i }))
 
-    expect(await screen.findByDisplayValue('acme-pharma')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('Acme Pharma')).toBeInTheDocument()
+    expect(await screen.findByDisplayValue('Acme Pharma')).toBeInTheDocument()
   })
 
   it('a saved draft never carries a password back into the resumed form, even if one somehow ended up in storage', async () => {
     const userId = 'tenant-draft-user-4'
     // Simulates a stale/tampered entry — the resumed form must stay blank regardless.
     // salesPerson is required to advance past step 0, to reach the password field.
-    seedDraft(userId, { ...EMPTY_FORM_VALUES, code: 'acme-pharma', name: 'Acme Pharma', salesPerson: 'role-sales-rep-1', ownerPassword: 'leaked-secret' })
+    seedDraft(userId, { ...EMPTY_FORM_VALUES, name: 'Acme Pharma', salesPerson: 'role-sales-rep-1', ownerPassword: 'leaked-secret' })
     await renderWithUser(userId)
     const user = userEvent.setup()
     await user.click(await screen.findByRole('button', { name: /new client/i }))
@@ -1162,19 +1159,19 @@ describe('CreateTenantDialog — draft persistence', () => {
 
   it('Discard clears the draft and starts fresh — reopening shows no decision view', async () => {
     const userId = 'tenant-draft-user-5'
-    seedDraft(userId, { ...EMPTY_FORM_VALUES, code: 'acme-pharma', name: 'Acme Pharma' })
+    seedDraft(userId, { ...EMPTY_FORM_VALUES, name: 'Acme Pharma' })
     const { unmount } = await renderWithUser(userId)
     const user = userEvent.setup()
     await user.click(await screen.findByRole('button', { name: /new client/i }))
 
     await user.click(await screen.findByRole('button', { name: /^Discard$/i }))
-    await screen.findByLabelText(/code \*/i)
+    await screen.findByLabelText(/^name \*$/i)
     expect(sessionStorage.getItem(draftStorageKey(userId))).toBeNull()
 
     unmount()
     await renderWithUser(userId)
     await userEvent.setup().click(await screen.findByRole('button', { name: /new client/i }))
-    expect(await screen.findByLabelText(/code \*/i)).toBeInTheDocument()
+    expect(await screen.findByLabelText(/^name \*$/i)).toBeInTheDocument()
     expect(screen.queryByText(/unsaved company from earlier/i)).not.toBeInTheDocument()
   })
 
@@ -1183,15 +1180,15 @@ describe('CreateTenantDialog — draft persistence', () => {
     const user = userEvent.setup()
     const { unmount } = await renderWithUser(userId)
     await user.click(await screen.findByRole('button', { name: /new client/i }))
-    await screen.findByLabelText(/code \*/i)
+    await screen.findByLabelText(/^name \*$/i)
 
-    await user.type(screen.getByLabelText(/code \*/i), 'acme-pharma')
+    await user.type(screen.getByLabelText(/^name \*$/i), 'Acme Pharma')
 
     await waitFor(
       () => {
         const raw = sessionStorage.getItem(draftStorageKey(userId))
         expect(raw).not.toBeNull()
-        expect(JSON.parse(raw as string).state.draft.code).toBe('acme-pharma')
+        expect(JSON.parse(raw as string).state.draft.name).toBe('Acme Pharma')
       },
       { timeout: 2000 },
     )
@@ -1210,7 +1207,7 @@ describe('CreateTenantDialog — draft persistence', () => {
     const user = userEvent.setup()
     const { unmount } = await renderWithUser(userId)
     await user.click(await screen.findByRole('button', { name: /new client/i }))
-    await screen.findByLabelText(/code \*/i)
+    await screen.findByLabelText(/^name \*$/i)
 
     await user.type(screen.getByLabelText(/^name \*$/i), 'Acme Pharma')
 

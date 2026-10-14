@@ -94,9 +94,10 @@ interface BookCampFormProps {
 
 // Shared across 3 pharma portal entry pages — only whether the MR picker renders differs per role.
 const BookCampForm = ({ needsMrPicker, type, project, patientExpectation, patientExpectationInvalid, onBooked, onCancel }: BookCampFormProps) => {
-  const { session, hasPermission } = usePermission()
+  const { session, hasAnyPermission } = usePermission()
   const selfMrId = session?.role.id
-  const canManageDoctors = hasPermission('doctor:manage')
+  // doctor:create is enough — the configured default for new pharma-mr role types (existing tenants need a backend sync); doctor:manage also satisfies it.
+  const canCreateDoctors = hasAnyPermission(['doctor:create', 'doctor:manage'])
   const [showNewDoctor, setShowNewDoctor] = useState(false)
   // A null type is just a resolver placeholder ('screening') — onSubmit's project-required guard blocks submit.
   const { resolver, parsePayload } = useBookCampFormResolver(needsMrPicker, selfMrId, type ?? 'screening', patientExpectation)
@@ -323,12 +324,16 @@ const BookCampForm = ({ needsMrPicker, type, project, patientExpectation, patien
       )}
 
       <div className="booking-section">
-        <SectionHeader icon={FiUserCheck} spaced={needsMrPicker} number={doctorSectionNumber}>Doctor</SectionHeader>
-        {!projectReady ? (
-          <p className="text-[13px] rounded-lg px-3 py-2 bg-muted/50" style={{ color: 'var(--qms-text-muted)' }}>
-            Select a project and camp type above first.
-          </p>
-        ) : mrDivisionMismatch ? (
+        <div className="flex items-center justify-between gap-2">
+          <SectionHeader icon={FiUserCheck} spaced={needsMrPicker} number={doctorSectionNumber}>Doctor</SectionHeader>
+          {/* Doctor creation is scoped by the MR's division alone, never by the picked project. */}
+          {canCreateDoctors && session && actingDivisionId && (
+            <Button type="button" variant="outline" onClick={() => setShowNewDoctor(true)}>
+              New doctor
+            </Button>
+          )}
+        </div>
+        {mrDivisionMismatch ? (
           <div className="text-[12px] rounded-lg px-3 py-2 bg-danger-soft border border-danger text-danger">
             {mrDivisionId === null
               ? "Can't confirm this MR's division — doctor search may not be accurate for this booking."
@@ -342,41 +347,33 @@ const BookCampForm = ({ needsMrPicker, type, project, patientExpectation, patien
                 <span>The previously picked doctor isn't within {DOCTOR_RANGE_KM}km of this camp location — pick a doctor near the new location instead.</span>
               </div>
             )}
-            <div className="flex items-center gap-2">
-              <div className="flex-1 min-w-0">
-                <Controller
-                  control={control}
-                  name="doctorId"
-                  render={({ field }) =>
-                    doctorOutOfRange ? (
-                      <DoctorDistancePicker
-                        value={field.value}
-                        label={doctorLabel}
-                        coordinates={location?.coordinates}
-                        onChange={(id, l) => { field.onChange(id); setValue('doctorLabel', l) }}
-                        onSelectDoctor={handleSelectDoctor}
-                        disabled={!projectReady || !locationReady}
-                      />
-                    ) : (
-                      <DoctorNameDivisionPicker
-                        value={field.value}
-                        label={doctorLabel}
-                        division={doctorDivisionId}
-                        onChange={(id, l) => { field.onChange(id); setValue('doctorLabel', l) }}
-                        onSelectDoctor={handleSelectDoctor}
-                        disabled={!projectReady}
-                      />
-                    )
-                  }
-                />
-              </div>
-              {/* No "New doctor" button when the acting user has no division — the create would just 403. */}
-              {canManageDoctors && session && actingDivisionId && (
-                <Button type="button" variant="outline" disabled={!projectReady} onClick={() => setShowNewDoctor(true)}>
-                  New doctor
-                </Button>
-              )}
-            </div>
+            {/* Doctor selection is scoped by division, not the project — pickable regardless of
+                whether a project has been chosen yet. Only the out-of-range variant still needs a
+                real camp location to compute distance against. */}
+            <Controller
+              control={control}
+              name="doctorId"
+              render={({ field }) =>
+                doctorOutOfRange ? (
+                  <DoctorDistancePicker
+                    value={field.value}
+                    label={doctorLabel}
+                    coordinates={location?.coordinates}
+                    onChange={(id, l) => { field.onChange(id); setValue('doctorLabel', l) }}
+                    onSelectDoctor={handleSelectDoctor}
+                    disabled={!locationReady}
+                  />
+                ) : (
+                  <DoctorNameDivisionPicker
+                    value={field.value}
+                    label={doctorLabel}
+                    division={doctorDivisionId}
+                    onChange={(id, l) => { field.onChange(id); setValue('doctorLabel', l) }}
+                    onSelectDoctor={handleSelectDoctor}
+                  />
+                )
+              }
+            />
           </div>
         )}
         {fieldError('doctorId') && <p className="text-[11px] mt-1 text-danger">{fieldError('doctorId')}</p>}

@@ -33,7 +33,6 @@ const GENDER_OPTIONS: { value: 'male' | 'female' | 'other'; label: string }[] = 
 // mandatory; the backend mints a new user + Role in the same transaction.
 interface DivisionFormValues {
   tenant: string
-  code: string
   name: string
   therapy: DivisionTherapy[]
   mrCount: number
@@ -47,7 +46,6 @@ interface DivisionFormValues {
 
 const EMPTY_FORM_VALUES: DivisionFormValues = {
   tenant: '',
-  code: '',
   name: '',
   therapy: [],
   mrCount: 0,
@@ -76,7 +74,6 @@ const useDivisionFormResolver = () =>
     schema: createDivisionSchema,
     toPayload: (values) => ({
       tenant: values.tenant,
-      code: values.code,
       name: values.name,
       therapy: values.therapy,
       mrCount: Number.isNaN(values.mrCount) ? undefined : values.mrCount,
@@ -130,7 +127,7 @@ const CreateDivisionModal = ({ onClose, defaultTenantId }: CreateDivisionModalPr
   // Only validates step-1 fields so step-2's still-empty head fields don't block Next.
   const handleNext = async () => {
     setStep1Attempted(true)
-    const valid = await trigger(['tenant', 'code', 'name', 'therapy'])
+    const valid = await trigger(['tenant', 'name', 'therapy'])
     if (valid) setStep(1)
   }
 
@@ -179,14 +176,6 @@ const CreateDivisionModal = ({ onClose, defaultTenantId }: CreateDivisionModalPr
                     )}
                   />
                   {fieldError('tenant') && <p className="text-[11px] mt-1 text-danger">{fieldError('tenant')}</p>}
-                </div>
-
-                <div>
-                  <Label className="block text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-                    Code *
-                  </Label>
-                  <Input type="text" placeholder="e.g. cardio1" className="text-[13px]" {...register('code')} />
-                  {fieldError('code') && <p className="text-[11px] mt-1 text-danger">{fieldError('code')}</p>}
                 </div>
 
                 <div>

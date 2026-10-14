@@ -87,7 +87,7 @@ export interface RegisterOwnerPayload {
 }
 
 export interface CreateTenantPayload {
-  code: string
+  // code is auto-generated server-side — never caller-supplied.
   name: string
   owner: RegisterOwnerPayload
   // Role id, must be type 'sales-rep'. Optional on the backend; required
@@ -325,9 +325,7 @@ export interface SearchDownlineMrQuery {
 }
 
 export interface CreateRolePayload {
-  /** Optional — the backend auto-generates one for pharma field-force roles
-   * (MR/ASM/RSM) when omitted; every other role type still requires it. */
-  code?: string
+  // code is auto-generated server-side — never caller-supplied.
   name: string
   description?: string
   permissions?: string[]

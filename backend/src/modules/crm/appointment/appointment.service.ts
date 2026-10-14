@@ -31,6 +31,7 @@ import { DivisionService } from '../division/division.service';
 import { ContactService } from '../contact/contact.service';
 import { LeadService } from '../lead/lead.service';
 import { RoleService } from '../../access-management/role/role.service';
+import { TENANT_PERMISSIONS } from '../../access-management/tenant/tenant.constants';
 
 type AppointmentDocument = HydratedDocument<IAppointment> | null;
 
@@ -48,10 +49,11 @@ const populate: any[] = [
 // HELPERS
 // ========================================================================================
 
-// a search-only actor (appointment:search, not appointment:manage) sees an appointment only if
-// they own it (salesPerson) or attend it (internalMembers).
+// any actor who isn't a full manager (appointment:manage / tenant:manage) sees an appointment only
+// if they own it (salesPerson) or attend it (internalMembers) — regardless of which lesser
+// permission (search / update / rsvp) got them through the route guard.
 const applyOwnScope = (where: any, ctx: RequestContext) => {
-    if (ctx.hasAnyPermissions([APPOINTMENT_PERMISSIONS.SEARCH.code]) && !ctx.hasAnyPermissions([APPOINTMENT_PERMISSIONS.MANAGE.code])) {
+    if (!ctx.hasAnyPermissions([APPOINTMENT_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code])) {
         where.$or = [{ salesPerson: ctx.role?._id }, { 'internalMembers.role': ctx.role?._id }];
     }
 };

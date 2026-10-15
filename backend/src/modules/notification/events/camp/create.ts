@@ -6,17 +6,14 @@ const config: TemplateConfig = {
     recepients: [
         {
             source: 'data.fo.email',
-            channels: {
-                email: 'fo/email.hbs',
-            },
+            channels: ['email']
         },
         {
             source: 'data.mr.email',
-            channels: {
-                email: 'mr/email.hbs',
-            },
+            channels: ['email']
         },
     ],
+    template: '/camp/create'
 };
 
 export default config;

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import type { AnalyticsTab } from '@/types/analytics.types'
+import { ANALYTICS_ROUTES } from '@/features/analytics/analytics.paths'
 import { useAnalyticsFilters } from '@/features/analytics/hooks/useAnalyticsFilters'
 import { useAnalyticsData } from '@/features/analytics/hooks/useAnalyticsData'
 import { computeAnalyticsKpis } from '@/features/analytics/analytics.kpis'
@@ -12,15 +13,12 @@ import ExecutiveTab from '@/features/analytics/components/tabs/ExecutiveTab'
 import SalesPipelineTab from '@/features/analytics/components/tabs/SalesPipelineTab'
 import CampsTab from '@/features/analytics/components/tabs/CampsTab'
 import DoctorsTab from '@/features/analytics/components/tabs/DoctorsTab'
-import FoPerformanceTab from '@/features/analytics/components/tabs/FoPerformanceTab'
 import FinancialTab from '@/features/analytics/components/tabs/FinancialTab'
 
-// Literal paths (not imported from analytics.routes.tsx) — that file imports
-// this component to build its route table, so importing back from it here
-// would be a circular module dependency.
+// Literal paths, not imported from analytics.routes.tsx (circular dependency). '/analytics/fo' is
+// deliberately absent — that route renders FoAnalyticsPage instead, never this component.
 const ROUTE_TO_TAB: Record<string, AnalyticsTab> = {
   '/analytics/sales': 'sales',
-  '/analytics/fo': 'fo',
   '/analytics/doctors': 'doctors',
   '/analytics/financial': 'financial',
 }
@@ -43,13 +41,11 @@ const TAB_TITLES: Record<AnalyticsTab, string> = {
   financial: 'Financial Analytics',
 }
 
-// AnalyticsModule — one shared component rendered by all 5 analytics routes.
-// The 4 focused routes (/analytics/sales|fo|doctors|financial) pin the view
-// to a single tab (no tab switcher shown); /analytics shows all 6, starting
-// on Executive. This replaces the prototype's <iframe src="analytics.html">
-// embed with a real component — deliberately not porting the iframe hack.
+// Shared by /analytics (all 6 tabs, switcher shown) and the 3 remaining focused routes (pinned to
+// one tab, no switcher) — replaces the prototype's <iframe src="analytics.html"> embed.
 const AnalyticsPage = () => {
   const location = useLocation()
+  const navigate = useNavigate()
   const focusedTab = ROUTE_TO_TAB[location.pathname]
   const [activeTab, setActiveTab] = useState<AnalyticsTab>('exec')
 
@@ -57,7 +53,7 @@ const AnalyticsPage = () => {
   const data = useAnalyticsData(filters)
 
   const kpis = useMemo(
-    () => computeAnalyticsKpis(data.camps, data.projects, data.leads, data.invoices, data.fieldOfficers, formatINR),
+    () => computeAnalyticsKpis(data.camps, data.projects, data.leads, data.invoices, data.activeFOs, formatINR),
     [data]
   )
 
@@ -105,7 +101,9 @@ const AnalyticsPage = () => {
               {TABS.map((t) => (
                 <button
                   key={t.id}
-                  onClick={() => setActiveTab(t.id)}
+                  // FO Performance navigates to its own real-data route instead of rendering inline
+                  // — it must never run inside this component's legacy mock useAnalyticsData shell.
+                  onClick={() => (t.id === 'fo' ? navigate(ANALYTICS_ROUTES.ANALYTICS_FO) : setActiveTab(t.id))}
                   className="px-3 py-1.5 rounded-lg text-[12px] font-bold border transition-all"
                   style={
                     tab === t.id
@@ -123,7 +121,6 @@ const AnalyticsPage = () => {
           {tab === 'sales' && <SalesPipelineTab leads={data.leads} />}
           {tab === 'camps' && <CampsTab camps={data.camps} />}
           {tab === 'doctors' && <DoctorsTab camps={data.camps} doctors={data.doctors} />}
-          {tab === 'fo' && <FoPerformanceTab camps={data.camps} fieldOfficers={data.fieldOfficers} />}
           {tab === 'financial' && (
             <FinancialTab invoices={data.invoices} pnlTrend={data.pnlTrend} expenseSplit={data.expenseSplit} arAging={data.arAging} />
           )}

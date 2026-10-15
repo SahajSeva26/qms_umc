@@ -526,6 +526,19 @@ anything; the processing logic is the seam left to fill.
 
 ## What's Next (planned)
 
+- **Notification delivery (branch `feature/notification`)** — the publish→EventBridge→SQS→worker plumbing +
+  template infra (`HandlebarsHelper`, event configs, `registerHelpers`) are all COMMITTED, but the module is
+  NOT functional end-to-end. Remaining seam: (1) **mock email provider** — NEXT step, approved, not yet
+  written: 3 files mirroring `queue.ts`/`events.ts` (`shared/types/mail.types.ts` `IMailProvider.send(IMailMessage{to,subject,body,from?})`,
+  `shared/providers/mail/mock/mock.provider.ts` `MockMailProvider` logs instead of sending, `shared/providers/mail/mail.ts`
+  `mailManager`); real SES drops in behind the same interface later (SES SDK not installed). (2) **`handleEvent()` processing** —
+  currently log-only: parse EventBridge envelope → load the `events/<entity>/<event>.ts` `TemplateConfig` by `code` →
+  resolve each recipient's `source` dot-path into event data → render the `.hbs` per channel via `HandlebarsHelper` →
+  `NotificationService.create` + send via the mail provider. (3) **real triggers** — no service calls `publish()` yet
+  (only the temp `POST /notifications/test-publish` route). ⚠️ Open design decisions (deferred): config `source` resolves
+  an **email** but the notification model `recipient` is a required **User id** — reconcile; template folder layout under
+  the new `template` base-path + `channels: string[]` config shape (user's uncommitted tweak — `.hbs` files currently all
+  deleted); persist-in-app-only vs full-send scope. See [[notification-template-approach]], [[event-bus-eventbridge]].
 - Inventory — `inventory-assignment` + `inventory-request` are now BUILT/wired. Remaining: build the
   last scaffolded module `inventory-transaction` (append-only stock ledger: issue/return/consume/adjust
   that drives consumable quantity & device location/status), and wire the **`received`** step of a

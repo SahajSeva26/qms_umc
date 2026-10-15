@@ -14,10 +14,14 @@ import type { RolePopulatedUser, Tenant } from '@/types/accessManagement.types'
 interface TenantHeaderProps {
   tenant: Tenant
   canManageTenant: boolean
+  // salesPerson is system:manage-gated server-side (same as owner) — shown only when true, matching
+  // EditTenantModal's own gate for editing it.
+  canManageSystem: boolean
   canViewRole: boolean
   ownerName: string | null
   ownerUser: RolePopulatedUser | null
   ownerEmailSuffix: string | null
+  salesPersonName: string | null
   tenantAddress: string | null
   divisionPenetrationPct: number | null
   onEditClick: () => void
@@ -40,10 +44,12 @@ const TENANT_LOGO_COPY = {
 const TenantHeader = ({
   tenant,
   canManageTenant,
+  canManageSystem,
   canViewRole,
   ownerName,
   ownerUser,
   ownerEmailSuffix,
+  salesPersonName,
   tenantAddress,
   divisionPenetrationPct,
   onEditClick,
@@ -105,6 +111,14 @@ const TenantHeader = ({
                   </span>
                 )}
                 {ownerEmailSuffix && <span className="ml-1.5">({ownerEmailSuffix})</span>}
+              </div>
+            )}
+            {canManageSystem && tenant.salesPerson && (
+              <div className="text-[11px] mt-1.5 wrap-break-word" style={{ color: 'var(--qms-text-muted)' }}>
+                Sales rep:{' '}
+                <span className="font-semibold" style={{ color: 'var(--qms-text-soft)' }}>
+                  {salesPersonName ?? tenant.salesPerson}
+                </span>
               </div>
             )}
             {tenantAddress && (

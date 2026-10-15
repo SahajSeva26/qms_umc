@@ -36,7 +36,7 @@ const TENANT: Tenant = {
   status: 'active',
 } as Tenant
 
-function renderHeader(props: Partial<{ tenant: Tenant; canManageTenant: boolean }> = {}) {
+function renderHeader(props: Partial<{ tenant: Tenant; canManageTenant: boolean; canManageSystem: boolean; salesPersonName: string | null }> = {}) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={queryClient}>
@@ -44,10 +44,12 @@ function renderHeader(props: Partial<{ tenant: Tenant; canManageTenant: boolean 
         <TenantHeader
           tenant={TENANT}
           canManageTenant
+          canManageSystem={false}
           canViewRole={false}
           ownerName={null}
           ownerUser={null}
           ownerEmailSuffix={null}
+          salesPersonName={null}
           tenantAddress={null}
           divisionPenetrationPct={null}
           onEditClick={vi.fn()}
@@ -72,6 +74,61 @@ describe('TenantHeader', () => {
     vi.resetAllMocks()
     window.URL.createObjectURL = vi.fn(() => 'blob:mock-preview-url')
     window.URL.revokeObjectURL = vi.fn()
+  })
+
+  it('shows the resolved sales rep name (QF-167) when system:manage and a salesPerson is assigned', async () => {
+    const { fileService } = await import('@/lib/file/file.service')
+    vi.mocked(fileService.searchFiles).mockResolvedValue(noLogo())
+
+    renderHeader({
+      tenant: { ...TENANT, salesPerson: 'role-sp-1' },
+      canManageSystem: true,
+      salesPersonName: 'Rohit Malhotra',
+    })
+
+    await waitFor(() => expect(screen.getByText('Rohit Malhotra')).toBeInTheDocument())
+    expect(screen.getByText(/sales rep:/i)).toBeInTheDocument()
+  })
+
+  it('falls back to the bare role id when the sales rep\'s name has not resolved yet', async () => {
+    const { fileService } = await import('@/lib/file/file.service')
+    vi.mocked(fileService.searchFiles).mockResolvedValue(noLogo())
+
+    renderHeader({
+      tenant: { ...TENANT, salesPerson: 'role-sp-1' },
+      canManageSystem: true,
+      salesPersonName: null,
+    })
+
+    await waitFor(() => expect(screen.getByText('role-sp-1')).toBeInTheDocument())
+  })
+
+  it('hides the sales rep row without system:manage, even when one is assigned', async () => {
+    const { fileService } = await import('@/lib/file/file.service')
+    vi.mocked(fileService.searchFiles).mockResolvedValue(noLogo())
+
+    renderHeader({
+      tenant: { ...TENANT, salesPerson: 'role-sp-1' },
+      canManageSystem: false,
+      salesPersonName: 'Rohit Malhotra',
+    })
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /upload logo/i })).toBeEnabled())
+    expect(screen.queryByText(/sales rep:/i)).not.toBeInTheDocument()
+  })
+
+  it('hides the sales rep row when no salesPerson is assigned, even with system:manage', async () => {
+    const { fileService } = await import('@/lib/file/file.service')
+    vi.mocked(fileService.searchFiles).mockResolvedValue(noLogo())
+
+    renderHeader({
+      tenant: { ...TENANT, salesPerson: null },
+      canManageSystem: true,
+      salesPersonName: null,
+    })
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /upload logo/i })).toBeEnabled())
+    expect(screen.queryByText(/sales rep:/i)).not.toBeInTheDocument()
   })
 
   it('renders a placeholder when no logo exists', async () => {
@@ -579,10 +636,12 @@ describe('TenantHeader', () => {
           <TenantHeader
             tenant={TENANT}
             canManageTenant
+            canManageSystem={false}
             canViewRole={false}
             ownerName={null}
             ownerUser={null}
             ownerEmailSuffix={null}
+            salesPersonName={null}
             tenantAddress={null}
             divisionPenetrationPct={null}
             onEditClick={vi.fn()}
@@ -622,10 +681,12 @@ describe('TenantHeader', () => {
           <TenantHeader
             tenant={TENANT}
             canManageTenant
+            canManageSystem={false}
             canViewRole={false}
             ownerName={null}
             ownerUser={null}
             ownerEmailSuffix={null}
+            salesPersonName={null}
             tenantAddress={null}
             divisionPenetrationPct={null}
             onEditClick={vi.fn()}
@@ -686,10 +747,12 @@ describe('TenantHeader', () => {
           <TenantHeader
             tenant={TENANT}
             canManageTenant
+            canManageSystem={false}
             canViewRole={false}
             ownerName={null}
             ownerUser={null}
             ownerEmailSuffix={null}
+            salesPersonName={null}
             tenantAddress={null}
             divisionPenetrationPct={null}
             onEditClick={vi.fn()}

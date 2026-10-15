@@ -1,21 +1,10 @@
 import type { RouteObject } from 'react-router-dom'
 import { Navigate } from 'react-router-dom'
 import { lazyRoute } from '@/lib/router/lazyRoute'
+import * as AccessManagementPaths from './accessManagement.paths'
 
-// Paths stay under `/admin/*` so existing nav links/bookmarks keep working.
-export const ACCESS_MANAGEMENT_ROUTES = {
-  TENANTS:              '/admin/tenants',
-  TENANT_DETAIL:        '/admin/tenants/:id',
-  PERMISSION_GROUPS:       '/admin/permission-groups',
-  PERMISSION_GROUP_DETAIL: '/admin/permission-groups/:id',
-  ROLE_TYPES:           '/admin/role-types',
-  ROLE_TYPE_NEW:        '/admin/role-types/new',
-  ROLE_TYPE_DETAIL:     '/admin/role-types/:id',
-  ROLES:                '/admin/roles',
-  ROLE_DETAIL:          '/admin/roles/:id',
-  EMPLOYEES:            '/admin/employees',
-  EMPLOYEE_DETAIL:      '/admin/employees/:id',
-}
+// A direct `export const` (not a bare re-export specifier) — see camps.routes.tsx for why.
+export const ACCESS_MANAGEMENT_ROUTES = AccessManagementPaths.ACCESS_MANAGEMENT_ROUTES
 
 // Each array unions its list+detail backend guards, not one shared guard — a search-only
 // caller can still reach a detail page that then 403s on its own fetch.

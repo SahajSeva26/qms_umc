@@ -1,9 +1,9 @@
 import type { RouteObject } from 'react-router-dom'
 import { lazyRoute } from '@/lib/router/lazyRoute'
+import * as QaFeedbackPaths from './qa-feedback.paths'
 
-export const QA_FEEDBACK_ROUTES = {
-  QA_FEEDBACK_REVIEW: '/admin/qa-feedback',
-}
+// A direct `export const` (not a bare re-export specifier) — see camps.routes.tsx for why.
+export const QA_FEEDBACK_ROUTES = QaFeedbackPaths.QA_FEEDBACK_ROUTES
 
 // Frontend-only gate — the backend's GET/POST /qa-feedback are open to any authenticated user (the
 // per-page FeedbackWidget popover needs to read tickets too), but this full admin dashboard (with

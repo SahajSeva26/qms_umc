@@ -123,35 +123,35 @@ describe('Sidebar — FO Management platform-tenant gate (unreachable via nav wh
   })
 })
 
-describe('Sidebar — Inventory Operations nav label mirrors the page\'s own "Requests-only" state', () => {
-  it('labels the nav item "Requests" for a field-officer-shaped session (only inventory-request:* permissions)', async () => {
+// The old per-session "Requests" label-swap (InventoryOperationsPage.tsx, removed) no longer
+// exists — the inventory nav item is one page with internal tabs now (InventoryManagementPage.tsx),
+// not a page whose identity changes per session. The label is a constant; this locks that in.
+describe('Sidebar — the Inventory Management nav label is constant, not session-dependent', () => {
+  it('shows "Inventory Management" for a field-officer-shaped session (only inventory-request:* permissions)', async () => {
     await renderSidebar({
       permissions: ['inventory-request:search', 'inventory-request:create'],
       session: sessionFixture('field-officer', ['inventory-request:search', 'inventory-request:create'], 'platform'),
     })
 
-    expect(screen.getByText('Requests')).toBeInTheDocument()
-    expect(screen.queryByText('Inventory Operations')).not.toBeInTheDocument()
+    expect(screen.getByText('Inventory Management')).toBeInTheDocument()
   })
 
-  it('keeps the "Inventory Operations" label for a session holding inventory-assignment:manage', async () => {
+  it('shows "Inventory Management" for a session holding inventory-assignment:manage', async () => {
     await renderSidebar({
       permissions: ['inventory-assignment:manage'],
       session: sessionFixture('inventory-manager', ['inventory-assignment:manage']),
     })
 
-    expect(screen.getByText('Inventory Operations')).toBeInTheDocument()
-    expect(screen.queryByText('Requests')).not.toBeInTheDocument()
+    expect(screen.getByText('Inventory Management')).toBeInTheDocument()
   })
 
-  it('keeps the "Inventory Operations" label for a system:manage session, even though it holds no explicit inventory-assignment/-ledger code', async () => {
+  it('shows "Inventory Management" for a system:manage session', async () => {
     await renderSidebar({
       permissions: ['system:manage'],
       session: sessionFixture('system-admin', ['system:manage']),
     })
 
-    expect(screen.getByText('Inventory Operations')).toBeInTheDocument()
-    expect(screen.queryByText('Requests')).not.toBeInTheDocument()
+    expect(screen.getByText('Inventory Management')).toBeInTheDocument()
   })
 })
 

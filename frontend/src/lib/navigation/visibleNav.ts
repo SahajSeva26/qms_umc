@@ -2,11 +2,10 @@ import { FULL_NAV_SECTIONS, type NavItem } from '@/lib/navigation/navRegistry'
 import { getPharmaRoleMeta } from '@/features/pharma/pharma.constants'
 import { canReadEmployees } from '@/lib/access/employeeAccess'
 
-// The single source of truth for "which sidebar item can this session actually reach" — shared by
-// Sidebar.tsx (what to render) and the post-login resolver (where to land). Originally lived as
-// Sidebar.tsx's own REAL_GATED_NAV_ITEMS/isNavItemVisible; extracted here so the two consumers
-// can't drift apart. Update the gates below in one place — both Sidebar.tsx and the resolver read them.
+// Single source of truth for "which sidebar item can this session reach" — shared by Sidebar.tsx
+// and the post-login resolver so the two consumers can't drift apart.
 const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
+  dashboard: ['tenant:manage'],
   crminvoicing: ['system:manage'],
   crm: ['lead:search', 'lead:manage', 'tenant:manage'],
   tenants: ['tenant:get', 'tenant:search', 'tenant:manage'],

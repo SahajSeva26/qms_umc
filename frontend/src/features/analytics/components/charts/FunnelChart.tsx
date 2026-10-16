@@ -3,7 +3,8 @@ import { formatINR } from '@/utils/formatters'
 export interface FunnelRow {
   label: string
   count: number
-  value: number
+  /** Omit when no real per-stage monetary aggregate exists — the bar then shows count only. */
+  value?: number
   color: string
   /** Text color for the bar's inline label — defaults to white. */
   onColor?: string
@@ -26,7 +27,7 @@ const FunnelChart = ({ rows }: FunnelChartProps) => {
         const widthPct = Math.max(4, (row.count / maxCount) * 100)
         const sharePct = totalCount > 0 ? Math.round((row.count / totalCount) * 100) : 0
         const labelFits = widthPct >= LABEL_FITS_THRESHOLD
-        const valueLabel = `${row.count} · ${formatINR(row.value)}`
+        const valueLabel = row.value !== undefined ? `${row.count} · ${formatINR(row.value)}` : String(row.count)
         return (
           <div key={row.label} className="flex items-center gap-3">
             <span className="text-[11px] font-semibold w-28 shrink-0 truncate" style={{ color: 'var(--qms-text-muted)' }}>

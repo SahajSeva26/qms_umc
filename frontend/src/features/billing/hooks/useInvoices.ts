@@ -5,9 +5,7 @@ import type { SearchInvoiceQuery } from '@/types/invoice.types'
 
 export const invoiceKeys = createEntityKeys<SearchInvoiceQuery>('invoices', 'invoice')
 
-// enabled must be passed false by the caller whenever no project is
-// selected — this account's reads are unscoped (platform tenant), so an
-// unguarded search here would return every invoice across the platform
-// instead of nothing.
-export const useInvoices = (query: SearchInvoiceQuery, enabled = true) =>
-  useEntityQuery(invoiceKeys, invoiceService.searchInvoices, query, { enabled })
+// enabled must be false when no project is selected — reads are unscoped (platform tenant), so an
+// unguarded search returns every invoice on the platform instead of nothing.
+export const useInvoices = (query: SearchInvoiceQuery, enabled = true, options?: { retry?: boolean }) =>
+  useEntityQuery(invoiceKeys, invoiceService.searchInvoices, query, { enabled, retry: options?.retry })

@@ -1,20 +1,33 @@
 import { useQuery } from '@tanstack/react-query'
+import { usePermission } from '@/hooks/usePermission'
 import { getDashboardData } from '@/features/dashboard/dashboard.service'
-import { DEFAULT_DASHBOARD_FILTERS } from '@/types/dashboard.types'
 
-// Shared wrapper around the Dashboard feature's aggregate data — lets other
-// features (Analytics) read it without importing features/dashboard/
-// internals directly. Mirrors useAuth.ts's role as the sanctioned shared
-// surface over features/auth/.
-//
-// Reads the unfiltered/default view: Analytics applies its own filtering and
-// has no dependency on the Dashboard's filter bar. The key mirrors
-// useDashboardData's `['dashboard', filters]` shape so that when Analytics and
-// the Dashboard are both mounted at defaults they share one cache entry
-// instead of fetching the same payload twice.
+const STALE_TIME_MS = 60_000
+
+// Shared wrapper around the Dashboard feature's aggregate data — lets Analytics read it without
+// importing features/dashboard/ internals. The key mirrors useDashboardData's own so both share
+// one cache entry instead of fetching the same payload twice.
 export const useDashboardDataShared = () => {
+  const { hasAnyPermission } = usePermission()
+  const canViewProjectReport = hasAnyPermission(['project:manage', 'tenant:manage'])
+  const canViewLeadReport = hasAnyPermission(['lead:manage'])
+  const canViewAppointmentReport = hasAnyPermission(['appointment:manage'])
+  const canViewInventoryAssignmentReport = hasAnyPermission(['inventory-assignment:manage'])
+  const canViewInvoiceReport = hasAnyPermission(['invoice:search', 'invoice:manage', 'tenant:manage'])
+  const canSearchPatients = hasAnyPermission(['patient:search', 'patient:manage'])
+
+  const flags = {
+    canViewProjectReport,
+    canViewLeadReport,
+    canViewAppointmentReport,
+    canViewInventoryAssignmentReport,
+    canViewInvoiceReport,
+    canSearchPatients,
+  }
+
   return useQuery({
-    queryKey: ['dashboard', DEFAULT_DASHBOARD_FILTERS],
-    queryFn: () => getDashboardData(DEFAULT_DASHBOARD_FILTERS),
+    queryKey: ['dashboard', flags],
+    queryFn: () => getDashboardData(flags),
+    staleTime: STALE_TIME_MS,
   })
 }

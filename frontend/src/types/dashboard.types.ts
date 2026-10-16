@@ -1,11 +1,10 @@
-// Mirrors the vanilla-JS prototype's dashboard-data.js shapes exactly.
-// TODO: entirely mock/frontend-only — no backend endpoints exist for any of this yet.
+// Dashboard contract — every KPI value is real-or-null. `v: null` renders as "-"; no mock
+// fallback in production. Empty breakdown/table/chart arrays render as "Live data not available".
 
 export interface KpiValue {
-  v: number
-  ly?: number
+  v: number | null
   unit?: 'inr' | 'pct'
-  camps?: { v: number; ly: number }
+  camps?: { v: number | null }
 }
 
 export interface CompanyRow {
@@ -15,15 +14,13 @@ export interface CompanyRow {
   camps: number
   billing: number
   outstanding: number
-  status: 'ACTIVE' | 'TRIAL' | 'PAUSED' | 'INACTIVE'
+  status: 'ACTIVE' | 'INACTIVE'
 }
 
 export interface CompanyData {
   totalCompanies: KpiValue
   totalDivisions: KpiValue
-  accountPenetration: KpiValue
   totalBilling: KpiValue
-  outstanding: KpiValue
   breakdown: CompanyRow[]
 }
 
@@ -39,14 +36,26 @@ export interface ProjectRow {
   status: 'LIVE' | 'PILOT' | 'PAUSED'
 }
 
+// Real backend status values (project.constants.ts's PROJECT_STATUS) — there is no
+// pilot/paused concept; `hold` is the closest real equivalent to "paused".
+export interface ProjectStatusRow {
+  status: 'new' | 'live' | 'hold' | 'closed'
+  count: number
+}
+
 export interface ProjectData {
   totalProjects: KpiValue
   screeningProjects: KpiValue
   dietProjects: KpiValue
   labProjects: KpiValue
-  totalBilling: KpiValue
+  // campCost * totalCamps summed across all projects (GET /projects/report's revenue aggregate) —
+  // an estimate of project value, not actual invoiced/collected billing.
+  estimatedValue: KpiValue
   outstanding: KpiValue
   breakdown: ProjectRow[]
+  // Real, org-wide status counts from GET /projects/report (project:manage/tenant:manage only) —
+  // empty for a caller without that permission, not derived from `breakdown`.
+  statusMix: ProjectStatusRow[]
 }
 
 export interface RegionRow {
@@ -91,16 +100,16 @@ export interface RepRow {
 
 export interface SalesData {
   totalProjects: KpiValue
-  screeningProjects: KpiValue
-  dietProjects: KpiValue
   totalBilling: KpiValue
   outstanding: KpiValue
   totalLeads: KpiValue
-  followUps: KpiValue
-  leadToPo: KpiValue
-  leadsScreeningPrj: KpiValue
-  leadsDietPrj: KpiValue
-  leadsOther: KpiValue & { value: number }
+  // GET /appointments/report's byType 'follow-up' bucket (appointment:manage only) — an exact,
+  // unscoped org-wide count, not a per-user own-scoped search count.
+  followUpAppointments: KpiValue
+  // GET /leads/report's kpis.pipelineValue — Σ estimatedValue over open (non-won/lost) leads.
+  pipelineValue: KpiValue
+  // Lead-stage win rate (won/(won+lost) in range) — NOT a lead-to-PO conversion rate.
+  leadWinRate: KpiValue
   repBreakdown: RepRow[]
 }
 
@@ -116,6 +125,12 @@ export interface ArAgingBucket {
   value: number
 }
 
+export interface InvoiceStatusRow {
+  status: 'draft' | 'approved' | 'issued' | 'grn_signed' | 'paid' | 'cancelled'
+  count: number
+  total: number
+}
+
 export interface AccountsData {
   revenue: KpiValue
   expenses: KpiValue
@@ -124,19 +139,19 @@ export interface AccountsData {
   pat: KpiValue
   patMarginPct: KpiValue
   arOutstanding: KpiValue
-  // Aging buckets come from the data source already split. The UI must not
-  // derive them by applying ratios to `arOutstanding` — that would be
-  // fabricated math running on top of real API numbers.
   arAging: ArAgingBucket[]
   expectedCollection: { thisWeek: KpiValue; thisMonth: KpiValue; thisYear: KpiValue }
   paymentCycleDays: KpiValue
   expenseSplit: ExpenseRow[]
+  // From GET /invoices/report — kept under invoice terms, never folded into revenue/EBITDA/AR above.
+  totalInvoices: KpiValue
+  totalInvoicedAmount: KpiValue
+  invoiceStatusMix: InvoiceStatusRow[]
 }
 
 export interface SpecialtyRow {
   specialty: string
   count: number
-  ly: number
 }
 
 export interface DoctorsData {
@@ -158,12 +173,14 @@ export interface InterpretationRow {
 
 export interface PatientsData {
   total: KpiValue
-  male: { v: number; share: number }
-  female: { v: number; share: number }
-  other: { v: number; share: number }
+  male: { v: number | null; share: number | null }
+  female: { v: number | null; share: number | null }
+  other: { v: number | null; share: number | null }
   interpretations: InterpretationRow[]
 }
 
+// No task/MOM/activity module exists in the backend — getCommandCenterData() always returns an
+// empty task list. Kept as a real (if permanently empty) type, not a mock data shape.
 export interface DashboardTask {
   id: string
   kind: 'MEETING' | 'MOM' | 'LEAD' | 'PO' | 'CUSTOM'
@@ -176,58 +193,19 @@ export interface DashboardTask {
   canAct: boolean
 }
 
-// ===========================================================================
-// SERVICE CONTRACT
-// ---------------------------------------------------------------------------
-// Everything below is the shape `dashboard.service.ts` promises to return,
-// independent of where the data actually comes from (mock today, a real
-// aggregation endpoint later). Components/hooks type against these — never
-// against the mock module. Lives here rather than inside features/dashboard/
-// because `hooks/useDashboardDataShared.ts` exposes the same contract to
-// Analytics.
-// ===========================================================================
-
-export interface DashboardFilterState {
-  dateRange: string
-  client: string
-  division: string
-  campType: string
-  rep: string
-  yoy: boolean
+export interface CommandCenterData {
+  quarter: string
+  tasks: DashboardTask[]
 }
 
-export const DEFAULT_DASHBOARD_FILTERS: DashboardFilterState = {
-  dateRange: 'QTD',
-  client: 'All clients',
-  division: 'All divisions',
-  campType: 'All',
-  rep: 'All reps',
-  yoy: true,
-}
+// SERVICE CONTRACT — the shape dashboard.service.ts returns. Lives here (not in features/dashboard/)
+// because useDashboardDataShared.ts exposes the same contract to Analytics.
 
-/** Options rendered by the global filter bar. Config, not metrics — fetched separately and cached indefinitely. */
-export interface DashboardFilterOptions {
-  dateRanges: { id: string; label: string }[]
-  clients: string[]
-  divisions: string[]
-  campTypes: string[]
-  salesPeople: string[]
-}
-
-/**
- * A headline KPI tile, pre-scoped to the active filters by the data source.
- * The UI renders `data` verbatim — it performs no scaling/derivation of its
- * own, so no filter math can ever be applied on top of a real API response.
- */
+/** A headline KPI tile. The UI renders `data` verbatim — no client-side scaling/derivation. */
 export interface HeadlineKpi {
   id: string
   label: string
   data: KpiValue
-}
-
-export interface CommandCenterData {
-  quarter: string
-  tasks: DashboardTask[]
 }
 
 export interface DashboardData {
@@ -239,4 +217,7 @@ export interface DashboardData {
   accounts: AccountsData
   doctors: DoctorsData
   patients: PatientsData
+  // True when at least one real section request failed (not merely "no endpoint exists").
+  // The page renders one small non-blocking notice when this is true.
+  hasLoadError: boolean
 }

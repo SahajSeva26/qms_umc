@@ -56,7 +56,7 @@ const CrmPage = () => {
     report: 'true',
   })
   // Unfiltered — always whole-tenant, independent of the table's own filters below.
-  const { report, isLoading: reportLoading, error: reportError } = useLeadReport({}, canManageLeads)
+  const { report, isLoading: reportLoading, error: reportError, refetch: refetchReport } = useLeadReport({}, canManageLeads)
 
   // Prototype default: a rep-level (non-managing) caller lands on Compact;
   // everyone else lands on List (crm.js's role check, ported to this app's
@@ -149,9 +149,12 @@ const CrmPage = () => {
           )}
 
           {canManageLeads && !reportLoading && reportError && (
-            <p className="text-[13px] mb-4" style={{ color: 'var(--qms-text-muted)' }}>
-              Couldn't load stats.
-            </p>
+            <div className="flex items-center gap-3 text-[13px] mb-4" style={{ color: 'var(--qms-text-muted)' }}>
+              <span>Couldn't load stats.</span>
+              <Button variant="outline" size="sm" onClick={() => refetchReport()}>
+                Retry
+              </Button>
+            </div>
           )}
 
           {canManageLeads && !reportLoading && !reportError && report && (

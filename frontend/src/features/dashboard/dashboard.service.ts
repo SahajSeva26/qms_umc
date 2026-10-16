@@ -1,68 +1,330 @@
-import {
-  buildMockCommandCenterData,
-  buildMockDashboardData,
-  buildMockFilterOptions,
-} from '@/features/dashboard/dashboard.mock'
+import { accessManagementService } from '@/features/access-management/accessManagement.service'
+import { projectsService } from '@/features/projects/projects.service'
+import { crmService } from '@/features/crm/crm.service'
+import { appointmentsRealService } from '@/features/crm/appointments/appointmentsReal.service'
+import { doctorsService } from '@/features/doctors/doctors.service'
+import { SPECIALIZATION_OPTIONS } from '@/types/doctor.types'
+import { patientService } from '@/features/clinical/patient/patient.service'
+import { inventoryAssignmentService } from '@/features/inventory/real/inventoryAssignment.service'
+import { invoiceService } from '@/features/billing/invoice.service'
 import type {
+  AccountsData,
   CommandCenterData,
+  CompanyData,
+  CompanyRow,
   DashboardData,
-  DashboardFilterOptions,
-  DashboardFilterState,
+  DoctorsData,
+  FoData,
+  HeadlineKpi,
+  KpiValue,
+  PatientsData,
+  ProjectData,
+  SalesData,
 } from '@/types/dashboard.types'
 
-// ===========================================================================
-// DASHBOARD DATA SOURCE BOUNDARY
-// ---------------------------------------------------------------------------
-// This file is the ONLY place that knows where dashboard data comes from.
-// Pages, components and hooks depend on the typed contract in
-// types/dashboard.types.ts and are agnostic to the source — so swapping mock
-// for a real API is a change to this file alone.
-//
-// STATUS: mock-backed. Verified against the backend on 2026-08-08 —
-// `backend/src/bin/app.ts` mounts 16 routers (auth, users, tenants,
-// permission-groups, role-types, roles, divisions, leads, contacts,
-// appointments, projects, qa-feedback, doctors, geo-profiles, camps,
-// counters) and NONE of them is a dashboard/analytics/reporting module.
-// There is no invoice, expense, payment, patient or sales-target model in the
-// backend at all, and no server-side aggregation exists (the only
-// `.aggregate()` in the whole backend is geoProfile's $geoNear).
-//
-// Existing entity endpoints were evaluated and rejected as a substitute:
-//   - They return `{count, items}` with page-level pagination only. Rebuilding
-//     these KPIs client-side would mean downloading whole collections purely to
-//     reduce them in the browser — the exact anti-pattern this boundary exists
-//     to prevent.
-//   - Per-client / per-specialty `breakdown[]` rows would require one request
-//     per entity (N+1).
-//   - `GET /tenants` is scoped by `ctx.where()` to the caller's own tenant, so
-//     its `count` is 1 for every non-system user — it cannot answer
-//     "total companies".
-//   - Every KPI carries a `ly` (last-year) comparison. The backend stores no
-//     historical snapshots and only `/camps` supports date-range filters, so
-//     `ly` has no real source for any metric.
-//
-// TO GO LIVE, the backend needs to expose pre-aggregated endpoints, e.g.:
-//   GET /dashboard/summary?dateRange&client&division&campType&rep
-//        -> { headline[], company, project, sales, accounts, doctors, patients }
-//   GET /dashboard/filter-options   -> selectable clients/divisions/reps
-//   GET /dashboard/command-center   -> { quarter, tasks[] }
-// Each must return values already reduced server-side, in the `{v, ly, unit}`
-// + short `breakdown[]` shape below. When they exist, replace the three
-// function bodies here with `api.get(...)` calls and add Zod parsing at this
-// boundary (see the note on validation in the hooks).
-// ===========================================================================
+// Real-or-null: `v: null` means no backend aggregation/permission exists for this metric (renders
+// "-"); a thrown request is recorded into `errored` instead, driving one small page-level notice.
+// No mock fallback in production. Permission gates are passed in by the caller (DashboardPage) since
+// this is a plain function, not a hook. Revenue/Expenses/EBITA/PAT/AR stay permanently null — there
+// is no accounting model backing them; invoice totals are wired separately under invoice terms only.
 
-export async function getDashboardData(filters: DashboardFilterState): Promise<DashboardData> {
-  // TODO: wire to GET /dashboard/summary — pass `filters` as query params.
-  return buildMockDashboardData(filters)
+const NO_VALUE: KpiValue = { v: null }
+
+/** Runs a real fetch. Never throws — failures are reported via `errored`. */
+async function attempt<T>(fn: () => Promise<T>): Promise<{ value: T | undefined; errored: boolean }> {
+  try {
+    return { value: await fn(), errored: false }
+  } catch {
+    return { value: undefined, errored: true }
+  }
 }
 
-export async function getDashboardFilterOptions(): Promise<DashboardFilterOptions> {
-  // TODO: wire to GET /dashboard/filter-options
-  return buildMockFilterOptions()
+async function loadCompany(base: CompanyData): Promise<{ data: CompanyData; errored: boolean }> {
+  // "Company-wise" means pharma clients only — excludes QMS's own platform tenant.
+  // firstPage.data.count below already IS the total customer-tenant count — no separate request needed.
+  const { value: firstPage, errored: firstPageErrored } = await attempt(() =>
+    accessManagementService.searchTenants({ type: 'customer', report: 'true', limit: '20', page: '1' }),
+  )
+  if (!firstPage?.data) return { data: base, errored: firstPageErrored }
+
+  let data = { ...base, totalCompanies: { v: firstPage.data.count } }
+
+  // 20/page, backend-enforced, no artificial page cap — fetches every page. Aggregate sums only
+  // populate once ALL pages succeed, else a missing page would silently understate the total.
+  const totalPages = Math.ceil(firstPage.data.count / 20)
+  const restPages = await Promise.all(
+    Array.from({ length: totalPages - 1 }, (_, i) =>
+      attempt(() => accessManagementService.searchTenants({ type: 'customer', report: 'true', limit: '20', page: String(i + 2) })),
+    ),
+  )
+  const pagesErrored = restPages.some((p) => p.errored)
+  if (pagesErrored) return { data, errored: true }
+
+  const allItems = [firstPage.data.items, ...restPages.map((p) => p.value!.data!.items)].flat()
+
+  const breakdown: CompanyRow[] = allItems.map((t) => ({
+    client: t.name,
+    divisions: t.stats?.totalDivisions ?? 0,
+    projects: t.stats?.totalProjects ?? 0,
+    camps: t.stats?.totalCamps ?? 0,
+    billing: t.stats?.billed ?? 0,
+    outstanding: 0, // no unpaid/overdue aggregation exists
+    status: (t.status === 'inactive' ? 'INACTIVE' : 'ACTIVE') as 'ACTIVE' | 'INACTIVE',
+  }))
+
+  data = {
+    ...data,
+    totalDivisions: { v: allItems.reduce((sum, t) => sum + (t.stats?.totalDivisions ?? 0), 0) },
+    totalBilling: { v: allItems.reduce((sum, t) => sum + (t.stats?.billed ?? 0), 0), unit: 'inr' },
+    breakdown,
+  }
+
+  return { data, errored: firstPageErrored }
+}
+
+async function loadProject(base: ProjectData, canViewProjectReport: boolean): Promise<{ data: ProjectData; errored: boolean }> {
+  const { value: res, errored } = await attempt(() => projectsService.searchProjects({ report: 'true', limit: '1' }))
+  const byType = res?.data?.report?.byType
+  let data = base
+  if (byType) {
+    const countFor = (type: string) => byType.find((b) => b.type === type)?.count ?? 0
+    data = {
+      ...data,
+      totalProjects: { v: res!.data.count },
+      screeningProjects: { v: countFor('screening') },
+      dietProjects: { v: countFor('diet') },
+      labProjects: { v: countFor('lab') },
+    }
+  }
+
+  // project:manage/tenant:manage only — skipped entirely otherwise, never fired to eat a 403.
+  if (!canViewProjectReport) return { data, errored }
+  const { value: reportRes, errored: reportErrored } = await attempt(() => projectsService.getProjectReport())
+  const byStatus = reportRes?.data?.byStatus
+  if (byStatus) {
+    data = {
+      ...data,
+      statusMix: byStatus.map((s) => ({ status: s.status, count: s.count })),
+      // campCost * totalCamps per project, summed server-side — an estimate, not actual invoiced revenue.
+      estimatedValue: { v: byStatus.reduce((sum, s) => sum + s.revenue, 0), unit: 'inr' },
+    }
+  }
+  return { data, errored: errored || reportErrored }
+}
+
+async function loadSales(
+  base: SalesData,
+  canViewLeadReport: boolean,
+  canViewAppointmentReport: boolean,
+): Promise<{ data: SalesData; errored: boolean }> {
+  // /leads/report needs lead:manage; a lead:search-only rep gets a 403, so fall back to a plain
+  // scoped count — pipelineValue/leadWinRate have no equivalent there and stay "-".
+  const [leadRes, leadCountRes, appointmentRes] = await Promise.all([
+    canViewLeadReport ? attempt(() => crmService.getLeadReport({})) : Promise.resolve({ value: undefined, errored: false }),
+    canViewLeadReport ? Promise.resolve({ value: undefined, errored: false }) : attempt(() => crmService.searchLeads({ limit: '1' })),
+    canViewAppointmentReport
+      ? attempt(() => appointmentsRealService.getAppointmentReport())
+      : Promise.resolve({ value: undefined, errored: false }),
+  ])
+
+  let data = base
+  if (leadRes.value?.data) {
+    data = {
+      ...data,
+      totalLeads: { v: leadRes.value.data.summary.totalLeads },
+      pipelineValue: { v: leadRes.value.data.kpis.pipelineValue, unit: 'inr' },
+      leadWinRate: { v: leadRes.value.data.kpis.winRate, unit: 'pct' },
+    }
+  } else if (leadCountRes.value?.data) {
+    data = { ...data, totalLeads: { v: leadCountRes.value.data.count } }
+  }
+  const followUpCount = appointmentRes.value?.data?.byType?.find((t) => t.type === 'follow-up')?.count
+  if (followUpCount !== undefined) {
+    data = { ...data, followUpAppointments: { v: followUpCount } }
+  }
+
+  return { data, errored: leadRes.errored || leadCountRes.errored || appointmentRes.errored }
+}
+
+async function loadFo(base: FoData, canViewInventoryAssignmentReport: boolean): Promise<{ data: FoData; errored: boolean }> {
+  // inventory-assignment:manage only, skipped entirely otherwise.
+  if (!canViewInventoryAssignmentReport) return { data: base, errored: false }
+  const { value: res, errored } = await attempt(() => inventoryAssignmentService.getInventoryAssignmentReport())
+  if (!res?.data) return { data: base, errored }
+  // totalFieldOfficers = every active FO role, not just ones holding stock — don't swap for
+  // fieldOfficersHoldingInventory, a materially smaller, different number.
+  return { data: { ...base, activeFOs: { v: res.data.summary.totalFieldOfficers } }, errored }
+}
+
+async function loadAccounts(base: AccountsData, canViewInvoiceReport: boolean): Promise<{ data: AccountsData; errored: boolean }> {
+  if (!canViewInvoiceReport) return { data: base, errored: false }
+  const { value: res, errored } = await attempt(() => invoiceService.getInvoiceReport())
+  if (!res?.data) return { data: base, errored }
+  return {
+    errored,
+    data: {
+      ...base,
+      totalInvoices: { v: res.data.totalInvoices },
+      totalInvoicedAmount: { v: res.data.totalInvoiced, unit: 'inr' },
+      invoiceStatusMix: res.data.statusCounts.map((s) => ({ status: s.status, count: s.count, total: s.total })),
+    },
+  }
+}
+
+async function loadDoctors(base: DoctorsData): Promise<{ data: DoctorsData; errored: boolean }> {
+  const { value: res, errored: totalErrored } = await attempt(() => doctorsService.searchDoctors({ limit: '1' }))
+  let data = base
+  if (res?.data !== undefined) data = { ...data, total: { v: res.data.count } }
+
+  // No by-specialty aggregation endpoint — 12 parallel limit:1 searches give an exact count each.
+  // Temporary high-call approach, not a pattern to repeat for larger enums. A failed specialty is
+  // dropped from the list, never shown as a fabricated 0.
+  const specialtyResults = await Promise.all(
+    SPECIALIZATION_OPTIONS.map(async (opt) => {
+      const { value: specRes, errored: specErrored } = await attempt(() => doctorsService.searchDoctors({ specialization: opt.value, limit: '1' }))
+      return { label: opt.label, count: specRes?.data?.count, errored: specErrored }
+    }),
+  )
+  const bySpecialty = specialtyResults
+    .filter((r) => r.count !== undefined)
+    .map((r) => ({ specialty: r.label, count: r.count! }))
+  if (bySpecialty.length > 0) data = { ...data, bySpecialty }
+
+  const specialtyErrored = specialtyResults.some((r) => r.errored)
+  return { data, errored: totalErrored || specialtyErrored }
+}
+
+async function loadPatients(base: PatientsData, canSearchPatients: boolean): Promise<{ data: PatientsData; errored: boolean }> {
+  // GET /patients needs patient:search/patient:manage — the Dashboard route only guarantees
+  // tenant:manage, so skip entirely rather than firing 4 guaranteed 403s for a caller without it.
+  if (!canSearchPatients) return { data: base, errored: false }
+  // No gender-aggregation endpoint, but `gender` is a real unscoped search filter — 3 parallel
+  // limit:1 searches give an exact per-gender count, each independent so one failing leaves only
+  // that gender "-" rather than substituting a fabricated 0.
+  const [totalRes, maleRes, femaleRes, otherRes] = await Promise.all([
+    attempt(() => patientService.searchPatients({ limit: '1' })),
+    attempt(() => patientService.searchPatients({ gender: 'male', limit: '1' })),
+    attempt(() => patientService.searchPatients({ gender: 'female', limit: '1' })),
+    attempt(() => patientService.searchPatients({ gender: 'other', limit: '1' })),
+  ])
+
+  let data = base
+  if (totalRes.value?.data) data = { ...data, total: { v: totalRes.value.data.count } }
+
+  const total = totalRes.value?.data?.count
+  const shareOf = (n: number) => (total && total > 0 ? Math.round((n / total) * 100) : null)
+
+  if (maleRes.value?.data) data = { ...data, male: { v: maleRes.value.data.count, share: shareOf(maleRes.value.data.count) } }
+  if (femaleRes.value?.data) data = { ...data, female: { v: femaleRes.value.data.count, share: shareOf(femaleRes.value.data.count) } }
+  if (otherRes.value?.data) data = { ...data, other: { v: otherRes.value.data.count, share: shareOf(otherRes.value.data.count) } }
+
+  return { data, errored: totalRes.errored || maleRes.errored || femaleRes.errored || otherRes.errored }
+}
+
+const EMPTY_COMPANY: CompanyData = { totalCompanies: NO_VALUE, totalDivisions: NO_VALUE, totalBilling: NO_VALUE, breakdown: [] }
+const EMPTY_PROJECT: ProjectData = {
+  totalProjects: NO_VALUE,
+  screeningProjects: NO_VALUE,
+  dietProjects: NO_VALUE,
+  labProjects: NO_VALUE,
+  estimatedValue: NO_VALUE,
+  outstanding: NO_VALUE,
+  breakdown: [],
+  statusMix: [],
+}
+const EMPTY_FO: FoData = {
+  occupancyRate: NO_VALUE,
+  efficiencyRate: NO_VALUE,
+  activeFOs: NO_VALUE,
+  regionalSpread: [],
+  campTimeBifurcation: [],
+  topFOs: [],
+}
+const EMPTY_SALES: SalesData = {
+  totalProjects: NO_VALUE,
+  totalBilling: NO_VALUE,
+  outstanding: NO_VALUE,
+  totalLeads: NO_VALUE,
+  followUpAppointments: NO_VALUE,
+  pipelineValue: NO_VALUE,
+  leadWinRate: NO_VALUE,
+  repBreakdown: [],
+}
+const EMPTY_ACCOUNTS: AccountsData = {
+  revenue: NO_VALUE,
+  expenses: NO_VALUE,
+  ebita: NO_VALUE,
+  ebitaMarginPct: NO_VALUE,
+  pat: NO_VALUE,
+  patMarginPct: NO_VALUE,
+  arOutstanding: NO_VALUE,
+  arAging: [],
+  expectedCollection: { thisWeek: NO_VALUE, thisMonth: NO_VALUE, thisYear: NO_VALUE },
+  paymentCycleDays: NO_VALUE,
+  expenseSplit: [],
+  totalInvoices: NO_VALUE,
+  totalInvoicedAmount: NO_VALUE,
+  invoiceStatusMix: [],
+}
+const EMPTY_DOCTORS: DoctorsData = { total: NO_VALUE, bySpecialty: [] }
+const EMPTY_PATIENTS: PatientsData = {
+  total: NO_VALUE,
+  male: { v: null, share: null },
+  female: { v: null, share: null },
+  other: { v: null, share: null },
+  interpretations: [],
+}
+
+export interface DashboardPermissionFlags {
+  canViewProjectReport: boolean
+  canViewLeadReport: boolean
+  canViewAppointmentReport: boolean
+  canViewInventoryAssignmentReport: boolean
+  canViewInvoiceReport: boolean
+  canSearchPatients: boolean
+}
+
+export async function getDashboardData(flags: DashboardPermissionFlags): Promise<DashboardData> {
+  const [company, project, sales, fo, accounts, doctors, patients] = await Promise.all([
+    loadCompany(EMPTY_COMPANY),
+    loadProject(EMPTY_PROJECT, flags.canViewProjectReport),
+    loadSales(EMPTY_SALES, flags.canViewLeadReport, flags.canViewAppointmentReport),
+    loadFo(EMPTY_FO, flags.canViewInventoryAssignmentReport),
+    loadAccounts(EMPTY_ACCOUNTS, flags.canViewInvoiceReport),
+    loadDoctors(EMPTY_DOCTORS),
+    loadPatients(EMPTY_PATIENTS, flags.canSearchPatients),
+  ])
+
+  // sales.data.totalProjects comes from project's own count (not a second GET /projects request).
+  const salesData = { ...sales.data, totalProjects: project.data.totalProjects }
+
+  const hasLoadError = [company, project, fo, sales, accounts, doctors, patients].some((r) => r.errored)
+
+  const headline: HeadlineKpi[] = [
+    { id: 'totalBilling', label: 'Total Billing', data: company.data.totalBilling },
+    { id: 'arOutstanding', label: 'AR Outstanding', data: accounts.data.arOutstanding },
+    { id: 'ebita', label: 'EBITA', data: accounts.data.ebita },
+    { id: 'projects', label: 'Projects', data: project.data.totalProjects },
+    { id: 'activeFos', label: 'Active FOs', data: fo.data.activeFOs },
+    { id: 'leads', label: 'Leads', data: salesData.totalLeads },
+    { id: 'doctors', label: 'Doctors', data: doctors.data.total },
+    { id: 'patients', label: 'Patients', data: patients.data.total },
+  ]
+
+  return {
+    headline,
+    company: company.data,
+    project: project.data,
+    fo: fo.data,
+    sales: salesData,
+    accounts: accounts.data,
+    doctors: doctors.data,
+    patients: patients.data,
+    hasLoadError,
+  }
 }
 
 export async function getCommandCenterData(): Promise<CommandCenterData> {
-  // TODO: wire to GET /dashboard/command-center
-  return buildMockCommandCenterData()
+  // No task/MOM/activity module exists in the backend yet.
+  return { quarter: '', tasks: [] }
 }

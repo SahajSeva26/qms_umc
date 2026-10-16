@@ -1,4 +1,4 @@
-import type { ArAgingBucket, FieldOfficer, PnlTrend } from '@/types/analytics.types'
+import type { ArAgingBucket, PnlTrend } from '@/types/analytics.types'
 
 // TODO: entirely mock — no backend endpoints exist for analytics yet.
 // PNL_TREND / AR_AGING mirror the vanilla-JS prototype's accounts-data.js
@@ -25,13 +25,4 @@ export const AR_AGING: ArAgingBucket[] = [
   { range: '31-60 days', amount: 2400000, share: 29 },
   { range: '61-90 days', amount: 1600000, share: 19 },
   { range: '90+ days', amount: 1200000, share: 14 },
-]
-
-export const FIELD_OFFICERS: FieldOfficer[] = [
-  { id: 'p-ravi', name: 'Ravi Kulkarni', hq: 'Mumbai', relievedOn: null, occupancyPct: 82, efficiencyPct: 88, feedbackAvg: 4.6 },
-  { id: 'p-anita', name: 'Anita Rao', hq: 'Bengaluru', relievedOn: null, occupancyPct: 76, efficiencyPct: 84, feedbackAvg: 4.4 },
-  { id: 'p-amit', name: 'Amit Verma', hq: 'Chennai', relievedOn: null, occupancyPct: 69, efficiencyPct: 79, feedbackAvg: 4.2 },
-  { id: 'p-sneha-fo', name: 'Sneha Iyer', hq: 'Hyderabad', relievedOn: null, occupancyPct: 71, efficiencyPct: 81, feedbackAvg: 4.3 },
-  { id: 'p-vikas', name: 'Vikas Menon', hq: 'Delhi', relievedOn: null, occupancyPct: 58, efficiencyPct: 66, feedbackAvg: 3.9 },
-  { id: 'p-priya-fo', name: 'Priya Nair', hq: 'Pune', relievedOn: '2026-04-30', occupancyPct: 74, efficiencyPct: 80, feedbackAvg: 4.5 },
 ]

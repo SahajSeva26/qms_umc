@@ -20,6 +20,18 @@ const WIDTH = 640
 const PADDING_LEFT = 56
 const PADDING_BOTTOM = 24
 const PADDING_TOP = 12
+const TARGET_X_AXIS_TICKS = 7
+
+// Picks ~TARGET_X_AXIS_TICKS evenly-spaced indices (always incl. first/last) — avoids overlapping
+// labels on a long series while still showing every point on a short one.
+function sampleLabelIndices(count: number): Set<number> {
+  if (count <= TARGET_X_AXIS_TICKS) return new Set(Array.from({ length: count }, (_, i) => i))
+  const step = Math.ceil((count - 1) / (TARGET_X_AXIS_TICKS - 1))
+  const indices = new Set<number>()
+  for (let i = 0; i < count; i += step) indices.add(i)
+  indices.add(count - 1)
+  return indices
+}
 
 // One axis only — both series share the same y-scale (dataviz skill rule:
 // never a dual-axis chart). Legend + direct hover tooltip per point.
@@ -39,6 +51,8 @@ const LineChart = ({ series, labels, formatY, height = 220, formatLabel }: LineC
     const value = (maxValue / 4) * i
     return { value, y: yFor(value) }
   })
+
+  const visibleLabelIndices = sampleLabelIndices(labels.length)
 
   return (
     <div>
@@ -98,17 +112,18 @@ const LineChart = ({ series, labels, formatY, height = 220, formatLabel }: LineC
         )}
 
         {labels.map((label, i) => (
-          <text
-            key={label}
-            x={xFor(i)}
-            y={height - 6}
-            textAnchor="middle"
-            fontSize={9}
-            fill="var(--qms-text-muted)"
-            style={{ display: i % 2 === 0 ? undefined : 'none' }}
-          >
-            {formatLabel ? formatLabel(label) : label}
-          </text>
+          visibleLabelIndices.has(i) && (
+            <text
+              key={label}
+              x={xFor(i)}
+              y={height - 6}
+              textAnchor="middle"
+              fontSize={9}
+              fill="var(--qms-text-muted)"
+            >
+              {formatLabel ? formatLabel(label) : label}
+            </text>
+          )
         ))}
       </svg>
 

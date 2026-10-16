@@ -8,7 +8,7 @@ export interface IMessage {
     to: string;
     // Message content.
     body: string;
-    // Email only — ignored by whatsapp/sms.
+    // Subject/title — kept consistent across all channels (not email-only).
     subject?: string;
     // Optional sender override; providers fall back to a configured default.
     from?: string;

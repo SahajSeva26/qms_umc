@@ -16,7 +16,6 @@ import { loadTemplate } from '../shared/utils/templateLoader';
 import { getByPath } from '../shared/utils/object';
 import { HandlebarsHelper } from '../shared/helpers/handlebar';
 import { messagingManager } from '../shared/providers/messaging/messaging';
-import { EMAIL } from '../shared/providers/messaging/email/mock.provider';
 import { IMessage } from '../shared/types/message.types';
 import { TemplateConfig } from '../shared/types/template.types';
 
@@ -92,8 +91,9 @@ export async function handleEvent(event: any): Promise<void> {
             }
 
             const message: IMessage = { to, body };
-            // Subject is email-only; omit it (don't pass undefined) for other channels.
-            if (channel === EMAIL && subject) {
+            // Subject is consistent across all channels; attach it whenever the config defines one
+            // (omit rather than pass undefined, per exactOptionalPropertyTypes).
+            if (subject) {
                 message.subject = subject;
             }
 

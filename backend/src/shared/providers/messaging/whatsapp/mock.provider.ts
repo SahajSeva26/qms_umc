@@ -7,8 +7,7 @@ import { isValidPhone } from '../../../utils/strings';
 export const WHATSAPP = 'whatsapp';
 
 // Mock whatsapp provider — logs the message instead of sending it. Swap for a real provider
-// (beside this file, e.g. cloud-api.provider.ts) later behind the same IMessageProvider
-// interface. `subject` is not used for whatsapp.
+// (beside this file, e.g. cloud-api.provider.ts) later behind the same IMessageProvider interface.
 export class WhatsappMockProvider implements IMessageProvider {
     async send(message: IMessage): Promise<void> {
         // Validate the input is valid for this channel before "sending".
@@ -24,6 +23,7 @@ export class WhatsappMockProvider implements IMessageProvider {
                 channel: WHATSAPP,
                 to: message.to,
                 from: message.from,
+                subject: message.subject,
                 body: message.body,
             },
             '[MOCK WHATSAPP] message "sent"',

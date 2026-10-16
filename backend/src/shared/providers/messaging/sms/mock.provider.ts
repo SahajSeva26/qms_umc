@@ -8,7 +8,6 @@ export const SMS = 'sms';
 
 // Mock sms provider — logs the message instead of sending it. Swap for a real provider
 // (beside this file, e.g. sns.provider.ts) later behind the same IMessageProvider interface.
-// `subject` is not used for sms.
 export class SmsMockProvider implements IMessageProvider {
     async send(message: IMessage): Promise<void> {
         // Validate the input is valid for this channel before "sending".
@@ -24,6 +23,7 @@ export class SmsMockProvider implements IMessageProvider {
                 channel: SMS,
                 to: message.to,
                 from: message.from,
+                subject: message.subject,
                 body: message.body,
             },
             '[MOCK SMS] message "sent"',

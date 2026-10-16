@@ -1,14 +1,17 @@
-// Notification worker — standalone process. Long-polls the notification SQS queue and
-// consumes events published to EventBridge and routed into the queue.
-//
-// For now it ONLY consumes: each message is parsed and handed to `handleEvent`, which is
-// the seam where notification processing will be added later. Nothing is persisted or sent yet.
+// Notification worker — standalone process. Long-polls the notification SQS queue, consumes
+// events published to EventBridge and routed into the queue, then for each event: renders the
+// per-recipient/per-channel template, persists a Notification row, and sends via the channel
+// provider. Runs as the SYSTEM user (no HTTP request → it builds its own context).
 //
 // Run separately from the API: `npm run worker:notification`.
+
+// MUST be first: registers the Zod OpenAPI extension before any module validator is imported below.
+import '../shared/config/swagger/swagger.registry';
 
 import fs from 'fs';
 import path from 'path';
 import ENV from '../shared/config/app.config';
+import connectDB from '../shared/config/connectDB';
 import { logger } from '../shared/utils/logger';
 import { queueManager } from '../shared/providers/queue/queue';
 import { SQS } from '../shared/providers/queue/aws/sqs.provider';
@@ -18,23 +21,54 @@ import { HandlebarsHelper } from '../shared/helpers/handlebar';
 import { messagingManager } from '../shared/providers/messaging/messaging';
 import { IMessage } from '../shared/types/message.types';
 import { TemplateConfig } from '../shared/types/template.types';
+import { buildContext, RequestContext } from '../shared/utils/contextBuilder';
+import { PERMISSIONS } from '../shared/env/permissions';
+import { TenantModel } from '../modules/access-management/tenant/tenant.model';
+import { UserModel } from '../modules/user/user.model';
+import { RoleModel } from '../modules/access-management/role/role.model';
+import { NotificationService } from '../modules/notification/notification.service';
+import { ICreateNotificationPayload } from '../modules/notification/notification.validators';
 
 const queueUrl = ENV.Providers.AWS_SQS.NotificationQueueUrl;
 const queue = queueManager.get(SQS);
 
-// Event configs live one per file, keyed by the event code (EventBridge detail-type):
-//   'camp.create' -> modules/notification/events/camp/create.ts
+// 'camp.create' -> modules/notification/events/camp/create.ts
 const EVENTS_DIR = path.join(__dirname, '../modules/notification/events');
-// Handlebars templates: <TEMPLATES_DIR>/<config.template>/<recipientFolder>/<channel>.hbs
 const TEMPLATES_DIR = path.join(__dirname, '../shared/templates');
 
-// Recipient folder is derived from the source's middle segment: 'data.fo.email' -> 'fo'.
-const recipientFolder = (source: string): string | undefined => {
-    const parts = source.split('.');
-    return parts.length >= 2 ? parts[1] : undefined;
+// System-user context the worker runs under (no HTTP request). ipAddress is pinned to 127.0.0.1
+// so system-originated actions are distinguishable from user-originated ones.
+export const buildWorkerContext = async (): Promise<RequestContext> => {
+    const tenant = await TenantModel.findOne({ code: ENV.App.SystemTenantCode });
+    const user = await UserModel.findOne({ email: ENV.App.SystemUserEmail });
+    // No populate('type'): the worker's import graph doesn't register the RoleType model, and the
+    // system ctx doesn't need it (permissions are pinned to system:manage; create/where ignore it).
+    const role = await RoleModel.findOne({ code: 'system' });
+
+    if (!tenant || !user || !role) {
+        throw new Error('System tenant/user/role not found — boot the app once so it seeds them, then start the worker.');
+    }
+
+    const req: any = {
+        socket: { remoteAddress: '127.0.0.1' },
+        user: {
+            _id: user._id.toString(),
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            role: role._id.toString(),
+            tenant: tenant._id.toString(),
+        },
+        role,
+        tenant,
+        permissions: [PERMISSIONS.SYSTEM.MANAGE.code],
+    };
+
+    buildContext(req, {}, () => {});
+    return req.context;
 };
 
-// Read + render a .hbs file; returns null if the file is missing (templates are optional/WIP).
+// Render a .hbs file; returns null if the file is missing.
 const renderTemplateFile = (filePath: string, data: unknown): string | null => {
     if (!fs.existsSync(filePath)) {
         return null;
@@ -43,11 +77,9 @@ const renderTemplateFile = (filePath: string, data: unknown): string | null => {
     return HandlebarsHelper.render(source, data);
 };
 
-// Turn a consumed event into outbound messages: load its config, resolve each recipient from
-// the event payload, render the per-channel template, and send via the matching messaging
-// provider. Persisting Notification rows is a later step (needs the recipient User id — the
-// config currently resolves an email, not a user id).
-export async function handleEvent(event: any): Promise<void> {
+// Turn a consumed event into notifications: load config, resolve recipients, render templates,
+// persist a row per recipient/channel, and send via the matching provider.
+export async function handleEvent(event: any, ctx: RequestContext): Promise<void> {
     // EventBridge envelope: detail-type carries the event code, detail carries the payload.
     const code: string | undefined = event?.['detail-type'];
     if (!code) {
@@ -64,19 +96,30 @@ export async function handleEvent(event: any): Promise<void> {
         return;
     }
 
-    // The config addresses the event payload as `data.*` (e.g. 'data.fo.email'); EventBridge
-    // Detail is the published payload, so expose it under `data`.
+    // Config addresses the payload as `data.*` (e.g. 'data.fo.email'), so expose detail under `data`.
     const payload = { data: event.detail ?? {} };
     const subject = config.subject ? HandlebarsHelper.render(config.subject, payload) : undefined;
 
+    // Source entity: type is the code prefix ('camp.create' -> 'camp'), id from data.<type>._id.
+    const entityType = code.split('.')[0] ?? code;
+    const entityId = getByPath(payload, `data.${entityType}._id`);
+    const entity = entityId ? { id: String(entityId), type: entityType, event: code } : undefined;
+
     for (const recipient of config.recepients) {
-        const to = getByPath(payload, recipient.source);
+        // 'data.fo.email' -> address is the last segment, recipient id is the object's _id,
+        // template folder is the middle segment ('fo').
+        const parts = recipient.source.split('.');
+        const addressKey = parts[parts.length - 1] ?? '';
+        const folder = parts[1] ?? '';
+        const recipientObj = getByPath(payload, parts.slice(0, -1).join('.')) as Record<string, any> | undefined;
+
+        const to = recipientObj?.[addressKey];
+        const recipientId = recipientObj?._id;
+
         if (typeof to !== 'string' || !to) {
             logger.warn({ code, source: recipient.source }, 'Recipient source did not resolve — skipping');
             continue;
         }
-
-        const folder = recipientFolder(recipient.source);
         if (!folder) {
             logger.warn({ code, source: recipient.source }, 'Could not derive template folder from source — skipping');
             continue;
@@ -86,13 +129,34 @@ export async function handleEvent(event: any): Promise<void> {
             const templatePath = path.join(TEMPLATES_DIR, config.template, folder, `${channel}.hbs`);
             const body = renderTemplateFile(templatePath, payload);
             if (body === null) {
-                logger.warn({ code, channel, templatePath }, 'Template missing — skipping send');
+                logger.warn({ code, channel, templatePath }, 'Template missing — skipping');
                 continue;
             }
 
+            // Persist the row (needs the recipient User id; without it we still send but don't persist).
+            if (recipientId) {
+                try {
+                    const createPayload: ICreateNotificationPayload = {
+                        recipient: String(recipientId),
+                        event: code,
+                        channel,
+                        body,
+                    };
+                    if (subject) {
+                        createPayload.subject = subject;
+                    }
+                    if (entity) {
+                        createPayload.entity = entity;
+                    }
+                    await NotificationService.create(createPayload, ctx);
+                } catch (error) {
+                    logger.error({ err: error, code, channel }, 'Failed to persist notification');
+                }
+            } else {
+                logger.warn({ code, source: recipient.source }, 'No recipient _id in payload — not persisting');
+            }
+
             const message: IMessage = { to, body };
-            // Subject is consistent across all channels; attach it whenever the config defines one
-            // (omit rather than pass undefined, per exactOptionalPropertyTypes).
             if (subject) {
                 message.subject = subject;
             }
@@ -106,7 +170,7 @@ export async function handleEvent(event: any): Promise<void> {
     }
 }
 
-async function pollMessages(): Promise<void> {
+async function pollMessages(ctx: RequestContext): Promise<void> {
     if (!queueUrl) {
         logger.error('AWS_SQS_NOTIFICATION_QUEUE_URL is not configured — worker cannot start');
         process.exitCode = 1;
@@ -123,10 +187,9 @@ async function pollMessages(): Promise<void> {
             for (const message of messages) {
                 try {
                     const event = JSON.parse(message.body);
-                    await handleEvent(event);
+                    await handleEvent(event, ctx);
 
-                    // Acknowledge only after a successful handle — a thrown error leaves the
-                    // message on the queue for redelivery after the visibility timeout.
+                    // Ack only after a successful handle — a throw leaves it for redelivery.
                     await queue.delete(queueUrl, message.receiptHandle);
                 } catch (error) {
                     logger.error({ err: error, messageId: message.id }, 'Failed to consume notification event');
@@ -140,10 +203,14 @@ async function pollMessages(): Promise<void> {
     }
 }
 
-// Only start polling when run as the entry point (`npm run worker:notification`), so the
-// module can be imported (e.g. for tests) without kicking off the consume loop.
+// Only start when run as the entry point, so the module can be imported (e.g. tests) without
+// connecting to the DB or starting the consume loop.
 if (require.main === module) {
-    pollMessages().catch((error) => {
+    (async () => {
+        await connectDB();
+        const ctx = await buildWorkerContext();
+        await pollMessages(ctx);
+    })().catch((error) => {
         logger.error({ err: error }, 'Notification worker terminated');
         process.exitCode = 1;
     });

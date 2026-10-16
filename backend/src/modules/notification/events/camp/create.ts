@@ -13,7 +13,8 @@ const config: TemplateConfig = {
             channels: ['email']
         },
     ],
-    template: '/camp/create'
+    template: '/camp/create',
+    subject: 'A new camp has been created'
 };
 
 export default config;

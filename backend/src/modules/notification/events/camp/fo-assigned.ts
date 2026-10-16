@@ -9,7 +9,8 @@ const config: TemplateConfig = {
             channels: ['email']
         },
     ],
-    template: '/camp/fo-assigned'
+    template: '/camp/fo-assigned',
+    subject: 'You have been assigned to a camp'
 };
 
 export default config;

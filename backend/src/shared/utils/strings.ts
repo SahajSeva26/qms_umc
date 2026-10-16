@@ -6,6 +6,12 @@ export const isValidEmail = (email: string): boolean => {
     return emailRegex.test(email);
 };
 
+export const isValidPhone = (phone: string): boolean => {
+    // E.164-ish: optional leading +, 7–15 digits, no leading zero.
+    const phoneRegex = /^\+?[1-9]\d{6,14}$/;
+    return phoneRegex.test(phone);
+};
+
 export const generateUUID = (): string => {
     return uuidv4().toString();
 };

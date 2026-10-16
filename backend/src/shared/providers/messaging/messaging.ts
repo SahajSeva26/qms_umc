@@ -1,7 +1,7 @@
 import { IMessageProvider } from '../../types/message.types';
-import { EMAIL, EmailMockProvider } from './mock/email.provider';
-import { WHATSAPP, WhatsappMockProvider } from './mock/whatsapp.provider';
-import { SMS, SmsMockProvider } from './mock/sms.provider';
+import { EMAIL, EmailMockProvider } from './email/mock.provider';
+import { WHATSAPP, WhatsappMockProvider } from './whatsapp/mock.provider';
+import { SMS, SmsMockProvider } from './sms/mock.provider';
 
 // Resolves an outbound messaging provider by channel name (email / whatsapp / sms). Keys match
 // the notification channel values, so the worker can do messagingManager.get(channel).send(msg).

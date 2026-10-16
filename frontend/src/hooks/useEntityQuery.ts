@@ -4,11 +4,13 @@ import type { EntityKeys } from '@/hooks/entityQueryKeys'
 interface UseEntityQueryOptions {
   enabled?: boolean
   keepPreviousData?: boolean
+  /** Omit to inherit the app-wide QueryClient default (retry:1) — only set for a rate-limited/
+   * analytics-style query that must never silently double its call count on failure. */
+  retry?: boolean
 }
 
-// Shared "search/list" shape used across every entity: a thin useQuery
-// wrapper keyed on [entityKey, query]. The bare-string overload is a
-// temporary allowance for callers not yet migrated onto the EntityKeys factory.
+// Shared "search/list" shape used across every entity. The bare-string overload is a temporary
+// allowance for callers not yet migrated onto the EntityKeys factory.
 export function useEntityQuery<TData, TQuery extends object>(
   entityKey: EntityKeys<TQuery>,
   fetchFn: (query: TQuery) => Promise<TData>,
@@ -34,5 +36,6 @@ export function useEntityQuery<TData, TQuery extends object>(
     queryFn: () => fetchFn(query),
     enabled: options?.enabled ?? true,
     placeholderData: options?.keepPreviousData ? keepPreviousData : undefined,
+    ...(options?.retry !== undefined ? { retry: options.retry } : {}),
   })
 }

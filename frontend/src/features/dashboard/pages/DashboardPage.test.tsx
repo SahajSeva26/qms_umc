@@ -1,21 +1,19 @@
+import type { ReactNode } from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { usePermission } from '@/hooks/usePermission'
 import { useAuth } from '@/hooks/useAuth'
 import { useDashboardData } from '@/features/dashboard/hooks/useDashboardData'
-import { useSalesDataShared } from '@/hooks/useSalesDataShared'
-import { useClientsDataShared } from '@/hooks/useClientsDataShared'
+import { useCampReport } from '@/features/camps/hooks/useCampReport'
 
 vi.mock('@/hooks/usePermission')
 vi.mock('@/hooks/useAuth')
 vi.mock('@/features/dashboard/hooks/useDashboardData')
-vi.mock('@/hooks/useSalesDataShared')
-vi.mock('@/hooks/useClientsDataShared')
-vi.mock('@/features/dashboard/components/CampOverviewSection', () => ({
-  default: () => <div>CampOverviewSection stub</div>,
-}))
-// Every other section is data-fetching-heavy and irrelevant to this specific
-// gating test — stub them all so this test only exercises the one boolean.
+vi.mock('@/features/camps/hooks/useCampReport')
+// Every section is data-fetching-heavy and irrelevant to this page-level smoke test — stub them
+// all so it only exercises that the page assembles without crashing.
+vi.mock('@/features/dashboard/components/CampReportSection', () => ({ default: () => <div>CampReportSection stub</div> }))
 vi.mock('@/features/dashboard/components/CompanySection', () => ({ default: () => null }))
 vi.mock('@/features/dashboard/components/ProjectsSection', () => ({ default: () => null }))
 vi.mock('@/features/dashboard/components/FoSection', () => ({ default: () => null }))
@@ -24,35 +22,34 @@ vi.mock('@/features/dashboard/components/AccountsSection', () => ({ default: () 
 vi.mock('@/features/dashboard/components/DoctorsSection', () => ({ default: () => null }))
 vi.mock('@/features/dashboard/components/PatientsSection', () => ({ default: () => null }))
 vi.mock('@/features/dashboard/components/TopKpiStrip', () => ({ default: () => null }))
-vi.mock('@/features/dashboard/components/FilterBar', () => ({ default: () => null }))
 
-function mockPermission(canViewCampReport: boolean) {
+function mockPermission() {
   vi.mocked(usePermission).mockReturnValue({
     hasPermission: () => false,
-    hasAnyPermission: (codes: string[]) => codes.includes('camp:manage') && canViewCampReport,
+    hasAnyPermission: () => false,
   } as unknown as ReturnType<typeof usePermission>)
 }
 
-describe('DashboardPage — CampOverviewSection permission gating', () => {
+// DashboardPage's own screening-count tile query needs a real QueryClient (it's a raw useQuery
+// call, not a mocked hook) — hasPermission/hasAnyPermission are mocked to always return false, so
+// `enabled` stays false and the query never actually fires.
+function renderWithQueryClient(ui: ReactNode) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>)
+}
+
+describe('DashboardPage', () => {
   beforeEach(() => {
     vi.resetAllMocks()
+    mockPermission()
     vi.mocked(useAuth).mockReturnValue({ user: { firstName: 'Test' } } as unknown as ReturnType<typeof useAuth>)
     vi.mocked(useDashboardData).mockReturnValue({ isLoading: false, error: null } as unknown as ReturnType<typeof useDashboardData>)
-    vi.mocked(useSalesDataShared).mockReturnValue({ reps: [], targets: [] } as unknown as ReturnType<typeof useSalesDataShared>)
-    vi.mocked(useClientsDataShared).mockReturnValue({ clients: [], projects: [], invoices: [] } as unknown as ReturnType<typeof useClientsDataShared>)
+    vi.mocked(useCampReport).mockReturnValue({ data: undefined } as unknown as ReturnType<typeof useCampReport>)
   })
 
-  it('renders CampOverviewSection for a caller with camp:manage/tenant:manage', async () => {
-    mockPermission(true)
+  it('renders without crashing and mounts CampReportSection unconditionally (the section gates its own visibility)', async () => {
     const DashboardPage = (await import('./DashboardPage')).default
-    render(<DashboardPage />)
-    expect(screen.getByText('CampOverviewSection stub')).toBeInTheDocument()
-  })
-
-  it('does not render CampOverviewSection for a caller lacking camp:manage/tenant:manage', async () => {
-    mockPermission(false)
-    const DashboardPage = (await import('./DashboardPage')).default
-    render(<DashboardPage />)
-    expect(screen.queryByText('CampOverviewSection stub')).not.toBeInTheDocument()
+    renderWithQueryClient(<DashboardPage />)
+    expect(screen.getByText('CampReportSection stub')).toBeInTheDocument()
   })
 })

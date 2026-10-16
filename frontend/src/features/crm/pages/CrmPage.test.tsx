@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { usePermission } from '@/hooks/usePermission'
 import { useLeads } from '@/features/crm/hooks/useLeads'
 import { useLeadReport } from '@/features/crm/hooks/useLeadReport'
@@ -61,7 +62,7 @@ describe('CrmPage — Lead KPI strip permission/loading/error branching', () => 
 
   it('never enables the report query and shows the non-manager message when lacking lead:manage/tenant:manage', async () => {
     mockPermission(false)
-    vi.mocked(useLeadReport).mockReturnValue({ report: undefined, isLoading: false, error: null })
+    vi.mocked(useLeadReport).mockReturnValue({ report: undefined, isLoading: false, isError: false, error: null, refetch: vi.fn() })
 
     await renderPage()
 
@@ -73,7 +74,7 @@ describe('CrmPage — Lead KPI strip permission/loading/error branching', () => 
 
   it('shows a loading skeleton while the report is in flight for a manager', async () => {
     mockPermission(true)
-    vi.mocked(useLeadReport).mockReturnValue({ report: undefined, isLoading: true, error: null })
+    vi.mocked(useLeadReport).mockReturnValue({ report: undefined, isLoading: true, isError: false, error: null, refetch: vi.fn() })
 
     await renderPage()
 
@@ -84,7 +85,7 @@ describe('CrmPage — Lead KPI strip permission/loading/error branching', () => 
 
   it('shows an inline error message when the report fails to load for a manager', async () => {
     mockPermission(true)
-    vi.mocked(useLeadReport).mockReturnValue({ report: undefined, isLoading: false, error: new Error('boom') })
+    vi.mocked(useLeadReport).mockReturnValue({ report: undefined, isLoading: false, isError: true, error: new Error('boom'), refetch: vi.fn() })
 
     await renderPage()
 
@@ -92,9 +93,20 @@ describe('CrmPage — Lead KPI strip permission/loading/error branching', () => 
     expect(screen.queryByText('Open Opportunities')).not.toBeInTheDocument()
   })
 
+  it('offers a manual Retry action that calls the hook\'s refetch, since the report never auto-retries', async () => {
+    mockPermission(true)
+    const refetch = vi.fn()
+    vi.mocked(useLeadReport).mockReturnValue({ report: undefined, isLoading: false, isError: true, error: new Error('boom'), refetch })
+
+    await renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(refetch).toHaveBeenCalledTimes(1)
+  })
+
   it('renders the real tenant-wide KPI strip with its scope label once the report resolves for a manager', async () => {
     mockPermission(true)
-    vi.mocked(useLeadReport).mockReturnValue({ report: reportFixture(), isLoading: false, error: null })
+    vi.mocked(useLeadReport).mockReturnValue({ report: reportFixture(), isLoading: false, isError: false, error: null, refetch: vi.fn() })
 
     await renderPage()
 

@@ -1,135 +1,151 @@
 import { useState } from 'react'
-import { FiFolder, FiEye } from 'react-icons/fi'
+import { FiFolder } from 'react-icons/fi'
 import { useDashboardData } from '@/features/dashboard/hooks/useDashboardData'
-import type { DashboardFilterState } from '@/types/dashboard.types'
+import { useDashboardProjects } from '@/features/dashboard/hooks/useDashboardProjects'
 import { formatINR } from '@/utils/formatters'
 import SectionCard from '@/features/dashboard/components/SectionCard'
 import MiniKpiCard from '@/features/dashboard/components/MiniKpiCard'
-import BarListRow from '@/features/dashboard/components/BarListRow'
-import FilterChips from '@/features/dashboard/components/FilterChips'
-import type { ProjectRow } from '@/types/dashboard.types'
+import EmptyLiveData from '@/features/dashboard/components/EmptyLiveData'
+import QueryStateBlock from '@/components/ui/QueryStateBlock'
+import type { ProjectStatusRow } from '@/types/dashboard.types'
 
-const TYPE_FILTERS = ['ALL', 'Screening', 'Diet', 'Lab']
-
-const STATUS_COLORS: Record<ProjectRow['status'], string> = {
-  LIVE: 'var(--success)',
-  PILOT: 'var(--warning)',
-  PAUSED: 'var(--danger)',
+// Real backend values (project.constants.ts's PROJECT_STATUS) — there is no pilot/paused status.
+const STATUS_LABEL: Record<ProjectStatusRow['status'], string> = {
+  new: 'New',
+  live: 'Live',
+  hold: 'Hold',
+  closed: 'Closed',
 }
 
-const HEALTH_BUCKETS = [
-  { label: '≥ 80 (good)', test: (h: number) => h >= 80, color: 'var(--success)' },
-  { label: '60–79 (ok)', test: (h: number) => h >= 60 && h < 80, color: 'var(--warning)' },
-  { label: '< 60 (risk)', test: (h: number) => h < 60, color: 'var(--danger)' },
-]
-
-interface ProjectsSectionProps {
-  filters: DashboardFilterState
-  onDrill: (title: string, content: string) => void
+const STATUS_COLOR: Record<ProjectStatusRow['status'], string> = {
+  new: 'linear-gradient(90deg,#64748b,#94a3b8)',
+  live: 'linear-gradient(90deg,#10b981,#34d399)',
+  hold: 'linear-gradient(90deg,#f59e0b,#fbbf24)',
+  closed: 'linear-gradient(90deg,#3b6dff,#60a5fa)',
 }
 
-const ProjectsSection = ({ filters, onDrill }: ProjectsSectionProps) => {
-  const [typeFilter, setTypeFilter] = useState('ALL')
-  const { data } = useDashboardData(filters)
+const STATUS_DOT: Record<ProjectStatusRow['status'], string> = {
+  new: '#64748b',
+  live: '#10b981',
+  hold: '#f59e0b',
+  closed: '#3b6dff',
+}
+
+const ProjectsSection = () => {
+  const [tab, setTab] = useState<'ALL' | ProjectStatusRow['status']>('ALL')
+  const { data } = useDashboardData()
+  const { data: dashboardProjects, isLoading: topProjectsLoading, isError: topProjectsErrored, refetch: refetchTopProjects } = useDashboardProjects()
+  const topProjects = dashboardProjects?.topByEstimatedValue
 
   if (!data) return null
   const { project } = data
 
-  const rows = typeFilter === 'ALL' ? project.breakdown : project.breakdown.filter((r) => r.type === typeFilter)
-  const topByBilling = [...rows].sort((a, b) => b.billing - a.billing).slice(0, 6)
-  const statusCounts = ['LIVE', 'PILOT', 'PAUSED'].map((s) => ({
-    status: s as ProjectRow['status'],
-    count: rows.filter((r) => r.status === s).length,
-  }))
-  const totalRows = rows.length || 1
-  const healthCounts = HEALTH_BUCKETS.map((b) => ({ ...b, count: rows.filter((r) => b.test(r.health)).length }))
+  const statusMix = tab === 'ALL' ? project.statusMix : project.statusMix.filter((s) => s.status === tab)
+  const totalStatusMix = statusMix.reduce((sum, s) => sum + s.count, 0) || 1
 
   return (
     <SectionCard
       icon={FiFolder}
       iconGradient="linear-gradient(135deg, #8b5cf6, var(--qms-brand))"
       title="Projects"
-      subtitle={`${rows.length} matching · click any to drill`}
-      headerAction={
-        <button
-          onClick={() => onDrill('All projects', `${project.breakdown.length} projects total`)}
-          className="flex items-center gap-1.5 text-[12px] font-semibold px-2.5 py-1 rounded-lg border transition-all hover:bg-(--qms-surface-hover)"
-          style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-soft)' }}
-        >
-          <FiEye size={13} /> View projects
-        </button>
-      }
+      subtitle="Project counts by type"
     >
-      <FilterChips options={TYPE_FILTERS} active={typeFilter} onChange={setTypeFilter} />
+      {project.statusMix.length > 0 && (
+        <div className="flex gap-1 flex-wrap mb-3">
+          {(['ALL', 'new', 'live', 'hold', 'closed'] as const).map((s) => (
+            <button
+              key={s}
+              onClick={() => setTab(s)}
+              className="px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all"
+              style={
+                tab === s
+                  ? { background: 'var(--qms-brand)', borderColor: 'var(--qms-brand)', color: '#fff' }
+                  : { background: 'var(--qms-surface-strong)', borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }
+              }
+            >
+              {s === 'ALL' ? 'All' : STATUS_LABEL[s]}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="grid gap-2.5 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' }}>
         <MiniKpiCard label="No. of Projects" data={project.totalProjects} />
-        <MiniKpiCard label="Screening · Projects" data={project.screeningProjects} suffix={`· ${project.screeningProjects.camps?.v} camps`} />
-        <MiniKpiCard label="Diet · Projects" data={project.dietProjects} suffix={`· ${project.dietProjects.camps?.v} camps`} />
-        <MiniKpiCard label="Lab · Projects" data={project.labProjects} suffix={`· ${project.labProjects.camps?.v} camps`} />
-        <MiniKpiCard label="Total Billing" data={project.totalBilling} />
+        <MiniKpiCard label="Screening · Projects" data={project.screeningProjects} />
+        <MiniKpiCard label="Diet · Projects" data={project.dietProjects} />
+        <MiniKpiCard label="Lab · Projects" data={project.labProjects} />
+        <MiniKpiCard label="Estimated Project Value" data={project.estimatedValue} />
         <MiniKpiCard label="Outstanding" data={project.outstanding} />
       </div>
 
       <div className="grid md:grid-cols-2 gap-5">
         <div>
           <h3 className="text-[12px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-            Top projects by billing
+            Top projects by estimated value
           </h3>
-          {topByBilling.map((row) => (
-            <BarListRow
-              key={row.id}
-              label={row.id}
-              sublabel={row.name}
-              value={formatINR(row.billing)}
-              share={(row.billing / (topByBilling[0]?.billing || 1)) * 100}
-              gradient="linear-gradient(90deg, #8b5cf6, var(--qms-brand))"
-              onClick={() =>
-                onDrill(row.id, `${row.name} · ${row.type} · ${row.camps} camps · Health ${row.health} · Owner ${row.owner} · ${row.status}`)
-              }
-            />
-          ))}
+          <QueryStateBlock
+            isLoading={topProjectsLoading}
+            error={topProjectsErrored}
+            loadingLabel="Loading…"
+            errorLabel="Failed to load project value data."
+            onRetry={refetchTopProjects}
+          >
+            {!topProjects || topProjects.length === 0 ? (
+              <EmptyLiveData />
+            ) : (
+              <div className="space-y-2">
+                {topProjects.map((p) => {
+                  const maxValue = topProjects[0]?.estimatedValue || 1
+                  return (
+                    <div key={p.id} className="grid grid-cols-[minmax(0,140px)_1fr_auto] gap-3 items-center py-1">
+                      <div className="min-w-0">
+                        <div className="text-[11px] font-semibold truncate" style={{ color: 'var(--qms-text)' }}>{p.code}</div>
+                        <div className="text-[11px] truncate" style={{ color: 'var(--qms-text-muted)' }}>{p.clientName} · {p.therapyLabel}</div>
+                      </div>
+                      <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--qms-surface-strong)' }}>
+                        <div
+                          className="h-full rounded-full"
+                          style={{ width: `${Math.min(100, Math.max(0, (p.estimatedValue / maxValue) * 100))}%`, background: 'linear-gradient(90deg,#8b5cf6,#3b6dff)' }}
+                        />
+                      </div>
+                      <div className="text-[12px] font-bold shrink-0 tabular-nums" style={{ color: 'var(--qms-text)' }}>{formatINR(p.estimatedValue)}</div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </QueryStateBlock>
         </div>
 
         <div>
           <h3 className="text-[12px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--qms-text-muted)' }}>
             Project status mix
           </h3>
-          <div
-            className="flex h-5 rounded-full overflow-hidden mb-2 border"
-            style={{ background: 'var(--qms-surface-strong)', borderColor: 'var(--qms-border)' }}
-          >
-            {statusCounts.filter((s) => s.count > 0).map((s) => (
-              <div
-                key={s.status}
-                className="flex items-center justify-center text-[10px] font-bold text-white"
-                style={{ width: `${(s.count / totalRows) * 100}%`, background: STATUS_COLORS[s.status] }}
-              >
-                {s.count}
+          {statusMix.length === 0 ? (
+            <EmptyLiveData />
+          ) : (
+            <>
+              <div className="flex h-5 rounded-full overflow-hidden mb-2" style={{ background: 'var(--qms-surface-strong)' }}>
+                {statusMix.filter((s) => s.count > 0).map((s) => (
+                  <div
+                    key={s.status}
+                    className="flex items-center justify-center text-[10px] font-bold text-white"
+                    style={{ width: `${(s.count / totalStatusMix) * 100}%`, background: STATUS_COLOR[s.status] }}
+                  >
+                    {s.count}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-3 mb-4">
-            {statusCounts.map((s) => (
-              <div key={s.status} className="flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>
-                <span className="w-2 h-2 rounded-full" style={{ background: STATUS_COLORS[s.status] }} />
-                {s.status}: {s.count}
+              <div className="flex flex-wrap gap-3 text-[11px]" style={{ color: 'var(--qms-text-soft)' }}>
+                {statusMix.map((s) => (
+                  <span key={s.status} className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: STATUS_DOT[s.status] }} />
+                    {STATUS_LABEL[s.status].toUpperCase()}: <b>{s.count}</b>
+                  </span>
+                ))}
               </div>
-            ))}
-          </div>
-
-          <h3 className="text-[12px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-            Health distribution
-          </h3>
-          {healthCounts.map((b) => (
-            <BarListRow
-              key={b.label}
-              label={b.label}
-              value={String(b.count)}
-              share={(b.count / totalRows) * 100}
-              gradient={b.color}
-            />
-          ))}
+            </>
+          )}
         </div>
       </div>
     </SectionCard>

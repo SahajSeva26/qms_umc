@@ -152,11 +152,9 @@ const NAV_BY_ID = Object.fromEntries(ALL_NAV_ITEMS.map((n) => [n.id, n]))
 
 export const FULL_NAV_SECTIONS: NavSection[] = [
   {
-    // Every item here is still mock-backed, no real endpoint yet — commented
-    // out, not deleted.
     section: 'Overview',
     subs: [
-      // { title: '', items: ['dashboard', 'analytics', 'foanalytics', 'docanalytics', 'finanalytics'].map((id) => NAV_BY_ID[id]) },
+      { title: '', items: ['dashboard', 'analytics', 'foanalytics', 'docanalytics', 'finanalytics'].map((id) => NAV_BY_ID[id]) },
     ],
   },
   {

@@ -10,17 +10,13 @@ import AnalyticsHeader from '@/features/analytics/components/AnalyticsHeader'
 import InsightBanner from '@/features/analytics/components/InsightBanner'
 import AnalyticsKpiStrip from '@/features/analytics/components/AnalyticsKpiStrip'
 import ExecutiveTab from '@/features/analytics/components/tabs/ExecutiveTab'
-import SalesPipelineTab from '@/features/analytics/components/tabs/SalesPipelineTab'
 import CampsTab from '@/features/analytics/components/tabs/CampsTab'
 import DoctorsTab from '@/features/analytics/components/tabs/DoctorsTab'
-import FinancialTab from '@/features/analytics/components/tabs/FinancialTab'
 
-// Literal paths, not imported from analytics.routes.tsx (circular dependency). '/analytics/fo' is
-// deliberately absent — that route renders FoAnalyticsPage instead, never this component.
+// Literal paths (circular dependency with analytics.routes.tsx). fo/sales/financial are absent —
+// those routes render their own dedicated pages, never this component.
 const ROUTE_TO_TAB: Record<string, AnalyticsTab> = {
-  '/analytics/sales': 'sales',
   '/analytics/doctors': 'doctors',
-  '/analytics/financial': 'financial',
 }
 
 const TABS: { id: AnalyticsTab; label: string }[] = [
@@ -101,9 +97,13 @@ const AnalyticsPage = () => {
               {TABS.map((t) => (
                 <button
                   key={t.id}
-                  // FO Performance navigates to its own real-data route instead of rendering inline
-                  // — it must never run inside this component's legacy mock useAnalyticsData shell.
-                  onClick={() => (t.id === 'fo' ? navigate(ANALYTICS_ROUTES.ANALYTICS_FO) : setActiveTab(t.id))}
+                  // FO/Sales/Financial navigate out instead of rendering inside this legacy mock shell.
+                  onClick={() => {
+                    if (t.id === 'fo') return navigate(ANALYTICS_ROUTES.ANALYTICS_FO)
+                    if (t.id === 'sales') return navigate(ANALYTICS_ROUTES.ANALYTICS_SALES)
+                    if (t.id === 'financial') return navigate(ANALYTICS_ROUTES.ANALYTICS_FINANCIAL)
+                    setActiveTab(t.id)
+                  }}
                   className="px-3 py-1.5 rounded-lg text-[12px] font-bold border transition-all"
                   style={
                     tab === t.id
@@ -118,12 +118,8 @@ const AnalyticsPage = () => {
           )}
 
           {tab === 'exec' && <ExecutiveTab camps={data.camps} clients={data.clients} pnlTrend={data.pnlTrend} />}
-          {tab === 'sales' && <SalesPipelineTab leads={data.leads} />}
           {tab === 'camps' && <CampsTab camps={data.camps} />}
           {tab === 'doctors' && <DoctorsTab camps={data.camps} doctors={data.doctors} />}
-          {tab === 'financial' && (
-            <FinancialTab invoices={data.invoices} pnlTrend={data.pnlTrend} expenseSplit={data.expenseSplit} arAging={data.arAging} />
-          )}
         </>
       )}
     </div>

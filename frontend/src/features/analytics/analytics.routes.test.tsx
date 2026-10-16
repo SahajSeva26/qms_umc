@@ -31,7 +31,7 @@ async function resolveAndRender(routePath: string) {
   )
 }
 
-describe('analytics.routes.tsx — /analytics/fo does not run the legacy mock analytics shell', () => {
+describe('analytics.routes.tsx — /analytics/fo, /analytics/sales, and /analytics/financial do not run the legacy mock analytics shell', () => {
   beforeEach(async () => {
     vi.resetAllMocks()
     vi.mocked(useAnalyticsData).mockReturnValue({
@@ -47,8 +47,18 @@ describe('analytics.routes.tsx — /analytics/fo does not run the legacy mock an
     expect(useAnalyticsData).not.toHaveBeenCalled()
   })
 
-  it('/analytics/sales (still legacy, out of this task\'s scope) DOES invoke useAnalyticsData — confirms the mock above the test is meaningfully differentiating, not vacuously true', async () => {
+  it('/analytics/sales never invokes useAnalyticsData (the mock-driven shared shell)', async () => {
     await resolveAndRender(ANALYTICS_ROUTES.ANALYTICS_SALES)
+    expect(useAnalyticsData).not.toHaveBeenCalled()
+  })
+
+  it('/analytics/financial never invokes useAnalyticsData (the mock-driven shared shell)', async () => {
+    await resolveAndRender(ANALYTICS_ROUTES.ANALYTICS_FINANCIAL)
+    expect(useAnalyticsData).not.toHaveBeenCalled()
+  })
+
+  it('/analytics/doctors (still legacy, out of this task\'s scope) DOES invoke useAnalyticsData — confirms the mock above is meaningfully differentiating, not vacuously true', async () => {
+    await resolveAndRender(ANALYTICS_ROUTES.ANALYTICS_DOCTORS)
     expect(useAnalyticsData).toHaveBeenCalled()
   })
 })

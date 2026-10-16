@@ -13,12 +13,14 @@ function renderAtAnalyticsRoot() {
       <Routes>
         <Route path="/analytics" element={<AnalyticsPage />} />
         <Route path="/analytics/fo" element={<div>fo-analytics-route-marker</div>} />
+        <Route path="/analytics/sales" element={<div>sales-analytics-route-marker</div>} />
+        <Route path="/analytics/financial" element={<div>financial-analytics-route-marker</div>} />
       </Routes>
     </MemoryRouter>,
   )
 }
 
-describe('AnalyticsPage — FO Performance tab', () => {
+describe('AnalyticsPage — FO Performance / Sales & Pipeline / Financial tabs navigate out, never render inline', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     vi.mocked(useAnalyticsData).mockReturnValue({
@@ -34,12 +36,28 @@ describe('AnalyticsPage — FO Performance tab', () => {
     expect(await screen.findByText('fo-analytics-route-marker')).toBeInTheDocument()
   })
 
-  it('never renders FO leaderboard/region content inside the legacy mock shell, even after other tab clicks', async () => {
+  it('clicking "Sales & Pipeline" navigates to /analytics/sales instead of rendering inline', async () => {
     renderAtAnalyticsRoot()
     await userEvent.click(screen.getByRole('button', { name: 'Sales & Pipeline' }))
+
+    expect(await screen.findByText('sales-analytics-route-marker')).toBeInTheDocument()
+  })
+
+  it('clicking "Financial" navigates to /analytics/financial instead of rendering inline', async () => {
+    renderAtAnalyticsRoot()
+    await userEvent.click(screen.getByRole('button', { name: 'Financial' }))
+
+    expect(await screen.findByText('financial-analytics-route-marker')).toBeInTheDocument()
+  })
+
+  it('never renders FO leaderboard/region, sales-pipeline, or financial-summary content inside the legacy mock shell, even after other local tab clicks', async () => {
+    renderAtAnalyticsRoot()
     await userEvent.click(screen.getByRole('button', { name: 'Camps' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Doctors' }))
 
     expect(screen.queryByText('FO leaderboard')).not.toBeInTheDocument()
     expect(screen.queryByText('By region')).not.toBeInTheDocument()
+    expect(screen.queryByText('Pipeline funnel')).not.toBeInTheDocument()
+    expect(screen.queryByText('Invoice-stage breakdown')).not.toBeInTheDocument()
   })
 })

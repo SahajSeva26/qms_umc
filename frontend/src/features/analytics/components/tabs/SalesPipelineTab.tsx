@@ -1,159 +1,113 @@
 import { useMemo } from 'react'
-import { FiFilter, FiXCircle, FiUsers, FiBriefcase } from 'react-icons/fi'
-import type { LeadEntity, LeadStatus } from '@/types/crm.types'
-import { LEAD_STATUS_LABEL, LEAD_STATUS_COLOR, LEAD_STATUS_ON_COLOR } from '@/types/crm.types'
-import { roleLabel, tenantLabel } from '@/features/crm/crm.utils'
+import { FiFilter, FiTrendingUp, FiGrid, FiBriefcase, FiAward, FiTarget, FiPercent, FiClock, FiUser } from 'react-icons/fi'
+import type { LeadReportResponse } from '@/types/crm.types'
+import { LEAD_STATUS_LABEL, LEAD_STATUS_COLOR, LEAD_STATUS_ON_COLOR, LEAD_PROJECT_TYPE_LABEL } from '@/types/crm.types'
+import type { TopAccountRow } from '@/features/analytics/analytics.salesStats'
 import { formatINR } from '@/utils/formatters'
 import AnalyticsSectionCard from '@/features/analytics/components/AnalyticsSectionCard'
-import Donut from '@/features/analytics/components/charts/Donut'
 import FunnelChart from '@/features/analytics/components/charts/FunnelChart'
+import LineChart from '@/features/analytics/components/charts/LineChart'
 import BarsHorizontal from '@/features/analytics/components/charts/BarsHorizontal'
-
-// All 7 real statuses (LeadEntity.status), replacing the old mock model's
-// 4-column STAGES + spliced-out LOST_STAGE — the real backend has no
-// "quotation" stage and no separate lost-category taxonomy (see
-// LEAD_TRANSITION_MAP/LEAD_STATUS_LABEL in crm.types.ts), so every status
-// gets one funnel row and nothing is collapsed/invented.
-const FUNNEL_STATUSES: LeadStatus[] = ['new', 'qualified', 'proposal', 'pilot', 'negotiation', 'won', 'lost']
+import KpiTile from '@/components/ui/KpiTile'
 
 interface SalesPipelineTabProps {
-  leads: LeadEntity[]
+  report: LeadReportResponse
+  // Built client-side from a real lead sweep (see SalesAnalyticsPage.tsx) — /leads/report has no per-tenant facet.
+  topAccounts: TopAccountRow[]
 }
 
-const SalesPipelineTab = ({ leads }: SalesPipelineTabProps) => {
+// Every real LeadStatus — funnelRows below fills in 0 for any status report.byStatus doesn't
+// include, nothing collapsed or invented.
+const FUNNEL_STATUSES: (keyof typeof LEAD_STATUS_LABEL)[] = ['new', 'qualified', 'proposal', 'pilot', 'negotiation', 'won', 'lost']
+
+// Per-stage monetary values, a lost-value aggregate, a lost-reason breakdown, and a full
+// per-rep leaderboard have no backend source and are deliberately not shown.
+const SalesPipelineTab = ({ report, topAccounts }: SalesPipelineTabProps) => {
   const funnelRows = useMemo(() => {
-    return FUNNEL_STATUSES.map((status) => {
-      const statusLeads = leads.filter((l) => l.status === status)
-      return {
-        label: LEAD_STATUS_LABEL[status],
-        count: statusLeads.length,
-        value: statusLeads.reduce((sum, l) => sum + l.estimatedValue, 0),
-        color: LEAD_STATUS_COLOR[status],
-        onColor: LEAD_STATUS_ON_COLOR[status],
-      }
-    })
-  }, [leads])
+    const countByStatus = new Map(report.byStatus.map((s) => [s.status, s.count]))
+    return FUNNEL_STATUSES.map((status) => ({
+      label: LEAD_STATUS_LABEL[status],
+      count: countByStatus.get(status) ?? 0,
+      color: LEAD_STATUS_COLOR[status],
+      onColor: LEAD_STATUS_ON_COLOR[status],
+    }))
+  }, [report.byStatus])
 
-  const totalPipelineValue = leads.reduce((sum, l) => sum + l.estimatedValue, 0)
-
-  const wonLeads = useMemo(() => leads.filter((l) => l.status === 'won'), [leads])
-  const lostLeads = useMemo(() => leads.filter((l) => l.status === 'lost'), [leads])
-
-  // No lost-category taxonomy exists server-side (LeadStageHistoryEntry only
-  // carries a free-text `reason`, not a fixed enum) — a won/lost value split
-  // is real data instead of an invented category breakdown; the actual
-  // reasons are listed as text below it.
-  const wonLostSplit = useMemo(
-    () => [
-      { label: 'Won', value: wonLeads.reduce((sum, l) => sum + l.estimatedValue, 0), color: LEAD_STATUS_COLOR.won },
-      { label: 'Lost', value: lostLeads.reduce((sum, l) => sum + l.estimatedValue, 0), color: LEAD_STATUS_COLOR.lost },
-    ],
-    [wonLeads, lostLeads]
-  )
-
-  const lostReasons = useMemo(
+  const projectTypeBars = useMemo(
     () =>
-      lostLeads
-        .map((l) => l.stageHistory.filter((h) => h.to === 'lost').slice(-1)[0]?.reason)
-        .filter((reason): reason is string => !!reason),
-    [lostLeads]
+      report.byProjectType.map((p) => ({
+        label: LEAD_PROJECT_TYPE_LABEL[p.projectType],
+        value: p.count,
+        formattedValue: String(p.count),
+      })),
+    [report.byProjectType],
   )
 
-  const bySalesPerson = useMemo(() => {
-    const groups = new Map<string, LeadEntity[]>()
-    for (const l of leads) {
-      const key = roleLabel(l.salesPerson)
-      groups.set(key, [...(groups.get(key) ?? []), l])
-    }
-    return [...groups.entries()]
-      .map(([salesPerson, ls]) => ({
-        salesPerson,
-        leads: ls.length,
-        won: ls.filter((l) => l.status === 'won').length,
-        pipeline: ls.reduce((sum, l) => sum + l.estimatedValue, 0),
-      }))
-      .sort((a, b) => b.won - a.won)
-  }, [leads])
+  const trendLabels = report.trends.newLeads.data.map((p) => p.period)
+  const trendSeries = [{ label: 'New leads', color: '#3b6dff', data: report.trends.newLeads.data.map((p) => p.count) }]
 
-  const topAccounts = useMemo(() => {
-    const groups = new Map<string, number>()
-    for (const l of leads) {
-      const key = tenantLabel(l.tenant)
-      groups.set(key, (groups.get(key) ?? 0) + l.estimatedValue)
-    }
-    return [...groups.entries()]
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 10)
-      .map(([account, value]) => ({ label: account, value, formattedValue: formatINR(value) }))
-  }, [leads])
+  const topAccountBars = useMemo(
+    () => topAccounts.map((a) => ({ label: a.tenant, value: a.value, formattedValue: formatINR(a.value) })),
+    [topAccounts],
+  )
+
+  const { summary, kpis } = report
 
   return (
-    <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))' }}>
-      <AnalyticsSectionCard
-        icon={FiFilter}
-        iconGradient="linear-gradient(135deg, var(--chart-1), var(--qms-teal))"
-        title="Pipeline funnel"
-        subtitle={`${leads.length} leads · ${formatINR(totalPipelineValue)}`}
-      >
-        <FunnelChart rows={funnelRows} />
-      </AnalyticsSectionCard>
+    <div className="flex flex-col gap-3.5">
+      <div className="grid gap-2.5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+        <KpiTile label="Pipeline value" value={formatINR(kpis.pipelineValue)} sub="current, open leads" tone="brand" icon={FiBriefcase} />
+        <KpiTile label="Won value" value={formatINR(kpis.wonValue)} sub={`selected period · ${kpis.wonCount} won`} tone="emerald" icon={FiAward} />
+        <KpiTile label="Win rate" value={`${kpis.winRate}%`} sub="selected period" tone="teal" icon={FiPercent} />
+        <KpiTile label="Avg deal size" value={formatINR(kpis.avgDealSize)} sub="all-time, won leads" tone="violet" icon={FiTarget} />
+        <KpiTile label="Sales velocity" value={`${kpis.salesVelocityDays}d`} sub="all-time, created → won" tone="amber" icon={FiClock} />
+        <KpiTile
+          label="Top rep"
+          value={kpis.topRep ? formatINR(kpis.topRep.wonValue) : '—'}
+          sub={kpis.topRep ? `all-time · ${kpis.topRep.name} · ${kpis.topRep.wonCount} won` : 'all-time — no won leads yet'}
+          tone="rose"
+          icon={FiUser}
+        />
+      </div>
 
-      <AnalyticsSectionCard
-        icon={FiXCircle}
-        iconGradient="linear-gradient(135deg, #f43f5e, #f59e0b)"
-        title="Won vs lost value"
-        subtitle={`${lostLeads.length} lost`}
-      >
-        <Donut slices={wonLostSplit} centerLabel={String(wonLeads.length + lostLeads.length)} centerSub="closed" />
-        {lostReasons.length > 0 && (
-          <ul className="mt-3 space-y-1 text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>
-            {lostReasons.slice(0, 5).map((reason, i) => (
-              <li key={i} className="truncate">· {reason}</li>
-            ))}
-          </ul>
-        )}
-      </AnalyticsSectionCard>
+      {/* Fixed 2-column grid (not auto-fit) so these 4 cards always form a 2x2, regardless of viewport width. */}
+      <div className="grid gap-3.5 grid-cols-2 max-[900px]:grid-cols-1">
+        <AnalyticsSectionCard
+          icon={FiFilter}
+          iconGradient="linear-gradient(135deg, var(--chart-1), var(--qms-teal))"
+          title="Pipeline funnel"
+          subtitle={`${summary.totalLeads} leads · current, all-time status counts`}
+        >
+          <FunnelChart rows={funnelRows} />
+        </AnalyticsSectionCard>
 
-      <AnalyticsSectionCard
-        icon={FiUsers}
-        iconGradient="linear-gradient(135deg, var(--chart-5), #10b981)"
-        title="By sales person"
-        subtitle="Won / win rate / pipeline"
-      >
-        <div className="overflow-x-auto">
-          <table className="w-full text-[13px]">
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--qms-border)' }}>
-                {['Sales person', 'Leads', 'Won', 'Win%', 'Pipeline'].map((h) => (
-                  <th key={h} className="text-left font-bold text-[11px] uppercase tracking-wider px-3 py-2" style={{ color: 'var(--qms-text-muted)' }}>
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {bySalesPerson.map((row) => (
-                <tr key={row.salesPerson} style={{ borderBottom: '1px solid var(--qms-border)' }}>
-                  <td className="px-3 py-2 font-semibold" style={{ color: 'var(--qms-text)' }}>{row.salesPerson}</td>
-                  <td className="px-3 py-2" style={{ color: 'var(--qms-text)' }}>{row.leads}</td>
-                  <td className="px-3 py-2" style={{ color: 'var(--qms-text)' }}>{row.won}</td>
-                  <td className="px-3 py-2" style={{ color: 'var(--qms-text)' }}>{row.leads > 0 ? Math.round((row.won / row.leads) * 100) : 0}%</td>
-                  <td className="px-3 py-2 font-bold" style={{ color: 'var(--qms-text)' }}>{formatINR(row.pipeline)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </AnalyticsSectionCard>
+        <AnalyticsSectionCard
+          icon={FiTrendingUp}
+          iconGradient="linear-gradient(135deg, #10b981, var(--chart-2))"
+          title="New leads trend"
+          subtitle="Selected period"
+        >
+          <LineChart series={trendSeries} labels={trendLabels} formatY={(v) => String(v)} />
+        </AnalyticsSectionCard>
 
-      <AnalyticsSectionCard
-        icon={FiBriefcase}
-        iconGradient="linear-gradient(135deg, var(--chart-3), #a855f7)"
-        title="Top accounts by value"
-        subtitle="Top 10"
-      >
-        <BarsHorizontal bars={topAccounts} />
-      </AnalyticsSectionCard>
+        <AnalyticsSectionCard
+          icon={FiGrid}
+          iconGradient="linear-gradient(135deg, var(--chart-3), #a855f7)"
+          title="Leads by project type"
+          subtitle="Current, all-time"
+        >
+          <BarsHorizontal bars={projectTypeBars} />
+        </AnalyticsSectionCard>
+
+        <AnalyticsSectionCard
+          icon={FiBriefcase}
+          iconGradient="linear-gradient(135deg, var(--chart-5), #10b981)"
+          title="Top accounts by value"
+          subtitle="Top 10 · selected period"
+        >
+          <BarsHorizontal bars={topAccountBars} />
+        </AnalyticsSectionCard>
+      </div>
     </div>
   )
 }

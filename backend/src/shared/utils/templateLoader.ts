@@ -2,17 +2,14 @@ import path from 'path';
 import { pathToFileURL } from 'url';
 import { logger } from './logger';
 
-// Dynamically imports a module and returns its default export, or null if the module
-// can't be loaded / has no default export. Generic + reusable — the caller resolves the
-// path (absolute recommended, e.g. via path.join(__dirname, ...)), so this isn't tied to
-// any one folder. Returns null (not throws) so callers decide how to handle a miss.
+// Dynamic-imports a module and returns its default export (null if it can't be loaded / has none).
+// Caller resolves the path, so this isn't tied to any folder. Returns null (not throws) on a miss.
 export async function loadTemplate<T>(modulePath: string): Promise<T | null> {
     if (!modulePath) {
         return null;
     }
 
-    // Under ESM (how tsx runs), dynamic import of an absolute path must be a file:// URL —
-    // a bare 'd:\...' path is rejected. Bare specifiers (package names) are imported as-is.
+    // Under ESM, dynamic import of an absolute path must be a file:// URL; bare specifiers are as-is.
     const specifier = path.isAbsolute(modulePath) ? pathToFileURL(modulePath).href : modulePath;
 
     try {

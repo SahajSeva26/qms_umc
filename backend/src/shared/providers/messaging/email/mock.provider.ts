@@ -6,11 +6,9 @@ import { isValidEmail } from '../../../utils/strings';
 
 export const EMAIL = 'email';
 
-// Mock email provider — logs the message instead of sending it. Swap for a real SES provider
-// (beside this file, e.g. ses.provider.ts) later behind the same IMessageProvider interface.
+// Mock email provider — logs instead of sending. Real SES provider drops in behind IMessageProvider.
 export class EmailMockProvider implements IMessageProvider {
     async send(message: IMessage): Promise<void> {
-        // Validate the input is valid for this channel before "sending".
         if (!isValidEmail(message.to)) {
             return throwAppError(`Invalid email recipient: ${message.to}`, StatusCodes.BAD_REQUEST);
         }

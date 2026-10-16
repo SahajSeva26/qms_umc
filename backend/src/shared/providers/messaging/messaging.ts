@@ -3,10 +3,8 @@ import { EMAIL, EmailMockProvider } from './email/mock.provider';
 import { WHATSAPP, WhatsappMockProvider } from './whatsapp/mock.provider';
 import { SMS, SmsMockProvider } from './sms/mock.provider';
 
-// Resolves an outbound messaging provider by channel name (email / whatsapp / sms). Keys match
-// the notification channel values, so the worker can do messagingManager.get(channel).send(msg).
-// All providers are mocks for now — real ones drop in behind IMessageProvider without touching
-// callers.
+// Resolves an outbound messaging provider by channel name (email / whatsapp / sms). Keys match the
+// notification channel values. Mocks for now — real ones drop in behind IMessageProvider.
 class MessagingManager {
     private readonly providers: Map<string, IMessageProvider> = new Map();
 

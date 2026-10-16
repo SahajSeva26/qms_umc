@@ -1,16 +1,11 @@
-// Outbound messaging contract — a provider only knows HOW to deliver a message on one channel
-// (email / whatsapp / sms). What to send and to whom is decided by the caller (the notification
-// worker), not here. Mock providers log instead of sending; real providers drop in behind the
-// same interface later.
+// Outbound messaging contract — a provider delivers a message on one channel (email/whatsapp/sms).
 
 export interface IMessage {
-    // Recipient address for the channel — an email address (email) or phone number (whatsapp/sms).
+    // Email address (email) or phone number (whatsapp/sms).
     to: string;
-    // Message content.
     body: string;
-    // Subject/title — kept consistent across all channels (not email-only).
+    // Subject/title — consistent across all channels.
     subject?: string;
-    // Optional sender override; providers fall back to a configured default.
     from?: string;
 }
 

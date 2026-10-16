@@ -12,7 +12,6 @@ export type TemplateConfig = {
     status: string;
     recepients: recepient[];
     template: string;
-    // Optional subject (used by the email channel). Rendered as a Handlebars string with the
-    // same event data as the body, so it can interpolate values, e.g. 'New camp at {{data.camp.venue}}'.
+    // Optional subject, rendered as a Handlebars string with the event data (e.g. '{{data.camp.venue}}').
     subject?: string;
 };

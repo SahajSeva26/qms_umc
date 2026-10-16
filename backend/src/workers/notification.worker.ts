@@ -6,20 +6,43 @@
 //
 // Run separately from the API: `npm run worker:notification`.
 
+import path from 'path';
 import ENV from '../shared/config/app.config';
 import { logger } from '../shared/utils/logger';
 import { queueManager } from '../shared/providers/queue/queue';
 import { SQS } from '../shared/providers/queue/aws/sqs.provider';
+import { loadTemplate } from '../shared/utils/templateLoader';
+import { TemplateConfig } from '../shared/types/template.types';
 
 const queueUrl = ENV.Providers.AWS_SQS.NotificationQueueUrl;
 const queue = queueManager.get(SQS);
 
+// Event configs live one per file, keyed by the event code (EventBridge detail-type):
+//   'camp.create' -> modules/notification/events/camp/create.ts
+const EVENTS_DIR = path.join(__dirname, '../modules/notification/events');
+
 // Seam for later: turn a consumed event into notifications and process/send it.
-// Deliberately does nothing but log for now — processing is added here.
+// Step 1 (done here): load the template config for the event. Resolving recipients,
+// rendering templates, and creating/dispatching notifications come next.
 async function handleEvent(event: any): Promise<void> {
-    logger.info('handleEvent called');
-    logger.info({ event }, 'Notification event consumed');
-    // TODO: process the event (create + dispatch notifications)
+    // EventBridge envelope: detail-type carries the event code, detail carries the payload.
+    const code: string | undefined = event?.['detail-type'];
+    if (!code) {
+        logger.warn({ event }, 'Consumed event has no detail-type — skipping');
+        return;
+    }
+
+    const configPath = path.join(EVENTS_DIR, code.replace(/\./g, '/'));
+    const config = await loadTemplate<TemplateConfig>(configPath);
+
+    if (!config) {
+        // No config for this code — ack and drop rather than retry forever.
+        logger.warn({ code }, 'No template config for event code — skipping');
+        return;
+    }
+
+    logger.info({ code, config }, 'Loaded template config for event');
+    // TODO next: resolve recipients, render templates per channel, create + dispatch notifications
 }
 
 async function pollMessages(): Promise<void> {

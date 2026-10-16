@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { crmService } from '@/features/crm/crm.service'
 import type { LeadEntity } from '@/types/crm.types'
-import { fetchRemainingPagesBounded } from '@/features/analytics/analytics.pagedFetch'
+import { fetchRemainingPagesBounded } from '@/lib/api/pagination'
 
 const STALE_TIME_MS = 60_000
 const PAGE_SIZE = 200

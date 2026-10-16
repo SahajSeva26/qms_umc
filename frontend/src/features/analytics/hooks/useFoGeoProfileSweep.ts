@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { geoProfileService } from '@/features/geo-profile/geoProfile.service'
 import type { GeoProfileEntity } from '@/types/geoProfile.types'
-import { fetchRemainingPagesBounded } from '@/features/analytics/analytics.pagedFetch'
+import { fetchRemainingPagesBounded } from '@/lib/api/pagination'
 
 const STALE_TIME_MS = 60_000
 const PAGE_SIZE = 200

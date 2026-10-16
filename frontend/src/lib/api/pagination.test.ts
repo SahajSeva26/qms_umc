@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { fetchRemainingPagesBounded } from './analytics.pagedFetch'
+import { fetchRemainingPagesBounded } from './pagination'
 
 describe('fetchRemainingPagesBounded', () => {
   it('fetches every remaining page exactly once, in order of page number in the result array', async () => {

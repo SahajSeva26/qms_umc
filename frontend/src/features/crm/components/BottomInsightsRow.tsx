@@ -8,6 +8,9 @@ import RecordsDrawer from '@/features/crm/components/RecordsDrawer'
 interface BottomInsightsRowProps {
   leads: LeadEntity[]
   onOpenLead: (id: string) => void
+  // "Top Reps" ranks across reps — meaningless (and for a KAM, always just themselves) when `leads`
+  // is one caller's own-scoped page rather than the tenant-wide set a lead:manage holder sees.
+  showTopReps?: boolean
 }
 
 type Drill = { title: string; exportSlug: string; leads: LeadEntity[] } | null
@@ -41,11 +44,11 @@ function topRepsByWon(leads: LeadEntity[]) {
   return [...byRep.values()].sort((a, b) => b.total - a.total).slice(0, 5)
 }
 
-const BottomInsightsRow = ({ leads, onOpenLead }: BottomInsightsRowProps) => {
+const BottomInsightsRow = ({ leads, onOpenLead, showTopReps = true }: BottomInsightsRowProps) => {
   const [drill, setDrill] = useState<Drill>(null)
 
   const dormant = leads.filter((l) => l.status !== 'won' && l.status !== 'lost' && daysSince(l.updatedAt) > 20)
-  const reps = topRepsByWon(leads)
+  const reps = showTopReps ? topRepsByWon(leads) : []
 
   return (
     <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
@@ -69,25 +72,27 @@ const BottomInsightsRow = ({ leads, onOpenLead }: BottomInsightsRowProps) => {
         </div>
       </div>
 
-      <div className="rounded-2xl border p-4" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
-        <h3 className="text-[13px] font-bold mb-3" style={{ color: 'var(--qms-text)' }}>Top Reps · Won value</h3>
-        <div className="space-y-2">
-          {reps.map((rep) => (
-            <button
-              key={rep.id}
-              onClick={() => setDrill({ title: `${rep.name} — Won leads`, exportSlug: `rep-${rep.id}`, leads: rep.leads })}
-              className="w-full flex items-center gap-2 rounded-lg p-1.5 transition-colors hover:bg-(--qms-surface-hover)"
-            >
-              <UserAvatar firstName={rep.name} size="sm" />
-              <span className="text-[12px] flex-1 truncate text-left" style={{ color: 'var(--qms-text)' }}>{rep.name}</span>
-              <span className="text-[12px] font-bold" style={{ color: 'var(--qms-text)' }}>{formatINR(rep.total)}</span>
-            </button>
-          ))}
-          {reps.length === 0 && (
-            <p className="text-[13px]" style={{ color: 'var(--qms-text-muted)' }}>No won leads yet.</p>
-          )}
+      {showTopReps && (
+        <div className="rounded-2xl border p-4" style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}>
+          <h3 className="text-[13px] font-bold mb-3" style={{ color: 'var(--qms-text)' }}>Top Reps · Won value</h3>
+          <div className="space-y-2">
+            {reps.map((rep) => (
+              <button
+                key={rep.id}
+                onClick={() => setDrill({ title: `${rep.name} — Won leads`, exportSlug: `rep-${rep.id}`, leads: rep.leads })}
+                className="w-full flex items-center gap-2 rounded-lg p-1.5 transition-colors hover:bg-(--qms-surface-hover)"
+              >
+                <UserAvatar firstName={rep.name} size="sm" />
+                <span className="text-[12px] flex-1 truncate text-left" style={{ color: 'var(--qms-text)' }}>{rep.name}</span>
+                <span className="text-[12px] font-bold" style={{ color: 'var(--qms-text)' }}>{formatINR(rep.total)}</span>
+              </button>
+            ))}
+            {reps.length === 0 && (
+              <p className="text-[13px]" style={{ color: 'var(--qms-text-muted)' }}>No won leads yet.</p>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {drill && (
         <RecordsDrawer

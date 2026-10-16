@@ -8,6 +8,7 @@ const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
   dashboard: ['tenant:manage'],
   crminvoicing: ['system:manage'],
   crm: ['lead:search', 'lead:manage', 'tenant:manage'],
+  salesdashboard: ['lead:search', 'lead:manage', 'tenant:manage'],
   tenants: ['tenant:get', 'tenant:search', 'tenant:manage'],
   permissiongroups: ['permission-group:get', 'permission-group:search', 'tenant:admin'],
   roletypes: ['tenant:manage', 'tenant:admin'],

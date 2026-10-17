@@ -1,4 +1,5 @@
 import { TemplateConfig } from '../../../../shared/types/template.types';
+import { NOTIFICATION_CHANNELS } from '../../notification.constants';
 
 const config: TemplateConfig = {
     code: 'camp.create',
@@ -6,11 +7,11 @@ const config: TemplateConfig = {
     recepients: [
         {
             source: 'data.fo.email',
-            channels: ['email']
+            channels: [NOTIFICATION_CHANNELS.EMAIL]
         },
         {
             source: 'data.mr.email',
-            channels: ['email']
+            channels: [NOTIFICATION_CHANNELS.EMAIL]
         },
     ],
     template: '/camp/create',

@@ -6,15 +6,15 @@ const config: TemplateConfig = {
     status: 'active',
     recepients: [
         {
-            source: 'data.fo.email',
+            source: 'data.fo.user.email',
             channels: [NOTIFICATION_CHANNELS.EMAIL]
         },
         {
-            source: 'data.mr.email',
+            source: 'data.mr.user.email',
             channels: [NOTIFICATION_CHANNELS.EMAIL]
         },
     ],
-    template: '/camp/create',
+    template: '/camp/create', 
     subject: 'A new camp has been created'
 };
 

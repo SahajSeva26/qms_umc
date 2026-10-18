@@ -100,9 +100,10 @@ export async function handleEvent(event: any, ctx: RequestContext): Promise<void
     const payload = { data: event.detail ?? {} };
     const subject = config.subject ? HandlebarsHelper.render(config.subject, payload) : undefined;
 
-    // Source entity: type is the code prefix ('camp.create' -> 'camp'), id from data.<type>._id.
+    // Source entity: type is the code prefix ('camp.create' -> 'camp'). The id is at data.<type>._id
+    // when the payload wraps the entity, or data._id when the entity itself is published flat.
     const entityType = code.split('.')[0] ?? code;
-    const entityId = getByPath(payload, `data.${entityType}._id`);
+    const entityId = getByPath(payload, `data.${entityType}._id`) ?? getByPath(payload, 'data._id');
     const entity = entityId ? { id: String(entityId), type: entityType, event: code } : undefined;
 
     const toPersist: ICreateNotificationPayload[] = [];

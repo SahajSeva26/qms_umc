@@ -37,7 +37,7 @@ import { RequestContext } from '../../../shared/utils/contextBuilder';
 import { isValidObjectID, toObjectId } from '../../../shared/utils/strings';
 import { endOfUTCDay, startOfUTCDay, utcDayRange } from '../../../shared/utils/dates';
 import { IServiceOptions } from '../../../shared/types/service.types';
-import { eventManager } from '../../../shared/providers/events/events';
+import { eventProcessor } from '../../../shared/helpers/eventProcessor';
 import { ProjectService } from '../../crm/project/project.service';
 import { DoctorService } from '../../crm/doctor/doctor.service';
 import { RoleService } from '../../access-management/role/role.service';
@@ -55,8 +55,6 @@ import { InventoryMasterModel } from '../../inventory/inventory-master/inventory
 import { InventoryAssignmentModel } from '../../inventory/inventory-assignment/inventory-assignment.model';
 import { INVENTORY_DEVICE_STATUS } from '../../inventory/inventory-device/inventory-device.constants';
 import { ITEM_TYPES } from '../../inventory/inventory-master/inventory-master.constants';
-
-const eventPublisher = eventManager.get('aws');
 
 const populate: any[] = [
     { path: 'tenant', select: 'name code' },
@@ -729,7 +727,7 @@ const create = async (model: ICreateCampPayload, ctx: RequestContext): Promise<H
 
     //6: raise the camp.create event with the populated camp (worker resolves recipients + delivers)
     const populatedCamp = await get(saved._id.toString(), ctx, { populate: true });
-    await eventPublisher.publish('camp', 'create', populatedCamp ?? saved, ctx);
+    await eventProcessor.process('camp', 'create', populatedCamp ?? saved, ctx);
 
     return populatedCamp ?? saved;
 };

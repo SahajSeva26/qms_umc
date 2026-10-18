@@ -27,6 +27,10 @@ export type RequestContext = {
         changes: string[];
     };
 
+    // when true, a handler may process side-effects (events/notifications) inline
+    // instead of publishing; defaults to false
+    processSync: boolean;
+
     // runtime fucntions
     setUser: (user: any) => void;
     setRole: (role: any) => void;
@@ -53,6 +57,8 @@ export const buildContext = (req: any, res: any, next: any) => {
         meta: {
             changes: [],
         },
+
+        processSync: false,
 
         // runtime funcitons
         setUser: (userData: any) => {

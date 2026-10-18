@@ -7,7 +7,7 @@ import { NotificationService } from './notification.service';
 import { NotificationMapper } from './notification.mapper';
 import { RequestHandler } from '../../shared/utils/requestHandler';
 import { RequestContext } from '../../shared/utils/contextBuilder';
-import { eventManager } from '../../shared/providers/events/events';
+import { eventProcessor } from '../../shared/helpers/eventProcessor';
 
 // GET /notifications/me — the caller's own notifications. The recipient is taken from ctx
 // (the authenticated user); search() pins the query to it, so no user id is ever accepted.
@@ -58,7 +58,7 @@ const testPublish = async (req: any, res: any) => {
         }
 
         const [entity = 'camp', event = 'create'] = (payload.type ?? 'camp.create').split('.');
-        await eventManager.get('aws').publish(entity, event, payload.data ?? {}, ctx);
+        await eventProcessor.process(entity, event, payload.data ?? {}, ctx);
 
         return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Test event published to EventBridge', {
             type: payload.type,

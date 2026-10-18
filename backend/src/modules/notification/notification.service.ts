@@ -116,6 +116,19 @@ const create = async (model: ICreateNotificationPayload, ctx: RequestContext): P
     return notification;
 };
 
+// Bulk-create rows in one round-trip. Used by the worker's recipient/channel fan-out.
+const bulkCreate = async (
+    models: ICreateNotificationPayload[],
+    ctx: RequestContext,
+): Promise<HydratedDocument<INotification>[]> => {
+    if (!models.length) {
+        return [];
+    }
+    const docs = models.map((model) => set(model, new NotificationModel({})));
+    // ordered:false → best-effort; a bad row doesn't abort the rest (matches per-row isolation)
+    return await NotificationModel.insertMany(docs, { ordered: false });
+};
+
 const update = async (id: string, model: IUpdateNotificationPayload, ctx: RequestContext) => {
     //1: get notification first (own-scoped)
     let notification = await NotificationService.get(id, ctx);
@@ -134,6 +147,7 @@ export const NotificationService = {
     get,
     search,
     create,
+    bulkCreate,
     update,
 };
 

@@ -37,6 +37,7 @@ import { RequestContext } from '../../../shared/utils/contextBuilder';
 import { isValidObjectID, toObjectId } from '../../../shared/utils/strings';
 import { endOfUTCDay, startOfUTCDay, utcDayRange } from '../../../shared/utils/dates';
 import { IServiceOptions } from '../../../shared/types/service.types';
+import { eventManager } from '../../../shared/providers/events/events';
 import { ProjectService } from '../../crm/project/project.service';
 import { DoctorService } from '../../crm/doctor/doctor.service';
 import { RoleService } from '../../access-management/role/role.service';
@@ -55,14 +56,16 @@ import { InventoryAssignmentModel } from '../../inventory/inventory-assignment/i
 import { INVENTORY_DEVICE_STATUS } from '../../inventory/inventory-device/inventory-device.constants';
 import { ITEM_TYPES } from '../../inventory/inventory-master/inventory-master.constants';
 
+const eventPublisher = eventManager.get('aws');
+
 const populate: any[] = [
     { path: 'tenant', select: 'name code' },
     { path: 'division', select: 'name code therapy' },
     { path: 'project', select: 'name status tests' },
     { path: 'doctor', select: 'name specialization pharmaCode' },
-    { path: 'fo' },
+    { path: 'fo', populate: { path: 'user', select: 'firstName lastName email' } },
     { path: 'dietitian' },
-    { path: 'mr' },
+    { path: 'mr', populate: { path: 'user', select: 'firstName lastName email' } },
     { path: 'asm' },
     { path: 'rsm' },
     { path: 'devices', select: 'name code type' },
@@ -328,7 +331,7 @@ const pickNearestByRoad = async (profiles: any[], lat: number, lng: number, work
 };
 
 // nearest worker of `worker`'s kind within coverage, not already booked that day. 422/409 on failure.
-const resolveNearestFreeWorker = async (camp: HydratedDocument<ICamp>, worker: FieldWorker, ctx: RequestContext): Promise<any> => {
+const resolveNearestFreeWorker = async (camp: any, worker: FieldWorker, ctx: RequestContext): Promise<any> => {
     const coordinates = (camp.location as any)?.coordinates as number[] | undefined;
     if (!coordinates || coordinates.length !== 2) {
         return throwAppError('Camp has no location coordinates to allocate from', StatusCodes.UNPROCESSABLE_ENTITY);
@@ -342,7 +345,7 @@ const resolveNearestFreeWorker = async (camp: HydratedDocument<ICamp>, worker: F
     }
 
     // nearest workers (distance order) not already booked on this date + overlapping slot
-    const booked = await bookedWorkerIds(worker.field, camp.date, (camp as any).timeSlot, camp._id);
+    const booked = await bookedWorkerIds(worker.field, camp.date, camp.timeSlot, camp._id);
     let freeProfiles = items.filter((profile: any) => !booked.includes(profile.role?.toString()));
     if (!freeProfiles.length) {
         return throwAppError(`All ${worker.label}s near this camp are already booked on this date and time slot`, StatusCodes.CONFLICT);
@@ -681,19 +684,19 @@ const create = async (model: ICreateCampPayload, ctx: RequestContext): Promise<H
 
     //3: build entity (tenant from the validated division) + apply the rest via set()
     const entity = new CampModel({ tenant: division.tenant, division: divisionId, project });
-    let camp = await set(model, entity, ctx);
+    let camp: any = await set(model, entity, ctx);
 
     // the worker this camp is staffed by, decided by its type
     const worker = workerFor(camp.type);
 
     //3b: a caller-supplied worker must be free for this camp's date + slot (overlap-aware). Hard 409.
-    if ((camp as any)[worker.field]) {
-        await assertWorkerFree(worker, (camp as any)[worker.field].toString(), camp.date, (camp as any).timeSlot, camp._id);
+    if (camp[worker.field]) {
+        await assertWorkerFree(worker, camp[worker.field].toString(), camp.date, camp.timeSlot, camp._id);
     }
 
     //4: best-effort auto-assign the nearest free worker when none supplied; on failure the camp stays
     // requested with no assignee (moveStage then blocks it leaving requested).
-    if (!(camp as any)[worker.field]) {
+    if (!camp[worker.field]) {
         try {
             const role = await resolveNearestFreeWorker(camp, worker, ctx);
             camp = await set({ [worker.field]: role.toString() }, camp, ctx);
@@ -703,7 +706,7 @@ const create = async (model: ICreateCampPayload, ctx: RequestContext): Promise<H
     }
 
     //4b: with a worker on the camp (already known free) auto-confirm, recording the transition.
-    if ((camp as any)[worker.field]) {
+    if (camp[worker.field]) {
         const actorName = `${ctx.user?.firstName || ''} ${ctx.user?.lastName || ''}`.trim();
         camp.stageHistory.push({
             from: CAMP_STATUSES.REQUESTED,
@@ -724,7 +727,11 @@ const create = async (model: ICreateCampPayload, ctx: RequestContext): Promise<H
         return await camp.save();
     });
 
-    return saved;
+    //6: raise the camp.create event with the populated camp (worker resolves recipients + delivers)
+    const populatedCamp = await get(saved._id.toString(), ctx, { populate: true });
+    await eventPublisher.publish('camp', 'create', populatedCamp ?? saved, ctx);
+
+    return populatedCamp ?? saved;
 };
 
 // voidCamp — internal-team record of a camp that happened WITHOUT a PO (WF-4). Deliberately skips
@@ -817,7 +824,7 @@ const approveVoidCamp = async (id: string, model: IApproveVoidCampPayload, ctx: 
 };
 
 const update = async (id: string, model: IUpdateCampPayload, ctx: RequestContext) => {
-    let camp = await CampService.get(id, ctx);
+    let camp: any = await CampService.get(id, ctx);
     if (!camp) {
         return throwAppError('Camp not found', StatusCodes.NOT_FOUND);
     }
@@ -833,8 +840,8 @@ const update = async (id: string, model: IUpdateCampPayload, ctx: RequestContext
     // assignee/date/slot can all change here — the assigned worker must stay free for the (possibly
     // new) date + slot (overlap-aware). Hard 409. Excludes this camp from the check.
     const worker = workerFor(camp.type);
-    if ((camp as any)[worker.field]) {
-        await assertWorkerFree(worker, (camp as any)[worker.field].toString(), camp.date, (camp as any).timeSlot, camp._id);
+    if (camp[worker.field]) {
+        await assertWorkerFree(worker, camp[worker.field].toString(), camp.date, camp.timeSlot, camp._id);
     }
 
     camp = await camp.save();
@@ -844,7 +851,7 @@ const update = async (id: string, model: IUpdateCampPayload, ctx: RequestContext
 
 // moveStage is the ONLY path allowed to change a camp's status.
 const moveStage = async (id: string, model: IMoveStagePayload, ctx: RequestContext) => {
-    let camp = await CampService.get(id, ctx);
+    let camp: any = await CampService.get(id, ctx);
     if (!camp) {
         return throwAppError('Camp not found', StatusCodes.NOT_FOUND);
     }
@@ -861,7 +868,7 @@ const moveStage = async (id: string, model: IMoveStagePayload, ctx: RequestConte
 
     // the worker this camp uses + its currently-assigned role id
     const worker = workerFor(camp.type);
-    const assignee = (camp as any)[worker.field];
+    const assignee = camp[worker.field];
 
     // a camp cannot leave `requested` without its assigned worker (cancellation is exempt)
     const isCancel = to === CAMP_STATUSES.CANCELLED || to === CAMP_STATUSES.CANCELLED_CHARGED;
@@ -874,7 +881,7 @@ const moveStage = async (id: string, model: IMoveStagePayload, ctx: RequestConte
 
     // a camp cannot be confirmed if its worker is already booked on another camp the same day AND slot
     if (to === CAMP_STATUSES.CONFIRMED && assignee) {
-        const booked = await bookedWorkerIds(worker.field, camp.date, (camp as any).timeSlot, camp._id);
+        const booked = await bookedWorkerIds(worker.field, camp.date, camp.timeSlot, camp._id);
         if (booked.includes(assignee.toString())) {
             return throwAppError(`The ${worker.label} is already booked on another camp on this date and time slot`, StatusCodes.CONFLICT);
         }
@@ -903,7 +910,7 @@ const moveStage = async (id: string, model: IMoveStagePayload, ctx: RequestConte
 // transition to moveStage, so status changes stay in one place (unlike approveVoidCamp, which
 // copy-pastes the journal push). Route access is role-gated to FO/dietitian (RoleGuard).
 const activate = async (id: string, model: IActivateCampPayload, ctx: RequestContext) => {
-    const camp = await CampService.get(id, ctx); // own-scoped: FO→fo slot, dietitian→dietitian slot
+    const camp: any = await CampService.get(id, ctx); // own-scoped: FO→fo slot, dietitian→dietitian slot
     if (!camp) {
         return throwAppError('Camp not found', StatusCodes.NOT_FOUND);
     }
@@ -911,7 +918,7 @@ const activate = async (id: string, model: IActivateCampPayload, ctx: RequestCon
     // ownership — only the camp's assigned worker may start it (DRY via workerFor: FO for
     // screening/lab, dietitian for diet). Belt-and-suspenders on top of the own-scoped get().
     const worker = workerFor(camp.type);
-    const assignee = (camp as any)[worker.field];
+    const assignee = camp[worker.field];
     if (!assignee || assignee.toString() !== (ctx.role?._id || ctx.role?.id)?.toString()) {
         return throwAppError(`Only the assigned ${worker.label} can start this camp`, StatusCodes.FORBIDDEN);
     }
@@ -1194,13 +1201,13 @@ const bookingAvailability = async (model: IBookingAvailabilityPayload, ctx: Requ
             .select(`${worker.field} date timeSlot`)
             .lean();
 
-        for (const camp of camps) {
-            const roleId = (camp as any)[worker.field]?.toString();
+        for (const camp of camps as any[]) {
+            const roleId = camp[worker.field]?.toString();
             if (!roleId) {
                 continue;
             }
-            const key = dateKey((camp as any).date);
-            const slot = (camp as any).timeSlot as CampTimeSlot;
+            const key = dateKey(camp.date);
+            const slot = camp.timeSlot as CampTimeSlot;
             // a camp blocks its worker for every slot it overlaps (daytime slots block each other)
             const overlaps = overlappingSlots(slot);
 

@@ -105,6 +105,8 @@ export async function handleEvent(event: any, ctx: RequestContext): Promise<void
     const entityId = getByPath(payload, `data.${entityType}._id`);
     const entity = entityId ? { id: String(entityId), type: entityType, event: code } : undefined;
 
+    const toPersist: ICreateNotificationPayload[] = [];
+
     for (const recipient of config.recepients) {
         // 'data.fo.email' -> address is the last segment, recipient id is the object's _id,
         // template folder is the middle segment ('fo').
@@ -133,25 +135,22 @@ export async function handleEvent(event: any, ctx: RequestContext): Promise<void
                 continue;
             }
 
-            // Persist the row (needs the recipient User id; without it we still send but don't persist).
+            // Queue the row for a single bulk insert (needs the recipient User id; without it we
+            // still send but don't persist).
             if (recipientId) {
-                try {
-                    const createPayload: ICreateNotificationPayload = {
-                        recipient: String(recipientId),
-                        event: code,
-                        channel,
-                        body,
-                    };
-                    if (subject) {
-                        createPayload.subject = subject;
-                    }
-                    if (entity) {
-                        createPayload.entity = entity;
-                    }
-                    await NotificationService.create(createPayload, ctx);
-                } catch (error) {
-                    logger.error({ err: error, code, channel }, 'Failed to persist notification');
+                const createPayload: ICreateNotificationPayload = {
+                    recipient: String(recipientId),
+                    event: code,
+                    channel,
+                    body,
+                };
+                if (subject) {
+                    createPayload.subject = subject;
                 }
+                if (entity) {
+                    createPayload.entity = entity;
+                }
+                toPersist.push(createPayload);
             } else {
                 logger.warn({ code, source: recipient.source }, 'No recipient _id in payload — not persisting');
             }
@@ -166,6 +165,15 @@ export async function handleEvent(event: any, ctx: RequestContext): Promise<void
             } catch (error) {
                 logger.error({ err: error, code, channel, to }, 'Failed to send notification message');
             }
+        }
+    }
+
+    // Persist all rows for this event in a single round-trip.
+    if (toPersist.length) {
+        try {
+            await NotificationService.bulkCreate(toPersist, ctx);
+        } catch (error) {
+            logger.error({ err: error, code }, 'Failed to persist notifications');
         }
     }
 }

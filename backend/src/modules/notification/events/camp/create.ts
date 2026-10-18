@@ -13,6 +13,14 @@ const config: TemplateConfig = {
             source: 'data.mr.user.email',
             channels: [NOTIFICATION_CHANNELS.EMAIL]
         },
+        {
+            source: 'data.asm.user.email',
+            channels: [NOTIFICATION_CHANNELS.EMAIL]
+        },
+        {
+            source: 'data.rsm.user.email',
+            channels: [NOTIFICATION_CHANNELS.EMAIL]
+        },
     ],
     template: '/camp/create', 
     subject: 'A new camp has been created'

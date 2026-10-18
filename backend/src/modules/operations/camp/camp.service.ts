@@ -64,8 +64,8 @@ const populate: any[] = [
     { path: 'fo', populate: { path: 'user', select: 'firstName lastName email' } },
     { path: 'dietitian' },
     { path: 'mr', populate: { path: 'user', select: 'firstName lastName email' } },
-    { path: 'asm' },
-    { path: 'rsm' },
+    { path: 'asm', populate: { path: 'user', select: 'firstName lastName email' } },
+    { path: 'rsm', populate: { path: 'user', select: 'firstName lastName email' } },
     { path: 'devices', select: 'name code type' },
 ];
 
@@ -846,7 +846,13 @@ const update = async (id: string, model: IUpdateCampPayload, ctx: RequestContext
 
     camp = await camp.save();
 
-    return camp;
+    // raise the camp.update event with the populated camp (worker resolves recipients + delivers)
+    const populatedCamp = await get(camp._id.toString(), ctx, { populate: true });
+    // real camp.update trigger — opt this flow into publishing
+    ctx.processSync = true;
+    await eventProcessor.process('camp', 'update', populatedCamp ?? camp, ctx);
+
+    return populatedCamp ?? camp;
 };
 
 // moveStage is the ONLY path allowed to change a camp's status.

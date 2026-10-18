@@ -727,6 +727,8 @@ const create = async (model: ICreateCampPayload, ctx: RequestContext): Promise<H
 
     //6: raise the camp.create event with the populated camp (worker resolves recipients + delivers)
     const populatedCamp = await get(saved._id.toString(), ctx, { populate: true });
+    // real camp.create trigger — opt this flow into publishing
+    ctx.processSync = true;
     await eventProcessor.process('camp', 'create', populatedCamp ?? saved, ctx);
 
     return populatedCamp ?? saved;

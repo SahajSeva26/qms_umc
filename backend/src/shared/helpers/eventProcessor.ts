@@ -20,7 +20,12 @@ class EventProcessor {
             return;
         }
 
-        await eventManager.get(provider).publish(entity, event, data, ctx);
+        // Best-effort: a publish failure must never block the caller's main operation.
+        try {
+            await eventManager.get(provider).publish(entity, event, data, ctx);
+        } catch (error: any) {
+            log.error({ err: error, entity, event }, 'Failed to publish event');
+        }
     }
 }
 

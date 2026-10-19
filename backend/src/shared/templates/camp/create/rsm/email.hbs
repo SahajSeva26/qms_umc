@@ -1,0 +1,9 @@
+Hi {{data.rsm.user.firstName}},
+
+A new {{data.type}} camp has been booked for your MR {{data.mr.user.firstName}} {{data.mr.user.lastName}}.
+
+Camp:   {{data.code}}
+Doctor: {{data.doctor.name}}
+Date:   {{formatDate data.date}}
+Time:   {{data.timeSlot}}
+Venue:  {{data.location.addressLine1}}{{#if data.location.locality}}, {{data.location.locality}}{{/if}}, {{data.location.city}}, {{data.location.state}} - {{data.location.pincode}}

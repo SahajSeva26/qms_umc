@@ -23,6 +23,12 @@ export type RequestContext = {
     permissions: string[];
     logger: typeof logger;
 
+    meta: {
+        changes: string[];
+    };
+
+    processSync: boolean;
+
     // runtime fucntions
     setUser: (user: any) => void;
     setRole: (role: any) => void;
@@ -45,6 +51,12 @@ export const buildContext = (req: any, res: any, next: any) => {
         tenant: req.tenant || null,
         permissions: req.permissions || [],
         logger: req.log || logger,
+
+        meta: {
+            changes: [],
+        },
+
+        processSync: false,
 
         // runtime funcitons
         setUser: (userData: any) => {

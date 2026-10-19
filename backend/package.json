@@ -8,7 +8,8 @@
     "build": "tsc",
     "prestart": "npm run build",
     "start": "node dist/bin/server.js",
-    "seed:dummy": "tsx src/shared/env/script/seedDummyData.ts"
+    "seed:dummy": "tsx src/shared/env/script/seedDummyData.ts",
+    "worker:notification": "tsx watch src/workers/notification.worker.ts"
   },
   "engines": {
     "node": "22.x"
@@ -17,7 +18,9 @@
   "license": "ISC",
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^8.5.0",
+    "@aws-sdk/client-eventbridge": "^3.1147.0",
     "@aws-sdk/client-s3": "^3.1132.0",
+    "@aws-sdk/client-sqs": "^3.1149.0",
     "@aws-sdk/s3-request-presigner": "^3.1136.0",
     "@fast-csv/parse": "^5.0.7",
     "@googlemaps/routing": "^3.1.1",
@@ -28,6 +31,7 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "express-rate-limit": "^8.5.2",
+    "handlebars": "^4.7.10",
     "http-status-codes": "^2.3.0",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.7.3",

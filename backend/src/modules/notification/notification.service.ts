@@ -45,6 +45,18 @@ const set = (model: any, entity: HydratedDocument<INotification>) => {
     if (model.body !== undefined) {
         entity.body = model.body;
     }
+    if (model.status) {
+        entity.status = model.status;
+    }
+    if (model.attempts !== undefined) {
+        entity.attempts = model.attempts;
+    }
+    if (model.error !== undefined) {
+        entity.error = model.error;
+    }
+    if (model.sentAt !== undefined) {
+        entity.sentAt = model.sentAt;
+    }
     if (model.read !== undefined) {
         entity.read = model.read;
         entity.readAt = model.read ? new Date() : null;

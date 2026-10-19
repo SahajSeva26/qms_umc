@@ -28,6 +28,7 @@ import { UserModel } from '../modules/user/user.model';
 import { RoleModel } from '../modules/access-management/role/role.model';
 import { NotificationService } from '../modules/notification/notification.service';
 import { ICreateNotificationPayload } from '../modules/notification/notification.validators';
+import { NOTIFICATION_CHANNELS, NOTIFICATION_STATUS } from '../modules/notification/notification.constants';
 
 const queueUrl = ENV.Providers.AWS_SQS.NotificationQueueUrl;
 const queue = queueManager.get(SQS);
@@ -77,45 +78,95 @@ const renderTemplateFile = (filePath: string, data: unknown): string | null => {
     return HandlebarsHelper.render(source, data);
 };
 
-// Turn a consumed event into notifications: load config, resolve recipients, render templates,
-// persist a row per recipient/channel, and send via the matching provider.
+// Event-level context shared by every delivery of one consumed event.
+type EventContext = {
+    code: string;
+    template: string;
+    payload: unknown;
+    subject?: string | undefined;
+    entity?: { id: string; type: string; event: string } | undefined;
+};
+
+// Deliver one channel to one recipient and return the row to persist with its final send status.
+// in-app has no provider (persisting the row is the delivery). Never throws — a failed send is a
+// 'failed' row.
+async function deliver(
+    evt: EventContext,
+    folder: string,
+    to: string,
+    recipientId: unknown,
+    channel: ICreateNotificationPayload['channel'],
+): Promise<ICreateNotificationPayload | null> {
+    const templatePath = path.join(TEMPLATES_DIR, evt.template, folder, `${channel}.hbs`);
+    const body = renderTemplateFile(templatePath, evt.payload);
+    if (body === null) {
+        logger.warn({ code: evt.code, channel, templatePath }, 'Template missing — skipping');
+        return null;
+    }
+    if (!recipientId) {
+        logger.warn({ code: evt.code, channel }, 'No recipient _id — skipping');
+        return null;
+    }
+
+    const row: ICreateNotificationPayload = { recipient: String(recipientId), event: evt.code, channel, body };
+    if (evt.subject) {
+        row.subject = evt.subject;
+    }
+    if (evt.entity) {
+        row.entity = evt.entity;
+    }
+
+    if (channel === NOTIFICATION_CHANNELS.IN_APP) {
+        return { ...row, status: NOTIFICATION_STATUS.SENT, sentAt: new Date() };
+    }
+
+    const message: IMessage = { to, body };
+    if (evt.subject) {
+        message.subject = evt.subject;
+    }
+
+    try {
+        await messagingManager.get(channel).send(message);
+        return { ...row, status: NOTIFICATION_STATUS.SENT, sentAt: new Date(), attempts: 1 };
+    } catch (error: any) {
+        logger.error({ err: error, code: evt.code, channel, to }, 'Failed to send notification message');
+        return { ...row, status: NOTIFICATION_STATUS.FAILED, error: String(error?.message ?? error), attempts: 1 };
+    }
+}
+
+// Load the event's config, resolve recipients, fan out delivery in parallel, persist in one write.
 export async function handleEvent(event: any, ctx: RequestContext): Promise<void> {
-    // EventBridge envelope: detail-type carries the event code, detail carries the payload.
     const code: string | undefined = event?.['detail-type'];
     if (!code) {
         logger.warn({ event }, 'Consumed event has no detail-type — skipping');
         return;
     }
 
-    const configPath = path.join(EVENTS_DIR, code.replace(/\./g, '/'));
-    const config = await loadTemplate<TemplateConfig>(configPath);
-
+    const config = await loadTemplate<TemplateConfig>(path.join(EVENTS_DIR, code.replace(/\./g, '/')));
     if (!config) {
-        // No config for this code — ack and drop rather than retry forever.
         logger.warn({ code }, 'No template config for event code — skipping');
         return;
     }
 
-    // Config addresses the payload as `data.*` (e.g. 'data.fo.email'), so expose detail under `data`.
+    // Configs address the payload as `data.*`, so expose the event detail under `data`.
     const payload = { data: event.detail ?? {} };
     const subject = config.subject ? HandlebarsHelper.render(config.subject, payload) : undefined;
 
-    // Source entity: type is the code prefix ('camp.create' -> 'camp'). The id is at data.<type>._id
-    // when the payload wraps the entity, or data._id when the entity itself is published flat.
+    // The entity id is at data.<type>._id when the payload wraps the entity, or data._id when flat.
     const entityType = code.split('.')[0] ?? code;
     const entityId = getByPath(payload, `data.${entityType}._id`) ?? getByPath(payload, 'data._id');
     const entity = entityId ? { id: String(entityId), type: entityType, event: code } : undefined;
 
-    const toPersist: ICreateNotificationPayload[] = [];
+    const evt: EventContext = { code, template: config.template, payload, subject, entity };
 
+    // Fan out every recipient × channel — standalone process, so the sends run in parallel.
+    const jobs: Promise<ICreateNotificationPayload | null>[] = [];
     for (const recipient of config.recepients) {
-        // 'data.fo.email' -> address is the last segment, recipient id is the object's _id,
-        // template folder is the middle segment ('fo').
+        // 'data.fo.user.email' → address is the last segment, id is the object's _id, folder is 'fo'.
         const parts = recipient.source.split('.');
         const addressKey = parts[parts.length - 1] ?? '';
         const folder = parts[1] ?? '';
         const recipientObj = getByPath(payload, parts.slice(0, -1).join('.')) as Record<string, any> | undefined;
-
         const to = recipientObj?.[addressKey];
         const recipientId = recipientObj?._id;
 
@@ -124,52 +175,16 @@ export async function handleEvent(event: any, ctx: RequestContext): Promise<void
             continue;
         }
         if (!folder) {
-            logger.warn({ code, source: recipient.source }, 'Could not derive template folder from source — skipping');
+            logger.warn({ code, source: recipient.source }, 'Could not derive template folder — skipping');
             continue;
         }
 
         for (const channel of recipient.channels) {
-            const templatePath = path.join(TEMPLATES_DIR, config.template, folder, `${channel}.hbs`);
-            const body = renderTemplateFile(templatePath, payload);
-            if (body === null) {
-                logger.warn({ code, channel, templatePath }, 'Template missing — skipping');
-                continue;
-            }
-
-            // Queue the row for a single bulk insert (needs the recipient User id; without it we
-            // still send but don't persist).
-            if (recipientId) {
-                const createPayload: ICreateNotificationPayload = {
-                    recipient: String(recipientId),
-                    event: code,
-                    channel,
-                    body,
-                };
-                if (subject) {
-                    createPayload.subject = subject;
-                }
-                if (entity) {
-                    createPayload.entity = entity;
-                }
-                toPersist.push(createPayload);
-            } else {
-                logger.warn({ code, source: recipient.source }, 'No recipient _id in payload — not persisting');
-            }
-
-            const message: IMessage = { to, body };
-            if (subject) {
-                message.subject = subject;
-            }
-
-            try {
-                await messagingManager.get(channel).send(message);
-            } catch (error) {
-                logger.error({ err: error, code, channel, to }, 'Failed to send notification message');
-            }
+            jobs.push(deliver(evt, folder, to, recipientId, channel));
         }
     }
 
-    // Persist all rows for this event in a single round-trip.
+    const toPersist = (await Promise.all(jobs)).filter(Boolean) as ICreateNotificationPayload[];
     if (toPersist.length) {
         try {
             await NotificationService.bulkCreate(toPersist, ctx);

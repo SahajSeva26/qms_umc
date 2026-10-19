@@ -26,6 +26,11 @@ export const CreateNotificationPayloadSchema = z.object({
     channel: z.enum(Object.values(NOTIFICATION_CHANNELS)).openapi({ example: 'in-app' }),
     subject: z.string().optional().openapi({ example: 'New camp created' }),
     body: z.string().optional().openapi({ example: 'A new camp has been created for your division.' }),
+    // delivery outcome — set by the worker after the send attempt (defaults to pending in the model)
+    status: z.enum(Object.values(NOTIFICATION_STATUS)).optional().openapi({ example: 'sent' }),
+    attempts: z.number().int().nonnegative().optional().openapi({ example: 1 }),
+    error: z.string().optional().openapi({ example: 'SES throttled' }),
+    sentAt: z.coerce.date().optional().openapi({ example: '2026-10-19T06:00:00Z' }),
 });
 export type ICreateNotificationPayload = z.infer<typeof CreateNotificationPayloadSchema>;
 

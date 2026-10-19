@@ -7,19 +7,19 @@ const config: TemplateConfig = {
     recepients: [
         {
             source: 'data.fo.user.email',
-            channels: [NOTIFICATION_CHANNELS.EMAIL]
+            channels: [NOTIFICATION_CHANNELS.EMAIL, NOTIFICATION_CHANNELS.IN_APP]
         },
         {
             source: 'data.mr.user.email',
-            channels: [NOTIFICATION_CHANNELS.EMAIL]
+            channels: [NOTIFICATION_CHANNELS.EMAIL, NOTIFICATION_CHANNELS.IN_APP]
         },
         {
             source: 'data.asm.user.email',
-            channels: [NOTIFICATION_CHANNELS.EMAIL]
+            channels: [NOTIFICATION_CHANNELS.EMAIL, NOTIFICATION_CHANNELS.IN_APP]
         },
         {
             source: 'data.rsm.user.email',
-            channels: [NOTIFICATION_CHANNELS.EMAIL]
+            channels: [NOTIFICATION_CHANNELS.EMAIL, NOTIFICATION_CHANNELS.IN_APP]
         },
     ],
     template: '/camp/create', 

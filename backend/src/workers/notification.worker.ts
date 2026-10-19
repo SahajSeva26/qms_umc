@@ -152,10 +152,12 @@ export async function handleEvent(event: any, ctx: RequestContext): Promise<void
     const payload = { data: event.detail ?? {} };
     const subject = config.subject ? HandlebarsHelper.render(config.subject, payload) : undefined;
 
-    // The entity id is at data.<type>._id when the payload wraps the entity, or data._id when flat.
+    // entity.type is the code prefix ('camp.create' → 'camp'), entity.event is the verb ('create').
+    // The id is at data.<type>._id when the payload wraps the entity, or data._id when flat.
     const entityType = code.split('.')[0] ?? code;
+    const entityEvent = code.split('.').slice(1).join('.') || code;
     const entityId = getByPath(payload, `data.${entityType}._id`) ?? getByPath(payload, 'data._id');
-    const entity = entityId ? { id: String(entityId), type: entityType, event: code } : undefined;
+    const entity = entityId ? { id: String(entityId), type: entityType, event: entityEvent } : undefined;
 
     const evt: EventContext = { code, template: config.template, payload, subject, entity };
 

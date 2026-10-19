@@ -8,6 +8,7 @@ import { NotificationMapper } from './notification.mapper';
 import { RequestHandler } from '../../shared/utils/requestHandler';
 import { RequestContext } from '../../shared/utils/contextBuilder';
 import { eventProcessor } from '../../shared/helpers/eventProcessor';
+import { NOTIFICATION_CHANNELS } from './notification.constants';
 
 // GET /notifications/me — the caller's own notifications. The recipient is taken from ctx
 // (the authenticated user); search() pins the query to it, so no user id is ever accepted.
@@ -23,8 +24,10 @@ const me = async (req: any, res: any) => {
             });
         }
 
-        // pull the user id from ctx and pin the search to the caller's own notifications
+        // pin the search to the caller's own notifications, and to the in-app inbox channel only
+        // (email/sms/whatsapp rows are delivery records, not inbox items)
         filters.recipient = ctx.user?._id;
+        filters.channel = NOTIFICATION_CHANNELS.IN_APP;
 
         const pagination = RequestHandler.getPagination(filters);
 
@@ -37,6 +40,18 @@ const me = async (req: any, res: any) => {
             'Notifications fetched successfully',
             NotificationMapper.toSearchResponse(result, ctx),
         );
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
+// PATCH /notifications/me/read — mark ALL the caller's in-app notifications as read.
+// No id/user in the request — the recipient is taken from ctx.
+const markAllRead = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+        const result = await NotificationService.markAllRead(ctx);
+        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Notifications marked as read', result);
     } catch (error: any) {
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }
@@ -71,5 +86,6 @@ const testPublish = async (req: any, res: any) => {
 
 export const NotificationController = {
     me,
+    markAllRead,
     testPublish,
 };

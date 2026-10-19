@@ -22,6 +22,17 @@ registry.registerPath({
     },
 });
 
+// mark ALL the caller's in-app notifications as read (recipient from ctx, no id)
+registry.registerPath({
+    method: 'patch',
+    path: '/notifications/me/read',
+    tags: ['NOTIFICATION'],
+    summary: "Mark all the caller's in-app notifications as read",
+    responses: {
+        200: { description: 'Notifications marked as read' },
+    },
+});
+
 // TEMP (testing only) — publish an event to EventBridge to exercise the EventBridge→SQS→worker
 // path from an HTTP call. Remove before production.
 registry.registerPath({
@@ -50,6 +61,7 @@ registry.registerPath({
 // notifications (recipient taken from ctx). Notifications are created internally via
 // NotificationService.create by the events that trigger them.
 NotificationRouter.get('/me', NotificationController.me);
+NotificationRouter.patch('/me/read', NotificationController.markAllRead);
 
 // TEMP (testing only) — see swagger registration above. Remove before production.
 NotificationRouter.post('/test-publish', NotificationController.testPublish);

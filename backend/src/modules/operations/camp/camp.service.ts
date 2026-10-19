@@ -840,12 +840,13 @@ const update = async (id: string, model: IUpdateCampPayload, ctx: RequestContext
     const worker = workerFor(camp.type);
     if (camp[worker.field]) {
         await assertWorkerFree(worker, camp[worker.field].toString(), camp.date, camp.timeSlot, camp._id);
+        // only fire the update event when the camp has an assigned worker (fo/dietitian)
+        ctx.processSync = true;
     }
 
     camp = await camp.save();
 
     const populatedCamp = await get(camp._id.toString(), ctx, { populate: true });
-    ctx.processSync = true;
     await eventProcessor.process('camp', 'update', populatedCamp ?? camp, ctx);
 
     return populatedCamp ?? camp;

@@ -11,6 +11,7 @@ import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../shared/utils/contextBuilder';
 import { isValidObjectID } from '../../shared/utils/strings';
 import { IServiceOptions } from '../../shared/types/service.types';
+import { NOTIFICATION_CHANNELS } from './notification.constants';
 
 type NotificationDocument = HydratedDocument<INotification> | null;
 
@@ -155,12 +156,28 @@ const update = async (id: string, model: IUpdateNotificationPayload, ctx: Reques
     return notification;
 };
 
+// mark ALL the caller's unread in-app notifications as read — recipient is taken from ctx (no id),
+// scoped so a user only ever touches their own rows.
+const markAllRead = async (ctx: RequestContext) => {
+    const recipient = ctx.user?._id;
+    if (!recipient) {
+        return throwAppError('Unauthorized', StatusCodes.UNAUTHORIZED);
+    }
+
+    const result = await NotificationModel.updateMany(
+        { recipient, channel: NOTIFICATION_CHANNELS.IN_APP, read: false },
+        { $set: { read: true, readAt: new Date() } },
+    );
+    return { modified: result.modifiedCount };
+};
+
 export const NotificationService = {
     get,
     search,
     create,
     bulkCreate,
     update,
+    markAllRead,
 };
 
 // ========================================================================================

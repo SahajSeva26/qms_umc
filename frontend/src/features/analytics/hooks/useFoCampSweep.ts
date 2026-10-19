@@ -3,7 +3,7 @@ import { campsRealService } from '@/features/camps/campsReal.service'
 import type { CampEntity } from '@/types/campReal.types'
 import type { AnalyticsFilters } from '@/types/analytics.types'
 import { todayLocalDateString, periodStartLocalDateString } from '@/features/analytics/analytics.localDate'
-import { fetchRemainingPagesBounded } from '@/features/analytics/analytics.pagedFetch'
+import { fetchRemainingPagesBounded } from '@/lib/api/pagination'
 
 const STALE_TIME_MS = 60_000
 const PAGE_SIZE = 200

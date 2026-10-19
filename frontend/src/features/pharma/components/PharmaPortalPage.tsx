@@ -4,6 +4,7 @@ import PharmaRoleGate from '@/features/pharma/components/PharmaRoleGate'
 import PharmaProjectsPage from '@/features/pharma/pages/PharmaProjectsPage'
 import MrBookCampTab from '@/features/pharma/components/MrBookCampTab'
 import PharmaDashboardTab from '@/features/pharma/components/PharmaDashboardTab'
+import MrDashboardTab from '@/features/pharma/components/MrDashboardTab'
 import PharmaDoctorsTab from '@/features/pharma/components/PharmaDoctorsTab'
 import MyCampScheduleTab from '@/features/pharma/components/MyCampScheduleTab'
 
@@ -59,7 +60,10 @@ const PharmaPortalPage = ({ roleTypeCode, portalLabel }: PharmaPortalPageProps) 
           })}
         </div>
 
-        {tab === 'dashboard' && <PharmaDashboardTab />}
+        {/* GET /camps/my's RoleGuard admits only Field Officer, Dietitian, and Pharma MR
+            (camp.routes.ts) — HO/RSM/ASM must stay on the generic GET /camps-backed dashboard,
+            or they 403 immediately on load. */}
+        {tab === 'dashboard' && (roleTypeCode === 'pharma-mr' ? <MrDashboardTab /> : <PharmaDashboardTab />)}
         {tab === 'projects' && <PharmaProjectsPage />}
         {tab === 'book' && <MrBookCampTab />}
         {tab === 'schedule' && <MyCampScheduleTab />}

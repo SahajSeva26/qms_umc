@@ -61,6 +61,8 @@ const ALL_NAV_ITEMS: NavItem[] = [
 
   { id: 'crm',          label: 'CRM',                         icon: 'Users',         path: CRM_ROUTES.CRM },
 
+  { id: 'salesdashboard', label: 'Sales Dashboard',           icon: 'TrendingUp',    path: CRM_ROUTES.SALES_DASHBOARD },
+
   { id: 'tenants',      label: 'Client Management',           icon: 'Globe',         path: ACCESS_MANAGEMENT_ROUTES.TENANTS },
 
   // Sales & CRM — Delivery
@@ -160,7 +162,7 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
   {
     section: 'Sales & CRM',
     subs: [
-      { title: 'Pipeline', items: ['appointments', 'crm', 'tenants'].map((id) => NAV_BY_ID[id]) },
+      { title: 'Pipeline', items: ['appointments', 'crm', 'salesdashboard', 'tenants'].map((id) => NAV_BY_ID[id]) },
       // 'gantt' commented out, not deleted — no prototype equivalent exists to re-skin against; page itself still works.
       { title: 'Delivery', items: ['projects'/* , 'gantt' */].map((id) => NAV_BY_ID[id]) },
     ],

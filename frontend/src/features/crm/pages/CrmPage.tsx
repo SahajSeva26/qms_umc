@@ -4,9 +4,11 @@ import type { LeadStatus } from '@/types/crm.types'
 import { usePermission } from '@/hooks/usePermission'
 import { useLeads } from '@/features/crm/hooks/useLeads'
 import { useLeadReport } from '@/features/crm/hooks/useLeadReport'
+import { useMySalesSweep } from '@/features/crm/hooks/useMySalesSweep'
 import { useCrmFilters } from '@/features/crm/hooks/useCrmFilters'
 import { matchesFilters } from '@/features/crm/crm.filter'
 import { computeKpis, computeValueKpis } from '@/features/crm/crm.kpis'
+import { computeMyKpis } from '@/features/crm/crm.myKpis'
 import { downloadLeadsCsv } from '@/features/crm/crm.export'
 import { usePagination } from '@/hooks/usePagination'
 import { Button } from '@/components/ui/button'
@@ -39,6 +41,10 @@ const CrmPage = () => {
   // move-stage still require lead:manage/tenant:manage — hide controls that
   // would only 403 rather than showing them and letting them fail.
   const canManageLeads = hasAnyPermission(['lead:manage', 'tenant:manage'])
+  // GET /leads/report is gated to lead:manage ONLY (not tenant:manage) at the route level — a
+  // tenant:manage-only caller must fall into the own-scope "My Sales Dashboard" branch too, or
+  // the report call 403s every time.
+  const canViewLeadReport = hasAnyPermission(['lead:manage'])
   const { filters, setFilter, reset } = useCrmFilters()
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
   // All 6 filters are real, backend-supported params — needed server-side so count/totalPages
@@ -56,7 +62,11 @@ const CrmPage = () => {
     report: 'true',
   })
   // Unfiltered — always whole-tenant, independent of the table's own filters below.
-  const { report, isLoading: reportLoading, error: reportError, refetch: refetchReport } = useLeadReport({}, canManageLeads)
+  const { report, isLoading: reportLoading, error: reportError, refetch: refetchReport } = useLeadReport({}, canViewLeadReport)
+  // Anyone without lead:manage (KAM, Sales Rep, or a tenant:manage-only caller) falls back to
+  // "My Sales Dashboard", derived client-side from one full own-scoped /leads sweep instead.
+  const mySweep = useMySalesSweep(!canViewLeadReport)
+  const myKpis = useMemo(() => (mySweep.data ? computeMyKpis(mySweep.data) : []), [mySweep.data])
 
   // Prototype default: a rep-level (non-managing) caller lands on Compact;
   // everyone else lands on List (crm.js's role check, ported to this app's
@@ -130,13 +140,47 @@ const CrmPage = () => {
 
       {!isLoading && !error && (
         <>
-          {!canManageLeads && (
-            <p className="text-[13px] mb-4" style={{ color: 'var(--qms-text-muted)' }}>
-              Statistics are available to lead managers.
-            </p>
+          {!canViewLeadReport && (
+            <>
+              {mySweep.isLoading && (
+                <div className="grid gap-2.5 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="rounded-xl border p-3 h-18 animate-pulse"
+                      style={{ background: 'var(--qms-surface-strong)', borderColor: 'var(--qms-border)' }}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {!mySweep.isLoading && mySweep.isError && (
+                <div className="flex items-center gap-3 text-[13px] mb-4" style={{ color: 'var(--qms-text-muted)' }}>
+                  <span>Couldn't load your sales dashboard.</span>
+                  <Button variant="outline" size="sm" onClick={() => mySweep.refetch()}>
+                    Retry
+                  </Button>
+                </div>
+              )}
+
+              {!mySweep.isLoading && !mySweep.isError && mySweep.data && (
+                <>
+                  <p className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+                    My Sales Dashboard · current portfolio
+                  </p>
+                  {mySweep.data.length === 0 ? (
+                    <p className="text-[13px] mb-4" style={{ color: 'var(--qms-text-muted)' }}>
+                      You have no leads yet.
+                    </p>
+                  ) : (
+                    <CrmKpiStrip tiles={myKpis} />
+                  )}
+                </>
+              )}
+            </>
           )}
 
-          {canManageLeads && reportLoading && (
+          {canViewLeadReport && reportLoading && (
             <div className="grid gap-2.5 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
               {Array.from({ length: 4 }).map((_, i) => (
                 <div
@@ -148,7 +192,7 @@ const CrmPage = () => {
             </div>
           )}
 
-          {canManageLeads && !reportLoading && reportError && (
+          {canViewLeadReport && !reportLoading && reportError && (
             <div className="flex items-center gap-3 text-[13px] mb-4" style={{ color: 'var(--qms-text-muted)' }}>
               <span>Couldn't load stats.</span>
               <Button variant="outline" size="sm" onClick={() => refetchReport()}>
@@ -157,7 +201,7 @@ const CrmPage = () => {
             </div>
           )}
 
-          {canManageLeads && !reportLoading && !reportError && report && (
+          {canViewLeadReport && !reportLoading && !reportError && report && (
             <>
               <p className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--qms-text-muted)' }}>
                 All lead statistics
@@ -195,7 +239,7 @@ const CrmPage = () => {
 
           <PaginationControls page={page} totalPages={totalPages(count)} onPageChange={setPage} />
 
-          <BottomInsightsRow leads={leads} onOpenLead={setOpenLeadId} />
+          <BottomInsightsRow leads={leads} onOpenLead={setOpenLeadId} showTopReps={canManageLeads} />
         </>
       )}
 

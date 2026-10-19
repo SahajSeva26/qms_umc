@@ -20,6 +20,10 @@ export const crmRoutes: RouteObject[] = [
     lazy: lazyRoute(() => import('./pages/CrmPage'), CRM_VIEW_PERMISSIONS),
   },
   {
+    path: CRM_ROUTES.SALES_DASHBOARD,
+    lazy: lazyRoute(() => import('./salesDashboard/pages/SalesDashboardPage'), CRM_VIEW_PERMISSIONS),
+  },
+  {
     path: CRM_ROUTES.APPOINTMENTS,
     lazy: lazyRoute(() => import('./pages/AppointmentsPage'), APPOINTMENT_VIEW_PERMISSIONS),
   },

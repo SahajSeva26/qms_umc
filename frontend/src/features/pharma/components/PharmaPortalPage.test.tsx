@@ -9,7 +9,8 @@ vi.mock('@/hooks/useSession')
 
 vi.mock('@/features/pharma/pages/PharmaProjectsPage', () => ({ default: () => <div>Projects tab content</div> }))
 vi.mock('@/features/pharma/components/MrBookCampTab', () => ({ default: () => <div>Book camp tab content</div> }))
-vi.mock('@/features/pharma/components/PharmaDashboardTab', () => ({ default: () => <div>Dashboard tab content</div> }))
+vi.mock('@/features/pharma/components/PharmaDashboardTab', () => ({ default: () => <div>Generic dashboard tab content</div> }))
+vi.mock('@/features/pharma/components/MrDashboardTab', () => ({ default: () => <div>MR dashboard tab content</div> }))
 vi.mock('@/features/pharma/components/PharmaDoctorsTab', () => ({ default: () => <div>Doctors tab content</div> }))
 vi.mock('@/features/pharma/components/MyCampScheduleTab', () => ({ default: () => <div>Camp schedule tab content</div> }))
 
@@ -67,4 +68,31 @@ describe('PharmaPortalPage — Camp schedule tab visibility', () => {
     await screen.findByRole('button', { name: /^dashboard$/i })
     expect(screen.queryByRole('button', { name: /camp schedule/i })).not.toBeInTheDocument()
   })
+})
+
+// GET /camps/my's RoleGuard admits only Field Officer, Dietitian, and Pharma MR (camp.routes.ts) —
+// HO/RSM/ASM must never be routed to MrDashboardTab (which calls /camps/my), or they 403 on load.
+describe('PharmaPortalPage — Dashboard tab routes to the correct component per role', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  it('renders MrDashboardTab (GET /camps/my) for pharma-mr', async () => {
+    await mockSettledSession('pharma-mr')
+    renderPortal('pharma-mr')
+
+    expect(await screen.findByText('MR dashboard tab content')).toBeInTheDocument()
+    expect(screen.queryByText('Generic dashboard tab content')).not.toBeInTheDocument()
+  })
+
+  it.each(['pharma-rsm', 'pharma-asm', 'pharma-division-head'])(
+    'renders the generic PharmaDashboardTab (GET /camps) for %s, never MrDashboardTab',
+    async (roleTypeCode) => {
+      await mockSettledSession(roleTypeCode)
+      renderPortal(roleTypeCode)
+
+      expect(await screen.findByText('Generic dashboard tab content')).toBeInTheDocument()
+      expect(screen.queryByText('MR dashboard tab content')).not.toBeInTheDocument()
+    },
+  )
 })

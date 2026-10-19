@@ -12,6 +12,7 @@ import { DIVISION_PERMISSIONS } from '../../modules/crm/division/division.consta
 import { CONTACT_PERMISSIONS } from '../../modules/crm/contact/contact.constants';
 import { BRAND_PERMISSIONS } from '../../modules/crm/brand/brand.constants';
 import { ROLE_PERMISSIONS } from '../../modules/access-management/role/role.constants';
+import { PROJECT_PERMISSIONS } from '../../modules/crm/project/project.constants';
 import { INVENTORY_REQUEST_PERMISSIONS } from '../../modules/inventory/inventory-request/inventory-request.constants';
 import { INVENTORY_MASTER_PERMISSIONS } from '../../modules/inventory/inventory-master/inventory-master.constants';
 import { INVENTORY_CONSUMABLE_PERMISSIONS } from '../../modules/inventory/inventory-consumable/inventory-consumable.constants';
@@ -58,6 +59,13 @@ export const CRM_BUSINESS_ROLE_TYPES = [
             // read-only view of the brand catalog (their own tenant's brands, scoped by ctx.where)
             BRAND_PERMISSIONS.SEARCH.code,
             BRAND_PERMISSIONS.GET.code,
+
+            // own-scoped (applyOwnScope pins non-manage actors to Project.salesRep === self) — real
+            // "my projects" data for the Sales Dashboard, unlike camp:search (dead for this role type)
+            // or invoice:search (no own-scope at all — would leak every tenant's invoices).
+            // project:search alone also covers GET /projects/:id (project.routes.ts accepts SEARCH
+            // directly on the detail route) — project:get is not separately checked anywhere.
+            PROJECT_PERMISSIONS.SEARCH.code,
         ],
     },
     {
@@ -76,6 +84,10 @@ export const CRM_BUSINESS_ROLE_TYPES = [
             DIVISION_PERMISSIONS.MANAGE.code,
             CONTACT_PERMISSIONS.MANAGE.code,
             BRAND_PERMISSIONS.MANAGE.code,
+
+            // see Sales Rep's own comment above — project:search is the one real, safely-own-scoped
+            // tile source for the Sales Dashboard; camp/invoice are not.
+            PROJECT_PERMISSIONS.SEARCH.code,
         ],
     },
 ];

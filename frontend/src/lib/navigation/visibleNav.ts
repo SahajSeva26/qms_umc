@@ -1,5 +1,5 @@
 import { FULL_NAV_SECTIONS, type NavItem } from '@/lib/navigation/navRegistry'
-import { getPharmaRoleMeta } from '@/features/pharma/pharma.constants'
+import { isPharmaRoleType } from '@/lib/access/pharmaAccess'
 import { canReadEmployees } from '@/lib/access/employeeAccess'
 
 // Single source of truth for "which sidebar item can this session reach" — shared by Sidebar.tsx
@@ -39,7 +39,7 @@ function isRealSystemManage(session: VisibleNavSession): boolean {
 
 /** Whether the nav item is reachable at all — the gate Sidebar.tsx renders from and AuthContinuePage resolves against. */
 export function isNavItemVisible(item: NavItem, session: VisibleNavSession): boolean {
-  if (item.id === 'pharma') return getPharmaRoleMeta(session.roleTypeCode) !== null
+  if (item.id === 'pharma') return isPharmaRoleType(session.roleTypeCode)
   if (item.id === 'employees') return session.isSettled && canReadEmployees(session.roleTypeCode, session.permissions)
   const requiredCodes = REAL_GATED_NAV_ITEMS[item.id]
   if (!requiredCodes) return true
@@ -57,10 +57,10 @@ export function isNavItemDisabled(item: NavItem, session: VisibleNavSession): bo
 
 /** Flattened, in display order — same section/sub filters Sidebar.tsx applies before rendering. */
 export function getVisibleNavItems(session: VisibleNavSession): NavItem[] {
-  const isPharmaRoleType = getPharmaRoleMeta(session.roleTypeCode) !== null
+  const sessionIsPharmaRoleType = isPharmaRoleType(session.roleTypeCode)
   return FULL_NAV_SECTIONS
     .filter((section) => section.section !== 'System' || isRealSystemManage(session))
-    .filter((section) => section.section === 'Pharma Portal' || !isPharmaRoleType)
+    .filter((section) => section.section === 'Pharma Portal' || !sessionIsPharmaRoleType)
     .flatMap((section) => section.subs.flatMap((sub) => sub.items))
     .filter((item) => isNavItemVisible(item, session))
 }

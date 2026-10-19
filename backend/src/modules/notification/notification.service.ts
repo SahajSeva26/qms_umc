@@ -83,7 +83,8 @@ const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): 
 };
 
 const search = async (filters: ISearchNotificationQuery, ctx: RequestContext, options?: IServiceOptions) => {
-    const sort: any = { createdAt: -1 };
+    // newest first; _id breaks ties so rows bulk-inserted in the same ms keep a stable order
+    const sort: any = { createdAt: -1, _id: -1 };
 
     const where: mongoose.QueryFilter<INotification> = {};
 

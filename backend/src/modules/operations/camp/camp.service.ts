@@ -725,9 +725,7 @@ const create = async (model: ICreateCampPayload, ctx: RequestContext): Promise<H
         return await camp.save();
     });
 
-    //6: raise the camp.create event with the populated camp (worker resolves recipients + delivers)
     const populatedCamp = await get(saved._id.toString(), ctx, { populate: true });
-    // real camp.create trigger — opt this flow into publishing
     ctx.processSync = true;
     await eventProcessor.process('camp', 'create', populatedCamp ?? saved, ctx);
 
@@ -846,9 +844,7 @@ const update = async (id: string, model: IUpdateCampPayload, ctx: RequestContext
 
     camp = await camp.save();
 
-    // raise the camp.update event with the populated camp (worker resolves recipients + delivers)
     const populatedCamp = await get(camp._id.toString(), ctx, { populate: true });
-    // real camp.update trigger — opt this flow into publishing
     ctx.processSync = true;
     await eventProcessor.process('camp', 'update', populatedCamp ?? camp, ctx);
 

@@ -27,8 +27,6 @@ export type RequestContext = {
         changes: string[];
     };
 
-    // when true, a handler may process side-effects (events/notifications) inline
-    // instead of publishing; defaults to false
     processSync: boolean;
 
     // runtime fucntions

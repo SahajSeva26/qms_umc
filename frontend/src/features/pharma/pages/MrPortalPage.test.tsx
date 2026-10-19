@@ -13,7 +13,7 @@ vi.mock('@/features/pharma/pages/PharmaProjectsPage', () => ({
 vi.mock('@/features/pharma/components/MrBookCampTab', () => ({
   default: () => <div>Book camp tab content</div>,
 }))
-vi.mock('@/features/pharma/components/PharmaDashboardTab', () => ({
+vi.mock('@/features/pharma/components/MrDashboardTab', () => ({
   default: () => <div>Dashboard tab content</div>,
 }))
 vi.mock('@/features/pharma/components/PharmaDoctorsTab', () => ({

@@ -41,14 +41,6 @@ export const UpdateNotificationPayloadSchema = z.object({
 });
 export type IUpdateNotificationPayload = z.infer<typeof UpdateNotificationPayloadSchema>;
 
-// TEMP (testing only) — payload for POST /notifications/test-publish.
-// Publishes an event to EventBridge to exercise the EventBridge→SQS→worker path. Remove before prod.
-export const TestPublishNotificationPayloadSchema = z.object({
-    type: z.string().min(1).default('camp.create').openapi({ example: 'camp.create' }),
-    data: z.any().optional().openapi({ example: { message: 'hello from test-publish route' } }),
-});
-export type ITestPublishNotificationPayload = z.infer<typeof TestPublishNotificationPayloadSchema>;
-
 //3: search ====================================>
 export const SearchNotificationQuerySchema = z.object({
     event: z.string().optional().openapi({ example: 'camp.create' }),

@@ -14,6 +14,7 @@ import { CounterService } from '../../counter/counter.service';
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
+import { eventProcessor } from '../../../shared/helpers/eventProcessor';
 import { isValidObjectID, toObjectId } from '../../../shared/utils/strings';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { LeadService } from '../lead/lead.service';
@@ -30,8 +31,8 @@ const populate: any[] = [
     { path: 'tenant', select: 'name code' },
     { path: 'division', select: 'name code therapy' },
     { path: 'lead', select: 'title status' },
-    { path: 'salesRep' },
-    { path: 'projectCoordinator' },
+    { path: 'salesRep', populate: { path: 'user', select: 'firstName lastName email' } },
+    { path: 'projectCoordinator', populate: { path: 'user', select: 'firstName lastName email' } },
     { path: 'marketingContact' },
     { path: 'tests', select: 'name code therapy' },
     // execution-mode document refs → file module
@@ -297,7 +298,11 @@ const create = async (model: ICreateProjectPayload, ctx: RequestContext): Promis
         return project;
     });
 
-    return project;
+    const populated = await get(project._id.toString(), ctx, { populate: true });
+    ctx.processSync = true;
+    await eventProcessor.process('project', 'create', populated ?? project, ctx);
+
+    return populated ?? project;
 };
 
 const update = async (id: string, model: IUpdateProjectPayload, ctx: RequestContext) => {
@@ -311,7 +316,14 @@ const update = async (id: string, model: IUpdateProjectPayload, ctx: RequestCont
     project = await set(model, project, ctx);
     project = await project.save();
 
-    return project;
+    // only notify on an update that (re)assigns the coordinator or sales rep
+    if (model.salesRep !== undefined || model.projectCoordinator !== undefined) {
+        ctx.processSync = true;
+    }
+    const populated = await get(project._id.toString(), ctx, { populate: true });
+    await eventProcessor.process('project', 'update', populated ?? project, ctx);
+
+    return populated ?? project;
 };
 
 // moveStage is the ONLY path allowed to change a project's status.

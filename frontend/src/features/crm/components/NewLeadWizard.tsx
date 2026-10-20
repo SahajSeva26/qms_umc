@@ -145,7 +145,9 @@ const NewLeadWizard = ({ onClose, onCreated, prefill }: NewLeadWizardProps) => {
       tenant: form.tenantId,
       division: form.divisionId,
       contactPerson: form.contactPersonId,
-      salesPerson: form.salesPersonId,
+      // Omitted (not sent as '') when unset — the backend then defaults to the
+      // tenant's assigned sales person, same as when the picker can't load.
+      ...(form.salesPersonId ? { salesPerson: form.salesPersonId } : {}),
       title: form.title,
       problemStatement: form.problemStatement,
       numberOfMRS: form.numberOfMRS,

@@ -209,4 +209,46 @@ describe('NewLeadWizard — draft persistence', () => {
     await waitFor(() => expect(onCreated).toHaveBeenCalled())
     expect(sessionStorage.getItem(draftStorageKey(userId))).toBeNull()
   }, 10000)
+
+  // Regression: the sales-rep picker 403s for actors (e.g. Sales Head) who lack
+  // tenant:manage, since resolving its role-type options requires GET /role-types.
+  // salesPersonId must stay optional so lead creation isn't blocked by that —
+  // the backend defaults an omitted salesPerson to the tenant's assigned rep.
+  it('creating a lead without picking a sales rep still succeeds, and the payload omits salesPerson entirely', async () => {
+    const { crmService } = await import('@/features/crm/crm.service')
+    const userId = nextDraftTestUserId()
+    const user = userEvent.setup()
+    const onCreated = vi.fn()
+
+    seedDraft(userId, {
+      tenantId: 'tenant-1', tenantLabel: 'Sun Cardio (SC)', divisionId: 'div-1', divisionLabel: 'Cardiology',
+      contactPersonId: 'contact-1', contactPersonLabel: 'Dr. Contact', focusTherapy: ['Cardiology'], focusTherapyDoctor: ['Cardiologist'],
+    })
+    useAuthStore.getState().setAuth({ id: userId, email: 'system@gmail.com', firstName: 'System', lastName: 'User' })
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <NewLeadWizard onClose={vi.fn()} onCreated={onCreated} />
+      </QueryClientProvider>,
+    )
+    await user.click(await screen.findByRole('button', { name: /^Resume$/i }))
+    await user.click(screen.getByRole('button', { name: /^Next/i }))
+
+    await user.type(screen.getByPlaceholderText(/cardiology screening expansion/i), 'Test Lead Title')
+    await user.type(screen.getByPlaceholderText(/describe the client/i), 'A real problem statement.')
+    await user.click(screen.getByRole('button', { name: 'Doctor meets' }))
+
+    await user.click(screen.getByRole('button', { name: /^Next/i }))
+    await user.click(await screen.findByRole('button', { name: 'Screening' }))
+    await user.click(screen.getByRole('button', { name: 'Screening Camp' }))
+    await user.type(screen.getByPlaceholderText(/reason for this offering/i), 'A real reason.')
+    await user.click(screen.getByRole('button', { name: /^Next/i }))
+
+    // Step 4 reached, sales rep combobox left untouched (no pick).
+    await screen.findByRole('combobox')
+    await user.click(screen.getByRole('button', { name: /Create lead/i }))
+
+    await waitFor(() => expect(onCreated).toHaveBeenCalled())
+    const payload = vi.mocked(crmService.createLead).mock.calls[0][0]
+    expect(payload).not.toHaveProperty('salesPerson')
+  }, 10000)
 })

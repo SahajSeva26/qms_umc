@@ -13,8 +13,8 @@ interface NotificationCardProps {
 // Unresolved entity types render inert — readable, but not clickable.
 const NotificationCard = ({ notification, onNavigate }: NotificationCardProps) => {
   const navigate = useNavigate()
-  const { session } = useSession()
-  const resolution = resolveNotificationEntity(notification.entity, session?.roleType?.code)
+  const { session, hasAnyPermission } = useSession()
+  const resolution = resolveNotificationEntity(notification.entity, session?.roleType?.code, hasAnyPermission)
   const Icon = resolution?.icon ?? FiBell
 
   const content = (

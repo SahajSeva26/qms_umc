@@ -43,7 +43,9 @@ export const wizardStep4Schema = z.object({
   estimatedValue: z.number().nonnegative('Must be 0 or more.'),
   confidence: z.number().int('Must be a whole number.').min(0).max(100),
   followUpDate: z.string().min(1, 'Follow-up date is required.'),
-  salesPersonId: z.string().min(1, 'Select a sales rep.'),
+  // Optional — CreateLeadPayload.salesPerson is optional; omitting it lets the
+  // backend default to the tenant's assigned sales person.
+  salesPersonId: z.string().optional(),
 })
 
 // Only enforced when the stage move requires a reason (backward moves etc.)

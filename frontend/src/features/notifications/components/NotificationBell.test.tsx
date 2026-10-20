@@ -280,4 +280,25 @@ describe('NotificationBell', () => {
 
     expect(await screen.findByText(/no notifications yet/i)).toBeInTheDocument()
   })
+
+  it('clicking "View all" closes the popover and opens the full drawer', async () => {
+    vi.mocked(notificationsService.getMyNotifications).mockResolvedValue({
+      success: true,
+      message: '',
+      data: { items: [itemFixture('a')], count: 1 },
+    })
+
+    const user = userEvent.setup()
+    renderBell()
+
+    await user.click(screen.getByRole('button', { name: /notifications/i }))
+    await screen.findByText('Subject a')
+
+    await user.click(screen.getByRole('button', { name: /view all/i }))
+
+    // The popover's compact feed is gone; the drawer's own "Notifications" heading + filters remain.
+    expect(screen.queryByRole('button', { name: /^load more$/i })).not.toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'All' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Unread' })).toBeInTheDocument()
+  })
 })

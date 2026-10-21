@@ -105,7 +105,9 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
   const [endTouched, setEndTouched] = useState(false)
   const [error, setError] = useState('')
 
-  const { session } = usePermission()
+  const { session, hasAnyPermission } = usePermission()
+  // POST /leads requires lead:manage or tenant:manage server-side — viewing an appointment needs neither.
+  const canCreateLead = hasAnyPermission(['lead:manage', 'tenant:manage'])
 
   const moveStage = useMoveAppointmentStage(appointment?.id ?? '')
   const respond = useRespondToAppointment(appointment?.id ?? '')
@@ -156,10 +158,7 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
 
   const resolvedNextSteps = nextStepsOption === NEXT_STEPS_OTHER ? nextStepsText.trim() : nextStepsOption
 
-  // moveStage's `reason` is required server-side (min length 1) for every
-  // `to`. For "done" the UI doesn't ask for it separately — MoM already
-  // captures the "why" there, so it's derived. For "cancelled" there's no
-  // other field to borrow from, so the user's own typed reason is sent as-is.
+  // moveStage's `reason` is required server-side — "done" derives it from MoM, "cancelled" sends the user's typed reason as-is.
   const buildMoveStageReason = (to: AppointmentStatus) => {
     if (to === 'done') return momText.trim() ? `Marked done — ${momText.trim()}` : 'Marked done'
     return cancelReason.trim()
@@ -214,9 +213,7 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
     setRescheduleEnd(value)
   }
 
-  // rescheduleReason is frontend-only for now — the update endpoint has no
-  // dedicated reason field (unlike moveStage's required `reason`), so it's
-  // validated here for discipline but not sent. See TODO.md.
+  // rescheduleReason is frontend-only for now — validated but not sent (update has no reason field). See TODO.md.
   const handleRescheduleSave = async () => {
     if (!rescheduleStart) return setError('A new start time is required')
     if (!rescheduleReason.trim()) return setError('A reason for rescheduling is required')
@@ -350,9 +347,17 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
           </div>
         </div>
       ) : (
-        <p className="mt-5 pt-4 text-[12px]" style={{ borderTop: '1px solid var(--qms-border)', color: 'var(--qms-text-muted)' }}>
-          This appointment is {(APPOINTMENT_STATUS_LABEL[appointment.status] ?? appointment.status).toLowerCase()} — read-only.
-        </p>
+        <div className="mt-5 pt-4 flex items-center justify-between gap-2 flex-wrap" style={{ borderTop: '1px solid var(--qms-border)' }}>
+          <p className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>
+            This appointment is {(APPOINTMENT_STATUS_LABEL[appointment.status] ?? appointment.status).toLowerCase()} — read-only.
+          </p>
+          {/* The one-time "+ New lead" inside the Mark-done dialog is easy to skip in the moment — offer it here too, so a done meeting's lead can still be created later. */}
+          {appointment.status === 'done' && canCreateLead && (
+            <Button type="button" size="sm" variant="outline" onClick={() => setNewLeadOpen(true)}>
+              + New lead
+            </Button>
+          )}
+        </div>
       )}
 
       <Dialog open={panel === 'moveStage'} onOpenChange={(o) => !o && setPanel(null)}>
@@ -411,7 +416,7 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
             {error && <p className="text-[12px] font-semibold text-danger">{error}</p>}
           </div>
           <DialogFooter className="sm:justify-between">
-            {targetStatus === 'done' ? (
+            {targetStatus === 'done' && canCreateLead ? (
               <Button type="button" size="sm" variant="outline" onClick={() => setNewLeadOpen(true)}>
                 + New lead
               </Button>

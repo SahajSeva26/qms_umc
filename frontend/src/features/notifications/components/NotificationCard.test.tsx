@@ -51,7 +51,8 @@ function renderCard(roleTypeCode: string | null) {
   )
 }
 
-// /camps?camp=<id> is unreachable for pharma roles (AppLayout force-redirects them).
+// /camps?camp=<id> is unreachable for pharma roles (AppLayout force-redirects them) — except
+// pharma-mr, which has its own exception onto the combined Camp Management page.
 describe('NotificationCard — pharma-role click destination', () => {
   it('renders as a clickable button and navigates for a non-pharma role', async () => {
     const user = userEvent.setup()
@@ -63,7 +64,7 @@ describe('NotificationCard — pharma-role click destination', () => {
     expect(await screen.findByText('Camps page')).toBeInTheDocument()
   })
 
-  it.each(['pharma-mr', 'pharma-asm', 'pharma-rsm', 'pharma-division-head'])(
+  it.each(['pharma-asm', 'pharma-rsm', 'pharma-division-head'])(
     'renders inert (no button) for %s, since /camps is unreachable for pharma roles',
     (roleTypeCode) => {
       renderCard(roleTypeCode)
@@ -72,6 +73,16 @@ describe('NotificationCard — pharma-role click destination', () => {
       expect(screen.getByText('A new camp has been created')).toBeInTheDocument()
     },
   )
+
+  it('renders clickable and navigates for pharma-mr, the one exception', async () => {
+    const user = userEvent.setup()
+    renderCard('pharma-mr')
+
+    const button = screen.getByRole('button')
+    await user.click(button)
+
+    expect(await screen.findByText('Camps page')).toBeInTheDocument()
+  })
 
   it('still renders clickable when session has not resolved yet (roleTypeCode undefined)', async () => {
     const user = userEvent.setup()

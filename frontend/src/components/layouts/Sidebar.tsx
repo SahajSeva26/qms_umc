@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { useSession } from '@/hooks/useSession'
 import { getPharmaRoleMeta } from '@/features/pharma/pharma.constants'
-import { isNavItemVisible as isNavItemReachable, type VisibleNavSession } from '@/lib/navigation/visibleNav'
+import { isNavItemVisible as isNavItemReachable, isPharmaExtraNavItem, type VisibleNavSession } from '@/lib/navigation/visibleNav'
 import {
   FULL_NAV_SECTIONS,
   type NavItem,
@@ -304,11 +304,16 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
 
   const visibleFullNavSections = FULL_NAV_SECTIONS
     .filter((section) => section.section !== 'System' || isRealSystemManage)
-    .filter((section) => section.section === 'Pharma Portal' || !isPharmaRoleType)
     .map((section) => ({
       ...section,
       subs: section.subs
-        .map((sub) => ({ ...sub, items: sub.items.filter(isNavItemVisible) }))
+        .map((sub) => ({
+          ...sub,
+          // A pharma session sees only its Pharma Portal link plus its own extra-item allowlist (e.g. MR's Camp Management).
+          items: sub.items.filter((item) =>
+            !isPharmaRoleType || item.id === 'pharma' || isPharmaExtraNavItem(item, visibleNavSession),
+          ).filter(isNavItemVisible),
+        }))
         .filter((sub) => sub.items.length > 0),
     }))
     .filter((section) => section.subs.length > 0)

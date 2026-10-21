@@ -89,6 +89,30 @@ describe('Sidebar — pharma identity isolation', () => {
     expect(screen.getByText('Doctor Management')).toBeInTheDocument()
     expect(screen.queryByText(/pharma portal/i)).not.toBeInTheDocument()
   })
+
+  // pharma-mr's one exception: it also sees the real (non-pharma) Camp Management item, own-scoped server-side.
+  it('shows Pharma Portal AND Camp Management for pharma-mr with camp:book — no other non-pharma item', async () => {
+    await renderSidebar({
+      permissions: ['camp:book'],
+      session: sessionFixture('pharma-mr', ['camp:book']),
+    })
+
+    expect(screen.getByText('Pharma Portal MR')).toBeInTheDocument()
+    expect(screen.getByText('Camp Management')).toBeInTheDocument()
+    expect(screen.queryByText('Dashboard')).not.toBeInTheDocument()
+    expect(screen.queryByText('CRM')).not.toBeInTheDocument()
+    expect(screen.queryByText('Client Management')).not.toBeInTheDocument()
+  })
+
+  it('no other pharma role gets the Camp Management exception, even if they somehow hold camp:book', async () => {
+    await renderSidebar({
+      permissions: ['camp:book'],
+      session: sessionFixture('pharma-rsm', ['camp:book']),
+    })
+
+    expect(screen.getByText('Pharma Portal RSM')).toBeInTheDocument()
+    expect(screen.queryByText('Camp Management')).not.toBeInTheDocument()
+  })
 })
 
 describe('Sidebar — FO Management platform-tenant gate (unreachable via nav while the item is hidden, but must not silently break)', () => {
@@ -123,9 +147,7 @@ describe('Sidebar — FO Management platform-tenant gate (unreachable via nav wh
   })
 })
 
-// The old per-session "Requests" label-swap (InventoryOperationsPage.tsx, removed) no longer
-// exists — the inventory nav item is one page with internal tabs now (InventoryManagementPage.tsx),
-// not a page whose identity changes per session. The label is a constant; this locks that in.
+// Inventory nav item is one page with internal tabs now (InventoryManagementPage.tsx) — label is a constant, not session-dependent.
 describe('Sidebar — the Inventory Management nav label is constant, not session-dependent', () => {
   it('shows "Inventory Management" for a field-officer-shaped session (only inventory-request:* permissions)', async () => {
     await renderSidebar({

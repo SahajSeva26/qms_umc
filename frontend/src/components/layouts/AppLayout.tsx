@@ -66,7 +66,9 @@ const AppLayout = () => {
   // null for a role with no type — optional-chain past the frontend type here.
   const pharmaMeta = getPharmaRoleMeta(session.roleType?.code)
   const onPharmaPath = location.pathname === '/pharma' || location.pathname.startsWith('/pharma/')
-  if (pharmaMeta && !onPharmaPath) {
+  // MR's one exception: only the combined Camp Management page itself, not /camps/screening, /camps/new, camp-detail routes, etc.
+  const onMrExtraPath = session.roleType?.code === 'pharma-mr' && location.pathname === '/camps'
+  if (pharmaMeta && !onPharmaPath && !onMrExtraPath) {
     return <Navigate to={pharmaMeta.portalPath} replace />
   }
   if (!pharmaMeta && onPharmaPath) {

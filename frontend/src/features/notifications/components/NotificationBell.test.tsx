@@ -15,7 +15,11 @@ vi.mock('@/features/notifications/notifications.service', () => ({
 }))
 
 function makeQueryClient() {
-  return new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  // staleTime matches the app's real queryClient.ts default (5min) — without it, every test
+  // query is "stale" by TanStack's own built-in default (0ms) and refetches on every mount
+  // regardless of whether NotificationBell itself actually triggers a refetch, masking bugs
+  // like the feed not refreshing when the popover reopens.
+  return new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 5 * 60 * 1000 } } })
 }
 
 function renderBell() {
@@ -111,6 +115,37 @@ describe('NotificationBell', () => {
 
     expect(await screen.findByText('Subject a')).toBeInTheDocument()
     expect(screen.getByText('Body a')).toBeInTheDocument()
+  })
+
+  it('reopening the popover refetches the feed instead of showing stale cached content — a new notification that arrived while closed must not be hidden behind a red badge with no visible content', async () => {
+    // The feed's query has the app-wide 5-minute staleTime, so without an explicit
+    // refetch-on-open it would keep showing page 1's original single item even after a
+    // second notification has landed server-side while the popover was closed.
+    vi.mocked(notificationsService.getMyNotifications).mockImplementation(async (query: SearchNotificationQuery) => {
+      if (query.page) {
+        return { success: true, message: '', data: { items: [itemFixture('a')], count: 1 } }
+      }
+      return { success: true, message: '', data: { items: [], count: 1 } }
+    })
+
+    const user = userEvent.setup()
+    renderBell()
+
+    await user.click(screen.getByRole('button', { name: /notifications/i }))
+    await screen.findByText('Subject a')
+    await user.click(screen.getByRole('button', { name: /notifications/i })) // close
+
+    vi.mocked(notificationsService.getMyNotifications).mockImplementation(async (query: SearchNotificationQuery) => {
+      if (query.page) {
+        return { success: true, message: '', data: { items: [itemFixture('b'), itemFixture('a')], count: 2 } }
+      }
+      return { success: true, message: '', data: { items: [], count: 2 } }
+    })
+
+    await user.click(screen.getByRole('button', { name: /notifications/i })) // reopen
+
+    expect(await screen.findByText('Subject b')).toBeInTheDocument()
+    expect(screen.getByText('Subject a')).toBeInTheDocument()
   })
 
   it('shows the unread badge when count > 0, hides it when 0', async () => {

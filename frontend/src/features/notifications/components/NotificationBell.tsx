@@ -16,9 +16,15 @@ const NotificationBell = () => {
   const feed = useNotificationFeed(open)
   const markAllRead = useMarkAllNotificationsRead()
 
-  // Re-validates the badge on open so it can't disagree with the freshly-loaded feed.
+  // Re-validates the badge AND the feed on open — the feed's query cache (5min default
+  // staleTime) would otherwise show stale content under a badge that's already gone red for a
+  // notification that arrived while the popover was closed.
   useEffect(() => {
-    if (open) refetchCount()
+    if (open) {
+      refetchCount()
+      feed.refetch()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, refetchCount])
 
   return (

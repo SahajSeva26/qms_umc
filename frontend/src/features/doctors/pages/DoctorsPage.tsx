@@ -37,10 +37,12 @@ const DoctorsPage = () => {
   const debouncedSearch = useDebouncedValue(filters.search, 300)
   const debouncedCity = useDebouncedValue(filters.city, 300)
   const debouncedState = useDebouncedValue(filters.state, 300)
-  const { hasPermission } = usePermission()
-  // Same permission gates the Inactive tab and both write endpoints server-side.
+  const { hasPermission, hasAnyPermission } = usePermission()
+  // Same permission gates the Inactive tab and the edit/deactivate endpoints server-side.
   const canSeeInactive = hasPermission('doctor:manage')
   const canManageDoctors = canSeeInactive
+  // doctor:create is a lighter, separate permission (e.g. an MR) — POST /doctors accepts either code.
+  const canCreateDoctors = hasAnyPermission(['doctor:create', 'doctor:manage'])
   const [tab, setTab] = useState<TabId>('roster')
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
   const { page: inactivePage, setPage: setInactivePage, totalPages: inactiveTotalPagesFor } = usePagination(PAGE_SIZE)
@@ -138,7 +140,7 @@ const DoctorsPage = () => {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {/* Hide create entry point rather than let a 403 hit on submit. */}
-          {canManageDoctors && (
+          {canCreateDoctors && (
             <button
               onClick={() => setEditModal({ open: true, doctor: null })}
               className="flex items-center gap-1.5 text-[13px] font-bold px-3.5 py-2 rounded-xl text-white shrink-0"

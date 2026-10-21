@@ -22,13 +22,25 @@ describe('resolveNotificationEntity', () => {
     expect(resolveNotificationEntity({ id: 'x-1', type: '', event: 'x.create' })).toBeNull()
   })
 
-  // /camps?camp=<id> is unreachable for pharma roles (AppLayout force-redirects them).
-  it.each(['pharma-mr', 'pharma-asm', 'pharma-rsm', 'pharma-division-head'])(
+  // /camps?camp=<id> is unreachable for pharma roles (AppLayout force-redirects them) — except
+  // pharma-mr, which has its own exception onto the combined Camp Management page.
+  it.each(['pharma-asm', 'pharma-rsm', 'pharma-division-head'])(
     'returns null for a whitelisted entity type when the viewer is %s (pharma roles cannot reach /camps)',
     (roleTypeCode) => {
       expect(resolveNotificationEntity({ id: 'camp-1', type: 'camp', event: 'camp.create' }, roleTypeCode)).toBeNull()
     },
   )
+
+  it('resolves camp for pharma-mr (AppLayout.tsx permits pathname === "/camps" for this one role)', () => {
+    const resolution = resolveNotificationEntity({ id: 'camp-1', type: 'camp', event: 'camp.create' }, 'pharma-mr')
+    expect(resolution).not.toBeNull()
+    expect(resolution?.href('camp-1')).toBe('/camps?camp=camp-1')
+    expect(resolution?.label).toBe('Camp')
+  })
+
+  it('still returns null for pharma-mr on a non-camp entity type (e.g. lead) — the exception is camp-only', () => {
+    expect(resolveNotificationEntity({ id: 'lead-1', type: 'lead', event: 'lead.create' }, 'pharma-mr')).toBeNull()
+  })
 
   it('still resolves camp for a non-pharma role (e.g. a camp coordinator)', () => {
     const resolution = resolveNotificationEntity({ id: 'camp-1', type: 'camp', event: 'camp.create' }, 'camp-coord')

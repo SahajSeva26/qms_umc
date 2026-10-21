@@ -185,3 +185,47 @@ describe('DoctorsPage', () => {
     expect(screen.getByRole('combobox', { name: /filter by city/i })).toBeEnabled()
   })
 })
+
+// doctor:create is a lighter permission than doctor:manage (e.g. an MR) — POST /doctors accepts
+// either code, so the Add-doctor entry point must show for doctor:create alone, not just doctor:manage.
+describe('DoctorsPage — Add doctor button gating', () => {
+  async function mockPermissions(hasAnyPermission: (codes: string[]) => boolean) {
+    vi.mocked(usePermission).mockReturnValue({
+      hasPermission: () => false,
+      hasAnyPermission,
+      hasAllPermissions: () => false,
+      session: null,
+      permissions: [],
+      isLoading: false,
+      isFetching: false,
+      isSettled: true,
+      isError: false,
+      isConfirmedUnauthenticated: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof usePermission>)
+  }
+
+  it('hides Add doctor with no doctor:create/doctor:manage', async () => {
+    await mockPermissions(() => false)
+    renderPage()
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /^roster$/i })).toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: /add doctor/i })).not.toBeInTheDocument()
+  })
+
+  it('shows Add doctor for doctor:create alone (e.g. an MR), without doctor:manage', async () => {
+    await mockPermissions((codes) => codes.includes('doctor:create'))
+    renderPage()
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /add doctor/i })).toBeInTheDocument())
+    // doctor:manage-only features (Inactive tab) stay hidden — doctor:create doesn't imply them.
+    expect(screen.queryByRole('button', { name: /inactive/i })).not.toBeInTheDocument()
+  })
+
+  it('shows Add doctor for doctor:manage', async () => {
+    await mockPermissions((codes) => codes.includes('doctor:manage'))
+    renderPage()
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /add doctor/i })).toBeInTheDocument())
+  })
+})

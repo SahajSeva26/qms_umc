@@ -49,6 +49,8 @@ export function resolveNotificationEntity(
   hasAnyPermission?: (codes: string[]) => boolean,
 ): EntityResolution | null {
   if (!entity?.type) return null
+  // pharma-mr's one exception: it can reach the real Camp Management page (AppLayout.tsx's onMrExtraPath).
+  if (roleTypeCode === 'pharma-mr' && entity.type === 'camp') return ENTITY_RESOLVERS.camp!
   if (isPharmaRoleType(roleTypeCode)) return null
   if (entity.type === 'project' && !canReachProjects(hasAnyPermission)) return null
   return ENTITY_RESOLVERS[entity.type] ?? null

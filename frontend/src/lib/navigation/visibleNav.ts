@@ -3,7 +3,7 @@ import { isPharmaRoleType } from '@/lib/access/pharmaAccess'
 import { canReadEmployees } from '@/lib/access/employeeAccess'
 
 // Single source of truth for "which sidebar item can this session reach" — shared by Sidebar.tsx
-// and the post-login resolver so the two consumers can't drift apart.
+// and the post-login resolver so the two consumers can't drift apart. 'camps' includes camp:book, the permission an MR holds.
 const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
   dashboard: ['tenant:manage'],
   crminvoicing: ['system:manage'],
@@ -17,13 +17,16 @@ const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
   appointments: ['appointment:search', 'appointment:manage', 'tenant:manage'],
   projects: ['project:search', 'project:manage', 'tenant:manage'],
   gantt: ['project:search', 'project:manage', 'tenant:manage'],
-  camps: ['camp:search', 'camp:manage', 'tenant:manage'],
+  camps: ['camp:search', 'camp:manage', 'camp:book', 'tenant:manage'],
   campsscreening: ['camp:search', 'camp:manage', 'tenant:manage'],
   campsdiet: ['camp:search', 'camp:manage', 'tenant:manage'],
   fieldofficers: ['tenant:manage', 'tenant:admin'],
   users: ['user:get', 'user:search', 'user:update'],
   geoprofiles: ['tenant:get', 'tenant:search', 'tenant:manage', 'tenant:admin', 'role:get', 'role:search'],
 }
+
+// MR's exceptions to "pharma sees only the Pharma Portal section" — real pages own-scoped server-side.
+const PHARMA_MR_EXTRA_NAV_ITEM_IDS = ['camps', 'doctors']
 
 export interface VisibleNavSession {
   isSettled: boolean
@@ -55,18 +58,27 @@ export function isNavItemDisabled(item: NavItem, session: VisibleNavSession): bo
   return !session.permissions.includes('camp:book')
 }
 
+/** True for the one non-pharma item a pharma session may still see — currently just pharma-mr's Camp Management. */
+export function isPharmaExtraNavItem(item: NavItem, session: VisibleNavSession): boolean {
+  return session.roleTypeCode === 'pharma-mr' && PHARMA_MR_EXTRA_NAV_ITEM_IDS.includes(item.id)
+}
+
 /** Flattened, in display order — same section/sub filters Sidebar.tsx applies before rendering. */
 export function getVisibleNavItems(session: VisibleNavSession): NavItem[] {
   const sessionIsPharmaRoleType = isPharmaRoleType(session.roleTypeCode)
   return FULL_NAV_SECTIONS
     .filter((section) => section.section !== 'System' || isRealSystemManage(session))
-    .filter((section) => section.section === 'Pharma Portal' || !sessionIsPharmaRoleType)
     .flatMap((section) => section.subs.flatMap((sub) => sub.items))
+    // A pharma session sees only its Pharma Portal link plus its own extra-item allowlist (e.g. MR's Camp Management).
+    .filter((item) => !sessionIsPharmaRoleType || item.id === 'pharma' || isPharmaExtraNavItem(item, session))
     .filter((item) => isNavItemVisible(item, session))
 }
 
-/** First reachable (visible AND not disabled) nav path, in the sidebar's own display order — null if none. */
+/** First reachable nav path in display order — a pharma session's own portal always wins over any extra item (e.g. MR's Camp Management). */
 export function getFirstVisibleNavPath(session: VisibleNavSession): string | null {
-  const item = getVisibleNavItems(session).find((candidate) => !isNavItemDisabled(candidate, session))
-  return item?.path ?? null
+  const visible = getVisibleNavItems(session).filter((candidate) => !isNavItemDisabled(candidate, session))
+  if (isPharmaRoleType(session.roleTypeCode)) {
+    return visible.find((candidate) => candidate.id === 'pharma')?.path ?? visible[0]?.path ?? null
+  }
+  return visible[0]?.path ?? null
 }

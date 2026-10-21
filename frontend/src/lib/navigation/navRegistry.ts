@@ -1,8 +1,4 @@
-// Data-only nav registry — imports ONLY dependency-free *.paths.ts route-constant modules (plus the
-// two features whose route constants already live in a standalone *.constants.ts), never a
-// *.routes.tsx route-object module, page, layout, or UI component. This boundary is what makes it
-// safe for both Sidebar.tsx (what to render) and the post-login resolver (lib/navigation/visibleNav.ts,
-// consumed by AuthContinuePage) to import without ever forming a cycle back into a page/route tree.
+// Data-only nav registry — imports ONLY dependency-free *.paths.ts route-constant modules, never a route/page/layout/component.
 import { DASHBOARD_ROUTES } from '@/features/dashboard/dashboard.paths'
 import { CRM_ROUTES }       from '@/features/crm/crm.paths'
 import { ANALYTICS_ROUTES } from '@/features/analytics/analytics.paths'
@@ -40,8 +36,7 @@ export interface NavSection {
 }
 
 // ── Nav item registry ────────────────────────────────────────────────────────
-// Real visibility is enforced by lib/navigation/visibleNav.ts (REAL_GATED_NAV_ITEMS/
-// isNavItemVisible), not by anything here.
+// Real visibility is enforced by lib/navigation/visibleNav.ts, not by anything here.
 
 const ALL_NAV_ITEMS: NavItem[] = [
 
@@ -168,6 +163,12 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    section: 'Pharma Portal',
+    subs: [
+      { title: '', items: ['pharma'].map((id) => NAV_BY_ID[id]) },
+    ],
+  },
+  {
     section: 'Operations',
     subs: [
       // Only 'camps'/'campsscreening'/'campsdiet' are backend-wired; the rest stay commented out, not deleted.
@@ -177,12 +178,6 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
       { title: 'Field Network',     items: ['fieldofficers', 'employees', 'doctors', 'geoprofiles'].map((id) => NAV_BY_ID[id]) },
       // Commented out, not deleted — this whole subsection is still mock-backed.
       // { title: 'Coverage & Alerts', items: ['hqmapping', 'remindauto'].map((id) => NAV_BY_ID[id]) },
-    ],
-  },
-  {
-    section: 'Pharma Portal',
-    subs: [
-      { title: '', items: ['pharma'].map((id) => NAV_BY_ID[id]) },
     ],
   },
   {

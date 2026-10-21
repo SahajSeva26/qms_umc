@@ -36,6 +36,7 @@ async function renderAt(path: string) {
           <Route path="/camps/diet" element={<div>Diet Camps Page</div>} />
           <Route path="/camps/new" element={<div>New Camp Page</div>} />
           <Route path="/camps/cmp-1" element={<div>Camp Detail Page</div>} />
+          <Route path="/doctors" element={<div>Doctor Management Page</div>} />
         </Route>
         <Route path="/auth/login" element={<div>Login Page</div>} />
         <Route path="/unauthorized" element={<div>Unauthorized Page</div>} />
@@ -225,5 +226,37 @@ describe('AppLayout — pharma/QMS route isolation', () => {
 
     expect(await screen.findByText('MR Portal Page')).toBeInTheDocument()
     expect(screen.queryByText(pageText)).not.toBeInTheDocument()
+  })
+
+  // Same exception pattern, extended to Doctor Management.
+  it('does not redirect pharma-mr away from /doctors — the other allowed non-pharma path', async () => {
+    const { useSession } = await import('@/hooks/useSession')
+    vi.mocked(useSession).mockReturnValue({
+      session: sessionFixture('pharma-mr'),
+      isFetching: false,
+      isError: false,
+      isConfirmedUnauthenticated: false,
+      refetchSession: vi.fn(),
+    } as unknown as ReturnType<typeof useSession>)
+
+    await renderAt('/doctors')
+
+    expect(await screen.findByText('Doctor Management Page')).toBeInTheDocument()
+  })
+
+  it('still redirects every other pharma role away from /doctors, back to their own portal', async () => {
+    const { useSession } = await import('@/hooks/useSession')
+    vi.mocked(useSession).mockReturnValue({
+      session: sessionFixture('pharma-rsm'),
+      isFetching: false,
+      isError: false,
+      isConfirmedUnauthenticated: false,
+      refetchSession: vi.fn(),
+    } as unknown as ReturnType<typeof useSession>)
+
+    await renderAt('/doctors')
+
+    expect(await screen.findByText('RSM Portal Page')).toBeInTheDocument()
+    expect(screen.queryByText('Doctor Management Page')).not.toBeInTheDocument()
   })
 })

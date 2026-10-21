@@ -25,8 +25,8 @@ const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
   geoprofiles: ['tenant:get', 'tenant:search', 'tenant:manage', 'tenant:admin', 'role:get', 'role:search'],
 }
 
-// MR's one exception to "pharma sees only the Pharma Portal section" — the real Camp Management page, own-scoped server-side.
-const PHARMA_MR_EXTRA_NAV_ITEM_IDS = ['camps']
+// MR's exceptions to "pharma sees only the Pharma Portal section" — real pages own-scoped server-side.
+const PHARMA_MR_EXTRA_NAV_ITEM_IDS = ['camps', 'doctors']
 
 export interface VisibleNavSession {
   isSettled: boolean

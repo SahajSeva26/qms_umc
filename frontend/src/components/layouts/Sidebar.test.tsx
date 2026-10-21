@@ -90,8 +90,8 @@ describe('Sidebar — pharma identity isolation', () => {
     expect(screen.queryByText(/pharma portal/i)).not.toBeInTheDocument()
   })
 
-  // pharma-mr's one exception: it also sees the real (non-pharma) Camp Management item, own-scoped server-side.
-  it('shows Pharma Portal AND Camp Management for pharma-mr with camp:book — no other non-pharma item', async () => {
+  // pharma-mr's one exception: it also sees the real (non-pharma) Camp Management + Doctor Management items, own-scoped server-side.
+  it('shows Pharma Portal AND Camp Management AND Doctor Management for pharma-mr with camp:book — no other non-pharma item', async () => {
     await renderSidebar({
       permissions: ['camp:book'],
       session: sessionFixture('pharma-mr', ['camp:book']),
@@ -99,12 +99,13 @@ describe('Sidebar — pharma identity isolation', () => {
 
     expect(screen.getByText('Pharma Portal MR')).toBeInTheDocument()
     expect(screen.getByText('Camp Management')).toBeInTheDocument()
+    expect(screen.getByText('Doctor Management')).toBeInTheDocument()
     expect(screen.queryByText('Dashboard')).not.toBeInTheDocument()
     expect(screen.queryByText('CRM')).not.toBeInTheDocument()
     expect(screen.queryByText('Client Management')).not.toBeInTheDocument()
   })
 
-  it('no other pharma role gets the Camp Management exception, even if they somehow hold camp:book', async () => {
+  it('no other pharma role gets the Camp Management/Doctor Management exception, even if they somehow hold camp:book', async () => {
     await renderSidebar({
       permissions: ['camp:book'],
       session: sessionFixture('pharma-rsm', ['camp:book']),
@@ -112,6 +113,7 @@ describe('Sidebar — pharma identity isolation', () => {
 
     expect(screen.getByText('Pharma Portal RSM')).toBeInTheDocument()
     expect(screen.queryByText('Camp Management')).not.toBeInTheDocument()
+    expect(screen.queryByText('Doctor Management')).not.toBeInTheDocument()
   })
 })
 

@@ -10,7 +10,7 @@ import { isValidObjectID } from '../../../shared/utils/strings';
 import { RoleService } from '../role/role.service';
 import { PermissionGroupService } from '../permission-group/permissionGroup.service';
 import { USER_PERMISSIONS, USER_STATUS } from '../../user/user.constants';
-import { ALLOWED_ROLETYPE_CODES, DEFAULT_PHARMA_ROLE_TYPES } from '../role-type/roleType.constants';
+import { ALLOWED_ROLETYPE_CODES, DEFAULT_PHARMA_ROLE_TYPES, ROLE_TYPE_PERMISSIONS } from '../role-type/roleType.constants';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
 import { provisionDefaultRoleTypes } from '../../../shared/env/roleTypeProvisioner';
@@ -371,7 +371,7 @@ const createTenant = async (model: ICreateTenantPayload, ctx: RequestContext) =>
                     code: ALLOWED_ROLETYPE_CODES.PLATFORM.ADMIN,
                     name: `${tenant.name}'s admin role type`,
                     description: `${tenant.name}'s admin role type`,
-                    permissions: [TENANT_PERMISSIONS.ADMIN.code],
+                    permissions: [TENANT_PERMISSIONS.ADMIN.code, ROLE_TYPE_PERMISSIONS.MANAGE.code],
                 },
             ]);
             if (!roleType) {

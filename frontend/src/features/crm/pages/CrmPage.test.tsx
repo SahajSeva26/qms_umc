@@ -1,17 +1,33 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { AxiosError } from 'axios'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
+import { toast } from 'sonner'
 import { usePermission } from '@/hooks/usePermission'
 import { useLeads } from '@/features/crm/hooks/useLeads'
+import { useLead } from '@/features/crm/hooks/useLead'
 import { useLeadReport } from '@/features/crm/hooks/useLeadReport'
 import { useMySalesSweep } from '@/features/crm/hooks/useMySalesSweep'
 import type { LeadEntity } from '@/types/crm.types'
 
 vi.mock('@/hooks/usePermission')
 vi.mock('@/features/crm/hooks/useLeads')
+vi.mock('@/features/crm/hooks/useLead')
 vi.mock('@/features/crm/hooks/useLeadReport')
 vi.mock('@/features/crm/hooks/useMySalesSweep')
+vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }))
+
+// Mirrors apiError.test.ts's fixture — a real axios error shape so isForbiddenError/
+// isNotFoundError (which gate the deep-link failure handling) classify it correctly.
+function axiosError(status: number): AxiosError {
+  const err = new Error('request failed') as AxiosError
+  err.isAxiosError = true
+  err.response = { status, data: {}, statusText: '', headers: {}, config: {} as never }
+  err.toJSON = () => ({})
+  return err
+}
 
 function mockPermission(canManageLeads: boolean) {
   vi.mocked(usePermission).mockReturnValue({
@@ -40,6 +56,11 @@ function mockLeads() {
     isUpdating: false,
     isCreating: false,
   } as unknown as ReturnType<typeof useLeads>)
+}
+
+// No lead is ever deep-linked in these tests (openLeadId starts null) — this is a safe no-op default.
+function mockLead() {
+  vi.mocked(useLead).mockReturnValue({ data: undefined } as unknown as ReturnType<typeof useLead>)
 }
 
 function mockMySweep(partial: Partial<ReturnType<typeof useMySalesSweep>>) {
@@ -97,15 +118,151 @@ async function renderPage() {
   const CrmPage = (await import('./CrmPage')).default
   return render(
     <QueryClientProvider client={makeQueryClient()}>
-      <CrmPage />
+      <MemoryRouter>
+        <CrmPage />
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }
+
+describe('CrmPage — ?lead=<id> deep link (notification click-through)', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    mockPermission(true)
+    mockMySweep({})
+  })
+
+  it('opens the drawer for a lead already on the loaded page', async () => {
+    vi.mocked(useLeads).mockReturnValue({
+      leads: [leadFixture({ id: 'l1', title: 'Loaded Lead' })],
+      count: 1,
+      isLoading: false,
+      error: null,
+      moveStage: vi.fn(),
+      updateLead: vi.fn(),
+      createLead: vi.fn(),
+      isMovingStage: false,
+      isUpdating: false,
+      isCreating: false,
+    } as unknown as ReturnType<typeof useLeads>)
+    mockLead()
+    vi.mocked(useLeadReport).mockReturnValue({ report: reportFixture(), isLoading: false, isError: false, error: null, refetch: vi.fn() })
+
+    const CrmPage = (await import('./CrmPage')).default
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <MemoryRouter initialEntries={['/crm?lead=l1']}>
+          <CrmPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    expect(await screen.findByRole('heading', { name: 'Loaded Lead' })).toBeInTheDocument()
+  })
+
+  it('falls back to a direct GET /leads/:id when the deep-linked lead is not on the loaded page', async () => {
+    mockLeads() // empty list — the deep-linked lead isn't here
+    vi.mocked(useLead).mockReturnValue({
+      data: { success: true, message: '', data: leadFixture({ id: 'l2', title: 'Fetched Lead' }) },
+    } as unknown as ReturnType<typeof useLead>)
+    vi.mocked(useLeadReport).mockReturnValue({ report: reportFixture(), isLoading: false, isError: false, error: null, refetch: vi.fn() })
+
+    const CrmPage = (await import('./CrmPage')).default
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <MemoryRouter initialEntries={['/crm?lead=l2']}>
+          <CrmPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    expect(await screen.findByRole('heading', { name: 'Fetched Lead' })).toBeInTheDocument()
+  })
+
+  it('a confirmed 404 on the direct fetch is treated as terminal: shows an error toast and clears the dead ?lead= param', async () => {
+    mockLeads() // empty list — the deep-linked lead isn't here
+    vi.mocked(useLead).mockReturnValue({
+      data: undefined,
+      error: axiosError(404),
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useLead>)
+    vi.mocked(useLeadReport).mockReturnValue({ report: reportFixture(), isLoading: false, isError: false, error: null, refetch: vi.fn() })
+
+    const CrmPage = (await import('./CrmPage')).default
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <MemoryRouter initialEntries={['/crm?lead=deleted-lead']}>
+          <CrmPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    await screen.findByText('CRM & Sales') // let the deep-link effect settle
+    expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/may have been removed/i))
+    // No "Retry" action on a terminal failure — just the message.
+    expect(vi.mocked(toast.error).mock.calls[0][1]).toBeUndefined()
+  })
+
+  it('a confirmed 403 on the direct fetch is also treated as terminal, same as a 404', async () => {
+    mockLeads()
+    vi.mocked(useLead).mockReturnValue({
+      data: undefined,
+      error: axiosError(403),
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useLead>)
+    vi.mocked(useLeadReport).mockReturnValue({ report: reportFixture(), isLoading: false, isError: false, error: null, refetch: vi.fn() })
+
+    const CrmPage = (await import('./CrmPage')).default
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <MemoryRouter initialEntries={['/crm?lead=forbidden-lead']}>
+          <CrmPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    await screen.findByText('CRM & Sales') // let effects settle
+    expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/may have been removed/i))
+  })
+
+  it('a transient failure (5xx/network) on the direct fetch keeps the ?lead= param and offers a Retry action instead of giving up on the destination', async () => {
+    mockLeads()
+    const refetch = vi.fn()
+    vi.mocked(useLead).mockReturnValue({
+      data: undefined,
+      error: axiosError(500),
+      refetch,
+    } as unknown as ReturnType<typeof useLead>)
+    vi.mocked(useLeadReport).mockReturnValue({ report: reportFixture(), isLoading: false, isError: false, error: null, refetch: vi.fn() })
+
+    const CrmPage = (await import('./CrmPage')).default
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <MemoryRouter initialEntries={['/crm?lead=flaky-lead']}>
+          <CrmPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    await screen.findByText('CRM & Sales')
+    expect(toast.error).toHaveBeenCalledWith(
+      expect.stringMatching(/try again/i),
+      expect.objectContaining({ action: expect.objectContaining({ label: 'Retry' }) }),
+    )
+
+    // Clicking the toast's Retry action calls the query's own refetch.
+    const [, options] = vi.mocked(toast.error).mock.calls[0]
+    const action = options?.action as { onClick: () => void } | undefined
+    action?.onClick()
+    expect(refetch).toHaveBeenCalledTimes(1)
+  })
+})
 
 describe('CrmPage — Lead KPI strip permission/loading/error branching', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     mockLeads()
+    mockLead()
     mockMySweep({}) // irrelevant for manager-path tests, which gate it off via `enabled: false`
   })
 
@@ -175,6 +332,7 @@ describe('CrmPage — My Sales Dashboard (KAM/Sales Rep own-scope path)', () => 
   beforeEach(() => {
     vi.resetAllMocks()
     mockLeads()
+    mockLead()
     mockPermission(false)
     vi.mocked(useLeadReport).mockReturnValue({ report: undefined, isLoading: false, isError: false, error: null, refetch: vi.fn() })
   })
@@ -246,6 +404,7 @@ describe('CrmPage — tenant:manage-only callers must not hit the lead:manage-ga
   beforeEach(() => {
     vi.resetAllMocks()
     mockLeads()
+    mockLead()
   })
 
   it('a tenant:manage (but not lead:manage) caller gets full lead visibility/mutation, but still falls into the own-scope My Sales Dashboard instead of calling the report endpoint', async () => {

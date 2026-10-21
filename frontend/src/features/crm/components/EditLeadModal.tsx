@@ -5,6 +5,7 @@ import { LEAD_PROJECT_TYPE_LABEL } from '@/types/crm.types'
 import type { UpdateLeadPayload } from '@/types/crm.types'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
+import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRoleTypes'
 import { useContacts } from '@/features/contacts/hooks/useContacts'
 import { PLATFORM_TENANT_CODE, PLATFORM_TENANT_FETCH_LIMIT } from '@/features/access-management/accessManagement.constants'
 import { editLeadSchema } from '@/features/crm/schemas/lead.schemas'
@@ -94,9 +95,26 @@ const EditLeadModal = ({ lead, onSave, onClose }: EditLeadModalProps) => {
   const { data: tenantData, isError: tenantsErrored } = useTenants({ status: 'active', limit: PLATFORM_TENANT_FETCH_LIMIT })
   // tenant.type is only on the wire for a system:manage caller; code is always present, so fall back to it.
   const platformTenant = tenantData?.data?.items.find((t) => t.type === 'platform' || t.code === PLATFORM_TENANT_CODE)
-  const { data: salesRoleData, isLoading: salesRolesLoading, isError: salesRolesErrored } =
-    useRoles(platformTenant ? { tenant: platformTenant.id, status: 'active' } : { tenant: undefined })
-  const salesRoles = platformTenant ? salesRoleData?.data?.items ?? [] : []
+
+  // A lead's sales person is a Sales Rep or Sales Head — GET /roles' own `type` filter takes a
+  // single role-TYPE id (not a code), and has no $in support, so both codes are resolved to ids
+  // first, then queried and merged client-side. Mirrors useTenantSalesRepPicker's sales-rep half.
+  const { data: salesRepTypeData, isError: salesRepTypeErrored } = useRoleTypes({ code: 'sales-rep', status: 'active' })
+  const { data: salesHeadTypeData, isError: salesHeadTypeErrored } = useRoleTypes({ code: 'sales-head', status: 'active' })
+  const salesRepTypeId = salesRepTypeData?.data?.items[0]?.id
+  const salesHeadTypeId = salesHeadTypeData?.data?.items[0]?.id
+
+  const { data: salesRepRoleData, isLoading: salesRepsLoading, isError: salesRepsErrored } = useRoles(
+    { tenant: platformTenant?.id, type: salesRepTypeId, status: 'active' },
+    !!platformTenant && !!salesRepTypeId,
+  )
+  const { data: salesHeadRoleData, isLoading: salesHeadsLoading, isError: salesHeadsErrored } = useRoles(
+    { tenant: platformTenant?.id, type: salesHeadTypeId, status: 'active' },
+    !!platformTenant && !!salesHeadTypeId,
+  )
+  const salesRoles = [...(salesRepRoleData?.data?.items ?? []), ...(salesHeadRoleData?.data?.items ?? [])]
+  const salesRolesLoading = salesRepsLoading || salesHeadsLoading
+  const salesRolesErrored = salesRepTypeErrored || salesHeadTypeErrored || salesRepsErrored || salesHeadsErrored
 
   const isOfferSelected = (code: string) => form.offers.some((o) => o.code === code)
   const toggleOffer = (code: string) => {

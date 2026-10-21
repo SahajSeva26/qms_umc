@@ -11,7 +11,21 @@ function makeQueryClient() {
 vi.mock('@/features/access-management/accessManagement.service', () => ({
   accessManagementService: {
     searchTenants: vi.fn(async () => ({ success: true, message: '', data: { items: [{ id: 't-1', code: 'qms', name: 'QMS', type: 'platform' }], count: 1 } })),
-    searchRoles: vi.fn(async () => ({ success: true, message: '', data: { items: [], count: 0 } })),
+    searchRoleTypes: vi.fn(async (query: { code?: string }) => ({
+      success: true, message: '',
+      data: { items: query.code === 'sales-rep' ? [{ id: 'rt-rep' }] : query.code === 'sales-head' ? [{ id: 'rt-head' }] : [], count: 1 },
+    })),
+    searchRoles: vi.fn(async (query: { type?: string }) => ({
+      success: true, message: '',
+      data: {
+        items: query.type === 'rt-rep'
+          ? [{ id: 'role-1', name: 'Rohit Malhotra', code: 'staff-sales-rep-1' }]
+          : query.type === 'rt-head'
+            ? [{ id: 'role-head', name: 'Rajiv Menon', code: 'staff-sales-head' }]
+            : [],
+        count: 1,
+      },
+    })),
   },
 }))
 
@@ -60,6 +74,19 @@ async function renderModal(lead: LeadEntity, onSave = vi.fn<(payload: UpdateLead
   await screen.findByText(/edit lead/i)
   return { onSave, onClose }
 }
+
+describe('EditLeadModal — sales rep picker is scoped to sales-rep/sales-head role types', () => {
+  it('lists only roles resolved via the sales-rep and sales-head role-type lookups', async () => {
+    const user = userEvent.setup()
+    await renderModal(leadFixture())
+
+    const comboboxes = screen.getAllByRole('combobox')
+    await user.click(comboboxes[1]) // [0] is Contact person, [1] is Sales rep
+
+    expect(await screen.findByRole('option', { name: 'Rohit Malhotra (staff-sales-rep-1)' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Rajiv Menon (staff-sales-head)' })).toBeInTheDocument()
+  })
+})
 
 describe('EditLeadModal — partial update payload', () => {
   beforeEach(() => {

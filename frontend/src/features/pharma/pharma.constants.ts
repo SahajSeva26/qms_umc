@@ -1,3 +1,5 @@
+import { isPharmaRoleType, type PharmaRoleTypeCode } from '@/lib/access/pharmaAccess'
+
 export const PHARMA_ROUTES = {
   PHARMA:                          '/pharma',
   PHARMA_HO:                       '/pharma/ho',
@@ -15,17 +17,17 @@ interface PharmaRoleMeta {
   portalPath: string
 }
 
-export const PHARMA_ROLE_META: Record<string, PharmaRoleMeta> = {
+// Keyed off the shared PharmaRoleTypeCode union (lib/access/pharmaAccess.ts) so the identity
+// list and this feature's own labels/paths can never drift apart into two different sets of codes.
+export const PHARMA_ROLE_META: Record<PharmaRoleTypeCode, PharmaRoleMeta> = {
   'pharma-division-head': { label: 'HO', portalPath: PHARMA_ROUTES.PHARMA_HO },
   'pharma-rsm': { label: 'RSM', portalPath: PHARMA_ROUTES.PHARMA_RSM },
   'pharma-asm': { label: 'ASM', portalPath: PHARMA_ROUTES.PHARMA_ASM },
   'pharma-mr': { label: 'MR', portalPath: PHARMA_ROUTES.PHARMA_MR },
 }
 
-export const PHARMA_ROLE_TYPE_CODES = Object.keys(PHARMA_ROLE_META)
-
 /** Safe lookup — an unknown/malformed role-type code resolves to null (treat as non-pharma), never an undefined property access. */
 export function getPharmaRoleMeta(code: string | undefined | null): PharmaRoleMeta | null {
-  if (!code) return null
-  return PHARMA_ROLE_META[code] ?? null
+  if (!isPharmaRoleType(code)) return null
+  return PHARMA_ROLE_META[code]
 }

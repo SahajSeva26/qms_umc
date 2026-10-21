@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
-import { FiSearch, FiBell, FiHelpCircle, FiChevronDown, FiLogOut, FiUser, FiMenu } from 'react-icons/fi'
+import { FiSearch, FiHelpCircle, FiChevronDown, FiLogOut, FiUser, FiMenu } from 'react-icons/fi'
 import { useAuth } from '@/hooks/useAuth'
 import { useSession } from '@/hooks/useSession'
 import { useProfilePicture } from '@/hooks/useProfilePicture'
 import { getGreeting, formatClockDisplay } from '@/utils/formatters'
 import ThemeToggle from '@/components/ui/ThemeToggle'
 import MyProfileModal from '@/components/layouts/MyProfileModal'
+import NotificationBell from '@/features/notifications/components/NotificationBell'
 
 interface TopbarProps {
   onMobileMenuToggle: () => void
@@ -91,15 +92,7 @@ const Topbar = ({ onMobileMenuToggle }: TopbarProps) => {
       <div className="ml-auto flex items-center gap-2">
         <ThemeToggle />
 
-        {/* Notifications */}
-        <button
-          className="relative w-8 h-8 flex items-center justify-center rounded-lg transition-all"
-          style={{ color: 'var(--qms-text-soft)' }}
-          aria-label="Notifications"
-        >
-          <FiBell size={16} />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full ring-2 ring-qms-surface" style={{ backgroundColor: 'var(--qms-role-super-admin)' }} />
-        </button>
+        <NotificationBell />
 
         {/* Help */}
         <button

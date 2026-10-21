@@ -1,8 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { toast } from 'sonner'
 import { FiDownload, FiPlus } from 'react-icons/fi'
 import type { LeadStatus } from '@/types/crm.types'
 import { usePermission } from '@/hooks/usePermission'
+import { isForbiddenError, isNotFoundError } from '@/utils/apiError'
 import { useLeads } from '@/features/crm/hooks/useLeads'
+import { useLead } from '@/features/crm/hooks/useLead'
 import { useLeadReport } from '@/features/crm/hooks/useLeadReport'
 import { useMySalesSweep } from '@/features/crm/hooks/useMySalesSweep'
 import { useCrmFilters } from '@/features/crm/hooks/useCrmFilters'
@@ -73,7 +77,15 @@ const CrmPage = () => {
   // own permission flag rather than a role-name string — see canManageLeads
   // above).
   const [view, setView] = useState<ViewMode>(canManageLeads ? 'list' : 'compact')
-  const [openLeadId, setOpenLeadId] = useState<string | null>(null)
+  // URL-backed so a notification's ?lead=<id> deep link opens the right drawer.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const openLeadId = searchParams.get('lead')
+  const setOpenLeadId = (id: string | null) => {
+    const next = new URLSearchParams(searchParams)
+    if (id) next.set('lead', id)
+    else next.delete('lead')
+    setSearchParams(next, { replace: true })
+  }
   const [wizardOpen, setWizardOpen] = useState(false)
   const [statusDrill, setStatusDrill] = useState<LeadStatus | null>(null)
 
@@ -81,7 +93,30 @@ const CrmPage = () => {
   const kpis = useMemo(() => computeKpis(report), [report])
   const valueKpis = useMemo(() => computeValueKpis(report), [report])
 
-  const openLead = leads.find((l) => l.id === openLeadId) ?? null
+  // Deep-linked lead may not be on the loaded page — fall back to a direct GET /leads/:id.
+  const leadFromList = leads.find((l) => l.id === openLeadId) ?? null
+  const { data: fetchedLead, error: fetchedLeadError, refetch: refetchLead } =
+    useLead(!leadFromList && openLeadId ? openLeadId : undefined)
+  const openLead = leadFromList ?? fetchedLead?.data ?? null
+
+  // A deep link (e.g. from a notification) whose target 404s, was deleted, or
+  // belongs to another tenant would otherwise leave the user on this page
+  // with no drawer, no error, and no explanation. Only treat a CONFIRMED
+  // 403/404 as terminal and drop the dead ?lead= param — a transient failure
+  // (network blip, 5xx) keeps the param and offers Retry instead, so it
+  // doesn't lose the destination over a temporary issue.
+  useEffect(() => {
+    if (leadFromList || !openLeadId || !fetchedLeadError) return
+    if (isForbiddenError(fetchedLeadError) || isNotFoundError(fetchedLeadError)) {
+      toast.error("Couldn't load that lead — it may have been removed or you may not have access to it.")
+      setOpenLeadId(null)
+    } else {
+      toast.error("Couldn't load that lead — try again.", { action: { label: 'Retry', onClick: () => refetchLead() } })
+    }
+    // leadFromList/setOpenLeadId/refetchLead are recreated every render; only
+    // re-run this when the fetch outcome itself changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openLeadId, fetchedLeadError])
 
   return (
     <div className="w-full">

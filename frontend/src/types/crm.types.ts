@@ -371,7 +371,9 @@ export interface CreateLeadPayload {
   tenant: string
   division: string
   contactPerson: string
-  salesPerson: string
+  // Optional — omitted, the backend defaults it to the tenant's assigned sales
+  // person (and 400s if the tenant has none and this is also omitted).
+  salesPerson?: string
   title: string
   problemStatement: string
   numberOfMRS: number

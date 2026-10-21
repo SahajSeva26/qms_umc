@@ -100,13 +100,13 @@ const WizardStep4 = ({ form, setField }: WizardStep4Props) => {
       </div>
 
       <div>
-        <Label className={labelClasses} style={labelStyle}>Sales rep *</Label>
+        <Label className={labelClasses} style={labelStyle}>Sales rep (optional)</Label>
         <Select key={form.salesPersonId || 'empty'} value={form.salesPersonId} onValueChange={(v) => selectSalesPerson(v as string)}>
           <SelectTrigger className={`w-full ${fieldClasses}`}>
-            <SelectValue placeholder={rolesLoading ? 'Loading...' : 'Select sales rep...'}>
+            <SelectValue placeholder={rolesLoading ? 'Loading...' : 'Default to company sales rep'}>
               {(v: string) => {
                 const r = salesRoles.find((role) => role.id === v)
-                return r ? `${r.name} (${r.code})` : rolesLoading ? 'Loading...' : 'Select sales rep...'
+                return r ? `${r.name} (${r.code})` : rolesLoading ? 'Loading...' : 'Default to company sales rep'
               }}
             </SelectValue>
           </SelectTrigger>
@@ -115,7 +115,7 @@ const WizardStep4 = ({ form, setField }: WizardStep4Props) => {
           </SelectContent>
         </Select>
         {(tenantsErrored || rolesErrored) && (
-          <p className="text-[11px] mt-1 text-danger">Couldn't load sales reps — try again.</p>
+          <p className="text-[11px] mt-1 text-danger">Couldn't load sales reps — leave unselected to default to the company's assigned sales rep.</p>
         )}
         {!tenantsErrored && !rolesErrored && !rolesLoading && !platformTenant && (
           <p className="text-[11px] mt-1 text-danger">No QMS internal (platform) company found — a sales rep must belong to one.</p>

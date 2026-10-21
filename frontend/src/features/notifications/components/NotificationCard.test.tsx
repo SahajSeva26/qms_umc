@@ -14,6 +14,13 @@ function sessionFixture(roleTypeCode: string | null) {
   } as unknown as ReturnType<typeof useSession>
 }
 
+function sessionFixtureWithPermissions(roleTypeCode: string, hasAnyPermission: (codes: string[]) => boolean) {
+  return {
+    session: { roleType: { code: roleTypeCode } },
+    hasAnyPermission,
+  } as unknown as ReturnType<typeof useSession>
+}
+
 function notificationFixture(overrides: Partial<NotificationEntityItem> = {}): NotificationEntityItem {
   return {
     id: 'n-1',
@@ -74,5 +81,55 @@ describe('NotificationCard — pharma-role click destination', () => {
     await user.click(button)
 
     expect(await screen.findByText('Camps page')).toBeInTheDocument()
+  })
+})
+
+function projectNotificationFixture(): NotificationEntityItem {
+  return {
+    id: 'n-2',
+    entity: { id: 'proj-1', type: 'project', event: 'create' },
+    event: 'project.create',
+    channel: 'in-app',
+    subject: 'A new project has been created',
+    body: 'Project prj-000001 created.',
+    status: 'sent',
+    sentAt: '2026-10-19T00:00:00Z',
+    read: false,
+    readAt: null,
+    createdAt: '2026-10-19T00:00:00Z',
+    updatedAt: '2026-10-19T00:00:00Z',
+  }
+}
+
+function renderProjectCard(roleTypeCode: string, hasAnyPermission: (codes: string[]) => boolean) {
+  vi.mocked(useSession).mockReturnValue(sessionFixtureWithPermissions(roleTypeCode, hasAnyPermission))
+  return render(
+    <MemoryRouter initialEntries={['/dashboard']}>
+      <Routes>
+        <Route path="*" element={<NotificationCard notification={projectNotificationFixture()} />} />
+        <Route path="/projects" element={<div>Projects page</div>} />
+      </Routes>
+    </MemoryRouter>,
+  )
+}
+
+// A project notification is gated on PROJECTS_VIEW_PERMISSIONS (see entityResolver.ts).
+describe('NotificationCard — project notification permission gating', () => {
+  it('renders inert when the viewer lacks the required permission', () => {
+    const hasAnyPermission = () => false
+    renderProjectCard('camp-coordinator-diet', hasAnyPermission)
+
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('renders clickable when the viewer holds the permission', async () => {
+    const user = userEvent.setup()
+    const hasAnyPermission = (codes: string[]) => codes.includes('project:search')
+    renderProjectCard('sales-rep', hasAnyPermission)
+
+    const button = screen.getByRole('button')
+    await user.click(button)
+
+    expect(await screen.findByText('Projects page')).toBeInTheDocument()
   })
 })

@@ -1,4 +1,4 @@
-import { ALLOWED_ROLETYPE_CODES } from '../../modules/access-management/role-type/roleType.constants';
+import { ALLOWED_ROLETYPE_CODES, ROLE_TYPE_PERMISSIONS } from '../../modules/access-management/role-type/roleType.constants';
 import { LEAD_PERMISSIONS } from '../../modules/crm/lead/lead.constants';
 import { APPOINTMENT_PERMISSIONS } from '../../modules/crm/appointment/appointment.constants';
 import { DOCTOR_PERMISSIONS } from '../../modules/crm/doctor/doctor.constants';
@@ -80,6 +80,10 @@ export const CRM_BUSINESS_ROLE_TYPES = [
 
             ROLE_PERMISSIONS.SEARCH.code,
             ROLE_PERMISSIONS.GET.code,
+
+            // read-only view of role types — needed to pick a type when assigning roles
+            ROLE_TYPE_PERMISSIONS.SEARCH.code,
+            ROLE_TYPE_PERMISSIONS.GET.code,
 
             DIVISION_PERMISSIONS.MANAGE.code,
             CONTACT_PERMISSIONS.MANAGE.code,

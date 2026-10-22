@@ -5,7 +5,13 @@ import { canReadEmployees } from '@/lib/access/employeeAccess'
 // Single source of truth for "which sidebar item can this session reach" — shared by Sidebar.tsx
 // and the post-login resolver so the two consumers can't drift apart. 'camps' includes camp:book, the permission an MR holds.
 const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
-  dashboard: ['tenant:manage'],
+  // Deliberately system:manage-only (not tenant:manage, which the platform tenant's own "admin"
+  // role type also holds) — scoped to exactly the seeded system account, per explicit request.
+  dashboard: ['system:manage'],
+  analytics: ['system:manage'],
+  foanalytics: ['system:manage'],
+  docanalytics: ['system:manage'],
+  finanalytics: ['system:manage'],
   crminvoicing: ['system:manage'],
   crm: ['lead:search', 'lead:manage', 'tenant:manage'],
   salesdashboard: ['lead:search', 'lead:manage', 'tenant:manage'],

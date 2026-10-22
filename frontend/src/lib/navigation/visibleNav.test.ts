@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getVisibleNavItems, getFirstVisibleNavPath, isPharmaExtraNavItem, type VisibleNavSession } from './visibleNav'
+import { getVisibleNavItems, getFirstVisibleNavPath, isNavItemVisible, isPharmaExtraNavItem, type VisibleNavSession } from './visibleNav'
 
 function sessionFixture(overrides: Partial<VisibleNavSession> = {}): VisibleNavSession {
   return {
@@ -46,6 +46,25 @@ describe('getVisibleNavItems — pharma-mr sees Pharma Portal + Camp Management 
     const ids = getVisibleNavItems(sessionFixture({ roleTypeCode: 'pharma-mr', permissions: [] })).map((i) => i.id)
     expect(ids).not.toContain('camps')
     expect(ids).toContain('doctors')
+  })
+})
+
+describe('isNavItemVisible — Dashboard + the 4 analytics items are system:manage-only, for now', () => {
+  const DASHBOARD_AND_ANALYTICS_IDS = ['dashboard', 'analytics', 'foanalytics', 'docanalytics', 'finanalytics']
+
+  it.each(DASHBOARD_AND_ANALYTICS_IDS)('hides %s from a session holding only tenant:manage (not system:manage)', (id) => {
+    const session = sessionFixture({ isSettled: true, permissions: ['tenant:manage'] })
+    expect(isNavItemVisible({ id, label: id, icon: 'Grid', path: `/${id}` }, session)).toBe(false)
+  })
+
+  it.each(DASHBOARD_AND_ANALYTICS_IDS)('shows %s for a session holding system:manage', (id) => {
+    const session = sessionFixture({ isSettled: true, permissions: ['system:manage'] })
+    expect(isNavItemVisible({ id, label: id, icon: 'Grid', path: `/${id}` }, session)).toBe(true)
+  })
+
+  it.each(DASHBOARD_AND_ANALYTICS_IDS)('hides %s from an unsettled session even with system:manage in the list', (id) => {
+    const session = sessionFixture({ isSettled: false, permissions: ['system:manage'] })
+    expect(isNavItemVisible({ id, label: id, icon: 'Grid', path: `/${id}` }, session)).toBe(false)
   })
 })
 

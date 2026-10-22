@@ -2,6 +2,7 @@ import { Fragment, useState } from 'react'
 import { FiBriefcase, FiArrowLeft, FiArrowRight, FiSave, FiX } from 'react-icons/fi'
 import type { CreateLeadPayload } from '@/types/crm.types'
 import { DEFAULT_WIZARD_FORM, type WizardFormState } from '@/features/crm/wizard.types'
+import { useSession } from '@/hooks/useSession'
 import { useLeads } from '@/features/crm/hooks/useLeads'
 import { useLeadDraftStore } from '@/features/crm/leadDraft.store'
 import { useDebouncedDraftSync } from '@/hooks/useDebouncedDraftSync'
@@ -53,9 +54,16 @@ const NewLeadWizard = ({ onClose, onCreated, prefill }: NewLeadWizardProps) => {
   // This wizard only ever creates a lead, never displays the list, so the
   // list query is skipped entirely.
   const { createLead, isCreating } = useLeads({}, false)
+  const { session } = useSession()
   const [step, setStep] = useState(0)
   const [form, setForm] = useState<WizardFormState>({ ...DEFAULT_WIZARD_FORM, ...prefill })
   const [error, setError] = useState<string | null>(null)
+
+  // A sales-rep is always locked to themselves (overriding any prefill) — GET /role-types, which the picker needs, is admin-only anyway.
+  const isSalesRepViewer = session?.roleType.code === 'sales-rep'
+  if (isSalesRepViewer && session.role.id && form.salesPersonId !== session.role.id) {
+    setForm((prev) => ({ ...prev, salesPersonId: session.role.id, salesPersonLabel: session.role.name }))
+  }
 
   // A prefilled open must never read, write, or clear the normal flow's
   // draft, so the hook never looks up a store for this instance at all.
@@ -111,10 +119,7 @@ const NewLeadWizard = ({ onClose, onCreated, prefill }: NewLeadWizardProps) => {
     if (step < 3) setStep(step + 1)
   }
 
-  // Jumping back to an already-completed step is always safe (its data was
-  // already validated on the way in). Jumping forward must still validate
-  // every step in between, since handleSave only re-checks step 3 — without
-  // this, a click straight to Review could skip Step 1/2/3's requirements.
+  // Jumping back is always safe (already validated); jumping forward must re-validate every step in between.
   const handleStepClick = (target: number) => {
     if (target === step) return
     if (target < step) {
@@ -252,7 +257,7 @@ const NewLeadWizard = ({ onClose, onCreated, prefill }: NewLeadWizardProps) => {
               {step === 0 && <WizardStep1 form={form} setField={setField} />}
               {step === 1 && <WizardStep2 form={form} setField={setField} />}
               {step === 2 && <WizardStep3 form={form} setField={setField} />}
-              {step === 3 && <WizardStep4 form={form} setField={setField} />}
+              {step === 3 && <WizardStep4 form={form} setField={setField} lockedToSelf={isSalesRepViewer} />}
             </div>
 
             <div className="flex items-center justify-between gap-3 px-5 pb-5 pt-3" style={{ borderTop: '1px solid var(--qms-border)' }}>

@@ -106,8 +106,8 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
   const [error, setError] = useState('')
 
   const { session, hasAnyPermission } = usePermission()
-  // POST /leads requires lead:manage or tenant:manage server-side — viewing an appointment needs neither.
-  const canCreateLead = hasAnyPermission(['lead:manage', 'tenant:manage'])
+  // POST /leads accepts lead:create, lead:manage, or tenant:manage server-side — viewing an appointment needs none of them.
+  const canCreateLead = hasAnyPermission(['lead:create', 'lead:manage', 'tenant:manage'])
 
   const moveStage = useMoveAppointmentStage(appointment?.id ?? '')
   const respond = useRespondToAppointment(appointment?.id ?? '')

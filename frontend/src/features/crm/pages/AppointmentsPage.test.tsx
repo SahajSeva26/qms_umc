@@ -19,6 +19,7 @@ async function mockPermission(canViewReport: boolean) {
   const { usePermission } = await import('@/hooks/usePermission')
   vi.mocked(usePermission).mockReturnValue({
     hasPermission: (code: string) => (code === 'appointment:manage' ? canViewReport : false),
+    hasAnyPermission: (codes: string[]) => (canViewReport ? codes.includes('appointment:manage') : false),
   } as unknown as ReturnType<typeof usePermission>)
 }
 

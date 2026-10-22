@@ -3,16 +3,18 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useAuthStore } from '@/features/auth/store'
+import type { ApiResponse } from '@/types/common.types'
+import type { SessionResponse } from '@/types/accessManagement.types'
 import NewLeadWizard from './NewLeadWizard'
 
-const sessionResponse = {
+const sessionResponse: ApiResponse<SessionResponse> = {
   success: true,
   message: '',
   data: {
     user: { id: 'user-1', email: 'system@gmail.com', firstName: 'System', lastName: 'User' },
-    role: { id: 'role-1', name: 'System' },
-    roleType: { id: 'rt-1', code: 'system' },
-    tenant: { id: 'tenant-1', name: 'QMS' },
+    role: { id: 'role-1', code: 'system', name: 'System' },
+    roleType: { id: 'rt-1', code: 'system', name: 'System' },
+    tenant: { id: 'tenant-1', code: 'qms', name: 'QMS', type: 'platform' },
     permissions: ['system:manage'],
   },
 }
@@ -210,10 +212,7 @@ describe('NewLeadWizard — draft persistence', () => {
     expect(sessionStorage.getItem(draftStorageKey(userId))).toBeNull()
   }, 10000)
 
-  // Regression: the sales-rep picker 403s for actors (e.g. Sales Head) who lack
-  // tenant:manage, since resolving its role-type options requires GET /role-types.
-  // salesPersonId must stay optional so lead creation isn't blocked by that —
-  // the backend defaults an omitted salesPerson to the tenant's assigned rep.
+  // Regression: salesPersonId must stay optional — the backend defaults an omitted one to the tenant's assigned rep.
   it('creating a lead without picking a sales rep still succeeds, and the payload omits salesPerson entirely', async () => {
     const { crmService } = await import('@/features/crm/crm.service')
     const userId = nextDraftTestUserId()
@@ -250,5 +249,111 @@ describe('NewLeadWizard — draft persistence', () => {
     await waitFor(() => expect(onCreated).toHaveBeenCalled())
     const payload = vi.mocked(crmService.createLead).mock.calls[0][0]
     expect(payload).not.toHaveProperty('salesPerson')
+  }, 10000)
+})
+
+// GET /role-types (needed for the picker) is admin-only and 403s for a sales-rep — skip it entirely.
+describe('NewLeadWizard — sales-rep viewer is locked to themselves on Step 4', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    sessionStorage.clear()
+    useAuthStore.getState().clearAuth()
+  })
+
+  async function reachStep4AsSalesRep(userId: string) {
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    const salesRepSessionResponse: ApiResponse<SessionResponse> = {
+      success: true,
+      message: '',
+      data: {
+        user: { id: userId, email: 'rohit@example.com', firstName: 'Rohit', lastName: 'Malhotra' },
+        role: { id: 'role-rohit', code: 'sr-rohit', name: 'Rohit Malhotra' },
+        roleType: { id: 'rt-sales-rep', code: 'sales-rep', name: 'Sales Rep' },
+        tenant: { id: 'tenant-1', code: 'qms', name: 'QMS', type: 'platform' },
+        permissions: ['lead:create'],
+      },
+    }
+    vi.mocked(accessManagementService.getMe).mockResolvedValue(salesRepSessionResponse)
+
+    const user = userEvent.setup()
+    seedDraft(userId, {
+      tenantId: 'tenant-1', tenantLabel: 'Sun Cardio (SC)', divisionId: 'div-1', divisionLabel: 'Cardiology',
+      contactPersonId: 'contact-1', contactPersonLabel: 'Dr. Contact', focusTherapy: ['Cardiology'], focusTherapyDoctor: ['Cardiologist'],
+    })
+    useAuthStore.getState().setAuth({ id: userId, email: 'rohit@example.com', firstName: 'Rohit', lastName: 'Malhotra' })
+    const onCreated = vi.fn()
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <NewLeadWizard onClose={vi.fn()} onCreated={onCreated} />
+      </QueryClientProvider>,
+    )
+    await user.click(await screen.findByRole('button', { name: /^Resume$/i }))
+    await user.click(screen.getByRole('button', { name: /^Next/i }))
+
+    await user.type(screen.getByPlaceholderText(/cardiology screening expansion/i), 'Test Lead Title')
+    await user.type(screen.getByPlaceholderText(/describe the client/i), 'A real problem statement.')
+    await user.click(screen.getByRole('button', { name: 'Doctor meets' }))
+
+    await user.click(screen.getByRole('button', { name: /^Next/i }))
+    await user.click(await screen.findByRole('button', { name: 'Screening' }))
+    await user.click(screen.getByRole('button', { name: 'Screening Camp' }))
+    await user.type(screen.getByPlaceholderText(/reason for this offering/i), 'A real reason.')
+    await user.click(screen.getByRole('button', { name: /^Next/i }))
+
+    return { user, onCreated }
+  }
+
+  it('shows the sales rep locked to "self" (no picker, no GET /role-types lookup) on Step 4', async () => {
+    const userId = nextDraftTestUserId()
+    await reachStep4AsSalesRep(userId)
+
+    expect(await screen.findByText('Rohit Malhotra')).toBeInTheDocument()
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+    const { useRoleTypes } = await import('@/features/access-management/role-type/hooks/useRoleTypes')
+    expect(vi.mocked(useRoleTypes).mock.calls.every((call) => call[1] === false)).toBe(true)
+  })
+
+  it('submits the lead with salesPerson set to the viewer\'s own role id, not any prefill', async () => {
+    const { crmService } = await import('@/features/crm/crm.service')
+    const userId = nextDraftTestUserId()
+    const { user, onCreated } = await reachStep4AsSalesRep(userId)
+
+    await user.click(screen.getByRole('button', { name: /Create lead/i }))
+
+    await waitFor(() => expect(onCreated).toHaveBeenCalled())
+    const payload = vi.mocked(crmService.createLead).mock.calls[0][0]
+    expect(payload).toHaveProperty('salesPerson', 'role-rohit')
+  }, 10000)
+
+  it('a non-sales-rep viewer (e.g. system/admin) still sees the normal picker', async () => {
+    // vi.clearAllMocks() resets call history, not a prior mockResolvedValue override — restore the
+    // module-level default explicitly rather than depend on test execution order.
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    vi.mocked(accessManagementService.getMe).mockResolvedValue(sessionResponse)
+
+    const userId = nextDraftTestUserId()
+    seedDraft(userId, {
+      tenantId: 'tenant-1', tenantLabel: 'Sun Cardio (SC)', divisionId: 'div-1', divisionLabel: 'Cardiology',
+      contactPersonId: 'contact-1', contactPersonLabel: 'Dr. Contact', focusTherapy: ['Cardiology'], focusTherapyDoctor: ['Cardiologist'],
+    })
+    useAuthStore.getState().setAuth({ id: userId, email: 'system@gmail.com', firstName: 'System', lastName: 'User' })
+    const user = userEvent.setup()
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <NewLeadWizard onClose={vi.fn()} onCreated={vi.fn()} />
+      </QueryClientProvider>,
+    )
+    await user.click(await screen.findByRole('button', { name: /^Resume$/i }))
+    await user.click(screen.getByRole('button', { name: /^Next/i }))
+    await user.type(screen.getByPlaceholderText(/cardiology screening expansion/i), 'Test Lead Title')
+    await user.type(screen.getByPlaceholderText(/describe the client/i), 'A real problem statement.')
+    await user.click(screen.getByRole('button', { name: 'Doctor meets' }))
+    await user.click(screen.getByRole('button', { name: /^Next/i }))
+    await user.click(await screen.findByRole('button', { name: 'Screening' }))
+    await user.click(screen.getByRole('button', { name: 'Screening Camp' }))
+    await user.type(screen.getByPlaceholderText(/reason for this offering/i), 'A real reason.')
+    await user.click(screen.getByRole('button', { name: /^Next/i }))
+
+    expect(await screen.findByRole('combobox')).toBeInTheDocument()
   }, 10000)
 })

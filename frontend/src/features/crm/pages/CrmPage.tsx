@@ -41,10 +41,12 @@ const VIEW_LABELS: { id: ViewMode; label: string }[] = [
 
 const CrmPage = () => {
   const { hasAnyPermission } = usePermission()
-  // A lead:search-only caller can view their own leads but create/update/
-  // move-stage still require lead:manage/tenant:manage — hide controls that
-  // would only 403 rather than showing them and letting them fail.
+  // A lead:search-only caller can view their own leads but create/update/move-stage need more — hide controls that would only 403.
   const canManageLeads = hasAnyPermission(['lead:manage', 'tenant:manage'])
+  // POST /leads also accepts lead:create (lighter than lead:manage — e.g. a sales rep creating their own lead).
+  const canCreateLeads = hasAnyPermission(['lead:create', 'lead:manage', 'tenant:manage'])
+  // PUT /:id and PATCH /:id/stage also accept lead:update (e.g. a sales rep editing/advancing their own lead).
+  const canEditLeads = hasAnyPermission(['lead:update', 'lead:manage', 'tenant:manage'])
   // GET /leads/report is gated to lead:manage ONLY (not tenant:manage) at the route level — a
   // tenant:manage-only caller must fall into the own-scope "My Sales Dashboard" branch too, or
   // the report call 403s every time.
@@ -142,7 +144,7 @@ const CrmPage = () => {
               </Button>
             ))}
           </div>
-          {canManageLeads && (
+          {canCreateLeads && (
             <Button
               onClick={() => setWizardOpen(true)}
               className="text-white shrink-0"
@@ -266,9 +268,9 @@ const CrmPage = () => {
               <CompactView leads={filtered} onSelectStatus={setStatusDrill} />
             )}
             {view === 'kanban' && (
-              <KanbanView leads={filtered} onOpen={setOpenLeadId} onMoveStage={moveStage} canManage={canManageLeads} />
+              <KanbanView leads={filtered} onOpen={setOpenLeadId} onMoveStage={moveStage} canManage={canEditLeads} />
             )}
-            {view === 'list' && <ListView leads={filtered} onOpen={setOpenLeadId} onMoveStage={moveStage} canManage={canManageLeads} />}
+            {view === 'list' && <ListView leads={filtered} onOpen={setOpenLeadId} onMoveStage={moveStage} canManage={canEditLeads} />}
             {view === 'calendar' && <CalendarView leads={filtered} onOpen={setOpenLeadId} />}
           </div>
 
@@ -278,7 +280,7 @@ const CrmPage = () => {
         </>
       )}
 
-      <LeadDrawer lead={openLead} onClose={() => setOpenLeadId(null)} onMoveStage={moveStage} onUpdateLead={updateLead} canManage={canManageLeads} />
+      <LeadDrawer lead={openLead} onClose={() => setOpenLeadId(null)} onMoveStage={moveStage} onUpdateLead={updateLead} canManage={canEditLeads} />
 
       {wizardOpen && (
         <NewLeadWizard
@@ -299,7 +301,7 @@ const CrmPage = () => {
           setStatusDrill(null)
           setWizardOpen(true)
         }}
-        canManage={canManageLeads}
+        canManage={canCreateLeads}
       />
     </div>
   )

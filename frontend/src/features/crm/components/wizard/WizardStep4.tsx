@@ -15,40 +15,38 @@ import { labelClasses, labelStyle, fieldClasses } from '@/features/crm/component
 interface WizardStep4Props {
   form: WizardFormState
   setField: <K extends keyof WizardFormState>(key: K, value: WizardFormState[K]) => void
+  // A sales-rep viewer — NewLeadWizard already locked form.salesPersonId to self; show it read-only, skip the picker's queries.
+  lockedToSelf?: boolean
 }
 
 // Navigation range only — DatePicker's own default caps at the current month, unreachable for a future follow-up.
 const FOLLOW_UP_DATE_START_MONTH = new Date(new Date().getFullYear() - 2, 0)
 const FOLLOW_UP_DATE_END_MONTH = new Date(new Date().getFullYear() + 5, 11)
 
-const WizardStep4 = ({ form, setField }: WizardStep4Props) => {
-  // limit: PLATFORM_TENANT_FETCH_LIMIT — see accessManagement.constants.ts;
-  // the backend's default 10-result limit can silently exclude the `qms`
-  // platform tenant once total active tenant count passes 10.
-  const { data: tenantData, isError: tenantsErrored } = useTenants({ type: 'platform', status: 'active', limit: PLATFORM_TENANT_FETCH_LIMIT })
+const WizardStep4 = ({ form, setField, lockedToSelf }: WizardStep4Props) => {
+  // limit: PLATFORM_TENANT_FETCH_LIMIT — the backend's default 10-result limit can silently exclude the `qms` platform tenant.
+  const { data: tenantData, isError: tenantsErrored } = useTenants(
+    { type: 'platform', status: 'active', limit: PLATFORM_TENANT_FETCH_LIMIT },
+    !lockedToSelf,
+  )
   const platformTenant = tenantData?.data?.items.find((t) => t.type === 'platform' || t.code === PLATFORM_TENANT_CODE)
 
-  // TODO: ask whether this field should really offer both sales-rep and
-  // sales-head, or only one of the two — combined into one fetch for now
-  // (backend's role-type search only supports a single exact `code`, not a
-  // list, so codes are split out client-side instead of two filtered calls).
-  // limit: '50' — sorted newest-first, and sales-rep/sales-head were seeded
-  // early, so the backend's default 10-result page already excludes both
-  // once the platform tenant has 10+ role types (confirmed live).
+  // TODO: ask whether this should offer both sales-rep and sales-head, or just one.
+  // limit: '50' — the backend's default 10-result page can exclude both once the platform tenant has 10+ role types.
   const { data: roleTypesData, isLoading: roleTypesLoading, isError: roleTypesErrored } = useRoleTypes(
     { tenant: platformTenant?.id, status: 'active', limit: '50' },
-    !!platformTenant,
+    !lockedToSelf && !!platformTenant,
   )
   const salesRepTypeId = roleTypesData?.data?.items.find((t) => t.code === 'sales-rep')?.id
   const salesHeadTypeId = roleTypesData?.data?.items.find((t) => t.code === 'sales-head')?.id
 
   const { data: salesRepRoleData, isLoading: salesRepRolesLoading, isError: salesRepRolesErrored } = useRoles(
     { tenant: platformTenant?.id, type: salesRepTypeId, status: 'active' },
-    !!platformTenant && !!salesRepTypeId,
+    !lockedToSelf && !!platformTenant && !!salesRepTypeId,
   )
   const { data: salesHeadRoleData, isLoading: salesHeadRolesLoading, isError: salesHeadRolesErrored } = useRoles(
     { tenant: platformTenant?.id, type: salesHeadTypeId, status: 'active' },
-    !!platformTenant && !!salesHeadTypeId,
+    !lockedToSelf && !!platformTenant && !!salesHeadTypeId,
   )
   const salesRoles = [...(salesRepRoleData?.data?.items ?? []), ...(salesHeadRoleData?.data?.items ?? [])]
   const rolesLoading = roleTypesLoading || salesRepRolesLoading || salesHeadRolesLoading
@@ -100,25 +98,34 @@ const WizardStep4 = ({ form, setField }: WizardStep4Props) => {
       </div>
 
       <div>
-        <Label className={labelClasses} style={labelStyle}>Sales rep (optional)</Label>
-        <Select key={form.salesPersonId || 'empty'} value={form.salesPersonId} onValueChange={(v) => selectSalesPerson(v as string)}>
-          <SelectTrigger className={`w-full ${fieldClasses}`}>
-            <SelectValue placeholder={rolesLoading ? 'Loading...' : 'Default to company sales rep'}>
-              {(v: string) => {
-                const r = salesRoles.find((role) => role.id === v)
-                return r ? `${r.name} (${r.code})` : rolesLoading ? 'Loading...' : 'Default to company sales rep'
-              }}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {salesRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
-          </SelectContent>
-        </Select>
-        {(tenantsErrored || rolesErrored) && (
-          <p className="text-[11px] mt-1 text-danger">Couldn't load sales reps — leave unselected to default to the company's assigned sales rep.</p>
-        )}
-        {!tenantsErrored && !rolesErrored && !rolesLoading && !platformTenant && (
-          <p className="text-[11px] mt-1 text-danger">No QMS internal (platform) company found — a sales rep must belong to one.</p>
+        <Label className={labelClasses} style={labelStyle}>Sales rep{lockedToSelf ? '' : ' (optional)'}</Label>
+        {lockedToSelf ? (
+          <>
+            <p className="text-[13px] py-1" style={{ color: 'var(--qms-text)' }}>{form.salesPersonLabel}</p>
+            <p className="text-[11px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>A sales rep's new leads are always assigned to themselves.</p>
+          </>
+        ) : (
+          <>
+            <Select key={form.salesPersonId || 'empty'} value={form.salesPersonId} onValueChange={(v) => selectSalesPerson(v as string)}>
+              <SelectTrigger className={`w-full ${fieldClasses}`}>
+                <SelectValue placeholder={rolesLoading ? 'Loading...' : 'Default to company sales rep'}>
+                  {(v: string) => {
+                    const r = salesRoles.find((role) => role.id === v)
+                    return r ? `${r.name} (${r.code})` : rolesLoading ? 'Loading...' : 'Default to company sales rep'
+                  }}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {salesRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {(tenantsErrored || rolesErrored) && (
+              <p className="text-[11px] mt-1 text-danger">Couldn't load sales reps — leave unselected to default to the company's assigned sales rep.</p>
+            )}
+            {!tenantsErrored && !rolesErrored && !rolesLoading && !platformTenant && (
+              <p className="text-[11px] mt-1 text-danger">No QMS internal (platform) company found — a sales rep must belong to one.</p>
+            )}
+          </>
         )}
       </div>
 

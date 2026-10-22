@@ -287,3 +287,29 @@ describe('Sidebar — Employees is visible to its allowed role types even withou
     expect(screen.getByText('Employees')).toBeInTheDocument()
   })
 })
+
+describe('Sidebar — Dashboard + the 4 analytics items are system:manage-only, for now', () => {
+  const LABELS = ['Dashboard', 'Sales Analytics', 'FO Analytics', 'Doctor Analytics', 'Financial Analytics']
+
+  it('hides Dashboard and all 4 analytics items for a session holding only tenant:manage', async () => {
+    await renderSidebar({
+      permissions: ['tenant:manage'],
+      session: sessionFixture('admin', ['tenant:manage'], 'platform'),
+    })
+
+    for (const label of LABELS) {
+      expect(screen.queryByText(label)).not.toBeInTheDocument()
+    }
+  })
+
+  it('shows Dashboard and all 4 analytics items for a system:manage session', async () => {
+    await renderSidebar({
+      permissions: ['system:manage'],
+      session: sessionFixture('system-admin', ['system:manage'], 'platform'),
+    })
+
+    for (const label of LABELS) {
+      expect(screen.getByText(label)).toBeInTheDocument()
+    }
+  })
+})

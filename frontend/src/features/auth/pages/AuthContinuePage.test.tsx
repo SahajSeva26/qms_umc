@@ -7,6 +7,8 @@ import { CAMPS_ROUTES } from '@/features/camps/camps.paths'
 import { PHARMA_ROUTES } from '@/features/pharma/pharma.constants'
 import { EMPLOYEE_ROUTES } from '@/features/access-management/employee/employee.paths'
 import { CRM_ROUTES } from '@/features/crm/crm.paths'
+import { DOCTORS_ROUTES } from '@/features/doctors/doctors.paths'
+import { DASHBOARD_ROUTES } from '@/features/dashboard/dashboard.paths'
 import AuthContinuePage from './AuthContinuePage'
 
 vi.mock('@/hooks/useSession')
@@ -54,6 +56,8 @@ function renderContinuePage() {
         <Route path={EMPLOYEE_ROUTES.EMPLOYEES} element={<div>Landed: {EMPLOYEE_ROUTES.EMPLOYEES}</div>} />
         <Route path={PHARMA_ROUTES.PHARMA} element={<div>Landed: {PHARMA_ROUTES.PHARMA}</div>} />
         <Route path={CRM_ROUTES.APPOINTMENTS} element={<div>Landed: {CRM_ROUTES.APPOINTMENTS}</div>} />
+        <Route path={DOCTORS_ROUTES.DOCTORS} element={<div>Landed: {DOCTORS_ROUTES.DOCTORS}</div>} />
+        <Route path={DASHBOARD_ROUTES.DASHBOARD} element={<div>Landed: {DASHBOARD_ROUTES.DASHBOARD}</div>} />
       </Routes>
     </MemoryRouter>,
   )
@@ -70,9 +74,7 @@ describe('AuthContinuePage — resolves the post-login landing from the session,
   })
 
   it('renders nothing (not "Nothing to show yet") while settled-but-session-null and a refetch is in flight — the exact post-login race window useLogin\'s refetchSession creates', () => {
-    // isSettled is a lifetime flag: it can stay true from an earlier resolved fetch while a NEW
-    // refetch (the one useLogin triggers right after this page mounts) is still in flight and
-    // session is momentarily null. Must not be read as "no access."
+    // isSettled can stay true from an earlier fetch while a new refetch (useLogin's) is in flight and session is momentarily null.
     mockSession({ isSettled: true, isFetching: true, session: null })
     const { container } = renderContinuePage()
 
@@ -118,20 +120,30 @@ describe('AuthContinuePage — resolves the post-login landing from the session,
     expect(screen.getByText(`Landed: ${PHARMA_ROUTES.PHARMA}`)).toBeInTheDocument()
   })
 
-  it('a misconfigured pharma session (no camp:book) is treated as having no reachable item, not routed into a dead portal', () => {
+  it('a misconfigured pharma session (no camp:book) skips its own disabled portal and lands on Doctor Management — the one other item an MR can always reach (no permission gate)', () => {
     const session = sessionFixture('pharma-mr', [], 'customer')
+    mockSession({ session, permissions: session.permissions })
+    renderContinuePage()
+
+    expect(screen.getByText(`Landed: ${DOCTORS_ROUTES.DOCTORS}`)).toBeInTheDocument()
+  })
+
+  it('a pharma-mr session with neither camp:book nor any role-type match resolves to null when even the extra-item allowlist is empty', () => {
+    // isPharmaExtraNavItem only admits 'camps'/'doctors' for pharma-mr specifically — any other
+    // pharma role type with no camp:book has nothing reachable at all.
+    const session = sessionFixture('pharma-rsm', [], 'customer')
     mockSession({ session, permissions: session.permissions })
     renderContinuePage()
 
     expect(screen.getByText(/nothing to show yet/i)).toBeInTheDocument()
   })
 
-  it('a system:manage session lands on Appointments — the first section\'s first item, since system:manage bypasses every gate', () => {
+  it('a system:manage session lands on Dashboard — now system:manage-only, and the first section\'s first item once reachable', () => {
     const session = sessionFixture('system-admin', ['system:manage'], 'platform')
     mockSession({ session, permissions: session.permissions })
     renderContinuePage()
 
-    expect(screen.getByText(`Landed: ${CRM_ROUTES.APPOINTMENTS}`)).toBeInTheDocument()
+    expect(screen.getByText(`Landed: ${DASHBOARD_ROUTES.DASHBOARD}`)).toBeInTheDocument()
   })
 
   it('even a role type with zero permission-gated grants still resolves somewhere, via the nav items open to any authenticated session (Employees is open to admin-family role types)', () => {

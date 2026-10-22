@@ -124,7 +124,11 @@ const seedSystemUser = async () => {
                 });
 
                 // role type level permissions
-                tenantAdminRoleType.permissions.push(PERMISSIONS.TENANT.MANAGE.code, PERMISSIONS.TENANT.ADMIN.code);
+                tenantAdminRoleType.permissions.push(
+                    PERMISSIONS.TENANT.MANAGE.code,
+                    PERMISSIONS.TENANT.ADMIN.code,
+                    PERMISSIONS.ROLE_TYPE.MANAGE.code,
+                );
                 await tenantAdminRoleType.save();
                 logger.debug({ roleTypeId: tenantAdminRoleType.id }, 'Admin role type created');
             }

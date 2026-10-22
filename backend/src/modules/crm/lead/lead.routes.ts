@@ -155,14 +155,14 @@ LeadRouter.get(
 );
 LeadRouter.put(
     '/:id',
-    AuthorizeMiddleware([LEAD_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
+    AuthorizeMiddleware([LEAD_PERMISSIONS.UPDATE.code, LEAD_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
     LeadController.update,
 );
 LeadRouter.patch(
     '/:id/stage',
-    AuthorizeMiddleware([LEAD_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
+    AuthorizeMiddleware([LEAD_PERMISSIONS.UPDATE.code, LEAD_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
     LeadController.moveStage,
 );
 
 LeadRouter.get('/', AuthorizeMiddleware(READ_GUARD), LeadController.search);
-LeadRouter.post('/', AuthorizeMiddleware(GUARD), LeadController.create);
+LeadRouter.post('/', AuthorizeMiddleware([LEAD_PERMISSIONS.CREATE.code, ...GUARD]), LeadController.create);

@@ -371,7 +371,9 @@ export interface CreateLeadPayload {
   tenant: string
   division: string
   contactPerson: string
-  salesPerson: string
+  // Optional — omitted, the backend defaults it to the tenant's assigned sales
+  // person (and 400s if the tenant has none and this is also omitted).
+  salesPerson?: string
   title: string
   problemStatement: string
   numberOfMRS: number
@@ -423,8 +425,10 @@ export interface KpiTile {
   sub?: string
 }
 
-// GET /leads/report — division/salesPerson/projectType/from/to all optional;
-// from/to only bound the newLeads trend, NOT summary/byStatus/byProjectType.
+// GET /leads/report — division/salesPerson/projectType/from/to all optional. from/to bound the
+// newLeads trend AND kpis.wonValue/wonCount/winRate (won/lost counted within [from,to]) — NOT
+// summary/byStatus/byProjectType (always all-time) or pipelineValue/avgDealSize/salesVelocityDays/
+// topRep (always all-time).
 export interface LeadReportQuery {
   division?: string
   salesPerson?: string

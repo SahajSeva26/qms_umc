@@ -1,10 +1,9 @@
 import type { RouteObject } from 'react-router-dom'
 import { lazyRoute } from '@/lib/router/lazyRoute'
+import * as FoPaths from './fo.paths'
 
-export const FO_ROUTES = {
-  FIELD_OFFICERS:  '/field-officers',
-  FIELD_OFFICER_DETAIL: '/field-officers/:id',
-}
+// A direct `export const` (not a bare re-export specifier) — see camps.routes.tsx for why.
+export const FO_ROUTES = FoPaths.FO_ROUTES
 
 // Cheap first filter only — field-officer (RoleType + every real Role of that
 // type) lives under the platform tenant, so this alone would wrongly admit a

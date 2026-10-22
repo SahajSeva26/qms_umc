@@ -1,7 +1,6 @@
 import type { Camp } from '@/types/camp.types'
 import type { ClientInvoice, ClientProject } from '@/types/client.types'
 import type { LeadEntity } from '@/types/crm.types'
-import type { FieldOfficer } from '@/types/analytics.types'
 import { pct } from '@/features/analytics/analytics.utils'
 
 export interface AnalyticsKpiTile {
@@ -20,7 +19,9 @@ export function computeAnalyticsKpis(
   projects: ClientProject[],
   leads: LeadEntity[],
   invoices: ClientInvoice[],
-  fieldOfficers: FieldOfficer[],
+  // Real value from GET /inventory-assignments/report (Dashboard's own activeFOs), already fetched
+  // by useAnalyticsData via useDashboardDataShared — null when unpermitted/unavailable, never mock.
+  activeFOs: number | null,
   formatINR: (v: number) => string
 ): AnalyticsKpiTile[] {
   const won = leads.filter((l) => l.status === 'won')
@@ -34,8 +35,6 @@ export function computeAnalyticsKpis(
   const revenue = paidInvoices.reduce((sum, i) => sum + i.amount, 0)
   const overdueInvoices = invoices.filter((i) => i.status === 'OVERDUE')
   const arOpen = invoices.filter((i) => i.status !== 'PAID').reduce((sum, i) => sum + i.amount, 0)
-  const activeFOs = fieldOfficers.filter((f) => !f.relievedOn)
-  const assignedCamps = camps.filter((c) => !!c.foId)
 
   return [
     { id: 'pipeline', label: 'Pipeline', icon: 'Briefcase', tone: 'brand', value: String(leads.length), sub: `${won.length} won · ${pct(won.length, leads.length)}% win` },
@@ -45,6 +44,6 @@ export function computeAnalyticsKpis(
     { id: 'avg-rating', label: 'Avg rating', icon: 'Star', tone: 'amber', value: avgRating !== null ? `${avgRating} ★` : '—', sub: `${rated.length} rated` },
     { id: 'revenue', label: 'Revenue (paid)', icon: 'Receipt', tone: 'brand', value: formatINR(revenue), sub: `${paidInvoices.length} invoices` },
     { id: 'ar-open', label: 'AR open', icon: 'AlertTriangle', tone: 'rose', value: formatINR(arOpen), sub: `${overdueInvoices.length} overdue` },
-    { id: 'active-fos', label: 'Active FOs', icon: 'Route', tone: 'brand', value: String(activeFOs.length), sub: `${assignedCamps.length} assigned camps` },
+    { id: 'active-fos', label: 'Active FOs', icon: 'Route', tone: 'brand', value: activeFOs !== null ? String(activeFOs) : '—', sub: 'assigned camps — not available' },
   ]
 }

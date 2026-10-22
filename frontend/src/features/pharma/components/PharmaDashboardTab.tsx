@@ -16,8 +16,8 @@ function doctorId(doctor: CampEntity['doctor']): string {
   return typeof doctor === 'string' ? doctor : (doctor as { _id?: string })._id ?? ''
 }
 
-// Partial MR dashboard — only tiles backed by real fields are shown. Brand-wise Rx stays log-only
-// (no Rx/prescription concept anywhere in the backend).
+// Generic pharma dashboard for HO/RSM/ASM (MR gets its own MrDashboardTab instead — GET /camps/my
+// is MR-only, see PharmaPortalPage.tsx). Only tiles backed by real fields are shown.
 const PharmaDashboardTab = () => {
   const { data, isLoading, error, refetch } = usePharmaCamps({ limit: AGGREGATE_LIMIT, report: 'true' })
   const camps = data?.data?.items ?? EMPTY_ARRAY

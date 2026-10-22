@@ -69,6 +69,13 @@ const TenantDetailPage = () => {
   const ownerEmailSuffix = ownerName && ownerUser?.email ? ownerUser.email : null
   const tenantAddress = tenant ? formatTenantAddress(tenant.address) : null
 
+  // salesPerson is a raw Role id, same system:manage-only gate as owner (accessManagement.types.ts) —
+  // resolved the same way owner is, so the name shows instead of a bare ObjectId.
+  const { data: salesPersonRoleData } = useRole(tenant?.salesPerson ?? undefined)
+  const salesPersonRole = salesPersonRoleData?.data ?? null
+  const salesPersonUser = salesPersonRole && typeof salesPersonRole.user !== 'string' ? (salesPersonRole.user as RolePopulatedUser) : null
+  const salesPersonName = salesPersonUser?.firstName ? `${salesPersonUser.firstName} ${salesPersonUser.lastName ?? ''}`.trim() : null
+
   const [editOpen, setEditOpen] = useState(false)
   const [createDivisionOpen, setCreateDivisionOpen] = useState(false)
 
@@ -233,10 +240,12 @@ const TenantDetailPage = () => {
           <TenantHeader
             tenant={tenant}
             canManageTenant={canManageTenant}
+            canManageSystem={canManageSystem}
             canViewRole={canViewRole}
             ownerName={ownerName}
             ownerUser={ownerUser}
             ownerEmailSuffix={ownerEmailSuffix}
+            salesPersonName={salesPersonName}
             tenantAddress={tenantAddress}
             divisionPenetrationPct={divisionPenetrationPct}
             onEditClick={() => setEditOpen(true)}

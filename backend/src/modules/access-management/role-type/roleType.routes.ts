@@ -8,8 +8,7 @@ import {
 } from './roleType.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
 import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
-import { PERMISSIONS } from '../../../shared/env/permissions';
-import { TENANT_PERMISSIONS } from '../tenant/tenant.constants';
+import { ROLE_TYPE_PERMISSIONS } from './roleType.constants';
 
 export const RoleTypeRouter = express.Router();
 
@@ -107,22 +106,22 @@ registry.registerPath({
 // =======================================================================
 RoleTypeRouter.get(
     '/:id',
-    AuthorizeMiddleware([TENANT_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.ADMIN.code]),
+    AuthorizeMiddleware([ROLE_TYPE_PERMISSIONS.MANAGE.code, ROLE_TYPE_PERMISSIONS.GET.code]),
     RoleTypeController.get,
 );
 RoleTypeRouter.put(
     '/:id',
-    AuthorizeMiddleware([TENANT_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.ADMIN.code]),
+    AuthorizeMiddleware([ROLE_TYPE_PERMISSIONS.MANAGE.code, ROLE_TYPE_PERMISSIONS.UPDATE.code]),
     RoleTypeController.update,
 );
 
 RoleTypeRouter.get(
     '/',
-    AuthorizeMiddleware([TENANT_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.ADMIN.code]),
+    AuthorizeMiddleware([ROLE_TYPE_PERMISSIONS.MANAGE.code, ROLE_TYPE_PERMISSIONS.SEARCH.code]),
     RoleTypeController.search,
 );
 RoleTypeRouter.post(
     '/',
-    AuthorizeMiddleware([TENANT_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.ADMIN.code]),
+    AuthorizeMiddleware([ROLE_TYPE_PERMISSIONS.MANAGE.code, ROLE_TYPE_PERMISSIONS.CREATE.code]),
     RoleTypeController.create,
 );

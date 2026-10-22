@@ -1,9 +1,9 @@
 import type { RouteObject } from 'react-router-dom'
 import { lazyRoute } from '@/lib/router/lazyRoute'
+import * as DedicatedOpsPaths from './dedicatedops.paths'
 
-export const DEDICATEDOPS_ROUTES = {
-  DEDICATEDOPS: '/fo/dedicated',
-}
+// A direct `export const` (not a bare re-export specifier) — see camps.routes.tsx for why.
+export const DEDICATEDOPS_ROUTES = DedicatedOpsPaths.DEDICATEDOPS_ROUTES
 
 // KNOWN GAP, BLOCKED ON BACKEND — this route is NOT permission-guarded.
 //
@@ -22,7 +22,7 @@ export const DEDICATEDOPS_ROUTES = {
 // worse — it would look guarded while enforcing nothing, since
 // usePermission() only ever holds codes the server actually issued.
 //
-// The `rolesAllowed` gate on this route's nav entry (navConfig.ts) is the
+// The `rolesAllowed` gate on this route's nav entry (navRegistry.ts) is the
 // legacy flat-role system, not this. It is UI-hiding, not authorization, and
 // per root CLAUDE.md §5a is intentionally left as-is on existing screens
 // until the whole app migrates off role-based nav.

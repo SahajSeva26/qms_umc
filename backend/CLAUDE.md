@@ -18,6 +18,7 @@ src/modules/
   vendor-master/            global platform-only vendor/supplier registry
   file/                     generic file/attachment store — presigned direct-to-S3 upload flow
   otp/                      global OTP issue/verify store — SERVICE-ONLY (no routes/controller/HTTP)
+  notification/             per-user notification inbox — 🔄 scaffold (GET /me only; no triggers/sender yet)
   access-management/        tenant, role, role-type, permission-group (RBAC), employee (HR registry)
   crm/                      division, brand, lead, project, appointment, contact, doctor (tenant-scoped registry)
   operations/               camp, geoProfile (field-staff geo + camp allocation),
@@ -169,6 +170,8 @@ const ctx: RequestContext = req.context
 // ctx.requestID    → UUID per request
 // ctx.ipAddress    → client IP
 // ctx.logger       → scoped logger
+// ctx.meta         → { changes: string[] } — free per-request bag; `changes` holds the names
+//                    of fields changed this request (push onto it in services, e.g. for events)
 // ctx.setUser(userData)
 // ctx.setRole(role)
 // ctx.setTenant(tenant)
@@ -384,15 +387,24 @@ import { PERMISSIONS, PERMISSIONS_ARRAY } from '../../shared/env/permissions'
 
 Never return a raw Mongoose document to the client. Always strip through a mapper.
 
+**`toSearchResponse` MUST be decoupled from `toResponse`** — inline the search-row fields
+independently, do NOT call `toResponse` from inside it. This lets a module trim its search-row
+shape (lighter list payloads) later without changing `GET /:id`. All 31 existing mappers were
+decoupled this way on 2026-09-29 (commit `8b3c7dc`); follow this for every new mapper.
+
 ```typescript
 export const FooMapper = {
     toResponse: (doc: HydratedDocument<IFoo>) => ({
         id: doc._id.toString(),
         // only safe, public fields
     }),
+    // decoupled — fields inlined, NOT `data.items.map(FooMapper.toResponse)`
     toSearchResponse: (data: { count: number; items: HydratedDocument<IFoo>[] }) => ({
         count: data.count,
-        items: data.items.map(FooMapper.toResponse),
+        items: data.items.map((doc) => ({
+            id: doc._id.toString(),
+            // same safe, public fields — or a trimmed subset for list views
+        })),
     }),
 }
 ```
@@ -460,12 +472,102 @@ All modules follow the layered convention above; all are wired in `src/bin/app.t
 
 | — | otp | — (service-only) | **global OTP issue/verify store — NO routes/controller/mapper/HTTP; invoked service-to-service** (e.g. screening consent). Public surface = `OtpService.request` / `resend` / `verify`; `get`/`search`/`create`/`update` are internal raw CRUD (CRUD does only the raw op; all business rules live in request/resend/verify). Model: `purpose`, `channel {type(sms/whatsapp/email), value}`, optional `entity {type,relation,id}` (partial 2dsphere-free index for lookup), `code` (6-digit, server-gen), `status` (pending/verified/expired/blocked), `expiresAt`, `attempts`, `maxAttempts` (5), `verifiedAt`. **request**: expire prior pending for the target → generate code + expiry (now + TTL, default 5 min) → raw create (atomic). **resend**: requires a prior OTP + a `RESEND_COOLDOWN_SECONDS` (60) gap, then reuses request. **verify**: find latest pending by purpose+entity → expired(400)/out-of-attempts(429/block)/wrong-code(400,++attempts,block on last)/match(verified). Purposes centralized in `OTP_PURPOSES` keyed by `OTP_ENTITY_TYPE` (file-module shape; each entry `{purpose, relation}`). NOT wired into `app.ts`/swagger/permissions by design. ⚠️ no delivery sender yet (channel recorded, nothing sends). |
 
+| — | notification | `/notifications` | **🔄 IN PROGRESS — scaffold only, not functional end-to-end.** Full layered module, wired (`app.ts` + swagger). Model: `recipient` (User, req), optional `tenant`, embedded `entity {id,type,event}`, `event` (**free-form string, NOT enum-constrained** — controlled internally; each emitting module owns its own event-name constants and passes them in; the old `NOTIFICATION_TYPES` enum was removed 2026-10-08), `channel` (email/in-app/whatsapp/sms), `subject`/`body`, `status` (pending/sent/failed), `attempts`/`error`/`sentAt`, `read`/`readAt`. Service `get`/`search`/`create`/`update` (`create` = bare save; intended to be called internally by the events that raise a notification). **Only ONE route: `GET /notifications/me`** — auth-only (NO permission guard), returns the caller's own notifications (recipient pinned from `ctx`, never accepted from client). No create/update route exposed; no mark-as-read route (service `update` toggles `read` but isn't wired). **⚠️ Two gaps make it non-functional:** (1) **nothing triggers it** — no service anywhere calls `NotificationService.create` (so it's never populated), (2) **no delivery sender** — `status`/`channel`/`attempts`/`sentAt`/`error` exist but nothing sends (same as otp). No `*_PERMISSIONS` registered. **Consumer worker — `handleEvent` now FULLY WIRED (2026-10-16, `feature/notification`, UNCOMMITTED, e2e-verified live DB, `tsc` clean):** `src/workers/notification.worker.ts` (`npm run worker:notification`) long-polls the notification queue (`queueManager.get('sqs')`), and for each event `handleEvent(event, ctx)`: (1) `code = event['detail-type']` → `loadTemplate<TemplateConfig>()` (generic dynamic-import loader, `src/shared/utils/templateLoader.ts`; absolute path → `file://` URL for ESM/tsx; path derived `camp.create`→`events/camp/create`); no config → warn + ack-drop. (2) `payload = {data: event.detail}` (configs address the payload as `data.*`); renders `config.subject` via Handlebars. (3) derives the source `entity` `{id: data.<prefix>._id, type: <prefix>, event: code}`. (4) per recipient: resolves the recipient OBJECT from the source's PARENT path (`data.fo.email`→`data.fo`) → `to`=object[lastSeg], `recipientId`=object`._id`, folder=middle segment (`fo`). (5) per channel: renders `<templates>/<config.template>/<folder>/<channel>.hbs` (missing → warn+skip) → **persists** `NotificationService.create({recipient:_id, event, channel, subject, body, entity}, ctx)` (no `_id` → warn+skip persist, still send) → **sends** via `messagingManager.get(channel).send({to, subject, body})`. Runs as the **system user**: `buildWorkerContext()` reuses the existing `buildContext` middleware with a stub `req` (socket.remoteAddress `127.0.0.1` to mark system actions) + the seeded system tenant/user/role (`RoleModel.findOne({code:'system'})` WITHOUT `.populate('type')` — RoleType isn't registered in the worker graph & isn't needed). Startup: side-effect import `swagger.registry` FIRST (else notification.validators `.openapi()` throws at import) → `connectDB()` → `buildWorkerContext()` once → `pollMessages(ctx)`; `handleEvent`/`buildWorkerContext` exported, poll guarded by `require.main === module`. Helpers: `getByPath` (`src/shared/utils/object.ts`); **messaging providers** (3 mocks, see Providers). The **full publish→consume path is CONFIRMED WORKING live** (EventBridge `source:qms` → rule → `qms-queue` → worker). **Deferred:** status stays `pending` (create payload has no status field — marking sent/failed is a follow-up); `tenant` omitted (optional); no real trigger calls `publish()` yet (only the temp test route). **TEMP test route (remove before prod):** `POST /notifications/test-publish` (auth-only, `TestPublishNotificationPayloadSchema` = optional `{type?:string (default camp.create), data?:any}`) calls `eventManager.get('aws').publish({type, data, ctx})` to emit an event to EventBridge so the EventBridge→SQS→worker path can be exercised from an HTTP call; registered in swagger under the NOTIFICATION tag. Added to `notification.{validators,controller,routes}.ts`. **Mapper convention:** follows the convention (both `toResponse`/`toSearchResponse`, strips internals — `recipient`/`tenant`/`attempts`/`error` omitted), with minor deviations — typed `any` instead of `HydratedDocument<INotification>`, threads an unused `ctx` param, and `toSearchResponse` loops calling `toResponse` (matches the documented convention but NOT the 2026-09-29 decoupling the other 31 mappers got). |
+
+### Notifications — STATUS + Frontend Integration (2026-10-19, branch `feature/notification`, UNCOMMITTED)
+
+**STATUS: now functional end-to-end** (supersedes the "scaffold only / not functional" prose in the row above). Triggers wired: **`camp.create`** (on `CampService.create`, recipients fo/mr/asm/rsm, email+in-app), **`camp.update`** (on `CampService.update` **only when the camp has an assigned worker**, recipients fo/mr, email-only), **`lead.create`** (on `LeadService.create`, recipient the `salesPerson`, email+in-app), **`lead.update`** (on `LeadService.update` **only when `salesPerson` is (re)assigned**, same recipient/channels), **`project.create`** (on `ProjectService.create`, recipients `projectCoordinator` + `salesRep`, email+in-app) and **`project.update`** (on `ProjectService.update` **only when `projectCoordinator` or `salesRep` is (re)assigned**, same recipients/channels). The worker renders + persists + sends (mock providers), rows carry a real **delivery status** (`sent`/`failed`, no longer stuck `pending`), and there's a working **in-app inbox + mark-all-read** for the frontend. Each emitting service sets `ctx.processSync = true` right before `eventProcessor.process(entity, event, populatedDoc, ctx)` (no-op when false). The temp `POST /notifications/test-publish` route (+ its validator/controller/schema) was **REMOVED (2026-10-19)** now that real triggers exist — events are produced only by domain triggers, no HTTP back-door; the module's public surface is exactly `GET /notifications/me` + `PATCH /notifications/me/read`. `/me` sorts `{createdAt:-1, _id:-1}` (newest first, `_id` tiebreaker so same-ms bulk-inserted rows paginate stably). Still deferred: real (non-mock) SES/SMS/WhatsApp providers; `camp.update` is email-only (no in-app); invoice (and other domains) not yet emitting; ~12 legacy `pending` rows (pre-2026-10-19) linger in dev DB.
+
+**Frontend API contract** — base `/api/v1`, auth via httpOnly cookie (`withCredentials: true`, no token handling). Two endpoints, both auth-only (no permission guard), both scoped to the logged-in user server-side (recipient taken from the session — never sent by the client):
+
+1. **`GET /notifications/me`** — the caller's **in-app** inbox. Server forces `channel=in-app` and `recipient=<session user>`, so email/sms/whatsapp rows (delivery records) are never returned here. Query (all optional): `page` (default 1), `limit` (default 10), `event` (e.g. `camp.create`), `status` (`pending`/`sent`/`failed`), `read` (`true`/`false`). Response `data = { count, items[] }`, newest first; each item:
+   ```json
+   { "id":"…", "entity":{"id":"<campId>","type":"camp","event":"create"},
+     "event":"camp.create", "channel":"in-app",
+     "subject":"A new camp has been created",
+     "body":"New screening camp cmp-000014 assigned to you — …",
+     "status":"sent", "sentAt":"2026-…Z", "read":false, "readAt":null,
+     "createdAt":"…", "updatedAt":"…" }
+   ```
+2. **`PATCH /notifications/me/read`** — no params, no body. Marks **all** the caller's unread in-app notifications read. Response `data = { modified: <count> }`.
+
+- **Unread badge:** `GET /notifications/me?read=false` → `data.count` is the unread count (no dedicated count endpoint).
+- **Deep-link:** `entity = {type:'camp', id, event:'create'|'update'|'fo-assigned'}` → route to e.g. `/camps/:entity.id`. (`entity.event` is the verb; the top-level `event` is the full code `camp.create` for grouping/filtering.)
+- Envelope is the app-standard `{ success, message, data }`. There is **no** client-facing "create notification" API — notifications are produced server-side by domain events.
+
 Cross-cutting: `AuthMiddleware` + `AuthorizeMiddleware` (AND/OR permission guards), system-user
 seeding + per-tenant default-role-type provisioning on boot, `PERMISSIONS`/`PERMISSIONS_ARRAY`
 registry, pino logging (`pino-http`), rate limiting (global + auth), `withTransaction` helper.
 
+**Providers** (`src/shared/providers/`): storage (S3 — presigned, see `file` module) and **events**
+(`events/` — `eventManager.get('aws')` → `EventBridgeProvider`, `IEventProvider.publish(entity, event, data, ctx?)`).
+**Signature (2026-10-12):** `publish(entity: string, event: string, data: object, ctx?: RequestContext)` —
+`entity` is the subject (`'camp'`/`'invoice'`/`'lead'`), `event` is what happened (`'create'`/`'update'`),
+combined into EventBridge `DetailType` as `` `${entity}.${event}` ``; `JSON.stringify(data)`→`Detail`,
+plus configured `Source`/`EventBusName`; the optional `ctx` is used only for request-scoped logging
+(`ctx.logger`, never serialized into the payload). (Replaced the old single-object `IQmsEvent = { type, data, ctx? }`
+param — `IQmsEvent` deleted.) `publish()` inspects `FailedEntryCount` (PutEvents
+returns 200 even on a rejected entry) and throws `throwAppError(500)` on failure. **Config shape
+(2026-10-08):** AWS credentials are shared in `ENV.Providers.AWS` (`Region`/`AccessKeyId`/
+`SecretAccessKey`); per-service config lives in siblings `ENV.Providers.AWS_S3` (`Bucket`/`Endpoint`)
+and `ENV.Providers.AWS_EventBridge` (`EventBusName` default `default`, `Source` default `qms.backend`).
+Env: `AWS_REGION`/`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` + `AWS_S3_BUCKET`/`AWS_S3_ENDPOINT` +
+`AWS_EVENT_BRIDGE_BUS_NAME`/`AWS_EVENT_BRIDGE_SOURCE`. ⚠️ EventBridge `publish()` is implemented but
+**no service calls it yet** (same not-wired-to-triggers gap as the `notification` module).
+
+The **consume side** is a separate provider domain: **queue** (`queue/` — `queueManager.get('sqs')`
+→ `SqsProvider`, `IQueueProvider.receive(queueUrl)` / `delete(queueUrl, receiptHandle)`). `SqsProvider`
+is the only place that imports `@aws-sdk/client-sqs`; `receive()` long-polls (`WaitTimeSeconds` 20,
+`MaxNumberOfMessages` 10, `VisibilityTimeout` 120) and drops malformed entries, `delete()` acks a
+processed message. Config: `ENV.Providers.AWS_SQS.NotificationQueueUrl`
+(env `AWS_SQS_NOTIFICATION_QUEUE_URL`; credentials shared from `ENV.Providers.AWS`).
+
+**Messaging** (`messaging/` — outbound notification delivery, 2026-10-16): `messagingManager.get(channel)`
+→ one provider per channel (`email`/`whatsapp`/`sms`), each in its own folder
+`messaging/<channel>/mock.provider.ts`. Interface `IMessage`/`IMessageProvider`
+(`src/shared/types/message.types.ts`); `send(IMessage{to, body, subject?, from?})`. **All mocks for now**
+(log instead of sending; real SES/etc. drop in beside the mock behind the same interface).
+**Validation is provider-side**: each `send` rejects (throwAppError 400) when `to` is invalid for the
+channel (`isValidEmail`/`isValidPhone` in `strings.ts`) or the body is empty. `in-app` has no provider
+(persisting the row IS delivery). Consumed by the notification worker's `handleEvent`.
+
+**Workers** (`src/workers/`, standalone processes — NOT wired into `server.ts`, run separately):
+**`notification.worker.ts`** (`npm run worker:notification`, `tsx watch`) is an SQS consumer — a
+`while(true)` loop that `queue.receive()`s from the notification queue, `JSON.parse`s each body,
+hands it to a local `handleEvent()` seam (currently **log-only** — a `// TODO: process` marker), then
+`queue.delete()`s on success (a thrown handler leaves the message for redelivery after the visibility
+timeout). Backs off 3s on a receive failure; exits non-zero if `NotificationQueueUrl` is unset.
+**Run it separately** — it is NOT started from `server.ts` (standard SQS-consumer pattern: scale/restart
+independently of the API).
+
+**End-to-end path CONFIRMED WORKING (2026-10-12, live AWS):** `publish()` → EventBridge (`default` bus,
+`source: qms`) → **rule routes to the `qms-queue` SQS queue** → worker `receive()` → `handleEvent()`
+logs → `delete()` acks. Verified live: a `camp.create` event published via EventBridge arrived in SQS as
+a full EventBridge envelope and the worker logged + acked it. The EventBridge→SQS routing rule + the SQS
+queue resource policy (allowing `events.amazonaws.com` to `sqs:SendMessage`) live in AWS config, NOT the
+repo — they were initially mis-wired (the rule's event pattern didn't match `source: qms` / `camp.create`,
+so events published fine but were silently dropped before the queue) and later fixed on the AWS side.
+⚠️ Gotchas: the config source default is `qms.backend` but `.env` sets `AWS_EVENT_BRIDGE_SOURCE=qms`, so
+events go out as `source: qms` — the rule pattern MUST match that. The backend IAM user
+(`qms-umc-backend-dev`) is scoped to `sqs:Send/Receive/DeleteMessage` on the queue only — it CANNOT
+`events:ListRules`/`sqs:GetQueueAttributes`, so rule/queue config must be inspected with an admin login.
+⚠️ **Still consume-only** — `handleEvent` logs but does NOT yet call `NotificationService` or send
+anything; the processing logic is the seam left to fill.
+
 ## What's Next (planned)
 
+- **Notification delivery (branch `feature/notification`, UNCOMMITTED as of 2026-10-16)** — `handleEvent` is now
+  **fully wired + e2e-verified** (load config → resolve recipients → render `.hbs` → persist `Notification` row →
+  send via mock messaging provider; see the notification module + Messaging provider rows). Resolved decisions:
+  recipient id is **populated in the event** (each recipient object carries its own `_id`, resolved from the source's
+  parent path — NO email lookup); template folder derived from the source middle segment; subject added to config,
+  consistent across all channels; 3 **mock messaging providers** (email/whatsapp/sms, NOT a single mail provider) with
+  provider-side input validation; worker runs as the **system user** via `buildContext` + a stub `req`. **Remaining:**
+  (1) **real triggers** — no service calls `publish()` yet (only the temp `POST /notifications/test-publish`); a real
+  `camp.create` emitter must publish the `data: {camp, doctor, fo, mr}` shape the templates expect, with populated `_id`s.
+  (2) **status tracking** — rows persist as `pending`; marking `sent`/`failed` after send needs a status path (create
+  payload has no status field). (3) real email/sms/whatsapp providers behind `IMessageProvider` (mocks only; SES SDK not
+  installed). (4) `tenant` on rows (omitted, optional). See [[notification-template-approach]], [[event-bus-eventbridge]].
 - Inventory — `inventory-assignment` + `inventory-request` are now BUILT/wired. Remaining: build the
   last scaffolded module `inventory-transaction` (append-only stock ledger: issue/return/consume/adjust
   that drives consumable quantity & device location/status), and wire the **`received`** step of a

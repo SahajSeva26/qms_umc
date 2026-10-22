@@ -1,17 +1,14 @@
-import { useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
 import { usePermission } from '@/hooks/usePermission'
-import { useDashboardFilters } from '@/features/dashboard/hooks/useDashboardFilters'
 import { useDashboardData } from '@/features/dashboard/hooks/useDashboardData'
-import { useSalesDataShared } from '@/hooks/useSalesDataShared'
-import { useClientsDataShared } from '@/hooks/useClientsDataShared'
-import { QUARTER } from '@/types/salesdash.types'
-import { buildSalesHeadKpis, DEFAULT_SALES_FILTER, type SalesFilterState } from '@/components/widgets/sales-kpi/sales.kpis'
+import { useCampReport } from '@/features/camps/hooks/useCampReport'
+import { screeningService } from '@/features/clinical/screening/screening.service'
+import { buildDashboardSalesKpis } from '@/features/dashboard/dashboard.salesKpis'
 import SalesFilterBar from '@/components/widgets/sales-kpi/SalesFilterBar'
 import SalesKpiGrid from '@/components/widgets/sales-kpi/SalesKpiGrid'
-import FilterBar from '@/features/dashboard/components/FilterBar'
 import TopKpiStrip from '@/features/dashboard/components/TopKpiStrip'
-import CampOverviewSection from '@/features/dashboard/components/CampOverviewSection'
+import CampReportSection from '@/features/dashboard/components/CampReportSection'
 import CompanySection from '@/features/dashboard/components/CompanySection'
 import ProjectsSection from '@/features/dashboard/components/ProjectsSection'
 import FoSection from '@/features/dashboard/components/FoSection'
@@ -20,33 +17,36 @@ import AccountsSection from '@/features/dashboard/components/AccountsSection'
 import DoctorsSection from '@/features/dashboard/components/DoctorsSection'
 import PatientsSection from '@/features/dashboard/components/PatientsSection'
 import SalesCommandCenter from '@/features/dashboard/components/SalesCommandCenter'
-import SideDrawer from '@/components/ui/SideDrawer'
+import PipelinePulseSection from '@/features/dashboard/components/PipelinePulseSection'
 import { getGreeting } from '@/utils/formatters'
+
+// closed + cancelled_charged — the "done" convention used elsewhere (e.g. project's executedCamps).
+const EXECUTED_CAMP_STATUSES = new Set(['closed', 'cancelled_charged'])
 
 const DashboardPage = () => {
   const { user } = useAuth()
   const { hasPermission, hasAnyPermission } = usePermission()
-  const { filters, setFilter, reset } = useDashboardFilters()
-  const [drill, setDrill] = useState<{ title: string; content: string } | null>(null)
-  const [salesFilter, setSalesFilter] = useState<SalesFilterState>(DEFAULT_SALES_FILTER)
 
   const isSuperAdmin = hasPermission('system:manage')
   // GET /camps/report requires this exact set — stricter than camp:search.
   const canViewCampReport = hasAnyPermission(['camp:manage', 'tenant:manage'])
+  // screening:search alone own-scopes results server-side — only screening:manage gives a true total.
+  const canViewScreeningTotal = hasPermission('screening:manage')
 
-  // Every section below calls useDashboardData(filters) with this same
-  // object, so they all read one deduped cache entry, not separate requests.
-  const { isLoading, error } = useDashboardData(filters)
+  const { data, isLoading, error } = useDashboardData()
 
-  // Gated with `enabled` — these two only feed super_admin-only blocks below.
-  const { reps, targets } = useSalesDataShared({ enabled: isSuperAdmin })
-  const { clients, projects, invoices } = useClientsDataShared({ enabled: isSuperAdmin })
-  const salesKpiTiles = useMemo(
-    () => (isSuperAdmin ? buildSalesHeadKpis({ reps, targets, clients, projects, invoices, filter: salesFilter, quarter: QUARTER }) : []),
-    [isSuperAdmin, reps, targets, clients, projects, invoices, salesFilter]
-  )
+  const { data: campReportRes } = useCampReport(isSuperAdmin && canViewCampReport)
+  const campsConducted = campReportRes?.data?.byStatus
+    .filter((s) => EXECUTED_CAMP_STATUSES.has(s.status))
+    .reduce((sum, s) => sum + s.count, 0) ?? null
 
-  const onDrill = (title: string, content: string) => setDrill({ title, content })
+  const { data: screeningCountRes } = useQuery({
+    queryKey: ['screenings', 'count', 'org-total'],
+    queryFn: () => screeningService.searchScreenings({ limit: '1' }),
+    enabled: isSuperAdmin && canViewScreeningTotal,
+    staleTime: 60_000,
+  })
+  const totalScreenings = screeningCountRes?.data?.count ?? null
 
   return (
     <div className="w-full">
@@ -59,11 +59,7 @@ const DashboardPage = () => {
         </p>
       </div>
 
-      <FilterBar filters={filters} setFilter={setFilter} reset={reset} />
-
-      {isSuperAdmin && (
-        <SalesFilterBar filter={salesFilter} onChange={setSalesFilter} reps={reps} clients={clients} projects={projects} />
-      )}
+      {isSuperAdmin && <SalesFilterBar />}
 
       {isLoading && (
         <div className="text-[13px] py-10 text-center" style={{ color: 'var(--qms-text-muted)' }}>
@@ -79,29 +75,47 @@ const DashboardPage = () => {
 
       {!isLoading && !error && (
         <>
-          <TopKpiStrip filters={filters} />
+          {data?.hasLoadError && (
+            <div className="text-[12px] rounded-xl px-3 py-2 mb-3.5 bg-warning-soft border border-warning text-warning">
+              Some live metrics could not be loaded.
+            </div>
+          )}
 
-          {isSuperAdmin && <SalesKpiGrid tiles={salesKpiTiles} />}
+          <TopKpiStrip />
 
-          {canViewCampReport && <CampOverviewSection />}
+          {isSuperAdmin && (
+            <SalesKpiGrid
+              tiles={buildDashboardSalesKpis(
+                {
+                  campsConducted,
+                  totalScreenings,
+                  totalProjects: data?.project.totalProjects.v ?? null,
+                  screeningProjects: data?.project.screeningProjects.v ?? null,
+                  dietProjects: data?.project.dietProjects.v ?? null,
+                  labProjects: data?.project.labProjects.v ?? null,
+                },
+                {
+                  pipelineValue: data?.sales.pipelineValue.v ?? null,
+                  leadWinRate: data?.sales.leadWinRate.v ?? null,
+                },
+              )}
+            />
+          )}
 
-          <CompanySection filters={filters} onDrill={onDrill} />
-          <ProjectsSection filters={filters} onDrill={onDrill} />
-          <FoSection filters={filters} onDrill={onDrill} />
-          <SalesSection filters={filters} onDrill={onDrill} />
-          <AccountsSection filters={filters} onDrill={onDrill} />
-          <DoctorsSection filters={filters} onDrill={onDrill} />
-          <PatientsSection filters={filters} onDrill={onDrill} />
+          <CampReportSection />
 
+          <CompanySection />
+          <ProjectsSection />
+          <FoSection />
+          <SalesSection />
+          <AccountsSection />
+          <DoctorsSection />
+          <PatientsSection />
+
+          {isSuperAdmin && <PipelinePulseSection />}
           {isSuperAdmin && <SalesCommandCenter />}
         </>
       )}
-
-      <SideDrawer open={!!drill} title={drill?.title ?? ''} onClose={() => setDrill(null)}>
-        <p className="text-[13px] leading-relaxed" style={{ color: 'var(--qms-text-soft)' }}>
-          {drill?.content}
-        </p>
-      </SideDrawer>
     </div>
   )
 }

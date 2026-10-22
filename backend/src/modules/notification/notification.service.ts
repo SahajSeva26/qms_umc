@@ -1,0 +1,186 @@
+// Notification Service
+import mongoose, { HydratedDocument } from 'mongoose';
+import { INotification, NotificationModel } from './notification.model';
+import {
+    ICreateNotificationPayload,
+    ISearchNotificationQuery,
+    IUpdateNotificationPayload,
+} from './notification.validators';
+import { throwAppError } from '../../shared/utils/error';
+import { StatusCodes } from 'http-status-codes';
+import { RequestContext } from '../../shared/utils/contextBuilder';
+import { isValidObjectID } from '../../shared/utils/strings';
+import { IServiceOptions } from '../../shared/types/service.types';
+import { NOTIFICATION_CHANNELS } from './notification.constants';
+
+type NotificationDocument = HydratedDocument<INotification> | null;
+
+const populate: any[] = [
+    { path: 'tenant', select: 'name code' },
+    { path: 'recipient', select: 'firstName lastName email' },
+];
+
+// ========================================================================================
+// CORE FUNCTIONS
+// ========================================================================================
+
+const set = (model: any, entity: HydratedDocument<INotification>) => {
+    if (model.recipient) {
+        entity.recipient = model.recipient;
+    }
+    if (model.tenant !== undefined) {
+        entity.tenant = model.tenant;
+    }
+    if (model.entity !== undefined) {
+        entity.entity = model.entity;
+    }
+    if (model.event) {
+        entity.event = model.event;
+    }
+    if (model.channel) {
+        entity.channel = model.channel;
+    }
+    if (model.subject !== undefined) {
+        entity.subject = model.subject;
+    }
+    if (model.body !== undefined) {
+        entity.body = model.body;
+    }
+    if (model.status) {
+        entity.status = model.status;
+    }
+    if (model.attempts !== undefined) {
+        entity.attempts = model.attempts;
+    }
+    if (model.error !== undefined) {
+        entity.error = model.error;
+    }
+    if (model.sentAt !== undefined) {
+        entity.sentAt = model.sentAt;
+    }
+    if (model.read !== undefined) {
+        entity.read = model.read;
+        entity.readAt = model.read ? new Date() : null;
+    }
+    return entity;
+};
+
+// internal-only fetch by id — no scope filter (callers are trusted services)
+const get = async (id: string, ctx: RequestContext, options?: IServiceOptions): Promise<NotificationDocument> => {
+    if (!isValidObjectID(id)) {
+        return null;
+    }
+
+    const where: mongoose.QueryFilter<INotification> = { _id: id };
+
+    let query = NotificationModel.findOne(where);
+
+    if (options?.populate) {
+        query = query.populate(populate);
+    }
+
+    return await query;
+};
+
+const search = async (filters: ISearchNotificationQuery, ctx: RequestContext, options?: IServiceOptions) => {
+    // newest first; _id breaks ties so rows bulk-inserted in the same ms keep a stable order
+    const sort: any = { createdAt: -1, _id: -1 };
+
+    const where: mongoose.QueryFilter<INotification> = {};
+
+    //1: recipient filter — the controller pins this to the caller's id (from ctx)
+    if (filters.recipient) {
+        where.recipient = filters.recipient;
+    }
+
+    //2: plain filters
+    if (filters.event) {
+        where.event = filters.event;
+    }
+    if (filters.channel) {
+        where.channel = filters.channel;
+    }
+    if (filters.status) {
+        where.status = filters.status;
+    }
+    if (filters.read !== undefined) {
+        where.read = filters.read;
+    }
+
+    //3: execute
+    const countPromise = NotificationModel.countDocuments(where);
+    const dataPromise = NotificationModel.find(where)
+        .populate(populate)
+        .limit(options?.pagination?.limit)
+        .skip(options?.pagination?.skip)
+        .sort(sort);
+
+    const [count, items] = await Promise.all([countPromise, dataPromise]);
+
+    return { count, items };
+};
+
+// System-created: an internal event (camp.create, camp.approved, ...) raises a notification for
+// a recipient on a channel. Tenant is optional — pass it when the caller already has it in hand.
+const create = async (model: ICreateNotificationPayload, ctx: RequestContext): Promise<HydratedDocument<INotification>> => {
+    const entity = new NotificationModel({});
+    let notification = set(model, entity);
+    notification = await notification.save();
+
+    return notification;
+};
+
+// Bulk-create rows in one round-trip. Used by the worker's recipient/channel fan-out.
+const bulkCreate = async (
+    models: ICreateNotificationPayload[],
+    ctx: RequestContext,
+): Promise<HydratedDocument<INotification>[]> => {
+    if (!models.length) {
+        return [];
+    }
+    const docs = models.map((model) => set(model, new NotificationModel({})));
+    // ordered:false → best-effort; a bad row doesn't abort the rest (matches per-row isolation)
+    return await NotificationModel.insertMany(docs, { ordered: false });
+};
+
+const update = async (id: string, model: IUpdateNotificationPayload, ctx: RequestContext) => {
+    //1: get notification first (own-scoped)
+    let notification = await NotificationService.get(id, ctx);
+    if (!notification) {
+        return throwAppError('Notification not found', StatusCodes.NOT_FOUND);
+    }
+
+    //2: apply editable fields
+    notification = set(model, notification);
+    notification = await notification.save();
+
+    return notification;
+};
+
+// mark ALL the caller's unread in-app notifications as read — recipient is taken from ctx (no id),
+// scoped so a user only ever touches their own rows.
+const markAllRead = async (ctx: RequestContext) => {
+    const recipient = ctx.user?._id;
+    if (!recipient) {
+        return throwAppError('Unauthorized', StatusCodes.UNAUTHORIZED);
+    }
+
+    const result = await NotificationModel.updateMany(
+        { recipient, channel: NOTIFICATION_CHANNELS.IN_APP, read: false },
+        { $set: { read: true, readAt: new Date() } },
+    );
+    return { modified: result.modifiedCount };
+};
+
+export const NotificationService = {
+    get,
+    search,
+    create,
+    bulkCreate,
+    update,
+    markAllRead,
+};
+
+// ========================================================================================
+// EXPORTS
+// ========================================================================================

@@ -18,6 +18,7 @@ import {
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
+import { eventProcessor } from '../../../shared/helpers/eventProcessor';
 import { isValidObjectID } from '../../../shared/utils/strings';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { DivisionService } from '../division/division.service';
@@ -37,7 +38,7 @@ const populate: any[] = [
     { path: 'tenant', select: 'name code' },
     { path: 'division', select: 'name code therapy' },
     { path: 'contactPerson' },
-    { path: 'salesPerson' },
+    { path: 'salesPerson', populate: { path: 'user', select: 'firstName lastName email' } },
 ];
 
 // ========================================================================================
@@ -284,7 +285,11 @@ const create = async (model: ICreateLeadPayload, ctx: RequestContext): Promise<H
         return entity;
     });
 
-    return lead;
+    const populated = await get(lead._id.toString(), ctx, { populate: true });
+    ctx.processSync = true;
+    await eventProcessor.process('lead', 'create', populated ?? lead, ctx);
+
+    return populated ?? lead;
 };
 
 const update = async (id: string, model: IUpdateLeadPayload, ctx: RequestContext) => {
@@ -301,13 +306,18 @@ const update = async (id: string, model: IUpdateLeadPayload, ctx: RequestContext
         }
         await assertPlatformSalesPerson(model.salesPerson, ctx);
         lead.salesPerson = model.salesPerson as any;
+        // only notify on an update that (re)assigns the sales person
+        ctx.processSync = true;
     }
 
     //3: apply the remaining editable fields (status/division/tenant/salesPerson are not touched here)
     lead = await set(model, lead, ctx);
     lead = await lead.save();
 
-    return lead;
+    const populated = await get(lead._id.toString(), ctx, { populate: true });
+    await eventProcessor.process('lead', 'update', populated ?? lead, ctx);
+
+    return populated ?? lead;
 };
 
 // moveStage is the ONLY path allowed to change a lead's status.

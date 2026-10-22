@@ -89,6 +89,32 @@ describe('Sidebar — pharma identity isolation', () => {
     expect(screen.getByText('Doctor Management')).toBeInTheDocument()
     expect(screen.queryByText(/pharma portal/i)).not.toBeInTheDocument()
   })
+
+  // pharma-mr's one exception: it also sees the real (non-pharma) Camp Management + Doctor Management items, own-scoped server-side.
+  it('shows Pharma Portal AND Camp Management AND Doctor Management for pharma-mr with camp:book — no other non-pharma item', async () => {
+    await renderSidebar({
+      permissions: ['camp:book'],
+      session: sessionFixture('pharma-mr', ['camp:book']),
+    })
+
+    expect(screen.getByText('Pharma Portal MR')).toBeInTheDocument()
+    expect(screen.getByText('Camp Management')).toBeInTheDocument()
+    expect(screen.getByText('Doctor Management')).toBeInTheDocument()
+    expect(screen.queryByText('Dashboard')).not.toBeInTheDocument()
+    expect(screen.queryByText('CRM')).not.toBeInTheDocument()
+    expect(screen.queryByText('Client Management')).not.toBeInTheDocument()
+  })
+
+  it('no other pharma role gets the Camp Management/Doctor Management exception, even if they somehow hold camp:book', async () => {
+    await renderSidebar({
+      permissions: ['camp:book'],
+      session: sessionFixture('pharma-rsm', ['camp:book']),
+    })
+
+    expect(screen.getByText('Pharma Portal RSM')).toBeInTheDocument()
+    expect(screen.queryByText('Camp Management')).not.toBeInTheDocument()
+    expect(screen.queryByText('Doctor Management')).not.toBeInTheDocument()
+  })
 })
 
 describe('Sidebar — FO Management platform-tenant gate (unreachable via nav while the item is hidden, but must not silently break)', () => {
@@ -123,35 +149,33 @@ describe('Sidebar — FO Management platform-tenant gate (unreachable via nav wh
   })
 })
 
-describe('Sidebar — Inventory Operations nav label mirrors the page\'s own "Requests-only" state', () => {
-  it('labels the nav item "Requests" for a field-officer-shaped session (only inventory-request:* permissions)', async () => {
+// Inventory nav item is one page with internal tabs now (InventoryManagementPage.tsx) — label is a constant, not session-dependent.
+describe('Sidebar — the Inventory Management nav label is constant, not session-dependent', () => {
+  it('shows "Inventory Management" for a field-officer-shaped session (only inventory-request:* permissions)', async () => {
     await renderSidebar({
       permissions: ['inventory-request:search', 'inventory-request:create'],
       session: sessionFixture('field-officer', ['inventory-request:search', 'inventory-request:create'], 'platform'),
     })
 
-    expect(screen.getByText('Requests')).toBeInTheDocument()
-    expect(screen.queryByText('Inventory Operations')).not.toBeInTheDocument()
+    expect(screen.getByText('Inventory Management')).toBeInTheDocument()
   })
 
-  it('keeps the "Inventory Operations" label for a session holding inventory-assignment:manage', async () => {
+  it('shows "Inventory Management" for a session holding inventory-assignment:manage', async () => {
     await renderSidebar({
       permissions: ['inventory-assignment:manage'],
       session: sessionFixture('inventory-manager', ['inventory-assignment:manage']),
     })
 
-    expect(screen.getByText('Inventory Operations')).toBeInTheDocument()
-    expect(screen.queryByText('Requests')).not.toBeInTheDocument()
+    expect(screen.getByText('Inventory Management')).toBeInTheDocument()
   })
 
-  it('keeps the "Inventory Operations" label for a system:manage session, even though it holds no explicit inventory-assignment/-ledger code', async () => {
+  it('shows "Inventory Management" for a system:manage session', async () => {
     await renderSidebar({
       permissions: ['system:manage'],
       session: sessionFixture('system-admin', ['system:manage']),
     })
 
-    expect(screen.getByText('Inventory Operations')).toBeInTheDocument()
-    expect(screen.queryByText('Requests')).not.toBeInTheDocument()
+    expect(screen.getByText('Inventory Management')).toBeInTheDocument()
   })
 })
 

@@ -8,7 +8,7 @@ import { useUpdateGeoProfile } from '@/features/geo-profile/hooks/useUpdateGeoPr
 import { profileToLocationValue, locationValueToCoordinates, locationValueToAddressPayload } from '@/features/geo-profile/utils/geoProfileLocationAdapter'
 import { isFieldOfficerRole } from '@/features/geo-profile/utils/geoProfile.utils'
 import { usePermission } from '@/hooks/usePermission'
-import { FO_ROUTES } from '@/features/fo/fo.routes'
+import { FO_ROUTES } from '@/features/fo/fo.paths'
 import RoleStatusPill from '@/features/access-management/role/components/RoleStatusPill'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import LocationPicker from '@/components/widgets/location-picker/LocationPicker'

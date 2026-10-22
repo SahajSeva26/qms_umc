@@ -1,12 +1,18 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { toast } from 'sonner'
 import { FiDownload, FiPlus } from 'react-icons/fi'
 import type { LeadStatus } from '@/types/crm.types'
 import { usePermission } from '@/hooks/usePermission'
+import { isForbiddenError, isNotFoundError } from '@/utils/apiError'
 import { useLeads } from '@/features/crm/hooks/useLeads'
+import { useLead } from '@/features/crm/hooks/useLead'
 import { useLeadReport } from '@/features/crm/hooks/useLeadReport'
+import { useMySalesSweep } from '@/features/crm/hooks/useMySalesSweep'
 import { useCrmFilters } from '@/features/crm/hooks/useCrmFilters'
 import { matchesFilters } from '@/features/crm/crm.filter'
 import { computeKpis, computeValueKpis } from '@/features/crm/crm.kpis'
+import { computeMyKpis } from '@/features/crm/crm.myKpis'
 import { downloadLeadsCsv } from '@/features/crm/crm.export'
 import { usePagination } from '@/hooks/usePagination'
 import { Button } from '@/components/ui/button'
@@ -35,10 +41,16 @@ const VIEW_LABELS: { id: ViewMode; label: string }[] = [
 
 const CrmPage = () => {
   const { hasAnyPermission } = usePermission()
-  // A lead:search-only caller can view their own leads but create/update/
-  // move-stage still require lead:manage/tenant:manage — hide controls that
-  // would only 403 rather than showing them and letting them fail.
+  // A lead:search-only caller can view their own leads but create/update/move-stage need more — hide controls that would only 403.
   const canManageLeads = hasAnyPermission(['lead:manage', 'tenant:manage'])
+  // POST /leads also accepts lead:create (lighter than lead:manage — e.g. a sales rep creating their own lead).
+  const canCreateLeads = hasAnyPermission(['lead:create', 'lead:manage', 'tenant:manage'])
+  // PUT /:id and PATCH /:id/stage also accept lead:update (e.g. a sales rep editing/advancing their own lead).
+  const canEditLeads = hasAnyPermission(['lead:update', 'lead:manage', 'tenant:manage'])
+  // GET /leads/report is gated to lead:manage ONLY (not tenant:manage) at the route level — a
+  // tenant:manage-only caller must fall into the own-scope "My Sales Dashboard" branch too, or
+  // the report call 403s every time.
+  const canViewLeadReport = hasAnyPermission(['lead:manage'])
   const { filters, setFilter, reset } = useCrmFilters()
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
   // All 6 filters are real, backend-supported params — needed server-side so count/totalPages
@@ -56,14 +68,26 @@ const CrmPage = () => {
     report: 'true',
   })
   // Unfiltered — always whole-tenant, independent of the table's own filters below.
-  const { report, isLoading: reportLoading, error: reportError } = useLeadReport({}, canManageLeads)
+  const { report, isLoading: reportLoading, error: reportError, refetch: refetchReport } = useLeadReport({}, canViewLeadReport)
+  // Anyone without lead:manage (KAM, Sales Rep, or a tenant:manage-only caller) falls back to
+  // "My Sales Dashboard", derived client-side from one full own-scoped /leads sweep instead.
+  const mySweep = useMySalesSweep(!canViewLeadReport)
+  const myKpis = useMemo(() => (mySweep.data ? computeMyKpis(mySweep.data) : []), [mySweep.data])
 
   // Prototype default: a rep-level (non-managing) caller lands on Compact;
   // everyone else lands on List (crm.js's role check, ported to this app's
   // own permission flag rather than a role-name string — see canManageLeads
   // above).
   const [view, setView] = useState<ViewMode>(canManageLeads ? 'list' : 'compact')
-  const [openLeadId, setOpenLeadId] = useState<string | null>(null)
+  // URL-backed so a notification's ?lead=<id> deep link opens the right drawer.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const openLeadId = searchParams.get('lead')
+  const setOpenLeadId = (id: string | null) => {
+    const next = new URLSearchParams(searchParams)
+    if (id) next.set('lead', id)
+    else next.delete('lead')
+    setSearchParams(next, { replace: true })
+  }
   const [wizardOpen, setWizardOpen] = useState(false)
   const [statusDrill, setStatusDrill] = useState<LeadStatus | null>(null)
 
@@ -71,7 +95,30 @@ const CrmPage = () => {
   const kpis = useMemo(() => computeKpis(report), [report])
   const valueKpis = useMemo(() => computeValueKpis(report), [report])
 
-  const openLead = leads.find((l) => l.id === openLeadId) ?? null
+  // Deep-linked lead may not be on the loaded page — fall back to a direct GET /leads/:id.
+  const leadFromList = leads.find((l) => l.id === openLeadId) ?? null
+  const { data: fetchedLead, error: fetchedLeadError, refetch: refetchLead } =
+    useLead(!leadFromList && openLeadId ? openLeadId : undefined)
+  const openLead = leadFromList ?? fetchedLead?.data ?? null
+
+  // A deep link (e.g. from a notification) whose target 404s, was deleted, or
+  // belongs to another tenant would otherwise leave the user on this page
+  // with no drawer, no error, and no explanation. Only treat a CONFIRMED
+  // 403/404 as terminal and drop the dead ?lead= param — a transient failure
+  // (network blip, 5xx) keeps the param and offers Retry instead, so it
+  // doesn't lose the destination over a temporary issue.
+  useEffect(() => {
+    if (leadFromList || !openLeadId || !fetchedLeadError) return
+    if (isForbiddenError(fetchedLeadError) || isNotFoundError(fetchedLeadError)) {
+      toast.error("Couldn't load that lead — it may have been removed or you may not have access to it.")
+      setOpenLeadId(null)
+    } else {
+      toast.error("Couldn't load that lead — try again.", { action: { label: 'Retry', onClick: () => refetchLead() } })
+    }
+    // leadFromList/setOpenLeadId/refetchLead are recreated every render; only
+    // re-run this when the fetch outcome itself changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openLeadId, fetchedLeadError])
 
   return (
     <div className="w-full">
@@ -97,7 +144,7 @@ const CrmPage = () => {
               </Button>
             ))}
           </div>
-          {canManageLeads && (
+          {canCreateLeads && (
             <Button
               onClick={() => setWizardOpen(true)}
               className="text-white shrink-0"
@@ -130,13 +177,47 @@ const CrmPage = () => {
 
       {!isLoading && !error && (
         <>
-          {!canManageLeads && (
-            <p className="text-[13px] mb-4" style={{ color: 'var(--qms-text-muted)' }}>
-              Statistics are available to lead managers.
-            </p>
+          {!canViewLeadReport && (
+            <>
+              {mySweep.isLoading && (
+                <div className="grid gap-2.5 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="rounded-xl border p-3 h-18 animate-pulse"
+                      style={{ background: 'var(--qms-surface-strong)', borderColor: 'var(--qms-border)' }}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {!mySweep.isLoading && mySweep.isError && (
+                <div className="flex items-center gap-3 text-[13px] mb-4" style={{ color: 'var(--qms-text-muted)' }}>
+                  <span>Couldn't load your sales dashboard.</span>
+                  <Button variant="outline" size="sm" onClick={() => mySweep.refetch()}>
+                    Retry
+                  </Button>
+                </div>
+              )}
+
+              {!mySweep.isLoading && !mySweep.isError && mySweep.data && (
+                <>
+                  <p className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+                    My Sales Dashboard · current portfolio
+                  </p>
+                  {mySweep.data.length === 0 ? (
+                    <p className="text-[13px] mb-4" style={{ color: 'var(--qms-text-muted)' }}>
+                      You have no leads yet.
+                    </p>
+                  ) : (
+                    <CrmKpiStrip tiles={myKpis} />
+                  )}
+                </>
+              )}
+            </>
           )}
 
-          {canManageLeads && reportLoading && (
+          {canViewLeadReport && reportLoading && (
             <div className="grid gap-2.5 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
               {Array.from({ length: 4 }).map((_, i) => (
                 <div
@@ -148,13 +229,16 @@ const CrmPage = () => {
             </div>
           )}
 
-          {canManageLeads && !reportLoading && reportError && (
-            <p className="text-[13px] mb-4" style={{ color: 'var(--qms-text-muted)' }}>
-              Couldn't load stats.
-            </p>
+          {canViewLeadReport && !reportLoading && reportError && (
+            <div className="flex items-center gap-3 text-[13px] mb-4" style={{ color: 'var(--qms-text-muted)' }}>
+              <span>Couldn't load stats.</span>
+              <Button variant="outline" size="sm" onClick={() => refetchReport()}>
+                Retry
+              </Button>
+            </div>
           )}
 
-          {canManageLeads && !reportLoading && !reportError && report && (
+          {canViewLeadReport && !reportLoading && !reportError && report && (
             <>
               <p className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--qms-text-muted)' }}>
                 All lead statistics
@@ -184,19 +268,19 @@ const CrmPage = () => {
               <CompactView leads={filtered} onSelectStatus={setStatusDrill} />
             )}
             {view === 'kanban' && (
-              <KanbanView leads={filtered} onOpen={setOpenLeadId} onMoveStage={moveStage} canManage={canManageLeads} />
+              <KanbanView leads={filtered} onOpen={setOpenLeadId} onMoveStage={moveStage} canManage={canEditLeads} />
             )}
-            {view === 'list' && <ListView leads={filtered} onOpen={setOpenLeadId} onMoveStage={moveStage} canManage={canManageLeads} />}
+            {view === 'list' && <ListView leads={filtered} onOpen={setOpenLeadId} onMoveStage={moveStage} canManage={canEditLeads} />}
             {view === 'calendar' && <CalendarView leads={filtered} onOpen={setOpenLeadId} />}
           </div>
 
           <PaginationControls page={page} totalPages={totalPages(count)} onPageChange={setPage} />
 
-          <BottomInsightsRow leads={leads} onOpenLead={setOpenLeadId} />
+          <BottomInsightsRow leads={leads} onOpenLead={setOpenLeadId} showTopReps={canManageLeads} />
         </>
       )}
 
-      <LeadDrawer lead={openLead} onClose={() => setOpenLeadId(null)} onMoveStage={moveStage} onUpdateLead={updateLead} canManage={canManageLeads} />
+      <LeadDrawer lead={openLead} onClose={() => setOpenLeadId(null)} onMoveStage={moveStage} onUpdateLead={updateLead} canManage={canEditLeads} />
 
       {wizardOpen && (
         <NewLeadWizard
@@ -217,7 +301,7 @@ const CrmPage = () => {
           setStatusDrill(null)
           setWizardOpen(true)
         }}
-        canManage={canManageLeads}
+        canManage={canCreateLeads}
       />
     </div>
   )

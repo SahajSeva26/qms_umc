@@ -1,11 +1,15 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { toast } from 'sonner'
 import { FiFileText, FiRefreshCw, FiDollarSign, FiPlus } from 'react-icons/fi'
 import type { ProjectStatus } from '@/types/project.types'
 import { PROJECT_TYPE_LABEL } from '@/types/project.types'
 import { useProjects } from '@/features/projects/hooks/useProjects'
+import { useProject } from '@/features/projects/hooks/useProject'
 import { useProjectReport } from '@/features/projects/hooks/useProjectReport'
 import { PROJECT_WRITE_PERMISSIONS, VOID_CAMP_WRITE_PERMISSIONS, PROJECT_TYPE_COLOR } from '@/features/projects/projects.utils'
 import { usePermission } from '@/hooks/usePermission'
+import { isForbiddenError, isNotFoundError } from '@/utils/apiError'
 import ProjectTable from '@/features/projects/components/ProjectTable'
 import ProjectDetailDrawer from '@/features/projects/components/ProjectDetailDrawer'
 import StatusChangeDialog from '@/features/projects/components/StatusChangeDialog'
@@ -79,7 +83,15 @@ const ProjectsPage = () => {
   // Kept separate from `search` since it's a selected id (via TenantAsyncPicker), not a live-typed string.
   const [clientId, setClientId] = useState('')
   const [clientLabel, setClientLabel] = useState('')
-  const [openDetailId, setOpenDetailId] = useState<string | null>(null)
+  // URL-backed so a notification's ?project=<id> deep link opens the right drawer.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const openDetailId = searchParams.get('project')
+  const setOpenDetailId = (id: string | null) => {
+    const next = new URLSearchParams(searchParams)
+    if (id) next.set('project', id)
+    else next.delete('project')
+    setSearchParams(next, { replace: true })
+  }
   const [statusChangeId, setStatusChangeId] = useState<string | null>(null)
   const [editId, setEditId] = useState<string | null>(null)
   const [voidCampsId, setVoidCampsId] = useState<string | null>(null)
@@ -126,7 +138,30 @@ const ProjectsPage = () => {
   const count = data?.data?.count ?? 0
   const typeBreakdown = data?.data?.report?.byType ?? []
 
-  const openDetail = projects.find((p) => p.id === openDetailId) ?? null
+  // Deep-linked project may not be on the loaded page — fall back to a direct GET /projects/:id.
+  const projectFromList = projects.find((p) => p.id === openDetailId) ?? null
+  const { data: fetchedProject, error: fetchedProjectError, refetch: refetchProject } =
+    useProject(!projectFromList && openDetailId ? openDetailId : undefined)
+  const openDetail = projectFromList ?? fetchedProject?.data ?? null
+
+  // A deep link (e.g. from a notification) whose target 404s, was deleted, or
+  // belongs to another tenant would otherwise leave the user on this page
+  // with no drawer, no error, and no explanation. Only treat a CONFIRMED
+  // 403/404 as terminal and drop the dead ?project= param — a transient
+  // failure (network blip, 5xx) keeps the param and offers Retry instead, so
+  // it doesn't lose the destination over a temporary issue.
+  useEffect(() => {
+    if (projectFromList || !openDetailId || !fetchedProjectError) return
+    if (isForbiddenError(fetchedProjectError) || isNotFoundError(fetchedProjectError)) {
+      toast.error("Couldn't load that project — it may have been removed or you may not have access to it.")
+      setOpenDetailId(null)
+    } else {
+      toast.error("Couldn't load that project — try again.", { action: { label: 'Retry', onClick: () => refetchProject() } })
+    }
+    // projectFromList/setOpenDetailId/refetchProject are recreated every
+    // render; only re-run this when the fetch outcome itself changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openDetailId, fetchedProjectError])
   const statusChangeProject = projects.find((p) => p.id === statusChangeId) ?? null
   const editProject = projects.find((p) => p.id === editId) ?? null
   const voidCampsProject = projects.find((p) => p.id === voidCampsId) ?? null

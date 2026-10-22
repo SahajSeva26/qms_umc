@@ -21,10 +21,7 @@ const SalesCommandCenter = () => {
   const { data } = useCommandCenterData()
   const [taskFilter, setTaskFilter] = useState<DashboardTask['status']>('PENDING')
 
-  // Local overlay on top of the fetched tasks. There is no task-mutation
-  // endpoint in the backend yet, so Yes/No is session-only and intentionally
-  // NOT written back — the fetched list stays the source of truth rather than
-  // being copied into component state and silently diverging from it.
+  // No task-mutation endpoint exists yet — Yes/No is session-only, not written back.
   // TODO: replace with a real mutation once the backend exposes one.
   const [statusOverrides, setStatusOverrides] = useState<Record<string, DashboardTask['status']>>({})
 
@@ -59,7 +56,7 @@ const SalesCommandCenter = () => {
           className="text-[11px] font-bold px-2 py-1 rounded-full"
           style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text-soft)' }}
         >
-          {data?.quarter ?? '—'}
+          {data?.quarter || '—'}
         </span>
       </div>
 
@@ -75,7 +72,7 @@ const SalesCommandCenter = () => {
         </div>
         <p className="text-[12px] leading-relaxed" style={{ color: 'var(--qms-text-soft)' }}>
           <span className="font-bold" style={{ color: 'var(--qms-text)' }}>Sales copilot:</span>{' '}
-          Team is tracking toward quarter target. Review the task list below to keep momentum.
+          No task/reminder data source exists in the backend yet — this panel is a placeholder shell.
         </p>
       </div>
 
@@ -112,7 +109,7 @@ const SalesCommandCenter = () => {
       <div className="space-y-1">
         {visible.length === 0 && (
           <div className="text-[13px] py-6 text-center" style={{ color: 'var(--qms-text-muted)' }}>
-            Nothing here.
+            Live data not available
           </div>
         )}
         {visible.map((task) => {

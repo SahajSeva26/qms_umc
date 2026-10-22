@@ -15,7 +15,7 @@ import EmployeeFieldsSection from '@/features/access-management/employee/compone
 import ExistingFieldOfficerPicker, { type PickedFieldOfficer } from '@/features/access-management/employee/components/ExistingFieldOfficerPicker'
 import { useOnboardFieldOfficer } from '@/features/access-management/employee/hooks/useOnboardFieldOfficer'
 import { useCreateEmployee } from '@/features/access-management/employee/hooks/useCreateEmployee'
-import { EMPLOYEE_ROUTES } from '@/features/access-management/employee/employee.routes'
+import { EMPLOYEE_ROUTES } from '@/features/access-management/employee/employee.paths'
 import type { EmployeeFieldsValues } from '@/features/access-management/employee/schemas/employee.schemas'
 import type { CreateRolePayload } from '@/types/accessManagement.types'
 import { getApiErrorMessage } from '@/utils/apiError'

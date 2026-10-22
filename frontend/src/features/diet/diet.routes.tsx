@@ -1,11 +1,9 @@
 import type { RouteObject } from 'react-router-dom'
 import { lazyRoute } from '@/lib/router/lazyRoute'
+import * as DietPaths from './diet.paths'
 
-export const DIET_ROUTES = {
-  DIET:           '/diet',
-  DIET_APPROVALS: '/diet/approvals',
-  DIET_PROFILES:  '/diet/profiles',
-}
+// A direct `export const` (not a bare re-export specifier) — see camps.routes.tsx for why.
+export const DIET_ROUTES = DietPaths.DIET_ROUTES
 
 export const dietRoutes: RouteObject[] = [
   { path: DIET_ROUTES.DIET,           lazy: lazyRoute(() => import('./pages/DietPage')) },

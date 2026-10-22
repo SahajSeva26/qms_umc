@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { EMPLOYEE_TYPE_LABEL, type EmployeeEntity, type EmployeePopulatedTenant, type EmployeePopulatedUser } from '@/types/accessManagement.types'
-import { EMPLOYEE_ROUTES } from '@/features/access-management/employee/employee.routes'
+import { EMPLOYEE_ROUTES } from '@/features/access-management/employee/employee.paths'
 import EmployeeStatusPill from '@/features/access-management/employee/components/EmployeeStatusPill'
 
 // Hand-built table matching RolesTable.tsx exactly: var(--qms-*) custom

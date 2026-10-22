@@ -1,7 +1,7 @@
 import { Suspense, useState } from 'react'
 import { Outlet, Navigate, useLocation } from 'react-router-dom'
 import { useSession } from '@/hooks/useSession'
-import { AUTH_ROUTES } from '@/features/auth/auth.routes'
+import { AUTH_ROUTES } from '@/features/auth/auth.paths'
 import { getPharmaRoleMeta } from '@/features/pharma/pharma.constants'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
@@ -66,7 +66,9 @@ const AppLayout = () => {
   // null for a role with no type — optional-chain past the frontend type here.
   const pharmaMeta = getPharmaRoleMeta(session.roleType?.code)
   const onPharmaPath = location.pathname === '/pharma' || location.pathname.startsWith('/pharma/')
-  if (pharmaMeta && !onPharmaPath) {
+  // MR's exceptions: Camp Management (exact match — not /camps/screening, /camps/new, etc.) and Doctor Management.
+  const onMrExtraPath = session.roleType?.code === 'pharma-mr' && (location.pathname === '/camps' || location.pathname === '/doctors')
+  if (pharmaMeta && !onPharmaPath && !onMrExtraPath) {
     return <Navigate to={pharmaMeta.portalPath} replace />
   }
   if (!pharmaMeta && onPharmaPath) {

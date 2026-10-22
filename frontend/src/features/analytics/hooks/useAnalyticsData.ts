@@ -3,7 +3,7 @@ import { useCampsData } from '@/hooks/useCampsData'
 import { useLeadsData } from '@/hooks/useLeadsData'
 import { useDashboardDataShared } from '@/hooks/useDashboardDataShared'
 import { CLIENTS, PROJECTS, INVOICES } from '@/types/client.types'
-import { PNL_TREND, AR_AGING, FIELD_OFFICERS } from '@/features/analytics/analytics.mock'
+import { PNL_TREND, AR_AGING } from '@/features/analytics/analytics.mock'
 import { scopedCamps, scopedInvoices, scopedLeads, scopedProjects } from '@/features/analytics/analytics.utils'
 import type { AnalyticsFilters } from '@/types/analytics.types'
 
@@ -25,7 +25,7 @@ export const useAnalyticsData = (filters: AnalyticsFilters) => {
   return {
     clients: CLIENTS,
     doctors,
-    fieldOfficers: FIELD_OFFICERS,
+    activeFOs: dashboardData?.fo.activeFOs.v ?? null,
     pnlTrend: PNL_TREND,
     arAging: AR_AGING,
     expenseSplit: dashboardData?.accounts.expenseSplit ?? [],

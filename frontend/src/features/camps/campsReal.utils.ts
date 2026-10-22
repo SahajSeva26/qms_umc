@@ -29,6 +29,31 @@ export function canRunScreening(
   return campRefId(isDiet ? camp.dietitian : camp.fo) === viewerRoleId
 }
 
+// Mirrors backend's PATCH /camps/:id/activate ownership check (RoleGuard + explicit assignee match,
+// not a permission code) — the camp's own assigned FO/dietitian can start it, no one else.
+export function canActivateCamp(
+  camp: {
+    type: string
+    fo: { _id?: string; id?: string } | string | null
+    dietitian: { _id?: string; id?: string } | string | null
+  },
+  viewerRoleId: string | undefined,
+  viewerRoleTypeCode: string | undefined,
+): boolean {
+  if (!viewerRoleId) return false
+  const isDiet = camp.type === 'diet'
+  if (viewerRoleTypeCode !== (isDiet ? 'dietitian' : 'field-officer')) return false
+  return campRefId(isDiet ? camp.dietitian : camp.fo) === viewerRoleId
+}
+
+// Mirrors backend's own activate() gate exactly (camp.service.ts: `new Date() < startOfUTCDay(camp.date)`)
+// — 00:00:00.000 UTC of the camp's scheduled day. Same-day is allowed; only a future date blocks.
+export function isCampActivatableToday(campDate: string): boolean {
+  const startOfCampDayUTC = new Date(campDate)
+  startOfCampDayUTC.setUTCHours(0, 0, 0, 0)
+  return new Date() >= startOfCampDayUTC
+}
+
 // Replaces any existing `camp` param on the return path rather than appending a second one.
 export function withCampParam(returnTo: string, campId: string): string {
   const [path, query = ''] = returnTo.split('?')

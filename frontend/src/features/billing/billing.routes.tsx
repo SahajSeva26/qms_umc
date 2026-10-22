@@ -1,13 +1,10 @@
 import type { RouteObject } from 'react-router-dom'
 import BillingPage from './pages/BillingPage'
 import { lazyRoute } from '@/lib/router/lazyRoute'
+import * as BillingPaths from './billing.paths'
 
-export const BILLING_ROUTES = {
-  BILLING:          '/billing',
-  BILLING_DIETITIAN: '/billing/dietitian',
-  BILLING_CRM:      '/billing/crm',
-  BILLING_CFO:      '/billing/cfo',
-}
+// A direct `export const` (not a bare re-export specifier) — see camps.routes.tsx for why.
+export const BILLING_ROUTES = BillingPaths.BILLING_ROUTES
 
 // BILLING/BILLING_CFO are still stubs (no dedicated backend module yet, see
 // root CLAUDE.md's module status table) — kept eager since BillingPage is

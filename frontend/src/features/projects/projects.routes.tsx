@@ -1,19 +1,19 @@
 import type { RouteObject } from 'react-router-dom'
 import { lazyRoute } from '@/lib/router/lazyRoute'
+import { PROJECTS_VIEW_PERMISSIONS } from '@/lib/access/projectAccess'
+import * as ProjectsPaths from './projects.paths'
 
-export const PROJECTS_ROUTES = {
-  PROJECTS:       '/projects',
-  PROJECTS_GANTT: '/projects/gantt',
-}
+// A direct `export const` (not a bare re-export specifier) — see camps.routes.tsx for why.
+export const PROJECTS_ROUTES = ProjectsPaths.PROJECTS_ROUTES
 
-// Matches project.routes.ts's real READ_GUARD exactly: project:search OR
-// project:manage OR tenant:manage. Found 2026-08-04: neither this route nor
-// the sidebar nav item had any guard at all — a Sales Head account (no
-// project:* permission per defaultRoleTypes.ts) could see and click into
-// "Project Management" from the nav and land on a real 403 "Failed to load
-// projects" screen, since the backend itself does correctly enforce this gate.
-const PROJECTS_VIEW_PERMISSIONS = ['project:search', 'project:manage', 'tenant:manage']
-
+// The real permission list is defined in lib/access/projectAccess.ts (shared,
+// dependency-free) so other features (e.g. notifications' entity resolver)
+// can check project reachability without importing this route module.
+// Found 2026-08-04: neither this route nor the sidebar nav item had any
+// guard at all — a Sales Head account (no project:* permission per
+// defaultRoleTypes.ts) could see and click into "Project Management" from
+// the nav and land on a real 403 "Failed to load projects" screen, since the
+// backend itself does correctly enforce this gate.
 export const projectsRoutes: RouteObject[] = [
   {
     path: PROJECTS_ROUTES.PROJECTS,

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useSession } from '@/hooks/useSession'
-import { PHARMA_ROLE_TYPE_CODES } from '@/features/pharma/pharma.constants'
+import { isPharmaRoleType } from '@/lib/access/pharmaAccess'
 
 interface AnyPharmaRoleGateProps {
   children: ReactNode
@@ -17,7 +17,7 @@ const AnyPharmaRoleGate = ({ children }: AnyPharmaRoleGateProps) => {
   }
   if (isConfirmedUnauthenticated) return <Navigate to="/login" replace />
 
-  if (!session?.roleType || !PHARMA_ROLE_TYPE_CODES.includes(session.roleType.code)) {
+  if (!isPharmaRoleType(session?.roleType?.code)) {
     return (
       <div className="w-full">
         <div className="rounded-lg border p-6 text-center" style={{ borderColor: 'var(--qms-border)' }}>

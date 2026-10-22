@@ -1,17 +1,45 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { AxiosError } from 'axios'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
+import { toast } from 'sonner'
 import { usePermission } from '@/hooks/usePermission'
 import { useLeads } from '@/features/crm/hooks/useLeads'
+import { useLead } from '@/features/crm/hooks/useLead'
 import { useLeadReport } from '@/features/crm/hooks/useLeadReport'
+import { useMySalesSweep } from '@/features/crm/hooks/useMySalesSweep'
+import type { LeadEntity } from '@/types/crm.types'
 
 vi.mock('@/hooks/usePermission')
 vi.mock('@/features/crm/hooks/useLeads')
+vi.mock('@/features/crm/hooks/useLead')
 vi.mock('@/features/crm/hooks/useLeadReport')
+vi.mock('@/features/crm/hooks/useMySalesSweep')
+vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }))
+
+// Mirrors apiError.test.ts's fixture — a real axios error shape so isForbiddenError/
+// isNotFoundError (which gate the deep-link failure handling) classify it correctly.
+function axiosError(status: number): AxiosError {
+  const err = new Error('request failed') as AxiosError
+  err.isAxiosError = true
+  err.response = { status, data: {}, statusText: '', headers: {}, config: {} as never }
+  err.toJSON = () => ({})
+  return err
+}
 
 function mockPermission(canManageLeads: boolean) {
   vi.mocked(usePermission).mockReturnValue({
     hasAnyPermission: (codes: string[]) => (canManageLeads ? codes.some((c) => c === 'lead:manage' || c === 'tenant:manage') : false),
+  } as unknown as ReturnType<typeof usePermission>)
+}
+
+// For scenarios where lead:manage and tenant:manage diverge — e.g. a tenant:manage-only caller,
+// who can see every lead (canManageLeads) but still can't call /leads/report (lead:manage only).
+function mockGrantedPermissions(granted: string[]) {
+  vi.mocked(usePermission).mockReturnValue({
+    hasAnyPermission: (codes: string[]) => codes.some((c) => granted.includes(c)),
   } as unknown as ReturnType<typeof usePermission>)
 }
 
@@ -28,6 +56,48 @@ function mockLeads() {
     isUpdating: false,
     isCreating: false,
   } as unknown as ReturnType<typeof useLeads>)
+}
+
+// No lead is ever deep-linked in these tests (openLeadId starts null) — this is a safe no-op default.
+function mockLead() {
+  vi.mocked(useLead).mockReturnValue({ data: undefined } as unknown as ReturnType<typeof useLead>)
+}
+
+function mockMySweep(partial: Partial<ReturnType<typeof useMySalesSweep>>) {
+  vi.mocked(useMySalesSweep).mockReturnValue({
+    data: undefined,
+    isLoading: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+    ...partial,
+  } as unknown as ReturnType<typeof useMySalesSweep>)
+}
+
+function leadFixture(overrides: Partial<LeadEntity>): LeadEntity {
+  return {
+    id: 'l1',
+    code: 'ld-000001',
+    tenant: 't1',
+    division: 'd1',
+    contactPerson: 'c1',
+    salesPerson: 's1',
+    focusTherapy: [],
+    focusTherapyDoctor: [],
+    title: 'Lead',
+    problemStatement: '',
+    numberOfMRS: 1,
+    currentlyDoing: [],
+    projectType: 'screening',
+    offers: [],
+    estimatedValue: 0,
+    confidence: 50,
+    status: 'new',
+    stageHistory: [],
+    createdAt: '2026-01-01',
+    updatedAt: '2026-01-01',
+    ...overrides,
+  } as LeadEntity
 }
 
 function reportFixture() {
@@ -48,43 +118,184 @@ async function renderPage() {
   const CrmPage = (await import('./CrmPage')).default
   return render(
     <QueryClientProvider client={makeQueryClient()}>
-      <CrmPage />
+      <MemoryRouter>
+        <CrmPage />
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }
+
+describe('CrmPage — ?lead=<id> deep link (notification click-through)', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    mockPermission(true)
+    mockMySweep({})
+  })
+
+  it('opens the drawer for a lead already on the loaded page', async () => {
+    vi.mocked(useLeads).mockReturnValue({
+      leads: [leadFixture({ id: 'l1', title: 'Loaded Lead' })],
+      count: 1,
+      isLoading: false,
+      error: null,
+      moveStage: vi.fn(),
+      updateLead: vi.fn(),
+      createLead: vi.fn(),
+      isMovingStage: false,
+      isUpdating: false,
+      isCreating: false,
+    } as unknown as ReturnType<typeof useLeads>)
+    mockLead()
+    vi.mocked(useLeadReport).mockReturnValue({ report: reportFixture(), isLoading: false, isError: false, error: null, refetch: vi.fn() })
+
+    const CrmPage = (await import('./CrmPage')).default
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <MemoryRouter initialEntries={['/crm?lead=l1']}>
+          <CrmPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    expect(await screen.findByRole('heading', { name: 'Loaded Lead' })).toBeInTheDocument()
+  })
+
+  it('falls back to a direct GET /leads/:id when the deep-linked lead is not on the loaded page', async () => {
+    mockLeads() // empty list — the deep-linked lead isn't here
+    vi.mocked(useLead).mockReturnValue({
+      data: { success: true, message: '', data: leadFixture({ id: 'l2', title: 'Fetched Lead' }) },
+    } as unknown as ReturnType<typeof useLead>)
+    vi.mocked(useLeadReport).mockReturnValue({ report: reportFixture(), isLoading: false, isError: false, error: null, refetch: vi.fn() })
+
+    const CrmPage = (await import('./CrmPage')).default
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <MemoryRouter initialEntries={['/crm?lead=l2']}>
+          <CrmPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    expect(await screen.findByRole('heading', { name: 'Fetched Lead' })).toBeInTheDocument()
+  })
+
+  it('a confirmed 404 on the direct fetch is treated as terminal: shows an error toast and clears the dead ?lead= param', async () => {
+    mockLeads() // empty list — the deep-linked lead isn't here
+    vi.mocked(useLead).mockReturnValue({
+      data: undefined,
+      error: axiosError(404),
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useLead>)
+    vi.mocked(useLeadReport).mockReturnValue({ report: reportFixture(), isLoading: false, isError: false, error: null, refetch: vi.fn() })
+
+    const CrmPage = (await import('./CrmPage')).default
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <MemoryRouter initialEntries={['/crm?lead=deleted-lead']}>
+          <CrmPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    await screen.findByText('CRM & Sales') // let the deep-link effect settle
+    expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/may have been removed/i))
+    // No "Retry" action on a terminal failure — just the message.
+    expect(vi.mocked(toast.error).mock.calls[0][1]).toBeUndefined()
+  })
+
+  it('a confirmed 403 on the direct fetch is also treated as terminal, same as a 404', async () => {
+    mockLeads()
+    vi.mocked(useLead).mockReturnValue({
+      data: undefined,
+      error: axiosError(403),
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useLead>)
+    vi.mocked(useLeadReport).mockReturnValue({ report: reportFixture(), isLoading: false, isError: false, error: null, refetch: vi.fn() })
+
+    const CrmPage = (await import('./CrmPage')).default
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <MemoryRouter initialEntries={['/crm?lead=forbidden-lead']}>
+          <CrmPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    await screen.findByText('CRM & Sales') // let effects settle
+    expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/may have been removed/i))
+  })
+
+  it('a transient failure (5xx/network) on the direct fetch keeps the ?lead= param and offers a Retry action instead of giving up on the destination', async () => {
+    mockLeads()
+    const refetch = vi.fn()
+    vi.mocked(useLead).mockReturnValue({
+      data: undefined,
+      error: axiosError(500),
+      refetch,
+    } as unknown as ReturnType<typeof useLead>)
+    vi.mocked(useLeadReport).mockReturnValue({ report: reportFixture(), isLoading: false, isError: false, error: null, refetch: vi.fn() })
+
+    const CrmPage = (await import('./CrmPage')).default
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <MemoryRouter initialEntries={['/crm?lead=flaky-lead']}>
+          <CrmPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    await screen.findByText('CRM & Sales')
+    expect(toast.error).toHaveBeenCalledWith(
+      expect.stringMatching(/try again/i),
+      expect.objectContaining({ action: expect.objectContaining({ label: 'Retry' }) }),
+    )
+
+    // Clicking the toast's Retry action calls the query's own refetch.
+    const [, options] = vi.mocked(toast.error).mock.calls[0]
+    const action = options?.action as { onClick: () => void } | undefined
+    action?.onClick()
+    expect(refetch).toHaveBeenCalledTimes(1)
+  })
+})
 
 describe('CrmPage — Lead KPI strip permission/loading/error branching', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     mockLeads()
+    mockLead()
+    mockMySweep({}) // irrelevant for manager-path tests, which gate it off via `enabled: false`
   })
 
-  it('never enables the report query and shows the non-manager message when lacking lead:manage/tenant:manage', async () => {
+  it('never enables the report query for a non-manager, and instead drives My Sales Dashboard from an own-scoped sweep', async () => {
     mockPermission(false)
-    vi.mocked(useLeadReport).mockReturnValue({ report: undefined, isLoading: false, error: null })
+    vi.mocked(useLeadReport).mockReturnValue({ report: undefined, isLoading: false, isError: false, error: null, refetch: vi.fn() })
+    mockMySweep({ data: [] })
 
     await renderPage()
 
     expect(useLeadReport).toHaveBeenCalledWith({}, false)
-    expect(screen.getByText('Statistics are available to lead managers.')).toBeInTheDocument()
+    expect(useMySalesSweep).toHaveBeenCalledWith(true)
+    expect(screen.getByText('My Sales Dashboard · current portfolio')).toBeInTheDocument()
+    expect(screen.getByText('You have no leads yet.')).toBeInTheDocument()
     expect(screen.queryByText('Open Opportunities')).not.toBeInTheDocument()
     expect(screen.queryByText('All lead statistics')).not.toBeInTheDocument()
   }, 15000) // first test in the file also pays for CrmPage's dynamic import — slow under full-suite load
 
   it('shows a loading skeleton while the report is in flight for a manager', async () => {
     mockPermission(true)
-    vi.mocked(useLeadReport).mockReturnValue({ report: undefined, isLoading: true, error: null })
+    vi.mocked(useLeadReport).mockReturnValue({ report: undefined, isLoading: true, isError: false, error: null, refetch: vi.fn() })
 
     await renderPage()
 
     expect(useLeadReport).toHaveBeenCalledWith({}, true)
+    expect(useMySalesSweep).toHaveBeenCalledWith(false)
     expect(screen.queryByText('Statistics are available to lead managers.')).not.toBeInTheDocument()
     expect(screen.queryByText('Open Opportunities')).not.toBeInTheDocument()
   })
 
   it('shows an inline error message when the report fails to load for a manager', async () => {
     mockPermission(true)
-    vi.mocked(useLeadReport).mockReturnValue({ report: undefined, isLoading: false, error: new Error('boom') })
+    vi.mocked(useLeadReport).mockReturnValue({ report: undefined, isLoading: false, isError: true, error: new Error('boom'), refetch: vi.fn() })
 
     await renderPage()
 
@@ -92,9 +303,20 @@ describe('CrmPage — Lead KPI strip permission/loading/error branching', () => 
     expect(screen.queryByText('Open Opportunities')).not.toBeInTheDocument()
   })
 
+  it('offers a manual Retry action that calls the hook\'s refetch, since the report never auto-retries', async () => {
+    mockPermission(true)
+    const refetch = vi.fn()
+    vi.mocked(useLeadReport).mockReturnValue({ report: undefined, isLoading: false, isError: true, error: new Error('boom'), refetch })
+
+    await renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(refetch).toHaveBeenCalledTimes(1)
+  })
+
   it('renders the real tenant-wide KPI strip with its scope label once the report resolves for a manager', async () => {
     mockPermission(true)
-    vi.mocked(useLeadReport).mockReturnValue({ report: reportFixture(), isLoading: false, error: null })
+    vi.mocked(useLeadReport).mockReturnValue({ report: reportFixture(), isLoading: false, isError: false, error: null, refetch: vi.fn() })
 
     await renderPage()
 
@@ -103,5 +325,186 @@ describe('CrmPage — Lead KPI strip permission/loading/error branching', () => 
     expect(screen.getByText('Won leads')).toBeInTheDocument()
     expect(screen.getByText('Lost leads')).toBeInTheDocument()
     expect(screen.getByText('Win Rate')).toBeInTheDocument()
+  })
+})
+
+describe('CrmPage — My Sales Dashboard (KAM/Sales Rep own-scope path)', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    mockLeads()
+    mockLead()
+    mockPermission(false)
+    vi.mocked(useLeadReport).mockReturnValue({ report: undefined, isLoading: false, isError: false, error: null, refetch: vi.fn() })
+  })
+
+  it('shows a loading skeleton while the own-scoped sweep is in flight', async () => {
+    mockMySweep({ isLoading: true })
+
+    await renderPage()
+
+    expect(screen.queryByText('My Sales Dashboard · current portfolio')).not.toBeInTheDocument()
+    expect(screen.queryByText('My Leads')).not.toBeInTheDocument()
+  })
+
+  it('shows an inline error with a Retry action when the sweep fails, never a partial/mixed KPI render', async () => {
+    const refetch = vi.fn()
+    mockMySweep({ isError: true, error: new Error('boom'), refetch })
+
+    await renderPage()
+
+    expect(screen.getByText("Couldn't load your sales dashboard.")).toBeInTheDocument()
+    expect(screen.queryByText('My Leads')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(refetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('derives all 8 confirmed own-scope KPI tiles (incl. velocity from stageHistory) from the swept leads, with no top-rep/targets fabrication', async () => {
+    mockMySweep({
+      data: [
+        leadFixture({ id: 'l1', status: 'won', estimatedValue: 100_000 }),
+        leadFixture({ id: 'l2', status: 'won', estimatedValue: 50_000 }),
+        leadFixture({ id: 'l3', status: 'lost', estimatedValue: 20_000 }),
+        leadFixture({ id: 'l4', status: 'qualified', estimatedValue: 30_000 }),
+      ],
+    })
+
+    await renderPage()
+
+    expect(screen.getByText('My Sales Dashboard · current portfolio')).toBeInTheDocument()
+    expect(screen.getByText('My Leads')).toBeInTheDocument()
+    expect(screen.getByText('4')).toBeInTheDocument() // total
+
+    expect(screen.getByText('Open Pipeline')).toBeInTheDocument()
+    expect(screen.getByText('Open Pipeline Value')).toBeInTheDocument()
+    expect(screen.getByText('Win Rate')).toBeInTheDocument()
+    expect(screen.getByText('Avg Won Deal Size')).toBeInTheDocument()
+    expect(screen.getByText('Sales Velocity (days)')).toBeInTheDocument()
+  })
+
+  it('shows an empty-portfolio message instead of a zeroed-out KPI strip when the caller has no leads', async () => {
+    mockMySweep({ data: [] })
+
+    await renderPage()
+
+    expect(screen.getByText('You have no leads yet.')).toBeInTheDocument()
+    expect(screen.queryByText('My Leads')).not.toBeInTheDocument()
+  })
+
+  it('hides the Top Reps leaderboard for a non-manager, since it would only ever rank their own single row', async () => {
+    mockMySweep({ data: [] })
+
+    await renderPage()
+
+    expect(screen.queryByText('Top Reps · Won value')).not.toBeInTheDocument()
+  })
+})
+
+describe('CrmPage — tenant:manage-only callers must not hit the lead:manage-gated /leads/report endpoint', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    mockLeads()
+    mockLead()
+  })
+
+  it('a tenant:manage (but not lead:manage) caller gets full lead visibility/mutation, but still falls into the own-scope My Sales Dashboard instead of calling the report endpoint', async () => {
+    mockGrantedPermissions(['tenant:manage'])
+    vi.mocked(useLeadReport).mockReturnValue({ report: undefined, isLoading: false, isError: false, error: null, refetch: vi.fn() })
+    mockMySweep({ data: [leadFixture({ status: 'won', estimatedValue: 10_000 })] })
+
+    await renderPage()
+
+    // canManageLeads (tenant:manage) still grants full lead mutation UI...
+    expect(screen.getByRole('button', { name: /New Lead/i })).toBeInTheDocument()
+    // ...but /leads/report is lead:manage-only at the route level, so it must never be enabled here.
+    expect(useLeadReport).toHaveBeenCalledWith({}, false)
+    expect(useMySalesSweep).toHaveBeenCalledWith(true)
+    expect(screen.getByText('My Sales Dashboard · current portfolio')).toBeInTheDocument()
+    expect(screen.queryByText('All lead statistics')).not.toBeInTheDocument()
+  })
+})
+
+describe('CrmPage — lead:create and lead:update grant their own narrower slice, not the full lead:manage set', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    mockLeads()
+    vi.mocked(useLeadReport).mockReturnValue({ report: undefined, isLoading: false, isError: false, error: null, refetch: vi.fn() })
+    mockMySweep({ data: [] })
+  })
+
+  it('a lead:create-only caller (no lead:manage/tenant:manage/lead:update) sees "New Lead"', async () => {
+    mockGrantedPermissions(['lead:create'])
+    vi.mocked(useLead).mockReturnValue({ data: undefined } as unknown as ReturnType<typeof useLead>)
+
+    await renderPage()
+
+    expect(screen.getByRole('button', { name: /New Lead/i })).toBeInTheDocument()
+  })
+
+  it('a lead:create-only caller gets no edit affordance on an opened lead (lead:create grants creation only, not editing)', async () => {
+    mockGrantedPermissions(['lead:create'])
+    vi.mocked(useLead).mockReturnValue({ data: undefined } as unknown as ReturnType<typeof useLead>)
+    vi.mocked(useLeads).mockReturnValue({
+      leads: [leadFixture({ id: 'l1', title: 'Created-only Lead' })],
+      count: 1,
+      isLoading: false,
+      error: null,
+      moveStage: vi.fn(),
+      updateLead: vi.fn(),
+      createLead: vi.fn(),
+      isMovingStage: false,
+      isUpdating: false,
+      isCreating: false,
+    } as unknown as ReturnType<typeof useLeads>)
+
+    const CrmPage = (await import('./CrmPage')).default
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <MemoryRouter initialEntries={['/crm?lead=l1']}>
+          <CrmPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    expect(await screen.findByRole('heading', { name: 'Created-only Lead' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit lead' })).not.toBeInTheDocument()
+  })
+
+  it('a lead:update-only caller (no lead:manage/tenant:manage/lead:create) sees no "New Lead" button', async () => {
+    mockGrantedPermissions(['lead:update'])
+    vi.mocked(useLead).mockReturnValue({ data: undefined } as unknown as ReturnType<typeof useLead>)
+
+    await renderPage()
+
+    expect(screen.queryByRole('button', { name: /New Lead/i })).not.toBeInTheDocument()
+  })
+
+  it('a lead:update-only caller gets the edit affordance on an opened lead (lead:update grants editing only, not creation)', async () => {
+    mockGrantedPermissions(['lead:update'])
+    vi.mocked(useLead).mockReturnValue({ data: undefined } as unknown as ReturnType<typeof useLead>)
+    vi.mocked(useLeads).mockReturnValue({
+      leads: [leadFixture({ id: 'l1', title: 'Updatable Lead' })],
+      count: 1,
+      isLoading: false,
+      error: null,
+      moveStage: vi.fn(),
+      updateLead: vi.fn(),
+      createLead: vi.fn(),
+      isMovingStage: false,
+      isUpdating: false,
+      isCreating: false,
+    } as unknown as ReturnType<typeof useLeads>)
+
+    const CrmPage = (await import('./CrmPage')).default
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <MemoryRouter initialEntries={['/crm?lead=l1']}>
+          <CrmPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    expect(await screen.findByRole('heading', { name: 'Updatable Lead' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Edit lead' })).toBeInTheDocument()
   })
 })

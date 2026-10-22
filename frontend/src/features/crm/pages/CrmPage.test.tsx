@@ -423,3 +423,88 @@ describe('CrmPage — tenant:manage-only callers must not hit the lead:manage-ga
     expect(screen.queryByText('All lead statistics')).not.toBeInTheDocument()
   })
 })
+
+describe('CrmPage — lead:create and lead:update grant their own narrower slice, not the full lead:manage set', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    mockLeads()
+    vi.mocked(useLeadReport).mockReturnValue({ report: undefined, isLoading: false, isError: false, error: null, refetch: vi.fn() })
+    mockMySweep({ data: [] })
+  })
+
+  it('a lead:create-only caller (no lead:manage/tenant:manage/lead:update) sees "New Lead"', async () => {
+    mockGrantedPermissions(['lead:create'])
+    vi.mocked(useLead).mockReturnValue({ data: undefined } as unknown as ReturnType<typeof useLead>)
+
+    await renderPage()
+
+    expect(screen.getByRole('button', { name: /New Lead/i })).toBeInTheDocument()
+  })
+
+  it('a lead:create-only caller gets no edit affordance on an opened lead (lead:create grants creation only, not editing)', async () => {
+    mockGrantedPermissions(['lead:create'])
+    vi.mocked(useLead).mockReturnValue({ data: undefined } as unknown as ReturnType<typeof useLead>)
+    vi.mocked(useLeads).mockReturnValue({
+      leads: [leadFixture({ id: 'l1', title: 'Created-only Lead' })],
+      count: 1,
+      isLoading: false,
+      error: null,
+      moveStage: vi.fn(),
+      updateLead: vi.fn(),
+      createLead: vi.fn(),
+      isMovingStage: false,
+      isUpdating: false,
+      isCreating: false,
+    } as unknown as ReturnType<typeof useLeads>)
+
+    const CrmPage = (await import('./CrmPage')).default
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <MemoryRouter initialEntries={['/crm?lead=l1']}>
+          <CrmPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    expect(await screen.findByRole('heading', { name: 'Created-only Lead' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit lead' })).not.toBeInTheDocument()
+  })
+
+  it('a lead:update-only caller (no lead:manage/tenant:manage/lead:create) sees no "New Lead" button', async () => {
+    mockGrantedPermissions(['lead:update'])
+    vi.mocked(useLead).mockReturnValue({ data: undefined } as unknown as ReturnType<typeof useLead>)
+
+    await renderPage()
+
+    expect(screen.queryByRole('button', { name: /New Lead/i })).not.toBeInTheDocument()
+  })
+
+  it('a lead:update-only caller gets the edit affordance on an opened lead (lead:update grants editing only, not creation)', async () => {
+    mockGrantedPermissions(['lead:update'])
+    vi.mocked(useLead).mockReturnValue({ data: undefined } as unknown as ReturnType<typeof useLead>)
+    vi.mocked(useLeads).mockReturnValue({
+      leads: [leadFixture({ id: 'l1', title: 'Updatable Lead' })],
+      count: 1,
+      isLoading: false,
+      error: null,
+      moveStage: vi.fn(),
+      updateLead: vi.fn(),
+      createLead: vi.fn(),
+      isMovingStage: false,
+      isUpdating: false,
+      isCreating: false,
+    } as unknown as ReturnType<typeof useLeads>)
+
+    const CrmPage = (await import('./CrmPage')).default
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <MemoryRouter initialEntries={['/crm?lead=l1']}>
+          <CrmPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    expect(await screen.findByRole('heading', { name: 'Updatable Lead' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Edit lead' })).toBeInTheDocument()
+  })
+})

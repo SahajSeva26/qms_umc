@@ -314,6 +314,13 @@ const moveStage = async (id: string, model: IMoveStagePayload, ctx: RequestConte
         return throwAppError(`Invalid stage transition from '${from}' to '${to}'`, StatusCodes.BAD_REQUEST);
     }
 
+    //3b: marking an appointment done requires a captured MoM. The MoM is saved via PUT /appointments/:id
+    // beforehand; this enforces server-side what the frontend already checks, so a direct API call can't
+    // close an appointment with an empty MoM.
+    if (to === APPOINTMENT_STATUSES.DONE && !appointment.mom?.details?.trim()) {
+        return throwAppError('Minutes of meeting are required to mark an appointment as done', StatusCodes.UNPROCESSABLE_ENTITY);
+    }
+
     //4: append to the append-only journal + flip the cached status (one atomic save)
     // snapshot the actor's identity from the token so history stays true even if the user/role later changes
     const actorName = `${ctx.user?.firstName || ''} ${ctx.user?.lastName || ''}`.trim();

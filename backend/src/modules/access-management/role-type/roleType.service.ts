@@ -47,10 +47,7 @@ const set = async (model: any, entity: HydratedDocument<IRoleType>, ctx: Request
         // them on every boot, so any API edit here would be silently reverted. Freeze permissions on
         // them entirely (name/description/status stay editable). Seed is the only writer.
         if (entity.isSystem) {
-            throwAppError(
-                'The permissions of a seeded role type are managed by the system and cannot be modified',
-                StatusCodes.FORBIDDEN,
-            );
+            throwAppError('The permissions of a seeded role type are managed by the system and cannot be modified', StatusCodes.FORBIDDEN);
         }
         // system:manage is a seed-only skeleton key. It can never be granted through the API...
         if (model.permissions.includes(SYSTEM_PERMISSIONS.MANAGE.code)) {

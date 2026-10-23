@@ -6,7 +6,7 @@ import { CounterService } from '../../counter/counter.service';
 import { throwAppError } from '../../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
-import { isValidObjectID } from '../../../shared/utils/strings';
+import { isValidObjectID, toObjectId } from '../../../shared/utils/strings';
 import { RoleService } from '../role/role.service';
 import { PermissionGroupService } from '../permission-group/permissionGroup.service';
 import { USER_PERMISSIONS, USER_STATUS } from '../../user/user.constants';
@@ -138,6 +138,12 @@ const search = async (filters: ISearchTenantQuery, ctx: RequestContext, options?
 
     if (filters.status && ctx.hasAnyPermissions([TENANT_PERMISSIONS.MANAGE.code])) {
         where.status = filters.status;
+    }
+
+    // companies this sales rep can start a lead on: assigned to them OR not yet assigned to anyone.
+    // ({ salesPerson: null } matches both an explicit null and a missing field.)
+    if (filters.salesRep) {
+        where.$or = [{ salesPerson: toObjectId(filters.salesRep) }, { salesPerson: null }];
     }
 
     // report runs extra per-tenant aggregations, so cap the page size to keep the load bounded

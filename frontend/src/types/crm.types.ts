@@ -87,6 +87,9 @@ export interface DivisionEntity {
 export interface DivisionStats {
   totalProjects: number
   liveProjects: number
+  // Live count of pharma-mr roles actually assigned to this division — distinct from the
+  // division's own editable `mrCount` (a planned/target figure set via Create/Edit Division).
+  mrs: number
 }
 
 export interface SearchDivisionQuery {

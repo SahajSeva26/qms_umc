@@ -1,7 +1,8 @@
 import { Controller, useFormContext } from 'react-hook-form'
+import { FiCheckCircle } from 'react-icons/fi'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import { useAsyncPickerState } from '@/hooks/useAsyncPickerState'
 import { useTenantWizardFieldError } from '@/features/access-management/tenant/components/wizard/TenantWizardValidationContext'
 import CreateTenantLogoFlow from '@/features/access-management/tenant/components/wizard/CreateTenantLogoFlow'
 import type { useTenantSalesRepPicker } from '@/features/access-management/tenant/hooks/useTenantSalesRepPicker'
@@ -16,7 +17,8 @@ interface TenantBasicsStepProps {
 const TenantBasicsStep = ({ salesRepPicker, logoFlow }: TenantBasicsStepProps) => {
   const { register, control } = useFormContext<TenantFormValues>()
   const fieldError = useTenantWizardFieldError()
-  const { pickerOpened, setPickerOpened, platformTenant, salesReps, salesRepsBusy, salesRepsErroredOut } = salesRepPicker
+  const { pickerOpened, setPickerOpened, query, setQuery, platformTenant, salesReps, salesRepsBusy, salesRepsErroredOut } = salesRepPicker
+  const { open, setOpen, containerRef } = useAsyncPickerState()
 
   return (
     <div>
@@ -48,33 +50,60 @@ const TenantBasicsStep = ({ salesRepPicker, logoFlow }: TenantBasicsStepProps) =
             {fieldError('gst') && <p className="text-[11px] mt-1 text-danger">{fieldError('gst')}</p>}
           </div>
         </div>
-        <div>
+        <div ref={containerRef} className="relative">
           <Label htmlFor="salesPerson" className="text-xs mb-1.5">
             Sales rep *
           </Label>
           <Controller
             control={control}
             name="salesPerson"
-            render={({ field }) => (
-              <Select
-                key={field.value || 'empty'}
-                value={field.value || undefined}
-                onValueChange={field.onChange}
-                onOpenChange={(next) => next && setPickerOpened(true)}
-              >
-                <SelectTrigger id="salesPerson" className="w-full">
-                  <SelectValue placeholder={salesRepsBusy ? 'Loading...' : 'Select sales rep...'}>
-                    {(v: string) => {
-                      const r = salesReps.find((role) => role.id === v)
-                      return r ? `${r.name} (${r.code})` : salesRepsBusy ? 'Loading...' : 'Select sales rep...'
-                    }}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {salesReps.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
-                </SelectContent>
-              </Select>
-            )}
+            render={({ field }) => {
+              const picked = salesReps.find((role) => role.id === field.value)
+              return (
+                <>
+                  <Input
+                    id="salesPerson"
+                    type="text"
+                    autoComplete="off"
+                    value={open ? query : picked ? `${picked.name} (${picked.code})` : ''}
+                    placeholder={salesRepsBusy ? 'Loading...' : 'Search sales rep by name...'}
+                    onFocus={() => { setPickerOpened(true); setOpen(true); setQuery('') }}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
+                  {open && (
+                    <div className="absolute left-0 right-0 top-full mt-1 z-50 p-1.5 rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10 max-h-56 overflow-y-auto">
+                      {salesRepsBusy && (
+                        <div className="text-[12px] px-2 py-2" style={{ color: 'var(--qms-text-muted)' }}>Searching…</div>
+                      )}
+                      {!salesRepsBusy && !salesRepsErroredOut && platformTenant && salesReps.length === 0 && (
+                        <div className="text-[12px] px-2 py-2" style={{ color: 'var(--qms-text-muted)' }}>
+                          {query.trim() ? `No sales reps match "${query.trim()}".` : 'No active sales reps are available.'}
+                        </div>
+                      )}
+                      {!salesRepsBusy && salesReps.map((r) => {
+                        const active = field.value === r.id
+                        return (
+                          <button
+                            key={r.id}
+                            type="button"
+                            onClick={() => {
+                              field.onChange(r.id)
+                              setOpen(false)
+                              setQuery('')
+                            }}
+                            className="w-full flex items-center justify-between gap-2 text-left text-[13px] px-2 py-1.5 rounded-md transition-colors hover:bg-(--qms-surface-hover)"
+                            style={{ color: 'var(--qms-text)' }}
+                          >
+                            <span className="truncate">{r.name} ({r.code})</span>
+                            {active && <FiCheckCircle size={14} style={{ color: 'var(--qms-brand)' }} className="shrink-0" />}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </>
+              )
+            }}
           />
           {fieldError('salesPerson') && <p className="text-[11px] mt-1 text-danger">{fieldError('salesPerson')}</p>}
           {pickerOpened && salesRepsErroredOut && (

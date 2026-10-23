@@ -1,5 +1,5 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
-import { FormProvider, useForm, useFormContext, useWatch } from 'react-hook-form'
+import { FormProvider, useForm, useFormContext, useWatch, type FieldErrors } from 'react-hook-form'
 import { FiArrowLeft, FiPlus } from 'react-icons/fi'
 import { useNavigate } from 'react-router-dom'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
@@ -52,6 +52,9 @@ const CreateTenantDialog = () => {
   const [locationResolution, setLocationResolution] = useState<LocationResolutionState>('idle')
   const [locationResolutionError, setLocationResolutionError] = useState<string | null>(null)
   const [locationHint, setLocationHint] = useState<string | null>(null)
+  // A 2xx response with no data.id is a contract break, not a normal failure — createTenant.isError
+  // stays false for it, so without this the user just sees "Creating…" freeze with no explanation.
+  const [malformedResponseError, setMalformedResponseError] = useState<string | null>(null)
   const navigate = useNavigate()
   const createTenant = useCreateTenant()
   const { resolver, parsePayload } = useTenantFormResolver()
@@ -112,6 +115,8 @@ const CreateTenantDialog = () => {
     salesRepPicker.setPickerOpened(false)
     setLocationResolution('idle')
     setLocationResolutionError(null)
+    setLocationHint(null)
+    setMalformedResponseError(null)
     createTenant.reset()
     logoFlow.reset()
     setDraftMode('loading')
@@ -150,10 +155,14 @@ const CreateTenantDialog = () => {
       return
     }
     setLocationResolutionError(null)
+    setMalformedResponseError(null)
     const payload = await parsePayload(values)
     createTenant.mutate(payload, {
       onSuccess: (res) => {
-        if (!res.data?.id) return
+        if (!res.data?.id) {
+          setMalformedResponseError('The company may have been created, but the server response was missing its id. Check the client list, or try again.')
+          return
+        }
         clearDraftOnSuccess()
         if (!logoFlow.pickedLogoFile) {
           resetAndClose()
@@ -165,6 +174,17 @@ const CreateTenantDialog = () => {
         logoFlow.startForTenant(res.data.id)
       },
     })
+  }
+
+  // Defense-in-depth: handleSubmit validates the WHOLE form across all 3 steps every time, but
+  // only the step currently on screen renders any error (useTenantWizardFieldError). Without this,
+  // a stale invalid field on an earlier step (e.g. a bad GST left over from step 0) silently blocks
+  // "Create company" with no visible feedback at all — no toast, no network request, nothing.
+  // Jump back to the earliest step that actually has an error, so it becomes visible.
+  const onInvalid = (errors: FieldErrors<TenantFormValues>) => {
+    setAdvanceAttempted(true)
+    const invalidStepIndex = CREATE_TENANT_STEP_FIELD_NAMES.findIndex((fields) => fields.some((f) => f in errors))
+    if (invalidStepIndex !== -1) setStep(invalidStepIndex)
   }
 
   return (
@@ -200,7 +220,7 @@ const CreateTenantDialog = () => {
             )}
 
             {(draftMode === 'active' || draftMode === 'disabled') && (
-            <form onSubmit={handleSubmit(onSubmit)} noValidate>
+            <form onSubmit={handleSubmit(onSubmit, onInvalid)} noValidate>
               <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
                 {!isPostCreateFlowActive && step === 0 && (
                   <TenantBasicsStep salesRepPicker={salesRepPicker} logoFlow={logoFlow} />
@@ -228,6 +248,12 @@ const CreateTenantDialog = () => {
                 {locationResolutionError && (
                   <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
                     {locationResolutionError}
+                  </div>
+                )}
+
+                {malformedResponseError && (
+                  <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
+                    {malformedResponseError}
                   </div>
                 )}
               </div>

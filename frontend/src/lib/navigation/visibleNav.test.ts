@@ -68,6 +68,64 @@ describe('isNavItemVisible — Dashboard + the 4 analytics items are system:mana
   })
 })
 
+describe('isNavItemVisible — "geoprofiles" (Field Staff Coverage) is open to any authenticated session, matching GET /geo-profiles\' genuinely open backend reads', () => {
+  it('is visible even for a session with zero permissions', () => {
+    const session = sessionFixture({ isSettled: true, permissions: [] })
+    expect(isNavItemVisible({ id: 'geoprofiles', label: 'Field Staff Coverage', icon: 'MapPin', path: '/geo-profiles' }, session)).toBe(true)
+  })
+
+  it('is visible for a field-officer session (previously wrongly gated behind unrelated tenant:*/role:* codes)', () => {
+    const session = sessionFixture({ isSettled: true, permissions: ['camp:search'], roleTypeCode: 'field-officer' })
+    expect(isNavItemVisible({ id: 'geoprofiles', label: 'Field Staff Coverage', icon: 'MapPin', path: '/geo-profiles' }, session)).toBe(true)
+  })
+
+  // Matches 'doctors'' own ungated behavior exactly — items with no REAL_GATED_NAV_ITEMS entry are
+  // visible unconditionally (nothing to gate against an open backend read), isSettled included.
+  it('is visible even for an unsettled session, same as every other fully-open nav item', () => {
+    const session = sessionFixture({ isSettled: false, permissions: [] })
+    expect(isNavItemVisible({ id: 'geoprofiles', label: 'Field Staff Coverage', icon: 'MapPin', path: '/geo-profiles' }, session)).toBe(true)
+  })
+})
+
+describe('isNavItemVisible — "salesdashboard" is visible to exactly sales-head/sales-rep, never system:manage or tenant:manage', () => {
+  it('is visible for a sales-head session with no permissions at all', () => {
+    const session = sessionFixture({ isSettled: true, permissions: [], roleTypeCode: 'sales-head' })
+    expect(isNavItemVisible({ id: 'salesdashboard', label: 'Sales Dashboard', icon: 'TrendingUp', path: '/crm/sales-dashboard' }, session)).toBe(true)
+  })
+
+  it('is visible for a sales-rep session with no permissions at all', () => {
+    const session = sessionFixture({ isSettled: true, permissions: [], roleTypeCode: 'sales-rep' })
+    expect(isNavItemVisible({ id: 'salesdashboard', label: 'Sales Dashboard', icon: 'TrendingUp', path: '/crm/sales-dashboard' }, session)).toBe(true)
+  })
+
+  it('is hidden for a system:manage session (no system:manage bypass for this item, per explicit request)', () => {
+    const session = sessionFixture({ isSettled: true, permissions: ['system:manage'], roleTypeCode: 'system-admin' })
+    expect(isNavItemVisible({ id: 'salesdashboard', label: 'Sales Dashboard', icon: 'TrendingUp', path: '/crm/sales-dashboard' }, session)).toBe(false)
+  })
+
+  it('is hidden for a tenant:manage admin role, even with lead:manage too', () => {
+    const session = sessionFixture({ isSettled: true, permissions: ['tenant:manage', 'lead:manage'], roleTypeCode: 'admin' })
+    expect(isNavItemVisible({ id: 'salesdashboard', label: 'Sales Dashboard', icon: 'TrendingUp', path: '/crm/sales-dashboard' }, session)).toBe(false)
+  })
+
+  it('is hidden for an unsettled sales-head session', () => {
+    const session = sessionFixture({ isSettled: false, permissions: [], roleTypeCode: 'sales-head' })
+    expect(isNavItemVisible({ id: 'salesdashboard', label: 'Sales Dashboard', icon: 'TrendingUp', path: '/crm/sales-dashboard' }, session)).toBe(false)
+  })
+})
+
+describe('getVisibleNavItems — "salesdashboard" is the first item for sales-head/sales-rep', () => {
+  it('is the first visible item for a sales-head session', () => {
+    const ids = getVisibleNavItems(sessionFixture({ roleTypeCode: 'sales-head', permissions: ['lead:manage'] })).map((i) => i.id)
+    expect(ids[0]).toBe('salesdashboard')
+  })
+
+  it('is the first visible item for a sales-rep session', () => {
+    const ids = getVisibleNavItems(sessionFixture({ roleTypeCode: 'sales-rep', permissions: ['lead:search'] })).map((i) => i.id)
+    expect(ids[0]).toBe('salesdashboard')
+  })
+})
+
 describe('getFirstVisibleNavPath — a pharma session always lands on its own portal, never an extra item', () => {
   it('pharma-mr lands on /pharma, not /camps or /doctors', () => {
     // /pharma is the role-agnostic item's own path — AppLayout.tsx separately redirects to the specific portal (e.g. /pharma/mr).

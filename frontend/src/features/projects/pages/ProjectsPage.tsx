@@ -7,7 +7,7 @@ import { PROJECT_TYPE_LABEL } from '@/types/project.types'
 import { useProjects } from '@/features/projects/hooks/useProjects'
 import { useProject } from '@/features/projects/hooks/useProject'
 import { useProjectReport } from '@/features/projects/hooks/useProjectReport'
-import { PROJECT_WRITE_PERMISSIONS, VOID_CAMP_WRITE_PERMISSIONS, PROJECT_TYPE_COLOR } from '@/features/projects/projects.utils'
+import { PROJECT_CREATE_PERMISSIONS, PROJECT_EDIT_PERMISSIONS, PROJECT_MANAGE_PERMISSIONS, VOID_CAMP_WRITE_PERMISSIONS, PROJECT_TYPE_COLOR } from '@/features/projects/projects.utils'
 import { usePermission } from '@/hooks/usePermission'
 import { isForbiddenError, isNotFoundError } from '@/utils/apiError'
 import ProjectTable from '@/features/projects/components/ProjectTable'
@@ -63,12 +63,14 @@ const HEADER_CHIPS = [
 
 const ProjectsPage = () => {
   const { hasAnyPermission } = usePermission()
-  const canWrite = hasAnyPermission(PROJECT_WRITE_PERMISSIONS)
-  // GET /projects/report needs the same permission set — hide counts rather than let it 403.
-  const canViewReport = canWrite
-  // Independent of canWrite — POST /camps/void-camp and PATCH /:id/approve-void are gated on
-  // camp:manage/tenant:manage, not project:manage, so a project-only manager must not see an
-  // action that would 403, and a camp manager without project:manage must still see it.
+  const canCreate = hasAnyPermission(PROJECT_CREATE_PERMISSIONS)
+  const canEdit = hasAnyPermission(PROJECT_EDIT_PERMISSIONS)
+  // GET /projects/report and PATCH /:id/stage (set-LIVE) are both manage-only — a project:create/
+  // project:update-only actor (Sales Rep) must not see the report or the Change-status action.
+  const canManage = hasAnyPermission(PROJECT_MANAGE_PERMISSIONS)
+  const canViewReport = canManage
+  // Independent of canManage — void-camp routes are gated on camp:manage/tenant:manage, not
+  // project:manage, so neither permission set implies the other.
   const canManageVoidCamps = hasAnyPermission(VOID_CAMP_WRITE_PERMISSIONS)
   const canFilterByClient = hasAnyPermission(PROJECT_CLIENT_FILTER_PERMISSIONS) && hasAnyPermission(TENANT_LOOKUP_PERMISSIONS)
   const { report } = useProjectReport(canViewReport)
@@ -235,7 +237,7 @@ const ProjectsPage = () => {
               style={{ background: 'var(--qms-surface-strong)', borderColor: 'var(--qms-border-strong)' }}
             />
           )}
-          {canWrite && (
+          {canCreate && (
             <button
               onClick={() => setWizardOpen(true)}
               className="flex items-center gap-1.5 text-[13px] font-bold px-3.5 py-2 rounded-xl text-white shrink-0"
@@ -282,7 +284,8 @@ const ProjectsPage = () => {
         <>
           <ProjectTable
             projects={projects}
-            canWrite={canWrite}
+            canEdit={canEdit}
+            canChangeStatus={canManage}
             canManageVoidCamps={canManageVoidCamps}
             onOpenDetail={setOpenDetailId}
             onEdit={setEditId}
@@ -300,7 +303,7 @@ const ProjectsPage = () => {
       )}
 
       {editProject && (
-        <EditProjectModal project={editProject} onClose={() => setEditId(null)} />
+        <EditProjectModal project={editProject} onClose={() => setEditId(null)} canManage={canManage} />
       )}
 
       {voidCampsProject && (

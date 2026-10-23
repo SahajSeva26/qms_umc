@@ -20,7 +20,7 @@ function projectFixture(overrides: Partial<ProjectEntity> = {}): ProjectEntity {
 }
 
 describe('ProjectTable — write-permission gating', () => {
-  it('canWrite=false: the row menu has no Edit/Change status entries, and the status pill click never fires onChangeStatus', async () => {
+  it('canEdit=false, canChangeStatus=false: the row menu has no Edit/Change status entries, and the status pill click never fires onChangeStatus', async () => {
     const onOpenDetail = vi.fn()
     const onEdit = vi.fn()
     const onChangeStatus = vi.fn()
@@ -30,7 +30,8 @@ describe('ProjectTable — write-permission gating', () => {
     render(
       <ProjectTable
         projects={[projectFixture()]}
-        canWrite={false}
+        canEdit={false}
+        canChangeStatus={false}
         canManageVoidCamps={false}
         onOpenDetail={onOpenDetail}
         onEdit={onEdit}
@@ -49,7 +50,7 @@ describe('ProjectTable — write-permission gating', () => {
     expect(onChangeStatus).not.toHaveBeenCalled()
   })
 
-  it('canWrite=true: the row menu shows Edit/Change status/Add void camp, and clicking the status pill fires onChangeStatus', async () => {
+  it('canEdit=true, canChangeStatus=true: the row menu shows Edit/Change status/Add void camp, and clicking the status pill fires onChangeStatus', async () => {
     const onOpenDetail = vi.fn()
     const onEdit = vi.fn()
     const onChangeStatus = vi.fn()
@@ -59,7 +60,8 @@ describe('ProjectTable — write-permission gating', () => {
     render(
       <ProjectTable
         projects={[projectFixture()]}
-        canWrite={true}
+        canEdit={true}
+        canChangeStatus={true}
         canManageVoidCamps={true}
         onOpenDetail={onOpenDetail}
         onEdit={onEdit}
@@ -78,14 +80,41 @@ describe('ProjectTable — write-permission gating', () => {
     expect(onChangeStatus).toHaveBeenCalledWith('proj-1')
   })
 
-  it('canWrite=true: clicking "Add void camp" fires onVoidCamps with the project id', async () => {
+  it('canEdit=true, canChangeStatus=false (a Sales Rep with project:update but not project:manage): Edit shows, but Change status does not — PATCH /:id/stage is manage-only', async () => {
+    const onChangeStatus = vi.fn()
+    const user = userEvent.setup()
+
+    render(
+      <ProjectTable
+        projects={[projectFixture()]}
+        canEdit={true}
+        canChangeStatus={false}
+        canManageVoidCamps={false}
+        onOpenDetail={vi.fn()}
+        onEdit={vi.fn()}
+        onChangeStatus={onChangeStatus}
+        onVoidCamps={vi.fn()}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: /project actions/i }))
+    expect(screen.getByRole('button', { name: /^edit$/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /change status/i })).not.toBeInTheDocument()
+
+    // The status pill itself is the OTHER trigger for onChangeStatus — must also stay inert.
+    await user.click(screen.getByText(/^new$/i))
+    expect(onChangeStatus).not.toHaveBeenCalled()
+  })
+
+  it('canEdit=true: clicking "Add void camp" fires onVoidCamps with the project id', async () => {
     const onVoidCamps = vi.fn()
     const user = userEvent.setup()
 
     render(
       <ProjectTable
         projects={[projectFixture()]}
-        canWrite={true}
+        canEdit={true}
+        canChangeStatus={true}
         canManageVoidCamps={true}
         onOpenDetail={vi.fn()}
         onEdit={vi.fn()}
@@ -100,13 +129,14 @@ describe('ProjectTable — write-permission gating', () => {
     expect(onVoidCamps).toHaveBeenCalledWith('proj-1')
   })
 
-  it('canWrite=true but canManageVoidCamps=false: Edit/Change status still show, but Add void camp does not', async () => {
+  it('canEdit=true but canManageVoidCamps=false: Edit/Change status still show, but Add void camp does not', async () => {
     const user = userEvent.setup()
 
     render(
       <ProjectTable
         projects={[projectFixture()]}
-        canWrite={true}
+        canEdit={true}
+        canChangeStatus={true}
         canManageVoidCamps={false}
         onOpenDetail={vi.fn()}
         onEdit={vi.fn()}
@@ -121,13 +151,14 @@ describe('ProjectTable — write-permission gating', () => {
     expect(screen.queryByRole('button', { name: /add void camp/i })).not.toBeInTheDocument()
   })
 
-  it('canWrite=false but canManageVoidCamps=true: Add void camp shows even without project write access', async () => {
+  it('canEdit=false but canManageVoidCamps=true: Add void camp shows even without project write access', async () => {
     const user = userEvent.setup()
 
     render(
       <ProjectTable
         projects={[projectFixture()]}
-        canWrite={false}
+        canEdit={false}
+        canChangeStatus={false}
         canManageVoidCamps={true}
         onOpenDetail={vi.fn()}
         onEdit={vi.fn()}
@@ -147,7 +178,8 @@ describe('ProjectTable — write-permission gating', () => {
     render(
       <ProjectTable
         projects={[projectFixture({ type: ['teleconsultation_diet'] })]}
-        canWrite={true}
+        canEdit={true}
+        canChangeStatus={true}
         canManageVoidCamps={true}
         onOpenDetail={vi.fn()}
         onEdit={vi.fn()}
@@ -166,7 +198,8 @@ describe('ProjectTable — camps progress bar', () => {
     render(
       <ProjectTable
         projects={[projectFixture({ totalCamps: 80, stats: { executedCamps: 51 } as ProjectEntity['stats'] })]}
-        canWrite={false}
+        canEdit={false}
+        canChangeStatus={false}
         canManageVoidCamps={false}
         onOpenDetail={vi.fn()}
         onEdit={vi.fn()}
@@ -185,7 +218,8 @@ describe('ProjectTable — camps progress bar', () => {
     render(
       <ProjectTable
         projects={[projectFixture({ totalCamps: 40, stats: { executedCamps: 45 } as ProjectEntity['stats'] })]}
-        canWrite={false}
+        canEdit={false}
+        canChangeStatus={false}
         canManageVoidCamps={false}
         onOpenDetail={vi.fn()}
         onEdit={vi.fn()}
@@ -202,7 +236,8 @@ describe('ProjectTable — camps progress bar', () => {
     render(
       <ProjectTable
         projects={[projectFixture({ totalCamps: 120, stats: undefined })]}
-        canWrite={false}
+        canEdit={false}
+        canChangeStatus={false}
         canManageVoidCamps={false}
         onOpenDetail={vi.fn()}
         onEdit={vi.fn()}

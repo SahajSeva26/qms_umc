@@ -65,7 +65,7 @@ export const DivisionMapper = {
             }
             // present only when the caller requested report=true
             if (stats) {
-                item.stats = stats[d._id?.toString()] ?? { totalProjects: 0, liveProjects: 0 };
+                item.stats = stats[d._id?.toString()] ?? { totalProjects: 0, liveProjects: 0, mrs: 0 };
             }
             result.items.push(item);
         }

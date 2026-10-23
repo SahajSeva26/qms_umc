@@ -299,6 +299,12 @@ const update = async (id: string, model: IUpdateLeadPayload, ctx: RequestContext
         return throwAppError('Lead not found', StatusCodes.NOT_FOUND);
     }
 
+    //1b: a terminal (won/lost) lead is closed — its fields can no longer be edited, so historical
+    // reporting (wonValue/avgDealSize/etc.) can't be silently rewritten after the fact.
+    if (TERMINAL_LEAD_STATUSES.includes(lead.status as string)) {
+        return throwAppError(`A ${lead.status} lead can no longer be edited`, StatusCodes.CONFLICT);
+    }
+
     //2: salesPerson can only be changed by a manager (override allowed); a non-manager cannot reassign
     if (model.salesPerson !== undefined) {
         if (!ctx.hasAnyPermissions([LEAD_PERMISSIONS.MANAGE.code])) {

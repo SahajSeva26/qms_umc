@@ -24,7 +24,9 @@ const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
   gantt: ['project:search', 'project:manage', 'tenant:manage'],
   camps: ['camp:search', 'camp:manage', 'camp:book', 'tenant:manage'],
   campsscreening: ['camp:search', 'camp:manage', 'tenant:manage'],
-  campsdiet: ['camp:search', 'camp:manage', 'tenant:manage'],
+  // Also includes camp:book (unlike campsscreening) — the pharma field-force's (MR/ASM/RSM) own
+  // extra-item allowlist below needs this page reachable, same backend GET /camps call as 'camps'.
+  campsdiet: ['camp:search', 'camp:manage', 'camp:book', 'tenant:manage'],
   fieldofficers: ['tenant:manage', 'tenant:admin'],
   users: ['user:get', 'user:search', 'user:update'],
   // No entry for 'geoprofiles' — GET /geo-profiles, /:id, /nearest are all open to any authenticated
@@ -34,7 +36,8 @@ const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
 
 // MR/ASM/RSM's exceptions to "pharma sees only the Pharma Portal section" — real pages own-scoped
 // server-side (camp:book is held by all three; doctor reads are open to any authenticated user).
-const PHARMA_FIELD_EXTRA_NAV_ITEM_IDS = ['camps', 'doctors']
+// 'campsdiet' is the same GET /camps call as 'camps', pre-filtered to type=diet.
+const PHARMA_FIELD_EXTRA_NAV_ITEM_IDS = ['camps', 'campsdiet', 'doctors']
 
 export interface VisibleNavSession {
   isSettled: boolean

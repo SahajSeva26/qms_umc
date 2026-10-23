@@ -33,6 +33,9 @@ export const MOM_SUBMISSION_DEADLINE_HOURS = 24;
 // entity key for the sequential appointment-code counter (seeded at startup, incremented on create)
 export const APPOINTMENT_COUNTER_ENTITY = 'appointment';
 
+// a sales person's planned meetings must be at least this many hours apart (double-booking guard)
+export const MEETING_MIN_GAP_HOURS = 1;
+
 // keyed by the stored status VALUE so moveStage can do APPOINTMENT_TRANSITION_MAP[appointment.status] directly.
 // planned is the entry point; done/cancelled are terminal.
 export const APPOINTMENT_TRANSITION_MAP: Record<string, string[]> = {

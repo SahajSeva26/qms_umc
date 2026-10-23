@@ -71,6 +71,9 @@ export const CRM_BUSINESS_ROLE_TYPES = [
             // set-LIVE (moveStage) stays manage-only → Sales Head.
             PROJECT_PERMISSIONS.CREATE.code,
             PROJECT_PERMISSIONS.UPDATE.code,
+
+            TEST_MASTER_PERMISSIONS.SEARCH.code,
+            TEST_MASTER_PERMISSIONS.GET.code,
         ],
     },
     {
@@ -97,6 +100,9 @@ export const CRM_BUSINESS_ROLE_TYPES = [
             // full project management (create + edit + set-LIVE/moveStage) with team-wide visibility
             // (project:manage is not own-scoped — Sales Head sees the whole team's projects).
             PROJECT_PERMISSIONS.MANAGE.code,
+
+            TEST_MASTER_PERMISSIONS.SEARCH.code,
+            TEST_MASTER_PERMISSIONS.GET.code,
         ],
     },
 ];

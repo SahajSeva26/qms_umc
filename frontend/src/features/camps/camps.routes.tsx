@@ -1,5 +1,10 @@
 import type { RouteObject } from 'react-router-dom'
 import { lazyRoute } from '@/lib/router/lazyRoute'
+// Matches GET /camps's own guard, which also accepts camp:book (pharma field-force read access —
+// the service scopes a division head to their division, and any other non-manage actor to camps
+// where they hold an FO/MR/ASM/RSM slot). Shared via lib/access/campAccess.ts so other features
+// (e.g. notifications' entity resolver) can check camp reachability without importing this module.
+import { CAMP_VIEW_PERMISSIONS } from '@/lib/access/campAccess'
 import TeleconsultationCampsStubPage from './pages/TeleconsultationCampsStubPage'
 import * as CampsPaths from './camps.paths'
 
@@ -15,11 +20,6 @@ export const CAMPS_ROUTES = CampsPaths.CAMPS_ROUTES
 // Only the NEW route is gated on write perms — viewing (the drawer, at CAMPS)
 // and editing (CAMP_EDIT) each check their own narrower permission internally.
 const CAMP_WRITE_PERMISSIONS = ['camp:create', 'camp:manage', 'tenant:manage']
-
-// Matches GET /camps's own guard, which also accepts camp:book (pharma field-force read access —
-// the service scopes a division head to their division, and any other non-manage actor to camps
-// where they hold an FO/MR/ASM/RSM slot).
-const CAMP_READ_PERMISSIONS = ['camp:search', 'camp:manage', 'camp:book', 'tenant:manage']
 
 // Matches GET /camps/:id's own guard (also accepts camp:book, scoped the same way as above).
 // Deliberately excludes camp:search alone — list access isn't detail access; camp:search-only
@@ -37,15 +37,15 @@ const CAMP_SCREENING_PERMISSIONS = ['screening:create', 'screening:manage', 'sys
 export const campsRoutes: RouteObject[] = [
   {
     path: CAMPS_ROUTES.CAMPS,
-    lazy: lazyRoute(() => import('./pages/CampsPageReal'), CAMP_READ_PERMISSIONS),
+    lazy: lazyRoute(() => import('./pages/CampsPageReal'), CAMP_VIEW_PERMISSIONS),
   },
   {
     path: CAMPS_ROUTES.CAMPS_SCREENING,
-    lazy: lazyRoute(() => import('./pages/ScreeningCampsPage'), CAMP_READ_PERMISSIONS),
+    lazy: lazyRoute(() => import('./pages/ScreeningCampsPage'), CAMP_VIEW_PERMISSIONS),
   },
   {
     path: CAMPS_ROUTES.CAMPS_DIET,
-    lazy: lazyRoute(() => import('./pages/DietCampsPage'), CAMP_READ_PERMISSIONS),
+    lazy: lazyRoute(() => import('./pages/DietCampsPage'), CAMP_VIEW_PERMISSIONS),
   },
   { path: CAMPS_ROUTES.CAMPS_TELE, element: <TeleconsultationCampsStubPage /> },
   {

@@ -128,10 +128,18 @@ describe('AuthContinuePage — resolves the post-login landing from the session,
     expect(screen.getByText(`Landed: ${DOCTORS_ROUTES.DOCTORS}`)).toBeInTheDocument()
   })
 
-  it('a pharma-mr session with neither camp:book nor any role-type match resolves to null when even the extra-item allowlist is empty', () => {
-    // isPharmaExtraNavItem only admits 'camps'/'doctors' for pharma-mr specifically — any other
-    // pharma role type with no camp:book has nothing reachable at all.
+  it('a misconfigured pharma-rsm session (no camp:book) also skips its own disabled portal and lands on Doctor Management, same as pharma-mr', () => {
+    // isPharmaExtraNavItem admits 'camps'/'doctors' for the whole pharma field-force
+    // (mr/asm/rsm), not pharma-mr alone.
     const session = sessionFixture('pharma-rsm', [], 'customer')
+    mockSession({ session, permissions: session.permissions })
+    renderContinuePage()
+
+    expect(screen.getByText(`Landed: ${DOCTORS_ROUTES.DOCTORS}`)).toBeInTheDocument()
+  })
+
+  it('a pharma-division-head session with no camp:book resolves to null — the extra-item allowlist excludes it', () => {
+    const session = sessionFixture('pharma-division-head', [], 'customer')
     mockSession({ session, permissions: session.permissions })
     renderContinuePage()
 

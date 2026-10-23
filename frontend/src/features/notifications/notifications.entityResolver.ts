@@ -1,7 +1,8 @@
 import { FiBox, FiUsers, FiFolder } from 'react-icons/fi'
 import type { IconType } from 'react-icons'
-import { isPharmaRoleType } from '@/lib/access/pharmaAccess'
+import { isPharmaRoleType, PHARMA_FIELD_ROLE_TYPE_CODES } from '@/lib/access/pharmaAccess'
 import { PROJECTS_VIEW_PERMISSIONS } from '@/lib/access/projectAccess'
+import { CAMP_VIEW_PERMISSIONS } from '@/lib/access/campAccess'
 import { CRM_ROUTES } from '@/features/crm/crm.paths'
 import { PROJECTS_ROUTES } from '@/features/projects/projects.paths'
 import type { NotificationEntity } from '@/features/notifications/notifications.types'
@@ -43,15 +44,27 @@ function canReachProjects(hasAnyPermission?: (codes: string[]) => boolean): bool
   return hasAnyPermission(PROJECTS_VIEW_PERMISSIONS)
 }
 
+// /camps is gated to CAMP_VIEW_PERMISSIONS (camps.routes.tsx's own guard) — a field-force session
+// without camp:book (a real, supported state; its sidebar link correctly disables) would otherwise
+// still get a clickable camp notification that 403s straight into /unauthorized.
+function canReachCamps(hasAnyPermission?: (codes: string[]) => boolean): boolean {
+  if (!hasAnyPermission) return true
+  return hasAnyPermission(CAMP_VIEW_PERMISSIONS)
+}
+
 export function resolveNotificationEntity(
   entity: NotificationEntity | null,
   roleTypeCode?: string | null,
   hasAnyPermission?: (codes: string[]) => boolean,
 ): EntityResolution | null {
   if (!entity?.type) return null
-  // pharma-mr's one exception: it can reach the real Camp Management page (AppLayout.tsx's onMrExtraPath).
-  if (roleTypeCode === 'pharma-mr' && entity.type === 'camp') return ENTITY_RESOLVERS.camp!
-  if (isPharmaRoleType(roleTypeCode)) return null
+  const isFieldForce = !!roleTypeCode && PHARMA_FIELD_ROLE_TYPE_CODES.includes(roleTypeCode)
+  // Pharma field-force's (MR/ASM/RSM) one exception: they can reach the real Camp Management
+  // page (AppLayout.tsx's onFieldExtraPath) for a camp entity specifically — every other pharma
+  // role, and every other entity type even for field-force, stays blocked (AppLayout force-
+  // redirects them off any non-portal path on identity alone).
+  if (isPharmaRoleType(roleTypeCode) && !(isFieldForce && entity.type === 'camp')) return null
+  if (entity.type === 'camp' && !canReachCamps(hasAnyPermission)) return null
   if (entity.type === 'project' && !canReachProjects(hasAnyPermission)) return null
   return ENTITY_RESOLVERS[entity.type] ?? null
 }

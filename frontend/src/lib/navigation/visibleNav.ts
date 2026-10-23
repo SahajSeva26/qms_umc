@@ -1,5 +1,5 @@
 import { FULL_NAV_SECTIONS, type NavItem } from '@/lib/navigation/navRegistry'
-import { isPharmaRoleType } from '@/lib/access/pharmaAccess'
+import { isPharmaRoleType, PHARMA_FIELD_ROLE_TYPE_CODES } from '@/lib/access/pharmaAccess'
 import { canReadEmployees } from '@/lib/access/employeeAccess'
 
 // Single source of truth for "which sidebar item can this session reach" — shared by Sidebar.tsx
@@ -32,8 +32,9 @@ const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
   // than the backend actually requires.
 }
 
-// MR's exceptions to "pharma sees only the Pharma Portal section" — real pages own-scoped server-side.
-const PHARMA_MR_EXTRA_NAV_ITEM_IDS = ['camps', 'doctors']
+// MR/ASM/RSM's exceptions to "pharma sees only the Pharma Portal section" — real pages own-scoped
+// server-side (camp:book is held by all three; doctor reads are open to any authenticated user).
+const PHARMA_FIELD_EXTRA_NAV_ITEM_IDS = ['camps', 'doctors']
 
 export interface VisibleNavSession {
   isSettled: boolean
@@ -69,9 +70,9 @@ export function isNavItemDisabled(item: NavItem, session: VisibleNavSession): bo
   return !session.permissions.includes('camp:book')
 }
 
-/** True for the one non-pharma item a pharma session may still see — currently just pharma-mr's Camp Management. */
+/** True for the non-pharma items a field-force pharma session (MR/ASM/RSM) may still see. */
 export function isPharmaExtraNavItem(item: NavItem, session: VisibleNavSession): boolean {
-  return session.roleTypeCode === 'pharma-mr' && PHARMA_MR_EXTRA_NAV_ITEM_IDS.includes(item.id)
+  return !!session.roleTypeCode && PHARMA_FIELD_ROLE_TYPE_CODES.includes(session.roleTypeCode) && PHARMA_FIELD_EXTRA_NAV_ITEM_IDS.includes(item.id)
 }
 
 /** Flattened, in display order — same section/sub filters Sidebar.tsx applies before rendering. */
@@ -80,12 +81,12 @@ export function getVisibleNavItems(session: VisibleNavSession): NavItem[] {
   return FULL_NAV_SECTIONS
     .filter((section) => section.section !== 'System' || isRealSystemManage(session))
     .flatMap((section) => section.subs.flatMap((sub) => sub.items))
-    // A pharma session sees only its Pharma Portal link plus its own extra-item allowlist (e.g. MR's Camp Management).
+    // A pharma session sees only its Pharma Portal link plus its own extra-item allowlist (e.g. Camp Management).
     .filter((item) => !sessionIsPharmaRoleType || item.id === 'pharma' || isPharmaExtraNavItem(item, session))
     .filter((item) => isNavItemVisible(item, session))
 }
 
-/** First reachable nav path in display order — a pharma session's own portal always wins over any extra item (e.g. MR's Camp Management). */
+/** First reachable nav path in display order — a pharma session's own portal always wins over any extra item (e.g. Camp Management). */
 export function getFirstVisibleNavPath(session: VisibleNavSession): string | null {
   const visible = getVisibleNavItems(session).filter((candidate) => !isNavItemDisabled(candidate, session))
   if (isPharmaRoleType(session.roleTypeCode)) {

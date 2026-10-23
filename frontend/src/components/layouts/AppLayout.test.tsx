@@ -28,6 +28,7 @@ async function renderAt(path: string) {
           <Route path="/dashboard" element={<div>Dashboard Page</div>} />
           <Route path="/pharma" element={<div>Pharma Redirect Page</div>} />
           <Route path="/pharma/rsm" element={<div>RSM Portal Page</div>} />
+          <Route path="/pharma/asm" element={<div>ASM Portal Page</div>} />
           <Route path="/pharma/ho" element={<div>HO Portal Page</div>} />
           <Route path="/pharma/mr" element={<div>MR Portal Page</div>} />
           <Route path="/pharmaceutical-x" element={<div>Pharmaceutical X Page</div>} />
@@ -173,11 +174,16 @@ describe('AppLayout — pharma/QMS route isolation', () => {
     expect(await screen.findByText('RSM Portal Page')).toBeInTheDocument()
   })
 
-  // pharma-mr's one exception: it also gets the real (non-pharma) Camp Management page, own-scoped server-side.
-  it('does not redirect pharma-mr away from /camps — the one allowed non-pharma path', async () => {
+  // Pharma field-force's (MR/ASM/RSM) one exception: they also get the real (non-pharma) Camp
+  // Management page, own-scoped server-side.
+  it.each([
+    ['pharma-mr', 'MR Portal Page'],
+    ['pharma-asm', 'ASM Portal Page'],
+    ['pharma-rsm', 'RSM Portal Page'],
+  ])('does not redirect %s away from /camps — the one allowed non-pharma path', async (roleTypeCode) => {
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
-      session: sessionFixture('pharma-mr'),
+      session: sessionFixture(roleTypeCode),
       isFetching: false,
       isError: false,
       isConfirmedUnauthenticated: false,
@@ -189,10 +195,10 @@ describe('AppLayout — pharma/QMS route isolation', () => {
     expect(await screen.findByText('Camp Management Page')).toBeInTheDocument()
   })
 
-  it('still redirects every other pharma role away from /camps, back to their own portal', async () => {
+  it('still redirects pharma-division-head (not field-force) away from /camps, back to their own portal', async () => {
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
-      session: sessionFixture('pharma-rsm'),
+      session: sessionFixture('pharma-division-head'),
       isFetching: false,
       isError: false,
       isConfirmedUnauthenticated: false,
@@ -201,7 +207,7 @@ describe('AppLayout — pharma/QMS route isolation', () => {
 
     await renderAt('/camps')
 
-    expect(await screen.findByText('RSM Portal Page')).toBeInTheDocument()
+    expect(await screen.findByText('HO Portal Page')).toBeInTheDocument()
     expect(screen.queryByText('Camp Management Page')).not.toBeInTheDocument()
   })
 
@@ -229,10 +235,14 @@ describe('AppLayout — pharma/QMS route isolation', () => {
   })
 
   // Same exception pattern, extended to Doctor Management.
-  it('does not redirect pharma-mr away from /doctors — the other allowed non-pharma path', async () => {
+  it.each([
+    ['pharma-mr', 'MR Portal Page'],
+    ['pharma-asm', 'ASM Portal Page'],
+    ['pharma-rsm', 'RSM Portal Page'],
+  ])('does not redirect %s away from /doctors — the other allowed non-pharma path', async (roleTypeCode) => {
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
-      session: sessionFixture('pharma-mr'),
+      session: sessionFixture(roleTypeCode),
       isFetching: false,
       isError: false,
       isConfirmedUnauthenticated: false,
@@ -244,10 +254,10 @@ describe('AppLayout — pharma/QMS route isolation', () => {
     expect(await screen.findByText('Doctor Management Page')).toBeInTheDocument()
   })
 
-  it('still redirects every other pharma role away from /doctors, back to their own portal', async () => {
+  it('still redirects pharma-division-head (not field-force) away from /doctors, back to their own portal', async () => {
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
-      session: sessionFixture('pharma-rsm'),
+      session: sessionFixture('pharma-division-head'),
       isFetching: false,
       isError: false,
       isConfirmedUnauthenticated: false,
@@ -256,7 +266,7 @@ describe('AppLayout — pharma/QMS route isolation', () => {
 
     await renderAt('/doctors')
 
-    expect(await screen.findByText('RSM Portal Page')).toBeInTheDocument()
+    expect(await screen.findByText('HO Portal Page')).toBeInTheDocument()
     expect(screen.queryByText('Doctor Management Page')).not.toBeInTheDocument()
   })
 })

@@ -49,14 +49,16 @@ const TenantDetailPage = () => {
   const tenant = data?.data ?? null
 
   const { hasPermission, hasAnyPermission } = usePermission()
-  const canManageTenant = hasPermission('tenant:manage')
+  // PUT /tenants/:id accepts tenant:update OR tenant:manage (tenant.routes.ts) — no seeded role type
+  // holds tenant:update without also holding tenant:manage today, but match the real guard anyway.
+  const canManageTenant = hasAnyPermission(['tenant:manage', 'tenant:update'])
   const canManageSystem = hasPermission('system:manage')
   const canViewRole = hasAnyPermission(['role:get', 'role:search', 'role:manage'])
-  // Matches GET /divisions's own route guard exactly (division:manage/tenant:admin/lead:manage).
-  const canViewDivisions = hasAnyPermission(['division:manage', 'tenant:admin', 'lead:manage'])
-  // division.service.ts's `tenant` filter is honored only for lead:manage/division:manage — a
+  // Matches GET /divisions's own route guard exactly (division:manage/division:search/tenant:admin/lead:manage).
+  const canViewDivisions = hasAnyPermission(['division:manage', 'division:search', 'tenant:admin', 'lead:manage'])
+  // division.service.ts's `tenant` filter is honored only for lead:manage/division:manage/division:search — a
   // tenant:admin-only caller's filter is silently dropped server-side, so hide the section instead of showing all tenants.
-  const canFilterDivisionsByTenant = hasAnyPermission(['lead:manage', 'division:manage'])
+  const canFilterDivisionsByTenant = hasAnyPermission(['lead:manage', 'division:manage', 'division:search'])
   // division.service.ts's `status` filter is honored only for division:manage/tenant:admin, not tenant:manage.
   const canSeeInactiveDivisions = hasAnyPermission(['division:manage', 'tenant:admin'])
   // POST /divisions requires division:manage only, not lead:manage — gated separately so a lead:manage-only viewer doesn't 403 on click.

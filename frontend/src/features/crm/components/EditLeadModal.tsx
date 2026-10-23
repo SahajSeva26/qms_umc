@@ -3,6 +3,7 @@ import { FiPackage, FiSave } from 'react-icons/fi'
 import type { LeadEntity, LeadOffer, LeadProjectType } from '@/types/crm.types'
 import { LEAD_PROJECT_TYPE_LABEL } from '@/types/crm.types'
 import type { UpdateLeadPayload } from '@/types/crm.types'
+import { useSession } from '@/hooks/useSession'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRoleTypes'
@@ -22,6 +23,7 @@ import { WzChipRow, WzChipToggle } from '@/components/ui/WzChip'
 import ChipPicker from '@/features/crm/components/wizard/ChipPicker'
 import { labelClasses, labelStyle, fieldClasses } from '@/features/crm/components/wizard/wizard.styles'
 import { unwrapId } from '@/utils/unwrapId'
+import { roleLabel } from '@/features/crm/crm.utils'
 
 interface EditLeadModalProps {
   lead: LeadEntity
@@ -92,25 +94,34 @@ const EditLeadModal = ({ lead, onSave, onClose }: EditLeadModalProps) => {
     useContacts({ division: divisionId, status: 'active' }, { enabled: !!divisionId })
   const contactPeople = contactPersonData?.data?.items ?? []
 
-  const { data: tenantData, isError: tenantsErrored } = useTenants({ status: 'active', limit: PLATFORM_TENANT_FETCH_LIMIT })
+  // A sales-rep can't reassign a lead to anyone else (lead:manage-only override, see lead.service.ts)
+  // and has no role-type:search/get, so GET /role-types 403s — skip the picker's queries entirely,
+  // same as WizardStep4.tsx's lockedToSelf.
+  const { session } = useSession()
+  const isSalesRepViewer = session?.roleType.code === 'sales-rep'
+
+  const { data: tenantData, isError: tenantsErrored } = useTenants(
+    { status: 'active', limit: PLATFORM_TENANT_FETCH_LIMIT },
+    !isSalesRepViewer,
+  )
   // tenant.type is only on the wire for a system:manage caller; code is always present, so fall back to it.
   const platformTenant = tenantData?.data?.items.find((t) => t.type === 'platform' || t.code === PLATFORM_TENANT_CODE)
 
   // A lead's sales person is a Sales Rep or Sales Head — GET /roles' own `type` filter takes a
   // single role-TYPE id (not a code), and has no $in support, so both codes are resolved to ids
   // first, then queried and merged client-side. Mirrors useTenantSalesRepPicker's sales-rep half.
-  const { data: salesRepTypeData, isError: salesRepTypeErrored } = useRoleTypes({ code: 'sales-rep', status: 'active' })
-  const { data: salesHeadTypeData, isError: salesHeadTypeErrored } = useRoleTypes({ code: 'sales-head', status: 'active' })
+  const { data: salesRepTypeData, isError: salesRepTypeErrored } = useRoleTypes({ code: 'sales-rep', status: 'active' }, !isSalesRepViewer)
+  const { data: salesHeadTypeData, isError: salesHeadTypeErrored } = useRoleTypes({ code: 'sales-head', status: 'active' }, !isSalesRepViewer)
   const salesRepTypeId = salesRepTypeData?.data?.items[0]?.id
   const salesHeadTypeId = salesHeadTypeData?.data?.items[0]?.id
 
   const { data: salesRepRoleData, isLoading: salesRepsLoading, isError: salesRepsErrored } = useRoles(
     { tenant: platformTenant?.id, type: salesRepTypeId, status: 'active' },
-    !!platformTenant && !!salesRepTypeId,
+    !isSalesRepViewer && !!platformTenant && !!salesRepTypeId,
   )
   const { data: salesHeadRoleData, isLoading: salesHeadsLoading, isError: salesHeadsErrored } = useRoles(
     { tenant: platformTenant?.id, type: salesHeadTypeId, status: 'active' },
-    !!platformTenant && !!salesHeadTypeId,
+    !isSalesRepViewer && !!platformTenant && !!salesHeadTypeId,
   )
   const salesRoles = [...(salesRepRoleData?.data?.items ?? []), ...(salesHeadRoleData?.data?.items ?? [])]
   const salesRolesLoading = salesRepsLoading || salesHeadsLoading
@@ -236,21 +247,30 @@ const EditLeadModal = ({ lead, onSave, onClose }: EditLeadModalProps) => {
 
           <div>
             <Label className={labelClasses} style={labelStyle}>Sales rep *</Label>
-            <Select value={form.salesPersonId} onValueChange={(v) => setField('salesPersonId', v as string)}>
-              <SelectTrigger className={`w-full ${fieldClasses}`}>
-                <SelectValue placeholder={salesRolesLoading ? 'Loading...' : 'Select sales rep...'}>
-                  {(v: string) => {
-                    const r = salesRoles.find((role) => role.id === v)
-                    return r ? `${r.name} (${r.code})` : salesRolesLoading ? 'Loading...' : 'Select sales rep...'
-                  }}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {salesRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
-              </SelectContent>
-            </Select>
-            {(tenantsErrored || salesRolesErrored) && (
-              <p className="text-[11px] mt-1 text-danger">Couldn't load sales reps — try again.</p>
+            {isSalesRepViewer ? (
+              <>
+                <p className="text-[13px] py-1" style={{ color: 'var(--qms-text)' }}>{roleLabel(lead.salesPerson)}</p>
+                <p className="text-[11px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>Only a manager can reassign this lead to a different sales person.</p>
+              </>
+            ) : (
+              <>
+                <Select value={form.salesPersonId} onValueChange={(v) => setField('salesPersonId', v as string)}>
+                  <SelectTrigger className={`w-full ${fieldClasses}`}>
+                    <SelectValue placeholder={salesRolesLoading ? 'Loading...' : 'Select sales rep...'}>
+                      {(v: string) => {
+                        const r = salesRoles.find((role) => role.id === v)
+                        return r ? `${r.name} (${r.code})` : salesRolesLoading ? 'Loading...' : 'Select sales rep...'
+                      }}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {salesRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {(tenantsErrored || salesRolesErrored) && (
+                  <p className="text-[11px] mt-1 text-danger">Couldn't load sales reps — try again.</p>
+                )}
+              </>
             )}
           </div>
 

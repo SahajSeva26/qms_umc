@@ -3,13 +3,28 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { LeadEntity, UpdateLeadPayload } from '@/types/crm.types'
+import type { ApiResponse } from '@/types/common.types'
+import type { SessionResponse } from '@/types/accessManagement.types'
 
 function makeQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } })
 }
 
+const sessionResponse: ApiResponse<SessionResponse> = {
+  success: true,
+  message: '',
+  data: {
+    user: { id: 'user-1', email: 'system@gmail.com', firstName: 'System', lastName: 'User' },
+    role: { id: 'role-1', code: 'system', name: 'System' },
+    roleType: { id: 'rt-1', code: 'system', name: 'System' },
+    tenant: { id: 'tenant-1', code: 'qms', name: 'QMS', type: 'platform' },
+    permissions: ['system:manage'],
+  },
+}
+
 vi.mock('@/features/access-management/accessManagement.service', () => ({
   accessManagementService: {
+    getMe: vi.fn(async () => sessionResponse),
     searchTenants: vi.fn(async () => ({ success: true, message: '', data: { items: [{ id: 't-1', code: 'qms', name: 'QMS', type: 'platform' }], count: 1 } })),
     searchRoleTypes: vi.fn(async (query: { code?: string }) => ({
       success: true, message: '',
@@ -246,5 +261,49 @@ describe('EditLeadModal — revert-to-original omits the field', () => {
       return call[0]
     })
     expect(payload.offers).toEqual([{ code: 'screening_camp', subOffer: 'sub-genuinely-new', reason: 'because' }])
+  })
+})
+
+// A sales rep has no role-type:search/role-type:get — GET /role-types 403s for them (live-confirmed
+// via adversarial sweep), so the picker must skip it entirely and show a locked, read-only display,
+// mirroring WizardStep4.tsx's lockedToSelf pattern for lead creation.
+describe('EditLeadModal — sales-rep viewer sees a locked sales-rep display, not the picker', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  const salesRepSessionResponse: ApiResponse<SessionResponse> = {
+    success: true,
+    message: '',
+    data: {
+      user: { id: 'user-rohit', email: 'rohit@example.com', firstName: 'Rohit', lastName: 'Malhotra' },
+      role: { id: 'role-1', code: 'staff-sales-rep-1', name: 'Rohit Malhotra' },
+      roleType: { id: 'rt-sales-rep', code: 'sales-rep', name: 'Sales Rep' },
+      tenant: { id: 'tenant-1', code: 'qms', name: 'QMS', type: 'platform' },
+      permissions: ['lead:update'],
+    },
+  }
+
+  it('shows the lead\'s own sales person read-only, with no combobox, once the session settles', async () => {
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    vi.mocked(accessManagementService.getMe).mockResolvedValue(salesRepSessionResponse)
+
+    await renderModal(leadFixture({
+      salesPerson: { _id: 'role-1', code: 'staff-sales-rep-1', name: 'Rohit Malhotra', permissions: [], status: 'active', type: 'rt-sales-rep', user: 'user-rohit', tenant: 'tenant-1' },
+    }))
+
+    expect(await screen.findByText('Rohit Malhotra')).toBeInTheDocument()
+    expect(screen.getByText(/only a manager can reassign/i)).toBeInTheDocument()
+    // Only the Contact person combobox remains — no Sales rep picker.
+    expect(screen.getAllByRole('combobox')).toHaveLength(1)
+  })
+
+  it('a non-sales-rep viewer (e.g. system/admin) still sees the normal sales-rep picker', async () => {
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    vi.mocked(accessManagementService.getMe).mockResolvedValue(sessionResponse)
+
+    await renderModal(leadFixture())
+
+    expect(screen.getAllByRole('combobox')).toHaveLength(2)
   })
 })

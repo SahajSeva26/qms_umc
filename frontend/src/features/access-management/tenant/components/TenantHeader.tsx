@@ -144,9 +144,11 @@ const TenantHeader = ({
           </div>
         </div>
 
-        <Button variant="outline" size="sm" className="shrink-0" onClick={onEditClick}>
-          <FiEdit2 size={14} /> Edit client
-        </Button>
+        {canManageTenant && (
+          <Button variant="outline" size="sm" className="shrink-0" onClick={onEditClick}>
+            <FiEdit2 size={14} /> Edit client
+          </Button>
+        )}
       </div>
 
       {/* Row 2 — only rendered when there's genuinely long feedback content. A true sibling

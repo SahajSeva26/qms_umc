@@ -56,13 +56,8 @@ const InventoryOverviewPanel = () => {
   }
   const canViewAny = canViewMasters || canViewDevices || canViewConsumables
 
-  if (!canViewAny) {
-    return (
-      <div className="px-4 py-10 text-center text-[13px] rounded-xl border" style={{ color: 'var(--qms-text-muted)', borderColor: 'var(--qms-border)' }}>
-        You don't have permission to view this overview.
-      </div>
-    )
-  }
+  // No permission for any of the 3 report types — render nothing, not an empty shell with a message.
+  if (!canViewAny) return null
 
   if (isLoading) {
     return (

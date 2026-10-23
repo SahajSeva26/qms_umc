@@ -90,14 +90,19 @@ describe('Sidebar — pharma identity isolation', () => {
     expect(screen.queryByText(/pharma portal/i)).not.toBeInTheDocument()
   })
 
-  // pharma-mr's one exception: it also sees the real (non-pharma) Camp Management + Doctor Management items, own-scoped server-side.
-  it('shows Pharma Portal AND Camp Management AND Doctor Management for pharma-mr with camp:book — no other non-pharma item', async () => {
+  // Pharma field-force's (MR/ASM/RSM) one exception: they also see the real (non-pharma) Camp
+  // Management + Doctor Management items, own-scoped server-side.
+  it.each([
+    ['pharma-mr', 'Pharma Portal MR'],
+    ['pharma-asm', 'Pharma Portal ASM'],
+    ['pharma-rsm', 'Pharma Portal RSM'],
+  ])('shows Pharma Portal AND Camp Management AND Doctor Management for %s with camp:book — no other non-pharma item', async (roleTypeCode, portalLabel) => {
     await renderSidebar({
       permissions: ['camp:book'],
-      session: sessionFixture('pharma-mr', ['camp:book']),
+      session: sessionFixture(roleTypeCode, ['camp:book']),
     })
 
-    expect(screen.getByText('Pharma Portal MR')).toBeInTheDocument()
+    expect(screen.getByText(portalLabel)).toBeInTheDocument()
     expect(screen.getByText('Camp Management')).toBeInTheDocument()
     expect(screen.getByText('Doctor Management')).toBeInTheDocument()
     expect(screen.queryByText('Dashboard')).not.toBeInTheDocument()
@@ -105,13 +110,13 @@ describe('Sidebar — pharma identity isolation', () => {
     expect(screen.queryByText('Client Management')).not.toBeInTheDocument()
   })
 
-  it('no other pharma role gets the Camp Management/Doctor Management exception, even if they somehow hold camp:book', async () => {
+  it('pharma-division-head does not get the Camp Management/Doctor Management exception, even if it somehow holds camp:book', async () => {
     await renderSidebar({
       permissions: ['camp:book'],
-      session: sessionFixture('pharma-rsm', ['camp:book']),
+      session: sessionFixture('pharma-division-head', ['camp:book']),
     })
 
-    expect(screen.getByText('Pharma Portal RSM')).toBeInTheDocument()
+    expect(screen.getByText('Pharma Portal HO')).toBeInTheDocument()
     expect(screen.queryByText('Camp Management')).not.toBeInTheDocument()
     expect(screen.queryByText('Doctor Management')).not.toBeInTheDocument()
   })

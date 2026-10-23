@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Controller, useForm, useWatch } from 'react-hook-form'
+import { Controller, useForm, useWatch, type FieldErrors } from 'react-hook-form'
 import { FiArrowLeft, FiPlus } from 'react-icons/fi'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -26,10 +26,14 @@ const STEP_TITLES = ['Company & role', 'User account', 'Permissions']
 // Fields grouped by step, used to force "touched" only for a step's own
 // fields once its Next/Submit has been attempted.
 const STEP_FIELD_NAMES: (keyof CreateRoleFormValues)[][] = [
-  ['name', 'roleType', 'division', 'supervisor'],
+  ['tenant', 'name', 'roleType', 'division', 'supervisor'],
   ['userFirstName', 'userLastName', 'userEmail', 'userPassword', 'userPhone', 'userGender'],
   [],
 ]
+
+// The subset of step 0's fields RHF/Zod actually validates via trigger() — division/supervisor
+// are plain-JS conditionals (see needsDivision/needsSupervisor below), not schema fields.
+const STEP_0_RHF_FIELDS: (keyof CreateRoleFormValues)[] = ['tenant', 'name', 'roleType']
 
 const touchedOverrideFor = (
   stepIndex: number,
@@ -129,7 +133,7 @@ const CreateRoleModal = () => {
   const handleNext = async () => {
     markStepAttempted(step)
     if (step === 0) {
-      const valid = await trigger(['tenant', 'name', 'roleType'])
+      const valid = await trigger(STEP_0_RHF_FIELDS)
       if (!valid) return
       if (needsDivision && !division) return
       if (needsSupervisor && !supervisor) return
@@ -154,12 +158,34 @@ const CreateRoleModal = () => {
     })
   }
 
+  // Defense-in-depth: handleSubmit validates the WHOLE form regardless of which step is on
+  // screen, but only the current step renders any error. Without this, a stale invalid field
+  // on an earlier step (e.g. roleType resolving division/supervisor requirements only after the
+  // user has already clicked past step 0 — see needsDivision/needsSupervisor below, both derived
+  // from an async query that can still be loading when step 0's own Next is clicked) silently
+  // blocks "Create role" with zero visible feedback — no toast, no network request, nothing.
+  const jumpToStepWithError = (errors: FieldErrors<CreateRoleFormValues>) => {
+    const invalidStepIndex = STEP_FIELD_NAMES.findIndex((fields) => fields.some((f) => f in errors))
+    if (invalidStepIndex !== -1) {
+      markStepAttempted(invalidStepIndex)
+      setStep(invalidStepIndex)
+    }
+  }
+
+  const onInvalid = (errors: FieldErrors<CreateRoleFormValues>) => {
+    markStepAttempted(step)
+    jumpToStepWithError(errors)
+  }
+
   const guardedSubmit = handleSubmit((values) => {
     markStepAttempted(2)
-    if (needsDivision && !values.division) return
-    if (needsSupervisor && !values.supervisor) return
+    if ((needsDivision && !values.division) || (needsSupervisor && !values.supervisor)) {
+      markStepAttempted(0)
+      setStep(0)
+      return
+    }
     onSubmit(values)
-  })
+  }, onInvalid)
 
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? setOpen(true) : resetAndClose())}>

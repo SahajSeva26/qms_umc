@@ -48,12 +48,12 @@ function makeQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } })
 }
 
-async function renderModal(project: ProjectEntity, onClose = vi.fn()) {
+async function renderModal(project: ProjectEntity, onClose = vi.fn(), canManage = true) {
   const EditProjectModal = (await import('./EditProjectModal')).default
   const queryClient = makeQueryClient()
   return render(
     <QueryClientProvider client={queryClient}>
-      <EditProjectModal project={project} onClose={onClose} />
+      <EditProjectModal project={project} onClose={onClose} canManage={canManage} />
     </QueryClientProvider>,
   )
 }
@@ -203,5 +203,52 @@ describe('EditProjectModal — partial update payload', () => {
       return call[1]
     })
     expect(payload).not.toHaveProperty('campTimeSlots')
+  })
+})
+
+describe('EditProjectModal — sales rep reassignment is manager-only', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('canManage=false: shows the current sales rep as read-only text, not an editable picker, with an explanatory note', async () => {
+    await renderModal(projectFixture({ salesRep: { _id: 'r-1', code: 'sr-1', name: 'Rep' } }), vi.fn(), false)
+
+    await screen.findByText(/edit project/i)
+    expect(screen.getByText('Rep')).toBeInTheDocument()
+    expect(screen.getByText(/only a project manager can reassign the sales rep/i)).toBeInTheDocument()
+    // No Select for sales rep — comboboxes present are therapy/project-coordinator/payment-terms only.
+    expect(screen.queryByText(/select sales rep/i)).not.toBeInTheDocument()
+  })
+
+  it('canManage=false: saving an otherwise-changed field never includes salesRep in the payload, even though it is immutable in the UI', async () => {
+    const { projectsService } = await import('@/features/projects/projects.service')
+    vi.mocked(projectsService.updateProject).mockResolvedValue({ success: true, message: '', data: projectFixture() })
+    const user = userEvent.setup()
+    await renderModal(projectFixture({ name: 'OLD-NAME', paymentTerms: 'net_30', salesRep: { _id: 'r-1', code: 'sr-1', name: 'Rep' } }), vi.fn(), false)
+
+    await screen.findByText(/edit project/i)
+    const nameInput = screen.getByDisplayValue('OLD-NAME')
+    await user.clear(nameInput)
+    await user.type(nameInput, 'NEW-NAME')
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    const payload = await vi.waitFor(() => {
+      const call = vi.mocked(projectsService.updateProject).mock.calls[0]
+      if (!call) throw new Error('not called yet')
+      return call[1]
+    })
+    expect(payload.name).toBe('NEW-NAME')
+    expect(payload).not.toHaveProperty('salesRep')
+  })
+
+  it('canManage=true: the sales rep picker is still editable, matching prior behavior', async () => {
+    await renderModal(projectFixture({ salesRep: { _id: 'r-1', code: 'sr-1', name: 'Rep' } }), vi.fn(), true)
+
+    await screen.findByText(/edit project/i)
+    expect(screen.queryByText(/only a project manager can reassign the sales rep/i)).not.toBeInTheDocument()
+    // A live, interactive Select renders its own placeholder/loading text — proves it's not
+    // the plain read-only text div.
+    expect(await screen.findByText(/select sales rep|loading/i)).toBeInTheDocument()
   })
 })

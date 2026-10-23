@@ -11,7 +11,8 @@ import {
   projectHealthScore,
   projectNearestExpiry,
   projectTenantName,
-  PROJECT_WRITE_PERMISSIONS,
+  PROJECT_CREATE_PERMISSIONS,
+  PROJECT_MANAGE_PERMISSIONS,
 } from '@/features/projects/projects.utils'
 import { formatDate, formatINR } from '@/utils/formatters'
 import GanttKpiStrip from '@/features/projects/components/GanttKpiStrip'
@@ -36,9 +37,9 @@ function healthColor(score: number): string {
 
 const ProjectGanttPage = () => {
   const { hasAnyPermission } = usePermission()
-  const canWrite = hasAnyPermission(PROJECT_WRITE_PERMISSIONS)
-  // GET /projects/report needs the same permission set — hide the strip rather than let it 403.
-  const canViewReport = canWrite
+  const canCreate = hasAnyPermission(PROJECT_CREATE_PERMISSIONS)
+  // GET /projects/report is manage-only — hide the strip rather than let it 403.
+  const canViewReport = hasAnyPermission(PROJECT_MANAGE_PERMISSIONS)
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [wizardOpen, setWizardOpen] = useState(false)
@@ -84,7 +85,7 @@ const ProjectGanttPage = () => {
             mail-confirmation projects (no date fields) are listed separately below.
           </p>
         </div>
-        {canWrite && (
+        {canCreate && (
           <button
             onClick={() => setWizardOpen(true)}
             className="flex items-center gap-1.5 text-[13px] font-bold px-3.5 py-2 rounded-xl text-white shrink-0"

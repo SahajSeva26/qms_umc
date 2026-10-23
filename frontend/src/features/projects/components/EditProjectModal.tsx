@@ -13,7 +13,7 @@ import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRo
 import { useContacts } from '@/features/contacts/hooks/useContacts'
 import { useUpdateProject } from '@/features/projects/hooks/useUpdateProject'
 import { editProjectSchema } from '@/features/projects/schemas/project.schemas'
-import { PROJECT_TYPE_COLOR } from '@/features/projects/projects.utils'
+import { PROJECT_TYPE_COLOR, projectSalesRepName } from '@/features/projects/projects.utils'
 import { PickCard, PickGrid } from '@/components/ui/PickCard'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -28,6 +28,9 @@ import { getApiErrorMessage } from '@/utils/apiError'
 interface EditProjectModalProps {
   project: ProjectEntity
   onClose: () => void
+  // project.service.ts's set() requires project:manage to change salesRep — read-only
+  // for anyone without it (matches ProjectsPage's own project:manage gate).
+  canManage: boolean
 }
 
 // Scoped to UpdateProjectPayload's fields — a strict subset of Create's,
@@ -69,7 +72,7 @@ const TYPE_ICONS: Record<ProjectType, typeof FiActivity> = {
   lab: FiDroplet,
 }
 
-const EditProjectModal = ({ project, onClose }: EditProjectModalProps) => {
+const EditProjectModal = ({ project, onClose, canManage }: EditProjectModalProps) => {
   const [form, setForm] = useState<EditFormState>(() => toFormState(project))
   const [error, setError] = useState<string | null>(null)
   const updateProject = useUpdateProject()
@@ -166,7 +169,9 @@ const EditProjectModal = ({ project, onClose }: EditProjectModalProps) => {
       ...(form.therapy !== orig.therapy ? { therapy: form.therapy as ProjectTherapy } : {}),
       ...(arrayChanged(form.type, orig.type) ? { type: form.type } : {}),
       ...(arrayChanged(form.campTimeSlots, orig.campTimeSlots) ? { campTimeSlots: form.campTimeSlots } : {}),
-      ...(form.salesRepId !== orig.salesRepId ? { salesRep: form.salesRepId } : {}),
+      // Defense-in-depth: the picker below is disabled for non-managers, so this is already inert
+      // for them — but never rely solely on the UI having prevented a value change.
+      ...(canManage && form.salesRepId !== orig.salesRepId ? { salesRep: form.salesRepId } : {}),
       ...(form.projectCoordinatorId !== orig.projectCoordinatorId ? { projectCoordinator: form.projectCoordinatorId } : {}),
       ...(form.marketingContactId !== orig.marketingContactId ? { marketingContact: form.marketingContactId } : {}),
       ...(form.paymentTerms !== orig.paymentTerms ? { paymentTerms: form.paymentTerms } : {}),
@@ -229,24 +234,37 @@ const EditProjectModal = ({ project, onClose }: EditProjectModalProps) => {
 
           <div>
             <Label className={labelClasses} style={labelStyle}>Sales rep *</Label>
-            <Select value={form.salesRepId} onValueChange={(v) => setField('salesRepId', v as string)}>
-              <SelectTrigger className={`w-full ${fieldClasses}`}>
-                <SelectValue placeholder={salesRolesLoading ? 'Loading...' : 'Select sales rep...'}>
-                  {(v: string) => {
-                    const r = salesRoles.find((role) => role.id === v)
-                    return r ? `${r.name} (${r.code})` : salesRolesLoading ? 'Loading...' : 'Select sales rep...'
-                  }}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {salesRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
-              </SelectContent>
-            </Select>
-            {salesRolesErrored && (
-              <p className="text-[11px] mt-1 text-danger">Couldn't load sales reps — try again.</p>
-            )}
-            {salesRepTypeMissing && (
-              <p className="text-[11px] mt-1 text-danger">The "Sales rep" role type is missing — contact an admin.</p>
+            {canManage ? (
+              <>
+                <Select value={form.salesRepId} onValueChange={(v) => setField('salesRepId', v as string)}>
+                  <SelectTrigger className={`w-full ${fieldClasses}`}>
+                    <SelectValue placeholder={salesRolesLoading ? 'Loading...' : 'Select sales rep...'}>
+                      {(v: string) => {
+                        const r = salesRoles.find((role) => role.id === v)
+                        return r ? `${r.name} (${r.code})` : salesRolesLoading ? 'Loading...' : 'Select sales rep...'
+                      }}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {salesRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {salesRolesErrored && (
+                  <p className="text-[11px] mt-1 text-danger">Couldn't load sales reps — try again.</p>
+                )}
+                {salesRepTypeMissing && (
+                  <p className="text-[11px] mt-1 text-danger">The "Sales rep" role type is missing — contact an admin.</p>
+                )}
+              </>
+            ) : (
+              <>
+                <div className={`w-full ${fieldClasses} flex items-center`} style={{ color: 'var(--qms-text-muted)' }}>
+                  {projectSalesRepName(project)}
+                </div>
+                <p className="text-[11px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>
+                  Only a project manager can reassign the sales rep.
+                </p>
+              </>
             )}
           </div>
 

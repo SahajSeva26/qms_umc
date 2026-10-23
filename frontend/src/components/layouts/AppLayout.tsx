@@ -3,6 +3,7 @@ import { Outlet, Navigate, useLocation } from 'react-router-dom'
 import { useSession } from '@/hooks/useSession'
 import { AUTH_ROUTES } from '@/features/auth/auth.paths'
 import { getPharmaRoleMeta } from '@/features/pharma/pharma.constants'
+import { PHARMA_FIELD_ROLE_TYPE_CODES } from '@/lib/access/pharmaAccess'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 import RouteFallback from './RouteFallback'
@@ -66,9 +67,9 @@ const AppLayout = () => {
   // null for a role with no type — optional-chain past the frontend type here.
   const pharmaMeta = getPharmaRoleMeta(session.roleType?.code)
   const onPharmaPath = location.pathname === '/pharma' || location.pathname.startsWith('/pharma/')
-  // MR's exceptions: Camp Management (exact match — not /camps/screening, /camps/new, etc.) and Doctor Management.
-  const onMrExtraPath = session.roleType?.code === 'pharma-mr' && (location.pathname === '/camps' || location.pathname === '/doctors')
-  if (pharmaMeta && !onPharmaPath && !onMrExtraPath) {
+  // MR/ASM/RSM's exceptions: Camp Management (exact match — not /camps/screening, /camps/new, etc.) and Doctor Management.
+  const onFieldExtraPath = !!session.roleType?.code && PHARMA_FIELD_ROLE_TYPE_CODES.includes(session.roleType.code) && (location.pathname === '/camps' || location.pathname === '/doctors')
+  if (pharmaMeta && !onPharmaPath && !onFieldExtraPath) {
     return <Navigate to={pharmaMeta.portalPath} replace />
   }
   if (!pharmaMeta && onPharmaPath) {

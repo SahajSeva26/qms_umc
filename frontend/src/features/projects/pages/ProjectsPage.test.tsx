@@ -44,10 +44,12 @@ function makeQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } })
 }
 
-async function mockPermission(canWrite: boolean) {
+// Mirrors the real hasAnyPermission contract — a blanket boolean can't distinguish
+// project:create from project:manage, the exact split ProjectsPage depends on.
+async function mockPermission(granted: string[]) {
   const { usePermission } = await import('@/hooks/usePermission')
   vi.mocked(usePermission).mockReturnValue({
-    hasAnyPermission: () => canWrite,
+    hasAnyPermission: (codes: string[]) => codes.some((c) => granted.includes(c)),
   } as unknown as ReturnType<typeof usePermission>)
 }
 
@@ -67,26 +69,90 @@ describe('ProjectsPage — write-permission gating', () => {
     vi.resetAllMocks()
   })
 
-  it('hides the "New project" button without project:manage/tenant:manage', async () => {
-    await mockPermission(false)
+  it('hides the "New project" button with no project permissions at all', async () => {
+    await mockPermission([])
     await renderPage()
 
     expect(await screen.findByRole('heading', { name: /project management/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /new project/i })).not.toBeInTheDocument()
   })
 
-  it('shows the "New project" button with project:manage/tenant:manage', async () => {
-    await mockPermission(true)
+  it('shows the "New project" button with project:manage', async () => {
+    await mockPermission(['project:manage'])
     await renderPage()
 
     expect(await screen.findByRole('button', { name: /new project/i })).toBeInTheDocument()
   })
 })
 
+describe('ProjectsPage — project:create-only session (a Sales Rep), distinct from project:manage', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  it('shows "New project" (project:create is enough to create), but hides the report/KPI strip and the row\'s Change-status action (both manage-only)', async () => {
+    const { projectsService } = await import('@/features/projects/projects.service')
+    vi.mocked(projectsService.searchProjects).mockResolvedValue({
+      success: true, message: '', data: { items: [projectFixture({ id: 'p1', name: 'Rep Owned Project' })], count: 1 },
+    } as never)
+
+    await mockPermission(['project:create'])
+    await renderPage()
+
+    expect(await screen.findByRole('button', { name: /new project/i })).toBeInTheDocument()
+
+    // The report/KPI strip renders only once GET /projects/report resolves — project:create alone
+    // must never even trigger that manage-only call. Absence of its content is the proxy here.
+    expect(screen.queryByText(/total projects/i)).not.toBeInTheDocument()
+
+    // project:create implies no edit/status rights — this session holds neither, so both are hidden.
+    await screen.findByText(/rep owned project/i)
+    await (await import('@testing-library/user-event')).default.setup().click(screen.getByRole('button', { name: /project actions/i }))
+    expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /change status/i })).not.toBeInTheDocument()
+  })
+
+  it('project:create AND project:update (the real Sales Rep grant): New project and Edit both show, Change status still does not', async () => {
+    const { projectsService } = await import('@/features/projects/projects.service')
+    vi.mocked(projectsService.searchProjects).mockResolvedValue({
+      success: true, message: '', data: { items: [projectFixture({ id: 'p1', name: 'Rep Owned Project' })], count: 1 },
+    } as never)
+
+    await mockPermission(['project:create', 'project:update'])
+    await renderPage()
+
+    expect(await screen.findByRole('button', { name: /new project/i })).toBeInTheDocument()
+    await screen.findByText(/rep owned project/i)
+
+    const userEvent = (await import('@testing-library/user-event')).default
+    await userEvent.setup().click(screen.getByRole('button', { name: /project actions/i }))
+    expect(screen.getByRole('button', { name: /^edit$/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /change status/i })).not.toBeInTheDocument()
+  })
+
+  it('project:manage (Sales Head): New project, Edit, and Change status all show', async () => {
+    const { projectsService } = await import('@/features/projects/projects.service')
+    vi.mocked(projectsService.searchProjects).mockResolvedValue({
+      success: true, message: '', data: { items: [projectFixture({ id: 'p1', name: 'Managed Project' })], count: 1 },
+    } as never)
+
+    await mockPermission(['project:manage'])
+    await renderPage()
+
+    expect(await screen.findByRole('button', { name: /new project/i })).toBeInTheDocument()
+    await screen.findByText(/managed project/i)
+
+    const userEvent = (await import('@testing-library/user-event')).default
+    await userEvent.setup().click(screen.getByRole('button', { name: /project actions/i }))
+    expect(screen.getByRole('button', { name: /^edit$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /change status/i })).toBeInTheDocument()
+  })
+})
+
 describe('ProjectsPage — ?project=<id> deep link (notification click-through)', () => {
   beforeEach(async () => {
     vi.resetAllMocks()
-    await mockPermission(true)
+    await mockPermission(['project:manage'])
   })
 
   it('opens the drawer for a project already on the loaded page', async () => {

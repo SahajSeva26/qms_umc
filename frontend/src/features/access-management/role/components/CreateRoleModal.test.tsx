@@ -436,4 +436,124 @@ describe('CreateRoleModal', () => {
     await user.click(screen.getByRole('button', { name: 'Next' }))
     await waitFor(() => expect(screen.getByText(/step 3 of 3/i)).toBeInTheDocument())
   })
+
+  it('a division requirement that only becomes known AFTER step 0 is passed (roleTypes cache updating mid-flow) blocks Create at final submit and jumps back to step 0 with a visible error, instead of silently doing nothing', async () => {
+    // Reproduces the real bug directly: needsDivision/needsSupervisor are
+    // derived fresh every render from `roleTypes.find(rt => rt.id ===
+    // roleType)?.code` (useRoleTypes' query result). Step 0's own Next button
+    // reads this at the moment it's clicked; final submit (guardedSubmit) reads
+    // it again, independently, whenever submit fires. These two reads can
+    // disagree whenever the underlying roleTypes data changes shape between
+    // them (e.g. a background refetch landing with a corrected/updated role
+    // type list) — exactly simulated here via queryClient.setQueryData.
+    //
+    // Before this fix: guardedSubmit's `if (needsDivision && !values.division)
+    // return` silently returned once the cache changed — the user, already on
+    // step 1 (user-account fields), saw absolutely nothing happen: no toast, no
+    // navigation, no network call, no error anywhere on screen (step 0's own
+    // error box is gated on stepAttempted[0], never set by guardedSubmit).
+    // Exactly the production bug's shape.
+    //
+    // After this fix: guardedSubmit marks step 0 attempted and jumps back to
+    // it, surfacing the same error box step 0's own Next already has.
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+
+    const roleTypesWithoutDivisionRequirement = {
+      success: true,
+      message: '',
+      data: { items: [roleTypeFixture({ id: 'rt-plain', code: 'sales-rep', name: 'Plain Role' })], count: 1 },
+    }
+    const roleTypesWithDivisionRequirement = {
+      success: true,
+      message: '',
+      data: {
+        items: [
+          // SAME id, DIFFERENT (pharma) code — models a refetch correcting/
+          // updating this role type's data after the user already picked it.
+          roleTypeFixture({ id: 'rt-plain', code: 'pharma-rsm', name: 'RSM (corrected)' }),
+          roleTypeFixture({ id: 'rt-dh', code: 'pharma-division-head', name: 'Division Head' }),
+        ],
+        count: 2,
+      },
+    }
+
+    vi.mocked(accessManagementService.searchTenants).mockResolvedValue({
+      success: true, message: '', data: { items: [{ id: 't-1', name: 'Acme', code: 'acme', address: null, businessLifetime: null, gst: null }], count: 1 },
+    })
+    vi.mocked(accessManagementService.searchRoleTypes).mockResolvedValue(roleTypesWithoutDivisionRequirement)
+    vi.mocked(accessManagementService.searchPermissionGroups).mockResolvedValue({
+      success: true, message: '', data: { items: [permissionGroupFixture()], count: 1 },
+    })
+
+    const queryClient = makeQueryClient()
+    const user = userEvent.setup()
+    await renderAndOpenModal(user, queryClient)
+
+    await selectCompany(user, 'Acme', /Acme/i)
+    await user.type(screen.getByLabelText(/^name$/i), 'Race Condition RSM')
+    await selectByLabel(user, /role type/i, /Plain Role/i)
+
+    // No division requirement YET — Next's own needsDivision check passes
+    // trivially, exactly like the real bug's window.
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    await waitFor(() => expect(screen.getByText(/step 2 of 3/i)).toBeInTheDocument())
+
+    // The cache updates while the user is already on step 1 — the SAME id now
+    // resolves to a pharma code requiring a division never collected.
+    queryClient.setQueryData(['role-types', { tenant: 't-1' }], roleTypesWithDivisionRequirement)
+
+    await user.type(screen.getByLabelText(/first name/i), 'Jane')
+    await user.type(screen.getByLabelText(/^email$/i), 'jane@example.com')
+    await user.type(screen.getByLabelText(/^password$/i), 'password123')
+    await user.type(screen.getByLabelText(/phone/i), '9876543210')
+
+    // Step 1 has no submit control of its own — advance to step 2 (the user
+    // can always do this; nothing on step 1 re-checks needsDivision) and click
+    // the real "Create role" submit button there. This is the exact, always-
+    // reachable path: a requirement that only became true after step 0 already
+    // passed is invisible on every later step until final submit is attempted.
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    await waitFor(() => expect(screen.getByText(/step 3 of 3/i)).toBeInTheDocument())
+    await user.click(screen.getByRole('button', { name: /create role/i }))
+
+    expect(await screen.findByText(/step 1 of 3/i)).toBeInTheDocument()
+    expect(await screen.findByText(/select a division for this role type/i)).toBeInTheDocument()
+    expect(accessManagementService.createRole).not.toHaveBeenCalled()
+  })
+
+  it('STEP_FIELD_NAMES and the real trigger() call agree on step 0 — no silent drift between the display list and what is actually validated', async () => {
+    // Regression guard for the other half of this bug: STEP_FIELD_NAMES[0] used to
+    // list ['name','roleType','division','supervisor'] while handleNext's real
+    // trigger() call validated ['tenant','name','roleType'] — a bare 'tenant' typo
+    // or future field addition to one list but not the other would silently stop
+    // showing/validating that field. Exercise it the direct way: clearing Name
+    // (a STEP_FIELD_NAMES[0] AND STEP_0_RHF_FIELDS member) must block Next with a
+    // visible error — proving both lists still cover the same real fields.
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+
+    vi.mocked(accessManagementService.searchTenants).mockResolvedValue({
+      success: true, message: '', data: { items: [{ id: 't-1', name: 'Acme', code: 'acme', address: null, businessLifetime: null, gst: null }], count: 1 },
+    })
+    vi.mocked(accessManagementService.searchRoleTypes).mockResolvedValue({
+      success: true,
+      message: '',
+      data: { items: [roleTypeFixture({ id: 'rt-1', code: 'sales-rep', name: 'Sales Rep' })], count: 1 },
+    })
+    vi.mocked(accessManagementService.searchPermissionGroups).mockResolvedValue({
+      success: true, message: '', data: { items: [permissionGroupFixture()], count: 1 },
+    })
+
+    const queryClient = makeQueryClient()
+    const user = userEvent.setup()
+    await renderAndOpenModal(user, queryClient)
+
+    await selectCompany(user, 'Acme', /Acme/i)
+    await selectByLabel(user, /role type/i, /Sales Rep/i)
+    // Name left blank — required by both the real validator and the display list.
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+
+    expect(screen.queryByText(/step 2 of 3/i)).not.toBeInTheDocument()
+    expect(await screen.findByText(/name is required/i)).toBeInTheDocument()
+    expect(accessManagementService.createRole).not.toHaveBeenCalled()
+  })
 })

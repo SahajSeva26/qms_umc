@@ -69,8 +69,11 @@ export const useTenantFormResolver = () =>
   })
 
 // Drives each step's trigger([...]) call on Next — one array per CreateTenantDialog step.
+// Must list every field actually rendered on that step — a field left out here can still fail
+// validation on final submit while showing no error anywhere the user can see (gst/businessLifetime
+// were missing here; see CreateTenantDialog's onInvalid for the remaining defense-in-depth).
 export const CREATE_TENANT_STEP_FIELD_NAMES: (keyof TenantFormValues)[][] = [
-  ['name', 'salesPerson'],
+  ['name', 'salesPerson', 'businessLifetime', 'gst'],
   ['address'],
   ['ownerFirstName', 'ownerLastName', 'ownerEmail', 'ownerPassword', 'ownerPhone', 'ownerGender'],
 ]

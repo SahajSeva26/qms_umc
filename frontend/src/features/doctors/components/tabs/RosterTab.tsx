@@ -38,10 +38,10 @@ const RosterTab = ({ doctors, filters, setFilter, reset, onOpenDoctor, geography
             </div>
             <StatusPill status={d.status} />
           </div>
-          {/* Camps is a real Camp.doctor filter, no per-doctor aggregate exists yet; Patients/Rx/★ have no backend field at all — see md-files/ui-revisions.md. */}
+          {/* Rx/★ have no backend field — kept as a placeholder. */}
           <div className="stats">
-            <div className="stat"><b>—</b><div className="l">Camps</div></div>
-            <div className="stat"><b>—</b><div className="l">Patients</div></div>
+            <div className="stat"><b>{d.stats ? d.stats.camps : '—'}</b><div className="l">Camps</div></div>
+            <div className="stat"><b>{d.stats ? d.stats.patientsCompleted : '—'}</b><div className="l">Patients</div></div>
             <div className="stat"><b>—</b><div className="l">Rx</div></div>
             <div className="stat"><b>—</b><div className="l">★</div></div>
           </div>

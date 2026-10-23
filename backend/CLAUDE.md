@@ -372,6 +372,8 @@ Order: system tenant → permission group → role type → user → role.
 
 Env vars required: `SYSTEM_USER_EMAIL`, `SYSTEM_USER_PASSWORD`, `SYSTEM_USER_PHONE`
 
+**Platform admin role type permissions (2026-10-23, branch `qa`):** the QMS **platform** admin role type (`tenantAdminRoleType`, §4.2) now carries `tenant:manage`, `tenant:admin`, `role-type:manage`, `role:manage`, `lead:manage`, `project:manage` and is **full-synced on every boot** (like `provisionDefaultRoleTypes` — applies additions + removals so an existing admin role type picks up new perms on restart, not only on first creation). Net-new vs before: `role:manage`, `lead:manage`, `project:manage` (closes the Bug-8 gap where admin lost project access after `tenant:manage` was removed from project routes). Granted on the **role type** (not the seeded admin role) so every platform admin-typed role inherits them (the admin role itself keeps empty role-level perms and inherits via `role.permissions ∪ roleType.permissions`). **Platform-only** — resolved as `{code:'admin', tenant: <system tenant>}`; **customer tenants get their own separate admin role type** (minted in `tenant.service.ts createTenant`) and are unaffected.
+
 ### Permissions Registry (`src/shared/env/permissions.ts`)
 
 All module permissions are aggregated here. Each module exports its own `*_PERMISSIONS` constant and it must be added to the `PERMISSIONS` object.

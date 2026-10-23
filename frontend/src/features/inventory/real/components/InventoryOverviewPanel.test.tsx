@@ -22,9 +22,9 @@ function makeQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } })
 }
 
-async function renderPanel() {
+async function renderPanel(hasAnyPermission: () => boolean = () => true) {
   const { usePermission } = await import('@/hooks/usePermission')
-  vi.mocked(usePermission).mockReturnValue({ hasAnyPermission: () => true } as unknown as ReturnType<typeof usePermission>)
+  vi.mocked(usePermission).mockReturnValue({ hasAnyPermission } as unknown as ReturnType<typeof usePermission>)
   const InventoryOverviewPanel = (await import('./InventoryOverviewPanel')).default
   return render(
     <QueryClientProvider client={makeQueryClient()}>
@@ -48,6 +48,13 @@ describe('InventoryOverviewPanel — error vs. genuinely empty', () => {
 
     await screen.findByText(/couldn't load the overview/i)
     expect(screen.queryByText('No devices yet.')).not.toBeInTheDocument()
+  })
+
+  it('renders nothing (no empty "permission" box) for a caller with none of the 3 manage permissions', async () => {
+    const { container } = await renderPanel(() => false)
+
+    expect(container).toBeEmptyDOMElement()
+    expect(screen.queryByText(/permission/i)).not.toBeInTheDocument()
   })
 
   it('a genuinely empty organisation (real zero counts, no fetch error) shows the empty-state label', async () => {

@@ -38,13 +38,8 @@ interface InventoryReportKpiStripProps {
 const InventoryReportKpiStrip = ({ tiles, isLoading, error, canView, skeletonCount, extraTiles, heading }: InventoryReportKpiStripProps) => {
   const gridCols = GRID_COLS[skeletonCount]
 
-  if (!canView) {
-    return (
-      <div className="px-4 py-6 text-center text-[13px] rounded-xl border mb-4" style={{ color: 'var(--qms-text-muted)', borderColor: 'var(--qms-border)' }}>
-        You don't have permission to view this overview.
-      </div>
-    )
-  }
+  // No permission for this overview at all — render nothing, not an empty shell with a message.
+  if (!canView) return null
 
   if (isLoading) {
     return (

@@ -24,9 +24,18 @@ vi.mock('@/features/crm/divisions/components/MrProvisioningCard', () => ({
   ),
 }))
 
+// Mirrors the seeded admin role type, which holds tenant:admin/tenant:manage AND role-type:manage
+// together (tenant.service.ts/seedSystemUser.ts) — both halves of canView are satisfied together.
 function mockPermission(canView: boolean) {
+  const granted = ['tenant:admin', 'tenant:manage', 'role-type:manage']
   vi.mocked(usePermission).mockReturnValue({
-    hasAnyPermission: (codes: string[]) => canView && (codes.includes('tenant:admin') || codes.includes('tenant:manage')),
+    hasAnyPermission: (codes: string[]) => canView && codes.some((c) => granted.includes(c)),
+  } as unknown as ReturnType<typeof usePermission>)
+}
+
+function mockGrantedPermissions(granted: string[]) {
+  vi.mocked(usePermission).mockReturnValue({
+    hasAnyPermission: (codes: string[]) => codes.some((c) => granted.includes(c)),
   } as unknown as ReturnType<typeof usePermission>)
 }
 
@@ -172,6 +181,52 @@ describe('DivisionMrsSection', () => {
 
   it('never fetches role types or roles, and renders nothing, for a caller lacking tenant:admin/tenant:manage', () => {
     mockPermission(false)
+    mockRoleType(null)
+    vi.mocked(useRoles).mockReturnValue({
+      data: undefined, isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useRoles>)
+
+    const { container } = renderSection()
+
+    expect(container).toBeEmptyDOMElement()
+    expect(useRoleTypes).toHaveBeenCalledWith(expect.anything(), false)
+    expect(useRoles).toHaveBeenCalledWith(expect.anything(), false)
+  })
+
+  it('a Sales Head (role:search + role-type:search, no tenant:admin/manage) can view the MR list but not Add MRs', () => {
+    mockGrantedPermissions(['role:search', 'role-type:search'])
+    mockRoleType()
+    vi.mocked(useRoles).mockReturnValue({
+      data: { success: true, message: '', data: { items: [mrFixture()], count: 1 } },
+      isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useRoles>)
+
+    renderSection()
+
+    expect(screen.getByText('Ravi Kumar')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /add mrs/i })).not.toBeInTheDocument()
+  })
+
+  it('a caller with role:search but no role-type:search cannot view the list (the role-type lookup would 403)', () => {
+    mockGrantedPermissions(['role:search'])
+    mockRoleType(null)
+    vi.mocked(useRoles).mockReturnValue({
+      data: undefined, isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useRoles>)
+
+    const { container } = renderSection()
+
+    expect(container).toBeEmptyDOMElement()
+    expect(useRoleTypes).toHaveBeenCalledWith(expect.anything(), false)
+    expect(useRoles).toHaveBeenCalledWith(expect.anything(), false)
+  })
+
+  // Regression: GET /role-types (roleType.routes.ts) only accepts role-type:manage/role-type:search —
+  // tenant:admin/tenant:manage are NOT accepted there, even though canView's first half (GET /roles)
+  // does accept them. A caller with only tenant:admin/tenant:manage would previously pass canView but
+  // then genuinely 403 on the real GET /role-types call.
+  it('a caller with tenant:admin/tenant:manage but no role-type:search/manage cannot view the list (the role-type lookup would 403)', () => {
+    mockGrantedPermissions(['tenant:admin', 'tenant:manage'])
     mockRoleType(null)
     vi.mocked(useRoles).mockReturnValue({
       data: undefined, isLoading: false, isError: false, error: null, refetch: vi.fn(),

@@ -225,14 +225,17 @@ describe('Sidebar — /camps/new highlights the originating Screening/Diet page,
   })
 })
 
-describe('Sidebar — Field Staff Coverage is hidden from field-officer sessions', () => {
-  it('hides Field Staff Coverage for a field-officer-shaped session (holds neither tenant nor role read/manage codes)', async () => {
+// GET /geo-profiles, /:id and /nearest are all open to any authenticated user server-side
+// (geoProfile.routes.ts) — Field Staff Coverage has no REAL_GATED_NAV_ITEMS entry, same as
+// Doctor Management, and must be visible regardless of tenant/role codes.
+describe('Sidebar — Field Staff Coverage is visible to any authenticated session, matching the open backend reads', () => {
+  it('shows Field Staff Coverage for a field-officer-shaped session (holds neither tenant nor role read/manage codes)', async () => {
     await renderSidebar({
       permissions: ['inventory-request:search', 'inventory-request:create'],
       session: sessionFixture('field-officer', ['inventory-request:search', 'inventory-request:create'], 'platform'),
     })
 
-    expect(screen.queryByText('Field Staff Coverage')).not.toBeInTheDocument()
+    expect(screen.getByText('Field Staff Coverage')).toBeInTheDocument()
   })
 
   it('shows Field Staff Coverage for a sales-rep session holding tenant:search/tenant:get', async () => {
@@ -244,7 +247,7 @@ describe('Sidebar — Field Staff Coverage is hidden from field-officer sessions
     expect(screen.getByText('Field Staff Coverage')).toBeInTheDocument()
   })
 
-  it('shows Field Staff Coverage for a system:manage session even without an explicit tenant/role code', async () => {
+  it('shows Field Staff Coverage for a system:manage session', async () => {
     await renderSidebar({
       permissions: ['system:manage'],
       session: sessionFixture('system-admin', ['system:manage']),

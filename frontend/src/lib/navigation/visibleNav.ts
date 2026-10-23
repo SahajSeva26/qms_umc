@@ -14,7 +14,6 @@ const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
   finanalytics: ['system:manage'],
   crminvoicing: ['system:manage'],
   crm: ['lead:search', 'lead:manage', 'tenant:manage'],
-  salesdashboard: ['lead:search', 'lead:manage', 'tenant:manage'],
   tenants: ['tenant:get', 'tenant:search', 'tenant:manage'],
   permissiongroups: ['permission-group:get', 'permission-group:search', 'tenant:admin'],
   roletypes: ['tenant:manage', 'tenant:admin'],
@@ -28,7 +27,9 @@ const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
   campsdiet: ['camp:search', 'camp:manage', 'tenant:manage'],
   fieldofficers: ['tenant:manage', 'tenant:admin'],
   users: ['user:get', 'user:search', 'user:update'],
-  geoprofiles: ['tenant:get', 'tenant:search', 'tenant:manage', 'tenant:admin', 'role:get', 'role:search'],
+  // No entry for 'geoprofiles' — GET /geo-profiles, /:id, /nearest are all open to any authenticated
+  // user server-side (geoProfile.routes.ts), same as 'doctors'; gating it here would be stricter
+  // than the backend actually requires.
 }
 
 // MR's exceptions to "pharma sees only the Pharma Portal section" — real pages own-scoped server-side.
@@ -50,6 +51,10 @@ function isRealSystemManage(session: VisibleNavSession): boolean {
 export function isNavItemVisible(item: NavItem, session: VisibleNavSession): boolean {
   if (item.id === 'pharma') return isPharmaRoleType(session.roleTypeCode)
   if (item.id === 'employees') return session.isSettled && canReadEmployees(session.roleTypeCode, session.permissions)
+  // Role-type-only, deliberately NOT permission-gated and NOT system:manage-bypassed — exactly
+  // sales-head/sales-rep, per explicit request (not visible to admin/system even though they hold
+  // tenant:manage/system:manage).
+  if (item.id === 'salesdashboard') return session.isSettled && (session.roleTypeCode === 'sales-head' || session.roleTypeCode === 'sales-rep')
   const requiredCodes = REAL_GATED_NAV_ITEMS[item.id]
   if (!requiredCodes) return true
   if (!session.isSettled) return false

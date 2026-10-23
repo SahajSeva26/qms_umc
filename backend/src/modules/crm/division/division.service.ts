@@ -12,6 +12,7 @@ import { TENANT_PERMISSIONS } from '../../access-management/tenant/tenant.consta
 import { TenantService } from '../../access-management/tenant/tenant.service';
 import { LEAD_PERMISSIONS } from '../lead/lead.constants';
 import { RoleService } from '../../access-management/role/role.service';
+import { RoleModel } from '../../access-management/role/role.model';
 import { RoleTypeModel } from '../../access-management/role-type/roleType.model';
 import { ALLOWED_ROLETYPE_CODES } from '../../access-management/role-type/roleType.constants';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
@@ -126,36 +127,62 @@ const search = async (filters: ISearchDivisionQuery, ctx: RequestContext, option
     return { count, items, stats };
 };
 
-// per-division rollup: total & live projects
+// per-division rollup: total & live projects, live MR count
 type DivisionStats = {
     totalProjects: number;
     liveProjects: number;
+    mrs: number;
 };
 
-// aggregate project counts per division for the given divisions (one query for the whole page)
+// aggregate project & MR counts per division for the given divisions (one query each for the whole page)
 const getDivisionStats = async (divisions: HydratedDocument<IDivision>[]): Promise<Record<string, DivisionStats>> => {
     const divisionIds = divisions.map((d) => d._id);
 
-    const projectGroups = await Project.aggregate([
-        { $match: { division: { $in: divisionIds } } },
-        {
-            $group: {
-                _id: '$division',
-                total: { $sum: 1 },
-                live: { $sum: { $cond: [{ $eq: ['$status', PROJECT_STATUS.LIVE] }, 1, 0] } },
+    const [projectGroups, mrGroups] = await Promise.all([
+        Project.aggregate([
+            { $match: { division: { $in: divisionIds } } },
+            {
+                $group: {
+                    _id: '$division',
+                    total: { $sum: 1 },
+                    live: { $sum: { $cond: [{ $eq: ['$status', PROJECT_STATUS.LIVE] }, 1, 0] } },
+                },
             },
-        },
+        ]),
+        // MR count per division: roles whose role-type is `pharma-mr` (resolved via $lookup, since
+        // role-types are per-tenant). Mirrors getTenantStats' MR aggregate, grouped by division — so
+        // the per-division counts sum to the tenant-level MR total.
+        RoleModel.aggregate([
+            { $match: { division: { $in: divisionIds } } },
+            {
+                $lookup: {
+                    from: RoleTypeModel.collection.name,
+                    localField: 'type',
+                    foreignField: '_id',
+                    as: 'roleType',
+                },
+            },
+            { $unwind: '$roleType' },
+            { $match: { 'roleType.code': ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR } },
+            { $group: { _id: '$division', total: { $sum: 1 } } },
+        ]),
     ]);
 
     const stats: Record<string, DivisionStats> = {};
     for (const id of divisionIds) {
-        stats[id.toString()] = { totalProjects: 0, liveProjects: 0 };
+        stats[id.toString()] = { totalProjects: 0, liveProjects: 0, mrs: 0 };
     }
     for (const g of projectGroups) {
         const entry = stats[g._id?.toString()];
         if (entry) {
             entry.totalProjects = g.total;
             entry.liveProjects = g.live;
+        }
+    }
+    for (const g of mrGroups) {
+        const entry = stats[g._id?.toString()];
+        if (entry) {
+            entry.mrs = g.total;
         }
     }
     return stats;

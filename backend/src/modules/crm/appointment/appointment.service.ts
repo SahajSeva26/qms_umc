@@ -15,6 +15,7 @@ import {
     APPOINTMENT_PERMISSIONS,
     APPOINTMENT_STATUSES,
     APPOINTMENT_TRANSITION_MAP,
+    MEETING_MIN_GAP_HOURS,
     MOM_SUBMISSION_DEADLINE_HOURS,
 } from './appointment.constants';
 import { calculateWorkingExpiry } from '../../../shared/helpers/expiryHelper';
@@ -55,6 +56,33 @@ const populate: any[] = [
 const applyOwnScope = (where: any, ctx: RequestContext) => {
     if (!ctx.hasAnyPermissions([APPOINTMENT_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code])) {
         where.$or = [{ salesPerson: ctx.role?._id }, { 'internalMembers.role': ctx.role?._id }];
+    }
+};
+
+const MEETING_MIN_GAP_MS = MEETING_MIN_GAP_HOURS * 60 * 60 * 1000;
+
+// block if the sales person already has a PLANNED appointment starting within MEETING_MIN_GAP of this
+// one (±1h). Checked GLOBALLY (not tenant-scoped) — a sales person serving multiple companies has one
+// shared calendar. Uses start time only; exactly MEETING_MIN_GAP apart is allowed (exclusive bounds).
+const assertSalesPersonFree = async (salesPerson: any, startTime: Date, excludeId: any) => {
+    const start = new Date(startTime).getTime();
+    const where: any = {
+        salesPerson,
+        status: APPOINTMENT_STATUSES.PLANNED,
+        'duration.startTime': {
+            $gt: new Date(start - MEETING_MIN_GAP_MS),
+            $lt: new Date(start + MEETING_MIN_GAP_MS),
+        },
+    };
+    if (excludeId) {
+        where._id = { $ne: excludeId };
+    }
+    const clash = await AppointmentModel.findOne(where);
+    if (clash) {
+        return throwAppError(
+            `This sales person already has a meeting within ${MEETING_MIN_GAP_HOURS} hour(s) of this time`,
+            StatusCodes.CONFLICT,
+        );
     }
 };
 
@@ -257,6 +285,10 @@ const create = async (model: ICreateAppointmentPayload, ctx: RequestContext): Pr
         parent = parentDoc._id;
     }
 
+    //4: double-booking guard — the creator (sales person) must not already have a planned meeting
+    // within MEETING_MIN_GAP of this start time
+    await assertSalesPersonFree(ctx.role?._id || ctx.role?.id, model.startTime, null);
+
     const appointment = await withTransaction(async () => {
         const code: string = await CounterService.next(APPOINTMENT_COUNTER_ENTITY, ctx);
         //4: build entity — tenant is derived from the division (the pharma company, source of truth).
@@ -286,6 +318,11 @@ const update = async (id: string, model: IUpdateAppointmentPayload, ctx: Request
         return throwAppError('Appointment not found', StatusCodes.NOT_FOUND);
     }
 
+    //1b: double-booking guard — re-check only when the start time changes (exclude this appointment itself)
+    if (model.startTime) {
+        await assertSalesPersonFree(appointment.salesPerson, model.startTime, appointment._id);
+    }
+
     //2: apply editable fields (tenant/division/salesPerson/parent/status are not touched here)
     appointment = await set(model, appointment, ctx);
     appointment = await appointment.save();
@@ -312,6 +349,13 @@ const moveStage = async (id: string, model: IMoveStagePayload, ctx: RequestConte
     //3: guard — transition must be allowed
     if (!canTransition(APPOINTMENT_TRANSITION_MAP, from, to)) {
         return throwAppError(`Invalid stage transition from '${from}' to '${to}'`, StatusCodes.BAD_REQUEST);
+    }
+
+    //3b: marking an appointment done requires a captured MoM. The MoM is saved via PUT /appointments/:id
+    // beforehand; this enforces server-side what the frontend already checks, so a direct API call can't
+    // close an appointment with an empty MoM.
+    if (to === APPOINTMENT_STATUSES.DONE && !appointment.mom?.details?.trim()) {
+        return throwAppError('Minutes of meeting are required to mark an appointment as done', StatusCodes.UNPROCESSABLE_ENTITY);
     }
 
     //4: append to the append-only journal + flip the cached status (one atomic save)

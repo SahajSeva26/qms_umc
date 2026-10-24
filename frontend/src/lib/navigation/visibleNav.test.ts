@@ -11,14 +11,14 @@ function sessionFixture(overrides: Partial<VisibleNavSession> = {}): VisibleNavS
   }
 }
 
-describe('isPharmaExtraNavItem — pharma field-force (MR/ASM/RSM) Camp Management + Doctor Management exceptions', () => {
-  it.each(['camps', 'doctors'])('is true for the %s item for each of pharma-mr/pharma-asm/pharma-rsm', (id) => {
+describe('isPharmaExtraNavItem — pharma field-force (MR/ASM/RSM) Camp Management + Diet Camps + Doctor Management exceptions', () => {
+  it.each(['camps', 'campsdiet', 'doctors'])('is true for the %s item for each of pharma-mr/pharma-asm/pharma-rsm', (id) => {
     for (const roleTypeCode of ['pharma-mr', 'pharma-asm', 'pharma-rsm']) {
       expect(isPharmaExtraNavItem({ id, label: id, icon: 'Sun', path: `/${id}` }, sessionFixture({ roleTypeCode }))).toBe(true)
     }
   })
 
-  it.each(['camps', 'doctors'])('is false for the %s item for pharma-division-head (not field-force)', (id) => {
+  it.each(['camps', 'campsdiet', 'doctors'])('is false for the %s item for pharma-division-head (not field-force)', (id) => {
     expect(isPharmaExtraNavItem({ id, label: id, icon: 'Sun', path: `/${id}` }, sessionFixture({ roleTypeCode: 'pharma-division-head' }))).toBe(false)
   })
 
@@ -27,11 +27,12 @@ describe('isPharmaExtraNavItem — pharma field-force (MR/ASM/RSM) Camp Manageme
   })
 })
 
-describe('getVisibleNavItems — pharma field-force (MR/ASM/RSM) sees Pharma Portal + Camp Management + Doctor Management; division-head gets no extra item', () => {
-  it.each(['pharma-mr', 'pharma-asm', 'pharma-rsm'])('includes "pharma", "camps" and "doctors" for %s with camp:book', (roleTypeCode) => {
+describe('getVisibleNavItems — pharma field-force (MR/ASM/RSM) sees Pharma Portal + Camp Management + Diet Camps + Doctor Management; division-head gets no extra item', () => {
+  it.each(['pharma-mr', 'pharma-asm', 'pharma-rsm'])('includes "pharma", "camps", "campsdiet" and "doctors" for %s with camp:book', (roleTypeCode) => {
     const ids = getVisibleNavItems(sessionFixture({ roleTypeCode, permissions: ['camp:book'] })).map((i) => i.id)
     expect(ids).toContain('pharma')
     expect(ids).toContain('camps')
+    expect(ids).toContain('campsdiet')
     expect(ids).toContain('doctors')
   })
 
@@ -40,9 +41,10 @@ describe('getVisibleNavItems — pharma field-force (MR/ASM/RSM) sees Pharma Por
     expect(ids).toEqual(['pharma'])
   })
 
-  it.each(['pharma-mr', 'pharma-asm', 'pharma-rsm'])('excludes "camps" (permission-gated) but still includes "doctors" (no gate) for %s without camp:book', (roleTypeCode) => {
+  it.each(['pharma-mr', 'pharma-asm', 'pharma-rsm'])('excludes "camps" and "campsdiet" (permission-gated) but still includes "doctors" (no gate) for %s without camp:book', (roleTypeCode) => {
     const ids = getVisibleNavItems(sessionFixture({ roleTypeCode, permissions: [] })).map((i) => i.id)
     expect(ids).not.toContain('camps')
+    expect(ids).not.toContain('campsdiet')
     expect(ids).toContain('doctors')
   })
 })

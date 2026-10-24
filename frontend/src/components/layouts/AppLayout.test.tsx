@@ -211,11 +211,10 @@ describe('AppLayout — pharma/QMS route isolation', () => {
     expect(screen.queryByText('Camp Management Page')).not.toBeInTheDocument()
   })
 
-  // The exception is exactly pathname === '/camps' — not a startsWith prefix match, so pharma-mr
-  // must still be bounced off every other /camps/* route (screening/diet/new/detail).
+  // The exceptions are exactly pathname === '/camps'/'/camps/diet' — not a startsWith prefix
+  // match, so pharma-mr must still be bounced off every other /camps/* route (screening/new/detail).
   it.each([
     ['/camps/screening', 'Screening Camps Page'],
-    ['/camps/diet', 'Diet Camps Page'],
     ['/camps/new', 'New Camp Page'],
     ['/camps/cmp-1', 'Camp Detail Page'],
   ])('redirects pharma-mr away from %s back to the MR portal, not the combined Camp Management exception', async (path, pageText) => {
@@ -232,6 +231,42 @@ describe('AppLayout — pharma/QMS route isolation', () => {
 
     expect(await screen.findByText('MR Portal Page')).toBeInTheDocument()
     expect(screen.queryByText(pageText)).not.toBeInTheDocument()
+  })
+
+  // Same exception pattern as Camp Management, extended to Diet Camps.
+  it.each([
+    ['pharma-mr', 'MR Portal Page'],
+    ['pharma-asm', 'ASM Portal Page'],
+    ['pharma-rsm', 'RSM Portal Page'],
+  ])('does not redirect %s away from /camps/diet — the pharma field-force exception', async (roleTypeCode) => {
+    const { useSession } = await import('@/hooks/useSession')
+    vi.mocked(useSession).mockReturnValue({
+      session: sessionFixture(roleTypeCode),
+      isFetching: false,
+      isError: false,
+      isConfirmedUnauthenticated: false,
+      refetchSession: vi.fn(),
+    } as unknown as ReturnType<typeof useSession>)
+
+    await renderAt('/camps/diet')
+
+    expect(await screen.findByText('Diet Camps Page')).toBeInTheDocument()
+  })
+
+  it('still redirects pharma-division-head (not field-force) away from /camps/diet, back to their own portal', async () => {
+    const { useSession } = await import('@/hooks/useSession')
+    vi.mocked(useSession).mockReturnValue({
+      session: sessionFixture('pharma-division-head'),
+      isFetching: false,
+      isError: false,
+      isConfirmedUnauthenticated: false,
+      refetchSession: vi.fn(),
+    } as unknown as ReturnType<typeof useSession>)
+
+    await renderAt('/camps/diet')
+
+    expect(await screen.findByText('HO Portal Page')).toBeInTheDocument()
+    expect(screen.queryByText('Diet Camps Page')).not.toBeInTheDocument()
   })
 
   // Same exception pattern, extended to Doctor Management.

@@ -9,6 +9,7 @@ import { IServiceOptions } from '../../../shared/types/service.types';
 import { TENANT_TYPE } from '../../access-management/tenant/tenant.constants';
 import { DivisionService } from '../division/division.service';
 import { CONTACT_TYPES } from './contact.constants';
+import { DESIGNATIONS_BY_DEPARTMENT, EMPLOYEE_DEPARTMENTS } from '../../access-management/employee/employee.constants';
 
 type ContactDocument = HydratedDocument<IContact> | null;
 
@@ -35,16 +36,57 @@ const resolveTenant = (model: ICreateContactPayload, ctx: RequestContext): strin
     return model.tenant;
 };
 
+// department must be a known one, and the designation must be one of that department's keys
+const assertDesignationMatchesDepartment = (department?: string | null, designation?: string | null) => {
+    if (department && !Object.values(EMPLOYEE_DEPARTMENTS).includes(department as any)) {
+        return throwAppError(`Invalid department: ${department}`, StatusCodes.BAD_REQUEST);
+    }
+    if (!designation) {
+        return;
+    }
+    if (!department) {
+        return throwAppError('A department is required to set a designation', StatusCodes.BAD_REQUEST);
+    }
+    const allowed: readonly { key: string }[] = (DESIGNATIONS_BY_DEPARTMENT as any)[department];
+    if (!allowed.some((d) => d.key === designation)) {
+        return throwAppError(`Designation "${designation}" is not valid for department "${department}"`, StatusCodes.BAD_REQUEST);
+    }
+};
+
 const set = (model: any, entity: HydratedDocument<IContact>) => {
-    if (model.name) entity.name = model.name;
-    if (model.designation !== undefined) entity.designation = model.designation;
-    if (model.department !== undefined) entity.department = model.department;
-    if (model.email !== undefined) entity.email = model.email;
-    if (model.phone !== undefined) entity.phone = model.phone;
-    if (model.location !== undefined) entity.location = model.location;
-    if (model.type) entity.type = model.type;
-    if (model.user !== undefined) entity.user = model.user;
-    if (model.status) entity.status = model.status;
+    if (model.name) {
+        entity.name = model.name;
+    }
+    if (model.designation !== undefined || model.department !== undefined) {
+        // validate the resulting pair — a payload may change only one side of it
+        const department = model.department !== undefined ? model.department : entity.department;
+        const designation = model.designation !== undefined ? model.designation : entity.designation;
+        assertDesignationMatchesDepartment(department, designation);
+    }
+    if (model.designation !== undefined) {
+        entity.designation = model.designation;
+    }
+    if (model.department !== undefined) {
+        entity.department = model.department;
+    }
+    if (model.email !== undefined) {
+        entity.email = model.email;
+    }
+    if (model.phone !== undefined) {
+        entity.phone = model.phone;
+    }
+    if (model.location !== undefined) {
+        entity.location = model.location;
+    }
+    if (model.type) {
+        entity.type = model.type;
+    }
+    if (model.user !== undefined) {
+        entity.user = model.user;
+    }
+    if (model.status) {
+        entity.status = model.status;
+    }
     return entity;
 };
 

@@ -160,17 +160,14 @@ const Topbar = ({ onMobileMenuToggle }: TopbarProps) => {
                     <FiUser size={14} style={{ color: 'var(--qms-text-muted)' }} />
                     My Profile
                   </button>
-                  {/* Dev-only — never present in a production build. */}
-                  {import.meta.env.DEV && (
-                    <button
-                      onClick={() => { setQuickSwitchOpen(true); setUserMenuOpen(false) }}
-                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] transition-all hover:bg-(--qms-surface-hover)"
-                      style={{ color: 'var(--qms-text-soft)' }}
-                    >
-                      <FiRepeat size={14} style={{ color: 'var(--qms-text-muted)' }} />
-                      Quick switch (dev)
-                    </button>
-                  )}
+                  <button
+                    onClick={() => { setQuickSwitchOpen(true); setUserMenuOpen(false) }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] transition-all hover:bg-(--qms-surface-hover)"
+                    style={{ color: 'var(--qms-text-soft)' }}
+                  >
+                    <FiRepeat size={14} style={{ color: 'var(--qms-text-muted)' }} />
+                    Quick switch (dev)
+                  </button>
                   <button
                     onClick={signOut}
                     className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] transition-all hover:bg-danger-soft"
@@ -189,7 +186,7 @@ const Topbar = ({ onMobileMenuToggle }: TopbarProps) => {
       {profileModalOpen && (
         <MyProfileModal user={user} session={session} onClose={() => setProfileModalOpen(false)} />
       )}
-      {import.meta.env.DEV && quickSwitchOpen && (
+      {quickSwitchOpen && (
         <QuickSwitchPopup onClose={() => setQuickSwitchOpen(false)} />
       )}
     </header>

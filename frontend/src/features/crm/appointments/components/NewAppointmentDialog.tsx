@@ -31,6 +31,7 @@ import {
   fieldSelectTriggerStyle,
 } from '@/features/crm/appointments/components/appointmentField.styles'
 import EditContactModal from '@/features/contacts/components/EditContactModal'
+import { CONTACT_DEPARTMENTS, CONTACT_DEPARTMENT_LABEL, DESIGNATIONS_BY_DEPARTMENT, type ContactDepartment } from '@/features/contacts/contact.constants'
 
 // Sentinel for the inline "+ Add new contact" option — never a real contact id,
 // and non-empty as base-ui's Select requires.
@@ -50,19 +51,11 @@ const APPOINTMENT_TYPE_ICON: Record<AppointmentType, IconType> = {
   spot: FiZap,
 }
 
-// Who-you're-meeting-as capture, scoped to this appointment only — not part of
-// the Contact's own stored record (that has its own separate, flat, free-text
-// `designation`). Frontend-only for now: neither field exists on the backend
-// Appointment yet, see TODO.md.
-const MEETING_DEPARTMENTS = ['Marketing', 'Purchase', 'Account', 'Logistic', 'Other'] as const
-type MeetingDepartment = (typeof MEETING_DEPARTMENTS)[number]
-const MEETING_DESIGNATIONS: Record<MeetingDepartment, string[]> = {
-  Marketing: ['Jr PMT', 'PMT', 'Sr.PMT', 'GPM', 'Sr.GPM', 'Marketing Manager', 'Division Head', 'BU Head', 'GM', 'Sr.GM', 'VP', 'Sr.VP', 'President', 'Other'],
-  Purchase: ['Executive', 'Manager', 'Head'],
-  Account: ['Executive', 'Manager', 'Head'],
-  Logistic: ['Executive', 'Manager', 'Head', 'Other'],
-  Other: ['Executive', 'Manager', 'Head', 'Other'],
-}
+// Who-you're-meeting-as capture, scoped to this appointment only — not part of the Contact's own
+// stored record. Frontend-only for now: neither field exists on the backend Appointment yet, see
+// TODO.md. Reuses the same department/designation enum as the Contact module (not a separate list)
+// so a picked contact's own department/designation can be prefilled here as an exact match.
+const MEETING_DEPARTMENTS = Object.values(CONTACT_DEPARTMENTS)
 
 // startTime is 'HH:mm' on the same calendar day; durationHours can be fractional
 // (e.g. 1.5) — a plain minute-of-day add suffices, wrapping past midnight is not
@@ -111,7 +104,7 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
   const [tenantId, setTenantId] = useState('')
   const [divisionId, setDivisionId] = useState('')
   const [contactPersonId, setContactPersonId] = useState('')
-  const [contactDepartment, setContactDepartment] = useState<MeetingDepartment | ''>('')
+  const [contactDepartment, setContactDepartment] = useState<ContactDepartment | ''>('')
   const [contactRole, setContactRole] = useState('')
   const [mode, setMode] = useState<AppointmentMode>('online')
   const [members, setMembers] = useState<SelectedMember[]>([])
@@ -135,6 +128,7 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
 
   const { data: tenantData, isLoading: tenantsLoading, isError: tenantsErrored } = useTenants({ status: 'active', limit: '20' }, open)
   const tenants = tenantData?.data?.items ?? []
+  const selectedTenant = tenants.find((t) => t.id === tenantId)
 
   const { data: divisionData, isLoading: divisionsLoading, isError: divisionsErrored } =
     useDivisions({ tenant: tenantId || undefined }, !!tenantId)
@@ -147,12 +141,24 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
 
   const createAppointment = useCreateAppointment()
 
+  // Prefills Department/Designation from the picked contact's own record — a sensible default for
+  // "who you're meeting as," not a hard link; still freely overridable below for this appointment.
+  const applyContactDefaults = (contactId: string) => {
+    const picked = contacts.find((c) => c.id === contactId)
+    const department = picked?.department as ContactDepartment | undefined
+    const designation = picked?.designation
+    const isValidPair = !!department && !!designation && DESIGNATIONS_BY_DEPARTMENT[department]?.some((d) => d.key === designation)
+    setContactDepartment(department && DESIGNATIONS_BY_DEPARTMENT[department] ? department : '')
+    setContactRole(isValidPair ? designation! : '')
+  }
+
   const handleContactSelect = (value: string | null) => {
     if (value === ADD_NEW_CONTACT_VALUE) {
       setAddingContact(true)
       return
     }
     setContactPersonId(value ?? '')
+    if (value) applyContactDefaults(value)
   }
 
   const reset = () => {
@@ -296,6 +302,29 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
 
           <div className="grid grid-cols-2 gap-3">
             <div>
+              <Label className={labelClasses} style={labelStyle}>City (auto from company)</Label>
+              <Input
+                value={selectedTenant?.address?.city ?? ''}
+                disabled
+                className={fieldInputClassName}
+                style={fieldInputStyle}
+                placeholder={!tenantId ? 'Select a company' : '—'}
+              />
+            </div>
+            <div>
+              <Label className={labelClasses} style={labelStyle}>State (auto from company)</Label>
+              <Input
+                value={selectedTenant?.address?.state ?? ''}
+                disabled
+                className={fieldInputClassName}
+                style={fieldInputStyle}
+                placeholder={!tenantId ? 'Select a company' : '—'}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
               <Label className={labelClasses} style={labelStyle}>Division *</Label>
               <Select
                 key={divisionId || 'empty'}
@@ -357,8 +386,8 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
             </div>
           </div>
 
-          {/* Who-you're-meeting-as for this appointment, not the contact's own stored
-              designation — frontend-only for now, see TODO.md. */}
+          {/* Who-you're-meeting-as for this appointment — defaults from the picked contact's own
+              department/designation (handleContactSelect), freely overridable here. */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className={labelClasses} style={labelStyle}>Department</Label>
@@ -366,16 +395,16 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
                 key={contactDepartment || 'empty'}
                 value={contactDepartment || undefined}
                 onValueChange={(v) => {
-                  const nextDepartment = (v ?? '') as MeetingDepartment | ''
+                  const nextDepartment = (v ?? '') as ContactDepartment | ''
                   setContactDepartment(nextDepartment)
-                  if (!nextDepartment || !MEETING_DESIGNATIONS[nextDepartment].includes(contactRole)) setContactRole('')
+                  if (!nextDepartment || !DESIGNATIONS_BY_DEPARTMENT[nextDepartment].some((d) => d.key === contactRole)) setContactRole('')
                 }}
               >
                 <SelectTrigger className={fieldSelectTriggerClassName} style={fieldSelectTriggerStyle}>
-                  <SelectValue placeholder="Select department...">{(v: string) => v}</SelectValue>
+                  <SelectValue placeholder="Select department...">{(v: string) => CONTACT_DEPARTMENT_LABEL[v as ContactDepartment] ?? v}</SelectValue>
                 </SelectTrigger>
                 <SelectContent className={fieldSelectContentClassName} style={fieldSelectContentStyle}>
-                  {MEETING_DEPARTMENTS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                  {MEETING_DEPARTMENTS.map((d) => <SelectItem key={d} value={d}>{CONTACT_DEPARTMENT_LABEL[d]}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -388,10 +417,12 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
                 disabled={!contactDepartment}
               >
                 <SelectTrigger className={fieldSelectTriggerClassName} style={fieldSelectTriggerStyle}>
-                  <SelectValue placeholder={contactDepartment ? 'Select designation...' : 'Select a department first'}>{(v: string) => v}</SelectValue>
+                  <SelectValue placeholder={contactDepartment ? 'Select designation...' : 'Select a department first'}>
+                    {(v: string) => (contactDepartment ? DESIGNATIONS_BY_DEPARTMENT[contactDepartment].find((d) => d.key === v)?.name ?? v : v)}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent className={fieldSelectContentClassName} style={fieldSelectContentStyle}>
-                  {contactDepartment && MEETING_DESIGNATIONS[contactDepartment].map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                  {contactDepartment && DESIGNATIONS_BY_DEPARTMENT[contactDepartment].map((d) => <SelectItem key={d.key} value={d.key}>{d.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

@@ -22,6 +22,13 @@ function networkError() {
   return err
 }
 
+// POST /employees 409s when the picked user already has an Employee record (employee.service.ts).
+function duplicateEmployeeRejection() {
+  const err = new AxiosError('Conflict')
+  err.response = { status: 409, data: { message: 'An employee already exists for this user' }, statusText: '', headers: {}, config: {} as never }
+  return err
+}
+
 vi.mock('@/features/access-management/employee/components/ExistingFieldOfficerPicker', () => ({
   default: ({ roleTypeId, workerLabel, onChange }: { roleTypeId: string; workerLabel: string; onChange: (v: unknown) => void }) => (
     <div>
@@ -58,6 +65,11 @@ vi.mock('@/features/access-management/accessManagement.service', () => ({
   },
 }))
 
+const DEFAULT_ROLE_TYPE_OPTIONS = [
+  { id: 'rt-fo-1', code: 'field-officer', name: 'Field officer', description: '', permissions: [], tenant: 't-platform-1' },
+  { id: 'rt-diet-1', code: 'dietitian', name: 'Dietitian', description: '', permissions: [], tenant: 't-platform-1' },
+]
+
 function renderModal(props: Partial<React.ComponentProps<typeof CreateEmployeeModal>> = {}) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
@@ -65,7 +77,7 @@ function renderModal(props: Partial<React.ComponentProps<typeof CreateEmployeeMo
       <MemoryRouter>
         <CreateEmployeeModal
           tenantId="t-platform-1"
-          roleTypeIds={{ 'field-officer': 'rt-fo-1', dietitian: 'rt-diet-1' }}
+          roleTypeOptions={DEFAULT_ROLE_TYPE_OPTIONS as never}
           canOnboardNewPerson
           canLinkExistingAccount
           {...props}
@@ -75,9 +87,29 @@ function renderModal(props: Partial<React.ComponentProps<typeof CreateEmployeeMo
   )
 }
 
+// The worker-type picker is a <Select> now — opens the dropdown then clicks the named option.
+async function switchWorkerType(user: ReturnType<typeof userEvent.setup>, name: RegExp) {
+  await user.click(screen.getByRole('combobox', { name: /role type/i }))
+  await user.click(await screen.findByRole('option', { name }))
+}
+
 describe('CreateEmployeeModal', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+  })
+
+  it('shows the role type\'s human-readable name on the trigger, not its raw ObjectId', async () => {
+    const user = userEvent.setup()
+    renderModal()
+    await user.click(screen.getByRole('button', { name: /new employee/i }))
+
+    const trigger = screen.getByRole('combobox', { name: /role type/i })
+    expect(trigger).toHaveTextContent('Field officer')
+    expect(trigger).not.toHaveTextContent('rt-fo-1')
+
+    await switchWorkerType(user, /^dietitian$/i)
+    expect(trigger).toHaveTextContent('Dietitian')
+    expect(trigger).not.toHaveTextContent('rt-diet-1')
   })
 
   it('Mode A\'s Role-details step requires name before advancing', async () => {
@@ -120,14 +152,14 @@ describe('CreateEmployeeModal', () => {
     expect(createEmployee).toHaveBeenCalledWith(expect.objectContaining({ email: 'ravi@example.com', phone: '9876543210', user: 'user-1' }))
   })
 
-  it('Mode A defaults the Role\'s type to the field-officer RoleType id, and switching the worker-kind toggle to Dietitian sends the dietitian RoleType id instead', async () => {
+  it('Mode A defaults the Role\'s type to the first RoleType option, and switching the role-type picker to Dietitian sends the dietitian RoleType id instead', async () => {
     const user = userEvent.setup()
     renderModal()
     await user.click(screen.getByRole('button', { name: /new employee/i }))
     await user.click(screen.getByRole('button', { name: /^onboard a new person$/i }))
 
-    // Switch BEFORE filling anything else — the toggle must repoint roleType before fields are touched.
-    await user.click(screen.getByRole('button', { name: /^dietitian$/i }))
+    // Switch BEFORE filling anything else — the picker must repoint roleType before fields are touched.
+    await switchWorkerType(user, /^dietitian$/i)
 
     await user.type(screen.getByLabelText('Name'), 'Anita Rao')
     await user.click(screen.getByRole('button', { name: /^next$/i }))
@@ -147,14 +179,14 @@ describe('CreateEmployeeModal', () => {
     expect(createRole).toHaveBeenCalledWith(expect.objectContaining({ type: 'rt-diet-1' }))
   })
 
-  it('switching the worker-kind toggle back to Field officer after Dietitian restores the field-officer RoleType id', async () => {
+  it('switching the role-type picker back to Field officer after Dietitian restores the field-officer RoleType id', async () => {
     const user = userEvent.setup()
     renderModal()
     await user.click(screen.getByRole('button', { name: /new employee/i }))
     await user.click(screen.getByRole('button', { name: /^onboard a new person$/i }))
 
-    await user.click(screen.getByRole('button', { name: /^dietitian$/i }))
-    await user.click(screen.getByRole('button', { name: /^field officer$/i }))
+    await switchWorkerType(user, /^dietitian$/i)
+    await switchWorkerType(user, /^field officer$/i)
 
     await user.type(screen.getByLabelText('Name'), 'Ravi Kumar')
     await user.click(screen.getByRole('button', { name: /^next$/i }))
@@ -173,12 +205,11 @@ describe('CreateEmployeeModal', () => {
     expect(createRole).toHaveBeenCalledWith(expect.objectContaining({ type: 'rt-fo-1' }))
   })
 
-  it('does not show the worker-kind toggle when only one RoleType id is available', () => {
-    renderModal({ roleTypeIds: { 'field-officer': 'rt-fo-1' } })
+  it('does not show the role-type picker when only one RoleType option is available', () => {
+    renderModal({ roleTypeOptions: [DEFAULT_ROLE_TYPE_OPTIONS[0]] as never })
     fireEvent.click(screen.getByRole('button', { name: /new employee/i }))
 
-    expect(screen.queryByRole('button', { name: /^dietitian$/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /^field officer$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: /role type/i })).not.toBeInTheDocument()
   })
 
   it('skips the mode toggle entirely when only canLinkExistingAccount is true', async () => {
@@ -240,6 +271,23 @@ describe('CreateEmployeeModal', () => {
     await waitFor(() => expect(screen.queryByText('New employee')).not.toBeInTheDocument())
     // Exactly one dispatch despite the 3 rapid clicks — no duplicate follow-up clobbered the UI.
     expect(createEmployee).toHaveBeenCalledTimes(1)
+  })
+
+  it('Mode B create failing with a duplicate-employee 409 shows the real backend message, not a generic "try again"', async () => {
+    const user = userEvent.setup()
+    createEmployee.mockRejectedValueOnce(duplicateEmployeeRejection())
+    renderModal({ canOnboardNewPerson: false, canLinkExistingAccount: true })
+    await user.click(screen.getByRole('button', { name: /new employee/i }))
+
+    await user.click(screen.getByRole('button', { name: /^pick existing fo$/i }))
+    await user.click(screen.getByRole('button', { name: /^next$/i }))
+    await user.click(screen.getByRole('combobox', { name: /employment type/i }))
+    await user.click(await screen.findByRole('option', { name: /full-time/i }))
+    await user.type(screen.getAllByLabelText('date-stub')[0], '2026-01-15')
+    await user.click(screen.getByRole('button', { name: /create employee/i }))
+
+    expect(await screen.findByText('An employee already exists for this user')).toBeInTheDocument()
+    expect(screen.queryByText(/please try again/i)).not.toBeInTheDocument()
   })
 
   it('renders nothing at all when neither creation mode is usable', () => {
@@ -771,20 +819,20 @@ describe('CreateEmployeeModal', () => {
     }))
   })
 
-  it('Mode B (link existing account) defaults to searching field officers, and switching the worker-kind toggle to Dietitian re-scopes the picker AND clears a pending pick', async () => {
+  it('Mode B (link existing account) defaults to searching the first RoleType option, and switching the role-type picker to Dietitian re-scopes the picker AND clears a pending pick', async () => {
     const user = userEvent.setup()
     renderModal({ canOnboardNewPerson: false, canLinkExistingAccount: true })
     await user.click(screen.getByRole('button', { name: /new employee/i }))
 
-    expect(screen.getByText('picker for field officer (rt-fo-1)')).toBeInTheDocument()
+    expect(screen.getByText('picker for Field officer (rt-fo-1)')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /^pick existing fo$/i }))
     expect(screen.getByRole('button', { name: /^next$/i })).toBeEnabled()
 
-    await user.click(screen.getByRole('button', { name: /^dietitian$/i }))
+    await switchWorkerType(user, /^dietitian$/i)
 
     // Re-scoped to the dietitian RoleType id, not the field-officer one.
-    expect(screen.getByText('picker for dietitian (rt-diet-1)')).toBeInTheDocument()
+    expect(screen.getByText('picker for Dietitian (rt-diet-1)')).toBeInTheDocument()
     // The FO pick made under the old kind is gone — Next is disabled again until a new pick is made.
     expect(screen.getByRole('button', { name: /^next$/i })).toBeDisabled()
   })

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { FiSearch, FiHelpCircle, FiChevronDown, FiLogOut, FiUser, FiMenu } from 'react-icons/fi'
+import { FiSearch, FiHelpCircle, FiChevronDown, FiLogOut, FiUser, FiMenu, FiRepeat } from 'react-icons/fi'
 import { useAuth } from '@/hooks/useAuth'
 import { useSession } from '@/hooks/useSession'
 import { useProfilePicture } from '@/hooks/useProfilePicture'
@@ -7,6 +7,7 @@ import { getGreeting, formatClockDisplay } from '@/utils/formatters'
 import ThemeToggle from '@/components/ui/ThemeToggle'
 import MyProfileModal from '@/components/layouts/MyProfileModal'
 import NotificationBell from '@/features/notifications/components/NotificationBell'
+import QuickSwitchPopup from '@/features/auth/components/QuickSwitchPopup'
 
 interface TopbarProps {
   onMobileMenuToggle: () => void
@@ -25,6 +26,7 @@ const Topbar = ({ onMobileMenuToggle }: TopbarProps) => {
   const [clock, setClock] = useState(formatClockDisplay)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [profileModalOpen, setProfileModalOpen] = useState(false)
+  const [quickSwitchOpen, setQuickSwitchOpen] = useState(false)
 
   useEffect(() => {
     const interval = setInterval(() => setClock(formatClockDisplay()), 60_000)
@@ -158,6 +160,17 @@ const Topbar = ({ onMobileMenuToggle }: TopbarProps) => {
                     <FiUser size={14} style={{ color: 'var(--qms-text-muted)' }} />
                     My Profile
                   </button>
+                  {/* Dev-only — never present in a production build. */}
+                  {import.meta.env.DEV && (
+                    <button
+                      onClick={() => { setQuickSwitchOpen(true); setUserMenuOpen(false) }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] transition-all hover:bg-(--qms-surface-hover)"
+                      style={{ color: 'var(--qms-text-soft)' }}
+                    >
+                      <FiRepeat size={14} style={{ color: 'var(--qms-text-muted)' }} />
+                      Quick switch (dev)
+                    </button>
+                  )}
                   <button
                     onClick={signOut}
                     className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] transition-all hover:bg-danger-soft"
@@ -175,6 +188,9 @@ const Topbar = ({ onMobileMenuToggle }: TopbarProps) => {
 
       {profileModalOpen && (
         <MyProfileModal user={user} session={session} onClose={() => setProfileModalOpen(false)} />
+      )}
+      {import.meta.env.DEV && quickSwitchOpen && (
+        <QuickSwitchPopup onClose={() => setQuickSwitchOpen(false)} />
       )}
     </header>
   )

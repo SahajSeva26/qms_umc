@@ -10,6 +10,21 @@ vi.mock('@/features/test-master/test.service', () => ({
   testService: { searchTests: vi.fn() },
 }))
 vi.mock('@/hooks/usePermission')
+const stubCreatedTest = { id: 't-new', code: 'tst-000099', name: 'New Test', therapy: 'cardiology', campType: 'screening', duration: 10, price: 100, consumption: [] }
+// Deliberately a different therapy/campType than the default fixtures (cardiology/screening) —
+// simulates an admin creating an unrelated test, unconstrained by the project being built.
+const stubMismatchedTest = { id: 't-mismatch', code: 'tst-000098', name: 'Oncology Lab Test', therapy: 'oncology', campType: 'lab', duration: 20, price: 500, consumption: [] }
+
+vi.mock('@/features/test-master/components/EditTestModal', () => ({
+  default: ({ onClose }: { onClose: (createdTest?: typeof stubCreatedTest) => void }) => (
+    <div>
+      New test modal stub
+      <button type="button" onClick={() => onClose()}>Close stub modal (no test created)</button>
+      <button type="button" onClick={() => onClose(stubCreatedTest)}>Close stub modal (test created)</button>
+      <button type="button" onClick={() => onClose(stubMismatchedTest)}>Close stub modal (mismatched test created)</button>
+    </div>
+  ),
+}))
 
 function makeQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -22,15 +37,16 @@ function testsResponse(items: typeof ecgTest[]) {
   return { success: true, message: '', data: { items, count: items.length } } as never
 }
 
-async function mockPermission(canBrowseTests = true) {
+async function mockPermission(canBrowseTests = true, canCreateTest = false) {
   const { usePermission } = await import('@/hooks/usePermission')
   vi.mocked(usePermission).mockReturnValue({
-    hasAnyPermission: (codes: string[]) => canBrowseTests && codes.includes('test-master:search'),
+    hasAnyPermission: (codes: string[]) =>
+      (canBrowseTests && codes.includes('test-master:search')) || (canCreateTest && codes.includes('test-master:manage')),
   } as unknown as ReturnType<typeof usePermission>)
 }
 
-async function renderStep(defaultValues: Partial<WizardFormState>, canBrowseTests = true) {
-  await mockPermission(canBrowseTests)
+async function renderStep(defaultValues: Partial<WizardFormState>, canBrowseTests = true, canCreateTest = false) {
+  await mockPermission(canBrowseTests, canCreateTest)
   const client = makeQueryClient()
   const { rerender } = render(
     <QueryClientProvider client={client}>
@@ -248,5 +264,96 @@ describe('WizardStep1 — therapy + project-type-filtered tests', () => {
     await rerenderWithForm({ therapy: 'cardiology', type: ['screening'], tests: ['t-1'] })
 
     expect(await screen.findByText(/don't have permission to browse the test catalog/i)).toBeInTheDocument()
+  })
+})
+
+// POST /test-masters requires test-master:manage — search/get alone (sales roles) can't create,
+// matching the prototype's admin/ops-manager-only Test master tab access.
+describe('WizardStep1 — "Add test" inline creation, gated on test-master:manage', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  it('hides "Add test" for an actor with only test-master:search (e.g. Sales Rep/Sales Head)', async () => {
+    const { testService } = await import('@/features/test-master/test.service')
+    vi.mocked(testService.searchTests).mockResolvedValue(testsResponse([ecgTest]))
+
+    await renderStep({ therapy: 'cardiology', type: ['screening'] }, true, false)
+
+    await screen.findByRole('button', { name: 'ECG' })
+    expect(screen.queryByRole('button', { name: /add test/i })).not.toBeInTheDocument()
+  })
+
+  it('shows "Add test" for an actor holding test-master:manage (e.g. Ops Manager/Admin)', async () => {
+    const { testService } = await import('@/features/test-master/test.service')
+    vi.mocked(testService.searchTests).mockResolvedValue(testsResponse([ecgTest]))
+
+    await renderStep({ therapy: 'cardiology', type: ['screening'] }, true, true)
+
+    expect(await screen.findByRole('button', { name: /add test/i })).toBeInTheDocument()
+  })
+
+  it('opens the new-test modal on click and refetches the test list on close, with no test created', async () => {
+    const { testService } = await import('@/features/test-master/test.service')
+    vi.mocked(testService.searchTests).mockResolvedValue(testsResponse([ecgTest]))
+
+    const user = userEvent.setup()
+    await renderStep({ therapy: 'cardiology', type: ['screening'] }, true, true)
+
+    await user.click(await screen.findByRole('button', { name: /add test/i }))
+    expect(screen.getByText('New test modal stub')).toBeInTheDocument()
+
+    const callsBeforeClose = vi.mocked(testService.searchTests).mock.calls.length
+    await user.click(screen.getByRole('button', { name: /no test created/i }))
+
+    expect(screen.queryByText('New test modal stub')).not.toBeInTheDocument()
+    await waitFor(() => expect(vi.mocked(testService.searchTests).mock.calls.length).toBeGreaterThan(callsBeforeClose))
+    // ECG, the only pre-existing test, stays unselected — nothing was auto-attached.
+    expect(screen.getByRole('button', { name: 'ECG' })).not.toHaveStyle({ background: 'var(--qms-brand)' })
+  })
+
+  it('auto-attaches the newly created test — selected immediately once it appears in the refetched list, no manual click needed', async () => {
+    const { testService } = await import('@/features/test-master/test.service')
+    // Before creating: only ECG exists. After the post-close refetch: the new test is also back
+    // from the server (matches real behaviour — the create lands in the catalog, then the wizard
+    // re-queries it), proving the auto-attach set the real test id, not just a stub id nothing renders.
+    vi.mocked(testService.searchTests)
+      .mockResolvedValueOnce(testsResponse([ecgTest]))
+      .mockResolvedValue(testsResponse([ecgTest, stubCreatedTest]))
+
+    const user = userEvent.setup()
+    await renderStep({ therapy: 'cardiology', type: ['screening'] }, true, true)
+
+    await user.click(await screen.findByRole('button', { name: /add test/i }))
+    await user.click(screen.getByRole('button', { name: /^close stub modal \(test created\)$/i }))
+
+    expect(screen.queryByText('New test modal stub')).not.toBeInTheDocument()
+    // The newly created test is selected immediately once it appears in the list.
+    expect(await screen.findByRole('button', { name: 'New Test' })).toHaveStyle({ background: 'var(--qms-brand)' })
+    // ECG (pre-existing) stays unselected — only the newly created test was attached.
+    expect(screen.getByRole('button', { name: 'ECG' })).not.toHaveStyle({ background: 'var(--qms-brand)' })
+  })
+
+  // P1 regression: a mismatched-therapy/campType test created via "Add test" must NEVER be
+  // silently attached — it's invisible in the filtered list, so the user can't notice/remove it.
+  it('does NOT auto-attach a newly created test whose therapy/campType do not match the project — refetches normally but leaves selection untouched', async () => {
+    const { testService } = await import('@/features/test-master/test.service')
+    // Returns the mismatched test in the refetched list too (as if the search filter were ever
+    // relaxed) — this is what actually exercises the frontend's own compatibility guard, not the filter.
+    vi.mocked(testService.searchTests)
+      .mockResolvedValueOnce(testsResponse([ecgTest]))
+      .mockResolvedValue(testsResponse([ecgTest, stubMismatchedTest]))
+
+    const user = userEvent.setup()
+    await renderStep({ therapy: 'cardiology', type: ['screening'] }, true, true)
+
+    await user.click(await screen.findByRole('button', { name: /add test/i }))
+    await user.click(screen.getByRole('button', { name: /mismatched test created/i }))
+
+    expect(screen.queryByText('New test modal stub')).not.toBeInTheDocument()
+    const mismatchedChip = await screen.findByRole('button', { name: /oncology lab test/i })
+    expect(mismatchedChip).not.toHaveStyle({ background: 'var(--qms-brand)' })
+    // The pre-existing ECG selection state is untouched too.
+    expect(screen.getByRole('button', { name: 'ECG' })).not.toHaveStyle({ background: 'var(--qms-brand)' })
   })
 })

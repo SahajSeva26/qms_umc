@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { accessManagementService } from '@/features/access-management/accessManagement.service'
+import { divisionService } from '@/features/crm/divisions/division.service'
+import { contactsService } from '@/features/contacts/contacts.service'
 
 // Mocks the pickers' services so their queries resolve to empty lists
 // instead of hitting the real API layer.
@@ -78,4 +82,125 @@ describe('NewAppointmentDialog — prefill from the clicked calendar slot', () =
     expect(screen.getAllByText('14').length).toBeGreaterThan(0)
     expect(await screen.findByText('Ends 15:00')).toBeInTheDocument()
   }, 20000)
+})
+
+describe('NewAppointmentDialog — City/State auto-derived from the selected company', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(accessManagementService.searchTenants).mockResolvedValue({
+      success: true,
+      message: '',
+      data: {
+        count: 2,
+        items: [
+          { id: 't-sunrise', code: 'clt-000001', name: 'Sunrise Pharma Ltd', address: { addressLine1: 'x', city: 'Mumbai', state: 'Maharashtra', pincode: '400001' }, businessLifetime: null, gst: null },
+          { id: 't-nohq', code: 'clt-000002', name: 'No Address Pharma', address: null, businessLifetime: null, gst: null },
+        ],
+      },
+    } as never)
+  })
+
+  it('shows "Select a company" placeholder for City/State before any company is picked', async () => {
+    await renderDialog(undefined, 'city-state-empty')
+    expect(await screen.findAllByPlaceholderText('Select a company')).toHaveLength(2)
+  })
+
+  it('fills City/State (read-only) from the selected company\'s address once picked', async () => {
+    const user = userEvent.setup()
+    await renderDialog(undefined, 'city-state-filled')
+
+    await user.click(await screen.findByText('Select company...'))
+    await user.click(await screen.findByRole('option', { name: 'Sunrise Pharma Ltd' }))
+
+    expect(await screen.findByDisplayValue('Mumbai')).toBeDisabled()
+    expect(screen.getByDisplayValue('Maharashtra')).toBeDisabled()
+  })
+
+  it('shows "—" for City/State when the selected company has no address on file', async () => {
+    const user = userEvent.setup()
+    await renderDialog(undefined, 'city-state-no-address')
+
+    await user.click(await screen.findByText('Select company...'))
+    await user.click(await screen.findByRole('option', { name: 'No Address Pharma' }))
+
+    expect(await screen.findAllByPlaceholderText('—')).toHaveLength(2)
+  })
+})
+
+describe('NewAppointmentDialog — Department/Designation auto-fill from the selected contact', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(accessManagementService.searchTenants).mockResolvedValue({
+      success: true,
+      message: '',
+      data: { count: 1, items: [{ id: 't-sunrise', code: 'clt-000001', name: 'Sunrise Pharma Ltd', address: null, businessLifetime: null, gst: null }] },
+    } as never)
+    vi.mocked(divisionService.searchDivisions).mockResolvedValue({
+      success: true,
+      message: '',
+      data: { count: 1, items: [{ id: 'div-1', name: 'Cardio', code: 'div-000001', therapy: [] }] },
+    } as never)
+    vi.mocked(contactsService.searchContacts).mockResolvedValue({
+      success: true,
+      message: '',
+      data: {
+        count: 2,
+        items: [
+          { id: 'c-with-dept', name: 'Dr. Mehta', department: 'marketing', designation: 'marketingmanager', type: 'customer', user: null, status: 'active' },
+          { id: 'c-no-dept', name: 'No Dept Guy', type: 'customer', user: null, status: 'active' },
+        ],
+      },
+    } as never)
+  })
+
+  async function pickCompanyAndDivision(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(await screen.findByText('Select company...'))
+    await user.click(await screen.findByRole('option', { name: 'Sunrise Pharma Ltd' }))
+    await user.click(await screen.findByText('Select division...'))
+    await user.click(await screen.findByRole('option', { name: 'Cardio' }))
+  }
+
+  it('fills Department/Designation from the selected contact\'s own record', async () => {
+    const user = userEvent.setup()
+    await renderDialog(undefined, 'dept-autofill')
+    await pickCompanyAndDivision(user)
+
+    await user.click(await screen.findByText('Select contact...'))
+    await user.click(await screen.findByRole('option', { name: 'Dr. Mehta' }))
+
+    expect(await screen.findByText('Marketing')).toBeInTheDocument()
+    expect(screen.getByText('Marketing Manager')).toBeInTheDocument()
+  })
+
+  it('leaves Department/Designation blank when the selected contact has neither', async () => {
+    const user = userEvent.setup()
+    await renderDialog(undefined, 'dept-autofill-empty')
+    await pickCompanyAndDivision(user)
+
+    await user.click(await screen.findByText('Select contact...'))
+    await user.click(await screen.findByRole('option', { name: 'No Dept Guy' }))
+
+    const departmentTrigger = (await screen.findByText('Department')).parentElement!.querySelector('[role="combobox"]')!
+    expect(departmentTrigger.querySelector('[data-slot="select-value"]')).toBeEmptyDOMElement()
+    const designationTrigger = screen.getByText('Designation').parentElement!.querySelector('[role="combobox"]')!
+    expect(designationTrigger).toBeDisabled()
+  })
+
+  it('still allows overriding the auto-filled Department/Designation for this appointment', async () => {
+    const user = userEvent.setup()
+    await renderDialog(undefined, 'dept-autofill-override')
+    await pickCompanyAndDivision(user)
+
+    await user.click(await screen.findByText('Select contact...'))
+    await user.click(await screen.findByRole('option', { name: 'Dr. Mehta' }))
+    expect(await screen.findByText('Marketing')).toBeInTheDocument()
+
+    await user.click(screen.getByText('Marketing'))
+    await user.click(await screen.findByRole('option', { name: 'Purchase' }))
+
+    await screen.findByText('Purchase')
+    const designationTrigger = screen.getByText('Designation').parentElement!.querySelector('[role="combobox"]')!
+    expect(designationTrigger.querySelector('[data-slot="select-value"]')).toBeEmptyDOMElement()
+    expect(screen.queryByText('Marketing Manager')).not.toBeInTheDocument()
+  })
 })

@@ -28,6 +28,7 @@ export interface ContactEntity {
   division?: ContactPopulatedDivision | string | null
   name: string
   designation?: string
+  department?: string
   email?: string
   phone?: string
   location?: string
@@ -63,6 +64,7 @@ export interface CreateContactPayload {
   division?: string
   name: string
   designation?: string
+  department?: string
   email?: string
   phone?: string
   location?: string
@@ -73,7 +75,9 @@ export interface CreateContactPayload {
 // tenant is NOT editable — a contact never changes the company it belongs to.
 export interface UpdateContactPayload {
   name?: string
-  designation?: string
+  // null clears the field; the backend only accepts a real enum key or null, never ''.
+  designation?: string | null
+  department?: string | null
   email?: string
   phone?: string
   location?: string

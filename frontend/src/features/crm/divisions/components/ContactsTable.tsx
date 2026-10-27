@@ -1,4 +1,5 @@
 import type { ContactEntity } from '@/types/contact.types'
+import { CONTACT_DEPARTMENT_LABEL, designationLabel, type ContactDepartment } from '@/features/contacts/contact.constants'
 
 interface ContactsTableProps {
   contacts: ContactEntity[]
@@ -20,6 +21,9 @@ const ContactsTable = ({ contacts, onView }: ContactsTableProps) => {
               </th>
               <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
                 Designation
+              </th>
+              <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
+                Department
               </th>
               <th className="text-left font-bold text-[11px] uppercase tracking-wider px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
                 Email
@@ -47,7 +51,10 @@ const ContactsTable = ({ contacts, onView }: ContactsTableProps) => {
                   {contact.name}
                 </td>
                 <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
-                  {contact.designation ?? '—'}
+                  {designationLabel(contact.department, contact.designation) ?? '—'}
+                </td>
+                <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
+                  {contact.department ? CONTACT_DEPARTMENT_LABEL[contact.department as ContactDepartment] ?? contact.department : '—'}
                 </td>
                 <td className="px-4 py-2.5" style={{ color: 'var(--qms-text-muted)' }}>
                   {contact.email ?? '—'}

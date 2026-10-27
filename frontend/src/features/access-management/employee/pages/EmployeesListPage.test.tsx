@@ -18,14 +18,18 @@ vi.mock('@/features/access-management/employee/hooks/useEmployees', () => ({
   useEmployees: (query: unknown) => { searchEmployees(query); return { data: { data: { count: 0, items: [] } }, isLoading: false, error: null, refetch: vi.fn() } },
 }))
 const useRoleTypesSpy = vi.fn()
-// Query-aware (not a single fixed fixture) — EmployeesListPage calls this twice, once per worker
-// kind (field-officer/dietitian), and a test overriding one kind's result must not affect the other.
-let roleTypesMockImpl: (query: { code: string }) => { data: unknown; isLoading: boolean; isError: boolean; refetch: () => void } =
-  (query) => ({ data: { data: { items: [{ id: `rt-${query.code}`, code: query.code }] } }, isLoading: false, isError: false, refetch: vi.fn() })
+// EmployeesListPage now makes ONE unfiltered-by-code useRoleTypes call (every active role type is
+// onboardable, not just field-officer/dietitian).
+let roleTypesMockImpl: () => { data: unknown; isLoading: boolean; isError: boolean; refetch: () => void } = () => ({
+  data: { data: { items: [{ id: 'rt-field-officer', code: 'field-officer', name: 'Field officer' }, { id: 'rt-dietitian', code: 'dietitian', name: 'Dietitian' }] } },
+  isLoading: false,
+  isError: false,
+  refetch: vi.fn(),
+})
 vi.mock('@/features/access-management/role-type/hooks/useRoleTypes', () => ({
-  useRoleTypes: (query: { code: string }, enabled: boolean) => {
+  useRoleTypes: (query: unknown, enabled: boolean) => {
     useRoleTypesSpy(query, enabled)
-    return roleTypesMockImpl(query)
+    return roleTypesMockImpl()
   },
 }))
 const useTenantsSpy = vi.fn()
@@ -64,7 +68,12 @@ async function renderPage(session: ReturnType<typeof sessionFixture> | null, per
 describe('EmployeesListPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    roleTypesMockImpl = (query) => ({ data: { data: { items: [{ id: `rt-${query.code}`, code: query.code }] } }, isLoading: false, isError: false, refetch: vi.fn() })
+    roleTypesMockImpl = () => ({
+      data: { data: { items: [{ id: 'rt-field-officer', code: 'field-officer', name: 'Field officer' }, { id: 'rt-dietitian', code: 'dietitian', name: 'Dietitian' }] } },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    })
   })
 
   it('paginates with the established limit=10 convention', async () => {
@@ -102,40 +111,39 @@ describe('EmployeesListPage', () => {
     expect(await screen.findByRole('button', { name: /new employee/i })).toBeInTheDocument()
   })
 
-  it('shows a loading state (not a silently-missing button) while both worker-role lookups are in flight', async () => {
+  it('shows a loading state (not a silently-missing button) while the role-type lookup is in flight', async () => {
     roleTypesMockImpl = () => ({ data: undefined, isLoading: true, isError: false, refetch: vi.fn() })
     await renderPage(sessionFixture('admin'), ['tenant:admin'])
 
-    expect(await screen.findByText(/loading worker roles/i)).toBeInTheDocument()
+    expect(await screen.findByText(/loading role types/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /new employee/i })).not.toBeInTheDocument()
   })
 
-  it('shows a retryable error — not a silently-missing button — when BOTH worker-role lookups fail', async () => {
+  it('shows a retryable error — not a silently-missing button — when the role-type lookup fails', async () => {
     const refetch = vi.fn()
     roleTypesMockImpl = () => ({ data: undefined, isLoading: false, isError: true, refetch })
     await renderPage(sessionFixture('admin'), ['tenant:admin'])
 
-    expect(await screen.findByText(/couldn't load worker roles/i)).toBeInTheDocument()
+    expect(await screen.findByText(/couldn't load role types/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /new employee/i })).not.toBeInTheDocument()
 
     await userEvent.setup().click(screen.getByRole('button', { name: /retry/i }))
     expect(refetch).toHaveBeenCalled()
   })
 
-  it('a FAILED dietitian lookup does not silently drop the option — the button still renders (field-officer is fine), with a visible retryable notice instead of nothing', async () => {
-    const refetchDietitian = vi.fn()
-    roleTypesMockImpl = (query) =>
-      query.code === 'dietitian'
-        ? { data: undefined, isLoading: false, isError: true, refetch: refetchDietitian }
-        : { data: { data: { items: [{ id: 'rt-field-officer', code: 'field-officer' }] } }, isLoading: false, isError: false, refetch: vi.fn() }
+  it('a FAILED role-type lookup that still returns cached/partial items keeps the button usable, with a visible retryable notice instead of nothing', async () => {
+    const refetch = vi.fn()
+    roleTypesMockImpl = () => ({
+      data: { data: { items: [{ id: 'rt-field-officer', code: 'field-officer', name: 'Field officer' }] } },
+      isLoading: false,
+      isError: true,
+      refetch,
+    })
     await renderPage(sessionFixture('admin'), ['tenant:admin'])
 
-    // The button still renders — field officer onboarding works even though dietitian lookup failed.
+    // The button still renders — field officer onboarding still works even though the lookup errored.
     expect(await screen.findByRole('button', { name: /new employee/i })).toBeInTheDocument()
-    expect(screen.getByText(/couldn't load dietitian — retry/i)).toBeInTheDocument()
-
-    await userEvent.setup().click(screen.getByText(/couldn't load dietitian — retry/i))
-    expect(refetchDietitian).toHaveBeenCalled()
+    expect(screen.queryByText(/couldn't load role types/i)).not.toBeInTheDocument()
   })
 
   it('strips ?onboard=new from the URL even when the session cannot use it (canOnboardNewPerson is false) — it must not linger even though nothing opens', async () => {
@@ -165,6 +173,69 @@ describe('EmployeesListPage', () => {
     await screen.findByText('Employees')
     expect(useRoleTypesSpy).toHaveBeenCalledWith(expect.anything(), true)
     expect(useTenantsSpy).toHaveBeenCalledWith(expect.anything(), false)
+  })
+
+  // An employee can only ever be linked to a platform role type (POST /employees is itself gated
+  // to platform admin/ops-manager role types) — GET /role-types must be scoped to the caller's own
+  // (platform) tenant so customer tenants' pharma/admin role types never appear in the picker.
+  it('scopes GET /role-types to the caller\'s own tenant, so customer-tenant role types never populate the picker', async () => {
+    await renderPage(sessionFixture('admin', 'platform'), ['tenant:admin'])
+    await screen.findByText('Employees')
+    expect(useRoleTypesSpy).toHaveBeenCalledWith(expect.objectContaining({ tenant: 't-1' }), true)
+  })
+
+  // 'system' (seeded internal/automation role type) and 'admin' (the tenant's own admin role type,
+  // provisioned at tenant creation) are never valid employee role types — they must never appear
+  // in the New Employee role-type picker, even though GET /role-types itself returns them.
+  it('excludes the "system" and "admin" role types from the New Employee role-type picker', async () => {
+    roleTypesMockImpl = () => ({
+      data: {
+        data: {
+          items: [
+            { id: 'rt-system', code: 'system', name: 'System' },
+            { id: 'rt-admin', code: 'admin', name: 'System Tenant Admin' },
+            { id: 'rt-field-officer', code: 'field-officer', name: 'Field Officer' },
+            { id: 'rt-finance', code: 'finance-manager', name: 'Finance Manager' },
+          ],
+        },
+      },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    })
+    const user = userEvent.setup()
+    await renderPage(sessionFixture('admin', 'platform'), ['tenant:admin'])
+    await user.click(await screen.findByRole('button', { name: /new employee/i }))
+    await user.click(screen.getByRole('combobox', { name: /role type/i }))
+
+    expect(await screen.findByRole('option', { name: 'Field Officer' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Finance Manager' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'System' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'System Tenant Admin' })).not.toBeInTheDocument()
+  })
+
+  // A background refetch can fail while stale cached role types remain (isError: true, data still
+  // populated) — the picker must stay usable with the stale data, but still surface a warning + Retry
+  // rather than looking like everything is fine.
+  it('keeps the role-type picker usable AND shows a stale-data warning with Retry when cached options remain but a refresh fails', async () => {
+    const refetchRoleTypes = vi.fn()
+    roleTypesMockImpl = () => ({
+      data: { data: { items: [{ id: 'rt-field-officer', code: 'field-officer', name: 'Field Officer' }] } },
+      isLoading: false,
+      isError: true,
+      refetch: refetchRoleTypes,
+    })
+    const user = userEvent.setup()
+    await renderPage(sessionFixture('admin', 'platform'), ['tenant:admin'])
+    await screen.findByText('Employees')
+
+    // The picker is still usable despite the refresh failure.
+    expect(screen.getByRole('button', { name: /new employee/i })).toBeInTheDocument()
+    // ...and a stale-data warning + retry are surfaced alongside it, not silently hidden.
+    expect(screen.getByText(/role types may be out of date/i)).toBeInTheDocument()
+    const retryButton = screen.getByRole('button', { name: /retry/i })
+    await user.click(retryButton)
+    expect(refetchRoleTypes).toHaveBeenCalled()
   })
 
   it('tenant:search (platform tenant) satisfies GET /tenants but NOT GET /role-types', async () => {

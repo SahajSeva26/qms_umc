@@ -4,11 +4,13 @@ import { usePermission } from '@/hooks/usePermission'
 import { useTest } from '@/features/test-master/hooks/useTest'
 import { useTestResults } from '@/features/clinical/test-result/hooks/useTestResults'
 import TestForm from '@/features/test-master/components/TestForm'
+import type { TestEntity } from '@/features/test-master/testMaster.types'
 
 interface EditTestModalProps {
   // null = create mode
   testId: string | null
-  onClose: () => void
+  // Called with the created entity on a successful create, or with no argument otherwise.
+  onClose: (createdTest?: TestEntity) => void
 }
 
 const EditTestModal = ({ testId, onClose }: EditTestModalProps) => {

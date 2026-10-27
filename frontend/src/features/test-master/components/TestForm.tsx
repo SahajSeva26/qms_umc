@@ -16,7 +16,9 @@ interface TestFormProps {
   // null = create mode; the wrapper (EditTestModal) fetches the full record
   // before this component ever mounts.
   test: TestEntity | null
-  onClose: () => void
+  // Called with the created entity on a successful create (so a caller like the
+  // project wizard can auto-select it), or with no argument on a successful edit.
+  onClose: (createdTest?: TestEntity) => void
   // Informational only, for the config.inputs[] edit-mode note — always
   // false in create mode.
   hasRecordedResults?: boolean
@@ -66,7 +68,7 @@ const TestForm = ({ test, onClose, hasRecordedResults = false }: TestFormProps) 
           ...(dirtyFields.status ? { status: values.status } : {}),
           ...(dirtyFields.config ? { config: values.config } : {}),
         },
-        { onSuccess: onClose },
+        { onSuccess: () => onClose() },
       )
       return
     }
@@ -90,7 +92,7 @@ const TestForm = ({ test, onClose, hasRecordedResults = false }: TestFormProps) 
           ...values.consumableIds.map((c) => ({ item: c.id, rate: c.quantity })),
         ],
       },
-      { onSuccess: onClose },
+      { onSuccess: (response) => onClose(response.data ?? undefined) },
     )
   }
 
@@ -112,7 +114,7 @@ const TestForm = ({ test, onClose, hasRecordedResults = false }: TestFormProps) 
       <MutationStatusBanner mutation={mutation} errorFallback="Could not save this test — try again." showSuccess={false} />
 
       <div className="flex justify-end gap-2">
-        <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button type="button" variant="secondary" onClick={() => onClose()}>Cancel</Button>
         <Button type="submit" disabled={mutation.isPending}>
           {mutation.isPending ? 'Saving…' : isEdit ? 'Save changes' : 'Create test'}
         </Button>

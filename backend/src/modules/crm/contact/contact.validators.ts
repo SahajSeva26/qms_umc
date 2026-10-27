@@ -36,8 +36,10 @@ export type ICreateContactPayload = z.infer<typeof CreateContactPayloadSchema>;
 // which also keeps the "pharma contacts require a division" invariant intact).
 export const UpdateContactPayloadSchema = z.object({
     name: z.string().min(1).optional(),
-    designation: z.enum(DESIGNATION_KEYS).optional(),
-    department: z.enum(Object.values(EMPLOYEE_DEPARTMENTS)).optional(),
+    // null clears the field (omit the key entirely to leave it untouched) — matches
+    // assertDesignationMatchesDepartment's existing null-means-clear contract in the service.
+    designation: z.enum(DESIGNATION_KEYS).nullable().optional(),
+    department: z.enum(Object.values(EMPLOYEE_DEPARTMENTS)).nullable().optional(),
     email: z.string().email().optional(),
     phone: z.string().optional(),
     location: z.string().optional(),

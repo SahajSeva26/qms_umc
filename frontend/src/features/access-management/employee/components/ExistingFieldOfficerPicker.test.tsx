@@ -140,7 +140,7 @@ describe('ExistingFieldOfficerPicker', () => {
     vi.mocked(useFieldOfficerRolePicker).mockReturnValue(pickerReturn({ error: new Error('403') }))
     render(<ExistingFieldOfficerPicker tenant="t-1" roleTypeId="rt-fo" workerLabel="field officer" value={null} onChange={vi.fn()} />)
 
-    expect(screen.getByText(/couldn't search field officers/i)).toBeInTheDocument()
+    expect(screen.getByText(/couldn't search field officer accounts/i)).toBeInTheDocument()
   })
 
   it('"Load more" calls fetchNextPage without losing the currently-shown rows', async () => {
@@ -159,8 +159,8 @@ describe('ExistingFieldOfficerPicker', () => {
     vi.mocked(useFieldOfficerRolePicker).mockReturnValue(pickerReturn({ error: new Error('403') }))
     render(<ExistingFieldOfficerPicker tenant="t-1" roleTypeId="rt-diet" workerLabel="dietitian" value={null} onChange={vi.fn()} />)
 
-    expect(screen.getByPlaceholderText(/search dietitians by name or email/i)).toBeInTheDocument()
-    expect(screen.getByText(/couldn't search dietitians/i)).toBeInTheDocument()
+    expect(screen.getByPlaceholderText(/search dietitian accounts by name or email/i)).toBeInTheDocument()
+    expect(screen.getByText(/couldn't search dietitian accounts/i)).toBeInTheDocument()
   })
 
   it('passes roleTypeId straight through to the underlying picker hook — the search is scoped by id, workerLabel only drives text', () => {

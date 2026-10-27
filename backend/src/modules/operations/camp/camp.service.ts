@@ -102,6 +102,13 @@ const OWN_SCOPE_FIELD_BY_ROLE_TYPE: Record<string, string> = {
     [ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR]: 'mr',
 };
 
+// camp coordinators are scoped by camp TYPE, not by a slot they fill — a screening coordinator sees
+// every screening camp, a diet coordinator every diet camp.
+const OWN_SCOPE_TYPE_BY_ROLE_TYPE: Record<string, string> = {
+    [ALLOWED_ROLETYPE_CODES.PLATFORM.CAMP_COORDINATOR_SCREENING]: CAMP_TYPES.SCREENING,
+    [ALLOWED_ROLETYPE_CODES.PLATFORM.CAMP_COORDINATOR_DIET]: CAMP_TYPES.DIET,
+};
+
 const applyOwnScope = (where: any, ctx: RequestContext) => {
     // a pharma division head sees every camp in their division
     if (ctx.role?.type?.code === ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_DIVISION_HEAD) {
@@ -111,6 +118,13 @@ const applyOwnScope = (where: any, ctx: RequestContext) => {
 
     // a manage actor is unscoped
     if (ctx.hasAnyPermissions([CAMP_PERMISSIONS.MANAGE.code])) {
+        return where;
+    }
+
+    // camp coordinators see every camp of their type (screening coord → screening, diet coord → diet)
+    const campType = OWN_SCOPE_TYPE_BY_ROLE_TYPE[ctx.role?.type?.code];
+    if (campType) {
+        where.type = campType;
         return where;
     }
 
@@ -561,7 +575,6 @@ const search = async (filters: ISearchCampQuery, ctx: RequestContext, options?: 
     const sort: any = { date: -1 };
 
     const where: mongoose.QueryFilter<ICamp> = { ...ctx.where() };
-    applyOwnScope(where, ctx);
 
     // tenant filter (switch tenants) is only honoured for a `camp:manage` actor not already
     // tenant-pinned by ctx.where() — a customer actor stays locked to their own tenant.
@@ -611,6 +624,10 @@ const search = async (filters: ISearchCampQuery, ctx: RequestContext, options?: 
             where.date.$lte = endOfUTCDay(filters.dateTo);
         }
     }
+
+    // applied LAST so the caller's scope always wins — a filter (type/fo/dietitian/division) can only
+    // narrow within it, never overwrite it
+    applyOwnScope(where, ctx);
 
     const countPromise = CampModel.countDocuments(where);
     const dataPromise = CampModel.find(where)

@@ -1,9 +1,15 @@
 import { z } from 'zod';
 import { CONTACT_STATUS, CONTACT_TYPES } from './contact.constants';
 import { isValidObjectID } from '../../../shared/utils/strings';
+import { DESIGNATIONS_BY_DEPARTMENT, EMPLOYEE_DEPARTMENTS } from '../../access-management/employee/employee.constants';
 
 const objectId = (label: string) =>
     z.string().refine((val) => isValidObjectID(val), { message: `${label} must be a valid id` });
+
+// every designation key across all departments (the department↔designation pairing is checked in the service)
+const DESIGNATION_KEYS = [
+    ...new Set(Object.values(DESIGNATIONS_BY_DEPARTMENT).flatMap((list) => list.map((d) => d.key))),
+] as [string, ...string[]];
 
 //1: create ====================================>
 export const CreateContactPayloadSchema = z.object({
@@ -13,8 +19,8 @@ export const CreateContactPayloadSchema = z.object({
     // optional — the division (within the tenant) this contact belongs to. Must belong to the tenant.
     division: objectId('Division').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8b' }),
     name: z.string().min(1).openapi({ example: 'Dr. Anil Mehta' }),
-    designation: z.string().optional().openapi({ example: 'Medical Advisor' }),
-    department: z.string().optional().openapi({ example: 'Cardiology' }),
+    designation: z.enum(DESIGNATION_KEYS).optional().openapi({ example: 'marketingmanager' }),
+    department: z.enum(Object.values(EMPLOYEE_DEPARTMENTS)).optional().openapi({ example: 'marketing' }),
     email: z.string().email().optional().openapi({ example: 'anil.mehta@pharma.com' }),
     phone: z.string().optional().openapi({ example: '+91 98765 43210' }),
     location: z.string().optional().openapi({ example: 'Mumbai, MH' }),
@@ -30,8 +36,8 @@ export type ICreateContactPayload = z.infer<typeof CreateContactPayloadSchema>;
 // which also keeps the "pharma contacts require a division" invariant intact).
 export const UpdateContactPayloadSchema = z.object({
     name: z.string().min(1).optional(),
-    designation: z.string().optional(),
-    department: z.string().optional(),
+    designation: z.enum(DESIGNATION_KEYS).optional(),
+    department: z.enum(Object.values(EMPLOYEE_DEPARTMENTS)).optional(),
     email: z.string().email().optional(),
     phone: z.string().optional(),
     location: z.string().optional(),

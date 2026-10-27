@@ -54,21 +54,39 @@ const assertDesignationMatchesDepartment = (department?: string | null, designat
 };
 
 const set = (model: any, entity: HydratedDocument<IContact>) => {
-    if (model.name) entity.name = model.name;
+    if (model.name) {
+        entity.name = model.name;
+    }
     if (model.designation !== undefined || model.department !== undefined) {
         // validate the resulting pair — a payload may change only one side of it
         const department = model.department !== undefined ? model.department : entity.department;
         const designation = model.designation !== undefined ? model.designation : entity.designation;
         assertDesignationMatchesDepartment(department, designation);
     }
-    if (model.designation !== undefined) entity.designation = model.designation;
-    if (model.department !== undefined) entity.department = model.department;
-    if (model.email !== undefined) entity.email = model.email;
-    if (model.phone !== undefined) entity.phone = model.phone;
-    if (model.location !== undefined) entity.location = model.location;
-    if (model.type) entity.type = model.type;
-    if (model.user !== undefined) entity.user = model.user;
-    if (model.status) entity.status = model.status;
+    if (model.designation !== undefined) {
+        entity.designation = model.designation;
+    }
+    if (model.department !== undefined) {
+        entity.department = model.department;
+    }
+    if (model.email !== undefined) {
+        entity.email = model.email;
+    }
+    if (model.phone !== undefined) {
+        entity.phone = model.phone;
+    }
+    if (model.location !== undefined) {
+        entity.location = model.location;
+    }
+    if (model.type) {
+        entity.type = model.type;
+    }
+    if (model.user !== undefined) {
+        entity.user = model.user;
+    }
+    if (model.status) {
+        entity.status = model.status;
+    }
     return entity;
 };
 

@@ -11,6 +11,16 @@ import { isValidObjectID, toObjectId } from '../../../shared/utils/strings';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { CampService } from '../camp/camp.service';
 import { CAMP_STATUSES } from '../camp/camp.constants';
+import { ALLOWED_ROLETYPE_CODES } from '../../access-management/role-type/roleType.constants';
+
+// ratings are "owned" only by the three field roles involved — the rated worker (FO/dietitian) and the
+// rater (MR). These role types see only their own ratings; any OTHER read-granted actor (ops team) sees
+// all ratings within their tenant.
+const SELF_SCOPED_RATING_ROLE_TYPES: string[] = [
+    ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER,
+    ALLOWED_ROLETYPE_CODES.PLATFORM.DIETITIAN,
+    ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR,
+];
 
 const populate: any[] = [
     { path: 'tenant', select: 'name code' },
@@ -58,12 +68,39 @@ const assertRaterOrManage = (rating: any, ctx: RequestContext) => {
     }
 };
 
-// a non-manage actor sees only ratings they gave (ratedBy) or that are about them (worker); manage
-// sees everything within ctx.where().
+// the FO/dietitian (worker) and MR (rater) see only ratings about/by them; manage AND the ops team
+// (coordinators/managers granted read, who are NOT self-scoped role types) see all within ctx.where().
 const applyOwnScope = (where: any, ctx: RequestContext) => {
-    if (!ctx.hasAnyPermissions([RATING_PERMISSIONS.MANAGE.code])) {
+    if (ctx.hasAnyPermissions([RATING_PERMISSIONS.MANAGE.code])) {
+        return;
+    }
+    if (SELF_SCOPED_RATING_ROLE_TYPES.includes(ctx.role?.type?.code)) {
         where.$or = [{ worker: ctx.role?._id }, { ratedBy: ctx.role?._id }];
     }
+};
+
+// "my ratings" — always pinned to the caller (ratings about them as worker OR given by them as rater),
+// regardless of role type / manage. Backs GET /ratings/me.
+const mine = async (filters: ISearchRatingQuery, ctx: RequestContext, options?: IServiceOptions) => {
+    const sort: any = { createdAt: -1 };
+
+    const where: mongoose.QueryFilter<IRating> = { ...ctx.where() };
+    where.$or = [{ worker: ctx.role?._id }, { ratedBy: ctx.role?._id }];
+
+    if (filters.camp) {
+        where.camp = toObjectId(filters.camp);
+    }
+
+    const countPromise = RatingModel.countDocuments(where);
+    const dataPromise = RatingModel.find(where)
+        .populate(populate)
+        .limit(options?.pagination?.limit)
+        .skip(options?.pagination?.skip)
+        .sort(sort);
+
+    const [count, items] = await Promise.all([countPromise, dataPromise]);
+
+    return { count, items };
 };
 
 // ================================ CORE FUNCTIONS ================================
@@ -208,6 +245,7 @@ const update = async (id: string, model: IUpdateRatingPayload, ctx: RequestConte
 export const RatingService = {
     get,
     search,
+    mine,
     create,
     update,
 };

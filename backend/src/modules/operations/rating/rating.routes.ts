@@ -36,6 +36,18 @@ registry.registerPath({
     },
 });
 
+// my ratings — the caller's own ratings (about them as worker OR given by them as rater)
+registry.registerPath({
+    method: 'get',
+    path: '/ratings/me',
+    tags: ['RATING'],
+    summary: 'Get the calling user\'s own ratings',
+    request: { query: SearchRatingQuerySchema },
+    responses: {
+        200: { description: 'Ratings fetched successfully' },
+    },
+});
+
 // create rating
 registry.registerPath({
     method: 'post',
@@ -77,6 +89,8 @@ registry.registerPath({
 // =======================================================================
 // reads require the matching read permission (or manage); writes require the matching write permission
 // (or manage).
+// /me declared before /:id so the literal path isn't swallowed by the param route
+RatingRouter.get('/me', AuthorizeMiddleware([RATING_PERMISSIONS.GET.code, RATING_PERMISSIONS.SEARCH.code, RATING_PERMISSIONS.MANAGE.code], 'OR'), RatingController.me);
 RatingRouter.get('/:id', AuthorizeMiddleware([RATING_PERMISSIONS.GET.code, RATING_PERMISSIONS.MANAGE.code], 'OR'), RatingController.get);
 RatingRouter.get('/', AuthorizeMiddleware([RATING_PERMISSIONS.SEARCH.code, RATING_PERMISSIONS.MANAGE.code], 'OR'), RatingController.search);
 RatingRouter.post('/', AuthorizeMiddleware([RATING_PERMISSIONS.CREATE.code, RATING_PERMISSIONS.MANAGE.code], 'OR'), RatingController.create);

@@ -126,6 +126,9 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
             APPOINTMENT_PERMISSIONS.GET.code,
             APPOINTMENT_PERMISSIONS.RSVP.code,
             PATIENT_PERMISSIONS.CREATE.code,
+            // ops oversight — read the camp-worker ratings in their tenant (not self-scoped)
+            RATING_PERMISSIONS.GET.code,
+            RATING_PERMISSIONS.SEARCH.code,
         ],
     },
     {
@@ -146,6 +149,9 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
             APPOINTMENT_PERMISSIONS.GET.code,
             APPOINTMENT_PERMISSIONS.RSVP.code,
             PATIENT_PERMISSIONS.CREATE.code,
+            // ops oversight — read the camp-worker ratings in their tenant (not self-scoped)
+            RATING_PERMISSIONS.GET.code,
+            RATING_PERMISSIONS.SEARCH.code,
         ],
     },
     {
@@ -162,6 +168,9 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
             APPOINTMENT_PERMISSIONS.SEARCH.code,
             APPOINTMENT_PERMISSIONS.GET.code,
             APPOINTMENT_PERMISSIONS.RSVP.code,
+            // ops oversight — read the camp-worker ratings in their tenant (not self-scoped)
+            RATING_PERMISSIONS.GET.code,
+            RATING_PERMISSIONS.SEARCH.code,
         ],
     },
     {
@@ -178,6 +187,9 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
             APPOINTMENT_PERMISSIONS.SEARCH.code,
             APPOINTMENT_PERMISSIONS.GET.code,
             APPOINTMENT_PERMISSIONS.RSVP.code,
+            // ops oversight — read the camp-worker ratings in their tenant (not self-scoped)
+            RATING_PERMISSIONS.GET.code,
+            RATING_PERMISSIONS.SEARCH.code,
         ],
     },
 

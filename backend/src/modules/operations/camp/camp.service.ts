@@ -1021,8 +1021,12 @@ const allocateWorker = async (id: string, ctx: RequestContext) => {
     }
 
     const role = await resolveNearestFreeWorker(camp, worker, ctx);
+    await CampService.update(id, { [worker.field]: role.toString() } as any, ctx);
 
-    return CampService.update(id, { [worker.field]: role.toString() } as any, ctx);
+    // mirror create(): a camp with its worker allocated is auto-confirmed (moveStage re-checks the slot)
+    await moveStage(id, { to: CAMP_STATUSES.CONFIRMED, reason: `Auto-confirmed on ${worker.label} allocation` } as any, ctx);
+
+    return CampService.get(id, ctx, { populate: true });
 };
 
 // authorize a pharma booker against the target MR by the caller's own role type:

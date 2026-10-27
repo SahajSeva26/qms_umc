@@ -1,9 +1,10 @@
 import mongoose, { HydratedDocument } from 'mongoose';
 import { ITenant, TenantModel } from './tenant.model';
-import { ICreateTenantPayload, ISearchTenantQuery, IUpdateTenantPayload } from './tenant.validators';
+import { CreateTenantPayloadSchema, ICreateTenantPayload, ISearchTenantQuery, IUpdateTenantPayload } from './tenant.validators';
 import { TENANT_COUNTER_ENTITY, TENANT_PERMISSIONS, TENANT_STATUS, TENANT_TYPE } from './tenant.constants';
 import { CounterService } from '../../counter/counter.service';
-import { throwAppError } from '../../../shared/utils/error';
+import { throwAppError, formatZodError } from '../../../shared/utils/error';
+import { CsvHelper } from '../../../shared/helpers/csvHelper';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
 import { isValidObjectID, toObjectId } from '../../../shared/utils/strings';
@@ -434,11 +435,99 @@ const createTenant = async (model: ICreateTenantPayload, ctx: RequestContext) =>
     }
 };
 
+// resolve a sales person (platform sales-rep Role) by email at runtime. Global lookup — sales persons
+// are platform staff. Returns the role id, or undefined if the email is unknown or the resolved role
+// isn't a sales-rep (the bulk importer then simply skips assignment, keeping the client).
+const resolveSalesPersonByEmail = async (email: string): Promise<string | undefined> => {
+    const user = await UserModel.findOne({ email: email.toLowerCase() }).select('_id');
+    if (!user) {
+        return undefined;
+    }
+    const role: any = await RoleModel.findOne({ user: user._id }).populate('type');
+    if (!role || role.type?.code !== ALLOWED_ROLETYPE_CODES.PLATFORM.SALES_REP) {
+        return undefined;
+    }
+    return role._id.toString();
+};
+
+// map one CSV row → CreateTenantPayload (sales person resolved by email at runtime).
+const rowToTenantPayload = async (row: any): Promise<any> => {
+    const hasAddress = Boolean(row.addressLine1 || row.city || row.state || row.pincode);
+
+    // resolve the sales person by email; an unknown email or a non-sales-rep role is silently
+    // skipped — the client is still imported, just without a sales person assigned.
+    const salesPerson = row.salesPersonEmail ? await resolveSalesPersonByEmail(row.salesPersonEmail) : undefined;
+
+    return {
+        name: row.name,
+        description: row.description || undefined,
+        gst: row.gst || undefined,
+        businessLifetime: row.businessLifetime ? Number(row.businessLifetime) : undefined,
+        salesPerson,
+        owner: {
+            firstName: row.ownerFirstName,
+            lastName: row.ownerLastName || undefined,
+            email: row.ownerEmail,
+            password: row.ownerPassword,
+            phone: row.ownerPhone || undefined,
+            gender: row.ownerGender || undefined,
+        },
+        address: hasAddress
+            ? {
+                  addressLine1: row.addressLine1,
+                  addressLine2: row.addressLine2 || undefined,
+                  locality: row.locality || undefined,
+                  city: row.city,
+                  state: row.state,
+                  country: row.country || undefined,
+                  pincode: row.pincode,
+                  googlePlaceId: row.googlePlaceId || undefined,
+                  coordinates: row.longitude && row.latitude ? [Number(row.longitude), Number(row.latitude)] : undefined,
+              }
+            : undefined,
+    };
+};
+
+// bulk-import CUSTOMER clients from a CSV. Every row is processed in parallel (Promise.all): build +
+// validate the payload → createTenant (a full transaction: tenant + permission group + role types +
+// owner user + admin role). Each row catches its own error so one bad row never aborts the rest; the
+// bulk stats are totalled at the end. type is never set → defaults to customer (customer-only import).
+const bulkCreate = async (file: Express.Multer.File, ctx: RequestContext) => {
+    const rows = await CsvHelper.parse(file.buffer);
+
+    const results = await Promise.all(
+        rows.map(async (row: any, index: number) => {
+            const rowNumber = index + 1;
+            try {
+                const payload = await rowToTenantPayload(row);
+                const { data, success, error } = CreateTenantPayloadSchema.safeParse(payload);
+                if (!success) {
+                    return { ok: false as const, row: rowNumber, error: formatZodError(error) };
+                }
+                await createTenant(data, ctx);
+                return { ok: true as const, row: rowNumber };
+            } catch (error: any) {
+                return { ok: false as const, row: rowNumber, error: error?.message || 'Failed to create client' };
+            }
+        }),
+    );
+
+    const failed = results.filter((r) => !r.ok) as { ok: false; row: number; error: any }[];
+
+    return {
+        totalRows: rows.length,
+        created: results.filter((r) => r.ok).length,
+        failed: failed.length,
+        errors: failed.map((f) => ({ row: f.row, error: f.error })),
+    };
+};
+
 export const TenantService = {
     get,
     search,
     create: createTenant,
     update,
+    bulkCreate,
 };
 
 // ========================================================================================

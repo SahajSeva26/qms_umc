@@ -14,6 +14,7 @@ export const CreateContactPayloadSchema = z.object({
     division: objectId('Division').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8b' }),
     name: z.string().min(1).openapi({ example: 'Dr. Anil Mehta' }),
     designation: z.string().optional().openapi({ example: 'Medical Advisor' }),
+    department: z.string().optional().openapi({ example: 'Cardiology' }),
     email: z.string().email().optional().openapi({ example: 'anil.mehta@pharma.com' }),
     phone: z.string().optional().openapi({ example: '+91 98765 43210' }),
     location: z.string().optional().openapi({ example: 'Mumbai, MH' }),
@@ -30,6 +31,7 @@ export type ICreateContactPayload = z.infer<typeof CreateContactPayloadSchema>;
 export const UpdateContactPayloadSchema = z.object({
     name: z.string().min(1).optional(),
     designation: z.string().optional(),
+    department: z.string().optional(),
     email: z.string().email().optional(),
     phone: z.string().optional(),
     location: z.string().optional(),

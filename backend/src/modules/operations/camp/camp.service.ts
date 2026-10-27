@@ -693,8 +693,9 @@ const create = async (model: ICreateCampPayload, ctx: RequestContext): Promise<H
     }
 
     //4: best-effort auto-assign the nearest free worker when none supplied; on failure the camp stays
-    // requested with no assignee (moveStage then blocks it leaving requested).
-    if (!camp[worker.field]) {
+    // requested with no assignee (moveStage then blocks it leaving requested). Diet camps are excluded
+    // — the internal team allocates the dietitian themselves (manual pick / allocateWorker).
+    if (!camp[worker.field] && worker !== DIETITIAN_WORKER) {
         try {
             const role = await resolveNearestFreeWorker(camp, worker, ctx);
             camp = await set({ [worker.field]: role.toString() }, camp, ctx);

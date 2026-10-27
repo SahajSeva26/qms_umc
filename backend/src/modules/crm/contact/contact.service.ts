@@ -38,6 +38,7 @@ const resolveTenant = (model: ICreateContactPayload, ctx: RequestContext): strin
 const set = (model: any, entity: HydratedDocument<IContact>) => {
     if (model.name) entity.name = model.name;
     if (model.designation !== undefined) entity.designation = model.designation;
+    if (model.department !== undefined) entity.department = model.department;
     if (model.email !== undefined) entity.email = model.email;
     if (model.phone !== undefined) entity.phone = model.phone;
     if (model.location !== undefined) entity.location = model.location;

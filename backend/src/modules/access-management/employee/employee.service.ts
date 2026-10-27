@@ -11,6 +11,7 @@ import { IServiceOptions } from '../../../shared/types/service.types';
 import { TENANT_TYPE } from '../tenant/tenant.constants';
 import { UserService } from '../../user/user.service';
 import { ALLOWED_ROLETYPE_CODES } from '../role-type/roleType.constants';
+import { TenantService } from '../tenant/tenant.service';
 
 const populate: any[] = [
     { path: 'tenant', select: 'name code type' },
@@ -46,6 +47,19 @@ const resolveTenant = (model: ICreateEmployeePayload, ctx: RequestContext): stri
         return throwAppError('Tenant is required', StatusCodes.BAD_REQUEST);
     }
     return model.tenant;
+};
+
+// Employees are QMS internal staff — only a PLATFORM tenant may hold them. Blocks customer
+// (pharma) tenants outright, including a customer admin (whose role-type code is also 'admin'
+// and therefore passes the route's RoleGuard).
+const assertPlatformTenant = async (tenantId: string, ctx: RequestContext) => {
+    const tenant = await TenantService.get(tenantId, ctx);
+    if (!tenant) {
+        throwAppError('Tenant not found', StatusCodes.NOT_FOUND);
+    }
+    if (tenant!.type !== TENANT_TYPE.PLATFORM) {
+        throwAppError('Employee records can only be created for platform tenants', StatusCodes.FORBIDDEN);
+    }
 };
 
 // ========================================================================================
@@ -165,6 +179,9 @@ const search = async (filters: ISearchEmployeeQuery, ctx: RequestContext, option
 const create = async (model: ICreateEmployeePayload, ctx: RequestContext): Promise<EmployeeDocument> => {
     //1: resolve owning tenant (explicit for platform, own-tenant for customer)
     const tenant = resolveTenant(model, ctx);
+
+    //1b: enforce platform-only — employees are QMS internal staff
+    await assertPlatformTenant(tenant, ctx);
 
     //2: linked user must exist
     const user = await UserService.get(model.user, ctx);

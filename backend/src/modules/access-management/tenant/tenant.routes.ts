@@ -2,12 +2,14 @@ import express from 'express';
 import { TenantController } from './tenant.controller';
 import { registry } from '../../../shared/config/swagger/swagger.registry';
 import {
+    BulkTenantOpenApiSchema,
     CreateTenantPayloadSchema,
     SearchTenantQuerySchema,
     UpdateTenantPayloadSchema,
 } from './tenant.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
 import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { csvUploader } from '../../../shared/middlewares/upload/csvUploader';
 import {
     PERMISSIONS,
     SYSTEM_PERMISSIONS,
@@ -74,6 +76,27 @@ registry.registerPath({
     },
 });
 
+// bulk create customer clients (CSV upload)
+registry.registerPath({
+    method: 'post',
+    path: '/tenants/bulk',
+    tags: ['TENANT'],
+    summary: 'Bulk create customer clients from a CSV upload',
+    request: {
+        body: {
+            content: {
+                'multipart/form-data': {
+                    schema: BulkTenantOpenApiSchema,
+                },
+            },
+        },
+    },
+    responses: {
+        200: { description: 'Clients created successfully' },
+        400: { description: 'Validation error / clients created with errors' },
+    },
+});
+
 // update tenant
 registry.registerPath({
     method: 'put',
@@ -136,6 +159,17 @@ TenantRouter.get(
         PERMISSIONS.TENANT.MANAGE.code,
     ]),
     TenantController.search,
+);
+// bulk create — platform-only (same guard as single create); CSV file field name is `file`.
+// declared before POST '/' for clarity.
+TenantRouter.post(
+    '/bulk',
+    AuthorizeMiddleware([
+        PERMISSIONS.TENANT.MANAGE.code,
+        SYSTEM_PERMISSIONS.MANAGE.code,
+    ]),
+    csvUploader.single('file'),
+    TenantController.bulkCreate,
 );
 TenantRouter.post(
     '/',

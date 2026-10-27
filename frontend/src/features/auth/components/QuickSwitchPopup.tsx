@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { FiX, FiRepeat, FiRefreshCw } from 'react-icons/fi'
+import { FiRepeat, FiRefreshCw } from 'react-icons/fi'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import { useLogin } from '@/features/auth/hooks/useLogin'
 import { AUTH_ROUTES } from '@/features/auth/auth.paths'
 import { getApiErrorMessage, isForbiddenError } from '@/utils/apiError'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   getCachedQuickSwitchAccounts,
   setCachedQuickSwitchAccounts,
@@ -16,9 +17,8 @@ interface QuickSwitchPopupProps {
   onClose: () => void
 }
 
-// The seed script (seedQmsDemo.ts) uses this fixed password for every demo account; a real
-// password is bcrypt-hashed server-side and can never be read back, so this is the one thing we
-// have to assume rather than fetch.
+// seedQmsDemo.ts's fixed password for every demo account — a real password is hashed and
+// can never be read back, so this is the one thing we assume rather than fetch.
 const DEMO_PASSWORD = 'Test@123'
 
 function roleLabel(role: { type: unknown; user: unknown }): string {
@@ -34,15 +34,8 @@ function roleEmail(role: { user: unknown }): string | null {
   return user?.email ?? null
 }
 
-// Dev-only: drives the real POST /auth/login with a known demo account's credentials, one click
-// per role — avoids opening a separate tab/incognito window to test as another role. Never shown
-// in a production build (gated by import.meta.env.DEV at the Topbar call site).
-//
-// GET /roles (used to build this list) requires tenant:admin/tenant:manage/role:search, which most
-// role types don't hold — so the list is fetched ONCE while on an admin-ish session and cached
-// client-side (quickSwitch.cache.ts); every later switch, from any role, reads the cache instead
-// of needing another privileged fetch. Opening this for the first time from a non-admin role (empty
-// cache, 403 on fetch) shows a message to start from Admin instead of failing silently.
+// Dev-only. GET /roles needs role:search/tenant:manage, which most roles lack, so the account
+// list is fetched once from an admin-ish session and cached (quickSwitch.cache.ts) for later switches.
 const QuickSwitchPopup = ({ onClose }: QuickSwitchPopupProps) => {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -64,7 +57,6 @@ const QuickSwitchPopup = ({ onClose }: QuickSwitchPopupProps) => {
         return email ? { label: roleLabel(role), email, password: DEMO_PASSWORD } : null
       })
       .filter((a): a is QuickSwitchAccount => !!a)
-      // Stable, readable ordering.
       .sort((a, b) => a.label.localeCompare(b.label))
 
     if (accounts.length > 0) {
@@ -80,9 +72,7 @@ const QuickSwitchPopup = ({ onClose }: QuickSwitchPopupProps) => {
 
   const handleSwitch = (email: string, password: string, label: string) => {
     setPendingLabel(label)
-    // Drop every cached query before switching — otherwise the next user could briefly see the
-    // previous user's cached lists/details until each query's own staleTime naturally expires
-    // (same reasoning as useAuth.ts's signOut()).
+    // Drop every cached query so the next user never briefly sees stale data (useAuth.ts's signOut()).
     queryClient.clear()
     login(
       { email, password },
@@ -99,34 +89,25 @@ const QuickSwitchPopup = ({ onClose }: QuickSwitchPopupProps) => {
   }
 
   return (
-    <div className="fixed inset-0 z-60 flex items-center justify-center p-4" style={{ background: 'rgba(7,11,28,.5)' }}>
-      <div className="fixed inset-0" onClick={onClose} />
-      <div
-        className="relative w-full max-w-sm max-h-[80vh] flex flex-col rounded-2xl border shadow-2xl overflow-hidden"
-        style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}
-      >
-        <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--qms-border)' }}>
-          <div className="flex items-center gap-2">
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="max-h-[80vh] overflow-hidden flex flex-col p-0 gap-0">
+        <DialogHeader className="shrink-0 flex-row items-center justify-between px-4 py-3 space-y-0" style={{ borderBottom: '1px solid var(--qms-border)' }}>
+          <DialogTitle className="flex items-center gap-2 text-[13px] font-bold" style={{ color: 'var(--qms-text)' }}>
             <FiRepeat size={14} style={{ color: 'var(--qms-brand)' }} />
-            <span className="text-[13px] font-bold" style={{ color: 'var(--qms-text)' }}>Quick switch (dev)</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={handleRefresh}
-              disabled={isLoading}
-              title="Refresh the account list from the database"
-              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-(--qms-surface-hover) disabled:opacity-50"
-              style={{ color: 'var(--qms-text-muted)' }}
-            >
-              <FiRefreshCw size={13} className={isLoading ? 'animate-spin' : ''} />
-            </button>
-            <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-(--qms-surface-hover)" style={{ color: 'var(--qms-text-muted)' }}>
-              <FiX size={15} />
-            </button>
-          </div>
-        </div>
+            Quick switch (dev)
+          </DialogTitle>
+          <button
+            onClick={handleRefresh}
+            disabled={isLoading}
+            title="Refresh the account list from the database"
+            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-(--qms-surface-hover) disabled:opacity-50"
+            style={{ color: 'var(--qms-text-muted)' }}
+          >
+            <FiRefreshCw size={13} className={isLoading ? 'animate-spin' : ''} />
+          </button>
+        </DialogHeader>
 
-        <div className="overflow-y-auto px-2 py-2">
+        <div className="flex-1 min-h-0 overflow-y-auto px-2 py-2">
           {isLoading && accounts.length === 0 && (
             <p className="text-[12px] px-3 py-4" style={{ color: 'var(--qms-text-muted)' }}>Loading accounts…</p>
           )}
@@ -162,12 +143,12 @@ const QuickSwitchPopup = ({ onClose }: QuickSwitchPopupProps) => {
         </div>
 
         {loginError && (
-          <div className="mx-3 mb-3 text-[12px] rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
+          <div className="shrink-0 mx-3 mb-3 text-[12px] rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
             {getApiErrorMessage(loginError, 'Could not sign in with that account.')}
           </div>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 

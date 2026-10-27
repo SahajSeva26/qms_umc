@@ -12,7 +12,6 @@ import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
 import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
 import { reportRateLimiter } from '../../../shared/middlewares/rateLimiter';
 import { PROJECT_PERMISSIONS } from './project.constants';
-import { TENANT_PERMISSIONS } from '../../access-management/tenant/tenant.constants';
 import { CAMP_PERMISSIONS } from '../../operations/camp/camp.constants';
 
 export const ProjectRouter = express.Router();
@@ -134,15 +133,17 @@ registry.registerPath({
 // =======================================================================
 // ======================== EXPORT PROJECT ROUTES ========================
 // =======================================================================
-const GUARD = [PROJECT_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code];
+// manage-only actions (report + set-live/stage). Project is gated purely on project:* permissions —
+// tenant:manage is deliberately not accepted here (it is not of this domain). Sales Head owns set-LIVE.
+const MANAGE_GUARD = [PROJECT_PERMISSIONS.MANAGE.code];
 // reps (project:search) may read; service scopes them to their own. camp:book lets pharma field-force
 // read projects (the service scopes them to their division) so they can pick what to book against.
-const READ_GUARD = [PROJECT_PERMISSIONS.SEARCH.code, CAMP_PERMISSIONS.BOOK.code, ...GUARD];
+const READ_GUARD = [PROJECT_PERMISSIONS.SEARCH.code, CAMP_PERMISSIONS.BOOK.code, ...MANAGE_GUARD];
 
 ProjectRouter.get(
     '/report',
     reportRateLimiter,
-    AuthorizeMiddleware(GUARD),
+    AuthorizeMiddleware(MANAGE_GUARD),
     ProjectController.report
 );
 
@@ -152,20 +153,19 @@ ProjectRouter.get(
         PROJECT_PERMISSIONS.MANAGE.code,
         PROJECT_PERMISSIONS.SEARCH.code,
         CAMP_PERMISSIONS.BOOK.code, // pharma field-force (book-only) may read projects; service scopes them to their division
-        TENANT_PERMISSIONS.MANAGE.code,
     ]),
     ProjectController.get,
 );
 ProjectRouter.put(
     '/:id',
-    AuthorizeMiddleware([PROJECT_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
+    AuthorizeMiddleware([PROJECT_PERMISSIONS.MANAGE.code, PROJECT_PERMISSIONS.UPDATE.code]),
     ProjectController.update,
 );
 ProjectRouter.patch(
     '/:id/stage',
-    AuthorizeMiddleware([PROJECT_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
+    AuthorizeMiddleware(MANAGE_GUARD),
     ProjectController.moveStage,
 );
 
 ProjectRouter.get('/', AuthorizeMiddleware(READ_GUARD), ProjectController.search);
-ProjectRouter.post('/', AuthorizeMiddleware(GUARD), ProjectController.create);
+ProjectRouter.post('/', AuthorizeMiddleware([PROJECT_PERMISSIONS.MANAGE.code, PROJECT_PERMISSIONS.CREATE.code]), ProjectController.create);

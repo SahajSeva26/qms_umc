@@ -10,6 +10,7 @@ import { useTenants } from '@/features/access-management/tenant/hooks/useTenants
 import { useDivisions } from '@/features/crm/divisions/hooks/useDivisions'
 import { usePermission } from '@/hooks/usePermission'
 import { createContactSchema, updateContactSchema } from '@/features/contacts/schemas/contact.schemas'
+import { CONTACT_DEPARTMENTS, CONTACT_DEPARTMENT_LABEL, DESIGNATIONS_BY_DEPARTMENT, type ContactDepartment } from '@/features/contacts/contact.constants'
 import { getApiErrorMessage } from '@/utils/apiError'
 import type { ContactEntity, ContactType, ContactStatus } from '@/types/contact.types'
 
@@ -23,23 +24,13 @@ const STATUS_OPTIONS: { value: ContactStatus; label: string }[] = [
   { value: 'inactive', label: 'Inactive' },
 ]
 
-// Frontend-only — `designation` stays a free string on the backend
-// (CreateContactPayload/UpdateContactPayload), this just constrains the
-// picker to a fixed list of real-world pharma-company contact roles.
-const DESIGNATION_OPTIONS = [
-  'Division Head',
-  'Marketing Manager',
-  'Regional Sales Manager',
-  'Medical Affairs Lead',
-  'Procurement Officer',
-]
-// Sentinel for the "—" (no designation) option — base-ui Select values must be
-// unique; this shape can't collide with a real free-typed legacy designation
-// the way a plain word like "NONE" could.
-const DESIGNATION_NONE = '__qms_no_designation__'
+const DEPARTMENT_OPTIONS = Object.values(CONTACT_DEPARTMENTS)
+// Sentinel for the "—" (none) option — base-ui Select values must be non-empty/unique.
+const NONE = '__qms_none__'
 
 interface ContactDraft {
   name: string
+  department: string
   designation: string
   email: string
   phone: string
@@ -48,11 +39,12 @@ interface ContactDraft {
   status: ContactStatus
 }
 
-const emptyDraft: ContactDraft = { name: '', designation: '', email: '', phone: '', location: '', type: 'customer', status: 'active' }
+const emptyDraft: ContactDraft = { name: '', department: '', designation: '', email: '', phone: '', location: '', type: 'customer', status: 'active' }
 
 function draftFromContact(c: ContactEntity): ContactDraft {
   return {
     name: c.name,
+    department: c.department ?? '',
     designation: c.designation ?? '',
     email: c.email ?? '',
     phone: c.phone ?? '',
@@ -109,6 +101,17 @@ const EditContactModalForm = ({ contact, onClose, fixedTenantId, fixedDivisionId
   const setDraftField = <K extends keyof ContactDraft>(key: K, value: ContactDraft[K]) => {
     setDraft((p) => ({ ...p, [key]: value }))
   }
+  // Changing department invalidates a designation from the old department's list — clear it
+  // whenever it no longer belongs to the newly picked department (mirrors the backend's own
+  // assertDesignationMatchesDepartment pairing check).
+  const handleDepartmentChange = (nextDepartment: string) => {
+    setDraft((p) => {
+      const stillValid = nextDepartment
+        ? DESIGNATIONS_BY_DEPARTMENT[nextDepartment as ContactDepartment]?.some((d) => d.key === p.designation)
+        : false
+      return { ...p, department: nextDepartment, designation: stillValid ? p.designation : '' }
+    })
+  }
 
   const { sessionPermissions } = usePermission()
   const needsTenantPicker = !isEdit && !fixedTenantId && sessionPermissions?.tenantType === 'platform'
@@ -150,11 +153,11 @@ const EditContactModalForm = ({ contact, onClose, fixedTenantId, fixedDivisionId
         // touched") so a field edited then reverted is never resent.
         await updateContact.mutateAsync({
           ...(draft.name !== initialDraft.name ? { name: result.data.name } : {}),
-          // '' (the "—" dropdown option) must be sent as-is, not folded into
-          // undefined — the backend only clears the field when the key is
-          // PRESENT (`model.designation !== undefined`); an omitted key
-          // leaves the old value untouched, silently no-oping the clear.
-          ...(draft.designation !== initialDraft.designation ? { designation: result.data.designation } : {}),
+          // The "—" dropdown option (draft value '') must map to `null`, not an omitted key or ''
+          // — the backend's UpdateContactPayloadSchema only accepts a real enum key or null (never
+          // ''); an omitted key leaves the old value untouched, silently no-oping the clear.
+          ...(draft.designation !== initialDraft.designation ? { designation: result.data.designation || null } : {}),
+          ...(draft.department !== initialDraft.department ? { department: result.data.department || null } : {}),
           ...(draft.email !== initialDraft.email ? { email: result.data.email || undefined } : {}),
           ...(draft.phone !== initialDraft.phone ? { phone: result.data.phone || undefined } : {}),
           ...(draft.location !== initialDraft.location ? { location: result.data.location || undefined } : {}),
@@ -182,6 +185,7 @@ const EditContactModalForm = ({ contact, onClose, fixedTenantId, fixedDivisionId
           division: result.data.division,
           name: result.data.name,
           designation: result.data.designation || undefined,
+          department: result.data.department || undefined,
           email: result.data.email || undefined,
           phone: result.data.phone || undefined,
           location: result.data.location || undefined,
@@ -258,18 +262,43 @@ const EditContactModalForm = ({ contact, onClose, fixedTenantId, fixedDivisionId
             <Input value={draft.name} onChange={(e) => setDraftField('name', e.target.value)} />
           </div>
           <div>
-            <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Designation</label>
-            <Select value={draft.designation || DESIGNATION_NONE} onValueChange={(v) => { if (!v) return; setDraftField('designation', v === DESIGNATION_NONE ? '' : v) }}>
+            <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Department</label>
+            <Select value={draft.department || NONE} onValueChange={(v) => { if (!v) return; handleDepartmentChange(v === NONE ? '' : v) }}>
               <SelectTrigger className="w-full text-[13px]">
-                <SelectValue>{(v: string) => (v === DESIGNATION_NONE ? 'Select designation' : v)}</SelectValue>
+                <SelectValue>{(v: string) => (v === NONE ? 'Select department' : CONTACT_DEPARTMENT_LABEL[v as ContactDepartment] ?? v)}</SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={DESIGNATION_NONE}>—</SelectItem>
-                {/* An existing contact's designation may predate this fixed list — keep it selectable rather than silently drop it. */}
-                {draft.designation && draft.designation !== DESIGNATION_NONE && !DESIGNATION_OPTIONS.includes(draft.designation) && (
-                  <SelectItem value={draft.designation}>{draft.designation}</SelectItem>
+                <SelectItem value={NONE}>—</SelectItem>
+                {/* An existing contact's department may predate this fixed list — keep it selectable rather than silently drop it. */}
+                {draft.department && !DEPARTMENT_OPTIONS.includes(draft.department as ContactDepartment) && (
+                  <SelectItem value={draft.department}>{draft.department}</SelectItem>
                 )}
-                {DESIGNATION_OPTIONS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                {DEPARTMENT_OPTIONS.map((d) => <SelectItem key={d} value={d}>{CONTACT_DEPARTMENT_LABEL[d]}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-[10.5px] font-bold uppercase tracking-wide block mb-1" style={{ color: 'var(--qms-text-muted)' }}>Designation</label>
+            <Select
+              key={draft.department || 'empty'}
+              value={draft.designation || NONE}
+              onValueChange={(v) => { if (!v) return; setDraftField('designation', v === NONE ? '' : v) }}
+              disabled={!draft.department}
+            >
+              <SelectTrigger className="w-full text-[13px]">
+                <SelectValue>
+                  {(v: string) => {
+                    if (v === NONE) return draft.department ? 'Select designation' : 'Select a department first'
+                    return DESIGNATIONS_BY_DEPARTMENT[draft.department as ContactDepartment]?.find((d) => d.key === v)?.name ?? v
+                  }}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>—</SelectItem>
+                {draft.department &&
+                  DESIGNATIONS_BY_DEPARTMENT[draft.department as ContactDepartment]?.map((d) => (
+                    <SelectItem key={d.key} value={d.key}>{d.name}</SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>

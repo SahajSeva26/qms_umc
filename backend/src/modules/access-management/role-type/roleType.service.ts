@@ -10,7 +10,7 @@ import { TenantService } from '../tenant/tenant.service';
 import { PERMISSIONS_ARRAY, SYSTEM_PERMISSIONS } from '../../../shared/env/permissions';
 import { IServiceOptions } from '../../../shared/types/service.types';
 import { PermissionGroupService } from '../permission-group/permissionGroup.service';
-import { TENANT_PERMISSIONS } from '../tenant/tenant.constants';
+import { TENANT_PERMISSIONS, TENANT_TYPE } from '../tenant/tenant.constants';
 
 type RoleTypeDocument = HydratedDocument<IRoleType> | null;
 const populate: any[] = [
@@ -47,10 +47,7 @@ const set = async (model: any, entity: HydratedDocument<IRoleType>, ctx: Request
         // them on every boot, so any API edit here would be silently reverted. Freeze permissions on
         // them entirely (name/description/status stay editable). Seed is the only writer.
         if (entity.isSystem) {
-            throwAppError(
-                'The permissions of a seeded role type are managed by the system and cannot be modified',
-                StatusCodes.FORBIDDEN,
-            );
+            throwAppError('The permissions of a seeded role type are managed by the system and cannot be modified', StatusCodes.FORBIDDEN);
         }
         // system:manage is a seed-only skeleton key. It can never be granted through the API...
         if (model.permissions.includes(SYSTEM_PERMISSIONS.MANAGE.code)) {
@@ -99,6 +96,9 @@ const search = async (filters: ISearchRoleTypeQuery, ctx: RequestContext, option
 
     const where: mongoose.QueryFilter<IRoleType> = { ...ctx.where() };
 
+    // default visibility: active role types only. A platform/internal actor can override via filters.status below.
+    where.status = ROLE_TYPE_STATUSES.ACTIVE;
+
     if (filters.name) {
         where.name = { $regex: filters.name, $options: 'i' };
     }
@@ -107,10 +107,14 @@ const search = async (filters: ISearchRoleTypeQuery, ctx: RequestContext, option
         where.code = filters.code;
     }
 
-    if (filters.status && ctx.hasAnyPermissions([TENANT_PERMISSIONS.ADMIN.code, TENANT_PERMISSIONS.MANAGE.code])) {
+    // only a platform/internal actor may override the default (e.g. to see inactive role types);
+    // a customer actor always stays on the active-only default.
+    if (filters.status && ctx.tenant?.type === TENANT_TYPE.PLATFORM) {
         where.status = filters.status;
     }
-    if (filters.tenant && ctx.hasAnyPermissions([TENANT_PERMISSIONS.MANAGE.code])) {
+    // a platform/internal actor may target a specific tenant; a customer actor is already
+    // pinned to its own tenant by ctx.where() (same idiom as doctor/brand/contact/employee/file search).
+    if (filters.tenant && ctx.tenant?.type === TENANT_TYPE.PLATFORM) {
         where.tenant = toObjectId(filters.tenant);
     }
 

@@ -1,14 +1,17 @@
 import { describe, it, expect } from 'vitest'
-import { computeKpis } from './crm.kpis'
+import { computeKpis, computeValueKpis } from './crm.kpis'
 import type { LeadReportResponse } from '@/types/crm.types'
 
-function makeReport(summary: Partial<LeadReportResponse['summary']>): LeadReportResponse {
+function makeReport(
+  summary: Partial<LeadReportResponse['summary']>,
+  kpis: Partial<LeadReportResponse['kpis']> = {},
+): LeadReportResponse {
   return {
     summary: { totalLeads: 0, converted: 0, lost: 0, open: 0, ...summary },
     byStatus: [],
     byProjectType: [],
     trends: { newLeads: { from: '2026-08-01', to: '2026-09-01', data: [] } },
-    kpis: { pipelineValue: 0, wonValue: 0, wonCount: 0, avgDealSize: 0, winRate: 0, salesVelocityDays: 0, topRep: null },
+    kpis: { pipelineValue: 0, wonValue: 0, wonCount: 0, avgDealSize: 0, winRate: 0, salesVelocityDays: 0, topRep: null, ...kpis },
   }
 }
 
@@ -40,5 +43,28 @@ describe('computeKpis', () => {
   it('returns zeroed tiles when report is null', () => {
     const tiles = computeKpis(null)
     expect(tiles.every((t) => t.value === 0)).toBe(true)
+  })
+})
+
+describe('computeValueKpis', () => {
+  it('does not add a Top Rep tile when report.kpis.topRep is null', () => {
+    const tiles = computeValueKpis(makeReport({}, { topRep: null }))
+    expect(tiles.find((t) => t.id === 'topRep')).toBeUndefined()
+    expect(tiles.map((t) => t.id)).toEqual(['pipelineValue', 'wonValue', 'avgDealSize', 'salesVelocityDays'])
+  })
+
+  it('adds a Top Rep tile reusing report.kpis.topRep — no extra fetch, picked up from the already-loaded report', () => {
+    const tiles = computeValueKpis(
+      makeReport({}, { topRep: { salesPerson: 'r-1', name: 'Rohit Malhotra', wonValue: 2500000, wonCount: 7 } }),
+    )
+
+    const topRepTile = tiles.find((t) => t.id === 'topRep')
+    expect(topRepTile).toMatchObject({ label: 'Top Rep', fmt: 'raw', value: 'Rohit Malhotra' })
+    expect(topRepTile?.sub).toContain('7 won')
+  })
+
+  it('returns no Top Rep tile (not a crash) when report is undefined', () => {
+    const tiles = computeValueKpis(undefined)
+    expect(tiles.find((t) => t.id === 'topRep')).toBeUndefined()
   })
 })

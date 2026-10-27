@@ -96,8 +96,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   // GET /doctors is open to any authenticated user server-side — no REAL_GATED_NAV_ITEMS entry.
   { id: 'doctors',      label: 'Doctor Management',           icon: 'Activity',      path: DOCTORS_ROUTES.DOCTORS },
 
-  // GET /geo-profiles is open to any authenticated user server-side, but visibleNav.ts's
-  // REAL_GATED_NAV_ITEMS still hides this item from a field-officer session (frontend-only gate).
+  // GET /geo-profiles is open to any authenticated user server-side — no REAL_GATED_NAV_ITEMS entry.
   { id: 'geoprofiles',  label: 'Field Staff Coverage',        icon: 'MapPin',        path: GEO_PROFILE_ROUTES.GEO_PROFILES },
 
   // Operations — Coverage & Alerts
@@ -157,7 +156,9 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
   {
     section: 'Sales & CRM',
     subs: [
-      { title: 'Pipeline', items: ['appointments', 'crm', 'salesdashboard', 'tenants'].map((id) => NAV_BY_ID[id]) },
+      // salesdashboard first — it's visible only to sales-head/sales-rep (visibleNav.ts), so this
+      // also puts it topmost in THEIR sidebar specifically, per explicit request.
+      { title: 'Pipeline', items: ['salesdashboard', 'appointments', 'crm', 'tenants'].map((id) => NAV_BY_ID[id]) },
       // 'gantt' commented out, not deleted — no prototype equivalent exists to re-skin against; page itself still works.
       { title: 'Delivery', items: ['projects'/* , 'gantt' */].map((id) => NAV_BY_ID[id]) },
     ],

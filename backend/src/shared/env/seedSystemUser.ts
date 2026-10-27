@@ -109,7 +109,19 @@ const seedSystemUser = async () => {
                 logger.debug({ roleTypeId: systemRoleType.id }, 'System role type created');
             }
 
-            // 4.2 Create system tenant admin role
+            // 4.2 Create / sync the QMS platform tenant admin role type. Permissions are seed-owned
+            // (isSystem), so full-sync them on every boot (like provisionDefaultRoleTypes) — this way an
+            // existing admin role type picks up newly-added permissions on restart, not only on first
+            // creation. Every role of this (platform-only) admin type inherits these; customer tenants
+            // get their own separate admin role type and are unaffected.
+            const adminRoleTypePermissions = [
+                PERMISSIONS.TENANT.MANAGE.code,
+                PERMISSIONS.TENANT.ADMIN.code,
+                PERMISSIONS.ROLE_TYPE.MANAGE.code,
+                PERMISSIONS.ROLE.MANAGE.code,
+                PERMISSIONS.LEAD.MANAGE.code,
+                PERMISSIONS.PROJECT.MANAGE.code,
+            ];
             let tenantAdminRoleType = await RoleTypeModel.findOne({
                 code: ALLOWED_ROLETYPE_CODES.PLATFORM.ADMIN,
                 tenant: tenant._id,
@@ -122,15 +134,20 @@ const seedSystemUser = async () => {
                     description: 'System tenant admin role type',
                     isSystem: true,
                 });
-
-                // role type level permissions
-                tenantAdminRoleType.permissions.push(
-                    PERMISSIONS.TENANT.MANAGE.code,
-                    PERMISSIONS.TENANT.ADMIN.code,
-                    PERMISSIONS.ROLE_TYPE.MANAGE.code,
-                );
+                tenantAdminRoleType.permissions.push(...adminRoleTypePermissions);
                 await tenantAdminRoleType.save();
                 logger.debug({ roleTypeId: tenantAdminRoleType.id }, 'Admin role type created');
+            } else {
+                // full-sync (additions + removals) so the live admin role type matches the list above
+                const current = tenantAdminRoleType.permissions ?? [];
+                const inSync =
+                    adminRoleTypePermissions.length === current.length &&
+                    adminRoleTypePermissions.every((code) => current.includes(code));
+                if (!inSync) {
+                    tenantAdminRoleType.set('permissions', adminRoleTypePermissions);
+                    await tenantAdminRoleType.save();
+                    logger.debug({ roleTypeId: tenantAdminRoleType.id }, 'Admin role type permissions synced');
+                }
             }
 
             // 4.3 Provision the platform's fixed business role types (sales, sales-head) with their lead permissions

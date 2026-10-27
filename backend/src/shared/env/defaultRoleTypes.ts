@@ -66,6 +66,14 @@ export const CRM_BUSINESS_ROLE_TYPES = [
             // project:search alone also covers GET /projects/:id (project.routes.ts accepts SEARCH
             // directly on the detail route) — project:get is not separately checked anywhere.
             PROJECT_PERMISSIONS.SEARCH.code,
+            // a rep creates a project from their OWN won lead (lead own-scope enforces "own lead only")
+            // and edits their own projects (project own-scope pins them to salesRep === self).
+            // set-LIVE (moveStage) stays manage-only → Sales Head.
+            PROJECT_PERMISSIONS.CREATE.code,
+            PROJECT_PERMISSIONS.UPDATE.code,
+
+            TEST_MASTER_PERMISSIONS.SEARCH.code,
+            TEST_MASTER_PERMISSIONS.GET.code,
         ],
     },
     {
@@ -89,9 +97,12 @@ export const CRM_BUSINESS_ROLE_TYPES = [
             CONTACT_PERMISSIONS.MANAGE.code,
             BRAND_PERMISSIONS.MANAGE.code,
 
-            // see Sales Rep's own comment above — project:search is the one real, safely-own-scoped
-            // tile source for the Sales Dashboard; camp/invoice are not.
-            PROJECT_PERMISSIONS.SEARCH.code,
+            // full project management (create + edit + set-LIVE/moveStage) with team-wide visibility
+            // (project:manage is not own-scoped — Sales Head sees the whole team's projects).
+            PROJECT_PERMISSIONS.MANAGE.code,
+
+            TEST_MASTER_PERMISSIONS.SEARCH.code,
+            TEST_MASTER_PERMISSIONS.GET.code,
         ],
     },
 ];

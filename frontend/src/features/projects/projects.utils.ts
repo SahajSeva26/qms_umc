@@ -18,9 +18,17 @@ export function isScreeningProject(project: ProjectEntity): boolean {
   return project.type.some((t) => SCREENING_MODE_TYPES.includes(t))
 }
 
-// Mirrors project.routes.ts's create/update guard exactly — deliberately
-// excludes `project:create`, which no route guard ever references.
-export const PROJECT_WRITE_PERMISSIONS = ['project:manage', 'tenant:manage']
+// Mirrors project.routes.ts's report/set-LIVE (moveStage) guard — manage-only, no
+// project:create/project:update path.
+export const PROJECT_MANAGE_PERMISSIONS = ['project:manage']
+
+// Mirrors project.routes.ts's POST / (create) guard — project:create is a Sales Rep's own-scoped
+// create right (their own won lead only; see lead/project own-scope), project:manage subsumes it.
+export const PROJECT_CREATE_PERMISSIONS = ['project:manage', 'project:create']
+
+// Mirrors project.routes.ts's PUT /:id (update) guard. Does NOT grant salesRep reassignment —
+// project.service.ts's set() requires project:manage specifically for that field.
+export const PROJECT_EDIT_PERMISSIONS = ['project:manage', 'project:update']
 
 // Mirrors camp.routes.ts's void-camp/approve-void guard exactly (camp:manage, not project:manage) —
 // a project:manage-only actor can see/edit the project but gets a 403 on every void-camp action;

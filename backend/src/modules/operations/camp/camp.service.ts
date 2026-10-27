@@ -44,6 +44,8 @@ import { RoleService } from '../../access-management/role/role.service';
 import { DivisionService } from '../../crm/division/division.service';
 import { ALLOWED_ROLETYPE_CODES } from '../../access-management/role-type/roleType.constants';
 import { RoleModel } from '../../access-management/role/role.model';
+import { EmployeeModel } from '../../access-management/employee/employee.model';
+import { EMPLOYEE_TYPES } from '../../access-management/employee/employee.constants';
 import { TENANT_TYPE } from '../../access-management/tenant/tenant.constants';
 import { InventoryMasterService } from '../../inventory/inventory-master/inventory-master.service';
 import { Project } from '../../crm/project/project.model';
@@ -100,6 +102,13 @@ const OWN_SCOPE_FIELD_BY_ROLE_TYPE: Record<string, string> = {
     [ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR]: 'mr',
 };
 
+// camp coordinators are scoped by camp TYPE, not by a slot they fill — a screening coordinator sees
+// every screening camp, a diet coordinator every diet camp.
+const OWN_SCOPE_TYPE_BY_ROLE_TYPE: Record<string, string> = {
+    [ALLOWED_ROLETYPE_CODES.PLATFORM.CAMP_COORDINATOR_SCREENING]: CAMP_TYPES.SCREENING,
+    [ALLOWED_ROLETYPE_CODES.PLATFORM.CAMP_COORDINATOR_DIET]: CAMP_TYPES.DIET,
+};
+
 const applyOwnScope = (where: any, ctx: RequestContext) => {
     // a pharma division head sees every camp in their division
     if (ctx.role?.type?.code === ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_DIVISION_HEAD) {
@@ -109,6 +118,13 @@ const applyOwnScope = (where: any, ctx: RequestContext) => {
 
     // a manage actor is unscoped
     if (ctx.hasAnyPermissions([CAMP_PERMISSIONS.MANAGE.code])) {
+        return where;
+    }
+
+    // camp coordinators see every camp of their type (screening coord → screening, diet coord → diet)
+    const campType = OWN_SCOPE_TYPE_BY_ROLE_TYPE[ctx.role?.type?.code];
+    if (campType) {
+        where.type = campType;
         return where;
     }
 
@@ -286,6 +302,42 @@ const rolesHoldingAllDevices = async (roleIds: any[], requiredDeviceItems: strin
     return qualified;
 };
 
+// Among candidate role ids, return the subset whose linked user is a FULL-TIME employee. Global
+// (not tenant-scoped) — field staff are platform-wide, mirroring allocation. Chain: role → user
+// (Role is 1:1 with a user) → employee (matched by user) → type full-time.
+const rolesWithFullTimeEmployment = async (roleIds: any[]): Promise<Set<string>> => {
+    const qualified = new Set<string>();
+    if (!roleIds.length) {
+        return qualified;
+    }
+
+    const roles = await RoleModel.find({ _id: { $in: roleIds } })
+        .select('user')
+        .lean();
+    const roleToUser = new Map<string, string>();
+    for (const role of roles) {
+        if (role.user) {
+            roleToUser.set(role._id.toString(), role.user.toString());
+        }
+    }
+    const userIds = [...new Set(roleToUser.values())];
+    if (!userIds.length) {
+        return qualified;
+    }
+
+    const employees = await EmployeeModel.find({ user: { $in: userIds }, type: EMPLOYEE_TYPES.FULL_TIME })
+        .select('user')
+        .lean();
+    const fullTimeUsers = new Set(employees.map((employee: any) => employee.user?.toString()));
+
+    for (const [roleId, userId] of roleToUser) {
+        if (fullTimeUsers.has(userId)) {
+            qualified.add(roleId);
+        }
+    }
+    return qualified;
+};
+
 // Among candidate geo-profiles (already free + equipped, straight-line ordered), keep those within
 // their coverage radius by actual ROAD distance and return the nearest one's role — one matrix call.
 // Falls back to the straight-line nearest on a maps outage (profiles are already distance-ordered) so
@@ -347,6 +399,16 @@ const resolveNearestFreeWorker = async (camp: any, worker: FieldWorker, ctx: Req
     let freeProfiles = items.filter((profile: any) => !booked.includes(profile.role?.toString()));
     if (!freeProfiles.length) {
         return throwAppError(`All ${worker.label}s near this camp are already booked on this date and time slot`, StatusCodes.CONFLICT);
+    }
+
+    // employment gate — a dietitian may only be allocated if they are a full-time employee (mirrors
+    // the booking-availability gate so the two never disagree). Dietitian workers only.
+    if (worker === DIETITIAN_WORKER) {
+        const fullTime = await rolesWithFullTimeEmployment(freeProfiles.map((profile: any) => profile.role));
+        freeProfiles = freeProfiles.filter((profile: any) => fullTime.has(profile.role?.toString()));
+        if (!freeProfiles.length) {
+            return throwAppError(`No nearby ${worker.label} is a full-time employee`, StatusCodes.CONFLICT);
+        }
     }
 
     // device gate — narrow to workers who hold every device the project's tests need. No requirement ⇒
@@ -513,7 +575,6 @@ const search = async (filters: ISearchCampQuery, ctx: RequestContext, options?: 
     const sort: any = { date: -1 };
 
     const where: mongoose.QueryFilter<ICamp> = { ...ctx.where() };
-    applyOwnScope(where, ctx);
 
     // tenant filter (switch tenants) is only honoured for a `camp:manage` actor not already
     // tenant-pinned by ctx.where() — a customer actor stays locked to their own tenant.
@@ -563,6 +624,10 @@ const search = async (filters: ISearchCampQuery, ctx: RequestContext, options?: 
             where.date.$lte = endOfUTCDay(filters.dateTo);
         }
     }
+
+    // applied LAST so the caller's scope always wins — a filter (type/fo/dietitian/division) can only
+    // narrow within it, never overwrite it
+    applyOwnScope(where, ctx);
 
     const countPromise = CampModel.countDocuments(where);
     const dataPromise = CampModel.find(where)
@@ -693,8 +758,9 @@ const create = async (model: ICreateCampPayload, ctx: RequestContext): Promise<H
     }
 
     //4: best-effort auto-assign the nearest free worker when none supplied; on failure the camp stays
-    // requested with no assignee (moveStage then blocks it leaving requested).
-    if (!camp[worker.field]) {
+    // requested with no assignee (moveStage then blocks it leaving requested). Diet camps are excluded
+    // — the internal team allocates the dietitian themselves (manual pick / allocateWorker).
+    if (!camp[worker.field] && worker !== DIETITIAN_WORKER) {
         try {
             const role = await resolveNearestFreeWorker(camp, worker, ctx);
             camp = await set({ [worker.field]: role.toString() }, camp, ctx);
@@ -955,8 +1021,12 @@ const allocateWorker = async (id: string, ctx: RequestContext) => {
     }
 
     const role = await resolveNearestFreeWorker(camp, worker, ctx);
+    await CampService.update(id, { [worker.field]: role.toString() } as any, ctx);
 
-    return CampService.update(id, { [worker.field]: role.toString() } as any, ctx);
+    // mirror create(): a camp with its worker allocated is auto-confirmed (moveStage re-checks the slot)
+    await moveStage(id, { to: CAMP_STATUSES.CONFIRMED, reason: `Auto-confirmed on ${worker.label} allocation` } as any, ctx);
+
+    return CampService.get(id, ctx, { populate: true });
 };
 
 // authorize a pharma booker against the target MR by the caller's own role type:
@@ -1186,6 +1256,14 @@ const bookingAvailability = async (model: IBookingAvailabilityPayload, ctx: Requ
     if (requiredDeviceItems.length && eligibleIds.length) {
         const qualified = await rolesHoldingAllDevices(eligibleIds, requiredDeviceItems);
         eligibleIds = eligibleIds.filter((id) => qualified.has(id));
+    }
+
+    //2c: employment gate — a dietitian is only bookable if they are a full-time employee (mirrors the
+    // allocation gate in resolveNearestFreeWorker, so availability never shows a dietitian that
+    // allocation would later reject). Dietitian workers only; no narrowing for field officers.
+    if (worker === DIETITIAN_WORKER && eligibleIds.length) {
+        const fullTime = await rolesWithFullTimeEmployment(eligibleIds);
+        eligibleIds = eligibleIds.filter((id) => fullTime.has(id));
     }
 
     //3: pull the confirmed/live camps for those workers across the whole range in one query, then build

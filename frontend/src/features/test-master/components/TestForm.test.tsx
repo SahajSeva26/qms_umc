@@ -72,7 +72,9 @@ describe('TestForm — create mode', () => {
     expect(payload.price).toBe(250)
     expect(payload.status).toBe('active')
     expect(payload.consumption).toEqual([])
-    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    // onClose is called WITH the created entity on a successful create, so a caller (e.g. the
+    // project wizard) can auto-select it — not just a bare "it closed" signal.
+    await waitFor(() => expect(onClose).toHaveBeenCalledWith(baseTest))
   })
 
   it('blocks submission until a therapy is consciously chosen — no first-enum-value default', async () => {

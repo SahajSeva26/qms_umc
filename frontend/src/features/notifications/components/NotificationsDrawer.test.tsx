@@ -14,6 +14,15 @@ vi.mock('@/features/notifications/notifications.service', () => ({
   },
 }))
 
+// Not the focus of this file (see notifications.entityResolver.test.ts / NotificationCard.test.tsx
+// for permission-gating coverage) — grant camp:search so the resolved "Camp" label renders here.
+vi.mock('@/hooks/useSession', () => ({
+  useSession: vi.fn(() => ({
+    session: { roleType: { code: 'camp-coord' } },
+    hasAnyPermission: (codes: string[]) => codes.includes('camp:search'),
+  })),
+}))
+
 function makeQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } })
 }

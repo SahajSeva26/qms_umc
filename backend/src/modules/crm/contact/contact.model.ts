@@ -27,6 +27,9 @@ const contactSchema = new mongoose.Schema(
         designation: {
             type: String,
         },
+        department: {
+            type: String,
+        },
         email: {
             type: String,
         },

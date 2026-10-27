@@ -4,6 +4,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import AppointmentDrawer from './AppointmentDrawer'
 import { usePermission } from '@/hooks/usePermission'
+import { appointmentsRealService } from '@/features/crm/appointments/appointmentsReal.service'
 import type { AppointmentEntity } from '@/types/appointment.types'
 
 vi.mock('@/hooks/usePermission')
@@ -164,5 +165,60 @@ describe('AppointmentDrawer — "+ New lead" is gated on lead:manage/tenant:mana
 
     expect(await screen.findByText('Move to Done')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /\+ new lead/i })).toBeInTheDocument()
+  })
+})
+
+// MOM is only ever first captured inside the Mark-done dialog (the backend requires mom.details
+// non-empty before accepting a moveStage to 'done') — so there is no standalone "write MOM" entry
+// point pre-done. Once done, a separate "Edit MOM" action lets you revise that text afterward.
+describe('AppointmentDrawer — Edit MOM (done appointments only)', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    mockPermission(() => true)
+  })
+
+  it('does not show an Edit MOM (or any standalone MOM) button for a non-terminal appointment', () => {
+    renderDrawer(appointmentFixture({ status: 'planned', mom: {} }))
+    expect(screen.queryByRole('button', { name: /edit mom|complete with mom/i })).not.toBeInTheDocument()
+  })
+
+  it('does not show Edit MOM for a cancelled appointment', () => {
+    renderDrawer(appointmentFixture({ status: 'cancelled', mom: {} }))
+    expect(screen.queryByRole('button', { name: /edit mom/i })).not.toBeInTheDocument()
+  })
+
+  it('shows Edit MOM for a done appointment', () => {
+    renderDrawer(appointmentFixture({ status: 'done', mom: { details: 'Already discussed' } }))
+    expect(screen.getByRole('button', { name: /^edit mom$/i })).toBeInTheDocument()
+  })
+
+  it('opens the MOM dialog pre-filled with the existing MOM text, and saves it via PUT /:id — independent of moveStage', async () => {
+    const user = userEvent.setup()
+    vi.mocked(appointmentsRealService.updateAppointment).mockResolvedValue({ data: { data: appointmentFixture() } } as never)
+    renderDrawer(appointmentFixture({ id: 'appt-1', status: 'done', mom: { details: 'Original MOM text' } }))
+
+    await user.click(screen.getByRole('button', { name: /^edit mom$/i }))
+    const textarea = await screen.findByPlaceholderText(/decisions taken/i)
+    expect(textarea).toHaveValue('Original MOM text')
+
+    await user.clear(textarea)
+    await user.type(textarea, 'Updated MOM text')
+    await user.click(screen.getByRole('button', { name: /save mom/i }))
+
+    expect(appointmentsRealService.updateAppointment).toHaveBeenCalledWith('appt-1', { mom: { details: 'Updated MOM text' } })
+    expect(appointmentsRealService.moveAppointmentStage).not.toHaveBeenCalled()
+  })
+
+  it('requires non-empty MOM text before saving', async () => {
+    const user = userEvent.setup()
+    renderDrawer(appointmentFixture({ status: 'done', mom: { details: 'Already discussed' } }))
+
+    await user.click(screen.getByRole('button', { name: /^edit mom$/i }))
+    const textarea = await screen.findByPlaceholderText(/decisions taken/i)
+    await user.clear(textarea)
+    await user.click(screen.getByRole('button', { name: /save mom/i }))
+
+    expect(await screen.findByText(/minutes of meeting are required/i)).toBeInTheDocument()
+    expect(appointmentsRealService.updateAppointment).not.toHaveBeenCalled()
   })
 })

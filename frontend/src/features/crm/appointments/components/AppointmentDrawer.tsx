@@ -83,7 +83,7 @@ const refId = (ref: unknown): string => {
   return obj._id ?? ''
 }
 
-type PanelKind = 'moveStage' | 'reschedule' | null
+type PanelKind = 'moveStage' | 'reschedule' | 'editMom' | null
 
 interface AppointmentDrawerProps {
   appointment: AppointmentEntity | null
@@ -101,6 +101,7 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
   const [rescheduleStart, setRescheduleStart] = useState('')
   const [rescheduleEnd, setRescheduleEnd] = useState('')
   const [rescheduleReason, setRescheduleReason] = useState('')
+  const [editMomText, setEditMomText] = useState('')
   // True once the user has directly edited End — stops the auto-shift below.
   const [endTouched, setEndTouched] = useState(false)
   const [error, setError] = useState('')
@@ -232,6 +233,26 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
     }
   }
 
+  // Standalone MOM edit — independent of the Mark-done transition. Only `mom.details` is
+  // persistable this way (PUT /:id); nextSteps only exists on a real moveStage transition.
+  const openEditMom = () => {
+    blurActiveElement()
+    setError('')
+    setEditMomText(appointment.mom.details ?? '')
+    setPanel('editMom')
+  }
+
+  const handleEditMomSave = async () => {
+    if (!editMomText.trim()) return setError('Minutes of meeting are required')
+    try {
+      await updateAppointment.mutateAsync({ mom: { details: editMomText.trim() } })
+      toast.success('MOM saved')
+      setPanel(null)
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Could not save the MOM.'))
+    }
+  }
+
   const handleRsvp = async (status: 'accepted' | 'declined') => {
     try {
       await respond.mutateAsync({ status })
@@ -260,29 +281,32 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
         {refName(appointment.tenant)} · {refName(appointment.division)}
       </p>
 
-      <KeyValueGrid
-        columns={2}
-        items={[
-          { label: 'Sales person', value: refName(appointment.salesPerson) },
-          {
-            label: 'When',
-            value: `${new Date(appointment.duration.startTime).toLocaleString()}${appointment.duration.endTime ? ` – ${new Date(appointment.duration.endTime).toLocaleTimeString()}` : ''}`,
-          },
-          { label: 'Mode', value: APPOINTMENT_MODE_LABEL[appointment.mode] },
-          { label: 'Link', value: appointment.destinationLink || undefined },
-          { label: 'Location', value: appointment.location || undefined },
-          { label: 'Linked lead', value: appointment.lead ? leadRefName(appointment.lead) : undefined },
-          { label: 'Parent appointment', value: appointment.parent ? refName(appointment.parent) : undefined },
-        ]}
-      />
+      <div
+        className="rounded-xl border p-3"
+        style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface)' }}
+      >
+        <KeyValueGrid
+          columns={2}
+          items={[
+            { label: 'Sales person', value: refName(appointment.salesPerson) },
+            {
+              label: 'When',
+              value: `${new Date(appointment.duration.startTime).toLocaleString()}${appointment.duration.endTime ? ` – ${new Date(appointment.duration.endTime).toLocaleTimeString()}` : ''}`,
+            },
+            { label: 'Mode', value: APPOINTMENT_MODE_LABEL[appointment.mode] },
+            { label: 'Link', value: appointment.destinationLink || undefined },
+            { label: 'Location', value: appointment.location || undefined },
+            { label: 'Linked lead', value: appointment.lead ? leadRefName(appointment.lead) : undefined },
+            { label: 'Parent appointment', value: appointment.parent ? refName(appointment.parent) : undefined },
+          ]}
+        />
+      </div>
 
-      <div className="mt-4 space-y-2.5">
-        <div>
-          <SectionLabel>Agenda</SectionLabel>
-          <p className="text-[13px]" style={{ color: 'var(--qms-text)' }}>{appointment.agenda.public || '—'}</p>
-        </div>
+      <div className="mt-4 rounded-xl border p-3" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface)' }}>
+        <SectionLabel>Agenda</SectionLabel>
+        <p className="text-[13px]" style={{ color: 'var(--qms-text)' }}>{appointment.agenda.public || '—'}</p>
         {appointment.agenda.private && (
-          <div className="rounded-lg px-2.5 py-2" style={{ background: 'rgba(168,85,247,.08)', border: '1px solid rgba(168,85,247,.3)' }}>
+          <div className="rounded-lg px-2.5 py-2 mt-2" style={{ background: 'rgba(168,85,247,.08)', border: '1px dashed rgba(168,85,247,.3)' }}>
             <div className="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: '#a855f7' }}>
               Private notes
             </div>
@@ -290,9 +314,8 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
           </div>
         )}
         {latestAppointmentNextSteps(appointment) && (
-          <div>
-            <SectionLabel>Next steps</SectionLabel>
-            <p className="text-[13px]" style={{ color: 'var(--qms-text)' }}>{latestAppointmentNextSteps(appointment)}</p>
+          <div className="mt-2 text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>
+            <b style={{ color: 'var(--qms-text)' }}>Next steps:</b> {latestAppointmentNextSteps(appointment)}
           </div>
         )}
       </div>
@@ -311,8 +334,12 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
       </div>
 
       {appointment.internalMembers.length > 0 && (
-        <div className="mt-4">
-          <SectionLabel>Internal team invitations</SectionLabel>
+        <div className="mt-4 rounded-xl border p-3" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface)' }}>
+          <SectionLabel>
+            Internal team · {appointment.internalMembers.filter((m) => m.status === 'accepted').length} accepted
+            {' · '}{appointment.internalMembers.filter((m) => m.status === 'pending').length} pending
+            {' · '}{appointment.internalMembers.filter((m) => m.status === 'declined').length} declined
+          </SectionLabel>
           <div className="space-y-1.5">
             {appointment.internalMembers.map((m, i) => {
               const roleId = unwrapId(m.role)
@@ -351,12 +378,21 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
           <p className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>
             This appointment is {(APPOINTMENT_STATUS_LABEL[appointment.status] ?? appointment.status).toLowerCase()} — read-only.
           </p>
-          {/* The one-time "+ New lead" inside the Mark-done dialog is easy to skip in the moment — offer it here too, so a done meeting's lead can still be created later. */}
-          {appointment.status === 'done' && canCreateLead && (
-            <Button type="button" size="sm" variant="outline" onClick={() => setNewLeadOpen(true)}>
-              + New lead
-            </Button>
-          )}
+          <div className="flex gap-2">
+            {/* MOM is only ever first captured via the Mark-done dialog, so editing it afterward only
+                makes sense once the appointment is actually done. */}
+            {appointment.status === 'done' && (
+              <Button type="button" size="sm" variant="outline" onClick={openEditMom}>
+                Edit MOM
+              </Button>
+            )}
+            {/* The one-time "+ New lead" inside the Mark-done dialog is easy to skip in the moment — offer it here too, so a done meeting's lead can still be created later. */}
+            {appointment.status === 'done' && canCreateLead && (
+              <Button type="button" size="sm" variant="outline" onClick={() => setNewLeadOpen(true)}>
+                + New lead
+              </Button>
+            )}
+          </div>
         </div>
       )}
 
@@ -458,6 +494,29 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
           <DialogFooter>
             <Button variant="outline" onClick={() => setPanel(null)}>Cancel</Button>
             <Button onClick={handleRescheduleSave} disabled={updateAppointment.isPending}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={panel === 'editMom'} onOpenChange={(o) => !o && setPanel(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Minutes of meeting</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className={labelClasses} style={labelStyle}>Minutes of meeting *</Label>
+              <Textarea
+                value={editMomText}
+                onChange={(e) => setEditMomText(e.target.value)}
+                rows={6}
+                placeholder="Decisions taken · objections raised · next commitments · pricing levers discussed"
+                className="text-[13px]"
+              />
+            </div>
+            {error && <p className="text-[12px] font-semibold text-danger">{error}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPanel(null)}>Cancel</Button>
+            <Button onClick={handleEditMomSave} disabled={updateAppointment.isPending}>Save MOM</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -1,5 +1,6 @@
-import { FiMail, FiPhone, FiMapPin, FiEdit2 } from 'react-icons/fi'
+import { FiMail, FiPhone, FiMapPin, FiEdit2, FiBriefcase } from 'react-icons/fi'
 import type { ContactEntity } from '@/types/contact.types'
+import { CONTACT_DEPARTMENT_LABEL, designationLabel, type ContactDepartment } from '@/features/contacts/contact.constants'
 import SideDrawer from '@/components/ui/SideDrawer'
 import { Button } from '@/components/ui/button'
 
@@ -30,7 +31,10 @@ const ContactDrawer = ({ contact, canEdit, onClose, onEdit }: ContactDrawerProps
         </div>
         <div className="min-w-0 flex-1">
           <div className="text-[16px] font-extrabold" style={{ color: 'var(--qms-text)' }}>{c.name}</div>
-          <div className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>{c.designation || '—'}</div>
+          <div className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>
+            {designationLabel(c.department, c.designation) || '—'}
+            {c.department && ` · ${CONTACT_DEPARTMENT_LABEL[c.department as ContactDepartment] ?? c.department}`}
+          </div>
           <div className="mt-2">
             <span
               className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${c.status === 'active' ? 'bg-success-soft text-success' : ''}`}
@@ -47,6 +51,8 @@ const ContactDrawer = ({ contact, canEdit, onClose, onEdit }: ContactDrawerProps
         <div className="flex items-center gap-1" style={{ color: 'var(--qms-text-muted)' }}><FiMail size={11} /> Email</div><div>{c.email || '—'}</div>
         <div className="flex items-center gap-1" style={{ color: 'var(--qms-text-muted)' }}><FiPhone size={11} /> Phone</div><div>{c.phone || '—'}</div>
         <div className="flex items-center gap-1" style={{ color: 'var(--qms-text-muted)' }}><FiMapPin size={11} /> Location</div><div>{c.location || '—'}</div>
+        <div className="flex items-center gap-1" style={{ color: 'var(--qms-text-muted)' }}><FiBriefcase size={11} /> Department</div>
+        <div>{c.department ? CONTACT_DEPARTMENT_LABEL[c.department as ContactDepartment] ?? c.department : '—'}</div>
         <div style={{ color: 'var(--qms-text-muted)' }}>Type</div><div>{c.type === 'platform' ? 'Platform (QMS internal)' : 'Customer'}</div>
         {c.user && (
           <>

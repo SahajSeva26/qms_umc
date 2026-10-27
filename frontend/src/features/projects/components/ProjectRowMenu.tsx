@@ -3,10 +3,12 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 
 interface ProjectRowMenuProps {
   // Required, not optional — see ProjectTable.tsx's identical reasoning.
-  canWrite: boolean
-  // Separate from canWrite — gated on camp:manage/tenant:manage (the void-camp routes' real
-  // guard), independent of project:manage. A project-only manager must not see this (it would
-  // 403 on every action); a camp manager without project:manage must still see it.
+  canEdit: boolean
+  // Separate from canEdit — PATCH /:id/stage (set-LIVE) is manage-only, no project:update path;
+  // a Sales Rep (project:update, no project:manage) can edit but must not change status.
+  canChangeStatus: boolean
+  // Separate from canEdit — void-camp routes are gated on camp:manage/tenant:manage, not
+  // project:manage, so neither permission set implies the other.
   canManageVoidCamps: boolean
   onViewDetail: () => void
   onEdit: () => void
@@ -16,10 +18,7 @@ interface ProjectRowMenuProps {
 
 const itemClasses = 'w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-[13px] font-medium text-left transition-colors hover:bg-(--qms-surface-hover)'
 
-// Edit/Change-status are omitted entirely (not just disabled) without canWrite; Add-void-camp is
-// gated on its own, separate permission — View details stays, since it's a read action gated
-// separately by the route guard.
-const ProjectRowMenu = ({ canWrite, canManageVoidCamps, onViewDetail, onEdit, onChangeStatus, onVoidCamps }: ProjectRowMenuProps) => (
+const ProjectRowMenu = ({ canEdit, canChangeStatus, canManageVoidCamps, onViewDetail, onEdit, onChangeStatus, onVoidCamps }: ProjectRowMenuProps) => (
   <Popover>
     <PopoverTrigger
       onClick={(e) => e.stopPropagation()}
@@ -33,15 +32,15 @@ const ProjectRowMenu = ({ canWrite, canManageVoidCamps, onViewDetail, onEdit, on
       <button className={itemClasses} style={{ color: 'var(--qms-text)' }} onClick={onViewDetail}>
         <FiEye size={14} /> View details
       </button>
-      {canWrite && (
-        <>
-          <button className={itemClasses} style={{ color: 'var(--qms-text)' }} onClick={onEdit}>
-            <FiEdit2 size={14} /> Edit
-          </button>
-          <button className={itemClasses} style={{ color: 'var(--qms-text)' }} onClick={onChangeStatus}>
-            <FiTag size={14} /> Change status
-          </button>
-        </>
+      {canEdit && (
+        <button className={itemClasses} style={{ color: 'var(--qms-text)' }} onClick={onEdit}>
+          <FiEdit2 size={14} /> Edit
+        </button>
+      )}
+      {canChangeStatus && (
+        <button className={itemClasses} style={{ color: 'var(--qms-text)' }} onClick={onChangeStatus}>
+          <FiTag size={14} /> Change status
+        </button>
       )}
       {canManageVoidCamps && (
         <button className={itemClasses} style={{ color: 'var(--qms-text)' }} onClick={onVoidCamps}>

@@ -23,20 +23,44 @@ describe('resolveNotificationEntity', () => {
   })
 
   // /camps?camp=<id> is unreachable for pharma roles (AppLayout force-redirects them) — except
-  // pharma-mr, which has its own exception onto the combined Camp Management page.
-  it.each(['pharma-asm', 'pharma-rsm', 'pharma-division-head'])(
-    'returns null for a whitelisted entity type when the viewer is %s (pharma roles cannot reach /camps)',
+  // the pharma field-force (MR/ASM/RSM), which has its own exception onto the combined Camp
+  // Management page; pharma-division-head is not field-force and stays excluded.
+  it('returns null for a whitelisted entity type when the viewer is pharma-division-head (pharma roles cannot reach /camps)', () => {
+    expect(resolveNotificationEntity({ id: 'camp-1', type: 'camp', event: 'camp.create' }, 'pharma-division-head')).toBeNull()
+  })
+
+  it.each(['pharma-mr', 'pharma-asm', 'pharma-rsm'])(
+    'resolves camp for %s (AppLayout.tsx permits pathname === "/camps" for pharma field-force)',
     (roleTypeCode) => {
-      expect(resolveNotificationEntity({ id: 'camp-1', type: 'camp', event: 'camp.create' }, roleTypeCode)).toBeNull()
+      const resolution = resolveNotificationEntity({ id: 'camp-1', type: 'camp', event: 'camp.create' }, roleTypeCode)
+      expect(resolution).not.toBeNull()
+      expect(resolution?.href('camp-1')).toBe('/camps?camp=camp-1')
+      expect(resolution?.label).toBe('Camp')
     },
   )
 
-  it('resolves camp for pharma-mr (AppLayout.tsx permits pathname === "/camps" for this one role)', () => {
-    const resolution = resolveNotificationEntity({ id: 'camp-1', type: 'camp', event: 'camp.create' }, 'pharma-mr')
-    expect(resolution).not.toBeNull()
-    expect(resolution?.href('camp-1')).toBe('/camps?camp=camp-1')
-    expect(resolution?.label).toBe('Camp')
-  })
+  it.each(['pharma-mr', 'pharma-asm', 'pharma-rsm'])(
+    'resolves camp for %s when it actually holds camp:book (the real permission check, not just role type)',
+    (roleTypeCode) => {
+      const hasAnyPermission = (codes: string[]) => codes.includes('camp:book')
+      const resolution = resolveNotificationEntity({ id: 'camp-1', type: 'camp', event: 'camp.create' }, roleTypeCode, hasAnyPermission)
+      expect(resolution).not.toBeNull()
+      expect(resolution?.href('camp-1')).toBe('/camps?camp=camp-1')
+    },
+  )
+
+  // A field-force session without camp:book is real and supported (its sidebar link correctly
+  // disables — see Sidebar.test.tsx) — /camps still 403s for it, so the card must stay inert
+  // rather than deep-linking into /unauthorized.
+  it.each(['pharma-mr', 'pharma-asm', 'pharma-rsm'])(
+    'returns null for %s when it lacks camp:book (and every other camp-read permission) — the real guard, not just role type',
+    (roleTypeCode) => {
+      const hasAnyPermission = () => false
+      expect(
+        resolveNotificationEntity({ id: 'camp-1', type: 'camp', event: 'camp.create' }, roleTypeCode, hasAnyPermission),
+      ).toBeNull()
+    },
+  )
 
   it('still returns null for pharma-mr on a non-camp entity type (e.g. lead) — the exception is camp-only', () => {
     expect(resolveNotificationEntity({ id: 'lead-1', type: 'lead', event: 'lead.create' }, 'pharma-mr')).toBeNull()
@@ -78,11 +102,21 @@ describe('resolveNotificationEntity', () => {
     ).toBeNull()
   })
 
-  it('still resolves camp for a viewer lacking project permissions (only /projects is unreachable for them, not /camps)', () => {
-    const hasAnyPermission = () => false
+  it('resolves camp for a non-pharma viewer who holds a camp-read permission but no project permission (the two gates are independent)', () => {
+    const hasAnyPermission = (codes: string[]) => codes.includes('camp:search')
     const resolution = resolveNotificationEntity({ id: 'camp-1', type: 'camp', event: 'camp.create' }, 'camp-coordinator-diet', hasAnyPermission)
     expect(resolution).not.toBeNull()
     expect(resolution?.href('camp-1')).toBe('/camps?camp=camp-1')
+  })
+
+  // /camps is gated to CAMP_VIEW_PERMISSIONS — this applies to EVERY recipient, not only the
+  // pharma field-force exception, so a non-pharma role with no camp-read permission at all must
+  // not get a clickable camp notification that 403s straight into /unauthorized.
+  it('returns null for a camp entity when a non-pharma viewer holds none of the required camp-read permissions', () => {
+    const hasAnyPermission = () => false
+    expect(
+      resolveNotificationEntity({ id: 'camp-1', type: 'camp', event: 'camp.create' }, 'camp-coordinator-diet', hasAnyPermission),
+    ).toBeNull()
   })
 
   it('still resolves project for a viewer holding project:search (e.g. a sales rep)', () => {

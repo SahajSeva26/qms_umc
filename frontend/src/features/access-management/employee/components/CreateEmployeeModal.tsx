@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import FieldLabel from '@/components/ui/FieldLabel'
 import { Input } from '@/components/ui/input'
 import { SegRow, SegButton } from '@/components/ui/SegButton'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import RoleUserSection from '@/features/access-management/role/components/RoleUserSection'
 import { useCreateRoleFormResolver, EMPTY_CREATE_FORM_VALUES, type CreateRoleFormValues } from '@/features/access-management/role/roleForm'
 import { useEmployeeFieldsResolver, EMPTY_EMPLOYEE_FIELDS_VALUES, toEmployeeFieldsPayload } from '@/features/access-management/employee/employeeForm'
@@ -17,21 +18,15 @@ import { useOnboardFieldOfficer } from '@/features/access-management/employee/ho
 import { useCreateEmployee } from '@/features/access-management/employee/hooks/useCreateEmployee'
 import { EMPLOYEE_ROUTES } from '@/features/access-management/employee/employee.paths'
 import type { EmployeeFieldsValues } from '@/features/access-management/employee/schemas/employee.schemas'
-import type { CreateRolePayload } from '@/types/accessManagement.types'
+import type { CreateRolePayload, RoleTypeEntity } from '@/types/accessManagement.types'
 import { getApiErrorMessage } from '@/utils/apiError'
 
 type Mode = 'new' | 'existing'
-type WorkerKind = 'field-officer' | 'dietitian'
-
-const WORKER_KIND_LABEL: Record<WorkerKind, string> = {
-  'field-officer': 'Field officer',
-  dietitian: 'Dietitian',
-}
 
 interface CreateEmployeeModalProps {
   tenantId: string
-  /** RoleType id for each onboardable worker kind — undefined kinds are not offered. */
-  roleTypeIds: Partial<Record<WorkerKind, string>>
+  /** Every active role type the actor can onboard/link an employee as — not limited to a fixed set. */
+  roleTypeOptions: RoleTypeEntity[]
   canOnboardNewPerson: boolean
   canLinkExistingAccount: boolean
   /** Opens straight into Mode A, skipping the mode toggle — used by the `?onboard=new` handoff. */
@@ -47,7 +42,7 @@ const USER_STEP_FIELDS: (keyof CreateRoleFormValues)[] = ['userFirstName', 'user
 
 const CreateEmployeeModal = ({
   tenantId,
-  roleTypeIds,
+  roleTypeOptions,
   canOnboardNewPerson,
   canLinkExistingAccount,
   autoOpenNewPerson,
@@ -57,10 +52,9 @@ const CreateEmployeeModal = ({
   const [open, setOpen] = useState(false)
   const bothModesAvailable = canOnboardNewPerson && canLinkExistingAccount
   const [mode, setMode] = useState<Mode>(canOnboardNewPerson ? 'new' : 'existing')
-  // Resolved dynamically, never pinned to field-officer — defaults to whichever kind has an id available.
-  const [workerKind, setWorkerKind] = useState<WorkerKind>(roleTypeIds['field-officer'] ? 'field-officer' : 'dietitian')
-  const workerTypeId = roleTypeIds[workerKind]
-  const availableWorkerKinds = (Object.keys(roleTypeIds) as WorkerKind[]).filter((k) => roleTypeIds[k])
+  // Defaults to the first available option — any role type may be chosen, not a fixed set.
+  const [workerTypeId, setWorkerTypeId] = useState<string>(roleTypeOptions[0]?.id ?? '')
+  const workerType = roleTypeOptions.find((t) => t.id === workerTypeId)
   const [step, setStep] = useState(0)
   const [stepAttempted, setStepAttempted] = useState([false, false, false])
   const [picked, setPicked] = useState<PickedFieldOfficer | null>(null)
@@ -151,13 +145,12 @@ const CreateEmployeeModal = ({
     employeeForm.reset(EMPTY_EMPLOYEE_FIELDS_VALUES)
   }
 
-  const handleWorkerKindChange = (nextKind: WorkerKind) => {
-    if (nextKind === workerKind) return
-    setWorkerKind(nextKind)
-    const nextTypeId = roleTypeIds[nextKind]
-    // Mode A's Role form carries the worker's RoleType directly — re-point it at the new kind's id.
-    roleForm.setValue('roleType', nextTypeId ?? '', { shouldValidate: true, shouldDirty: true })
-    // Mode B's pick is scoped to the OLD kind's roster — meaningless once searching the other kind.
+  const handleWorkerTypeChange = (nextTypeId: string | null) => {
+    if (!nextTypeId || nextTypeId === workerTypeId) return
+    setWorkerTypeId(nextTypeId)
+    // Mode A's Role form carries the worker's RoleType directly — re-point it at the new type's id.
+    roleForm.setValue('roleType', nextTypeId, { shouldValidate: true, shouldDirty: true })
+    // Mode B's pick is scoped to the OLD type's roster — meaningless once searching a different type.
     setPicked(null)
   }
 
@@ -299,14 +292,20 @@ const CreateEmployeeModal = ({
           </DialogDescription>
         </DialogHeader>
 
-        {step === 0 && availableWorkerKinds.length > 1 && (
-          <SegRow>
-            {availableWorkerKinds.map((kind) => (
-              <SegButton key={kind} active={workerKind === kind} onClick={() => handleWorkerKindChange(kind)}>
-                {WORKER_KIND_LABEL[kind]}
-              </SegButton>
-            ))}
-          </SegRow>
+        {step === 0 && roleTypeOptions.length > 1 && (
+          <div>
+            <FieldLabel htmlFor="workerType">Role type</FieldLabel>
+            <Select value={workerTypeId} onValueChange={handleWorkerTypeChange}>
+              <SelectTrigger id="workerType" className="w-full">
+                <SelectValue>{(v: string) => roleTypeOptions.find((t) => t.id === v)?.name ?? v}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {roleTypeOptions.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         )}
 
         {bothModesAvailable && step === 0 && (
@@ -361,7 +360,7 @@ const CreateEmployeeModal = ({
               <ExistingFieldOfficerPicker
                 tenant={tenantId}
                 roleTypeId={workerTypeId}
-                workerLabel={workerKind === 'dietitian' ? 'dietitian' : 'field officer'}
+                workerLabel={workerType?.name ?? 'person'}
                 value={picked?.userId ?? null}
                 onChange={setPicked}
               />
@@ -429,7 +428,7 @@ const CreateEmployeeModal = ({
             )}
             {createEmployee.isError && (
               <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
-                Failed to create the employee record. Please try again.
+                {getApiErrorMessage(createEmployee.error, 'Failed to create the employee record. Please try again.')}
               </div>
             )}
           </div>

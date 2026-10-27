@@ -36,7 +36,7 @@ const TENANT: Tenant = {
   status: 'active',
 } as Tenant
 
-function renderHeader(props: Partial<{ tenant: Tenant; canManageTenant: boolean; canManageSystem: boolean; salesPersonName: string | null }> = {}) {
+function renderHeader(props: Partial<{ tenant: Tenant; canManageTenant: boolean; canManageSystem: boolean; salesPersonName: string | null; onEditClick: () => void }> = {}) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={queryClient}>
@@ -717,7 +717,7 @@ describe('TenantHeader', () => {
 
   // ---- New TenantHeader-specific coverage ----
 
-  it('canManageTenant=false renders full tenant identity with no upload controls', async () => {
+  it('canManageTenant=false renders full tenant identity with no upload controls and no Edit client button (PUT /tenants/:id is tenant:update/tenant:manage-gated)', async () => {
     const { fileService } = await import('@/lib/file/file.service')
     vi.mocked(fileService.searchFiles).mockResolvedValue(noLogo())
 
@@ -727,12 +727,28 @@ describe('TenantHeader', () => {
     // Identity always renders, regardless of canManageTenant.
     expect(screen.getByText('Acme Pharma')).toBeInTheDocument()
     expect(screen.getByText('acme')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /edit client/i })).toBeInTheDocument()
+
+    // No Edit client button for a non-manager — it would only 403 on save.
+    expect(screen.queryByRole('button', { name: /edit client/i })).not.toBeInTheDocument()
 
     // No upload controls for a non-manager.
     expect(screen.queryByRole('button', { name: /upload logo/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /change logo/i })).not.toBeInTheDocument()
     expect(document.querySelector('input[type="file"]')).not.toBeInTheDocument()
+  })
+
+  it('canManageTenant=true shows the Edit client button, which calls onEditClick', async () => {
+    const { fileService } = await import('@/lib/file/file.service')
+    vi.mocked(fileService.searchFiles).mockResolvedValue(noLogo())
+    const onEditClick = vi.fn()
+
+    renderHeader({ canManageTenant: true, onEditClick })
+    await waitFor(() => expect(fileService.searchFiles).toHaveBeenCalled())
+
+    const editButton = screen.getByRole('button', { name: /edit client/i })
+    expect(editButton).toBeInTheDocument()
+    await userEvent.click(editButton)
+    expect(onEditClick).toHaveBeenCalledTimes(1)
   })
 
   it('local preview survives a background refetch — not replaced by the loading ellipsis', async () => {

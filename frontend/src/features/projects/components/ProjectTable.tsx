@@ -15,10 +15,13 @@ const CENTERED_COLUMNS = new Set(['Type', 'Execution', 'POs', 'Value'])
 
 interface ProjectTableProps {
   projects: ProjectEntity[]
-  // Required, not optional, so a future caller can't silently render write
-  // controls by omitting it. Mirrors the backend's project:manage/tenant:manage guard.
-  canWrite: boolean
-  // Separate from canWrite — void-camp actions are gated on camp:manage/tenant:manage, not
+  // Required, not optional, so a future caller can't silently render write controls by omitting
+  // it. Mirrors the backend's PUT /:id guard (project:manage OR project:update).
+  canEdit: boolean
+  // Separate from canEdit — PATCH /:id/stage (set-LIVE) is manage-only, no project:update path;
+  // a Sales Rep (project:update, no project:manage) can edit but must not change status.
+  canChangeStatus: boolean
+  // Separate from canEdit — void-camp actions are gated on camp:manage/tenant:manage, not
   // project:manage (see projects.utils.ts's VOID_CAMP_WRITE_PERMISSIONS).
   canManageVoidCamps: boolean
   onOpenDetail: (id: string) => void
@@ -29,7 +32,7 @@ interface ProjectTableProps {
 
 // Prototype's .tbl (styles.css) — 13px base, 10px/12px cell padding, 11px/700/.06em uppercase
 // header, no header background fill (just a border), row hover → --qms-surface-strong.
-const ProjectTable = ({ projects, canWrite, canManageVoidCamps, onOpenDetail, onEdit, onChangeStatus, onVoidCamps }: ProjectTableProps) => (
+const ProjectTable = ({ projects, canEdit, canChangeStatus, canManageVoidCamps, onOpenDetail, onEdit, onChangeStatus, onVoidCamps }: ProjectTableProps) => (
   <div className="overflow-x-auto rounded-xl border backdrop-blur-xl" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface)' }}>
     <table className="w-full text-[13px]">
       <thead>
@@ -104,14 +107,15 @@ const ProjectTable = ({ projects, canWrite, canManageVoidCamps, onOpenDetail, on
                 {formatINR(valueAfterGST)}
               </td>
               <td className="px-3 py-2.5 align-top whitespace-nowrap">
-                <ProjectStatusPill status={project.status} onClick={canWrite ? () => { onChangeStatus(project.id) } : undefined} />
+                <ProjectStatusPill status={project.status} onClick={canChangeStatus ? () => { onChangeStatus(project.id) } : undefined} />
               </td>
               <td className="px-3 py-2.5 align-top whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>
                 {projectSalesRepName(project).split(' ')[0]}
               </td>
               <td className="px-1 py-2.5 align-top whitespace-nowrap">
                 <ProjectRowMenu
-                  canWrite={canWrite}
+                  canEdit={canEdit}
+                  canChangeStatus={canChangeStatus}
                   canManageVoidCamps={canManageVoidCamps && projectSupportsVoidCamps}
                   onViewDetail={() => onOpenDetail(project.id)}
                   onEdit={() => onEdit(project.id)}

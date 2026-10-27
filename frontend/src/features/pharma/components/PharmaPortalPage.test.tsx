@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import PharmaPortalPage from './PharmaPortalPage'
 import type { SessionResponse } from '@/types/accessManagement.types'
@@ -12,6 +13,7 @@ vi.mock('@/features/pharma/components/MrBookCampTab', () => ({ default: () => <d
 vi.mock('@/features/pharma/components/PharmaDashboardTab', () => ({ default: () => <div>Generic dashboard tab content</div> }))
 vi.mock('@/features/pharma/components/MrDashboardTab', () => ({ default: () => <div>MR dashboard tab content</div> }))
 vi.mock('@/features/pharma/components/PharmaDoctorsTab', () => ({ default: () => <div>Doctors tab content</div> }))
+vi.mock('@/features/pharma/components/PharmaMyTeamTab', () => ({ default: () => <div>My Team tab content</div> }))
 vi.mock('@/features/pharma/components/MyCampScheduleTab', () => ({ default: () => <div>Camp schedule tab content</div> }))
 
 function sessionFixture(roleTypeCode: string): SessionResponse {
@@ -93,6 +95,39 @@ describe('PharmaPortalPage — Dashboard tab routes to the correct component per
 
       expect(await screen.findByText('Generic dashboard tab content')).toBeInTheDocument()
       expect(screen.queryByText('MR dashboard tab content')).not.toBeInTheDocument()
+    },
+  )
+})
+
+// HO/RSM/ASM see their downline hierarchy (PharmaMyTeamTab) instead of the doctor registry; MR
+// keeps the original Doctors tab unchanged — a locked product decision, not an oversight.
+describe('PharmaPortalPage — Doctors tab is swapped for My Team, except for MR', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  it('shows "Doctors" and renders PharmaDoctorsTab for pharma-mr', async () => {
+    await mockSettledSession('pharma-mr')
+    renderPortal('pharma-mr')
+
+    const tabButton = await screen.findByRole('button', { name: /^doctors$/i })
+    expect(screen.queryByRole('button', { name: /my team/i })).not.toBeInTheDocument()
+
+    await userEvent.click(tabButton)
+    expect(await screen.findByText('Doctors tab content')).toBeInTheDocument()
+  })
+
+  it.each(['pharma-rsm', 'pharma-asm', 'pharma-division-head'])(
+    'shows "My Team" and renders PharmaMyTeamTab for %s',
+    async (roleTypeCode) => {
+      await mockSettledSession(roleTypeCode)
+      renderPortal(roleTypeCode)
+
+      const tabButton = await screen.findByRole('button', { name: /my team/i })
+      expect(screen.queryByRole('button', { name: /^doctors$/i })).not.toBeInTheDocument()
+
+      await userEvent.click(tabButton)
+      expect(await screen.findByText('My Team tab content')).toBeInTheDocument()
     },
   )
 })

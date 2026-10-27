@@ -33,10 +33,14 @@ const STATUS_OPTIONS: { value: RoleStatus | 'all'; label: string }[] = [
 // moved into a drawer) — same shape as DivisionContactsSection.tsx.
 const DivisionMrsSection = ({ tenantId, divisionId }: DivisionMrsSectionProps) => {
   const { hasAnyPermission } = usePermission()
-  // Deliberately excludes role:search — the dependent GET /role-types lookup
-  // below has no role:search fallback, so that caller could never load anyway.
-  const canView = hasAnyPermission(['tenant:admin', 'tenant:manage'])
-  const canAdd = canView
+  // Mirrors what both dependent routes actually accept: GET /roles (role.routes.ts)
+  // takes tenant:admin/tenant:manage/role:search, GET /role-types (roleType.routes.ts)
+  // takes ONLY role-type:manage/role-type:search (tenant:admin/manage are NOT accepted there,
+  // even though every seeded role type holding tenant:admin/manage also happens to hold
+  // role-type:manage today) — a caller needs both, e.g. Sales Head (role:search + role-type:search).
+  const canView = hasAnyPermission(['tenant:admin', 'tenant:manage', 'role:search']) && hasAnyPermission(['role-type:manage', 'role-type:search'])
+  // Mutations (POST /roles) are still tenant:admin/tenant:manage-only (role.routes.ts:150) — role:search is read-only.
+  const canAdd = hasAnyPermission(['tenant:admin', 'tenant:manage'])
 
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search, 300)

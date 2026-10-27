@@ -63,7 +63,15 @@ const DivisionsTable = ({ divisions, onRowClick }: DivisionsTableProps) => {
             }
             label="Projects"
           />
-          <Stat value={division.mrCount} label="MRs" />
+          <Stat value={division.mrCount} label="MRs (target)" />
+          <Stat
+            value={
+              division.stats
+                ? division.stats.mrs
+                : <span className="text-[10px] font-bold italic" style={{ color: 'var(--qms-text-muted)' }}>—</span>
+            }
+            label="MRs (live)"
+          />
 
           <div className="w-28 shrink-0 text-[11px] truncate" style={{ color: 'var(--qms-text-muted)' }}>
             {ownerName(division.owner) ?? '—'}

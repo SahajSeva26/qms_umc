@@ -102,6 +102,13 @@ export const SearchTenantQuerySchema = z.object({
     // regex-matched against the tenant's embedded address
     city: z.string().optional().openapi({ example: 'Mumbai' }),
     state: z.string().optional().openapi({ example: 'Maharashtra' }),
+    // narrow to companies a sales rep can start a lead on: assigned to this rep OR not yet assigned to
+    // anyone. The frontend passes the logged-in rep's own role id (New Lead company picker).
+    salesRep: z
+        .string()
+        .refine((val) => isValidObjectID(val), { message: 'salesRep must be a valid ObjectId' })
+        .optional()
+        .openapi({ example: '64f1a2b3c4d5e6f7a8b9c0d5' }),
     page: z.string().optional().openapi({ example: '1' }),
 
     limit: z.string().optional().openapi({ example: '10' }),
@@ -109,3 +116,11 @@ export const SearchTenantQuerySchema = z.object({
     report: z.enum(['true', 'false']).optional().openapi({ example: 'true' }),
 });
 export type ISearchTenantQuery = z.infer<typeof SearchTenantQuerySchema>;
+
+//4: bulk create (CSV upload) ====================================>
+// No shared form fields — every per-client field comes from the CSV rows (incl. the sales person,
+// by email), validated per row against CreateTenantPayloadSchema in the service. type is always
+// customer (model default). This schema is swagger-only, to render a file picker.
+export const BulkTenantOpenApiSchema = z.object({
+    file: z.any().openapi({ type: 'string', format: 'binary' }),
+});

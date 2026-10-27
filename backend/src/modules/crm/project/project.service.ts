@@ -57,13 +57,20 @@ const assertPlatformStaff = async (roleId: string, label: string, ctx: RequestCo
     }
 };
 
-// tests reference the global TestMaster catalog — every supplied id must resolve to a real test.
-const assertTestsExist = async (testIds: string[], ctx: RequestContext) => {
+// tests reference the global TestMaster catalog — every supplied id must resolve to a real
+// test AND match the project's own therapy + one of its camp types (project.type[]).
+const assertTestsExist = async (testIds: string[], therapy: string, types: string[], ctx: RequestContext) => {
     const uniqueIds = [...new Set(testIds)];
     for (const id of uniqueIds) {
         const test = await TestMasterService.get(id, ctx);
         if (!test) {
             return throwAppError(`Test not found: ${id}`, StatusCodes.BAD_REQUEST);
+        }
+        if (test.therapy && test.therapy !== therapy) {
+            return throwAppError(`Test "${test.name}" belongs to a different therapy and cannot be added to this project`, StatusCodes.BAD_REQUEST);
+        }
+        if (test.campType && !types.includes(test.campType)) {
+            return throwAppError(`Test "${test.name}" (${test.campType}) is not offered by this project's type(s)`, StatusCodes.BAD_REQUEST);
         }
     }
 };
@@ -87,8 +94,12 @@ const applyOwnScope = (where: any, ctx: RequestContext) => {
 // ========================================================================================
 
 const set = async (model: any, entity: HydratedDocument<IProject>, ctx: RequestContext) => {
-    // team — validated against platform tenant before being applied
+    // team — validated against platform tenant before being applied. Changing the sales rep is a
+    // management action (project:manage only); on create it defaults from the lead's salesPerson.
     if (model.salesRep) {
+        if (!ctx.hasAnyPermissions([PROJECT_PERMISSIONS.MANAGE.code])) {
+            return throwAppError('Only a manager can change the sales rep of a project', StatusCodes.FORBIDDEN);
+        }
         await assertPlatformStaff(model.salesRep, 'Sales rep', ctx);
         entity.salesRep = model.salesRep;
     }
@@ -114,7 +125,7 @@ const set = async (model: any, entity: HydratedDocument<IProject>, ctx: RequestC
     if (model.therapy) entity.therapy = model.therapy;
     if (model.type) entity.type = model.type;
     if (model.tests) {
-        await assertTestsExist(model.tests, ctx);
+        await assertTestsExist(model.tests, entity.therapy, (entity.type as string[]) || [], ctx);
         entity.tests = model.tests;
     }
 
@@ -283,12 +294,13 @@ const create = async (model: ICreateProjectPayload, ctx: RequestContext): Promis
 
     const project = await withTransaction(async () => {
         const code: string = await CounterService.next(PROJECT_COUNTER_ENTITY, ctx);
-        //3: build entity — tenant + division are derived from the lead (source of truth),
-        // never trusted from the payload.
+        //3: build entity — tenant + division + salesRep are derived from the lead (source of truth),
+        // never trusted from the payload. A project:manage actor can reassign salesRep later via update.
         const entity = new Project({
             lead: lead._id,
             tenant: lead.tenant,
             division: lead.division,
+            salesRep: lead.salesPerson,
             code,
         });
 

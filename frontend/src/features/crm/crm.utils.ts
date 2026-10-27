@@ -24,6 +24,16 @@ export function contactPersonLabel(contact: LeadPopulatedContact | string | unde
   return contact.name
 }
 
+export function contactPersonEmail(contact: LeadPopulatedContact | string | undefined): string | undefined {
+  if (!contact || typeof contact === 'string') return undefined
+  return contact.email
+}
+
+export function contactPersonPhone(contact: LeadPopulatedContact | string | undefined): string | undefined {
+  if (!contact || typeof contact === 'string') return undefined
+  return contact.phone
+}
+
 export function tenantLabel(tenant: LeadPopulatedTenant | string | undefined): string {
   if (!tenant || typeof tenant === 'string') return '—'
   return tenant.name

@@ -8,3 +8,8 @@ export function isPharmaRoleType(roleTypeCode: string | undefined | null): roleT
   if (!roleTypeCode) return false
   return (PHARMA_ROLE_TYPE_CODES as readonly string[]).includes(roleTypeCode)
 }
+
+// The pharma field-force (not pharma-division-head) — these three get the same non-pharma-portal
+// exceptions: Camp Management + Doctor Management in the sidebar (visibleNav.ts), the matching
+// route guard (AppLayout.tsx), and clickable camp notifications (notifications.entityResolver.ts).
+export const PHARMA_FIELD_ROLE_TYPE_CODES = ['pharma-mr', 'pharma-asm', 'pharma-rsm']

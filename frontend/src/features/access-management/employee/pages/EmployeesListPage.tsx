@@ -34,24 +34,24 @@ const EmployeesListContent = () => {
   const canSearchRoleTypes = permissions.includes('tenant:admin') || permissions.includes('tenant:manage') || permissions.includes('system:manage')
   const canSearchTenants = permissions.includes('tenant:search') || permissions.includes('tenant:manage') || permissions.includes('system:manage')
 
+  // High fixed limit (not pagination) — same "load everything for a picker" convention as
+  // useRoles({ limit: '500' }) elsewhere. Scoped to the caller's own (platform) tenant — an
+  // employee can only ever be linked to a platform role type (POST /employees is itself gated
+  // to platform admin/ops-manager role types), so customer tenants' pharma/admin role types
+  // must never appear in this picker.
   const {
-    data: foTypeData,
-    isLoading: foTypeLoading,
-    isError: foTypeErrored,
-    refetch: refetchFoType,
-  } = useRoleTypes({ code: 'field-officer', status: 'active' }, canSearchRoleTypes)
-  const {
-    data: dietitianTypeData,
-    isLoading: dietitianTypeLoading,
-    isError: dietitianTypeErrored,
-    refetch: refetchDietitianType,
-  } = useRoleTypes({ code: 'dietitian', status: 'active' }, canSearchRoleTypes)
-  const foTypeId = foTypeData?.data?.items[0]?.id
-  const dietitianTypeId = dietitianTypeData?.data?.items[0]?.id
+    data: roleTypesData,
+    isLoading: roleTypesRawLoading,
+    isError: roleTypesRawErrored,
+    refetch: refetchRoleTypes,
+  } = useRoleTypes({ status: 'active', limit: '500', tenant: tenantId }, canSearchRoleTypes && !!tenantId)
+  // 'system' (the seeded internal/automation role type) and 'admin' (the tenant's own admin role
+  // type, provisioned at tenant creation, not onboarded here) are never valid employee role types.
+  const roleTypeOptions = (roleTypesData?.data?.items ?? []).filter((t) => t.code !== 'system' && t.code !== 'admin')
   // Only meaningful once canSearchRoleTypes is true — an unauthorized actor's queries stay
   // permanently disabled/idle, which must not be read as a failure.
-  const roleTypesLoading = canSearchRoleTypes && (foTypeLoading || dietitianTypeLoading)
-  const roleTypesErrored = canSearchRoleTypes && (foTypeErrored || dietitianTypeErrored)
+  const roleTypesLoading = canSearchRoleTypes && roleTypesRawLoading
+  const roleTypesErrored = canSearchRoleTypes && roleTypesRawErrored
 
   const canOnboard = canOnboardNewPerson(session?.roleType.code, permissions)
   const canLink = canLinkExistingAccount(session?.roleType.code, permissions)
@@ -106,46 +106,47 @@ const EmployeesListContent = () => {
             Employees
           </h1>
           <p className="text-[13px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>
-            {!isLoading && !error ? `${totalCount} total` : 'Field officer / dietitian HR records.'}
+            {!isLoading && !error ? `${totalCount} total` : 'HR records for any role type.'}
           </p>
         </div>
         {tenantId && (canOnboard || canLink) && (
           roleTypesLoading ? (
-            <p className="text-[13px]" style={{ color: 'var(--qms-text-muted)' }}>Loading worker roles…</p>
-          ) : roleTypesErrored && !foTypeId && !dietitianTypeId ? (
-            // Both lookups failed (or the only one that mattered did) — nothing to onboard against at
-            // all, so this replaces the button rather than silently hiding it with no explanation.
+            <p className="text-[13px]" style={{ color: 'var(--qms-text-muted)' }}>Loading role types…</p>
+          ) : roleTypesErrored && roleTypeOptions.length === 0 ? (
             <div className="flex items-center gap-2">
-              <p className="text-[13px] text-danger">Couldn't load worker roles.</p>
+              <p className="text-[13px] text-danger">Couldn't load role types.</p>
               <button
                 type="button"
-                onClick={() => { void refetchFoType(); void refetchDietitianType() }}
+                onClick={() => void refetchRoleTypes()}
                 className="text-[13px] font-semibold underline decoration-dotted underline-offset-2 hover:no-underline"
               >
                 Retry
               </button>
             </div>
-          ) : (foTypeId || dietitianTypeId) && (
-            <div className="flex flex-col items-end gap-1">
+          ) : roleTypeOptions.length > 0 && (
+            <div className="flex items-center gap-2">
+              {/* A background refresh can fail while cached role types remain — keep the picker
+                  usable with the stale data, but still flag that it may be out of date. */}
+              {roleTypesErrored && (
+                <div className="flex items-center gap-2">
+                  <p className="text-[13px] text-danger">Role types may be out of date.</p>
+                  <button
+                    type="button"
+                    onClick={() => void refetchRoleTypes()}
+                    className="text-[13px] font-semibold underline decoration-dotted underline-offset-2 hover:no-underline"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
               <CreateEmployeeModal
                 tenantId={tenantId}
-                roleTypeIds={{ 'field-officer': foTypeId, dietitian: dietitianTypeId }}
+                roleTypeOptions={roleTypeOptions}
                 canOnboardNewPerson={canOnboard}
                 canLinkExistingAccount={canLink}
                 autoOpenNewPerson={shouldAutoOpen}
                 onAutoOpenHandled={handleAutoOpenHandled}
               />
-              {/* One kind failed to load but the other is usable — surface it rather than silently
-                  dropping that option with no explanation (the original bug this fixes). */}
-              {roleTypesErrored && (
-                <button
-                  type="button"
-                  onClick={() => { void refetchFoType(); void refetchDietitianType() }}
-                  className="text-[11px] font-semibold text-danger underline decoration-dotted underline-offset-2 hover:no-underline"
-                >
-                  {!foTypeId ? "Couldn't load Field officer — retry" : "Couldn't load Dietitian — retry"}
-                </button>
-              )}
             </div>
           )
         )}

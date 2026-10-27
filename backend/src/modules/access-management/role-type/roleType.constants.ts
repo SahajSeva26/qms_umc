@@ -14,6 +14,10 @@ const PHARMA_CAMP_PERMISSIONS = [CAMP_PERMISSIONS.BOOK.code];
 // read-only view of their own tenant's brand catalog (scoped by ctx.where) — every pharma role
 const PHARMA_BRAND_PERMISSIONS = [BRAND_PERMISSIONS.SEARCH.code, BRAND_PERMISSIONS.GET.code];
 
+// Raw strings, not ROLE_PERMISSIONS/ROLE_TYPE_PERMISSIONS.*.code — role.constants.ts imports
+// ALLOWED_ROLETYPE_CODES from this file, so importing either back would be circular.
+const PHARMA_DOWNLINE_PERMISSIONS = ['role:search', 'role-type:search'];
+
 export const ALLOWED_ROLETYPE_CODES = {
     PLATFORM: {
         SYSTEM: 'system',
@@ -69,19 +73,19 @@ export const DEFAULT_PHARMA_ROLE_TYPES = [
         name: 'Pharma Division Head',
         description: 'Pharma division head',
         // division head manages its own tenant's doctor registry (tenant-scoped via ctx.where())
-        permissions: [...PHARMA_CAMP_PERMISSIONS, ...PHARMA_BRAND_PERMISSIONS, DOCTOR_PERMISSIONS.MANAGE.code] as string[],
+        permissions: [...PHARMA_CAMP_PERMISSIONS, ...PHARMA_BRAND_PERMISSIONS, ...PHARMA_DOWNLINE_PERMISSIONS, DOCTOR_PERMISSIONS.MANAGE.code] as string[],
     },
     {
         code: ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_RSM,
         name: 'Pharma RSM',
         description: 'Pharma regional sales manager',
-        permissions: [...PHARMA_CAMP_PERMISSIONS, ...PHARMA_BRAND_PERMISSIONS] as string[],
+        permissions: [...PHARMA_CAMP_PERMISSIONS, ...PHARMA_BRAND_PERMISSIONS, ...PHARMA_DOWNLINE_PERMISSIONS] as string[],
     },
     {
         code: ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_ASM,
         name: 'Pharma ASM',
         description: 'Pharma area sales manager',
-        permissions: [...PHARMA_CAMP_PERMISSIONS, ...PHARMA_BRAND_PERMISSIONS] as string[],
+        permissions: [...PHARMA_CAMP_PERMISSIONS, ...PHARMA_BRAND_PERMISSIONS, ...PHARMA_DOWNLINE_PERMISSIONS] as string[],
     },
     {
         code: ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR,

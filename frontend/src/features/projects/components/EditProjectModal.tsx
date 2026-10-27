@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { FiSave, FiActivity, FiHeart, FiVideo, FiDroplet, FiClock } from 'react-icons/fi'
 import type { PaymentTerms, ProjectEntity, ProjectTherapy, ProjectType } from '@/types/project.types'
@@ -12,8 +12,10 @@ import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRoleTypes'
 import { useContacts } from '@/features/contacts/hooks/useContacts'
 import { useUpdateProject } from '@/features/projects/hooks/useUpdateProject'
+import { useTestsForProjectWizard } from '@/features/test-master/hooks/useTestsForProjectWizard'
+import { usePermission } from '@/hooks/usePermission'
 import { editProjectSchema } from '@/features/projects/schemas/project.schemas'
-import { PROJECT_TYPE_COLOR } from '@/features/projects/projects.utils'
+import { PROJECT_TYPE_COLOR, projectSalesRepName, allowedCampTypesForProjectTypes } from '@/features/projects/projects.utils'
 import { PickCard, PickGrid } from '@/components/ui/PickCard'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -28,6 +30,9 @@ import { getApiErrorMessage } from '@/utils/apiError'
 interface EditProjectModalProps {
   project: ProjectEntity
   onClose: () => void
+  // project.service.ts's set() requires project:manage to change salesRep — read-only
+  // for anyone without it (matches ProjectsPage's own project:manage gate).
+  canManage: boolean
 }
 
 // Scoped to UpdateProjectPayload's fields — a strict subset of Create's,
@@ -36,6 +41,7 @@ interface EditFormState {
   name: string
   therapy: ProjectTherapy | ''
   type: ProjectType[]
+  tests: string[]
   campTimeSlots: CampTimeSlotValue[]
   salesRepId: string
   projectCoordinatorId: string
@@ -49,6 +55,7 @@ const toFormState = (project: ProjectEntity): EditFormState => ({
   name: project.name,
   therapy: project.therapy,
   type: project.type,
+  tests: project.tests.map((t) => unwrapId(t)).filter(Boolean),
   campTimeSlots: project.campTimeSlots,
   salesRepId: unwrapId(project.salesRep),
   projectCoordinatorId: unwrapId(project.projectCoordinator),
@@ -69,7 +76,7 @@ const TYPE_ICONS: Record<ProjectType, typeof FiActivity> = {
   lab: FiDroplet,
 }
 
-const EditProjectModal = ({ project, onClose }: EditProjectModalProps) => {
+const EditProjectModal = ({ project, onClose, canManage }: EditProjectModalProps) => {
   const [form, setForm] = useState<EditFormState>(() => toFormState(project))
   const [error, setError] = useState<string | null>(null)
   const updateProject = useUpdateProject()
@@ -87,6 +94,10 @@ const EditProjectModal = ({ project, onClose }: EditProjectModalProps) => {
 
   const toggleType = (t: ProjectType) => {
     setField('type', form.type.includes(t) ? form.type.filter((x) => x !== t) : [...form.type, t])
+  }
+
+  const toggleTest = (id: string) => {
+    setField('tests', form.tests.includes(id) ? form.tests.filter((t) => t !== id) : [...form.tests, id])
   }
 
   const toggleSlot = (slot: CampTimeSlotValue) => {
@@ -143,6 +154,36 @@ const EditProjectModal = ({ project, onClose }: EditProjectModalProps) => {
     useContacts({ division: projectDivisionId, status: 'active' }, { enabled: !!projectDivisionId })
   const marketingContacts = marketingContactData?.data?.items ?? []
 
+  // Tests must stay a valid pair with therapy/type — changing either here (e.g. adding a camp
+  // type) can leave previously-attached tests invalid for the new combination; the backend only
+  // re-validates tests when the tests field itself is resent, so re-editing this list is the only
+  // way to reconcile that server-side gap today.
+  const { hasAnyPermission } = usePermission()
+  const canBrowseTests = hasAnyPermission(['test-master:search', 'test-master:manage'])
+  const allowedCampTypes = allowedCampTypesForProjectTypes(form.type)
+  const {
+    tests: availableTests,
+    isLoading: isLoadingTests,
+    isFetching: isFetchingMoreTests,
+    error: testsError,
+    hasMore: hasMoreTests,
+    loadMore: loadMoreTests,
+    refetch: refetchTests,
+  } = useTestsForProjectWizard(form.therapy, allowedCampTypes, canBrowseTests)
+
+  // A test already attached that's no longer valid for the current therapy/type must be dropped —
+  // but only once the matching catalog page has actually loaded, so a still-valid test isn't
+  // wrongly cleared while its page is mid-fetch.
+  useEffect(() => {
+    if (isLoadingTests || form.tests.length === 0) return
+    const validIds = new Set(availableTests.map((t) => t.id))
+    const stillValid = form.tests.filter((id) => validIds.has(id))
+    if (stillValid.length !== form.tests.length) {
+      setField('tests', stillValid)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.therapy, allowedCampTypes.join(','), isLoadingTests])
+
   const handleSave = async () => {
     const result = editProjectSchema.safeParse({
       name: form.name,
@@ -161,12 +202,20 @@ const EditProjectModal = ({ project, onClose }: EditProjectModalProps) => {
     setError(null)
 
     const orig = initial.current
+    // The backend only re-validates tests when `tests` itself is present in the payload — so a
+    // therapy/type-only change must still resend `tests` (even if the array value is unchanged)
+    // to force that revalidation; otherwise a now-invalid attached test would pass through silently.
+    const therapyOrTypeChanged = form.therapy !== orig.therapy || arrayChanged(form.type, orig.type)
+    const testsChanged = arrayChanged(form.tests, orig.tests)
     const payload: UpdateProjectPayload = {
       ...(form.name !== orig.name ? { name: form.name } : {}),
       ...(form.therapy !== orig.therapy ? { therapy: form.therapy as ProjectTherapy } : {}),
       ...(arrayChanged(form.type, orig.type) ? { type: form.type } : {}),
+      ...(testsChanged || therapyOrTypeChanged ? { tests: form.tests } : {}),
       ...(arrayChanged(form.campTimeSlots, orig.campTimeSlots) ? { campTimeSlots: form.campTimeSlots } : {}),
-      ...(form.salesRepId !== orig.salesRepId ? { salesRep: form.salesRepId } : {}),
+      // Defense-in-depth: the picker below is disabled for non-managers, so this is already inert
+      // for them — but never rely solely on the UI having prevented a value change.
+      ...(canManage && form.salesRepId !== orig.salesRepId ? { salesRep: form.salesRepId } : {}),
       ...(form.projectCoordinatorId !== orig.projectCoordinatorId ? { projectCoordinator: form.projectCoordinatorId } : {}),
       ...(form.marketingContactId !== orig.marketingContactId ? { marketingContact: form.marketingContactId } : {}),
       ...(form.paymentTerms !== orig.paymentTerms ? { paymentTerms: form.paymentTerms } : {}),
@@ -217,6 +266,49 @@ const EditProjectModal = ({ project, onClose }: EditProjectModalProps) => {
           </div>
 
           <div>
+            <Label className={labelClasses} style={labelStyle}>Tests to be conducted</Label>
+            {!canBrowseTests ? (
+              <p className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>
+                You don't have permission to browse the test catalog.
+              </p>
+            ) : !form.therapy ? (
+              <p className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>Select a therapy to see available tests.</p>
+            ) : allowedCampTypes.length === 0 ? (
+              <p className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>Select a project type to see available tests.</p>
+            ) : isLoadingTests ? (
+              <p className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>Loading tests…</p>
+            ) : testsError ? (
+              <div className="text-[12px] rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger flex items-center justify-between gap-2">
+                <span>Couldn't load tests for this therapy.</span>
+                <button
+                  type="button"
+                  className="font-semibold underline decoration-dotted underline-offset-2 hover:no-underline shrink-0"
+                  onClick={() => refetchTests()}
+                >
+                  Retry
+                </button>
+              </div>
+            ) : availableTests.length === 0 ? (
+              <p className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>No tests configured for this therapy and project type yet.</p>
+            ) : (
+              <>
+                <ChipRow>
+                  {availableTests.map((t) => (
+                    <ChipToggle key={t.id} active={form.tests.includes(t.id)} onClick={() => toggleTest(t.id)}>
+                      {t.name}
+                    </ChipToggle>
+                  ))}
+                </ChipRow>
+                {hasMoreTests && (
+                  <Button type="button" variant="outline" size="xs" className="mt-2" onClick={loadMoreTests} disabled={isFetchingMoreTests}>
+                    {isFetchingMoreTests ? 'Loading…' : 'Load more tests'}
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
+
+          <div>
             <Label className={labelClasses} style={labelStyle}><FiClock size={12} className="inline mr-1" />Camp time slots (multi-select) *</Label>
             <ChipRow>
               {CAMP_TIME_SLOT_VALUES.map((slot) => (
@@ -229,24 +321,37 @@ const EditProjectModal = ({ project, onClose }: EditProjectModalProps) => {
 
           <div>
             <Label className={labelClasses} style={labelStyle}>Sales rep *</Label>
-            <Select value={form.salesRepId} onValueChange={(v) => setField('salesRepId', v as string)}>
-              <SelectTrigger className={`w-full ${fieldClasses}`}>
-                <SelectValue placeholder={salesRolesLoading ? 'Loading...' : 'Select sales rep...'}>
-                  {(v: string) => {
-                    const r = salesRoles.find((role) => role.id === v)
-                    return r ? `${r.name} (${r.code})` : salesRolesLoading ? 'Loading...' : 'Select sales rep...'
-                  }}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {salesRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
-              </SelectContent>
-            </Select>
-            {salesRolesErrored && (
-              <p className="text-[11px] mt-1 text-danger">Couldn't load sales reps — try again.</p>
-            )}
-            {salesRepTypeMissing && (
-              <p className="text-[11px] mt-1 text-danger">The "Sales rep" role type is missing — contact an admin.</p>
+            {canManage ? (
+              <>
+                <Select value={form.salesRepId} onValueChange={(v) => setField('salesRepId', v as string)}>
+                  <SelectTrigger className={`w-full ${fieldClasses}`}>
+                    <SelectValue placeholder={salesRolesLoading ? 'Loading...' : 'Select sales rep...'}>
+                      {(v: string) => {
+                        const r = salesRoles.find((role) => role.id === v)
+                        return r ? `${r.name} (${r.code})` : salesRolesLoading ? 'Loading...' : 'Select sales rep...'
+                      }}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {salesRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {salesRolesErrored && (
+                  <p className="text-[11px] mt-1 text-danger">Couldn't load sales reps — try again.</p>
+                )}
+                {salesRepTypeMissing && (
+                  <p className="text-[11px] mt-1 text-danger">The "Sales rep" role type is missing — contact an admin.</p>
+                )}
+              </>
+            ) : (
+              <>
+                <div className={`w-full ${fieldClasses} flex items-center`} style={{ color: 'var(--qms-text-muted)' }}>
+                  {projectSalesRepName(project)}
+                </div>
+                <p className="text-[11px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>
+                  Only a project manager can reassign the sales rep.
+                </p>
+              </>
             )}
           </div>
 

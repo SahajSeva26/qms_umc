@@ -90,29 +90,36 @@ describe('Sidebar — pharma identity isolation', () => {
     expect(screen.queryByText(/pharma portal/i)).not.toBeInTheDocument()
   })
 
-  // pharma-mr's one exception: it also sees the real (non-pharma) Camp Management + Doctor Management items, own-scoped server-side.
-  it('shows Pharma Portal AND Camp Management AND Doctor Management for pharma-mr with camp:book — no other non-pharma item', async () => {
+  // Pharma field-force's (MR/ASM/RSM) one exception: they also see the real (non-pharma) Camp
+  // Management + Diet Camps + Doctor Management items, own-scoped server-side.
+  it.each([
+    ['pharma-mr', 'Pharma Portal MR'],
+    ['pharma-asm', 'Pharma Portal ASM'],
+    ['pharma-rsm', 'Pharma Portal RSM'],
+  ])('shows Pharma Portal AND Camp Management AND Diet Camps AND Doctor Management for %s with camp:book — no other non-pharma item', async (roleTypeCode, portalLabel) => {
     await renderSidebar({
       permissions: ['camp:book'],
-      session: sessionFixture('pharma-mr', ['camp:book']),
+      session: sessionFixture(roleTypeCode, ['camp:book']),
     })
 
-    expect(screen.getByText('Pharma Portal MR')).toBeInTheDocument()
+    expect(screen.getByText(portalLabel)).toBeInTheDocument()
     expect(screen.getByText('Camp Management')).toBeInTheDocument()
+    expect(screen.getByText('Diet Camps')).toBeInTheDocument()
     expect(screen.getByText('Doctor Management')).toBeInTheDocument()
     expect(screen.queryByText('Dashboard')).not.toBeInTheDocument()
     expect(screen.queryByText('CRM')).not.toBeInTheDocument()
     expect(screen.queryByText('Client Management')).not.toBeInTheDocument()
   })
 
-  it('no other pharma role gets the Camp Management/Doctor Management exception, even if they somehow hold camp:book', async () => {
+  it('pharma-division-head does not get the Camp Management/Diet Camps/Doctor Management exception, even if it somehow holds camp:book', async () => {
     await renderSidebar({
       permissions: ['camp:book'],
-      session: sessionFixture('pharma-rsm', ['camp:book']),
+      session: sessionFixture('pharma-division-head', ['camp:book']),
     })
 
-    expect(screen.getByText('Pharma Portal RSM')).toBeInTheDocument()
+    expect(screen.getByText('Pharma Portal HO')).toBeInTheDocument()
     expect(screen.queryByText('Camp Management')).not.toBeInTheDocument()
+    expect(screen.queryByText('Diet Camps')).not.toBeInTheDocument()
     expect(screen.queryByText('Doctor Management')).not.toBeInTheDocument()
   })
 })
@@ -225,14 +232,17 @@ describe('Sidebar — /camps/new highlights the originating Screening/Diet page,
   })
 })
 
-describe('Sidebar — Field Staff Coverage is hidden from field-officer sessions', () => {
-  it('hides Field Staff Coverage for a field-officer-shaped session (holds neither tenant nor role read/manage codes)', async () => {
+// GET /geo-profiles, /:id and /nearest are all open to any authenticated user server-side
+// (geoProfile.routes.ts) — Field Staff Coverage has no REAL_GATED_NAV_ITEMS entry, same as
+// Doctor Management, and must be visible regardless of tenant/role codes.
+describe('Sidebar — Field Staff Coverage is visible to any authenticated session, matching the open backend reads', () => {
+  it('shows Field Staff Coverage for a field-officer-shaped session (holds neither tenant nor role read/manage codes)', async () => {
     await renderSidebar({
       permissions: ['inventory-request:search', 'inventory-request:create'],
       session: sessionFixture('field-officer', ['inventory-request:search', 'inventory-request:create'], 'platform'),
     })
 
-    expect(screen.queryByText('Field Staff Coverage')).not.toBeInTheDocument()
+    expect(screen.getByText('Field Staff Coverage')).toBeInTheDocument()
   })
 
   it('shows Field Staff Coverage for a sales-rep session holding tenant:search/tenant:get', async () => {
@@ -244,7 +254,7 @@ describe('Sidebar — Field Staff Coverage is hidden from field-officer sessions
     expect(screen.getByText('Field Staff Coverage')).toBeInTheDocument()
   })
 
-  it('shows Field Staff Coverage for a system:manage session even without an explicit tenant/role code', async () => {
+  it('shows Field Staff Coverage for a system:manage session', async () => {
     await renderSidebar({
       permissions: ['system:manage'],
       session: sessionFixture('system-admin', ['system:manage']),

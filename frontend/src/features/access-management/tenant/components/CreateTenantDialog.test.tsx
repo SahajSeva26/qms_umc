@@ -103,12 +103,17 @@ async function renderDialog() {
   )
 }
 
+// Sales rep is a search-as-you-type picker (not a Select) — focusing the input opens the
+// dropdown and fetches; the option then renders as a button with the rep's name/code.
+async function pickSalesRep(user: ReturnType<typeof userEvent.setup>, optionName: RegExp = /sales rep one/i) {
+  await user.click(screen.getByLabelText(/sales rep \*/i))
+  await user.click(await screen.findByText(optionName))
+}
+
 // Advances from step 0 (company basics) to step 1 (location) only.
 async function fillStep0AndAdvance(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/^name \*$/i), 'Acme Pharma')
-  await user.click(screen.getByRole('combobox', { name: /sales rep/i }))
-  const option = await screen.findByText(/sales rep one/i)
-  await user.click(option)
+  await pickSalesRep(user)
   await user.click(screen.getByRole('button', { name: /^next$/i }))
 }
 
@@ -290,8 +295,7 @@ function makeFile(name = 'logo.png', type = 'image/png', size = 1024) {
 
 async function fillStep0Simple(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/^name \*$/i), 'Acme Pharma')
-  await user.click(screen.getByRole('combobox', { name: /sales rep/i }))
-  await user.click(await screen.findByText(/sales rep one/i))
+  await pickSalesRep(user)
 }
 
 // Step 1 (location) — leaves the address blank and advances to step 2.
@@ -1227,5 +1231,177 @@ describe('CreateTenantDialog — draft persistence', () => {
 
     await user.click(await screen.findByRole('button', { name: /^Resume$/i }))
     expect(await screen.findByDisplayValue('Acme Pharma')).toBeInTheDocument()
+  })
+})
+
+// Regression: step 0's "Next" previously only validated name/salesPerson (CREATE_TENANT_STEP_FIELD_NAMES[0]),
+// not gst/businessLifetime which are ALSO rendered on step 0. An invalid GST could silently sail
+// past "Next" all the way to the final "Create company" click on step 2, where handleSubmit's
+// whole-form validation would reject it with ZERO visible feedback (the error renders only on
+// step 0's own useTenantWizardFieldError, which the user isn't looking at) — no network call,
+// no toast, nothing. Confirmed live via Playwright against a real running instance before fixing.
+// First two tests prove both previously-missing fields (gst, businessLifetime) are now covered by
+// step 0's own gate. Third test covers the basic onInvalid wiring via a same-step error — see its
+// own comment for why this dialog currently has no reachable path that exercises the actual
+// cross-step jump (every field here is a static schema check, unlike CreateRoleModal's
+// needsDivision/needsSupervisor, which are derived from data that can change after their own
+// step's gate already passed).
+describe('CreateTenantDialog — invalid GST on step 0 must block progress visibly, never silently block the final submit', () => {
+  beforeEach(async () => {
+    vi.resetAllMocks()
+    sessionStorage.clear()
+    useAuthStore.getState().clearAuth()
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    vi.mocked(accessManagementService.getMe).mockResolvedValue(sessionResponse)
+    vi.mocked(accessManagementService.searchTenants).mockResolvedValue({ success: true, message: '', data: { items: [{ id: 't-platform', name: 'QMS Platform', code: 'qms-platform', type: 'platform', address: null }], count: 1 } } as never)
+    vi.mocked(accessManagementService.searchRoleTypes).mockResolvedValue({ success: true, message: '', data: { items: [{ id: 'rt-sales-rep', code: 'sales-rep' }], count: 1 } } as never)
+    vi.mocked(accessManagementService.searchRoles).mockResolvedValue({ success: true, message: '', data: { items: [{ id: 'role-sales-rep-1', code: 'sr-001', name: 'Sales Rep One' }], count: 1 } } as never)
+    window.URL.createObjectURL = vi.fn(() => 'blob:mock-preview-url')
+    window.URL.revokeObjectURL = vi.fn()
+  })
+
+  it('an invalid GST blocks "Next" on step 0 itself, with the real GSTIN error visible right there', async () => {
+    const user = userEvent.setup({ delay: null })
+    await renderDialog()
+    await user.click(screen.getByRole('button', { name: /new client/i }))
+
+    await user.type(screen.getByLabelText(/^name \*$/i), 'Sagar Pharma')
+    await user.type(screen.getByLabelText(/gst number/i), '2udgtthoom78876')
+    await pickSalesRep(user)
+    await user.click(screen.getByRole('button', { name: /^next$/i }))
+
+    // Still on step 0 — "Next" did not advance.
+    expect(screen.getByText(/step 1 of 3/i)).toBeInTheDocument()
+    expect(screen.getByText(/enter a valid 15-character gstin/i)).toBeInTheDocument()
+  })
+
+  it('defense-in-depth: a final-submit validation failure shows the real error and never calls createTenant, even when the error lives on the step the user is already on', async () => {
+    // Covers the basic onInvalid wiring (handleSubmit's second arg is actually reached and the
+    // error renders) via a same-step error. NOTE: this does not exercise the step-JUMP itself —
+    // every one of this dialog's schema fields is a static string check (no async-derived
+    // requirement that can flip true after its own step's gate already passed, unlike
+    // CreateRoleModal's needsDivision/needsSupervisor), so once CREATE_TENANT_STEP_FIELD_NAMES
+    // covers every real field (see the parity test below), a prior step's own trigger() call can
+    // never leave it invalid by the time final submit runs — there is currently no reachable path
+    // through this UI where onInvalid's jump actually fires. It stays as real defense-in-depth.
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    const user = userEvent.setup({ delay: null })
+    await renderDialog()
+    await user.click(screen.getByRole('button', { name: /new client/i }))
+
+    await user.type(screen.getByLabelText(/^name \*$/i), 'Sagar Pharma')
+    await pickSalesRep(user)
+    await user.click(screen.getByRole('button', { name: /^next$/i }))
+    expect(screen.getByText(/step 2 of 3/i)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /^next$/i }))
+    expect(screen.getByText(/step 3 of 3/i)).toBeInTheDocument()
+
+    await user.type(screen.getByLabelText(/first name \*/i), 'Jane')
+    await user.type(screen.getByLabelText(/^email \*$/i), 'not-an-email')
+    await user.type(screen.getByLabelText(/^password \*$/i), 'password123')
+    await user.click(screen.getByRole('button', { name: /create company/i }))
+
+    await waitFor(() => expect(screen.getByText(/enter a valid email/i)).toBeInTheDocument())
+    expect(screen.getByText(/step 3 of 3/i)).toBeInTheDocument()
+    expect(accessManagementService.createTenant).not.toHaveBeenCalled()
+  })
+
+  it('businessLifetime (the other field missing from the original drift) also blocks "Next" on step 0, not just GST', async () => {
+    // The real bug was CREATE_TENANT_STEP_FIELD_NAMES[0] missing BOTH gst and businessLifetime —
+    // the GST test above only proves one of the two is now covered. A negative value fails the
+    // schema's own .nonnegative() check, proving this field is actually in trigger()'s call too.
+    const user = userEvent.setup({ delay: null })
+    await renderDialog()
+    await user.click(screen.getByRole('button', { name: /new client/i }))
+
+    await user.type(screen.getByLabelText(/^name \*$/i), 'Sagar Pharma')
+    await user.type(screen.getByLabelText(/business lifetime/i), '-5')
+    await pickSalesRep(user)
+    await user.click(screen.getByRole('button', { name: /^next$/i }))
+
+    expect(screen.getByText(/step 1 of 3/i)).toBeInTheDocument()
+    expect(screen.getByText(/must be 0 or more/i)).toBeInTheDocument()
+  })
+})
+
+describe('CreateTenantDialog — sales rep picker honesty', () => {
+  beforeEach(async () => {
+    vi.resetAllMocks()
+    sessionStorage.clear()
+    useAuthStore.getState().clearAuth()
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    vi.mocked(accessManagementService.getMe).mockResolvedValue(sessionResponse)
+    vi.mocked(accessManagementService.searchTenants).mockResolvedValue({ success: true, message: '', data: { items: [{ id: 't-platform', name: 'QMS Platform', code: 'qms-platform', type: 'platform', address: null }], count: 1 } } as never)
+    vi.mocked(accessManagementService.searchRoleTypes).mockResolvedValue({ success: true, message: '', data: { items: [{ id: 'rt-sales-rep', code: 'sales-rep' }], count: 1 } } as never)
+  })
+
+  it('shows an honest "no active sales reps" message when the query succeeds but returns zero — not a blank dropdown with no explanation', async () => {
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    vi.mocked(accessManagementService.searchRoles).mockResolvedValue({ success: true, message: '', data: { items: [], count: 0 } } as never)
+
+    const user = userEvent.setup({ delay: null })
+    await renderDialog()
+    await user.click(screen.getByRole('button', { name: /new client/i }))
+
+    await user.click(screen.getByLabelText(/sales rep \*/i))
+
+    expect(await screen.findByText(/no active sales reps are available/i)).toBeInTheDocument()
+  })
+
+  it('a sales rep past the backend\'s default page of 10 is reachable by typing their name — the query is sent with a search term, not just the first page', async () => {
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    vi.mocked(accessManagementService.searchRoles).mockResolvedValue({
+      success: true, message: '', data: { items: [{ id: 'role-sales-rep-11', code: 'sr-011', name: 'Eleventh Rep' }], count: 1 },
+    } as never)
+
+    const user = userEvent.setup({ delay: null })
+    await renderDialog()
+    await user.click(screen.getByRole('button', { name: /new client/i }))
+
+    await user.click(screen.getByLabelText(/sales rep \*/i))
+    await user.type(screen.getByLabelText(/sales rep \*/i), 'Eleventh')
+
+    await waitFor(() =>
+      expect(accessManagementService.searchRoles).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Eleventh' }),
+      ),
+    )
+    expect(await screen.findByText(/eleventh rep/i)).toBeInTheDocument()
+  })
+})
+
+describe('CreateTenantDialog — malformed success response is never silent', () => {
+  beforeEach(async () => {
+    vi.resetAllMocks()
+    sessionStorage.clear()
+    useAuthStore.getState().clearAuth()
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    vi.mocked(accessManagementService.getMe).mockResolvedValue(sessionResponse)
+    vi.mocked(accessManagementService.searchTenants).mockResolvedValue({ success: true, message: '', data: { items: [{ id: 't-platform', name: 'QMS Platform', code: 'qms-platform', type: 'platform', address: null }], count: 1 } } as never)
+    vi.mocked(accessManagementService.searchRoleTypes).mockResolvedValue({ success: true, message: '', data: { items: [{ id: 'rt-sales-rep', code: 'sales-rep' }], count: 1 } } as never)
+    vi.mocked(accessManagementService.searchRoles).mockResolvedValue({ success: true, message: '', data: { items: [{ id: 'role-sales-rep-1', code: 'sr-001', name: 'Sales Rep One' }], count: 1 } } as never)
+  })
+
+  it('a 2xx createTenant response with no data.id shows a visible error instead of silently doing nothing', async () => {
+    const { accessManagementService } = await import('@/features/access-management/accessManagement.service')
+    vi.mocked(accessManagementService.createTenant).mockResolvedValue({ success: true, message: '', data: {} } as never)
+
+    const user = userEvent.setup({ delay: null })
+    await renderDialog()
+    await user.click(screen.getByRole('button', { name: /new client/i }))
+
+    await fillStep0AndAdvance(user)
+    await user.click(screen.getByRole('button', { name: /^next$/i }))
+    expect(screen.getByText(/step 3 of 3/i)).toBeInTheDocument()
+
+    await user.type(screen.getByLabelText(/first name \*/i), 'Jane')
+    await user.type(screen.getByLabelText(/^email \*$/i), 'jane@example.com')
+    await user.type(screen.getByLabelText(/^password \*$/i), 'password123')
+    await user.click(screen.getByRole('button', { name: /create company/i }))
+
+    expect(await screen.findByText(/server response was missing its id/i)).toBeInTheDocument()
+    // Dialog stays open on step 3 — no silent close/navigate on a response this broken.
+    expect(screen.getByText(/step 3 of 3/i)).toBeInTheDocument()
+    expect(navigateMock).not.toHaveBeenCalled()
   })
 })

@@ -130,10 +130,32 @@ const getTenantMe =async(req:any,res:any)=>{
         return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
     }
 }
+const bulkCreate = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+
+        if (!req.file) {
+            return throwAppError('CSV file is required', StatusCodes.BAD_REQUEST);
+        }
+
+        const result = await TenantService.bulkCreate(req.file, ctx);
+
+        // surface any invalid/failed rows as a 400 with the per-row summary; a fully clean import is 200
+        if (result.errors && result.errors.length > 0) {
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Clients created with errors', result);
+        }
+
+        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Clients created successfully', result);
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
 export const TenantController = {
     get,
     search,
     create,
     update,
-    getTenantMe
+    getTenantMe,
+    bulkCreate,
 };

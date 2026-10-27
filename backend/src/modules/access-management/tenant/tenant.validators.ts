@@ -116,3 +116,11 @@ export const SearchTenantQuerySchema = z.object({
     report: z.enum(['true', 'false']).optional().openapi({ example: 'true' }),
 });
 export type ISearchTenantQuery = z.infer<typeof SearchTenantQuerySchema>;
+
+//4: bulk create (CSV upload) ====================================>
+// No shared form fields — every per-client field comes from the CSV rows (incl. the sales person,
+// by email), validated per row against CreateTenantPayloadSchema in the service. type is always
+// customer (model default). This schema is swagger-only, to render a file picker.
+export const BulkTenantOpenApiSchema = z.object({
+    file: z.any().openapi({ type: 'string', format: 'binary' }),
+});

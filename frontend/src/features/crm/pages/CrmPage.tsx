@@ -15,6 +15,7 @@ import { computeKpis, computeValueKpis } from '@/features/crm/crm.kpis'
 import { computeMyKpis } from '@/features/crm/crm.myKpis'
 import { downloadLeadsCsv } from '@/features/crm/crm.export'
 import { usePagination } from '@/hooks/usePagination'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { Button } from '@/components/ui/button'
 import PaginationControls from '@/components/ui/PaginationControls'
 import CrmKpiStrip from '@/features/crm/components/CrmKpiStrip'
@@ -53,13 +54,18 @@ const CrmPage = () => {
   const canViewLeadReport = hasAnyPermission(['lead:manage'])
   const { filters, setFilter, reset } = useCrmFilters()
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
+  // Debounced before reaching the query — undebounced, every keystroke changes useLeads' queryKey
+  // and unmounts CrmFilterBar mid-typing. focusTherapy is a Select (discrete values), not free
+  // text, so it doesn't need this.
+  const debouncedQ = useDebouncedValue(filters.q)
+  const debouncedCode = useDebouncedValue(filters.code)
   // All 6 filters are real, backend-supported params — needed server-side so count/totalPages
   // reflect the filtered total. matchesFilters below only re-applies status/title/date client-side.
   // report=true drives each row's stats.followUps (ListView only).
   const { leads, count, isLoading, error, moveStage, updateLead } = useLeads({
     status: filters.status || undefined,
-    title: filters.q || undefined,
-    code: filters.code || undefined,
+    title: debouncedQ || undefined,
+    code: debouncedCode || undefined,
     focusTherapy: filters.focusTherapy || undefined,
     fyFrom: filters.fyFrom || undefined,
     fyTo: filters.fyTo || undefined,
@@ -248,12 +254,6 @@ const CrmPage = () => {
                 Pipeline value
               </p>
               <CrmKpiStrip tiles={valueKpis} />
-              {report.kpis.topRep && (
-                <p className="text-[12px] mt-2" style={{ color: 'var(--qms-text-muted)' }}>
-                  Top rep (all-time): <span className="font-semibold" style={{ color: 'var(--qms-text)' }}>{report.kpis.topRep.name}</span>
-                  {' · '}{report.kpis.topRep.wonCount} won
-                </p>
-              )}
             </>
           )}
 

@@ -1,5 +1,5 @@
 import type { IconType } from 'react-icons'
-import { FiBriefcase, FiCheckCircle, FiXCircle, FiTarget, FiActivity, FiDollarSign, FiClock } from 'react-icons/fi'
+import { FiBriefcase, FiCheckCircle, FiXCircle, FiTarget, FiActivity, FiDollarSign, FiClock, FiAward } from 'react-icons/fi'
 import type { KpiTile as KpiTileData } from '@/types/crm.types'
 import { formatINR, formatPercent } from '@/utils/formatters'
 import KpiTile, { type KpiTone } from '@/components/ui/KpiTile'
@@ -11,6 +11,7 @@ const ICON_MAP: Record<string, IconType> = {
   Target: FiTarget,
   DollarSign: FiDollarSign,
   Clock: FiClock,
+  Award: FiAward,
 }
 
 // tile.tone (crm.kpis.ts) already uses the prototype's own tone names
@@ -24,6 +25,7 @@ function toTone(tone: string): KpiTone {
 function formatValue(tile: KpiTileData): string {
   if (tile.fmt === 'inr') return formatINR(Number(tile.value))
   if (tile.fmt === 'pct') return formatPercent(Number(tile.value), 1)
+  if (tile.fmt === 'raw') return String(tile.value)
   return Number(tile.value).toLocaleString('en-IN')
 }
 
@@ -43,6 +45,7 @@ const CrmKpiStrip = ({ tiles }: CrmKpiStripProps) => (
         key={tile.id}
         label={tile.label}
         value={formatValue(tile)}
+        sub={tile.sub}
         tone={toTone(tile.tone)}
         icon={ICON_MAP[tile.icon] ?? FiActivity}
       />

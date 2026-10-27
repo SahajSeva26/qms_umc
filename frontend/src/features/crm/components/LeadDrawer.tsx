@@ -45,7 +45,7 @@ const LeadDrawer = ({ lead, onClose, onMoveStage, onUpdateLead, canManage }: Lea
   const nextStatuses = canManage ? LEAD_TRANSITION_MAP[lead.status] : []
 
   return (
-    <SideDrawer open={!!lead} title={lead.title} onClose={onClose}>
+    <SideDrawer open={!!lead} title={lead.title} onClose={onClose} widthClassName="max-w-[640px]">
       <div className="mb-4">
         <div className="flex items-start justify-between gap-2">
           <div className="text-[15px] font-bold truncate" style={{ color: 'var(--qms-text)' }}>{lead.title}</div>
@@ -74,7 +74,10 @@ const LeadDrawer = ({ lead, onClose, onMoveStage, onUpdateLead, canManage }: Lea
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-1 mb-4 p-1 rounded-xl" style={{ background: 'var(--qms-surface-strong)' }}>
+      <div
+        className="grid grid-cols-4 gap-1 mb-4 p-1 rounded-xl border"
+        style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}
+      >
         {TABS.map((t) => (
           <button
             key={t}
@@ -82,7 +85,7 @@ const LeadDrawer = ({ lead, onClose, onMoveStage, onUpdateLead, canManage }: Lea
             className="text-[11px] font-semibold py-1.5 rounded-lg transition-all"
             style={
               tab === t
-                ? { background: 'var(--qms-surface-card)', color: 'var(--qms-text)', boxShadow: 'var(--shadow-sm, 0 1px 2px rgba(0,0,0,.06))' }
+                ? { background: 'var(--background)', color: 'var(--qms-text)', boxShadow: 'var(--shadow-sm, 0 1px 2px rgba(0,0,0,.06))' }
                 : { color: 'var(--qms-text-muted)' }
             }
           >

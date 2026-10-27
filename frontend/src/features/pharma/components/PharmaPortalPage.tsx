@@ -6,6 +6,7 @@ import MrBookCampTab from '@/features/pharma/components/MrBookCampTab'
 import PharmaDashboardTab from '@/features/pharma/components/PharmaDashboardTab'
 import MrDashboardTab from '@/features/pharma/components/MrDashboardTab'
 import PharmaDoctorsTab from '@/features/pharma/components/PharmaDoctorsTab'
+import PharmaMyTeamTab from '@/features/pharma/components/PharmaMyTeamTab'
 import MyCampScheduleTab from '@/features/pharma/components/MyCampScheduleTab'
 
 type TabId = 'dashboard' | 'projects' | 'book' | 'schedule' | 'doctors'
@@ -32,6 +33,9 @@ const PharmaPortalPage = ({ roleTypeCode, portalLabel }: PharmaPortalPageProps) 
   // Camp schedule is MR-only among the pharma roles — GET /camps/my's RoleGuard admits pharma-mr
   // plus platform field-officers/dietitians, not ASM/RSM/division-head.
   const visibleTabs = TABS.filter((t) => t.id !== 'schedule' || roleTypeCode === 'pharma-mr')
+  // HO/RSM/ASM see their downline hierarchy instead of the doctor registry; MR keeps Doctors.
+  const isMr = roleTypeCode === 'pharma-mr'
+  const doctorsTabLabel = isMr ? 'Doctors' : 'My Team'
 
   return (
     <PharmaRoleGate roleTypeCode={roleTypeCode}>
@@ -54,7 +58,7 @@ const PharmaPortalPage = ({ roleTypeCode, portalLabel }: PharmaPortalPageProps) 
                   borderBottomColor: tab === t.id ? 'var(--qms-brand)' : 'transparent',
                 }}
               >
-                <Icon size={12} /> {t.label}
+                <Icon size={12} /> {t.id === 'doctors' ? doctorsTabLabel : t.label}
               </button>
             )
           })}
@@ -67,7 +71,7 @@ const PharmaPortalPage = ({ roleTypeCode, portalLabel }: PharmaPortalPageProps) 
         {tab === 'projects' && <PharmaProjectsPage />}
         {tab === 'book' && <MrBookCampTab />}
         {tab === 'schedule' && <MyCampScheduleTab />}
-        {tab === 'doctors' && <PharmaDoctorsTab />}
+        {tab === 'doctors' && (isMr ? <PharmaDoctorsTab /> : <PharmaMyTeamTab />)}
       </div>
     </PharmaRoleGate>
   )

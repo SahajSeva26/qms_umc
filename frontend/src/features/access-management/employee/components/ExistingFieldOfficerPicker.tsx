@@ -16,8 +16,8 @@ export interface PickedFieldOfficer {
 interface ExistingFieldOfficerPickerProps {
   tenant: string | undefined
   roleTypeId: string | undefined
-  /** Drives placeholder/empty-state wording only — the actual search is already scoped by roleTypeId. */
-  workerLabel: 'field officer' | 'dietitian'
+  /** The role type's display name — drives placeholder/empty-state wording only; the actual search is already scoped by roleTypeId. */
+  workerLabel: string
   value: string | null
   onChange: (picked: PickedFieldOfficer) => void
 }
@@ -61,7 +61,9 @@ const ExistingFieldOfficerPicker = ({ tenant, roleTypeId, workerLabel, value, on
 
   const { items, isFetching, isFetchingNextPage, error, hasNextPage, fetchNextPage, isDebouncing, hasSearchableQuery } =
     useFieldOfficerRolePicker(search, tenant, roleTypeId, true)
-  const workerLabelPlural = workerLabel === 'dietitian' ? 'dietitians' : 'field officers'
+  // Naive pluralization — role type names in this system are plain nouns/noun phrases (e.g.
+  // "Field Officer", "Sales Rep", "Admin"), none of which need irregular plural handling.
+  const workerLabelPlural = `${workerLabel} accounts`
 
   const handleSelect = (role: RoleEntity) => {
     const reason = blockReason(role)

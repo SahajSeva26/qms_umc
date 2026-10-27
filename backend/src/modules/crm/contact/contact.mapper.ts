@@ -34,6 +34,7 @@ export const ContactMapper = {
                 division: contact.division || null,
                 name: contact.name,
                 designation: contact.designation,
+                department: contact.department,
                 email: contact.email,
                 phone: contact.phone,
                 location: contact.location,

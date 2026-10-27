@@ -1,4 +1,5 @@
 import type { KpiTile, LeadReportResponse } from '@/types/crm.types'
+import { formatINR } from '@/utils/formatters'
 
 // Pipeline Value / Won ₹ / Avg Deal Size are now backed by GET /leads/report's `kpis` block
 // (2026-09-29 backend work) — no longer omitted.
@@ -27,7 +28,7 @@ export function computeKpis(report: LeadReportResponse | null | undefined): KpiT
 // report.kpis (a distinct facet block). Only wonValue/wonCount/winRate are windowed to the report's
 // own from/to — pipelineValue/avgDealSize/salesVelocityDays/topRep are all computed all-time
 // (see backend lead.service.ts report()).
-const VALUE_KPI_CONFIG: Omit<KpiTile, 'value' | 'delta'>[] = [
+const VALUE_KPI_CONFIG: Omit<KpiTile, 'value' | 'delta' | 'sub'>[] = [
   { id: 'pipelineValue', label: 'Pipeline Value', tone: 'violet', icon: 'DollarSign', fmt: 'inr' },
   { id: 'wonValue', label: 'Won Value', tone: 'emerald', icon: 'DollarSign', fmt: 'inr' },
   { id: 'avgDealSize', label: 'Avg Deal Size', tone: 'teal', icon: 'DollarSign', fmt: 'inr' },
@@ -43,5 +44,23 @@ export function computeValueKpis(report: LeadReportResponse | null | undefined):
     salesVelocityDays: kpis?.salesVelocityDays ?? 0,
   }
 
-  return VALUE_KPI_CONFIG.map((cfg) => ({ ...cfg, value: values[cfg.id], delta: 0 }))
+  const tiles: KpiTile[] = VALUE_KPI_CONFIG.map((cfg) => ({ ...cfg, value: values[cfg.id], delta: 0 }))
+
+  // topRep rides the same report.kpis facet (no extra call) but is a name, not a number — 'raw'
+  // fmt + a won-count/value sub line, only shown once there's an actual leader to name.
+  const topRep = kpis?.topRep
+  if (topRep) {
+    tiles.push({
+      id: 'topRep',
+      label: 'Top Rep',
+      tone: 'brand',
+      icon: 'Award',
+      fmt: 'raw',
+      value: topRep.name,
+      delta: 0,
+      sub: `${topRep.wonCount} won · ${formatINR(topRep.wonValue)}`,
+    })
+  }
+
+  return tiles
 }

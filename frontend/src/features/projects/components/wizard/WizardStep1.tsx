@@ -1,11 +1,12 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form'
-import { FiActivity, FiHeart, FiVideo, FiDroplet, FiTag, FiInfo } from 'react-icons/fi'
+import { FiActivity, FiHeart, FiVideo, FiDroplet, FiTag, FiInfo, FiPlusCircle } from 'react-icons/fi'
 import type { WizardFormState } from '@/features/projects/wizard.types'
 import type { ProjectTherapy, ProjectType } from '@/types/project.types'
 import { PROJECT_THERAPY_LABEL, PROJECT_TYPE_LABEL } from '@/types/project.types'
 import { PROJECT_TYPE_COLOR, allowedCampTypesForProjectTypes } from '@/features/projects/projects.utils'
 import { useTestsForProjectWizard } from '@/features/test-master/hooks/useTestsForProjectWizard'
+import EditTestModal from '@/features/test-master/components/EditTestModal'
 import { usePermission } from '@/hooks/usePermission'
 import { PickCard, PickGrid } from '@/components/ui/PickCard'
 import SectionHeader from '@/components/ui/SectionHeader'
@@ -66,6 +67,10 @@ const WizardStep1 = () => {
   // gate the query so it never fires and 403s for an actor who lacks it.
   const { hasAnyPermission } = usePermission()
   const canBrowseTests = hasAnyPermission(['test-master:search', 'test-master:manage'])
+  // POST /test-masters requires the full manage permission — search/get alone can't create.
+  // Sales roles only hold search/get today, so this stays ops/admin-only, same as the prototype.
+  const canCreateTest = hasAnyPermission(['test-master:manage'])
+  const [showNewTestModal, setShowNewTestModal] = useState(false)
 
   // Disabled until BOTH a therapy AND a project type are picked — otherwise a
   // selected test could vanish once therapy/type is later chosen.
@@ -141,7 +146,29 @@ const WizardStep1 = () => {
       </div>
 
       <div>
-        <SectionHeader icon={FiDroplet}>Tests to be conducted</SectionHeader>
+        <div className="flex items-center justify-between gap-2">
+          <SectionHeader icon={FiDroplet}>Tests to be conducted</SectionHeader>
+          {canCreateTest && (
+            <Button type="button" variant="outline" size="xs" onClick={() => setShowNewTestModal(true)}>
+              <FiPlusCircle size={12} /> Add test
+            </Button>
+          )}
+        </div>
+        {showNewTestModal && (
+          <EditTestModal
+            testId={null}
+            onClose={(createdTest) => {
+              setShowNewTestModal(false)
+              refetchTests()
+              // Auto-attach only if the created test matches the project's current therapy/type — a
+              // mismatched test is invisible in the filtered list below and must never be silently attached.
+              const isCompatible = !!createdTest && createdTest.therapy === therapy && !!createdTest.campType && allowedCampTypes.includes(createdTest.campType)
+              if (isCompatible && createdTest && !selectedTestIds.includes(createdTest.id)) {
+                setValue('tests', [...selectedTestIds, createdTest.id], { shouldDirty: true })
+              }
+            }}
+          />
+        )}
         {!canBrowseTests ? (
           <p className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>
             You don't have permission to browse the test catalog. This project will be created with

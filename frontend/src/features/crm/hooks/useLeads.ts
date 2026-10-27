@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { crmService } from '@/features/crm/crm.service'
 import { LEAD_STATUS_LABEL } from '@/types/crm.types'
 import type { CreateLeadPayload, LeadStatus, SearchLeadQuery, UpdateLeadPayload } from '@/types/crm.types'
@@ -22,6 +22,9 @@ export const useLeads = (query: SearchLeadQuery = {}, fetchList: boolean = true)
     queryKey: ['leads', effectiveQuery],
     queryFn: () => crmService.searchLeads(effectiveQuery),
     enabled: fetchList,
+    // Without this, isLoading flips true on every new queryKey (e.g. typing in a search box) and
+    // unmounts whatever's gated on it — e.g. the filter bar itself, mid-interaction.
+    placeholderData: keepPreviousData,
   })
 
   const leads = data?.data?.items ?? []

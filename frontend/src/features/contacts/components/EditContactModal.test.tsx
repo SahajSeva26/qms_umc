@@ -54,7 +54,8 @@ function contactFixture(overrides: Partial<ContactEntity> = {}): ContactEntity {
     tenant: 't-1',
     division: { _id: 'div-1', name: 'Div', code: 'div-1', therapy: [] } as unknown as ContactEntity['division'],
     name: 'STALE-NAME',
-    designation: 'Marketing Manager',
+    department: 'marketing',
+    designation: 'marketingmanager',
     email: 'stale@example.com',
     phone: '9876543210',
     location: 'Pune',
@@ -164,13 +165,14 @@ describe('EditContactModal — partial update payload', () => {
     expect(payload).not.toHaveProperty('location')
   })
 
-  // '' must still be sent (not omitted) when it's a genuine change from a
-  // non-empty original — proves the revert-to-original fix didn't fold a
-  // deliberate clear into "unchanged" via an empty-string falsy check.
-  it('explicitly clearing designation from a non-empty original still sends designation: "" ', async () => {
+  // The backend's UpdateContactPayloadSchema (designation/department: enum.nullable().optional())
+  // only accepts a real enum key or `null` — never '' — so the "—" option's draft value ('')
+  // must be translated to `null` at the payload boundary, not sent as-is (would 400) or omitted
+  // (would silently no-op the clear, since the backend only clears a PRESENT key).
+  it('explicitly clearing designation from a non-empty original sends designation: null, not ""', async () => {
     const { contactsService } = await import('@/features/contacts/contacts.service')
     const user = userEvent.setup()
-    await renderModal(contactFixture({ designation: 'Marketing Manager' }))
+    await renderModal(contactFixture({ department: 'marketing', designation: 'marketingmanager' }))
 
     await user.click(screen.getByText('Marketing Manager'))
     await user.click(await screen.findByRole('option', { name: '—' }))
@@ -181,7 +183,56 @@ describe('EditContactModal — partial update payload', () => {
       if (!call) throw new Error('not called yet')
       return call[1]
     })
-    expect(payload).toHaveProperty('designation', '')
+    expect(payload).toHaveProperty('designation', null)
+  })
+
+  it('clearing department also sends department: null, not ""', async () => {
+    const { contactsService } = await import('@/features/contacts/contacts.service')
+    const user = userEvent.setup()
+    await renderModal(contactFixture({ department: 'purchase', designation: undefined }))
+
+    await user.click(screen.getByText('Purchase'))
+    await user.click(await screen.findByRole('option', { name: '—' }))
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    const payload = await vi.waitFor(() => {
+      const call = vi.mocked(contactsService.updateContact).mock.calls[0]
+      if (!call) throw new Error('not called yet')
+      return call[1]
+    })
+    expect(payload).toHaveProperty('department', null)
+  })
+
+  it('changing department clears a now-invalid designation, and designation is disabled until a department is picked', async () => {
+    const user = userEvent.setup()
+    await renderModal(contactFixture({ department: 'marketing', designation: 'marketingmanager' }))
+
+    expect(screen.getByText('Marketing Manager')).toBeInTheDocument()
+
+    await user.click(screen.getByText('Marketing'))
+    await user.click(await screen.findByRole('option', { name: 'Purchase' }))
+
+    expect(screen.getByText(/select designation/i)).toBeInTheDocument()
+    expect(screen.queryByText('Marketing Manager')).not.toBeInTheDocument()
+  })
+
+  it('picking a department then a designation from that department\'s list sends both in the payload', async () => {
+    const { contactsService } = await import('@/features/contacts/contacts.service')
+    const user = userEvent.setup()
+    await renderModal(contactFixture({ department: undefined, designation: undefined }))
+
+    await user.click(screen.getByText(/select department/i))
+    await user.click(await screen.findByRole('option', { name: 'Purchase' }))
+    await user.click(screen.getByText(/select designation/i))
+    await user.click(await screen.findByRole('option', { name: 'Manager' }))
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    const payload = await vi.waitFor(() => {
+      const call = vi.mocked(contactsService.updateContact).mock.calls[0]
+      if (!call) throw new Error('not called yet')
+      return call[1]
+    })
+    expect(payload).toMatchObject({ department: 'purchase', designation: 'manager' })
   })
 })
 

@@ -57,13 +57,20 @@ const assertPlatformStaff = async (roleId: string, label: string, ctx: RequestCo
     }
 };
 
-// tests reference the global TestMaster catalog — every supplied id must resolve to a real test.
-const assertTestsExist = async (testIds: string[], ctx: RequestContext) => {
+// tests reference the global TestMaster catalog — every supplied id must resolve to a real
+// test AND match the project's own therapy + one of its camp types (project.type[]).
+const assertTestsExist = async (testIds: string[], therapy: string, types: string[], ctx: RequestContext) => {
     const uniqueIds = [...new Set(testIds)];
     for (const id of uniqueIds) {
         const test = await TestMasterService.get(id, ctx);
         if (!test) {
             return throwAppError(`Test not found: ${id}`, StatusCodes.BAD_REQUEST);
+        }
+        if (test.therapy && test.therapy !== therapy) {
+            return throwAppError(`Test "${test.name}" belongs to a different therapy and cannot be added to this project`, StatusCodes.BAD_REQUEST);
+        }
+        if (test.campType && !types.includes(test.campType)) {
+            return throwAppError(`Test "${test.name}" (${test.campType}) is not offered by this project's type(s)`, StatusCodes.BAD_REQUEST);
         }
     }
 };
@@ -118,7 +125,7 @@ const set = async (model: any, entity: HydratedDocument<IProject>, ctx: RequestC
     if (model.therapy) entity.therapy = model.therapy;
     if (model.type) entity.type = model.type;
     if (model.tests) {
-        await assertTestsExist(model.tests, ctx);
+        await assertTestsExist(model.tests, entity.therapy, (entity.type as string[]) || [], ctx);
         entity.tests = model.tests;
     }
 

@@ -60,8 +60,8 @@ const ratingSchema = new mongoose.Schema(
     },
 );
 
-// one rating per (camp, rated worker, rater) — an MR can't rate the same worker twice for one camp
-ratingSchema.index({ camp: 1, worker: 1, ratedBy: 1 }, { unique: true });
+// one rating per (tenant, camp, worker, rater) — each rater rates a worker once per camp
+ratingSchema.index({ tenant: 1, camp: 1, worker: 1, ratedBy: 1 }, { unique: true });
 
 export const RatingModel = mongoose.model('Rating', ratingSchema);
 export type IRating = InferSchemaType<typeof ratingSchema>;

@@ -7,6 +7,7 @@ import { TEST_MASTER_PERMISSIONS } from '../../modules/operations/testMaster/tes
 import { PATIENT_PERMISSIONS } from '../../modules/operations/patient/patient.constants';
 import { SCREENING_PERMISSIONS } from '../../modules/operations/screening/screening.constants';
 import { TEST_PERMISSIONS } from '../../modules/operations/test/test.constants';
+import { RATING_PERMISSIONS } from '../../modules/operations/rating/rating.constants';
 import { TENANT_PERMISSIONS } from '../../modules/access-management/tenant/tenant.constants';
 import { DIVISION_PERMISSIONS } from '../../modules/crm/division/division.constants';
 import { CONTACT_PERMISSIONS } from '../../modules/crm/contact/contact.constants';
@@ -219,6 +220,9 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
             TEST_PERMISSIONS.UPDATE.code,
             TEST_PERMISSIONS.GET.code,
             TEST_PERMISSIONS.SEARCH.code,
+            // read ratings given about them for their camps (the MR is the rater; read-only here)
+            RATING_PERMISSIONS.GET.code,
+            RATING_PERMISSIONS.SEARCH.code,
             // raise and manage their own refill/return requests (progressing the stage is manage-only)
             INVENTORY_REQUEST_PERMISSIONS.CREATE.code,
             INVENTORY_REQUEST_PERMISSIONS.GET.code,
@@ -258,6 +262,9 @@ export const OPERATION_BUSINESS_ROLE_TYPES = [
             TEST_PERMISSIONS.UPDATE.code,
             TEST_PERMISSIONS.GET.code,
             TEST_PERMISSIONS.SEARCH.code,
+            // read ratings given about them for their camps (the MR is the rater; read-only here)
+            RATING_PERMISSIONS.GET.code,
+            RATING_PERMISSIONS.SEARCH.code,
             // raise and manage their own refill/return requests (progressing the stage is manage-only)
             INVENTORY_REQUEST_PERMISSIONS.CREATE.code,
             INVENTORY_REQUEST_PERMISSIONS.GET.code,

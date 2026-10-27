@@ -18,6 +18,7 @@ import { TEST_MASTER_PERMISSIONS } from '../../modules/operations/testMaster/tes
 import { PATIENT_PERMISSIONS } from '../../modules/operations/patient/patient.constants';
 import { SCREENING_PERMISSIONS } from '../../modules/operations/screening/screening.constants';
 import { TEST_PERMISSIONS } from '../../modules/operations/test/test.constants';
+import { RATING_PERMISSIONS } from '../../modules/operations/rating/rating.constants';
 import { COUNTER_PERMISSIONS } from '../../modules/counter/counter.constants';
 import { INVENTORY_MASTER_PERMISSIONS } from '../../modules/inventory/inventory-master/inventory-master.constants';
 import { INVENTORY_CONSUMABLE_PERMISSIONS } from '../../modules/inventory/inventory-consumable/inventory-consumable.constants';
@@ -59,6 +60,7 @@ export const PERMISSIONS = {
     PATIENT: PATIENT_PERMISSIONS,
     SCREENING: SCREENING_PERMISSIONS,
     TEST: TEST_PERMISSIONS,
+    RATING: RATING_PERMISSIONS,
     COUNTER: COUNTER_PERMISSIONS,
     INVENTORY_MASTER: INVENTORY_MASTER_PERMISSIONS,
     INVENTORY_CONSUMABLE: INVENTORY_CONSUMABLE_PERMISSIONS,

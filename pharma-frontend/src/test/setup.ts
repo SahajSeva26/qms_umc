@@ -21,3 +21,19 @@ if (typeof globalThis.IntersectionObserver === 'undefined') {
   }
   globalThis.IntersectionObserver = NoopIntersectionObserver as unknown as typeof IntersectionObserver
 }
+
+// jsdom has no real matchMedia implementation — a no-op stub for tests that don't care (e.g.
+// anything rendering AppLayout, which watches the lg breakpoint); a test that does care installs
+// its own mock (see AppLayout.test.tsx's desktop-breakpoint regression test).
+if (typeof window !== 'undefined' && typeof window.matchMedia === 'undefined') {
+  window.matchMedia = ((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia
+}

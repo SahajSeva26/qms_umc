@@ -1,11 +1,6 @@
 import type { ReactNode } from 'react'
-import { useState } from 'react'
 import { FiShield, FiLock, FiStar, FiImage, FiActivity, FiNavigation, FiMapPin, FiHome, FiUser } from 'react-icons/fi'
-import { Button } from '@qms/ui'
-import { useSession } from '@/hooks/useSession'
-import { useRatings } from '@/features/rating/hooks/useRatings'
-import RatingDisplay from '@/features/rating/components/RatingDisplay'
-import RateCampModal from '@/features/rating/components/RateCampModal'
+import { CampRatingSection } from '@/features/rating'
 import { specializationLabel } from '@/types/doctor.types'
 import { CAMP_TIME_SLOT_LABEL } from '@/types/campTimeSlot.constants'
 import { CAMP_TYPE_LABEL } from '@/types/campReal.types'
@@ -16,7 +11,6 @@ import type { CampEntity, CampPopulatedDoctor, CampPopulatedProject, CampPopulat
 const populatedRole = (r: CampEntity['fo']): CampPopulatedRole | null => (r && typeof r !== 'string' ? r : null)
 const populatedDoctor = (d: CampEntity['doctor']): CampPopulatedDoctor | null => (d && typeof d !== 'string' ? d : null)
 const populatedProject = (p: CampEntity['project']): CampPopulatedProject | null => (p && typeof p !== 'string' ? p : null)
-const roleId = (r: CampEntity['fo']): string | undefined => populatedRole(r)?._id ?? (typeof r === 'string' ? r : undefined)
 
 const CARD_ACCENTS = {
   camp: '#3b6dff',
@@ -222,48 +216,15 @@ const PatientsCard = () => (
   </Card>
 )
 
-// FO / camp rating — read-only display of the real rating module, plus a Rate/Edit action for
-// the camp's own MR once closed. Same RatingSection logic as PharmaCampDetailDrawer.
-const RatingCard = ({ camp }: { camp: CampEntity }) => {
-  const { session } = useSession()
-  const [modalOpen, setModalOpen] = useState(false)
-  const mrId = roleId(camp.mr)
-  const isOwnMr = !!session?.role.id && session.role.id === mrId
-  const canRate = isOwnMr && camp.status === 'closed'
-
-  const { items, isLoading, error, refetch } = useRatings({ camp: camp.id }, { enabled: canRate || camp.status === 'closed' })
-  const existing = items[0] ?? null
-
-  if (!canRate && !existing && !error) return null
-
-  return (
-    <Card title="FO / camp rating" icon={FiStar} color={CARD_ACCENTS.rating}>
-      {isLoading ? (
-        <div className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>Loading…</div>
-      ) : error ? (
-        <div className="flex items-center justify-between gap-2 text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>
-          <span>Couldn't load this camp's rating.</span>
-          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-        </div>
-      ) : existing ? (
-        <>
-          <RatingDisplay rating={existing} />
-          {canRate && (
-            <Button variant="outline" size="sm" className="mt-2" onClick={() => setModalOpen(true)}>
-              <FiStar size={12} /> Edit rating
-            </Button>
-          )}
-        </>
-      ) : (
-        <Button size="sm" onClick={() => setModalOpen(true)}>
-          <FiStar size={12} /> Rate camp
-        </Button>
-      )}
-
-      {modalOpen && <RateCampModal open campId={camp.id} existing={existing} onClose={() => setModalOpen(false)} />}
-    </Card>
-  )
-}
+// Permission-gated rating display/action is shared with PharmaCampDetailDrawer's RatingSection via
+// CampRatingSection — this just supplies the dossier's own Card chrome around it. (Previously this
+// was its own separate copy of the same logic, missing the rating:* permission check the drawer
+// had — an HO/RSM/ASM viewing a closed camp's dossier would get a 403 from GET /ratings instead of
+// the section simply not rendering, and an MR without rating:create could see "Rate camp" they
+// couldn't actually submit. One shared component now, so this can't drift again.)
+const RatingCard = ({ camp }: { camp: CampEntity }) => (
+  <CampRatingSection camp={camp} wrapper={(content) => <Card title="FO / camp rating" icon={FiStar} color={CARD_ACCENTS.rating}>{content}</Card>} />
+)
 
 interface CampDossierContentProps {
   camp: CampEntity

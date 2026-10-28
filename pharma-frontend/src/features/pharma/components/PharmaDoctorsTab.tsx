@@ -8,8 +8,9 @@ import { usePermission } from '@/hooks/usePermission'
 import SearchInput from '@/components/ui/SearchInput'
 import PaginationControls from '@/components/ui/PaginationControls'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@qms/ui'
+import DialogErrorBoundary from '@/components/ui/DialogErrorBoundary'
+import DialogOpeningFallback from '@/components/ui/DialogOpeningFallback'
 import type { DoctorEntity } from '@/types/doctor.types'
 import { SPECIALIZATION_LABEL } from '@/types/doctor.types'
 
@@ -18,23 +19,6 @@ import { SPECIALIZATION_LABEL } from '@/types/doctor.types'
 const importEditDoctorModal = () => import('@/features/pharma/components/EditDoctorModal')
 const EditDoctorModal = lazy(importEditDoctorModal)
 const prefetchEditDoctorModal = () => { void importEditDoctorModal() }
-
-// A dialog shell, not a content skeleton — no real shape to match yet, and no data fetch (a form, not a list).
-const EditorOpeningFallback = (
-  <Dialog open>
-    <DialogContent className="sm:max-w-2xl" showCloseButton={false}>
-      <DialogHeader>
-        <DialogTitle>Opening editor…</DialogTitle>
-      </DialogHeader>
-      <div className="flex items-center justify-center py-10">
-        <div
-          className="h-6 w-6 rounded-full border-2 animate-spin"
-          style={{ borderColor: 'var(--qms-border)', borderTopColor: 'var(--qms-brand)' }}
-        />
-      </div>
-    </DialogContent>
-  </Dialog>
-)
 
 const PAGE_SIZE = 10
 
@@ -215,14 +199,16 @@ const PharmaDoctorsTab = () => {
       </QueryStateBlock>
 
       {editModal.open && (
-        <Suspense fallback={EditorOpeningFallback}>
-          <EditDoctorModal
-            open
-            doctor={editModal.doctor}
-            divisionId={divisionId}
-            onClose={() => setEditModal({ open: false, doctor: null })}
-          />
-        </Suspense>
+        <DialogErrorBoundary onClose={() => setEditModal({ open: false, doctor: null })}>
+          <Suspense fallback={<DialogOpeningFallback />}>
+            <EditDoctorModal
+              open
+              doctor={editModal.doctor}
+              divisionId={divisionId}
+              onClose={() => setEditModal({ open: false, doctor: null })}
+            />
+          </Suspense>
+        </DialogErrorBoundary>
       )}
     </div>
   )

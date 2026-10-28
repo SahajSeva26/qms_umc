@@ -1,6 +1,6 @@
 import { addDays, format } from 'date-fns'
 import { useInfiniteQuery, type InfiniteData, type QueryKey } from '@tanstack/react-query'
-import { pharmaCampsService } from '@/features/pharma/pharmaCamps.service'
+import { pharmaCampsService } from '@/features/camps/camps.service'
 import type { BookingAvailabilityPayload, BookingAvailabilityResponse, BookingAvailabilityDayEntry } from '@/types/campReal.types'
 
 // Each batch is one request — stays well under the backend's 30-day span cap

@@ -3,8 +3,7 @@ import { FiUserCheck, FiMapPin, FiCalendar, FiFileText, FiAlertTriangle } from '
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { useReshapingResolver } from '@/hooks/useReshapingResolver'
 import { bookCampPayloadSchema, type BookCampFormPayload } from '@/features/pharma/schemas/bookCamp.schemas'
-import { useBookCamp } from '@/features/camps/hooks/useBookCamp'
-import { useDayRangeAvailability } from '@/features/camps/hooks/useDayRangeAvailability'
+import { useBookCamp, useDayRangeAvailability } from '@/features/camps'
 import { useSession } from '@/hooks/useSession'
 import { usePermission } from '@/hooks/usePermission'
 import { getApiErrorMessage } from '@/utils/apiError'
@@ -23,6 +22,8 @@ import { Button } from '@qms/ui'
 import { Textarea } from '@/components/ui/textarea'
 import SectionHeader from '@/components/ui/SectionHeader'
 import FieldErrorText from '@/components/ui/FieldErrorText'
+import DialogErrorBoundary from '@/components/ui/DialogErrorBoundary'
+import DialogOpeningFallback from '@/components/ui/DialogOpeningFallback'
 import ENV from '@/config/env'
 
 // This form is already the lazy chunk (see MrPortalPage.tsx), so the doctor-create modal is
@@ -329,19 +330,21 @@ const BookCampForm = ({ type, project, patientExpectation, patientExpectationInv
         {fieldError('doctorId') && <p className="text-[11px] mt-1 text-danger">{fieldError('doctorId')}</p>}
 
         {showNewDoctor && session && actingDivisionId && (
-          <Suspense fallback={null}>
-            <EditDoctorModal
-              open
-              doctor={null}
-              divisionId={actingDivisionId}
-              onCreated={(created) => {
-                setValue('doctorId', created.id, { shouldDirty: true, shouldTouch: true, shouldValidate: true })
-                setValue('doctorLabel', `${created.name} (${created.pharmaCode})`)
-                handleSelectDoctor(created)
-              }}
-              onClose={() => setShowNewDoctor(false)}
-            />
-          </Suspense>
+          <DialogErrorBoundary onClose={() => setShowNewDoctor(false)}>
+            <Suspense fallback={<DialogOpeningFallback />}>
+              <EditDoctorModal
+                open
+                doctor={null}
+                divisionId={actingDivisionId}
+                onCreated={(created) => {
+                  setValue('doctorId', created.id, { shouldDirty: true, shouldTouch: true, shouldValidate: true })
+                  setValue('doctorLabel', `${created.name} (${created.pharmaCode})`)
+                  handleSelectDoctor(created)
+                }}
+                onClose={() => setShowNewDoctor(false)}
+              />
+            </Suspense>
+          </DialogErrorBoundary>
         )}
       </div>
 

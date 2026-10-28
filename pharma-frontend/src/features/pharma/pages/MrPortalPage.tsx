@@ -6,7 +6,11 @@ import MrDashboardTab from '@/features/pharma/components/MrDashboardTab'
 
 // Dashboard stays eager (default tab, needs fast first paint). Every other tab is a real,
 // separately-downloadable chunk via React.lazy, each with its own local Suspense fallback.
-const MyCampScheduleTab = lazy(() => import('@/features/pharma/components/MyCampScheduleTab'))
+// MyCampScheduleTab is deliberately imported by its direct path, never through features/camps's
+// public barrel (index.ts) — that barrel only ever exports eager hooks; routing a lazy component
+// through it (even via this exact direct path) would defeat its own chunk isolation, confirmed via
+// a real Vite build.
+const MyCampScheduleTab = lazy(() => import('@/features/camps/components/MyCampScheduleTab'))
 const PharmaDoctorsTab = lazy(() => import('@/features/pharma/components/PharmaDoctorsTab'))
 // Book camp carries RHF + Zod + the Maps SDK boundary (same weight class as the Doctors tab's
 // EditDoctorModal) — a user who never books a camp shouldn't download any of it.

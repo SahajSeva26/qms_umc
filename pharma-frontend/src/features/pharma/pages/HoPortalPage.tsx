@@ -1,4 +1,4 @@
-import PharmaDashboardPortalPage from '@/features/pharma/pages/PharmaDashboardPortalPage'
+import PharmaDashboardPortalPage from '@/features/portal/pages/PharmaDashboardPortalPage'
 
 const HoPortalPage = () => <PharmaDashboardPortalPage roleTypeCode="pharma-division-head" portalLabel="HO" />
 

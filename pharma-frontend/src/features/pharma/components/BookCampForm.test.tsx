@@ -65,7 +65,7 @@ const startOfToday = () => {
 }
 const TODAY_KEY = format(startOfToday(), 'yyyy-MM-dd')
 
-vi.mock('@/features/pharma/pharmaCamps.service', () => ({
+vi.mock('@/features/camps/camps.service', () => ({
   pharmaCampsService: {
     bookCamp: vi.fn(async () => ({ success: true, message: '', data: { id: 'camp-1', code: 'cmp-000001' } })),
     getBookingAvailability: vi.fn(async () => ({
@@ -207,7 +207,7 @@ describe('BookCampForm — session/identity guards', () => {
     await user.click(screen.getByRole('button', { name: /^cancel$/i }))
     expect(onCancel).toHaveBeenCalledTimes(1)
 
-    const { pharmaCampsService } = await import('@/features/pharma/pharmaCamps.service')
+    const { pharmaCampsService } = await import('@/features/camps/camps.service')
     expect(pharmaCampsService.bookCamp).not.toHaveBeenCalled()
   })
 
@@ -358,7 +358,7 @@ describe('BookCampForm — all sections visible at once', () => {
 
   it('a real refetch that reports the picked date/slot is no longer available clears the selection instead of leaving it stale', async () => {
     await mockSession()
-    const { pharmaCampsService } = await import('@/features/pharma/pharmaCamps.service')
+    const { pharmaCampsService } = await import('@/features/camps/camps.service')
     const user = userEvent.setup()
     const queryClient = makeQueryClient()
     const BookCampForm = (await import('@/features/pharma/components/BookCampForm')).default
@@ -386,7 +386,7 @@ describe('BookCampForm — all sections visible at once', () => {
 
   it('submit is blocked while the availability fetch for the picked date/slot is genuinely loading or has errored', async () => {
     await mockSession()
-    const { pharmaCampsService } = await import('@/features/pharma/pharmaCamps.service')
+    const { pharmaCampsService } = await import('@/features/camps/camps.service')
     const user = userEvent.setup()
     const queryClient = makeQueryClient()
     const BookCampForm = (await import('@/features/pharma/components/BookCampForm')).default
@@ -432,7 +432,7 @@ describe('BookCampForm — availability day-strip', () => {
     vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver)
 
     await mockSession()
-    const { pharmaCampsService } = await import('@/features/pharma/pharmaCamps.service')
+    const { pharmaCampsService } = await import('@/features/camps/camps.service')
     const user = userEvent.setup()
     await renderForm()()
 
@@ -488,7 +488,7 @@ describe('BookCampForm — availability day-strip', () => {
 
   it('the first availability batch shifts to match the lead-time-shifted day-strip, and stays within the backend\'s 30-day span cap', async () => {
     await mockSession()
-    const { pharmaCampsService } = await import('@/features/pharma/pharmaCamps.service')
+    const { pharmaCampsService } = await import('@/features/camps/camps.service')
     const user = userEvent.setup()
     await renderForm({ project: { ...TEST_PROJECT, daysToBookBefore: 5 } })()
 
@@ -511,7 +511,7 @@ describe('BookCampForm — submit', () => {
 
   it('submits the session\'s own role id as mr — pharma-frontend is MR-only, so there is no on-behalf-of MR picker', async () => {
     await mockSession('self-role-42')
-    const { pharmaCampsService } = await import('@/features/pharma/pharmaCamps.service')
+    const { pharmaCampsService } = await import('@/features/camps/camps.service')
     const user = userEvent.setup()
     await renderForm()()
 
@@ -537,7 +537,7 @@ describe('BookCampForm — submit', () => {
 
   it('submits patientExpectation as omitted when the caller passes undefined (its own section 1 field was left blank)', async () => {
     await mockSession()
-    const { pharmaCampsService } = await import('@/features/pharma/pharmaCamps.service')
+    const { pharmaCampsService } = await import('@/features/camps/camps.service')
     const user = userEvent.setup()
     await renderForm({ patientExpectation: undefined })()
 
@@ -550,7 +550,7 @@ describe('BookCampForm — submit', () => {
 
   it('passes the caller-owned patientExpectation straight through into the booking payload — preserves a genuine 0', async () => {
     await mockSession()
-    const { pharmaCampsService } = await import('@/features/pharma/pharmaCamps.service')
+    const { pharmaCampsService } = await import('@/features/camps/camps.service')
     const user = userEvent.setup()
     await renderForm({ patientExpectation: 0 })()
 
@@ -577,7 +577,7 @@ describe('BookCampForm — submit', () => {
 
   it('Cancel never submits the form as a side effect', async () => {
     await mockSession()
-    const { pharmaCampsService } = await import('@/features/pharma/pharmaCamps.service')
+    const { pharmaCampsService } = await import('@/features/camps/camps.service')
     const user = userEvent.setup()
     await renderForm()()
 
@@ -587,7 +587,7 @@ describe('BookCampForm — submit', () => {
 
   it('disables the submit button while a booking is in flight, preventing a duplicate submit', async () => {
     await mockSession()
-    const { pharmaCampsService } = await import('@/features/pharma/pharmaCamps.service')
+    const { pharmaCampsService } = await import('@/features/camps/camps.service')
     let resolveBooking: (value: ApiResponse<CampMutationResponseEntity>) => void = () => {}
     vi.mocked(pharmaCampsService.bookCamp).mockImplementation(
       () => new Promise((resolve) => { resolveBooking = resolve }),
@@ -609,7 +609,7 @@ describe('BookCampForm — submit', () => {
 
   it('blocks a true rapid double-submit to exactly one mutation call', async () => {
     await mockSession()
-    const { pharmaCampsService } = await import('@/features/pharma/pharmaCamps.service')
+    const { pharmaCampsService } = await import('@/features/camps/camps.service')
     let resolveBooking: (value: ApiResponse<CampMutationResponseEntity>) => void = () => {}
     vi.mocked(pharmaCampsService.bookCamp).mockImplementation(
       () => new Promise((resolve) => { resolveBooking = resolve }),
@@ -698,8 +698,10 @@ describe('BookCampForm — inline doctor creation (gated on doctor:create OR doc
     await fillLocation(user)
 
     await user.click(await screen.findByRole('button', { name: /new doctor/i }))
-    const dialog = await screen.findByRole('dialog')
+    // Waits for the real EditDoctorModal content first — its lazy chunk briefly shows
+    // DialogOpeningFallback's own "dialog" role, a different DOM node from the real one.
     expect(await screen.findByRole('heading', { name: 'Add doctor' })).toBeInTheDocument()
+    const dialog = screen.getByRole('dialog')
 
     await user.type(within(dialog).getByLabelText(/pharma doctor code/i), 'DOC-NEW')
     await user.type(within(dialog).getByLabelText(/^doctor name$/i), 'Dr. New')

@@ -1,7 +1,7 @@
 import { FiLayers, FiGrid, FiClock, FiCalendar, FiActivity, FiCheckCircle, FiXCircle, FiSlash, FiHeart, FiDroplet } from 'react-icons/fi'
 import KpiTile from '@/components/ui/KpiTile'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
-import { usePharmaMyCamps } from '@/features/pharma/hooks/usePharmaMyCamps'
+import { usePharmaMyCamps } from '@/features/camps'
 import { CAMP_STATUS_LABEL, CAMP_STATUS_COLOR } from '@/components/widgets/camp/campStatus.constants'
 import { CAMP_TYPE_LABEL } from '@/types/campReal.types'
 import type { CampStatus, CampType } from '@/types/campReal.types'

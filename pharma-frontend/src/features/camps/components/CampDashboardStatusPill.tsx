@@ -1,4 +1,4 @@
-import { CAMP_SCHEDULE_STATUS_COLOR, CAMP_SCHEDULE_STATUS_PILL_LABEL } from '@/features/pharma/campDashboardStatus'
+import { CAMP_SCHEDULE_STATUS_COLOR, CAMP_SCHEDULE_STATUS_PILL_LABEL } from '@/features/camps/campDashboardStatus'
 import type { CampStatus } from '@/types/campReal.types'
 
 // Plain text, no dot, 14%-tinted background. Mirrors internal-frontend's

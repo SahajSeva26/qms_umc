@@ -3,10 +3,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import MrDashboardTab from './MrDashboardTab'
-import { pharmaCampsService } from '@/features/pharma/pharmaCamps.service'
+import { pharmaCampsService } from '@/features/camps/camps.service'
 import type { CampSummary } from '@/types/campReal.types'
 
-vi.mock('@/features/pharma/pharmaCamps.service', () => ({
+vi.mock('@/features/camps/camps.service', () => ({
   pharmaCampsService: {
     myCamps: vi.fn(),
   },

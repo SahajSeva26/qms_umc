@@ -17,6 +17,7 @@ export type { Suggestion, SelectedPlaceDetails } from './location/usePlacesAutoc
 
 export { default as RootLayout } from './layout/RootLayout'
 export { default as RouteErrorBoundary } from './layout/RouteErrorBoundary'
+export { isChunkLoadError } from './layout/chunkLoadError'
 export { default as RouteFallback } from './layout/RouteFallback'
 export { default as SessionLoading } from './layout/SessionLoading'
 export { default as SessionRecovery } from './layout/SessionRecovery'

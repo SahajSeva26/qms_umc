@@ -30,8 +30,11 @@ const appRouter = createBrowserRouter([
           { path: '/pharma/ho', lazy: lazyRoute(() => import('@/features/pharma/pages/HoPortalPage'), PHARMA_VIEW_PERMISSIONS) },
           { path: '/pharma/rsm', lazy: lazyRoute(() => import('@/features/pharma/pages/RsmPortalPage'), PHARMA_VIEW_PERMISSIONS) },
           { path: '/pharma/asm', lazy: lazyRoute(() => import('@/features/pharma/pages/AsmPortalPage'), PHARMA_VIEW_PERMISSIONS) },
-          // Standalone deep-link target for the Camp Dossier's "Open page" button.
-          { path: '/pharma/camps/:id', lazy: lazyRoute(() => import('@/features/pharma/pages/CampDossierPage'), PHARMA_VIEW_PERMISSIONS) },
+          // Standalone deep-link target for the Camp Dossier's "Open page" button. Direct module
+          // path, not through features/camps's public barrel (index.ts is eager-hooks-only by
+          // design — routing a lazy route target through it would defeat this route's own chunk
+          // isolation, confirmed via a real Vite build).
+          { path: '/pharma/camps/:id', lazy: lazyRoute(() => import('@/features/camps/pages/CampDossierPage'), PHARMA_VIEW_PERMISSIONS) },
           { path: '/unauthorized', element: <UnauthorizedPage homePath={DASHBOARD_PATH} /> },
           // Inside AppLayout so an unauthenticated hit on a bad URL redirects to login, not 404 first.
           { path: '*', element: <NotFoundPage homePath={DASHBOARD_PATH} /> },

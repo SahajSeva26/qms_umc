@@ -1,12 +1,20 @@
-import { useEffect, useState } from 'react'
-import { FiChevronDown, FiLogOut, FiMenu, FiX } from 'react-icons/fi'
+import { lazy, Suspense, useRef, useState, type RefObject } from 'react'
+import { FiChevronDown, FiMenu, FiX } from 'react-icons/fi'
 import { useSession } from '@/hooks/useSession'
 import { useSignOut } from '@/features/auth/useSignOut'
+import ThemeToggle from '@/components/ui/ThemeToggle'
+
+// Lazy: @base-ui/react/popover only needs to be fetched once the account button is actually
+// pressed, not on every page's initial load (it was previously eager here, adding to the
+// always-shipped shell for a menu most visits never open).
+const AccountMenu = lazy(() => import('@/components/layouts/AccountMenu'))
 
 interface TopbarProps {
   mobileMenuOpen: boolean
   onMobileMenuToggle: () => void
-  mobileMenuToggleId: string
+  /** AppLayout's DialogPrimitive.Popup uses this as its `finalFocus` target — returning focus
+   * here on close, since the drawer's trigger lives outside the Dialog's own component tree. */
+  mobileMenuToggleRef: RefObject<HTMLButtonElement | null>
   mobileSidebarId: string
 }
 
@@ -22,12 +30,18 @@ function getGreeting(): string {
 }
 
 // Trimmed port of internal-frontend's Topbar — no global search/AI Copilot/notifications/
-// quick-switch/theme-toggle (pharma-frontend has no themeStore and the shared theme.css has no
-// dark-mode variant at all, so a toggle here would have nothing to switch to). Sign-out itself is
+// quick-switch (notifications are a separate, not-yet-migrated milestone; quick-switch is
+// internal-only dev tooling). Theme toggle IS restored below — pharma-frontend genuinely has its
+// own themeStore (initialized before mount in main.tsx) and the shared theme.css's .dark variant;
+// an earlier version of this comment claimed otherwise, which was simply wrong. Sign-out itself is
 // owned by useSignOut (features/auth) — this component stays purely presentational, no transport.
-const Topbar = ({ mobileMenuOpen, onMobileMenuToggle, mobileMenuToggleId, mobileSidebarId }: TopbarProps) => {
+const Topbar = ({ mobileMenuOpen, onMobileMenuToggle, mobileMenuToggleRef, mobileSidebarId }: TopbarProps) => {
   const { session } = useSession()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  // Deferred mount, same pattern as AppLayout's mobile drawer: fetch the popover's lazy chunk
+  // only on first open, but keep it mounted afterward so base-ui's own close animation can play.
+  const [accountMenuMounted, setAccountMenuMounted] = useState(false)
+  const accountTriggerRef = useRef<HTMLButtonElement>(null)
   const { signOut, isPending, error } = useSignOut()
 
   const user = session?.user
@@ -35,23 +49,13 @@ const Topbar = ({ mobileMenuOpen, onMobileMenuToggle, mobileMenuToggleId, mobile
   const firstName = user?.firstName ?? 'there'
   const roleLabel = session?.roleType?.name ?? ''
 
-  // Escape closes the user menu from anywhere, matching native menu/dialog behavior.
-  useEffect(() => {
-    if (!userMenuOpen) return
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setUserMenuOpen(false)
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [userMenuOpen])
-
   return (
     <header
       className="sticky top-0 z-40 flex items-center gap-3.5 px-6 py-3.5 backdrop-blur-xl"
       style={{ background: 'var(--qms-surface)', borderBottom: '1px solid var(--qms-border)' }}
     >
       <button
-        id={mobileMenuToggleId}
+        ref={mobileMenuToggleRef}
         onClick={onMobileMenuToggle}
         className="lg:hidden w-8 h-8 flex items-center justify-center rounded-lg transition-all shrink-0"
         style={{ color: 'var(--qms-text-muted)' }}
@@ -71,12 +75,23 @@ const Topbar = ({ mobileMenuOpen, onMobileMenuToggle, mobileMenuToggleId, mobile
         )}
       </div>
 
-      <div className="ml-auto relative">
+      <div className="ml-auto flex items-center gap-2">
+        <ThemeToggle />
+
+        {/* This is profile info plus one action, not a real multi-item menu, so the
+            lazily-mounted AccountMenu below is a non-modal Popover (role="dialog",
+            Escape-to-close via base-ui) rather than a hand-rolled role="menu". Non-modal means it
+            is dismissable but NOT a focus trap — fine here since it's one action, not content the
+            user must finish interacting with before leaving. */}
         <button
-          onClick={() => setUserMenuOpen((v) => !v)}
+          ref={accountTriggerRef}
+          onClick={() => {
+            setAccountMenuMounted(true)
+            setUserMenuOpen((v) => !v)
+          }}
           className="flex items-center gap-2 pl-1.5 pr-2.5 py-1.5 rounded-full border transition-all"
           style={{ borderColor: 'var(--qms-border)', backgroundColor: 'var(--qms-surface-strong)' }}
-          aria-haspopup="menu"
+          aria-haspopup="dialog"
           aria-expanded={userMenuOpen}
           aria-label={userMenuOpen ? 'Close account menu' : 'Open account menu'}
         >
@@ -93,40 +108,22 @@ const Topbar = ({ mobileMenuOpen, onMobileMenuToggle, mobileMenuToggleId, mobile
           </div>
           <FiChevronDown size={13} style={{ color: 'var(--qms-text-muted)' }} />
         </button>
-
-        {userMenuOpen && (
-          <>
-            <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)} />
-            <div
-              className="absolute right-0 top-full mt-2 w-52 z-50 rounded-xl border shadow-xl backdrop-blur-xl overflow-hidden"
-              style={{ borderColor: 'var(--qms-border)', backgroundColor: 'var(--popover)' }}
-            >
-              <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--qms-border)' }}>
-                <div className="text-[13px] font-bold" style={{ color: 'var(--qms-text)' }}>
-                  {user ? `${user.firstName} ${user.lastName}` : '—'}
-                </div>
-                <div className="text-[11px] mt-0.5" style={{ color: 'var(--qms-text-muted)' }}>{user?.email}</div>
-              </div>
-              <div className="py-1">
-                <button
-                  onClick={signOut}
-                  disabled={isPending}
-                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] transition-all hover:bg-danger-soft disabled:opacity-60 disabled:cursor-not-allowed"
-                  style={{ color: 'var(--danger)' }}
-                >
-                  <FiLogOut size={14} />
-                  {isPending ? 'Signing out…' : 'Sign out'}
-                </button>
-                {error && (
-                  <p className="px-4 pb-2.5 text-[11px]" style={{ color: 'var(--danger)' }} role="alert">
-                    {error}
-                  </p>
-                )}
-              </div>
-            </div>
-          </>
-        )}
       </div>
+
+      {accountMenuMounted && (
+        <Suspense fallback={null}>
+          <AccountMenu
+            open={userMenuOpen}
+            onOpenChange={setUserMenuOpen}
+            anchor={accountTriggerRef.current}
+            name={user ? `${user.firstName} ${user.lastName}` : '—'}
+            email={user?.email}
+            onSignOut={signOut}
+            isPending={isPending}
+            error={error}
+          />
+        </Suspense>
+      )}
     </header>
   )
 }

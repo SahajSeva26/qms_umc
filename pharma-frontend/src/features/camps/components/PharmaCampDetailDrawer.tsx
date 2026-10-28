@@ -1,17 +1,14 @@
-import { useState, type ReactNode } from 'react'
-import { FiStar, FiFileText } from 'react-icons/fi'
+import { type ReactNode } from 'react'
+import { FiFileText } from 'react-icons/fi'
 import { Button } from '@qms/ui'
 import SideDrawer from '@/components/ui/SideDrawer'
 import StageHistoryList from '@/components/ui/StageHistoryList'
-import CampDashboardStatusPill from '@/features/pharma/components/CampDashboardStatusPill'
+import CampDashboardStatusPill from '@/features/camps/components/CampDashboardStatusPill'
 import CampTypePillReal from '@/components/widgets/camp/CampTypePillReal'
+import { CampRatingSection } from '@/features/rating'
 import { CAMP_TIME_SLOT_LABEL } from '@/types/campTimeSlot.constants'
 import { specializationLabel } from '@/types/doctor.types'
 import type { CampEntity, CampPopulatedDoctor, CampPopulatedRole } from '@/types/campReal.types'
-import { useSession } from '@/hooks/useSession'
-import { useRatings } from '@/features/rating/hooks/useRatings'
-import RatingDisplay from '@/features/rating/components/RatingDisplay'
-import RateCampModal from '@/features/rating/components/RateCampModal'
 
 interface PharmaCampDetailDrawerProps {
   camp: CampEntity | null
@@ -54,51 +51,11 @@ const KpiTile = ({ label, value, placeholder }: { label: string; value?: string;
   </div>
 )
 
-const mrRoleId = (mr: CampEntity['mr']): string | undefined =>
-  mr && typeof mr !== 'string' ? (mr as CampPopulatedRole)._id : (mr ?? undefined)
-
-// Only the camp's own MR may rate, and only once closed (mirrors backend assertCampMrOrManage).
-const RatingSection = ({ camp }: { camp: CampEntity }) => {
-  const { session } = useSession()
-  const [modalOpen, setModalOpen] = useState(false)
-  const isOwnMr = !!session?.role.id && session.role.id === mrRoleId(camp.mr)
-  const canRate = isOwnMr && camp.status === 'closed'
-
-  const { items, isLoading, error, refetch } = useRatings({ camp: camp.id }, { enabled: canRate || camp.status === 'closed' })
-  const existing = items[0] ?? null
-
-  if (!canRate && !existing && !error) return null
-
-  return (
-    <Section title="FO / camp rating">
-      {isLoading ? (
-        <div className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>Loading…</div>
-      ) : error ? (
-        <div className="flex items-center justify-between gap-2 text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>
-          <span>Couldn't load this camp's rating.</span>
-          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-        </div>
-      ) : existing ? (
-        <>
-          <RatingDisplay rating={existing} />
-          {canRate && (
-            <Button variant="outline" size="sm" className="mt-2" onClick={() => setModalOpen(true)}>
-              <FiStar size={12} /> Edit rating
-            </Button>
-          )}
-        </>
-      ) : canRate ? (
-        <Button size="sm" onClick={() => setModalOpen(true)}>
-          <FiStar size={12} /> Rate camp
-        </Button>
-      ) : null}
-
-      {modalOpen && (
-        <RateCampModal open campId={camp.id} existing={existing} onClose={() => setModalOpen(false)} />
-      )}
-    </Section>
-  )
-}
+// Permission-gated rating display/action is shared with CampDossierContent's RatingCard via
+// CampRatingSection — this just supplies the drawer's own Section chrome around it.
+const RatingSection = ({ camp }: { camp: CampEntity }) => (
+  <CampRatingSection camp={camp} wrapper={(content) => <Section title="FO / camp rating">{content}</Section>} />
+)
 
 // Pharma field force (camp:book) can read a camp but has no stage-move capability (camp:manage
 // only), so this stays display-only.

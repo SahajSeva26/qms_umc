@@ -1,5 +1,5 @@
 import { useGetEntity } from '@/hooks/useGetEntity'
-import { pharmaCampsService } from '@/features/pharma/pharmaCamps.service'
+import { pharmaCampsService } from '@/features/camps/camps.service'
 
 const keyFor = (id: string) => ['pharma-camp', id] as const
 

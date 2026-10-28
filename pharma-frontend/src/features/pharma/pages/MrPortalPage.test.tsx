@@ -13,7 +13,7 @@ vi.mock('@/features/pharma/components/MrDashboardTab', () => ({
 vi.mock('@/features/pharma/components/MrBookCampTab', () => ({
   default: () => <div>Book camp tab content</div>,
 }))
-vi.mock('@/features/pharma/components/MyCampScheduleTab', () => ({
+vi.mock('@/features/camps/components/MyCampScheduleTab', () => ({
   default: () => <div>Camp schedule tab content</div>,
 }))
 vi.mock('@/features/pharma/components/PharmaDoctorsTab', () => ({
@@ -95,7 +95,7 @@ describe('MrPortalPage — pharma-frontend MR portal frame', () => {
     // Re-mock with a never-resolving import() so the test can assert on what's on screen
     // DURING the Suspense boundary, not just after it settles. Proves the P2 fix: Schedule is a
     // real lazy() boundary with its own fallback, not eagerly bundled with Dashboard.
-    vi.doMock('@/features/pharma/components/MyCampScheduleTab', () => ({
+    vi.doMock('@/features/camps/components/MyCampScheduleTab', () => ({
       default: () => new Promise(() => {}) as never,
     }))
     vi.resetModules()

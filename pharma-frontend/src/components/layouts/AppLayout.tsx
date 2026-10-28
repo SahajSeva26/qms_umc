@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { RouteFallback, SessionLoading, SessionRecovery } from '@qms/ui'
 import { useSession } from '@/hooks/useSession'
@@ -6,11 +6,20 @@ import Sidebar from '@/components/layouts/Sidebar'
 import Topbar from '@/components/layouts/Topbar'
 import ENV from '@/config/env'
 
-const MOBILE_SIDEBAR_ID = 'pharma-mobile-sidebar'
-const MOBILE_MENU_TOGGLE_ID = 'pharma-mobile-menu-toggle'
+// Lazy: @base-ui/react/dialog only needs to be fetched once the hamburger is actually pressed,
+// not on every page's initial load (it was previously eager here, adding ~37kB gzip to the
+// always-shipped shell for a drawer most visits never open).
+const MobileNavDrawer = lazy(() => import('@/components/layouts/MobileNavDrawer'))
 
 // Owns exactly what every authenticated route needs regardless of content: session resolution,
 // loading, inconclusive-failure recovery, plus the shared Sidebar/Topbar shell.
+const MOBILE_SIDEBAR_ID = 'pharma-mobile-sidebar'
+
+// Matches Tailwind's default `lg` breakpoint — the same one the drawer's own `lg:hidden` and the
+// desktop Sidebar's `hidden lg:flex` key off. Kept in sync with those classes, not derived from
+// them, since Tailwind's breakpoints aren't readable at runtime.
+const DESKTOP_BREAKPOINT_QUERY = '(min-width: 1024px)'
+
 const AppLayout = () => {
   const {
     session,
@@ -21,22 +30,15 @@ const AppLayout = () => {
   } = useSession()
 
   const [mobileOpen, setMobileOpen] = useState(false)
-  const mobileDrawerRef = useRef<HTMLDivElement>(null)
-
-  // Escape closes the drawer from anywhere; focus moves into the drawer on open and back to the
-  // hamburger button that opened it on close, matching native dialog/drawer behavior.
-  useEffect(() => {
-    if (!mobileOpen) return
-    mobileDrawerRef.current?.focus()
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMobileOpen(false)
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('keydown', onKeyDown)
-      document.getElementById(MOBILE_MENU_TOGGLE_ID)?.focus()
-    }
-  }, [mobileOpen])
+  // Deferred mount: the drawer's lazy chunk is only fetched on the FIRST open, but once that
+  // happens it stays mounted (controlled via `open`) so base-ui's own closing animation/backdrop
+  // fade can still play — unmounting immediately on close would cut that animation short.
+  const [mobileDrawerMounted, setMobileDrawerMounted] = useState(false)
+  // Topbar's hamburger button lives in a sibling component, not this Dialog's own Trigger slot
+  // (it's controlled externally — see the `open={mobileOpen}` below) — passed down so base-ui's
+  // own finalFocus can return focus to it on close, the same way SideDrawer.tsx gets focus-trap/
+  // Escape/finalFocus for free from this same primitive.
+  const mobileMenuToggleRef = useRef<HTMLButtonElement>(null)
 
   // Latches isSessionError since React Query resets it the instant a retry
   // starts; gated on !session so a looser isAuthenticated flag (were one
@@ -57,6 +59,20 @@ const AppLayout = () => {
     }
   }, [isConfirmedUnauthenticated])
 
+  // CSS alone (`lg:hidden` on the drawer, `hidden lg:flex` on the desktop Sidebar) only hides the
+  // mobile drawer visually once the viewport crosses into desktop width — it stays logically open
+  // and, being a real base-ui Dialog, keeps focus-trapping/blocking the page underneath via an
+  // invisible backdrop. Close it in state whenever the breakpoint is crossed so it's actually
+  // closed, not just hidden.
+  useEffect(() => {
+    const mql = window.matchMedia(DESKTOP_BREAKPOINT_QUERY)
+    const handleChange = (e: MediaQueryListEvent) => {
+      if (e.matches) setMobileOpen(false)
+    }
+    mql.addEventListener('change', handleChange)
+    return () => mql.removeEventListener('change', handleChange)
+  }, [])
+
   if (!session) {
     if (isConfirmedUnauthenticated) return null
 
@@ -73,31 +89,27 @@ const AppLayout = () => {
         <Sidebar />
       </div>
 
-      {mobileOpen && (
-        <>
-          <div
-            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm lg:hidden"
-            onClick={() => setMobileOpen(false)}
-          />
-          <div
+      {/* Mounted only once opened at least once — avoids fetching @base-ui/react/dialog (and
+          rendering a second Sidebar) on every page load for a drawer most visits never open. */}
+      {mobileDrawerMounted && (
+        <Suspense fallback={null}>
+          <MobileNavDrawer
+            open={mobileOpen}
+            onOpenChange={setMobileOpen}
+            finalFocusRef={mobileMenuToggleRef}
             id={MOBILE_SIDEBAR_ID}
-            ref={mobileDrawerRef}
-            tabIndex={-1}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Navigation"
-            className="fixed inset-y-0 left-0 z-50 lg:hidden outline-none"
-          >
-            <Sidebar />
-          </div>
-        </>
+          />
+        </Suspense>
       )}
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Topbar
           mobileMenuOpen={mobileOpen}
-          onMobileMenuToggle={() => setMobileOpen((v) => !v)}
-          mobileMenuToggleId={MOBILE_MENU_TOGGLE_ID}
+          onMobileMenuToggle={() => {
+            setMobileDrawerMounted(true)
+            setMobileOpen((v) => !v)
+          }}
+          mobileMenuToggleRef={mobileMenuToggleRef}
           mobileSidebarId={MOBILE_SIDEBAR_ID}
         />
         <main className="flex-1 overflow-auto p-6">

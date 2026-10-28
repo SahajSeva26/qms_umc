@@ -176,6 +176,12 @@ describe('AppLayout — cross-origin login redirect', () => {
 })
 
 describe('AppLayout — mobile sidebar drawer', () => {
+  afterEach(() => {
+    // Restores the global jsdom setup's default matchMedia stub, overridden below for the
+    // desktop-breakpoint test.
+    vi.unstubAllGlobals()
+  })
+
   function mockAuthenticated() {
     return import('@/hooks/useSession').then(({ useSession }) =>
       vi.mocked(useSession).mockReturnValue({
@@ -188,6 +194,25 @@ describe('AppLayout — mobile sidebar drawer', () => {
     )
   }
 
+  // jsdom has no real matchMedia implementation — this stub captures the one listener AppLayout
+  // registers so the test can simulate crossing the lg breakpoint via a manual dispatch.
+  function mockMatchMedia() {
+    const listeners = new Set<(e: MediaQueryListEvent) => void>()
+    const mql = {
+      matches: false,
+      media: '(min-width: 1024px)',
+      addEventListener: (_: 'change', listener: (e: MediaQueryListEvent) => void) => listeners.add(listener),
+      removeEventListener: (_: 'change', listener: (e: MediaQueryListEvent) => void) => listeners.delete(listener),
+    } as unknown as MediaQueryList
+    vi.stubGlobal('matchMedia', vi.fn().mockReturnValue(mql))
+    return {
+      crossIntoDesktop: () => {
+        const event = { matches: true } as MediaQueryListEvent
+        listeners.forEach((listener) => listener(event))
+      },
+    }
+  }
+
   it('starts closed, opens via the Topbar hamburger, and closes via the backdrop', async () => {
     await mockAuthenticated()
 
@@ -198,7 +223,8 @@ describe('AppLayout — mobile sidebar drawer', () => {
     expect(screen.queryByRole('dialog', { name: /navigation/i })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /open menu/i }))
-    expect(screen.getByRole('dialog', { name: /navigation/i })).toBeInTheDocument()
+    // The drawer is lazily mounted (fetched only on first open) — wait for its chunk to resolve.
+    expect(await screen.findByRole('dialog', { name: /navigation/i })).toBeInTheDocument()
 
     await user.click(document.querySelector('.fixed.inset-0.z-40.bg-black\\/40')!)
     expect(screen.queryByRole('dialog', { name: /navigation/i })).not.toBeInTheDocument()
@@ -213,10 +239,33 @@ describe('AppLayout — mobile sidebar drawer', () => {
 
     const toggleButton = screen.getByRole('button', { name: /open menu/i })
     await user.click(toggleButton)
-    expect(screen.getByRole('dialog', { name: /navigation/i })).toHaveFocus()
+    // base-ui's default initialFocus moves focus to the first tabbable element inside the
+    // popup (the Sidebar's own nav link), not the dialog container itself.
+    expect(await screen.findByRole('dialog', { name: /navigation/i })).toBeInTheDocument()
+    expect(document.activeElement).not.toBe(document.body)
 
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('dialog', { name: /navigation/i })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /open menu/i })).toHaveFocus()
+  })
+
+  it('closes the drawer when the viewport crosses into desktop width, even though CSS already hides it there', async () => {
+    const { crossIntoDesktop } = mockMatchMedia()
+    await mockAuthenticated()
+
+    const user = userEvent.setup()
+    render(tree('/dashboard'))
+    await screen.findByText('Dashboard Page')
+
+    await user.click(screen.getByRole('button', { name: /open menu/i }))
+    expect(await screen.findByRole('dialog', { name: /navigation/i })).toBeInTheDocument()
+
+    // Simulate the browser crossing the lg breakpoint (e.g. resizing from mobile to desktop
+    // width) while the drawer is still open. `lg:hidden` only hides it visually — without the
+    // matchMedia listener, the real base-ui Dialog stays logically open and keeps focus-trapping
+    // behind an invisible backdrop.
+    crossIntoDesktop()
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /navigation/i })).not.toBeInTheDocument())
   })
 })

@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import type { SessionResponse } from '@/types/accessManagement.types'
 
@@ -21,10 +21,6 @@ async function renderAt(path: string) {
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/pharma" element={<PharmaRedirectPage />} />
-        <Route path="/pharma/ho" element={<div>HO Portal</div>} />
-        <Route path="/pharma/rsm" element={<div>RSM Portal</div>} />
-        <Route path="/pharma/asm" element={<div>ASM Portal</div>} />
-        <Route path="/pharma/mr" element={<div>MR Portal</div>} />
         <Route path="/login" element={<div>Login Page</div>} />
         <Route path="/unauthorized" element={<div>Unauthorized Page</div>} />
       </Routes>
@@ -33,6 +29,12 @@ async function renderAt(path: string) {
 }
 
 describe('PharmaRedirectPage', () => {
+  const originalLocation = window.location
+
+  afterEach(() => {
+    Object.defineProperty(window, 'location', { value: originalLocation, writable: true, configurable: true })
+  })
+
   it('renders nothing decisive while the session has not settled yet', async () => {
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
@@ -61,11 +63,18 @@ describe('PharmaRedirectPage', () => {
   })
 
   it.each([
-    ['pharma-division-head', 'HO Portal'],
-    ['pharma-rsm', 'RSM Portal'],
-    ['pharma-asm', 'ASM Portal'],
-    ['pharma-mr', 'MR Portal'],
-  ])('redirects role type %s to its own portal', async (roleTypeCode, expectedText) => {
+    ['pharma-division-head', '/pharma/ho'],
+    ['pharma-rsm', '/pharma/rsm'],
+    ['pharma-asm', '/pharma/asm'],
+    ['pharma-mr', '/pharma/mr'],
+  ])('cross-origin redirects role type %s to pharma-frontend\'s own portal path (not an in-app route)', async (roleTypeCode, expectedPath) => {
+    const hrefSpy = vi.fn()
+    Object.defineProperty(window, 'location', {
+      value: { ...originalLocation, set href(v: string) { hrefSpy(v) } },
+      writable: true,
+      configurable: true,
+    })
+
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
       isSettled: true,
@@ -75,10 +84,17 @@ describe('PharmaRedirectPage', () => {
 
     await renderAt('/pharma')
 
-    expect(await screen.findByText(expectedText)).toBeInTheDocument()
+    await waitFor(() => expect(hrefSpy).toHaveBeenCalledWith(`http://localhost:5174${expectedPath}`))
   })
 
-  it('redirects a non-pharma role to /unauthorized, never rendering pharma content', async () => {
+  it('redirects a non-pharma role to /unauthorized, never attempting a cross-origin navigation', async () => {
+    const hrefSpy = vi.fn()
+    Object.defineProperty(window, 'location', {
+      value: { ...originalLocation, set href(v: string) { hrefSpy(v) } },
+      writable: true,
+      configurable: true,
+    })
+
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
       isSettled: true,
@@ -89,6 +105,6 @@ describe('PharmaRedirectPage', () => {
     await renderAt('/pharma')
 
     expect(await screen.findByText('Unauthorized Page')).toBeInTheDocument()
-    expect(screen.queryByText('HO Portal')).not.toBeInTheDocument()
+    expect(hrefSpy).not.toHaveBeenCalled()
   })
 })

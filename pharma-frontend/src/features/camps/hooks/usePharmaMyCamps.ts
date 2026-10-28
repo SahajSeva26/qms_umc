@@ -1,5 +1,5 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
-import { pharmaCampsService } from '@/features/pharma/pharmaCamps.service'
+import { pharmaCampsService } from '@/features/camps/camps.service'
 import type { SearchCampQuery } from '@/types/campReal.types'
 
 export const pharmaMyCampKeys = {

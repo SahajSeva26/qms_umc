@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { Dialog as DialogPrimitive } from '@base-ui/react/dialog'
 import { DialogPortal } from '@/components/ui/dialog'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
-import { usePharmaCamp } from '@/features/pharma/hooks/usePharmaCamp'
-import CampDossierContent from '@/features/pharma/components/dossier/CampDossierContent'
+import { usePharmaCamp } from '@/features/camps/hooks/usePharmaCamp'
+import CampDossierContent from '@/features/camps/components/dossier/CampDossierContent'
 import { campDossierPath } from '@/features/pharma/pharma.constants'
 
 interface CampDossierModalProps {

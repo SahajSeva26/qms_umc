@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { pharmaCampsService } from '@/features/pharma/pharmaCamps.service'
+import { pharmaCampsService } from '@/features/camps/camps.service'
 import type { BookCampPayload } from '@/types/campReal.types'
 
 // Invalidates by root key segment ('pharma-my-camps'), not a specific query object — TanStack

@@ -4,10 +4,10 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import CampDossierModal from './CampDossierModal'
-import { pharmaCampsService } from '@/features/pharma/pharmaCamps.service'
+import { pharmaCampsService } from '@/features/camps/camps.service'
 import type { CampEntity } from '@/types/campReal.types'
 
-vi.mock('@/features/pharma/pharmaCamps.service', () => ({
+vi.mock('@/features/camps/camps.service', () => ({
   pharmaCampsService: {
     myCamps: vi.fn(),
     getCamp: vi.fn(),
@@ -25,7 +25,7 @@ vi.mock('@/features/rating/rating.service', () => ({
 }))
 
 vi.mock('@/hooks/useSession', () => ({
-  useSession: () => ({ session: null }),
+  useSession: () => ({ session: null, hasAnyPermission: () => false }),
 }))
 
 function campFixture(overrides: Partial<CampEntity> = {}): CampEntity {

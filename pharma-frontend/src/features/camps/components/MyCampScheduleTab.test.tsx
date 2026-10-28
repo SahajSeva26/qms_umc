@@ -4,10 +4,10 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import MyCampScheduleTab from './MyCampScheduleTab'
-import { pharmaCampsService } from '@/features/pharma/pharmaCamps.service'
+import { pharmaCampsService } from '@/features/camps/camps.service'
 import type { CampEntity, CampSummary } from '@/types/campReal.types'
 
-vi.mock('@/features/pharma/pharmaCamps.service', () => ({
+vi.mock('@/features/camps/camps.service', () => ({
   pharmaCampsService: {
     myCamps: vi.fn(),
     getCamp: vi.fn(),

@@ -1,4 +1,5 @@
-import { describe, it, expect, vi } from 'vitest'
+import { createRef } from 'react'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -9,7 +10,6 @@ vi.mock('@/features/auth/auth.service', () => ({
   authService: { logout: vi.fn() },
 }))
 
-const MOBILE_MENU_TOGGLE_ID = 'mobile-menu-toggle'
 const MOBILE_SIDEBAR_ID = 'mobile-sidebar'
 
 function sessionFixture(): SessionResponse {
@@ -38,7 +38,7 @@ async function renderTopbar(opts?: { onMobileMenuToggle?: () => void; mobileMenu
       <Topbar
         mobileMenuOpen={opts?.mobileMenuOpen ?? false}
         onMobileMenuToggle={opts?.onMobileMenuToggle ?? vi.fn()}
-        mobileMenuToggleId={MOBILE_MENU_TOGGLE_ID}
+        mobileMenuToggleRef={createRef<HTMLButtonElement>()}
         mobileSidebarId={MOBILE_SIDEBAR_ID}
       />
     </QueryClientProvider>,
@@ -46,6 +46,12 @@ async function renderTopbar(opts?: { onMobileMenuToggle?: () => void; mobileMenu
 }
 
 describe('Topbar — pharma-frontend shell header', () => {
+  const originalLocation = window.location
+
+  afterEach(() => {
+    Object.defineProperty(window, 'location', { value: originalLocation, writable: true, configurable: true })
+  })
+
   it('shows the greeting with the session user\'s first name and their role label', async () => {
     await mockSession(sessionFixture())
     await renderTopbar()
@@ -79,7 +85,6 @@ describe('Topbar — pharma-frontend shell header', () => {
     const closedButton = screen.getByRole('button', { name: /open menu/i })
     expect(closedButton).toHaveAttribute('aria-expanded', 'false')
     expect(closedButton).toHaveAttribute('aria-controls', MOBILE_SIDEBAR_ID)
-    expect(closedButton).toHaveAttribute('id', MOBILE_MENU_TOGGLE_ID)
 
     const Topbar = (await import('./Topbar')).default
     rerender(
@@ -87,7 +92,7 @@ describe('Topbar — pharma-frontend shell header', () => {
         <Topbar
           mobileMenuOpen
           onMobileMenuToggle={vi.fn()}
-          mobileMenuToggleId={MOBILE_MENU_TOGGLE_ID}
+          mobileMenuToggleRef={createRef<HTMLButtonElement>()}
           mobileSidebarId={MOBILE_SIDEBAR_ID}
         />
       </QueryClientProvider>,
@@ -97,31 +102,46 @@ describe('Topbar — pharma-frontend shell header', () => {
     expect(openButton).toHaveAttribute('aria-expanded', 'true')
   })
 
-  it('opens the user menu and shows Sign out, with aria-expanded/aria-haspopup on the trigger', async () => {
+  it('renders a working theme toggle (pharma-frontend genuinely has themeStore + dark-mode CSS, contrary to a prior stale comment)', async () => {
+    await mockSession(sessionFixture())
+    const user = userEvent.setup()
+    await renderTopbar()
+
+    const toggle = screen.getByRole('button', { name: /toggle theme/i })
+    expect(document.documentElement.classList.contains('dark')).toBe(false)
+
+    await user.click(toggle)
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
+
+    await user.click(toggle)
+    expect(document.documentElement.classList.contains('dark')).toBe(false)
+  })
+
+  it('opens the account popover (a real base-ui Popover — role=dialog, aria-haspopup=dialog) and shows Sign out', async () => {
     await mockSession(sessionFixture())
     const user = userEvent.setup()
     await renderTopbar()
 
     const trigger = screen.getByRole('button', { name: /open account menu/i })
-    expect(trigger).toHaveAttribute('aria-haspopup', 'menu')
+    expect(trigger).toHaveAttribute('aria-haspopup', 'dialog')
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
 
     await user.click(trigger)
-    expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument()
+    expect(await screen.findByRole('dialog', { name: /account/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^sign out$/i })).toBeInTheDocument()
     expect(screen.getByText('a@example.com')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /close account menu/i })).toHaveAttribute('aria-expanded', 'true')
   })
 
-  it('Escape closes the open user menu', async () => {
+  it('Escape closes the account popover (base-ui\'s own Escape-to-close — non-modal, not a focus trap)', async () => {
     await mockSession(sessionFixture())
     const user = userEvent.setup()
     await renderTopbar()
 
-    await user.click(screen.getByText('Riya Shah'))
-    expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /open account menu/i }))
+    expect(await screen.findByRole('dialog', { name: /account/i })).toBeInTheDocument()
 
     await user.keyboard('{Escape}')
-    expect(screen.queryByRole('button', { name: /sign out/i })).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /account/i })).not.toBeInTheDocument())
   })
 
   it('on success: awaits logout, THEN redirects — never the reverse order', async () => {
@@ -130,18 +150,18 @@ describe('Topbar — pharma-frontend shell header', () => {
     vi.mocked(authService.logout).mockReturnValue(
       new Promise((resolve) => { resolveLogout = () => resolve({ success: true, message: '', data: null }) }),
     )
-    const originalHref = window.location.href
     const hrefSpy = vi.fn()
     Object.defineProperty(window, 'location', {
-      value: { ...window.location, set href(v: string) { hrefSpy(v) } },
+      value: { ...originalLocation, set href(v: string) { hrefSpy(v) } },
       writable: true,
+      configurable: true,
     })
 
     await mockSession(sessionFixture())
     const user = userEvent.setup()
     await renderTopbar()
-    await user.click(screen.getByText('Riya Shah'))
-    await user.click(screen.getByRole('button', { name: /sign out/i }))
+    await user.click(screen.getByRole('button', { name: /open account menu/i }))
+    await user.click(await screen.findByRole('button', { name: /^sign out$/i }))
 
     // Disabled + "Signing out…" while the logout call is still in flight — the redirect must not
     // have fired yet.
@@ -151,8 +171,6 @@ describe('Topbar — pharma-frontend shell header', () => {
     resolveLogout()
     await waitFor(() => expect(hrefSpy).toHaveBeenCalledTimes(1))
     expect(hrefSpy).toHaveBeenCalledWith(expect.stringContaining('/auth/login'))
-
-    Object.defineProperty(window, 'location', { value: { ...window.location, href: originalHref }, writable: true })
   })
 
   it('on failure: shows a visible, retryable error, re-enables the button, and never redirects', async () => {
@@ -160,15 +178,16 @@ describe('Topbar — pharma-frontend shell header', () => {
     vi.mocked(authService.logout).mockRejectedValueOnce(new Error('network error'))
     const hrefSpy = vi.fn()
     Object.defineProperty(window, 'location', {
-      value: { ...window.location, set href(v: string) { hrefSpy(v) } },
+      value: { ...originalLocation, set href(v: string) { hrefSpy(v) } },
       writable: true,
+      configurable: true,
     })
 
     await mockSession(sessionFixture())
     const user = userEvent.setup()
     await renderTopbar()
-    await user.click(screen.getByText('Riya Shah'))
-    await user.click(screen.getByRole('button', { name: /sign out/i }))
+    await user.click(screen.getByRole('button', { name: /open account menu/i }))
+    await user.click(await screen.findByRole('button', { name: /^sign out$/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/sign out failed/i)
     expect(screen.getByRole('button', { name: /^sign out$/i })).not.toBeDisabled()
@@ -181,15 +200,16 @@ describe('Topbar — pharma-frontend shell header', () => {
     vi.mocked(authService.logout).mockResolvedValueOnce({ success: true, message: '', data: null })
     const hrefSpy = vi.fn()
     Object.defineProperty(window, 'location', {
-      value: { ...window.location, set href(v: string) { hrefSpy(v) } },
+      value: { ...originalLocation, set href(v: string) { hrefSpy(v) } },
       writable: true,
+      configurable: true,
     })
 
     await mockSession(sessionFixture())
     const user = userEvent.setup()
     await renderTopbar()
-    await user.click(screen.getByText('Riya Shah'))
-    await user.click(screen.getByRole('button', { name: /sign out/i }))
+    await user.click(screen.getByRole('button', { name: /open account menu/i }))
+    await user.click(await screen.findByRole('button', { name: /^sign out$/i }))
     expect(await screen.findByRole('alert')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /^sign out$/i }))

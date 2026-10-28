@@ -5,10 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "node scripts/build.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "validate:env": "node scripts/validate-env.mjs --mode production",
+    "test:scripts": "node --test scripts/validate-env.test.mjs"
   },
   "dependencies": {
     "@qms/core": "*",

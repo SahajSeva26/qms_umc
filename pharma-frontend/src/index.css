@@ -1,5 +1,11 @@
 @import "@qms/ui/theme.css";
 
+/* Tailwind v4's automatic content detection does not cross into node_modules
+   (by design — @qms/ui is resolved as a workspace package through a
+   node_modules symlink either way), so the shared package's own components
+   never get scanned for utility classes without this explicit @source. */
+@source "../../packages/ui/src";
+
 @layer base {
   * { @apply border-border outline-ring/50; }
 

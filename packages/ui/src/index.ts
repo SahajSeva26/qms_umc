@@ -1,7 +1,19 @@
 export { cn } from './cn'
 export { Button, buttonVariants } from './primitives/Button'
+export { Input } from './primitives/Input'
+export { Label } from './primitives/Label'
+export { Select, SelectContent, SelectItem, SelectScrollDownButton, SelectScrollUpButton, SelectTrigger, SelectValue } from './primitives/Select'
 export { Toaster, toast } from './primitives/Toaster'
 export type { ToasterProps } from './primitives/Toaster'
+
+export { default as GoogleMapsProvider } from './location/GoogleMapsProvider'
+export { default as LocationPicker } from './location/LocationPicker'
+export { default as LocationAddressFields } from './location/LocationAddressFields'
+export type { LocationResolutionState, LocationPickerProps } from './location/location.types'
+export { REQUIRED_ADDRESS_FIELDS } from './location/location.types'
+// Public for standalone Places search widgets too (e.g. internal-frontend's StateCityFilter), not just LocationPicker's own internals.
+export { usePlacesAutocomplete } from './location/usePlacesAutocomplete'
+export type { Suggestion, SelectedPlaceDetails } from './location/usePlacesAutocomplete'
 
 export { default as RootLayout } from './layout/RootLayout'
 export { default as RouteErrorBoundary } from './layout/RouteErrorBoundary'

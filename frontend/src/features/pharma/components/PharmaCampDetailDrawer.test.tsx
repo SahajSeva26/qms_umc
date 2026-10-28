@@ -1,7 +1,21 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import PharmaCampDetailDrawer from './PharmaCampDetailDrawer'
+import { useSession } from '@/hooks/useSession'
 import type { CampEntity } from '@/types/campReal.types'
+import type { RatingEntity } from '@/types/rating.types'
+
+vi.mock('@/hooks/useSession')
+
+const { searchRatings } = vi.hoisted(() => ({
+  searchRatings: vi.fn(async (): Promise<{ success: boolean; message: string; data: { items: RatingEntity[]; count: number } }> =>
+    ({ success: true, message: '', data: { items: [], count: 0 } })),
+}))
+
+vi.mock('@/features/rating/rating.service', () => ({
+  ratingService: { searchRatings, myRatings: vi.fn(), getRating: vi.fn(), createRating: vi.fn(), updateRating: vi.fn() },
+}))
 
 function campFixture(overrides: Partial<CampEntity> = {}): CampEntity {
   return {
@@ -21,9 +35,43 @@ function campFixture(overrides: Partial<CampEntity> = {}): CampEntity {
   } as CampEntity
 }
 
+function ratingFixture(overrides: Partial<RatingEntity> = {}): RatingEntity {
+  return {
+    id: 'rating-1', camp: null, worker: null,
+    ratedBy: { id: 'mr-1', name: 'Amit Desai', code: 'mr-001' },
+    tenant: null, onTime: 5, attire: 4, communication: 4, overall: 4.3,
+    ratedAt: '2026-09-21T00:00:00.000Z', createdAt: '2026-09-21T00:00:00.000Z', updatedAt: '2026-09-21T00:00:00.000Z',
+    ...overrides,
+  }
+}
+
+function mockSession(roleId: string | null) {
+  vi.mocked(useSession).mockReturnValue({
+    session: roleId ? { user: { id: 'u-1' }, role: { id: roleId, code: 'pharma-mr', division: 'div-1' }, roleType: { code: 'pharma-mr' }, tenant: { id: 't-1', name: 'Tenant' } } : null,
+  } as unknown as ReturnType<typeof useSession>)
+}
+
+function makeQueryClient() {
+  return new QueryClient({ defaultOptions: { queries: { retry: false } } })
+}
+
+function renderDrawer(camp: CampEntity) {
+  render(
+    <QueryClientProvider client={makeQueryClient()}>
+      <PharmaCampDetailDrawer camp={camp} onClose={vi.fn()} />
+    </QueryClientProvider>,
+  )
+}
+
 describe('PharmaCampDetailDrawer', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    searchRatings.mockResolvedValue({ success: true, message: '', data: { items: [], count: 0 } })
+    mockSession(null)
+  })
+
   it('labels the staffing row "Field Officer" and shows the FO name for a screening camp', () => {
-    render(<PharmaCampDetailDrawer camp={campFixture()} onClose={vi.fn()} />)
+    renderDrawer(campFixture())
 
     expect(screen.getByText('Field Officer')).toBeInTheDocument()
     expect(screen.getByText('Ravi Kumar')).toBeInTheDocument()
@@ -31,11 +79,8 @@ describe('PharmaCampDetailDrawer', () => {
   })
 
   it('a diet camp labels the staffing row "Dietitian" and shows the dietitian name, not a stale FO', () => {
-    render(
-      <PharmaCampDetailDrawer
-        camp={campFixture({ type: 'diet', fo: { _id: 'fo-1', code: 'fo-001', name: 'Ravi Kumar' }, dietitian: { _id: 'diet-1', code: 'diet-001', name: 'Anita Rao' } })}
-        onClose={vi.fn()}
-      />,
+    renderDrawer(
+      campFixture({ type: 'diet', fo: { _id: 'fo-1', code: 'fo-001', name: 'Ravi Kumar' }, dietitian: { _id: 'diet-1', code: 'diet-001', name: 'Anita Rao' } }),
     )
 
     expect(screen.getByText('Dietitian')).toBeInTheDocument()
@@ -45,15 +90,86 @@ describe('PharmaCampDetailDrawer', () => {
   })
 
   it('a diet camp with no dietitian shows "Not yet assigned", even with a stale camp.fo present', () => {
-    render(
-      <PharmaCampDetailDrawer
-        camp={campFixture({ type: 'diet', fo: { _id: 'fo-1', code: 'fo-001', name: 'Ravi Kumar' }, dietitian: null })}
-        onClose={vi.fn()}
-      />,
-    )
+    renderDrawer(campFixture({ type: 'diet', fo: { _id: 'fo-1', code: 'fo-001', name: 'Ravi Kumar' }, dietitian: null }))
 
     expect(screen.getByText('Dietitian')).toBeInTheDocument()
     expect(screen.getByText('Not yet assigned')).toBeInTheDocument()
     expect(screen.queryByText('Ravi Kumar')).not.toBeInTheDocument()
+  })
+
+  it('shows the camp type as a pill alongside status', () => {
+    renderDrawer(campFixture({ type: 'lab' }))
+
+    expect(screen.getByText('Lab')).toBeInTheDocument()
+  })
+
+  it('renders real patient stats (not just patientExpectation) when the backend has supplied camp.stats', () => {
+    renderDrawer(campFixture({ patientExpectation: 40, stats: { patients: 35, patientsCompleted: 20 } }))
+
+    expect(screen.getByText('20 / 35')).toBeInTheDocument()
+  })
+
+  it('falls back to patientExpectation when camp.stats is absent', () => {
+    renderDrawer(campFixture({ patientExpectation: 40, stats: undefined }))
+
+    expect(screen.getByText('0 / 40')).toBeInTheDocument()
+  })
+
+  it('shows a non-faked "Coming soon" for Rx count/feedback — there is no backing data model for these yet', () => {
+    renderDrawer(campFixture())
+
+    expect(screen.getAllByText('Coming soon')).toHaveLength(2)
+  })
+
+  it('renders the stage history audit trail', () => {
+    renderDrawer(
+      campFixture({
+        stageHistory: [{ from: 'requested', to: 'confirmed', reason: 'Slot locked', actor: { name: 'Amit Desai' }, createdAt: '2026-09-11T10:00:00.000Z' }],
+      }),
+    )
+
+    expect(screen.getByText('Stage history')).toBeInTheDocument()
+    expect(screen.getByText('confirmed')).toBeInTheDocument()
+    expect(screen.getByText(/Amit Desai/)).toBeInTheDocument()
+  })
+
+  describe('FO / camp rating section', () => {
+    it('shows no rating section for a camp that is neither closed nor rated', () => {
+      renderDrawer(campFixture({ status: 'confirmed', mr: { _id: 'mr-1', code: 'mr-001', name: 'Amit Desai' } }))
+
+      expect(screen.queryByText('FO / camp rating')).not.toBeInTheDocument()
+    })
+
+    it('shows a "Rate camp" action for the camp\'s own MR once the camp is closed and unrated', async () => {
+      mockSession('mr-1')
+      renderDrawer(campFixture({ status: 'closed', mr: { _id: 'mr-1', code: 'mr-001', name: 'Amit Desai' } }))
+
+      expect(await screen.findByRole('button', { name: /rate camp/i })).toBeInTheDocument()
+    })
+
+    it('does not show a "Rate camp" action for an MR who does not own this camp', () => {
+      mockSession('someone-else')
+      renderDrawer(campFixture({ status: 'closed', mr: { _id: 'mr-1', code: 'mr-001', name: 'Amit Desai' } }))
+
+      expect(screen.queryByText('FO / camp rating')).not.toBeInTheDocument()
+    })
+
+    it('shows the existing rating read-only plus an "Edit rating" action when the owning MR already rated it', async () => {
+      searchRatings.mockResolvedValue({ success: true, message: '', data: { items: [ratingFixture()], count: 1 } })
+      mockSession('mr-1')
+      renderDrawer(campFixture({ status: 'closed', mr: { _id: 'mr-1', code: 'mr-001', name: 'Amit Desai' } }))
+
+      expect(await screen.findByText('Overall')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /edit rating/i })).toBeInTheDocument()
+    })
+
+    it('shows the existing rating read-only with no edit action to a non-owning viewer', async () => {
+      searchRatings.mockResolvedValue({ success: true, message: '', data: { items: [ratingFixture()], count: 1 } })
+      mockSession('someone-else')
+      renderDrawer(campFixture({ status: 'closed', mr: { _id: 'mr-1', code: 'mr-001', name: 'Amit Desai' } }))
+
+      expect(await screen.findByText('Overall')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /edit rating/i })).not.toBeInTheDocument()
+    })
   })
 })

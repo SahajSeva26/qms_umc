@@ -10,6 +10,8 @@ export interface PickedFieldOfficer {
   email: string
   phone: string
   gender?: 'male' | 'female' | 'other'
+  firstName?: string
+  lastName?: string
   label: string
 }
 
@@ -83,6 +85,8 @@ const ExistingFieldOfficerPicker = ({ tenant, roleTypeId, workerLabel, value, on
       email: user.email,
       phone: user.phone ?? '',
       gender: user.gender,
+      firstName: user.firstName,
+      lastName: user.lastName,
       label: roleLabel(role),
     })
   }

@@ -1,27 +1,33 @@
 import { useState } from 'react'
 import { FiCalendar } from 'react-icons/fi'
 import { usePharmaMyCamps } from '@/features/pharma/hooks/usePharmaMyCamps'
-import PharmaCampTable from '@/features/pharma/components/PharmaCampTable'
+import MrCampScheduleTable from '@/features/pharma/components/MrCampScheduleTable'
 import PharmaCampDetailDrawer from '@/features/pharma/components/PharmaCampDetailDrawer'
+import CampDossierModal from '@/features/pharma/components/dossier/CampDossierModal'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import PaginationControls from '@/components/ui/PaginationControls'
 import { usePagination } from '@/hooks/usePagination'
-import { CAMP_STATUS_LABEL } from '@/components/widgets/camp/campStatus.constants'
-import { CAMP_STATUS_VALUES, type CampEntity, type CampStatus } from '@/types/campReal.types'
+import { CAMP_SCHEDULE_STATUS_TABS } from '@/features/pharma/campDashboardStatus'
+import type { CampEntity, CampStatus } from '@/types/campReal.types'
 
 const PAGE_SIZE = 10
 
 type ScheduleTab = CampStatus | 'all'
-const TAB_ORDER: ScheduleTab[] = ['all', ...CAMP_STATUS_VALUES]
-// "Upcoming"/"Completed" read better here than the generic "Confirmed"/"Closed" labels.
-const TAB_LABEL_OVERRIDE: Partial<Record<ScheduleTab, string>> = { confirmed: 'Upcoming', closed: 'Completed', all: 'All' }
-const tabLabel = (tab: ScheduleTab) => TAB_LABEL_OVERRIDE[tab] ?? CAMP_STATUS_LABEL[tab as CampStatus]
+// Exact DOM order + labels from the prototype's statusTabs array: All, Requested, Ongoing
+// (live), Upcoming (confirmed), Completed (closed), Cancelled, Cancelled but charged.
+const TAB_ORDER: ScheduleTab[] = ['all', ...CAMP_SCHEDULE_STATUS_TABS.map((t) => t.value)]
+const TAB_LABEL: Record<ScheduleTab, string> = {
+  all: 'All',
+  ...Object.fromEntries(CAMP_SCHEDULE_STATUS_TABS.map((t) => [t.value, t.label])),
+} as Record<ScheduleTab, string>
+const tabLabel = (tab: ScheduleTab) => TAB_LABEL[tab]
 
 // Real GET /camps/my, not a mock — field-force's own camps across every project, with a
 // server-computed status/type summary (CampSummary) independent of the current page/filter.
 const MyCampScheduleTab = () => {
   const [activeTab, setActiveTab] = useState<ScheduleTab>('all')
   const [openCamp, setOpenCamp] = useState<CampEntity | null>(null)
+  const [dossierCampId, setDossierCampId] = useState<string | null>(null)
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
 
   const { data, isLoading, error, refetch } = usePharmaMyCamps({
@@ -82,12 +88,22 @@ const MyCampScheduleTab = () => {
             No camps in this status yet.
           </div>
         ) : (
-          <PharmaCampTable camps={camps} onOpenCamp={setOpenCamp} />
+          <MrCampScheduleTable
+            camps={camps}
+            onOpenCamp={setOpenCamp}
+            onOpenDossier={(camp) => setDossierCampId(camp.id)}
+            onRateCamp={setOpenCamp}
+          />
         )}
         <PaginationControls page={page} totalPages={totalPages(totalCount)} onPageChange={setPage} />
       </QueryStateBlock>
 
-      <PharmaCampDetailDrawer camp={openCamp} onClose={() => setOpenCamp(null)} />
+      <PharmaCampDetailDrawer
+        camp={openCamp}
+        onClose={() => setOpenCamp(null)}
+        onOpenDossier={() => { if (openCamp) { setDossierCampId(openCamp.id); setOpenCamp(null) } }}
+      />
+      <CampDossierModal campId={dossierCampId} onClose={() => setDossierCampId(null)} />
     </div>
   )
 }

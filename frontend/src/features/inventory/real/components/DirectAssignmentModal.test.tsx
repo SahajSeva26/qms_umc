@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
-import type { InventoryAssignmentReportFieldOfficer } from '@/types/inventoryAssignment.types'
+import type { FieldStaffRole } from '@/hooks/useFieldStaffRoster'
 import type { InventoryDeviceEntity } from '@/types/inventoryDevice.types'
 import type { InventoryMasterEntity } from '@/types/inventoryMaster.types'
 import { toast } from '@/components/ui/sonner'
@@ -31,12 +31,8 @@ vi.mock('@/features/inventory/real/inventoryDevice.service', () => ({
   },
 }))
 
-function foFixture(overrides: Partial<InventoryAssignmentReportFieldOfficer> = {}): InventoryAssignmentReportFieldOfficer {
-  return {
-    role: 'role-1', name: 'Jane FO', code: 'fo-1',
-    devicesHeld: 0, consumableUnitsHeld: 0, awaitingApproval: 0, awaitingReceipt: 0,
-    ...overrides,
-  }
+function foFixture(overrides: Partial<FieldStaffRole> = {}): FieldStaffRole {
+  return { role: 'role-1', name: 'Jane FO', code: 'fo-1', kind: 'fo', ...overrides }
 }
 
 function deviceFixture(overrides: Partial<InventoryDeviceEntity> = {}): InventoryDeviceEntity {
@@ -58,7 +54,7 @@ function renderModal(props: Partial<React.ComponentProps<typeof DirectAssignment
   const Wrapper = makeWrapper()
   return render(
     <Wrapper>
-      <DirectAssignmentModal fieldOfficers={[foFixture()]} onClose={vi.fn()} {...props} />
+      <DirectAssignmentModal fieldStaff={[foFixture()]} onClose={vi.fn()} {...props} />
     </Wrapper>,
   )
 }
@@ -69,10 +65,10 @@ describe('DirectAssignmentModal', () => {
   })
 
   it('disables the FO select and shows a placeholder when the roster is empty', () => {
-    renderModal({ fieldOfficers: [] })
+    renderModal({ fieldStaff: [] })
 
     expect(screen.getByRole('combobox')).toBeDisabled()
-    expect(screen.getByText('No field officers available')).toBeInTheDocument()
+    expect(screen.getByText('No field officers or dietitians available')).toBeInTheDocument()
   })
 
   it('submit stays disabled until an FO is picked AND at least one device or consumable line is valid', async () => {
@@ -172,7 +168,7 @@ describe('DirectAssignmentModal', () => {
       'role-1',
       { devices: ['dev-1'], consumables: [{ item: 'm-1', quantity: 5 }] },
     ))
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Assigned successfully — FO now holds 6 inventory records.'))
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Assigned successfully — now holds 6 inventory records.'))
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
   })
 

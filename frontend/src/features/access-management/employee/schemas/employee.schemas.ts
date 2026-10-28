@@ -48,7 +48,7 @@ const employeeProfileSchema = z.object({
 })
 
 // Shared by both create-wizard modes and EditEmployeeEditor — deliberately excludes user/email/tenant.
-// `type` is required on create; EditEmployeeEditor exposes no field for it (frontend choice).
+// `type` is required on create and editable in both modes.
 export const employeeFieldsSchema = z.object({
   type: z.enum(['full-time', 'part-time', 'contractual', 'freelance']).optional(),
   phone: z.string().trim().optional(),
@@ -70,7 +70,7 @@ export const employeeFieldsSchema = z.object({
 
 export type EmployeeFieldsValues = z.infer<typeof employeeFieldsSchema>
 
-// Create mode only — EditEmployeeEditor shares the base schema without a `type` field, so the base schema itself must keep it optional.
+// Create mode only — requires `type` to be set; EditEmployeeEditor uses the base schema as-is.
 export const createEmployeeFieldsSchema = employeeFieldsSchema.superRefine((v, ctx) => {
   if (!v.type) {
     ctx.addIssue({ code: 'custom', message: 'Select an employment type.', path: ['type'] })

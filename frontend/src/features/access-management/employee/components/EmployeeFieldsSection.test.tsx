@@ -181,7 +181,7 @@ describe('EmployeeFieldsSection', () => {
     const user = userEvent.setup()
     render(<Harness defaultValues={{ ...EMPTY_EMPLOYEE_FIELDS_VALUES, doj: '2026-01-01' }} onSubmit={onSubmit} />)
 
-    const [, daRuleTypeTrigger] = screen.getAllByRole('combobox')
+    const [, , daRuleTypeTrigger] = screen.getAllByRole('combobox')
     await user.click(daRuleTypeTrigger)
     await user.click(await screen.findByRole('option', { name: 'Fixed' }))
     await user.click(screen.getByRole('button', { name: /submit/i }))

@@ -10,7 +10,11 @@ export const PHARMA_ROUTES = {
   PHARMA_PROJECT_CAMPS:            '/pharma/projects/:id/camps',
   PHARMA_PROJECT_CAMPS_SCREENING:  '/pharma/projects/:id/camps/screening',
   PHARMA_PROJECT_CAMPS_DIET:       '/pharma/projects/:id/camps/diet',
+  // Standalone Camp Dossier page — same content as the drawer's "Open page" deep link.
+  PHARMA_CAMP_DOSSIER:             '/pharma/camps/:id',
 }
+
+export const campDossierPath = (id: string) => PHARMA_ROUTES.PHARMA_CAMP_DOSSIER.replace(':id', id)
 
 interface PharmaRoleMeta {
   label: string

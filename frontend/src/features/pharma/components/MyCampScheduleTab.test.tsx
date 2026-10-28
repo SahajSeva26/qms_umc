@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import MyCampScheduleTab from './MyCampScheduleTab'
 import { pharmaCampsService } from '@/features/pharma/pharmaCamps.service'
 import type { CampEntity, CampSummary } from '@/types/campReal.types'
@@ -9,6 +10,7 @@ import type { CampEntity, CampSummary } from '@/types/campReal.types'
 vi.mock('@/features/pharma/pharmaCamps.service', () => ({
   pharmaCampsService: {
     myCamps: vi.fn(),
+    getCamp: vi.fn(),
   },
 }))
 
@@ -49,7 +51,9 @@ function makeQueryClient() {
 function renderTab() {
   return render(
     <QueryClientProvider client={makeQueryClient()}>
-      <MyCampScheduleTab />
+      <MemoryRouter>
+        <MyCampScheduleTab />
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }
@@ -75,10 +79,11 @@ describe('MyCampScheduleTab', () => {
 
     expect(await screen.findByRole('button', { name: /^All\s*15$/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^Requested\s*2$/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Ongoing\s*2$/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^Upcoming\s*2$/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^Live\s*2$/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^Completed\s*9$/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^Cancelled\s*0$/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Cancelled but charged\s*0$/ })).toBeInTheDocument()
   })
 
   it('clicking a status pill re-queries GET /camps/my with that status and resets to page 1', async () => {

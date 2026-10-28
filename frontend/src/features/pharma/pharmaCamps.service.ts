@@ -1,11 +1,19 @@
 import api from '@/lib/api/api'
-import type { PaginatedResponse } from '@/types/common.types'
+import type { ApiResponse, PaginatedResponse } from '@/types/common.types'
 import type { CampEntity, CampSummary, SearchCampQuery } from '@/types/campReal.types'
 
 // Deliberately not importing campsReal.service.ts — cross-feature import,
 // same isolation reasoning as billingCamps.service.ts. Backend scopes results by role server-side.
 const searchScopedCamps = async (query: SearchCampQuery) => {
   const res = await api.get<PaginatedResponse<CampEntity>>('/camps', { params: query })
+  return res.data
+}
+
+// GET /camps/:id — reads are tenant-scoped but open to any authenticated user server-side; the
+// Camp Dossier uses this for a single camp regardless of how the caller reached it (drawer or
+// a direct standalone-page link).
+const getCamp = async (id: string) => {
+  const res = await api.get<ApiResponse<CampEntity>>(`/camps/${id}`)
   return res.data
 }
 
@@ -25,4 +33,5 @@ const myCamps = async (query: SearchCampQuery) => {
 export const pharmaCampsService = {
   searchScopedCamps,
   myCamps,
+  getCamp,
 }

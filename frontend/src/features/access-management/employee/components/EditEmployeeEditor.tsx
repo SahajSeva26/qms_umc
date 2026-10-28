@@ -35,6 +35,7 @@ const EditEmployeeEditor = ({ employee }: EditEmployeeEditorProps) => {
     resolver,
     mode: 'onChange',
     defaultValues: {
+      type: employee.type,
       phone: employee.phone,
       doj: employee.doj.slice(0, 10),
       dol: employee.dol?.slice(0, 10) ?? '',
@@ -59,6 +60,7 @@ const EditEmployeeEditor = ({ employee }: EditEmployeeEditorProps) => {
       const parsed = await parsePayload(values)
       try {
         await updateEmployee.mutateAsync({
+          type: parsed.type,
           phone: parsed.phone,
           doj: parsed.doj,
           dol: parsed.dol || undefined,

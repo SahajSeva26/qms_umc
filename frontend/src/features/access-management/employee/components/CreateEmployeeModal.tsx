@@ -90,10 +90,12 @@ const CreateEmployeeModal = ({
   // Destructured so the effect depends on the stable method reference, not RHF's broader (less stable) form object.
   const { setValue: setEmployeeField } = employeeForm
 
-  // Prefills gender from the picked Role's populated User; Location is NOT sourced this way (always filled manually).
+  // Prefills gender + name from the picked Role's populated User; Location is NOT sourced this way (always filled manually).
   useEffect(() => {
     if (mode !== 'existing' || !picked) return
     setEmployeeField('profile.gender', picked.gender ?? undefined)
+    setEmployeeField('profile.firstName', picked.firstName ?? undefined)
+    setEmployeeField('profile.lastName', picked.lastName ?? undefined)
   }, [mode, picked, setEmployeeField])
 
   const stepTitles = mode === 'new' ? STEP_TITLES_NEW : STEP_TITLES_EXISTING
@@ -178,6 +180,13 @@ const CreateEmployeeModal = ({
     return parseRolePayload(roleForm.getValues())
   }
 
+  // The name is already typed into the User step (userFirstName/userLastName) — carried over into
+  // the employee's own profile so the search bar (which matches profile.firstName/lastName) works.
+  const withUserName = (fields: EmployeeFieldsValues, firstName: string, lastName: string): EmployeeFieldsValues => ({
+    ...fields,
+    profile: { ...fields.profile, firstName, lastName },
+  })
+
   const submitNewPerson = async (employeeValues: EmployeeFieldsValues) => {
     // Backstop against a submit path bypassing disabled={isBusy} (e.g. a stray Enter-key submit).
     if (isBusy) return
@@ -185,12 +194,15 @@ const CreateEmployeeModal = ({
     // Role+User already succeeded — retry ONLY the Employee POST, never re-touch Role/User creation.
     if (onboard.state.step === 'account-created') {
       const rolePayload = roleForm.getValues()
-      await onboard.retryEmployee(rolePayload.userEmail, rolePayload.userPhone, toEmployeeFieldsPayload(employeeFields))
+      const fields = withUserName(employeeFields, rolePayload.userFirstName, rolePayload.userLastName)
+      await onboard.retryEmployee(rolePayload.userEmail, rolePayload.userPhone, toEmployeeFieldsPayload(fields))
       return
     }
     const rolePayload = await buildRolePayload()
     if (!rolePayload) return
-    await onboard.start(rolePayload, toEmployeeFieldsPayload(employeeFields))
+    const roleFormValues = roleForm.getValues()
+    const fields = withUserName(employeeFields, roleFormValues.userFirstName, roleFormValues.userLastName)
+    await onboard.start(rolePayload, toEmployeeFieldsPayload(fields))
   }
 
   // Guarded by submittingRef: state.step-based re-entrancy guards read state through closure, so a
@@ -202,7 +214,9 @@ const CreateEmployeeModal = ({
       markStepAttempted(lastStepIndex)
       if (!(await employeeForm.trigger())) return
       const employeeFields = await parseEmployeeFields(employeeForm.getValues())
-      await onboard.checkIfAccountExists(toEmployeeFieldsPayload(employeeFields))
+      const roleFormValues = roleForm.getValues()
+      const fields = withUserName(employeeFields, roleFormValues.userFirstName, roleFormValues.userLastName)
+      await onboard.checkIfAccountExists(toEmployeeFieldsPayload(fields))
     } finally {
       submittingRef.current = false
     }

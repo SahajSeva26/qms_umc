@@ -14,4 +14,5 @@ export const pharmaRoutes: RouteObject[] = [
   { path: PHARMA_ROUTES.PHARMA_PROJECT_CAMPS, lazy: lazyRoute(() => import('./pages/PharmaProjectCampsPage'), PHARMA_VIEW_PERMISSIONS) },
   { path: PHARMA_ROUTES.PHARMA_PROJECT_CAMPS_SCREENING, lazy: lazyRoute(() => import('./pages/PharmaScreeningCampsPage'), PHARMA_VIEW_PERMISSIONS) },
   { path: PHARMA_ROUTES.PHARMA_PROJECT_CAMPS_DIET, lazy: lazyRoute(() => import('./pages/PharmaDietCampsPage'), PHARMA_VIEW_PERMISSIONS) },
+  { path: PHARMA_ROUTES.PHARMA_CAMP_DOSSIER, lazy: lazyRoute(() => import('./pages/CampDossierPage'), PHARMA_VIEW_PERMISSIONS) },
 ]

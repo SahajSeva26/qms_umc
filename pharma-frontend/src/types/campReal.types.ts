@@ -26,6 +26,8 @@ export interface SearchCampQuery {
   status?: CampStatus
   page?: string
   limit?: string
+  /** Triggers the backend's per-row `stats` block (patients/patientsCompleted) alongside items. */
+  report?: 'true' | 'false'
 }
 
 /** Frozen snapshot of who made this transition, captured at the moment it happened. */

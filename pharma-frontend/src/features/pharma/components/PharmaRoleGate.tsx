@@ -4,8 +4,8 @@ import { useSession } from '@/hooks/useSession'
 import ENV from '@/config/env'
 
 interface PharmaRoleGateProps {
-  /** The one pharma role-type code this page is for (see roleType.constants.ts). */
-  roleTypeCode: string
+  /** The pharma role-type code(s) this page is for (see roleType.constants.ts). */
+  roleTypeCode: string | string[]
   children: ReactNode
 }
 
@@ -25,15 +25,16 @@ const PharmaRoleGate = ({ roleTypeCode, children }: PharmaRoleGateProps) => {
   }
   if (isConfirmedUnauthenticated) return null
 
-  if (session?.roleType?.code !== roleTypeCode) {
-    // A real cross-role deep link (e.g. ASM opening /pharma/mr) — only MR has a page
-    // behind it today, so any other pharma role has nowhere real to land yet.
+  const allowedCodes = Array.isArray(roleTypeCode) ? roleTypeCode : [roleTypeCode]
+  if (!session?.roleType?.code || !allowedCodes.includes(session.roleType.code)) {
+    // A real cross-role deep link (e.g. an MR session opening /pharma/ho directly) — the index
+    // redirect sends each role to its own path, but a direct URL hit must still be blocked here.
     return (
       <div className="w-full">
         <div className="rounded-lg border p-6 text-center" style={{ borderColor: 'var(--qms-border)' }}>
           <h2 className="text-lg font-bold mb-1" style={{ color: 'var(--qms-text)' }}>Not available for your role</h2>
           <p className="text-[13px]" style={{ color: 'var(--qms-text-muted)' }}>
-            This portal is only for pharma MR right now. HO, RSM, and ASM are coming soon.
+            This portal isn't available for your role.
           </p>
         </div>
       </div>

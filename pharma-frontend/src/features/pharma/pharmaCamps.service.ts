@@ -1,5 +1,5 @@
 import api from '@/lib/api/api'
-import type { ApiResponse } from '@qms/core'
+import type { ApiResponse, PaginatedResponse } from '@qms/core'
 import type {
   BookCampPayload,
   BookingAvailabilityPayload,
@@ -25,9 +25,16 @@ const myCamps = async (query: SearchCampQuery) => {
 
 // GET /camps/:id — reads are tenant-scoped but open to any authenticated user server-side; the
 // Camp Dossier uses this for a single camp regardless of how the caller reached it (drawer or
-// a direct standalone-page link). searchScopedCamps is left out — no tab needs it yet.
+// a direct standalone-page link).
 const getCamp = async (id: string) => {
   const res = await api.get<ApiResponse<CampEntity>>(`/camps/${id}`)
+  return res.data
+}
+
+// GET /camps — generic role-scoped search (HO/RSM/ASM's own dashboard; MR uses /camps/my
+// instead, see myCamps). The backend scopes results by role server-side.
+const searchScopedCamps = async (query: SearchCampQuery) => {
+  const res = await api.get<PaginatedResponse<CampEntity>>('/camps', { params: query })
   return res.data
 }
 
@@ -53,4 +60,5 @@ export const pharmaCampsService = {
   getCamp,
   bookCamp,
   getBookingAvailability,
+  searchScopedCamps,
 }

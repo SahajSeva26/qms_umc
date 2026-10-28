@@ -1,20 +1,39 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import AppLayout from './AppLayout'
 
 vi.mock('@/hooks/useSession')
 
+function makeQueryClient() {
+  return new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
+}
+
 function tree(path: string) {
   return (
-    <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route path="/*" element={<AppLayout />}>
-          <Route path="dashboard" element={<div>Dashboard Page</div>} />
-        </Route>
-      </Routes>
-    </MemoryRouter>
+    <QueryClientProvider client={makeQueryClient()}>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route path="/*" element={<AppLayout />}>
+            <Route path="dashboard" element={<div>Dashboard Page</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>
   )
+}
+
+function authenticatedSessionFixture() {
+  return {
+    user: { id: 'u-1', email: 'a@example.com', firstName: 'Riya', lastName: 'Shah' },
+    role: { id: 'role-1', code: 'pharma-mr', name: 'MR' },
+    roleType: { id: 'rt-1', code: 'pharma-mr', name: 'pharma-mr' },
+    tenant: { id: 't-1', code: 'tenant-1', name: 'Tenant', type: 'customer' },
+    permissions: ['camp:book'],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any
 }
 
 describe('AppLayout — session recovery latch', () => {
@@ -153,5 +172,51 @@ describe('AppLayout — cross-origin login redirect', () => {
     render(tree('/dashboard'))
 
     await waitFor(() => expect(window.location.href).toContain('/auth/login'))
+  })
+})
+
+describe('AppLayout — mobile sidebar drawer', () => {
+  function mockAuthenticated() {
+    return import('@/hooks/useSession').then(({ useSession }) =>
+      vi.mocked(useSession).mockReturnValue({
+        session: authenticatedSessionFixture(),
+        isFetching: false,
+        isError: false,
+        isConfirmedUnauthenticated: false,
+        refetchSession: vi.fn(),
+      } as unknown as ReturnType<typeof useSession>),
+    )
+  }
+
+  it('starts closed, opens via the Topbar hamburger, and closes via the backdrop', async () => {
+    await mockAuthenticated()
+
+    const user = userEvent.setup()
+    render(tree('/dashboard'))
+    await screen.findByText('Dashboard Page')
+
+    expect(screen.queryByRole('dialog', { name: /navigation/i })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /open menu/i }))
+    expect(screen.getByRole('dialog', { name: /navigation/i })).toBeInTheDocument()
+
+    await user.click(document.querySelector('.fixed.inset-0.z-40.bg-black\\/40')!)
+    expect(screen.queryByRole('dialog', { name: /navigation/i })).not.toBeInTheDocument()
+  })
+
+  it('Escape closes the drawer and returns focus to the hamburger button', async () => {
+    await mockAuthenticated()
+
+    const user = userEvent.setup()
+    render(tree('/dashboard'))
+    await screen.findByText('Dashboard Page')
+
+    const toggleButton = screen.getByRole('button', { name: /open menu/i })
+    await user.click(toggleButton)
+    expect(screen.getByRole('dialog', { name: /navigation/i })).toHaveFocus()
+
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog', { name: /navigation/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /open menu/i })).toHaveFocus()
   })
 })

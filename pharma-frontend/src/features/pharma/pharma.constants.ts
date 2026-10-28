@@ -17,7 +17,7 @@ interface PharmaRoleMeta {
 }
 
 // Keyed off the shared PharmaRoleTypeCode union so this can't drift from the identity list.
-// Only MR has a real page so far — PharmaRoleGate shows a "not available" message for the rest.
+// All four roles have a real portal page — PharmaRoleGate blocks any role from the wrong path.
 export const PHARMA_ROLE_META: Record<PharmaRoleTypeCode, PharmaRoleMeta> = {
   'pharma-division-head': { label: 'HO', portalPath: PHARMA_ROUTES.PHARMA_HO },
   'pharma-rsm': { label: 'RSM', portalPath: PHARMA_ROUTES.PHARMA_RSM },

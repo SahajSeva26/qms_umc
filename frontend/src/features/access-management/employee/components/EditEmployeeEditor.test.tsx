@@ -17,7 +17,7 @@ vi.mock('@/components/ui/DatePicker', () => ({
 
 function employeeFixture(overrides: Partial<EmployeeEntity> = {}): EmployeeEntity {
   return {
-    id: 'emp-1', email: 'ravi@example.com', phone: '9876543210', type: 'field-officer',
+    id: 'emp-1', email: 'ravi@example.com', phone: '9876543210', type: 'full-time',
     doj: '2026-01-01T00:00:00.000Z', status: 'active', user: 'u-1', tenant: 't-1',
     bankDetails: { accountHolderName: 'Ravi Kumar', accountNumber: '', ifscCode: '', bankName: 'HDFC', branch: '' },
     profile: { firstName: 'Ravi', lastName: '', fatherName: '', bloodGroup: 'O+' },

@@ -41,7 +41,7 @@ describe('ExistingFieldOfficerPicker', () => {
     expect(screen.getByText(/type at least 2 characters/i)).toBeInTheDocument()
   })
 
-  it('selecting a row surfaces the populated user\'s id/email/phone', async () => {
+  it('selecting a row surfaces the populated user\'s id/email/phone/name', async () => {
     vi.mocked(useFieldOfficerRolePicker).mockReturnValue(pickerReturn({ items: [roleFixture()] }))
     const onChange = vi.fn()
     const user = userEvent.setup()
@@ -49,7 +49,10 @@ describe('ExistingFieldOfficerPicker', () => {
 
     await user.click(screen.getByText('Ravi Kumar'))
 
-    expect(onChange).toHaveBeenCalledWith({ userId: 'user-1', email: 'ravi@example.com', phone: '9876543210', gender: 'male', label: 'Ravi Kumar' })
+    expect(onChange).toHaveBeenCalledWith({
+      userId: 'user-1', email: 'ravi@example.com', phone: '9876543210', gender: 'male',
+      firstName: 'Ravi', lastName: 'Kumar', label: 'Ravi Kumar',
+    })
   })
 
   it('highlights the row matching the linked user\'s id (not the role\'s own id) via aria-pressed', () => {

@@ -6,7 +6,7 @@ import { canManageEmployees } from '@/lib/access/employeeAccess'
 import EditEmployeeEditor from '@/features/access-management/employee/components/EditEmployeeEditor'
 import EmployeeStatusPill from '@/features/access-management/employee/components/EmployeeStatusPill'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
-import type { EmployeeEntity, EmployeePopulatedTenant, EmployeePopulatedUser } from '@/types/accessManagement.types'
+import { EMPLOYEE_TYPE_LABEL, type EmployeeEntity, type EmployeePopulatedTenant, type EmployeePopulatedUser } from '@/types/accessManagement.types'
 import { isNotFoundError } from '@/utils/apiError'
 
 // A Field Officer viewing their own record (own-scope, server-side) gets a read-only view here —
@@ -38,6 +38,9 @@ const ReadOnlyEmployeeView = ({ employee }: { employee: EmployeeEntity }) => {
         </div>
         <div className="text-[13px]" style={{ color: 'var(--qms-text-muted)' }}>
           Date of joining: {new Date(employee.doj).toLocaleDateString()}
+        </div>
+        <div className="text-[13px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>
+          Employment type: {EMPLOYEE_TYPE_LABEL[employee.type] ?? employee.type}
         </div>
       </div>
     </div>

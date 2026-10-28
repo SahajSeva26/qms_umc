@@ -1,9 +1,13 @@
+import { useRatings } from '@/features/rating/hooks/useRatings'
 import type { CampStats } from '@/types/campReal.types'
 
-// Patients is derivable from the screening collection; the other 3 have no backing field on CampEntity, so stay placeholders.
-const PLACEHOLDER_TILES = ['Rx count', 'Feedback', 'FO rating'] as const
+// Rx count and Feedback have no backing data model yet (no prescription entity, no patient
+// feedback entity) — shown honestly as "Coming soon". FO rating is wired to the real rating
+// module below.
+const PLACEHOLDER_TILES = ['Rx count', 'Feedback'] as const
 
 interface CampDrawerKpiRowProps {
+  campId: string
   stats: CampStats | undefined
   // Settled but this camp wasn't in the result window — distinct from "still loading" (see CampDrawer.tsx's statsQuery).
   notFound: boolean
@@ -13,39 +17,64 @@ interface CampDrawerKpiRowProps {
   patientExpectation: number
 }
 
-const CampDrawerKpiRow = ({ stats, notFound, error, onRetry, patientExpectation }: CampDrawerKpiRowProps) => (
-  <div className="grid grid-cols-2 gap-2 mb-4">
-    <div className="rounded-[14px] border p-2.5" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface)' }}>
-      <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--qms-text-muted)' }}>Patients</div>
+// Matches the prototype's .id-kpi-grid (4-col grid, 2-col under 720px) / .id-kpi tile styling.
+const KpiTile = ({ label, children }: { label: string; children: React.ReactNode }) => (
+  <div className="rounded-[14px] border p-3" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface)' }}>
+    <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--qms-text-muted)' }}>{label}</div>
+    <div className="text-[18px] font-extrabold tracking-tight mt-0.5" style={{ color: 'var(--qms-text)' }}>{children}</div>
+  </div>
+)
+
+const FoRatingTile = ({ campId }: { campId: string }) => {
+  const { items, isLoading } = useRatings({ camp: campId })
+  const rating = items[0]
+
+  return (
+    <KpiTile label="FO rating">
+      {isLoading ? (
+        <span className="text-[13px] font-bold italic" style={{ color: 'var(--qms-text-muted)' }}>Loading…</span>
+      ) : rating ? (
+        <>
+          {rating.overall.toFixed(1)}
+          <span className="text-[11px] font-normal ml-1" style={{ color: 'var(--qms-text-muted)' }}>★ from pharma</span>
+        </>
+      ) : (
+        <span className="text-[13px] font-bold italic" style={{ color: 'var(--qms-text-muted)' }}>Not yet rated</span>
+      )}
+    </KpiTile>
+  )
+}
+
+const CampDrawerKpiRow = ({ campId, stats, notFound, error, onRetry, patientExpectation }: CampDrawerKpiRowProps) => (
+  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
+    <KpiTile label="Patients">
       {stats ? (
-        <div className="text-[13px] font-bold mt-0.5" style={{ color: 'var(--qms-text)' }}>
+        <>
           {stats.patientsCompleted}/{stats.patients || patientExpectation}
           {stats.patients > 0 && (
-            <span className="font-normal ml-1" style={{ color: 'var(--qms-text-muted)' }}>
-              ({Math.round((stats.patientsCompleted / stats.patients) * 100)}% done)
+            <span className="text-[11px] font-normal ml-1" style={{ color: 'var(--qms-text-muted)' }}>
+              {Math.round((stats.patientsCompleted / stats.patients) * 100)}% done
             </span>
           )}
-        </div>
+        </>
       ) : error ? (
-        <button onClick={onRetry} className="text-[13px] font-bold italic mt-0.5 underline decoration-dotted text-danger">
+        <button onClick={onRetry} className="text-[13px] font-bold italic underline decoration-dotted text-danger">
           Couldn't load — retry
         </button>
       ) : notFound ? (
-        <div className="text-[13px] font-bold italic mt-0.5" style={{ color: 'var(--qms-text-muted)' }}>Unavailable</div>
+        <span className="text-[13px] font-bold italic" style={{ color: 'var(--qms-text-muted)' }}>Unavailable</span>
       ) : (
-        <div className="text-[13px] font-bold italic mt-0.5" style={{ color: 'var(--qms-text-muted)' }}>Loading…</div>
+        <span className="text-[13px] font-bold italic" style={{ color: 'var(--qms-text-muted)' }}>Loading…</span>
       )}
-    </div>
+    </KpiTile>
+
     {PLACEHOLDER_TILES.map((label) => (
-      <div
-        key={label}
-        className="rounded-[14px] border p-2.5"
-        style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface)' }}
-      >
-        <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--qms-text-muted)' }}>{label}</div>
-        <div className="text-[13px] font-bold italic mt-0.5" style={{ color: '#8b5cf6' }}>Coming soon</div>
-      </div>
+      <KpiTile key={label} label={label}>
+        <span className="text-[13px] font-bold italic" style={{ color: '#8b5cf6' }}>Coming soon</span>
+      </KpiTile>
     ))}
+
+    <FoRatingTile campId={campId} />
   </div>
 )
 

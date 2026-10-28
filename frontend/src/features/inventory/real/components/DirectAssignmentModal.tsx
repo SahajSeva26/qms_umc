@@ -8,7 +8,7 @@ import {
   isConsumableLineSetValid,
   type ConsumableAssignmentLineDraft,
 } from '@/features/inventory/real/utils/directAssignmentDraft'
-import type { InventoryAssignmentReportFieldOfficer } from '@/types/inventoryAssignment.types'
+import type { FieldStaffRole } from '@/hooks/useFieldStaffRoster'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
@@ -18,9 +18,9 @@ import MutationStatusBanner from '@/components/ui/MutationStatusBanner'
 import { toast } from '@/components/ui/sonner'
 
 interface DirectAssignmentModalProps {
-  // Roster from the parent panel (InventoryAssignmentsPanel's report data) —
-  // this modal never fetches its own FO list.
-  fieldOfficers: InventoryAssignmentReportFieldOfficer[]
+  // Roster from the parent panel (useFieldStaffRoster) — this modal never fetches its own list.
+  // The backend's direct-assign endpoint already accepts either (assertAssignableFieldStaff).
+  fieldStaff: FieldStaffRole[]
   onClose: () => void
 }
 
@@ -32,8 +32,9 @@ const duplicateAt = (lines: ConsumableAssignmentLineDraft[], index: number): boo
   return lines.some((other, i) => i !== index && other.item === line.item)
 }
 
-// Manager-only: pushes devices/consumables straight to an FO, bypassing the request lifecycle.
-const DirectAssignmentModal = ({ fieldOfficers, onClose }: DirectAssignmentModalProps) => {
+// Manager-only: pushes devices/consumables straight to a field officer or dietitian, bypassing
+// the request lifecycle.
+const DirectAssignmentModal = ({ fieldStaff, onClose }: DirectAssignmentModalProps) => {
   const mutation = useDirectAssignInventory()
 
   const [selectedFo, setSelectedFo] = useState('')
@@ -68,7 +69,7 @@ const DirectAssignmentModal = ({ fieldOfficers, onClose }: DirectAssignmentModal
       }
 
       const res = await mutation.mutateAsync({ fo: selectedFo, payload })
-      toast.success(`Assigned successfully — FO now holds ${res.data?.count ?? 0} inventory records.`)
+      toast.success(`Assigned successfully — now holds ${res.data?.count ?? 0} inventory records.`)
       onClose()
     } catch {
       // Error surfaces via MutationStatusBanner (mutation.isError) below — nothing else to do here.
@@ -82,30 +83,32 @@ const DirectAssignmentModal = ({ fieldOfficers, onClose }: DirectAssignmentModal
       <DialogContent className="sm:max-w-lg" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle className="text-sm font-bold" style={{ color: 'var(--qms-text)' }}>
-            Assign inventory to FO
+            Assign inventory to field staff
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 min-w-0">
           <div>
-            <FieldLabel>Field officer</FieldLabel>
+            <FieldLabel>Field officer or dietitian</FieldLabel>
             <Select
               value={selectedFo}
               onValueChange={(v) => { if (v) setSelectedFo(v) }}
-              disabled={fieldOfficers.length === 0}
+              disabled={fieldStaff.length === 0}
             >
               <SelectTrigger className="w-full text-[13px]">
                 <SelectValue>
                   {() => {
-                    if (fieldOfficers.length === 0) return 'No field officers available'
-                    const match = fieldOfficers.find((f) => f.role === selectedFo)
-                    return match ? `${match.name} (${match.code})` : 'Select a field officer'
+                    if (fieldStaff.length === 0) return 'No field officers or dietitians available'
+                    const match = fieldStaff.find((f) => f.role === selectedFo)
+                    return match ? `${match.name} (${match.code})` : 'Select a field officer or dietitian'
                   }}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {fieldOfficers.map((fo) => (
-                  <SelectItem key={fo.role} value={fo.role}>{fo.name} ({fo.code})</SelectItem>
+                {fieldStaff.map((staff) => (
+                  <SelectItem key={staff.role} value={staff.role}>
+                    {staff.name} ({staff.code}) · {staff.kind === 'dietitian' ? 'Dietitian' : 'FO'}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>

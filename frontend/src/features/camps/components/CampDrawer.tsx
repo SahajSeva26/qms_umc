@@ -8,7 +8,6 @@ import { useCampRefNames } from '@/features/camps/hooks/useCampRefNames'
 import { campRefId, canRunScreening, canActivateCamp } from '@/features/camps/campsReal.utils'
 import { usePermission } from '@/hooks/usePermission'
 import SideDrawer from '@/components/ui/SideDrawer'
-import CampStatusPillReal from '@/components/widgets/camp/CampStatusPillReal'
 import CampStageActionRow from '@/features/camps/components/CampStageActionRow'
 import CampDrawerKpiRow from '@/features/camps/components/CampDrawerKpiRow'
 import CampStageHistoryList from '@/features/camps/components/CampStageHistoryList'
@@ -22,11 +21,21 @@ import { CAMP_TIME_SLOT_LABEL } from '@/types/campTimeSlot.constants'
 const TABS = ['Overview', 'Stage history'] as const
 type Tab = (typeof TABS)[number]
 
-// Same 3 type colors already used app-wide for camp type pills/cards.
+// Matches the prototype's camps-data.js CAMP_TYPES exactly (icon-tile gradient start color).
 const TYPE_COLOR: Record<CampType, string> = {
   screening: '#3b6dff',
   diet: '#10b981',
   lab: '#8b5cf6',
+}
+
+// Matches the prototype's camps-data.js CAMP_STATUSES color set exactly.
+const STATUS_COLOR: Record<string, string> = {
+  requested: '#94a3b8',
+  confirmed: '#3b6dff',
+  live: '#10b981',
+  closed: '#14b8a6',
+  cancelled: '#f59e0b',
+  cancelled_charged: '#f43f5e',
 }
 
 const CAMP_UPDATE_PERMISSIONS = ['camp:update', 'camp:manage', 'tenant:manage']
@@ -54,12 +63,70 @@ interface CampDrawerContentProps {
   onClose: () => void
 }
 
+// Clones the prototype's .form-section-h: an icon-badge (gradient brand→teal) + uppercase label,
+// separated from the body by a dashed rule.
 const SectionHeader = ({ icon: Icon, children }: { icon: typeof FiUser; children: ReactNode }) => (
-  <div className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-[.06em] mt-4 mb-2" style={{ color: 'var(--qms-text-muted)' }}>
-    <Icon size={13} />
+  <div
+    className="flex items-center gap-2 mt-4 mb-2.5 pb-2 text-[12px] font-bold uppercase tracking-[.04em]"
+    style={{ borderBottom: '1px dashed var(--qms-border)', color: 'var(--qms-text-soft)' }}
+  >
+    <span
+      className="w-[22px] h-[22px] rounded-lg flex items-center justify-center text-white shrink-0"
+      style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
+    >
+      <Icon size={12} />
+    </span>
     {children}
   </div>
 )
+
+// Clones the prototype's .kv key-value grid: fixed-width label column + value, both in one card.
+const KvGrid = ({ children }: { children: ReactNode }) => (
+  <div
+    className="grid gap-x-3.5 gap-y-2 rounded-[14px] border p-3 text-[13px]"
+    style={{ gridTemplateColumns: '120px 1fr', borderColor: 'var(--qms-border)', background: 'var(--qms-surface)' }}
+  >
+    {children}
+  </div>
+)
+
+const KvRow = ({ label, value }: { label: ReactNode; value: ReactNode }) => (
+  <>
+    <div className="font-semibold" style={{ color: 'var(--qms-text-muted)' }}>{label}</div>
+    <div style={{ color: 'var(--qms-text)' }}>{value}</div>
+  </>
+)
+
+const Chip = ({ children }: { children: ReactNode }) => (
+  <span
+    className="inline-flex items-center gap-1 text-[12px] font-medium px-2.5 py-1 rounded-full border"
+    style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-strong)', color: 'var(--qms-text-soft)' }}
+  >
+    {children}
+  </span>
+)
+
+// Matches the prototype's camps-data.js CAMP_STATUSES label set (title-case, "Cancelled (charged)" lowercase-parenthetical).
+const STATUS_LABEL: Record<string, string> = {
+  requested: 'Requested',
+  confirmed: 'Confirmed',
+  live: 'Live',
+  closed: 'Closed',
+  cancelled: 'Cancelled',
+  cancelled_charged: 'Cancelled (charged)',
+}
+
+const StatusPill = ({ status }: { status: string }) => {
+  const color = STATUS_COLOR[status] ?? '#94a3b8'
+  return (
+    <span
+      className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold"
+      style={{ background: `color-mix(in srgb, ${color} 14%, transparent)`, color }}
+    >
+      {STATUS_LABEL[status] ?? status}
+    </span>
+  )
+}
 
 const CampDrawerContent = ({ campId, onClose }: CampDrawerContentProps) => {
   const navigate = useNavigate()
@@ -95,7 +162,7 @@ const CampDrawerContent = ({ campId, onClose }: CampDrawerContentProps) => {
   const worker = isDiet ? dietitian : fo
 
   return (
-    <SideDrawer open title={camp?.code ?? 'Camp'} onClose={onClose} widthClassName="max-w-lg">
+    <SideDrawer open title={camp?.code ?? 'Camp'} onClose={onClose} widthClassName="max-w-[940px]">
       {isLoading && (
         <div className="text-[13px] py-10 text-center" style={{ color: 'var(--qms-text-muted)' }}>
           Loading camp…
@@ -110,16 +177,18 @@ const CampDrawerContent = ({ campId, onClose }: CampDrawerContentProps) => {
 
       {camp && !isLoading && (
         <>
-          <div className="flex items-start gap-3 mb-4">
+          {/* Clones the prototype's drawer header: 56x56 gradient icon tile, title, location/date/
+              slot sub-line, then a wrapped row of status pill + context chips. */}
+          <div className="flex items-start gap-3.5 mb-4">
             <div
               className="w-14 h-14 rounded-2xl flex items-center justify-center text-white shrink-0"
               style={{ background: `linear-gradient(135deg, ${TYPE_COLOR[camp.type]}, #14b8a6)` }}
             >
-              <span className="text-[18px] font-extrabold">{CAMP_TYPE_LABEL[camp.type][0]}</span>
+              <span className="text-[20px] font-extrabold">{CAMP_TYPE_LABEL[camp.type][0]}</span>
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-start justify-between gap-2">
-                <div className="font-bold text-[15px] truncate" style={{ color: 'var(--qms-text)' }}>
+                <div className="font-extrabold text-[18px] tracking-tight truncate" style={{ color: 'var(--qms-text)' }}>
                   {camp.code} · {CAMP_TYPE_LABEL[camp.type]} Camp
                 </div>
                 {canUpdate && (
@@ -140,24 +209,14 @@ const CampDrawerContent = ({ campId, onClose }: CampDrawerContentProps) => {
                   </button>
                 )}
               </div>
-              <div className="text-[12px] truncate" style={{ color: 'var(--qms-text-muted)' }}>
+              <div className="text-[12.5px] truncate" style={{ color: 'var(--qms-text-muted)' }}>
                 {camp.location ? `${camp.location.city}, ${camp.location.state}` : 'Location unavailable'} · {new Date(camp.date).toLocaleDateString()} · {camp.timeSlot ? CAMP_TIME_SLOT_LABEL[camp.timeSlot] : '—'}
               </div>
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                <CampStatusPillReal status={camp.status} />
-                <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border" style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }}>
-                  {camp.tenant && typeof camp.tenant !== 'string' ? camp.tenant.name : campRefId(camp.tenant) ?? '—'}
-                </span>
-                {camp.division && typeof camp.division !== 'string' && (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border" style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }}>
-                    {divisionName(camp.division)}
-                  </span>
-                )}
-                {camp.project && typeof camp.project !== 'string' && (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border" style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }}>
-                    {projectName(camp.project)}
-                  </span>
-                )}
+              <div className="flex flex-wrap gap-1.5 mt-2.5">
+                <StatusPill status={camp.status} />
+                <Chip>{camp.tenant && typeof camp.tenant !== 'string' ? camp.tenant.name : campRefId(camp.tenant) ?? '—'}</Chip>
+                {camp.division && typeof camp.division !== 'string' && <Chip>{divisionName(camp.division)}</Chip>}
+                {camp.project && typeof camp.project !== 'string' && <Chip>{projectName(camp.project)}</Chip>}
               </div>
             </div>
           </div>
@@ -182,6 +241,7 @@ const CampDrawerContent = ({ campId, onClose }: CampDrawerContentProps) => {
           {tab === 'Overview' && (
             <div>
               <CampDrawerKpiRow
+                campId={camp.id}
                 stats={campStats}
                 notFound={isStatsNotFound}
                 error={statsQuery.error}
@@ -190,36 +250,41 @@ const CampDrawerContent = ({ campId, onClose }: CampDrawerContentProps) => {
               />
 
               <SectionHeader icon={FiUser}>Doctor</SectionHeader>
-              <div className="rounded-[14px] border p-3 space-y-1.5" style={{ borderColor: 'var(--qms-border)' }}>
-                <OverviewRow label="Name" value={doctorName(camp.doctor)} />
-                <OverviewRow label="Pharma code" value={doctor?.pharmaCode || '—'} />
-                <OverviewRow label="Specialization" value={specializationLabel(doctor?.specialization)} />
-              </div>
+              <KvGrid>
+                <KvRow label="Name" value={doctorName(camp.doctor)} />
+                <KvRow label="Pharma code" value={doctor?.pharmaCode || '—'} />
+                <KvRow label="Specialization" value={specializationLabel(doctor?.specialization)} />
+              </KvGrid>
 
               <SectionHeader icon={FiTruck}>{isDiet ? 'Dietitian' : 'Field Officer'}</SectionHeader>
-              <div className="rounded-[14px] border p-3" style={{ borderColor: 'var(--qms-border)' }}>
-                {worker ? (
-                  <OverviewRow label={isDiet ? 'Dietitian' : 'FO'} value={roleName(isDiet ? camp.dietitian : camp.fo)} />
-                ) : (
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[12px] font-semibold text-danger">Unassigned</span>
-                    {canUpdate && (
-                      <Button variant="outline" size="sm" onClick={() => allocateFo.mutate()} disabled={allocateFo.isPending}>
-                        {allocateFo.isPending ? 'Allocating…' : isDiet ? 'Assign dietitian' : 'Assign FO'}
-                      </Button>
-                    )}
-                  </div>
-                )}
-                {allocateFo.isError && (
-                  <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger mt-2">
-                    {(allocateFo.error as { response?: { data?: { message?: string } } })?.response?.data?.message || `Could not allocate a${isDiet ? ' dietitian' : 'n FO'}.`}
-                  </div>
-                )}
-                <OverviewRow label="MR" value={camp.mr ? roleName(camp.mr) : '—'} />
-              </div>
+              <KvGrid>
+                <KvRow
+                  label={isDiet ? 'Dietitian' : 'FO'}
+                  value={
+                    worker ? (
+                      roleName(isDiet ? camp.dietitian : camp.fo)
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold" style={{ color: '#e11d48' }}>— Unassigned —</span>
+                        {canUpdate && (
+                          <Button variant="outline" size="sm" onClick={() => allocateFo.mutate()} disabled={allocateFo.isPending}>
+                            {allocateFo.isPending ? 'Allocating…' : isDiet ? 'Assign dietitian' : 'Assign FO'}
+                          </Button>
+                        )}
+                      </div>
+                    )
+                  }
+                />
+                <KvRow label="MR" value={camp.mr ? roleName(camp.mr) : '—'} />
+              </KvGrid>
+              {allocateFo.isError && (
+                <div className="text-xs rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger mt-2">
+                  {(allocateFo.error as { response?: { data?: { message?: string } } })?.response?.data?.message || `Could not allocate a${isDiet ? ' dietitian' : 'n FO'}.`}
+                </div>
+              )}
 
               <SectionHeader icon={FiCpu}>Devices allocated ({camp.devices.length})</SectionHeader>
-              <div className="rounded-[14px] border p-3" style={{ borderColor: 'var(--qms-border)' }}>
+              <div className="rounded-[14px] border p-3" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface)' }}>
                 {camp.devices.length > 0 ? (
                   <div className="space-y-1.5">
                     {camp.devices.map((d) => (
@@ -236,13 +301,13 @@ const CampDrawerContent = ({ campId, onClose }: CampDrawerContentProps) => {
                 )}
               </div>
 
-              <SectionHeader icon={FiFileText}>Notes</SectionHeader>
-              <div className="rounded-[14px] border p-3 space-y-2" style={{ borderColor: 'var(--qms-border)' }}>
-                <OverviewRow label="Company" value={camp.tenant && typeof camp.tenant !== 'string' ? camp.tenant.name : campRefId(camp.tenant) ?? '—'} />
-                <OverviewRow label="Billing" value={camp.billingType === 'billable' ? 'Billable' : 'Void'} />
-                <OverviewRow label="Patient expectation" value={String(camp.patientExpectation)} />
-                <OverviewRow label="Notes" value={camp.notes || '—'} />
-              </div>
+              <SectionHeader icon={FiFileText}>Notes &amp; billing</SectionHeader>
+              <KvGrid>
+                <KvRow label="Company" value={camp.tenant && typeof camp.tenant !== 'string' ? camp.tenant.name : campRefId(camp.tenant) ?? '—'} />
+                <KvRow label="Billing" value={camp.billingType === 'billable' ? 'Billable' : 'Void'} />
+                <KvRow label="Patient expectation" value={String(camp.patientExpectation)} />
+                <KvRow label="Notes" value={camp.notes || '—'} />
+              </KvGrid>
 
               <div className="mt-4">
                 <CampStageActionRow
@@ -269,12 +334,5 @@ const CampDrawerContent = ({ campId, onClose }: CampDrawerContentProps) => {
     </SideDrawer>
   )
 }
-
-const OverviewRow = ({ label, value }: { label: string; value: string }) => (
-  <div className="flex items-start justify-between gap-3">
-    <span className="text-[11px] font-semibold uppercase tracking-wider shrink-0" style={{ color: 'var(--qms-text-muted)' }}>{label}</span>
-    <span className="text-[13px] text-right" style={{ color: 'var(--qms-text)' }}>{value}</span>
-  </div>
-)
 
 export default CampDrawer

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { FiDownload, FiCpu, FiPackage, FiHome, FiUserPlus } from 'react-icons/fi'
 import { usePermission } from '@/hooks/usePermission'
 import { useInventoryAssignments } from '@/features/inventory/real/hooks/useInventoryAssignments'
-import { useInventoryAssignmentReport } from '@/features/inventory/real/hooks/useInventoryAssignmentReport'
+import { useFieldStaffRoster } from '@/hooks/useFieldStaffRoster'
 import { useInventoryDevices } from '@/features/inventory/real/hooks/useInventoryDevices'
 import { useInventoryConsumables } from '@/features/inventory/real/hooks/useInventoryConsumables'
 import { useGeoProfiles } from '@/features/geo-profile/hooks/useGeoProfiles'
@@ -35,37 +35,42 @@ const InventoryAssignmentsPanel = () => {
   const { hasAnyPermission } = usePermission()
   const canManage = hasAnyPermission(['inventory-assignment:manage'])
 
-  const { report, isLoading: reportLoading, error: reportError, refetch: refetchReport } = useInventoryAssignmentReport(canManage)
-  const fieldOfficers = report?.fieldOfficers ?? []
+  // GET /inventory-assignments/report only aggregates field officers (backend gap) — the roster
+  // itself is resolved directly via role-type instead, so dietitians are included too.
+  const { roster: fieldStaff, isLoading: rosterLoading, isError: rosterErrored, isTruncated: rosterTruncated, refetch: refetchRoster } = useFieldStaffRoster(canManage)
 
   const { data: deviceAssignmentsData, isLoading: deviceAssignmentsLoading, error: deviceAssignmentsError, refetch: refetchDeviceAssignments } = useInventoryAssignments({ inventoryType: 'InventoryDevice', limit: FETCH_LIMIT }, canManage)
   const { data: consumableAssignmentsData, isLoading: consumableAssignmentsLoading, error: consumableAssignmentsError, refetch: refetchConsumableAssignments } = useInventoryAssignments({ inventoryType: 'InventoryConsumable', limit: FETCH_LIMIT }, canManage)
   // Gated on canManage like the rest — nothing here should fire for a viewer the `!canManage` early return below blocks.
   const { data: devicesData, isLoading: devicesLoading, error: devicesError, refetch: refetchDevices } = useInventoryDevices({ limit: FETCH_LIMIT }, canManage)
   const { data: consumablesData, isLoading: consumablesLoading, error: consumablesError, refetch: refetchConsumables } = useInventoryConsumables({ limit: FETCH_LIMIT }, canManage)
-  const { data: geoProfilesData, isLoading: geoProfilesLoading, error: geoProfilesError, refetch: refetchGeoProfiles } = useGeoProfiles({ type: 'fo', limit: FETCH_LIMIT }, canManage)
+  const { data: foGeoProfilesData, isLoading: foGeoProfilesLoading, error: foGeoProfilesError, refetch: refetchFoGeoProfiles } = useGeoProfiles({ type: 'fo', limit: FETCH_LIMIT }, canManage)
+  const { data: dtGeoProfilesData, isLoading: dtGeoProfilesLoading, error: dtGeoProfilesError, refetch: refetchDtGeoProfiles } = useGeoProfiles({ type: 'dietitian', limit: FETCH_LIMIT }, canManage)
 
-  const isLoading = reportLoading || deviceAssignmentsLoading || consumableAssignmentsLoading || devicesLoading || consumablesLoading || geoProfilesLoading
-  const error = reportError || deviceAssignmentsError || consumableAssignmentsError || devicesError || consumablesError || geoProfilesError
+  const isLoading = rosterLoading || deviceAssignmentsLoading || consumableAssignmentsLoading || devicesLoading || consumablesLoading || foGeoProfilesLoading || dtGeoProfilesLoading
+  const error = rosterErrored || deviceAssignmentsError || consumableAssignmentsError || devicesError || consumablesError || foGeoProfilesError || dtGeoProfilesError
   const retryGrid = () => {
-    refetchReport()
+    refetchRoster()
     refetchDeviceAssignments()
     refetchConsumableAssignments()
     refetchDevices()
     refetchConsumables()
-    refetchGeoProfiles()
+    refetchFoGeoProfiles()
+    refetchDtGeoProfiles()
   }
 
   // Capped fetches, not real pagination — past the cap, rows silently disappear from chips/counts/HQ.
   const truncatedLabels = useMemo(() => {
     const labels: string[] = []
+    if (rosterTruncated) labels.push('field staff')
     if ((deviceAssignmentsData?.data?.items.length ?? 0) < (deviceAssignmentsData?.data?.count ?? 0)) labels.push('device assignments')
     if ((consumableAssignmentsData?.data?.items.length ?? 0) < (consumableAssignmentsData?.data?.count ?? 0)) labels.push('consumable assignments')
     if ((devicesData?.data?.items.length ?? 0) < (devicesData?.data?.count ?? 0)) labels.push('devices')
     if ((consumablesData?.data?.items.length ?? 0) < (consumablesData?.data?.count ?? 0)) labels.push('consumable lots')
-    if ((geoProfilesData?.data?.items.length ?? 0) < (geoProfilesData?.data?.count ?? 0)) labels.push('FO locations')
+    if ((foGeoProfilesData?.data?.items.length ?? 0) < (foGeoProfilesData?.data?.count ?? 0)) labels.push('FO locations')
+    if ((dtGeoProfilesData?.data?.items.length ?? 0) < (dtGeoProfilesData?.data?.count ?? 0)) labels.push('dietitian locations')
     return labels
-  }, [deviceAssignmentsData, consumableAssignmentsData, devicesData, consumablesData, geoProfilesData])
+  }, [rosterTruncated, deviceAssignmentsData, consumableAssignmentsData, devicesData, consumablesData, foGeoProfilesData, dtGeoProfilesData])
 
   const deviceById = useMemo(() => {
     const map = new Map<string, { name: string; color: string | null }>()
@@ -91,13 +96,13 @@ const InventoryAssignmentsPanel = () => {
 
   const hqByRole = useMemo(() => {
     const map = new Map<string, string>()
-    const items = geoProfilesData?.data?.items ?? []
+    const items = [...(foGeoProfilesData?.data?.items ?? []), ...(dtGeoProfilesData?.data?.items ?? [])]
     items.forEach((g) => {
       const parts = [g.city, g.state].filter(Boolean)
       if (parts.length) map.set(g.role, parts.join(' · '))
     })
     return map
-  }, [geoProfilesData])
+  }, [foGeoProfilesData, dtGeoProfilesData])
 
   const chipsByAssignee = useMemo(() => {
     const map = new Map<string, AssignmentChip[]>()
@@ -150,13 +155,14 @@ const InventoryAssignmentsPanel = () => {
   const handleExport = async () => {
     setExporting(true)
     try {
-      const [assignmentsRes, devicesRes, geoProfilesRes] = await Promise.all([
+      const [assignmentsRes, devicesRes, foGeoProfilesRes, dtGeoProfilesRes] = await Promise.all([
         inventoryAssignmentService.searchInventoryAssignments({ inventoryType: 'InventoryDevice', limit: '1000' }),
         inventoryDeviceService.searchInventoryDevices({ limit: '1000' }),
         geoProfileService.searchGeoProfiles({ type: 'fo', limit: '1000' }),
+        geoProfileService.searchGeoProfiles({ type: 'dietitian', limit: '1000' }),
       ])
       const deviceByIdFull = new Map(devicesRes.data.items.map((d) => [d.id, d]))
-      const geoProfileByRole = new Map(geoProfilesRes.data.items.map((g) => [g.role, g]))
+      const geoProfileByRole = new Map([...foGeoProfilesRes.data.items, ...dtGeoProfilesRes.data.items].map((g) => [g.role, g]))
       const rows: AssignedDeviceRow[] = assignmentsRes.data.items.map((assignment) => ({
         assignment,
         device: deviceByIdFull.get(assignment.inventory.id) ?? null,
@@ -165,7 +171,8 @@ const InventoryAssignmentsPanel = () => {
       const truncated = [
         assignmentsRes.data.items.length < assignmentsRes.data.count ? 'assignments' : null,
         devicesRes.data.items.length < devicesRes.data.count ? 'devices' : null,
-        geoProfilesRes.data.items.length < geoProfilesRes.data.count ? 'FO geo-profiles' : null,
+        foGeoProfilesRes.data.items.length < foGeoProfilesRes.data.count ? 'FO geo-profiles' : null,
+        dtGeoProfilesRes.data.items.length < dtGeoProfilesRes.data.count ? 'dietitian geo-profiles' : null,
       ].filter((v): v is string => v !== null)
       if (truncated.length > 0) {
         toast.warning(`Export is incomplete: too many ${truncated.join(', ')} to include all — some rows may show missing data.`)
@@ -190,32 +197,26 @@ const InventoryAssignmentsPanel = () => {
     <div>
       <div className="mb-3 flex items-start justify-between gap-4">
         <p className="text-[12px] mt-0.5" style={{ color: 'var(--qms-text-muted)' }}>
-          Who currently holds what, by field officer.
+          Who currently holds what, by field officer or dietitian.
         </p>
         <div className="flex flex-col items-end gap-1.5 shrink-0">
           <div className="flex items-center gap-2">
             <Button
               size="sm"
               onClick={() => setShowDirectAssignment(true)}
-              disabled={reportLoading || !!reportError || fieldOfficers.length === 0}
+              disabled={rosterLoading || rosterErrored || fieldStaff.length === 0}
             >
-              <FiUserPlus size={14} /> Assign to FO
+              <FiUserPlus size={14} /> Assign to field staff
             </Button>
             <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting} className="shrink-0">
               <FiDownload size={14} /> {exporting ? 'Exporting…' : 'Export devices'}
             </Button>
           </div>
-          {reportError && (
-            <div className="flex items-center gap-2 text-[12px] text-danger">
-              <span>Couldn't load field officers.</span>
-              <Button variant="outline" size="sm" onClick={() => refetchReport()}>Retry</Button>
-            </div>
-          )}
         </div>
       </div>
 
       {showDirectAssignment && (
-        <DirectAssignmentModal fieldOfficers={fieldOfficers} onClose={() => setShowDirectAssignment(false)} />
+        <DirectAssignmentModal fieldStaff={fieldStaff} onClose={() => setShowDirectAssignment(false)} />
       )}
 
       {!isLoading && !error && truncatedLabels.length > 0 && (
@@ -226,13 +227,15 @@ const InventoryAssignmentsPanel = () => {
 
       <QueryStateBlock isLoading={isLoading} error={error} loadingLabel="Loading assignments…" errorLabel="Failed to load assignments. Please try again." onRetry={retryGrid}>
         <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--qms-border)' }}>
-          {fieldOfficers.map((fo) => {
-            const chips = chipsByAssignee.get(fo.role) ?? []
+          {fieldStaff.map((staff) => {
+            const chips = chipsByAssignee.get(staff.role) ?? []
             return (
-              <div key={fo.role} className="grid" style={{ gridTemplateColumns: '220px 1fr', borderBottom: '1px solid var(--qms-border)' }}>
+              <div key={staff.role} className="grid" style={{ gridTemplateColumns: '220px 1fr', borderBottom: '1px solid var(--qms-border)' }}>
                 <div className="p-3" style={{ background: 'rgba(0,0,0,.02)' }}>
-                  <div className="text-[12px] font-bold" style={{ color: 'var(--qms-text)' }}>{fo.name}</div>
-                  <div className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>{hqByRole.get(fo.role) ?? '—'}</div>
+                  <div className="text-[12px] font-bold" style={{ color: 'var(--qms-text)' }}>{staff.name}</div>
+                  <div className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>
+                    {staff.kind === 'dietitian' ? 'Dietitian' : 'Field Officer'} · {hqByRole.get(staff.role) ?? '—'}
+                  </div>
                 </div>
                 <div className="p-3 flex flex-wrap gap-1.5 items-start content-start">
                   {chips.length === 0 ? (
@@ -255,9 +258,9 @@ const InventoryAssignmentsPanel = () => {
             )
           })}
 
-          {fieldOfficers.length === 0 && (
+          {fieldStaff.length === 0 && (
             <div className="px-4 py-10 text-center text-[13px]" style={{ color: 'var(--qms-text-muted)' }}>
-              No field officers found.
+              No field officers or dietitians found.
             </div>
           )}
 

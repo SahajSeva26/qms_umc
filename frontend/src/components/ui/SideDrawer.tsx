@@ -19,7 +19,7 @@ const SideDrawer = ({ open, title, onClose, children, widthClassName = 'max-w-md
       <DialogPrimitive.Backdrop className="fixed inset-0 z-40 bg-black/40 supports-backdrop-filter:backdrop-blur-sm duration-100 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0" />
       <DialogPrimitive.Popup
         className={`fixed inset-y-0 right-0 z-50 w-full ${widthClassName} flex flex-col shadow-2xl outline-none duration-150 data-open:animate-in data-open:slide-in-from-right data-closed:animate-out data-closed:slide-out-to-right`}
-        style={{ background: 'var(--qms-surface-card)', borderLeft: '1px solid var(--qms-border)' }}
+        style={{ background: 'var(--qms-surface-card)', borderLeft: '1px solid var(--qms-border)', backdropFilter: 'blur(20px) saturate(140%)' }}
       >
         <div
           className="flex items-center justify-between px-5 py-4"

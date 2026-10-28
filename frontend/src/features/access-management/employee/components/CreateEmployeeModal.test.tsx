@@ -33,7 +33,7 @@ vi.mock('@/features/access-management/employee/components/ExistingFieldOfficerPi
   default: ({ roleTypeId, workerLabel, onChange }: { roleTypeId: string; workerLabel: string; onChange: (v: unknown) => void }) => (
     <div>
       <p>picker for {workerLabel} ({roleTypeId})</p>
-      <button type="button" onClick={() => onChange({ userId: 'user-existing', email: 'existing@example.com', phone: '9999999999', gender: 'male', label: 'Existing FO' })}>
+      <button type="button" onClick={() => onChange({ userId: 'user-existing', email: 'existing@example.com', phone: '9999999999', gender: 'male', firstName: 'Existing', lastName: 'FO', label: 'Existing FO' })}>
         Pick existing FO
       </button>
       <button type="button" onClick={() => onChange({ userId: 'user-existing-2', email: 'existing2@example.com', phone: '9999999998', label: 'Second FO' })}>
@@ -152,6 +152,34 @@ describe('CreateEmployeeModal', () => {
     expect(createEmployee).toHaveBeenCalledWith(expect.objectContaining({ email: 'ravi@example.com', phone: '9876543210', user: 'user-1' }))
   })
 
+  it('Mode A carries the User-step\'s first/last name into the Employee payload\'s own profile (the search bar matches profile.firstName/lastName, not the linked user\'s name)', async () => {
+    const user = userEvent.setup()
+    renderModal()
+    await user.click(screen.getByRole('button', { name: /new employee/i }))
+    await user.click(screen.getByRole('button', { name: /^onboard a new person$/i }))
+
+    await user.type(screen.getByLabelText('Name'), 'Ravi Kumar')
+    await user.click(screen.getByRole('button', { name: /^next$/i }))
+
+    await user.type(screen.getByLabelText('First name'), 'Ravi')
+    await user.type(screen.getByLabelText('Last name'), 'Kumar')
+    await user.type(screen.getByLabelText('Email'), 'ravi@example.com')
+    await user.type(screen.getByLabelText('Password'), 'Password1')
+    await user.type(screen.getByLabelText(/^phone/i), '9876543210')
+    await user.click(screen.getByRole('button', { name: /^next$/i }))
+
+    await user.click(screen.getByRole('combobox', { name: /employment type/i }))
+    await user.click(await screen.findByRole('option', { name: /full-time/i }))
+    await user.type(screen.getAllByLabelText('date-stub')[0], '2026-01-15')
+
+    await user.click(screen.getByRole('button', { name: /create employee/i }))
+
+    await waitFor(() => expect(createEmployee).toHaveBeenCalled())
+    expect(createEmployee).toHaveBeenCalledWith(expect.objectContaining({
+      profile: expect.objectContaining({ firstName: 'Ravi', lastName: 'Kumar' }),
+    }))
+  })
+
   it('Mode A defaults the Role\'s type to the first RoleType option, and switching the role-type picker to Dietitian sends the dietitian RoleType id instead', async () => {
     const user = userEvent.setup()
     renderModal()
@@ -245,6 +273,25 @@ describe('CreateEmployeeModal', () => {
 
     await waitFor(() => expect(createEmployee).toHaveBeenCalled())
     expect(createEmployee).toHaveBeenCalledWith(expect.objectContaining({ user: 'user-existing', tenant: 't-platform-1' }))
+  })
+
+  it('Mode B carries the picked account\'s first/last name into the Employee payload\'s own profile', async () => {
+    const user = userEvent.setup()
+    renderModal({ canOnboardNewPerson: false, canLinkExistingAccount: true })
+    await user.click(screen.getByRole('button', { name: /new employee/i }))
+
+    await user.click(screen.getByRole('button', { name: /^pick existing fo$/i }))
+    await user.click(screen.getByRole('button', { name: /^next$/i }))
+
+    await user.click(screen.getByRole('combobox', { name: /employment type/i }))
+    await user.click(await screen.findByRole('option', { name: /full-time/i }))
+    await user.type(screen.getAllByLabelText('date-stub')[0], '2026-01-15')
+    await user.click(screen.getByRole('button', { name: /create employee/i }))
+
+    await waitFor(() => expect(createEmployee).toHaveBeenCalled())
+    expect(createEmployee).toHaveBeenCalledWith(expect.objectContaining({
+      profile: expect.objectContaining({ firstName: 'Existing', lastName: 'FO' }),
+    }))
   })
 
   it('Mode B rapidly double-submitted fires exactly one Employee POST, and a successful create still closes the modal and navigates rather than getting stuck on a stray error', async () => {
@@ -410,6 +457,27 @@ describe('CreateEmployeeModal', () => {
     expect(createEmployee).toHaveBeenCalledWith(expect.objectContaining({ user: 'user-1', email: 'ravi@example.com', phone: '9876543210' }))
     // Still just once — the check recovered the existing account, never re-created it.
     expect(createRole).toHaveBeenCalledTimes(1)
+  })
+
+  it('"Check again" also carries the User-step\'s name into the Employee payload\'s own profile, same as a normal Mode A submit', async () => {
+    createRole.mockRejectedValueOnce(networkError())
+    const user = userEvent.setup()
+    await fillAndSubmitModeA(user)
+
+    await screen.findByText(/couldn't confirm whether the account was created/i)
+    searchRoles.mockResolvedValueOnce({
+      success: true, message: '', data: {
+        count: 1,
+        items: [{ id: 'role-1', code: 'fo-ravi', user: { _id: 'user-1', firstName: 'Ravi', lastName: 'Kumar', email: 'ravi@example.com', phone: '9876543210' } }],
+      },
+    } as never)
+
+    await user.click(screen.getByRole('button', { name: /check again/i }))
+
+    await waitFor(() => expect(createEmployee).toHaveBeenCalledTimes(1))
+    expect(createEmployee).toHaveBeenCalledWith(expect.objectContaining({
+      profile: expect.objectContaining({ firstName: 'Ravi' }),
+    }))
   })
 
   it('"Check again" finding nothing falls back to the confirmed-failure state (a fresh retry is then safe), showing the specific "no account found" message', async () => {

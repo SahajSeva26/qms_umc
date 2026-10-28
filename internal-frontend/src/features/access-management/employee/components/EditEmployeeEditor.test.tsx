@@ -7,8 +7,11 @@ import { useUpdateEmployee } from '@/features/access-management/employee/hooks/u
 import type { EmployeeEntity, UpdateEmployeePayload } from '@/types/accessManagement.types'
 
 vi.mock('@/features/access-management/employee/hooks/useUpdateEmployee')
-vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({ default: () => null }))
-vi.mock('@/components/widgets/location-picker/LocationAddressFields', () => ({ default: () => null }))
+vi.mock('@qms/ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@qms/ui')>()),
+  LocationPicker: () => null,
+  LocationAddressFields: () => null,
+}))
 vi.mock('@/components/ui/DatePicker', () => ({
   default: ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
     <input aria-label="date-stub" value={value} onChange={(e) => onChange(e.target.value)} />

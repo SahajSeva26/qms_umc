@@ -6,10 +6,10 @@ import { Textarea } from '@/components/ui/textarea'
 import FieldLabel from '@/components/ui/FieldLabel'
 import DatePicker from '@/components/ui/DatePicker'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import LocationPicker from '@/components/widgets/location-picker/LocationPicker'
-import LocationAddressFields from '@/components/widgets/location-picker/LocationAddressFields'
-import type { LocationValue } from '@/types/location.types'
+import { LocationPicker, LocationAddressFields } from '@qms/ui'
+import type { LocationValue } from '@qms/core'
 import type { EmployeeFieldsValues } from '@/features/access-management/employee/schemas/employee.schemas'
+import ENV from '@/config/env'
 
 interface EmployeeFieldsSectionProps<TFormValues extends FieldValues & EmployeeFieldsValues> {
   mode: 'create' | 'edit'
@@ -260,6 +260,8 @@ const EmployeeFieldsSection = <TFormValues extends FieldValues & EmployeeFieldsV
           render={({ field: locationField }) => (
             <div className="space-y-2">
               <LocationPicker
+                apiKey={ENV.Maps.ApiKey}
+                mapId={ENV.Maps.MapId}
                 value={(locationField.value as LocationValue) ?? null}
                 onChange={locationField.onChange}
                 onLocationHintChange={setLocationHint}

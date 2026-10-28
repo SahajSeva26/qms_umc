@@ -2,7 +2,7 @@
 // Deliberately separate from `camp.types.ts`, the old mock model ~100 files still depend on.
 
 import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
-import type { LocationValue } from '@/types/location.types'
+import type { LocationValue } from '@qms/core'
 
 export const CAMP_TYPE_VALUES = ['screening', 'diet', 'lab'] as const
 export type CampType = (typeof CAMP_TYPE_VALUES)[number]

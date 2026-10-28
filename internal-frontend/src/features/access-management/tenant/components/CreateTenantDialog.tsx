@@ -11,7 +11,7 @@ import { CREATE_TENANT_STEP_FIELD_NAMES, EMPTY_FORM_VALUES, useTenantFormResolve
 import { useTenantDraftStore, stripPassword, type TenantDraftSnapshot } from '@/features/access-management/tenant/tenantDraft.store'
 import { useDebouncedDraftSync } from '@/hooks/useDebouncedDraftSync'
 import type { createDraftStore } from '@/hooks/useDraftStore'
-import type { LocationResolutionState } from '@/components/widgets/location-picker/location.types'
+import type { LocationResolutionState } from '@qms/ui'
 import { TENANT_ROUTES } from '@/features/access-management/tenant/tenant.routes'
 import { TenantWizardValidationProvider } from '@/features/access-management/tenant/components/wizard/TenantWizardValidationContext'
 import DraftLoadingPlaceholder from '@/components/ui/DraftLoadingPlaceholder'
@@ -176,11 +176,8 @@ const CreateTenantDialog = () => {
     })
   }
 
-  // Defense-in-depth: handleSubmit validates the WHOLE form across all 3 steps every time, but
-  // only the step currently on screen renders any error (useTenantWizardFieldError). Without this,
-  // a stale invalid field on an earlier step (e.g. a bad GST left over from step 0) silently blocks
-  // "Create company" with no visible feedback at all — no toast, no network request, nothing.
-  // Jump back to the earliest step that actually has an error, so it becomes visible.
+  // A stale invalid field on an earlier step (its error UI isn't on screen) would otherwise
+  // silently block submit with no feedback — jump back to the earliest step with an error.
   const onInvalid = (errors: FieldErrors<TenantFormValues>) => {
     setAdvanceAttempted(true)
     const invalidStepIndex = CREATE_TENANT_STEP_FIELD_NAMES.findIndex((fields) => fields.some((f) => f in errors))

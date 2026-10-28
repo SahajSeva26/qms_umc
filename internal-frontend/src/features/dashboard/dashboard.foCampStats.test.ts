@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { buildFoRegionalSpread, buildFoTimeSlotBifurcation } from './dashboard.foCampStats'
 import type { CampEntity } from '@/types/campReal.types'
-import type { LocationValue } from '@/types/location.types'
+import type { LocationValue } from '@qms/core'
 
 function camp(overrides: Partial<CampEntity> = {}): CampEntity {
   return {

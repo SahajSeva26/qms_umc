@@ -4,11 +4,10 @@ import { useApiLoadingStatus, useMapsLibrary, APILoadingStatus, APIProviderConte
 import { Input } from '@/components/ui/input'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { useAsyncPickerState } from '@/hooks/useAsyncPickerState'
-import { usePlacesAutocomplete, type Suggestion, type SelectedPlaceDetails } from './usePlacesAutocomplete'
+import { usePlacesAutocomplete, type Suggestion, type SelectedPlaceDetails } from '@qms/ui'
 
-// State -> City filter combobox pair: City is inert until a validated State is selected, and
-// editing either box's text away from its committed selection clears that selection immediately.
-// Local text seeds from props only at mount — caller remounts via `key` to reset externally.
+// City is inert until a validated State is selected; editing either box away from its committed
+// selection clears it. Local text seeds from props only at mount — remount via `key` to reset.
 
 const STATE_TYPE = 'administrative_area_level_1'
 

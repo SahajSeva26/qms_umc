@@ -6,8 +6,8 @@ import type { CampType } from '@/types/campReal.types'
 import { CAMP_TYPE_LABEL } from '@/types/campReal.types'
 import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
 import { CAMP_TIME_SLOT_LABEL, CAMP_TIME_SLOT_VALUES } from '@/types/campTimeSlot.constants'
-import type { LocationValue } from '@/types/location.types'
-import { createEmptyLocationValue } from '@/types/location.types'
+import type { LocationValue } from '@qms/core'
+import { createEmptyLocationValue } from '@qms/core'
 import { useCampsReal } from '@/features/camps/hooks/useCampsReal'
 import { useVoidCamp } from '@/features/camps/hooks/useVoidCamp'
 import { useApproveVoidCamp } from '@/features/camps/hooks/useApproveVoidCamp'
@@ -17,12 +17,12 @@ import { voidCampFormSchema } from '@/features/projects/schemas/voidCamp.schemas
 import CampDoctorSearchPicker from '@/features/camps/components/CampDoctorSearchPicker'
 import CampMrPicker from '@/features/camps/components/CampMrPicker'
 import InventoryMasterMultiPicker from '@/features/inventory/real/components/InventoryMasterMultiPicker'
-import LocationPicker from '@/components/widgets/location-picker/LocationPicker'
-import LocationAddressFields from '@/components/widgets/location-picker/LocationAddressFields'
+import { LocationPicker, LocationAddressFields } from '@qms/ui'
 import CampStatusPillReal from '@/components/widgets/camp/CampStatusPillReal'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import ENV from '@/config/env'
 import { Label } from '@/components/ui/label'
 import DatePicker from '@/components/ui/DatePicker'
 import { Textarea } from '@/components/ui/textarea'
@@ -43,12 +43,8 @@ interface VoidCampDialogProps {
   onClose: () => void
 }
 
-// WF-4 (CLAUDE.md) — "Camp done without PO → Add void camp → Upline approval → PO received →
-// Admin maps PO → Reconciled." Matches the prototype's own per-project "Add void camp" placement
-// (projects-manager.js openVoidCamp), but wires the REAL two-step backend flow instead of the
-// prototype's single combined add+approve step: POST /camps/void-camp lands the camp in
-// `requested`; a separate PATCH .../approve-void (camp:manage OR tenant:manage) moves it to
-// `closed` with its own reason, recorded in real stage history — not a free-text "approved by" field.
+// Wires the real two-step backend flow (WF-4): POST /camps/void-camp lands `requested`; a
+// separate PATCH .../approve-void moves it to `closed` with its own recorded reason.
 const ApproveRow = ({ camp }: { camp: CampEntity }) => {
   const [reasonOpen, setReasonOpen] = useState(false)
   const [reason, setReason] = useState('')
@@ -156,9 +152,8 @@ const VoidCampDialog = ({ project, onClose }: VoidCampDialogProps) => {
       setFormError('This project has no resolved client/division — cannot record a void camp.')
       return
     }
-    // Validates the FULL location contract the backend requires (addressLine1 + coordinates, not
-    // just city/state/pincode) — catches a manually-typed address with no map pin selected before
-    // it reaches the backend as a 400.
+    // Validates the full location contract (addressLine1 + coordinates) — catches a manually-typed
+    // address with no map pin selected before it reaches the backend as a 400.
     const result = voidCampFormSchema.safeParse({ type, doctorId, date, timeSlot, location, mailUrl })
     if (!result.success) {
       setFormError(result.error.issues[0]?.message ?? 'Please complete the required fields.')
@@ -278,7 +273,7 @@ const VoidCampDialog = ({ project, onClose }: VoidCampDialogProps) => {
 
             <div className="space-y-2">
               <Label className="text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: 'var(--qms-text-muted)' }}>Location *</Label>
-              <LocationPicker value={location} onChange={setLocation} defaultCountry="India" countryCode="IN" />
+              <LocationPicker apiKey={ENV.Maps.ApiKey} mapId={ENV.Maps.MapId} value={location} onChange={setLocation} defaultCountry="India" countryCode="IN" />
               <LocationAddressFields value={location} onChange={setLocation} defaultCountry="India" />
             </div>
 

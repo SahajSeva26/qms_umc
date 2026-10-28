@@ -1,7 +1,7 @@
 import { employeeFieldsSchema, createEmployeeFieldsSchema, type EmployeeFieldsValues } from '@/features/access-management/employee/schemas/employee.schemas'
 import { useReshapingResolver } from '@/hooks/useReshapingResolver'
 import type { BankDetails, EmployeeProfile } from '@/types/accessManagement.types'
-import type { LocationValue } from '@/types/location.types'
+import type { LocationValue } from '@qms/core'
 
 // The backend's optional string fields are `.min(1).optional()` or a format regex — undefined is
 // fine, but a plain '' from an untouched <Input> fails validation with a 400.

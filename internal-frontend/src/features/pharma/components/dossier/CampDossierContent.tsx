@@ -11,9 +11,8 @@ import { CAMP_TIME_SLOT_LABEL } from '@/types/campTimeSlot.constants'
 import { CAMP_TYPE_LABEL } from '@/types/campReal.types'
 import type { CampEntity, CampPopulatedDoctor, CampPopulatedProject, CampPopulatedRole } from '@/types/campReal.types'
 
-// Clones the prototype's camp-detail.js `cd-*` design system — a stack of detail cards, each
-// an icon-badge header + body — rather than the app's own KeyValueGrid/Section pattern used
-// elsewhere, so this screen visually matches the prototype dossier the user is cloning.
+// Clones the prototype's cd-* design system — a stack of detail cards — rather than this app's
+// own KeyValueGrid/Section pattern, so the dossier visually matches the prototype it's cloning.
 
 const populatedRole = (r: CampEntity['fo']): CampPopulatedRole | null => (r && typeof r !== 'string' ? r : null)
 const populatedDoctor = (d: CampEntity['doctor']): CampPopulatedDoctor | null => (d && typeof d !== 'string' ? d : null)
@@ -205,9 +204,8 @@ const PhotosCard = () => (
   </Card>
 )
 
-// Shell only for this round — the real table needs screenings-per-camp + tests-per-screening
-// (N+1) plus PII redaction; flagged in BACKEND_REQUEST_camp-dossier.md #2. Matches the
-// prototype's column set so the real data can drop straight in later.
+// Shell only — the real table needs screenings-per-camp + tests-per-screening plus PII redaction.
+// Matches the prototype's column set so real data can drop straight in later.
 const PatientsCard = () => (
   <Card title="Patients · results · interpretation" icon={FiMapPin} color={CARD_ACCENTS.patients}>
     <div className="overflow-x-auto">
@@ -234,15 +232,20 @@ const RatingCard = ({ camp }: { camp: CampEntity }) => {
   const isOwnMr = !!session?.role.id && session.role.id === mrId
   const canRate = isOwnMr && camp.status === 'closed'
 
-  const { items, isLoading } = useRatings({ camp: camp.id }, { enabled: canRate || camp.status === 'closed' })
+  const { items, isLoading, error, refetch } = useRatings({ camp: camp.id }, { enabled: canRate || camp.status === 'closed' })
   const existing = items[0] ?? null
 
-  if (!canRate && !existing) return null
+  if (!canRate && !existing && !error) return null
 
   return (
     <Card title="FO / camp rating" icon={FiStar} color={CARD_ACCENTS.rating}>
       {isLoading ? (
         <div className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>Loading…</div>
+      ) : error ? (
+        <div className="flex items-center justify-between gap-2 text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>
+          <span>Couldn't load this camp's rating.</span>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </div>
       ) : existing ? (
         <>
           <RatingDisplay rating={existing} />
@@ -267,12 +270,8 @@ interface CampDossierContentProps {
   camp: CampEntity
 }
 
-// The pharma-visible section order, exactly as researched from camp-detail.js's
-// renderCampDossier(): Header → Camp details → Doctor details → MR details → FO/Dietitian →
-// Camp photos → Patients/results/interpretation → FO/camp rating. Internal-only sections
-// (Sales team, PO, Timing, Consumables, Expenses, Payment, Reminders, Camp coordinator — the
-// last has no backing field in our model at all) are omitted entirely, matching the prototype's
-// own return '' behavior for a pharma viewer.
+// Section order from camp-detail.js's renderCampDossier(). Internal-only sections (sales team,
+// PO, timing, expenses, etc.) are omitted, matching the prototype's own pharma-viewer behavior.
 const CampDossierContent = ({ camp }: CampDossierContentProps) => (
   <div style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
     <DossierHeader camp={camp} />

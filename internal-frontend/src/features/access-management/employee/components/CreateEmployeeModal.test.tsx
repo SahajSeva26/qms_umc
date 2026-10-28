@@ -7,8 +7,13 @@ import { AxiosError } from 'axios'
 import CreateEmployeeModal from './CreateEmployeeModal'
 
 // LocationPicker/LocationAddressFields are Google Maps/geocoder-backed and awkward to render in jsdom — stubbed per EditEmployeeEditor.test.tsx.
-vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({ default: () => null }))
-vi.mock('@/components/widgets/location-picker/LocationAddressFields', () => ({ default: () => null }))
+// @qms/ui exports many things this file also uses (Button, etc.) — spread the real module and
+// override only the two location components, rather than mocking the whole package.
+vi.mock('@qms/ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@qms/ui')>()),
+  LocationPicker: () => null,
+  LocationAddressFields: () => null,
+}))
 
 function confirmedRejection() {
   const err = new AxiosError('Bad Request')

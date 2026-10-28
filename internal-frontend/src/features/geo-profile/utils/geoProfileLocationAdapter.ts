@@ -1,4 +1,4 @@
-import type { LocationValue } from '@/types/location.types'
+import type { LocationValue } from '@qms/core'
 import type { GeoCoordinates, GeoProfileAddressFields, GeoProfileAddressPayloadFields, GeoProfileEntity } from '@/types/geoProfile.types'
 
 // Hydrates the picker's LocationValue from a loaded profile's coordinates + address fields.

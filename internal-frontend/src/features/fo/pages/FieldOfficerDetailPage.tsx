@@ -11,15 +11,14 @@ import { usePermission } from '@/hooks/usePermission'
 import { FO_ROUTES } from '@/features/fo/fo.paths'
 import RoleStatusPill from '@/features/access-management/role/components/RoleStatusPill'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
-import LocationPicker from '@/components/widgets/location-picker/LocationPicker'
-import LocationAddressFields from '@/components/widgets/location-picker/LocationAddressFields'
+import { LocationPicker, LocationAddressFields, REQUIRED_ADDRESS_FIELDS, type LocationResolutionState } from '@qms/ui'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { REQUIRED_ADDRESS_FIELDS, type LocationResolutionState } from '@/components/widgets/location-picker/location.types'
 import type { RoleEntity, RolePopulatedUser } from '@/types/accessManagement.types'
-import type { LocationValue } from '@/types/location.types'
+import type { LocationValue } from '@qms/core'
 import type { GeoProfileEntity } from '@/types/geoProfile.types'
+import ENV from '@/config/env'
 
 function userField<K extends keyof RolePopulatedUser>(user: RoleEntity['user'], key: K): RolePopulatedUser[K] | undefined {
   if (user === null || typeof user === 'string') return undefined
@@ -37,13 +36,8 @@ function locationMissingRequiredAddress(location: LocationValue | null): boolean
   return REQUIRED_ADDRESS_FIELDS.some((f) => !location[f.key].trim())
 }
 
-// field-officer Roles live only under the platform tenant — same rule
-// FieldOfficersPage.tsx enforces, since the route's own permission gate
-// (tenant:manage/tenant:admin) alone would also admit a customer-tenant admin
-// holding the same codes. Kept as a lightweight outer gate (no data hooks of
-// its own) so a customer-tenant admin who navigates here directly is
-// redirected before FieldOfficerDetailContent's role/GeoProfile queries ever
-// fire, not after.
+// field-officer Roles live only under the platform tenant — the route's own permission gate
+// alone would also admit a customer-tenant admin, so this redirects before any data query fires.
 const FieldOfficerDetailPage = () => {
   const { session } = usePermission()
 
@@ -54,11 +48,8 @@ const FieldOfficerDetailPage = () => {
   return <FieldOfficerDetailContent />
 }
 
-// Card 1 of what will eventually be several: all-info + the location picker,
-// kept together since a location edit needs no permission beyond viewing the
-// FO today. Later, permission-gated additions (e.g. camp history, device
-// assignments) belong in their own sibling card(s), each independently
-// gate-able — not folded into this one.
+// Card 1 of what will eventually be several — later permission-gated additions (camp history,
+// device assignments) belong in their own sibling card(s), not folded into this one.
 const FieldOfficerDetailContent = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -68,22 +59,10 @@ const FieldOfficerDetailContent = () => {
   const { data: roleData, isLoading: roleLoading, error: roleError, refetch: refetchRole } = useRole(id)
   const fo = roleData?.data ?? null
 
-  // The route only guarantees a platform-tenant session, not that the
-  // requested Role id is actually a field-officer — a platform admin can
-  // still open any Role id directly (e.g. a sales-rep's). The backend's
-  // GeoProfile create path doesn't validate this either (confirmed: it
-  // checks the Role exists and the 1:1 uniqueness, never that the linked
-  // Role's RoleType matches the profile's own `type`), so this frontend
-  // check is the only thing stopping a mismatched GeoProfile from being
-  // created via this page. Logged as a backend gap in md-files/TODO.md
-  // (gitignored, local-only — not visible in this diff).
-  //
-  // isFieldOfficer is deliberately three-valued (not a plain boolean) so the
-  // GeoProfile query below can be gated on "confirmed FO", not "not yet known
-  // to be non-FO" — while `fo` is still loading, isNotFieldOfficer alone would
-  // read false and let the query fire for a role that turns out to be a
-  // sales-rep once useRole resolves.
+  // A platform admin can open any Role id directly — the backend's GeoProfile create doesn't
+  // validate RoleType match either, so this frontend check is the only real one.
   const isFieldOfficer = fo ? isFieldOfficerRole(fo) : null
+  // Three-valued so the query below gates on "confirmed FO", not "not yet known to be non-FO".
   const isNotFieldOfficer = isFieldOfficer === false
 
   const {
@@ -231,9 +210,7 @@ interface LocationFormProps {
   geoProfile: GeoProfileEntity | null
 }
 
-// Handles both cases a Role can be in — an existing 1:1 GeoProfile to edit,
-// or none yet (create-on-save) — since the link is optional, not guaranteed
-// to exist just because the Role does.
+// Handles both cases — an existing 1:1 GeoProfile to edit, or none yet (create-on-save).
 const LocationForm = ({ roleId, geoProfile }: LocationFormProps) => {
   const isCreateMode = !geoProfile
   const createGeoProfile = useCreateGeoProfile()
@@ -286,6 +263,8 @@ const LocationForm = ({ roleId, geoProfile }: LocationFormProps) => {
   return (
     <div>
       <LocationPicker
+        apiKey={ENV.Maps.ApiKey}
+        mapId={ENV.Maps.MapId}
         value={location}
         onChange={handleLocationChange}
         onResolutionStateChange={setLocationResolution}

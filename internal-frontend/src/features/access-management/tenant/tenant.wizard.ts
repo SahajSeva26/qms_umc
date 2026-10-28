@@ -1,7 +1,7 @@
 import { useReshapingResolver } from '@/hooks/useReshapingResolver'
 import { createTenantSchema } from '@/features/access-management/tenant/schemas/tenant.schemas'
 import type { CreateTenantPayload } from '@/types/accessManagement.types'
-import type { LocationValue } from '@/types/location.types'
+import type { LocationValue } from '@qms/core'
 
 export interface TenantFormValues {
   name: string
@@ -68,10 +68,8 @@ export const useTenantFormResolver = () =>
     nestedFieldMaps: { owner: OWNER_FIELD_TO_FORM_FIELD, address: ADDRESS_FIELD_TO_FORM_FIELD },
   })
 
-// Drives each step's trigger([...]) call on Next — one array per CreateTenantDialog step.
-// Must list every field actually rendered on that step — a field left out here can still fail
-// validation on final submit while showing no error anywhere the user can see (gst/businessLifetime
-// were missing here; see CreateTenantDialog's onInvalid for the remaining defense-in-depth).
+// Drives each step's trigger([...]) call on Next — must list every field actually rendered on
+// that step, or a left-out field can fail validation on submit with no visible error anywhere.
 export const CREATE_TENANT_STEP_FIELD_NAMES: (keyof TenantFormValues)[][] = [
   ['name', 'salesPerson', 'businessLifetime', 'gst'],
   ['address'],

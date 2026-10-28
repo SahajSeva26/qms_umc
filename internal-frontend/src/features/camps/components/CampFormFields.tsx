@@ -17,11 +17,10 @@ import type { DoctorEntity } from '@/types/doctor.types'
 import { DOCTOR_RANGE_KM } from '@/types/doctor.types'
 import { CAMP_TIME_SLOT_LABEL } from '@/types/campTimeSlot.constants'
 import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
-import type { LocationValue } from '@/types/location.types'
-import LocationPicker from '@/components/widgets/location-picker/LocationPicker'
-import LocationAddressFields from '@/components/widgets/location-picker/LocationAddressFields'
-import type { LocationResolutionState } from '@/components/widgets/location-picker/location.types'
+import type { LocationValue } from '@qms/core'
+import { LocationPicker, LocationAddressFields, type LocationResolutionState } from '@qms/ui'
 import { haversineDistanceKm } from '@/utils/geo'
+import ENV from '@/config/env'
 
 const TYPE_OPTIONS: { value: CampType; label: string }[] = CAMP_TYPE_VALUES.map((value) => ({ value, label: CAMP_TYPE_LABEL[value] }))
 
@@ -103,9 +102,8 @@ const CampFormFields = ({
   const deviceIds = devices ? devices.split(',').map((d) => d.trim()).filter(Boolean) : []
   const [locationHint, setLocationHint] = useState<string | null>(null)
 
-  // Create-mode only — defaults the camp location to the picked doctor's own address, and flags
+  // Create-mode only — defaults the camp location to the picked doctor's address, and flags
   // (rather than silently keeping) a doctor who falls out of range after a manual location edit.
-  // Edit mode keeps its existing flat layout; an already-placed camp has no "pick order" to enforce.
   const [doctorLocation, setDoctorLocation] = useState<LocationValue | null>(null)
   const [doctorOutOfRange, setDoctorOutOfRange] = useState(false)
 
@@ -248,6 +246,8 @@ const CampFormFields = ({
           </p>
         )}
         <LocationPicker
+          apiKey={ENV.Maps.ApiKey}
+          mapId={ENV.Maps.MapId}
           value={location}
           onChange={mode === 'create' ? handleLocationChange : (v: LocationValue) => setField('location', v)}
           onResolutionStateChange={onLocationResolutionChange}

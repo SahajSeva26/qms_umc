@@ -11,8 +11,8 @@ import { haversineDistanceKm } from '@/utils/geo'
 import type { BookCampPayload, CampMutationResponseEntity, CampType } from '@/types/campReal.types'
 import type { ApiResponse } from '@/types/common.types'
 import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
-import type { LocationValue } from '@/types/location.types'
-import type { LocationResolutionState } from '@/components/widgets/location-picker/location.types'
+import type { LocationValue } from '@qms/core'
+import { LocationPicker, LocationAddressFields, type LocationResolutionState } from '@qms/ui'
 import type { DoctorEntity } from '@/types/doctor.types'
 import { DOCTOR_RANGE_KM } from '@/types/doctor.types'
 import DoctorDistancePicker from '@/features/pharma/components/DoctorDistancePicker'
@@ -20,12 +20,11 @@ import DoctorNameDivisionPicker from '@/features/pharma/components/DoctorNameDiv
 import MrPicker from '@/features/pharma/components/MrPicker'
 import { EditDoctorModal } from '@/features/doctors'
 import DayStripAvailability from '@/features/pharma/components/DayStripAvailability'
-import LocationPicker from '@/components/widgets/location-picker/LocationPicker'
-import LocationAddressFields from '@/components/widgets/location-picker/LocationAddressFields'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import SectionHeader from '@/components/ui/SectionHeader'
 import FieldErrorText from '@/components/ui/FieldErrorText'
+import ENV from '@/config/env'
 
 interface FormValues {
   mrId: string
@@ -117,9 +116,8 @@ const BookCampForm = ({ needsMrPicker, type, project, patientExpectation, patien
   // The picked doctor's OWN location, captured at pick time — the camp location defaults to this.
   // Once the doctor is cleared (or location is manually pushed out of range) this is cleared too.
   const [doctorLocation, setDoctorLocation] = useState<LocationValue | null>(null)
-  // Set once a manual location edit pushes the already-picked doctor more than DOCTOR_RANGE_KM
-  // away — switches the Doctor section into "out of range, re-pick" mode (distance-sorted,
-  // scoped to the NEW location) instead of silently keeping a doctor who can't serve this camp.
+  // Set once a manual edit pushes the picked doctor past DOCTOR_RANGE_KM — switches Doctor into
+  // a distance-sorted re-pick instead of silently keeping one who can't serve this camp.
   const [doctorOutOfRange, setDoctorOutOfRange] = useState(false)
 
   const {
@@ -145,7 +143,7 @@ const BookCampForm = ({ needsMrPicker, type, project, patientExpectation, patien
   const mrDivisionMismatch = needsMrPicker && !!watchedMrId && (mrDivisionId === null || mrDivisionId !== actingDivisionId)
 
 // Keyed on the coordinate pair, not object identity — LocationPicker can re-fire onChange
-  // with a new reference for the same point (e.g. an address-only edit).
+  // with a new reference for the same point.
   const coordKeyOf = (v: LocationValue | null) => (v?.coordinates ? `${v.coordinates[0]},${v.coordinates[1]}` : null)
 
   const handleSelectDoctor = (doctor: DoctorEntity | null) => {
@@ -155,16 +153,13 @@ const BookCampForm = ({ needsMrPicker, type, project, patientExpectation, patien
       return
     }
     setDoctorLocation(doctor.location)
-    // Defaults the camp location to the doctor's own address — still fully editable afterwards.
     // Goes straight through setValue, NOT handleLocationChange below — this is the doctor-driven
     // default itself, so it must never immediately re-trigger its own out-of-range check.
     setValue('location', doctor.location, { shouldDirty: true, shouldTouch: true, shouldValidate: true })
   }
 
-  // Shared by both the map picker and the manual address fields — whichever one the user actually
-  // used to change the location. Only a call to THIS function (never handleSelectDoctor's direct
-  // setValue above) re-checks the picked doctor's range, since only this path is a genuine
-  // user-driven location edit.
+  // Only a call to THIS function (never handleSelectDoctor's direct setValue above) re-checks the
+  // picked doctor's range — only this path is a genuine user-driven location edit.
   const handleLocationChange = (next: LocationValue) => {
     const prevCoordKey = coordKeyOf(location ?? null)
     const nextCoordKey = coordKeyOf(next)
@@ -347,9 +342,8 @@ const BookCampForm = ({ needsMrPicker, type, project, patientExpectation, patien
                 <span>The previously picked doctor isn't within {DOCTOR_RANGE_KM}km of this camp location — pick a doctor near the new location instead.</span>
               </div>
             )}
-            {/* Doctor selection is scoped by division, not the project — pickable regardless of
-                whether a project has been chosen yet. Only the out-of-range variant still needs a
-                real camp location to compute distance against. */}
+            {/* Doctor selection is scoped by division, not the project — pickable before a project
+                is chosen. Only the out-of-range variant needs a real location to compute distance. */}
             <Controller
               control={control}
               name="doctorId"
@@ -412,6 +406,8 @@ const BookCampForm = ({ needsMrPicker, type, project, patientExpectation, patien
           render={({ field }) => (
             <div className="space-y-2">
               <LocationPicker
+                apiKey={ENV.Maps.ApiKey}
+                mapId={ENV.Maps.MapId}
                 value={field.value}
                 onChange={handleLocationChange}
                 onResolutionStateChange={setLocationResolution}

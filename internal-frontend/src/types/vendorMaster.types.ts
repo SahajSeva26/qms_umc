@@ -1,5 +1,5 @@
 // Matches backend/vendor-master exactly — a global, platform-only registry (no tenant scoping).
-import type { LocationValue } from '@/types/location.types'
+import type { LocationValue } from '@qms/core'
 
 export type VendorStatus = 'active' | 'inactive'
 

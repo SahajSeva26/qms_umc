@@ -11,7 +11,7 @@ import {
   type CreateVendorMasterFormValues,
   type UpdateVendorMasterFormValues,
 } from '@/features/inventory/real/schemas/vendorMaster.schemas'
-import LocationAddressFields from '@/components/widgets/location-picker/LocationAddressFields'
+import { LocationAddressFields } from '@qms/ui'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,9 +19,8 @@ import FieldLabel from '@/components/ui/FieldLabel'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import MutationStatusBanner from '@/components/ui/MutationStatusBanner'
 
-// An empty string is "provided but invalid" to the backend's email().optional() — must be an absent key, not ''.
-// Empty list -> undefined (omit the key) is correct for CREATE only — edit has its own wrapper below,
-// since there an empty list is a real, intentional "remove all contacts", not "nothing to send".
+// Empty list -> undefined (omit the key) is correct for CREATE only — edit has its own wrapper
+// below, since there an empty list is a real "remove all contacts", not "nothing to send".
 function sanitizeContacts(contacts: VendorContact[] | undefined): VendorContact[] | undefined {
   if (!contacts?.length) return undefined
   return contacts.map((c) => ({

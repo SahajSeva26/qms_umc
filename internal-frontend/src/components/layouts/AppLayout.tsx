@@ -1,6 +1,6 @@
 import { Suspense, useState } from 'react'
 import { Outlet, Navigate, useLocation } from 'react-router-dom'
-import { RouteFallback, SessionLoading, SessionRecovery } from '@qms/ui'
+import { RouteFallback, SessionLoading, SessionRecovery, GoogleMapsProvider } from '@qms/ui'
 import { useSession } from '@/hooks/useSession'
 import { AUTH_ROUTES } from '@/features/auth/auth.paths'
 import { getPharmaRoleMeta } from '@/features/pharma/pharma.constants'
@@ -8,7 +8,7 @@ import { PHARMA_FIELD_ROLE_TYPE_CODES } from '@/lib/access/pharmaAccess'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 import FeedbackWidget from '@/features/qa-feedback/components/FeedbackWidget'
-import GoogleMapsProvider from '@/components/widgets/location-picker/GoogleMapsProvider'
+import ENV from '@/config/env'
 
 const SB_INTENT_KEY = 'qms.sb.intent'
 
@@ -76,7 +76,7 @@ const AppLayout = () => {
   }
 
   return (
-    <GoogleMapsProvider>
+    <GoogleMapsProvider apiKey={ENV.Maps.ApiKey}>
       <div className="app-bg flex h-dvh overflow-hidden">
         <div className="hidden lg:flex shrink-0">
           <Sidebar collapsed={collapsed} onToggle={handleToggle} />

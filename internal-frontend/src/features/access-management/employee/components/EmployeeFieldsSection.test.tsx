@@ -12,8 +12,11 @@ vi.mock('@/components/ui/DatePicker', () => ({
   ),
 }))
 
-vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({ default: () => null }))
-vi.mock('@/components/widgets/location-picker/LocationAddressFields', () => ({ default: () => null }))
+vi.mock('@qms/ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@qms/ui')>()),
+  LocationPicker: () => null,
+  LocationAddressFields: () => null,
+}))
 
 function Harness({ defaultValues, onSubmit }: { defaultValues: EmployeeFieldsValues; onSubmit: (v: EmployeeFieldsValues) => void }) {
   const { resolver, parsePayload } = useEmployeeFieldsResolver()

@@ -31,8 +31,9 @@ vi.mock('@/features/inventory/real/components/InventoryMasterMultiPicker', () =>
 }))
 // A "Pick location" button sets addressLine1 + coordinates, standing in for an actual map-pin
 // drop — lets tests exercise both "no pin picked" (coordinates missing) and the full success path.
-vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
-  default: ({ value, onChange }: { value: { addressLine1: string }; onChange: (v: unknown) => void }) => (
+vi.mock('@qms/ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@qms/ui')>()),
+  LocationPicker: ({ value, onChange }: { value: { addressLine1: string }; onChange: (v: unknown) => void }) => (
     <button
       type="button"
       onClick={() => onChange({ ...value, addressLine1: '12 MG Road', coordinates: [72.8777, 19.076] })}
@@ -40,9 +41,7 @@ vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
       Pick location
     </button>
   ),
-}))
-vi.mock('@/components/widgets/location-picker/LocationAddressFields', () => ({
-  default: ({ value, onChange }: { value: { city: string; state: string; pincode: string }; onChange: (v: unknown) => void }) => (
+  LocationAddressFields: ({ value, onChange }: { value: { city: string; state: string; pincode: string }; onChange: (v: unknown) => void }) => (
     <div>
       <input aria-label="City" value={value.city} onChange={(e) => onChange({ ...value, city: e.target.value })} />
       <input aria-label="State" value={value.state} onChange={(e) => onChange({ ...value, state: e.target.value })} />

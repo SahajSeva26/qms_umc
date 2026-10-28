@@ -11,8 +11,9 @@ import type { DoctorEntity } from '@/types/doctor.types'
 vi.mock('@/hooks/useSession')
 
 // Mocks the map (needs real Google Maps creds) with a button firing the same onChange(LocationValue) contract.
-vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
-  default: ({ value, onChange }: { value: unknown; onChange: (v: unknown) => void }) => (
+vi.mock('@qms/ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@qms/ui')>()),
+  LocationPicker: ({ value, onChange }: { value: unknown; onChange: (v: unknown) => void }) => (
     <button
       type="button"
       onClick={() => onChange({ ...(value as object ?? {}), coordinates: [73.8567, 18.5204] })}

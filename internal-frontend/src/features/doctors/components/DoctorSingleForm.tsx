@@ -7,29 +7,35 @@ import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/sonner'
 import { Input } from '@/components/ui/input'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
-import LocationPicker from '@/components/widgets/location-picker/LocationPicker'
-import LocationAddressFields from '@/components/widgets/location-picker/LocationAddressFields'
-import type { LocationResolutionState } from '@/components/widgets/location-picker/location.types'
+import { LocationPicker, LocationAddressFields, type LocationResolutionState } from '@qms/ui'
 import DoctorScopeFields from '@/features/doctors/components/DoctorScopeFields'
 import type { DoctorCreateScope } from '@/features/doctors/hooks/useDoctorCreateScope'
 import { SPECIALIZATION_OPTIONS } from '@/features/doctors/doctors.ui'
 import {
-  createDoctorFormSchema,
-  editDoctorFormSchema,
-  emptyCreateDoctorFormValues,
+  createDoctorFormSchemaFor,
+  editDoctorFormSchemaFor,
+  emptyCreateDoctorFormValues as sharedEmptyCreateDoctorFormValues,
   fromDoctorEntity,
   toCreateDoctorPayload,
   toUpdateDoctorPayload,
   type CreateDoctorFormValues,
   type EditDoctorFormValues,
-} from '@/features/doctors/schemas/doctorForm'
+} from '@qms/core'
 import type { CreateDoctorPayload, DoctorEntity, DoctorSpecialization, DoctorStatus, UpdateDoctorPayload } from '@/types/doctor.types'
-import type { LocationValue } from '@/types/location.types'
+import type { LocationValue } from '@qms/core'
+import ENV from '@/config/env'
 
 const STATUS_OPTIONS: { value: DoctorStatus; label: string }[] = [
   { value: 'active', label: 'Active' },
   { value: 'inactive', label: 'Inactive' },
 ]
+
+// Shared schema module (@qms/core) is generic over the specialization union — bind it to this
+// app's own DoctorSpecialization values once, here, rather than at every call site.
+const SPECIALIZATION_VALUES = SPECIALIZATION_OPTIONS.map((o) => o.value) as [DoctorSpecialization, ...DoctorSpecialization[]]
+const createDoctorFormSchema = createDoctorFormSchemaFor(SPECIALIZATION_VALUES)
+const editDoctorFormSchema = editDoctorFormSchemaFor(SPECIALIZATION_VALUES)
+const emptyCreateDoctorFormValues = sharedEmptyCreateDoctorFormValues<DoctorSpecialization>('cp')
 
 interface DoctorSingleFormProps {
   doctor: DoctorEntity | null
@@ -41,11 +47,8 @@ interface DoctorSingleFormProps {
   isSaving: boolean
 }
 
-// Thin dispatcher only — no hooks of its own. Conditionally choosing which useForm
-// generic/resolver to call within one component body would violate the Rules of Hooks even
-// though the modal always remounts per-doctor (EditDoctorModal's key={doctor?.id ?? '__new__'}
-// pattern) — a branch inside one component is still a hook-order violation regardless of
-// remounting, so create/edit are two genuinely separate components instead.
+// Thin dispatcher only — branching useForm's generic/resolver inside one component body would
+// violate the Rules of Hooks, so create/edit are two separate components instead.
 const DoctorSingleForm = (props: DoctorSingleFormProps) =>
   props.doctor
     ? (
@@ -88,13 +91,13 @@ const CreateDoctorSingleForm = ({ scope, forcedTenant, forcedDivision, onSubmit,
     handleSubmit,
     control,
     formState: { errors, touchedFields, isSubmitted, isSubmitting },
-  } = useForm<CreateDoctorFormValues>({
+  } = useForm<CreateDoctorFormValues<DoctorSpecialization>>({
     resolver: zodResolver(createDoctorFormSchema),
     mode: 'onChange',
     defaultValues: emptyCreateDoctorFormValues,
   })
 
-  const fieldError = (field: keyof CreateDoctorFormValues) =>
+  const fieldError = (field: keyof CreateDoctorFormValues<DoctorSpecialization>) =>
     (touchedFields[field] || isSubmitted) ? errors[field]?.message : undefined
 
   const locationErrorMessage = (touchedFields.location || isSubmitted)
@@ -104,9 +107,8 @@ const CreateDoctorSingleForm = ({ scope, forcedTenant, forcedDivision, onSubmit,
   const onFormSubmit = handleSubmit(async (values) => {
     setFormError(null)
 
-    // Same two-state block used by NearestGeoProfilesPage/CampDetailPageReal's own save/search
-    // handlers — a failed or still-resolving pin must never be allowed through, since either
-    // could leave stale/incomplete address data sitting in the submitted location.
+    // A failed or still-resolving pin must never be allowed through — either could leave
+    // stale/incomplete address data in the submitted location.
     if (locationResolution === 'loading') {
       setFormError('Still resolving the picked location — wait a moment and try again')
       return
@@ -185,6 +187,8 @@ const CreateDoctorSingleForm = ({ scope, forcedTenant, forcedDivision, onSubmit,
             render={({ field }) => (
               <>
                 <LocationPicker
+                  apiKey={ENV.Maps.ApiKey}
+                  mapId={ENV.Maps.MapId}
                   value={(field.value as LocationValue | undefined) ?? null}
                   onChange={field.onChange}
                   onResolutionStateChange={setLocationResolution}
@@ -238,7 +242,7 @@ const EditDoctorSingleForm = ({ doctor, onSubmit, onCancel, isSaving }: EditDoct
     setError,
     clearErrors,
     formState: { errors, dirtyFields, isSubmitting },
-  } = useForm<EditDoctorFormValues>({
+  } = useForm<EditDoctorFormValues<DoctorSpecialization>>({
     resolver: zodResolver(editDoctorFormSchema),
     mode: 'onChange',
     defaultValues: fromDoctorEntity(doctor),
@@ -246,22 +250,15 @@ const EditDoctorSingleForm = ({ doctor, onSubmit, onCancel, isSaving }: EditDoct
 
   const locationErrorMessage = errors.location?.coordinates?.message ?? errors.location?.message
 
-  // This IS the <form>'s onSubmit — `handleSubmit` is RHF's own wrapper; the inner callback is
-  // async and awaits onSubmit so RHF's formState.isSubmitting stays true for the full round
-  // trip (client validation AND the coordinator's mutateAsync), closing the double-submit
-  // window a synchronous callback would leave open.
+  // The async inner callback awaits onSubmit so isSubmitting stays true for the full round trip,
+  // closing the double-submit window a synchronous callback would leave open.
   const onFormSubmit = handleSubmit(async (values) => {
     setFormError(null)
-    // Clear any manually-set field errors from a PRIOR failed submit attempt first — RHF does
-    // not auto-clear a manually setError'd field the way it clears its own resolver-driven
-    // errors, so without this a stale message could keep showing even after the user fixed
-    // that field and this attempt would otherwise succeed.
+    // RHF doesn't auto-clear a manually setError'd field the way it clears resolver-driven
+    // errors — without this a stale message could outlive the fix that would otherwise succeed.
     clearErrors(['email', 'mobile', 'location'])
 
-    // Location-resolution guard — identical to create mode: today's actual behavior blocks
-    // BOTH create and edit while a pin is still resolving or has failed, not create only. Not a
-    // field error (no single field it belongs to — it's blocking on the external LocationPicker
-    // widget's own async state), so this alone uses the form-level formError slot.
+    // Not a field error (no single field it belongs to) — uses the form-level formError slot.
     if (locationResolution === 'loading') {
       setFormError('Still resolving the picked location — wait a moment and try again')
       return
@@ -276,9 +273,7 @@ const EditDoctorSingleForm = ({ doctor, onSubmit, onCancel, isSaving }: EditDoct
       setError('email', { message: 'Email cannot be cleared to blank — leave it unchanged, or enter a valid email' })
       return
     }
-    // Email — invalid format: only enforced once actually touched (an untouched legacy
-    // malformed email must round-trip on an unrelated edit — the bare z.string() schema field
-    // never catches this).
+    // Only enforced once touched — an untouched legacy malformed email must round-trip unchanged.
     if (dirtyFields.email && values.email.trim() && !z.string().email().safeParse(values.email.trim()).success) {
       setError('email', { message: 'Enter a valid email' })
       return
@@ -289,12 +284,8 @@ const EditDoctorSingleForm = ({ doctor, onSubmit, onCancel, isSaving }: EditDoct
       setError('mobile', { message: 'Mobile number must be at least 10 characters' })
       return
     }
-    // Location: `null` is fine only as the untouched legacy passthrough. If the user actively
-    // cleared a previously-populated location, that must be a blocked field error — mapping it
-    // to `location: undefined` would silently omit it from the request and leave the doctor's
-    // old location unchanged while reporting success. A touched-but-incomplete location never
-    // reaches this handler at all — RHF's own field-level validation against the location
-    // schema already blocks submit natively once any part of the object is dirtied.
+    // `null` is fine only as the untouched legacy passthrough — an actively-cleared location must
+    // block, or omitting it would silently leave the doctor's old location unchanged.
     if (dirtyFields.location && values.location === null) {
       setError('location', { message: 'Location cannot be cleared — pick a new location on the map, or leave it unchanged' })
       return
@@ -363,6 +354,8 @@ const EditDoctorSingleForm = ({ doctor, onSubmit, onCancel, isSaving }: EditDoct
             render={({ field }) => (
               <>
                 <LocationPicker
+                  apiKey={ENV.Maps.ApiKey}
+                  mapId={ENV.Maps.MapId}
                   value={field.value as LocationValue | null}
                   onChange={field.onChange}
                   onResolutionStateChange={setLocationResolution}

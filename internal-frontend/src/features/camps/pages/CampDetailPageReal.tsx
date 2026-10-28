@@ -23,8 +23,8 @@ import DraftLoadingPlaceholder from '@/components/ui/DraftLoadingPlaceholder'
 import DraftResumeDecision from '@/components/ui/DraftResumeDecision'
 import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
 import type { ProjectEntity } from '@/types/project.types'
-import type { LocationValue } from '@/types/location.types'
-import type { LocationResolutionState } from '@/components/widgets/location-picker/location.types'
+import type { LocationValue } from '@qms/core'
+import type { LocationResolutionState } from '@qms/ui'
 import { CAMP_TYPE_VALUES, type CampType } from '@/types/campReal.types'
 import { allowedCampTypesForProjectTypes } from '@/types/project.types'
 
@@ -131,16 +131,13 @@ const CampDetailPageReal = () => {
   // Backend hard-400s create() when camp.type isn't in project.type[] (camp.service.ts) — narrow here to match.
   const allowedCampTypes = pickedProject ? allowedCampTypesForProjectTypes(pickedProject.type) : CAMP_TYPE_VALUES
 
-  // Covers the resume-draft gap: only the project id/label were persisted, not the full
-  // ProjectEntity (it isn't stored at all) — re-fetch it once `project` is known but unpicked.
-  // Set during render, not an effect — matches this file's draftMode derivation above.
+  // Only the project id/label were persisted in a resumed draft — re-fetch the full ProjectEntity.
   const resumingProjectId = !pickedProject ? project || undefined : undefined
   const { data: resumedProjectData, isLoading: resumedProjectLoading, isError: resumedProjectErrored } = useProjectDetailShared(resumingProjectId)
   if (resumedProjectData?.data && !pickedProject) {
     const resumed = resumedProjectData.data
-    // A route-locked type must also be one the resumed project actually offers — otherwise the
-    // type-lock fix above forces e.g. 'diet' while this project only allows 'screening', and
-    // handleSave would silently submit a project/type combination the backend 400s on.
+    // A route-locked type must also be one the resumed project actually offers, or handleSave
+    // would silently submit a project/type combination the backend 400s on.
     if (lockedTypeValue && !allowedCampTypesForProjectTypes(resumed.type).includes(lockedTypeValue)) {
       setField('project', '')
       setProjectLabelState('')

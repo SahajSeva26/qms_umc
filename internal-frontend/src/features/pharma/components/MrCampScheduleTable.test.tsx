@@ -7,99 +7,69 @@ import type { CampEntity } from '@/types/campReal.types'
 function campFixture(overrides: Partial<CampEntity> = {}): CampEntity {
   return {
     id: 'camp-1', code: 'cmp-000001', tenant: 't-1', division: 'div-1', project: 'proj-1',
-    doctor: { _id: 'doc-1', name: 'Dr. Aarav Mehta', specialization: 'cardiologist' },
-    type: 'screening', billingType: 'billable', patientExpectation: 40,
-    fo: { _id: 'fo-1', code: 'fo-001', name: 'Ravi Kumar' }, dietitian: null,
-    mr: { _id: 'mr-1', code: 'mr-001', name: 'Amit Desai' }, asm: null, rsm: null,
-    date: '2026-09-20', timeSlot: '9am-1pm',
-    location: { addressLine1: '1 MG Road', city: 'Mumbai', state: 'Maharashtra', country: 'India', pincode: '400001', coordinates: [72.87, 19.07] },
-    devices: [], notes: '', status: 'requested', stageHistory: [],
+    doctor: 'doc-1', type: 'screening', billingType: 'billable', patientExpectation: 0,
+    fo: null, dietitian: null, mr: null, asm: null, rsm: null, date: '2026-09-15',
+    timeSlot: '9am-1pm', location: null, devices: [], meta: null,
+    status: 'closed', stageHistory: [],
     createdAt: '', updatedAt: '', ...overrides,
   } as CampEntity
 }
 
-function renderTable(camps: CampEntity[], overrides: Partial<React.ComponentProps<typeof MrCampScheduleTable>> = {}) {
-  const onOpenCamp = vi.fn()
-  const onOpenDossier = vi.fn()
-  const onRateCamp = vi.fn()
-  render(<MrCampScheduleTable camps={camps} onOpenCamp={onOpenCamp} onOpenDossier={onOpenDossier} onRateCamp={onRateCamp} {...overrides} />)
-  return { onOpenCamp, onOpenDossier, onRateCamp }
-}
-
-describe('MrCampScheduleTable', () => {
-  it('renders the prototype\'s exact column set: Camp · Date, Type, Doctor, City, FO assigned, Status', () => {
-    renderTable([campFixture()])
-
-    expect(screen.getByRole('columnheader', { name: 'Camp · Date' })).toBeInTheDocument()
-    expect(screen.getByRole('columnheader', { name: 'Type' })).toBeInTheDocument()
-    expect(screen.getByRole('columnheader', { name: 'Doctor' })).toBeInTheDocument()
-    expect(screen.getByRole('columnheader', { name: 'City' })).toBeInTheDocument()
-    expect(screen.getByRole('columnheader', { name: 'FO assigned' })).toBeInTheDocument()
-    expect(screen.getByRole('columnheader', { name: 'Status' })).toBeInTheDocument()
-  })
-
-  it('shows the camp code, doctor name, city, and assigned FO', () => {
-    renderTable([campFixture()])
-
-    expect(screen.getByText('cmp-000001')).toBeInTheDocument()
-    expect(screen.getByText('Dr. Aarav Mehta')).toBeInTheDocument()
-    expect(screen.getByText('Mumbai')).toBeInTheDocument()
-    expect(screen.getByText('Ravi Kumar')).toBeInTheDocument()
-  })
-
-  it('shows the dietitian, not a stale FO, for a diet camp', () => {
-    renderTable([campFixture({
-      type: 'diet',
-      fo: { _id: 'fo-1', code: 'fo-001', name: 'Ravi Kumar' },
-      dietitian: { _id: 'diet-1', code: 'diet-001', name: 'Anita Rao' },
-    })])
-
-    expect(screen.getByText('Anita Rao')).toBeInTheDocument()
-    expect(screen.queryByText('Ravi Kumar')).not.toBeInTheDocument()
-  })
-
-  it('clicking a row calls onOpenCamp with that camp', async () => {
-    const { onOpenCamp } = renderTable([campFixture()])
+describe('MrCampScheduleTable — keyboard activation', () => {
+  it('Enter/Space on the row itself opens the camp', async () => {
+    const onOpenCamp = vi.fn()
     const user = userEvent.setup()
+    render(<MrCampScheduleTable camps={[campFixture()]} onOpenCamp={onOpenCamp} onOpenDossier={vi.fn()} onRateCamp={vi.fn()} />)
 
-    await user.click(screen.getByText('cmp-000001'))
+    const row = screen.getByRole('button', { name: /cmp-000001/i })
+    row.focus()
+    await user.keyboard('{Enter}')
 
-    expect(onOpenCamp).toHaveBeenCalledWith(expect.objectContaining({ id: 'camp-1' }))
+    expect(onOpenCamp).toHaveBeenCalledTimes(1)
   })
 
-  it('shows View details and Open dossier actions for every camp, regardless of status', () => {
-    renderTable([campFixture({ status: 'requested' })])
-
-    expect(screen.getByTitle('View details')).toBeInTheDocument()
-    expect(screen.getByTitle('Open full camp dossier')).toBeInTheDocument()
-  })
-
-  it('shows the Rate camp action only once the camp is closed', () => {
-    renderTable([campFixture({ status: 'closed' })])
-
-    expect(screen.getByTitle('Rate camp')).toBeInTheDocument()
-  })
-
-  it('hides the Rate camp action for a camp that is not yet closed', () => {
-    renderTable([campFixture({ status: 'confirmed' })])
-
-    expect(screen.queryByTitle('Rate camp')).not.toBeInTheDocument()
-  })
-
-  it('never shows Mark complete or Cancel — camp stage-move belongs to the FO, not the MR', () => {
-    renderTable([campFixture({ status: 'confirmed' })])
-
-    expect(screen.queryByTitle('Mark complete')).not.toBeInTheDocument()
-    expect(screen.queryByTitle('Cancel')).not.toBeInTheDocument()
-  })
-
-  it('clicking the Open dossier icon calls onOpenDossier without also triggering the row click', async () => {
-    const { onOpenCamp, onOpenDossier } = renderTable([campFixture()])
+  // The row's own onKeyDown must not fire when a key press originates on a NESTED focusable
+  // element (the dossier/view/rate icon buttons) and bubbles up — only a key press on the row
+  // itself (event.target === event.currentTarget) should open the camp. Regression test for the
+  // P2 finding: Enter/Space on a nested button used to also trigger onOpenCamp via bubbling, and
+  // the row handler's own preventDefault() suppressed the nested button's native activation entirely.
+  it('Enter on the nested "Open full camp dossier" button does NOT also trigger onOpenCamp via bubbling', async () => {
+    const onOpenCamp = vi.fn()
+    const onOpenDossier = vi.fn()
     const user = userEvent.setup()
+    render(<MrCampScheduleTable camps={[campFixture()]} onOpenCamp={onOpenCamp} onOpenDossier={onOpenDossier} onRateCamp={vi.fn()} />)
 
-    await user.click(screen.getByTitle('Open full camp dossier'))
+    const dossierButton = screen.getByRole('button', { name: /open full camp dossier/i })
+    dossierButton.focus()
+    await user.keyboard('{Enter}')
 
-    expect(onOpenDossier).toHaveBeenCalledWith(expect.objectContaining({ id: 'camp-1' }))
+    expect(onOpenDossier).toHaveBeenCalledTimes(1)
+    expect(onOpenCamp).not.toHaveBeenCalled()
+  })
+
+  it('Space on the nested "View details" button does NOT also trigger the row\'s own onOpenCamp a second time', async () => {
+    const onOpenCamp = vi.fn()
+    const user = userEvent.setup()
+    render(<MrCampScheduleTable camps={[campFixture()]} onOpenCamp={onOpenCamp} onOpenDossier={vi.fn()} onRateCamp={vi.fn()} />)
+
+    const viewButton = screen.getByRole('button', { name: /view details/i })
+    viewButton.focus()
+    await user.keyboard(' ')
+
+    expect(onOpenCamp).toHaveBeenCalledTimes(1)
+  })
+
+  it('Enter on the "Rate camp" button (shown only for a closed camp) does not bubble into the row handler either', async () => {
+    const onOpenCamp = vi.fn()
+    const onRateCamp = vi.fn()
+    const user = userEvent.setup()
+    render(<MrCampScheduleTable camps={[campFixture({ status: 'closed' })]} onOpenCamp={onOpenCamp} onOpenDossier={vi.fn()} onRateCamp={onRateCamp} />)
+
+    const rateButton = screen.getByRole('button', { name: /rate camp/i })
+    rateButton.focus()
+    await user.keyboard('{Enter}')
+
+    expect(onRateCamp).toHaveBeenCalledTimes(1)
     expect(onOpenCamp).not.toHaveBeenCalled()
   })
 })

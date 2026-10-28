@@ -2,8 +2,6 @@ import { useState } from 'react'
 import { FiStar } from 'react-icons/fi'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { toast } from '@/components/ui/sonner'
-import { getApiErrorMessage } from '@/utils/apiError'
 import { useRateCamp } from '@/features/rating/hooks/useRateCamp'
 import { RATING_GROUNDS, type RatingGroundKey } from '@/features/rating/rating.constants'
 import type { RatingEntity } from '@/types/rating.types'
@@ -21,11 +19,8 @@ interface RateCampModalProps {
   onClose: () => void
 }
 
-// Clones the prototype's mr-portal.js window.mrRateCamp modal: one star-button row per ground
-// (onTime/attire/communication — our backend's actual fields, not the prototype's newer
-// onTime/campExecution/softSkill scheme). No reason/feedback inputs — the backend model has
-// no such fields. Always reachable (create when unrated, edit when already rated), unlike the
-// prototype which hides the action entirely once a camp is rated.
+// One star-button row per ground — no reason/feedback inputs, the backend model has none. Always
+// reachable (create when unrated, edit when already rated), unlike the prototype which hides it.
 const RateCampModal = ({ open, campId, existing, onClose }: RateCampModalProps) => {
   const [scores, setScores] = useState<Scores>(existing ? scoresFrom(existing) : emptyScores())
   const { rateCamp, updateRating, isSubmitting, isUpdating } = useRateCamp()
@@ -35,6 +30,7 @@ const RateCampModal = ({ open, campId, existing, onClose }: RateCampModalProps) 
 
   const allScored = RATING_GROUNDS.every((g) => scores[g.key] > 0)
 
+  // useRateCamp's own mutations already toast — this catch only stops an unhandled rejection.
   const handleSubmit = async () => {
     try {
       if (existing) {
@@ -43,8 +39,8 @@ const RateCampModal = ({ open, campId, existing, onClose }: RateCampModalProps) 
         await rateCamp({ camp: campId, ...scores })
       }
       onClose()
-    } catch (err) {
-      toast.error(getApiErrorMessage(err, 'Could not save the rating — try again.'))
+    } catch {
+      // already toasted by useRateCamp's onError
     }
   }
 

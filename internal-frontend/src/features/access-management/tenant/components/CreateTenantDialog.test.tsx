@@ -46,8 +46,11 @@ vi.mock('@/lib/file/file.upload', () => ({
 
 // LocationPicker needs real Google Maps credentials, unavailable in tests —
 // mock it to a button using the same onChange(LocationValue) contract a real pin-drop would use.
-vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
-  default: ({ value, onChange, onResolutionStateChange }: {
+// @qms/ui exports many other things (Button, etc.) — spread the real module and override only
+// LocationPicker, rather than mocking the whole package.
+vi.mock('@qms/ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@qms/ui')>()),
+  LocationPicker: ({ value, onChange, onResolutionStateChange }: {
     value: unknown
     onChange: (v: unknown) => void
     onResolutionStateChange?: (status: 'idle' | 'loading' | 'error') => void

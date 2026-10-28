@@ -4,8 +4,9 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { Tenant } from '@/types/accessManagement.types'
 
-vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
-  default: ({ value, onChange, onResolutionStateChange }: {
+vi.mock('@qms/ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@qms/ui')>()),
+  LocationPicker: ({ value, onChange, onResolutionStateChange }: {
     value: unknown
     onChange: (v: unknown) => void
     onResolutionStateChange?: (status: 'idle' | 'loading' | 'error') => void

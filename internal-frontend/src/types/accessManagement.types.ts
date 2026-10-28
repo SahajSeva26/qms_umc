@@ -1,7 +1,7 @@
 // Shared types for the PBAC domain — reflects the real backend permission
 // model (GET /auth/me), decoupled from auth.types.ts's frontend-only UserRole system.
 
-import type { LocationValue } from '@/types/location.types'
+import type { LocationValue } from '@qms/core'
 
 // ---------------------------------------------------------------------------
 // Permission catalog

@@ -11,7 +11,7 @@ import { usePermission } from '@/hooks/usePermission'
 import CampFormFields from '@/features/camps/components/CampFormFields'
 import { Button } from '@/components/ui/button'
 import type { CampEntity } from '@/types/campReal.types'
-import type { LocationResolutionState } from '@/components/widgets/location-picker/location.types'
+import type { LocationResolutionState } from '@qms/ui'
 
 // create and update are distinct permissions — a create-only actor can't edit this page.
 const CAMP_UPDATE_PERMISSIONS = ['camp:update', 'camp:manage', 'tenant:manage']

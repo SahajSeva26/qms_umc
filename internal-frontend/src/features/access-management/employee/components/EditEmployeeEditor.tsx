@@ -8,7 +8,7 @@ import { EMPLOYEE_ROUTES } from '@/features/access-management/employee/employee.
 import { useUpdateEmployee } from '@/features/access-management/employee/hooks/useUpdateEmployee'
 import { useEmployeeFieldsResolver, dropBlankStrings } from '@/features/access-management/employee/employeeForm'
 import type { BankDetails, EmployeeProfile } from '@/types/accessManagement.types'
-import type { LocationValue } from '@/types/location.types'
+import type { LocationValue } from '@qms/core'
 import EmployeeFieldsSection from '@/features/access-management/employee/components/EmployeeFieldsSection'
 import EmployeeStatusPill from '@/features/access-management/employee/components/EmployeeStatusPill'
 import type { EmployeeFieldsValues } from '@/features/access-management/employee/schemas/employee.schemas'

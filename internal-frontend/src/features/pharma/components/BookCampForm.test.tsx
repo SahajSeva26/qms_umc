@@ -14,8 +14,9 @@ vi.mock('@/hooks/useSession')
 // Mocks the map (needs real Google Maps creds) with buttons firing the same onChange/onResolutionStateChange contract.
 // A second "Set FAR test coordinates" button exercises the out-of-range re-pick flow without
 // needing real map interaction.
-vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
-  default: ({ value, onChange, onResolutionStateChange }: {
+vi.mock('@qms/ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@qms/ui')>()),
+  LocationPicker: ({ value, onChange, onResolutionStateChange }: {
     value: unknown
     onChange: (v: unknown) => void
     onResolutionStateChange?: (status: 'idle' | 'loading' | 'error') => void

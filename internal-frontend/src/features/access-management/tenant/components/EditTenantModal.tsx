@@ -13,11 +13,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import type { LocationValue } from '@/types/location.types'
-import LocationPicker from '@/components/widgets/location-picker/LocationPicker'
-import LocationAddressFields from '@/components/widgets/location-picker/LocationAddressFields'
-import type { LocationResolutionState } from '@/components/widgets/location-picker/location.types'
+import type { LocationValue } from '@qms/core'
+import { LocationPicker, LocationAddressFields, type LocationResolutionState } from '@qms/ui'
 import FieldErrorText from '@/components/ui/FieldErrorText'
+import ENV from '@/config/env'
 
 interface EditTenantModalProps {
   tenant: Tenant
@@ -191,6 +190,8 @@ const EditTenantModal = ({ tenant, canManageTenant, canManageSystem, onClose }: 
               render={({ field }) => (
                 <div className="space-y-2">
                   <LocationPicker
+                    apiKey={ENV.Maps.ApiKey}
+                    mapId={ENV.Maps.MapId}
                     value={field.value}
                     onChange={field.onChange}
                     onResolutionStateChange={setLocationResolution}

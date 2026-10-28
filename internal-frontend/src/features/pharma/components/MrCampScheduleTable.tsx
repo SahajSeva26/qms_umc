@@ -14,11 +14,8 @@ interface MrCampScheduleTableProps {
 const doctor = (d: CampEntity['doctor']): CampPopulatedDoctor | null => (d && typeof d !== 'string' ? d : null)
 const populatedRole = (r: CampEntity['fo']): CampPopulatedRole | null => (r && typeof r !== 'string' ? r : null)
 
-// Clones the prototype's mr-portal.js tabSchedule() table exactly: Camp·Date / Type / Doctor /
-// City / FO assigned / Status columns, plus the View/Open-dossier/Rate-camp row actions.
-// "Mark complete" and "Cancel" are omitted — camp stage-move is camp:manage-only server-side and
-// a pharma MR doesn't hold it (see md-files/BACKEND_REQUEST_camp-dossier.md #9). "Submit Rx" is
-// omitted — no Rx/prescription entity exists in the backend at all (see item #6).
+// "Mark complete"/"Cancel" are omitted — camp stage-move is camp:manage-only, which a pharma MR
+// never holds. "Submit Rx" is omitted — no Rx/prescription entity exists in the backend at all.
 const MrCampScheduleTable = ({ camps, onOpenCamp, onOpenDossier, onRateCamp }: MrCampScheduleTableProps) => (
   <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}>
     <div className="overflow-x-auto">
@@ -43,7 +40,10 @@ const MrCampScheduleTable = ({ camps, onOpenCamp, onOpenDossier, onRateCamp }: M
               <tr
                 key={camp.id}
                 onClick={() => onOpenCamp(camp)}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenCamp(camp) } }}
+                onKeyDown={(e) => {
+                  if (e.target !== e.currentTarget) return
+                  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenCamp(camp) }
+                }}
                 role="button"
                 tabIndex={0}
                 className="cursor-pointer transition-colors hover:bg-(--qms-surface-hover) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--qms-brand)"

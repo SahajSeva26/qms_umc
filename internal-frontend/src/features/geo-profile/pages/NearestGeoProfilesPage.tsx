@@ -8,14 +8,14 @@ import { useNearestGeoProfiles } from '@/features/geo-profile/hooks/useNearestGe
 import { useRoles, roleKeys } from '@/features/access-management/role/hooks/useRoles'
 import { accessManagementService } from '@/features/access-management/accessManagement.service'
 import GeoProfileStatusPill from '@/features/geo-profile/components/GeoProfileStatusPill'
-import LocationPicker from '@/components/widgets/location-picker/LocationPicker'
+import { LocationPicker, type LocationResolutionState } from '@qms/ui'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { GeoProfileType, NearestGeoProfileQuery } from '@/types/geoProfile.types'
-import type { LocationValue } from '@/types/location.types'
-import type { LocationResolutionState } from '@/components/widgets/location-picker/location.types'
+import type { LocationValue } from '@qms/core'
+import ENV from '@/config/env'
 
 // Query only fires once a valid type + lat/lng have been submitted — this is
 // a lookup tool, not a live-as-you-type search.
@@ -125,6 +125,8 @@ const NearestGeoProfilesPage = () => {
             Location
           </Label>
           <LocationPicker
+            apiKey={ENV.Maps.ApiKey}
+            mapId={ENV.Maps.MapId}
             value={location}
             onChange={setLocation}
             defaultCountry="India"

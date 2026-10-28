@@ -1,6 +1,7 @@
 import { FiExternalLink, FiX } from 'react-icons/fi'
 import { useNavigate } from 'react-router-dom'
-import { Dialog, DialogPortal } from '@/components/ui/dialog'
+import { Dialog as DialogPrimitive } from '@base-ui/react/dialog'
+import { DialogPortal } from '@/components/ui/dialog'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import { usePharmaCamp } from '@/features/pharma/hooks/usePharmaCamp'
 import CampDossierContent from '@/features/pharma/components/dossier/CampDossierContent'
@@ -11,10 +12,8 @@ interface CampDossierModalProps {
   onClose: () => void
 }
 
-// Clones the prototype's #cd-overlay: a CENTERED modal sheet (not a side drawer) — backdrop
-// rgba(15,23,42,.55), 980px sheet, sticky top bar with "Open page" (hard-navigates to the
-// standalone route) and Close. Reuses the base-ui Dialog primitive (already a centered overlay)
-// rather than SideDrawer, which slides from the right and doesn't match this screen.
+// Centered sheet (not the shared DialogContent, whose centering doesn't fit this layout), but
+// still a real popup primitive so focus-trap/Escape work like every other dialog.
 const CampDossierModal = ({ campId, onClose }: CampDossierModalProps) => {
   const navigate = useNavigate()
   const { data, isLoading, error, refetch } = usePharmaCamp(campId ?? undefined)
@@ -23,17 +22,18 @@ const CampDossierModal = ({ campId, onClose }: CampDossierModalProps) => {
   if (!campId) return null
 
   return (
-    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+    <DialogPrimitive.Root open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogPortal>
-        <div
-          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-6"
+        <DialogPrimitive.Backdrop
+          className="fixed inset-0 z-50 duration-100 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0"
           style={{ background: 'rgba(15,23,42,.55)' }}
-          onClick={onClose}
+        />
+        <DialogPrimitive.Popup
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-6 outline-none"
         >
           <div
             className="w-full rounded-[18px] overflow-hidden"
             style={{ maxWidth: 980, background: 'var(--qms-page-bg, #f7f8fb)', boxShadow: '0 30px 80px rgba(0,0,0,.35)' }}
-            onClick={(e) => e.stopPropagation()}
           >
             <div
               className="sticky top-0 z-10 px-3.5 py-2.5 flex items-center justify-between border-b"
@@ -49,15 +49,13 @@ const CampDossierModal = ({ campId, onClose }: CampDossierModalProps) => {
                 >
                   <FiExternalLink size={14} /> Open page
                 </button>
-                <button
-                  type="button"
-                  onClick={onClose}
+                <DialogPrimitive.Close
                   aria-label="Close"
                   className="inline-flex items-center justify-center rounded-lg w-7 h-7"
                   style={{ color: 'var(--qms-text)' }}
                 >
                   <FiX size={16} />
-                </button>
+                </DialogPrimitive.Close>
               </div>
             </div>
             <div className="p-3.5">
@@ -66,9 +64,9 @@ const CampDossierModal = ({ campId, onClose }: CampDossierModalProps) => {
               </QueryStateBlock>
             </div>
           </div>
-        </div>
+        </DialogPrimitive.Popup>
       </DialogPortal>
-    </Dialog>
+    </DialogPrimitive.Root>
   )
 }
 

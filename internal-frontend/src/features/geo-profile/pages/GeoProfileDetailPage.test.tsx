@@ -7,8 +7,9 @@ import type { GeoProfileEntity } from '@/types/geoProfile.types'
 
 vi.mock('@/hooks/usePermission')
 
-vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
-  default: ({ value, onChange, onResolutionStateChange, onManualCoordinateEntry }: {
+vi.mock('@qms/ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@qms/ui')>()),
+  LocationPicker: ({ value, onChange, onResolutionStateChange, onManualCoordinateEntry }: {
     value: unknown
     onChange: (v: unknown) => void
     onResolutionStateChange?: (status: 'idle' | 'loading' | 'error') => void

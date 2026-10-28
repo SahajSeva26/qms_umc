@@ -38,8 +38,9 @@ vi.mock('@/features/crm/divisions/division.service', () => ({
 
 // Simulates picking a real point on the map — EditDoctorModal's own save-time completeness
 // check requires addressLine1/city/state/pincode in addition to coordinates.
-vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
-  default: ({ value, onChange, onResolutionStateChange }: {
+vi.mock('@qms/ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@qms/ui')>()),
+  LocationPicker: ({ value, onChange, onResolutionStateChange }: {
     value: unknown
     onChange: (v: unknown) => void
     onResolutionStateChange?: (status: 'idle' | 'loading' | 'error') => void
@@ -67,8 +68,8 @@ vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
       </button>
     </>
   ),
+  LocationAddressFields: () => null,
 }))
-vi.mock('@/components/widgets/location-picker/LocationAddressFields', () => ({ default: () => null }))
 
 function sessionFixture(tenantType: 'platform' | 'customer', division: string | null = 'div-1'): SessionResponse {
   return {

@@ -10,16 +10,15 @@ import { useUpdateGeoProfile } from '@/features/geo-profile/hooks/useUpdateGeoPr
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import { usePermission } from '@/hooks/usePermission'
 import GeoProfileStatusPill from '@/features/geo-profile/components/GeoProfileStatusPill'
-import LocationPicker from '@/components/widgets/location-picker/LocationPicker'
-import LocationAddressFields from '@/components/widgets/location-picker/LocationAddressFields'
+import { LocationPicker, LocationAddressFields, REQUIRED_ADDRESS_FIELDS, type LocationResolutionState } from '@qms/ui'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { GeoProfileEntity, GeoProfileStatus, GeoProfileType } from '@/types/geoProfile.types'
-import type { LocationValue } from '@/types/location.types'
-import { REQUIRED_ADDRESS_FIELDS, type LocationResolutionState } from '@/components/widgets/location-picker/location.types'
+import type { LocationValue } from '@qms/core'
 import type { RoleEntity } from '@/types/accessManagement.types'
+import ENV from '@/config/env'
 
 interface AddressLikeFields {
   addressLine1?: string | null
@@ -295,6 +294,8 @@ const CreateGeoProfileForm = ({ roles, roleName }: RoleNameLookupProps) => {
               Location
             </Label>
             <LocationPicker
+              apiKey={ENV.Maps.ApiKey}
+              mapId={ENV.Maps.MapId}
               value={location}
               onChange={setLocation}
               onResolutionStateChange={setLocationResolution}
@@ -459,6 +460,8 @@ const EditGeoProfileForm = ({ geoProfile, roleName }: EditGeoProfileFormProps) =
               Location
             </Label>
             <LocationPicker
+              apiKey={ENV.Maps.ApiKey}
+              mapId={ENV.Maps.MapId}
               value={location}
               onChange={handleLocationChange}
               onResolutionStateChange={setLocationResolution}

@@ -43,9 +43,8 @@ const Row = ({ label, value }: { label: string; value: ReactNode }) => (
   </div>
 )
 
-// Rx count has no backing data model yet (no prescription entity) — shown honestly as
-// "Coming soon", matching CampDrawerKpiRow's convention. FO rating is wired to the real
-// rating module below (its own Section, not a tile — see RatingSection).
+// Rx count has no backing data model yet — shown honestly as "Coming soon". FO rating is wired
+// to the real rating module below (its own Section, not a tile — see RatingSection).
 const KpiTile = ({ label, value, placeholder }: { label: string; value?: string; placeholder?: boolean }) => (
   <div className="rounded-[14px] border p-2.5" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface)' }}>
     <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--qms-text-muted)' }}>{label}</div>
@@ -58,24 +57,28 @@ const KpiTile = ({ label, value, placeholder }: { label: string; value?: string;
 const mrRoleId = (mr: CampEntity['mr']): string | undefined =>
   mr && typeof mr !== 'string' ? (mr as CampPopulatedRole)._id : (mr ?? undefined)
 
-// FO / camp rating — only the camp's own MR may rate, and only once the camp is closed
-// (mirrors the backend's assertCampMrOrManage + RATEABLE_CAMP_STATUSES). Always offers an
-// edit entry point once rated, unlike the prototype which hides the action entirely.
+// Only the camp's own MR may rate, and only once closed. Always offers an edit entry point
+// once rated, unlike the prototype which hides the action entirely.
 const RatingSection = ({ camp }: { camp: CampEntity }) => {
   const { session } = useSession()
   const [modalOpen, setModalOpen] = useState(false)
   const isOwnMr = !!session?.role.id && session.role.id === mrRoleId(camp.mr)
   const canRate = isOwnMr && camp.status === 'closed'
 
-  const { items, isLoading } = useRatings({ camp: camp.id }, { enabled: canRate || camp.status === 'closed' })
+  const { items, isLoading, error, refetch } = useRatings({ camp: camp.id }, { enabled: canRate || camp.status === 'closed' })
   const existing = items[0] ?? null
 
-  if (!canRate && !existing) return null
+  if (!canRate && !existing && !error) return null
 
   return (
     <Section title="FO / camp rating">
       {isLoading ? (
         <div className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>Loading…</div>
+      ) : error ? (
+        <div className="flex items-center justify-between gap-2 text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>
+          <span>Couldn't load this camp's rating.</span>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </div>
       ) : existing ? (
         <>
           <RatingDisplay rating={existing} />

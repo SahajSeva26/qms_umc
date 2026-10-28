@@ -1,11 +1,10 @@
 import { Controller, useFormContext } from 'react-hook-form'
 import { Label } from '@/components/ui/label'
-import LocationPicker from '@/components/widgets/location-picker/LocationPicker'
-import LocationAddressFields from '@/components/widgets/location-picker/LocationAddressFields'
-import type { LocationResolutionState } from '@/components/widgets/location-picker/location.types'
+import { LocationPicker, LocationAddressFields, type LocationResolutionState } from '@qms/ui'
 import FieldErrorText from '@/components/ui/FieldErrorText'
 import { useTenantWizardFieldError } from '@/features/access-management/tenant/components/wizard/TenantWizardValidationContext'
 import type { TenantFormValues } from '@/features/access-management/tenant/tenant.wizard'
+import ENV from '@/config/env'
 
 interface TenantLocationStepProps {
   setLocationResolution: (v: LocationResolutionState) => void
@@ -35,6 +34,8 @@ const TenantLocationStep = ({ setLocationResolution, locationHint, setLocationHi
             render={({ field }) => (
               <div className="space-y-2">
                 <LocationPicker
+                  apiKey={ENV.Maps.ApiKey}
+                  mapId={ENV.Maps.MapId}
                   value={field.value}
                   onChange={field.onChange}
                   onResolutionStateChange={setLocationResolution}

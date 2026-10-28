@@ -9,8 +9,9 @@ import type { RoleEntity } from '@/types/accessManagement.types'
 
 vi.mock('@/hooks/useSession')
 
-vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
-  default: ({ value, onChange, onResolutionStateChange }: {
+vi.mock('@qms/ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@qms/ui')>()),
+  LocationPicker: ({ value, onChange, onResolutionStateChange }: {
     value: unknown
     onChange: (v: unknown) => void
     onResolutionStateChange?: (status: 'idle' | 'loading' | 'error') => void
@@ -38,8 +39,8 @@ vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
       </button>
     </>
   ),
+  LocationAddressFields: () => null,
 }))
-vi.mock('@/components/widgets/location-picker/LocationAddressFields', () => ({ default: () => null }))
 
 vi.mock('@/features/inventory/real/components/InventoryMasterMultiPicker', () => ({
   default: ({ onChange }: { onChange: (ids: string[], labels: Record<string, string>) => void }) => (

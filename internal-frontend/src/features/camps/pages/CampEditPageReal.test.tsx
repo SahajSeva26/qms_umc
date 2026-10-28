@@ -8,8 +8,9 @@ import type { RoleEntity } from '@/types/accessManagement.types'
 
 vi.mock('@/hooks/useSession')
 
-vi.mock('@/components/widgets/location-picker/LocationPicker', () => ({
-  default: ({ onResolutionStateChange }: {
+vi.mock('@qms/ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@qms/ui')>()),
+  LocationPicker: ({ onResolutionStateChange }: {
     onResolutionStateChange?: (status: 'idle' | 'loading' | 'error') => void
   }) => (
     <>

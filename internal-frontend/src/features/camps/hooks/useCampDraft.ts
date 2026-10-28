@@ -3,7 +3,7 @@ import { campRefId } from '@/features/camps/campsReal.utils'
 import type { BillingType, CampEntity, CampType } from '@/types/campReal.types'
 import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
 import { CAMP_TIME_SLOT_VALUES } from '@/types/campTimeSlot.constants'
-import type { LocationValue } from '@/types/location.types'
+import type { LocationValue } from '@qms/core'
 
 export interface CampDraft {
   tenant: string

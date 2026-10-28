@@ -1,6 +1,6 @@
 // Doctor is tenant-scoped — a customer-tenant caller is pinned to their own
 // tenant server-side; a platform caller must supply one explicitly.
-import type { LocationValue } from '@/types/location.types'
+import type { LocationValue } from '@qms/core'
 
 // Mirrors DOCTOR_SPECIALIZATION (backend doctor.constants.ts) exactly.
 export type DoctorSpecialization =
@@ -17,10 +17,8 @@ export type DoctorSpecialization =
   | 'chest_physician'
   | 'nephrologist'
 
-// Single source of truth for every specialization picker/filter/label in the app — cp/gp keep
-// their established short label, the rest are spelled out. Lives here (not a feature's own ui.ts)
-// so both feature-owned and cross-feature/shared widget components can import it without
-// violating the project's feature-boundary convention.
+// Single source of truth for every specialization picker/filter/label in the app — lives here
+// (not a feature's own ui.ts) so shared widget components can import it without a cross-feature violation.
 export const SPECIALIZATION_OPTIONS: { value: DoctorSpecialization; label: string }[] = [
   { value: 'cp', label: 'CP' },
   { value: 'gp', label: 'GP' },
@@ -40,9 +38,8 @@ export const SPECIALIZATION_LABEL: Record<DoctorSpecialization, string> = Object
   SPECIALIZATION_OPTIONS.map((o) => [o.value, o.label]),
 ) as Record<DoctorSpecialization, string>
 
-// For a populate-shape `specialization?: string` (e.g. CampPopulatedDoctor) rather than the
-// proper DoctorSpecialization union — falls back to the raw value for a stale/unrecognized one
-// instead of crashing or silently showing nothing.
+// For a loose populate-shape string rather than the proper union — falls back to the raw value
+// for a stale/unrecognized one instead of crashing.
 export function specializationLabel(value: string | null | undefined): string {
   if (!value) return '—'
   return SPECIALIZATION_LABEL[value as DoctorSpecialization] ?? value
@@ -109,9 +106,8 @@ export interface SearchDoctorQuery {
   report?: 'true' | 'false'
 }
 
-// Mirrors DOCTOR_NEAREST_MAX_DISTANCE (doctor.constants.ts) in km, for a client-side
-// "is this doctor within range of this camp location" check (e.g. after overriding the camp
-// location away from the picked doctor's own address) — no backend round-trip needed for that.
+// Mirrors DOCTOR_NEAREST_MAX_DISTANCE (doctor.constants.ts) in km — for a client-side
+// "is this doctor within range" check, no backend round-trip needed.
 export const DOCTOR_RANGE_KM = 35
 
 // The 35km radius is server-fixed — no radius/range param exists.

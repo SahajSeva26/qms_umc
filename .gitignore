@@ -30,10 +30,16 @@ docs/db-learning
 *.tsbuildinfo
 
 # ======================
-# Frontend (Vite/React)
+# Internal Frontend (Vite/React)
 # ======================
-frontend/node_modules/
-frontend/dist/
+internal-frontend/node_modules/
+internal-frontend/dist/
+
+# ======================
+# Pharma Frontend (Vite/React)
+# ======================
+pharma-frontend/node_modules/
+pharma-frontend/dist/
 
 # ======================
 # Backend
@@ -144,5 +150,6 @@ test-results/
 # (previously tracked, deliberately untracked; kept on disk, never committed)
 # ======================
 # backend/CLAUDE.md
-# frontend/CLAUDE.md
+# internal-frontend/CLAUDE.md
+# pharma-frontend/CLAUDE.md
 # mobile/CLAUDE.md

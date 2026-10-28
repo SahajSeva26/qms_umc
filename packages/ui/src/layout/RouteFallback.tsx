@@ -1,9 +1,9 @@
-// Suspense fallback for a lazy-loaded feature route, rendered inside
-// AppLayout's <main> — the sidebar/topbar shell stays mounted, only this
-// content area shows a placeholder while the feature's chunk downloads.
-// Deliberately not a full-screen spinner: this fires on every first visit
-// to a feature per session, not just once, so it needs to read as "content
-// loading" rather than "app loading."
+// Suspense fallback for a lazy-loaded feature route, rendered inside the
+// authenticated shell's main content area — the sidebar/topbar stay
+// mounted, only this content area shows a placeholder while the feature's
+// chunk downloads. Deliberately not a full-screen spinner: this fires on
+// every first visit to a feature per session, not just once, so it needs to
+// read as "content loading" rather than "app loading."
 const RouteFallback = () => {
   return (
     <div className="flex flex-col gap-4 animate-pulse" aria-busy="true" aria-live="polite">

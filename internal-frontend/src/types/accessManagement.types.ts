@@ -365,56 +365,17 @@ export interface UpdateRolePayload {
 // Session (GET /auth/me)
 // ---------------------------------------------------------------------------
 
-export interface SessionUser {
-  id: string
-  email: string
-  firstName: string
-  lastName: string
-  avatar?: { url: string; id: string }
-}
-
-export interface SessionRole {
-  id: string
-  code: string
-  name: string
-  // Division id when the role is division-restricted (e.g. Pharma Division Head); null when the
-  // role has no division, absent only if the backend response predates this field.
-  division?: string | null
-}
-
-export interface SessionRoleType {
-  id: string
-  code: string
-  name: string
-}
-
-export interface SessionTenant {
-  id: string
-  code: string
-  name: string
-  type: TenantType
-}
-
-/** Raw shape of the `data` payload from GET /auth/me. */
-export interface SessionResponse {
-  user: SessionUser
-  role: SessionRole
-  roleType: SessionRoleType
-  tenant: SessionTenant
-  permissions: string[]
-}
-
-/** Flattened, display-friendly projection of SessionResponse used by
- * usePermission()/useActiveRole(), so callers don't reach into nested objects. */
-export interface SessionPermissions {
-  permissions: string[]
-  roleCode: string
-  roleTypeCode: string
-  roleTypeId: string
-  tenantCode: string
-  tenantType: 'platform' | 'customer'
-  tenantId: string
-}
+// Canonical definitions moved to @qms/core (shared by both apps' useSession()) —
+// re-exported here so the many existing `@/types/accessManagement.types` import
+// sites in this app don't all need updating for one extraction.
+export type {
+  SessionUser,
+  SessionRole,
+  SessionRoleType,
+  SessionTenant,
+  SessionResponse,
+  SessionPermissions,
+} from '@qms/core'
 
 // ---------------------------------------------------------------------------
 // Employee — HR/staff-registry record layered on top of a User+Role, currently scoped to Field

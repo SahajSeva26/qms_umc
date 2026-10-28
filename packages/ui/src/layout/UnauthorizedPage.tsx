@@ -1,13 +1,18 @@
 import { useNavigate } from 'react-router-dom'
 import { FiShieldOff } from 'react-icons/fi'
-import { Button } from '@/components/ui/button'
-import { DASHBOARD_ROUTES } from '@/features/dashboard/dashboard.paths'
+import { Button } from '../primitives/Button'
 
-// Dedicated destination for RequirePermission's route-level redirect —
-// distinct from AccessPermissionGate's in-page denial message: this is a
-// real navigation to its own URL (/unauthorized), not an inline conditional.
+interface UnauthorizedPageProps {
+  /** Where "Go to dashboard" navigates — each app supplies its own landing route. */
+  homePath: string
+  /** Defaults to "Go to dashboard" — override for an app whose landing page isn't a dashboard. */
+  homeLabel?: string
+}
 
-const UnauthorizedPage = () => {
+// Dedicated destination for a route-level permission redirect — distinct
+// from an in-page denial message: this is a real navigation to its own URL
+// (/unauthorized), not an inline conditional.
+const UnauthorizedPage = ({ homePath, homeLabel = 'Go to dashboard' }: UnauthorizedPageProps) => {
   const navigate = useNavigate()
 
   return (
@@ -26,7 +31,7 @@ const UnauthorizedPage = () => {
         <Button variant="outline" onClick={() => navigate(-1)}>
           Go back
         </Button>
-        <Button onClick={() => navigate(DASHBOARD_ROUTES.DASHBOARD)}>Go to dashboard</Button>
+        <Button onClick={() => navigate(homePath)}>{homeLabel}</Button>
       </div>
     </div>
   )

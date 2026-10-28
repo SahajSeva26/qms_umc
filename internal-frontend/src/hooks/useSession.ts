@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
-import { accessManagementService } from '@/features/access-management/accessManagement.service'
+import { getMe } from '@qms/core'
+import api from '@/lib/api/api'
 import type { SessionResponse } from '@/types/accessManagement.types'
 
 // The ONE central session hook, owning the single GET /auth/me fetch that
@@ -16,7 +17,7 @@ export const useSession = () => {
 
   const query = useQuery({
     queryKey: SESSION_QUERY_KEY,
-    queryFn: () => accessManagementService.getMe(),
+    queryFn: () => getMe(api),
     staleTime: 5 * 60 * 1000, // 5 minutes — permissions rarely change mid-session
     // Never retry a 401 (no valid session) — retrying just doubles isLoading time for no benefit.
     retry: (failureCount, error) => {

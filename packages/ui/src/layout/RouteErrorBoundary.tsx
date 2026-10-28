@@ -1,6 +1,6 @@
 import { isRouteErrorResponse, useRouteError } from 'react-router-dom'
 import { FiAlertTriangle, FiRefreshCw } from 'react-icons/fi'
-import { Button } from '@/components/ui/button'
+import { Button } from '../primitives/Button'
 
 // Matches the browser-specific error text a failed dynamic import() throws
 // (React Router's `lazy:` route loaders use a plain import() under the
@@ -22,13 +22,13 @@ function isChunkLoadError(error: unknown): boolean {
   return CHUNK_LOAD_FAILURE_PATTERNS.some((pattern) => lower.includes(pattern))
 }
 
-// Root/AppLayout `errorElement` — catches anything an authenticated route
+// Root/app-shell `errorElement` — catches anything an authenticated route
 // tree throws that isn't handled locally: render errors, and specifically
 // lazy-chunk load failures (stale deployment, dropped connection mid-fetch).
 // Rendered in place of the ENTIRE matched route tree it's attached to (React
 // Router's errorElement semantics) — at the root this replaces the whole
-// app; when also attached at the AppLayout level, an error inside the authed
-// shell's children is caught there instead, without losing the root.
+// app; when also attached at the authenticated-shell level, an error inside
+// that shell's children is caught there instead, without losing the root.
 const RouteErrorBoundary = () => {
   const error = useRouteError()
   const chunkFailure = isChunkLoadError(error)

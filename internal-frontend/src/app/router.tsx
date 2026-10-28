@@ -1,11 +1,9 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom'
-import RootLayout from '@/components/layouts/RootLayout'
+import { RootLayout, RouteErrorBoundary, UnauthorizedPage, NotFoundPage } from '@qms/ui'
 import AppLayout from '@/components/layouts/AppLayout'
-import UnauthorizedPage from '@/components/layouts/UnauthorizedPage'
-import NotFoundPage from '@/components/layouts/NotFoundPage'
-import RouteErrorBoundary from '@/components/layouts/RouteErrorBoundary'
 import { authRoutes } from '@/features/auth/auth.routes'
 import { AUTH_ROUTES } from '@/features/auth/auth.paths'
+import { DASHBOARD_ROUTES } from '@/features/dashboard/dashboard.paths'
 import { dashboardRoutes } from '@/features/dashboard/dashboard.routes'
 import { crmRoutes } from '@/features/crm/crm.routes'
 import { campsRoutes } from '@/features/camps/camps.routes'
@@ -50,7 +48,7 @@ const appRouter = createBrowserRouter([
         // own "Refresh" action for the recovery path.
         errorElement: <RouteErrorBoundary />,
         children: [
-          { path: '/unauthorized', element: <UnauthorizedPage /> },
+          { path: '/unauthorized', element: <UnauthorizedPage homePath={DASHBOARD_ROUTES.DASHBOARD} /> },
           ...dashboardRoutes,
           ...crmRoutes,
           ...campsRoutes,
@@ -69,7 +67,7 @@ const appRouter = createBrowserRouter([
           ...qaFeedbackRoutes,
           // Authenticated catch-all — keeps the sidebar/topbar for a bad
           // in-app URL instead of falling through to a route-less blank page.
-          { path: '*', element: <NotFoundPage /> },
+          { path: '*', element: <NotFoundPage homePath={DASHBOARD_ROUTES.DASHBOARD} /> },
         ],
       },
     ],

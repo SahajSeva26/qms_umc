@@ -1,12 +1,18 @@
 import { useNavigate } from 'react-router-dom'
 import { FiCompass } from 'react-icons/fi'
-import { Button } from '@/components/ui/button'
-import { DASHBOARD_ROUTES } from '@/features/dashboard/dashboard.paths'
+import { Button } from '../primitives/Button'
 
-// Authenticated catch-all (`path: '*'`) — mounted as a child of AppLayout so
+interface NotFoundPageProps {
+  /** Where "Go to dashboard" navigates — each app supplies its own landing route. */
+  homePath: string
+  /** Defaults to "Go to dashboard" — override for an app whose landing page isn't a dashboard. */
+  homeLabel?: string
+}
+
+// Authenticated catch-all (`path: '*'`) — mounted as a child of the app shell so
 // the sidebar/topbar stay visible for a bad in-app URL, matching
 // UnauthorizedPage's visual pattern.
-const NotFoundPage = () => {
+const NotFoundPage = ({ homePath, homeLabel = 'Go to dashboard' }: NotFoundPageProps) => {
   const navigate = useNavigate()
 
   return (
@@ -24,7 +30,7 @@ const NotFoundPage = () => {
         <Button variant="outline" onClick={() => navigate(-1)}>
           Go back
         </Button>
-        <Button onClick={() => navigate(DASHBOARD_ROUTES.DASHBOARD)}>Go to dashboard</Button>
+        <Button onClick={() => navigate(homePath)}>{homeLabel}</Button>
       </div>
     </div>
   )

@@ -1,5 +1,5 @@
 import { FiWifiOff, FiRefreshCw, FiLoader } from 'react-icons/fi'
-import { Button } from '@/components/ui/button'
+import { Button } from '../primitives/Button'
 
 // Shown when the session check failed inconclusively (429, network blip,
 // 5xx) — not a confirmed 401. Caller must keep this mounted while `pending`

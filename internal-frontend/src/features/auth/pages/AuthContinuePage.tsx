@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { Navigate } from 'react-router-dom'
+import { SessionRecovery } from '@qms/ui'
 import { useSession } from '@/hooks/useSession'
 import { AUTH_ROUTES } from '@/features/auth/auth.paths'
-import SessionRecovery from '@/components/layouts/SessionRecovery'
 import { getFirstVisibleNavPath } from '@/lib/navigation/visibleNav'
 
 // The post-login landing target. Consumes the SAME session query useLogin already triggered a

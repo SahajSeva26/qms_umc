@@ -1,9 +1,9 @@
 import { useState, type ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
+import { SessionRecovery } from '@qms/ui'
 import { usePermission } from '@/hooks/usePermission'
 import { canReadEmployees } from '@/lib/access/employeeAccess'
 import { AUTH_ROUTES } from '@/features/auth/auth.paths'
-import SessionRecovery from './SessionRecovery'
 
 interface RequireEmployeeAccessProps {
   children: ReactNode

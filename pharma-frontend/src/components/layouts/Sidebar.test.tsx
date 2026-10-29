@@ -46,6 +46,28 @@ describe('Sidebar — pharma-frontend shell nav', () => {
     expect(link).toHaveAttribute('href', '/pharma/ho')
   })
 
+  it.each(['pharma-division-head', 'pharma-mr', 'pharma-rsm', 'pharma-asm'])(
+    'shows a link to Doctor Management alongside the portal link, for %s',
+    async (roleTypeCode) => {
+      await mockSession(sessionFixture(roleTypeCode))
+      await renderSidebar()
+
+      const link = screen.getByRole('link', { name: /doctor management/i })
+      expect(link).toHaveAttribute('href', '/pharma/doctors')
+    },
+  )
+
+  it.each(['pharma-division-head', 'pharma-mr', 'pharma-rsm', 'pharma-asm'])(
+    'shows a link to Camp Management alongside the other two links, for %s',
+    async (roleTypeCode) => {
+      await mockSession(sessionFixture(roleTypeCode))
+      await renderSidebar()
+
+      const link = screen.getByRole('link', { name: /camp management/i })
+      expect(link).toHaveAttribute('href', '/pharma/camps')
+    },
+  )
+
   it('renders no nav link for an unrecognized role-type code', async () => {
     await mockSession(sessionFixture('sales-rep'))
     await renderSidebar()

@@ -7,13 +7,12 @@ import { useUpdateEmployee } from '@/features/access-management/employee/hooks/u
 import type { EmployeeEntity, UpdateEmployeePayload } from '@/types/accessManagement.types'
 
 vi.mock('@/features/access-management/employee/hooks/useUpdateEmployee')
+// react-day-picker's Popover+Calendar is awkward to exercise through userEvent in jsdom — stubbed with the same contract.
 vi.mock('@qms/ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@qms/ui')>()),
   LocationPicker: () => null,
   LocationAddressFields: () => null,
-}))
-vi.mock('@/components/ui/DatePicker', () => ({
-  default: ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
+  DatePicker: ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
     <input aria-label="date-stub" value={value} onChange={(e) => onChange(e.target.value)} />
   ),
 }))

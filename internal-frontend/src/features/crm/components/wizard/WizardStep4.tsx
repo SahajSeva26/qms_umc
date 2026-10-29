@@ -8,7 +8,7 @@ import { formatINR } from '@/utils/formatters'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import DatePicker from '@/components/ui/DatePicker'
+import { DatePicker } from '@qms/ui'
 import { ReviewCard, ReviewGrid, ReviewField } from '@/components/ui/ReviewCard'
 import { labelClasses, labelStyle, fieldClasses } from '@/features/crm/components/wizard/wizard.styles'
 

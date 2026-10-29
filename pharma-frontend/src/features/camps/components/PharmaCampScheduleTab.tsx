@@ -41,14 +41,14 @@ const SCHEDULE_SKELETON = (
   </div>
 )
 
-// Role-aware Camp Schedule for HO/RSM/ASM — real GET /camps (server-scoped by role: today HO is
-// correctly whole-division; ASM/RSM scoping has a known backend gap, see
-// md-files/BACKEND_REQUEST_camp-asm-rsm-own-scope.md — not addressed client-side, by design: this
-// component does no downline resolution or extra filtering of its own, and must not, since that
-// would be a client-side security boundary pretending to be real. Unlike MR's /camps/my, this
-// endpoint has no server-computed summary block, so status tabs show no counts (vs. MyCampScheduleTab's
-// count-bearing tabs) — adding counts here would mean a second, different aggregate call this
-// slice doesn't need yet.
+// Role-aware Camp Schedule for HO/RSM/ASM — real GET /camps, server-scoped by role: HO is the
+// whole division; ASM/RSM is their downline, resolved at booking time (the target MR's real
+// supervisor chain is snapshotted onto the camp — see usePharmaCamps.ts for the full scoping
+// note). This component does no downline resolution or extra filtering of its own, and must not,
+// since that would be a client-side security boundary pretending to be real. Unlike MR's
+// /camps/my, this endpoint has no server-computed summary block, so status tabs show no counts
+// (vs. MyCampScheduleTab's count-bearing tabs) — adding counts here would mean a second, different
+// aggregate call this slice doesn't need yet.
 const PharmaCampScheduleTab = () => {
   const [activeTab, setActiveTab] = useState<ScheduleTab>('all')
   const [openCamp, setOpenCamp] = useState<CampEntity | null>(null)

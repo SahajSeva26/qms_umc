@@ -1,5 +1,5 @@
 import { FiCopy } from 'react-icons/fi'
-import { toast } from '@/components/ui/sonner'
+import { toast } from './Toaster'
 
 interface CopyButtonProps {
   value: string

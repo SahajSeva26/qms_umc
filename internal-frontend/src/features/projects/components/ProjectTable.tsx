@@ -1,6 +1,6 @@
 import type { ProjectEntity } from '@/types/project.types'
 import { PROJECT_THERAPY_LABEL, allowedCampTypesForProjectTypes } from '@/types/project.types'
-import CopyButton from '@/components/ui/CopyButton'
+import { CopyButton } from '@qms/ui'
 import { formatINR } from '@/utils/formatters'
 import { computeGstBreakdown, projectDivisionName, projectSalesRepName, projectTenantName } from '@/features/projects/projects.utils'
 import ProjectTypePills from '@/features/projects/components/ProjectTypePill'

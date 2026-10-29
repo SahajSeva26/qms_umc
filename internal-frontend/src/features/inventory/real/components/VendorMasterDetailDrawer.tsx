@@ -1,7 +1,7 @@
 import { Fragment } from 'react'
 import { FiEdit2, FiInfo, FiHash, FiUsers, FiMapPin } from 'react-icons/fi'
 import SideDrawer from '@/components/ui/SideDrawer'
-import CopyButton from '@/components/ui/CopyButton'
+import { CopyButton } from '@qms/ui'
 import { Button } from '@/components/ui/button'
 import type { VendorMasterEntity } from '@/types/vendorMaster.types'
 

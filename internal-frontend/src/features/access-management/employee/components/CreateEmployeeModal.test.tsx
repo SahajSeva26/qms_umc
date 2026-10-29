@@ -8,11 +8,16 @@ import CreateEmployeeModal from './CreateEmployeeModal'
 
 // LocationPicker/LocationAddressFields are Google Maps/geocoder-backed and awkward to render in jsdom — stubbed per EditEmployeeEditor.test.tsx.
 // @qms/ui exports many things this file also uses (Button, etc.) — spread the real module and
-// override only the two location components, rather than mocking the whole package.
+// override only the two location components and DatePicker (react-day-picker's Popover+Calendar
+// is awkward to exercise through userEvent in jsdom — stubbed with the same contract), rather
+// than mocking the whole package.
 vi.mock('@qms/ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@qms/ui')>()),
   LocationPicker: () => null,
   LocationAddressFields: () => null,
+  DatePicker: ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
+    <input aria-label="date-stub" value={value} onChange={(e) => onChange(e.target.value)} />
+  ),
 }))
 
 function confirmedRejection() {
@@ -45,13 +50,6 @@ vi.mock('@/features/access-management/employee/components/ExistingFieldOfficerPi
         Pick second FO (no gender)
       </button>
     </div>
-  ),
-}))
-
-// react-day-picker's Popover+Calendar is awkward to exercise through userEvent in jsdom — stubbed with the same contract.
-vi.mock('@/components/ui/DatePicker', () => ({
-  default: ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
-    <input aria-label="date-stub" value={value} onChange={(e) => onChange(e.target.value)} />
   ),
 }))
 

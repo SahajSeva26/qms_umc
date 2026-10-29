@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import DatePicker from '@/components/ui/DatePicker'
+import { DatePicker } from '@qms/ui'
 import SearchInput from '@/components/ui/SearchInput'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import DoctorAsyncPicker from '@/components/widgets/doctor/DoctorAsyncPicker'

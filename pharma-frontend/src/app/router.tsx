@@ -40,6 +40,14 @@ const appRouter = createBrowserRouter([
           // design — routing a lazy route target through it would defeat this route's own chunk
           // isolation, confirmed via a real Vite build).
           { path: '/pharma/camps/:id', lazy: lazyRoute(() => import('@/features/camps/pages/CampDossierPage'), PHARMA_VIEW_PERMISSIONS) },
+          // Sidebar-level page, distinct from the small "Doctors" tab already inside
+          // MrPortalPage — reachable by all four pharma role types, gated internally by
+          // PharmaRoleGate (see DoctorManagementPage.tsx) with a different permission ceiling
+          // per role (see that file's header comment).
+          { path: '/pharma/doctors', lazy: lazyRoute(() => import('@/features/doctors/pages/DoctorManagementPage'), PHARMA_VIEW_PERMISSIONS) },
+          // Sidebar-level page, distinct from the lighter "Camp schedule" portal tabs — see
+          // CampManagementPage.tsx's header comment for the full rationale.
+          { path: '/pharma/camps', lazy: lazyRoute(() => import('@/features/camps/pages/CampManagementPage'), PHARMA_VIEW_PERMISSIONS) },
           { path: '/unauthorized', element: <UnauthorizedPage homePath={DASHBOARD_PATH} /> },
           // Inside AppLayout so an unauthenticated hit on a bad URL redirects to login, not 404 first.
           { path: '*', element: <NotFoundPage homePath={DASHBOARD_PATH} /> },

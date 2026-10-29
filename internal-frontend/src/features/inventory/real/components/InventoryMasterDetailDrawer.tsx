@@ -1,7 +1,7 @@
 import { Fragment } from 'react'
 import { FiEdit2, FiInfo, FiHash } from 'react-icons/fi'
 import SideDrawer from '@/components/ui/SideDrawer'
-import CopyButton from '@/components/ui/CopyButton'
+import { CopyButton } from '@qms/ui'
 import { Button } from '@/components/ui/button'
 import { INVENTORY_MASTER_TYPE_LABEL } from '@/types/inventoryMaster.types'
 import type { InventoryMasterEntity } from '@/types/inventoryMaster.types'

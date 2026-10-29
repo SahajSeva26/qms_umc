@@ -8,7 +8,7 @@ import type { InventoryConsumableEntity, InventoryConsumableStatus } from '@/typ
 import type { InventoryMovementHistorySource } from '@/types/inventoryLedger.types'
 import { Button } from '@/components/ui/button'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
-import CopyButton from '@/components/ui/CopyButton'
+import { CopyButton } from '@qms/ui'
 import PaginationControls from '@/components/ui/PaginationControls'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import EditInventoryConsumableModal from '@/features/inventory/real/components/EditInventoryConsumableModal'

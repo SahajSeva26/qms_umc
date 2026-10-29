@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { FiChevronDown, FiX } from 'react-icons/fi'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Popover, PopoverContent, PopoverTrigger } from '@qms/ui'
 import SearchInput from '@/components/ui/SearchInput'
 import { cn } from '@/lib/utils'
 

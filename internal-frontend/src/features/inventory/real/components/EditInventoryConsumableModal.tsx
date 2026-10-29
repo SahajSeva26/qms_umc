@@ -16,7 +16,7 @@ import VendorMasterPicker from '@/features/inventory/real/components/VendorMaste
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import DatePicker from '@/components/ui/DatePicker'
+import { DatePicker } from '@qms/ui'
 import FieldLabel from '@/components/ui/FieldLabel'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import MutationStatusBanner from '@/components/ui/MutationStatusBanner'

@@ -6,16 +6,14 @@ import EmployeeFieldsSection from './EmployeeFieldsSection'
 import { useEmployeeFieldsResolver, EMPTY_EMPLOYEE_FIELDS_VALUES } from '@/features/access-management/employee/employeeForm'
 import type { EmployeeFieldsValues } from '@/features/access-management/employee/schemas/employee.schemas'
 
-vi.mock('@/components/ui/DatePicker', () => ({
-  default: ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
-    <input aria-label="date-stub" value={value} onChange={(e) => onChange(e.target.value)} />
-  ),
-}))
-
+// react-day-picker's Popover+Calendar is awkward to exercise through userEvent in jsdom — stubbed with the same contract.
 vi.mock('@qms/ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@qms/ui')>()),
   LocationPicker: () => null,
   LocationAddressFields: () => null,
+  DatePicker: ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
+    <input aria-label="date-stub" value={value} onChange={(e) => onChange(e.target.value)} />
+  ),
 }))
 
 function Harness({ defaultValues, onSubmit }: { defaultValues: EmployeeFieldsValues; onSubmit: (v: EmployeeFieldsValues) => void }) {

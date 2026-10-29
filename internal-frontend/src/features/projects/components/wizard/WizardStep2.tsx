@@ -8,7 +8,7 @@ import { PickCard, PickGrid } from '@/components/ui/PickCard'
 import SectionHeader from '@/components/ui/SectionHeader'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import DatePicker from '@/components/ui/DatePicker'
+import { DatePicker } from '@qms/ui'
 import { labelClasses, labelStyle, fieldClasses } from '@/features/projects/components/wizard/wizard.styles'
 import { useWizardFieldError } from '@/features/projects/components/wizard/WizardValidationContext'
 

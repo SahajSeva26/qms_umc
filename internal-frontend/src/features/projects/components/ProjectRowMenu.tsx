@@ -1,5 +1,5 @@
 import { FiMoreHorizontal, FiEye, FiEdit2, FiTag, FiFileText } from 'react-icons/fi'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Popover, PopoverContent, PopoverTrigger } from '@qms/ui'
 
 interface ProjectRowMenuProps {
   // Required, not optional — see ProjectTable.tsx's identical reasoning.

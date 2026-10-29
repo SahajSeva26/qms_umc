@@ -13,6 +13,7 @@ export const CAMP_TYPE_LABEL: Record<CampType, string> = {
   lab: 'Lab',
 }
 
+export type BillingType = 'billable' | 'void'
 export type CampStatus = 'requested' | 'confirmed' | 'live' | 'closed' | 'cancelled' | 'cancelled_charged'
 
 /** GET /camps/my's top-level summary — totals over the caller's own camps, independent of the current page/filter. */
@@ -23,7 +24,20 @@ export interface CampSummary {
 }
 
 export interface SearchCampQuery {
+  code?: string
+  tenant?: string
+  project?: string
+  division?: string
+  doctor?: string
+  fo?: string
+  dietitian?: string
   status?: CampStatus
+  type?: CampType
+  billingType?: BillingType
+  city?: string
+  state?: string
+  dateFrom?: string
+  dateTo?: string
   page?: string
   limit?: string
   /** Triggers the backend's per-row `stats` block (patients/patientsCompleted) alongside items. */
@@ -46,10 +60,14 @@ export interface CampStageHistoryEntry {
 }
 
 /** get()/search() populate; create/update/moveStage/allocateFo return bare ObjectIds. */
+export interface CampPopulatedTenant { _id?: string; code: string; name: string }
+export interface CampPopulatedDivision { _id?: string; code: string; name: string; therapy?: string }
 export interface CampPopulatedProject { _id?: string; name: string; status?: string; tests?: string[] }
 export interface CampPopulatedDoctor { _id?: string; name: string; specialization?: string; pharmaCode?: string }
 /** fo/mr/asm/rsm populate with NO field projection — the full Role document comes back. */
 export interface CampPopulatedRole { _id?: string; code: string; name: string; status?: string; [key: string]: unknown }
+/** devices populates with a narrow projection (`select: 'name code type'`) — a fetched/searched camp's devices are these sub-docs, never bare id strings. */
+export interface CampPopulatedDevice { _id: string; name: string; code: string; type: string }
 
 export interface CampStats {
   patients: number
@@ -59,20 +77,29 @@ export interface CampStats {
 export interface CampEntity {
   id: string
   code: string
+  tenant?: CampPopulatedTenant | string
+  division?: CampPopulatedDivision | string
   project: CampPopulatedProject | string | null
   doctor: CampPopulatedDoctor | string
   type: CampType
+  billingType?: BillingType
   patientExpectation: number
   /** Screening/lab camps are staffed here; a diet camp is staffed via `dietitian` instead — only one applies, decided by `type`. */
   fo: CampPopulatedRole | string | null
   /** Diet-camp counterpart of `fo` — only one applies, by type. */
   dietitian: CampPopulatedRole | string | null
   mr: CampPopulatedRole | string | null
+  asm?: CampPopulatedRole | string | null
+  rsm?: CampPopulatedRole | string | null
   date: string
   timeSlot: CampTimeSlotValue | null
   /** Nullable — the backend mapper returns `camp.location || null`; legacy camps predating the location migration have none. */
   location: LocationValue | null
+  devices?: CampPopulatedDevice[]
   notes?: string
+  conscentPath?: string
+  /** Free-form metadata bag — null unless set. */
+  meta?: Record<string, unknown> | null
   status: CampStatus
   stageHistory: CampStageHistoryEntry[]
   createdAt: string

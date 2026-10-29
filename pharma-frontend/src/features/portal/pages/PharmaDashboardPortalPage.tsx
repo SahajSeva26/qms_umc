@@ -27,11 +27,9 @@ const TABS: { id: TabId; label: string; icon: typeof FiBarChart2 }[] = [
 
 // Shared, thin portal shell for HO/RSM/ASM — the same two tabs for all three roles, since the
 // underlying GET /camps the Schedule tab calls is server-scoped per role server-side (see
-// usePharmaCamps.ts) — correctly for HO (division-wide) today, but ASM/RSM scoping is a KNOWN,
-// still-pending backend gap (see md-files/BACKEND_REQUEST_camp-asm-rsm-own-scope.md): it currently
-// only matches camps where the ASM/RSM's own id happens to be stamped onto them at booking time,
-// not their actual downline. A fuller multi-tab portal (projects, doctors, etc.) is a later,
-// separate step.
+// usePharmaCamps.ts for the full scoping note) — HO sees their whole division, ASM/RSM see their
+// downline (a booking-time snapshot, not a live hierarchy lookup). A fuller multi-tab portal
+// (projects, doctors, etc.) is a later, separate step.
 const PharmaDashboardPortalPage = ({ roleTypeCode, portalLabel }: PharmaDashboardPortalPageProps) => {
   const [tab, setTab] = useState<TabId>('dashboard')
 

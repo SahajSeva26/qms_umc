@@ -1,7 +1,7 @@
 import { FiFileText } from 'react-icons/fi'
 import CampTypePillReal from '@/components/widgets/camp/CampTypePillReal'
 import CampDashboardStatusPill from '@/features/pharma/components/CampDashboardStatusPill'
-import CopyButton from '@/components/ui/CopyButton'
+import { CopyButton } from '@qms/ui'
 import type { CampEntity, CampPopulatedDoctor, CampPopulatedRole } from '@/types/campReal.types'
 import { CAMP_TIME_SLOT_LABEL } from '@/types/campTimeSlot.constants'
 

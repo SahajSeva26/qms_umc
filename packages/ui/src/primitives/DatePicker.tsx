@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { format } from 'date-fns'
 import { FiCalendar, FiX } from 'react-icons/fi'
-import { Calendar } from '@/components/ui/calendar'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { cn } from '@/lib/utils'
+import { Calendar } from './Calendar'
+import { Popover, PopoverContent, PopoverTrigger } from './Popover'
+import { cn } from '../cn'
 
 interface DatePickerProps {
   /** ISO date string (YYYY-MM-DD) or empty string for unset */
@@ -21,8 +21,8 @@ interface DatePickerProps {
 const DEFAULT_START_MONTH = new Date(new Date().getFullYear() - 120, 0)
 const DEFAULT_END_MONTH = new Date()
 
-// Shared date picker — shadcn Popover + Calendar composition. Value in/out is
-// an ISO YYYY-MM-DD string to match how dates are stored across the mocks.
+// Shared date picker — Popover + Calendar composition. Value in/out is an ISO
+// YYYY-MM-DD string.
 const DatePicker = ({ value, onChange, placeholder = 'Pick a date', className, disabled, startMonth, endMonth }: DatePickerProps) => {
   const [open, setOpen] = useState(false)
   const selected = value ? new Date(`${value}T00:00:00`) : undefined

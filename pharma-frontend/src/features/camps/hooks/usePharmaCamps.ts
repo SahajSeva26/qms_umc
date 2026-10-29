@@ -6,14 +6,15 @@ export const pharmaCampKeys = {
   list: (query: SearchCampQuery) => ['pharma-camps', query] as const,
 }
 
-// GET /camps — generic role-scoped search for HO/RSM/ASM's dashboard. Distinct from
-// usePharmaMyCamps (MR/FO/Dietitian-only GET /camps/my).
-// TODO(backend): confirmed via direct code read that the backend's own-scope query for ASM/RSM
-// does NOT yet resolve a real downline (direct/indirect reports) — it only matches a camp where
-// the ASM/RSM's own role id happens to be stamped onto it at booking time, so this hook can return
-// an incomplete/inconsistent camp list for those roles today. HO (division-head) scoping is
-// correct. See md-files/BACKEND_REQUEST_camp-asm-rsm-own-scope.md (the scoping fix) and
-// md-files/BACKEND_REQUEST_camp-scope-indexes.md (indexes needed once that fix lands).
+// GET /camps — generic role-scoped search for HO/RSM/ASM/MR. Distinct from usePharmaMyCamps
+// (MR/FO/Dietitian-only GET /camps/my). HO (division-head) scoping matches the whole division.
+// ASM/RSM scoping matches camps where their own role id is stamped on an assignment field — for a
+// normally booked camp (POST /camps/book), that's set correctly at booking time by resolving the
+// target MR's real supervisor chain (mr -> asm -> rsm, see resolveMrChain in camp.service.ts), so
+// an ASM/RSM genuinely sees their downline's camps. It's a snapshot taken at booking time, not a
+// live hierarchy lookup: a camp keeps the manager who was in place when it was booked even after a
+// later MR reassignment, and a camp created without an mr in its payload (e.g. a void camp with
+// none supplied) never gets asm/rsm populated at all. Neither is a frontend concern to work around.
 export const usePharmaCamps = (query: SearchCampQuery, options?: { keepPreviousData?: boolean }) =>
   useQuery({
     queryKey: pharmaCampKeys.list(query),

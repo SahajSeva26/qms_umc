@@ -1,7 +1,7 @@
 import { Fragment, useState, type ReactNode } from 'react'
 import { FiChevronDown, FiChevronUp, FiAlertTriangle } from 'react-icons/fi'
 import type { CampEntity } from '@/types/campReal.types'
-import CopyButton from '@/components/ui/CopyButton'
+import { CopyButton } from '@qms/ui'
 import CampStatusPillReal from '@/components/widgets/camp/CampStatusPillReal'
 import { useCampRefNames } from '@/features/camps/hooks/useCampRefNames'
 import { usePermission } from '@/hooks/usePermission'

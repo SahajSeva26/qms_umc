@@ -1,7 +1,7 @@
 import { Fragment } from 'react'
 import { FiEdit2, FiInfo, FiHash, FiPackage, FiClock } from 'react-icons/fi'
 import SideDrawer from '@/components/ui/SideDrawer'
-import CopyButton from '@/components/ui/CopyButton'
+import { CopyButton } from '@qms/ui'
 import { Button } from '@/components/ui/button'
 import ExpiryBandPill from '@/features/inventory/real/components/ExpiryBandPill'
 import type { InventoryConsumableEntity } from '@/types/inventoryConsumable.types'

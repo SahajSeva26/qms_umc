@@ -7,6 +7,10 @@ export const PHARMA_ROUTES = {
   PHARMA_MR: '/pharma/mr',
   // Standalone Camp Dossier page — same content as the drawer's "Open page" deep link.
   PHARMA_CAMP_DOSSIER: '/pharma/camps/:id',
+  // Sidebar-level Doctor Management page, reachable by all four roles — see Sidebar.tsx.
+  DOCTOR_MANAGEMENT: '/pharma/doctors',
+  // Sidebar-level Camp Management page, reachable by all four roles — see Sidebar.tsx.
+  CAMP_MANAGEMENT: '/pharma/camps',
 }
 
 export const campDossierPath = (id: string) => PHARMA_ROUTES.PHARMA_CAMP_DOSSIER.replace(':id', id)

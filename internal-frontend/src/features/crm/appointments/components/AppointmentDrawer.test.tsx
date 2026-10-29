@@ -222,3 +222,30 @@ describe('AppointmentDrawer — Edit MOM (done appointments only)', () => {
     expect(appointmentsRealService.updateAppointment).not.toHaveBeenCalled()
   })
 })
+
+describe('AppointmentDrawer — meeting outcome', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    mockPermission(() => true)
+  })
+
+  it('offers outcome editing only after the appointment has concluded', () => {
+    const { rerender } = renderDrawer(appointmentFixture({ status: 'planned' }))
+    expect(screen.queryByRole('button', { name: /set outcome/i })).not.toBeInTheDocument()
+    rerender(<QueryClientProvider client={makeQueryClient()}><AppointmentDrawer appointment={appointmentFixture({ status: 'done' })} onClose={vi.fn()} /></QueryClientProvider>)
+    expect(screen.getByRole('button', { name: /set outcome/i })).toBeInTheDocument()
+  })
+
+  it('saves a selected backend outcome through the appointment update endpoint', async () => {
+    vi.mocked(appointmentsRealService.updateAppointment).mockResolvedValue({ data: { data: appointmentFixture() } } as never)
+    const user = userEvent.setup()
+    renderDrawer(appointmentFixture({ status: 'done' }))
+    await user.click(screen.getByRole('button', { name: /set outcome/i }))
+    await user.click(screen.getByRole('button', { name: /not responding/i }))
+    await user.type(screen.getByLabelText(/detail \/ reason/i), 'Client did not return the call')
+    await user.click(screen.getByRole('button', { name: /save outcome/i }))
+    expect(appointmentsRealService.updateAppointment).toHaveBeenCalledWith('appt-1', {
+      outcome: { title: 'not-responding', reason: 'Client did not return the call' },
+    })
+  })
+})

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import type { AppointmentEntity, AppointmentStatus } from '@/types/appointment.types'
+import type { AppointmentEntity, AppointmentOutcomeTitle, AppointmentStatus } from '@/types/appointment.types'
 import {
   APPOINTMENT_MODE_LABEL,
   APPOINTMENT_STATUS_LABEL,
@@ -43,6 +43,12 @@ const NEXT_STEPS_OPTIONS = [
   'Rescheduled meetings',
 ] as const
 const NEXT_STEPS_OTHER = 'Other'
+const OUTCOME_OPTIONS: { value: AppointmentOutcomeTitle; label: string; color: string }[] = [
+  { value: 'converted-to-lead', label: 'Converted to lead', color: '#10b981' },
+  { value: 'not-responding', label: 'Not responding', color: '#f43f5e' },
+  { value: 'not-interested', label: 'Not interested', color: '#94a3b8' },
+  { value: 'will-update-later', label: 'Will update later', color: '#f59e0b' },
+]
 
 const labelClasses = 'block text-[10px] font-semibold tracking-widest uppercase mb-2'
 const labelStyle = { color: 'var(--qms-text-muted)' }
@@ -83,7 +89,7 @@ const refId = (ref: unknown): string => {
   return obj._id ?? ''
 }
 
-type PanelKind = 'moveStage' | 'reschedule' | 'editMom' | null
+type PanelKind = 'moveStage' | 'reschedule' | 'editMom' | 'outcome' | null
 
 interface AppointmentDrawerProps {
   appointment: AppointmentEntity | null
@@ -102,6 +108,8 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
   const [rescheduleEnd, setRescheduleEnd] = useState('')
   const [rescheduleReason, setRescheduleReason] = useState('')
   const [editMomText, setEditMomText] = useState('')
+  const [outcomeTitle, setOutcomeTitle] = useState<AppointmentOutcomeTitle | ''>('')
+  const [outcomeReason, setOutcomeReason] = useState('')
   // True once the user has directly edited End — stops the auto-shift below.
   const [endTouched, setEndTouched] = useState(false)
   const [error, setError] = useState('')
@@ -253,6 +261,25 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
     }
   }
 
+  const openOutcome = () => {
+    blurActiveElement()
+    setError('')
+    setOutcomeTitle(appointment.outcome?.title ?? '')
+    setOutcomeReason(appointment.outcome?.reason ?? '')
+    setPanel('outcome')
+  }
+
+  const handleOutcomeSave = async () => {
+    if (!outcomeTitle) return setError('Select an outcome first.')
+    try {
+      await updateAppointment.mutateAsync({ outcome: { title: outcomeTitle, reason: outcomeReason.trim() } })
+      toast.success('Meeting outcome saved')
+      setPanel(null)
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Could not save the meeting outcome.'))
+    }
+  }
+
   const handleRsvp = async (status: 'accepted' | 'declined') => {
     try {
       await respond.mutateAsync({ status })
@@ -333,6 +360,16 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
         )}
       </div>
 
+      {appointment.outcome?.title && (
+        <div className="mt-4 rounded-xl border p-3" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface)' }}>
+          <SectionLabel>Meeting outcome</SectionLabel>
+          <p className="text-[13px] font-semibold" style={{ color: 'var(--qms-text)' }}>
+            {OUTCOME_OPTIONS.find((option) => option.value === appointment.outcome?.title)?.label ?? appointment.outcome.title}
+          </p>
+          {appointment.outcome.reason && <p className="mt-1 text-[12px] whitespace-pre-wrap" style={{ color: 'var(--qms-text-muted)' }}>{appointment.outcome.reason}</p>}
+        </div>
+      )}
+
       {appointment.internalMembers.length > 0 && (
         <div className="mt-4 rounded-xl border p-3" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface)' }}>
           <SectionLabel>
@@ -376,9 +413,12 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
       ) : (
         <div className="mt-5 pt-4 flex items-center justify-between gap-2 flex-wrap" style={{ borderTop: '1px solid var(--qms-border)' }}>
           <p className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>
-            This appointment is {(APPOINTMENT_STATUS_LABEL[appointment.status] ?? appointment.status).toLowerCase()} — read-only.
+            This appointment is {(APPOINTMENT_STATUS_LABEL[appointment.status] ?? appointment.status).toLowerCase()}.
           </p>
           <div className="flex gap-2">
+            {(appointment.status === 'done' || appointment.status === 'cancelled') && hasAnyPermission(['appointment:update', 'appointment:manage', 'tenant:manage']) && (
+              <Button type="button" size="sm" variant="outline" onClick={openOutcome}>Set outcome</Button>
+            )}
             {/* MOM is only ever first captured via the Mark-done dialog, so editing it afterward only
                 makes sense once the appointment is actually done. */}
             {appointment.status === 'done' && (
@@ -517,6 +557,40 @@ const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => 
           <DialogFooter>
             <Button variant="outline" onClick={() => setPanel(null)}>Cancel</Button>
             <Button onClick={handleEditMomSave} disabled={updateAppointment.isPending}>Save MOM</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={panel === 'outcome'} onOpenChange={(open) => !open && !updateAppointment.isPending && setPanel(null)}>
+        <DialogContent className="sm:max-w-[880px] p-0 overflow-hidden">
+          <DialogHeader className="px-5 py-4 border-b" style={{ borderColor: 'var(--qms-border)' }}>
+            <DialogTitle>Set meeting outcome</DialogTitle>
+            <p className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>{refName(appointment.tenant)} · {refName(appointment.contactPerson)}</p>
+          </DialogHeader>
+          <div className="px-5 py-5 space-y-4">
+            <div>
+              <Label className={labelClasses} style={labelStyle}>Outcome *</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {OUTCOME_OPTIONS.map((option) => (
+                  <button key={option.value} type="button" aria-pressed={outcomeTitle === option.value} onClick={() => { setOutcomeTitle(option.value); setError('') }}
+                    className="min-h-10 rounded-xl border px-3 text-left text-[12px] font-semibold transition-colors"
+                    style={{ borderColor: outcomeTitle === option.value ? '#a7bfff' : 'var(--qms-border)', background: outcomeTitle === option.value ? 'color-mix(in srgb, var(--qms-brand) 10%, var(--popover))' : 'var(--popover)', color: 'var(--qms-text)' }}>
+                    <span aria-hidden="true" style={{ color: option.color }}>●</span> {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <Label className={labelClasses} style={labelStyle} htmlFor="appointment-outcome-reason">Detail / reason</Label>
+              <Textarea id="appointment-outcome-reason" value={outcomeReason} onChange={(event) => setOutcomeReason(event.target.value)} rows={3}
+                placeholder="What did the client say? Any specific competitor / pricing / timing context?" />
+            </div>
+            {outcomeTitle === 'converted-to-lead' && <p className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>To create a CRM lead, use the separate New lead action after saving this outcome.</p>}
+            {error && <p role="alert" className="text-[12px] font-semibold text-danger">{error}</p>}
+          </div>
+          <DialogFooter className="border-t px-5 pt-4 pb-6" style={{ borderColor: 'var(--qms-border)' }}>
+            <Button variant="outline" onClick={() => setPanel(null)} disabled={updateAppointment.isPending}>Cancel</Button>
+            <Button onClick={handleOutcomeSave} disabled={updateAppointment.isPending}>{updateAppointment.isPending ? 'Saving…' : 'Save outcome'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

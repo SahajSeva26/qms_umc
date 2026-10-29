@@ -157,6 +157,13 @@ export interface AppointmentMom {
   submissionDeadline?: string
 }
 
+export type AppointmentOutcomeTitle = 'converted-to-lead' | 'not-interested' | 'not-responding' | 'will-update-later'
+
+export interface AppointmentOutcome {
+  title?: AppointmentOutcomeTitle
+  reason?: string
+}
+
 export interface AppointmentEntity {
   id: string
   code: string
@@ -176,6 +183,7 @@ export interface AppointmentEntity {
   agenda: AppointmentAgenda
   status: AppointmentStatus
   mom: AppointmentMom
+  outcome?: AppointmentOutcome
   // No top-level nextSteps field exists — it only ever lives inside stageHistory[].nextSteps.
   stageHistory: AppointmentStageHistoryEntry[]
   createdAt: string
@@ -231,6 +239,7 @@ export interface UpdateAppointmentPayload {
   endTime?: string
   agenda?: AppointmentAgenda
   mom?: { details?: string }
+  outcome?: { title: AppointmentOutcomeTitle; reason?: string }
 }
 
 export interface MoveAppointmentStagePayload {

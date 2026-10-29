@@ -39,12 +39,14 @@ const InvoiceDetailDrawer = ({ invoiceId, onClose }: InvoiceDetailDrawerProps) =
   const { data, isLoading, error, refetch } = useInvoice(invoiceId ?? undefined)
   const invoice = data?.data ?? null
   const invoiceProjectId = invoice ? (typeof invoice.project === 'string' ? invoice.project : invoice.project._id) : undefined
+  const { hasAnyPermission } = usePermission()
+  const canReadProjects = hasAnyPermission(['project:search', 'project:manage', 'camp:book', 'tenant:manage'])
+  const canReadCamps = hasAnyPermission(['camp:search', 'camp:manage', 'tenant:manage'])
   const {
     data: projectData,
     refetch: refetchProject,
-  } = useBillingProject(invoiceProjectId)
+  } = useBillingProject(canReadProjects ? invoiceProjectId : undefined)
   const project = projectData?.data ?? null
-  const { hasAnyPermission } = usePermission()
   const { page, setPage, pageSize, totalPages, resetToFirstPage } = usePagination(LINE_ITEM_PAGE_SIZE)
   const [addCampOpen, setAddCampOpen] = useState(false)
   const [addCampOpening, setAddCampOpening] = useState(false)
@@ -219,7 +221,7 @@ const InvoiceDetailDrawer = ({ invoiceId, onClose }: InvoiceDetailDrawerProps) =
                 <div className="text-[10px] font-semibold tracking-widest uppercase" style={{ color: 'var(--qms-text-muted)' }}>
                   Camps ({lineItemCount})
                 </div>
-                {isDraft && canAddLine && project && (
+                {isDraft && canAddLine && canReadCamps && project && (
                   <Button variant="outline" size="sm" onClick={handleOpenAddCamp} disabled={addCampOpening}>
                     {addCampOpening ? 'Loading…' : 'Add camp'}
                   </Button>

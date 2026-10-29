@@ -12,7 +12,7 @@ const REAL_GATED_NAV_ITEMS: Record<string, string[]> = {
   foanalytics: ['system:manage'],
   docanalytics: ['system:manage'],
   finanalytics: ['system:manage'],
-  crminvoicing: ['system:manage'],
+  crminvoicing: ['invoice:search', 'invoice:manage', 'tenant:manage'],
   crm: ['lead:search', 'lead:manage', 'tenant:manage'],
   tenants: ['tenant:get', 'tenant:search', 'tenant:manage'],
   permissiongroups: ['permission-group:get', 'permission-group:search', 'tenant:admin'],

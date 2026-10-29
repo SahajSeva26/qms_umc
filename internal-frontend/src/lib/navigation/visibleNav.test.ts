@@ -68,6 +68,18 @@ describe('isNavItemVisible — Dashboard + the 4 analytics items are system:mana
   })
 })
 
+describe('CRM Invoicing navigation', () => {
+  const item = { id: 'crminvoicing', label: 'CRM Invoicing', icon: 'FileText', path: '/billing/crm' }
+
+  it('shows the page to a finance manager with invoice manage permission', () => {
+    expect(isNavItemVisible(item, sessionFixture({ permissions: ['invoice:manage', 'invoice-line-item:manage'] }))).toBe(true)
+  })
+
+  it('does not show the page for a session without invoice read permission', () => {
+    expect(isNavItemVisible(item, sessionFixture({ permissions: ['invoice-line-item:manage'] }))).toBe(false)
+  })
+})
+
 describe('isNavItemVisible — "geoprofiles" (Field Staff Coverage) is open to any authenticated session, matching GET /geo-profiles\' genuinely open backend reads', () => {
   it('is visible even for a session with zero permissions', () => {
     const session = sessionFixture({ isSettled: true, permissions: [] })

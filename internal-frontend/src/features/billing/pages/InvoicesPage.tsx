@@ -19,10 +19,12 @@ type InvoicingTab = 'generate' | 'pipeline'
 
 const InvoicesPage = () => {
   const { hasAnyPermission } = usePermission()
-  const canCreate = hasAnyPermission(['invoice:create', 'invoice:manage'])
+  const canReadProjects = hasAnyPermission(['project:search', 'project:manage', 'camp:book', 'tenant:manage'])
+  const canReadCamps = hasAnyPermission(['camp:search', 'camp:manage', 'tenant:manage'])
+  const canCreate = hasAnyPermission(['invoice:create', 'invoice:manage']) && canReadProjects && canReadCamps
   const canMoveStage = hasAnyPermission(['invoice:manage', 'tenant:manage'])
   // GET /invoices/:id requires invoice:get/invoice:manage/tenant:manage, distinct from invoice:search which reaches this list.
-  // /billing/crm's own route guard (system:manage only, temporary) currently masks this; gated anyway for when that's widened.
+  // The route admits invoice readers, including finance managers; detail has its own endpoint guard.
   const canViewDetail = hasAnyPermission(['invoice:get', 'invoice:manage', 'tenant:manage'])
   const [tab, setTab] = useState<InvoicingTab>(canCreate ? 'generate' : 'pipeline')
 
@@ -101,9 +103,9 @@ const InvoicesPage = () => {
 
       {tab === 'pipeline' && (
         <div>
-          <div className="w-80 mb-4">
+          {canReadProjects && <div className="w-80 mb-4">
             <BillingProjectPicker value={filterProjectId} label={filterProjectLabel} onChange={handleFilterProjectChange} />
-          </div>
+          </div>}
 
           <InvoicePipelineKpiStrip report={report} isLoading={isReportLoading} error={reportError} />
 

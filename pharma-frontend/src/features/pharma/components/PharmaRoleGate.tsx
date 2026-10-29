@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { useEffect } from 'react'
 import { useSession } from '@/hooks/useSession'
-import ENV from '@/config/env'
+import { internalHref } from '@/config/env'
 
 interface PharmaRoleGateProps {
   /** The pharma role-type code(s) this page is for (see roleType.constants.ts). */
@@ -16,7 +16,8 @@ const PharmaRoleGate = ({ roleTypeCode, children }: PharmaRoleGateProps) => {
 
   useEffect(() => {
     if (isConfirmedUnauthenticated) {
-      window.location.href = `${ENV.Hosts.InternalOrigin}/auth/login`
+      const attempted = `${window.location.pathname}${window.location.search}${window.location.hash}`
+      window.location.href = internalHref(`/auth/login?returnTo=${encodeURIComponent(attempted)}`)
     }
   }, [isConfirmedUnauthenticated])
 

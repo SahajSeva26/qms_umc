@@ -1,12 +1,26 @@
-// A production build with VITE_INTERNAL_ORIGIN unset would otherwise silently fall back to
-// localhost, redirecting every internal-only session to a dead local dev server. Required in
-// production; the localhost default is for local dev only.
-function requiredInProd(value: string | undefined, name: string, devDefault: string): string {
-  if (value) return value
+// Production serves both apps from ONE public origin, path-routed by a CDN/reverse proxy
+// (internal owns '/', pharma owns '/pharma/*') — see md-files/FRONTEND_SPLIT_ARCHITECTURE.md §5.
+// A navigation to an internal path (e.g. the shared /auth/login) in production is therefore just
+// a relative path; the proxy decides which build actually serves it. Only LOCAL DEV genuinely has
+// two different origins (different Vite ports, no proxy in front), so an absolute cross-origin URL
+// is only ever built there, from an explicit, OPTIONAL dev-only override — never required, and
+// never meaningful in a production build.
+const INTERNAL_DEV_ORIGIN_FALLBACK = 'http://localhost:5173'
+
+function internalDevOrigin(): string | null {
+  const configured = import.meta.env.VITE_INTERNAL_DEV_ORIGIN
   if (import.meta.env.PROD) {
-    throw new Error(`${name} is required in a production build — refusing to fall back to a localhost default.`)
+    if (configured) {
+      throw new Error(
+        'VITE_INTERNAL_DEV_ORIGIN is a local-development-only override and must not be set in a production build — production reaches the shared login through the same public origin via the deployment proxy, not a configured cross-origin URL.',
+      )
+    }
+    return null
   }
-  return devDefault
+  if (configured && !/^https?:\/\/localhost(:\d+)?$/.test(configured)) {
+    throw new Error(`VITE_INTERNAL_DEV_ORIGIN must be a bare http(s)://localhost[:port] origin, got: ${configured}`)
+  }
+  return configured || INTERNAL_DEV_ORIGIN_FALLBACK
 }
 
 const ENV = {
@@ -15,11 +29,6 @@ const ENV = {
     Environment: import.meta.env.VITE_ENV || 'development',
     Name: 'QMS Pharma Portal',
   },
-  // Where this app sends a session that turns out to be internal-only, per
-  // the Decided login flow (md-files/FRONTEND_SPLIT_ARCHITECTURE.md §5).
-  Hosts: {
-    InternalOrigin: requiredInProd(import.meta.env.VITE_INTERNAL_ORIGIN, 'VITE_INTERNAL_ORIGIN', 'http://localhost:5173'),
-  },
   // Both empty until set — LocationPicker treats either as "not configured"
   // and renders a fallback rather than attempting to load the Maps SDK.
   Maps: {
@@ -27,5 +36,17 @@ const ENV = {
     MapId: import.meta.env.VITE_GOOGLE_MAP_ID || '',
   },
 } as const
+
+/**
+ * The href to navigate to for a path that belongs to the internal-frontend build (e.g. the shared
+ * '/auth/login'). In production this is the SAME relative path, unchanged — correct because both
+ * apps share one public origin and the proxy routes everything outside '/pharma/*' to the internal
+ * build. In local dev (no proxy in front) it's prefixed with internal-frontend's own dev-server
+ * origin so the browser actually reaches the right process.
+ */
+export function internalHref(path: string): string {
+  const devOrigin = internalDevOrigin()
+  return devOrigin ? `${devOrigin}${path}` : path
+}
 
 export default ENV

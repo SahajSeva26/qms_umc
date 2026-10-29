@@ -4,7 +4,7 @@ import { RouteFallback, SessionLoading, SessionRecovery } from '@qms/ui'
 import { useSession } from '@/hooks/useSession'
 import Sidebar from '@/components/layouts/Sidebar'
 import Topbar from '@/components/layouts/Topbar'
-import ENV from '@/config/env'
+import { internalHref } from '@/config/env'
 
 // Lazy: @base-ui/react/dialog only needs to be fetched once the hamburger is actually pressed,
 // not on every page's initial load (it was previously eager here, adding ~37kB gzip to the
@@ -48,14 +48,22 @@ const AppLayout = () => {
   if (isSessionError && !session && !sawSessionError) setSawSessionError(true)
   if (session && sawSessionError) setSawSessionError(false)
 
-  // No login page lives in this app — the shared login is hosted at the
-  // internal app's origin (see the Decided login note in
-  // md-files/FRONTEND_SPLIT_ARCHITECTURE.md §5). A cross-origin navigation,
-  // not an in-app route — kept in an effect (not inline during render) so a
+  // No login page lives in this app — the shared login is hosted at the internal app's path (see
+  // the Decided login note in md-files/FRONTEND_SPLIT_ARCHITECTURE.md §5). A hard document
+  // navigation, not an in-app route — internalHref resolves to a same-origin relative path in
+  // production (the deployment proxy routes it to the internal build) and only becomes an
+  // absolute cross-port URL in local dev. Kept in an effect (not inline during render) so a
   // temporary session failure (429/5xx) never redirects, only a CONFIRMED 401.
+  //
+  // Captures the FULL attempted destination (pathname + search + hash, e.g. a specific camp
+  // dossier with its own query/anchor state) as returnTo, so a direct deep link isn't lost — see
+  // features/auth/returnTo.ts (internal-frontend) for where this is validated against the
+  // now-authenticated session before ever being used, never trusted before that.
   useEffect(() => {
     if (isConfirmedUnauthenticated) {
-      window.location.href = `${ENV.Hosts.InternalOrigin}/auth/login`
+      const attempted = `${window.location.pathname}${window.location.search}${window.location.hash}`
+      const loginPath = `/auth/login?returnTo=${encodeURIComponent(attempted)}`
+      window.location.href = internalHref(loginPath)
     }
   }, [isConfirmedUnauthenticated])
 

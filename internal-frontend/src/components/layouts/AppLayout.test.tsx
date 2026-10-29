@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import type { SessionResponse } from '@/types/accessManagement.types'
 
@@ -8,6 +8,28 @@ vi.mock('@/hooks/useSession')
 vi.mock('./Sidebar', () => ({ default: () => <div>Sidebar</div> }))
 vi.mock('./Topbar', () => ({ default: () => <div>Topbar</div> }))
 vi.mock('@/features/qa-feedback/components/FeedbackWidget', () => ({ default: () => null }))
+
+// A pharma destination is now reached via a hard document navigation (window.location.replace),
+// not an in-app react-router Navigate — it's a DIFFERENT BUILD under '/pharma/*', not a route this
+// router owns (see md-files/FRONTEND_SPLIT_ARCHITECTURE.md §5). pharmaHref resolves to an absolute
+// http://localhost:5174 URL in this (non-PROD) test environment — see config/env.ts's
+// pharmaDevOrigin(). Assert the navigation call itself, not rendered page content that can never
+// actually appear (jsdom doesn't follow window.location.replace).
+const replaceSpy = vi.fn()
+const originalLocation = window.location
+
+afterEach(() => {
+  Object.defineProperty(window, 'location', { value: originalLocation, writable: true, configurable: true })
+  replaceSpy.mockClear()
+})
+
+function mockLocationReplace() {
+  Object.defineProperty(window, 'location', {
+    value: { ...originalLocation, replace: replaceSpy },
+    writable: true,
+    configurable: true,
+  })
+}
 
 function sessionFixture(roleTypeCode: string): SessionResponse {
   return {
@@ -26,11 +48,10 @@ async function renderAt(path: string) {
       <Routes>
         <Route element={<AppLayout />}>
           <Route path="/dashboard" element={<div>Dashboard Page</div>} />
-          <Route path="/pharma" element={<div>Pharma Redirect Page</div>} />
-          <Route path="/pharma/rsm" element={<div>RSM Portal Page</div>} />
-          <Route path="/pharma/asm" element={<div>ASM Portal Page</div>} />
-          <Route path="/pharma/ho" element={<div>HO Portal Page</div>} />
-          <Route path="/pharma/mr" element={<div>MR Portal Page</div>} />
+          {/* No '/pharma/*' routes here — intentionally, matching the real router (see
+              app/router.tsx's own note): internal-frontend no longer registers any '/pharma/*'
+              route at all, so a pharma session is ALWAYS sent out via the hard document
+              navigation below, regardless of which internal path it's currently on. */}
           <Route path="/pharmaceutical-x" element={<div>Pharmaceutical X Page</div>} />
           <Route path="/camps" element={<div>Camp Management Page</div>} />
           <Route path="/camps/screening" element={<div>Screening Camps Page</div>} />
@@ -96,7 +117,15 @@ describe('AppLayout — session lifecycle', () => {
 })
 
 describe('AppLayout — pharma/QMS route isolation', () => {
-  it('redirects a QMS session directly opening /pharma to /unauthorized, never rendering pharma content', async () => {
+  // A non-pharma session never triggers the pharmaMeta redirect branch at all — getPharmaRoleMeta
+  // returns null for it, regardless of the current path. This router also no longer registers any
+  // '/pharma/*' route for internal-frontend to defend against in the first place (the deployment
+  // proxy routes that prefix to the separately-deployed pharma build before this app ever sees the
+  // request) — so there is no "QMS session hits /pharma, gets redirected to /unauthorized" case
+  // left to test here; a bad in-app URL for a QMS session is the router's own catch-all's concern,
+  // not AppLayout's.
+  it('a non-pharma session never triggers the pharma redirect, on any path, and makes no navigation call', async () => {
+    mockLocationReplace()
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
       session: sessionFixture('system-admin'),
@@ -106,13 +135,14 @@ describe('AppLayout — pharma/QMS route isolation', () => {
       refetchSession: vi.fn(),
     } as unknown as ReturnType<typeof useSession>)
 
-    await renderAt('/pharma')
+    await renderAt('/dashboard')
 
-    expect(await screen.findByText('Unauthorized Page')).toBeInTheDocument()
-    expect(screen.queryByText('Pharma Redirect Page')).not.toBeInTheDocument()
+    expect(await screen.findByText('Dashboard Page')).toBeInTheDocument()
+    expect(replaceSpy).not.toHaveBeenCalled()
   })
 
-  it('redirects a pharma session directly opening /dashboard to their own portal path', async () => {
+  it('redirects a pharma session directly opening /dashboard to their own portal build via a hard document navigation', async () => {
+    mockLocationReplace()
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
       session: sessionFixture('pharma-rsm'),
@@ -124,23 +154,33 @@ describe('AppLayout — pharma/QMS route isolation', () => {
 
     await renderAt('/dashboard')
 
-    expect(await screen.findByText('RSM Portal Page')).toBeInTheDocument()
+    await waitFor(() => expect(replaceSpy).toHaveBeenCalledWith('http://localhost:5174/pharma/rsm'))
     expect(screen.queryByText('Dashboard Page')).not.toBeInTheDocument()
   })
 
-  it('does not redirect a pharma session already on its own portal path — no redirect loop', async () => {
+  // The navigation itself must run in a useEffect, not directly in the render body — a side
+  // effect with a real-world consequence (an actual browser navigation) must not execute during
+  // render, which React may call more than once for the same commit (Strict Mode double-invoke,
+  // concurrent rendering) or discard without committing at all. Proven here by asserting the
+  // "Redirecting…" shell is a REAL, visible render output, not just an inference from the
+  // navigation call — if the navigation ran directly in the render body instead (call
+  // window.location.replace, then `return null`), this component would never produce visible
+  // "Redirecting…" text at all; there would be nothing here to find.
+  it('renders a visible "Redirecting to your portal…" shell as its own real output — the render body itself must never directly fire a side-effecting navigation', async () => {
+    mockLocationReplace()
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
-      session: sessionFixture('pharma-rsm'),
+      session: sessionFixture('pharma-mr'),
       isFetching: false,
       isError: false,
       isConfirmedUnauthenticated: false,
       refetchSession: vi.fn(),
     } as unknown as ReturnType<typeof useSession>)
 
-    await renderAt('/pharma/rsm')
+    await renderAt('/dashboard')
 
-    expect(await screen.findByText('RSM Portal Page')).toBeInTheDocument()
+    expect(await screen.findByText('Redirecting to your portal…')).toBeInTheDocument()
+    expect(replaceSpy).toHaveBeenCalledWith('http://localhost:5174/pharma/mr')
   })
 
   it('does not redirect a QMS session on a non-pharma path — normal rendering proceeds', async () => {
@@ -159,7 +199,8 @@ describe('AppLayout — pharma/QMS route isolation', () => {
     expect(screen.getByText('Sidebar')).toBeInTheDocument()
   })
 
-  it('does not treat an unrelated /pharmaceutical-x path as a pharma path', async () => {
+  it('redirects a pharma session on an unrelated /pharmaceutical-x path too — there is no path-string special-casing left, only the field-force exception list', async () => {
+    mockLocationReplace()
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
       session: sessionFixture('pharma-rsm'),
@@ -171,7 +212,7 @@ describe('AppLayout — pharma/QMS route isolation', () => {
 
     await renderAt('/pharmaceutical-x')
 
-    expect(await screen.findByText('RSM Portal Page')).toBeInTheDocument()
+    await waitFor(() => expect(replaceSpy).toHaveBeenCalledWith('http://localhost:5174/pharma/rsm'))
   })
 
   // Pharma field-force's (MR/ASM/RSM) one exception: they also get the real (non-pharma) Camp
@@ -195,7 +236,8 @@ describe('AppLayout — pharma/QMS route isolation', () => {
     expect(await screen.findByText('Camp Management Page')).toBeInTheDocument()
   })
 
-  it('still redirects pharma-division-head (not field-force) away from /camps, back to their own portal', async () => {
+  it('still redirects pharma-division-head (not field-force) away from /camps, back to their own portal build', async () => {
+    mockLocationReplace()
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
       session: sessionFixture('pharma-division-head'),
@@ -207,7 +249,7 @@ describe('AppLayout — pharma/QMS route isolation', () => {
 
     await renderAt('/camps')
 
-    expect(await screen.findByText('HO Portal Page')).toBeInTheDocument()
+    await waitFor(() => expect(replaceSpy).toHaveBeenCalledWith('http://localhost:5174/pharma/ho'))
     expect(screen.queryByText('Camp Management Page')).not.toBeInTheDocument()
   })
 
@@ -217,7 +259,8 @@ describe('AppLayout — pharma/QMS route isolation', () => {
     ['/camps/screening', 'Screening Camps Page'],
     ['/camps/new', 'New Camp Page'],
     ['/camps/cmp-1', 'Camp Detail Page'],
-  ])('redirects pharma-mr away from %s back to the MR portal, not the combined Camp Management exception', async (path, pageText) => {
+  ])('redirects pharma-mr away from %s to its own portal build, not the combined Camp Management exception', async (path, pageText) => {
+    mockLocationReplace()
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
       session: sessionFixture('pharma-mr'),
@@ -229,7 +272,7 @@ describe('AppLayout — pharma/QMS route isolation', () => {
 
     await renderAt(path)
 
-    expect(await screen.findByText('MR Portal Page')).toBeInTheDocument()
+    await waitFor(() => expect(replaceSpy).toHaveBeenCalledWith('http://localhost:5174/pharma/mr'))
     expect(screen.queryByText(pageText)).not.toBeInTheDocument()
   })
 
@@ -253,7 +296,8 @@ describe('AppLayout — pharma/QMS route isolation', () => {
     expect(await screen.findByText('Diet Camps Page')).toBeInTheDocument()
   })
 
-  it('still redirects pharma-division-head (not field-force) away from /camps/diet, back to their own portal', async () => {
+  it('still redirects pharma-division-head (not field-force) away from /camps/diet, back to their own portal build', async () => {
+    mockLocationReplace()
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
       session: sessionFixture('pharma-division-head'),
@@ -265,7 +309,7 @@ describe('AppLayout — pharma/QMS route isolation', () => {
 
     await renderAt('/camps/diet')
 
-    expect(await screen.findByText('HO Portal Page')).toBeInTheDocument()
+    await waitFor(() => expect(replaceSpy).toHaveBeenCalledWith('http://localhost:5174/pharma/ho'))
     expect(screen.queryByText('Diet Camps Page')).not.toBeInTheDocument()
   })
 
@@ -289,7 +333,8 @@ describe('AppLayout — pharma/QMS route isolation', () => {
     expect(await screen.findByText('Doctor Management Page')).toBeInTheDocument()
   })
 
-  it('still redirects pharma-division-head (not field-force) away from /doctors, back to their own portal', async () => {
+  it('still redirects pharma-division-head (not field-force) away from /doctors, back to their own portal build', async () => {
+    mockLocationReplace()
     const { useSession } = await import('@/hooks/useSession')
     vi.mocked(useSession).mockReturnValue({
       session: sessionFixture('pharma-division-head'),
@@ -301,7 +346,7 @@ describe('AppLayout — pharma/QMS route isolation', () => {
 
     await renderAt('/doctors')
 
-    expect(await screen.findByText('HO Portal Page')).toBeInTheDocument()
+    await waitFor(() => expect(replaceSpy).toHaveBeenCalledWith('http://localhost:5174/pharma/ho'))
     expect(screen.queryByText('Doctor Management Page')).not.toBeInTheDocument()
   })
 })

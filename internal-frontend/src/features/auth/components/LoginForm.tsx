@@ -6,13 +6,18 @@ import { loginSchema, type LoginFormValues } from '../auth.schemas'
 import { useLogin } from '../hooks/useLogin'
 import ThemeToggle from '@/components/ui/ThemeToggle'
 import { AUTH_ROUTES } from '@/features/auth/auth.paths'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getApiErrorMessage, isServerUnreachable, isServiceFailure } from '@/utils/apiError'
 import { useServerHealth } from '@/hooks/useServerHealth'
 import ServerUnavailable from '@/components/layouts/ServerUnavailable'
 
 const LoginForm = () => {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  // Untrusted at this point — just the raw string the login URL was opened with. Real validation
+  // (well-formed + allowlisted against the now-authenticated session) happens in AuthContinuePage,
+  // which is the earliest point a session actually exists to validate against.
+  const returnTo = searchParams.get('returnTo')
   const { mutate: login, isPending, error, reset: resetLogin } = useLogin()
   const [showPassword, setShowPassword] = useState(false)
   const { checkHealth, isChecking } = useServerHealth()
@@ -34,7 +39,13 @@ const LoginForm = () => {
     login(values, {
       // AuthContinuePage resolves the real per-session landing page from the session query
       // useLogin() already refetches — no second /auth/me call, no hard-coded destination.
-      onSuccess: () => navigate(AUTH_ROUTES.CONTINUE, { replace: true }),
+      // returnTo is carried through unvalidated as a search param — AuthContinuePage is where
+      // it's actually checked against the now-known session, never trusted before that.
+      onSuccess: () =>
+        navigate(
+          returnTo ? `${AUTH_ROUTES.CONTINUE}?returnTo=${encodeURIComponent(returnTo)}` : AUTH_ROUTES.CONTINUE,
+          { replace: true },
+        ),
       onError: (err) => {
         if (isServerUnreachable(err)) setUnreachable(true)
       },

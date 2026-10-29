@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import { authService } from '@/features/auth/auth.service'
-import ENV from '@/config/env'
+import { internalHref } from '@/config/env'
 
 // Pharma-frontend has no in-app login route or local auth store to clear (the
 // shared login lives at the internal app's origin — see AppLayout.tsx), so a
@@ -15,7 +15,9 @@ export const useSignOut = () => {
   const mutation = useMutation({
     mutationFn: () => authService.logout(),
     onSuccess: () => {
-      window.location.href = `${ENV.Hosts.InternalOrigin}/auth/login`
+      // No returnTo here, deliberately — a user who just signed out should land on a plain login
+      // page, not be sent straight back to the page they were on when they chose to sign out.
+      window.location.href = internalHref('/auth/login')
     },
   })
 

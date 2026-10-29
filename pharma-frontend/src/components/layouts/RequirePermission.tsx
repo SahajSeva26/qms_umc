@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
 import { SessionRecovery } from '@qms/ui'
 import { usePermission } from '@/hooks/usePermission'
-import ENV from '@/config/env'
+import { internalHref } from '@/config/env'
 
 interface RequirePermissionProps {
   anyOf?: string[]
@@ -22,9 +22,11 @@ const RequirePermission = ({ anyOf, allOf, children }: RequirePermissionProps) =
   if (session && sawSessionError) setSawSessionError(false)
 
   // In an effect so a temporary session failure (429/5xx) never redirects, only a CONFIRMED 401.
+  // Captures the attempted destination as returnTo — same fix as AppLayout.tsx's own redirect.
   useEffect(() => {
     if (isConfirmedUnauthenticated) {
-      window.location.href = `${ENV.Hosts.InternalOrigin}/auth/login`
+      const attempted = `${window.location.pathname}${window.location.search}${window.location.hash}`
+      window.location.href = internalHref(`/auth/login?returnTo=${encodeURIComponent(attempted)}`)
     }
   }, [isConfirmedUnauthenticated])
 

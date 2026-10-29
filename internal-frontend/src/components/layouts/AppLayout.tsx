@@ -1,4 +1,4 @@
-import { Suspense, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { Outlet, Navigate, useLocation } from 'react-router-dom'
 import { RouteFallback, SessionLoading, SessionRecovery, GoogleMapsProvider } from '@qms/ui'
 import { useSession } from '@/hooks/useSession'
@@ -8,7 +8,7 @@ import { PHARMA_FIELD_ROLE_TYPE_CODES } from '@/lib/access/pharmaAccess'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 import FeedbackWidget from '@/features/qa-feedback/components/FeedbackWidget'
-import ENV from '@/config/env'
+import ENV, { pharmaHref } from '@/config/env'
 
 const SB_INTENT_KEY = 'qms.sb.intent'
 
@@ -48,11 +48,39 @@ const AppLayout = () => {
     })
   }
 
+  // roleType is typed as required, but the backend mapper can emit roleType:
+  // null for a role with no type — optional-chain past the frontend type here.
+  const pharmaMeta = session ? getPharmaRoleMeta(session.roleType?.code) : null
+  // MR/ASM/RSM's exceptions: Camp Management, Diet Camps (exact matches — not /camps/screening,
+  // /camps/new, etc.), and Doctor Management.
+  const onFieldExtraPath = !!session?.roleType?.code && PHARMA_FIELD_ROLE_TYPE_CODES.includes(session.roleType.code) && (location.pathname === '/camps' || location.pathname === '/camps/diet' || location.pathname === '/doctors')
+  const shouldRedirectToPharma = !!pharmaMeta && !onFieldExtraPath
+
+  // A pharma session on any internal-frontend route (this router no longer registers '/pharma/*'
+  // at all — the deployment proxy routes that prefix to the separately-deployed pharma build
+  // before it ever reaches here) is sent to its own portal via a hard document navigation, not an
+  // in-app Navigate — it's a different bundle. pharmaHref: same-origin relative path in
+  // production, cross-port absolute URL in local dev only. Kept in an effect, not inline during
+  // render: a side effect with a real-world consequence (an actual browser navigation) must not
+  // run directly in a render body, which React may call more than once for the same commit
+  // (Strict Mode double-invoke, concurrent rendering, a discarded render) or not commit at all.
+  useEffect(() => {
+    if (shouldRedirectToPharma && pharmaMeta) {
+      window.location.replace(pharmaHref(pharmaMeta.portalPath))
+    }
+  }, [shouldRedirectToPharma, pharmaMeta])
+
   // Keyed off `session` itself, never Zustand's looser `isAuthenticated`,
   // which can be true while `session` is still null right after a fresh login.
   if (!session) {
     // GET /auth/me shares a rate limiter with login/refresh, so a 429 must not read as an invalid session.
-    if (isConfirmedUnauthenticated) return <Navigate to={AUTH_ROUTES.LOGIN} replace />
+    if (isConfirmedUnauthenticated) {
+      // Captures the attempted destination as returnTo (validated later against the now-known
+      // session in AuthContinuePage — see features/auth/returnTo.ts) so a cold visit to a deep
+      // internal URL isn't lost. Mirrors the api.ts interceptor's own redirectToLogin fix.
+      const attempted = `${location.pathname}${location.search}${location.hash}`
+      return <Navigate to={`${AUTH_ROUTES.LOGIN}?returnTo=${encodeURIComponent(attempted)}`} replace />
+    }
 
     if (sawSessionError) return <SessionRecovery onRetry={refetchSession} pending={isSessionFetching} />
 
@@ -61,18 +89,14 @@ const AppLayout = () => {
     return <SessionRecovery onRetry={refetchSession} pending={isSessionFetching} />
   }
 
-  // roleType is typed as required, but the backend mapper can emit roleType:
-  // null for a role with no type — optional-chain past the frontend type here.
-  const pharmaMeta = getPharmaRoleMeta(session.roleType?.code)
-  const onPharmaPath = location.pathname === '/pharma' || location.pathname.startsWith('/pharma/')
-  // MR/ASM/RSM's exceptions: Camp Management, Diet Camps (exact matches — not /camps/screening,
-  // /camps/new, etc.), and Doctor Management.
-  const onFieldExtraPath = !!session.roleType?.code && PHARMA_FIELD_ROLE_TYPE_CODES.includes(session.roleType.code) && (location.pathname === '/camps' || location.pathname === '/camps/diet' || location.pathname === '/doctors')
-  if (pharmaMeta && !onPharmaPath && !onFieldExtraPath) {
-    return <Navigate to={pharmaMeta.portalPath} replace />
-  }
-  if (!pharmaMeta && onPharmaPath) {
-    return <Navigate to="/unauthorized" replace />
+  if (shouldRedirectToPharma) {
+    // The effect above is already in flight (or has already fired) — this is only what's briefly
+    // on screen while the browser is still navigating to the new path.
+    return (
+      <div className="text-[13px] py-10 text-center" style={{ color: 'var(--qms-text-muted)' }}>
+        Redirecting to your portal…
+      </div>
+    )
   }
 
   return (

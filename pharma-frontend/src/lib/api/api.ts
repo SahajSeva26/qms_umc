@@ -1,5 +1,5 @@
 import axios from 'axios'
-import ENV from '@/config/env'
+import ENV, { internalHref } from '@/config/env'
 
 const LOGIN_PATH = '/auth/login'
 
@@ -22,13 +22,17 @@ const api = axios.create({
 // refresh-token call.
 let refreshPromise: Promise<void> | null = null
 
-// The shared login lives at the internal app's origin per the Decided login
-// flow (md-files/FRONTEND_SPLIT_ARCHITECTURE.md §5) — a real cross-origin
-// navigation, not an in-app route. Guards against a reload loop the same way
-// internal-frontend's api.ts does: skip if we're already there.
+// The shared login lives at the internal app's path per the Decided login flow
+// (md-files/FRONTEND_SPLIT_ARCHITECTURE.md §5) — a hard document navigation, not an in-app route.
+// internalHref resolves to a same-origin relative path in production (the deployment proxy routes
+// it to the internal build) and only becomes an absolute cross-port URL in local dev. Guards
+// against a reload loop the same way internal-frontend's api.ts does: skip if we're already there.
+// Captures the full attempted destination as returnTo, same as AppLayout's cold-visit redirect —
+// this is the OTHER entry point (a mid-session 401, not just a cold unauthenticated visit).
 function redirectToLogin() {
-  const loginUrl = `${ENV.Hosts.InternalOrigin}${LOGIN_PATH}`
-  if (window.location.href.startsWith(loginUrl)) return
+  const attempted = `${window.location.pathname}${window.location.search}${window.location.hash}`
+  const loginUrl = internalHref(`${LOGIN_PATH}?returnTo=${encodeURIComponent(attempted)}`)
+  if (window.location.href.startsWith(internalHref(LOGIN_PATH))) return
   window.location.href = loginUrl
 }
 

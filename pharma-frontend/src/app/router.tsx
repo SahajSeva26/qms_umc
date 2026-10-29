@@ -22,7 +22,12 @@ const appRouter = createBrowserRouter([
         errorElement: <RouteErrorBoundary />,
         children: [
           // Sends each session to its own role's portal path below — not a page of its own.
+          // Registered at BOTH '/' (bare dev-server root, no proxy in front — localhost:5174/)
+          // AND '/pharma' (the actual deployed public root for this build in production — see
+          // md-files/FRONTEND_SPLIT_ARCHITECTURE.md §5a; a direct visit to that path, not just '/',
+          // must resolve the session's portal the same way, not 404 through the catch-all below).
           { index: true, lazy: lazyRoute(() => import('@/features/pharma/pages/PharmaIndexRedirect'), PHARMA_VIEW_PERMISSIONS) },
+          { path: '/pharma', lazy: lazyRoute(() => import('@/features/pharma/pages/PharmaIndexRedirect'), PHARMA_VIEW_PERMISSIONS) },
           // Lazy-loaded via the router itself (not React.lazy) so each role's chunk is never in
           // the initial bundle. PharmaRoleGate (inside each page) still blocks a direct hit on
           // the wrong role's path — this permission check only gates "any pharma access at all".

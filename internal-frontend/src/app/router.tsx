@@ -10,7 +10,6 @@ import { campsRoutes } from '@/features/camps/camps.routes'
 import { dietRoutes } from '@/features/diet/diet.routes'
 import { foRoutes } from '@/features/fo/fo.routes'
 import { dedicatedOpsRoutes } from '@/features/dedicatedops/dedicatedops.routes'
-import { pharmaRoutes } from '@/features/pharma/pharma.routes'
 import { projectsRoutes } from '@/features/projects/projects.routes'
 import { doctorsRoutes } from '@/features/doctors/doctors.routes'
 import { geoProfileRoutes } from '@/features/geo-profile/geoProfile.routes'
@@ -55,7 +54,6 @@ const appRouter = createBrowserRouter([
           ...dietRoutes,
           ...foRoutes,
           ...dedicatedOpsRoutes,
-          ...pharmaRoutes,
           ...projectsRoutes,
           ...doctorsRoutes,
           ...geoProfileRoutes,
@@ -65,6 +63,13 @@ const appRouter = createBrowserRouter([
           ...accessManagementRoutes,
           ...divisionsRoutes,
           ...qaFeedbackRoutes,
+          // NOTE: no '/pharma/*' routes here — intentionally removed, not an oversight.
+          // Production serves '/pharma/*' from the separately-deployed pharma-frontend build via
+          // the deployment proxy (one public origin, path-routed — see
+          // md-files/FRONTEND_SPLIT_ARCHITECTURE.md §5); this router never sees those requests.
+          // features/pharma/pages/{HoPortalPage,RsmPortalPage,AsmPortalPage,MrPortalPage,
+          // PharmaRedirectPage,CampDossierPage,...} are now orphaned — left in place, not deleted,
+          // since removing them is a separate cleanup decision from this routing change.
           // Authenticated catch-all — keeps the sidebar/topbar for a bad
           // in-app URL instead of falling through to a route-less blank page.
           { path: '*', element: <NotFoundPage homePath={DASHBOARD_ROUTES.DASHBOARD} /> },

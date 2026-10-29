@@ -4,7 +4,13 @@ import { lazyRoute } from '@/lib/router/lazyRoute'
 // the service scopes a division head to their division, and any other non-manage actor to camps
 // where they hold an FO/MR/ASM/RSM slot). Shared via lib/access/campAccess.ts so other features
 // (e.g. notifications' entity resolver) can check camp reachability without importing this module.
-import { CAMP_VIEW_PERMISSIONS } from '@/lib/access/campAccess'
+import {
+  CAMP_VIEW_PERMISSIONS,
+  CAMP_WRITE_PERMISSIONS,
+  CAMP_DETAIL_PERMISSIONS,
+  CAMP_EDIT_PERMISSIONS,
+  CAMP_SCREENING_PERMISSIONS,
+} from '@/lib/access/campAccess'
 import TeleconsultationCampsStubPage from './pages/TeleconsultationCampsStubPage'
 import * as CampsPaths from './camps.paths'
 
@@ -17,22 +23,13 @@ import * as CampsPaths from './camps.paths'
 // into its own camps.paths.ts module.
 export const CAMPS_ROUTES = CampsPaths.CAMPS_ROUTES
 
-// Only the NEW route is gated on write perms — viewing (the drawer, at CAMPS)
-// and editing (CAMP_EDIT) each check their own narrower permission internally.
-const CAMP_WRITE_PERMISSIONS = ['camp:create', 'camp:manage', 'tenant:manage']
-
-// Matches GET /camps/:id's own guard (also accepts camp:book, scoped the same way as above).
-// Deliberately excludes camp:search alone — list access isn't detail access; camp:search-only
-// 403s on GET /camps/:id.
-const CAMP_DETAIL_PERMISSIONS = ['camp:get', 'camp:manage', 'camp:book', 'tenant:manage']
-
-// update (camp:update) is a distinct backend permission from create — this
-// route only ever edits an existing camp, so only the update code is checked.
-const CAMP_EDIT_PERMISSIONS = ['camp:update', 'camp:manage', 'tenant:manage']
-
-// Router-level gate only checks "can this role touch Screening at all" — the
-// precise assigned-FO check needs the camp's own `fo` field, so it lives inside CampScreeningPage itself.
-const CAMP_SCREENING_PERMISSIONS = ['screening:create', 'screening:manage', 'system:manage']
+// CAMP_WRITE_PERMISSIONS: only the NEW route is gated on write perms — viewing (the drawer, at
+// CAMPS) and editing (CAMP_EDIT) each check their own narrower permission internally.
+// CAMP_DETAIL_PERMISSIONS excludes camp:search alone — list access isn't detail access;
+// camp:search-only 403s on GET /camps/:id.
+// CAMP_EDIT_PERMISSIONS: update (camp:update) is a distinct backend permission from create.
+// CAMP_SCREENING_PERMISSIONS: router-level gate only checks "can this role touch Screening at
+// all" — the precise assigned-FO check needs the camp's own `fo` field, inside CampScreeningPage.
 
 export const campsRoutes: RouteObject[] = [
   {

@@ -25,9 +25,14 @@ let refreshPromise: Promise<void> | null = null
 // need to log in again" 401 (e.g. GET /auth/me firing before any session
 // exists yet) has nothing useful to redirect to — hard-reloading the same
 // page just restarts the whole request cycle indefinitely.
+//
+// Captures the full attempted destination as returnTo (validated later, against the now-known
+// session, in AuthContinuePage — see features/auth/returnTo.ts) so a mid-session 401 on a deep
+// internal URL doesn't lose it either, same fix as pharma-frontend's own redirectToLogin.
 function redirectToLogin() {
   if (window.location.pathname === AUTH_ROUTES.LOGIN) return
-  window.location.href = AUTH_ROUTES.LOGIN
+  const attempted = `${window.location.pathname}${window.location.search}${window.location.hash}`
+  window.location.href = `${AUTH_ROUTES.LOGIN}?returnTo=${encodeURIComponent(attempted)}`
 }
 
 api.interceptors.response.use(

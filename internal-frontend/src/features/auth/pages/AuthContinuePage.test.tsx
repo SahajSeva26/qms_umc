@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { useSession } from '@/hooks/useSession'
 import type { SessionResponse } from '@/types/accessManagement.types'
@@ -45,9 +45,9 @@ function mockSession(overrides: Partial<{
   } as unknown as ReturnType<typeof useSession>)
 }
 
-function renderContinuePage() {
+function renderContinuePage(entry = '/auth/continue') {
   return render(
-    <MemoryRouter initialEntries={['/auth/continue']}>
+    <MemoryRouter initialEntries={[entry]}>
       <Routes>
         <Route path="/auth/continue" element={<AuthContinuePage />} />
         <Route path="/auth/login" element={<div>Login page</div>} />
@@ -63,8 +63,19 @@ function renderContinuePage() {
   )
 }
 
+// A pharma destination is reached via a hard document navigation (window.location.replace), not
+// an in-app react-router Navigate — it's a DIFFERENT BUILD under '/pharma/*' (see
+// md-files/FRONTEND_SPLIT_ARCHITECTURE.md §5), not a route this router owns. pharmaHref resolves
+// to an absolute http://localhost:5174 URL in this (non-PROD) test environment.
+const replaceSpy = vi.fn()
+const originalLocation = window.location
+
 describe('AuthContinuePage — resolves the post-login landing from the session, not a hard-coded page', () => {
   beforeEach(() => vi.resetAllMocks())
+  afterEach(() => {
+    Object.defineProperty(window, 'location', { value: originalLocation, writable: true, configurable: true })
+    replaceSpy.mockClear()
+  })
 
   it('renders nothing while the session has not settled yet (no guess, no flash)', () => {
     mockSession({ isSettled: false })
@@ -112,12 +123,67 @@ describe('AuthContinuePage — resolves the post-login landing from the session,
     expect(screen.getByText(`Landed: ${CRM_ROUTES.APPOINTMENTS}`)).toBeInTheDocument()
   })
 
-  it('a pharma-identity session lands on its own portal path (identity routing, not permission routing)', () => {
+  it('end-to-end: a real ?returnTo= query string on the URL (not a hand-constructed prop) is read via useSearchParams, validated, and wins over the fallback landing page', () => {
+    // Fallback for this session's permission set resolves to Appointments (CRM_ROUTES), a
+    // DIFFERENT page from the camp-detail returnTo below — landing on the camp page, not
+    // Appointments, proves the query string actually drove the decision rather than the fallback
+    // resolver coincidentally landing on the same page the returnTo would have.
+    const session = sessionFixture('dietitian', ['appointment:search', 'appointment:get', 'appointment:rsvp', 'camp:search'], 'platform')
+    mockSession({ session, permissions: session.permissions })
+    renderContinuePage(`/auth/continue?returnTo=${encodeURIComponent('/camps?camp=cmp-1')}`)
+
+    expect(screen.getByText(`Landed: ${CAMPS_ROUTES.CAMPS}`)).toBeInTheDocument()
+  })
+
+  it('end-to-end: a real ?returnTo= query string this session is NOT permitted to use is rejected by canUseReturnTo and falls back to the normal landing page (a DIFFERENT page from the rejected returnTo), not followed blindly', () => {
+    // No camp:* permission at all — the returnTo below must be rejected outright, landing on this
+    // session's real fallback (Appointments), not on Camp Management, proving rejection actually
+    // happened rather than merely a lucky fallback/target coincidence.
+    const session = sessionFixture('dietitian', ['appointment:search', 'appointment:get', 'appointment:rsvp'], 'platform')
+    mockSession({ session, permissions: session.permissions })
+    renderContinuePage(`/auth/continue?returnTo=${encodeURIComponent('/camps?camp=cmp-1')}`)
+
+    expect(screen.getByText(`Landed: ${CRM_ROUTES.APPOINTMENTS}`)).toBeInTheDocument()
+  })
+
+  it('end-to-end: a real ?returnTo= pointing into the pharma build is read from the URL and carried into the hard document navigation', async () => {
+    Object.defineProperty(window, 'location', {
+      value: { ...originalLocation, replace: replaceSpy },
+      writable: true,
+      configurable: true,
+    })
+    const session = sessionFixture('pharma-mr', ['camp:book'], 'customer')
+    mockSession({ session, permissions: session.permissions })
+    renderContinuePage(`/auth/continue?returnTo=${encodeURIComponent('/pharma/camps/cmp-1')}`)
+
+    await waitFor(() => expect(replaceSpy).toHaveBeenCalledWith('http://localhost:5174/pharma/camps/cmp-1'))
+  })
+
+  it('a pharma-identity session is sent to its own portal BUILD via a hard document navigation (identity routing, not permission routing)', async () => {
+    Object.defineProperty(window, 'location', {
+      value: { ...originalLocation, replace: replaceSpy },
+      writable: true,
+      configurable: true,
+    })
     const session = sessionFixture('pharma-mr', ['camp:book'], 'customer')
     mockSession({ session, permissions: session.permissions })
     renderContinuePage()
 
-    expect(screen.getByText(`Landed: ${PHARMA_ROUTES.PHARMA}`)).toBeInTheDocument()
+    await waitFor(() => expect(replaceSpy).toHaveBeenCalledWith('http://localhost:5174/pharma/mr'))
+  })
+
+  it('renders a visible "Redirecting to your portal…" shell as its own real output — the render body itself must never directly fire a side-effecting navigation', async () => {
+    Object.defineProperty(window, 'location', {
+      value: { ...originalLocation, replace: replaceSpy },
+      writable: true,
+      configurable: true,
+    })
+    const session = sessionFixture('pharma-mr', ['camp:book'], 'customer')
+    mockSession({ session, permissions: session.permissions })
+    renderContinuePage()
+
+    expect(await screen.findByText('Redirecting to your portal…')).toBeInTheDocument()
+    expect(replaceSpy).toHaveBeenCalledWith('http://localhost:5174/pharma/mr')
   })
 
   it('a misconfigured pharma session (no camp:book) skips its own disabled portal and lands on Doctor Management — the one other item an MR can always reach (no permission gate)', () => {

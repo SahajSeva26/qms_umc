@@ -1,6 +1,10 @@
 import type { ReactNode } from 'react'
 import { FiShield, FiLock, FiStar, FiImage, FiActivity, FiNavigation, FiMapPin, FiHome, FiUser } from 'react-icons/fi'
-import { CampRatingSection } from '@/features/rating'
+import { CampRatingSection } from '@qms/widgets'
+import { useSession } from '@/hooks/useSession'
+import api from '@/lib/api/api'
+import { toast } from '@/components/ui/sonner'
+import { getApiErrorMessage } from '@/utils/apiError'
 import { specializationLabel } from '@/types/doctor.types'
 import { CAMP_TIME_SLOT_LABEL } from '@/types/campTimeSlot.constants'
 import { CAMP_TYPE_LABEL } from '@/types/campReal.types'
@@ -216,15 +220,32 @@ const PatientsCard = () => (
   </Card>
 )
 
-// Permission-gated rating display/action is shared with PharmaCampDetailDrawer's RatingSection via
-// CampRatingSection — this just supplies the dossier's own Card chrome around it. (Previously this
-// was its own separate copy of the same logic, missing the rating:* permission check the drawer
-// had — an HO/RSM/ASM viewing a closed camp's dossier would get a 403 from GET /ratings instead of
-// the section simply not rendering, and an MR without rating:create could see "Rate camp" they
-// couldn't actually submit. One shared component now, so this can't drift again.)
-const RatingCard = ({ camp }: { camp: CampEntity }) => (
-  <CampRatingSection camp={camp} wrapper={(content) => <Card title="FO / camp rating" icon={FiStar} color={CARD_ACCENTS.rating}>{content}</Card>} />
-)
+// Permission-gated rating display/action is shared with internal-frontend and
+// PharmaCampDetailDrawer's RatingSection via @qms/widgets' CampRatingSection — this just supplies
+// the dossier's own Card chrome and computes the app-specific policy (who's "the rater", and
+// whether this viewer holds the rating:* permissions) before handing primitives to the widget,
+// which has no opinion on either.
+const RatingCard = ({ camp }: { camp: CampEntity }) => {
+  const { session, hasAnyPermission } = useSession()
+  const isOwnMr = !!session?.role.id && session.role.id === populatedRole(camp.mr)?._id
+  const canCreate = isOwnMr && camp.status === 'closed' && hasAnyPermission(['rating:create', 'rating:manage'])
+
+  return (
+    <CampRatingSection
+      campId={camp.id}
+      ratingAccess={{
+        canSearch: hasAnyPermission(['rating:search', 'rating:manage']),
+        canReadOwn: hasAnyPermission(['rating:get', 'rating:search', 'rating:manage']),
+        canCreate,
+        canUpdate: hasAnyPermission(['rating:update', 'rating:manage']),
+      }}
+      api={api}
+      toast={toast}
+      getErrorMessage={getApiErrorMessage}
+      wrapper={(content) => <Card title="FO / camp rating" icon={FiStar} color={CARD_ACCENTS.rating}>{content}</Card>}
+    />
+  )
+}
 
 interface CampDossierContentProps {
   camp: CampEntity

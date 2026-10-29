@@ -4,18 +4,9 @@ import { render, screen } from '@testing-library/react'
 import CampDossierContent from './CampDossierContent'
 import { useSession } from '@/hooks/useSession'
 import type { CampEntity } from '@/types/campReal.types'
-import type { RatingEntity } from '@/types/rating.types'
 
 vi.mock('@/hooks/useSession')
-
-const { searchRatings } = vi.hoisted(() => ({
-  searchRatings: vi.fn(async (): Promise<{ success: boolean; message: string; data: { items: RatingEntity[]; count: number } }> =>
-    ({ success: true, message: '', data: { items: [], count: 0 } })),
-}))
-
-vi.mock('@/features/rating/rating.service', () => ({
-  ratingService: { searchRatings, myRatings: vi.fn(), getRating: vi.fn(), createRating: vi.fn(), updateRating: vi.fn() },
-}))
+vi.mock('@/lib/api/api', () => ({ default: { get: vi.fn(), post: vi.fn(), put: vi.fn() } }))
 
 function campFixture(overrides: Partial<CampEntity> = {}): CampEntity {
   return {
@@ -35,9 +26,10 @@ function campFixture(overrides: Partial<CampEntity> = {}): CampEntity {
   } as CampEntity
 }
 
-function mockSession(roleId: string | null) {
+function mockSession(roleId: string | null, permissions: string[] = ['rating:search', 'rating:create']) {
   vi.mocked(useSession).mockReturnValue({
     session: roleId ? { user: { id: 'u-1' }, role: { id: roleId, code: 'pharma-mr', division: 'div-1' }, roleType: { code: 'pharma-mr' }, tenant: { id: 't-1', name: 'Tenant' } } : null,
+    hasAnyPermission: (codes: string[]) => codes.some((c) => permissions.includes(c)),
   } as unknown as ReturnType<typeof useSession>)
 }
 
@@ -51,9 +43,10 @@ function renderContent(camp: CampEntity) {
 }
 
 describe('CampDossierContent', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks()
-    searchRatings.mockResolvedValue({ success: true, message: '', data: { items: [], count: 0 } })
+    const api = (await import('@/lib/api/api')).default
+    vi.mocked(api.get).mockResolvedValue({ data: { success: true, message: '', data: { items: [], count: 0 } } })
     mockSession(null)
   })
 
@@ -118,5 +111,26 @@ describe('CampDossierContent', () => {
     renderContent(campFixture({ status: 'closed', mr: { _id: 'mr-1', code: 'mr-001', name: 'Amit Desai' } }))
 
     expect(await screen.findByRole('button', { name: /rate camp/i })).toBeInTheDocument()
+  })
+
+  it('renders no FO / camp rating card at all for a viewer with no rating:* permission — and never calls GET /ratings', async () => {
+    mockSession('mr-1', [])
+    const api = (await import('@/lib/api/api')).default
+    renderContent(campFixture({ status: 'closed', mr: { _id: 'mr-1', code: 'mr-001', name: 'Amit Desai' } }))
+
+    expect(screen.queryByText('FO / camp rating')).not.toBeInTheDocument()
+    expect(api.get).not.toHaveBeenCalledWith('/ratings', expect.anything())
+  })
+
+  // GET /ratings (search) is guarded by rating:search OR rating:manage — NOT rating:get, which
+  // only covers the different GET /ratings/:id route. A role holding only rating:get would still
+  // doom-403 if this were gated on rating:get.
+  it('renders no FO / camp rating card for a viewer holding only rating:get — never calls GET /ratings', async () => {
+    mockSession('mr-1', ['rating:get'])
+    const api = (await import('@/lib/api/api')).default
+    renderContent(campFixture({ status: 'closed', mr: { _id: 'mr-1', code: 'mr-001', name: 'Amit Desai' } }))
+
+    expect(screen.queryByText('FO / camp rating')).not.toBeInTheDocument()
+    expect(api.get).not.toHaveBeenCalledWith('/ratings', expect.anything())
   })
 })

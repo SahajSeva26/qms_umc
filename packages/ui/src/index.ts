@@ -1,5 +1,17 @@
 export { cn } from './cn'
 export { Button, buttonVariants } from './primitives/Button'
+export {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogOverlay,
+  DialogPortal,
+  DialogTitle,
+  DialogTrigger,
+} from './primitives/Dialog'
 export { Input } from './primitives/Input'
 export { Label } from './primitives/Label'
 export { Select, SelectContent, SelectItem, SelectScrollDownButton, SelectScrollUpButton, SelectTrigger, SelectValue } from './primitives/Select'

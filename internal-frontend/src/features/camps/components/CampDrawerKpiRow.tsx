@@ -1,4 +1,6 @@
-import { useRatings } from '@/features/rating/hooks/useRatings'
+import { useRatings } from '@qms/core'
+import { useSession } from '@/hooks/useSession'
+import api from '@/lib/api/api'
 import type { CampStats } from '@/types/campReal.types'
 
 // Rx count and Feedback have no backing data model yet (no prescription entity, no patient
@@ -25,13 +27,23 @@ const KpiTile = ({ label, children }: { label: string; children: React.ReactNode
   </div>
 )
 
+// Gated on GET /ratings' real guard (rating:search OR rating:manage) — a real fix over the
+// previous version here, which had no gate at all and triggered a GET /ratings for every camp
+// regardless of viewer. A viewer without the permission keeps the grid's 4th slot (an inert tile,
+// like the Rx/Feedback placeholders) rather than leaving a gap, without ever making the request.
 const FoRatingTile = ({ campId }: { campId: string }) => {
-  const { items, isLoading } = useRatings({ camp: campId })
+  const { hasAnyPermission } = useSession()
+  // GET /ratings (search) is guarded by rating:search OR rating:manage — rating:get alone only
+  // covers GET /ratings/:id and would still doom-403 here.
+  const canViewRating = hasAnyPermission(['rating:search', 'rating:manage'])
+  const { items, isLoading } = useRatings(api, { camp: campId }, { enabled: canViewRating })
   const rating = items[0]
 
   return (
     <KpiTile label="FO rating">
-      {isLoading ? (
+      {!canViewRating ? (
+        <span className="text-[13px] font-bold italic" style={{ color: 'var(--qms-text-muted)' }}>—</span>
+      ) : isLoading ? (
         <span className="text-[13px] font-bold italic" style={{ color: 'var(--qms-text-muted)' }}>Loading…</span>
       ) : rating ? (
         <>

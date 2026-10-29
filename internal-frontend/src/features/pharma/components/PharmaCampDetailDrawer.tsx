@@ -1,5 +1,6 @@
-import { useState, type ReactNode } from 'react'
-import { FiStar, FiFileText } from 'react-icons/fi'
+import { type ReactNode } from 'react'
+import { FiFileText } from 'react-icons/fi'
+import { CampRatingSection } from '@qms/widgets'
 import SideDrawer from '@/components/ui/SideDrawer'
 import StageHistoryList from '@/components/ui/StageHistoryList'
 import { Button } from '@/components/ui/button'
@@ -9,9 +10,9 @@ import { CAMP_TIME_SLOT_LABEL } from '@/types/campTimeSlot.constants'
 import { specializationLabel } from '@/types/doctor.types'
 import type { CampEntity, CampPopulatedDoctor, CampPopulatedRole } from '@/types/campReal.types'
 import { useSession } from '@/hooks/useSession'
-import { useRatings } from '@/features/rating/hooks/useRatings'
-import RatingDisplay from '@/features/rating/components/RatingDisplay'
-import RateCampModal from '@/features/rating/components/RateCampModal'
+import api from '@/lib/api/api'
+import { toast } from '@/components/ui/sonner'
+import { getApiErrorMessage } from '@/utils/apiError'
 
 interface PharmaCampDetailDrawerProps {
   camp: CampEntity | null
@@ -57,47 +58,30 @@ const KpiTile = ({ label, value, placeholder }: { label: string; value?: string;
 const mrRoleId = (mr: CampEntity['mr']): string | undefined =>
   mr && typeof mr !== 'string' ? (mr as CampPopulatedRole)._id : (mr ?? undefined)
 
-// Only the camp's own MR may rate, and only once closed. Always offers an edit entry point
-// once rated, unlike the prototype which hides the action entirely.
+// Only the camp's own MR may rate, and only once closed. Always offers an edit entry point once
+// rated, unlike the prototype which hides the action entirely. Each rating:* permission maps to
+// the EXACT backend route it gates (see CampRatingAccess) — a viewer without any read capability
+// makes zero rating requests, a real fix over the previous inline version here, which had no
+// permission check at all and let any camp-drawer viewer trigger a request that could 403.
 const RatingSection = ({ camp }: { camp: CampEntity }) => {
-  const { session } = useSession()
-  const [modalOpen, setModalOpen] = useState(false)
+  const { session, hasAnyPermission } = useSession()
   const isOwnMr = !!session?.role.id && session.role.id === mrRoleId(camp.mr)
-  const canRate = isOwnMr && camp.status === 'closed'
-
-  const { items, isLoading, error, refetch } = useRatings({ camp: camp.id }, { enabled: canRate || camp.status === 'closed' })
-  const existing = items[0] ?? null
-
-  if (!canRate && !existing && !error) return null
+  const canCreate = isOwnMr && camp.status === 'closed' && hasAnyPermission(['rating:create', 'rating:manage'])
 
   return (
-    <Section title="FO / camp rating">
-      {isLoading ? (
-        <div className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>Loading…</div>
-      ) : error ? (
-        <div className="flex items-center justify-between gap-2 text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>
-          <span>Couldn't load this camp's rating.</span>
-          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-        </div>
-      ) : existing ? (
-        <>
-          <RatingDisplay rating={existing} />
-          {canRate && (
-            <Button variant="outline" size="sm" className="mt-2" onClick={() => setModalOpen(true)}>
-              <FiStar size={12} /> Edit rating
-            </Button>
-          )}
-        </>
-      ) : canRate ? (
-        <Button size="sm" onClick={() => setModalOpen(true)}>
-          <FiStar size={12} /> Rate camp
-        </Button>
-      ) : null}
-
-      {modalOpen && (
-        <RateCampModal open campId={camp.id} existing={existing} onClose={() => setModalOpen(false)} />
-      )}
-    </Section>
+    <CampRatingSection
+      campId={camp.id}
+      ratingAccess={{
+        canSearch: hasAnyPermission(['rating:search', 'rating:manage']),
+        canReadOwn: hasAnyPermission(['rating:get', 'rating:search', 'rating:manage']),
+        canCreate,
+        canUpdate: hasAnyPermission(['rating:update', 'rating:manage']),
+      }}
+      api={api}
+      toast={toast}
+      getErrorMessage={getApiErrorMessage}
+      wrapper={(children) => <Section title="FO / camp rating">{children}</Section>}
+    />
   )
 }
 

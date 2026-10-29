@@ -48,3 +48,20 @@ export { unreadNotificationCountKey, useUnreadNotificationCount } from './notifi
 export { notificationFeedKey, useNotificationFeed } from './notifications/hooks/useNotificationFeed'
 export { useMarkAllNotificationsRead } from './notifications/hooks/useMarkAllNotificationsRead'
 export { useNotificationsPage } from './notifications/hooks/useNotificationsPage'
+
+export type {
+  RatingPopulatedCamp,
+  RatingPopulatedRole,
+  RatingPopulatedTenant,
+  RatingEntity,
+  CreateRatingPayload,
+  UpdateRatingPayload,
+  SearchRatingQuery,
+} from './rating/rating.types'
+export { searchRatings, myRatings, getRating, createRating, updateRating } from './rating/rating.service'
+export { RATING_GROUNDS } from './rating/rating.constants'
+export type { RatingGroundKey } from './rating/rating.constants'
+export { useRatings } from './rating/hooks/useRatings'
+export { useMyRatings } from './rating/hooks/useMyRatings'
+export { useRateCamp } from './rating/hooks/useRateCamp'
+export type { UseRateCampDeps } from './rating/hooks/useRateCamp'

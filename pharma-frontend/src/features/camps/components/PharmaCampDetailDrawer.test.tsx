@@ -7,18 +7,15 @@ import type { CampEntity } from '@/types/campReal.types'
 import PharmaCampDetailDrawer from './PharmaCampDetailDrawer'
 
 vi.mock('@/hooks/useSession')
-vi.mock('@/features/rating/rating.service', () => ({
-  ratingService: { searchRatings: vi.fn().mockResolvedValue({ success: true, message: '', data: { items: [], count: 0 } }) },
-}))
-vi.mock('@/features/rating/hooks/useRateCamp', () => ({
-  useRateCamp: () => ({ rateCamp: vi.fn(), updateRating: vi.fn(), isSubmitting: false, isUpdating: false }),
-}))
+vi.mock('@/lib/api/api', () => ({ default: { get: vi.fn(), post: vi.fn(), put: vi.fn() } }))
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.clearAllMocks()
+  const api = (await import('@/lib/api/api')).default
+  vi.mocked(api.get).mockResolvedValue({ data: { success: true, message: '', data: { items: [], count: 0 } } })
 })
 
-function sessionFixture(roleId: string, permissions: string[] = ['camp:book', 'rating:create', 'rating:get', 'rating:search']): SessionResponse {
+function sessionFixture(roleId: string, permissions: string[] = ['camp:book', 'rating:create', 'rating:search']): SessionResponse {
   return {
     user: { id: 'u-1', email: 'a@example.com', firstName: 'a', lastName: 'b' },
     role: { id: roleId, code: 'pharma-mr', name: 'MR', division: 'div-1' },
@@ -69,13 +66,25 @@ describe('PharmaCampDetailDrawer — lazy RateCampModal', () => {
 
 describe('PharmaCampDetailDrawer — rating section permission gating (HO/RSM/ASM)', () => {
   it('hides the rating section entirely for a viewer with no rating:* permission, and never calls GET /ratings', async () => {
-    const { ratingService } = await import('@/features/rating/rating.service')
+    const api = (await import('@/lib/api/api')).default
 
     await renderDrawer(campFixture(), ['camp:book'])
 
     await screen.findByText('Dr. A')
     expect(screen.queryByText(/camp rating/i)).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /rate camp/i })).not.toBeInTheDocument()
-    expect(ratingService.searchRatings).not.toHaveBeenCalled()
+    expect(api.get).not.toHaveBeenCalledWith('/ratings', expect.anything())
+  })
+
+  // GET /ratings (search) is guarded by rating:search OR rating:manage — NOT rating:get, which
+  // only covers the different GET /ratings/:id route.
+  it('hides the rating section for a viewer holding only rating:get — never calls GET /ratings', async () => {
+    const api = (await import('@/lib/api/api')).default
+
+    await renderDrawer(campFixture(), ['camp:book', 'rating:get'])
+
+    await screen.findByText('Dr. A')
+    expect(screen.queryByText(/camp rating/i)).not.toBeInTheDocument()
+    expect(api.get).not.toHaveBeenCalledWith('/ratings', expect.anything())
   })
 })

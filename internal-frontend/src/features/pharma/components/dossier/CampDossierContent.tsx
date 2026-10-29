@@ -1,11 +1,10 @@
 import type { ReactNode } from 'react'
-import { useState } from 'react'
 import { FiShield, FiLock, FiStar, FiImage, FiActivity, FiNavigation, FiMapPin, FiHome, FiUser } from 'react-icons/fi'
-import { Button } from '@/components/ui/button'
+import { CampRatingSection } from '@qms/widgets'
 import { useSession } from '@/hooks/useSession'
-import { useRatings } from '@/features/rating/hooks/useRatings'
-import RatingDisplay from '@/features/rating/components/RatingDisplay'
-import RateCampModal from '@/features/rating/components/RateCampModal'
+import api from '@/lib/api/api'
+import { toast } from '@/components/ui/sonner'
+import { getApiErrorMessage } from '@/utils/apiError'
 import { specializationLabel } from '@/types/doctor.types'
 import { CAMP_TIME_SLOT_LABEL } from '@/types/campTimeSlot.constants'
 import { CAMP_TYPE_LABEL } from '@/types/campReal.types'
@@ -224,45 +223,35 @@ const PatientsCard = () => (
 )
 
 // FO / camp rating — read-only display of the real rating module, plus a Rate/Edit action for
-// the camp's own MR once closed. Same RatingSection logic as PharmaCampDetailDrawer.
+// the camp's own MR once closed. Same policy as PharmaCampDetailDrawer's RatingSection. Each
+// rating:* permission maps to the EXACT backend route it gates (see CampRatingAccess) — a viewer
+// without any read capability makes zero rating requests, a real fix over the previous inline
+// version here, which had no permission check at all and let any camp-drawer viewer trigger a
+// request that could 403.
 const RatingCard = ({ camp }: { camp: CampEntity }) => {
-  const { session } = useSession()
-  const [modalOpen, setModalOpen] = useState(false)
+  const { session, hasAnyPermission } = useSession()
   const mrId = roleId(camp.mr)
   const isOwnMr = !!session?.role.id && session.role.id === mrId
-  const canRate = isOwnMr && camp.status === 'closed'
-
-  const { items, isLoading, error, refetch } = useRatings({ camp: camp.id }, { enabled: canRate || camp.status === 'closed' })
-  const existing = items[0] ?? null
-
-  if (!canRate && !existing && !error) return null
+  const canCreate = isOwnMr && camp.status === 'closed' && hasAnyPermission(['rating:create', 'rating:manage'])
 
   return (
-    <Card title="FO / camp rating" icon={FiStar} color={CARD_ACCENTS.rating}>
-      {isLoading ? (
-        <div className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>Loading…</div>
-      ) : error ? (
-        <div className="flex items-center justify-between gap-2 text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>
-          <span>Couldn't load this camp's rating.</span>
-          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-        </div>
-      ) : existing ? (
-        <>
-          <RatingDisplay rating={existing} />
-          {canRate && (
-            <Button variant="outline" size="sm" className="mt-2" onClick={() => setModalOpen(true)}>
-              <FiStar size={12} /> Edit rating
-            </Button>
-          )}
-        </>
-      ) : (
-        <Button size="sm" onClick={() => setModalOpen(true)}>
-          <FiStar size={12} /> Rate camp
-        </Button>
+    <CampRatingSection
+      campId={camp.id}
+      ratingAccess={{
+        canSearch: hasAnyPermission(['rating:search', 'rating:manage']),
+        canReadOwn: hasAnyPermission(['rating:get', 'rating:search', 'rating:manage']),
+        canCreate,
+        canUpdate: hasAnyPermission(['rating:update', 'rating:manage']),
+      }}
+      api={api}
+      toast={toast}
+      getErrorMessage={getApiErrorMessage}
+      wrapper={(children) => (
+        <Card title="FO / camp rating" icon={FiStar} color={CARD_ACCENTS.rating}>
+          {children}
+        </Card>
       )}
-
-      {modalOpen && <RateCampModal open campId={camp.id} existing={existing} onClose={() => setModalOpen(false)} />}
-    </Card>
+    />
   )
 }
 

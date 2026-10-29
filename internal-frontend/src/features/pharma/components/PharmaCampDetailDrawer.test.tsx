@@ -4,18 +4,10 @@ import { render, screen } from '@testing-library/react'
 import PharmaCampDetailDrawer from './PharmaCampDetailDrawer'
 import { useSession } from '@/hooks/useSession'
 import type { CampEntity } from '@/types/campReal.types'
-import type { RatingEntity } from '@/types/rating.types'
+import type { RatingEntity } from '@qms/core'
 
 vi.mock('@/hooks/useSession')
-
-const { searchRatings } = vi.hoisted(() => ({
-  searchRatings: vi.fn(async (): Promise<{ success: boolean; message: string; data: { items: RatingEntity[]; count: number } }> =>
-    ({ success: true, message: '', data: { items: [], count: 0 } })),
-}))
-
-vi.mock('@/features/rating/rating.service', () => ({
-  ratingService: { searchRatings, myRatings: vi.fn(), getRating: vi.fn(), createRating: vi.fn(), updateRating: vi.fn() },
-}))
+vi.mock('@/lib/api/api', () => ({ default: { get: vi.fn(), post: vi.fn(), put: vi.fn() } }))
 
 function campFixture(overrides: Partial<CampEntity> = {}): CampEntity {
   return {
@@ -45,9 +37,10 @@ function ratingFixture(overrides: Partial<RatingEntity> = {}): RatingEntity {
   }
 }
 
-function mockSession(roleId: string | null) {
+function mockSession(roleId: string | null, permissions: string[] = ['rating:search', 'rating:create']) {
   vi.mocked(useSession).mockReturnValue({
     session: roleId ? { user: { id: 'u-1' }, role: { id: roleId, code: 'pharma-mr', division: 'div-1' }, roleType: { code: 'pharma-mr' }, tenant: { id: 't-1', name: 'Tenant' } } : null,
+    hasAnyPermission: (codes: string[]) => codes.some((c) => permissions.includes(c)),
   } as unknown as ReturnType<typeof useSession>)
 }
 
@@ -64,9 +57,10 @@ function renderDrawer(camp: CampEntity) {
 }
 
 describe('PharmaCampDetailDrawer', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks()
-    searchRatings.mockResolvedValue({ success: true, message: '', data: { items: [], count: 0 } })
+    const api = (await import('@/lib/api/api')).default
+    vi.mocked(api.get).mockResolvedValue({ data: { success: true, message: '', data: { items: [], count: 0 } } })
     mockSession(null)
   })
 
@@ -154,22 +148,56 @@ describe('PharmaCampDetailDrawer', () => {
       expect(screen.queryByText('FO / camp rating')).not.toBeInTheDocument()
     })
 
-    it('shows the existing rating read-only plus an "Edit rating" action when the owning MR already rated it', async () => {
-      searchRatings.mockResolvedValue({ success: true, message: '', data: { items: [ratingFixture()], count: 1 } })
-      mockSession('mr-1')
+    it('shows the existing rating read-only plus an "Edit rating" action when the owning MR holds rating:update', async () => {
+      const api = (await import('@/lib/api/api')).default
+      vi.mocked(api.get).mockResolvedValue({ data: { success: true, message: '', data: { items: [ratingFixture()], count: 1 } } })
+      mockSession('mr-1', ['rating:search', 'rating:create', 'rating:update'])
       renderDrawer(campFixture({ status: 'closed', mr: { _id: 'mr-1', code: 'mr-001', name: 'Amit Desai' } }))
 
       expect(await screen.findByText('Overall')).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /edit rating/i })).toBeInTheDocument()
     })
 
+    // Edit is gated on rating:update, never rating:create — the owning MR holding only create
+    // (not update) must NOT see an Edit action, even though they could create a first rating.
+    it('does NOT show "Edit rating" to the owning MR when they hold rating:create but not rating:update', async () => {
+      const api = (await import('@/lib/api/api')).default
+      vi.mocked(api.get).mockResolvedValue({ data: { success: true, message: '', data: { items: [ratingFixture()], count: 1 } } })
+      mockSession('mr-1', ['rating:search', 'rating:create'])
+      renderDrawer(campFixture({ status: 'closed', mr: { _id: 'mr-1', code: 'mr-001', name: 'Amit Desai' } }))
+
+      expect(await screen.findByText('Overall')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /edit rating/i })).not.toBeInTheDocument()
+    })
+
     it('shows the existing rating read-only with no edit action to a non-owning viewer', async () => {
-      searchRatings.mockResolvedValue({ success: true, message: '', data: { items: [ratingFixture()], count: 1 } })
+      const api = (await import('@/lib/api/api')).default
+      vi.mocked(api.get).mockResolvedValue({ data: { success: true, message: '', data: { items: [ratingFixture()], count: 1 } } })
       mockSession('someone-else')
       renderDrawer(campFixture({ status: 'closed', mr: { _id: 'mr-1', code: 'mr-001', name: 'Amit Desai' } }))
 
       expect(await screen.findByText('Overall')).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: /edit rating/i })).not.toBeInTheDocument()
+    })
+
+    it('renders no FO / camp rating section at all for a viewer with no rating:* permission — and never calls GET /ratings', async () => {
+      mockSession('mr-1', [])
+      const api = (await import('@/lib/api/api')).default
+      renderDrawer(campFixture({ status: 'closed', mr: { _id: 'mr-1', code: 'mr-001', name: 'Amit Desai' } }))
+
+      expect(screen.queryByText('FO / camp rating')).not.toBeInTheDocument()
+      expect(api.get).not.toHaveBeenCalledWith('/ratings', expect.anything())
+    })
+
+    // GET /ratings (search) is guarded by rating:search OR rating:manage — NOT rating:get, which
+    // only covers the different GET /ratings/:id route.
+    it('renders no FO / camp rating section for a viewer holding only rating:get — never calls GET /ratings', async () => {
+      mockSession('mr-1', ['rating:get'])
+      const api = (await import('@/lib/api/api')).default
+      renderDrawer(campFixture({ status: 'closed', mr: { _id: 'mr-1', code: 'mr-001', name: 'Amit Desai' } }))
+
+      expect(screen.queryByText('FO / camp rating')).not.toBeInTheDocument()
+      expect(api.get).not.toHaveBeenCalledWith('/ratings', expect.anything())
     })
   })
 })

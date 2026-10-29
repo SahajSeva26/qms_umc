@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { Suspense, lazy, useState } from 'react'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import DialogErrorBoundary from './DialogErrorBoundary'
 
@@ -26,7 +26,7 @@ describe('DialogErrorBoundary', () => {
     expect(screen.getByText('Dialog content')).toBeInTheDocument()
   })
 
-  it('catches a render error and shows it in a real accessible dialog shell, not a bare div', () => {
+  it('catches a render error and shows it in an accessible, real modal shell, not a bare div', () => {
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     render(
@@ -35,12 +35,94 @@ describe('DialogErrorBoundary', () => {
       </DialogErrorBoundary>,
     )
 
-    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    const panel = screen.getByRole('alertdialog')
+    expect(panel).toBeInTheDocument()
+    expect(panel).toHaveAttribute('aria-modal', 'true')
     expect(screen.getByText(/something went wrong/i)).toBeInTheDocument()
     expect(screen.getByText(/this dialog couldn't be displayed/i)).toBeInTheDocument()
     expect(screen.queryByText('Dialog content')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument()
 
+    consoleErrorSpy.mockRestore()
+  })
+
+  it('moves focus into the panel on open, and Escape calls onClose like every other dialog', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const onClose = vi.fn()
+    const user = userEvent.setup()
+
+    render(
+      <DialogErrorBoundary onClose={onClose}>
+        <Thrower shouldThrow />
+      </DialogErrorBoundary>,
+    )
+
+    const panel = screen.getByRole('alertdialog')
+    await waitFor(() => expect(panel).toHaveFocus())
+
+    await user.keyboard('{Escape}')
+    expect(onClose).toHaveBeenCalledTimes(1)
+
+    consoleErrorSpy.mockRestore()
+  })
+
+  it('focus stays trapped inside the panel — Tab from the last focusable element wraps to the first', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const user = userEvent.setup()
+
+    render(
+      <DialogErrorBoundary onClose={vi.fn()}>
+        <Thrower shouldThrow />
+      </DialogErrorBoundary>,
+    )
+
+    const panel = screen.getByRole('alertdialog')
+    const buttons = within(panel).getAllByRole('button')
+    const [firstButton] = buttons
+    const lastButton = buttons[buttons.length - 1]
+
+    lastButton.focus()
+    await user.tab()
+    expect(document.activeElement).toBe(firstButton)
+
+    firstButton.focus()
+    await user.tab({ shift: true })
+    expect(document.activeElement).toBe(lastButton)
+
+    consoleErrorSpy.mockRestore()
+  })
+
+  it('restores focus to whatever had it before the crash, once the fallback closes', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const user = userEvent.setup()
+
+    // Mounting DialogErrorBoundary's crashing child happens on the SAME render as the trigger
+    // click that opens it, same as every real call site here (open + lazy-mount on one click) — so
+    // the trigger genuinely holds focus at the moment the crash is first caught.
+    function Parent() {
+      const [open, setOpen] = useState(false)
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>Outside trigger</button>
+          {open && (
+            <DialogErrorBoundary onClose={() => setOpen(false)}>
+              <Thrower shouldThrow />
+            </DialogErrorBoundary>
+          )}
+        </>
+      )
+    }
+
+    render(<Parent />)
+    const trigger = screen.getByRole('button', { name: /outside trigger/i })
+    await user.click(trigger)
+
+    const panel = await screen.findByRole('alertdialog')
+    await waitFor(() => expect(panel).toHaveFocus())
+
+    await user.click(screen.getByRole('button', { name: /^close$/i }))
+
+    await waitFor(() => expect(trigger).toHaveFocus())
     consoleErrorSpy.mockRestore()
   })
 
@@ -92,12 +174,12 @@ describe('DialogErrorBoundary', () => {
     }
 
     render(<Parent />)
-    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /^close$/i }))
 
     expect(onClose).toHaveBeenCalledTimes(1)
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
     expect(screen.getByText('Closed')).toBeInTheDocument()
     consoleErrorSpy.mockRestore()
   })

@@ -1,11 +1,15 @@
 import { type ReactNode } from 'react'
 import { FiFileText } from 'react-icons/fi'
 import { Button } from '@qms/ui'
+import { CampRatingSection } from '@qms/widgets'
 import SideDrawer from '@/components/ui/SideDrawer'
 import StageHistoryList from '@/components/ui/StageHistoryList'
 import CampDashboardStatusPill from '@/features/camps/components/CampDashboardStatusPill'
 import CampTypePillReal from '@/components/widgets/camp/CampTypePillReal'
-import { CampRatingSection } from '@/features/rating'
+import { useSession } from '@/hooks/useSession'
+import api from '@/lib/api/api'
+import { toast } from '@/components/ui/sonner'
+import { getApiErrorMessage } from '@/utils/apiError'
 import { CAMP_TIME_SLOT_LABEL } from '@/types/campTimeSlot.constants'
 import { specializationLabel } from '@/types/doctor.types'
 import type { CampEntity, CampPopulatedDoctor, CampPopulatedRole } from '@/types/campReal.types'
@@ -51,11 +55,33 @@ const KpiTile = ({ label, value, placeholder }: { label: string; value?: string;
   </div>
 )
 
-// Permission-gated rating display/action is shared with CampDossierContent's RatingCard via
-// CampRatingSection — this just supplies the drawer's own Section chrome around it.
-const RatingSection = ({ camp }: { camp: CampEntity }) => (
-  <CampRatingSection camp={camp} wrapper={(content) => <Section title="FO / camp rating">{content}</Section>} />
-)
+const mrRoleId = (mr: CampEntity['mr']): string | undefined =>
+  mr && typeof mr !== 'string' ? (mr as CampPopulatedRole)._id : (mr ?? undefined)
+
+// Permission-gated rating display/action is shared with internal-frontend and CampDossierContent's
+// RatingCard via @qms/widgets' CampRatingSection — this just supplies the drawer's own Section
+// chrome and computes the app-specific policy before handing primitives to the widget.
+const RatingSection = ({ camp }: { camp: CampEntity }) => {
+  const { session, hasAnyPermission } = useSession()
+  const isOwnMr = !!session?.role.id && session.role.id === mrRoleId(camp.mr)
+  const canCreate = isOwnMr && camp.status === 'closed' && hasAnyPermission(['rating:create', 'rating:manage'])
+
+  return (
+    <CampRatingSection
+      campId={camp.id}
+      ratingAccess={{
+        canSearch: hasAnyPermission(['rating:search', 'rating:manage']),
+        canReadOwn: hasAnyPermission(['rating:get', 'rating:search', 'rating:manage']),
+        canCreate,
+        canUpdate: hasAnyPermission(['rating:update', 'rating:manage']),
+      }}
+      api={api}
+      toast={toast}
+      getErrorMessage={getApiErrorMessage}
+      wrapper={(content) => <Section title="FO / camp rating">{content}</Section>}
+    />
+  )
+}
 
 // Pharma field force (camp:book) can read a camp but has no stage-move capability (camp:manage
 // only), so this stays display-only.

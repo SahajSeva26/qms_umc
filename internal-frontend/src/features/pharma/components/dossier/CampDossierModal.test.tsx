@@ -14,18 +14,16 @@ vi.mock('@/features/pharma/pharmaCamps.service', () => ({
   },
 }))
 
-// CampDossierContent's RatingCard genuinely calls the rating service — without this mock it
-// fails in a real test environment (no backend), producing a transient error-state Retry button
-// that destabilizes the Tab sequence below. Resolved empty so the dialog's tabbable-element set
-// is deterministic for the focus-trap assertions.
-vi.mock('@/features/rating/rating.service', () => ({
-  ratingService: {
-    searchRatings: vi.fn(async () => ({ success: true, message: '', data: { items: [], count: 0 } })),
-  },
+// CampDossierContent's RatingCard genuinely calls the rating API (via @qms/core's useRatings) —
+// without this mock it fails in a real test environment (no backend), producing a transient
+// error-state Retry button that destabilizes the Tab sequence below. Resolved empty so the
+// dialog's tabbable-element set is deterministic for the focus-trap assertions.
+vi.mock('@/lib/api/api', () => ({
+  default: { get: vi.fn(async () => ({ data: { success: true, message: '', data: { items: [], count: 0 } } })) },
 }))
 
 vi.mock('@/hooks/useSession', () => ({
-  useSession: () => ({ session: null }),
+  useSession: () => ({ session: null, hasAnyPermission: () => false }),
 }))
 
 function campFixture(overrides: Partial<CampEntity> = {}): CampEntity {

@@ -1,6 +1,5 @@
 import { FiStar } from 'react-icons/fi'
-import { RATING_GROUNDS } from '@/features/rating/rating.constants'
-import type { RatingEntity } from '@/types/rating.types'
+import { RATING_GROUNDS, type RatingEntity } from '@qms/core'
 
 const stars = (n: number) => {
   const filled = Math.round(n)
@@ -19,7 +18,7 @@ interface RatingDisplayProps {
 
 // Read-only breakdown — clones the prototype's camp-detail.js renderRating() grid layout
 // (ground label + star glyphs + N/5) and audit line. No reason/feedback text — the backend
-// model has no such fields (see BACKEND_REQUEST_camp-dossier.md).
+// model has no such fields (see md-files/BACKEND_REQUESTS.md §4.5).
 const RatingDisplay = ({ rating }: RatingDisplayProps) => {
   const grounds = [
     { key: 'overall', label: 'Overall', value: rating.overall },

@@ -13,6 +13,15 @@ export type { EntityResolution, EntityResolverConfig } from './notifications/not
 // shared so the two apps' copies can't drift (no @base-ui/react dependency, safe here).
 export { useNotificationBellState } from './notifications/useNotificationBellState'
 
+// CampRatingSection itself is eager (it must render to decide whether to show anything at all),
+// but its own heavy half (RateCampModal, @base-ui/react/dialog + the rating form) is lazy-loaded
+// internally via React.lazy, mounted only once a viewer actually opens the rate/edit form — same
+// Trigger/Popover-style split as notifications, just both halves living in one file since
+// CampRatingSection's own "trigger" render is tiny (a read-only display or a single button).
+export { default as CampRatingSection } from './rating/CampRatingSection'
+export type { CampRatingSectionProps, CampRatingAccess } from './rating/CampRatingSection'
+export { default as RatingDisplay } from './rating/RatingDisplay'
+
 // NotificationBellPopover (and the NotificationsDrawer/NotificationCard it owns internally) are
 // deliberately NOT re-exported from this barrel: they pull in @base-ui/react/dialog + /popover,
 // which nothing else in this barrel's eager export set uses. Statically re-exporting them here

@@ -1,29 +1,42 @@
 import { useState } from 'react'
+import axios, { type AxiosInstance } from 'axios'
 import { FiStar } from 'react-icons/fi'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { useRateCamp } from '@/features/rating/hooks/useRateCamp'
-import { RATING_GROUNDS, type RatingGroundKey } from '@/features/rating/rating.constants'
-import type { RatingEntity } from '@/types/rating.types'
+import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@qms/ui'
+import { RATING_GROUNDS, useRateCamp, type RatingGroundKey, type RatingEntity } from '@qms/core'
 
 type Scores = Record<RatingGroundKey, number>
 
 const emptyScores = (): Scores => ({ onTime: 0, attire: 0, communication: 0 })
 const scoresFrom = (rating: RatingEntity): Scores => ({ onTime: rating.onTime, attire: rating.attire, communication: rating.communication })
 
-interface RateCampModalProps {
+export interface RateCampModalProps {
   open: boolean
   campId: string
   /** Present when editing an existing rating — pre-fills the picker and calls update, not create. */
   existing: RatingEntity | null
   onClose: () => void
+  /** The CALLING app's own configured axios instance — same convention as @qms/core's getMe(api). */
+  api: AxiosInstance
+  /** Each app's own toast function — both currently re-export the same `sonner` toast via
+   * @qms/ui's Toaster, so this is typically just `import { toast } from '@qms/ui'`. */
+  toast: { success: (msg: string) => void; error: (msg: string) => void }
+  /** Each app's own axios-error-to-message extractor. */
+  getErrorMessage: (err: unknown, fallback: string) => string
+  /** Only supplied by CampRatingSection's create-only branch (no read capability at all — see
+   * CampRatingAccess.canCreate without canSearch/canReadOwn): called with the backend's own
+   * message when a create 409s because a rating already exists — the viewer has no way to SEE
+   * that rating, so this surfaces a durable, honest explanation in the section instead of just a
+   * toast, and closes the modal (there's nothing left to submit). Omitted for every other caller,
+   * which already shows the existing rating inline and would never hit this 409 in the first
+   * place (its own "Rate camp"/"Edit rating" buttons are gated on there being no existing rating). */
+  onCreateConflict?: (message: string) => void
 }
 
 // One star-button row per ground — no reason/feedback inputs, the backend model has none. Always
 // reachable (create when unrated, edit when already rated), unlike the prototype which hides it.
-const RateCampModal = ({ open, campId, existing, onClose }: RateCampModalProps) => {
+const RateCampModal = ({ open, campId, existing, onClose, api, toast, getErrorMessage, onCreateConflict }: RateCampModalProps) => {
   const [scores, setScores] = useState<Scores>(existing ? scoresFrom(existing) : emptyScores())
-  const { rateCamp, updateRating, isSubmitting, isUpdating } = useRateCamp()
+  const { rateCamp, updateRating, isSubmitting, isUpdating } = useRateCamp({ api, toast, getErrorMessage })
   const isSaving = isSubmitting || isUpdating
 
   const setGround = (key: RatingGroundKey, value: number) => setScores((prev) => ({ ...prev, [key]: value }))
@@ -31,6 +44,9 @@ const RateCampModal = ({ open, campId, existing, onClose }: RateCampModalProps) 
   const allScored = RATING_GROUNDS.every((g) => scores[g.key] > 0)
 
   // useRateCamp's own mutations already toast — this catch only stops an unhandled rejection.
+  // Only a genuine 409 (the backend's "already rated" conflict) is treated as unrecoverable for a
+  // create-only caller — any other failure (network, 5xx, validation) leaves the modal open with
+  // the viewer's scores intact so they can retry, same as every other caller.
   const handleSubmit = async () => {
     try {
       if (existing) {
@@ -39,8 +55,13 @@ const RateCampModal = ({ open, campId, existing, onClose }: RateCampModalProps) 
         await rateCamp({ camp: campId, ...scores })
       }
       onClose()
-    } catch {
-      // already toasted by useRateCamp's onError
+    } catch (err) {
+      const isConflict = axios.isAxiosError(err) && err.response?.status === 409
+      if (onCreateConflict && !existing && isConflict) {
+        onCreateConflict(getErrorMessage(err, 'A rating already exists for this camp.'))
+        onClose()
+      }
+      // already toasted by useRateCamp's onError; modal stays open for anything else
     }
   }
 

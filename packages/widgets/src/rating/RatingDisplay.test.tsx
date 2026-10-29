@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import type { RatingEntity } from '@qms/core'
 import RatingDisplay from './RatingDisplay'
-import type { RatingEntity } from '@/types/rating.types'
 
 function ratingFixture(overrides: Partial<RatingEntity> = {}): RatingEntity {
   return {

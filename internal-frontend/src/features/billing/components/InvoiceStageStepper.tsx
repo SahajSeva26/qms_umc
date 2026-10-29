@@ -1,17 +1,17 @@
 import type { InvoiceStatus } from '@/types/invoice.types'
 
-// The prototype's 4-stage linear stepper (Generated→Approved→GRN→Paid) maps
-// onto our real 6-status enum as: draft~Generated, approved~Approved,
-// issued~-- (no prototype equivalent, folded into the Approved→GRN gap),
-// grn_signed~GRN, paid~Paid. `cancelled` branches off `issued` and isn't a
-// linear stage, so it's rendered as its own terminal marker, not a 5th dot.
-const STEPS: { status: InvoiceStatus; label: string }[] = [
-  { status: 'draft', label: 'Draft' },
-  { status: 'approved', label: 'Approved' },
-  { status: 'issued', label: 'Issued' },
-  { status: 'grn_signed', label: 'GRN' },
-  { status: 'paid', label: 'Paid' },
-]
+// The prototype's four visible milestones map onto the real backend workflow.
+// `issued` is an intermediate backend state between Approved and GRN, so it
+// remains on the Approved milestone rather than inventing a fifth UI stage.
+const STEPS = ['Generated', 'Approved', 'GRN', 'Paid'] as const
+
+const STATUS_STAGE: Record<Exclude<InvoiceStatus, 'cancelled'>, number> = {
+  draft: 0,
+  approved: 1,
+  issued: 1,
+  grn_signed: 2,
+  paid: 3,
+}
 
 interface InvoiceStageStepperProps {
   status: InvoiceStatus
@@ -26,34 +26,50 @@ const InvoiceStageStepper = ({ status }: InvoiceStageStepperProps) => {
     )
   }
 
-  const curIdx = STEPS.findIndex((s) => s.status === status)
+  const curIdx = STATUS_STAGE[status]
+  const progress = (curIdx / (STEPS.length - 1)) * 100
 
   return (
-    <div className="flex items-center gap-1.5 flex-wrap">
-      <div className="flex items-center gap-1.5">
-        {STEPS.map((step, i) => {
+    <div className="flex w-full items-center gap-3" aria-label="Invoice progress">
+      <div className="relative flex min-w-0 flex-1 items-center justify-between">
+        <div
+          aria-hidden="true"
+          className="absolute left-2.5 right-2.5 top-1/2 h-0.5 -translate-y-1/2"
+          style={{ background: 'var(--qms-border)' }}
+        />
+        <div
+          aria-hidden="true"
+          className="absolute left-2.5 top-1/2 h-0.5 -translate-y-1/2"
+          style={{ background: '#10b981', width: `calc((100% - 20px) * ${progress / 100})` }}
+        />
+        {STEPS.map((label, i) => {
           const state = i < curIdx ? 'done' : i === curIdx ? 'cur' : 'todo'
           const bg = state === 'done' ? '#10b981' : state === 'cur' ? 'var(--qms-brand)' : 'var(--qms-border)'
           const color = state === 'todo' ? 'var(--qms-text-muted)' : '#fff'
           return (
-            <div key={step.status} className="flex items-center gap-1.5">
+            <div
+              key={label}
+              className="relative z-10 flex"
+            >
               <div
                 className="flex items-center justify-center rounded-full text-[10px] font-extrabold shrink-0"
                 style={{ width: 20, height: 20, background: bg, color }}
-                title={step.label}
+                aria-label={`${label} stage`}
+                aria-current={state === 'cur' ? 'step' : undefined}
               >
-                {state === 'done' ? '✓' : i + 1}
+                {i + 1}
               </div>
-              {i < STEPS.length - 1 && (
-                <div className="h-0.5 w-4" style={{ background: i < curIdx ? '#10b981' : 'var(--qms-border)' }} />
-              )}
             </div>
           )
         })}
       </div>
-      <div className="flex gap-3 ml-1 text-[9px] font-bold uppercase tracking-wide" style={{ color: 'var(--qms-text-muted)' }}>
-        {STEPS.map((step) => (
-          <span key={step.status}>{step.label}</span>
+      <div
+        className="flex shrink-0 items-center gap-3 text-[9px] font-bold uppercase tracking-wide"
+        style={{ color: 'var(--qms-text-muted)' }}
+        aria-label="Invoice stage labels"
+      >
+        {STEPS.map((label) => (
+          <span key={label}>{label}</span>
         ))}
       </div>
     </div>

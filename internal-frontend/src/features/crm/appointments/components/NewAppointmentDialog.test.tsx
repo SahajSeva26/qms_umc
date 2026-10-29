@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { accessManagementService } from '@/features/access-management/accessManagement.service'
 import { divisionService } from '@/features/crm/divisions/division.service'
 import { contactsService } from '@/features/contacts/contacts.service'
+import { crmService } from '@/features/crm/crm.service'
 
 // Mocks the pickers' services so their queries resolve to empty lists
 // instead of hitting the real API layer.
@@ -23,6 +24,9 @@ vi.mock('@/features/contacts/contacts.service', () => ({
   contactsService: {
     searchContacts: vi.fn(async () => ({ success: true, message: '', data: { items: [], count: 0 } })),
   },
+}))
+vi.mock('@/features/crm/crm.service', () => ({
+  crmService: { searchLeads: vi.fn(async () => ({ success: true, message: '', data: { items: [], count: 0 } })) },
 }))
 vi.mock('@/features/crm/appointments/hooks/useCreateAppointment', () => ({
   useCreateAppointment: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -202,5 +206,53 @@ describe('NewAppointmentDialog — Department/Designation auto-fill from the sel
     const designationTrigger = screen.getByText('Designation').parentElement!.querySelector('[role="combobox"]')!
     expect(designationTrigger.querySelector('[data-slot="select-value"]')).toBeEmptyDOMElement()
     expect(screen.queryByText('Marketing Manager')).not.toBeInTheDocument()
+  })
+})
+
+describe('NewAppointmentDialog — linked lead first', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(accessManagementService.searchTenants).mockResolvedValue({
+      success: true, message: '', data: { count: 1, items: [{ id: 'tenant-1', name: 'Sunrise Pharma', address: { city: 'Mumbai', state: 'Maharashtra' } }] },
+    } as never)
+    vi.mocked(divisionService.searchDivisions).mockResolvedValue({
+      success: true, message: '', data: { count: 1, items: [{ id: 'division-1', name: 'Cardio' }] },
+    } as never)
+    vi.mocked(contactsService.searchContacts).mockResolvedValue({
+      success: true, message: '', data: { count: 2, items: [
+        { id: 'contact-1', name: 'Dr. Mehta', department: 'marketing', designation: 'marketingmanager' },
+        { id: 'contact-2', name: 'Other Cardio Contact' },
+      ] },
+    } as never)
+    vi.mocked(crmService.searchLeads).mockResolvedValue({
+      success: true, message: '', data: { count: 1, items: [{
+        id: 'lead-1', title: 'Cardio project', code: 'ld-000001', status: 'new',
+        tenant: { _id: 'tenant-1', name: 'Sunrise Pharma', code: 'clt-1' },
+        division: { _id: 'division-1', name: 'Cardio', code: 'div-1', therapy: [] },
+        contactPerson: { _id: 'contact-1', division: 'division-1', tenant: 'tenant-1', name: 'Dr. Mehta', department: 'marketing', designation: 'marketingmanager', type: 'customer', status: 'active' },
+      }] },
+    } as never)
+  })
+
+  it('puts the linked lead before account and fills company, division, contact, department, and designation', async () => {
+    const user = userEvent.setup()
+    await renderDialog(undefined, 'lead-first')
+    await user.click(screen.getByRole('button', { name: 'Follow-up' }))
+    const leadLabel = screen.getByText(/Linked lead/)
+    const companyLabel = screen.getByText('Company *')
+    expect(leadLabel.compareDocumentPosition(companyLabel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    await user.type(screen.getByPlaceholderText('Search lead by title...'), 'Cardio')
+    await user.click(await screen.findByRole('button', { name: /Cardio project/ }))
+    expect(await screen.findByText('Sunrise Pharma')).toBeInTheDocument()
+    expect(screen.getByText('Cardio')).toBeInTheDocument()
+    expect(screen.getByText('Dr. Mehta')).toBeInTheDocument()
+    expect(screen.getByText('Marketing')).toBeInTheDocument()
+    expect(screen.getByText('Marketing Manager')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Mumbai')).toBeDisabled()
+    expect(vi.mocked(contactsService.searchContacts)).toHaveBeenCalledWith(expect.objectContaining({ division: 'division-1', status: 'active' }))
+    await user.click(screen.getByRole('button', { name: 'Clear linked lead' }))
+    await user.type(screen.getByPlaceholderText('Search lead by title...'), 'Cardio')
+    expect(await screen.findByRole('button', { name: /Cardio project/ })).toBeInTheDocument()
+    expect(vi.mocked(crmService.searchLeads)).toHaveBeenCalledWith(expect.objectContaining({ division: 'division-1', limit: '10' }))
   })
 })

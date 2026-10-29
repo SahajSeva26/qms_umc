@@ -299,7 +299,9 @@ export interface LeadPopulatedRole {
 export interface LeadPopulatedContact {
   _id?: string
   tenant: string
+  division?: string | null
   name: string
+  department?: string
   designation?: string
   email?: string
   phone?: string

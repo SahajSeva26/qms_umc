@@ -6,6 +6,7 @@ import type { AppointmentType, AppointmentMode } from '@/types/appointment.types
 import { APPOINTMENT_TYPE_LABEL, APPOINTMENT_MODE_LABEL } from '@/types/appointment.types'
 import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
 import { useDivisions } from '@/features/crm/divisions/hooks/useDivisions'
+import { useDivision } from '@/features/crm/divisions/hooks/useDivision'
 import { useContacts } from '@/features/contacts/hooks/useContacts'
 import { useCreateAppointment } from '@/features/crm/appointments/hooks/useCreateAppointment'
 import { toast } from '@/components/ui/sonner'
@@ -32,6 +33,7 @@ import {
 } from '@/features/crm/appointments/components/appointmentField.styles'
 import EditContactModal from '@/features/contacts/components/EditContactModal'
 import { CONTACT_DEPARTMENTS, CONTACT_DEPARTMENT_LABEL, DESIGNATIONS_BY_DEPARTMENT, type ContactDepartment } from '@/features/contacts/contact.constants'
+import type { LeadEntity, LeadPopulatedContact } from '@/types/crm.types'
 
 // Sentinel for the inline "+ Add new contact" option — never a real contact id,
 // and non-empty as base-ui's Select requires.
@@ -56,6 +58,7 @@ const APPOINTMENT_TYPE_ICON: Record<AppointmentType, IconType> = {
 // TODO.md. Reuses the same department/designation enum as the Contact module (not a separate list)
 // so a picked contact's own department/designation can be prefilled here as an exact match.
 const MEETING_DEPARTMENTS = Object.values(CONTACT_DEPARTMENTS)
+const populatedId = (value: { _id?: string } | string) => typeof value === 'string' ? value : value._id ?? ''
 
 // startTime is 'HH:mm' on the same calendar day; durationHours can be fractional
 // (e.g. 1.5) — a plain minute-of-day add suffices, wrapping past midnight is not
@@ -116,6 +119,9 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
   const [location, setLocation] = useState('')
   const [leadId, setLeadId] = useState('')
   const [leadLabel, setLeadLabel] = useState('')
+  const [leadContact, setLeadContact] = useState<LeadPopulatedContact | null>(null)
+  const [leadTenantName, setLeadTenantName] = useState('')
+  const [leadDivisionName, setLeadDivisionName] = useState('')
   const [parentId, setParentId] = useState('')
   const [parentLabel, setParentLabel] = useState('')
   const [agendaPublic, setAgendaPublic] = useState('')
@@ -128,23 +134,34 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
 
   const { data: tenantData, isLoading: tenantsLoading, isError: tenantsErrored } = useTenants({ status: 'active', limit: '20' }, open)
   const tenants = tenantData?.data?.items ?? []
-  const selectedTenant = tenants.find((t) => t.id === tenantId)
+  const listedTenant = tenants.find((t) => t.id === tenantId)
+  // The first company page may not include the lead's company. Search by its name using the same
+  // tenant:search permission as the existing picker, then match its id before showing address data.
+  const { data: leadTenantData } = useTenants(
+    { name: leadTenantName, status: 'active', limit: '10' },
+    open && !!leadId && !!leadTenantName && !listedTenant,
+  )
+  const selectedTenant = listedTenant ?? leadTenantData?.data?.items.find((t) => t.id === tenantId)
 
   const { data: divisionData, isLoading: divisionsLoading, isError: divisionsErrored } =
     useDivisions({ tenant: tenantId || undefined }, !!tenantId)
   const divisions = tenantId ? divisionData?.data?.items ?? [] : []
+  const listedDivision = divisions.find((d) => d.id === divisionId)
+  const { data: divisionDetail } = useDivision(leadId && divisionId && !listedDivision ? divisionId : undefined)
+  const selectedDivisionName = listedDivision?.name ?? divisionDetail?.data?.name ?? leadDivisionName
 
   // Scoped by division, not tenant — Contact.division is required for customer-type contacts.
   const { data: contactData, isLoading: contactsLoading, isError: contactsErrored } =
     useContacts({ division: divisionId || undefined, status: 'active' }, { enabled: !!divisionId })
   const contacts = divisionId ? contactData?.data?.items ?? [] : []
+  const leadContactInDivision = leadContact && leadContact.division === divisionId ? leadContact : null
 
   const createAppointment = useCreateAppointment()
 
   // Prefills Department/Designation from the picked contact's own record — a sensible default for
   // "who you're meeting as," not a hard link; still freely overridable below for this appointment.
   const applyContactDefaults = (contactId: string) => {
-    const picked = contacts.find((c) => c.id === contactId)
+    const picked = contacts.find((c) => c.id === contactId) ?? (leadContactInDivision?._id === contactId ? leadContactInDivision : undefined)
     const department = picked?.department as ContactDepartment | undefined
     const designation = picked?.designation
     const isValidPair = !!department && !!designation && DESIGNATIONS_BY_DEPARTMENT[department]?.some((d) => d.key === designation)
@@ -159,6 +176,42 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
     }
     setContactPersonId(value ?? '')
     if (value) applyContactDefaults(value)
+    else { setContactDepartment(''); setContactRole('') }
+  }
+
+  const clearLead = () => {
+    setLeadId('')
+    setLeadLabel('')
+    setLeadContact(null)
+    setLeadTenantName('')
+    setLeadDivisionName('')
+  }
+
+  const selectLead = (id: string, label: string, lead: LeadEntity | null) => {
+    if (!lead) { clearLead(); return }
+    const nextTenantId = populatedId(lead.tenant)
+    const nextDivisionId = populatedId(lead.division)
+    if (!nextTenantId || !nextDivisionId) {
+      setError('This lead has no company or division. Choose another lead.')
+      return
+    }
+    const contact = typeof lead.contactPerson === 'string' ? null : lead.contactPerson
+    const nextContact = contact?.division === nextDivisionId ? contact : null
+    setLeadId(id)
+    setLeadLabel(label)
+    setLeadTenantName(typeof lead.tenant === 'string' ? '' : lead.tenant.name)
+    setLeadDivisionName(typeof lead.division === 'string' ? '' : lead.division.name)
+    setTenantId(nextTenantId)
+    setDivisionId(nextDivisionId)
+    setLeadContact(nextContact)
+    setContactPersonId(nextContact?._id ?? '')
+    const department = nextContact?.department as ContactDepartment | undefined
+    const designation = nextContact?.designation
+    setContactDepartment(department && DESIGNATIONS_BY_DEPARTMENT[department] ? department : '')
+    setContactRole(department && designation && DESIGNATIONS_BY_DEPARTMENT[department]?.some((d) => d.key === designation) ? designation : '')
+    setParentId('')
+    setParentLabel('')
+    setError('')
   }
 
   const reset = () => {
@@ -177,6 +230,9 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
     setLocation('')
     setLeadId('')
     setLeadLabel('')
+    setLeadContact(null)
+    setLeadTenantName('')
+    setLeadDivisionName('')
     setParentId('')
     setParentLabel('')
     setAgendaPublic('')
@@ -192,6 +248,7 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
   }
 
   const selectTenant = (id: string) => {
+    if (id !== tenantId) clearLead()
     setTenantId(id)
     setDivisionId('')
     setContactPersonId('')
@@ -284,17 +341,31 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
             </div>
           </div>
 
+          {type === 'follow-up' && (
+            <div>
+              <SectionHeader icon={FiRefreshCw} color="#0f766e">Follow-up reference</SectionHeader>
+              <Label className={labelClasses} style={labelStyle}>Linked lead {!parentId && '*'}</Label>
+              <LeadIdPicker value={leadId} label={leadLabel} divisionId={divisionId} onChange={selectLead} />
+              <p className="text-[11px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>
+                Selecting a lead fills its company, division, and contact when that contact belongs to the division.
+              </p>
+            </div>
+          )}
+
           <div>
             <SectionHeader icon={FiBriefcase}>Account</SectionHeader>
             <Label className={labelClasses} style={labelStyle}>Company *</Label>
             <Select key={tenantId || 'empty'} value={tenantId || undefined} onValueChange={(v) => selectTenant(v ?? '')}>
               <SelectTrigger className={fieldSelectTriggerClassName} style={fieldSelectTriggerStyle}>
                 <SelectValue placeholder={tenantsLoading ? 'Loading...' : 'Select company...'}>
-                  {(v: string) => tenants.find((t) => t.id === v)?.name ?? (tenantsLoading ? 'Loading...' : 'Select company...')}
+                  {(v: string) => tenants.find((t) => t.id === v)?.name ?? (v === tenantId && (selectedTenant?.name || leadTenantName) ? selectedTenant?.name ?? leadTenantName : tenantsLoading ? 'Loading...' : 'Select company...')}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent className={fieldSelectContentClassName} style={fieldSelectContentStyle}>
                 {tenants.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                {tenantId && !listedTenant && (selectedTenant?.name || leadTenantName) && (
+                  <SelectItem value={tenantId}>{selectedTenant?.name ?? leadTenantName}</SelectItem>
+                )}
               </SelectContent>
             </Select>
             {tenantsErrored && <p className="text-[11px] mt-1 text-danger">Couldn't load companies — try again.</p>}
@@ -331,6 +402,7 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
                 value={divisionId || undefined}
                 onValueChange={(v) => {
                   setDivisionId(v ?? '')
+                  if (v !== divisionId) clearLead()
                   setContactPersonId('')
                   setContactDepartment('')
                   setContactRole('')
@@ -343,11 +415,12 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
               >
                 <SelectTrigger className={fieldSelectTriggerClassName} style={fieldSelectTriggerStyle}>
                   <SelectValue placeholder={!tenantId ? 'Select a company first' : divisionsLoading ? 'Loading...' : 'Select division...'}>
-                    {(v: string) => divisions.find((d) => d.id === v)?.name ?? (divisionsLoading ? 'Loading...' : 'Select division...')}
+                    {(v: string) => divisions.find((d) => d.id === v)?.name ?? (v === divisionId && selectedDivisionName ? selectedDivisionName : divisionsLoading ? 'Loading...' : 'Select division...')}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent className={fieldSelectContentClassName} style={fieldSelectContentStyle}>
                   {divisions.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+                  {divisionId && !listedDivision && selectedDivisionName && <SelectItem value={divisionId}>{selectedDivisionName}</SelectItem>}
                 </SelectContent>
               </Select>
               {divisionsErrored && <p className="text-[11px] mt-1 text-danger">Couldn't load divisions.</p>}
@@ -363,6 +436,7 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
                   <SelectValue placeholder={!divisionId ? 'Select a division first' : contactsLoading ? 'Loading...' : 'Select contact...'}>
                     {(v: string) =>
                       contacts.find((c) => c.id === v)?.name ??
+                      (leadContactInDivision?._id === v ? leadContactInDivision.name : null) ??
                       (justCreatedContact?.id === v ? justCreatedContact.name : null) ??
                       (contactsLoading ? 'Loading...' : 'Select contact...')
                     }
@@ -370,6 +444,9 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
                 </SelectTrigger>
                 <SelectContent className={fieldSelectContentClassName} style={fieldSelectContentStyle}>
                   {contacts.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  {leadContactInDivision?._id && !contacts.some((c) => c.id === leadContactInDivision._id) && (
+                    <SelectItem value={leadContactInDivision._id}>{leadContactInDivision.name}</SelectItem>
+                  )}
                   {divisionId && (
                     <SelectItem value={ADD_NEW_CONTACT_VALUE}>
                       <span className="flex items-center gap-1.5" style={{ color: 'var(--qms-brand)' }}>
@@ -432,12 +509,7 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
             <div>
               {/* Matches the prototype's teal "Follow-up of" section header (sales-calendar.js). */}
               <SectionHeader icon={FiRefreshCw} color="#0f766e">Follow-up reference</SectionHeader>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className={labelClasses} style={labelStyle}>Linked lead {!parentId && '*'}</Label>
-                  <LeadIdPicker value={leadId} label={leadLabel} onChange={(id, label) => { setLeadId(id); setLeadLabel(label) }} />
-                </div>
-                <div>
+              <div>
                   <Label className={labelClasses} style={labelStyle}>Linked meeting {!leadId && '*'}</Label>
                   <LinkedMeetingPicker
                     value={parentId}
@@ -445,9 +517,8 @@ const NewAppointmentDialog = ({ open, onClose, onCreated, prefill }: NewAppointm
                     divisionId={divisionId}
                     onChange={(id, label) => { setParentId(id); setParentLabel(label) }}
                   />
-                </div>
                 {!leadId && !parentId && (
-                  <p className="text-[11px] col-span-2" style={{ color: 'var(--qms-text-muted)' }}>
+                  <p className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>
                     Follow-up appointments need either a linked lead or a linked meeting.
                   </p>
                 )}

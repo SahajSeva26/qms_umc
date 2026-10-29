@@ -1,13 +1,23 @@
 import { lazy, Suspense, useRef, useState, type RefObject } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { FiChevronDown, FiMenu, FiX } from 'react-icons/fi'
+import { NotificationBellTrigger, useNotificationBellState } from '@qms/widgets'
 import { useSession } from '@/hooks/useSession'
 import { useSignOut } from '@/features/auth/useSignOut'
 import ThemeToggle from '@/components/ui/ThemeToggle'
+import api from '@/lib/api/api'
+import { resolveNotificationEntity } from '@/features/notifications/notifications.entityResolver'
 
 // Lazy: @base-ui/react/popover only needs to be fetched once the account button is actually
 // pressed, not on every page's initial load (it was previously eager here, adding to the
-// always-shipped shell for a menu most visits never open).
+// always-shipped shell for a menu most visits never open). Same reasoning applies to the
+// notification popover (pulls in @base-ui/react/dialog + /popover for its own feed/drawer) —
+// NotificationBellTrigger (the icon + badge) stays eager via @qms/widgets' own barrel since it has
+// no @base-ui dependency; only the popover half is lazy, imported by its own direct subpath, NOT
+// through @qms/widgets' eager barrel (see that package's index.ts for why a barrel re-export would
+// defeat this chunk isolation even behind React.lazy).
 const AccountMenu = lazy(() => import('@/components/layouts/AccountMenu'))
+const NotificationBellPopover = lazy(() => import('@qms/widgets/notifications/NotificationBellPopover'))
 
 interface TopbarProps {
   mobileMenuOpen: boolean
@@ -36,13 +46,27 @@ function getGreeting(): string {
 // an earlier version of this comment claimed otherwise, which was simply wrong. Sign-out itself is
 // owned by useSignOut (features/auth) — this component stays purely presentational, no transport.
 const Topbar = ({ mobileMenuOpen, onMobileMenuToggle, mobileMenuToggleRef, mobileSidebarId }: TopbarProps) => {
-  const { session } = useSession()
+  const { session, hasAnyPermission } = useSession()
+  const navigate = useNavigate()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   // Deferred mount, same pattern as AppLayout's mobile drawer: fetch the popover's lazy chunk
   // only on first open, but keep it mounted afterward so base-ui's own close animation can play.
   const [accountMenuMounted, setAccountMenuMounted] = useState(false)
   const accountTriggerRef = useRef<HTMLButtonElement>(null)
   const { signOut, isPending, error } = useSignOut()
+
+  // Same deferred-mount pattern as the account menu — NotificationBellTrigger (icon+badge) is
+  // always eager; NotificationBellPopover (the actual feed/drawer) only mounts on first click.
+  // State machine shared with internal-frontend's Topbar via @qms/widgets, so the two can't drift.
+  const {
+    open: notificationsOpen,
+    setOpen: setNotificationsOpen,
+    popoverMounted: notificationsPopoverMounted,
+    drawerOpen: notificationsDrawerOpen,
+    setDrawerOpen: setNotificationsDrawerOpen,
+    triggerRef: notificationTriggerRef,
+    toggle: toggleNotifications,
+  } = useNotificationBellState()
 
   const user = session?.user
   const initials = getInitials(user?.firstName, user?.lastName)
@@ -77,6 +101,53 @@ const Topbar = ({ mobileMenuOpen, onMobileMenuToggle, mobileMenuToggleRef, mobil
 
       <div className="ml-auto flex items-center gap-2">
         <ThemeToggle />
+
+        <NotificationBellTrigger
+          ref={notificationTriggerRef}
+          api={api}
+          open={notificationsOpen}
+          onClick={toggleNotifications}
+        />
+        {notificationsPopoverMounted && (
+          <Suspense
+            // Rendered only while notificationsOpen is true — NOT merely while
+            // notificationsPopoverMounted is true. A click→click-again (open, then close before
+            // the lazy chunk resolves) must not leave this loading shell stuck on screen after the
+            // user has already closed the bell.
+            fallback={
+              notificationsOpen ? (
+                // A real popover-shaped shell, not a blank gap — the trigger above stays fully
+                // responsive while this chunk loads; this is only ever shown for the brief window
+                // between the first click and the lazy chunk resolving, and only if still open.
+                <div
+                  className="fixed z-50 w-80 rounded-xl border shadow-xl p-3 text-[12px] text-center"
+                  style={{
+                    borderColor: 'var(--qms-border)',
+                    backgroundColor: 'var(--popover)',
+                    color: 'var(--qms-text-muted)',
+                    top: (notificationTriggerRef.current?.getBoundingClientRect().bottom ?? 0) + 8,
+                    right: window.innerWidth - (notificationTriggerRef.current?.getBoundingClientRect().right ?? 0),
+                  }}
+                >
+                  Loading…
+                </div>
+              ) : null
+            }
+          >
+            <NotificationBellPopover
+              api={api}
+              open={notificationsOpen}
+              onOpenChange={setNotificationsOpen}
+              anchor={notificationTriggerRef.current}
+              resolveEntity={resolveNotificationEntity}
+              roleTypeCode={session?.roleType?.code}
+              hasAnyPermission={hasAnyPermission}
+              onNavigate={(href) => navigate(href)}
+              drawerOpen={notificationsDrawerOpen}
+              onDrawerOpenChange={setNotificationsDrawerOpen}
+            />
+          </Suspense>
+        )}
 
         {/* This is profile info plus one action, not a real multi-item menu, so the
             lazily-mounted AccountMenu below is a non-modal Popover (role="dialog",

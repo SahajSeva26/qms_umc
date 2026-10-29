@@ -1,13 +1,15 @@
-import { useNavigate } from 'react-router-dom'
 import { FiBell } from 'react-icons/fi'
-import { useSession } from '@/hooks/useSession'
-import { resolveNotificationEntity } from '@/features/notifications/notifications.entityResolver'
-import { formatRelativeTime } from '@/features/notifications/notifications.formatters'
-import type { NotificationEntityItem } from '@/features/notifications/notifications.types'
+import { formatRelativeTime, type NotificationEntityItem } from '@qms/core'
+import type { EntityResolution } from './notifications.entityResolver'
 
 interface NotificationCardProps {
   notification: NotificationEntityItem
-  onNavigate?: () => void
+  /** Already app-configured (icon/label/href per entity type, permission/role gated) — built via
+   * @qms/core's createNotificationEntityResolver. Pass the bound function, not the factory. */
+  resolveEntity: (entity: NotificationEntityItem['entity'], roleTypeCode?: string | null, hasAnyPermission?: (codes: string[]) => boolean) => EntityResolution | null
+  roleTypeCode?: string | null
+  hasAnyPermission?: (codes: string[]) => boolean
+  onNavigate: (href: string) => void
   /** 'full' (the drawer) shows the untruncated body, an absolute timestamp, and an entity-type
    * label — the popover's 'compact' (default) clips both to keep the list short. */
   variant?: 'compact' | 'full'
@@ -19,11 +21,11 @@ function formatAbsoluteTime(isoDate: string): string {
   return d.toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
-// Unresolved entity types render inert — readable, but not clickable.
-const NotificationCard = ({ notification, onNavigate, variant = 'compact' }: NotificationCardProps) => {
-  const navigate = useNavigate()
-  const { session, hasAnyPermission } = useSession()
-  const resolution = resolveNotificationEntity(notification.entity, session?.roleType?.code, hasAnyPermission)
+// Unresolved entity types render inert — readable, but not clickable. This is the one shared row
+// component both apps' NotificationBell/NotificationsDrawer render; navigation itself is always
+// delegated to the caller via onNavigate(href) — this component never imports a router.
+const NotificationCard = ({ notification, resolveEntity, roleTypeCode, hasAnyPermission, onNavigate, variant = 'compact' }: NotificationCardProps) => {
+  const resolution = resolveEntity(notification.entity, roleTypeCode, hasAnyPermission)
   const Icon = resolution?.icon ?? FiBell
   const isFull = variant === 'full'
 
@@ -83,10 +85,7 @@ const NotificationCard = ({ notification, onNavigate, variant = 'compact' }: Not
   return (
     <button
       type="button"
-      onClick={() => {
-        navigate(resolution.href(notification.entity!.id))
-        onNavigate?.()
-      }}
+      onClick={() => onNavigate(resolution.href(notification.entity!.id))}
       className="w-full text-left border-b last:border-b-0 transition-all hover:bg-(--qms-surface-hover)"
       style={{ borderColor: 'var(--qms-border)' }}
     >

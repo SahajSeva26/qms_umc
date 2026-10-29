@@ -1,17 +1,16 @@
+import type { AxiosInstance } from 'axios'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { notificationsService } from '@/features/notifications/notifications.service'
+import { markAllNotificationsRead } from '../notifications.service'
 
 // No per-id endpoint exists — marks every unread notification read in one call.
-const useMarkAllNotificationsRead = () => {
+export function useMarkAllNotificationsRead(api: AxiosInstance) {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: () => notificationsService.markAllRead(),
+    mutationFn: () => markAllNotificationsRead(api),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] })
       queryClient.invalidateQueries({ queryKey: ['notifications-feed'] })
     },
   })
 }
-
-export default useMarkAllNotificationsRead

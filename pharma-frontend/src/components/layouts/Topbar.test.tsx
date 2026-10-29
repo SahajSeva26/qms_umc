@@ -3,12 +3,16 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import type { SessionResponse } from '@qms/core'
 
 vi.mock('@/hooks/useSession')
 vi.mock('@/features/auth/auth.service', () => ({
   authService: { logout: vi.fn() },
 }))
+// The notification bell's own data layer isn't under test here (covered by its own test file) —
+// stubbed so Topbar's tests aren't coupled to its network calls.
+vi.mock('@/lib/api/api', () => ({ default: {} }))
 
 const MOBILE_SIDEBAR_ID = 'mobile-sidebar'
 
@@ -24,7 +28,10 @@ function sessionFixture(): SessionResponse {
 
 async function mockSession(session: SessionResponse | null) {
   const { useSession } = await import('@/hooks/useSession')
-  vi.mocked(useSession).mockReturnValue({ session } as unknown as ReturnType<typeof useSession>)
+  vi.mocked(useSession).mockReturnValue({
+    session,
+    hasAnyPermission: (codes: string[]) => (session?.permissions ?? []).some((p) => codes.includes(p)),
+  } as unknown as ReturnType<typeof useSession>)
 }
 
 function makeQueryClient() {
@@ -35,12 +42,14 @@ async function renderTopbar(opts?: { onMobileMenuToggle?: () => void; mobileMenu
   const Topbar = (await import('./Topbar')).default
   return render(
     <QueryClientProvider client={makeQueryClient()}>
-      <Topbar
-        mobileMenuOpen={opts?.mobileMenuOpen ?? false}
-        onMobileMenuToggle={opts?.onMobileMenuToggle ?? vi.fn()}
-        mobileMenuToggleRef={createRef<HTMLButtonElement>()}
-        mobileSidebarId={MOBILE_SIDEBAR_ID}
-      />
+      <MemoryRouter>
+        <Topbar
+          mobileMenuOpen={opts?.mobileMenuOpen ?? false}
+          onMobileMenuToggle={opts?.onMobileMenuToggle ?? vi.fn()}
+          mobileMenuToggleRef={createRef<HTMLButtonElement>()}
+          mobileSidebarId={MOBILE_SIDEBAR_ID}
+        />
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }
@@ -89,12 +98,14 @@ describe('Topbar — pharma-frontend shell header', () => {
     const Topbar = (await import('./Topbar')).default
     rerender(
       <QueryClientProvider client={makeQueryClient()}>
-        <Topbar
-          mobileMenuOpen
-          onMobileMenuToggle={vi.fn()}
-          mobileMenuToggleRef={createRef<HTMLButtonElement>()}
-          mobileSidebarId={MOBILE_SIDEBAR_ID}
-        />
+        <MemoryRouter>
+          <Topbar
+            mobileMenuOpen
+            onMobileMenuToggle={vi.fn()}
+            mobileMenuToggleRef={createRef<HTMLButtonElement>()}
+            mobileSidebarId={MOBILE_SIDEBAR_ID}
+          />
+        </MemoryRouter>
       </QueryClientProvider>,
     )
 
@@ -142,6 +153,35 @@ describe('Topbar — pharma-frontend shell header', () => {
 
     await user.keyboard('{Escape}')
     await waitFor(() => expect(screen.queryByRole('dialog', { name: /account/i })).not.toBeInTheDocument())
+  })
+
+  it('clicking the notification bell then closing it again before the lazy chunk resolves removes the loading shell, not leaves it stuck', async () => {
+    let resolvePopoverImport!: () => void
+    vi.doMock('@qms/widgets/notifications/NotificationBellPopover', () => new Promise((resolve) => {
+      resolvePopoverImport = () => resolve({
+        default: () => <div role="dialog" aria-label="Notifications" />,
+      })
+    }))
+
+    await mockSession(sessionFixture())
+    const user = userEvent.setup()
+    await renderTopbar()
+
+    const bellButton = screen.getByRole('button', { name: /^notifications$/i })
+    await user.click(bellButton)
+    // The loading shell shows while the chunk is still in flight.
+    expect(await screen.findByText(/loading/i)).toBeInTheDocument()
+
+    // Close again — BEFORE the lazy import resolves.
+    await user.click(bellButton)
+    expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
+
+    // Only now does the chunk resolve — the shell must stay gone, not reappear.
+    resolvePopoverImport()
+    await waitFor(() => expect(screen.queryByText(/loading/i)).not.toBeInTheDocument())
+    expect(screen.queryByRole('dialog', { name: /notifications/i })).not.toBeInTheDocument()
+
+    vi.doUnmock('@qms/widgets/notifications/NotificationBellPopover')
   })
 
   it('on success: awaits logout, THEN redirects — never the reverse order', async () => {

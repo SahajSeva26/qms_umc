@@ -6,6 +6,10 @@
     "pharma-frontend",
     "packages/*"
   ],
+  "scripts": {
+    "test:packages": "vitest run --config vitest.packages.config.ts",
+    "typecheck:packages": "tsc -p packages/core/tsconfig.build.json --noEmit && tsc -p packages/ui/tsconfig.build.json --noEmit && tsc -p packages/widgets/tsconfig.build.json --noEmit"
+  },
   "overrides": {
     "@base-ui/react": "1.6.0",
     "@fontsource-variable/inter": "5.3.0",

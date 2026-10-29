@@ -14,13 +14,10 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
-    // @qms/ui and @qms/core have no test runner of their own yet — their co-located tests run
-    // via this app's Vitest until those packages get their own.
-    include: [
-      '**/*.{test,spec}.?(c|m)[jt]s?(x)',
-      '../packages/ui/src/location/**/*.{test,spec}.?(c|m)[jt]s?(x)',
-      '../packages/core/src/**/*.{test,spec}.?(c|m)[jt]s?(x)',
-    ],
+    // Shared packages (@qms/core, @qms/ui, @qms/widgets) have their own root-level test command
+    // (`npm run test:packages`, see ../vitest.packages.config.ts) — not included here, so neither
+    // app's own test run silently skips them and they aren't run twice across CI.
+    include: ['**/*.{test,spec}.?(c|m)[jt]s?(x)'],
     // scripts/*.test.mjs are build-tooling regression tests run via plain `node --test`
     // (npm run test:scripts) — not application code, and not written against vitest's API.
     // Spread configDefaults.exclude (not a hand-copied guess) so node_modules/.git etc. stay excluded.

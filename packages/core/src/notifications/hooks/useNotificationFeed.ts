@@ -1,15 +1,20 @@
+import type { AxiosInstance } from 'axios'
 import { useInfiniteQuery, type InfiniteData, type QueryKey } from '@tanstack/react-query'
-import { notificationsService } from '@/features/notifications/notifications.service'
-import { EMPTY_ARRAY } from '@/utils/emptyArray'
-import type { NotificationEntityItem, PaginatedNotificationsResponse } from '@/features/notifications/notifications.types'
+import { getMyNotifications } from '../notifications.service'
+import type { NotificationEntityItem, PaginatedNotificationsResponse } from '../notifications.types'
 
 const PAGE_SIZE = 10
+
+// Stable empty-array reference — a literal `?? []` fallback creates a new array every render,
+// defeating any caller's useMemo/useCallback deps on `items`. Self-contained here rather than
+// depending on either app's own utils/emptyArray.ts.
+const EMPTY_ITEMS: NotificationEntityItem[] = []
 
 // Paginated feed for the bell popover. useInfiniteQuery refetches every fetched page together
 // on invalidation, so mark-all-read's invalidateQueries updates page 1 and page 2+ coherently.
 export const notificationFeedKey = ['notifications-feed'] as const
 
-const useNotificationFeed = (enabled: boolean) => {
+export function useNotificationFeed(api: AxiosInstance, enabled: boolean) {
   const {
     data,
     isFetching,
@@ -21,8 +26,7 @@ const useNotificationFeed = (enabled: boolean) => {
     refetch,
   } = useInfiniteQuery<PaginatedNotificationsResponse, Error, InfiniteData<PaginatedNotificationsResponse>, QueryKey, number>({
     queryKey: notificationFeedKey,
-    queryFn: ({ pageParam }) =>
-      notificationsService.getMyNotifications({ page: String(pageParam), limit: String(PAGE_SIZE) }),
+    queryFn: ({ pageParam }) => getMyNotifications(api, { page: String(pageParam), limit: String(PAGE_SIZE) }),
     initialPageParam: 1,
     getNextPageParam: (lastPage, allPages) => {
       const loadedSoFar = allPages.reduce((sum, p) => sum + (p.data?.items.length ?? 0), 0)
@@ -32,7 +36,7 @@ const useNotificationFeed = (enabled: boolean) => {
     enabled,
   })
 
-  const items: NotificationEntityItem[] = data?.pages.flatMap((p) => p.data?.items ?? EMPTY_ARRAY) ?? EMPTY_ARRAY
+  const items: NotificationEntityItem[] = data?.pages.flatMap((p) => p.data?.items ?? EMPTY_ITEMS) ?? EMPTY_ITEMS
   const count = data?.pages.at(-1)?.data?.count ?? 0
 
   return {
@@ -50,5 +54,3 @@ const useNotificationFeed = (enabled: boolean) => {
     loadMore: fetchNextPage,
   }
 }
-
-export default useNotificationFeed

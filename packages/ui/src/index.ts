@@ -23,3 +23,10 @@ export { default as SessionLoading } from './layout/SessionLoading'
 export { default as SessionRecovery } from './layout/SessionRecovery'
 export { default as UnauthorizedPage } from './layout/UnauthorizedPage'
 export { default as NotFoundPage } from './layout/NotFoundPage'
+
+// Notification UI (NotificationBellTrigger/Popover/Drawer/Card) deliberately does NOT live here —
+// even the trigger performs a React Query API request (useUnreadNotificationCount), which violates
+// this package's own independence rule (ui stays free of API services/session state/business
+// features; see md-files/FRONTEND_SPLIT_ARCHITECTURE.md's dependency rule #2). It lives in
+// @qms/widgets instead — a shared BUSINESS widget surface that's allowed to consume @qms/core's
+// API/query hooks, which @qms/ui itself must not.

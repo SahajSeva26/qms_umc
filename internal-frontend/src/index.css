@@ -1,7 +1,8 @@
 @import "@qms/ui/theme.css";
 
 /* Tailwind v4's automatic content detection does not cross into node_modules
-   (by design — @qms/ui is resolved as a workspace package through a
-   node_modules symlink either way), so the shared package's own components
-   never get scanned for utility classes without this explicit @source. */
+   (by design — @qms/ui/@qms/widgets are resolved as workspace packages through
+   a node_modules symlink either way), so their own components never get
+   scanned for utility classes without these explicit @source directives. */
 @source "../../packages/ui/src";
+@source "../../packages/widgets/src";

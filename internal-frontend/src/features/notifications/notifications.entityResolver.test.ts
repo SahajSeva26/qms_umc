@@ -2,8 +2,9 @@ import { describe, it, expect } from 'vitest'
 import { resolveNotificationEntity } from './notifications.entityResolver'
 
 describe('resolveNotificationEntity', () => {
-  it('resolves a whitelisted entity type (camp) to an icon/label/href', () => {
-    const resolution = resolveNotificationEntity({ id: 'camp-1', type: 'camp', event: 'camp.create' })
+  it('resolves a whitelisted entity type (camp) to an icon/label/href when the viewer holds a camp-read permission', () => {
+    const hasAnyPermission = (codes: string[]) => codes.includes('camp:search')
+    const resolution = resolveNotificationEntity({ id: 'camp-1', type: 'camp', event: 'camp.create' }, 'camp-coord', hasAnyPermission)
 
     expect(resolution).not.toBeNull()
     expect(resolution?.href('camp-1')).toBe('/camps?camp=camp-1')
@@ -11,7 +12,8 @@ describe('resolveNotificationEntity', () => {
   })
 
   it('returns null for an unrecognized entity type — never builds a URL from an arbitrary backend string', () => {
-    expect(resolveNotificationEntity({ id: 'x-1', type: 'some-future-type', event: 'x.create' })).toBeNull()
+    const hasAnyPermission = () => true
+    expect(resolveNotificationEntity({ id: 'x-1', type: 'some-future-type', event: 'x.create' }, 'camp-coord', hasAnyPermission)).toBeNull()
   })
 
   it('returns null for a null entity', () => {
@@ -19,25 +21,17 @@ describe('resolveNotificationEntity', () => {
   })
 
   it('returns null for an entity with an empty type', () => {
-    expect(resolveNotificationEntity({ id: 'x-1', type: '', event: 'x.create' })).toBeNull()
+    const hasAnyPermission = () => true
+    expect(resolveNotificationEntity({ id: 'x-1', type: '', event: 'x.create' }, 'camp-coord', hasAnyPermission)).toBeNull()
   })
 
   // /camps?camp=<id> is unreachable for pharma roles (AppLayout force-redirects them) — except
   // the pharma field-force (MR/ASM/RSM), which has its own exception onto the combined Camp
   // Management page; pharma-division-head is not field-force and stays excluded.
   it('returns null for a whitelisted entity type when the viewer is pharma-division-head (pharma roles cannot reach /camps)', () => {
-    expect(resolveNotificationEntity({ id: 'camp-1', type: 'camp', event: 'camp.create' }, 'pharma-division-head')).toBeNull()
+    const hasAnyPermission = () => true
+    expect(resolveNotificationEntity({ id: 'camp-1', type: 'camp', event: 'camp.create' }, 'pharma-division-head', hasAnyPermission)).toBeNull()
   })
-
-  it.each(['pharma-mr', 'pharma-asm', 'pharma-rsm'])(
-    'resolves camp for %s (AppLayout.tsx permits pathname === "/camps" for pharma field-force)',
-    (roleTypeCode) => {
-      const resolution = resolveNotificationEntity({ id: 'camp-1', type: 'camp', event: 'camp.create' }, roleTypeCode)
-      expect(resolution).not.toBeNull()
-      expect(resolution?.href('camp-1')).toBe('/camps?camp=camp-1')
-      expect(resolution?.label).toBe('Camp')
-    },
-  )
 
   it.each(['pharma-mr', 'pharma-asm', 'pharma-rsm'])(
     'resolves camp for %s when it actually holds camp:book (the real permission check, not just role type)',
@@ -46,6 +40,7 @@ describe('resolveNotificationEntity', () => {
       const resolution = resolveNotificationEntity({ id: 'camp-1', type: 'camp', event: 'camp.create' }, roleTypeCode, hasAnyPermission)
       expect(resolution).not.toBeNull()
       expect(resolution?.href('camp-1')).toBe('/camps?camp=camp-1')
+      expect(resolution?.label).toBe('Camp')
     },
   )
 
@@ -63,28 +58,40 @@ describe('resolveNotificationEntity', () => {
   )
 
   it('still returns null for pharma-mr on a non-camp entity type (e.g. lead) — the exception is camp-only', () => {
-    expect(resolveNotificationEntity({ id: 'lead-1', type: 'lead', event: 'lead.create' }, 'pharma-mr')).toBeNull()
+    const hasAnyPermission = () => true
+    expect(resolveNotificationEntity({ id: 'lead-1', type: 'lead', event: 'lead.create' }, 'pharma-mr', hasAnyPermission)).toBeNull()
   })
 
-  it('still resolves camp for a non-pharma role (e.g. a camp coordinator)', () => {
-    const resolution = resolveNotificationEntity({ id: 'camp-1', type: 'camp', event: 'camp.create' }, 'camp-coord')
+  it('still resolves camp for a non-pharma role (e.g. a camp coordinator) holding a camp-read permission', () => {
+    const hasAnyPermission = (codes: string[]) => codes.includes('camp:manage')
+    const resolution = resolveNotificationEntity({ id: 'camp-1', type: 'camp', event: 'camp.create' }, 'camp-coord', hasAnyPermission)
     expect(resolution).not.toBeNull()
     expect(resolution?.href('camp-1')).toBe('/camps?camp=camp-1')
   })
 
-  it('still resolves camp when no roleTypeCode is passed (e.g. callers that have not been updated)', () => {
-    expect(resolveNotificationEntity({ id: 'camp-1', type: 'camp', event: 'camp.create' })).not.toBeNull()
+  // FAIL CLOSED: a camp/project notification must not resolve to a clickable destination when the
+  // caller omits hasAnyPermission entirely — that must never silently fall through as "allowed".
+  it('FAILS CLOSED for a camp entity when hasAnyPermission is omitted entirely', () => {
+    expect(resolveNotificationEntity({ id: 'camp-1', type: 'camp', event: 'camp.create' }, 'camp-coord')).toBeNull()
   })
 
-  it('resolves a lead entity to /crm?lead=<id>', () => {
+  it('FAILS CLOSED for a project entity when hasAnyPermission is omitted entirely', () => {
+    expect(resolveNotificationEntity({ id: 'proj-1', type: 'project', event: 'project.create' }, 'sales-rep')).toBeNull()
+  })
+
+  // lead has no permission gate (matches the pre-migration behavior) — it still resolves without
+  // hasAnyPermission, since createNotificationEntityResolver only fails closed for TYPES that
+  // actually have a configured requiredPermissions check.
+  it('resolves a lead entity to /crm?lead=<id> even with no hasAnyPermission passed (lead has no permission gate)', () => {
     const resolution = resolveNotificationEntity({ id: 'lead-1', type: 'lead', event: 'lead.create' })
     expect(resolution).not.toBeNull()
     expect(resolution?.href('lead-1')).toBe('/crm?lead=lead-1')
     expect(resolution?.label).toBe('Lead')
   })
 
-  it('resolves a project entity to /projects?project=<id>', () => {
-    const resolution = resolveNotificationEntity({ id: 'proj-1', type: 'project', event: 'project.create' })
+  it('resolves a project entity to /projects?project=<id> when the viewer holds a project-read permission', () => {
+    const hasAnyPermission = (codes: string[]) => codes.includes('project:search')
+    const resolution = resolveNotificationEntity({ id: 'proj-1', type: 'project', event: 'project.create' }, 'sales-rep', hasAnyPermission)
     expect(resolution).not.toBeNull()
     expect(resolution?.href('proj-1')).toBe('/projects?project=proj-1')
     expect(resolution?.label).toBe('Project')
@@ -124,9 +131,5 @@ describe('resolveNotificationEntity', () => {
     const resolution = resolveNotificationEntity({ id: 'proj-1', type: 'project', event: 'project.create' }, 'sales-rep', hasAnyPermission)
     expect(resolution).not.toBeNull()
     expect(resolution?.href('proj-1')).toBe('/projects?project=proj-1')
-  })
-
-  it('still resolves project when no hasAnyPermission callback is passed (e.g. callers that have not been updated)', () => {
-    expect(resolveNotificationEntity({ id: 'proj-1', type: 'project', event: 'project.create' })).not.toBeNull()
   })
 })

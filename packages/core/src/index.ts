@@ -29,3 +29,22 @@ export type {
   DoctorLocationLike,
   DoctorCreateScopeValue,
 } from './doctorForm'
+
+export type {
+  NotificationChannel,
+  NotificationStatus,
+  NotificationEntity,
+  NotificationEntityItem,
+  SearchNotificationQuery,
+  MarkAllReadResponse,
+  PaginatedNotificationsResponse,
+} from './notifications/notifications.types'
+export { getMyNotifications, markAllNotificationsRead } from './notifications/notifications.service'
+export { formatRelativeTime } from './notifications/notifications.formatters'
+// createNotificationEntityResolver / EntityResolution live in @qms/widgets, not here — that type
+// carries a react-icons IconType (a presentation concern), and this package stays limited to
+// transport/query contracts.
+export { unreadNotificationCountKey, useUnreadNotificationCount } from './notifications/hooks/useUnreadNotificationCount'
+export { notificationFeedKey, useNotificationFeed } from './notifications/hooks/useNotificationFeed'
+export { useMarkAllNotificationsRead } from './notifications/hooks/useMarkAllNotificationsRead'
+export { useNotificationsPage } from './notifications/hooks/useNotificationsPage'

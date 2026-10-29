@@ -1,12 +1,22 @@
 import { useState, useEffect, lazy, Suspense } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { FiSearch, FiHelpCircle, FiChevronDown, FiLogOut, FiUser, FiMenu, FiRepeat } from 'react-icons/fi'
+import { NotificationBellTrigger, useNotificationBellState } from '@qms/widgets'
 import { useAuth } from '@/hooks/useAuth'
 import { useSession } from '@/hooks/useSession'
 import { useProfilePicture } from '@/hooks/useProfilePicture'
 import { getGreeting, formatClockDisplay } from '@/utils/formatters'
 import ThemeToggle from '@/components/ui/ThemeToggle'
 import MyProfileModal from '@/components/layouts/MyProfileModal'
-import NotificationBell from '@/features/notifications/components/NotificationBell'
+import api from '@/lib/api/api'
+import { resolveNotificationEntity } from '@/features/notifications/notifications.entityResolver'
+
+// Lazy: @base-ui/react/popover (feed/drawer) only needs to be fetched once the bell is actually
+// clicked. NotificationBellTrigger (icon + badge) stays eager via @qms/widgets' own barrel since it
+// has no @base-ui dependency; only the popover half is lazy, imported by its own direct subpath,
+// NOT through @qms/widgets' eager barrel (a barrel re-export would defeat chunk isolation even
+// behind React.lazy — see that package's index.ts).
+const NotificationBellPopover = lazy(() => import('@qms/widgets/notifications/NotificationBellPopover'))
 
 // Dev-only demo-account switcher. Vite statically replaces import.meta.env.DEV with a literal
 // false in a production build, which makes this whole dynamic import dead code Rollup can fully
@@ -26,7 +36,8 @@ function getInitials(firstName?: string, lastName?: string): string {
 
 const Topbar = ({ onMobileMenuToggle }: TopbarProps) => {
   const { user, signOut } = useAuth()
-  const { session } = useSession()
+  const { session, hasAnyPermission } = useSession()
+  const navigate = useNavigate()
   // Called unconditionally with a safe fallback id (Rules of Hooks) — read-only display here,
   // so no separate trigger-level gate is needed like MyProfileModal's.
   const { url: pictureUrl } = useProfilePicture(user?.id ?? '')
@@ -34,6 +45,19 @@ const Topbar = ({ onMobileMenuToggle }: TopbarProps) => {
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [profileModalOpen, setProfileModalOpen] = useState(false)
   const [quickSwitchOpen, setQuickSwitchOpen] = useState(false)
+
+  // Same deferred-mount pattern as QuickSwitchPopup above — NotificationBellTrigger (icon+badge)
+  // is always eager; NotificationBellPopover (the actual feed/drawer) only mounts on first click.
+  // State machine shared with pharma-frontend's Topbar via @qms/widgets, so the two can't drift.
+  const {
+    open: notificationsOpen,
+    setOpen: setNotificationsOpen,
+    popoverMounted: notificationsPopoverMounted,
+    drawerOpen: notificationsDrawerOpen,
+    setDrawerOpen: setNotificationsDrawerOpen,
+    triggerRef: notificationTriggerRef,
+    toggle: toggleNotifications,
+  } = useNotificationBellState()
 
   useEffect(() => {
     const interval = setInterval(() => setClock(formatClockDisplay()), 60_000)
@@ -101,7 +125,49 @@ const Topbar = ({ onMobileMenuToggle }: TopbarProps) => {
       <div className="ml-auto flex items-center gap-2">
         <ThemeToggle />
 
-        <NotificationBell />
+        <NotificationBellTrigger
+          ref={notificationTriggerRef}
+          api={api}
+          open={notificationsOpen}
+          onClick={toggleNotifications}
+        />
+        {notificationsPopoverMounted && (
+          <Suspense
+            // Rendered only while notificationsOpen is true — NOT merely while
+            // notificationsPopoverMounted is true. A click→click-again (open, then close before
+            // the lazy chunk resolves) must not leave this loading shell stuck on screen after the
+            // user has already closed the bell.
+            fallback={
+              notificationsOpen ? (
+                <div
+                  className="fixed z-50 w-80 rounded-xl border shadow-xl p-3 text-[12px] text-center"
+                  style={{
+                    borderColor: 'var(--qms-border)',
+                    backgroundColor: 'var(--popover)',
+                    color: 'var(--qms-text-muted)',
+                    top: (notificationTriggerRef.current?.getBoundingClientRect().bottom ?? 0) + 8,
+                    right: window.innerWidth - (notificationTriggerRef.current?.getBoundingClientRect().right ?? 0),
+                  }}
+                >
+                  Loading…
+                </div>
+              ) : null
+            }
+          >
+            <NotificationBellPopover
+              api={api}
+              open={notificationsOpen}
+              onOpenChange={setNotificationsOpen}
+              anchor={notificationTriggerRef.current}
+              resolveEntity={resolveNotificationEntity}
+              roleTypeCode={session?.roleType?.code}
+              hasAnyPermission={hasAnyPermission}
+              onNavigate={(href) => navigate(href)}
+              drawerOpen={notificationsDrawerOpen}
+              onDrawerOpenChange={setNotificationsDrawerOpen}
+            />
+          </Suspense>
+        )}
 
         {/* Help */}
         <button

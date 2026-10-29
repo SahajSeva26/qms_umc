@@ -19,6 +19,13 @@ const DIST_ASSETS = join(import.meta.dirname, '..', 'dist', 'assets')
 // appear by coincidence elsewhere (confirmed against a real build before writing this).
 const FORBIDDEN_MARKERS = ['APIProviderContext', '@vis.gl/react-google-maps']
 
+// The notification bell is deliberately split: NotificationBellTrigger (icon+badge, eager, no
+// @base-ui dependency) stays in the main bundle; NotificationBellPopover (the feed/mark-all-read/
+// drawer, @base-ui/react/dialog+popover) must stay in its own lazy chunk, fetched only once the
+// bell is actually clicked. These markers are unique to the popover's own query/mutation logic —
+// confirmed against a real build before writing this — and must never appear in the main chunk.
+const FORBIDDEN_NOTIFICATION_MARKERS = ['notifications-feed', 'markAllNotificationsRead']
+
 // Baseline was ~176.9kB gzip before @base-ui/react/dialog + /popover were briefly eagerly
 // imported into AppLayout/Topbar (which pushed it to ~214.1kB gzip — a real regression, since
 // fixed by lazily mounting the mobile drawer and account popover behind first interaction).
@@ -52,6 +59,22 @@ if (leaked.length > 0) {
   )
 } else {
   console.log(`✓ Bundle isolation check passed: ${entryChunk} does not contain the Maps SDK.`)
+}
+
+const leakedNotification = FORBIDDEN_NOTIFICATION_MARKERS.filter((marker) => entrySource.includes(marker))
+
+if (leakedNotification.length > 0) {
+  failed = true
+  console.error(
+    `✖ Bundle isolation check FAILED: the main entry chunk (${entryChunk}) contains the ` +
+    `notification popover/feed (markers found: ${leakedNotification.join(', ')}).\n` +
+    'This means NotificationBellPopover was imported eagerly (or re-exported from @qms/ui\'s main ' +
+    'barrel) instead of via its own lazy subpath ' +
+    '(lazy(() => import(\'@qms/ui/notifications/NotificationBellPopover\'))). Only ' +
+    'NotificationBellTrigger (the icon+badge) belongs in the eager shell.',
+  )
+} else {
+  console.log(`✓ Bundle isolation check passed: ${entryChunk} does not contain the notification popover/feed.`)
 }
 
 const gzipBytes = gzipSync(entrySource).length

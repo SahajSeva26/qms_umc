@@ -1,4 +1,3 @@
-// Scoped to this feature — notification-card-specific, not a shared utility.
 export function formatRelativeTime(isoDate: string): string {
   const then = new Date(isoDate).getTime()
   if (Number.isNaN(then)) return ''

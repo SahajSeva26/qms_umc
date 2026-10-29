@@ -16,6 +16,7 @@ import GeographyTab from '@/features/doctors/components/tabs/GeographyTab'
 import InactiveTab from '@/features/doctors/components/tabs/InactiveTab'
 import DoctorDrawer from '@/features/doctors/components/DoctorDrawer'
 import EditDoctorModal from '@/features/doctors/components/EditDoctorModal'
+import { CAMP_VIEW_PERMISSIONS } from '@/lib/access/campAccess'
 
 type TabId = 'roster' | 'specialties' | 'geography' | 'inactive'
 
@@ -43,6 +44,10 @@ const DoctorsPage = () => {
   const canManageDoctors = canSeeInactive
   // doctor:create is a lighter, separate permission (e.g. an MR) — POST /doctors accepts either code.
   const canCreateDoctors = hasAnyPermission(['doctor:create', 'doctor:manage'])
+  const canViewDoctorCamps = hasAnyPermission(CAMP_VIEW_PERMISSIONS)
+  // Resolving same-division MRs requires both GET /roles and GET /role-types.
+  const canViewDoctorMrs = hasAnyPermission(['tenant:admin', 'tenant:manage', 'role:search'])
+    && hasAnyPermission(['role-type:manage', 'role-type:search'])
   const [tab, setTab] = useState<TabId>('roster')
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
   const { page: inactivePage, setPage: setInactivePage, totalPages: inactiveTotalPagesFor } = usePagination(PAGE_SIZE)
@@ -248,6 +253,8 @@ const DoctorsPage = () => {
       <DoctorDrawer
         doctor={openDoctor}
         canEdit={canManageDoctors}
+        canViewMrs={canViewDoctorMrs}
+        canViewCamps={canViewDoctorCamps}
         onClose={() => setOpenDoctorId(null)}
         onEdit={() => { setEditModal({ open: true, doctor: openDoctor }); setOpenDoctorId(null) }}
       />

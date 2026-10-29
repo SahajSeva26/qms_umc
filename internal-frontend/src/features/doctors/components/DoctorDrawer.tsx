@@ -5,16 +5,19 @@ import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/sonner'
 import { initials, SPECIALIZATION_LABEL } from '@/features/doctors/doctors.ui'
 import StatusPill from '@/features/doctors/components/StatusPill'
+import DoctorNetworkDetails from '@/features/doctors/components/DoctorNetworkDetails'
 
 interface DoctorDrawerProps {
   doctor: DoctorEntity | null
   canEdit: boolean
+  canViewMrs: boolean
+  canViewCamps: boolean
   onClose: () => void
   onEdit: () => void
 }
 
 // Camps/Patients are real (report=true on doctor search); ★/Engagement and the AI prediction panel have no backend field yet.
-const DoctorDrawer = ({ doctor, canEdit, onClose, onEdit }: DoctorDrawerProps) => {
+const DoctorDrawer = ({ doctor, canEdit, canViewMrs, canViewCamps, onClose, onEdit }: DoctorDrawerProps) => {
   if (!doctor) return <SideDrawer open={false} title="" onClose={onClose}>{null}</SideDrawer>
 
   const d = doctor
@@ -25,6 +28,10 @@ const DoctorDrawer = ({ doctor, canEdit, onClose, onEdit }: DoctorDrawerProps) =
     : d.location?.googlePlaceId
       ? `https://www.google.com/maps/place/?q=place_id:${d.location.googlePlaceId}`
       : null
+  const tenantId = typeof d.tenant === 'string' ? d.tenant : d.tenant?._id ?? null
+  const tenantName = typeof d.tenant === 'string' ? 'Company unavailable' : d.tenant?.name || 'Company unavailable'
+  const divisionId = typeof d.division === 'string' ? d.division : d.division?._id ?? null
+  const divisionName = typeof d.division === 'string' ? 'Division unavailable' : d.division?.name || 'Division unavailable'
 
   return (
     <SideDrawer open={!!doctor} title={`${d.name} · ${d.pharmaCode}`} onClose={onClose} widthClassName="max-w-[940px]">
@@ -92,6 +99,18 @@ const DoctorDrawer = ({ doctor, canEdit, onClose, onEdit }: DoctorDrawerProps) =
           </>
         )}
       </div>
+
+      <DoctorNetworkDetails
+        key={d.id}
+        doctorId={d.id}
+        tenantId={tenantId}
+        tenantName={tenantName}
+        divisionId={divisionId}
+        divisionName={divisionName}
+        totalCamps={d.stats?.camps}
+        canViewMrs={canViewMrs}
+        canViewCamps={canViewCamps}
+      />
 
       <div className="flex items-center gap-2 flex-wrap mt-3">
         {d.mobile && <Button variant="outline" onClick={handleWhatsApp}><FiMessageCircle size={13} /> WhatsApp</Button>}

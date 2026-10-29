@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { AxiosError } from 'axios'
 import { addDays, format } from 'date-fns'
 import type { SessionResponse } from '@qms/core'
 import type { DoctorEntity } from '@/types/doctor.types'
@@ -58,6 +59,10 @@ vi.mock('@/features/pharma/doctors.service', () => ({
   },
 }))
 
+vi.mock('@/features/pharma/mr.service', () => ({
+  searchDownlineMrs: vi.fn(async () => ({ success: true, message: '', data: { items: [], count: 0 } })),
+}))
+
 const startOfToday = () => {
   const d = new Date()
   d.setHours(0, 0, 0, 0)
@@ -104,6 +109,27 @@ function doctorFixture(overrides: Partial<DoctorEntity> = {}): DoctorEntity {
   } as DoctorEntity
 }
 
+// Shapes a rejection the same way axios does for a real backend ApiError body, so
+// getApiErrorMessage's axios.isAxiosError<ApiErrorBody> check actually matches it.
+function apiErrorFixture(statusCode: number, message: string) {
+  const error = new AxiosError(message)
+  error.response = {
+    status: statusCode,
+    data: { message, statusCode },
+    statusText: '', headers: {}, config: {} as never,
+  }
+  return error
+}
+
+function mrFixture(overrides: { id?: string; code?: string; name?: string; divisionId?: string | null } = {}) {
+  return {
+    id: overrides.id ?? 'mr-1',
+    code: overrides.code ?? 'MR-001',
+    name: overrides.name ?? 'Rahul Kumar',
+    division: overrides.divisionId === null ? null : { _id: overrides.divisionId ?? 'div-mr-1', name: 'MR Division', code: 'MRDIV' },
+  }
+}
+
 // The mocked LocationPicker's "Set FAR test coordinates" button uses [77.0266, 28.4595]
 // (Gurugram), ~1150km from doctorFixture()'s Pune coordinates — well past DOCTOR_RANGE_KM (35km),
 // used to exercise the out-of-range re-pick flow.
@@ -144,14 +170,21 @@ async function mockSession(roleId?: string, grantedDoctorPermissions: string[] =
   } as unknown as ReturnType<typeof useSession>)
 }
 
-function renderForm(props: { type?: 'screening' | 'diet'; patientExpectation?: number; project?: typeof TEST_PROJECT | null } = {}) {
+function renderForm(props: { type?: 'screening' | 'diet'; patientExpectation?: number; project?: typeof TEST_PROJECT | null; needsMrPicker?: boolean } = {}) {
   return async () => {
     const BookCampForm = (await import('@/features/pharma/components/BookCampForm')).default
     const onBooked = vi.fn()
     const onCancel = vi.fn()
     render(
       <QueryClientProvider client={makeQueryClient()}>
-        <BookCampForm type={props.type ?? 'screening'} project={'project' in props ? (props.project ?? null) : TEST_PROJECT} patientExpectation={props.patientExpectation} onBooked={onBooked} onCancel={onCancel} />
+        <BookCampForm
+          needsMrPicker={props.needsMrPicker ?? false}
+          type={props.type ?? 'screening'}
+          project={'project' in props ? (props.project ?? null) : TEST_PROJECT}
+          patientExpectation={props.patientExpectation}
+          onBooked={onBooked}
+          onCancel={onCancel}
+        />
       </QueryClientProvider>,
     )
     return { onBooked, onCancel }
@@ -165,6 +198,22 @@ async function fillLocation(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/^state$/i), 'Maharashtra')
   await user.type(screen.getByLabelText(/^pincode$/i), '411001')
   await user.click(screen.getByRole('button', { name: /^set test coordinates$/i }))
+}
+
+// MR-picking is a plain name search (MrPicker, GET /roles/mrs) — server-scoped to the caller's
+// own downline; this helper just drives the already-scoped mocked results. Re-pickable: once a
+// value is already selected, AsyncPicker shows a chip (not the search input) — clicking it clears
+// the selection and reopens search, matching the real re-pick interaction.
+async function pickMr(user: ReturnType<typeof userEvent.setup>, mr = mrFixture()) {
+  const { searchDownlineMrs } = await import('@/features/pharma/mr.service')
+  vi.mocked(searchDownlineMrs).mockResolvedValue({
+    success: true, message: '', data: { items: [mr], count: 1 },
+  })
+  const existingChip = screen.queryByLabelText(/clear selected mr/i)
+  if (existingChip) await user.click(existingChip.closest('[id]') ?? existingChip)
+  await user.type(await screen.findByPlaceholderText(/search mr by name/i), mr.name)
+  const option = await screen.findByText(new RegExp(`${mr.name} \\(${mr.code}\\)`, 'i'), {}, { timeout: 3000 })
+  await user.click(option)
 }
 
 // Doctor-picking is a plain division-scoped name search (DoctorNameDivisionPicker, GET
@@ -364,7 +413,7 @@ describe('BookCampForm — all sections visible at once', () => {
     const BookCampForm = (await import('@/features/pharma/components/BookCampForm')).default
     render(
       <QueryClientProvider client={queryClient}>
-        <BookCampForm type="screening" project={TEST_PROJECT} patientExpectation={undefined} onBooked={vi.fn()} onCancel={vi.fn()} />
+        <BookCampForm needsMrPicker={false} type="screening" project={TEST_PROJECT} patientExpectation={undefined} onBooked={vi.fn()} onCancel={vi.fn()} />
       </QueryClientProvider>,
     )
 
@@ -392,7 +441,7 @@ describe('BookCampForm — all sections visible at once', () => {
     const BookCampForm = (await import('@/features/pharma/components/BookCampForm')).default
     render(
       <QueryClientProvider client={queryClient}>
-        <BookCampForm type="screening" project={TEST_PROJECT} patientExpectation={undefined} onBooked={vi.fn()} onCancel={vi.fn()} />
+        <BookCampForm needsMrPicker={false} type="screening" project={TEST_PROJECT} patientExpectation={undefined} onBooked={vi.fn()} onCancel={vi.fn()} />
       </QueryClientProvider>,
     )
 
@@ -509,7 +558,7 @@ describe('BookCampForm — submit', () => {
     vi.resetAllMocks()
   })
 
-  it('submits the session\'s own role id as mr — pharma-frontend is MR-only, so there is no on-behalf-of MR picker', async () => {
+  it('submits the session\'s own role id as mr when needsMrPicker is false (self-booking) — no MR picker shown', async () => {
     await mockSession('self-role-42')
     const { pharmaCampsService } = await import('@/features/camps/camps.service')
     const user = userEvent.setup()
@@ -533,6 +582,21 @@ describe('BookCampForm — submit', () => {
     expect(payload).not.toHaveProperty('coordinates')
     expect(payload.project).toBe(TEST_PROJECT.id)
     expect(screen.getByText(TEST_PROJECT.name)).toBeInTheDocument()
+  })
+
+  it('surfaces a backend error (self-booking) the same way the on-behalf-of case does — one shared error display, not two', async () => {
+    await mockSession()
+    const user = userEvent.setup()
+    await renderForm()()
+    const { pharmaCampsService } = await import('@/features/camps/camps.service')
+    vi.mocked(pharmaCampsService.bookCamp).mockRejectedValueOnce(
+      apiErrorFixture(409, 'This project does not offer screening camps'),
+    )
+
+    await fillWholeForm(user)
+    await user.click(screen.getByRole('button', { name: /book camp/i }))
+
+    expect(await screen.findByText(/this project does not offer screening camps/i)).toBeInTheDocument()
   })
 
   it('submits patientExpectation as omitted when the caller passes undefined (its own section 1 field was left blank)', async () => {
@@ -643,7 +707,7 @@ describe('BookCampForm — zero configured slots', () => {
 
     render(
       <QueryClientProvider client={makeQueryClient()}>
-        <BookCampForm type="screening" project={{ id: 'proj-2', name: 'Empty Project', campTimeSlots: [], daysToBookBefore: 0 }} patientExpectation={undefined} onBooked={vi.fn()} onCancel={vi.fn()} />
+        <BookCampForm needsMrPicker={false} type="screening" project={{ id: "proj-2", name: 'Empty Project', campTimeSlots: [], daysToBookBefore: 0 }} patientExpectation={undefined} onBooked={vi.fn()} onCancel={vi.fn()} />
       </QueryClientProvider>,
     )
 
@@ -771,5 +835,121 @@ describe('BookCampForm — inline doctor creation (gated on doctor:create OR doc
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(doctorsService.createDoctor).not.toHaveBeenCalled()
+  })
+})
+
+describe('BookCampForm — needsMrPicker (HO/RSM/ASM "book on behalf of MR")', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  it('needsMrPicker=false (MR self-booking) renders no MR section at all', async () => {
+    await mockSession()
+    await renderForm({ needsMrPicker: false })()
+
+    expect(screen.queryByPlaceholderText(/search mr by name/i)).not.toBeInTheDocument()
+  })
+
+  it('needsMrPicker=true renders the MR section and blocks submit until an MR is picked', async () => {
+    await mockSession()
+    await renderForm({ needsMrPicker: true })()
+
+    expect(screen.getByPlaceholderText(/search mr by name/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^book camp$/i })).toBeDisabled()
+  })
+
+  it('picking an MR re-scopes the Doctor picker to the MR\'s own division, overriding the caller\'s own fallback', async () => {
+    await mockSession()
+    const user = userEvent.setup()
+    await renderForm({ needsMrPicker: true })()
+
+    const { searchDoctors } = (await import('@/features/pharma/doctors.service')).doctorsService
+
+    // Before any MR is picked, doctorDivisionId falls back to the caller's own session division
+    // (div-1) — the doctor picker is usable immediately rather than dead-ended, and a search here
+    // would hit the caller's own division.
+    expect(screen.getByPlaceholderText(/^search doctor by name/i)).toBeInTheDocument()
+
+    await pickMr(user, mrFixture({ divisionId: 'div-mr-77' }))
+    await user.type(await screen.findByPlaceholderText(/^search doctor by name/i), 'Priya')
+
+    // Once an MR is picked, the doctor search is scoped to THEIR division, not the caller's own.
+    await waitFor(() => expect(searchDoctors).toHaveBeenCalledWith(expect.objectContaining({ division: 'div-mr-77' })))
+  })
+
+  it('submits the picked MR\'s role id as `mr`, not the caller\'s own session role id', async () => {
+    await mockSession('caller-role-id')
+    const user = userEvent.setup()
+    await renderForm({ needsMrPicker: true })()
+
+    await pickMr(user, mrFixture({ id: 'mr-target-id', divisionId: 'div-mr-1' }))
+    await fillWholeForm(user)
+    await user.click(screen.getByRole('button', { name: /^book camp$/i }))
+
+    const { pharmaCampsService } = await import('@/features/camps/camps.service')
+    await waitFor(() => expect(pharmaCampsService.bookCamp).toHaveBeenCalledWith(
+      expect.objectContaining({ mr: 'mr-target-id' }),
+    ))
+  })
+
+  it('surfaces the backend\'s 403 when assertCanBook rejects the picked MR (outside the caller\'s real hierarchy, despite passing the client-side picker)', async () => {
+    await mockSession()
+    const user = userEvent.setup()
+    await renderForm({ needsMrPicker: true })()
+    const { pharmaCampsService } = await import('@/features/camps/camps.service')
+    vi.mocked(pharmaCampsService.bookCamp).mockRejectedValueOnce(
+      apiErrorFixture(403, 'You can only book for MRs that report to you'),
+    )
+
+    await pickMr(user)
+    await fillWholeForm(user)
+    await user.click(screen.getByRole('button', { name: /^book camp$/i }))
+
+    expect(await screen.findByText(/you can only book for mrs that report to you/i)).toBeInTheDocument()
+  })
+
+  it('surfaces the backend\'s 409 (e.g. a slot conflict) the same way self-booking already does', async () => {
+    await mockSession()
+    const user = userEvent.setup()
+    await renderForm({ needsMrPicker: true })()
+    const { pharmaCampsService } = await import('@/features/camps/camps.service')
+    vi.mocked(pharmaCampsService.bookCamp).mockRejectedValueOnce(
+      apiErrorFixture(409, 'This FO is already booked for an overlapping slot'),
+    )
+
+    await pickMr(user)
+    await fillWholeForm(user)
+    await user.click(screen.getByRole('button', { name: /^book camp$/i }))
+
+    expect(await screen.findByText(/this fo is already booked for an overlapping slot/i)).toBeInTheDocument()
+  })
+
+  it('picking a different MR resets a previously picked doctor — a doctor valid for one MR\'s division may not be valid for another\'s', async () => {
+    await mockSession()
+    const user = userEvent.setup()
+    await renderForm({ needsMrPicker: true })()
+
+    await pickMr(user, mrFixture({ id: 'mr-1', divisionId: 'div-mr-1' }))
+    await pickDoctor(user)
+    expect(screen.getByText(/Dr\. Priya Sharma \(DOC-1\)/i)).toBeInTheDocument()
+
+    await pickMr(user, mrFixture({ id: 'mr-2', name: 'Second Manager', code: 'MR-002', divisionId: 'div-mr-2' }))
+
+    expect(screen.queryByText(/Dr\. Priya Sharma \(DOC-1\)/i)).not.toBeInTheDocument()
+  })
+
+  it('"New doctor" is scoped to the picked MR\'s division, not the caller\'s own', async () => {
+    await mockSession(undefined, ['doctor:create'])
+    const user = userEvent.setup()
+    await renderForm({ needsMrPicker: true })()
+
+    await pickMr(user, mrFixture({ divisionId: 'div-mr-1' }))
+    await user.click(await screen.findByRole('button', { name: /new doctor/i }))
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    // EditDoctorModal takes a flat divisionId prop in this app (no forcedTenant/forcedDivision
+    // picker like internal-frontend's admin-grade version) — the dialog rendering at all here,
+    // right after picking an MR whose division differs from the caller's own (div-1), proves
+    // showNewDoctor's `doctorDivisionId` gate is live, not the caller's actingDivisionId.
   })
 })

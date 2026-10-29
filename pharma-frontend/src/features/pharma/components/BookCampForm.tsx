@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
-import { FiUserCheck, FiMapPin, FiCalendar, FiFileText, FiAlertTriangle } from 'react-icons/fi'
+import { FiUser, FiUserCheck, FiMapPin, FiCalendar, FiFileText, FiAlertTriangle } from 'react-icons/fi'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { useReshapingResolver } from '@/hooks/useReshapingResolver'
 import { bookCampPayloadSchema, type BookCampFormPayload } from '@/features/pharma/schemas/bookCamp.schemas'
@@ -17,6 +17,7 @@ import type { DoctorEntity } from '@/types/doctor.types'
 import { DOCTOR_RANGE_KM } from '@/types/doctor.types'
 import DoctorDistancePicker from '@/features/pharma/components/DoctorDistancePicker'
 import DoctorNameDivisionPicker from '@/features/pharma/components/DoctorNameDivisionPicker'
+import MrPicker from '@/features/pharma/components/MrPicker'
 import DayStripAvailability from '@/features/pharma/components/DayStripAvailability'
 import { Button } from '@qms/ui'
 import { Textarea } from '@/components/ui/textarea'
@@ -31,6 +32,8 @@ import ENV from '@/config/env'
 const EditDoctorModal = lazy(() => import('@/features/pharma/components/EditDoctorModal'))
 
 interface FormValues {
+  mrId: string
+  mrLabel: string
   doctorId: string
   doctorLabel: string
   date: string
@@ -41,6 +44,7 @@ interface FormValues {
 }
 
 const EMPTY_FORM_VALUES: FormValues = {
+  mrId: '', mrLabel: '',
   doctorId: '', doctorLabel: '',
   date: '',
   timeSlot: '',
@@ -48,12 +52,13 @@ const EMPTY_FORM_VALUES: FormValues = {
   notes: '',
 }
 
-// pharma-frontend is MR-only — no on-behalf-of booking, so `mr` is spliced in at submit time
-// (see onSubmit below), not part of this form's own reshaping.
-const useBookCampFormResolver = (type: CampType, patientExpectation: number | undefined) =>
+// selfMrId is spliced in as `mr` when the caller IS the MR (needsMrPicker false).
+const useBookCampFormResolver = (needsMrPicker: boolean, selfMrId: string | undefined, type: CampType, patientExpectation: number | undefined) =>
   useReshapingResolver<FormValues, BookCampFormPayload>({
     schema: bookCampPayloadSchema,
     toPayload: (values) => ({
+      // '' rather than undefined, so Zod's min(1) check gives a friendly required message.
+      mr: ((needsMrPicker ? values.mrId : selfMrId) || '') as string,
       doctor: values.doctorId,
       type,
       patientExpectation,
@@ -63,7 +68,8 @@ const useBookCampFormResolver = (type: CampType, patientExpectation: number | un
       notes: values.notes.trim() || undefined,
       devices: undefined,
     }),
-    topLevelFieldMap: { doctor: 'doctorId' },
+    // Maps payload keys to this form's differently-named fields, so a Zod error lands on the right field.
+    topLevelFieldMap: { mr: 'mrId', doctor: 'doctorId' },
     nestedFieldMaps: {
       location: {
         addressLine1: 'location', addressLine2: 'location', locality: 'location',
@@ -74,6 +80,8 @@ const useBookCampFormResolver = (type: CampType, patientExpectation: number | un
   })
 
 interface BookCampFormProps {
+  /** Whether this role books on behalf of someone else — shows the MR picker. MR itself never does. */
+  needsMrPicker: boolean
   /** Locked context from the caller's page, never user-editable — no Camp type picker shown. */
   type: CampType | null
   /** Locked context from the caller's page — null until the caller's own project/camp-type picker has a selection. */
@@ -88,9 +96,14 @@ interface BookCampFormProps {
   onCancel: () => void
 }
 
-// Lean MR-only port of internal-frontend's BookCampForm.tsx — no on-behalf-of MR picker (an MR
-// always books for themselves), so `mr` is spliced from the session unconditionally.
-const BookCampForm = ({ type, project, patientExpectation, patientExpectationInvalid, onBooked, onCancel }: BookCampFormProps) => {
+// Shared across both the MR's own "Book camp" tab and the HO/RSM/ASM "Book on behalf of MR" tab
+// — only whether the MR picker renders differs per role. Mirrors internal-frontend's
+// BookCampForm.tsx: needsMrPicker=true shows the MR section and re-scopes doctor search to the
+// picked MR's own division (resolveMrChain on the backend derives the camp's division from the
+// target MR too, never the caller's) — the picker itself is already server-scoped to the caller's
+// real downline (GET /roles/mrs), and POST /camps/book's assertCanBook re-enforces the same
+// hierarchy independently, so there's no division-mismatch case to guard against here.
+const BookCampForm = ({ needsMrPicker, type, project, patientExpectation, patientExpectationInvalid, onBooked, onCancel }: BookCampFormProps) => {
   const { session } = useSession()
   const { hasAnyPermission } = usePermission()
   const selfMrId = session?.role.id
@@ -98,7 +111,7 @@ const BookCampForm = ({ type, project, patientExpectation, patientExpectationInv
   const canCreateDoctors = hasAnyPermission(['doctor:create', 'doctor:manage'])
   const [showNewDoctor, setShowNewDoctor] = useState(false)
   // A null type is just a resolver placeholder ('screening') — onSubmit's project-required guard blocks submit.
-  const { resolver, parsePayload } = useBookCampFormResolver(type ?? 'screening', patientExpectation)
+  const { resolver, parsePayload } = useBookCampFormResolver(needsMrPicker, selfMrId, type ?? 'screening', patientExpectation)
   const bookCamp = useBookCamp()
   // Closes the race window before isPending flips true, since parsePayload's re-parse runs first.
   const submittingRef = useRef(false)
@@ -106,9 +119,12 @@ const BookCampForm = ({ type, project, patientExpectation, patientExpectationInv
   const [locationError, setLocationError] = useState<string | null>(null)
   const [locationHint, setLocationHint] = useState<string | null>(null)
 
-  // Doctor search (both the division name-search and /doctors/nearest) scopes to the caller's
-  // own division — pharma-frontend is MR-only, so there's no picked-MR's division to drift from.
+  // Doctor search (both the division name-search and /doctors/nearest) scopes to the picked MR's
+  // own division once one is picked, falling back to the caller's own (self-booking has no
+  // mrDivisionId to pick up).
+  const [mrDivisionId, setMrDivisionId] = useState<string | null>(null)
   const actingDivisionId = session?.role.division ?? null
+  const doctorDivisionId = mrDivisionId ?? actingDivisionId
 
   // The picked doctor's OWN location, captured at pick time — the camp location defaults to this.
   // Once the doctor is cleared (or location is manually pushed out of range) this is cleared too.
@@ -130,6 +146,8 @@ const BookCampForm = ({ type, project, patientExpectation, patientExpectationInv
     defaultValues: EMPTY_FORM_VALUES,
   })
   // useWatch, not watch() — watch() returns a function React Compiler can't memoize safely.
+  const watchedMrId = useWatch({ control, name: 'mrId' })
+  const mrLabel = useWatch({ control, name: 'mrLabel' })
   const doctorLabel = useWatch({ control, name: 'doctorLabel' })
   const location = useWatch({ control, name: 'location' })
   const watchedDate = useWatch({ control, name: 'date' })
@@ -217,13 +235,21 @@ const BookCampForm = ({ type, project, patientExpectation, patientExpectationInv
     return undefined
   }
 
-  // Should be unreachable for a genuine pharma MR session — fails safely instead of
-  // submitting `mr: undefined` if it happens anyway.
-  const missingSelfMrId = !selfMrId
+  // Should be unreachable for a genuine pharma MR self-booking session — fails safely instead of
+  // submitting `mr: undefined` if it happens anyway. Not applicable when needsMrPicker (the form's
+  // own mr:'' required-field validation covers "no MR picked yet" for that case).
+  const missingSelfMrId = !needsMrPicker && !selfMrId
+
+  // Blocks submit whether the MR identity is missing because the session itself is broken
+  // (self-booking) or because the picker simply hasn't been used yet (on-behalf-of booking) — the
+  // form's own mr:'' required-field validation would also catch the latter on submit, but gating
+  // the button directly avoids a user hitting Enter into a visible validation error for free.
+  const missingMr = needsMrPicker ? !watchedMrId : !selfMrId
 
   const onSubmit = async (values: FormValues) => {
+    const mr = needsMrPicker ? values.mrId : selfMrId
     // Should be unreachable (submit is disabled on all of these) — guards a stray Enter-key submit.
-    if (!project || !type || patientExpectationInvalid || availabilityIndeterminate || !selfMrId) return
+    if (!project || !type || patientExpectationInvalid || availabilityIndeterminate || !mr) return
     if (locationResolution !== 'idle') {
       setLocationError(
         locationResolution === 'loading'
@@ -235,7 +261,7 @@ const BookCampForm = ({ type, project, patientExpectation, patientExpectationInv
     setLocationError(null)
     const formPayload = await parsePayload(values)
     // project/mr are context, not form state, so they're added here rather than via the resolver.
-    const payload: BookCampPayload = { ...formPayload, project: project.id, mr: selfMrId }
+    const payload: BookCampPayload = { ...formPayload, project: project.id, mr }
     const res = await bookCamp.mutateAsync(payload)
     reset(EMPTY_FORM_VALUES)
     onBooked(res)
@@ -262,9 +288,10 @@ const BookCampForm = ({ type, project, patientExpectation, patientExpectationInv
   const locationReady = !!project && !!location?.coordinates && locationResolution === 'idle'
   const projectReady = !!project && !!type
 
-  // Continues MrBookCampTab's "1 · Project & camp" numbering — pharma-frontend has no MR-picker
-  // section (no on-behalf-of booking), so Doctor starts at 2, unlike internal-frontend's 2/3 split.
-  const doctorSectionNumber = 2
+  // Continues MrBookCampTab's "1 · Project & camp" numbering — the MR section (when present)
+  // takes 2, pushing Doctor to 3; self-booking has no MR section, so Doctor stays at 2.
+  const mrSectionNumber = 2
+  const doctorSectionNumber = needsMrPicker ? 3 : 2
   const locationSectionNumber = doctorSectionNumber + 1
   const dateSectionNumber = locationSectionNumber + 1
   const notesSectionNumber = dateSectionNumber + 1
@@ -284,10 +311,40 @@ const BookCampForm = ({ type, project, patientExpectation, patientExpectationInv
         </div>
       )}
 
+      {needsMrPicker && (
+        <div className="booking-section">
+          <SectionHeader icon={FiUser} spaced={false} number={mrSectionNumber}>MR</SectionHeader>
+          <Controller
+            control={control}
+            name="mrId"
+            render={({ field }) => (
+              <MrPicker
+                value={field.value}
+                label={mrLabel}
+                onChange={(id, l, divisionId) => {
+                  field.onChange(id)
+                  setValue('mrLabel', l)
+                  setMrDivisionId(divisionId)
+                  // A newly-picked MR may resolve to a different division — the old doctor pick
+                  // (and anything location-derived from it) could be stale, so clear it.
+                  setValue('doctorId', '', { shouldDirty: true })
+                  setValue('doctorLabel', '')
+                  setDoctorLocation(null)
+                  setDoctorOutOfRange(false)
+                }}
+              />
+            )}
+          />
+          {fieldError('mrId') && <p className="text-[11px] mt-1 text-danger">{fieldError('mrId')}</p>}
+        </div>
+      )}
+
       <div className="booking-section">
         <div className="flex items-center justify-between gap-2">
-          <SectionHeader icon={FiUserCheck} spaced={false} number={doctorSectionNumber}>Doctor</SectionHeader>
-          {canCreateDoctors && session && actingDivisionId && (
+          <SectionHeader icon={FiUserCheck} spaced={needsMrPicker} number={doctorSectionNumber}>Doctor</SectionHeader>
+          {/* Doctor creation is scoped by the booking target's division — the picked MR's once one
+              is picked, the caller's own otherwise. */}
+          {canCreateDoctors && session && doctorDivisionId && (
             <Button type="button" variant="outline" onClick={() => setShowNewDoctor(true)}>
               New doctor
             </Button>
@@ -319,7 +376,7 @@ const BookCampForm = ({ type, project, patientExpectation, patientExpectationInv
                 <DoctorNameDivisionPicker
                   value={field.value}
                   label={doctorLabel}
-                  division={actingDivisionId}
+                  division={doctorDivisionId}
                   onChange={(id, l) => { field.onChange(id); setValue('doctorLabel', l) }}
                   onSelectDoctor={handleSelectDoctor}
                 />
@@ -329,13 +386,13 @@ const BookCampForm = ({ type, project, patientExpectation, patientExpectationInv
         </div>
         {fieldError('doctorId') && <p className="text-[11px] mt-1 text-danger">{fieldError('doctorId')}</p>}
 
-        {showNewDoctor && session && actingDivisionId && (
+        {showNewDoctor && session && doctorDivisionId && (
           <DialogErrorBoundary onClose={() => setShowNewDoctor(false)}>
             <Suspense fallback={<DialogOpeningFallback />}>
               <EditDoctorModal
                 open
                 doctor={null}
-                divisionId={actingDivisionId}
+                divisionId={doctorDivisionId}
                 onCreated={(created) => {
                   setValue('doctorId', created.id, { shouldDirty: true, shouldTouch: true, shouldValidate: true })
                   setValue('doctorLabel', `${created.name} (${created.pharmaCode})`)
@@ -445,7 +502,7 @@ const BookCampForm = ({ type, project, patientExpectation, patientExpectationInv
           <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
           <Button
             type="submit"
-            disabled={!projectReady || bookCamp.isPending || missingSelfMrId || locationResolution === 'loading' || !!patientExpectationInvalid || availabilityIndeterminate}
+            disabled={!projectReady || bookCamp.isPending || missingMr || locationResolution === 'loading' || !!patientExpectationInvalid || availabilityIndeterminate}
             className="font-bold text-white"
             style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
           >

@@ -4,13 +4,16 @@ import { CAMP_TIME_SLOT_VALUES } from '@/types/campTimeSlot.constants'
 
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/
 
-// `project`/`mr` are spliced into the payload at submit time, not form fields — pharma-frontend
-// is MR-only, so there's no on-behalf-of mrId field (unlike internal-frontend's form).
-export type BookCampFormPayload = Omit<BookCampPayload, 'project' | 'mr'>
+// `project` is deliberately NOT part of this schema or the form — it's a locked value spliced
+// into the real payload right before the mutation fires. `mr` IS part of it: BookCampForm either
+// shows an MR picker (on-behalf-of booking) or splices the caller's own role id as `mr` at submit
+// time (self-booking) — see BookCampForm.tsx's needsMrPicker branch.
+export type BookCampFormPayload = Omit<BookCampPayload, 'project'>
 
 // Mirrors BookCampPayloadSchema (backend camp.validators.ts) including conscentPath's
-// misspelling.
+// misspelling; mr is required even for self-booking.
 export const bookCampPayloadSchema = z.object({
+  mr: z.string().min(1, 'MR is required.'),
   doctor: z.string().min(1, 'Doctor is required.'),
   type: z.enum(['screening', 'diet', 'lab']).optional(),
   patientExpectation: z.number().int('Must be a whole number.').nonnegative('Must be 0 or more.').optional(),

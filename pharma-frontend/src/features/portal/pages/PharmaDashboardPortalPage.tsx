@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState } from 'react'
-import { FiBarChart2, FiCalendar } from 'react-icons/fi'
+import { FiBarChart2, FiCalendar, FiUserPlus } from 'react-icons/fi'
 import { RouteFallback } from '@qms/ui'
 import PharmaRoleGate from '@/features/pharma/components/PharmaRoleGate'
 import PharmaDashboardTab from '@/features/pharma/components/PharmaDashboardTab'
@@ -11,6 +11,9 @@ import PharmaDashboardTab from '@/features/pharma/components/PharmaDashboardTab'
 // chunk isolation entirely, even when consumed via this exact direct path. The barrel intentionally
 // only ever exports eager, lightweight hooks for this reason.
 const PharmaCampScheduleTab = lazy(() => import('@/features/camps/components/PharmaCampScheduleTab'))
+// Same chunk MrPortalPage's own "Book camp" tab already loads (RHF + Zod + the Maps SDK boundary)
+// — a user who never books shouldn't download any of it.
+const MrBookCampTab = lazy(() => import('@/features/pharma/components/MrBookCampTab'))
 
 interface PharmaDashboardPortalPageProps {
   roleTypeCode: string
@@ -18,17 +21,22 @@ interface PharmaDashboardPortalPageProps {
   portalLabel: string
 }
 
-type TabId = 'dashboard' | 'schedule'
+type TabId = 'dashboard' | 'schedule' | 'book'
 
 const TABS: { id: TabId; label: string; icon: typeof FiBarChart2 }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: FiBarChart2 },
   { id: 'schedule', label: 'Camp schedule', icon: FiCalendar },
+  { id: 'book', label: 'Book on behalf of MR', icon: FiUserPlus },
 ]
 
-// Shared, thin portal shell for HO/RSM/ASM — the same two tabs for all three roles, since the
+// Shared, thin portal shell for HO/RSM/ASM — the same tabs for all three roles, since the
 // underlying GET /camps the Schedule tab calls is server-scoped per role server-side (see
 // usePharmaCamps.ts for the full scoping note) — HO sees their whole division, ASM/RSM see their
-// downline (a booking-time snapshot, not a live hierarchy lookup). A fuller multi-tab portal
+// downline (a booking-time snapshot, not a live hierarchy lookup). The "Book on behalf of MR" tab
+// reuses MrBookCampTab's own component (needsMrPicker=true) — same booking implementation as the
+// MR's own tab, not a separate build; MrPicker's GET /roles/mrs search is itself server-scoped to
+// the caller's downline, and POST /camps/book's assertCanBook re-enforces the same hierarchy
+// independently, so no extra client-side role filtering is needed here. A fuller multi-tab portal
 // (projects, doctors, etc.) is a later, separate step.
 const PharmaDashboardPortalPage = ({ roleTypeCode, portalLabel }: PharmaDashboardPortalPageProps) => {
   const [tab, setTab] = useState<TabId>('dashboard')
@@ -64,6 +72,11 @@ const PharmaDashboardPortalPage = ({ roleTypeCode, portalLabel }: PharmaDashboar
         {tab === 'schedule' && (
           <Suspense fallback={<RouteFallback />}>
             <PharmaCampScheduleTab />
+          </Suspense>
+        )}
+        {tab === 'book' && (
+          <Suspense fallback={<RouteFallback />}>
+            <MrBookCampTab needsMrPicker />
           </Suspense>
         )}
       </div>

@@ -21,8 +21,8 @@ vi.mock('@/features/pharma/components/ProjectDevicesRequiredCard', () => ({ defa
 
 // Stub is stateful so a remount regression test can prove `key={projectId}` actually loses state.
 vi.mock('@/features/pharma/components/BookCampForm', () => ({
-  default: function MockBookCampForm({ type, project, patientExpectation, patientExpectationInvalid }: {
-    type: string | null; project: { name: string } | null
+  default: function MockBookCampForm({ needsMrPicker, type, project, patientExpectation, patientExpectationInvalid }: {
+    needsMrPicker: boolean; type: string | null; project: { name: string } | null
     patientExpectation: number | undefined; patientExpectationInvalid?: boolean
   }) {
     const [doctorDraft, setDoctorDraft] = useState('')
@@ -30,6 +30,7 @@ vi.mock('@/features/pharma/components/BookCampForm', () => ({
       <div>
         <div>Booking form mounted · type: {type ?? 'none'} · project: {project?.name ?? 'none'}</div>
         <div>patientExpectation: {patientExpectation ?? 'undefined'} · invalid: {String(!!patientExpectationInvalid)}</div>
+        <div>needsMrPicker: {String(needsMrPicker)}</div>
         <input placeholder="Doctor draft (simulated field state)" value={doctorDraft} onChange={(e) => setDoctorDraft(e.target.value)} />
       </div>
     )
@@ -56,12 +57,12 @@ async function mockSession(roleTypeCode = 'pharma-mr') {
   } as unknown as ReturnType<typeof useSession>)
 }
 
-async function renderTab() {
-  await mockSession()
+async function renderTab(props: { needsMrPicker?: boolean; roleTypeCode?: string } = {}) {
+  await mockSession(props.roleTypeCode)
   const MrBookCampTab = (await import('./MrBookCampTab')).default
   return render(
     <QueryClientProvider client={makeQueryClient()}>
-      <MrBookCampTab />
+      <MrBookCampTab needsMrPicker={props.needsMrPicker} />
     </QueryClientProvider>,
   )
 }
@@ -270,5 +271,50 @@ describe('MrBookCampTab — Expected patients (section 1, owned outside BookCamp
 
     expect(screen.getByLabelText(/expected patients/i)).toHaveValue(null)
     expect(await screen.findByText(/patientExpectation: undefined/i)).toBeInTheDocument()
+  })
+})
+
+describe('MrBookCampTab — needsMrPicker (HO/RSM/ASM "book on behalf of MR" reuse)', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  it('defaults to needsMrPicker=false and the MR\'s own self-booking copy when the prop is omitted', async () => {
+    await renderTab()
+
+    expect(screen.getByText(/^book a new camp$/i)).toBeInTheDocument()
+    expect(screen.getByText(/booking form mounted/i).parentElement).toBeInTheDocument()
+    expect(await screen.findByText(/needsMrPicker: false/i)).toBeInTheDocument()
+  })
+
+  it('needsMrPicker=true shows the on-behalf-of heading and passes needsMrPicker through to BookCampForm unchanged', async () => {
+    await renderTab({ needsMrPicker: true })
+
+    expect(screen.getByText(/book on behalf of an mr/i)).toBeInTheDocument()
+    expect(screen.queryByText(/^book a new camp$/i)).not.toBeInTheDocument()
+    expect(await screen.findByText(/needsMrPicker: true/i)).toBeInTheDocument()
+  })
+
+  it('whoCanBookCamp is still checked against the SIGNED-IN booker\'s own role, not overridden for on-behalf-of booking', async () => {
+    const user = userEvent.setup()
+    // An ASM booking on behalf of an MR — the project restricts booking to pharma-mr only, so the
+    // ASM (the actual booker) must still be blocked, even though needsMrPicker is true.
+    await renderTab({ needsMrPicker: true, roleTypeCode: 'pharma-asm' })
+
+    await pickProject(user, projectFixture({ whoCanBookCamp: ['pharma-mr'] }))
+
+    expect(await screen.findByText(/your role cannot book camps on this project/i)).toBeInTheDocument()
+    expect(screen.getByText(/booking form mounted · type: none · project: none/i)).toBeInTheDocument()
+  })
+
+  it('a project whose whoCanBookCamp includes the booking ASM\'s own role still books normally with needsMrPicker=true', async () => {
+    const user = userEvent.setup()
+    await renderTab({ needsMrPicker: true, roleTypeCode: 'pharma-asm' })
+
+    await pickProject(user, projectFixture({ whoCanBookCamp: ['pharma-asm'] }))
+
+    expect(screen.queryByText(/your role cannot book camps on this project/i)).not.toBeInTheDocument()
+    expect(await screen.findByText(/booking form mounted · type: screening · project: cardio screening drive/i)).toBeInTheDocument()
+    expect(screen.getByText(/needsMrPicker: true/i)).toBeInTheDocument()
   })
 })

@@ -11,6 +11,11 @@ vi.mock('@/features/camps/camps.service', () => ({
     searchScopedCamps: vi.fn().mockResolvedValue({ success: true, message: '', data: { items: [], count: 0 } }),
   },
 }))
+// Full-weight (RHF + Zod + Maps SDK) — this file only needs to prove the tab mounts it with
+// needsMrPicker, not exercise the real booking form (BookCampForm.test.tsx owns that).
+vi.mock('@/features/pharma/components/MrBookCampTab', () => ({
+  default: ({ needsMrPicker }: { needsMrPicker?: boolean }) => <div>Book-on-behalf tab mounted · needsMrPicker: {String(!!needsMrPicker)}</div>,
+}))
 
 function sessionFixture(roleTypeCode: string): SessionResponse {
   return {
@@ -58,5 +63,15 @@ describe('PharmaDashboardPortalPage — shared HO/RSM/ASM shell', () => {
     await renderPage('pharma-mr', 'pharma-asm')
 
     expect(await screen.findByText(/not available for your role/i)).toBeInTheDocument()
+  })
+
+  it('switches to the "Book on behalf of MR" tab and mounts MrBookCampTab with needsMrPicker=true', async () => {
+    const user = userEvent.setup()
+    await renderPage('pharma-asm', 'pharma-asm')
+
+    const bookTabButton = screen.getByRole('button', { name: /^Book on behalf of MR$/ })
+    await user.click(bookTabButton)
+
+    expect(await screen.findByText(/book-on-behalf tab mounted · needsMrPicker: true/i)).toBeInTheDocument()
   })
 })

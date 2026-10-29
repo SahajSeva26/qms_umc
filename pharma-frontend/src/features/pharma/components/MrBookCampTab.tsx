@@ -14,9 +14,18 @@ import { allowedCampTypesForProjectTypes, type WhoCanBookCampCode } from '@/type
 import { CAMP_TYPE_LABEL, type CampType } from '@/types/campReal.types'
 import type { ProjectEntity } from '@/types/project.types'
 
+interface MrBookCampTabProps {
+  /** True for the HO/RSM/ASM "Book on behalf of MR" tab — shows BookCampForm's MR picker and
+   * swaps this tab's own copy. False (default) is the MR's own self-booking tab, unchanged. */
+  needsMrPicker?: boolean
+}
+
 // "Project & Camp" section — BookCampForm below self-disables until project+type are picked
-// (never hidden), remounting fresh via key={projectId}.
-const MrBookCampTab = () => {
+// (never hidden), remounting fresh via key={projectId}. Shared by the MR's own "Book camp" tab
+// and the HO/RSM/ASM "Book on behalf of MR" tab — only needsMrPicker and the heading/button copy
+// differ; the project/camp-type/patient-count section and BookCampForm itself are identical,
+// mirroring the prototype's own "one booking implementation, reused everywhere" design.
+const MrBookCampTab = ({ needsMrPicker = false }: MrBookCampTabProps) => {
   const { session } = useSession()
   const [projectId, setProjectId] = useState('')
   const [projectLabel, setProjectLabel] = useState('')
@@ -47,7 +56,7 @@ const MrBookCampTab = () => {
   }
 
   const handleBooked = () => {
-    toast.success('Camp requested')
+    toast.success(needsMrPicker ? 'Camp booked on behalf of the MR' : 'Camp requested')
     setProjectId('')
     setProjectLabel('')
     setSelectedProject(null)
@@ -70,8 +79,14 @@ const MrBookCampTab = () => {
     <div>
       <div className="flex items-center justify-between gap-2 mb-4">
         <div>
-          <h2 className="text-sm font-bold" style={{ color: 'var(--qms-text)' }}>Book a new camp</h2>
-          <p className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>All fields on one page — fill what's needed, then confirm at the bottom</p>
+          <h2 className="text-sm font-bold" style={{ color: 'var(--qms-text)' }}>
+            {needsMrPicker ? 'Book on behalf of an MR' : 'Book a new camp'}
+          </h2>
+          <p className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>
+            {needsMrPicker
+              ? 'Pick an MR from your team, then fill in the rest — confirm at the bottom'
+              : "All fields on one page — fill what's needed, then confirm at the bottom"}
+          </p>
         </div>
         <Button type="button" variant="outline" size="sm" onClick={clearForm}>
           <FiRotateCcw size={12} /> Clear form
@@ -126,6 +141,7 @@ const MrBookCampTab = () => {
           notes), which must never carry over when the picked project changes underneath it. */}
       <BookCampForm
         key={projectId}
+        needsMrPicker={needsMrPicker}
         type={bookableProject ? (campType || null) : null}
         project={bookableProject && campType ? { id: bookableProject.id, name: bookableProject.name, campTimeSlots: bookableProject.campTimeSlots, daysToBookBefore: bookableProject.daysToBookBefore } : null}
         patientExpectation={patientExpectation}

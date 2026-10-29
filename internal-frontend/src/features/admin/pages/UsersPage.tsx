@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useUsers } from '@/features/admin/hooks/useUsers'
 import { useUserReport } from '@/features/admin/hooks/useUserReport'
+import { useUserRoleLabels } from '@/features/admin/hooks/useUserRoleLabels'
 import { adminService } from '@/features/admin/admin.service'
 import UsersTable from '@/features/admin/components/UsersTable'
 import UsersFilterBar from '@/features/admin/components/UsersFilterBar'
@@ -24,6 +25,7 @@ const CLIENT_SIDE_FETCH_LIMIT = 200
 const UsersPage = () => {
   const { hasPermission, hasAnyPermission } = usePermission()
   const canViewReport = hasPermission('user:manage')
+  const canViewRoles = hasAnyPermission(['role:search', 'tenant:admin', 'tenant:manage'])
   const reportQuery = useUserReport({}, canViewReport)
   // GET /users/:id requires user:get, distinct from user:search which reaches this list.
   const canOpenUserDetail = hasPermission('user:get')
@@ -93,6 +95,8 @@ const UsersPage = () => {
   const totalCount = needsClientSidePagination
     ? (tenantFiltered ?? []).length
     : (singleStatusQuery.data?.data?.count ?? 0)
+  const visibleUserEmails = useMemo(() => users.map((user) => user.email), [users])
+  const rolesByEmail = useUserRoleLabels(visibleUserEmails, canViewRoles)
 
   // Company filter paginates over one capped fetch — flag when the real total exceeds it rather than silently truncating.
   const realTotalUserCount = clientSideQuery.data?.data?.count ?? 0
@@ -147,7 +151,7 @@ const UsersPage = () => {
       )}
 
       <QueryStateBlock isLoading={isLoading} error={isError} loadingLabel="Loading users…" errorLabel="Failed to load users. Please try again." onRetry={refetchUsers}>
-        <UsersTable users={users} canOpenDetail={canOpenUserDetail} />
+        <UsersTable users={users} canOpenDetail={canOpenUserDetail} rolesByEmail={rolesByEmail} />
         <PaginationControls page={page} totalPages={totalPages(totalCount)} onPageChange={setPage} />
       </QueryStateBlock>
     </div>

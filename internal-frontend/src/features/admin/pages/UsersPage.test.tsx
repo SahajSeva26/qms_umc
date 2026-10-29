@@ -5,12 +5,14 @@ import { MemoryRouter } from 'react-router-dom'
 import { usePermission } from '@/hooks/usePermission'
 import { useUsers } from '@/features/admin/hooks/useUsers'
 import { useUserReport } from '@/features/admin/hooks/useUserReport'
+import { useUserRoleLabels } from '@/features/admin/hooks/useUserRoleLabels'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import { useTenants } from '@/features/access-management/tenant'
 
 vi.mock('@/hooks/usePermission')
 vi.mock('@/features/admin/hooks/useUsers')
 vi.mock('@/features/admin/hooks/useUserReport')
+vi.mock('@/features/admin/hooks/useUserRoleLabels')
 vi.mock('@/features/access-management/role/hooks/useRoles')
 vi.mock('@/features/access-management/tenant', () => ({
   useTenants: vi.fn(),
@@ -35,6 +37,7 @@ function mockBaseHooks() {
   } as unknown as ReturnType<typeof useUsers>)
   vi.mocked(useRoles).mockReturnValue({ data: undefined } as unknown as ReturnType<typeof useRoles>)
   vi.mocked(useTenants).mockReturnValue({ data: undefined } as unknown as ReturnType<typeof useTenants>)
+  vi.mocked(useUserRoleLabels).mockReturnValue({})
 }
 
 function reportFixture() {

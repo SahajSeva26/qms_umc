@@ -47,17 +47,9 @@ describe('UsersKpiStrip', () => {
     expect(screen.getByText(/platform overview/i)).toBeInTheDocument()
   })
 
-  it('renders a trend data point per entry returned by the backend, without assuming a fixed count', () => {
-    const report = reportFixture()
-    render(<UsersKpiStrip report={report} />)
-    // Every-other label is visually hidden but still in the DOM; the first
-    // point's formatted label is always visible (index 0).
-    expect(screen.getByText('08-06')).toBeInTheDocument()
-  })
-
-  it('formats day-granularity trend labels as MM-DD, not the raw YYYY-MM-DD', () => {
+  it('does not render the registration graph while retaining the KPI strip', () => {
     render(<UsersKpiStrip report={reportFixture()} />)
-    expect(screen.getByText('08-06')).toBeInTheDocument()
+    expect(screen.queryByText(/registration trend/i)).not.toBeInTheDocument()
     expect(screen.queryByText('2026-08-06')).not.toBeInTheDocument()
   })
 
@@ -70,33 +62,4 @@ describe('UsersKpiStrip', () => {
     expect(screen.getAllByText('0').length).toBeGreaterThan(0)
   })
 
-  it('renders sensibly with a single-point trend (from === to edge case)', () => {
-    const single = reportFixture({
-      trends: {
-        registrations: {
-          granularity: 'day',
-          from: '2026-09-05T00:00:00.000Z',
-          to: '2026-09-05T23:59:59.999Z',
-          data: [{ period: '2026-09-05', count: 3 }],
-        },
-      },
-    })
-    render(<UsersKpiStrip report={single} />)
-    expect(screen.getByText('09-05')).toBeInTheDocument()
-  })
-
-  it('shows a "no registrations" message instead of an empty chart when the trend array is empty', () => {
-    const emptyTrend = reportFixture({
-      trends: {
-        registrations: {
-          granularity: 'day',
-          from: '2026-09-05T00:00:00.000Z',
-          to: '2026-09-04T23:59:59.999Z',
-          data: [],
-        },
-      },
-    })
-    render(<UsersKpiStrip report={emptyTrend} />)
-    expect(screen.getByText(/no registrations in this period/i)).toBeInTheDocument()
-  })
 })

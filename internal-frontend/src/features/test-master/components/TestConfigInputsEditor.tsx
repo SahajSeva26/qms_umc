@@ -21,10 +21,6 @@ interface TestConfigInputsEditorProps {
   hasRecordedResults?: boolean
 }
 
-// Capped at 1: the backend's Test.result is a single {key,value,unit}
-// object, so TestResultForm can only ever record inputs[0].
-const MAX_CONFIG_INPUTS = 1
-
 const TestConfigInputsEditor = ({ hasRecordedResults = false }: TestConfigInputsEditorProps) => {
   const { control, formState: { errors } } = useFormContext<TestFormValues>()
   const { fields, append, remove } = useFieldArray({ control, name: 'config.inputs' })
@@ -32,8 +28,7 @@ const TestConfigInputsEditor = ({ hasRecordedResults = false }: TestConfigInputs
   return (
     <div>
       <div className="flex items-center justify-between mb-1.5">
-        <FieldLabel>Input field</FieldLabel>
-        {fields.length < MAX_CONFIG_INPUTS && (
+        <FieldLabel>Input fields</FieldLabel>
           <Button
             type="button"
             variant="outline"
@@ -42,7 +37,6 @@ const TestConfigInputsEditor = ({ hasRecordedResults = false }: TestConfigInputs
           >
             <FiPlus size={12} /> Add field
           </Button>
-        )}
       </div>
 
       {hasRecordedResults && (

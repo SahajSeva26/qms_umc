@@ -52,9 +52,7 @@ export const testFormSchema = z.object({
   duration: z.number({ error: 'Duration is required' }).min(0, 'Duration must be 0 or more'),
   price: z.number({ error: 'Price is required' }).min(0, 'Price must be 0 or more'),
   status: z.enum(['active', 'inactive']),
-  // Capped to 1: backend's Test.result is a single {key,value,unit} object,
-  // not an array, so TestResultForm can only ever record inputs[0].
-  config: z.object({ inputs: z.array(configInputSchema).max(1, 'Only one result field is supported per test') }),
+  config: z.object({ inputs: z.array(configInputSchema) }),
   // Create mode only — edit mode's resource sections are read-only counts
   // and these fields are excluded from the update payload.
   requiredDeviceIds: z.array(z.string().trim().min(1)),

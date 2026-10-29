@@ -213,15 +213,33 @@ describe('TestForm — create mode', () => {
     expect(payload.config).toEqual({ inputs: [{ label: 'Blood Sugar Level', type: 'number', unit: 'mg/dL', options: [] }] })
   })
 
-  it('caps result fields at one — the "Add field" button disappears once a field exists', async () => {
+  it('adds and submits multiple input fields, and allows removing one', async () => {
+    const { testService } = await import('@/features/test-master/test.service')
+    vi.mocked(testService.createTest).mockResolvedValue({ success: true, message: '', data: baseTest } as never)
     const user = userEvent.setup()
     await renderForm(null)
 
-    expect(screen.getByRole('button', { name: /add field/i })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /add field/i }))
-    expect(screen.queryByRole('button', { name: /add field/i })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /add field/i }))
+    expect(screen.getAllByPlaceholderText(/field label/i)).toHaveLength(2)
 
-    await user.click(screen.getByRole('button', { name: /remove field/i }))
+    await user.type(screen.getByLabelText(/^name/i), 'Panel Test')
+    await user.click(screen.getByLabelText(/therapy/i))
+    await user.click(await screen.findByRole('option', { name: /cardiology/i }))
+    await user.click(screen.getByLabelText(/camp type/i))
+    await user.click(await screen.findByRole('option', { name: /screening/i }))
+    await user.type(screen.getByLabelText(/duration/i), '15')
+    await user.type(screen.getByLabelText(/price/i), '250')
+    const labels = screen.getAllByPlaceholderText(/field label/i)
+    await user.type(labels[0], 'Systolic')
+    await user.type(labels[1], 'Diastolic')
+    await user.click(screen.getByRole('button', { name: /create test/i }))
+
+    await waitFor(() => expect(testService.createTest).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(testService.createTest).mock.calls[0][0].config?.inputs.map((input) => input.label)).toEqual(['Systolic', 'Diastolic'])
+
+    await user.click(screen.getAllByRole('button', { name: /remove field/i })[0])
+    expect(screen.getAllByPlaceholderText(/field label/i)).toHaveLength(1)
     expect(screen.getByRole('button', { name: /add field/i })).toBeInTheDocument()
   })
 

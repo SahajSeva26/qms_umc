@@ -1,11 +1,14 @@
-import type { ReactNode } from 'react'
-import type { ProjectEntity } from '@/types/project.types'
-import { EXECUTION_MODE_LABEL, PAYMENT_TERMS_LABEL, PROJECT_THERAPY_LABEL } from '@/types/project.types'
+import { useState, type ReactNode } from 'react'
+import { FiPlus } from 'react-icons/fi'
+import type { ProjectEntity, PurchaseOrder } from '@/types/project.types'
+import { AVAILABLE_POINTER_LABEL, CLIENT_REPORT_CADENCE_LABEL, EXECUTION_MODE_LABEL, PAYMENT_TERMS_LABEL, PROJECT_THERAPY_LABEL } from '@/types/project.types'
 import { computeGstBreakdown, projectDivisionName, projectTenantName } from '@/features/projects/projects.utils'
 import { formatDate, formatINR } from '@/utils/formatters'
 import SideDrawer from '@/components/ui/SideDrawer'
 import ProjectStatusPill from '@/features/projects/components/ProjectStatusPill'
 import ProjectTypePills from '@/features/projects/components/ProjectTypePill'
+import AddPurchaseOrderDialog from '@/features/projects/components/AddPurchaseOrderDialog'
+import { Button } from '@/components/ui/button'
 
 // Prototype's dv() (projects-manager.js:1965)
 const Row = ({ label, value }: { label: string; value: ReactNode }) => (
@@ -27,8 +30,8 @@ const SectionLabel = ({ children }: { children: ReactNode }) => (
   </div>
 )
 
-// Prototype's drawer kpi() tile (projects-manager.js:1959) shows 5 tiles built off a pos[] array
-// and an executed-camp counter our model has neither of — only Total camps/Value are real here.
+// Keep the drawer header intentionally compact. The remaining real backend-backed values,
+// including executed camps when report=true, live in More details below.
 const KpiTile = ({ label, value }: { label: string; value: ReactNode }) => (
   <div
     className="flex-1 min-w-27.5 px-3 py-2.5 rounded-[10px] border"
@@ -58,22 +61,45 @@ function leadTitle(lead: ProjectEntity['lead']): string {
   return typeof lead === 'string' ? lead : lead.title
 }
 
+function getLatestPurchaseOrder(purchaseOrders: PurchaseOrder[]): PurchaseOrder | undefined {
+  if (purchaseOrders.length === 0) return undefined
+
+  const datedOrders = purchaseOrders
+    .map((purchaseOrder, index) => ({ purchaseOrder, index, timestamp: purchaseOrder.date ? Date.parse(purchaseOrder.date) : Number.NaN }))
+    .filter(({ timestamp }) => Number.isFinite(timestamp))
+
+  if (datedOrders.length === 0) return purchaseOrders.at(-1)
+  return datedOrders.reduce((latest, candidate) => (
+    candidate.timestamp > latest.timestamp || (candidate.timestamp === latest.timestamp && candidate.index > latest.index)
+      ? candidate
+      : latest
+  )).purchaseOrder
+}
+
 interface ProjectDetailDrawerProps {
   project: ProjectEntity | null
   onClose: () => void
+  canEdit: boolean
 }
 
-// Purchase-orders/Void camps/Camps-done from the prototype have no equivalent on our Project model.
-const ProjectDetailDrawer = ({ project, onClose }: ProjectDetailDrawerProps) => {
+const ProjectDetailDrawer = ({ project, onClose, canEdit }: ProjectDetailDrawerProps) => {
+  const [addingPo, setAddingPo] = useState(false)
   const gst = project ? computeGstBreakdown(project.valueBeforeGST, project.gst) : null
+  const purchaseOrders = project?.executionMode?.mode === 'po' ? (project.executionMode.po?.purchaseOrders ?? []) : []
+  const currentPurchaseOrder = getLatestPurchaseOrder(purchaseOrders)
   // Prototype's drawer subtitle is "{id} · {client} · {division} · {type}" under the name
   // (projects-manager.js's renderProjectDetail()). Folded into SideDrawer's single `title` string.
   const title = project
     ? `${project.name} — ${project.code} · ${projectTenantName(project)} · ${projectDivisionName(project)}`
     : ''
 
+  const handleClose = () => {
+    setAddingPo(false)
+    onClose()
+  }
+
   return (
-    <SideDrawer open={!!project} title={title} onClose={onClose} widthClassName="max-w-lg">
+    <SideDrawer open={!!project} title={title} onClose={handleClose} widthClassName="max-w-lg">
       {project && (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
@@ -126,6 +152,66 @@ const ProjectDetailDrawer = ({ project, onClose }: ProjectDetailDrawerProps) => 
             </RowGrid>
           </div>
 
+          {project.executionMode?.mode === 'po' && (
+            <div className="space-y-4">
+              {currentPurchaseOrder && (
+                <section aria-label="Current execution PO">
+                  <SectionLabel>Current execution PO</SectionLabel>
+                  <div className="rounded-[10px] border px-3 py-3" style={{ borderColor: 'var(--qms-brand)', background: 'color-mix(in srgb, var(--qms-brand) 7%, transparent)' }}>
+                    <div className="text-[13px] font-extrabold mb-2" style={{ color: 'var(--qms-text)' }}>{currentPurchaseOrder.number || '—'}</div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                      <Row label="PO date" value={currentPurchaseOrder.date ? formatDate(currentPurchaseOrder.date) : '—'} />
+                      <Row label="PO expiry" value={currentPurchaseOrder.expiry ? formatDate(currentPurchaseOrder.expiry) : '—'} />
+                    </div>
+                  </div>
+                </section>
+              )}
+              <div className="flex items-center justify-between gap-3 mb-1.5">
+                <SectionLabel>PO history</SectionLabel>
+                {canEdit && (
+                  <Button variant="outline" size="sm" onClick={() => setAddingPo(true)}>
+                    <FiPlus size={13} /> Add PO
+                  </Button>
+                )}
+              </div>
+              {purchaseOrders.length === 0 ? (
+                <p className="text-[12px] rounded-lg border border-dashed px-3 py-4 text-center" style={{ color: 'var(--qms-text-muted)', borderColor: 'var(--qms-border)' }}>
+                  No purchase orders recorded.
+                </p>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border" style={{ borderColor: 'var(--qms-border)' }}>
+                  <table aria-label="Purchase order history" className="w-full min-w-[440px] text-left border-collapse">
+                    <thead>
+                      <tr style={{ background: 'var(--qms-surface)' }}>
+                        {['PO no', 'Date', 'Expiry'].map((label) => (
+                          <th key={label} className="px-3 py-2 text-[10px] font-bold uppercase tracking-[.05em]" style={{ color: 'var(--qms-text-muted)' }}>{label}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {purchaseOrders.map((po, index) => (
+                        <tr key={`${po.number ?? 'po'}-${po.date ?? index}-${index}`} className="border-t" style={{ borderColor: 'var(--qms-border)' }}>
+                          <td className="px-3 py-2 text-[12px] font-semibold" style={{ color: 'var(--qms-text)' }}>
+                            <span className="inline-flex items-center gap-1.5">
+                              {po.number || '—'}
+                              {po === currentPurchaseOrder && (
+                                <span className="rounded-full px-1.5 py-0.5 text-[8px] font-extrabold uppercase tracking-wide" style={{ color: 'var(--qms-brand)', background: 'color-mix(in srgb, var(--qms-brand) 10%, transparent)' }}>
+                                  Current
+                                </span>
+                              )}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>{po.date ? formatDate(po.date) : '—'}</td>
+                          <td className="px-3 py-2 text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>{po.expiry ? formatDate(po.expiry) : '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
           <div>
             <SectionLabel>More details</SectionLabel>
             <RowGrid>
@@ -133,7 +219,18 @@ const ProjectDetailDrawer = ({ project, onClose }: ProjectDetailDrawerProps) => 
               <Row label="Value after GST" value={gst ? formatINR(gst.valueAfterGST) : '—'} />
               <Row label="GST %" value={`${project.gst}%`} />
               <Row label="Camp cost" value={formatINR(project.campCost)} />
+              <Row label="Additional cost" value={formatINR(project.additionalCost)} />
+              <Row label="Camps done / total" value={project.stats ? `${project.stats.executedCamps} / ${project.totalCamps}` : `— / ${project.totalCamps}`} />
               <Row label="Booking lead days" value={String(project.daysToBookBefore)} />
+              <Row label="Free cancellation" value={`${project.freeCancelHours} hours`} />
+              <Row label="Cancellation allowance" value={`${project.cancellationAllowed}%`} />
+              <Row label="Chargeable-cancel deduction" value={`${project.campCostDeductionOnChargableCancel}%`} />
+              <Row label="Earliest slot" value={project.effectiveEarliestSlot ? formatDate(project.effectiveEarliestSlot) : '—'} />
+              <Row label="PO renewal reminder" value={`${project.poRenewalReminder}%`} />
+              <Row label="Client report cadence" value={project.clientReportCandance ? CLIENT_REPORT_CADENCE_LABEL[project.clientReportCandance] : '—'} />
+              <Row label="Report pointers" value={project.availablePointers.map((pointer) => AVAILABLE_POINTER_LABEL[pointer] ?? pointer).join(', ') || '—'} />
+              <Row label="TAT / notes" value={project.tats || '—'} />
+              <Row label="SOP" value={project.sops || '—'} />
               <Row label="Owner" value={roleName(project.salesRep)} />
               <Row label="Created" value={formatDate(project.createdAt)} />
               <Row label="Updated" value={formatDate(project.updatedAt)} />
@@ -154,6 +251,7 @@ const ProjectDetailDrawer = ({ project, onClose }: ProjectDetailDrawerProps) => 
           )}
         </div>
       )}
+      {project && addingPo && <AddPurchaseOrderDialog project={project} onClose={() => setAddingPo(false)} />}
     </SideDrawer>
   )
 }

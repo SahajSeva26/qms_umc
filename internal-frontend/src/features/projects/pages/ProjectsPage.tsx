@@ -190,7 +190,7 @@ const ProjectsPage = () => {
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+      <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
         <div className="flex gap-1.5">
           {TABS.map((t) => {
             const tabCount = t.id === 'all' ? report?.summary.totalProjects : tabCounts?.[t.id]
@@ -250,23 +250,22 @@ const ProjectsPage = () => {
       </div>
 
       {!isLoading && !error && (
-        <div className="text-[12px] mb-2" style={{ color: 'var(--qms-text-muted)' }}>{count} project{count === 1 ? '' : 's'}</div>
-      )}
-
-      {!isLoading && !error && typeBreakdown.some((entry) => entry.count > 0) && (
-        <div className="flex flex-wrap gap-1.5 mb-3">
+        <div className="mb-2 flex min-h-6 flex-wrap items-center gap-1.5">
+          <span className="mr-1 text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>
+            {count} project{count === 1 ? '' : 's'}
+          </span>
           {typeBreakdown.filter((entry) => entry.count > 0).map((entry) => {
-            const color = PROJECT_TYPE_COLOR[entry.type] ?? '#94a3b8'
-            return (
-              <span
-                key={entry.type}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold"
-                style={{ background: `${color}1a`, color, border: `1px solid ${color}2e` }}
-              >
-                {PROJECT_TYPE_LABEL[entry.type] ?? entry.type} · {entry.count}
-              </span>
-            )
-          })}
+              const color = PROJECT_TYPE_COLOR[entry.type] ?? '#94a3b8'
+              return (
+                <span
+                  key={entry.type}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold"
+                  style={{ background: `${color}1a`, color, border: `1px solid ${color}2e` }}
+                >
+                  {PROJECT_TYPE_LABEL[entry.type] ?? entry.type} · {entry.count}
+                </span>
+              )
+            })}
         </div>
       )}
 
@@ -296,7 +295,7 @@ const ProjectsPage = () => {
         </>
       )}
 
-      <ProjectDetailDrawer project={openDetail} onClose={() => setOpenDetailId(null)} />
+      <ProjectDetailDrawer project={openDetail} onClose={() => setOpenDetailId(null)} canEdit={canEdit} />
 
       {statusChangeProject && (
         <StatusChangeDialog project={statusChangeProject} onClose={() => setStatusChangeId(null)} />

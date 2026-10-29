@@ -296,13 +296,19 @@ CampRouter.get(
     CampController.report
 );
 
-// my camps — role-gated to field-force; MUST be before '/:id' so '/my' isn't treated as an id
+// my camps — role-gated to field-force + pharma management (HO/RSM/ASM); MUST be before '/:id'
+// so '/my' isn't treated as an id. The service own-scopes each role (HO → division, ASM/RSM → the
+// slots stamped on their camps, FO/dietitian/MR → their own slot), so the summary a manager sees
+// is the same scoped set as the list they drill into.
 CampRouter.get(
     '/my',
     RoleGuard([
         ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER,
         ALLOWED_ROLETYPE_CODES.PLATFORM.DIETITIAN,
         ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR,
+        ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_ASM,
+        ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_RSM,
+        ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_DIVISION_HEAD,
     ]),
     CampController.myCamps,
 );

@@ -73,8 +73,9 @@ const search = async (req: any, res: any) => {
     }
 };
 
-// "my camps" — field-force (FO / dietitian / MR) see only the camps they're assigned to. Delegates
-// to CampService.myCamps, which own-scopes these non-manage roles to their own slot (fo/dietitian/mr).
+// "my camps" — field-force (FO / dietitian / MR) and pharma management (HO / RSM / ASM) see their
+// own scoped camps + a summary. Delegates to CampService.myCamps, which own-scopes each role: HO by
+// division, ASM/RSM by the slots stamped on their camps, FO/dietitian/MR by their own slot.
 const myCamps = async (req: any, res: any) => {
     try {
         const ctx: RequestContext = req.context;

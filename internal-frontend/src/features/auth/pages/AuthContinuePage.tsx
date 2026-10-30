@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Navigate, useSearchParams } from 'react-router-dom'
 import { SessionRecovery } from '@qms/ui'
+import { createQuickSwitchTransferFragment, getCachedQuickSwitchAccounts } from '@qms/core'
 import { useSession } from '@/hooks/useSession'
 import { AUTH_ROUTES } from '@/features/auth/auth.paths'
 import { getFirstVisibleNavPath } from '@/lib/navigation/visibleNav'
@@ -60,7 +61,16 @@ const AuthContinuePage = () => {
   // (Strict Mode double-invoke, concurrent rendering, a discarded render) or not commit at all.
   useEffect(() => {
     if (destinationIsPharmaBuild && destination) {
-      window.location.replace(pharmaHref(destination))
+      let href = pharmaHref(destination)
+      if (import.meta.env.DEV) {
+        const fragment = createQuickSwitchTransferFragment(getCachedQuickSwitchAccounts() ?? [])
+        if (fragment) {
+          const url = new URL(href, window.location.origin)
+          url.hash = fragment
+          href = url.href
+        }
+      }
+      window.location.replace(href)
     }
   }, [destinationIsPharmaBuild, destination])
 

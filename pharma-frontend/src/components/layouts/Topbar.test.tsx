@@ -143,6 +143,18 @@ describe('Topbar — pharma-frontend shell header', () => {
     expect(screen.getByText('a@example.com')).toBeInTheDocument()
   })
 
+  it('opens the dev quick switcher from a pharma session, so testers are not trapped in this app', async () => {
+    await mockSession(sessionFixture())
+    const user = userEvent.setup()
+    await renderTopbar()
+
+    await user.click(screen.getByRole('button', { name: /open account menu/i }))
+    await user.click(await screen.findByRole('button', { name: /quick switch/i }))
+
+    expect(await screen.findByRole('dialog', { name: /quick switch/i })).toBeInTheDocument()
+    expect(screen.getByText('system@gmail.com')).toBeInTheDocument()
+  })
+
   it('Escape closes the account popover (base-ui\'s own Escape-to-close — non-modal, not a focus trap)', async () => {
     await mockSession(sessionFixture())
     const user = userEvent.setup()

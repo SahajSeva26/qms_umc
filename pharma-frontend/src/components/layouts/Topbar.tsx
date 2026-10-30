@@ -1,6 +1,6 @@
 import { lazy, Suspense, useRef, useState, type RefObject } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FiChevronDown, FiMenu, FiX } from 'react-icons/fi'
+import { FiChevronDown, FiMenu, FiRepeat, FiX } from 'react-icons/fi'
 import { NotificationBellTrigger, useNotificationBellState } from '@qms/widgets'
 import { useSession } from '@/hooks/useSession'
 import { useSignOut } from '@/features/auth/useSignOut'
@@ -18,6 +18,9 @@ import { resolveNotificationEntity } from '@/features/notifications/notification
 // defeat this chunk isolation even behind React.lazy).
 const AccountMenu = lazy(() => import('@/components/layouts/AccountMenu'))
 const NotificationBellPopover = lazy(() => import('@qms/widgets/notifications/NotificationBellPopover'))
+const QuickSwitchPopup = import.meta.env.DEV
+  ? lazy(() => import('@/features/auth/QuickSwitchPopup'))
+  : null
 
 interface TopbarProps {
   mobileMenuOpen: boolean
@@ -39,9 +42,8 @@ function getGreeting(): string {
   return 'Good evening'
 }
 
-// Trimmed port of internal-frontend's Topbar — no global search/AI Copilot/notifications/
-// quick-switch (notifications are a separate, not-yet-migrated milestone; quick-switch is
-// internal-only dev tooling). Theme toggle IS restored below — pharma-frontend genuinely has its
+// Trimmed port of internal-frontend's Topbar — no global search or AI Copilot. Theme toggle IS
+// restored below — pharma-frontend genuinely has its
 // own themeStore (initialized before mount in main.tsx) and the shared theme.css's .dark variant;
 // an earlier version of this comment claimed otherwise, which was simply wrong. Sign-out itself is
 // owned by useSignOut (features/auth) — this component stays purely presentational, no transport.
@@ -52,6 +54,7 @@ const Topbar = ({ mobileMenuOpen, onMobileMenuToggle, mobileMenuToggleRef, mobil
   // Deferred mount, same pattern as AppLayout's mobile drawer: fetch the popover's lazy chunk
   // only on first open, but keep it mounted afterward so base-ui's own close animation can play.
   const [accountMenuMounted, setAccountMenuMounted] = useState(false)
+  const [quickSwitchOpen, setQuickSwitchOpen] = useState(false)
   const accountTriggerRef = useRef<HTMLButtonElement>(null)
   const { signOut, isPending, error } = useSignOut()
 
@@ -192,7 +195,27 @@ const Topbar = ({ mobileMenuOpen, onMobileMenuToggle, mobileMenuToggleRef, mobil
             onSignOut={signOut}
             isPending={isPending}
             error={error}
+            devActions={QuickSwitchPopup ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setUserMenuOpen(false)
+                  setQuickSwitchOpen(true)
+                }}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] transition-all hover:bg-(--qms-surface-hover)"
+                style={{ color: 'var(--qms-text)' }}
+              >
+                <FiRepeat size={14} />
+                Quick switch (dev)
+              </button>
+            ) : undefined}
           />
+        </Suspense>
+      )}
+
+      {QuickSwitchPopup && quickSwitchOpen && (
+        <Suspense fallback={null}>
+          <QuickSwitchPopup onClose={() => setQuickSwitchOpen(false)} />
         </Suspense>
       )}
     </header>

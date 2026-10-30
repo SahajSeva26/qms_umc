@@ -14,6 +14,14 @@ export { AuthMeResponseSchema } from './session.schema'
 export { getMe } from './getMe'
 export { validateApiResponse } from './validateApiResponse'
 export { reportApiContractMismatch } from './reportApiContractMismatch'
+export {
+  createQuickSwitchTransferFragment,
+  DEMO_QUICK_SWITCH_PASSWORD,
+  getCachedQuickSwitchAccounts,
+  readQuickSwitchTransferFragment,
+  setCachedQuickSwitchAccounts,
+} from './quickSwitch.cache'
+export type { QuickSwitchAccount } from './quickSwitch.cache'
 
 export {
   createDoctorFormSchemaFor,

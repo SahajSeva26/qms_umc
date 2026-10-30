@@ -9,9 +9,10 @@ import { getApiErrorMessage, isForbiddenError } from '@/utils/apiError'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   getCachedQuickSwitchAccounts,
+  DEMO_QUICK_SWITCH_PASSWORD,
   setCachedQuickSwitchAccounts,
   type QuickSwitchAccount,
-} from '@/features/auth/quickSwitch.cache'
+} from '@qms/core'
 
 interface QuickSwitchPopupProps {
   onClose: () => void
@@ -19,8 +20,6 @@ interface QuickSwitchPopupProps {
 
 // seedQmsDemo.ts's fixed password for every demo account — a real password is hashed and
 // can never be read back, so this is the one thing we assume rather than fetch.
-const DEMO_PASSWORD = 'Test@123'
-
 function roleLabel(role: { type: unknown; user: unknown }): string {
   const type = typeof role.type === 'object' && role.type ? (role.type as { name?: string }) : null
   const user = typeof role.user === 'object' && role.user ? (role.user as { firstName?: string; lastName?: string }) : null
@@ -41,32 +40,29 @@ const QuickSwitchPopup = ({ onClose }: QuickSwitchPopupProps) => {
   const queryClient = useQueryClient()
   const { mutate: login, isPending, error: loginError } = useLogin()
   const [pendingLabel, setPendingLabel] = useState<string | null>(null)
-  const [cached, setCached] = useState<QuickSwitchAccount[] | null>(() => getCachedQuickSwitchAccounts())
-  const [manualRefresh, setManualRefresh] = useState(false)
+  const [cached] = useState<QuickSwitchAccount[] | null>(() => getCachedQuickSwitchAccounts())
 
   // Only actually fetches when there's no cache yet, or the user explicitly asked to refresh —
   // not on every popup open, since most sessions won't hold role:search.
-  const shouldFetch = !cached || manualRefresh
+  const shouldFetch = !cached
   const { data, isLoading, error: fetchError, refetch } = useRoles({ limit: '500', status: 'active' }, shouldFetch)
 
-  useEffect(() => {
-    if (!data?.data?.items) return
-    const accounts: QuickSwitchAccount[] = data.data.items
+  const fetchedAccounts = useMemo(() => {
+    if (!data?.data?.items) return []
+    return data.data.items
       .map((role) => {
         const email = roleEmail(role)
-        return email ? { label: roleLabel(role), email, password: DEMO_PASSWORD } : null
+        return email ? { label: roleLabel(role), email, password: DEMO_QUICK_SWITCH_PASSWORD } : null
       })
       .filter((a): a is QuickSwitchAccount => !!a)
       .sort((a, b) => a.label.localeCompare(b.label))
-
-    if (accounts.length > 0) {
-      setCachedQuickSwitchAccounts(accounts)
-      setCached(accounts)
-    }
-    setManualRefresh(false)
   }, [data])
 
-  const accounts = useMemo(() => cached ?? [], [cached])
+  useEffect(() => {
+    if (fetchedAccounts.length > 0) setCachedQuickSwitchAccounts(fetchedAccounts)
+  }, [fetchedAccounts])
+
+  const accounts = fetchedAccounts.length > 0 ? fetchedAccounts : (cached ?? [])
   const showForbiddenHint = !cached && isForbiddenError(fetchError)
   const showGenericFetchError = !cached && fetchError && !showForbiddenHint
 
@@ -84,7 +80,6 @@ const QuickSwitchPopup = ({ onClose }: QuickSwitchPopupProps) => {
   }
 
   const handleRefresh = () => {
-    setManualRefresh(true)
     void refetch()
   }
 

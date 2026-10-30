@@ -1,5 +1,6 @@
 import { Popover as PopoverPrimitive } from '@base-ui/react/popover'
 import { FiLogOut } from 'react-icons/fi'
+import type { ReactNode } from 'react'
 
 interface AccountMenuProps {
   open: boolean
@@ -10,6 +11,7 @@ interface AccountMenuProps {
   onSignOut: () => void
   isPending: boolean
   error: string | null
+  devActions?: ReactNode
 }
 
 // Split out of Topbar so @base-ui/react/popover is only fetched once the account button is
@@ -18,7 +20,7 @@ interface AccountMenuProps {
 // already gives role="dialog" + Escape-to-close via base-ui) is a more truthful fit than a
 // hand-rolled role="menu" with no arrow-key navigation. It is NOT a focus trap — base-ui's
 // Popover is non-modal by default, which is fine here since it's dismissable and not blocking.
-const AccountMenu = ({ open, onOpenChange, anchor, name, email, onSignOut, isPending, error }: AccountMenuProps) => (
+const AccountMenu = ({ open, onOpenChange, anchor, name, email, onSignOut, isPending, error, devActions }: AccountMenuProps) => (
   <PopoverPrimitive.Root open={open} onOpenChange={onOpenChange}>
     <PopoverPrimitive.Portal>
       <PopoverPrimitive.Positioner anchor={anchor} side="bottom" align="end" sideOffset={8}>
@@ -32,6 +34,7 @@ const AccountMenu = ({ open, onOpenChange, anchor, name, email, onSignOut, isPen
             <div className="text-[11px] mt-0.5" style={{ color: 'var(--qms-text-muted)' }}>{email}</div>
           </div>
           <div className="py-1">
+            {devActions}
             <button
               onClick={onSignOut}
               disabled={isPending}

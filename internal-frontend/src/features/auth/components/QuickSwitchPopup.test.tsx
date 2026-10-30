@@ -7,7 +7,7 @@ import { AxiosError } from 'axios'
 import { useLogin } from '@/features/auth/hooks/useLogin'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import { AUTH_ROUTES } from '@/features/auth/auth.paths'
-import * as quickSwitchCache from '@/features/auth/quickSwitch.cache'
+import * as quickSwitchCache from '@qms/core'
 import QuickSwitchPopup from './QuickSwitchPopup'
 
 vi.mock('@/features/auth/hooks/useLogin')

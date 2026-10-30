@@ -9,6 +9,7 @@ import { EMPLOYEE_ROUTES } from '@/features/access-management/employee/employee.
 import { CRM_ROUTES } from '@/features/crm/crm.paths'
 import { DOCTORS_ROUTES } from '@/features/doctors/doctors.paths'
 import { DASHBOARD_ROUTES } from '@/features/dashboard/dashboard.paths'
+import { setCachedQuickSwitchAccounts } from '@qms/core'
 import AuthContinuePage from './AuthContinuePage'
 
 vi.mock('@/hooks/useSession')
@@ -71,7 +72,10 @@ const replaceSpy = vi.fn()
 const originalLocation = window.location
 
 describe('AuthContinuePage — resolves the post-login landing from the session, not a hard-coded page', () => {
-  beforeEach(() => vi.resetAllMocks())
+  beforeEach(() => {
+    vi.resetAllMocks()
+    localStorage.clear()
+  })
   afterEach(() => {
     Object.defineProperty(window, 'location', { value: originalLocation, writable: true, configurable: true })
     replaceSpy.mockClear()
@@ -170,6 +174,30 @@ describe('AuthContinuePage — resolves the post-login landing from the session,
     renderContinuePage()
 
     await waitFor(() => expect(replaceSpy).toHaveBeenCalledWith('http://localhost:5174/pharma/mr'))
+  })
+
+  it('carries the dev quick-switch account catalogue into the split pharma origin without putting passwords in the URL', async () => {
+    Object.defineProperty(window, 'location', {
+      value: { ...originalLocation, replace: replaceSpy },
+      writable: true,
+      configurable: true,
+    })
+    setCachedQuickSwitchAccounts([
+      { label: 'MR — Amit', email: 'mr1@demo.qms.in', password: 'Test@123' },
+      { label: 'ASM — Neha', email: 'asm@demo.qms.in', password: 'Test@123' },
+    ])
+    const session = sessionFixture('pharma-mr', ['camp:book'], 'customer')
+    mockSession({ session, permissions: session.permissions })
+
+    renderContinuePage()
+
+    await waitFor(() => expect(replaceSpy).toHaveBeenCalledTimes(1))
+    const destination = replaceSpy.mock.calls[0]?.[0] as string
+    expect(destination).toContain('http://localhost:5174/pharma/mr#qmsQuickSwitch=')
+    expect(decodeURIComponent(destination)).toContain('mr1@demo.qms.in')
+    expect(decodeURIComponent(destination)).toContain('asm@demo.qms.in')
+    expect(destination).not.toContain('Test@123')
+    expect(decodeURIComponent(destination)).not.toContain('Test@123')
   })
 
   it('renders a visible "Redirecting to your portal…" shell as its own real output — the render body itself must never directly fire a side-effecting navigation', async () => {

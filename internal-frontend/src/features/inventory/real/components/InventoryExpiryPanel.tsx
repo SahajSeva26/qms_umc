@@ -5,6 +5,10 @@ import { useInventoryConsumables } from '@/features/inventory/real/hooks/useInve
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import { expiryBand, remainingLabel, type ExpiryBand, type ExpiryBandCode } from '@/features/inventory/real/utils/expiryBand'
 import type { InventoryConsumableEntity } from '@/types/inventoryConsumable.types'
+import InventoryConsumableDetailDrawer from '@/features/inventory/real/components/InventoryConsumableDetailDrawer'
+import EditInventoryConsumableModal from '@/features/inventory/real/components/EditInventoryConsumableModal'
+import InventoryMovementHistoryDrawer from '@/features/inventory/real/components/InventoryMovementHistoryDrawer'
+import type { InventoryMovementHistorySource } from '@/types/inventoryLedger.types'
 
 const BAND_ORDER: ExpiryBandCode[] = ['GREEN', 'YELLOW', 'ORANGE', 'RED', 'EXPIRED']
 const BAND_LABEL: Record<ExpiryBandCode, string> = {
@@ -43,7 +47,11 @@ function fefoAction(bandCode: ExpiryBandCode, isEarliest: boolean): { label: str
 const InventoryExpiryPanel = () => {
   const { hasAnyPermission } = usePermission()
   const canManage = hasAnyPermission(['inventory-consumable:manage'])
+  const canViewLedger = hasAnyPermission(['inventory-ledger:manage'])
   const [activeBand, setActiveBand] = useState<ExpiryBandCode | 'ALL'>('ALL')
+  const [detailLot, setDetailLot] = useState<InventoryConsumableEntity | null>(null)
+  const [editLot, setEditLot] = useState<InventoryConsumableEntity | null>(null)
+  const [historySource, setHistorySource] = useState<InventoryMovementHistorySource | null>(null)
 
   const { data, isLoading, error, refetch } = useInventoryConsumables({
     status: canManage ? 'active' : undefined,
@@ -152,7 +160,20 @@ const InventoryExpiryPanel = () => {
                   const action = fefoAction(band.code, isEarliest)
                   const bandColor = BAND_PILL_COLOR[band.css]
                   return (
-                    <tr key={lot.id} style={isEarliest ? { background: 'rgba(244,63,94,.05)' } : undefined}>
+                    <tr
+                      key={lot.id}
+                      onClick={() => setDetailLot(lot)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault()
+                          setDetailLot(lot)
+                        }
+                      }}
+                      tabIndex={0}
+                      aria-label={`View details for ${lot.item.name ?? lot.item.id}, batch ${lot.batch}`}
+                      className="cursor-pointer transition-colors hover:bg-(--qms-surface-hover) focus-visible:outline-2 focus-visible:outline-(--qms-brand) focus-visible:outline-offset-[-2px]"
+                      style={isEarliest ? { background: 'rgba(244,63,94,.05)' } : undefined}
+                    >
                       <td>
                         <b>{lot.item.name ?? lot.item.id}</b>
                         <div className="text-xs" style={{ color: 'var(--qms-text-muted)' }}>{lot.item.code}</div>
@@ -188,6 +209,51 @@ const InventoryExpiryPanel = () => {
           )}
         </div>
       </QueryStateBlock>
+
+      {detailLot && (
+        <InventoryConsumableDetailDrawer
+          lot={detailLot}
+          canManage={canManage}
+          canViewLedger={canViewLedger}
+          onClose={() => setDetailLot(null)}
+          onEdit={() => {
+            setEditLot(detailLot)
+            setDetailLot(null)
+          }}
+          onViewHistory={() => {
+            setHistorySource({
+              mode: 'inventory',
+              inventoryType: 'InventoryConsumable',
+              inventoryId: detailLot.id,
+              summary: {
+                batch: detailLot.batch,
+                itemName: detailLot.item.name ?? detailLot.item.id,
+                quantity: detailLot.quantity,
+                status: detailLot.status,
+                expiryDate: detailLot.expiryDate,
+              },
+            })
+            setDetailLot(null)
+          }}
+        />
+      )}
+
+      {editLot && (
+        <EditInventoryConsumableModal
+          lot={editLot}
+          canManageStatus={canManage}
+          onClose={() => setEditLot(null)}
+        />
+      )}
+
+      {historySource && (
+        <InventoryMovementHistoryDrawer
+          open
+          source={historySource}
+          canManage={canViewLedger}
+          onClose={() => setHistorySource(null)}
+        />
+      )}
     </div>
   )
 }

@@ -1,9 +1,12 @@
 import { Fragment } from 'react'
-import { FiEdit2, FiInfo, FiHash, FiPackage, FiClock } from 'react-icons/fi'
+import { FiEdit2, FiInfo, FiHash, FiPackage, FiClock, FiDollarSign, FiBox } from 'react-icons/fi'
 import SideDrawer from '@/components/ui/SideDrawer'
 import { CopyButton } from '@qms/ui'
 import { Button } from '@/components/ui/button'
 import ExpiryBandPill from '@/features/inventory/real/components/ExpiryBandPill'
+import { useInventoryMaster } from '@/features/inventory/real/hooks/useInventoryMaster'
+import { INVENTORY_MASTER_TYPE_LABEL } from '@/types/inventoryMaster.types'
+import { remainingLabel } from '@/features/inventory/real/utils/expiryBand'
 import type { InventoryConsumableEntity } from '@/types/inventoryConsumable.types'
 
 interface KvRow { label: string; value: string | number | undefined | null }
@@ -42,9 +45,15 @@ interface InventoryConsumableDetailDrawerProps {
   onViewHistory: () => void
 }
 
-// Same drawer-first structure as Item Master/Devices/Vendor Master — only real lot fields shown
-// (the prototype's Batch/Expiry/Storage section needs reorderLevel/storage we don't have, see ui-revisions.md).
-const InventoryConsumableDetailDrawer = ({ lot, canManage, canViewLedger, onClose, onEdit, onViewHistory }: InventoryConsumableDetailDrawerProps) => (
+// Shared by the Consumables and Expiry/FEFO tabs. Lot data is enriched from the
+// existing catalog endpoint for category and reorder policy; prototype-only
+// purchase cost/GST/storage/linked-device fields are deliberately not fabricated.
+const InventoryConsumableDetailDrawer = ({ lot, canManage, canViewLedger, onClose, onEdit, onViewHistory }: InventoryConsumableDetailDrawerProps) => {
+  const masterQuery = useInventoryMaster(lot.item.id)
+  const master = masterQuery.data?.data
+  const unit = master?.unit ?? lot.item.unit
+
+  return (
   <SideDrawer open title={lot.item.name ?? lot.item.id} onClose={onClose} widthClassName="max-w-[940px]">
     <div className="flex items-start gap-3.5 mb-5">
       <div
@@ -55,7 +64,9 @@ const InventoryConsumableDetailDrawer = ({ lot, canManage, canViewLedger, onClos
       </div>
       <div className="min-w-0 flex-1">
         <div className="text-[17px] font-bold leading-tight" style={{ color: 'var(--qms-text)' }}>{lot.item.name ?? lot.item.id}</div>
-        <div className="text-[12px] mt-0.5" style={{ color: 'var(--qms-text-muted)' }}>Consumable lot{lot.vendor?.name ? ` · ${lot.vendor.name}` : ''}</div>
+        <div className="text-[12px] mt-0.5" style={{ color: 'var(--qms-text-muted)' }}>
+          Consumable{master?.type ? ` · ${INVENTORY_MASTER_TYPE_LABEL[master.type]}` : ''}{lot.vendor?.name ? ` · ${lot.vendor.name}` : ''}
+        </div>
         <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
           <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full" style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text-soft)' }}>
             <FiHash size={11} />
@@ -63,6 +74,9 @@ const InventoryConsumableDetailDrawer = ({ lot, canManage, canViewLedger, onClos
             <CopyButton value={lot.batch} label="Batch number" />
           </span>
           <ExpiryBandPill expiryDate={lot.expiryDate} />
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full" style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text-soft)' }}>
+            <FiBox size={11} /> {lot.quantity}{unit ? ` ${unit}` : ''}
+          </span>
           {lot.status && (
             <span
               className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${lot.status === 'active' ? 'bg-success-soft text-success' : ''}`}
@@ -76,15 +90,47 @@ const InventoryConsumableDetailDrawer = ({ lot, canManage, canViewLedger, onClos
     </div>
 
     <SectionCard
-      title="Details"
+      title="Identity"
       icon={FiInfo}
       rows={[
-        { label: 'Quantity', value: lot.quantity },
-        { label: 'Vendor', value: lot.vendor?.name },
-        { label: 'Manufacturing date', value: lot.manufacturingDate?.slice(0, 10) },
-        { label: 'Expiry date', value: lot.expiryDate?.slice(0, 10) },
+        { label: 'Item code', value: master?.code ?? lot.item.code },
+        { label: 'SKU', value: master?.sku ?? lot.item.sku },
+        { label: 'Category', value: master?.type ? INVENTORY_MASTER_TYPE_LABEL[master.type] : undefined },
+        { label: 'Description', value: master?.description },
       ]}
     />
+
+    <SectionCard
+      title="Commercial"
+      icon={FiDollarSign}
+      rows={[
+        { label: 'Vendor', value: lot.vendor?.name },
+        { label: 'Vendor code', value: lot.vendor?.code },
+        { label: 'On hand', value: `${lot.quantity}${unit ? ` ${unit}` : ''}` },
+      ]}
+    />
+
+    <SectionCard
+      title="Batch · Expiry"
+      icon={FiPackage}
+      rows={[
+        { label: 'Batch no', value: lot.batch },
+        { label: 'Manufacturing date', value: lot.manufacturingDate?.slice(0, 10) },
+        { label: 'Expiry date', value: lot.expiryDate?.slice(0, 10) },
+        { label: 'Remaining', value: lot.expiryDate ? remainingLabel(lot.expiryDate) : undefined },
+        { label: 'Reorder level', value: master?.minStock },
+      ]}
+    />
+
+    {masterQuery.isLoading && (
+      <p className="text-[11px] mb-4" role="status" style={{ color: 'var(--qms-text-muted)' }}>Loading catalog details…</p>
+    )}
+    {masterQuery.error && (
+      <div className="mb-4 flex items-center gap-2 text-[11px]" role="alert" style={{ color: 'var(--qms-danger)' }}>
+        <span>Catalog details could not be loaded.</span>
+        <button type="button" className="font-semibold underline" onClick={() => masterQuery.refetch()}>Try again</button>
+      </div>
+    )}
 
     <p className="text-[11px] mb-5" style={{ color: 'var(--qms-text-muted)' }}>
       Added {new Date(lot.createdAt).toLocaleDateString()} · Updated {new Date(lot.updatedAt).toLocaleDateString()}
@@ -104,6 +150,7 @@ const InventoryConsumableDetailDrawer = ({ lot, canManage, canViewLedger, onClos
       <Button variant="secondary" onClick={onClose} className="ml-auto">Close</Button>
     </div>
   </SideDrawer>
-)
+  )
+}
 
 export default InventoryConsumableDetailDrawer

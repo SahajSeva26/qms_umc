@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState } from 'react'
-import { FiBarChart2, FiCalendar, FiUserPlus } from 'react-icons/fi'
+import { FiBarChart2, FiCalendar, FiUserPlus, FiUsers } from 'react-icons/fi'
 import { RouteFallback } from '@qms/ui'
 import PharmaRoleGate from '@/features/pharma/components/PharmaRoleGate'
 import PharmaDashboardTab from '@/features/pharma/components/PharmaDashboardTab'
@@ -14,6 +14,7 @@ const PharmaCampScheduleTab = lazy(() => import('@/features/camps/components/Pha
 // Same chunk MrPortalPage's own "Book camp" tab already loads (RHF + Zod + the Maps SDK boundary)
 // — a user who never books shouldn't download any of it.
 const MrBookCampTab = lazy(() => import('@/features/pharma/components/MrBookCampTab'))
+const MyTeamTab = lazy(() => import('@/features/team/components/MyTeamTab'))
 
 interface PharmaDashboardPortalPageProps {
   roleTypeCode: string
@@ -21,13 +22,19 @@ interface PharmaDashboardPortalPageProps {
   portalLabel: string
 }
 
-type TabId = 'dashboard' | 'schedule' | 'book'
+type TabId = 'dashboard' | 'schedule' | 'book' | 'team'
 
-const TABS: { id: TabId; label: string; icon: typeof FiBarChart2 }[] = [
+const BASE_TABS: { id: TabId; label: string; icon: typeof FiBarChart2 }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: FiBarChart2 },
   { id: 'schedule', label: 'Camp schedule', icon: FiCalendar },
   { id: 'book', label: 'Book on behalf of MR', icon: FiUserPlus },
 ]
+
+// My Team only for ASM today — GET /roles/mrs gives ASM their real direct reports, but RSM/HO
+// need a deeper tree (ASM grouping, or the full RSM→ASM→MR tree) that endpoint can't produce yet.
+// See md-files/BACKEND_REQUESTS.md §6/§7 — left absent for RSM/HO rather than shown with a
+// flat/misleading substitute.
+const MY_TEAM_ROLE_TYPES = new Set(['pharma-asm'])
 
 // Shared, thin portal shell for HO/RSM/ASM — the same tabs for all three roles, since the
 // underlying GET /camps the Schedule tab calls is server-scoped per role server-side (see
@@ -40,6 +47,9 @@ const TABS: { id: TabId; label: string; icon: typeof FiBarChart2 }[] = [
 // (projects, doctors, etc.) is a later, separate step.
 const PharmaDashboardPortalPage = ({ roleTypeCode, portalLabel }: PharmaDashboardPortalPageProps) => {
   const [tab, setTab] = useState<TabId>('dashboard')
+  const TABS = MY_TEAM_ROLE_TYPES.has(roleTypeCode)
+    ? [...BASE_TABS, { id: 'team' as const, label: 'My Team', icon: FiUsers }]
+    : BASE_TABS
 
   return (
     <PharmaRoleGate roleTypeCode={roleTypeCode}>
@@ -77,6 +87,11 @@ const PharmaDashboardPortalPage = ({ roleTypeCode, portalLabel }: PharmaDashboar
         {tab === 'book' && (
           <Suspense fallback={<RouteFallback />}>
             <MrBookCampTab needsMrPicker />
+          </Suspense>
+        )}
+        {tab === 'team' && (
+          <Suspense fallback={<RouteFallback />}>
+            <MyTeamTab />
           </Suspense>
         )}
       </div>

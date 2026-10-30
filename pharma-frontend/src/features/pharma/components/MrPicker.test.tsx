@@ -152,6 +152,35 @@ describe('MrPicker', () => {
     expect(vi.mocked(searchDownlineMrs)).toHaveBeenCalledTimes(2)
   })
 
+  it("shows the populated user's real name instead of the role-name placeholder", async () => {
+    const { searchDownlineMrs } = await import('@/features/pharma/mr.service')
+    vi.mocked(searchDownlineMrs).mockResolvedValue({
+      success: true,
+      message: '',
+      data: {
+        items: [{
+          ...mrFixture('mr-0', 'pharma-mr role for Priya'),
+          user: { _id: 'user-1', firstName: 'Priya', lastName: 'Shah', email: 'priya@example.com' },
+        }],
+        count: 1,
+      },
+    })
+
+    const MrPicker = (await import('@/features/pharma/components/MrPicker')).default
+    const user = userEvent.setup()
+
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <MrPicker value="" label="" onChange={vi.fn()} />
+      </QueryClientProvider>,
+    )
+
+    await user.type(screen.getByPlaceholderText(/search mr by name/i), 'Priya')
+
+    expect(await screen.findByText(/^Priya Shah /, {}, { timeout: 3000 })).toBeInTheDocument()
+    expect(screen.queryByText(/pharma-mr role for Priya/i)).not.toBeInTheDocument()
+  })
+
   it("passes the selected MR's normalized division id (from a populated _id) as onChange's third argument", async () => {
     const { searchDownlineMrs } = await import('@/features/pharma/mr.service')
     vi.mocked(searchDownlineMrs).mockResolvedValue({

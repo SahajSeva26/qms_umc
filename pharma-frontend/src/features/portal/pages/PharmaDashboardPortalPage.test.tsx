@@ -16,6 +16,11 @@ vi.mock('@/features/camps/camps.service', () => ({
 vi.mock('@/features/pharma/components/MrBookCampTab', () => ({
   default: ({ needsMrPicker }: { needsMrPicker?: boolean }) => <div>Book-on-behalf tab mounted · needsMrPicker: {String(!!needsMrPicker)}</div>,
 }))
+// Full-weight (its own GET /roles/mrs query) — this file only needs to prove the tab is
+// role-gated and mounts; MyTeamTab.test.tsx owns the real rendering/data behavior.
+vi.mock('@/features/team/components/MyTeamTab', () => ({
+  default: () => <div>My Team tab mounted</div>,
+}))
 
 function sessionFixture(roleTypeCode: string): SessionResponse {
   return {
@@ -74,4 +79,23 @@ describe('PharmaDashboardPortalPage — shared HO/RSM/ASM shell', () => {
 
     expect(await screen.findByText(/book-on-behalf tab mounted · needsMrPicker: true/i)).toBeInTheDocument()
   })
+
+  it('ASM sees a "My Team" tab and it mounts MyTeamTab', async () => {
+    const user = userEvent.setup()
+    await renderPage('pharma-asm', 'pharma-asm')
+
+    const teamTabButton = screen.getByRole('button', { name: /^My Team$/ })
+    await user.click(teamTabButton)
+
+    expect(await screen.findByText(/my team tab mounted/i)).toBeInTheDocument()
+  })
+
+  it.each(['pharma-rsm', 'pharma-division-head'])(
+    '%s does NOT see a "My Team" tab — GET /roles/mrs can\'t produce their deeper tree yet (see md-files/BACKEND_REQUESTS.md)',
+    async (roleTypeCode) => {
+      await renderPage(roleTypeCode, roleTypeCode)
+
+      expect(screen.queryByRole('button', { name: /^My Team$/ })).not.toBeInTheDocument()
+    },
+  )
 })

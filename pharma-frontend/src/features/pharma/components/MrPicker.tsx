@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAsyncPickerState } from '@/hooks/useAsyncPickerState'
 import { useEligibleMrs } from '@/features/pharma/hooks/useEligibleMrs'
-import type { EligibleMr } from '@/features/pharma/mr.types'
+import { displayMrName, type EligibleMr } from '@/features/pharma/mr.types'
 import AsyncPicker from '@/components/ui/AsyncPicker'
 
 interface MrPickerProps {
@@ -15,7 +15,7 @@ interface MrPickerProps {
 // Server-scopes results to the caller's own downline — never fetches more than the caller is
 // actually allowed to book for (re-enforced independently by the backend's assertCanBook on
 // submit). Mirrors internal-frontend's MrPicker.tsx.
-const mrLabel = (mr: EligibleMr) => `${mr.name} (${mr.code})`
+const mrLabel = (mr: EligibleMr) => `${displayMrName(mr)} (${mr.code})`
 
 const mrDivisionId = (mr: EligibleMr): string | null =>
   typeof mr.division === 'string' ? mr.division : mr.division?._id ?? null

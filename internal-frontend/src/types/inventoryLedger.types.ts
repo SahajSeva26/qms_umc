@@ -61,6 +61,7 @@ export interface InventoryLedgerEntity {
 }
 
 export interface SearchInventoryLedgerQuery {
+  source?: InventoryLedgerSource
   request?: string
   requestType?: InventoryRequestType
   inventoryType?: InventoryLedgerItemType

@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { FiLayout, FiBookOpen, FiCpu, FiPackage, FiCalendar, FiTool, FiUsers, FiUserCheck, FiClipboard, FiRepeat, FiTruck } from 'react-icons/fi'
+import { FiLayout, FiBookOpen, FiCpu, FiPackage, FiCalendar, FiTool, FiUsers, FiUserCheck, FiClipboard, FiRepeat, FiTruck, FiClock } from 'react-icons/fi'
 import { usePermission } from '@/hooks/usePermission'
 import InventoryPageShell, { type InventoryPageTab } from '@/features/inventory/real/components/InventoryPageShell'
 import InventoryOverviewPanel from '@/features/inventory/real/components/InventoryOverviewPanel'
@@ -15,8 +15,9 @@ import InventoryRequestsPanel from '@/features/inventory/real/components/Invento
 import InventoryLedgerPanel from '@/features/inventory/real/components/InventoryLedgerPanel'
 import InventoryVendorsPanel from '@/features/inventory/real/components/InventoryVendorsPanel'
 import MyInventoryPanel from '@/features/inventory/real/components/MyInventoryPanel'
+import InventoryAuditPanel from '@/features/inventory/real/components/InventoryAuditPanel'
 
-type InventoryView = 'overview' | 'masters' | 'devices' | 'consumables' | 'expiry' | 'calibration' | 'assignments' | 'foinventory' | 'myinventory' | 'requests' | 'movements' | 'vendors'
+type InventoryView = 'overview' | 'masters' | 'devices' | 'consumables' | 'expiry' | 'calibration' | 'assignments' | 'foinventory' | 'myinventory' | 'requests' | 'audit' | 'movements' | 'vendors'
 
 // Identity, not permission — a field worker has no inventory-assignment:* code at all, but the
 // GET /inventory-assignments read endpoint has no permission gate server-side either, so this tab
@@ -50,6 +51,7 @@ const InventoryManagementPage = () => {
     ...(canViewAssignments ? [{ view: 'foinventory' as const, label: 'FO Inventory', icon: FiUserCheck }] : []),
     ...(isFieldWorker ? [{ view: 'myinventory' as const, label: 'My Inventory', icon: FiUserCheck }] : []),
     ...(canViewRequests ? [{ view: 'requests' as const, label: 'Requests', icon: FiClipboard }] : []),
+    ...(canViewMovements ? [{ view: 'audit' as const, label: 'Audit', icon: FiClock }] : []),
     ...(canViewMovements ? [{ view: 'movements' as const, label: 'Movements', icon: FiRepeat }] : []),
     ...(canViewVendors ? [{ view: 'vendors' as const, label: 'Vendor Master', icon: FiTruck }] : []),
   ], [canViewAssignments, isFieldWorker, canViewRequests, canViewMovements, canViewVendors])
@@ -77,6 +79,7 @@ const InventoryManagementPage = () => {
       {view === 'foinventory' && canViewAssignments && <InventoryFoInventoryPanel />}
       {view === 'myinventory' && isFieldWorker && <MyInventoryPanel />}
       {view === 'requests' && canViewRequests && <InventoryRequestsPanel />}
+      {view === 'audit' && canViewMovements && <InventoryAuditPanel />}
       {view === 'movements' && canViewMovements && <InventoryLedgerPanel />}
       {view === 'vendors' && canViewVendors && <InventoryVendorsPanel />}
     </InventoryPageShell>

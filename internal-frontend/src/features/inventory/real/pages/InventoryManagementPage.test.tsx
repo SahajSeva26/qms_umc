@@ -16,6 +16,7 @@ vi.mock('@/features/inventory/real/components/InventoryAssignmentsPanel', () => 
 vi.mock('@/features/inventory/real/components/InventoryFoInventoryPanel', () => ({ default: () => <div>FO Inventory panel content</div> }))
 vi.mock('@/features/inventory/real/components/InventoryRequestsPanel', () => ({ default: () => <div>Requests panel content</div> }))
 vi.mock('@/features/inventory/real/components/InventoryLedgerPanel', () => ({ default: () => <div>Movements panel content</div> }))
+vi.mock('@/features/inventory/real/components/InventoryAuditPanel', () => ({ default: () => <div>Audit panel content</div> }))
 vi.mock('@/features/inventory/real/components/InventoryVendorsPanel', () => ({ default: () => <div>Vendors panel content</div> }))
 vi.mock('@/features/inventory/real/components/MyInventoryPanel', () => ({ default: () => <div>My Inventory panel content</div> }))
 // InventoryPageShell pulls in useInventoryOverviewKpis, which hits 5 real
@@ -50,12 +51,12 @@ async function renderPage(
 }
 
 // One page, one route — most tabs are unconditional (open reads); Assignments/FO Inventory/Requests/
-// Movements/Vendor Master are shown only when the viewer holds the real permission their read requires.
+// Audit/Movements/Vendor Master are shown only when the viewer holds the real permission their read requires.
 describe('InventoryManagementPage — one page, tabs gated by real per-area permissions', () => {
-  it('a full-access viewer sees all 11 tabs and defaults to Overview', async () => {
+  it('a full-access viewer sees every available tab and defaults to Overview', async () => {
     await renderPage(() => true)
 
-    for (const label of ['Overview', 'Item Master', 'Devices', 'Consumables', 'Expiry / FEFO', 'Calibration', 'Assignments', 'FO Inventory', 'Requests', 'Movements', 'Vendor Master']) {
+    for (const label of ['Overview', 'Item Master', 'Devices', 'Consumables', 'Expiry / FEFO', 'Calibration', 'Assignments', 'FO Inventory', 'Requests', 'Audit', 'Movements', 'Vendor Master']) {
       expect(screen.getByRole('button', { name: new RegExp(`^${label}$`, 'i') })).toBeInTheDocument()
     }
     expect(screen.getByText('Overview panel content')).toBeInTheDocument()
@@ -67,7 +68,7 @@ describe('InventoryManagementPage — one page, tabs gated by real per-area perm
     for (const label of ['Overview', 'Item Master', 'Devices', 'Consumables', 'Expiry / FEFO', 'Calibration', 'Requests']) {
       expect(screen.getByRole('button', { name: new RegExp(`^${label}$`, 'i') })).toBeInTheDocument()
     }
-    for (const label of ['Assignments', 'FO Inventory', 'Movements', 'Vendor Master']) {
+    for (const label of ['Assignments', 'FO Inventory', 'Audit', 'Movements', 'Vendor Master']) {
       expect(screen.queryByRole('button', { name: new RegExp(`^${label}$`, 'i') })).not.toBeInTheDocument()
     }
   })
@@ -124,6 +125,13 @@ describe('InventoryManagementPage — one page, tabs gated by real per-area perm
     await renderPage(() => true, `${ADMIN_ROUTES.ADMIN_INVENTORY}?view=movements`)
 
     expect(screen.getByText('Movements panel content')).toBeInTheDocument()
+    expect(screen.queryByText('Overview panel content')).not.toBeInTheDocument()
+  })
+
+  it('deep-linking straight to ?view=audit shows the read-only Audit panel', async () => {
+    await renderPage(() => true, `${ADMIN_ROUTES.ADMIN_INVENTORY}?view=audit`)
+
+    expect(screen.getByText('Audit panel content')).toBeInTheDocument()
     expect(screen.queryByText('Overview panel content')).not.toBeInTheDocument()
   })
 

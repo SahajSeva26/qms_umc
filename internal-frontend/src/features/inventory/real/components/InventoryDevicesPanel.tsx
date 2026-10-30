@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { FiAlertTriangle, FiCheckCircle, FiCpu, FiHardDrive, FiPlus, FiTag } from 'react-icons/fi'
+import { FiAlertTriangle, FiCalendar, FiCheckCircle, FiCpu, FiHardDrive, FiPlus, FiTag, FiTool } from 'react-icons/fi'
 import { usePermission } from '@/hooks/usePermission'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { useInventoryDevices } from '@/features/inventory/real/hooks/useInventoryDevices'
@@ -11,7 +11,6 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import PaginationControls from '@/components/ui/PaginationControls'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
-import { CopyButton } from '@qms/ui'
 import EditInventoryDeviceModal from '@/features/inventory/real/components/EditInventoryDeviceModal'
 import InventoryDeviceDetailDrawer from '@/features/inventory/real/components/InventoryDeviceDetailDrawer'
 import InventoryDeviceSearchBar from '@/features/inventory/real/components/InventoryDeviceSearchBar'
@@ -130,30 +129,39 @@ const InventoryDevicesPanel = () => {
             No devices found.
           </div>
         ) : (
-          <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
+          <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
             {items.map((device) => {
               const sc = STATUS_STYLE[device.status]
               return (
                 <div
                   key={device.id}
                   onClick={() => setDetailDevice(device)}
-                  className="rounded-xl border p-3.5 space-y-2.5 cursor-pointer transition-colors hover:bg-(--qms-surface-hover)"
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      setDetailDevice(device)
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`View ${device.item.name ?? device.serialNumber} details`}
+                  className="group rounded-xl border p-3 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--qms-brand)"
                   style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}
                 >
-                  <div className="flex items-start gap-2.5">
+                  <div className="flex items-start gap-2.5 mb-2.5">
                     <div
-                      className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-                      style={{ background: 'linear-gradient(135deg, rgba(36,81,240,.16), rgba(20,184,166,.16))', color: 'var(--qms-brand)' }}
+                      className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-white"
+                      style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
                     >
-                      <FiCpu size={16} />
+                      <FiCpu size={18} />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="text-[13px] font-bold truncate" style={{ color: 'var(--qms-text)' }} title={device.item.name}>
+                      <div className="text-[9px] font-bold uppercase tracking-wide" style={{ color: 'var(--qms-text-muted)' }}>Device unit</div>
+                      <div className="text-[13px] font-bold truncate leading-tight" style={{ color: 'var(--qms-text)' }} title={device.item.name}>
                         {device.item.name ?? device.item.id}
                       </div>
-                      <div className="flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>
-                        <span className="font-mono" title={device.serialNumber}>{truncateIdentifier(device.serialNumber)}</span>
-                        <CopyButton value={device.serialNumber} label="Serial number" />
+                      <div className="text-[10px] truncate mt-0.5" style={{ color: 'var(--qms-text-muted)' }}>
+                        {device.vendor?.name ?? 'Vendor unavailable'} · <span className="font-mono" title={device.serialNumber}>{truncateIdentifier(device.serialNumber)}</span>
                       </div>
                     </div>
                     <span
@@ -164,21 +172,27 @@ const InventoryDevicesPanel = () => {
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 text-center pt-2" style={{ borderTop: '1px solid var(--qms-border)' }}>
-                    <div>
-                      <div className="text-[12px] font-extrabold" style={{ color: 'var(--qms-text)' }}>{device.manufacturingDate?.slice(0, 10) ?? '—'}</div>
-                      <div className="text-[10px]" style={{ color: 'var(--qms-text-muted)' }}>Mfg date</div>
+                  <p className="min-h-8 text-[10px] leading-4 mb-2.5 line-clamp-2" style={{ color: 'var(--qms-text-muted)' }}>
+                    Physical inventory unit{device.item.code ? ` for catalog item ${device.item.code}` : ''}.
+                  </p>
+
+                  <div className="grid grid-cols-3 gap-1.5 text-center">
+                    <div className="rounded-lg px-1.5 py-2" style={{ background: 'var(--qms-surface-soft)' }}>
+                      <FiCalendar className="mx-auto mb-1" size={12} style={{ color: 'var(--qms-brand)' }} />
+                      <div className="text-[10px] font-extrabold truncate" style={{ color: 'var(--qms-text)' }}>{device.warrantyExpiryDate?.slice(0, 10) ?? '—'}</div>
+                      <div className="text-[8px] uppercase tracking-wide" style={{ color: 'var(--qms-text-muted)' }}>Warranty</div>
                     </div>
-                    <div>
-                      <div className="text-[12px] font-extrabold" style={{ color: 'var(--qms-text)' }}>{device.warrantyExpiryDate?.slice(0, 10) ?? '—'}</div>
-                      <div className="text-[10px]" style={{ color: 'var(--qms-text-muted)' }}>Warranty</div>
+                    <div className="rounded-lg px-1.5 py-2" style={{ background: 'var(--qms-surface-soft)' }}>
+                      <FiTool className="mx-auto mb-1" size={12} style={{ color: 'var(--qms-teal)' }} />
+                      <div className="text-[10px] font-extrabold truncate" style={{ color: 'var(--qms-text)' }}>{device.lastCalibrationDate?.slice(0, 10) ?? '—'}</div>
+                      <div className="text-[8px] uppercase tracking-wide" style={{ color: 'var(--qms-text-muted)' }}>Last calib.</div>
                     </div>
-                    <div>
-                      <div className="text-[12px] font-extrabold" style={{ color: 'var(--qms-text)' }}>{device.nextCalibrationDate?.slice(0, 10) ?? '—'}</div>
-                      <div className="text-[10px]" style={{ color: 'var(--qms-text-muted)' }}>Next calib.</div>
+                    <div className="rounded-lg px-1.5 py-2" style={{ background: 'var(--qms-surface-soft)' }}>
+                      <FiTool className="mx-auto mb-1" size={12} style={{ color: '#f59e0b' }} />
+                      <div className="text-[10px] font-extrabold truncate" style={{ color: 'var(--qms-text)' }}>{device.nextCalibrationDate?.slice(0, 10) ?? '—'}</div>
+                      <div className="text-[8px] uppercase tracking-wide" style={{ color: 'var(--qms-text-muted)' }}>Next calib.</div>
                     </div>
                   </div>
-
                 </div>
               )
             })}

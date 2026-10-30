@@ -54,6 +54,29 @@ vi.mock('@/features/inventory/real/inventoryMaster.service', () => ({
   },
 }))
 
+vi.mock('@/features/inventory/real/inventoryDevice.service', () => ({
+  inventoryDeviceService: {
+    searchInventoryDevices: vi.fn(async () => ({
+      success: true,
+      message: '',
+      data: {
+        count: 1,
+        items: [{
+          id: 'device-1',
+          item: { id: 'item-1', code: 'DEV-SYR-01', name: 'Syringe pump', sku: 'sku-001', unit: 'unit' },
+          vendor: { id: 'vendor-1', code: 'V-01', name: 'MedTech' },
+          serialNumber: 'SYR-0001',
+          status: 'available',
+          warrantyExpiryDate: '2027-01-01T00:00:00.000Z',
+          nextCalibrationDate: '2026-12-01T00:00:00.000Z',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        }],
+      },
+    })),
+  },
+}))
+
 function makeQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } })
 }
@@ -127,6 +150,10 @@ describe('InventoryMasterTab — row click opens a detail drawer, Edit lives ins
 
     await user.click(await screen.findByText('Syringe pump'))
     expect(await screen.findByRole('heading', { name: 'Syringe pump' })).toBeInTheDocument()
+    expect(await screen.findByText('Registered device units (1)')).toBeInTheDocument()
+    expect(screen.getByText('SYR-0001')).toBeInTheDocument()
+    expect(screen.getByText('MedTech')).toBeInTheDocument()
+    expect(screen.getByText('Description & stocking')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument()
   })
 

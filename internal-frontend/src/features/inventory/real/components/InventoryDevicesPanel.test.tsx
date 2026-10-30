@@ -50,6 +50,27 @@ vi.mock('@/features/inventory/real/inventoryDevice.service', () => ({
   },
 }))
 
+vi.mock('@/features/inventory/real/inventoryMaster.service', () => ({
+  inventoryMasterService: {
+    getInventoryMaster: vi.fn(async () => ({
+      success: true,
+      message: '',
+      data: {
+        id: 'item-1',
+        code: 'DEV-01',
+        name: 'Infusion pump',
+        description: 'Portable infusion device for controlled medication delivery.',
+        type: 'device',
+        sku: 'PUMP-01',
+        unit: 'unit',
+        minStock: 2,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    })),
+  },
+}))
+
 function makeQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } })
 }
@@ -121,6 +142,9 @@ describe('InventoryDevicesPanel — card click opens a detail drawer, Edit lives
 
     await user.click(await screen.findByText('SN-0099'))
     expect(await screen.findByRole('heading', { name: 'Infusion pump' })).toBeInTheDocument()
+    expect(await screen.findByText('Portable infusion device for controlled medication delivery.')).toBeInTheDocument()
+    expect(screen.getByText('PUMP-01')).toBeInTheDocument()
+    expect(screen.getByText('Lifecycle & calibration')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument()
   })
 

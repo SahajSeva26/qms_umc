@@ -1,10 +1,11 @@
 import { Fragment } from 'react'
-import { FiEdit2, FiInfo, FiHash, FiCpu, FiClock } from 'react-icons/fi'
+import { FiCalendar, FiClock, FiCpu, FiEdit2, FiHash, FiInfo, FiPackage, FiTag, FiTool } from 'react-icons/fi'
 import SideDrawer from '@/components/ui/SideDrawer'
 import { CopyButton } from '@qms/ui'
 import { Button } from '@/components/ui/button'
 import { INVENTORY_DEVICE_STATUS_LABEL } from '@/types/inventoryDevice.types'
 import type { InventoryDeviceEntity, InventoryDeviceStatus } from '@/types/inventoryDevice.types'
+import { useInventoryMaster } from '@/features/inventory/real/hooks/useInventoryMaster'
 
 const STATUS_STYLE: Record<InventoryDeviceStatus, { bg: string; fg: string }> = {
   available: { bg: 'var(--qms-surface-strong)', fg: 'var(--qms-text-soft)' },
@@ -55,6 +56,8 @@ interface InventoryDeviceDetailDrawerProps {
 // TYPE — no fleet rollup to show. Only real per-unit fields; no price (not on our model, see ui-revisions.md).
 const InventoryDeviceDetailDrawer = ({ device, canManage, canViewLedger, onClose, onEdit, onViewHistory }: InventoryDeviceDetailDrawerProps) => {
   const sc = STATUS_STYLE[device.status]
+  const masterQuery = useInventoryMaster(device.item.id)
+  const master = masterQuery.data?.data
 
   return (
     <SideDrawer open title={device.item.name ?? device.item.id} onClose={onClose} widthClassName="max-w-[940px]">
@@ -67,7 +70,9 @@ const InventoryDeviceDetailDrawer = ({ device, canManage, canViewLedger, onClose
         </div>
         <div className="min-w-0 flex-1">
           <div className="text-[17px] font-bold leading-tight" style={{ color: 'var(--qms-text)' }}>{device.item.name ?? device.item.id}</div>
-          <div className="text-[12px] mt-0.5" style={{ color: 'var(--qms-text-muted)' }}>Device{device.vendor?.name ? ` · ${device.vendor.name}` : ''}</div>
+          <div className="text-[12px] mt-0.5" style={{ color: 'var(--qms-text-muted)' }}>
+            Device{device.vendor?.name ? ` · ${device.vendor.name}` : ''}{device.item.sku || master?.sku ? ` · ${device.item.sku ?? master?.sku}` : ''}
+          </div>
           <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
             <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full" style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text-soft)' }}>
               <FiHash size={11} />
@@ -81,17 +86,51 @@ const InventoryDeviceDetailDrawer = ({ device, canManage, canViewLedger, onClose
         </div>
       </div>
 
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-5">
+        <SummaryTile label="Status" value={INVENTORY_DEVICE_STATUS_LABEL[device.status]} icon={FiTag} />
+        <SummaryTile label="Warranty" value={device.warrantyExpiryDate?.slice(0, 10) ?? '—'} icon={FiCalendar} />
+        <SummaryTile label="Last calibration" value={device.lastCalibrationDate?.slice(0, 10) ?? '—'} icon={FiTool} />
+        <SummaryTile label="Next calibration" value={device.nextCalibrationDate?.slice(0, 10) ?? '—'} icon={FiTool} />
+      </div>
+
+      {master?.description && (
+        <SectionCard title="Description" icon={FiInfo} rows={[{ label: 'About', value: master.description }]} />
+      )}
+
       <SectionCard
-        title="Details"
-        icon={FiInfo}
+        title="Identity"
+        icon={FiHash}
         rows={[
+          { label: 'Serial number', value: device.serialNumber },
+          { label: 'Item code', value: master?.code ?? device.item.code },
+          { label: 'SKU', value: master?.sku ?? device.item.sku },
+          { label: 'Unit', value: master?.unit ?? device.item.unit },
           { label: 'Vendor', value: device.vendor?.name },
+          { label: 'Vendor code', value: device.vendor?.code },
+        ]}
+      />
+
+      <SectionCard
+        title="Lifecycle & calibration"
+        icon={FiPackage}
+        rows={[
+          { label: 'Status', value: INVENTORY_DEVICE_STATUS_LABEL[device.status] },
           { label: 'Manufacturing date', value: device.manufacturingDate?.slice(0, 10) },
           { label: 'Warranty expiry', value: device.warrantyExpiryDate?.slice(0, 10) },
           { label: 'Last calibrated', value: device.lastCalibrationDate?.slice(0, 10) },
           { label: 'Next calibration', value: device.nextCalibrationDate?.slice(0, 10) },
         ]}
       />
+
+      {masterQuery.isLoading && (
+        <p className="text-[11px] mb-4" role="status" style={{ color: 'var(--qms-text-muted)' }}>Loading catalog details…</p>
+      )}
+      {masterQuery.error && (
+        <div className="mb-4 flex items-center gap-2 text-[11px]" role="alert" style={{ color: 'var(--qms-danger)' }}>
+          <span>Catalog details could not be loaded.</span>
+          <button type="button" className="font-semibold underline" onClick={() => masterQuery.refetch()}>Try again</button>
+        </div>
+      )}
 
       <p className="text-[11px] mb-5" style={{ color: 'var(--qms-text-muted)' }}>
         Added {new Date(device.createdAt).toLocaleDateString()} · Updated {new Date(device.updatedAt).toLocaleDateString()}
@@ -113,5 +152,14 @@ const InventoryDeviceDetailDrawer = ({ device, canManage, canViewLedger, onClose
     </SideDrawer>
   )
 }
+
+const SummaryTile = ({ label, value, icon: Icon }: { label: string; value: string; icon: typeof FiInfo }) => (
+  <div className="rounded-xl border p-3" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}>
+    <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wide mb-1" style={{ color: 'var(--qms-text-muted)' }}>
+      <Icon size={11} style={{ color: 'var(--qms-brand)' }} /> {label}
+    </div>
+    <div className="text-[12px] font-extrabold truncate" style={{ color: 'var(--qms-text)' }} title={value}>{value}</div>
+  </div>
+)
 
 export default InventoryDeviceDetailDrawer

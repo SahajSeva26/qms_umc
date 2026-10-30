@@ -48,7 +48,15 @@ async function renderDrawer() {
   const FoInventoryDrawer = (await import('@/features/inventory/real/components/FoInventoryDrawer')).default
   return render(
     <QueryClientProvider client={makeQueryClient()}>
-      <FoInventoryDrawer open foRoleId="fo-1" foName="Asha Field Officer" foCode="FO-001" onClose={() => {}} />
+      <FoInventoryDrawer
+        open
+        foRoleId="fo-1"
+        foName="Asha Field Officer"
+        foCode="FO-001"
+        devicesHeld={8}
+        consumableUnitsHeld={16}
+        onClose={() => {}}
+      />
     </QueryClientProvider>,
   )
 }
@@ -81,12 +89,16 @@ describe('FoInventoryDrawer', () => {
     getInventoryConsumable.mockImplementation(async (id: string) => ({
       success: true,
       message: '',
-      data: { id, item: { id: 'master-consumable', name: 'Lancets' }, vendor: null, batch: `BATCH-${id}`, manufacturingDate: '2026-01-01T00:00:00.000Z', quantity: 20 },
+      data: { id, item: { id: 'master-consumable', name: 'Lancets', unit: 'box' }, vendor: null, batch: `BATCH-${id}`, manufacturingDate: '2026-01-01T00:00:00.000Z', quantity: 20 },
     }))
   })
 
   it('uses ten-row assignment pages and only resolves inventory for the visible device page', async () => {
     await renderDrawer()
+
+    expect(await screen.findByText('8')).toBeInTheDocument()
+    expect(screen.getByText('16')).toBeInTheDocument()
+    expect(await screen.findByText('20 box')).toBeInTheDocument()
 
     await waitFor(() => {
       expect(useInventoryAssignments).toHaveBeenCalledWith(

@@ -18,7 +18,13 @@ const InventoryFoInventoryPanel = () => {
   const { report, isLoading: reportLoading, error: reportError, refetch: refetchReport } = useInventoryAssignmentReport(true)
   const { data: assignmentsData, isLoading: assignmentsLoading, error: assignmentsError, refetch: refetchAssignments } = useInventoryAssignments({ inventoryType: 'InventoryConsumable', limit: FETCH_LIMIT })
   const { page, setPage, totalPages } = usePagination(PAGE_SIZE)
-  const [selectedFo, setSelectedFo] = useState<{ role: string; name: string; code: string } | null>(null)
+  const [selectedFo, setSelectedFo] = useState<{
+    role: string
+    name: string
+    code: string
+    devicesHeld: number
+    consumableUnitsHeld: number
+  } | null>(null)
 
   const isLoading = reportLoading || assignmentsLoading
   const error = reportError || assignmentsError
@@ -93,13 +99,26 @@ const InventoryFoInventoryPanel = () => {
                   return (
                     <tr
                       key={fo.role}
-                      className="transition-colors hover:bg-(--qms-surface-hover)"
+                      className="transition-colors hover:bg-(--qms-surface-hover) cursor-pointer"
                       style={{ borderBottom: '1px solid var(--qms-border)' }}
+                      onClick={() => setSelectedFo({
+                        role: fo.role,
+                        name: fo.name,
+                        code: fo.code,
+                        devicesHeld: fo.devicesHeld,
+                        consumableUnitsHeld: fo.consumableUnitsHeld,
+                      })}
                     >
                       <td className="px-4 py-2 max-w-xs" style={{ color: 'var(--qms-text)' }}>
                         <button
                           type="button"
-                          onClick={() => setSelectedFo({ role: fo.role, name: fo.name, code: fo.code })}
+                          onClick={() => setSelectedFo({
+                            role: fo.role,
+                            name: fo.name,
+                            code: fo.code,
+                            devicesHeld: fo.devicesHeld,
+                            consumableUnitsHeld: fo.consumableUnitsHeld,
+                          })}
                           className="truncate text-left w-full cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-2"
                           style={{ color: 'inherit', outlineColor: 'var(--qms-brand)' }}
                           title={fo.name}
@@ -144,6 +163,8 @@ const InventoryFoInventoryPanel = () => {
           foRoleId={selectedFo.role}
           foName={selectedFo.name}
           foCode={selectedFo.code}
+          devicesHeld={selectedFo.devicesHeld}
+          consumableUnitsHeld={selectedFo.consumableUnitsHeld}
         />
       )}
     </div>

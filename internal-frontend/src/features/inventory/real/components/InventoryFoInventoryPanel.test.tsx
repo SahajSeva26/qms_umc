@@ -70,7 +70,23 @@ describe('InventoryFoInventoryPanel', () => {
 
     expect(await screen.findByLabelText('FO inventory drawer stub')).toBeInTheDocument()
     expect(foInventoryDrawerSpy).toHaveBeenLastCalledWith(
-      expect.objectContaining({ open: true, foRoleId: 'role-1', foName: 'Asha Field Officer', foCode: 'FO-001' }),
+      expect.objectContaining({
+        open: true,
+        foRoleId: 'role-1',
+        foName: 'Asha Field Officer',
+        foCode: 'FO-001',
+        devicesHeld: 3,
+        consumableUnitsHeld: 40,
+      }),
     )
+  })
+
+  it('opens the drawer when the row is clicked outside the name control', async () => {
+    const user = userEvent.setup()
+    await renderPanel()
+
+    await user.click(await screen.findByText('FO-001'))
+
+    expect(await screen.findByLabelText('FO inventory drawer stub')).toBeInTheDocument()
   })
 })

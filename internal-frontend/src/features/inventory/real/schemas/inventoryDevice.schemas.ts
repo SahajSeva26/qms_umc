@@ -29,3 +29,15 @@ export const updateInventoryDeviceSchema = z.object({
   status: z.enum(INVENTORY_DEVICE_STATUS_VALUES),
 })
 export type InventoryDeviceUpdateFormValues = z.infer<typeof updateInventoryDeviceSchema>
+
+// The backend stores calibration as two dates rather than a separate status.
+// Requiring both here prevents "Mark done" from creating an unscheduled device,
+// while the ordering refinement keeps the derived calibration status truthful.
+export const completeDeviceCalibrationSchema = z.object({
+  lastCalibrationDate: z.string().trim().min(1, 'Calibration date is required.'),
+  nextCalibrationDate: z.string().trim().min(1, 'Next calibration date is required.'),
+}).refine(
+  (values) => values.nextCalibrationDate > values.lastCalibrationDate,
+  { path: ['nextCalibrationDate'], message: 'Next calibration must be after the completion date.' },
+)
+export type CompleteDeviceCalibrationFormValues = z.infer<typeof completeDeviceCalibrationSchema>

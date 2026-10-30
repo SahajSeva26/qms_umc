@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { FiCheck } from 'react-icons/fi'
 import { usePermission } from '@/hooks/usePermission'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { useInventoryDevices } from '@/features/inventory/real/hooks/useInventoryDevices'
@@ -9,6 +10,9 @@ import InventoryDeviceSearchBar from '@/features/inventory/real/components/Inven
 import type { InventoryDeviceSearchBarValue } from '@/features/inventory/real/components/InventoryDeviceSearchBar'
 import { calibrationStatus, CALIBRATION_STATUS_COLOR, type CalibrationStatusCode } from '@/features/inventory/real/utils/calibrationStatus'
 import { INVENTORY_DEVICE_STATUS_LABEL } from '@/types/inventoryDevice.types'
+import type { InventoryDeviceEntity } from '@/types/inventoryDevice.types'
+import { Button } from '@/components/ui/button'
+import MarkDeviceCalibratedModal from '@/features/inventory/real/components/MarkDeviceCalibratedModal'
 
 const STATUS_OPTIONS: { value: CalibrationStatusCode | 'ALL'; label: string }[] = [
   { value: 'ALL', label: 'All statuses' },
@@ -21,14 +25,17 @@ const STATUS_OPTIONS: { value: CalibrationStatusCode | 'ALL'; label: string }[] 
 // Same capped-fetch pattern as InventoryExpiryPanel — shows all loaded devices (default filter is ALL), no pagination.
 const FETCH_LIMIT = '1000'
 
-// The prototype's "mark calibrated" action has no backend endpoint yet (see md-files/ui-revisions.md) — read-only.
 // Same real device list as InventoryDevicesPanel, re-sorted by calibration due date, assignee cross-referenced.
+// "Mark done" faithfully uses the generic device update contract: calibration state is derived from
+// lastCalibrationDate/nextCalibrationDate rather than a separate backend status.
 const InventoryCalibrationPanel = () => {
   const { hasAnyPermission } = usePermission()
+  const canManage = hasAnyPermission(['inventory-device:manage'])
   const canViewAssignments = hasAnyPermission(['inventory-assignment:manage'])
   const [searchBar, setSearchBar] = useState<InventoryDeviceSearchBarValue>({ serial: '', item: null })
   const debouncedSerial = useDebouncedValue(searchBar.serial, 300)
   const [statusFilter, setStatusFilter] = useState<CalibrationStatusCode | 'ALL'>('ALL')
+  const [calibrationDevice, setCalibrationDevice] = useState<InventoryDeviceEntity | null>(null)
 
   const { data, isLoading, error, refetch } = useInventoryDevices({
     serialNumber: debouncedSerial.trim() || undefined,
@@ -103,6 +110,7 @@ const InventoryCalibrationPanel = () => {
                   <th>Next due</th>
                   <th>Status</th>
                   {canViewAssignments && <th>Assigned to / location</th>}
+                  {canManage && <th className="text-right">Action</th>}
                 </tr>
               </thead>
               <tbody>
@@ -123,6 +131,13 @@ const InventoryCalibrationPanel = () => {
                       {canViewAssignments && (
                         <td>{assigneeByDevice.get(device.id) ?? INVENTORY_DEVICE_STATUS_LABEL[device.status]}</td>
                       )}
+                      {canManage && (
+                        <td className="text-right">
+                          <Button type="button" variant="outline" size="sm" onClick={() => setCalibrationDevice(device)}>
+                            <FiCheck size={13} /> Mark done
+                          </Button>
+                        </td>
+                      )}
                     </tr>
                   )
                 })}
@@ -137,6 +152,10 @@ const InventoryCalibrationPanel = () => {
           )}
         </div>
       </QueryStateBlock>
+
+      {calibrationDevice && (
+        <MarkDeviceCalibratedModal device={calibrationDevice} onClose={() => setCalibrationDevice(null)} />
+      )}
     </div>
   )
 }

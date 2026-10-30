@@ -3,7 +3,7 @@ import { BrandController } from './brand.controller';
 import { registry } from '../../../shared/config/swagger/swagger.registry';
 import { CreateBrandPayloadSchema, SearchBrandQuerySchema, UpdateBrandPayloadSchema } from './brand.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
-import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { Authorize } from '../../../shared/middlewares/authorize.middleware';
 import { BRAND_PERMISSIONS } from './brand.constants';
 import { TENANT_PERMISSIONS } from '../../access-management/tenant/tenant.constants';
 
@@ -91,8 +91,8 @@ registry.registerPath({
 const GUARD = [BRAND_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.ADMIN.code];
 const READ_GUARD = [BRAND_PERMISSIONS.SEARCH.code, ...GUARD];
 
-BrandRouter.get('/:id', AuthorizeMiddleware(READ_GUARD), BrandController.get);
-BrandRouter.put('/:id', AuthorizeMiddleware(GUARD), BrandController.update);
+BrandRouter.get('/:id', Authorize.anyPermissions(READ_GUARD), BrandController.get);
+BrandRouter.put('/:id', Authorize.anyPermissions(GUARD), BrandController.update);
 
-BrandRouter.get('/', AuthorizeMiddleware(READ_GUARD), BrandController.search);
-BrandRouter.post('/', AuthorizeMiddleware(GUARD), BrandController.create);
+BrandRouter.get('/', Authorize.anyPermissions(READ_GUARD), BrandController.search);
+BrandRouter.post('/', Authorize.anyPermissions(GUARD), BrandController.create);

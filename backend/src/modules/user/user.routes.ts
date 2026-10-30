@@ -9,7 +9,7 @@ import {
 } from './user.validators';
 import { AuthMiddleware } from '../../shared/middlewares/authmiddleware';
 import { PERMISSIONS } from '../../shared/env/permissions';
-import { AuthorizeMiddleware } from '../../shared/middlewares/authorizeMiddleware';
+import { Authorize } from '../../shared/middlewares/authorize.middleware';
 import { reportRateLimiter } from '../../shared/middlewares/rateLimiter';
 
 export const UserRouter = express.Router();
@@ -99,24 +99,24 @@ UserRouter.get(
     '/report',
     reportRateLimiter,
     AuthMiddleware,
-    AuthorizeMiddleware([PERMISSIONS.USER.MANAGE.code]),
+    Authorize.anyPermissions([PERMISSIONS.USER.MANAGE.code]),
     UserController.report,
 );
 UserRouter.get(
     '/:id',
     AuthMiddleware,
-    AuthorizeMiddleware([PERMISSIONS.USER.GET.code]),
+    Authorize.anyPermissions([PERMISSIONS.USER.GET.code]),
     UserController.get,
 );
 UserRouter.put(
     '/:id',
     AuthMiddleware,
-    AuthorizeMiddleware([PERMISSIONS.USER.UPDATE.code]),
+    Authorize.anyPermissions([PERMISSIONS.USER.UPDATE.code]),
     UserController.update,
 );
 UserRouter.get(
     '/',
     AuthMiddleware,
-    AuthorizeMiddleware([PERMISSIONS.USER.SEARCH.code]),
+    Authorize.anyPermissions([PERMISSIONS.USER.SEARCH.code]),
     UserController.search,
 );

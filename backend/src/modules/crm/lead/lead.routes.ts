@@ -9,7 +9,7 @@ import {
     UpdateLeadPayloadSchema,
 } from './lead.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
-import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { Authorize } from '../../../shared/middlewares/authorize.middleware';
 import { reportRateLimiter } from '../../../shared/middlewares/rateLimiter';
 import { LEAD_PERMISSIONS } from './lead.constants';
 import { TENANT_PERMISSIONS } from '../../access-management/tenant/tenant.constants';
@@ -138,7 +138,7 @@ const READ_GUARD = [LEAD_PERMISSIONS.SEARCH.code, ...GUARD]; // reps (lead:searc
 LeadRouter.get(
     '/report',
     reportRateLimiter,
-    AuthorizeMiddleware([
+    Authorize.anyPermissions([
         LEAD_PERMISSIONS.MANAGE.code,
     ]),
     LeadController.report
@@ -146,7 +146,7 @@ LeadRouter.get(
 
 LeadRouter.get(
     '/:id',
-    AuthorizeMiddleware([
+    Authorize.anyPermissions([
         LEAD_PERMISSIONS.MANAGE.code,
         LEAD_PERMISSIONS.SEARCH.code,
         TENANT_PERMISSIONS.MANAGE.code,
@@ -155,14 +155,14 @@ LeadRouter.get(
 );
 LeadRouter.put(
     '/:id',
-    AuthorizeMiddleware([LEAD_PERMISSIONS.UPDATE.code, LEAD_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([LEAD_PERMISSIONS.UPDATE.code, LEAD_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
     LeadController.update,
 );
 LeadRouter.patch(
     '/:id/stage',
-    AuthorizeMiddleware([LEAD_PERMISSIONS.UPDATE.code, LEAD_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([LEAD_PERMISSIONS.UPDATE.code, LEAD_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
     LeadController.moveStage,
 );
 
-LeadRouter.get('/', AuthorizeMiddleware(READ_GUARD), LeadController.search);
-LeadRouter.post('/', AuthorizeMiddleware([LEAD_PERMISSIONS.CREATE.code, ...GUARD]), LeadController.create);
+LeadRouter.get('/', Authorize.anyPermissions(READ_GUARD), LeadController.search);
+LeadRouter.post('/', Authorize.anyPermissions([LEAD_PERMISSIONS.CREATE.code, ...GUARD]), LeadController.create);

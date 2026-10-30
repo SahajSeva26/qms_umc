@@ -15,8 +15,7 @@ import {
     VoidCampPayloadSchema,
 } from './camp.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
-import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
-import { RoleGuard } from '../../../shared/middlewares/roleGuard';
+import { Authorize } from '../../../shared/middlewares/authorize.middleware';
 import { reportRateLimiter } from '../../../shared/middlewares/rateLimiter';
 import { CAMP_PERMISSIONS } from './camp.constants';
 import { TENANT_PERMISSIONS } from '../../access-management/tenant/tenant.constants';
@@ -292,7 +291,7 @@ const READ_GUARD = [CAMP_PERMISSIONS.SEARCH.code, ...GUARD]; // assigned field-f
 CampRouter.get(
     '/report',
     reportRateLimiter,
-    AuthorizeMiddleware(GUARD),
+    Authorize.anyPermissions(GUARD),
     CampController.report
 );
 
@@ -302,7 +301,7 @@ CampRouter.get(
 // is the same scoped set as the list they drill into.
 CampRouter.get(
     '/my',
-    RoleGuard([
+    Authorize.roles([
         ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER,
         ALLOWED_ROLETYPE_CODES.PLATFORM.DIETITIAN,
         ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR,
@@ -315,7 +314,7 @@ CampRouter.get(
 
 CampRouter.get(
     '/:id',
-    AuthorizeMiddleware([
+    Authorize.anyPermissions([
         CAMP_PERMISSIONS.MANAGE.code,
         CAMP_PERMISSIONS.GET.code,
         CAMP_PERMISSIONS.BOOK.code, // pharma field-force (book-only) may read camps; service scopes them to their division
@@ -325,7 +324,7 @@ CampRouter.get(
 );
 CampRouter.put(
     '/:id',
-    AuthorizeMiddleware([
+    Authorize.anyPermissions([
         CAMP_PERMISSIONS.UPDATE.code,
         CAMP_PERMISSIONS.MANAGE.code,
         TENANT_PERMISSIONS.MANAGE.code,
@@ -334,27 +333,27 @@ CampRouter.put(
 );
 CampRouter.patch(
     '/:id/stage',
-    AuthorizeMiddleware([CAMP_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([CAMP_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
     CampController.moveStage,
 );
 // start a camp (confirmed → live) — role-gated to the field staff who run it; ownership + stage +
 // scheduled-date are enforced in the service. NOT permission-gated (field staff, not managers).
 CampRouter.patch(
     '/:id/activate',
-    RoleGuard([ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER, ALLOWED_ROLETYPE_CODES.PLATFORM.DIETITIAN]),
+    Authorize.roles([ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER, ALLOWED_ROLETYPE_CODES.PLATFORM.DIETITIAN]),
     CampController.activate,
 );
 
 // approve a void camp (requested → closed) — camp:manage (ops) / tenant:manage only
 CampRouter.patch(
     '/:id/approve-void',
-    AuthorizeMiddleware([CAMP_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([CAMP_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
     CampController.approveVoidCamp,
 );
 
 CampRouter.post(
     '/:id/allocate',
-    AuthorizeMiddleware([
+    Authorize.anyPermissions([
         CAMP_PERMISSIONS.UPDATE.code,
         CAMP_PERMISSIONS.MANAGE.code,
         TENANT_PERMISSIONS.MANAGE.code,
@@ -364,7 +363,7 @@ CampRouter.post(
 
 CampRouter.get(
     '/',
-    AuthorizeMiddleware([
+    Authorize.anyPermissions([
         CAMP_PERMISSIONS.SEARCH.code,
         CAMP_PERMISSIONS.MANAGE.code,
         CAMP_PERMISSIONS.BOOK.code, // pharma field-force (book-only) may read camps; service scopes them to their division
@@ -375,7 +374,7 @@ CampRouter.get(
 
 CampRouter.post(
     '/',
-    AuthorizeMiddleware([
+    Authorize.anyPermissions([
         CAMP_PERMISSIONS.CREATE.code,
         CAMP_PERMISSIONS.MANAGE.code,
         TENANT_PERMISSIONS.MANAGE.code,
@@ -387,7 +386,7 @@ CampRouter.post(
 // (ops managers) / tenant:manage, never to pharma field-force (no camp:book here).
 CampRouter.post(
     '/void-camp',
-    AuthorizeMiddleware([CAMP_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([CAMP_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
     CampController.voidCamp,
 );
 
@@ -395,10 +394,10 @@ CampRouter.post(
 // camp:book holders (pharma role types); the service further restricts to customer tenants.
 CampRouter.post(
     '/booking-availability',
-    AuthorizeMiddleware([CAMP_PERMISSIONS.BOOK.code]),
+    Authorize.anyPermissions([CAMP_PERMISSIONS.BOOK.code]),
     CampController.bookingAvailability,
 );
 
 // pharma field-force booking — only pharma role types hold camp:book. The service then authorizes
 // the caller against the target MR (self / downline). No manage fallback: booking is pharma-only.
-CampRouter.post('/book', AuthorizeMiddleware([CAMP_PERMISSIONS.BOOK.code]), CampController.book);
+CampRouter.post('/book', Authorize.anyPermissions([CAMP_PERMISSIONS.BOOK.code]), CampController.book);

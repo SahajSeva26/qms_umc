@@ -4,7 +4,7 @@ import { TestMasterController } from './testMaster.controller';
 import { registry } from '../../../shared/config/swagger/swagger.registry';
 import { CreateTestMasterPayloadSchema, SearchTestMasterQuerySchema, UpdateTestMasterPayloadSchema } from './testMaster.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
-import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { Authorize } from '../../../shared/middlewares/authorize.middleware';
 import { TEST_MASTER_PERMISSIONS } from './testMaster.constants';
 
 export const TestMasterRouter = express.Router();
@@ -87,8 +87,8 @@ registry.registerPath({
 // ===================== EXPORT TEST MASTER ROUTES =======================
 // =======================================================================
 // reads require the matching read permission (or manage); writes require manage.
-TestMasterRouter.get('/:id', AuthorizeMiddleware([TEST_MASTER_PERMISSIONS.GET.code, TEST_MASTER_PERMISSIONS.MANAGE.code], 'OR'), TestMasterController.get);
-TestMasterRouter.get('/', AuthorizeMiddleware([TEST_MASTER_PERMISSIONS.SEARCH.code, TEST_MASTER_PERMISSIONS.MANAGE.code], 'OR'), TestMasterController.search);
+TestMasterRouter.get('/:id', Authorize.anyPermissions([TEST_MASTER_PERMISSIONS.GET.code, TEST_MASTER_PERMISSIONS.MANAGE.code]), TestMasterController.get);
+TestMasterRouter.get('/', Authorize.anyPermissions([TEST_MASTER_PERMISSIONS.SEARCH.code, TEST_MASTER_PERMISSIONS.MANAGE.code]), TestMasterController.search);
 
-TestMasterRouter.post('/', AuthorizeMiddleware([TEST_MASTER_PERMISSIONS.MANAGE.code]), TestMasterController.create);
-TestMasterRouter.put('/:id', AuthorizeMiddleware([TEST_MASTER_PERMISSIONS.MANAGE.code]), TestMasterController.update);
+TestMasterRouter.post('/', Authorize.anyPermissions([TEST_MASTER_PERMISSIONS.MANAGE.code]), TestMasterController.create);
+TestMasterRouter.put('/:id', Authorize.anyPermissions([TEST_MASTER_PERMISSIONS.MANAGE.code]), TestMasterController.update);

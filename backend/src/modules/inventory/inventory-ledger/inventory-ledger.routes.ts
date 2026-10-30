@@ -4,7 +4,7 @@ import { InventoryLedgerController } from './inventory-ledger.controller';
 import { registry } from '../../../shared/config/swagger/swagger.registry';
 import { SearchInventoryLedgerQuerySchema } from './inventory-ledger.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
-import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { Authorize } from '../../../shared/middlewares/authorize.middleware';
 import { INVENTORY_LEDGER_PERMISSIONS } from './inventory-ledger.constants';
 
 export const InventoryLedgerRouter = express.Router();
@@ -42,5 +42,5 @@ registry.registerPath({
 // ==================== EXPORT INVENTORY LEDGER ROUTES ===================
 // =======================================================================
 // The ledger is append-only + system-written: reads only, and manager-only (inventory-ledger:manage).
-InventoryLedgerRouter.get('/:id', AuthorizeMiddleware([INVENTORY_LEDGER_PERMISSIONS.MANAGE.code]), InventoryLedgerController.get);
-InventoryLedgerRouter.get('/', AuthorizeMiddleware([INVENTORY_LEDGER_PERMISSIONS.MANAGE.code]), InventoryLedgerController.search);
+InventoryLedgerRouter.get('/:id', Authorize.anyPermissions([INVENTORY_LEDGER_PERMISSIONS.MANAGE.code]), InventoryLedgerController.get);
+InventoryLedgerRouter.get('/', Authorize.anyPermissions([INVENTORY_LEDGER_PERMISSIONS.MANAGE.code]), InventoryLedgerController.search);

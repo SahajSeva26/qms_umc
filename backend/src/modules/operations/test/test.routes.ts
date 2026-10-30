@@ -4,7 +4,7 @@ import { TestController } from './test.controller';
 import { registry } from '../../../shared/config/swagger/swagger.registry';
 import { CreateTestPayloadSchema, SearchTestQuerySchema, UpdateTestPayloadSchema } from './test.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
-import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { Authorize } from '../../../shared/middlewares/authorize.middleware';
 import { TEST_PERMISSIONS } from './test.constants';
 
 export const TestRouter = express.Router();
@@ -75,8 +75,8 @@ registry.registerPath({
 // =======================================================================
 // reads require the matching read permission (or manage); writes require the matching write
 // permission (or manage).
-TestRouter.get('/:id', AuthorizeMiddleware([TEST_PERMISSIONS.GET.code, TEST_PERMISSIONS.MANAGE.code], 'OR'), TestController.get);
-TestRouter.get('/', AuthorizeMiddleware([TEST_PERMISSIONS.SEARCH.code, TEST_PERMISSIONS.MANAGE.code], 'OR'), TestController.search);
+TestRouter.get('/:id', Authorize.anyPermissions([TEST_PERMISSIONS.GET.code, TEST_PERMISSIONS.MANAGE.code]), TestController.get);
+TestRouter.get('/', Authorize.anyPermissions([TEST_PERMISSIONS.SEARCH.code, TEST_PERMISSIONS.MANAGE.code]), TestController.search);
 
-TestRouter.post('/', AuthorizeMiddleware([TEST_PERMISSIONS.CREATE.code, TEST_PERMISSIONS.MANAGE.code], 'OR'), TestController.create);
-TestRouter.put('/:id', AuthorizeMiddleware([TEST_PERMISSIONS.UPDATE.code, TEST_PERMISSIONS.MANAGE.code], 'OR'), TestController.update);
+TestRouter.post('/', Authorize.anyPermissions([TEST_PERMISSIONS.CREATE.code, TEST_PERMISSIONS.MANAGE.code]), TestController.create);
+TestRouter.put('/:id', Authorize.anyPermissions([TEST_PERMISSIONS.UPDATE.code, TEST_PERMISSIONS.MANAGE.code]), TestController.update);

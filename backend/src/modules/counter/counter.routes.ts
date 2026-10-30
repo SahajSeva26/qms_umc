@@ -7,7 +7,7 @@ import {
     UpdateCounterPayloadSchema,
 } from './counter.validators';
 import { AuthMiddleware } from '../../shared/middlewares/authmiddleware';
-import { AuthorizeMiddleware } from '../../shared/middlewares/authorizeMiddleware';
+import { Authorize } from '../../shared/middlewares/authorize.middleware';
 import { COUNTER_PERMISSIONS } from './counter.constants';
 
 export const CounterRouter = express.Router();
@@ -74,6 +74,6 @@ CounterRouter.get('/', CounterController.search);
 
 CounterRouter.put(
     '/:id',
-    AuthorizeMiddleware([COUNTER_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([COUNTER_PERMISSIONS.MANAGE.code]),
     CounterController.update,
 );

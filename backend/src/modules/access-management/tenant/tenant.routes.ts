@@ -8,7 +8,7 @@ import {
     UpdateTenantPayloadSchema,
 } from './tenant.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
-import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { Authorize } from '../../../shared/middlewares/authorize.middleware';
 import { csvUploader } from '../../../shared/middlewares/upload/csvUploader';
 import {
     PERMISSIONS,
@@ -146,7 +146,7 @@ TenantRouter.get('/me', AuthMiddleware, TenantController.getTenantMe);
 
 TenantRouter.get(
     '/:id',
-    AuthorizeMiddleware([
+    Authorize.anyPermissions([
         PERMISSIONS.TENANT.GET.code,
         PERMISSIONS.TENANT.MANAGE.code,
     ]),
@@ -154,7 +154,7 @@ TenantRouter.get(
 );
 TenantRouter.get(
     '/',
-    AuthorizeMiddleware([
+    Authorize.anyPermissions([
         PERMISSIONS.TENANT.SEARCH.code,
         PERMISSIONS.TENANT.MANAGE.code,
     ]),
@@ -164,7 +164,7 @@ TenantRouter.get(
 // declared before POST '/' for clarity.
 TenantRouter.post(
     '/bulk',
-    AuthorizeMiddleware([
+    Authorize.anyPermissions([
         PERMISSIONS.TENANT.MANAGE.code,
         SYSTEM_PERMISSIONS.MANAGE.code,
     ]),
@@ -173,7 +173,7 @@ TenantRouter.post(
 );
 TenantRouter.post(
     '/',
-    AuthorizeMiddleware([
+    Authorize.anyPermissions([
         // PERMISSIONS.TENANT.CREATE.code,
         PERMISSIONS.TENANT.MANAGE.code,
         SYSTEM_PERMISSIONS.MANAGE.code,
@@ -182,7 +182,7 @@ TenantRouter.post(
 );
 TenantRouter.put(
     '/:id',
-    AuthorizeMiddleware([
+    Authorize.anyPermissions([
         PERMISSIONS.TENANT.UPDATE.code,
         PERMISSIONS.TENANT.MANAGE.code,
     ]),

@@ -10,7 +10,7 @@ import {
     UpdateDoctorPayloadSchema,
 } from './doctor.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
-import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { Authorize } from '../../../shared/middlewares/authorize.middleware';
 import { DOCTOR_PERMISSIONS } from './doctor.constants';
 import { CAMP_PERMISSIONS } from '../../operations/camp/camp.constants';
 import { csvUploader } from '../../../shared/middlewares/upload/csvUploader';
@@ -134,7 +134,7 @@ registry.registerPath({
 // NOTE: /nearest is declared before /:id so the literal path is not swallowed by the param route.
 // /nearest is a pharma-side lookup (find doctors near a point when booking a camp) — gated to
 // camp:book holders only, so only pharma field-force roles can reach it.
-DoctorRouter.get('/nearest', AuthorizeMiddleware([CAMP_PERMISSIONS.BOOK.code]), DoctorController.nearest);
+DoctorRouter.get('/nearest', Authorize.anyPermissions([CAMP_PERMISSIONS.BOOK.code]), DoctorController.nearest);
 DoctorRouter.get('/:id', DoctorController.get);
 DoctorRouter.get('/', DoctorController.search);
 
@@ -143,19 +143,19 @@ DoctorRouter.get('/', DoctorController.search);
 // doctor into their OWN division regardless of what's sent.
 DoctorRouter.post(
     '/',
-    AuthorizeMiddleware([DOCTOR_PERMISSIONS.CREATE.code, DOCTOR_PERMISSIONS.MANAGE.code], 'OR'),
+    Authorize.anyPermissions([DOCTOR_PERMISSIONS.CREATE.code, DOCTOR_PERMISSIONS.MANAGE.code]),
     DoctorController.create,
 );
 
 // bulk create — guarded by doctor:manage; CSV file field name is `file`
 DoctorRouter.post(
     '/bulk',
-    AuthorizeMiddleware([DOCTOR_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([DOCTOR_PERMISSIONS.MANAGE.code]),
     csvUploader.single('file'),
     DoctorController.bulkCreate,
 );
 DoctorRouter.put(
     '/:id',
-    AuthorizeMiddleware([DOCTOR_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([DOCTOR_PERMISSIONS.MANAGE.code]),
     DoctorController.update,
 );

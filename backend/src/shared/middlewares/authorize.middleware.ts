@@ -6,7 +6,7 @@ import { RequestContext } from '../utils/contextBuilder';
 // Authorization guards — each method takes the required roles/permissions and RETURNS an Express
 // middleware. Use AFTER AuthMiddleware (which populates ctx.role + ctx.permissions). All three
 // delegate to the ctx helpers, so system:manage god-mode bypass is preserved.
-class Authorize {
+class AuthorizeGuard {
     // allow only if the caller's role-type code is one of `roles`
     roles(roles: string[]) {
         return (req: any, res: any, next: any) => {
@@ -53,4 +53,4 @@ class Authorize {
     }
 }
 
-export const authorize = new Authorize();
+export const Authorize = new AuthorizeGuard();

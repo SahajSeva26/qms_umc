@@ -9,7 +9,7 @@ import {
     UpdateGeoProfilePayloadSchema,
 } from './geoProfile.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
-import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { Authorize } from '../../../shared/middlewares/authorize.middleware';
 import { GEO_PROFILE_PERMISSIONS } from './geoProfile.constants';
 
 export const GeoProfileRouter = express.Router();
@@ -112,5 +112,5 @@ GeoProfileRouter.get('/nearest', GeoProfileController.nearest);
 GeoProfileRouter.get('/:id', GeoProfileController.get);
 GeoProfileRouter.get('/', GeoProfileController.search);
 
-GeoProfileRouter.post('/', AuthorizeMiddleware([GEO_PROFILE_PERMISSIONS.MANAGE.code]), GeoProfileController.create);
-GeoProfileRouter.put('/:id', AuthorizeMiddleware([GEO_PROFILE_PERMISSIONS.MANAGE.code]), GeoProfileController.update);
+GeoProfileRouter.post('/', Authorize.anyPermissions([GEO_PROFILE_PERMISSIONS.MANAGE.code]), GeoProfileController.create);
+GeoProfileRouter.put('/:id', Authorize.anyPermissions([GEO_PROFILE_PERMISSIONS.MANAGE.code]), GeoProfileController.update);

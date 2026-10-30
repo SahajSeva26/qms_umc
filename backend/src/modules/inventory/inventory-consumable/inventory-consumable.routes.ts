@@ -9,7 +9,7 @@ import {
     UpdateInventoryConsumablePayloadSchema,
 } from './inventory-consumable.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
-import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { Authorize } from '../../../shared/middlewares/authorize.middleware';
 import { INVENTORY_CONSUMABLE_PERMISSIONS } from './inventory-consumable.constants';
 
 export const InventoryConsumableRouter = express.Router();
@@ -117,7 +117,7 @@ registry.registerPath({
 // the report is manager-only; it MUST be registered before '/:id' so 'report' is not read as an id.
 InventoryConsumableRouter.get(
     '/report',
-    AuthorizeMiddleware([INVENTORY_CONSUMABLE_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([INVENTORY_CONSUMABLE_PERMISSIONS.MANAGE.code]),
     InventoryConsumableController.report,
 );
 InventoryConsumableRouter.get('/:id', InventoryConsumableController.get);
@@ -125,11 +125,11 @@ InventoryConsumableRouter.get('/', InventoryConsumableController.search);
 
 InventoryConsumableRouter.post(
     '/',
-    AuthorizeMiddleware([INVENTORY_CONSUMABLE_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([INVENTORY_CONSUMABLE_PERMISSIONS.MANAGE.code]),
     InventoryConsumableController.create,
 );
 InventoryConsumableRouter.put(
     '/:id',
-    AuthorizeMiddleware([INVENTORY_CONSUMABLE_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([INVENTORY_CONSUMABLE_PERMISSIONS.MANAGE.code]),
     InventoryConsumableController.update,
 );

@@ -8,7 +8,7 @@ import {
     UpdateRolePayloadSchema,
 } from './role.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
-import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { Authorize } from '../../../shared/middlewares/authorize.middleware';
 import { PERMISSIONS } from '../../../shared/env/permissions';
 import { TENANT_PERMISSIONS } from '../tenant/tenant.constants';
 import { ROLE_PERMISSIONS } from './role.constants';
@@ -124,7 +124,7 @@ registry.registerPath({
 RoleRouter.get('/mrs', RoleController.searchMrs);
 RoleRouter.get(
     '/:id',
-    AuthorizeMiddleware([
+    Authorize.anyPermissions([
         TENANT_PERMISSIONS.ADMIN.code,
         TENANT_PERMISSIONS.MANAGE.code,
         ROLE_PERMISSIONS.GET.code,
@@ -133,12 +133,12 @@ RoleRouter.get(
 );
 RoleRouter.put(
     '/:id',
-    AuthorizeMiddleware([TENANT_PERMISSIONS.ADMIN.code, TENANT_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([TENANT_PERMISSIONS.ADMIN.code, TENANT_PERMISSIONS.MANAGE.code]),
     RoleController.update,
 );
 RoleRouter.get(
     '/',
-    AuthorizeMiddleware([
+    Authorize.anyPermissions([
         TENANT_PERMISSIONS.ADMIN.code,
         TENANT_PERMISSIONS.MANAGE.code,
         ROLE_PERMISSIONS.SEARCH.code,
@@ -147,6 +147,6 @@ RoleRouter.get(
 );
 RoleRouter.post(
     '/',
-    AuthorizeMiddleware([TENANT_PERMISSIONS.ADMIN.code, TENANT_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([TENANT_PERMISSIONS.ADMIN.code, TENANT_PERMISSIONS.MANAGE.code]),
     RoleController.create,
 );

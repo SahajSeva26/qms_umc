@@ -7,6 +7,9 @@ import {
     ApproveVoidCampPayloadSchema,
     BookCampPayloadSchema,
     BookingAvailabilityPayloadSchema,
+    CampFileCompletePayloadSchema,
+    CampFileListQuerySchema,
+    CampFileUploadPayloadSchema,
     CampReportQuerySchema,
     CreateCampPayloadSchema,
     MoveStagePayloadSchema,
@@ -282,6 +285,57 @@ registry.registerPath({
     },
 });
 
+// create camp file upload intents (single or bulk) — assigned field worker only
+registry.registerPath({
+    method: 'post',
+    path: '/camps/{id}/files',
+    tags: ['CAMP'],
+    summary: 'Create camp file upload intents (bulk) — returns a presigned PUT URL per file (assigned FO/dietitian only)',
+    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+    request: {
+        body: { content: { 'application/json': { schema: CampFileUploadPayloadSchema } } },
+    },
+    responses: {
+        201: { description: 'Upload intents created; response carries an uploadUrl per file' },
+        400: { description: 'Validation error / bad purpose, mime or size' },
+        403: { description: 'Not the assigned worker' },
+        404: { description: 'Camp not found' },
+        409: { description: 'Camp status does not allow this upload' },
+    },
+});
+
+// complete (activate) camp files in bulk — partial success
+registry.registerPath({
+    method: 'patch',
+    path: '/camps/{id}/files',
+    tags: ['CAMP'],
+    summary: 'Complete (verify + activate) uploaded camp files in bulk — partial success per file (assigned FO/dietitian only)',
+    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+    request: {
+        body: { content: { 'application/json': { schema: CampFileCompletePayloadSchema } } },
+    },
+    responses: {
+        200: { description: 'Per-file completion results' },
+        400: { description: 'Validation error' },
+        403: { description: 'Not the assigned worker' },
+        404: { description: 'Camp not found' },
+    },
+});
+
+// list a camp's files (optionally by purpose)
+registry.registerPath({
+    method: 'get',
+    path: '/camps/{id}/files',
+    tags: ['CAMP'],
+    summary: "List a camp's active files (optionally filtered by purpose) with presigned read URLs",
+    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+    request: { query: CampFileListQuerySchema },
+    responses: {
+        200: { description: 'Camp files fetched successfully' },
+        404: { description: 'Camp not found' },
+    },
+});
+
 // =======================================================================
 // ========================= EXPORT CAMP ROUTES ==========================
 // =======================================================================
@@ -361,6 +415,30 @@ CampRouter.post(
     CampController.allocateWorker,
 );
 
+// camp files — writes (post = create intents, patch = complete/activate) are role-gated to the field
+// staff who run the camp (assigned-worker + status checks live in CampService); reads use the same
+// permission gate as GET /camps/:id.
+CampRouter.get(
+    '/:id/files',
+    Authorize.anyPermissions([
+        CAMP_PERMISSIONS.MANAGE.code,
+        CAMP_PERMISSIONS.GET.code,
+        CAMP_PERMISSIONS.BOOK.code,
+        TENANT_PERMISSIONS.MANAGE.code,
+    ]),
+    CampController.getFiles,
+);
+CampRouter.post(
+    '/:id/files',
+    Authorize.roles([ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER, ALLOWED_ROLETYPE_CODES.PLATFORM.DIETITIAN]),
+    CampController.postFiles,
+);
+CampRouter.patch(
+    '/:id/files',
+    Authorize.roles([ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER, ALLOWED_ROLETYPE_CODES.PLATFORM.DIETITIAN]),
+    CampController.patchFiles,
+);
+
 CampRouter.get(
     '/',
     Authorize.anyPermissions([
@@ -401,3 +479,5 @@ CampRouter.post(
 // pharma field-force booking — only pharma role types hold camp:book. The service then authorizes
 // the caller against the target MR (self / downline). No manage fallback: booking is pharma-only.
 CampRouter.post('/book', Authorize.anyPermissions([CAMP_PERMISSIONS.BOOK.code]), CampController.book);
+
+

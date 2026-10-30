@@ -1,7 +1,7 @@
 // File Validators
 import { z } from 'zod';
 import { isValidObjectID } from '../../shared/utils/strings';
-import { ENTITY_RELATION_ARRAY, ENTITY_TYPE, FILE_STATUS, FILE_TYPE } from './file.constants';
+import { FILE_STATUS, FILE_TYPE } from './file.constants';
 
 const objectId = (label: string) =>
     z.string().refine((val) => isValidObjectID(val), {
@@ -26,8 +26,9 @@ export const CreateFilePayloadSchema = z
         tenant: objectId('Tenant').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
         // optional — upload-first: the record is attached later via update (type + relation stay required)
         entityId: objectId('Entity').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
-        entityType: z.enum(Object.values(ENTITY_TYPE)).openapi({ example: 'tenant' }),
-        entityRelation: z.enum(ENTITY_RELATION_ARRAY).openapi({ example: 'logo' }),
+        // free-form: the type/relation are owned by the calling domain, not the file module
+        entityType: z.string().min(1).openapi({ example: 'camp' }),
+        entityRelation: z.string().min(1).openapi({ example: 'setup' }),
         tags: z.array(z.string()).optional().openapi({ example: ['branding'] }),
         // one entry per file — a draft doc + a presigned upload URL is produced for each
         files: z.array(FileMetaSchema).min(1).openapi({ example: [{ fileName: 'logo.png', fileSize: 20480, fileType: 'image/png' }] }),
@@ -61,8 +62,8 @@ export const SearchFileQuerySchema = z.object({
     // only honoured for platform staff; customer users stay pinned to their own tenant
     tenant: objectId('Tenant').optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
     entityId: z.string().optional().openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
-    entityType: z.enum(Object.values(ENTITY_TYPE)).optional().openapi({ example: 'tenant' }),
-    relation: z.enum(ENTITY_RELATION_ARRAY).optional().openapi({ example: 'logo' }),
+    entityType: z.string().optional().openapi({ example: 'camp' }),
+    relation: z.string().optional().openapi({ example: 'setup' }),
     type: z.enum(Object.values(FILE_TYPE)).optional().openapi({ example: 'image' }),
     // discarded is only visible to a file:manage actor (see the service)
     status: z.enum(Object.values(FILE_STATUS)).optional().openapi({ example: 'active' }),

@@ -1,6 +1,8 @@
 
 
 // Camp Constants
+import { IFileRelationConfig } from '../../../shared/types/file.types';
+
 export const CAMP_COUNTER_ENTITY = 'camp';
 
 export const CAMP_TYPES = {
@@ -50,6 +52,52 @@ export const CAMP_TRANSITION_MAP: Record<string, string[]> = {
     [CAMP_STATUSES.CANCELLED]: [],
     [CAMP_STATUSES.CANCELLED_CHARGED]: [],
 };
+
+// ================= CAMP FILE CONFIG ===============
+// The camp domain owns its file "purposes" and their rules; the generic file module knows none of
+// this — it only receives { entityType, relation, cap }. Shared convention: every entity module
+// declares its purposes like this (relation + cap satisfy the IFileRelationConfig contract).
+
+// stored as entity.type on the file doc (free-form)
+export const CAMP_FILE_ENTITY_TYPE = 'camp';
+
+const CAMP_FILE_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png'];
+const CAMP_FILE_MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+
+export type CampFilePurposeConfig = IFileRelationConfig & {
+    cap: number;
+    allowedMimeTypes: string[];
+    maxSizeBytes: number;
+    // camp statuses during which this purpose may be uploaded
+    allowedCampStatuses: string[];
+};
+
+// keyed by the purpose code the frontend sends (e.g. "check-in-selfie")
+export const CAMP_FILE_PURPOSES: Record<string, CampFilePurposeConfig> = {
+    setup: {
+        relation: 'setup',
+        cap: 5,
+        allowedMimeTypes: CAMP_FILE_IMAGE_MIME_TYPES,
+        maxSizeBytes: CAMP_FILE_MAX_IMAGE_SIZE_BYTES,
+        allowedCampStatuses: [CAMP_STATUSES.LIVE],
+    },
+    'check-in-selfie': {
+        relation: 'check-in-selfie',
+        cap: 1,
+        allowedMimeTypes: CAMP_FILE_IMAGE_MIME_TYPES,
+        maxSizeBytes: CAMP_FILE_MAX_IMAGE_SIZE_BYTES,
+        allowedCampStatuses: [CAMP_STATUSES.LIVE],
+    },
+    closure: {
+        relation: 'closure',
+        cap: 3,
+        allowedMimeTypes: CAMP_FILE_IMAGE_MIME_TYPES,
+        maxSizeBytes: CAMP_FILE_MAX_IMAGE_SIZE_BYTES,
+        allowedCampStatuses: [CAMP_STATUSES.LIVE, CAMP_STATUSES.CLOSED],
+    },
+};
+
+export const CAMP_FILE_PURPOSE_KEYS = Object.keys(CAMP_FILE_PURPOSES) as [string, ...string[]];
 
 // ================= CAMP PERMISSIONS CONSTANTS ===============
 

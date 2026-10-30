@@ -6,6 +6,9 @@ import {
     ApproveVoidCampPayloadSchema,
     BookCampPayloadSchema,
     BookingAvailabilityPayloadSchema,
+    CampFileCompletePayloadSchema,
+    CampFileListQuerySchema,
+    CampFileUploadPayloadSchema,
     CampReportQuerySchema,
     CreateCampPayloadSchema,
     MoveStagePayloadSchema,
@@ -16,6 +19,7 @@ import {
 import { StatusCodes } from 'http-status-codes';
 import { CampService } from './camp.service';
 import { CampMapper } from './camp.mapper';
+import { FileMapper } from '../../file/file.mapper';
 import { RequestHandler } from '../../../shared/utils/requestHandler';
 import { RequestContext } from '../../../shared/utils/contextBuilder';
 
@@ -372,6 +376,66 @@ const bookingAvailability = async (req: any, res: any) => {
     }
 };
 
+// ============================= CAMP FILES =============================
+
+const postFiles = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+        const { id } = req?.params;
+        if (!id) {
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Camp ID is required', null);
+        }
+        const { data, success, error } = CampFileUploadPayloadSchema.safeParse(req.body);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', { fields: validationErrors });
+        }
+        const result = await CampService.postFiles(id, data, ctx);
+        return ResponseHandler.appResponse(res, StatusCodes.CREATED, true, 'Upload intents created', FileMapper.toSearchResponse(result, ctx));
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
+const patchFiles = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+        const { id } = req?.params;
+        if (!id) {
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Camp ID is required', null);
+        }
+        const { data, success, error } = CampFileCompletePayloadSchema.safeParse(req.body);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', { fields: validationErrors });
+        }
+        const result = await CampService.patchFiles(id, data, ctx);
+        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Files completed', result);
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
+const getFiles = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+        const { id } = req?.params;
+        if (!id) {
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Camp ID is required', null);
+        }
+        const { data: filters, success, error } = CampFileListQuerySchema.safeParse(req.query);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', { errors: validationErrors });
+        }
+        const pagination = RequestHandler.getPagination(filters);
+        const result = await CampService.getFiles(id, filters.purpose, ctx, { pagination });
+        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Camp files fetched successfully', FileMapper.toSearchResponse(result, ctx));
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
 export const CampController = {
     get,
     search,
@@ -386,4 +450,7 @@ export const CampController = {
     allocateWorker,
     report,
     bookingAvailability,
+    getFiles,
+    postFiles,
+    patchFiles,
 };

@@ -1,6 +1,6 @@
 // Camp Validators
 import { z } from 'zod';
-import { BILLING_TYPES, CAMP_STATUSES, CAMP_TIME_SLOTS, CAMP_TYPES } from './camp.constants';
+import { BILLING_TYPES, CAMP_FILE_PURPOSE_KEYS, CAMP_STATUSES, CAMP_TIME_SLOTS, CAMP_TYPES } from './camp.constants';
 import { isValidObjectID } from '../../../shared/utils/strings';
 
 const objectId = (label: string) =>
@@ -200,3 +200,36 @@ export const CampReportQuerySchema = z.object({
     status: z.enum(Object.values(CAMP_STATUSES)).optional().openapi({ example: 'closed' }),
 });
 export type ICampReportQuery = z.infer<typeof CampReportQuerySchema>;
+
+//6: camp files ====================================>
+// Create upload intents (single or bulk). The frontend sends only file METADATA + a purpose per file;
+// entity id + uploader are derived server-side. One presigned PUT URL is returned per file.
+export const CampFileUploadPayloadSchema = z.object({
+    files: z
+        .array(
+            z.object({
+                purpose: z.enum(CAMP_FILE_PURPOSE_KEYS).openapi({ example: 'check-in-selfie' }),
+                fileName: z.string().min(1).openapi({ example: 'check-in.jpg' }),
+                mimeType: z.string().min(1).openapi({ example: 'image/jpeg' }),
+                size: z.number().int().positive().openapi({ example: 245000 }),
+            }),
+        )
+        .min(1)
+        .max(20)
+        .openapi({ example: [{ purpose: 'check-in-selfie', fileName: 'check-in.jpg', mimeType: 'image/jpeg', size: 245000 }] }),
+});
+export type ICampFileUploadPayload = z.infer<typeof CampFileUploadPayloadSchema>;
+
+// Bulk complete — after the client has PUT the bytes to S3. Partial success; retry-safe (idempotent).
+export const CampFileCompletePayloadSchema = z.object({
+    fileIds: z.array(objectId('File')).min(1).max(20).openapi({ example: ['665f0c3a1a2b3c4d5e6f7a8a'] }),
+});
+export type ICampFileCompletePayload = z.infer<typeof CampFileCompletePayloadSchema>;
+
+// List a camp's files (optionally filtered by purpose).
+export const CampFileListQuerySchema = z.object({
+    purpose: z.enum(CAMP_FILE_PURPOSE_KEYS).optional().openapi({ example: 'setup' }),
+    page: z.string().optional().openapi({ example: '1' }),
+    limit: z.string().optional().openapi({ example: '10' }),
+});
+export type ICampFileListQuery = z.infer<typeof CampFileListQuerySchema>;

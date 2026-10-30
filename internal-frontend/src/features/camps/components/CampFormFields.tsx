@@ -4,7 +4,6 @@ import type { CampDraft } from '@/features/camps/hooks/useCampDraft'
 import CampFoPicker from '@/features/camps/components/CampFoPicker'
 import CampMrPicker from '@/features/camps/components/CampMrPicker'
 import CampDoctorSearchPicker from '@/features/camps/components/CampDoctorSearchPicker'
-import InventoryMasterMultiPicker from '@/features/inventory/real/components/InventoryMasterMultiPicker'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -64,8 +63,6 @@ interface CampFormFieldsProps {
   /** Called whenever the Type select changes (create mode only — edit mode locks it) so the
    * caller can clear the now-irrelevant worker field (fo or dietitian) and its label. */
   onTypeChange?: (type: CampType) => void
-  deviceLabels: Record<string, string>
-  onDevicesChange: (ids: string[], labels: Record<string, string>) => void
   onLocationResolutionChange: (state: LocationResolutionState) => void
 }
 
@@ -92,13 +89,10 @@ const CampFormFields = ({
   dietitianLabel,
   setDietitianLabel,
   onTypeChange,
-  deviceLabels,
-  onDevicesChange,
   onLocationResolutionChange,
 }: CampFormFieldsProps) => {
-  const { doctor, division, type, billingType, patientExpectation, date, timeSlot, location, fo, dietitian, mr, devices, notes } = draft
+  const { doctor, division, type, billingType, patientExpectation, date, timeSlot, location, fo, dietitian, mr, notes } = draft
   const isDiet = type === 'diet'
-  const deviceIds = devices ? devices.split(',').map((d) => d.trim()).filter(Boolean) : []
   const [locationHint, setLocationHint] = useState<string | null>(null)
 
   // Create-mode only — defaults the camp location to the picked doctor's address, and flags
@@ -325,11 +319,6 @@ const CampFormFields = ({
             </SelectContent>
           </Select>
         </div>
-      </div>
-
-      <div>
-        <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Devices</Label>
-        <InventoryMasterMultiPicker value={deviceIds} labels={deviceLabels} onChange={onDevicesChange} type="device" disabled={isLocked} />
       </div>
 
       <div>

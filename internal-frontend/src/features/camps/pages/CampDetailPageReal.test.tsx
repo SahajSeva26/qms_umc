@@ -215,6 +215,14 @@ describe('CampDetailPageReal — create mode, inline doctor creation', () => {
     useAuthStore.getState().clearAuth()
   })
 
+  it('does not offer device allocation on the internal new-camp form', async () => {
+    await mockSessionWithPermission(true)
+    await renderCreatePage()
+
+    expect(screen.queryByRole('button', { name: /pick a device/i })).not.toBeInTheDocument()
+    expect(screen.queryByText(/^Devices$/i)).not.toBeInTheDocument()
+  })
+
   // This modal's labels aren't htmlFor-associated with their inputs, hence the sibling lookup.
   async function fillNewDoctorRequiredFields(user: ReturnType<typeof userEvent.setup>) {
     const codeLabel = screen.getByText(/pharma doctor code/i)

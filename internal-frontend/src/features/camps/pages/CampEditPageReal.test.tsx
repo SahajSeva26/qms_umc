@@ -25,19 +25,6 @@ vi.mock('@qms/ui', async (importOriginal) => ({
   ),
 }))
 
-vi.mock('@/features/inventory/real/components/InventoryMasterMultiPicker', () => ({
-  default: ({ onChange }: { onChange: (ids: string[], labels: Record<string, string>) => void }) => (
-    <>
-      <button type="button" onClick={() => onChange(['dev-new'], { 'dev-new': 'New Device (DEV-1)' })}>
-        Pick a device
-      </button>
-      <button type="button" onClick={() => onChange([], {})}>
-        Clear devices
-      </button>
-    </>
-  ),
-}))
-
 vi.mock('@/features/camps/campsReal.service', () => ({
   campsRealService: {
     getCamp: vi.fn(),
@@ -282,45 +269,12 @@ describe('CampEditPageReal — snapshot-vs-final dirty gating', () => {
     expect(payload).not.toHaveProperty('devices')
   })
 
-  it('picking a device then clearing it back to the original empty set omits devices from the payload', async () => {
+  it('does not offer device allocation while editing a camp', async () => {
     await mockSessionAndPermission()
-    const { campsRealService } = await import('@/features/camps/campsReal.service')
-
-    const user = userEvent.setup()
-    await renderEditPage(campFixture({ type: 'screening' }))
-    await screen.findByText(/edit camp/i)
-
-    await user.click(screen.getByRole('button', { name: /pick a device/i }))
-    await user.click(screen.getByRole('button', { name: /clear devices/i }))
-
-    await user.click(screen.getByRole('button', { name: /save changes/i }))
-
-    await waitFor(() => expect(campsRealService.updateCamp).toHaveBeenCalledTimes(1))
-    const [, payload] = vi.mocked(campsRealService.updateCamp).mock.calls[0]
-    expect(payload).not.toHaveProperty('devices')
-    expect(payload).not.toHaveProperty('type')
-    expect(payload).not.toHaveProperty('billingType')
-    expect(payload).not.toHaveProperty('patientExpectation')
-  })
-
-  it('picking a device and leaving it selected includes devices in the payload', async () => {
-    await mockSessionAndPermission()
-    const { campsRealService } = await import('@/features/camps/campsReal.service')
-
-    const user = userEvent.setup()
     await renderEditPage(campFixture())
+
     await screen.findByText(/edit camp/i)
-
-    await user.click(screen.getByRole('button', { name: /pick a device/i }))
-    await user.click(screen.getByRole('button', { name: /save changes/i }))
-
-    await waitFor(() => expect(campsRealService.updateCamp).toHaveBeenCalledTimes(1))
-    const [, payload] = vi.mocked(campsRealService.updateCamp).mock.calls[0]
-    expect(payload).toHaveProperty('devices')
-    expect(payload.devices).toEqual(['dev-new'])
-    expect(payload).not.toHaveProperty('type')
-    expect(payload).not.toHaveProperty('billingType')
-    expect(payload).not.toHaveProperty('patientExpectation')
+    expect(screen.queryByText(/^Devices$/i)).not.toBeInTheDocument()
   })
 
   it('Type is locked in edit mode — the backend update schema has no type field at all, so it must never be sent', async () => {

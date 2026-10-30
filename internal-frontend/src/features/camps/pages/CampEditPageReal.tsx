@@ -73,15 +73,12 @@ const CampEditForm = ({ camp, returnTo }: CampEditFormProps) => {
   const canWrite = hasAnyPermission(CAMP_UPDATE_PERMISSIONS)
 
   const { draft, setField } = useCampDraft(camp)
-  const { doctor, fo, dietitian, mr, date, timeSlot, location, devices, notes, billingType, patientExpectation } = draft
+  const { doctor, fo, dietitian, mr, date, timeSlot, location, notes, billingType, patientExpectation } = draft
 
   const [locationResolution, setLocationResolution] = useState<LocationResolutionState>('idle')
   const [mrLabel, setMrLabel] = useState(() => campRefName(camp.mr) ?? '')
   const [foLabel, setFoLabel] = useState(() => campRefName(camp.fo) ?? '')
   const [dietitianLabel, setDietitianLabel] = useState(() => campRefName(camp.dietitian) ?? '')
-  const [deviceLabels, setDeviceLabels] = useState<Record<string, string>>(() =>
-    Object.fromEntries(camp.devices.map((d) => [d._id, `${d.name} (${d.code})`])),
-  )
 
   const effectiveTenant = campRefId(camp.tenant) || ''
   const isLocked = camp.status !== 'requested'
@@ -97,10 +94,6 @@ const CampEditForm = ({ camp, returnTo }: CampEditFormProps) => {
   const { data: editProjectData } = useProjectDetailShared(camp.project ? campRefId(camp.project) ?? undefined : undefined)
   const editProject = editProjectData?.data ?? null
   const bookableSlots = editProject?.campTimeSlots ?? []
-
-  const deviceIds = devices ? devices.split(',').map((d) => d.trim()).filter(Boolean) : []
-  const sortedIds = (ids: string[]) => [...ids].sort().join(',')
-  const originalDeviceIds = sortedIds(camp.devices.map((d) => d._id))
 
   const updateCamp = useUpdateCamp(camp.id)
   const [formError, setFormError] = useState<string | null>(null)
@@ -132,7 +125,6 @@ const CampEditForm = ({ camp, returnTo }: CampEditFormProps) => {
         // Backend leaves an absent key unchanged — omit unless the final value differs from the original.
         ...(billingType !== camp.billingType ? { billingType } : {}),
         ...(patientExpectationNum !== camp.patientExpectation ? { patientExpectation: patientExpectationNum } : {}),
-        ...(sortedIds(deviceIds) !== originalDeviceIds ? { devices: deviceIds } : {}),
       },
       {
         // replace: a save shouldn't leave the edit page as a Back-able history step.
@@ -166,8 +158,6 @@ const CampEditForm = ({ camp, returnTo }: CampEditFormProps) => {
         setFoLabel={setFoLabel}
         dietitianLabel={dietitianLabel}
         setDietitianLabel={setDietitianLabel}
-        deviceLabels={deviceLabels}
-        onDevicesChange={(ids, labels) => { setField('devices', ids.join(', ')); setDeviceLabels(labels) }}
         onLocationResolutionChange={setLocationResolution}
       />
 

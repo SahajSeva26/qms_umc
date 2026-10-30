@@ -47,7 +47,7 @@ const CampDetailPageReal = () => {
   const returnTo = searchParams.get('from') || '/camps'
 
   const { draft, setField: setFieldRaw } = useCampDraft(null, lockedTypeValue ?? undefined)
-  const { tenant, division, project, doctor, mr, date, timeSlot, location, devices, notes, type, billingType, patientExpectation, fo, dietitian } = draft
+  const { tenant, division, project, doctor, mr, date, timeSlot, location, notes, type, billingType, patientExpectation, fo, dietitian } = draft
 
   // Pin can visibly move before (or without ever) firing onChange — Save must block until it settles.
   const [locationResolution, setLocationResolution] = useState<LocationResolutionState>('idle')
@@ -188,7 +188,6 @@ const CampDetailPageReal = () => {
     if (!location.coordinates) { setFormError('Pick a location on the map'); return }
 
     setFormError(null)
-    const deviceIds = devices ? devices.split(',').map((d) => d.trim()).filter(Boolean) : []
     const patientExpectationNum = patientExpectation ? Number(patientExpectation) : undefined
     createCamp.mutate(
       {
@@ -205,7 +204,9 @@ const CampDetailPageReal = () => {
         date,
         timeSlot: timeSlot as CampTimeSlotValue,
         location: location as LocationValue,
-        devices: deviceIds,
+        // Device allocation is handled after creation from the camp's edit/operations flow.
+        // Always clear legacy draft selections rather than submitting a hidden field.
+        devices: [],
         notes: notes || undefined,
       },
       {
@@ -380,8 +381,6 @@ const CampDetailPageReal = () => {
               if (nextType === 'diet') { setField('fo', ''); setFoLabel('') }
               else { setField('dietitian', ''); setDietitianLabel('') }
             }}
-            deviceLabels={deviceLabels}
-            onDevicesChange={(ids, labels) => { setField('devices', ids.join(', ')); setDeviceLabels(labels) }}
             onLocationResolutionChange={setLocationResolution}
           />
         </div>

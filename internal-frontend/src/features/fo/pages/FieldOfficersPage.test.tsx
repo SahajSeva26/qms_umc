@@ -54,6 +54,10 @@ vi.mock('@/features/fo/hooks/useFoRosterCamps', () => ({
 vi.mock('@/features/fo/hooks/useFoRosterDevices', () => ({
   useFoRosterDevices: () => ({}),
 }))
+const useFoRosterRatingsMock = vi.hoisted(() => vi.fn((_roleIds: string[], _enabled: boolean) => ({})))
+vi.mock('@/features/fo/hooks/useFoRosterRatings', () => ({
+  useFoRosterRatings: (roleIds: string[], enabled: boolean) => useFoRosterRatingsMock(roleIds, enabled),
+}))
 vi.mock('@/features/fo/hooks/useFoWeekCamps', () => ({
   useFoWeekCamps: () => ({}),
 }))
@@ -162,7 +166,7 @@ describe('FieldOfficersPage — a roster card opens the real drawer, not a table
   })
 })
 
-describe('FieldOfficersPage — Roster/Assignments/Devices tab switch', () => {
+describe('FieldOfficersPage — Roster/Assignments/Performance/Devices tab switch', () => {
   it('defaults to the Roster tab and switches to Devices on click', async () => {
     vi.clearAllMocks()
     const user = userEvent.setup()
@@ -186,6 +190,41 @@ describe('FieldOfficersPage — Roster/Assignments/Devices tab switch', () => {
 
     expect(screen.getByText('This week')).toBeInTheDocument()
     expect(screen.getByText('FO')).toBeInTheDocument()
+  })
+
+  it('shows the Performance tab only with rating access and renders backend rating metrics', async () => {
+    vi.clearAllMocks()
+    useFoRosterRatingsMock.mockReturnValue({
+      'role-1': {
+        average: 4.4,
+        onTimeAverage: 4.5,
+        attireAverage: 4.2,
+        communicationAverage: 4.3,
+        count: 8,
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      },
+    })
+    const user = userEvent.setup()
+    await renderPage(
+      { tenant: { type: 'platform' } },
+      (codes) => codes.includes('rating:search'),
+    )
+
+    await user.click(screen.getByRole('button', { name: /performance/i }))
+    expect(screen.getByText('Rating / 5')).toBeInTheDocument()
+    expect(screen.getByText('4.4')).toBeInTheDocument()
+
+    useFoRosterRatingsMock.mockReturnValue({})
+  })
+
+  it('does not expose Performance when the viewer cannot search or manage ratings', async () => {
+    vi.clearAllMocks()
+    await renderPage({ tenant: { type: 'platform' } }, () => false)
+
+    await screen.findByText('Jane FO')
+    expect(screen.queryByRole('button', { name: /performance/i })).not.toBeInTheDocument()
   })
 })
 

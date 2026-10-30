@@ -2,12 +2,14 @@ import { FiSun, FiMoon, FiAlertTriangle } from 'react-icons/fi'
 import type { RoleEntity } from '@/types/accessManagement.types'
 import type { GeoProfileEntity } from '@/types/geoProfile.types'
 import type { FoRosterCampSummary } from '@/features/fo/hooks/useFoRosterCamps'
+import type { FoRosterRatingSummary } from '@/features/fo/hooks/useFoRosterRatings'
 import { foRealStatus, FO_STATUS_LABEL, FO_STATUS_BG, FO_STATUS_COLOR, initials } from '@/features/fo/utils/foRealStatus'
 
 interface FoRosterCardProps {
   role: RoleEntity
   geoProfile?: GeoProfileEntity
   campSummary?: FoRosterCampSummary
+  ratingSummary?: FoRosterRatingSummary
   onOpen: (roleId: string) => void
 }
 
@@ -18,7 +20,7 @@ function displayName(role: RoleEntity): string {
 
 // Matches the prototype's .fo-card CSS (fo-manager.js:18-60). Container is a
 // <div>, not a <button>, so Retry below can be its own real <button>.
-const FoRosterCard = ({ role, geoProfile, campSummary, onOpen }: FoRosterCardProps) => {
+const FoRosterCard = ({ role, geoProfile, campSummary, ratingSummary, onOpen }: FoRosterCardProps) => {
   const name = displayName(role)
   const location = [geoProfile?.city, geoProfile?.state].filter(Boolean).join(', ') || '—'
   // A failed camp fetch must never render as "no camp today / 0 closed / 0
@@ -101,7 +103,22 @@ const FoRosterCard = ({ role, geoProfile, campSummary, onOpen }: FoRosterCardPro
           <div className="text-[9px] uppercase tracking-wide" style={{ color: 'var(--qms-text-muted)' }}>Occupancy</div>
         </div>
         <div className="rounded-lg text-center py-1.5" style={{ background: 'rgba(59,109,255,.05)' }}>
-          <div className="text-[12px] italic font-semibold" style={{ color: 'var(--qms-brand)' }}>Soon</div>
+          {ratingSummary?.error ? (
+            <button
+              type="button"
+              onClick={ratingSummary.refetch}
+              className="text-[12px] font-semibold"
+              style={{ color: 'var(--qms-danger, #b91c1c)' }}
+              aria-label={`Retry rating for ${name}`}
+              title="Couldn't load rating. Retry"
+            >
+              !
+            </button>
+          ) : (
+            <div className="font-extrabold text-[14px]" style={{ color: 'var(--qms-brand)' }}>
+              {ratingSummary?.isLoading ? '…' : ratingSummary?.average?.toFixed(1) ?? '—'}
+            </div>
+          )}
           <div className="text-[9px] uppercase tracking-wide" style={{ color: 'var(--qms-text-muted)' }}>★ Rating</div>
         </div>
       </div>

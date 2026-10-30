@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
-import { FiPlus, FiUsers, FiCalendar, FiActivity, FiClock, FiShield, FiCpu, FiFileText, FiZap, FiCheckSquare } from 'react-icons/fi'
+import { FiPlus, FiUsers, FiCalendar, FiActivity, FiClock, FiShield, FiCpu, FiFileText, FiZap, FiCheckSquare, FiBarChart2 } from 'react-icons/fi'
 import { useRoles } from '@/features/access-management/role/hooks/useRoles'
 import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRoleTypes'
 import { useGeoProfiles } from '@/features/geo-profile/hooks/useGeoProfiles'
@@ -10,11 +10,13 @@ import { useFilterState } from '@/hooks/useFilterState'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { useFoRosterCamps } from '@/features/fo/hooks/useFoRosterCamps'
 import { useFoRosterDevices } from '@/features/fo/hooks/useFoRosterDevices'
+import { useFoRosterRatings } from '@/features/fo/hooks/useFoRosterRatings'
 import { useFoTodayCamps, useFoActiveCount } from '@/features/fo/hooks/useFoTodayCamps'
 import CreateFoModal from '@/features/fo/components/CreateFoModal'
 import FoRosterCard from '@/features/fo/components/FoRosterCard'
 import FoDevicesTable from '@/features/fo/components/FoDevicesTable'
 import FoAssignmentsWeekGrid from '@/features/fo/components/FoAssignmentsWeekGrid'
+import FoPerformanceGrid from '@/features/fo/components/FoPerformanceGrid'
 import FoRealDrawer from '@/features/fo/components/FoRealDrawer'
 import KpiTile from '@/components/ui/KpiTile'
 import { Button } from '@/components/ui/button'
@@ -27,7 +29,7 @@ import type { RoleStatus } from '@/types/accessManagement.types'
 
 const PAGE_SIZE = 10
 
-type FoTab = 'roster' | 'assignments' | 'devices'
+type FoTab = 'roster' | 'assignments' | 'performance' | 'devices'
 
 interface FieldOfficersFilterState {
   search: string
@@ -55,6 +57,7 @@ const FieldOfficersPage = () => {
 const FieldOfficersContent = () => {
   const { session, hasAnyPermission } = usePermission()
   const canCreateFo = hasAnyPermission(['tenant:admin', 'tenant:manage'])
+  const canViewRatings = hasAnyPermission(['rating:search', 'rating:manage'])
   const tenantId = session?.tenant.id
   const [tab, setTab] = useState<FoTab>('roster')
   const [openRoleId, setOpenRoleId] = useState<string | null>(null)
@@ -100,6 +103,7 @@ const FieldOfficersContent = () => {
 
   const campSummaries = useFoRosterCamps(roleIds)
   const devicesByRole = useFoRosterDevices(roleIds)
+  const ratingsByRole = useFoRosterRatings(roleIds, canViewRatings)
 
   const todayCamps = useFoTodayCamps()
   const activeCount = useFoActiveCount(todayCamps.camps)
@@ -240,6 +244,15 @@ const FieldOfficersContent = () => {
         >
           <FiCheckSquare size={13} /> Assignments
         </button>
+        {canViewRatings && (
+          <button
+            onClick={() => setTab('performance')}
+            className="flex items-center gap-1.5 px-3 py-2 text-[13px] font-semibold border-b-2 -mb-px transition-colors"
+            style={{ borderColor: tab === 'performance' ? 'var(--qms-brand)' : 'transparent', color: tab === 'performance' ? 'var(--qms-brand)' : 'var(--qms-text-muted)' }}
+          >
+            <FiBarChart2 size={13} /> Performance
+          </button>
+        )}
         <button
           onClick={() => setTab('devices')}
           className="flex items-center gap-1.5 px-3 py-2 text-[13px] font-semibold border-b-2 -mb-px transition-colors"
@@ -300,6 +313,7 @@ const FieldOfficersContent = () => {
                   role={fo}
                   geoProfile={geoByRole.get(fo.id)}
                   campSummary={campSummaries[fo.id]}
+                  ratingSummary={ratingsByRole[fo.id]}
                   onOpen={setOpenRoleId}
                 />
               ))}
@@ -307,6 +321,8 @@ const FieldOfficersContent = () => {
           )
         ) : tab === 'assignments' ? (
           <FoAssignmentsWeekGrid roles={fos} geoByRole={geoByRole} onOpen={setOpenRoleId} />
+        ) : tab === 'performance' ? (
+          <FoPerformanceGrid roles={fos} geoByRole={geoByRole} campSummaries={campSummaries} ratingsByRole={ratingsByRole} onOpen={setOpenRoleId} />
         ) : (
           <FoDevicesTable roles={fos} geoByRole={geoByRole} devicesByRole={devicesByRole} onOpen={setOpenRoleId} />
         )}

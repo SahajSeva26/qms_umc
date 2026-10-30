@@ -6,8 +6,6 @@ import {
     IApproveVoidCampPayload,
     IBookCampPayload,
     IBookingAvailabilityPayload,
-    ICampFileCompletePayload,
-    ICampFileUploadPayload,
     ICampReportQuery,
     ICreateCampPayload,
     IMoveStagePayload,
@@ -18,8 +16,6 @@ import {
 import {
     BILLING_TYPES,
     CAMP_COUNTER_ENTITY,
-    CAMP_FILE_ENTITY_TYPE,
-    CAMP_FILE_PURPOSES,
     CAMP_PERMISSIONS,
     CAMP_STATUSES,
     CAMP_TIME_SLOTS,
@@ -28,8 +24,6 @@ import {
     CampTimeSlot,
 } from './camp.constants';
 import { CampDocument, CampStats, FieldWorker } from './camp.types';
-import { FileService } from '../../file/file.service';
-import { FILE_STATUS } from '../../file/file.constants';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
 import { CounterService } from '../../counter/counter.service';
 import { geoProfileModel } from '../geoProfile/geoProfile.model';
@@ -1356,137 +1350,6 @@ const bookingAvailability = async (model: IBookingAvailabilityPayload, ctx: Requ
     };
 };
 
-// ============================= CAMP FILES =============================
-// Domain-owned file orchestration over the generic FileService. The camp module owns WHO can upload
-// (the camp's assigned worker), WHICH statuses allow it, WHAT purposes/constraints apply, and the
-// file<->camp relationship; storage logic stays in FileService. The method names
-// getFiles/postFiles/patchFiles are the shared convention every entity module follows.
-
-// resolve the camp (scoped) + authorize writes: only the camp's assigned worker, or a camp:manage actor.
-const loadCampForFileWrite = async (campId: string, ctx: RequestContext): Promise<any> => {
-    const camp: any = await get(campId, ctx, { populate: true });
-    if (!camp) {
-        return throwAppError('Camp not found', StatusCodes.NOT_FOUND);
-    }
-    if (ctx.hasAnyPermissions([CAMP_PERMISSIONS.MANAGE.code])) {
-        return camp;
-    }
-    const worker = workerFor(camp.type);
-    const assignee = camp[worker.field];
-    const assigneeId = (assignee?._id ?? assignee)?.toString();
-    const callerRoleId = (ctx.role?._id || ctx.user?.role)?.toString();
-    if (!assigneeId || assigneeId !== callerRoleId) {
-        return throwAppError('Only the camp’s assigned worker may manage its files', StatusCodes.FORBIDDEN);
-    }
-    return camp;
-};
-
-// POST — create upload intents (single/bulk): validate each file against its purpose + the camp's
-// status, group by purpose (one relation per FileService.create), return a presigned PUT URL per file.
-const postFiles = async (campId: string, model: ICampFileUploadPayload, ctx: RequestContext) => {
-    const camp = await loadCampForFileWrite(campId, ctx);
-
-    // validate each file against its purpose config + the camp's status, and group by purpose
-    const groups: Record<string, typeof model.files> = {};
-    for (const f of model.files) {
-        const cfg = CAMP_FILE_PURPOSES[f.purpose];
-        if (!cfg) {
-            return throwAppError(`Unknown file purpose "${f.purpose}"`, StatusCodes.BAD_REQUEST);
-        }
-        if (!cfg.allowedCampStatuses.includes(camp.status)) {
-            return throwAppError(`"${f.purpose}" files can only be uploaded while the camp is ${cfg.allowedCampStatuses.join(' or ')}`, StatusCodes.CONFLICT);
-        }
-        if (!cfg.allowedMimeTypes.includes(f.mimeType)) {
-            return throwAppError(`"${f.purpose}" accepts only: ${cfg.allowedMimeTypes.join(', ')}`, StatusCodes.BAD_REQUEST);
-        }
-        if (f.size > cfg.maxSizeBytes) {
-            return throwAppError(`"${f.purpose}" files must be at most ${cfg.maxSizeBytes} bytes`, StatusCodes.BAD_REQUEST);
-        }
-        (groups[f.purpose] ||= []).push(f);
-    }
-
-    const tenant = (camp.tenant?._id ?? camp.tenant)?.toString();
-    const created: any[] = [];
-    for (const [purpose, group] of Object.entries(groups)) {
-        const cfg = CAMP_FILE_PURPOSES[purpose]!;
-        // cap is enforced HERE (the file module no longer checks). Count non-discarded files for this
-        // relation so in-flight drafts also count against the cap.
-        const { count } = await FileService.search({ entityType: CAMP_FILE_ENTITY_TYPE, entityId: campId, relation: cfg.relation } as any, ctx);
-        if (count + group.length > cfg.cap) {
-            return throwAppError(`"${purpose}" accepts at most ${cfg.cap} file(s)`, StatusCodes.CONFLICT);
-        }
-        const docs = await FileService.create(
-            {
-                tenant,
-                entity: { id: campId, type: CAMP_FILE_ENTITY_TYPE, relation: cfg.relation },
-                files: group.map((f) => ({ fileName: f.fileName, fileSize: f.size, fileType: f.mimeType })),
-            } as any,
-            ctx,
-        );
-        created.push(...docs);
-    }
-    return { count: created.length, items: created };
-};
-
-// PATCH — complete (HEAD-verify + activate) uploaded files in bulk. Partial success (one failure
-// doesn't block the rest), idempotent (already-active = success), each file must belong to THIS camp.
-const patchFiles = async (campId: string, model: ICampFileCompletePayload, ctx: RequestContext) => {
-    await loadCampForFileWrite(campId, ctx); // revalidate authorization at completion
-
-    const results: any[] = [];
-    for (const fileId of model.fileIds) {
-        try {
-            const file: any = await FileService.get(fileId, ctx);
-            if (!file) {
-                results.push({ fileId, status: 'failed', reason: 'not_found' });
-                continue;
-            }
-            if (file.entity?.type !== CAMP_FILE_ENTITY_TYPE || file.entity?.id?.toString() !== campId) {
-                results.push({ fileId, status: 'failed', reason: 'not_this_camp' });
-                continue;
-            }
-            if (file.status === FILE_STATUS.ACTIVE) {
-                results.push({ fileId, status: FILE_STATUS.ACTIVE }); // idempotent — already done
-                continue;
-            }
-            // only a freshly-uploaded (draft) file can be completed; inactive/discarded cannot
-            if (file.status !== FILE_STATUS.DRAFT) {
-                results.push({ fileId, status: 'failed', reason: 'invalid_status' });
-                continue;
-            }
-            await FileService.changeStatus(fileId, { status: FILE_STATUS.ACTIVE }, ctx);
-            results.push({ fileId, status: FILE_STATUS.ACTIVE });
-        } catch (error: any) {
-            results.push({ fileId, status: 'failed', reason: error?.message ?? 'activation_failed' });
-        }
-    }
-    return { results };
-};
-
-// GET — list a camp's active files (optionally by purpose), each with a presigned read URL. Read
-// access follows what get() already allows (own-scoped) — a camp you can't see 404s.
-const getFiles = async (campId: string, purpose: string | undefined, ctx: RequestContext, options?: IServiceOptions) => {
-    const camp = await get(campId, ctx, { populate: true });
-    if (!camp) {
-        return throwAppError('Camp not found', StatusCodes.NOT_FOUND);
-    }
-
-    let relation: string | undefined;
-    if (purpose) {
-        const cfg = CAMP_FILE_PURPOSES[purpose];
-        if (!cfg) {
-            return throwAppError(`Unknown file purpose "${purpose}"`, StatusCodes.BAD_REQUEST);
-        }
-        relation = cfg.relation;
-    }
-
-    return await FileService.search(
-        { entityType: CAMP_FILE_ENTITY_TYPE, entityId: campId, relation, status: FILE_STATUS.ACTIVE } as any,
-        ctx,
-        { ...options, withUrls: true } as any,
-    );
-};
-
 export const CampService = {
     get,
     search,
@@ -1501,9 +1364,6 @@ export const CampService = {
     book,
     report,
     bookingAvailability,
-    getFiles,
-    postFiles,
-    patchFiles,
     // exposed so the camp-day flow (screening/test) resolves the camp's worker kind (FO/dietitian)
     // from the same single branch, instead of duplicating the diet-vs-screening decision.
     workerFor,

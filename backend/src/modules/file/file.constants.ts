@@ -45,6 +45,13 @@ export const ENTITY_RELATION = {
         LOGO: { name: 'logo', cap: 1 },
     },
 
+    //camp
+    [ENTITY_TYPE.CAMP]: {
+        SETUP: { name: 'setup', cap: 5 },
+        CHECK_IN_SELFIE: { name: 'check-in-selfie', cap: 1 },
+        CLOSURE: { name: 'closure', cap: 3 },
+    },
+
     // Add more entity types and their relations here
 } as const;
 

@@ -36,6 +36,7 @@ export type RequestContext = {
     setPermissions: (permissions: string[]) => void;
     hasAnyPermissions: (required: string[]) => boolean;
     hasAllPermissions: (required: string[]) => boolean;
+    hasRole: (roles: string[]) => boolean;
     requirePermissions: (permissions: string[]) => boolean;
     where: () => object;
 };
@@ -110,6 +111,15 @@ export const buildContext = (req: any, res: any, next: any) => {
                 }
             }
             return true;
+        },
+
+        // role-type gate — true if the actor's role type code is in `roles`. system:manage bypasses.
+        hasRole(roles: string[]) {
+            if (req.context.permissions.includes(PERMISSIONS.SYSTEM.MANAGE.code)) {
+                return true;
+            }
+            const roleTypeCode: string | undefined = req.context.role?.type?.code;
+            return !!roleTypeCode && roles.includes(roleTypeCode);
         },
 
         // guard

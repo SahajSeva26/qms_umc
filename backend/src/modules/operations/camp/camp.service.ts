@@ -485,17 +485,16 @@ const set = async (model: any, entity: HydratedDocument<ICamp>, ctx: RequestCont
         entity.doctor = model.doctor;
     }
 
-    // worker override — only the field matching the camp's type is accepted; the other kind is rejected.
+    // the type-matching worker is the camp's primary assignee; the opposite kind is an optional
+    // secondary (recorded only). Both may be set — each is validated to hold its correct role type.
     const otherWorker = worker === FO_WORKER ? DIETITIAN_WORKER : FO_WORKER;
-    if (model[otherWorker.field]) {
-        return throwAppError(
-            `This camp is staffed by a ${worker.label}; the ${otherWorker.label} field does not apply`,
-            StatusCodes.BAD_REQUEST,
-        );
-    }
     if (model[worker.field]) {
         await assertWorkerRole(model[worker.field], worker);
         (entity as any)[worker.field] = model[worker.field];
+    }
+    if (model[otherWorker.field]) {
+        await assertWorkerRole(model[otherWorker.field], otherWorker);
+        (entity as any)[otherWorker.field] = model[otherWorker.field];
     }
     // mr is the only pharma-chain ref accepted; asm/rsm are derived from it (reset when the MR changes)
     if (model.mr) {
@@ -753,8 +752,13 @@ const create = async (model: ICreateCampPayload, ctx: RequestContext): Promise<H
     const worker = workerFor(camp.type);
 
     //3b: a caller-supplied worker must be free for this camp's date + slot (overlap-aware). Hard 409.
+    const otherWorker = worker === FO_WORKER ? DIETITIAN_WORKER : FO_WORKER;
     if (camp[worker.field]) {
         await assertWorkerFree(worker, camp[worker.field].toString(), camp.date, camp.timeSlot, camp._id);
+    }
+    // the optional opposite-kind worker, when supplied, must also be free (recorded only — never auto-allocated)
+    if (camp[otherWorker.field]) {
+        await assertWorkerFree(otherWorker, camp[otherWorker.field].toString(), camp.date, camp.timeSlot, camp._id);
     }
 
     //4: best-effort auto-assign the nearest free worker when none supplied; on failure the camp stays
@@ -904,10 +908,14 @@ const update = async (id: string, model: IUpdateCampPayload, ctx: RequestContext
     // assignee/date/slot can all change here — the assigned worker must stay free for the (possibly
     // new) date + slot (overlap-aware). Hard 409. Excludes this camp from the check.
     const worker = workerFor(camp.type);
+    const otherWorker = worker === FO_WORKER ? DIETITIAN_WORKER : FO_WORKER;
     if (camp[worker.field]) {
         await assertWorkerFree(worker, camp[worker.field].toString(), camp.date, camp.timeSlot, camp._id);
         // only fire the update event when the camp has an assigned worker (fo/dietitian)
         ctx.processSync = true;
+    }
+    if (camp[otherWorker.field]) {
+        await assertWorkerFree(otherWorker, camp[otherWorker.field].toString(), camp.date, camp.timeSlot, camp._id);
     }
 
     camp = await camp.save();

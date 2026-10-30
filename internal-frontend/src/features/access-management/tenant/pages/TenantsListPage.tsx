@@ -4,6 +4,7 @@ import { useTenantsFilters } from '@/features/access-management/tenant/hooks/use
 import TenantsTable from '@/features/access-management/tenant/components/TenantsTable'
 import TenantsFilterBar from '@/features/access-management/tenant/components/TenantsFilterBar'
 import CreateTenantDialog from '@/features/access-management/tenant/components/CreateTenantDialog'
+import ImportTenantsDialog from '@/features/access-management/tenant/components/ImportTenantsDialog'
 import PaginationControls from '@/components/ui/PaginationControls'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import { usePermission } from '@/hooks/usePermission'
@@ -81,7 +82,12 @@ const TenantsListPage = () => {
             </span>
           </div>
         </div>
-        {canManageTenant && <CreateTenantDialog />}
+        {canManageTenant && (
+          <div className="flex items-center gap-2">
+            <ImportTenantsDialog />
+            <CreateTenantDialog />
+          </div>
+        )}
       </div>
 
       {/* Prototype's .cm-crumbs — styled like a link even though this IS the root view (no nav target). */}

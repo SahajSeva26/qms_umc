@@ -1,3 +1,4 @@
+import axios from 'axios'
 import api from '@/lib/api/api'
 import { validateApiResponse } from '@/lib/api/validateApiResponse'
 import { AuthMeResponseSchema } from '@/features/access-management/accessManagement.response-schemas'
@@ -7,6 +8,7 @@ import type {
   CreateRolePayload,
   CreateRoleTypePayload,
   CreateTenantPayload,
+  BulkTenantResult,
   EmployeeEntity,
   PermissionGroupEntity,
   RoleEntity,
@@ -53,6 +55,46 @@ const getTenant = async (id: string) => {
 const createTenant = async (payload: CreateTenantPayload) => {
   const res = await api.post<ApiResponse<Tenant>>('/tenants', payload)
   return res.data
+}
+
+function isBulkTenantResult(value: unknown): value is BulkTenantResult {
+  if (!value || typeof value !== 'object') return false
+  const result = value as Record<string, unknown>
+  const errorsAreValid = Array.isArray(result.errors) && result.errors.every((entry) => {
+    if (!entry || typeof entry !== 'object') return false
+    const rowError = entry as Record<string, unknown>
+    return typeof rowError.row === 'number' && 'error' in rowError
+  })
+  return (
+    typeof result.totalRows === 'number' &&
+    typeof result.created === 'number' &&
+    typeof result.failed === 'number' &&
+    errorsAreValid
+  )
+}
+
+const bulkCreateTenants = async (file: File): Promise<BulkTenantResult> => {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  try {
+    const res = await api.post<ApiResponse<BulkTenantResult>>('/tenants/bulk', formData)
+    if (!isBulkTenantResult(res.data.data)) {
+      throw new Error('Invalid bulk client import response')
+    }
+    return res.data.data
+  } catch (error) {
+    // The backend deliberately returns 400 for a mixed result even though the
+    // valid rows have already committed. Preserve that result for honest UI.
+    if (
+      axios.isAxiosError(error) &&
+      error.response?.status === 400 &&
+      isBulkTenantResult(error.response.data?.data)
+    ) {
+      return error.response.data.data
+    }
+    throw error
+  }
 }
 
 const updateTenant = async (id: string, payload: UpdateTenantPayload) => {
@@ -165,6 +207,7 @@ export const accessManagementService = {
   searchTenants,
   getTenant,
   createTenant,
+  bulkCreateTenants,
   updateTenant,
   searchPermissionGroups,
   getPermissionGroup,

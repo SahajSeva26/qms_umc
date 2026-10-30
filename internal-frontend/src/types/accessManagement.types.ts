@@ -98,6 +98,21 @@ export interface CreateTenantPayload {
   gst?: string
 }
 
+// POST /tenants/bulk processes each CSV row independently. A 400 response can
+// therefore still contain successfully-created clients alongside row errors.
+export interface BulkTenantRowError {
+  row: number
+  // Backend forwards either Zod's field map or an arbitrary caught error.
+  error: unknown
+}
+
+export interface BulkTenantResult {
+  totalRows: number
+  created: number
+  failed: number
+  errors: BulkTenantRowError[]
+}
+
 export interface UpdateTenantPayload {
   name?: string
   // Only takes effect server-side if caller has `tenant:manage`; silently ignored otherwise.

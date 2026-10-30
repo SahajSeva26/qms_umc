@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { usePermission } from '@/hooks/usePermission'
 import { useCampsReal } from '@/features/camps/hooks/useCampsReal'
@@ -13,6 +13,8 @@ vi.mock('@/features/camps/hooks/useCampsReal')
 vi.mock('@/features/camps/hooks/useCampTypeStatusCounts')
 vi.mock('@/features/camps/hooks/useCampRefNames')
 vi.mock('@/features/camps/hooks/useCampReal')
+vi.mock('@/features/geo-profile/DietitianRosterPanel', () => ({ default: () => <div>Dietitian roster content</div> }))
+vi.mock('@/features/inventory/real/DietDevicesPanel', () => ({ default: () => <div>Diet devices content</div> }))
 vi.mock('@/features/camps/hooks/useMoveCampStage', () => ({
   useMoveCampStage: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
 }))
@@ -112,8 +114,9 @@ describe('DietCampsPage', () => {
     await renderPage()
 
     expect(useCampTypeStatusCounts).toHaveBeenCalledWith('diet')
-    expect(screen.getByText('4')).toBeInTheDocument()
-    expect(screen.getByText('6')).toBeInTheDocument()
+    const statusFilters = screen.getByLabelText('Diet camp status filters')
+    expect(within(statusFilters).getByRole('button', { name: /requested 4/i })).toBeInTheDocument()
+    expect(within(statusFilters).getByRole('button', { name: /completed 6/i })).toBeInTheDocument()
   })
 
   it('renders diet camps as cards (dietitian team chip), not a table', async () => {
@@ -138,31 +141,43 @@ describe('DietCampsPage', () => {
 
     await renderPage()
 
-    // "Requested" appears in both the KPI strip and the tab strip below it — the KPI tile is first.
+    // "Requested" appears in both the KPI strip and the status-pill strip — the KPI tile is first.
     const [kpiTileLabel] = screen.getAllByText('Requested')
     await userEvent.setup().click(kpiTileLabel.closest('button')!)
 
     expect(useCampsReal).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'requested', type: 'diet' }))
   })
 
-  it('shows "New diet camp" only when the actor can write', async () => {
+  it('shows "New request" only when the actor can write', async () => {
     mockPermission(true)
     mockCampsRealListWith([])
     mockStatusCounts()
 
     await renderPage()
 
-    expect(screen.getByRole('button', { name: /new diet camp/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /new request/i })).toBeInTheDocument()
   })
 
-  it('hides "New diet camp" when the actor lacks write permission', async () => {
+  it('hides "New request" when the actor lacks write permission', async () => {
     mockPermission(false)
     mockCampsRealListWith([])
     mockStatusCounts()
 
     await renderPage()
 
-    expect(screen.queryByRole('button', { name: /new diet camp/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /new request/i })).not.toBeInTheDocument()
+  })
+
+  it('renders the real pipeline summary and prototype-style status counts', async () => {
+    mockPermission(false)
+    mockCampsRealListWith([])
+    mockStatusCounts({ requested: 4, confirmed: 2, live: 1, closed: 6 })
+
+    await renderPage()
+
+    expect(screen.getByText(/4 requested · 2 upcoming · 1 live · 6 completed/i)).toBeInTheDocument()
+    const statusFilters = screen.getByLabelText('Diet camp status filters')
+    expect(within(statusFilters).getByRole('button', { name: /upcoming 2/i })).toBeInTheDocument()
   })
 
   it('shows the empty state when there are no diet camps', async () => {
@@ -173,5 +188,27 @@ describe('DietCampsPage', () => {
     await renderPage()
 
     expect(screen.getByText('No diet camps found.')).toBeInTheDocument()
+  })
+
+  it('switches to the real Dietitians and Devices module tabs without keeping camp content mounted', async () => {
+    const { default: userEvent } = await import('@testing-library/user-event')
+    mockPermission(false)
+    mockCampsRealListWith([])
+    mockStatusCounts()
+    await renderPage()
+
+    const user = userEvent.setup()
+    const tabs = screen.getByLabelText('Diet camp management sections')
+    const kpiTile = screen.getAllByText('All')[0].closest('button')!
+    expect(kpiTile.compareDocumentPosition(tabs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: 'Dietitians' }))
+    expect(await screen.findByText('Dietitian roster content')).toBeInTheDocument()
+    expect(screen.queryByText('No diet camps found.')).not.toBeInTheDocument()
+    expect(screen.getByText('All')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Devices' }))
+    expect(await screen.findByText('Diet devices content')).toBeInTheDocument()
+    expect(screen.queryByText('Dietitian roster content')).not.toBeInTheDocument()
   })
 })

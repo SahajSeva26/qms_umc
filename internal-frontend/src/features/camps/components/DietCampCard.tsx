@@ -25,7 +25,7 @@ const DietCampCard = ({ camp, onOpen }: DietCampCardProps) => {
 
   return (
     <div
-      className="rounded-xl border p-3 cursor-pointer transition-transform hover:-translate-y-0.5"
+      className="group rounded-xl border p-3 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md"
       style={{ background: 'var(--qms-surface)', borderColor: 'var(--qms-border)' }}
       onClick={() => onOpen(camp.id)}
     >

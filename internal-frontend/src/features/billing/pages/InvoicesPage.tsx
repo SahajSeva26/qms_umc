@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
-import { FiFilePlus, FiGitMerge } from 'react-icons/fi'
+import { FiCheckSquare, FiFilePlus, FiGitMerge } from 'react-icons/fi'
 import { useInvoices } from '@/features/billing/hooks/useInvoices'
 import { useInvoice } from '@/features/billing/hooks/useInvoice'
 import { useInvoiceLineItems } from '@/features/billing/hooks/useInvoiceLineItems'
 import { useInvoiceReport } from '@/features/billing/hooks/useInvoiceReport'
 import BillingProjectPicker from '@/features/billing/components/BillingProjectPicker'
 import GenerateInvoiceTab from '@/features/billing/components/GenerateInvoiceTab'
+import CheckResultsTab from '@/features/billing/components/CheckResultsTab'
 import InvoicePipelineKpiStrip from '@/features/billing/components/InvoicePipelineKpiStrip'
 import InvoiceCard from '@/features/billing/components/InvoiceCard'
 import InvoiceDetailDrawer from '@/features/billing/components/InvoiceDetailDrawer'
@@ -15,13 +16,17 @@ import PaginationControls from '@/components/ui/PaginationControls'
 import { usePagination } from '@/hooks/usePagination'
 import { usePermission } from '@/hooks/usePermission'
 
-type InvoicingTab = 'generate' | 'pipeline'
+type InvoicingTab = 'generate' | 'check' | 'pipeline'
 
 const InvoicesPage = () => {
   const { hasAnyPermission } = usePermission()
   const canReadProjects = hasAnyPermission(['project:search', 'project:manage', 'camp:book', 'tenant:manage'])
   const canReadCamps = hasAnyPermission(['camp:search', 'camp:manage', 'tenant:manage'])
   const canCreate = hasAnyPermission(['invoice:create', 'invoice:manage']) && canReadProjects && canReadCamps
+  // Cross-checking patient records needs full camp visibility (screening:manage), not just
+  // screening:search — that permission own-scopes results to screenings the viewer themselves
+  // performed, which isn't useful for someone verifying another FO's camp before invoicing.
+  const canCheckResults = hasAnyPermission(['screening:manage', 'tenant:manage']) && canReadProjects && canReadCamps
   const canMoveStage = hasAnyPermission(['invoice:manage', 'tenant:manage'])
   // GET /invoices/:id requires invoice:get/invoice:manage/tenant:manage, distinct from invoice:search which reaches this list.
   // The route admits invoice readers, including finance managers; detail has its own endpoint guard.
@@ -85,6 +90,18 @@ const InvoicesPage = () => {
             <FiFilePlus size={14} /> Generate Invoice
           </button>
         )}
+        {canCheckResults && (
+          <button
+            onClick={() => setTab('check')}
+            className="flex items-center gap-1.5 px-3 py-2 text-[13px] font-semibold whitespace-nowrap border-b-2 -mb-px transition-colors"
+            style={{
+              borderColor: tab === 'check' ? 'var(--qms-brand)' : 'transparent',
+              color: tab === 'check' ? 'var(--qms-brand)' : 'var(--qms-text-muted)',
+            }}
+          >
+            <FiCheckSquare size={14} /> Check Results
+          </button>
+        )}
         <button
           onClick={() => setTab('pipeline')}
           className="flex items-center gap-1.5 px-3 py-2 text-[13px] font-semibold whitespace-nowrap border-b-2 -mb-px transition-colors"
@@ -100,6 +117,8 @@ const InvoicesPage = () => {
       {tab === 'generate' && canCreate && (
         <GenerateInvoiceTab onCreated={(id) => { setOpenDetailId(id); setTab('pipeline') }} />
       )}
+
+      {tab === 'check' && canCheckResults && <CheckResultsTab />}
 
       {tab === 'pipeline' && (
         <div>

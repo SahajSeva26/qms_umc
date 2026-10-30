@@ -1,0 +1,273 @@
+import { useState, useEffect, lazy, Suspense } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { FiSearch, FiHelpCircle, FiChevronDown, FiLogOut, FiUser, FiMenu, FiRepeat } from 'react-icons/fi'
+import { NotificationBellTrigger, useNotificationBellState } from '@qms/widgets'
+import { useAuth } from '@/hooks/useAuth'
+import { useSession } from '@/hooks/useSession'
+import { useProfilePicture } from '@/hooks/useProfilePicture'
+import { getGreeting, formatClockDisplay } from '@/utils/formatters'
+import ThemeToggle from '@/components/ui/ThemeToggle'
+import MyProfileModal from '@/components/layouts/MyProfileModal'
+import api from '@/lib/api/api'
+import { resolveNotificationEntity } from '@/features/notifications/notifications.entityResolver'
+
+// Lazy: @base-ui/react/popover (feed/drawer) only needs to be fetched once the bell is actually
+// clicked. NotificationBellTrigger (icon + badge) stays eager via @qms/widgets' own barrel since it
+// has no @base-ui dependency; only the popover half is lazy, imported by its own direct subpath,
+// NOT through @qms/widgets' eager barrel (a barrel re-export would defeat chunk isolation even
+// behind React.lazy — see that package's index.ts).
+const NotificationBellPopover = lazy(() => import('@qms/widgets/notifications/NotificationBellPopover'))
+
+// Dev-only demo-account switcher. Vite statically replaces import.meta.env.DEV with a literal
+// false in a production build, which makes this whole dynamic import dead code Rollup can fully
+// eliminate — not just hidden at runtime, excluded from the production bundle entirely (verified
+// against a real `vite build` output; see md-files/FRONTEND_SPLIT_ARCHITECTURE.md's note on this).
+const QuickSwitchPopup = import.meta.env.DEV
+  ? lazy(() => import('@/features/auth/components/QuickSwitchPopup'))
+  : null
+
+interface TopbarProps {
+  onMobileMenuToggle: () => void
+}
+
+function getInitials(firstName?: string, lastName?: string): string {
+  return [(firstName?.[0] ?? ''), (lastName?.[0] ?? '')].join('').toUpperCase() || 'U'
+}
+
+const Topbar = ({ onMobileMenuToggle }: TopbarProps) => {
+  const { user, signOut } = useAuth()
+  const { session, hasAnyPermission } = useSession()
+  const navigate = useNavigate()
+  // Called unconditionally with a safe fallback id (Rules of Hooks) — read-only display here,
+  // so no separate trigger-level gate is needed like MyProfileModal's.
+  const { url: pictureUrl } = useProfilePicture(user?.id ?? '')
+  const [clock, setClock] = useState(formatClockDisplay)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [profileModalOpen, setProfileModalOpen] = useState(false)
+  const [quickSwitchOpen, setQuickSwitchOpen] = useState(false)
+
+  // Same deferred-mount pattern as QuickSwitchPopup above — NotificationBellTrigger (icon+badge)
+  // is always eager; NotificationBellPopover (the actual feed/drawer) only mounts on first click.
+  // State machine shared with pharma-frontend's Topbar via @qms/widgets, so the two can't drift.
+  const {
+    open: notificationsOpen,
+    setOpen: setNotificationsOpen,
+    popoverMounted: notificationsPopoverMounted,
+    drawerOpen: notificationsDrawerOpen,
+    setDrawerOpen: setNotificationsDrawerOpen,
+    triggerRef: notificationTriggerRef,
+    toggle: toggleNotifications,
+  } = useNotificationBellState()
+
+  useEffect(() => {
+    const interval = setInterval(() => setClock(formatClockDisplay()), 60_000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const initials  = getInitials(user?.firstName, user?.lastName)
+  const firstName = user?.firstName ?? 'there'
+  // roleType is typed required, but the backend session mapper can emit null.
+  const roleLabel = session?.roleType?.name ?? ''
+  const roleColor = 'var(--qms-brand)'
+
+  return (
+    <header
+      className="sticky top-0 z-40 flex items-center gap-3.5 px-6 py-3.5 backdrop-blur-xl"
+      style={{
+        background: 'var(--qms-surface)',
+        borderBottom: '1px solid var(--qms-border)',
+      }}
+    >
+      {/* Mobile menu button */}
+      <button
+        onClick={onMobileMenuToggle}
+        className="lg:hidden w-8 h-8 flex items-center justify-center rounded-lg transition-all"
+        style={{ color: 'var(--qms-text-soft)' }}
+        aria-label="Open menu"
+      >
+        <FiMenu size={18} />
+      </button>
+
+      {/* Greeting + clock */}
+      <div className="hidden sm:flex flex-col leading-tight mr-1">
+        <span className="text-[13px] font-bold" style={{ color: 'var(--qms-text)' }}>
+          {getGreeting()}, {firstName} 👋
+        </span>
+        <span className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>{clock}</span>
+      </div>
+
+      {/* Search */}
+      <div className="relative flex-1 max-w-130">
+        <FiSearch size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--qms-text-muted)' }} />
+        <input
+          type="text"
+          placeholder="Search camps, doctors, leads, devices, projects..."
+          style={{
+            borderColor: 'var(--qms-border-input)',
+            backgroundColor: 'var(--qms-surface-strong)',
+            color: 'var(--qms-text)',
+          }}
+          className="w-full pl-9 pr-12 py-2 text-[13px] rounded-xl border outline-none focus:border-(--qms-border-strong) focus:ring-2 focus:ring-(--qms-ring) transition-all placeholder:text-qms-text-muted"
+        />
+        <kbd
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] px-1.5 py-0.5 rounded-md border font-mono"
+          style={{
+            borderColor: 'var(--qms-border)',
+            backgroundColor: 'var(--qms-surface-card)',
+            color: 'var(--qms-text-muted)',
+          }}
+        >
+          ⌘K
+        </kbd>
+      </div>
+
+      {/* Right actions */}
+      <div className="ml-auto flex items-center gap-2">
+        <ThemeToggle />
+
+        <NotificationBellTrigger
+          ref={notificationTriggerRef}
+          api={api}
+          open={notificationsOpen}
+          onClick={toggleNotifications}
+        />
+        {notificationsPopoverMounted && (
+          <Suspense
+            // Rendered only while notificationsOpen is true — NOT merely while
+            // notificationsPopoverMounted is true. A click→click-again (open, then close before
+            // the lazy chunk resolves) must not leave this loading shell stuck on screen after the
+            // user has already closed the bell.
+            fallback={
+              notificationsOpen ? (
+                <div
+                  className="fixed z-50 w-80 rounded-xl border shadow-xl p-3 text-[12px] text-center"
+                  style={{
+                    borderColor: 'var(--qms-border)',
+                    backgroundColor: 'var(--popover)',
+                    color: 'var(--qms-text-muted)',
+                    top: (notificationTriggerRef.current?.getBoundingClientRect().bottom ?? 0) + 8,
+                    right: window.innerWidth - (notificationTriggerRef.current?.getBoundingClientRect().right ?? 0),
+                  }}
+                >
+                  Loading…
+                </div>
+              ) : null
+            }
+          >
+            <NotificationBellPopover
+              api={api}
+              open={notificationsOpen}
+              onOpenChange={setNotificationsOpen}
+              anchor={notificationTriggerRef.current}
+              resolveEntity={resolveNotificationEntity}
+              roleTypeCode={session?.roleType?.code}
+              hasAnyPermission={hasAnyPermission}
+              onNavigate={(href) => navigate(href)}
+              drawerOpen={notificationsDrawerOpen}
+              onDrawerOpenChange={setNotificationsDrawerOpen}
+            />
+          </Suspense>
+        )}
+
+        {/* Help */}
+        <button
+          className="w-8 h-8 flex items-center justify-center rounded-lg transition-all"
+          style={{ color: 'var(--qms-text-soft)' }}
+          aria-label="Help"
+        >
+          <FiHelpCircle size={16} />
+        </button>
+
+        {/* User chip */}
+        <div className="relative">
+          <button
+            onClick={() => setUserMenuOpen((v) => !v)}
+            className="flex items-center gap-2 pl-1.5 pr-2.5 py-1.5 rounded-full border transition-all"
+            style={{
+              borderColor: 'var(--qms-border)',
+              backgroundColor: 'var(--qms-surface-strong)',
+            }}
+          >
+            <div
+              className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 overflow-hidden"
+              style={{ background: roleColor }}
+            >
+              {pictureUrl ? (
+                <img src={pictureUrl} alt="Profile picture" className="w-full h-full object-cover" />
+              ) : (
+                initials
+              )}
+            </div>
+            <div className="hidden sm:block text-left">
+              <div className="text-[13px] font-semibold leading-none" style={{ color: 'var(--qms-text)' }}>
+                {user ? `${user.firstName} ${user.lastName}` : '—'}
+              </div>
+              <div className="text-[11px] leading-none mt-0.5" style={{ color: 'var(--qms-text-muted)' }}>{roleLabel}</div>
+            </div>
+            <FiChevronDown size={13} style={{ color: 'var(--qms-text-muted)' }} />
+          </button>
+
+          {/* Dropdown */}
+          {userMenuOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)} />
+              <div
+                className="absolute right-0 top-full mt-2 w-52 z-50 rounded-xl border shadow-xl backdrop-blur-xl overflow-hidden"
+                style={{
+                  borderColor: 'var(--qms-border)',
+                  backgroundColor: 'var(--popover)',
+                }}
+              >
+                <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--qms-border)' }}>
+                  <div className="text-[13px] font-bold" style={{ color: 'var(--qms-text)' }}>
+                    {user ? `${user.firstName} ${user.lastName}` : '—'}
+                  </div>
+                  <div className="text-[11px] mt-0.5" style={{ color: 'var(--qms-text-muted)' }}>{user?.email}</div>
+                </div>
+                <div className="py-1">
+                  <button
+                    onClick={() => { setProfileModalOpen(true); setUserMenuOpen(false) }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] transition-all hover:bg-(--qms-surface-hover)"
+                    style={{ color: 'var(--qms-text-soft)' }}
+                  >
+                    <FiUser size={14} style={{ color: 'var(--qms-text-muted)' }} />
+                    My Profile
+                  </button>
+                  {QuickSwitchPopup && (
+                    <button
+                      onClick={() => { setQuickSwitchOpen(true); setUserMenuOpen(false) }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] transition-all hover:bg-(--qms-surface-hover)"
+                      style={{ color: 'var(--qms-text-soft)' }}
+                    >
+                      <FiRepeat size={14} style={{ color: 'var(--qms-text-muted)' }} />
+                      Quick switch (dev)
+                    </button>
+                  )}
+                  <button
+                    onClick={signOut}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] transition-all hover:bg-danger-soft"
+                    style={{ color: 'var(--danger)' }}
+                  >
+                    <FiLogOut size={14} />
+                    Sign out
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {profileModalOpen && (
+        <MyProfileModal user={user} session={session} onClose={() => setProfileModalOpen(false)} />
+      )}
+      {QuickSwitchPopup && quickSwitchOpen && (
+        <Suspense fallback={null}>
+          <QuickSwitchPopup onClose={() => setQuickSwitchOpen(false)} />
+        </Suspense>
+      )}
+    </header>
+  )
+}
+
+export default Topbar

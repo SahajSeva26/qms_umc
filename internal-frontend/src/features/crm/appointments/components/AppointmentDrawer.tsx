@@ -1,0 +1,618 @@
+import { useState } from 'react'
+import type { ReactNode } from 'react'
+import type { AppointmentEntity, AppointmentOutcomeTitle, AppointmentStatus } from '@/types/appointment.types'
+import {
+  APPOINTMENT_MODE_LABEL,
+  APPOINTMENT_STATUS_LABEL,
+  APPOINTMENT_TRANSITION_MAP,
+  APPOINTMENT_TYPE_LABEL,
+} from '@/types/appointment.types'
+import { usePermission } from '@/hooks/usePermission'
+import { useMoveAppointmentStage } from '@/features/crm/appointments/hooks/useMoveAppointmentStage'
+import { useRespondToAppointment } from '@/features/crm/appointments/hooks/useRespondToAppointment'
+import { useUpdateAppointment } from '@/features/crm/appointments/hooks/useUpdateAppointment'
+import SideDrawer from '@/components/ui/SideDrawer'
+import KeyValueGrid from '@/components/ui/KeyValueGrid'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import DateTimePicker from '@/components/ui/DateTimePicker'
+import { Label } from '@/components/ui/label'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import { unwrapId } from '@/utils/unwrapId'
+import { Textarea } from '@/components/ui/textarea'
+import { toast } from '@/components/ui/sonner'
+import NewLeadWizard from '@/features/crm/components/NewLeadWizard'
+import { APPOINTMENT_TYPE_COLOR, latestAppointmentNextSteps } from '@/features/crm/appointments/appointmentsReal.utils'
+import { getApiErrorMessage } from '@/utils/apiError'
+
+const STATUS_COLOR: Record<AppointmentStatus, string> = {
+  planned: '#3b6dff',
+  done: '#10b981',
+  cancelled: '#94a3b8',
+}
+
+// Display text only — 'Cancelled'/'Rescheduled meetings' don't trigger the real Cancel/Reschedule actions.
+const NEXT_STEPS_OPTIONS = [
+  'Cred send',
+  'Required PPT send',
+  'Quotation',
+  'Indent raise',
+  'Negations',
+  'PO received',
+  'Cancelled',
+  'Rescheduled meetings',
+] as const
+const NEXT_STEPS_OTHER = 'Other'
+const OUTCOME_OPTIONS: { value: AppointmentOutcomeTitle; label: string; color: string }[] = [
+  { value: 'converted-to-lead', label: 'Converted to lead', color: '#10b981' },
+  { value: 'not-responding', label: 'Not responding', color: '#f43f5e' },
+  { value: 'not-interested', label: 'Not interested', color: '#94a3b8' },
+  { value: 'will-update-later', label: 'Will update later', color: '#f59e0b' },
+]
+
+const labelClasses = 'block text-[10px] font-semibold tracking-widest uppercase mb-2'
+const labelStyle = { color: 'var(--qms-text-muted)' }
+
+// Matches the prototype's status-pill formula (color-mix(...12%,transparent)),
+// used identically in its drawer/list/leads views (sales-calendar.js).
+const Pill = ({ color, children }: { color: string; children: ReactNode }) => (
+  <span className="text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: `color-mix(in srgb, ${color} 12%, transparent)`, color }}>
+    {children}
+  </span>
+)
+
+const SectionLabel = ({ children }: { children: ReactNode }) => (
+  <div className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--qms-text-muted)' }}>
+    {children}
+  </div>
+)
+
+const refName = (ref: unknown, fallback = '—'): string => {
+  if (!ref) return fallback
+  if (typeof ref === 'string') return ref
+  const obj = ref as { name?: string }
+  return obj.name ?? fallback
+}
+
+// Lead's own populated shape uses `title`, not `name`.
+const leadRefName = (ref: unknown, fallback = '—'): string => {
+  if (!ref) return fallback
+  if (typeof ref === 'string') return ref
+  const obj = ref as { title?: string }
+  return obj.title ?? fallback
+}
+
+const refId = (ref: unknown): string => {
+  if (!ref) return ''
+  if (typeof ref === 'string') return ref
+  const obj = ref as { _id?: string }
+  return obj._id ?? ''
+}
+
+type PanelKind = 'moveStage' | 'reschedule' | 'editMom' | 'outcome' | null
+
+interface AppointmentDrawerProps {
+  appointment: AppointmentEntity | null
+  onClose: () => void
+}
+
+const AppointmentDrawer = ({ appointment, onClose }: AppointmentDrawerProps) => {
+  const [panel, setPanel] = useState<PanelKind>(null)
+  const [targetStatus, setTargetStatus] = useState<AppointmentStatus | ''>('')
+  const [momText, setMomText] = useState('')
+  const [cancelReason, setCancelReason] = useState('')
+  const [nextStepsOption, setNextStepsOption] = useState<string>('')
+  const [nextStepsText, setNextStepsText] = useState('')
+  const [newLeadOpen, setNewLeadOpen] = useState(false)
+  const [rescheduleStart, setRescheduleStart] = useState('')
+  const [rescheduleEnd, setRescheduleEnd] = useState('')
+  const [rescheduleReason, setRescheduleReason] = useState('')
+  const [editMomText, setEditMomText] = useState('')
+  const [outcomeTitle, setOutcomeTitle] = useState<AppointmentOutcomeTitle | ''>('')
+  const [outcomeReason, setOutcomeReason] = useState('')
+  // True once the user has directly edited End — stops the auto-shift below.
+  const [endTouched, setEndTouched] = useState(false)
+  const [error, setError] = useState('')
+
+  const { session, hasAnyPermission } = usePermission()
+  // POST /leads accepts lead:create, lead:manage, or tenant:manage server-side — viewing an appointment needs none of them.
+  const canCreateLead = hasAnyPermission(['lead:create', 'lead:manage', 'tenant:manage'])
+
+  const moveStage = useMoveAppointmentStage(appointment?.id ?? '')
+  const respond = useRespondToAppointment(appointment?.id ?? '')
+  const updateAppointment = useUpdateAppointment(appointment?.id ?? '')
+
+  if (!appointment) return null
+
+  const myRoleId = session?.role.id
+  const myInvite = appointment.internalMembers.find((m) => {
+    const roleId = unwrapId(m.role)
+    return roleId === myRoleId
+  })
+
+  const legalTargets = APPOINTMENT_TRANSITION_MAP[appointment.status] ?? []
+  const isTerminal = legalTargets.length === 0
+  const statusColor = STATUS_COLOR[appointment.status] ?? '#94a3b8'
+
+
+  const blurActiveElement = () => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+  }
+
+  // Only moveStage persists nextSteps — pre-fill from the latest stage-history entry.
+  const resetNextStepsFromAppointment = () => {
+    const existingNextSteps = latestAppointmentNextSteps(appointment)
+    const isPreset = (NEXT_STEPS_OPTIONS as readonly string[]).includes(existingNextSteps)
+    setNextStepsOption(existingNextSteps ? (isPreset ? existingNextSteps : NEXT_STEPS_OTHER) : '')
+    setNextStepsText(isPreset ? '' : existingNextSteps)
+  }
+
+  const openMoveStage = (to: AppointmentStatus) => {
+    blurActiveElement()
+    setError('')
+    if (to === 'done') {
+      setMomText(appointment.mom.details ?? '')
+      resetNextStepsFromAppointment()
+    }
+    if (to === 'cancelled') setCancelReason('')
+    setTargetStatus(to)
+    setPanel('moveStage')
+  }
+
+  const handleNextStepsOptionChange = (value: string | null) => {
+    const next = value ?? ''
+    setNextStepsOption(next)
+    setNextStepsText(next !== NEXT_STEPS_OTHER ? next : '')
+  }
+
+  const resolvedNextSteps = nextStepsOption === NEXT_STEPS_OTHER ? nextStepsText.trim() : nextStepsOption
+
+  // moveStage's `reason` is required server-side — "done" derives it from MoM, "cancelled" sends the user's typed reason as-is.
+  const buildMoveStageReason = (to: AppointmentStatus) => {
+    if (to === 'done') return momText.trim() ? `Marked done — ${momText.trim()}` : 'Marked done'
+    return cancelReason.trim()
+  }
+
+  // MOM saves via the plain update endpoint before moveStage, so a failed
+  // status flip doesn't lose the already-typed text.
+  const handleMoveStageSave = async () => {
+    if (!targetStatus) return
+    // Frontend-only checks — not yet enforced by moveStage() on the backend.
+    if (targetStatus === 'done' && !momText.trim()) return setError('Minutes of meeting are required to mark this appointment done')
+    if (targetStatus === 'cancelled' && !cancelReason.trim()) return setError('A reason for cancelling is required')
+    try {
+      const momChanged = targetStatus === 'done' && momText.trim() && momText.trim() !== (appointment.mom.details ?? '')
+      if (momChanged) {
+        await updateAppointment.mutateAsync({ mom: { details: momText.trim() } })
+      }
+      await moveStage.mutateAsync({ to: targetStatus, reason: buildMoveStageReason(targetStatus), nextSteps: resolvedNextSteps || undefined })
+      toast.success(`Moved to ${APPOINTMENT_STATUS_LABEL[targetStatus]}`)
+      setPanel(null)
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Could not update the appointment status.'))
+    }
+  }
+
+  const openReschedule = () => {
+    blurActiveElement()
+    setError('')
+    setRescheduleStart(appointment.duration.startTime.slice(0, 16))
+    setRescheduleEnd(appointment.duration.endTime?.slice(0, 16) ?? '')
+    setRescheduleReason('')
+    setEndTouched(false)
+    setPanel('reschedule')
+  }
+
+  const originalDurationMs = appointment.duration.endTime
+    ? new Date(appointment.duration.endTime).getTime() - new Date(appointment.duration.startTime).getTime()
+    : null
+  const handleRescheduleStartChange = (value: string) => {
+    setRescheduleStart(value)
+    if (!endTouched && originalDurationMs && value) {
+      const newEnd = new Date(new Date(value).getTime() + originalDurationMs)
+      const pad = (n: number) => String(n).padStart(2, '0')
+      setRescheduleEnd(
+        `${newEnd.getFullYear()}-${pad(newEnd.getMonth() + 1)}-${pad(newEnd.getDate())}T${pad(newEnd.getHours())}:${pad(newEnd.getMinutes())}`,
+      )
+    }
+  }
+
+  const handleRescheduleEndChange = (value: string) => {
+    setEndTouched(true)
+    setRescheduleEnd(value)
+  }
+
+  // rescheduleReason is frontend-only for now — validated but not sent (update has no reason field). See TODO.md.
+  const handleRescheduleSave = async () => {
+    if (!rescheduleStart) return setError('A new start time is required')
+    if (!rescheduleReason.trim()) return setError('A reason for rescheduling is required')
+    if (rescheduleEnd && new Date(rescheduleEnd).getTime() <= new Date(rescheduleStart).getTime()) {
+      return setError('End must be after start')
+    }
+    try {
+      await updateAppointment.mutateAsync({
+        startTime: new Date(rescheduleStart).toISOString(),
+        endTime: rescheduleEnd ? new Date(rescheduleEnd).toISOString() : undefined,
+      })
+      toast.success('Appointment rescheduled')
+      setPanel(null)
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Could not reschedule.'))
+    }
+  }
+
+  // Standalone MOM edit — independent of the Mark-done transition. Only `mom.details` is
+  // persistable this way (PUT /:id); nextSteps only exists on a real moveStage transition.
+  const openEditMom = () => {
+    blurActiveElement()
+    setError('')
+    setEditMomText(appointment.mom.details ?? '')
+    setPanel('editMom')
+  }
+
+  const handleEditMomSave = async () => {
+    if (!editMomText.trim()) return setError('Minutes of meeting are required')
+    try {
+      await updateAppointment.mutateAsync({ mom: { details: editMomText.trim() } })
+      toast.success('MOM saved')
+      setPanel(null)
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Could not save the MOM.'))
+    }
+  }
+
+  const openOutcome = () => {
+    blurActiveElement()
+    setError('')
+    setOutcomeTitle(appointment.outcome?.title ?? '')
+    setOutcomeReason(appointment.outcome?.reason ?? '')
+    setPanel('outcome')
+  }
+
+  const handleOutcomeSave = async () => {
+    if (!outcomeTitle) return setError('Select an outcome first.')
+    try {
+      await updateAppointment.mutateAsync({ outcome: { title: outcomeTitle, reason: outcomeReason.trim() } })
+      toast.success('Meeting outcome saved')
+      setPanel(null)
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Could not save the meeting outcome.'))
+    }
+  }
+
+  const handleRsvp = async (status: 'accepted' | 'declined') => {
+    try {
+      await respond.mutateAsync({ status })
+      toast.success(status === 'accepted' ? 'Accepted' : 'Declined')
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'Could not record your response.'))
+    }
+  }
+
+  return (
+    <SideDrawer open title="Appointment details" onClose={onClose}>
+      <div className="flex flex-wrap items-center gap-1.5 mb-3">
+        <span className="text-[10px] font-bold px-2 py-1 rounded-full font-mono" style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text-muted)' }}>
+          {appointment.code}
+        </span>
+        {/* Matches the prototype's tm.color per-type pill (typeMeta, sales-calendar.js) — was
+            hardcoded to the app's brand color regardless of type. */}
+        <Pill color={APPOINTMENT_TYPE_COLOR[appointment.type]}>{APPOINTMENT_TYPE_LABEL[appointment.type]}</Pill>
+        <Pill color={statusColor}>{APPOINTMENT_STATUS_LABEL[appointment.status] ?? appointment.status}</Pill>
+      </div>
+
+      <h3 className="text-[16px] font-bold" style={{ color: 'var(--qms-text)' }}>
+        {refName(appointment.contactPerson)}
+      </h3>
+      <p className="text-[12px] mt-0.5 mb-4" style={{ color: 'var(--qms-text-muted)' }}>
+        {refName(appointment.tenant)} · {refName(appointment.division)}
+      </p>
+
+      <div
+        className="rounded-xl border p-3"
+        style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface)' }}
+      >
+        <KeyValueGrid
+          columns={2}
+          items={[
+            { label: 'Sales person', value: refName(appointment.salesPerson) },
+            {
+              label: 'When',
+              value: `${new Date(appointment.duration.startTime).toLocaleString()}${appointment.duration.endTime ? ` – ${new Date(appointment.duration.endTime).toLocaleTimeString()}` : ''}`,
+            },
+            { label: 'Mode', value: APPOINTMENT_MODE_LABEL[appointment.mode] },
+            { label: 'Link', value: appointment.destinationLink || undefined },
+            { label: 'Location', value: appointment.location || undefined },
+            { label: 'Linked lead', value: appointment.lead ? leadRefName(appointment.lead) : undefined },
+            { label: 'Parent appointment', value: appointment.parent ? refName(appointment.parent) : undefined },
+          ]}
+        />
+      </div>
+
+      <div className="mt-4 rounded-xl border p-3" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface)' }}>
+        <SectionLabel>Agenda</SectionLabel>
+        <p className="text-[13px]" style={{ color: 'var(--qms-text)' }}>{appointment.agenda.public || '—'}</p>
+        {appointment.agenda.private && (
+          <div className="rounded-lg px-2.5 py-2 mt-2" style={{ background: 'rgba(168,85,247,.08)', border: '1px dashed rgba(168,85,247,.3)' }}>
+            <div className="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: '#a855f7' }}>
+              Private notes
+            </div>
+            <p className="text-[12px]" style={{ color: 'var(--qms-text)' }}>{appointment.agenda.private}</p>
+          </div>
+        )}
+        {latestAppointmentNextSteps(appointment) && (
+          <div className="mt-2 text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>
+            <b style={{ color: 'var(--qms-text)' }}>Next steps:</b> {latestAppointmentNextSteps(appointment)}
+          </div>
+        )}
+      </div>
+
+      <div className="mt-4">
+        <SectionLabel>Minutes of meeting</SectionLabel>
+        {appointment.mom.details ? (
+          <div className="rounded-lg border px-2.5 py-2" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface)' }}>
+            <p className="text-[13px] whitespace-pre-wrap" style={{ color: 'var(--qms-text)' }}>{appointment.mom.details}</p>
+          </div>
+        ) : (
+          <p className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>
+            Not submitted yet{appointment.mom.submissionDeadline ? ` — due by ${new Date(appointment.mom.submissionDeadline).toLocaleString()}` : ''}.
+          </p>
+        )}
+      </div>
+
+      {appointment.outcome?.title && (
+        <div className="mt-4 rounded-xl border p-3" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface)' }}>
+          <SectionLabel>Meeting outcome</SectionLabel>
+          <p className="text-[13px] font-semibold" style={{ color: 'var(--qms-text)' }}>
+            {OUTCOME_OPTIONS.find((option) => option.value === appointment.outcome?.title)?.label ?? appointment.outcome.title}
+          </p>
+          {appointment.outcome.reason && <p className="mt-1 text-[12px] whitespace-pre-wrap" style={{ color: 'var(--qms-text-muted)' }}>{appointment.outcome.reason}</p>}
+        </div>
+      )}
+
+      {appointment.internalMembers.length > 0 && (
+        <div className="mt-4 rounded-xl border p-3" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface)' }}>
+          <SectionLabel>
+            Internal team · {appointment.internalMembers.filter((m) => m.status === 'accepted').length} accepted
+            {' · '}{appointment.internalMembers.filter((m) => m.status === 'pending').length} pending
+            {' · '}{appointment.internalMembers.filter((m) => m.status === 'declined').length} declined
+          </SectionLabel>
+          <div className="space-y-1.5">
+            {appointment.internalMembers.map((m, i) => {
+              const roleId = unwrapId(m.role)
+              // Matches the prototype's invite-status colors (ACCEPTED/REJECTED/PENDING) —
+              // our 'declined' is the closest match to its 'REJECTED'; it has no 'modified' state.
+              const color = m.status === 'accepted' ? '#047857' : m.status === 'declined' ? '#b91c1c' : '#1d4ed8'
+              return (
+                <div key={roleId ?? i} className="flex items-center justify-between text-[12px] rounded-lg border px-2.5 py-1.5" style={{ borderColor: 'var(--qms-border)' }}>
+                  <span style={{ color: 'var(--qms-text)' }}>{refName(m.role)}</span>
+                  <Pill color={color}>{m.status}</Pill>
+                </div>
+              )
+            })}
+          </div>
+          {myInvite && myInvite.status === 'pending' && appointment.status === 'planned' && (
+            <div className="flex gap-2 mt-2">
+              <Button size="sm" onClick={() => handleRsvp('accepted')} disabled={respond.isPending}>Accept</Button>
+              <Button size="sm" variant="outline" onClick={() => handleRsvp('declined')} disabled={respond.isPending}>Decline</Button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!isTerminal ? (
+        <div className="mt-5 pt-4" style={{ borderTop: '1px solid var(--qms-border)' }}>
+          <div className="flex flex-wrap gap-2">
+            {legalTargets.includes('done') && <Button size="sm" onClick={() => openMoveStage('done')}>Mark done</Button>}
+            {appointment.status === 'planned' && <Button size="sm" variant="outline" onClick={openReschedule}>Reschedule</Button>}
+            {legalTargets.includes('cancelled') && (
+              <Button size="sm" variant="destructive" onClick={() => openMoveStage('cancelled')}>Cancel</Button>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="mt-5 pt-4 flex items-center justify-between gap-2 flex-wrap" style={{ borderTop: '1px solid var(--qms-border)' }}>
+          <p className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>
+            This appointment is {(APPOINTMENT_STATUS_LABEL[appointment.status] ?? appointment.status).toLowerCase()}.
+          </p>
+          <div className="flex gap-2">
+            {(appointment.status === 'done' || appointment.status === 'cancelled') && hasAnyPermission(['appointment:update', 'appointment:manage', 'tenant:manage']) && (
+              <Button type="button" size="sm" variant="outline" onClick={openOutcome}>Set outcome</Button>
+            )}
+            {/* MOM is only ever first captured via the Mark-done dialog, so editing it afterward only
+                makes sense once the appointment is actually done. */}
+            {appointment.status === 'done' && (
+              <Button type="button" size="sm" variant="outline" onClick={openEditMom}>
+                Edit MOM
+              </Button>
+            )}
+            {/* The one-time "+ New lead" inside the Mark-done dialog is easy to skip in the moment — offer it here too, so a done meeting's lead can still be created later. */}
+            {appointment.status === 'done' && canCreateLead && (
+              <Button type="button" size="sm" variant="outline" onClick={() => setNewLeadOpen(true)}>
+                + New lead
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
+      <Dialog open={panel === 'moveStage'} onOpenChange={(o) => !o && setPanel(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>{targetStatus && `Move to ${APPOINTMENT_STATUS_LABEL[targetStatus]}`}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            {targetStatus === 'done' && (
+              <div>
+                <Label className={labelClasses} style={labelStyle}>Minutes of meeting</Label>
+                <Textarea
+                  value={momText}
+                  onChange={(e) => setMomText(e.target.value)}
+                  rows={3}
+                  placeholder="What was discussed / decided…"
+                  className="text-[13px]"
+                />
+              </div>
+            )}
+            {targetStatus === 'done' && (
+              <div>
+                <Label className={labelClasses} style={labelStyle}>Next steps</Label>
+                <Select key={nextStepsOption || 'empty'} value={nextStepsOption || undefined} onValueChange={handleNextStepsOptionChange}>
+                  <SelectTrigger className="w-full text-[13px]">
+                    <SelectValue placeholder="Select next step…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {NEXT_STEPS_OPTIONS.map((opt) => (
+                      <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                    ))}
+                    <SelectItem value={NEXT_STEPS_OTHER}>{NEXT_STEPS_OTHER}</SelectItem>
+                  </SelectContent>
+                </Select>
+                {nextStepsOption === NEXT_STEPS_OTHER && (
+                  <Textarea
+                    value={nextStepsText}
+                    onChange={(e) => setNextStepsText(e.target.value)}
+                    rows={2}
+                    placeholder="What happens next…"
+                    className="text-[13px] mt-2"
+                  />
+                )}
+              </div>
+            )}
+            {targetStatus === 'cancelled' && (
+              <div>
+                <Label className={labelClasses} style={labelStyle}>Reason for cancelling *</Label>
+                <Textarea
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  rows={2}
+                  placeholder="Why is this appointment being cancelled…"
+                  className="text-[13px]"
+                />
+              </div>
+            )}
+            {error && <p className="text-[12px] font-semibold text-danger">{error}</p>}
+          </div>
+          <DialogFooter className="sm:justify-between">
+            {targetStatus === 'done' && canCreateLead ? (
+              <Button type="button" size="sm" variant="outline" onClick={() => setNewLeadOpen(true)}>
+                + New lead
+              </Button>
+            ) : <div />}
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setPanel(null)}>Cancel</Button>
+              <Button onClick={handleMoveStageSave} disabled={moveStage.isPending || updateAppointment.isPending}>Confirm</Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={panel === 'reschedule'} onOpenChange={(o) => !o && setPanel(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Reschedule appointment</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className={labelClasses} style={labelStyle}>New start *</Label>
+                <DateTimePicker value={rescheduleStart} onChange={handleRescheduleStartChange} className="text-[13px] w-full" />
+              </div>
+              <div>
+                <Label className={labelClasses} style={labelStyle}>New end</Label>
+                <DateTimePicker value={rescheduleEnd} onChange={handleRescheduleEndChange} className="text-[13px] w-full" />
+              </div>
+            </div>
+            <div>
+              <Label className={labelClasses} style={labelStyle}>Reason for rescheduling *</Label>
+              <Textarea
+                value={rescheduleReason}
+                onChange={(e) => setRescheduleReason(e.target.value)}
+                rows={2}
+                placeholder="Why is this appointment being rescheduled…"
+                className="text-[13px]"
+              />
+            </div>
+            {error && <p className="text-[12px] font-semibold text-danger">{error}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPanel(null)}>Cancel</Button>
+            <Button onClick={handleRescheduleSave} disabled={updateAppointment.isPending}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={panel === 'editMom'} onOpenChange={(o) => !o && setPanel(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Minutes of meeting</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className={labelClasses} style={labelStyle}>Minutes of meeting *</Label>
+              <Textarea
+                value={editMomText}
+                onChange={(e) => setEditMomText(e.target.value)}
+                rows={6}
+                placeholder="Decisions taken · objections raised · next commitments · pricing levers discussed"
+                className="text-[13px]"
+              />
+            </div>
+            {error && <p className="text-[12px] font-semibold text-danger">{error}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPanel(null)}>Cancel</Button>
+            <Button onClick={handleEditMomSave} disabled={updateAppointment.isPending}>Save MOM</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={panel === 'outcome'} onOpenChange={(open) => !open && !updateAppointment.isPending && setPanel(null)}>
+        <DialogContent className="sm:max-w-[880px] p-0 overflow-hidden">
+          <DialogHeader className="px-5 py-4 border-b" style={{ borderColor: 'var(--qms-border)' }}>
+            <DialogTitle>Set meeting outcome</DialogTitle>
+            <p className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>{refName(appointment.tenant)} · {refName(appointment.contactPerson)}</p>
+          </DialogHeader>
+          <div className="px-5 py-5 space-y-4">
+            <div>
+              <Label className={labelClasses} style={labelStyle}>Outcome *</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {OUTCOME_OPTIONS.map((option) => (
+                  <button key={option.value} type="button" aria-pressed={outcomeTitle === option.value} onClick={() => { setOutcomeTitle(option.value); setError('') }}
+                    className="min-h-10 rounded-xl border px-3 text-left text-[12px] font-semibold transition-colors"
+                    style={{ borderColor: outcomeTitle === option.value ? '#a7bfff' : 'var(--qms-border)', background: outcomeTitle === option.value ? 'color-mix(in srgb, var(--qms-brand) 10%, var(--popover))' : 'var(--popover)', color: 'var(--qms-text)' }}>
+                    <span aria-hidden="true" style={{ color: option.color }}>●</span> {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <Label className={labelClasses} style={labelStyle} htmlFor="appointment-outcome-reason">Detail / reason</Label>
+              <Textarea id="appointment-outcome-reason" value={outcomeReason} onChange={(event) => setOutcomeReason(event.target.value)} rows={3}
+                placeholder="What did the client say? Any specific competitor / pricing / timing context?" />
+            </div>
+            {outcomeTitle === 'converted-to-lead' && <p className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>To create a CRM lead, use the separate New lead action after saving this outcome.</p>}
+            {error && <p role="alert" className="text-[12px] font-semibold text-danger">{error}</p>}
+          </div>
+          <DialogFooter className="border-t px-5 pt-4 pb-6" style={{ borderColor: 'var(--qms-border)' }}>
+            <Button variant="outline" onClick={() => setPanel(null)} disabled={updateAppointment.isPending}>Cancel</Button>
+            <Button onClick={handleOutcomeSave} disabled={updateAppointment.isPending}>{updateAppointment.isPending ? 'Saving…' : 'Save outcome'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {newLeadOpen && (
+        <NewLeadWizard
+          onClose={() => setNewLeadOpen(false)}
+          onCreated={() => setNewLeadOpen(false)}
+          prefill={{
+            tenantId: refId(appointment.tenant),
+            tenantLabel: refName(appointment.tenant),
+            divisionId: refId(appointment.division),
+            divisionLabel: refName(appointment.division),
+            contactPersonId: refId(appointment.contactPerson),
+            contactPersonLabel: refName(appointment.contactPerson),
+            salesPersonId: refId(appointment.salesPerson),
+            salesPersonLabel: refName(appointment.salesPerson),
+          }}
+        />
+      )}
+    </SideDrawer>
+  )
+}
+
+export default AppointmentDrawer

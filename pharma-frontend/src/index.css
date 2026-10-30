@@ -1,0 +1,19 @@
+@import "@qms/ui/theme.css";
+
+/* Tailwind v4's automatic content detection does not cross into node_modules
+   (by design — @qms/ui/@qms/widgets are resolved as workspace packages through
+   a node_modules symlink either way), so their own components never get
+   scanned for utility classes without these explicit @source directives. */
+@source "../../packages/ui/src";
+@source "../../packages/widgets/src";
+
+@layer base {
+  * { @apply border-border outline-ring/50; }
+
+  body { @apply bg-background text-foreground; }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) { cursor: pointer; }
+
+  html { @apply font-sans; }
+}

@@ -1,0 +1,396 @@
+import { useState } from 'react'
+import { FiPackage, FiSave } from 'react-icons/fi'
+import type { LeadEntity, LeadOffer, LeadProjectType } from '@/types/crm.types'
+import { LEAD_PROJECT_TYPE_LABEL } from '@/types/crm.types'
+import type { UpdateLeadPayload } from '@/types/crm.types'
+import { useSession } from '@/hooks/useSession'
+import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
+import { useRoles } from '@/features/access-management/role/hooks/useRoles'
+import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRoleTypes'
+import { useContacts } from '@/features/contacts/hooks/useContacts'
+import { PLATFORM_TENANT_CODE, PLATFORM_TENANT_FETCH_LIMIT } from '@/features/access-management/accessManagement.constants'
+import { editLeadSchema } from '@/features/crm/schemas/lead.schemas'
+import { THERAPIES, SPECIALTIES, CURRENT_ACTIVITIES, QMS_OFFERINGS } from '@/features/crm/crm.constants'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import { DatePicker } from '@qms/ui'
+import { SegRow, SegButton } from '@/components/ui/SegButton'
+import { WzChipRow, WzChipToggle } from '@/components/ui/WzChip'
+import ChipPicker from '@/features/crm/components/wizard/ChipPicker'
+import { labelClasses, labelStyle, fieldClasses } from '@/features/crm/components/wizard/wizard.styles'
+import { unwrapId } from '@/utils/unwrapId'
+import { roleLabel } from '@/features/crm/crm.utils'
+
+interface EditLeadModalProps {
+  lead: LeadEntity
+  onSave: (payload: UpdateLeadPayload) => Promise<unknown>
+  onClose: () => void
+}
+
+// Navigation range only — DatePicker's own default caps at the current month, unreachable for a future follow-up.
+const FOLLOW_UP_DATE_START_MONTH = new Date(new Date().getFullYear() - 2, 0)
+const FOLLOW_UP_DATE_END_MONTH = new Date(new Date().getFullYear() + 5, 11)
+
+// tenant/division/status are deliberately absent: tenant/division are immutable
+// post-create, and status only ever moves through moveStage, never this form.
+interface EditFormState {
+  contactPersonId: string
+  salesPersonId: string
+  title: string
+  problemStatement: string
+  numberOfMRS: number
+  projectType: LeadProjectType | ''
+  focusTherapy: string[]
+  focusTherapyDoctor: string[]
+  currentlyDoing: string[]
+  offers: LeadOffer[]
+  notes: string
+  estimatedValue: number
+  confidence: number
+  followUpDate: string
+}
+
+const toFormState = (lead: LeadEntity): EditFormState => ({
+  contactPersonId: unwrapId(lead.contactPerson),
+  salesPersonId: unwrapId(lead.salesPerson),
+  title: lead.title,
+  problemStatement: lead.problemStatement,
+  numberOfMRS: lead.numberOfMRS,
+  projectType: lead.projectType,
+  focusTherapy: lead.focusTherapy,
+  focusTherapyDoctor: lead.focusTherapyDoctor,
+  currentlyDoing: lead.currentlyDoing,
+  offers: lead.offers,
+  notes: lead.notes ?? '',
+  estimatedValue: lead.estimatedValue,
+  confidence: lead.confidence,
+  followUpDate: lead.followUpDate ? lead.followUpDate.slice(0, 10) : '',
+})
+
+const PROJECT_TYPES: LeadProjectType[] = ['screening', 'diet', 'tele_diet', 'lab', 'mixed']
+
+// Every field here is last-write-wins server-side — compare against the original
+// snapshot at submit time so a value reverted back to its original is never resent.
+const valueChanged = (a: unknown, b: unknown) =>
+  typeof a === 'object' && a !== null ? JSON.stringify(a) !== JSON.stringify(b) : a !== b
+
+const EditLeadModal = ({ lead, onSave, onClose }: EditLeadModalProps) => {
+  const [initial] = useState<EditFormState>(() => toFormState(lead))
+  const [form, setForm] = useState<EditFormState>(initial)
+  const [error, setError] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
+
+  const setField = <K extends keyof EditFormState>(key: K, value: EditFormState[K]) => {
+    setForm((prev) => ({ ...prev, [key]: value }))
+  }
+
+  // Contact person is scoped to the lead's own (immutable) division, same as WizardStep1.tsx.
+  const divisionId = unwrapId(lead.division)
+  const { data: contactPersonData, isLoading: contactPeopleLoading, isError: contactPeopleErrored } =
+    useContacts({ division: divisionId, status: 'active' }, { enabled: !!divisionId })
+  const contactPeople = contactPersonData?.data?.items ?? []
+
+  // A sales-rep can't reassign a lead to anyone else (lead:manage-only override, see lead.service.ts)
+  // and has no role-type:search/get, so GET /role-types 403s — skip the picker's queries entirely,
+  // same as WizardStep4.tsx's lockedToSelf.
+  const { session } = useSession()
+  const isSalesRepViewer = session?.roleType.code === 'sales-rep'
+
+  const { data: tenantData, isError: tenantsErrored } = useTenants(
+    { status: 'active', limit: PLATFORM_TENANT_FETCH_LIMIT },
+    !isSalesRepViewer,
+  )
+  // tenant.type is only on the wire for a system:manage caller; code is always present, so fall back to it.
+  const platformTenant = tenantData?.data?.items.find((t) => t.type === 'platform' || t.code === PLATFORM_TENANT_CODE)
+
+  // A lead's sales person is a Sales Rep or Sales Head — GET /roles' own `type` filter takes a
+  // single role-TYPE id (not a code), and has no $in support, so both codes are resolved to ids
+  // first, then queried and merged client-side. Mirrors useTenantSalesRepPicker's sales-rep half.
+  const { data: salesRepTypeData, isError: salesRepTypeErrored } = useRoleTypes({ code: 'sales-rep', status: 'active' }, !isSalesRepViewer)
+  const { data: salesHeadTypeData, isError: salesHeadTypeErrored } = useRoleTypes({ code: 'sales-head', status: 'active' }, !isSalesRepViewer)
+  const salesRepTypeId = salesRepTypeData?.data?.items[0]?.id
+  const salesHeadTypeId = salesHeadTypeData?.data?.items[0]?.id
+
+  const { data: salesRepRoleData, isLoading: salesRepsLoading, isError: salesRepsErrored } = useRoles(
+    { tenant: platformTenant?.id, type: salesRepTypeId, status: 'active' },
+    !isSalesRepViewer && !!platformTenant && !!salesRepTypeId,
+  )
+  const { data: salesHeadRoleData, isLoading: salesHeadsLoading, isError: salesHeadsErrored } = useRoles(
+    { tenant: platformTenant?.id, type: salesHeadTypeId, status: 'active' },
+    !isSalesRepViewer && !!platformTenant && !!salesHeadTypeId,
+  )
+  const salesRoles = [...(salesRepRoleData?.data?.items ?? []), ...(salesHeadRoleData?.data?.items ?? [])]
+  const salesRolesLoading = salesRepsLoading || salesHeadsLoading
+  const salesRolesErrored = salesRepTypeErrored || salesHeadTypeErrored || salesRepsErrored || salesHeadsErrored
+
+  const isOfferSelected = (code: string) => form.offers.some((o) => o.code === code)
+  const toggleOffer = (code: string) => {
+    setField('offers', isOfferSelected(code) ? form.offers.filter((o) => o.code !== code) : [...form.offers, { code, subOffer: '', reason: '' }])
+  }
+  const updateOffer = (code: string, field: 'subOffer' | 'reason', value: string) => {
+    setField('offers', form.offers.map((o) => (o.code === code ? { ...o, [field]: value } : o)))
+  }
+  const toggleActivity = (activity: string) => {
+    setField('currentlyDoing', form.currentlyDoing.includes(activity) ? form.currentlyDoing.filter((a) => a !== activity) : [...form.currentlyDoing, activity])
+  }
+
+  const handleSave = async () => {
+    const result = editLeadSchema.safeParse(form)
+    if (!result.success) {
+      setError(result.error.issues[0]?.message ?? 'Please complete the required fields.')
+      return
+    }
+    setError(null)
+
+    const changed = <K extends keyof EditFormState>(key: K) => valueChanged(form[key], initial[key])
+    const payload: UpdateLeadPayload = {
+      ...(changed('contactPersonId') ? { contactPerson: form.contactPersonId } : {}),
+      ...(changed('salesPersonId') ? { salesPerson: form.salesPersonId } : {}),
+      ...(changed('title') ? { title: form.title } : {}),
+      ...(changed('problemStatement') ? { problemStatement: form.problemStatement } : {}),
+      ...(changed('numberOfMRS') ? { numberOfMRS: form.numberOfMRS } : {}),
+      ...(changed('projectType') ? { projectType: form.projectType || undefined } : {}),
+      ...(changed('focusTherapy') ? { focusTherapy: form.focusTherapy } : {}),
+      ...(changed('focusTherapyDoctor') ? { focusTherapyDoctor: form.focusTherapyDoctor } : {}),
+      ...(changed('currentlyDoing') ? { currentlyDoing: form.currentlyDoing } : {}),
+      ...(changed('offers') ? { offers: form.offers } : {}),
+      ...(changed('notes') ? { notes: form.notes || undefined } : {}),
+      ...(changed('estimatedValue') ? { estimatedValue: form.estimatedValue } : {}),
+      ...(changed('confidence') ? { confidence: form.confidence } : {}),
+      ...(changed('followUpDate') ? { followUpDate: form.followUpDate || undefined } : {}),
+    }
+
+    setIsSaving(true)
+    try {
+      await onSave(payload)
+      onClose()
+    } catch {
+      // no-op: useLeads' updateLeadMutation.onError already toasted
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent
+        className="max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0"
+        style={{ width: 'min(640px, 92vw)', maxWidth: 'min(640px, 92vw)' }}
+        showCloseButton={false}
+      >
+        <DialogHeader className="px-5 py-4" style={{ borderBottom: '1px solid var(--qms-border)' }}>
+          <DialogTitle className="text-sm font-bold" style={{ color: 'var(--qms-text)' }}>Edit lead</DialogTitle>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+          <div>
+            <Label className={labelClasses} style={labelStyle}>Title *</Label>
+            <Input
+              type="text"
+              value={form.title}
+              onChange={(e) => setField('title', e.target.value)}
+              className={fieldClasses}
+            />
+          </div>
+
+          <div>
+            <Label className={labelClasses} style={labelStyle}>Problem statement *</Label>
+            <Textarea
+              value={form.problemStatement}
+              onChange={(e) => setField('problemStatement', e.target.value)}
+              rows={3}
+              className={fieldClasses}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2.5">
+            <div>
+              <Label className={labelClasses} style={labelStyle}>No. of MRs</Label>
+              <Input
+                type="number"
+                value={form.numberOfMRS || ''}
+                onChange={(e) => setField('numberOfMRS', Number(e.target.value))}
+                className={fieldClasses}
+              />
+            </div>
+            <div>
+              <Label className={labelClasses} style={labelStyle}>Estimated value (₹)</Label>
+              <Input
+                type="number"
+                value={form.estimatedValue || ''}
+                onChange={(e) => setField('estimatedValue', Number(e.target.value))}
+                className={fieldClasses}
+              />
+            </div>
+          </div>
+
+          <div>
+            <Label className={labelClasses} style={labelStyle}>Contact person *</Label>
+            <Select value={form.contactPersonId} onValueChange={(v) => setField('contactPersonId', v as string)}>
+              <SelectTrigger className={`w-full ${fieldClasses}`}>
+                <SelectValue placeholder={contactPeopleLoading ? 'Loading...' : 'Select contact person...'}>
+                  {(v: string) => contactPeople.find((c) => c.id === v)?.name ?? (contactPeopleLoading ? 'Loading...' : 'Select contact person...')}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {contactPeople.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {contactPeopleErrored && (
+              <p className="text-[11px] mt-1 text-danger">Couldn't load contacts — try again.</p>
+            )}
+          </div>
+
+          <div>
+            <Label className={labelClasses} style={labelStyle}>Sales rep *</Label>
+            {isSalesRepViewer ? (
+              <>
+                <p className="text-[13px] py-1" style={{ color: 'var(--qms-text)' }}>{roleLabel(lead.salesPerson)}</p>
+                <p className="text-[11px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>Only a manager can reassign this lead to a different sales person.</p>
+              </>
+            ) : (
+              <>
+                <Select value={form.salesPersonId} onValueChange={(v) => setField('salesPersonId', v as string)}>
+                  <SelectTrigger className={`w-full ${fieldClasses}`}>
+                    <SelectValue placeholder={salesRolesLoading ? 'Loading...' : 'Select sales rep...'}>
+                      {(v: string) => {
+                        const r = salesRoles.find((role) => role.id === v)
+                        return r ? `${r.name} (${r.code})` : salesRolesLoading ? 'Loading...' : 'Select sales rep...'
+                      }}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {salesRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {(tenantsErrored || salesRolesErrored) && (
+                  <p className="text-[11px] mt-1 text-danger">Couldn't load sales reps — try again.</p>
+                )}
+              </>
+            )}
+          </div>
+
+          <div>
+            <Label className={labelClasses} style={labelStyle}>Focus therapy *</Label>
+            <ChipPicker options={THERAPIES} selected={form.focusTherapy} onChange={(v) => setField('focusTherapy', v)} placeholder="Add a therapy area..." />
+          </div>
+
+          <div>
+            <Label className={labelClasses} style={labelStyle}>Focus doctor specialty *</Label>
+            <ChipPicker options={SPECIALTIES} selected={form.focusTherapyDoctor} onChange={(v) => setField('focusTherapyDoctor', v)} placeholder="Add a specialty..." />
+          </div>
+
+          <div>
+            <Label className={labelClasses} style={labelStyle}>Currently doing *</Label>
+            <WzChipRow>
+              {CURRENT_ACTIVITIES.map((activity) => (
+                <WzChipToggle key={activity} active={form.currentlyDoing.includes(activity)} onClick={() => toggleActivity(activity)}>
+                  {activity}
+                </WzChipToggle>
+              ))}
+            </WzChipRow>
+          </div>
+
+          <div>
+            <Label className={labelClasses} style={labelStyle}>Type of project *</Label>
+            <SegRow>
+              {PROJECT_TYPES.map((pt) => (
+                <SegButton key={pt} active={form.projectType === pt} onClick={() => setField('projectType', pt)}>
+                  {LEAD_PROJECT_TYPE_LABEL[pt]}
+                </SegButton>
+              ))}
+            </SegRow>
+          </div>
+
+          <div>
+            <Label className={labelClasses} style={labelStyle}>QMS can offer *</Label>
+            <WzChipRow>
+              {QMS_OFFERINGS.map((offer) => (
+                <WzChipToggle key={offer.code} active={isOfferSelected(offer.code)} onClick={() => toggleOffer(offer.code)}>
+                  {offer.label}
+                </WzChipToggle>
+              ))}
+            </WzChipRow>
+
+            {form.offers.map((offer) => {
+              const label = QMS_OFFERINGS.find((o) => o.code === offer.code)?.label ?? offer.code
+              return (
+                <div key={offer.code} className="rounded-[10px] border p-2.5 mt-2" style={{ borderColor: 'var(--qms-border)' }}>
+                  <div className="flex items-center gap-1.5 text-[12px] font-extrabold mb-1.5" style={{ color: 'var(--qms-text)' }}>
+                    <FiPackage size={12} /> {label}
+                  </div>
+                  <Input
+                    type="text"
+                    value={offer.subOffer ?? ''}
+                    onChange={(e) => updateOffer(offer.code, 'subOffer', e.target.value)}
+                    className={`${fieldClasses} mb-2`}
+                    placeholder="Sub-offering detail..."
+                  />
+                  <Textarea
+                    value={offer.reason ?? ''}
+                    onChange={(e) => updateOffer(offer.code, 'reason', e.target.value)}
+                    rows={2}
+                    className={fieldClasses}
+                    placeholder="Reason for this offering *"
+                  />
+                </div>
+              )
+            })}
+          </div>
+
+          <div>
+            <Label className={labelClasses} style={labelStyle}>Notes</Label>
+            <Textarea
+              value={form.notes}
+              onChange={(e) => setField('notes', e.target.value)}
+              rows={3}
+              className={fieldClasses}
+              placeholder="Internal notes..."
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2.5">
+            <div>
+              <Label className={labelClasses} style={labelStyle}>Next follow-up date</Label>
+              <DatePicker
+                value={form.followUpDate}
+                onChange={(iso) => setField('followUpDate', iso)}
+                className={`w-full ${fieldClasses}`}
+                startMonth={FOLLOW_UP_DATE_START_MONTH}
+                endMonth={FOLLOW_UP_DATE_END_MONTH}
+              />
+            </div>
+            <div>
+              <Label className={labelClasses} style={labelStyle}>
+                Confidence — <span style={{ color: 'var(--qms-brand)', fontWeight: 800 }}>{form.confidence}%</span>
+              </Label>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={5}
+                value={form.confidence}
+                onChange={(e) => setField('confidence', Number(e.target.value))}
+                className="w-full mt-2.5"
+              />
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter className="px-5 pb-5 pt-3" style={{ borderTop: '1px solid var(--qms-border)' }}>
+          {error && <p className="text-[12px] text-danger mr-auto self-center">{error}</p>}
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button onClick={handleSave} disabled={isSaving} className="font-bold text-white" style={{ background: 'linear-gradient(135deg, var(--qms-brand), #3b6dff 60%, var(--qms-teal))' }}>
+            <FiSave size={14} /> {isSaving ? 'Saving…' : 'Save changes'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+export default EditLeadModal

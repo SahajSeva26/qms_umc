@@ -34,12 +34,14 @@ docs/db-learning
 # ======================
 internal-frontend/node_modules/
 internal-frontend/dist/
+internal-frontend/.vite/
 
 # ======================
 # Pharma Frontend (Vite/React)
 # ======================
 pharma-frontend/node_modules/
 pharma-frontend/dist/
+pharma-frontend/.vite/
 
 # ======================
 # Backend

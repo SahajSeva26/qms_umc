@@ -513,6 +513,17 @@ const report = async (filters: ILeadReportQuery, ctx: RequestContext) => {
     };
 };
 
+// mark a lead as converted — called by ProjectService.create after a project is created from it.
+// Dedicated path so hasProject is never settable via the public update payload / set().
+const markProjectCreated = async (id: string, ctx: RequestContext): Promise<LeadDocument> => {
+    const lead = await get(id, ctx);
+    if (!lead) {
+        return throwAppError('Lead not found', StatusCodes.NOT_FOUND);
+    }
+    lead.hasProject = true;
+    return await lead.save();
+};
+
 export const LeadService = {
     get,
     search,
@@ -520,6 +531,7 @@ export const LeadService = {
     update,
     moveStage,
     report,
+    markProjectCreated,
 };
 
 // ========================================================================================

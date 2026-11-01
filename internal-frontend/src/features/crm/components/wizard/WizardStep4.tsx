@@ -1,0 +1,157 @@
+import type { WizardFormState } from '@/features/crm/wizard.types'
+import { LEAD_PROJECT_TYPE_LABEL } from '@/types/crm.types'
+import { useTenants } from '@/features/access-management/tenant/hooks/useTenants'
+import { useRoles } from '@/features/access-management/role/hooks/useRoles'
+import { useRoleTypes } from '@/features/access-management/role-type/hooks/useRoleTypes'
+import { PLATFORM_TENANT_CODE, PLATFORM_TENANT_FETCH_LIMIT } from '@/features/access-management/accessManagement.constants'
+import { formatINR } from '@/utils/formatters'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { DatePicker } from '@qms/ui'
+import { ReviewCard, ReviewGrid, ReviewField } from '@/components/ui/ReviewCard'
+import { labelClasses, labelStyle, fieldClasses } from '@/features/crm/components/wizard/wizard.styles'
+
+interface WizardStep4Props {
+  form: WizardFormState
+  setField: <K extends keyof WizardFormState>(key: K, value: WizardFormState[K]) => void
+  // A sales-rep viewer — NewLeadWizard already locked form.salesPersonId to self; show it read-only, skip the picker's queries.
+  lockedToSelf?: boolean
+}
+
+// Navigation range only — DatePicker's own default caps at the current month, unreachable for a future follow-up.
+const FOLLOW_UP_DATE_START_MONTH = new Date(new Date().getFullYear() - 2, 0)
+const FOLLOW_UP_DATE_END_MONTH = new Date(new Date().getFullYear() + 5, 11)
+
+const WizardStep4 = ({ form, setField, lockedToSelf }: WizardStep4Props) => {
+  // limit: PLATFORM_TENANT_FETCH_LIMIT — the backend's default 10-result limit can silently exclude the `qms` platform tenant.
+  const { data: tenantData, isError: tenantsErrored } = useTenants(
+    { type: 'platform', status: 'active', limit: PLATFORM_TENANT_FETCH_LIMIT },
+    !lockedToSelf,
+  )
+  const platformTenant = tenantData?.data?.items.find((t) => t.type === 'platform' || t.code === PLATFORM_TENANT_CODE)
+
+  // TODO: ask whether this should offer both sales-rep and sales-head, or just one.
+  // limit: '50' — the backend's default 10-result page can exclude both once the platform tenant has 10+ role types.
+  const { data: roleTypesData, isLoading: roleTypesLoading, isError: roleTypesErrored } = useRoleTypes(
+    { tenant: platformTenant?.id, status: 'active', limit: '50' },
+    !lockedToSelf && !!platformTenant,
+  )
+  const salesRepTypeId = roleTypesData?.data?.items.find((t) => t.code === 'sales-rep')?.id
+  const salesHeadTypeId = roleTypesData?.data?.items.find((t) => t.code === 'sales-head')?.id
+
+  const { data: salesRepRoleData, isLoading: salesRepRolesLoading, isError: salesRepRolesErrored } = useRoles(
+    { tenant: platformTenant?.id, type: salesRepTypeId, status: 'active' },
+    !lockedToSelf && !!platformTenant && !!salesRepTypeId,
+  )
+  const { data: salesHeadRoleData, isLoading: salesHeadRolesLoading, isError: salesHeadRolesErrored } = useRoles(
+    { tenant: platformTenant?.id, type: salesHeadTypeId, status: 'active' },
+    !lockedToSelf && !!platformTenant && !!salesHeadTypeId,
+  )
+  const salesRoles = [...(salesRepRoleData?.data?.items ?? []), ...(salesHeadRoleData?.data?.items ?? [])]
+  const rolesLoading = roleTypesLoading || salesRepRolesLoading || salesHeadRolesLoading
+  const rolesErrored = roleTypesErrored || salesRepRolesErrored || salesHeadRolesErrored
+
+  const selectSalesPerson = (roleId: string) => {
+    const role = salesRoles.find((r) => r.id === roleId)
+    setField('salesPersonId', roleId)
+    setField('salesPersonLabel', role?.name ?? '')
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-2.5">
+        <div>
+          <Label className={labelClasses} style={labelStyle}>Estimated value (₹)</Label>
+          <Input
+            type="number"
+            value={form.estimatedValue || ''}
+            onChange={(e) => setField('estimatedValue', Number(e.target.value))}
+            className={fieldClasses}
+          />
+        </div>
+        <div>
+          <Label className={labelClasses} style={labelStyle}>Next follow-up date *</Label>
+          <DatePicker
+            value={form.followUpDate}
+            onChange={(iso) => setField('followUpDate', iso)}
+            className={`w-full ${fieldClasses}`}
+            startMonth={FOLLOW_UP_DATE_START_MONTH}
+            endMonth={FOLLOW_UP_DATE_END_MONTH}
+          />
+        </div>
+      </div>
+
+      <div>
+        <Label className={labelClasses} style={labelStyle}>
+          Confidence — <span style={{ color: 'var(--qms-brand)', fontWeight: 800 }}>{form.confidence}%</span>
+        </Label>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={5}
+          value={form.confidence}
+          onChange={(e) => setField('confidence', Number(e.target.value))}
+          className="w-full"
+        />
+      </div>
+
+      <div>
+        <Label className={labelClasses} style={labelStyle}>Sales rep{lockedToSelf ? '' : ' (optional)'}</Label>
+        {lockedToSelf ? (
+          <>
+            <p className="text-[13px] py-1" style={{ color: 'var(--qms-text)' }}>{form.salesPersonLabel}</p>
+            <p className="text-[11px] mt-1" style={{ color: 'var(--qms-text-muted)' }}>A sales rep's new leads are always assigned to themselves.</p>
+          </>
+        ) : (
+          <>
+            <Select key={form.salesPersonId || 'empty'} value={form.salesPersonId} onValueChange={(v) => selectSalesPerson(v as string)}>
+              <SelectTrigger className={`w-full ${fieldClasses}`}>
+                <SelectValue placeholder={rolesLoading ? 'Loading...' : 'Default to company sales rep'}>
+                  {(v: string) => {
+                    const r = salesRoles.find((role) => role.id === v)
+                    return r ? `${r.name} (${r.code})` : rolesLoading ? 'Loading...' : 'Default to company sales rep'
+                  }}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {salesRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.code})</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {(tenantsErrored || rolesErrored) && (
+              <p className="text-[11px] mt-1 text-danger">Couldn't load sales reps — leave unselected to default to the company's assigned sales rep.</p>
+            )}
+            {!tenantsErrored && !rolesErrored && !rolesLoading && !platformTenant && (
+              <p className="text-[11px] mt-1 text-danger">No QMS internal (platform) company found — a sales rep must belong to one.</p>
+            )}
+          </>
+        )}
+      </div>
+
+      <p className="text-[12px] mt-2" style={{ color: 'var(--qms-text-muted)' }}>
+        Lead opens in status <b>New</b>. Transition forward by drag-drop in the kanban.
+      </p>
+
+      <ReviewCard>
+        <ReviewGrid>
+          <ReviewField label="Pharma" value={form.tenantLabel || '—'} />
+          <ReviewField label="Division" value={form.divisionLabel || '—'} />
+          <ReviewField label="Focus therapy" value={form.focusTherapy.join(', ') || '—'} />
+          <ReviewField label="MRs" value={form.numberOfMRS ? String(form.numberOfMRS) : '—'} />
+          <ReviewField label="Project type" value={form.projectType ? LEAD_PROJECT_TYPE_LABEL[form.projectType] : '—'} />
+          <ReviewField label="QMS offer" value={form.offers.length ? String(form.offers.length) : '—'} />
+          <ReviewField label="Value" value={formatINR(form.estimatedValue)} />
+        </ReviewGrid>
+        {form.problemStatement && (
+          <div className="mt-3">
+            <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--qms-text-soft)' }}>Problem statement</div>
+            <div className="text-[13px] mt-1 leading-snug" style={{ color: 'var(--qms-text)' }}>{form.problemStatement}</div>
+          </div>
+        )}
+      </ReviewCard>
+    </div>
+  )
+}
+
+export default WizardStep4

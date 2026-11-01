@@ -1,0 +1,271 @@
+import { useMemo, useState } from 'react'
+import { FiUsers, FiLayers, FiMap, FiMoon, FiPlus, FiCheckCircle, FiMapPin } from 'react-icons/fi'
+import KpiTile from '@/components/ui/KpiTile'
+import PaginationControls from '@/components/ui/PaginationControls'
+import QueryStateBlock from '@/components/ui/QueryStateBlock'
+import { useDoctorSearch as useDoctors } from '@/hooks/useDoctorSearch'
+import { useDoctorsFilters } from '@/features/doctors/hooks/useDoctorsFilters'
+import { usePermission } from '@/hooks/usePermission'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { usePagination } from '@/hooks/usePagination'
+import type { DoctorEntity, DoctorSpecialization } from '@/types/doctor.types'
+import { EMPTY_ARRAY } from '@/utils/emptyArray'
+import RosterTab from '@/features/doctors/components/tabs/RosterTab'
+import SpecialtiesTab from '@/features/doctors/components/tabs/SpecialtiesTab'
+import GeographyTab from '@/features/doctors/components/tabs/GeographyTab'
+import InactiveTab from '@/features/doctors/components/tabs/InactiveTab'
+import DoctorDrawer from '@/features/doctors/components/DoctorDrawer'
+import EditDoctorModal from '@/features/doctors/components/EditDoctorModal'
+import { CAMP_VIEW_PERMISSIONS } from '@/lib/access/campAccess'
+
+type TabId = 'roster' | 'specialties' | 'geography' | 'inactive'
+
+const TABS: { id: TabId; label: string; icon: typeof FiUsers }[] = [
+  { id: 'roster', label: 'Roster', icon: FiUsers },
+  { id: 'specialties', label: 'Specialties', icon: FiLayers },
+  { id: 'geography', label: 'Geography', icon: FiMap },
+  { id: 'inactive', label: 'Inactive', icon: FiMoon },
+]
+
+const PAGE_SIZE = 10
+
+// Specialties/Geography tabs' city/specialization counts aggregate over only this many active
+// doctors (pending a backend aggregation endpoint) — labeled as a sample in the UI, not presented as whole-dataset metrics.
+const AGGREGATE_LIMIT = 10
+
+const DoctorsPage = () => {
+  const { filters, setFilter, reset } = useDoctorsFilters()
+  const debouncedSearch = useDebouncedValue(filters.search, 300)
+  const debouncedCity = useDebouncedValue(filters.city, 300)
+  const debouncedState = useDebouncedValue(filters.state, 300)
+  const { hasPermission, hasAnyPermission } = usePermission()
+  // Same permission gates the Inactive tab and the edit/deactivate endpoints server-side.
+  const canSeeInactive = hasPermission('doctor:manage')
+  const canManageDoctors = canSeeInactive
+  // doctor:create is a lighter, separate permission (e.g. an MR) — POST /doctors accepts either code.
+  const canCreateDoctors = hasAnyPermission(['doctor:create', 'doctor:manage'])
+  const canViewDoctorCamps = hasAnyPermission(CAMP_VIEW_PERMISSIONS)
+  // Resolving same-division MRs requires both GET /roles and GET /role-types.
+  const canViewDoctorMrs = hasAnyPermission(['tenant:admin', 'tenant:manage', 'role:search'])
+    && hasAnyPermission(['role-type:manage', 'role-type:search'])
+  const [tab, setTab] = useState<TabId>('roster')
+  const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
+  const { page: inactivePage, setPage: setInactivePage, totalPages: inactiveTotalPagesFor } = usePagination(PAGE_SIZE)
+  const [openDoctorId, setOpenDoctorId] = useState<string | null>(null)
+  const [editModal, setEditModal] = useState<{ open: boolean; doctor: DoctorEntity | null }>({ open: false, doctor: null })
+
+  const { data, isLoading, error, refetch } = useDoctors(
+    {
+      name: debouncedSearch || undefined,
+      specialization: filters.specialization === 'ALL' ? undefined : filters.specialization,
+      status: filters.status === 'ALL' ? undefined : filters.status,
+      city: debouncedCity || undefined,
+      state: debouncedState || undefined,
+      page: String(page),
+      limit: String(PAGE_SIZE),
+      report: 'true',
+    },
+    { keepPreviousData: true },
+  )
+  const doctors = data?.data?.items ?? EMPTY_ARRAY
+  const totalCount = data?.data?.count ?? 0
+
+  // activeDoctors is only a sample for the Specialties/Geography breakdown — the response's own
+  // `count` (the real whole-dataset total) backs the KPI tiles instead.
+  const needsActiveSample = tab === 'specialties' || tab === 'geography'
+  const { data: activeData, isLoading: activeLoading, error: activeError, refetch: refetchActive } = useDoctors({
+    limit: String(AGGREGATE_LIMIT),
+    report: needsActiveSample ? 'true' : undefined,
+  })
+  const activeDoctors = activeData?.data?.items ?? EMPTY_ARRAY
+  const activeTotalCount = activeData?.data?.count ?? 0
+
+  // Needs its own query since the backend only returns inactive doctors on explicit request.
+  const { data: inactiveData, isLoading: inactiveLoading, error: inactiveError, refetch: refetchInactive } = useDoctors(
+    canSeeInactive ? { status: 'inactive', page: String(inactivePage), limit: String(PAGE_SIZE), report: tab === 'inactive' ? 'true' : undefined } : { limit: '0' },
+    { enabled: canSeeInactive, keepPreviousData: true },
+  )
+  const inactiveDoctors = canSeeInactive ? inactiveData?.data?.items ?? EMPTY_ARRAY : EMPTY_ARRAY
+  const inactiveTotalCount = canSeeInactive ? inactiveData?.data?.count ?? 0 : 0
+
+  const handleFilterChange = <K extends keyof typeof filters>(key: K, value: (typeof filters)[K]) => {
+    setFilter(key, value)
+    resetToFirstPage()
+  }
+
+  const handleReset = () => {
+    reset()
+    resetToFirstPage()
+  }
+
+  // `active`/`inactive` use the response's own `count`; `cities`/`specializations` are still genuinely
+  // sampled (no backend aggregate for them) — surfaced as `isSample: true` so the UI can label them.
+  const kpis = useMemo(() => {
+    const cities = new Set(activeDoctors.map((d) => d.location?.city).filter(Boolean)).size
+    const specializations = new Set(activeDoctors.map((d) => d.specialization)).size
+    return { cities, specializations, active: activeTotalCount, inactive: inactiveTotalCount, isSample: activeTotalCount > AGGREGATE_LIMIT }
+  }, [activeDoctors, activeTotalCount, inactiveTotalCount])
+
+  const allKnownDoctors = [...doctors, ...activeDoctors, ...inactiveDoctors]
+  const openDoctor = allKnownDoctors.find((d) => d.id === openDoctorId) ?? null
+
+  const handleGoToRosterWithSpecialization = (specialization: DoctorSpecialization) => {
+    setFilter('specialization', specialization)
+    resetToFirstPage()
+    setTab('roster')
+  }
+
+  // Bumped on every jump so StateCityFilter re-seeds even when the same city/state is clicked twice in a row.
+  const [geographySeedKey, setGeographySeedKey] = useState(0)
+  const [geographySeed, setGeographySeed] = useState<{ city: string; state: string } | null>(null)
+
+  const handleGoToRosterWithCityState = (city: string, state: string) => {
+    setFilter('city', city)
+    setFilter('state', state)
+    resetToFirstPage()
+    setTab('roster')
+    setGeographySeed({ city, state })
+    setGeographySeedKey((k) => k + 1)
+  }
+
+  return (
+    <div className="w-full">
+      <div className="flex items-start justify-between gap-3 mb-4 flex-wrap">
+        <div>
+          <div className="text-[12px] mb-1" style={{ color: 'var(--qms-text-muted)' }}>Network · Doctor Management</div>
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--qms-text)' }}>Doctor Management</h1>
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full" style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text-muted)' }}>
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--success)' }} /> Doctor master · live
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full" style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text-muted)' }}>
+              <FiMapPin size={11} /> Geo-mapped
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Hide create entry point rather than let a 403 hit on submit. */}
+          {canCreateDoctors && (
+            <button
+              onClick={() => setEditModal({ open: true, doctor: null })}
+              className="flex items-center gap-1.5 text-[13px] font-bold px-3.5 py-2 rounded-xl text-white shrink-0"
+              style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}
+            >
+              <FiPlus size={14} /> Add doctor
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(168px, 1fr))' }}>
+        {/* These are always-visible, independent queries — a failed/loading fetch must not silently read as "0 doctors". */}
+        {canSeeInactive && (
+          <KpiTile
+            label="Total doctors"
+            value={
+              activeError || inactiveError ? '—'
+                : activeLoading || inactiveLoading ? '…'
+                  : String(kpis.active + kpis.inactive)
+            }
+            sub={
+              activeError ? 'Failed to load'
+                : activeLoading ? 'Loading…'
+                  : `${kpis.cities} cities · ${kpis.specializations} specializations${kpis.isSample ? ' (sample)' : ''}`
+            }
+            tone="brand"
+            icon={FiUsers}
+          />
+        )}
+        <KpiTile
+          label="Active"
+          value={activeError ? '—' : activeLoading ? '…' : String(kpis.active)}
+          sub={activeError ? 'Failed to load' : activeLoading ? 'Loading…' : undefined}
+          tone="emerald"
+          icon={FiCheckCircle}
+        />
+        {canSeeInactive && (
+          <KpiTile
+            label="Inactive"
+            value={inactiveError ? '—' : inactiveLoading ? '…' : String(kpis.inactive)}
+            sub={inactiveError ? 'Failed to load' : inactiveLoading ? 'Loading…' : undefined}
+            tone="rose"
+            icon={FiMoon}
+          />
+        )}
+      </div>
+
+      <div className="flex flex-wrap gap-1 mb-4 border-b overflow-x-auto" style={{ borderColor: 'var(--qms-border)' }}>
+        {TABS.filter((t) => t.id !== 'inactive' || canSeeInactive).map((t) => {
+          const Icon = t.icon
+          return (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className="flex items-center gap-1.5 px-3 py-2.5 text-[12.5px] font-semibold border-b-2 transition-colors shrink-0"
+              style={{
+                color: tab === t.id ? 'var(--qms-text)' : 'var(--qms-text-muted)',
+                borderBottomColor: tab === t.id ? 'var(--qms-brand)' : 'transparent',
+              }}
+            >
+              <Icon size={12} /> {t.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Each tab has its own independent query — a failed/loading secondary query must not render as empty/zero under a different tab. */}
+      <>
+        {tab === 'roster' && (
+          <QueryStateBlock isLoading={isLoading} error={error} loadingLabel="Loading doctors…" errorLabel="Failed to load doctors. Please try again." onRetry={refetch}>
+            <RosterTab
+              doctors={doctors}
+              filters={filters}
+              setFilter={handleFilterChange}
+              reset={handleReset}
+              onOpenDoctor={setOpenDoctorId}
+              geographySeedKey={geographySeedKey}
+              geographySeed={geographySeed}
+            />
+            <PaginationControls page={page} totalPages={totalPages(totalCount)} onPageChange={setPage} />
+          </QueryStateBlock>
+        )}
+
+        {tab === 'specialties' && (
+          <QueryStateBlock isLoading={activeLoading} error={activeError} loadingLabel="Loading specialties…" errorLabel="Failed to load doctors. Please try again." onRetry={refetchActive}>
+            <SpecialtiesTab doctors={activeDoctors} onSelectSpecialization={handleGoToRosterWithSpecialization} isSample={kpis.isSample} />
+          </QueryStateBlock>
+        )}
+
+        {tab === 'geography' && (
+          <QueryStateBlock isLoading={activeLoading} error={activeError} loadingLabel="Loading geography…" errorLabel="Failed to load doctors. Please try again." onRetry={refetchActive}>
+            <GeographyTab doctors={activeDoctors} onSelectCityState={handleGoToRosterWithCityState} isSample={kpis.isSample} />
+          </QueryStateBlock>
+        )}
+
+        {tab === 'inactive' && (
+          <QueryStateBlock isLoading={inactiveLoading} error={inactiveError} loadingLabel="Loading inactive doctors…" errorLabel="Failed to load doctors. Please try again." onRetry={refetchInactive}>
+            <InactiveTab doctors={inactiveDoctors} onOpenDoctor={setOpenDoctorId} />
+            <PaginationControls page={inactivePage} totalPages={inactiveTotalPagesFor(inactiveTotalCount)} onPageChange={setInactivePage} />
+          </QueryStateBlock>
+        )}
+      </>
+
+      <DoctorDrawer
+        doctor={openDoctor}
+        canEdit={canManageDoctors}
+        canViewMrs={canViewDoctorMrs}
+        canViewCamps={canViewDoctorCamps}
+        onClose={() => setOpenDoctorId(null)}
+        onEdit={() => { setEditModal({ open: true, doctor: openDoctor }); setOpenDoctorId(null) }}
+      />
+
+      <EditDoctorModal
+        open={editModal.open}
+        doctor={editModal.doctor}
+        onClose={() => setEditModal({ open: false, doctor: null })}
+      />
+    </div>
+  )
+}
+
+export default DoctorsPage

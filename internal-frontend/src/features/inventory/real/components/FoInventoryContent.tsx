@@ -1,0 +1,190 @@
+import { useMemo } from 'react'
+import { FiCpu, FiPackage, FiCalendar } from 'react-icons/fi'
+import QueryStateBlock from '@/components/ui/QueryStateBlock'
+import PaginationControls from '@/components/ui/PaginationControls'
+import { useInventoryAssignments } from '@/features/inventory/real/hooks/useInventoryAssignments'
+import { useFoInventoryDevices, useFoInventoryConsumables } from '@/features/inventory/real/hooks/useFoInventoryDetails'
+import { expiryBand } from '@/features/inventory/real/utils/expiryBand'
+import { INVENTORY_DEVICE_STATUS_LABEL } from '@/types/inventoryDevice.types'
+import type { InventoryAssignmentEntity } from '@/types/inventoryAssignment.types'
+import { usePagination } from '@/hooks/usePagination'
+
+const PAGE_SIZE = 10
+
+// Stable reference so dependent memos don't re-run on every "no items yet" render.
+const EMPTY_ASSIGNMENTS: InventoryAssignmentEntity[] = []
+
+interface FoInventoryContentProps {
+  /** Only fetches/renders while true — lets a caller (e.g. a closed drawer) skip the network calls entirely. */
+  active: boolean
+  foRoleId: string
+  summary?: {
+    devicesHeld?: number
+    consumableUnitsHeld?: number
+  }
+}
+
+// KPI-tile strip + devices/consumables tables for one assignee — shared by FoInventoryDrawer (the
+// org-wide roster's per-row drill-in) and MyInventoryPanel (a field worker's own-inventory tab), so
+// the two never drift into separately-maintained copies of the same device/consumable tables.
+const FoInventoryContent = ({ active, foRoleId, summary }: FoInventoryContentProps) => {
+  const { page: devicePage, setPage: setDevicePage, totalPages: deviceTotalPages } = usePagination(PAGE_SIZE)
+  const { page: consumablePage, setPage: setConsumablePage, totalPages: consumableTotalPages } = usePagination(PAGE_SIZE)
+  const { data: deviceAssignmentsData, isLoading: deviceAssignmentsLoading, error: deviceAssignmentsError, refetch: refetchDeviceAssignments } =
+    useInventoryAssignments({ assignee: foRoleId, inventoryType: 'InventoryDevice', page: String(devicePage), limit: String(PAGE_SIZE) }, active)
+  const { data: consumableAssignmentsData, isLoading: consumableAssignmentsLoading, error: consumableAssignmentsError, refetch: refetchConsumableAssignments } =
+    useInventoryAssignments({ assignee: foRoleId, inventoryType: 'InventoryConsumable', page: String(consumablePage), limit: String(PAGE_SIZE) }, active)
+
+  const deviceRows = deviceAssignmentsData?.data?.items ?? EMPTY_ASSIGNMENTS
+  const consumableRows = consumableAssignmentsData?.data?.items ?? EMPTY_ASSIGNMENTS
+  const deviceCount = deviceAssignmentsData?.data?.count ?? 0
+  const consumableCount = consumableAssignmentsData?.data?.count ?? 0
+
+  // Fetched by exact id, not a global list scan — never misses an item regardless of status
+  // (the global search defaults to active-only, which would hide expired consumable lots).
+  const deviceIds = useMemo(() => deviceRows.map((a) => a.inventory.id), [deviceRows])
+  const consumableIds = useMemo(() => consumableRows.map((a) => a.inventory.id), [consumableRows])
+
+  const { data: deviceById, isLoading: devicesLoading, error: devicesError, refetch: refetchDevices } = useFoInventoryDevices(deviceIds, active)
+  const { data: consumableById, isLoading: consumablesLoading, error: consumablesError, refetch: refetchConsumables } = useFoInventoryConsumables(consumableIds, active)
+
+  const isLoading = deviceAssignmentsLoading || consumableAssignmentsLoading || devicesLoading || consumablesLoading
+  const error = deviceAssignmentsError || consumableAssignmentsError || devicesError || consumablesError
+  const retry = () => {
+    refetchDeviceAssignments()
+    refetchConsumableAssignments()
+    refetchDevices()
+    refetchConsumables()
+  }
+
+  const expiringSoonCount = useMemo(() => {
+    return consumableRows.filter((a: InventoryAssignmentEntity) => {
+      const band = expiryBand(a.inventory.expiryDate)
+      return band && (band.code === 'EXPIRED' || band.code === 'RED' || band.code === 'ORANGE')
+    }).length
+  }, [consumableRows])
+
+  return (
+    <QueryStateBlock isLoading={isLoading} error={error} loadingLabel="Loading inventory…" errorLabel="Failed to load inventory. Please try again." onRetry={retry}>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mb-5">
+        <div className="rounded-xl border p-3 flex items-center gap-3" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}>
+          <span className="w-9 h-9 rounded-xl flex items-center justify-center text-white shrink-0" style={{ background: 'linear-gradient(135deg, var(--qms-brand), #6366f1)' }}><FiCpu size={17} /></span>
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-wider mb-0.5" style={{ color: 'var(--qms-text-muted)' }}>Devices</div>
+            <div className="text-lg font-extrabold" style={{ color: 'var(--qms-text)' }}>{summary?.devicesHeld ?? deviceCount}</div>
+          </div>
+        </div>
+        <div className="rounded-xl border p-3 flex items-center gap-3" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}>
+          <span className="w-9 h-9 rounded-xl flex items-center justify-center text-white shrink-0" style={{ background: 'linear-gradient(135deg, var(--qms-teal), #10b981)' }}><FiPackage size={17} /></span>
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-wider mb-0.5" style={{ color: 'var(--qms-text-muted)' }}>Consumable units</div>
+            <div className="text-lg font-extrabold" style={{ color: 'var(--qms-text)' }}>{summary?.consumableUnitsHeld ?? consumableRows.reduce((sum, row) => sum + row.quantity, 0)}</div>
+          </div>
+        </div>
+        <div className="rounded-xl border p-3 flex items-center gap-3" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface-card)' }}>
+          <span className="w-9 h-9 rounded-xl flex items-center justify-center text-white shrink-0" style={{ background: expiringSoonCount > 0 ? 'linear-gradient(135deg, #f97316, #ef4444)' : 'linear-gradient(135deg, #10b981, #14b8a6)' }}><FiCalendar size={17} /></span>
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-wider mb-0.5" style={{ color: 'var(--qms-text-muted)' }}>Expiring soon</div>
+            <div className="text-lg font-extrabold" style={{ color: expiringSoonCount > 0 ? '#c2410c' : 'var(--qms-text)' }}>{expiringSoonCount}</div>
+            <div className="text-[10px]" style={{ color: 'var(--qms-text-muted)' }}>Visible page · &lt; 90 days</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide mb-2 pb-2" style={{ color: 'var(--qms-text-muted)', borderBottom: '1px dashed var(--qms-border)' }}>
+        <span className="w-6 h-6 rounded-md flex items-center justify-center text-white" style={{ background: 'linear-gradient(135deg, var(--qms-brand), var(--qms-teal))' }}><FiCpu size={12} /></span>
+        Devices ({deviceCount})
+      </div>
+      {deviceRows.length > 0 ? (
+        <div className="rounded-xl border overflow-hidden mb-5" style={{ borderColor: 'var(--qms-border)' }}>
+          <table className="w-full text-[12px]">
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--qms-border)' }}>
+                {['Serial', 'Device', 'SKU', 'Status', 'Calibration'].map((h) => (
+                  <th key={h} className="text-left font-bold text-[10px] uppercase tracking-wider px-3 py-2" style={{ color: 'var(--qms-text-muted)' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {deviceRows.map((a) => {
+                const device = deviceById?.get(a.inventory.id)
+                return (
+                  <tr key={a.id} style={{ borderBottom: '1px solid var(--qms-border)' }}>
+                    <td className="px-3 py-2 font-mono" style={{ color: 'var(--qms-text-muted)' }}>{a.inventory.serialNumber ?? '—'}</td>
+                    <td className="px-3 py-2" style={{ color: 'var(--qms-text)' }}>{device?.item?.name ?? '—'}</td>
+                    <td className="px-3 py-2 font-mono" style={{ color: 'var(--qms-text-muted)' }}>{device?.item?.sku ?? '—'}</td>
+                    <td className="px-3 py-2" style={{ color: 'var(--qms-text-muted)' }}>{a.inventory.status ? INVENTORY_DEVICE_STATUS_LABEL[a.inventory.status as keyof typeof INVENTORY_DEVICE_STATUS_LABEL] ?? a.inventory.status : '—'}</td>
+                    <td className="px-3 py-2" style={{ color: 'var(--qms-text-muted)' }}>{device?.nextCalibrationDate ? new Date(device.nextCalibrationDate).toLocaleDateString() : '—'}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="text-[12px] mb-5" style={{ color: 'var(--qms-text-muted)' }}>No devices assigned.</div>
+      )}
+      <div className="mb-5">
+        <PaginationControls
+          page={devicePage}
+          totalPages={deviceTotalPages(deviceCount)}
+          onPageChange={setDevicePage}
+          disabled={deviceAssignmentsLoading || devicesLoading}
+        />
+      </div>
+
+      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide mb-2 pb-2" style={{ color: 'var(--qms-text-muted)', borderBottom: '1px dashed var(--qms-border)' }}>
+        <span className="w-6 h-6 rounded-md flex items-center justify-center text-white" style={{ background: 'linear-gradient(135deg, var(--qms-teal), var(--qms-brand))' }}><FiPackage size={12} /></span>
+        Consumable lots ({consumableCount})
+      </div>
+      {consumableRows.length > 0 ? (
+        <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--qms-border)' }}>
+          <table className="w-full text-[12px]">
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--qms-border)' }}>
+                {['Item', 'Code', 'Batch', 'Qty', 'Expiry'].map((h) => (
+                  <th key={h} className="text-left font-bold text-[10px] uppercase tracking-wider px-3 py-2" style={{ color: 'var(--qms-text-muted)' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {consumableRows.map((a) => {
+                const consumable = consumableById?.get(a.inventory.id)
+                const band = expiryBand(a.inventory.expiryDate)
+                return (
+                  <tr key={a.id} style={{ borderBottom: '1px solid var(--qms-border)' }}>
+                    <td className="px-3 py-2" style={{ color: 'var(--qms-text)' }}>{consumable?.item?.name ?? '—'}</td>
+                    <td className="px-3 py-2 font-mono" style={{ color: 'var(--qms-text-muted)' }}>{consumable?.item?.code ?? '—'}</td>
+                    <td className="px-3 py-2 font-mono" style={{ color: 'var(--qms-text-muted)' }}>{a.inventory.batch ?? '—'}</td>
+                    <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--qms-text)' }}>
+                      {a.quantity}{consumable?.item?.unit ? ` ${consumable.item.unit}` : ''}
+                    </td>
+                    <td className="px-3 py-2">
+                      {band ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: band.css === 'green' ? 'rgba(16,185,129,.15)' : band.css === 'yellow' ? 'rgba(234,179,8,.18)' : band.css === 'orange' ? 'rgba(249,115,22,.16)' : 'rgba(244,63,94,.15)', color: band.css === 'green' ? '#059669' : band.css === 'yellow' ? '#a16207' : band.css === 'orange' ? '#c2410c' : '#e11d48' }}>
+                          {band.label}
+                        </span>
+                      ) : (
+                        <span style={{ color: 'var(--qms-text-muted)' }}>—</span>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>No consumables held.</div>
+      )}
+      <PaginationControls
+        page={consumablePage}
+        totalPages={consumableTotalPages(consumableCount)}
+        onPageChange={setConsumablePage}
+        disabled={consumableAssignmentsLoading || consumablesLoading}
+      />
+    </QueryStateBlock>
+  )
+}
+
+export default FoInventoryContent

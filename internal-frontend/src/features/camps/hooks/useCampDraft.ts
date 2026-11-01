@@ -1,0 +1,69 @@
+import { useReducer } from 'react'
+import { campRefId } from '@/features/camps/campsReal.utils'
+import type { BillingType, CampEntity, CampType } from '@/types/campReal.types'
+import type { CampTimeSlotValue } from '@/types/campTimeSlot.constants'
+import { CAMP_TIME_SLOT_VALUES } from '@/types/campTimeSlot.constants'
+import type { LocationValue } from '@qms/core'
+
+export interface CampDraft {
+  tenant: string
+  division: string
+  project: string
+  doctor: string
+  type: CampType
+  billingType: BillingType
+  patientExpectation: string
+  fo: string
+  dietitian: string
+  mr: string
+  date: string
+  timeSlot: CampTimeSlotValue | ''
+  location: LocationValue | null
+  /** Selected InventoryMaster device ObjectIds — comma-joined for the shared SET_FIELD string reducer, split back into an array at submit time. */
+  devices: string
+  notes: string
+}
+
+type CampDraftField = keyof CampDraft
+type CampDraftFieldValue<F extends CampDraftField> = CampDraft[F]
+type CampDraftAction = { [F in CampDraftField]: { type: 'SET_FIELD'; field: F; value: CampDraftFieldValue<F> } }[CampDraftField]
+
+function buildInitialDraft(camp: CampEntity | null, initialType?: CampType): CampDraft {
+  return {
+    tenant: '',
+    division: campRefId(camp?.division) ?? '',
+    project: campRefId(camp?.project) ?? '',
+    doctor: campRefId(camp?.doctor) ?? '',
+    type: camp?.type ?? initialType ?? 'screening',
+    billingType: camp?.billingType ?? 'billable',
+    patientExpectation: camp ? String(camp.patientExpectation ?? '') : '',
+    fo: campRefId(camp?.fo) ?? '',
+    dietitian: campRefId(camp?.dietitian) ?? '',
+    mr: campRefId(camp?.mr) ?? '',
+    date: camp?.date ? camp.date.slice(0, 10) : '',
+    timeSlot: camp?.timeSlot && (CAMP_TIME_SLOT_VALUES as string[]).includes(camp.timeSlot) ? camp.timeSlot : '',
+    location: camp?.location ?? null,
+    // camp.devices is always populated sub-docs, never bare id strings — .join() alone would give "[object Object]".
+    devices: (camp?.devices ?? []).map((d) => d._id).join(', '),
+    notes: camp?.notes ?? '',
+  }
+}
+
+function campDraftReducer(state: CampDraft, action: CampDraftAction): CampDraft {
+  switch (action.type) {
+    case 'SET_FIELD':
+      return { ...state, [action.field]: action.value }
+    default:
+      return state
+  }
+}
+
+// initialType seeds a fresh create draft only — an existing camp's own type always wins.
+export const useCampDraft = (camp: CampEntity | null, initialType?: CampType) => {
+  const [draft, dispatch] = useReducer(campDraftReducer, camp, (c) => buildInitialDraft(c, initialType))
+
+  const setField = <F extends CampDraftField>(field: F, value: CampDraftFieldValue<F>) =>
+    dispatch({ type: 'SET_FIELD', field, value } as CampDraftAction)
+
+  return { draft, setField }
+}

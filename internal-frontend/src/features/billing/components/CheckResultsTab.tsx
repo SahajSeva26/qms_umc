@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { FiCheckSquare } from 'react-icons/fi'
+import { DatePicker } from '@qms/ui'
 import { useEligibleInvoiceCamps } from '@/features/billing/hooks/useEligibleInvoiceCamps'
 import { useScreenings } from '@/features/clinical/screening/hooks/useScreenings'
 import ScreeningCrossCheckRow from '@/features/billing/components/ScreeningCrossCheckRow'
@@ -11,21 +12,40 @@ import { formatDate } from '@/utils/formatters'
 
 const PAGE_SIZE = 20
 
-// Lets someone cross-check a camp's recorded patients/screenings/test results before the camp
-// gets drafted into an invoice. Reuses the same "project -> billable camps" picker the Generate
-// Invoice tab uses (useEligibleInvoiceCamps), since screenings are camp-scoped, not
-// project-scoped, on the backend — there's no single endpoint that returns every screening
-// across a project's camps in one call.
+// Navigation range only, not a business rule — mirrors CampsFilterBarReal's own constants/field class.
+const FILTER_DATE_START_MONTH = new Date(new Date().getFullYear() - 10, 0)
+const FILTER_DATE_END_MONTH = new Date(new Date().getFullYear() + 10, 11)
+const DATE_FIELD_CLASS = 'w-36 h-auto rounded-lg px-2.5 py-1.5 text-[12px]'
+
+// Screenings are camp-scoped, not project-scoped, on the backend — no single endpoint returns
+// every screening across a project's camps, hence the project -> camp drill-down.
 const CheckResultsTab = () => {
   const [projectId, setProjectId] = useState('')
   const [projectLabel, setProjectLabel] = useState('')
   const [campId, setCampId] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const isInvalidRange = !!dateFrom && !!dateTo && dateTo < dateFrom
 
-  const { data: camps, isLoading: campsLoading, error: campsError, refetch: refetchCamps } = useEligibleInvoiceCamps(projectId || undefined)
+  const { data: camps, isLoading: campsLoading, error: campsError, refetch: refetchCamps } = useEligibleInvoiceCamps(
+    !isInvalidRange ? (projectId || undefined) : undefined,
+    { dateFrom, dateTo },
+  )
 
   const handleProjectChange = (id: string, label: string) => {
     setProjectId(id)
     setProjectLabel(label)
+    setCampId('')
+  }
+
+  // The selected camp may fall outside a newly-narrowed date range and silently disappear from
+  // the dropdown — clear the selection so a stale, now-hidden camp's results don't keep showing.
+  const handleDateFromChange = (v: string) => {
+    setDateFrom(v)
+    setCampId('')
+  }
+  const handleDateToChange = (v: string) => {
+    setDateTo(v)
     setCampId('')
   }
 
@@ -41,6 +61,26 @@ const CheckResultsTab = () => {
         <div className="w-80">
           <BillingProjectPicker value={projectId} label={projectLabel} onChange={handleProjectChange} />
         </div>
+        {projectId && (
+          <>
+            <DatePicker
+              value={dateFrom}
+              onChange={handleDateFromChange}
+              placeholder="Camp date from"
+              className={DATE_FIELD_CLASS}
+              startMonth={FILTER_DATE_START_MONTH}
+              endMonth={FILTER_DATE_END_MONTH}
+            />
+            <DatePicker
+              value={dateTo}
+              onChange={handleDateToChange}
+              placeholder="Camp date to"
+              className={DATE_FIELD_CLASS}
+              startMonth={FILTER_DATE_START_MONTH}
+              endMonth={FILTER_DATE_END_MONTH}
+            />
+          </>
+        )}
         {projectId && (
           <div className="w-80">
             <select
@@ -63,28 +103,38 @@ const CheckResultsTab = () => {
         )}
       </div>
 
-      {!projectId && (
+      {isInvalidRange && (
+        <div className="text-[13px] rounded-xl px-3 py-2 mb-3 bg-danger-soft border border-danger text-danger">
+          "Camp date to" can't be before "Camp date from" — pick a valid range.
+        </div>
+      )}
+
+      {!isInvalidRange && !projectId && (
         <div className="rounded-xl border p-6 text-center text-[13px]" style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }}>
           Pick a project above to see its billable camps.
         </div>
       )}
 
-      {projectId && !campsLoading && !campsError && (camps ?? []).length === 0 && (
+      {!isInvalidRange && projectId && !campsLoading && !campsError && (camps ?? []).length === 0 && (
         <div className="rounded-xl border p-6 text-center text-[13px]" style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }}>
-          No billable, closed or cancelled-charged camps are available for this project yet.
+          {dateFrom || dateTo
+            ? 'No billable, closed or cancelled-charged camps fall in this date range for this project.'
+            : 'No billable, closed or cancelled-charged camps are available for this project yet.'}
         </div>
       )}
 
-      {projectId && campsError && (
+      {!isInvalidRange && projectId && campsError && (
         <div className="flex items-center justify-between gap-3 text-[13px] rounded-xl px-3 py-2 bg-danger-soft border border-danger text-danger">
           <span>Couldn't load camps for this project.</span>
           <button onClick={() => refetchCamps()} className="shrink-0 underline font-semibold">Retry</button>
         </div>
       )}
 
-      {projectId && campId && <CampCrossCheckPanel campId={campId} />}
+      {/* Keyed by campId so switching camps remounts the panel — usePagination's page state must
+          not survive a camp switch, or a later page carried over to a smaller camp can look empty. */}
+      {!isInvalidRange && projectId && campId && <CampCrossCheckPanel key={campId} campId={campId} />}
 
-      {projectId && !campId && !campsLoading && !campsError && (camps ?? []).length > 0 && (
+      {!isInvalidRange && projectId && !campId && !campsLoading && !campsError && (camps ?? []).length > 0 && (
         <div className="rounded-xl border p-6 text-center text-[13px]" style={{ borderColor: 'var(--qms-border)', color: 'var(--qms-text-muted)' }}>
           Pick a camp above to review its recorded patients.
         </div>

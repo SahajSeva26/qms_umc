@@ -16,22 +16,21 @@ import PaginationControls from '@/components/ui/PaginationControls'
 import { usePagination } from '@/hooks/usePagination'
 import { usePermission } from '@/hooks/usePermission'
 
-type InvoicingTab = 'generate' | 'check' | 'pipeline'
+type InvoicingTab = 'check' | 'generate' | 'pipeline'
 
 const InvoicesPage = () => {
   const { hasAnyPermission } = usePermission()
   const canReadProjects = hasAnyPermission(['project:search', 'project:manage', 'camp:book', 'tenant:manage'])
   const canReadCamps = hasAnyPermission(['camp:search', 'camp:manage', 'tenant:manage'])
   const canCreate = hasAnyPermission(['invoice:create', 'invoice:manage']) && canReadProjects && canReadCamps
-  // Cross-checking patient records needs full camp visibility (screening:manage), not just
-  // screening:search — that permission own-scopes results to screenings the viewer themselves
-  // performed, which isn't useful for someone verifying another FO's camp before invoicing.
-  const canCheckResults = hasAnyPermission(['screening:manage', 'tenant:manage']) && canReadProjects && canReadCamps
+  // Both managers required — screening:search/test:search own-scope to the viewer's own rows, and
+  // tenant:manage isn't accepted by either route, so neither can substitute.
+  const canCheckResults = hasAnyPermission(['screening:manage']) && hasAnyPermission(['test:manage']) && canReadProjects && canReadCamps
   const canMoveStage = hasAnyPermission(['invoice:manage', 'tenant:manage'])
   // GET /invoices/:id requires invoice:get/invoice:manage/tenant:manage, distinct from invoice:search which reaches this list.
   // The route admits invoice readers, including finance managers; detail has its own endpoint guard.
   const canViewDetail = hasAnyPermission(['invoice:get', 'invoice:manage', 'tenant:manage'])
-  const [tab, setTab] = useState<InvoicingTab>(canCreate ? 'generate' : 'pipeline')
+  const [tab, setTab] = useState<InvoicingTab>(canCheckResults ? 'check' : canCreate ? 'generate' : 'pipeline')
 
   const [filterProjectId, setFilterProjectId] = useState('')
   const [filterProjectLabel, setFilterProjectLabel] = useState('')
@@ -78,18 +77,6 @@ const InvoicesPage = () => {
       </div>
 
       <div className="flex gap-1 mb-4 border-b overflow-x-auto" style={{ borderColor: 'var(--qms-border)' }}>
-        {canCreate && (
-          <button
-            onClick={() => setTab('generate')}
-            className="flex items-center gap-1.5 px-3 py-2 text-[13px] font-semibold whitespace-nowrap border-b-2 -mb-px transition-colors"
-            style={{
-              borderColor: tab === 'generate' ? 'var(--qms-brand)' : 'transparent',
-              color: tab === 'generate' ? 'var(--qms-brand)' : 'var(--qms-text-muted)',
-            }}
-          >
-            <FiFilePlus size={14} /> Generate Invoice
-          </button>
-        )}
         {canCheckResults && (
           <button
             onClick={() => setTab('check')}
@@ -100,6 +87,18 @@ const InvoicesPage = () => {
             }}
           >
             <FiCheckSquare size={14} /> Check Results
+          </button>
+        )}
+        {canCreate && (
+          <button
+            onClick={() => setTab('generate')}
+            className="flex items-center gap-1.5 px-3 py-2 text-[13px] font-semibold whitespace-nowrap border-b-2 -mb-px transition-colors"
+            style={{
+              borderColor: tab === 'generate' ? 'var(--qms-brand)' : 'transparent',
+              color: tab === 'generate' ? 'var(--qms-brand)' : 'var(--qms-text-muted)',
+            }}
+          >
+            <FiFilePlus size={14} /> Generate Invoice
           </button>
         )}
         <button

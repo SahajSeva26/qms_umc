@@ -11,12 +11,9 @@ const patientName = (screening: ScreeningEntity) => {
   return [patient.firstName, patient.middleName, patient.lastName].filter(Boolean).join(' ')
 }
 
-// Read-only row for someone cross-checking a camp's recorded patients before an invoice is
-// drafted — no edit affordances, just the patient, their screening outcome, and any test
-// results recorded against them. Photos are not shown: no backend field for them exists yet
-// (see md-files/BACKEND_REQUESTS.md).
+// Photos are not shown — no backend field for them exists yet (md-files/BACKEND_REQUESTS.md).
 const ScreeningCrossCheckRow = ({ screening }: ScreeningCrossCheckRowProps) => {
-  const { data } = useTestResults({ screening: screening.id, limit: '20' }, screening.status === 'completed')
+  const { data, isLoading, error, refetch } = useTestResults({ screening: screening.id, limit: '20' }, screening.status === 'completed')
   const results = data?.data?.items ?? []
 
   return (
@@ -62,7 +59,14 @@ const ScreeningCrossCheckRow = ({ screening }: ScreeningCrossCheckRowProps) => {
           <div className="text-[10px] font-semibold tracking-widest uppercase mb-1" style={{ color: 'var(--qms-text-muted)' }}>
             Test results
           </div>
-          {results.length === 0 ? (
+          {isLoading ? (
+            <div className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>Loading test results…</div>
+          ) : error ? (
+            <div className="flex items-center gap-2 text-[11px] text-danger">
+              <span>Couldn't load test results — don't treat this patient as having none.</span>
+              <button onClick={() => refetch()} className="underline font-semibold shrink-0">Retry</button>
+            </div>
+          ) : results.length === 0 ? (
             <div className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>No test results recorded.</div>
           ) : (
             <div className="flex flex-wrap gap-1.5">

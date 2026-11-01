@@ -142,6 +142,13 @@ const leadSchema = new mongoose.Schema(
             type: Object,
             default: {},
         },
+
+        // true once a project has been created from this lead (one project per lead). Set only by the
+        // dedicated LeadService method during project creation — never via the public update payload.
+        hasProject: {
+            type: Boolean,
+            default: false,
+        },
     },
     {
         timestamps: true,

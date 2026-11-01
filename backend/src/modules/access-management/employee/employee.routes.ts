@@ -8,7 +8,7 @@ import {
     UpdateEmployeePayloadSchema,
 } from './employee.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
-import { RoleGuard } from '../../../shared/middlewares/roleGuard';
+import { Authorize } from '../../../shared/middlewares/authorize.middleware';
 import { ALLOWED_ROLETYPE_CODES } from '../role-type/roleType.constants';
 
 export const EmployeeRouter = express.Router();
@@ -114,7 +114,7 @@ registry.registerPath({
     },
 });
 
-EmployeeRouter.get('/:id', RoleGuard(EMPLOYEE_READ_ROLES), EmployeeController.get);
-EmployeeRouter.get('/', RoleGuard(EMPLOYEE_READ_ROLES), EmployeeController.search);
-EmployeeRouter.post('/', RoleGuard(EMPLOYEE_MANAGE_ROLES), EmployeeController.create);
-EmployeeRouter.put('/:id', RoleGuard(EMPLOYEE_MANAGE_ROLES), EmployeeController.update);
+EmployeeRouter.get('/:id', Authorize.roles(EMPLOYEE_READ_ROLES), EmployeeController.get);
+EmployeeRouter.get('/', Authorize.roles(EMPLOYEE_READ_ROLES), EmployeeController.search);
+EmployeeRouter.post('/', Authorize.roles(EMPLOYEE_MANAGE_ROLES), EmployeeController.create);
+EmployeeRouter.put('/:id', Authorize.roles(EMPLOYEE_MANAGE_ROLES), EmployeeController.update);

@@ -12,7 +12,7 @@ import {
     UpdateAppointmentPayloadSchema,
 } from './appointment.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
-import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { Authorize } from '../../../shared/middlewares/authorize.middleware';
 import { reportRateLimiter } from '../../../shared/middlewares/rateLimiter';
 import { APPOINTMENT_PERMISSIONS } from './appointment.constants';
 import { TENANT_PERMISSIONS } from '../../access-management/tenant/tenant.constants';
@@ -166,13 +166,13 @@ const READ_GUARD = [APPOINTMENT_PERMISSIONS.SEARCH.code, ...GUARD];
 AppointmentRouter.get(
     '/report',
     reportRateLimiter,
-    AuthorizeMiddleware([APPOINTMENT_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([APPOINTMENT_PERMISSIONS.MANAGE.code]),
     AppointmentController.report,
 );
 
 AppointmentRouter.get(
     '/:id',
-    AuthorizeMiddleware([
+    Authorize.anyPermissions([
         APPOINTMENT_PERMISSIONS.MANAGE.code,
         APPOINTMENT_PERMISSIONS.SEARCH.code,
         TENANT_PERMISSIONS.MANAGE.code,
@@ -183,7 +183,7 @@ AppointmentRouter.get(
 // so the service's own-scope pins the update to appointments they own/attend. manage/tenant:manage see all.
 AppointmentRouter.put(
     '/:id',
-    AuthorizeMiddleware([
+    Authorize.anyPermissions([
         APPOINTMENT_PERMISSIONS.MANAGE.code,
         APPOINTMENT_PERMISSIONS.UPDATE.code,
         TENANT_PERMISSIONS.MANAGE.code,
@@ -195,7 +195,7 @@ AppointmentRouter.put(
 // appointment). manage/tenant:manage see all.
 AppointmentRouter.patch(
     '/:id/stage',
-    AuthorizeMiddleware([APPOINTMENT_PERMISSIONS.MANAGE.code, APPOINTMENT_PERMISSIONS.UPDATE.code, TENANT_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([APPOINTMENT_PERMISSIONS.MANAGE.code, APPOINTMENT_PERMISSIONS.UPDATE.code, TENANT_PERMISSIONS.MANAGE.code]),
     AppointmentController.moveStage,
 );
 
@@ -203,12 +203,12 @@ AppointmentRouter.patch(
 // (manage is the domain superset). The service still enforces that the actor is actually on the invite list.
 AppointmentRouter.patch(
     '/:id/rsvp',
-    AuthorizeMiddleware([APPOINTMENT_PERMISSIONS.RSVP.code, APPOINTMENT_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([APPOINTMENT_PERMISSIONS.RSVP.code, APPOINTMENT_PERMISSIONS.MANAGE.code]),
     AppointmentController.respond,
 );
 
-AppointmentRouter.get('/', AuthorizeMiddleware(READ_GUARD), AppointmentController.search);
+AppointmentRouter.get('/', Authorize.anyPermissions(READ_GUARD), AppointmentController.search);
 // the sales person creates their own appointment via appointment:create — the role already
 // holds this but it was never wired into a route guard (dead permission, same shape as the
 // lead:create/update gap). manage/tenant:manage still create on behalf of anyone.
-AppointmentRouter.post('/', AuthorizeMiddleware([APPOINTMENT_PERMISSIONS.CREATE.code, ...GUARD]), AppointmentController.create);
+AppointmentRouter.post('/', Authorize.anyPermissions([APPOINTMENT_PERMISSIONS.CREATE.code, ...GUARD]), AppointmentController.create);

@@ -7,7 +7,7 @@ import {
     UpdateQaFeedbackPayloadSchema,
 } from './qaFeedback.validators';
 import { AuthMiddleware } from '../../shared/middlewares/authmiddleware';
-import { AuthorizeMiddleware } from '../../shared/middlewares/authorizeMiddleware';
+import { Authorize } from '../../shared/middlewares/authorize.middleware';
 import { QA_FEEDBACK_PERMISSIONS } from './qaFeedback.constants';
 
 export const QaFeedbackRouter = express.Router();
@@ -114,6 +114,6 @@ QaFeedbackRouter.get('/:id', QaFeedbackController.get);
 QaFeedbackRouter.get('/', QaFeedbackController.search);
 QaFeedbackRouter.put(
     '/:id',
-    AuthorizeMiddleware([QA_FEEDBACK_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([QA_FEEDBACK_PERMISSIONS.MANAGE.code]),
     QaFeedbackController.update,
 );

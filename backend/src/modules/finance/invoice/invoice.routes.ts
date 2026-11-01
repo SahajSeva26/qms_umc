@@ -10,7 +10,7 @@ import {
     UpdateInvoicePayloadSchema,
 } from './invoice.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
-import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { Authorize } from '../../../shared/middlewares/authorize.middleware';
 import { reportRateLimiter } from '../../../shared/middlewares/rateLimiter';
 import { INVOICE_PERMISSIONS } from './invoice.constants';
 import { TENANT_PERMISSIONS } from '../../access-management/tenant/tenant.constants';
@@ -137,32 +137,32 @@ registry.registerPath({
 InvoiceRouter.get(
     '/report',
     reportRateLimiter,
-    AuthorizeMiddleware([INVOICE_PERMISSIONS.SEARCH.code, INVOICE_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([INVOICE_PERMISSIONS.SEARCH.code, INVOICE_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
     InvoiceController.report,
 );
 
 InvoiceRouter.get(
     '/:id',
-    AuthorizeMiddleware([INVOICE_PERMISSIONS.GET.code, INVOICE_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([INVOICE_PERMISSIONS.GET.code, INVOICE_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
     InvoiceController.get,
 );
 InvoiceRouter.put(
     '/:id',
-    AuthorizeMiddleware([INVOICE_PERMISSIONS.UPDATE.code, INVOICE_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([INVOICE_PERMISSIONS.UPDATE.code, INVOICE_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
     InvoiceController.update,
 );
 InvoiceRouter.patch(
     '/:id/stage',
-    AuthorizeMiddleware([INVOICE_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([INVOICE_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
     InvoiceController.moveStage,
 );
 InvoiceRouter.get(
     '/',
-    AuthorizeMiddleware([INVOICE_PERMISSIONS.SEARCH.code, INVOICE_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([INVOICE_PERMISSIONS.SEARCH.code, INVOICE_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
     InvoiceController.search,
 );
 InvoiceRouter.post(
     '/',
-    AuthorizeMiddleware([INVOICE_PERMISSIONS.CREATE.code, INVOICE_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([INVOICE_PERMISSIONS.CREATE.code, INVOICE_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
     InvoiceController.create,
 );

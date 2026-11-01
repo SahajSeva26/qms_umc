@@ -9,7 +9,7 @@ import {
     UpdateInventoryMasterPayloadSchema,
 } from './inventory-master.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
-import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { Authorize } from '../../../shared/middlewares/authorize.middleware';
 import { INVENTORY_MASTER_PERMISSIONS } from './inventory-master.constants';
 
 export const InventoryMasterRouter = express.Router();
@@ -114,7 +114,7 @@ registry.registerPath({
 // the report is manager-only; it MUST be registered before '/:id' so 'report' is not read as an id.
 InventoryMasterRouter.get(
     '/report',
-    AuthorizeMiddleware([INVENTORY_MASTER_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([INVENTORY_MASTER_PERMISSIONS.MANAGE.code]),
     InventoryMasterController.report,
 );
 InventoryMasterRouter.get('/:id', InventoryMasterController.get);
@@ -122,11 +122,11 @@ InventoryMasterRouter.get('/', InventoryMasterController.search);
 
 InventoryMasterRouter.post(
     '/',
-    AuthorizeMiddleware([INVENTORY_MASTER_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([INVENTORY_MASTER_PERMISSIONS.MANAGE.code]),
     InventoryMasterController.create,
 );
 InventoryMasterRouter.put(
     '/:id',
-    AuthorizeMiddleware([INVENTORY_MASTER_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([INVENTORY_MASTER_PERMISSIONS.MANAGE.code]),
     InventoryMasterController.update,
 );

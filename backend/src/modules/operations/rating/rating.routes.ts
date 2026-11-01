@@ -4,7 +4,7 @@ import { RatingController } from './rating.controller';
 import { registry } from '../../../shared/config/swagger/swagger.registry';
 import { CreateRatingPayloadSchema, SearchRatingQuerySchema, UpdateRatingPayloadSchema } from './rating.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
-import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { Authorize } from '../../../shared/middlewares/authorize.middleware';
 import { RATING_PERMISSIONS } from './rating.constants';
 
 export const RatingRouter = express.Router();
@@ -90,8 +90,8 @@ registry.registerPath({
 // reads require the matching read permission (or manage); writes require the matching write permission
 // (or manage).
 // /me declared before /:id so the literal path isn't swallowed by the param route
-RatingRouter.get('/me', AuthorizeMiddleware([RATING_PERMISSIONS.GET.code, RATING_PERMISSIONS.SEARCH.code, RATING_PERMISSIONS.MANAGE.code], 'OR'), RatingController.me);
-RatingRouter.get('/:id', AuthorizeMiddleware([RATING_PERMISSIONS.GET.code, RATING_PERMISSIONS.MANAGE.code], 'OR'), RatingController.get);
-RatingRouter.get('/', AuthorizeMiddleware([RATING_PERMISSIONS.SEARCH.code, RATING_PERMISSIONS.MANAGE.code], 'OR'), RatingController.search);
-RatingRouter.post('/', AuthorizeMiddleware([RATING_PERMISSIONS.CREATE.code, RATING_PERMISSIONS.MANAGE.code], 'OR'), RatingController.create);
-RatingRouter.put('/:id', AuthorizeMiddleware([RATING_PERMISSIONS.UPDATE.code, RATING_PERMISSIONS.MANAGE.code], 'OR'), RatingController.update);
+RatingRouter.get('/me', Authorize.anyPermissions([RATING_PERMISSIONS.GET.code, RATING_PERMISSIONS.SEARCH.code, RATING_PERMISSIONS.MANAGE.code]), RatingController.me);
+RatingRouter.get('/:id', Authorize.anyPermissions([RATING_PERMISSIONS.GET.code, RATING_PERMISSIONS.MANAGE.code]), RatingController.get);
+RatingRouter.get('/', Authorize.anyPermissions([RATING_PERMISSIONS.SEARCH.code, RATING_PERMISSIONS.MANAGE.code]), RatingController.search);
+RatingRouter.post('/', Authorize.anyPermissions([RATING_PERMISSIONS.CREATE.code, RATING_PERMISSIONS.MANAGE.code]), RatingController.create);
+RatingRouter.put('/:id', Authorize.anyPermissions([RATING_PERMISSIONS.UPDATE.code, RATING_PERMISSIONS.MANAGE.code]), RatingController.update);

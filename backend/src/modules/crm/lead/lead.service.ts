@@ -149,6 +149,11 @@ const search = async (filters: ISearchLeadQuery, ctx: RequestContext, options?: 
     if (filters.salesPerson) {
         where.salesPerson = filters.salesPerson;
     }
+    // hasProject — 'true' = leads converted to a project; 'false' = not yet (also matches legacy docs
+    // created before the field existed, hence { $ne: true } rather than { $eq: false })
+    if (filters.hasProject !== undefined) {
+        where.hasProject = filters.hasProject === 'true' ? true : { $ne: true };
+    }
     // fyFrom / fyTo — bound the lead's creation date (financial-year range). Dates are already
     // parsed + validated (fyFrom <= fyTo) in the validators; normalize to inclusive UTC day bounds.
     if (filters.fyFrom || filters.fyTo) {
@@ -513,6 +518,17 @@ const report = async (filters: ILeadReportQuery, ctx: RequestContext) => {
     };
 };
 
+// mark a lead as converted — called by ProjectService.create after a project is created from it.
+// Dedicated path so hasProject is never settable via the public update payload / set().
+const markProjectCreated = async (id: string, ctx: RequestContext): Promise<LeadDocument> => {
+    const lead = await get(id, ctx);
+    if (!lead) {
+        return throwAppError('Lead not found', StatusCodes.NOT_FOUND);
+    }
+    lead.hasProject = true;
+    return await lead.save();
+};
+
 export const LeadService = {
     get,
     search,
@@ -520,6 +536,7 @@ export const LeadService = {
     update,
     moveStage,
     report,
+    markProjectCreated,
 };
 
 // ========================================================================================

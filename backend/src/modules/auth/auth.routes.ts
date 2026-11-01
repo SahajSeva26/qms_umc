@@ -9,7 +9,7 @@ import {
     ResetPasswordPayloadSchema,
 } from './auth.validators';
 import { AuthMiddleware } from '../../shared/middlewares/authmiddleware';
-import { AuthorizeMiddleware } from '../../shared/middlewares/authorizeMiddleware';
+import { Authorize } from '../../shared/middlewares/authorize.middleware';
 import { TENANT_PERMISSIONS } from '../access-management/tenant/tenant.constants';
 
 export const AuthRouter = express.Router();
@@ -144,7 +144,7 @@ registry.registerPath({
 // AuthRouter.post(
 //     '/register',
 //     AuthMiddleware,
-//     AuthorizeMiddleware([TENANT_PERMISSIONS.MANAGE.code]),
+//     Authorize.anyPermissions([TENANT_PERMISSIONS.MANAGE.code]),
 //     AuthController.register,
 // );
 AuthRouter.post('/login', AuthController.login);
@@ -159,6 +159,6 @@ AuthRouter.post('/reset-password', AuthMiddleware, AuthController.resetPassword)
 AuthRouter.post(
     '/forgot-password',
     AuthMiddleware,
-    AuthorizeMiddleware([TENANT_PERMISSIONS.ADMIN.code]),
+    Authorize.anyPermissions([TENANT_PERMISSIONS.ADMIN.code]),
     AuthController.forgotPassword,
 );

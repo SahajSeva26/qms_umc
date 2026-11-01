@@ -10,7 +10,7 @@ import {
     UpdateInventoryRequestPayloadSchema,
 } from './inventory-request.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
-import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { Authorize } from '../../../shared/middlewares/authorize.middleware';
 import { INVENTORY_REQUEST_PERMISSIONS } from './inventory-request.constants';
 
 export const InventoryRequestRouter = express.Router();
@@ -140,28 +140,28 @@ registry.registerPath({
 // request's stage (approve/reject/receive) is a manage-only action.
 InventoryRequestRouter.get(
     '/report',
-    AuthorizeMiddleware([INVENTORY_REQUEST_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([INVENTORY_REQUEST_PERMISSIONS.MANAGE.code]),
     InventoryRequestController.report,
 );
 InventoryRequestRouter.get(
     '/:id',
-    AuthorizeMiddleware([INVENTORY_REQUEST_PERMISSIONS.GET.code, INVENTORY_REQUEST_PERMISSIONS.MANAGE.code], 'OR'),
+    Authorize.anyPermissions([INVENTORY_REQUEST_PERMISSIONS.GET.code, INVENTORY_REQUEST_PERMISSIONS.MANAGE.code]),
     InventoryRequestController.get,
 );
 InventoryRequestRouter.get(
     '/',
-    AuthorizeMiddleware([INVENTORY_REQUEST_PERMISSIONS.SEARCH.code, INVENTORY_REQUEST_PERMISSIONS.MANAGE.code], 'OR'),
+    Authorize.anyPermissions([INVENTORY_REQUEST_PERMISSIONS.SEARCH.code, INVENTORY_REQUEST_PERMISSIONS.MANAGE.code]),
     InventoryRequestController.search,
 );
 
 InventoryRequestRouter.post(
     '/',
-    AuthorizeMiddleware([INVENTORY_REQUEST_PERMISSIONS.CREATE.code, INVENTORY_REQUEST_PERMISSIONS.MANAGE.code], 'OR'),
+    Authorize.anyPermissions([INVENTORY_REQUEST_PERMISSIONS.CREATE.code, INVENTORY_REQUEST_PERMISSIONS.MANAGE.code]),
     InventoryRequestController.create,
 );
 InventoryRequestRouter.put(
     '/:id',
-    AuthorizeMiddleware([INVENTORY_REQUEST_PERMISSIONS.UPDATE.code, INVENTORY_REQUEST_PERMISSIONS.MANAGE.code], 'OR'),
+    Authorize.anyPermissions([INVENTORY_REQUEST_PERMISSIONS.UPDATE.code, INVENTORY_REQUEST_PERMISSIONS.MANAGE.code]),
     InventoryRequestController.update,
 );
 // both a requester (update) and a manager (manage) may hit this — the service decides which
@@ -169,6 +169,6 @@ InventoryRequestRouter.put(
 // request (and, for a refill, confirm receipt).
 InventoryRequestRouter.patch(
     '/:id/stage',
-    AuthorizeMiddleware([INVENTORY_REQUEST_PERMISSIONS.UPDATE.code, INVENTORY_REQUEST_PERMISSIONS.MANAGE.code], 'OR'),
+    Authorize.anyPermissions([INVENTORY_REQUEST_PERMISSIONS.UPDATE.code, INVENTORY_REQUEST_PERMISSIONS.MANAGE.code]),
     InventoryRequestController.moveStage,
 );

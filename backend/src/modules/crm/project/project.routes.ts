@@ -9,7 +9,7 @@ import {
     UpdateProjectPayloadSchema,
 } from './project.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
-import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { Authorize } from '../../../shared/middlewares/authorize.middleware';
 import { reportRateLimiter } from '../../../shared/middlewares/rateLimiter';
 import { PROJECT_PERMISSIONS } from './project.constants';
 import { CAMP_PERMISSIONS } from '../../operations/camp/camp.constants';
@@ -143,13 +143,13 @@ const READ_GUARD = [PROJECT_PERMISSIONS.SEARCH.code, CAMP_PERMISSIONS.BOOK.code,
 ProjectRouter.get(
     '/report',
     reportRateLimiter,
-    AuthorizeMiddleware(MANAGE_GUARD),
+    Authorize.anyPermissions(MANAGE_GUARD),
     ProjectController.report
 );
 
 ProjectRouter.get(
     '/:id',
-    AuthorizeMiddleware([
+    Authorize.anyPermissions([
         PROJECT_PERMISSIONS.MANAGE.code,
         PROJECT_PERMISSIONS.SEARCH.code,
         CAMP_PERMISSIONS.BOOK.code, // pharma field-force (book-only) may read projects; service scopes them to their division
@@ -158,14 +158,14 @@ ProjectRouter.get(
 );
 ProjectRouter.put(
     '/:id',
-    AuthorizeMiddleware([PROJECT_PERMISSIONS.MANAGE.code, PROJECT_PERMISSIONS.UPDATE.code]),
+    Authorize.anyPermissions([PROJECT_PERMISSIONS.MANAGE.code, PROJECT_PERMISSIONS.UPDATE.code]),
     ProjectController.update,
 );
 ProjectRouter.patch(
     '/:id/stage',
-    AuthorizeMiddleware(MANAGE_GUARD),
+    Authorize.anyPermissions(MANAGE_GUARD),
     ProjectController.moveStage,
 );
 
-ProjectRouter.get('/', AuthorizeMiddleware(READ_GUARD), ProjectController.search);
-ProjectRouter.post('/', AuthorizeMiddleware([PROJECT_PERMISSIONS.MANAGE.code, PROJECT_PERMISSIONS.CREATE.code]), ProjectController.create);
+ProjectRouter.get('/', Authorize.anyPermissions(READ_GUARD), ProjectController.search);
+ProjectRouter.post('/', Authorize.anyPermissions([PROJECT_PERMISSIONS.MANAGE.code, PROJECT_PERMISSIONS.CREATE.code]), ProjectController.create);

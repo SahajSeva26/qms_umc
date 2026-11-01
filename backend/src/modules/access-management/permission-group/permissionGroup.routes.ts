@@ -7,7 +7,7 @@ import {
     UpdatePermissionGroupPayloadSchema,
 } from './permissionGroup.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
-import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { Authorize } from '../../../shared/middlewares/authorize.middleware';
 import { PERMISSION_GROUP_PERMISSIONS } from './permissionGroup.constants';
 import { TENANT_PERMISSIONS } from '../tenant/tenant.constants';
 
@@ -89,22 +89,22 @@ registry.registerPath({
 
 PermissionGroupRouter.get(
     '/:id',
-    AuthorizeMiddleware([PERMISSION_GROUP_PERMISSIONS.GET.code]),
+    Authorize.anyPermissions([PERMISSION_GROUP_PERMISSIONS.GET.code]),
     PermissionGroupController.get,
 );
 PermissionGroupRouter.get(
     '/',
-    AuthorizeMiddleware([PERMISSION_GROUP_PERMISSIONS.SEARCH.code,TENANT_PERMISSIONS.ADMIN.code]),
+    Authorize.anyPermissions([PERMISSION_GROUP_PERMISSIONS.SEARCH.code,TENANT_PERMISSIONS.ADMIN.code]),
     PermissionGroupController.search,
 );
 // PermissionGroupRouter.post(
 //     '/',
-//     AuthorizeMiddleware([PERMISSION_GROUP_PERMISSIONS.CREATE.code]),
+//     Authorize.anyPermissions([PERMISSION_GROUP_PERMISSIONS.CREATE.code]),
 //     PermissionGroupController.create,
 // );
 PermissionGroupRouter.put(
     '/:id',
-    AuthorizeMiddleware([PERMISSION_GROUP_PERMISSIONS.UPDATE.code]),
+    Authorize.anyPermissions([PERMISSION_GROUP_PERMISSIONS.UPDATE.code]),
     PermissionGroupController.update,
 );
 

@@ -6,7 +6,10 @@ import {
     IApproveVoidCampPayload,
     IBookCampPayload,
     IBookingAvailabilityPayload,
+    ICampFileActivatePayload,
+    ICampFilePostPayload,
     ICampReportQuery,
+    IGetCampFilesQuery,
     ICreateCampPayload,
     IMoveStagePayload,
     ISearchCampQuery,
@@ -16,6 +19,8 @@ import {
 import {
     BILLING_TYPES,
     CAMP_COUNTER_ENTITY,
+    CAMP_FILE_CONFIG,
+    CAMP_FILE_ENTITY_TYPE,
     CAMP_PERMISSIONS,
     CAMP_STATUSES,
     CAMP_TIME_SLOTS,
@@ -46,6 +51,9 @@ import { ALLOWED_ROLETYPE_CODES } from '../../access-management/role-type/roleTy
 import { RoleModel } from '../../access-management/role/role.model';
 import { EmployeeModel } from '../../access-management/employee/employee.model';
 import { EMPLOYEE_TYPES } from '../../access-management/employee/employee.constants';
+import { FileService } from '../../file/file.service';
+import { FileMapper } from '../../file/file.mapper';
+import { FILE_STATUS } from '../../file/file.constants';
 import { TENANT_TYPE } from '../../access-management/tenant/tenant.constants';
 import { InventoryMasterService } from '../../inventory/inventory-master/inventory-master.service';
 import { Project } from '../../crm/project/project.model';
@@ -485,17 +493,16 @@ const set = async (model: any, entity: HydratedDocument<ICamp>, ctx: RequestCont
         entity.doctor = model.doctor;
     }
 
-    // worker override — only the field matching the camp's type is accepted; the other kind is rejected.
+    // the type-matching worker is the camp's primary assignee; the opposite kind is an optional
+    // secondary (recorded only). Both may be set — each is validated to hold its correct role type.
     const otherWorker = worker === FO_WORKER ? DIETITIAN_WORKER : FO_WORKER;
-    if (model[otherWorker.field]) {
-        return throwAppError(
-            `This camp is staffed by a ${worker.label}; the ${otherWorker.label} field does not apply`,
-            StatusCodes.BAD_REQUEST,
-        );
-    }
     if (model[worker.field]) {
         await assertWorkerRole(model[worker.field], worker);
         (entity as any)[worker.field] = model[worker.field];
+    }
+    if (model[otherWorker.field]) {
+        await assertWorkerRole(model[otherWorker.field], otherWorker);
+        (entity as any)[otherWorker.field] = model[otherWorker.field];
     }
     // mr is the only pharma-chain ref accepted; asm/rsm are derived from it (reset when the MR changes)
     if (model.mr) {
@@ -753,8 +760,13 @@ const create = async (model: ICreateCampPayload, ctx: RequestContext): Promise<H
     const worker = workerFor(camp.type);
 
     //3b: a caller-supplied worker must be free for this camp's date + slot (overlap-aware). Hard 409.
+    const otherWorker = worker === FO_WORKER ? DIETITIAN_WORKER : FO_WORKER;
     if (camp[worker.field]) {
         await assertWorkerFree(worker, camp[worker.field].toString(), camp.date, camp.timeSlot, camp._id);
+    }
+    // the optional opposite-kind worker, when supplied, must also be free (recorded only — never auto-allocated)
+    if (camp[otherWorker.field]) {
+        await assertWorkerFree(otherWorker, camp[otherWorker.field].toString(), camp.date, camp.timeSlot, camp._id);
     }
 
     //4: best-effort auto-assign the nearest free worker when none supplied; on failure the camp stays
@@ -904,10 +916,14 @@ const update = async (id: string, model: IUpdateCampPayload, ctx: RequestContext
     // assignee/date/slot can all change here — the assigned worker must stay free for the (possibly
     // new) date + slot (overlap-aware). Hard 409. Excludes this camp from the check.
     const worker = workerFor(camp.type);
+    const otherWorker = worker === FO_WORKER ? DIETITIAN_WORKER : FO_WORKER;
     if (camp[worker.field]) {
         await assertWorkerFree(worker, camp[worker.field].toString(), camp.date, camp.timeSlot, camp._id);
         // only fire the update event when the camp has an assigned worker (fo/dietitian)
         ctx.processSync = true;
+    }
+    if (camp[otherWorker.field]) {
+        await assertWorkerFree(otherWorker, camp[otherWorker.field].toString(), camp.date, camp.timeSlot, camp._id);
     }
 
     camp = await camp.save();
@@ -1342,6 +1358,166 @@ const bookingAvailability = async (model: IBookingAvailabilityPayload, ctx: Requ
     };
 };
 
+// POST /camps/files — the camp's assigned worker (FO/dietitian) creates upload intent(s) for a relation.
+// Validates the relation + each file (mime/size), authorizes the worker, gates on camp status, enforces
+// the per-relation cap, then creates a draft file per entry via the file module and returns a presigned
+// PUT uploadUrl for each so the frontend can upload the bytes directly.
+const campFiles = async (model: ICampFilePostPayload, ctx: RequestContext) => {
+    // 1: relation + entity detail are validated by the schema (relation is a known enum, entityId a valid id)
+
+    // 2: get the camp (scoped)
+    const camp = await get(model.entityId, ctx, { populate: true });
+    if (!camp) {
+        return throwAppError('Camp not found', StatusCodes.NOT_FOUND);
+    }
+
+    // 3: get the per-relation config
+    const config = CAMP_FILE_CONFIG[model.relation];
+    if (!config) {
+        return throwAppError(`Unknown camp file relation "${model.relation}"`, StatusCodes.BAD_REQUEST);
+    }
+
+    // 4: enforce the relation's constraints on every file — mime type + size (per-file, before any create)
+    for (const file of model.files) {
+        if (!config.mimeTypes.includes(file.fileType)) {
+            return throwAppError(
+                `"${file.fileName}" has an unsupported type "${file.fileType}" — "${model.relation}" allows ${config.mimeTypes.join(', ')}`,
+                StatusCodes.BAD_REQUEST,
+            );
+        }
+        if (file.fileSize > config.maxSize) {
+            return throwAppError(
+                `"${file.fileName}" is too large — "${model.relation}" allows at most ${config.maxSize} bytes per file`,
+                StatusCodes.BAD_REQUEST,
+            );
+        }
+    }
+
+    // 5: authorize — only the camp's assigned worker may upload its files (DRY via workerFor: FO for
+    // screening/lab, dietitian for diet). Belt-and-suspenders on top of the own-scoped get().
+    const worker = workerFor(camp.type);
+    const assignee = camp[worker.field];
+    const assigneeId = (assignee?._id || assignee)?.toString();
+    if (!assigneeId || assigneeId !== (ctx.role?._id || ctx.role?.id)?.toString()) {
+        return throwAppError(`Only the assigned ${worker.label} can upload camp files`, StatusCodes.FORBIDDEN);
+    }
+
+    // 6: status gate — files for this relation may only be uploaded while the camp is in an allowed status
+    if (!config.statusAllowed.includes(camp.status)) {
+        return throwAppError(
+            `"${model.relation}" files can only be uploaded while the camp is ${config.statusAllowed.join(' or ')}`,
+            StatusCodes.CONFLICT,
+        );
+    }
+
+    // 7: cap check — existing ACTIVE files for this camp+relation + the requested count must not exceed
+    // the relation's cap. The file module doesn't enforce camp caps, so we own it here.
+    const existing = await FileService.search(
+        { entityId: camp._id.toString(), entityType: CAMP_FILE_ENTITY_TYPE, relation: model.relation, status: FILE_STATUS.ACTIVE },
+        ctx,
+    );
+    if (existing.count + model.files.length > config.cap) {
+        return throwAppError(
+            `"${model.relation}" allows at most ${config.cap} file(s); ${existing.count} already present`,
+            StatusCodes.CONFLICT,
+        );
+    }
+
+    // 8: create a draft file doc per entry via the file module — each comes back with a presigned PUT
+    // uploadUrl. The frontend PUTs the bytes to each url, then flips the batch active via POST /files/activate.
+    const tenantId = (camp.tenant?._id || camp.tenant)?.toString();
+    const created = await FileService.create(
+        {
+            tenant: tenantId,
+            entity: { id: camp._id.toString(), type: CAMP_FILE_ENTITY_TYPE, relation: model.relation },
+            files: model.files,
+        } as any,
+        ctx,
+    );
+
+    // return the files with their presigned upload URLs so the frontend can upload the bytes directly
+    return created.map((file) => FileMapper.toResponse(file, ctx));
+};
+
+// POST /camps/files/activate — the camp's assigned worker flips its uploaded draft files to active.
+// Mirrors campFiles' worker authorization, verifies the files belong to this camp, then delegates the
+// draft → active flip to the file module's bulkActivate (which verifies each object exists in S3).
+const campFileActivate = async (model: ICampFileActivatePayload, ctx: RequestContext) => {
+    // 1: get the camp (own-scoped; populated for the worker)
+    const camp: any = await get(model.entityId, ctx, { populate: true });
+    if (!camp) {
+        return throwAppError('Camp not found', StatusCodes.NOT_FOUND);
+    }
+
+    // 2: authorize — only the camp's assigned worker may activate its files (same as campFiles)
+    const worker = workerFor(camp.type);
+    const assignee = camp[worker.field];
+    const assigneeId = (assignee?._id || assignee)?.toString();
+    if (!assigneeId || assigneeId !== (ctx.role?._id || ctx.role?.id)?.toString()) {
+        return throwAppError(`Only the assigned ${worker.label} can activate camp files`, StatusCodes.FORBIDDEN);
+    }
+
+    // 3: every file must belong to THIS camp — stops this route being used to activate another camp's
+    // files (the generic file module doesn't bind activation to the owning entity)
+    for (const id of model.fileIds) {
+        const file = await FileService.get(id, ctx);
+        if (!file || file.entity?.type !== CAMP_FILE_ENTITY_TYPE || file.entity?.id?.toString() !== camp._id.toString()) {
+            return throwAppError(`File "${id}" does not belong to this camp`, StatusCodes.BAD_REQUEST);
+        }
+    }
+
+    // 4: delegate the draft → active flip to the file module (verifies each S3 object exists first)
+    const activated = await FileService.bulkActivate({ fileIds: model.fileIds }, ctx);
+    return activated.map((file) => FileMapper.toResponse(file, ctx));
+};
+
+// GET /camps/files?entityId=&relation= — list a camp's ACTIVE files (optionally for one relation), with
+// presigned read URLs. Authorization = "can the caller read this camp": get() own-scopes every role
+// (FO/MR to their own camps, coordinators by type, managers to all), so viewing inherits the same rules.
+const getCampFiles = async (query: IGetCampFilesQuery, ctx: RequestContext) => {
+    // 1: get the camp (scoped) — if the caller can't read it, 404
+    const camp = await get(query.entityId, ctx);
+    if (!camp) {
+        return throwAppError('Camp not found', StatusCodes.NOT_FOUND);
+    }
+
+    // 2: list the camp's active files (optionally narrowed to one relation), with presigned read URLs
+    const result = await FileService.search(
+        { entityId: camp._id.toString(), entityType: CAMP_FILE_ENTITY_TYPE, relation: query.relation, status: FILE_STATUS.ACTIVE },
+        ctx,
+        { withUrls: true } as any,
+    );
+    return FileMapper.toSearchResponse(result, ctx);
+};
+
+// DELETE /camps/files/:fileId — the camp's assigned worker discards one of its files (e.g. uploaded by
+// mistake). Soft-delete (status → discarded); since the cap counts ACTIVE files only, this frees the
+// relation's cap so a replacement can be uploaded. The owning camp is derived from the file's own entity
+// ref, then worker-authorized exactly like the other camp-file routes.
+const campFileDiscard = async (fileId: string, ctx: RequestContext) => {
+    // 1: load the file (scoped) + confirm it's a camp file
+    const file = await FileService.get(fileId, ctx);
+    if (!file || file.entity?.type !== CAMP_FILE_ENTITY_TYPE || !file.entity?.id) {
+        return throwAppError('Camp file not found', StatusCodes.NOT_FOUND);
+    }
+
+    // 2: load the owning camp (own-scoped) + authorize the assigned worker
+    const camp: any = await get(file.entity.id.toString(), ctx, { populate: true });
+    if (!camp) {
+        return throwAppError('Camp not found', StatusCodes.NOT_FOUND);
+    }
+    const worker = workerFor(camp.type);
+    const assignee = camp[worker.field];
+    const assigneeId = (assignee?._id || assignee)?.toString();
+    if (!assigneeId || assigneeId !== (ctx.role?._id || ctx.role?.id)?.toString()) {
+        return throwAppError(`Only the assigned ${worker.label} can discard camp files`, StatusCodes.FORBIDDEN);
+    }
+
+    // 3: soft-delete (draft or active → discarded); frees the relation's cap for a re-upload
+    const discarded = await FileService.changeStatus(fileId, { status: FILE_STATUS.DISCARDED }, ctx);
+    return FileMapper.toResponse(discarded, ctx);
+};
+
 export const CampService = {
     get,
     search,
@@ -1356,6 +1532,10 @@ export const CampService = {
     book,
     report,
     bookingAvailability,
+    campFiles,
+    campFileActivate,
+    getCampFiles,
+    campFileDiscard,
     // exposed so the camp-day flow (screening/test) resolves the camp's worker kind (FO/dietitian)
     // from the same single branch, instead of duplicating the diet-vs-screening decision.
     workerFor,

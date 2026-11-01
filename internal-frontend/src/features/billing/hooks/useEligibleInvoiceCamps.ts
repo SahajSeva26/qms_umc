@@ -2,33 +2,19 @@ import { useQuery } from '@tanstack/react-query'
 import { billingCampsService } from '@/features/billing/billingCamps.service'
 import type { CampEntity, CampStatus } from '@/types/campReal.types'
 
-// A camp qualifies for billing only if it is billable-type AND has reached a
-// billable lifecycle state — mirrors invoice.service.ts's own
-// BILLABLE_CAMP_STATUSES / assertCampEligibleForBilling exactly.
+// Mirrors invoice.service.ts's BILLABLE_CAMP_STATUSES — not authoritative for already-billed
+// camps (that's only confirmed by the create/add call's 409); see backend/CLAUDE.md.
 const ELIGIBLE_STATUSES: CampStatus[] = ['closed', 'cancelled_charged']
 
-// Backend has no dedicated "billable, unbilled camps for a project" endpoint
-// (confirmed open item in backend/CLAUDE.md) — this pre-filters to
-// billingType=billable + eligible status, but whether a camp is ALREADY
-// billed on a live invoice can only be confirmed by the create/add call
-// itself (a 409). Treat this list as "probably eligible," not authoritative.
-//
-// KNOWN, DEFERRED LIMITATION: neither GenerateInvoiceTab nor
-// AddCampToInvoiceDialog excludes camps already billed on a DIFFERENT,
-// still-live invoice for this same project — this hook has no way to know
-// that without an N+1 query (one invoice-line-item lookup per camp), which
-// isn't worth adding client-side. No double-billing risk (the backend's
-// assertCampBillable 409s on submit either way), but a project's 2nd+
-// invoice will surface such conflicts only at submit time, not in the
-// picker. Fix properly once the backend adds an "unbilled eligible camps
-// for project" endpoint — don't build the N+1 workaround here meanwhile.
-//
-// Fetches ALL pages for each eligible status, not just page 1 — a project
-// can have 45+ eligible camps, and the default list hook's 10-record page
-// would silently truncate the picker.
+// Fetches ALL pages per status — a project can have 45+ eligible camps, more than one default page.
 const PAGE_LIMIT = '50'
 
-const fetchAllPagesForStatus = async (projectId: string, status: CampStatus): Promise<CampEntity[]> => {
+export interface EligibleCampsDateRange {
+  dateFrom?: string
+  dateTo?: string
+}
+
+const fetchAllPagesForStatus = async (projectId: string, status: CampStatus, dateRange?: EligibleCampsDateRange): Promise<CampEntity[]> => {
   const all: CampEntity[] = []
   let page = 1
   let hasMore = true
@@ -38,6 +24,8 @@ const fetchAllPagesForStatus = async (projectId: string, status: CampStatus): Pr
       project: projectId,
       billingType: 'billable',
       status,
+      ...(dateRange?.dateFrom ? { dateFrom: dateRange.dateFrom } : {}),
+      ...(dateRange?.dateTo ? { dateTo: dateRange.dateTo } : {}),
       page: String(page),
       limit: PAGE_LIMIT,
     })
@@ -51,13 +39,14 @@ const fetchAllPagesForStatus = async (projectId: string, status: CampStatus): Pr
   return all
 }
 
-export const useEligibleInvoiceCamps = (projectId: string | undefined) =>
+// dateRange is optional and passed through to the real, server-filtered GET /camps dateFrom/dateTo.
+export const useEligibleInvoiceCamps = (projectId: string | undefined, dateRange?: EligibleCampsDateRange) =>
   useQuery({
-    queryKey: ['billing', 'eligible-camps', projectId],
+    queryKey: ['billing', 'eligible-camps', projectId, dateRange?.dateFrom ?? '', dateRange?.dateTo ?? ''],
     queryFn: async () => {
       if (!projectId) return []
       const perStatus = await Promise.all(
-        ELIGIBLE_STATUSES.map((status) => fetchAllPagesForStatus(projectId, status)),
+        ELIGIBLE_STATUSES.map((status) => fetchAllPagesForStatus(projectId, status, dateRange)),
       )
       return perStatus.flat()
     },

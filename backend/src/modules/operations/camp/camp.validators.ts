@@ -214,3 +214,26 @@ export const CampFilePostPayloadSchema = z.object({
         .openapi({ example: [{ fileName: 'setup-1.jpg', fileSize: 20480, fileType: 'image/jpeg' }] }),
 });
 export type ICampFilePostPayload = z.infer<typeof CampFilePostPayloadSchema>;
+
+//7: camp file activate ====================================>
+// `entityId` = the camp whose files these are; `fileIds` = the draft files (already uploaded to S3) to
+// flip active. The service authorizes the camp's worker, then delegates the flip to the file module.
+export const CampFileActivatePayloadSchema = z.object({
+    entityId: objectId('Camp').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
+    fileIds: z
+        .array(objectId('File'))
+        .min(1)
+        .openapi({ example: ['665f0c3a1a2b3c4d5e6f7a8a'] }),
+});
+export type ICampFileActivatePayload = z.infer<typeof CampFileActivatePayloadSchema>;
+
+//8: get camp files ====================================>
+// list a camp's files; `relation` optionally narrows to one relation (else all relations).
+export const GetCampFilesQuerySchema = z.object({
+    entityId: objectId('Camp').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
+    relation: z
+        .enum(Object.values(CAMP_FILE_RELATIONS) as [string, ...string[]])
+        .optional()
+        .openapi({ example: 'setup' }),
+});
+export type IGetCampFilesQuery = z.infer<typeof GetCampFilesQuerySchema>;

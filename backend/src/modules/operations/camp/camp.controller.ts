@@ -6,9 +6,11 @@ import {
     ApproveVoidCampPayloadSchema,
     BookCampPayloadSchema,
     BookingAvailabilityPayloadSchema,
+    CampFileActivatePayloadSchema,
     CampFilePostPayloadSchema,
     CampReportQuerySchema,
     CreateCampPayloadSchema,
+    GetCampFilesQuerySchema,
     MoveStagePayloadSchema,
     SearchCampQuerySchema,
     UpdateCampPayloadSchema,
@@ -393,6 +395,46 @@ const campFiles = async (req: any, res: any) => {
     }
 };
 
+const campFileActivate = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+
+        const { data, success, error } = CampFileActivatePayloadSchema.safeParse(req.body);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                fields: validationErrors,
+            });
+        }
+
+        const result = await CampService.campFileActivate(data, ctx);
+
+        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'ok', result);
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
+const getCampFiles = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+
+        const { data, success, error } = GetCampFilesQuerySchema.safeParse(req.query);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                fields: validationErrors,
+            });
+        }
+
+        const result = await CampService.getCampFiles(data, ctx);
+
+        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Camp files fetched successfully', result);
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
 export const CampController = {
     get,
     search,
@@ -408,4 +450,6 @@ export const CampController = {
     report,
     bookingAvailability,
     campFiles,
+    campFileActivate,
+    getCampFiles,
 };

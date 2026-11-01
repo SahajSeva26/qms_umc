@@ -6,8 +6,10 @@ import {
     IApproveVoidCampPayload,
     IBookCampPayload,
     IBookingAvailabilityPayload,
+    ICampFileActivatePayload,
     ICampFilePostPayload,
     ICampReportQuery,
+    IGetCampFilesQuery,
     ICreateCampPayload,
     IMoveStagePayload,
     ISearchCampQuery,
@@ -1437,6 +1439,57 @@ const campFiles = async (model: ICampFilePostPayload, ctx: RequestContext) => {
     return created.map((file) => FileMapper.toResponse(file, ctx));
 };
 
+// POST /camps/files/activate — the camp's assigned worker flips its uploaded draft files to active.
+// Mirrors campFiles' worker authorization, verifies the files belong to this camp, then delegates the
+// draft → active flip to the file module's bulkActivate (which verifies each object exists in S3).
+const campFileActivate = async (model: ICampFileActivatePayload, ctx: RequestContext) => {
+    // 1: get the camp (own-scoped; populated for the worker)
+    const camp: any = await get(model.entityId, ctx, { populate: true });
+    if (!camp) {
+        return throwAppError('Camp not found', StatusCodes.NOT_FOUND);
+    }
+
+    // 2: authorize — only the camp's assigned worker may activate its files (same as campFiles)
+    const worker = workerFor(camp.type);
+    const assignee = camp[worker.field];
+    const assigneeId = (assignee?._id || assignee)?.toString();
+    if (!assigneeId || assigneeId !== (ctx.role?._id || ctx.role?.id)?.toString()) {
+        return throwAppError(`Only the assigned ${worker.label} can activate camp files`, StatusCodes.FORBIDDEN);
+    }
+
+    // 3: every file must belong to THIS camp — stops this route being used to activate another camp's
+    // files (the generic file module doesn't bind activation to the owning entity)
+    for (const id of model.fileIds) {
+        const file = await FileService.get(id, ctx);
+        if (!file || file.entity?.type !== CAMP_FILE_ENTITY_TYPE || file.entity?.id?.toString() !== camp._id.toString()) {
+            return throwAppError(`File "${id}" does not belong to this camp`, StatusCodes.BAD_REQUEST);
+        }
+    }
+
+    // 4: delegate the draft → active flip to the file module (verifies each S3 object exists first)
+    const activated = await FileService.bulkActivate({ fileIds: model.fileIds }, ctx);
+    return activated.map((file) => FileMapper.toResponse(file, ctx));
+};
+
+// GET /camps/files?entityId=&relation= — list a camp's ACTIVE files (optionally for one relation), with
+// presigned read URLs. Authorization = "can the caller read this camp": get() own-scopes every role
+// (FO/MR to their own camps, coordinators by type, managers to all), so viewing inherits the same rules.
+const getCampFiles = async (query: IGetCampFilesQuery, ctx: RequestContext) => {
+    // 1: get the camp (scoped) — if the caller can't read it, 404
+    const camp = await get(query.entityId, ctx);
+    if (!camp) {
+        return throwAppError('Camp not found', StatusCodes.NOT_FOUND);
+    }
+
+    // 2: list the camp's active files (optionally narrowed to one relation), with presigned read URLs
+    const result = await FileService.search(
+        { entityId: camp._id.toString(), entityType: CAMP_FILE_ENTITY_TYPE, relation: query.relation, status: FILE_STATUS.ACTIVE },
+        ctx,
+        { withUrls: true } as any,
+    );
+    return FileMapper.toSearchResponse(result, ctx);
+};
+
 export const CampService = {
     get,
     search,
@@ -1452,6 +1505,8 @@ export const CampService = {
     report,
     bookingAvailability,
     campFiles,
+    campFileActivate,
+    getCampFiles,
     // exposed so the camp-day flow (screening/test) resolves the camp's worker kind (FO/dietitian)
     // from the same single branch, instead of duplicating the diet-vs-screening decision.
     workerFor,

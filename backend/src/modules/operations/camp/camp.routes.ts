@@ -7,8 +7,10 @@ import {
     ApproveVoidCampPayloadSchema,
     BookCampPayloadSchema,
     BookingAvailabilityPayloadSchema,
+    CampFileActivatePayloadSchema,
     CampFilePostPayloadSchema,
     CampReportQuerySchema,
+    GetCampFilesQuerySchema,
     CreateCampPayloadSchema,
     MoveStagePayloadSchema,
     SearchCampQuerySchema,
@@ -299,6 +301,38 @@ registry.registerPath({
     },
 });
 
+// camp files — activate uploaded draft files for a camp (assigned FO/dietitian only)
+registry.registerPath({
+    method: 'post',
+    path: '/camps/files/activate',
+    tags: ['CAMP'],
+    summary: 'Activate uploaded camp draft files (assigned FO/dietitian only)',
+    request: {
+        body: { content: { 'application/json': { schema: CampFileActivatePayloadSchema } } },
+    },
+    responses: {
+        200: { description: 'ok' },
+        400: { description: 'Validation error / file does not belong to this camp' },
+        403: { description: 'Not the assigned worker' },
+        404: { description: 'Camp not found' },
+        409: { description: 'A file cannot be activated (not uploaded / invalid transition)' },
+    },
+});
+
+// camp files — list a camp's files (anyone who can read the camp)
+registry.registerPath({
+    method: 'get',
+    path: '/camps/files',
+    tags: ['CAMP'],
+    summary: "List a camp's active files (optionally for one relation)",
+    request: { query: GetCampFilesQuerySchema },
+    responses: {
+        200: { description: 'Camp files fetched successfully' },
+        400: { description: 'Validation error' },
+        404: { description: 'Camp not found' },
+    },
+});
+
 // =======================================================================
 // ========================= EXPORT CAMP ROUTES ==========================
 // =======================================================================
@@ -327,6 +361,20 @@ CampRouter.get(
         ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_DIVISION_HEAD,
     ]),
     CampController.myCamps,
+);
+
+// camp files — list a camp's files; MUST be before '/:id' so 'files' isn't treated as an id. Read-gated
+// like the camp read routes (service own-scopes the caller to the camps they can see).
+CampRouter.get(
+    '/files',
+    Authorize.anyPermissions([
+        CAMP_PERMISSIONS.SEARCH.code,
+        CAMP_PERMISSIONS.GET.code,
+        CAMP_PERMISSIONS.BOOK.code,
+        CAMP_PERMISSIONS.MANAGE.code,
+        TENANT_PERMISSIONS.MANAGE.code,
+    ]),
+    CampController.getCampFiles,
 );
 
 CampRouter.get(
@@ -426,6 +474,14 @@ CampRouter.post(
     '/files',
     Authorize.roles([ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER, ALLOWED_ROLETYPE_CODES.PLATFORM.DIETITIAN]),
     CampController.campFiles,
+);
+
+// camp files — activate uploaded draft files. Role-gated to the field staff who run the camp; the
+// service authorizes the assigned worker + verifies the files belong to the camp, then bulk-activates.
+CampRouter.post(
+    '/files/activate',
+    Authorize.roles([ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER, ALLOWED_ROLETYPE_CODES.PLATFORM.DIETITIAN]),
+    CampController.campFileActivate,
 );
 
 

@@ -1,6 +1,11 @@
 import { ResponseHandler } from '../../../shared/utils/responseHandler';
 import { formatZodError, throwAppError } from '../../../shared/utils/error';
-import { CreateTenantPayloadSchema, UpdateTenantPayloadSchema } from './tenant.validators';
+import {
+    ActivateTenantLogoPayloadSchema,
+    CreateTenantLogoPayloadSchema,
+    CreateTenantPayloadSchema,
+    UpdateTenantPayloadSchema,
+} from './tenant.validators';
 import { StatusCodes } from 'http-status-codes';
 import { TenantService } from './tenant.service';
 import { TenantMapper } from './tenant.mapper';
@@ -151,6 +156,70 @@ const bulkCreate = async (req: any, res: any) => {
     }
 };
 
+const createLogo = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+        const { id } = req.params;
+        if (!id) {
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Tenant ID is required', null);
+        }
+
+        const { data, success, error } = CreateTenantLogoPayloadSchema.safeParse(req.body);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                fields: validationErrors,
+            });
+        }
+
+        const result = await TenantService.createLogo(id, data, ctx);
+
+        return ResponseHandler.appResponse(res, StatusCodes.CREATED, true, 'ok', result);
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
+const activateLogo = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+        const { id } = req.params;
+        if (!id) {
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Tenant ID is required', null);
+        }
+
+        const { data, success, error } = ActivateTenantLogoPayloadSchema.safeParse(req.body);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                fields: validationErrors,
+            });
+        }
+
+        const result = await TenantService.activateLogo(id, data, ctx);
+
+        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Tenant logo updated', result);
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
+const getLogo = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+        const { id } = req.params;
+        if (!id) {
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Tenant ID is required', null);
+        }
+
+        const result = await TenantService.getLogo(id, ctx);
+
+        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Tenant logo fetched successfully', result);
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
 export const TenantController = {
     get,
     search,
@@ -158,4 +227,7 @@ export const TenantController = {
     update,
     getTenantMe,
     bulkCreate,
+    createLogo,
+    activateLogo,
+    getLogo,
 };

@@ -435,6 +435,22 @@ const getCampFiles = async (req: any, res: any) => {
     }
 };
 
+const campFileDiscard = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+        const { id } = req.params;
+        if (!id) {
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'File ID is required', null);
+        }
+
+        const result = await CampService.campFileDiscard(id, ctx);
+
+        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Camp file discarded', result);
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
 export const CampController = {
     get,
     search,
@@ -452,4 +468,5 @@ export const CampController = {
     campFiles,
     campFileActivate,
     getCampFiles,
+    campFileDiscard,
 };

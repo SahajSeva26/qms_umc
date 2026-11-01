@@ -333,6 +333,21 @@ registry.registerPath({
     },
 });
 
+// camp files — discard a file (assigned FO/dietitian only); frees the relation's cap for a re-upload
+registry.registerPath({
+    method: 'delete',
+    path: '/camps/files/{id}',
+    tags: ['CAMP'],
+    summary: 'Discard a camp file (assigned FO/dietitian only)',
+    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+    responses: {
+        200: { description: 'Camp file discarded' },
+        400: { description: 'Validation error' },
+        403: { description: 'Not the assigned worker' },
+        404: { description: 'Camp file not found' },
+    },
+});
+
 // =======================================================================
 // ========================= EXPORT CAMP ROUTES ==========================
 // =======================================================================
@@ -482,6 +497,14 @@ CampRouter.post(
     '/files/activate',
     Authorize.roles([ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER, ALLOWED_ROLETYPE_CODES.PLATFORM.DIETITIAN]),
     CampController.campFileActivate,
+);
+
+// camp files — discard one (soft-delete). Role-gated to the field staff who run the camp; the service
+// derives the camp from the file + authorizes the assigned worker, then frees the cap for a re-upload.
+CampRouter.delete(
+    '/files/:id',
+    Authorize.roles([ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER, ALLOWED_ROLETYPE_CODES.PLATFORM.DIETITIAN]),
+    CampController.campFileDiscard,
 );
 
 

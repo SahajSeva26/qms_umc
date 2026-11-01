@@ -149,6 +149,11 @@ const search = async (filters: ISearchLeadQuery, ctx: RequestContext, options?: 
     if (filters.salesPerson) {
         where.salesPerson = filters.salesPerson;
     }
+    // hasProject — 'true' = leads converted to a project; 'false' = not yet (also matches legacy docs
+    // created before the field existed, hence { $ne: true } rather than { $eq: false })
+    if (filters.hasProject !== undefined) {
+        where.hasProject = filters.hasProject === 'true' ? true : { $ne: true };
+    }
     // fyFrom / fyTo — bound the lead's creation date (financial-year range). Dates are already
     // parsed + validated (fyFrom <= fyTo) in the validators; normalize to inclusive UTC day bounds.
     if (filters.fyFrom || filters.fyTo) {

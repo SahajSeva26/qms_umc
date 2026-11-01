@@ -1490,6 +1490,34 @@ const getCampFiles = async (query: IGetCampFilesQuery, ctx: RequestContext) => {
     return FileMapper.toSearchResponse(result, ctx);
 };
 
+// DELETE /camps/files/:fileId — the camp's assigned worker discards one of its files (e.g. uploaded by
+// mistake). Soft-delete (status → discarded); since the cap counts ACTIVE files only, this frees the
+// relation's cap so a replacement can be uploaded. The owning camp is derived from the file's own entity
+// ref, then worker-authorized exactly like the other camp-file routes.
+const campFileDiscard = async (fileId: string, ctx: RequestContext) => {
+    // 1: load the file (scoped) + confirm it's a camp file
+    const file = await FileService.get(fileId, ctx);
+    if (!file || file.entity?.type !== CAMP_FILE_ENTITY_TYPE || !file.entity?.id) {
+        return throwAppError('Camp file not found', StatusCodes.NOT_FOUND);
+    }
+
+    // 2: load the owning camp (own-scoped) + authorize the assigned worker
+    const camp: any = await get(file.entity.id.toString(), ctx, { populate: true });
+    if (!camp) {
+        return throwAppError('Camp not found', StatusCodes.NOT_FOUND);
+    }
+    const worker = workerFor(camp.type);
+    const assignee = camp[worker.field];
+    const assigneeId = (assignee?._id || assignee)?.toString();
+    if (!assigneeId || assigneeId !== (ctx.role?._id || ctx.role?.id)?.toString()) {
+        return throwAppError(`Only the assigned ${worker.label} can discard camp files`, StatusCodes.FORBIDDEN);
+    }
+
+    // 3: soft-delete (draft or active → discarded); frees the relation's cap for a re-upload
+    const discarded = await FileService.changeStatus(fileId, { status: FILE_STATUS.DISCARDED }, ctx);
+    return FileMapper.toResponse(discarded, ctx);
+};
+
 export const CampService = {
     get,
     search,
@@ -1507,6 +1535,7 @@ export const CampService = {
     campFiles,
     campFileActivate,
     getCampFiles,
+    campFileDiscard,
     // exposed so the camp-day flow (screening/test) resolves the camp's worker kind (FO/dietitian)
     // from the same single branch, instead of duplicating the diet-vs-screening decision.
     workerFor,

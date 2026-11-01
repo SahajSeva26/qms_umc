@@ -14,7 +14,7 @@ const objectId = (label: string) =>
 // upload URL for each. The entity ref is three flat fields, folded back into a nested `entity` so the
 // service sees model.entity.*. `fileType` is the file's MIME type (drives the S3 ContentType + the
 // derived image/document classification).
-const FileMetaSchema = z.object({
+export const FileMetaSchema = z.object({
     fileName: z.string().min(1).openapi({ example: 'logo.png' }),
     fileSize: z.number().int().positive().openapi({ example: 20480 }),
     fileType: z.string().min(1).openapi({ example: 'image/png' }),

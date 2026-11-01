@@ -6,6 +6,7 @@ import {
     IApproveVoidCampPayload,
     IBookCampPayload,
     IBookingAvailabilityPayload,
+    ICampFilePostPayload,
     ICampReportQuery,
     ICreateCampPayload,
     IMoveStagePayload,
@@ -16,6 +17,8 @@ import {
 import {
     BILLING_TYPES,
     CAMP_COUNTER_ENTITY,
+    CAMP_FILE_CONFIG,
+    CAMP_FILE_ENTITY_TYPE,
     CAMP_PERMISSIONS,
     CAMP_STATUSES,
     CAMP_TIME_SLOTS,
@@ -46,6 +49,9 @@ import { ALLOWED_ROLETYPE_CODES } from '../../access-management/role-type/roleTy
 import { RoleModel } from '../../access-management/role/role.model';
 import { EmployeeModel } from '../../access-management/employee/employee.model';
 import { EMPLOYEE_TYPES } from '../../access-management/employee/employee.constants';
+import { FileService } from '../../file/file.service';
+import { FileMapper } from '../../file/file.mapper';
+import { FILE_STATUS } from '../../file/file.constants';
 import { TENANT_TYPE } from '../../access-management/tenant/tenant.constants';
 import { InventoryMasterService } from '../../inventory/inventory-master/inventory-master.service';
 import { Project } from '../../crm/project/project.model';
@@ -1350,6 +1356,87 @@ const bookingAvailability = async (model: IBookingAvailabilityPayload, ctx: Requ
     };
 };
 
+// POST /camps/files — the camp's assigned worker (FO/dietitian) creates upload intent(s) for a relation.
+// Validates the relation + each file (mime/size), authorizes the worker, gates on camp status, enforces
+// the per-relation cap, then creates a draft file per entry via the file module and returns a presigned
+// PUT uploadUrl for each so the frontend can upload the bytes directly.
+const campFiles = async (model: ICampFilePostPayload, ctx: RequestContext) => {
+    // 1: relation + entity detail are validated by the schema (relation is a known enum, entityId a valid id)
+
+    // 2: get the camp (scoped)
+    const camp = await get(model.entityId, ctx, { populate: true });
+    if (!camp) {
+        return throwAppError('Camp not found', StatusCodes.NOT_FOUND);
+    }
+
+    // 3: get the per-relation config
+    const config = CAMP_FILE_CONFIG[model.relation];
+    if (!config) {
+        return throwAppError(`Unknown camp file relation "${model.relation}"`, StatusCodes.BAD_REQUEST);
+    }
+
+    // 4: enforce the relation's constraints on every file — mime type + size (per-file, before any create)
+    for (const file of model.files) {
+        if (!config.mimeTypes.includes(file.fileType)) {
+            return throwAppError(
+                `"${file.fileName}" has an unsupported type "${file.fileType}" — "${model.relation}" allows ${config.mimeTypes.join(', ')}`,
+                StatusCodes.BAD_REQUEST,
+            );
+        }
+        if (file.fileSize > config.maxSize) {
+            return throwAppError(
+                `"${file.fileName}" is too large — "${model.relation}" allows at most ${config.maxSize} bytes per file`,
+                StatusCodes.BAD_REQUEST,
+            );
+        }
+    }
+
+    // 5: authorize — only the camp's assigned worker may upload its files (DRY via workerFor: FO for
+    // screening/lab, dietitian for diet). Belt-and-suspenders on top of the own-scoped get().
+    const worker = workerFor(camp.type);
+    const assignee = camp[worker.field];
+    const assigneeId = (assignee?._id || assignee)?.toString();
+    if (!assigneeId || assigneeId !== (ctx.role?._id || ctx.role?.id)?.toString()) {
+        return throwAppError(`Only the assigned ${worker.label} can upload camp files`, StatusCodes.FORBIDDEN);
+    }
+
+    // 6: status gate — files for this relation may only be uploaded while the camp is in an allowed status
+    if (!config.statusAllowed.includes(camp.status)) {
+        return throwAppError(
+            `"${model.relation}" files can only be uploaded while the camp is ${config.statusAllowed.join(' or ')}`,
+            StatusCodes.CONFLICT,
+        );
+    }
+
+    // 7: cap check — existing ACTIVE files for this camp+relation + the requested count must not exceed
+    // the relation's cap. The file module doesn't enforce camp caps, so we own it here.
+    const existing = await FileService.search(
+        { entityId: camp._id.toString(), entityType: CAMP_FILE_ENTITY_TYPE, relation: model.relation, status: FILE_STATUS.ACTIVE },
+        ctx,
+    );
+    if (existing.count + model.files.length > config.cap) {
+        return throwAppError(
+            `"${model.relation}" allows at most ${config.cap} file(s); ${existing.count} already present`,
+            StatusCodes.CONFLICT,
+        );
+    }
+
+    // 8: create a draft file doc per entry via the file module — each comes back with a presigned PUT
+    // uploadUrl. The frontend PUTs the bytes to each url, then flips the batch active via POST /files/activate.
+    const tenantId = (camp.tenant?._id || camp.tenant)?.toString();
+    const created = await FileService.create(
+        {
+            tenant: tenantId,
+            entity: { id: camp._id.toString(), type: CAMP_FILE_ENTITY_TYPE, relation: model.relation },
+            files: model.files,
+        } as any,
+        ctx,
+    );
+
+    // return the files with their presigned upload URLs so the frontend can upload the bytes directly
+    return created.map((file) => FileMapper.toResponse(file, ctx));
+};
+
 export const CampService = {
     get,
     search,
@@ -1364,6 +1451,7 @@ export const CampService = {
     book,
     report,
     bookingAvailability,
+    campFiles,
     // exposed so the camp-day flow (screening/test) resolves the camp's worker kind (FO/dietitian)
     // from the same single branch, instead of duplicating the diet-vs-screening decision.
     workerFor,

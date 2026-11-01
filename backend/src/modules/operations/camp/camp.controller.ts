@@ -6,6 +6,7 @@ import {
     ApproveVoidCampPayloadSchema,
     BookCampPayloadSchema,
     BookingAvailabilityPayloadSchema,
+    CampFilePostPayloadSchema,
     CampReportQuerySchema,
     CreateCampPayloadSchema,
     MoveStagePayloadSchema,
@@ -372,6 +373,26 @@ const bookingAvailability = async (req: any, res: any) => {
     }
 };
 
+const campFiles = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+
+        const { data, success, error } = CampFilePostPayloadSchema.safeParse(req.body);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                fields: validationErrors,
+            });
+        }
+
+        const result = await CampService.campFiles(data, ctx);
+
+        return ResponseHandler.appResponse(res, StatusCodes.CREATED, true, 'ok', result);
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
 export const CampController = {
     get,
     search,
@@ -386,4 +407,5 @@ export const CampController = {
     allocateWorker,
     report,
     bookingAvailability,
+    campFiles,
 };

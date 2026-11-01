@@ -1,7 +1,8 @@
 // Camp Validators
 import { z } from 'zod';
-import { BILLING_TYPES, CAMP_STATUSES, CAMP_TIME_SLOTS, CAMP_TYPES } from './camp.constants';
+import { BILLING_TYPES, CAMP_FILE_RELATIONS, CAMP_STATUSES, CAMP_TIME_SLOTS, CAMP_TYPES } from './camp.constants';
 import { isValidObjectID } from '../../../shared/utils/strings';
+import { FileMetaSchema } from '../../file/file.validators';
 
 const objectId = (label: string) =>
     z.string().refine((val) => isValidObjectID(val), { message: `${label} must be a valid id` });
@@ -200,3 +201,16 @@ export const CampReportQuerySchema = z.object({
     status: z.enum(Object.values(CAMP_STATUSES)).optional().openapi({ example: 'closed' }),
 });
 export type ICampReportQuery = z.infer<typeof CampReportQuerySchema>;
+
+//6: camp files ====================================>
+// `files` is METADATA only (no binary) — forwarded as-is to the file module, which creates a draft
+// doc + presigned upload URL per entry. Reuses the file module's FileMetaSchema (same shape it expects).
+export const CampFilePostPayloadSchema = z.object({
+    relation: z.enum(Object.values(CAMP_FILE_RELATIONS) as [string, ...string[]]).openapi({ example: 'setup' }),
+    entityId: objectId('Camp').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
+    files: z
+        .array(FileMetaSchema)
+        .min(1)
+        .openapi({ example: [{ fileName: 'setup-1.jpg', fileSize: 20480, fileType: 'image/jpeg' }] }),
+});
+export type ICampFilePostPayload = z.infer<typeof CampFilePostPayloadSchema>;

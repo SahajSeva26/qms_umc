@@ -7,6 +7,7 @@ import {
     ApproveVoidCampPayloadSchema,
     BookCampPayloadSchema,
     BookingAvailabilityPayloadSchema,
+    CampFilePostPayloadSchema,
     CampReportQuerySchema,
     CreateCampPayloadSchema,
     MoveStagePayloadSchema,
@@ -282,6 +283,22 @@ registry.registerPath({
     },
 });
 
+// camp files — create upload intent(s) for a relation (assigned FO/dietitian only)
+registry.registerPath({
+    method: 'post',
+    path: '/camps/files',
+    tags: ['CAMP'],
+    summary: 'Create camp file upload intent(s) for a relation (assigned FO/dietitian only)',
+    request: {
+        body: { content: { 'application/json': { schema: CampFilePostPayloadSchema } } },
+    },
+    responses: {
+        201: { description: 'ok' },
+        400: { description: 'Validation error / unknown relation' },
+        404: { description: 'Camp not found' },
+    },
+});
+
 // =======================================================================
 // ========================= EXPORT CAMP ROUTES ==========================
 // =======================================================================
@@ -402,5 +419,13 @@ CampRouter.post(
 // pharma field-force booking — only pharma role types hold camp:book. The service then authorizes
 // the caller against the target MR (self / downline). No manage fallback: booking is pharma-only.
 CampRouter.post('/book', Authorize.anyPermissions([CAMP_PERMISSIONS.BOOK.code]), CampController.book);
+
+// camp files — create upload intent(s). Role-gated to the field staff who run the camp; the service
+// resolves the camp (by entityId) + the relation config.
+CampRouter.post(
+    '/files',
+    Authorize.roles([ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER, ALLOWED_ROLETYPE_CODES.PLATFORM.DIETITIAN]),
+    CampController.campFiles,
+);
 
 

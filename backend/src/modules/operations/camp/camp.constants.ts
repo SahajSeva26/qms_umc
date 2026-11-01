@@ -1,6 +1,8 @@
 
 
 // Camp Constants
+import { IEntityFileConfig } from '../../../shared/types/file.types';
+
 export const CAMP_COUNTER_ENTITY = 'camp';
 
 export const CAMP_TYPES = {
@@ -49,6 +51,47 @@ export const CAMP_TRANSITION_MAP: Record<string, string[]> = {
     [CAMP_STATUSES.CLOSED]: [],
     [CAMP_STATUSES.CANCELLED]: [],
     [CAMP_STATUSES.CANCELLED_CHARGED]: [],
+};
+
+// ================= CAMP FILE RELATIONS ===============
+
+export const CAMP_FILE_ENTITY_TYPE = 'camp';
+
+// the file relations a camp supports
+export const CAMP_FILE_RELATIONS = {
+    SETUP: 'setup',
+    CHECK_IN_SELFIE: 'check-in-selfie',
+    CLOSURE: 'closure',
+} as const;
+
+// allowed image types + max bytes per camp photo (all relations are photos)
+const CAMP_PHOTO_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const CAMP_PHOTO_MAX_SIZE = 5 * 1024 * 1024; // 5 MB
+
+// per-relation config: the relation + the camp statuses during which it may be uploaded, the cap,
+// and the per-file size/mime-type constraints
+export const CAMP_FILE_CONFIG: Record<string, IEntityFileConfig> = {
+    [CAMP_FILE_RELATIONS.SETUP]: {
+        relation: CAMP_FILE_RELATIONS.SETUP,
+        statusAllowed: [CAMP_STATUSES.LIVE],
+        cap: 5,
+        maxSize: CAMP_PHOTO_MAX_SIZE,
+        mimeTypes: CAMP_PHOTO_MIME_TYPES,
+    },
+    [CAMP_FILE_RELATIONS.CHECK_IN_SELFIE]: {
+        relation: CAMP_FILE_RELATIONS.CHECK_IN_SELFIE,
+        statusAllowed: [CAMP_STATUSES.LIVE],
+        cap: 1,
+        maxSize: CAMP_PHOTO_MAX_SIZE,
+        mimeTypes: CAMP_PHOTO_MIME_TYPES,
+    },
+    [CAMP_FILE_RELATIONS.CLOSURE]: {
+        relation: CAMP_FILE_RELATIONS.CLOSURE,
+        statusAllowed: [CAMP_STATUSES.LIVE, CAMP_STATUSES.CLOSED],
+        cap: 3,
+        maxSize: CAMP_PHOTO_MAX_SIZE,
+        mimeTypes: CAMP_PHOTO_MIME_TYPES,
+    },
 };
 
 // ================= CAMP PERMISSIONS CONSTANTS ===============

@@ -113,8 +113,10 @@ const CampEditForm = ({ camp, returnTo }: CampEditFormProps) => {
     updateCamp.mutate(
       {
         doctor: doctor || undefined,
-        // A legacy diet camp can carry a historic `fo` from before dietitian support — send only the matching field.
-        ...(camp.type === 'diet' ? { dietitian: dietitian || undefined } : { fo: fo || undefined }),
+        // Both worker fields are now accepted simultaneously — sending both reflects the current
+        // draft rather than silently dropping a legacy secondary.
+        fo: fo || undefined,
+        dietitian: dietitian || undefined,
         mr: mr || undefined,
         date: date || undefined,
         timeSlot: timeSlot || undefined,

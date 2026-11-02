@@ -744,11 +744,12 @@ describe('CampDetailPageReal — create mode, MR/FO pickers', () => {
     expect(screen.queryByText(/cipla mr/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/cipla fo/i)).not.toBeInTheDocument()
     expect(await screen.findByPlaceholderText(/search mr by name/i)).toBeInTheDocument()
-    // Company change also clears timeSlot now, so FO's date+slot eligibility gate re-closes.
-    expect(await screen.findByPlaceholderText(/pick a date and time slot first/i)).toBeInTheDocument()
+    // Company change also clears timeSlot now, so both the primary FO picker and the secondary
+    // dietitian picker's date+slot eligibility gate re-close.
+    expect(await screen.findAllByPlaceholderText(/pick a date and time slot first/i)).toHaveLength(2)
   })
 
-  it('switching Type from Screening to Diet clears a picked FO (and its label) rather than sending both fo and dietitian', async () => {
+  it('switching Type from Screening to Diet keeps a picked FO — it becomes the secondary support picker, no longer cleared', async () => {
     await mockSessionWithPermission(true)
     await mockTenants([{ id: 't-cipla', name: 'Cipla', code: 'cipla', type: 'customer' }])
     await mockRoleTypesAndRoles({
@@ -780,9 +781,8 @@ describe('CampDetailPageReal — create mode, MR/FO pickers', () => {
     await user.click(typeTrigger)
     await user.click(await screen.findByRole('option', { name: /^Diet$/i }))
 
-    // The FO's label is gone — the field swapped to the (empty) Dietitian picker.
-    // Date/timeSlot/location stay intact, so the picker reaches its own "Search…" state (not the gate placeholder).
-    expect(screen.queryByText(/cipla fo/i)).not.toBeInTheDocument()
+    // FO persists as the secondary picker now — no longer cleared on type switch.
+    expect(screen.getByText(/cipla fo/i)).toBeInTheDocument()
     expect(screen.getByText(/^Dietitian \(optional/i)).toBeInTheDocument()
     expect(await screen.findByPlaceholderText(/search dietitian by name/i)).toBeInTheDocument()
   })
@@ -804,7 +804,8 @@ describe('CampDetailPageReal — create mode, MR/FO pickers', () => {
     await renderCreatePage()
     await pickCompany(user, 'Cipla')
 
-    expect(await screen.findByPlaceholderText('Pick a location first')).toBeInTheDocument()
+    // Both the primary FO picker and the secondary dietitian picker gate on location the same way.
+    expect(await screen.findAllByPlaceholderText('Pick a location first')).toHaveLength(2)
   })
 
   it('FO search uses the coverage-radius lookup (GET /geo-profiles/nearest), not a name-based Role search — a platform-tenant-only RoleType has no meaningful tenant-scoped name search left in this picker', async () => {

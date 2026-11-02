@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { FiShield, FiLock, FiStar, FiImage, FiActivity, FiNavigation, FiMapPin, FiHome, FiUser } from 'react-icons/fi'
 import { CampRatingSection } from '@qms/widgets'
+import { CampPhotosViewer } from '@/features/camps/components/dossier/CampPhotosViewer'
 import { useSession } from '@/hooks/useSession'
 import api from '@/lib/api/api'
 import { toast } from '@/components/ui/sonner'
@@ -195,9 +196,9 @@ const WorkerCard = ({ camp }: { camp: CampEntity }) => {
   )
 }
 
-const PhotosCard = () => (
+const PhotosCard = ({ camp }: { camp: CampEntity }) => (
   <Card title="Camp photos" icon={FiImage} color={CARD_ACCENTS.photos}>
-    <Empty>No photos uploaded yet.</Empty>
+    <CampPhotosViewer campId={camp.id} />
   </Card>
 )
 
@@ -259,7 +260,7 @@ const CampDossierContent = ({ camp }: CampDossierContentProps) => (
     <DoctorDetailsCard camp={camp} />
     <MrDetailsCard camp={camp} />
     <WorkerCard camp={camp} />
-    <PhotosCard />
+    <PhotosCard camp={camp} />
     <PatientsCard />
     <RatingCard camp={camp} />
     {camp.notes && (

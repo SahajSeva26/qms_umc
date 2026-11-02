@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState } from 'react'
 import { FiCalendar } from 'react-icons/fi'
-import { usePharmaCamps } from '@/features/camps/hooks/usePharmaCamps'
+import { usePharmaMyCamps } from '@/features/camps/hooks/usePharmaMyCamps'
 import PharmaCampScheduleTable from '@/features/camps/components/PharmaCampScheduleTable'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import PaginationControls from '@/components/ui/PaginationControls'
@@ -41,20 +41,14 @@ const SCHEDULE_SKELETON = (
   </div>
 )
 
-// Role-aware Camp Schedule for HO/RSM/ASM — real GET /camps, server-scoped by role: HO is the
-// whole division; ASM/RSM is their downline, resolved at booking time (the target MR's real
-// supervisor chain is snapshotted onto the camp — see usePharmaCamps.ts for the full scoping
-// note). This component does no downline resolution or extra filtering of its own, and must not,
-// since that would be a client-side security boundary pretending to be real. Unlike MR's
-// /camps/my, this endpoint has no server-computed summary block, so status tabs show no counts
-// (vs. MyCampScheduleTab's count-bearing tabs) — adding counts here would mean a second, different
-// aggregate call this slice doesn't need yet.
+// Role-aware Camp Schedule for HO/RSM/ASM — real GET /camps/my, server-scoped by role. Now gets
+// the same server-computed summary MyCampScheduleTab already uses for its count-bearing tabs.
 const PharmaCampScheduleTab = () => {
   const [activeTab, setActiveTab] = useState<ScheduleTab>('all')
   const [openCamp, setOpenCamp] = useState<CampEntity | null>(null)
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
 
-  const { data, isLoading, isFetching, error, refetch } = usePharmaCamps(
+  const { data, isLoading, isFetching, error, refetch } = usePharmaMyCamps(
     {
       status: activeTab === 'all' ? undefined : activeTab,
       page: String(page),
@@ -64,6 +58,9 @@ const PharmaCampScheduleTab = () => {
   )
   const camps = data?.data?.items ?? []
   const totalCount = data?.data?.count ?? 0
+  const summary = data?.data?.summary
+  const countFor = (tab: ScheduleTab) =>
+    tab === 'all' ? (summary?.totalCamps ?? 0) : (summary?.statusCounts.find((s) => s.status === tab)?.count ?? 0)
 
   const handleSelectTab = (tab: ScheduleTab) => {
     setActiveTab(tab)
@@ -77,7 +74,7 @@ const PharmaCampScheduleTab = () => {
         <h2 className="text-sm font-bold" style={{ color: 'var(--qms-text)' }}>Camp schedule</h2>
       </div>
       <p className="text-[12px] mb-4" style={{ color: 'var(--qms-text-muted)' }}>
-        {totalCount} camp{totalCount === 1 ? '' : 's'} · use View details to open a camp
+        {totalCount} of {summary?.totalCamps ?? totalCount} camps · use View details to open a camp
       </p>
 
       <div className="flex flex-wrap gap-1.5 mb-4">
@@ -87,7 +84,7 @@ const PharmaCampScheduleTab = () => {
             <button
               key={tab}
               onClick={() => handleSelectTab(tab)}
-              className="px-3 py-1.5 rounded-full text-[12px] font-semibold transition-colors border"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold transition-colors border"
               style={{
                 color: isActive ? 'white' : 'var(--qms-text-soft)',
                 background: isActive ? 'var(--qms-brand)' : 'var(--qms-surface-card)',
@@ -95,6 +92,12 @@ const PharmaCampScheduleTab = () => {
               }}
             >
               {tabLabel(tab)}
+              <span
+                className="text-[11px] font-bold rounded-full px-1.5"
+                style={{ background: isActive ? 'rgba(255,255,255,0.25)' : 'var(--qms-surface-hover)' }}
+              >
+                {countFor(tab)}
+              </span>
             </button>
           )
         })}

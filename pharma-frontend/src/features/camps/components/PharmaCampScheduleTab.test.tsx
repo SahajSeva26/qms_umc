@@ -4,11 +4,11 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import PharmaCampScheduleTab from './PharmaCampScheduleTab'
 import { pharmaCampsService } from '@/features/camps/camps.service'
-import type { CampEntity } from '@/types/campReal.types'
+import type { CampEntity, CampSummary } from '@/types/campReal.types'
 
 vi.mock('@/features/camps/camps.service', () => ({
   pharmaCampsService: {
-    searchScopedCamps: vi.fn(),
+    myCamps: vi.fn(),
     getCamp: vi.fn(),
   },
 }))
@@ -34,10 +34,14 @@ function campFixture(overrides: Partial<CampEntity> = {}): CampEntity {
   } as CampEntity
 }
 
-function mockSearch(items: CampEntity[], count = items.length) {
-  vi.mocked(pharmaCampsService.searchScopedCamps).mockResolvedValue({
-    success: true, message: '', data: { items, count },
-  })
+function summaryFixture(overrides: Partial<CampSummary> = {}): CampSummary {
+  return { totalCamps: 0, statusCounts: [], typeCounts: [], ...overrides }
+}
+
+function mockMyCamps(items: CampEntity[], count = items.length, summary = summaryFixture({ totalCamps: count })) {
+  vi.mocked(pharmaCampsService.myCamps).mockResolvedValue({
+    success: true, message: '', data: { items, count, summary },
+  } as never)
 }
 
 function makeQueryClient() {
@@ -57,55 +61,55 @@ describe('PharmaCampScheduleTab — HO/RSM/ASM role-aware Camp Schedule', () => 
     vi.resetAllMocks()
   })
 
-  it('status tabs render with no counts (GET /camps has no server summary, unlike /camps/my)', async () => {
-    mockSearch([campFixture()])
+  it('status tabs render with server-computed counts from GET /camps/my\'s summary', async () => {
+    mockMyCamps([campFixture()], 1, summaryFixture({ totalCamps: 5, statusCounts: [{ status: 'requested', count: 5 }] }))
     renderTab()
 
-    expect(await screen.findByRole('button', { name: /^All$/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^Requested$/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^Ongoing$/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^Completed$/ })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /^All\s*5$/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Requested\s*5$/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Ongoing\s*0$/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Completed\s*0$/ })).toBeInTheDocument()
   })
 
-  it('clicking a status tab re-queries GET /camps with that status and resets to page 1', async () => {
-    mockSearch([campFixture()])
+  it('clicking a status tab re-queries GET /camps/my with that status and resets to page 1', async () => {
+    mockMyCamps([campFixture()])
     renderTab()
     await screen.findByText('cmp-000001')
 
     const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: /^Completed$/ }))
+    await user.click(screen.getByRole('button', { name: /^Completed/ }))
 
-    await waitFor(() => expect(pharmaCampsService.searchScopedCamps).toHaveBeenCalledWith(
+    await waitFor(() => expect(pharmaCampsService.myCamps).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'closed', page: '1' }),
     ))
   })
 
   it('"All" sends no status filter', async () => {
-    mockSearch([campFixture()])
+    mockMyCamps([campFixture()])
     renderTab()
     await screen.findByText('cmp-000001')
 
-    const lastCall = vi.mocked(pharmaCampsService.searchScopedCamps).mock.calls.at(-1)![0]
+    const lastCall = vi.mocked(pharmaCampsService.myCamps).mock.calls.at(-1)![0]
     expect(lastCall.status).toBeUndefined()
   })
 
-  it('paginates via GET /camps\'s own page param, driven by the real count', async () => {
+  it('paginates via GET /camps/my\'s own page param, driven by the real count', async () => {
     const page1 = Array.from({ length: 10 }, (_, i) => campFixture({ id: `camp-${i}`, code: `cmp-00000${i}` }))
-    mockSearch(page1, 12)
+    mockMyCamps(page1, 12)
     renderTab()
     await screen.findByText('Page 1 of 2')
 
     const user = userEvent.setup()
-    mockSearch([campFixture({ id: 'camp-11', code: 'cmp-000011' })], 12)
+    mockMyCamps([campFixture({ id: 'camp-11', code: 'cmp-000011' })], 12)
     await user.click(screen.getByRole('button', { name: /next/i }))
 
-    await waitFor(() => expect(pharmaCampsService.searchScopedCamps).toHaveBeenLastCalledWith(
+    await waitFor(() => expect(pharmaCampsService.myCamps).toHaveBeenLastCalledWith(
       expect.objectContaining({ page: '2' }),
     ))
   })
 
   it('clicking "View details" opens the real PharmaCampDetailDrawer for that camp — the sole interactive control on the row, not a competing nested one', async () => {
-    mockSearch([campFixture({ code: 'cmp-000016', status: 'closed' })])
+    mockMyCamps([campFixture({ code: 'cmp-000016', status: 'closed' })])
     renderTab()
 
     await screen.findByText('cmp-000016')
@@ -116,7 +120,7 @@ describe('PharmaCampScheduleTab — HO/RSM/ASM role-aware Camp Schedule', () => 
   })
 
   it('shows a camp-list-shaped skeleton before the first response resolves', async () => {
-    vi.mocked(pharmaCampsService.searchScopedCamps).mockReturnValue(new Promise(() => {}))
+    vi.mocked(pharmaCampsService.myCamps).mockReturnValue(new Promise(() => {}))
     renderTab()
 
     const skeleton = await screen.findByText('', { selector: '[aria-busy="true"]' })
@@ -124,30 +128,30 @@ describe('PharmaCampScheduleTab — HO/RSM/ASM role-aware Camp Schedule', () => 
     expect(screen.queryByText(/loading camps/i)).not.toBeInTheDocument()
   })
 
-  it('shows the error state with Retry on failure, and Retry re-calls GET /camps', async () => {
-    vi.mocked(pharmaCampsService.searchScopedCamps).mockRejectedValueOnce(new Error('network error'))
+  it('shows the error state with Retry on failure, and Retry re-calls GET /camps/my', async () => {
+    vi.mocked(pharmaCampsService.myCamps).mockRejectedValueOnce(new Error('network error'))
     renderTab()
 
     await screen.findByText(/failed to load camps/i)
-    expect(pharmaCampsService.searchScopedCamps).toHaveBeenCalledTimes(1)
+    expect(pharmaCampsService.myCamps).toHaveBeenCalledTimes(1)
 
-    mockSearch([campFixture()])
+    mockMyCamps([campFixture()])
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: /retry/i }))
 
-    await waitFor(() => expect(pharmaCampsService.searchScopedCamps).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(pharmaCampsService.myCamps).toHaveBeenCalledTimes(2))
     expect(await screen.findByText('cmp-000001')).toBeInTheDocument()
   })
 
   it('shows the empty state when the filtered status has no camps', async () => {
-    mockSearch([], 0)
+    mockMyCamps([], 0)
     renderTab()
 
     expect(await screen.findByText(/no camps in this status yet/i)).toBeInTheDocument()
   })
 
   it('shows an MR column, not an FO-assigned column (distinct from MrCampScheduleTable)', async () => {
-    mockSearch([campFixture({ mr: { _id: 'mr-1', code: 'mr-1', name: 'Dr. MR One' } })])
+    mockMyCamps([campFixture({ mr: { _id: 'mr-1', code: 'mr-1', name: 'Dr. MR One' } })])
     renderTab()
 
     expect(await screen.findByText('Dr. MR One')).toBeInTheDocument()
@@ -155,7 +159,7 @@ describe('PharmaCampScheduleTab — HO/RSM/ASM role-aware Camp Schedule', () => 
   })
 
   it('each row has exactly one interactive control ("View details") — no nested row-level role="button" competing with it', async () => {
-    mockSearch([campFixture()])
+    mockMyCamps([campFixture()])
     renderTab()
     await screen.findByText('cmp-000001')
 

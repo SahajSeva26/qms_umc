@@ -21,7 +21,7 @@ export const WEEKLY_PLAN_PERMISSIONS = {
     SEARCH: {
         code: 'weekly-plan:search',
         name: 'Search Weekly Plan',
-        description: 'View/search own weekly plans (as owner or supervisor) only',
+        description: 'View/search own weekly plans only',
     } as const,
 
     CREATE: {

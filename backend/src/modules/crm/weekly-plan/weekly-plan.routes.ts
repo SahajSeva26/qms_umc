@@ -50,7 +50,7 @@ registry.registerPath({
     method: 'post',
     path: '/weekly-plans',
     tags: ['WEEKLY-PLAN'],
-    summary: 'Create weekly plan (supervisor is derived from the creator role)',
+    summary: 'Create weekly plan (owner = creator)',
     request: {
         body: {
             content: {
@@ -62,7 +62,7 @@ registry.registerPath({
     },
     responses: {
         201: { description: 'Weekly plan created successfully' },
-        400: { description: 'Validation error or no supervisor assigned' },
+        400: { description: 'Validation error' },
     },
 });
 
@@ -95,7 +95,7 @@ registry.registerPath({
     method: 'patch',
     path: '/weekly-plans/{id}/stage',
     tags: ['WEEKLY-PLAN'],
-    summary: 'Move weekly plan stage — approve/reject (supervisor) or resubmit (owner)',
+    summary: 'Move weekly plan stage — approve/reject (weekly-plan:manage) or resubmit (owner)',
     parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
     request: {
         body: {
@@ -130,8 +130,8 @@ WeeklyPlanRouter.put(
     WeeklyPlanController.update,
 );
 
-// approve/reject (supervisor) or resubmit (owner) — both reach via weekly-plan:update; the service
-// enforces the direction-based authorization (supervisor vs owner).
+// approve/reject (requires weekly-plan:manage) or resubmit (owner) — both reach via weekly-plan:update;
+// the service enforces the direction-based authorization (manage-for-approve vs owner-for-resubmit).
 WeeklyPlanRouter.patch(
     '/:id/stage',
     Authorize.anyPermissions([WEEKLY_PLAN_PERMISSIONS.UPDATE.code, ...GUARD]),

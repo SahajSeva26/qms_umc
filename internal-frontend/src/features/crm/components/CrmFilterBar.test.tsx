@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import CrmFilterBar from './CrmFilterBar'
 import type { CrmFilterState } from '@/features/crm/hooks/useCrmFilters'
 
-const DEFAULT_FILTERS: CrmFilterState = { status: '', q: '', code: '', focusTherapy: '', fyFrom: '', fyTo: '' }
+const DEFAULT_FILTERS: CrmFilterState = { status: '', q: '', code: '', focusTherapy: '', fyFrom: '', fyTo: '', hasProject: '' }
 
 function renderBar(filters: CrmFilterState = DEFAULT_FILTERS) {
   const setFilter = vi.fn()

@@ -23,5 +23,7 @@ export function matchesFilters(lead: LeadEntity, filters: CrmFilterState): boole
   const createdAt = new Date(lead.createdAt).getTime()
   if (filters.fyFrom && createdAt < new Date(`${filters.fyFrom}T00:00:00.000Z`).getTime()) return false
   if (filters.fyTo && createdAt > new Date(`${filters.fyTo}T23:59:59.999Z`).getTime()) return false
+  if (filters.hasProject === 'true' && !lead.hasProject) return false
+  if (filters.hasProject === 'false' && lead.hasProject) return false
   return true
 }

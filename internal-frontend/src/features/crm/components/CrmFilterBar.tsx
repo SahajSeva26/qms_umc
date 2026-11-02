@@ -13,6 +13,8 @@ const STATUSES = Object.keys(LEAD_STATUS_LABEL) as LeadStatus[]
 // SelectValue children render-prop fix as the search-field picker below.
 const STATUS_FILTER_LABEL: Record<string, string> = { ALL: 'All stages', ...LEAD_STATUS_LABEL }
 
+const HAS_PROJECT_LABEL: Record<string, string> = { ALL: 'All leads', true: 'Converted', false: 'Not converted' }
+
 // Which CrmFilterState key the single search box writes into — picked via the dropdown next to it.
 // Therapy is deliberately NOT here — it's a closed, pickable set (THERAPIES), so it gets its own
 // select below rather than living in the free-text search box.
@@ -82,6 +84,17 @@ const CrmFilterBar = ({ filters, setFilter, reset }: CrmFilterBarProps) => {
         <span className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>–</span>
         <DatePicker value={filters.fyTo} onChange={(v) => setFilter('fyTo', v)} placeholder="FY to" className="w-32" />
       </div>
+
+      <Select value={filters.hasProject || 'ALL'} onValueChange={(v) => setFilter('hasProject', (v as string) === 'ALL' ? '' : (v as 'true' | 'false'))}>
+        <SelectTrigger className="text-[12px]" aria-label="Filter by project conversion">
+          <SelectValue placeholder="All leads">{(v: string) => HAS_PROJECT_LABEL[v] ?? v}</SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="ALL">All leads</SelectItem>
+          <SelectItem value="true">Converted</SelectItem>
+          <SelectItem value="false">Not converted</SelectItem>
+        </SelectContent>
+      </Select>
 
       <div className="flex items-center gap-1.5 ml-auto">
         <Select value={searchField} onValueChange={(v) => handleSearchFieldChange(v as SearchField)}>

@@ -69,9 +69,11 @@ const getProjectReport = async (query: ProjectReportQuery = {}) => {
 // searchLeads export yet). Calling GET /leads directly here keeps this
 // feature's blast radius limited to Project; fixing crm.service.ts is a
 // separate, pre-existing task.
+// Defaults to hiding already-converted leads so the wizard doesn't offer creating a
+// second project off the same lead — callers may still override via query.hasProject.
 const searchWonLeads = async (query: SearchLeadQuery = {}) => {
   const res = await api.get<PaginatedResponse<LeadEntity>>('/leads', {
-    params: { limit: DEFAULT_LIMIT, ...query, status: 'won' },
+    params: { limit: DEFAULT_LIMIT, hasProject: 'false', ...query, status: 'won' },
   })
   return res.data
 }

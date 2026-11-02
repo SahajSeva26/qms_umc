@@ -93,11 +93,6 @@ const weeklyPlanSchema = new mongoose.Schema(
             ref: 'Role',
             required: [true, 'Sales person is required'],
         },
-        supervisor: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'Role',
-            required: true,
-        },
         status: {
             type: String,
             enum: Object.values(WEEKLY_PLAN_STATUS),

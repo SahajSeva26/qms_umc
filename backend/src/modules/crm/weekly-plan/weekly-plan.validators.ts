@@ -36,7 +36,6 @@ export const CreateWeeklyPlanPayloadSchema = z
     .object({
         startDate: z.coerce.date().openapi({ example: '2026-08-03' }),
         endDate: z.coerce.date().openapi({ example: '2026-08-09' }),
-        supervisor: objectId('Supervisor').openapi({ example: '665f0c3a1a2b3c4d5e6f7a90' }),
         plans: PlansArraySchema.optional(),
     })
     .refine((d) => d.endDate >= d.startDate, {
@@ -51,7 +50,6 @@ export type ICreateWeeklyPlanPayload = z.infer<typeof CreateWeeklyPlanPayloadSch
 export const UpdateWeeklyPlanPayloadSchema = z.object({
     startDate: z.coerce.date().optional(),
     endDate: z.coerce.date().optional(),
-    supervisor: objectId('Supervisor').optional(),
     plans: PlansArraySchema.optional(),
 });
 export type IUpdateWeeklyPlanPayload = z.infer<typeof UpdateWeeklyPlanPayloadSchema>;
@@ -67,7 +65,6 @@ export type IMoveStagePayload = z.infer<typeof MoveStagePayloadSchema>;
 export const SearchWeeklyPlanQuerySchema = z.object({
     status: z.enum(Object.values(WEEKLY_PLAN_STATUS)).optional().openapi({ example: 'pending' }),
     salesPerson: objectId('Sales person').optional(),
-    supervisor: objectId('Supervisor').optional(),
     // bound the plan's week by its startDate
     dateFrom: z.coerce.date().optional().openapi({ example: '2026-08-01' }),
     dateTo: z.coerce.date().optional().openapi({ example: '2026-08-31' }),

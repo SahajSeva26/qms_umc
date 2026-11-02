@@ -52,6 +52,36 @@ const planSchema = new mongoose.Schema({
     },
 });
 
+// append-only audit journal of status transitions — mirrors the appointment stageHistory pattern.
+const stageHistorySchema = new mongoose.Schema(
+    {
+        from: {
+            type: String,
+            enum: Object.values(WEEKLY_PLAN_STATUS),
+            required: [true, 'From status is required'],
+        },
+        to: {
+            type: String,
+            enum: Object.values(WEEKLY_PLAN_STATUS),
+            required: [true, 'To status is required'],
+        },
+        // frozen snapshot of the actor at the moment of the transition — immutable audit trail.
+        // roleId stays linkable; name/email never change even if the user/role later does.
+        actor: {
+            roleId: { type: mongoose.Schema.Types.ObjectId, ref: 'Role' },
+            name: { type: String },
+            email: { type: String },
+        },
+        reason: {
+            type: String,
+            required: [true, 'Reason is required'],
+        },
+    },
+    {
+        timestamps: true,
+    },
+);
+
 const weeklyPlanSchema = new mongoose.Schema(
     {
         startDate: { type: Date, required: true },
@@ -75,9 +105,14 @@ const weeklyPlanSchema = new mongoose.Schema(
         },
         plans: {
             type: [planSchema],
-            max: 6,
             default: [],
+            // Mongoose ignores `max` on arrays — enforce the 6-per-week cap with a custom validator.
+            validate: {
+                validator: (v: unknown[]) => v.length <= 6,
+                message: 'A weekly plan can have at most 6 plans',
+            },
         },
+        stageHistory: [stageHistorySchema],
     },
     {
         timestamps: true,

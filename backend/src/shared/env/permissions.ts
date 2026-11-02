@@ -10,6 +10,7 @@ import { CONTACT_PERMISSIONS } from '../../modules/crm/contact/contact.constants
 import { BRAND_PERMISSIONS } from '../../modules/crm/brand/brand.constants';
 import { APPOINTMENT_PERMISSIONS } from '../../modules/crm/appointment/appointment.constants';
 import { PROJECT_PERMISSIONS } from '../../modules/crm/project/project.constants';
+import { WEEKLY_PLAN_PERMISSIONS } from '../../modules/crm/weekly-plan/weekly-plan.constants';
 import { QA_FEEDBACK_PERMISSIONS } from '../../modules/qa-feedback/qaFeedback.constants';
 import { DOCTOR_PERMISSIONS } from '../../modules/crm/doctor/doctor.constants';
 import { GEO_PROFILE_PERMISSIONS } from '../../modules/operations/geoProfile/geoProfile.constants';
@@ -52,6 +53,7 @@ export const PERMISSIONS = {
     BRAND: BRAND_PERMISSIONS,
     APPOINTMENT: APPOINTMENT_PERMISSIONS,
     PROJECT: PROJECT_PERMISSIONS,
+    WEEKLY_PLAN: WEEKLY_PLAN_PERMISSIONS,
     QA_FEEDBACK: QA_FEEDBACK_PERMISSIONS,
     DOCTOR: DOCTOR_PERMISSIONS,
     GEO_PROFILE: GEO_PROFILE_PERMISSIONS,

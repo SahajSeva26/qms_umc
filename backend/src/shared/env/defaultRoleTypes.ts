@@ -14,6 +14,7 @@ import { CONTACT_PERMISSIONS } from '../../modules/crm/contact/contact.constants
 import { BRAND_PERMISSIONS } from '../../modules/crm/brand/brand.constants';
 import { ROLE_PERMISSIONS } from '../../modules/access-management/role/role.constants';
 import { PROJECT_PERMISSIONS } from '../../modules/crm/project/project.constants';
+import { WEEKLY_PLAN_PERMISSIONS } from '../../modules/crm/weekly-plan/weekly-plan.constants';
 import { INVENTORY_REQUEST_PERMISSIONS } from '../../modules/inventory/inventory-request/inventory-request.constants';
 import { INVENTORY_MASTER_PERMISSIONS } from '../../modules/inventory/inventory-master/inventory-master.constants';
 import { INVENTORY_CONSUMABLE_PERMISSIONS } from '../../modules/inventory/inventory-consumable/inventory-consumable.constants';
@@ -73,6 +74,14 @@ export const CRM_BUSINESS_ROLE_TYPES = [
             PROJECT_PERMISSIONS.CREATE.code,
             PROJECT_PERMISSIONS.UPDATE.code,
 
+            // own weekly plans — create + edit own, read own (service scopes to salesPerson/supervisor),
+            // and move stage (resubmit a rejected plan). Approve/reject is supervisor-only, enforced in
+            // the service by direction, so update is enough here.
+            WEEKLY_PLAN_PERMISSIONS.CREATE.code,
+            WEEKLY_PLAN_PERMISSIONS.UPDATE.code,
+            WEEKLY_PLAN_PERMISSIONS.SEARCH.code,
+            WEEKLY_PLAN_PERMISSIONS.GET.code,
+
             TEST_MASTER_PERMISSIONS.SEARCH.code,
             TEST_MASTER_PERMISSIONS.GET.code,
         ],
@@ -101,6 +110,10 @@ export const CRM_BUSINESS_ROLE_TYPES = [
             // full project management (create + edit + set-LIVE/moveStage) with team-wide visibility
             // (project:manage is not own-scoped — Sales Head sees the whole team's projects).
             PROJECT_PERMISSIONS.MANAGE.code,
+
+            // full weekly-plan management — team-wide visibility (manage bypasses own-scope). As the
+            // reps' supervisor they also approve/reject via moveStage; manage covers that too.
+            WEEKLY_PLAN_PERMISSIONS.MANAGE.code,
 
             TEST_MASTER_PERMISSIONS.SEARCH.code,
             TEST_MASTER_PERMISSIONS.GET.code,

@@ -157,6 +157,7 @@ const appointmentSchema = new mongoose.Schema(
                 default: '',
             },
         },
+
         status: {
             type: String,
             enum: Object.values(APPOINTMENT_STATUSES),

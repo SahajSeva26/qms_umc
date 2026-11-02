@@ -16,6 +16,7 @@ import '../../../modules/crm/contact/contact.routes';
 import '../../../modules/crm/brand/brand.routes';
 import '../../../modules/crm/appointment/appointment.routes';
 import '../../../modules/crm/project/project.routes';
+import '../../../modules/crm/weekly-plan/weekly-plan.routes';
 import '../../../modules/qa-feedback/qaFeedback.routes';
 import '../../../modules/crm/doctor/doctor.routes';
 import '../../../modules/operations/geoProfile/geoProfile.routes';

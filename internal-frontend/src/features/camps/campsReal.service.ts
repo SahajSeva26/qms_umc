@@ -7,15 +7,19 @@ import type {
   BookingAvailabilityPayload,
   BookingAvailabilityResponse,
   CampEntity,
+  CampFileActivatePayload,
+  CampFilePostPayload,
   CampMutationResponseEntity,
   CampStatus,
   CreateCampPayload,
+  GetCampFilesQuery,
   MoveCampStagePayload,
   SearchCampQuery,
   UpdateCampPayload,
   VoidCampPayload,
 } from '@/types/campReal.types'
 import type { CampReport } from '@/types/campReport.types'
+import type { FileEntity } from '@/types/file.types'
 
 // Deliberately separate from `camps.service.ts`, the old mock store other files still depend on.
 const searchCamps = async (query: SearchCampQuery) => {
@@ -92,6 +96,28 @@ const getBookingAvailability = async (payload: BookingAvailabilityPayload) => {
   return res.data
 }
 
+// Camp photos — setup/check-in-selfie/closure, role-gated server-side to the camp's assigned
+// worker (upload/activate/discard); reads inherit the normal camp read own-scope.
+const createCampFiles = async (payload: CampFilePostPayload) => {
+  const res = await api.post<ApiResponse<FileEntity[]>>('/camps/files', payload)
+  return res.data
+}
+
+const activateCampFiles = async (payload: CampFileActivatePayload) => {
+  const res = await api.post<ApiResponse<FileEntity[]>>('/camps/files/activate', payload)
+  return res.data
+}
+
+const getCampFiles = async (query: GetCampFilesQuery) => {
+  const res = await api.get<PaginatedResponse<FileEntity>>('/camps/files', { params: query })
+  return res.data
+}
+
+const discardCampFile = async (fileId: string) => {
+  const res = await api.delete<ApiResponse<FileEntity>>(`/camps/files/${fileId}`)
+  return res.data
+}
+
 export const campsRealService = {
   searchCamps,
   getCamp,
@@ -105,4 +131,8 @@ export const campsRealService = {
   allocateFo,
   getCampReport,
   getBookingAvailability,
+  createCampFiles,
+  activateCampFiles,
+  getCampFiles,
+  discardCampFile,
 }

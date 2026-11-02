@@ -7,8 +7,9 @@ export type FileStatus = 'draft' | 'active' | 'inactive' | 'discarded'
 // real ENTITY_RELATION group today — every other value is zod-valid but rejected downstream.
 export type FileEntityType = 'user' | 'tenant' | 'lead' | 'project' | 'camp' | 'invoice' | 'screening' | 'test'
 
-// Only 'profile_picture' (user) and 'logo' (tenant) exist today, both cap 1.
-export type FileEntityRelation = 'profile_picture' | 'logo'
+// 'profile_picture' (user) and 'logo' (tenant) are cap 1. 'setup'/'check-in-selfie'/'closure'
+// (camp) are multi-file galleries with their own per-relation caps — see camp.constants.ts.
+export type FileEntityRelation = 'profile_picture' | 'logo' | 'setup' | 'check-in-selfie' | 'closure'
 
 export interface FileEntityRef {
   id?: string

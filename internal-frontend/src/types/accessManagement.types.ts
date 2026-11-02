@@ -70,6 +70,9 @@ export interface SearchTenantQuery {
   type?: TenantType
   // TODO: only honored server-side if caller has `tenant:manage`; otherwise search is hard-scoped to status=active.
   status?: TenantStatus
+  // tenant.service.ts: matches tenants assigned to this Role id OR unassigned (salesPerson: null)
+  // — a sales rep's own book, not "only tenants with no one assigned."
+  salesRep?: string
   page?: string
   limit?: string
   // When 'true', each item gets a `stats` object (see TenantStats). Backend

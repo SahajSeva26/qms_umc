@@ -91,6 +91,7 @@ export interface InvoiceEntity {
 export interface SearchInvoiceQuery {
   tenant?: string
   project?: string
+  code?: string
   status?: InvoiceStatus
   dateFrom?: string
   dateTo?: string

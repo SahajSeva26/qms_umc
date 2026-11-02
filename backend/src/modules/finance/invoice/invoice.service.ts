@@ -122,6 +122,7 @@ const search = async (filters: ISearchInvoiceQuery, ctx: RequestContext, options
         where.tenant = filters.tenant;
     }
     if (filters.project) where.project = filters.project;
+    if (filters.code) where.code = { $regex: filters.code, $options: 'i' };
     if (filters.status) where.status = filters.status;
     // issue-date range — dateTo is snapped to end-of-day (UTC) so the whole end day is included
     if (filters.dateFrom || filters.dateTo) {

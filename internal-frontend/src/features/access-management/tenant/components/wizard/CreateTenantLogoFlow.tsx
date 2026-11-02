@@ -1,7 +1,6 @@
 import { FiRefreshCw, FiUpload } from 'react-icons/fi'
 import { Button } from '@/components/ui/button'
 import LogoPreview from '@/components/ui/LogoPreview'
-import StartOverUploadDialog from '@/components/widgets/upload/StartOverUploadDialog'
 import { ACCEPTED_LOGO_MIME_TYPES } from '@/features/access-management/tenant/tenant.constants'
 import { Label } from '@/components/ui/label'
 import type { CreateTenantLogoFlowApi } from '@/features/access-management/tenant/hooks/useCreateTenantLogoFlow'
@@ -11,8 +10,7 @@ interface CreateTenantLogoFlowProps {
   variant: 'picker' | 'status'
 }
 
-// Swallows a sync throw or async rejection — useUploadFile's steps re-throw after failing, and
-// onClick can't await/catch a handler's return value. Mirrors TenantHeader.tsx's own callSafely.
+// Swallows a sync throw or async rejection — onClick can't await/catch a handler's return value.
 function callSafely(fn: () => void): void {
   void Promise.resolve().then(fn).catch(() => {})
 }
@@ -29,20 +27,9 @@ const CreateTenantLogoFlow = ({ flow, variant }: CreateTenantLogoFlowProps) => {
     openLogoPicker,
     handleLogoPicked,
     logoState,
-    retryLogoUpload,
-    startOverLogoUpload,
-    retryLogoCleanup,
     retryLogo,
-    hasRetriedThisAttempt,
-    setHasRetriedThisAttempt,
-    startOverDialogOpen,
-    setStartOverDialogOpen,
-    inFlightUploadStep,
-    uploadStalled,
-    awaitingAbandonAck,
-    isTopLevelTerminalFailure,
-    isTopLevelRetryable,
-    continueWithoutLogo,
+    isTerminalFailure,
+    isRetryable,
     finishWithoutLogo,
   } = flow
 
@@ -86,143 +73,36 @@ const CreateTenantLogoFlow = ({ flow, variant }: CreateTenantLogoFlowProps) => {
             onChange={(e) => handleLogoPicked(e.target.files?.[0] ?? null)}
           />
           <p className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>
-            {logoState.step === 'uploading' && logoState.upload.step === 'uploading' && 'Uploading logo…'}
-            {logoState.step === 'uploading' && logoState.upload.step === 'activating' && 'Confirming upload…'}
-            {logoState.step === 'uploading' && logoState.upload.step === 'creating' && 'Starting upload…'}
-            {logoState.step === 'uploading' && logoState.upload.step === 'restarting' && 'Starting a new upload…'}
-            {logoState.step === 'uploading' && logoState.upload.step === 'upload-failed' && "The upload didn't go through."}
-            {logoState.step === 'deactivating-old' && 'Preparing…'}
-            {logoState.step === 'linking-new' && 'Linking logo…'}
-            {logoState.step === 'link-uncertain-checking' && 'Checking upload status…'}
-            {logoState.step === 'restoring-old' && 'Finishing up…'}
-            {logoState.step === 'cleaning-up-orphan' && 'Cleaning up…'}
-            {isTopLevelRetryable(logoState.step) && "We couldn't confirm the logo upload — you can retry or continue without it."}
-            {isTopLevelTerminalFailure(logoState.step) && "We couldn't attach the logo to the new company."}
+            {logoState.step === 'creating' && 'Starting upload…'}
+            {logoState.step === 'uploading' && 'Uploading logo…'}
+            {logoState.step === 'activating' && 'Confirming upload…'}
+            {logoState.step === 'activate-uncertain' && 'Checking upload status…'}
+            {isRetryable(logoState.step) && "We couldn't confirm the logo upload — you can retry or continue without it."}
+            {isTerminalFailure(logoState.step) && "We couldn't attach the logo to the new company."}
           </p>
         </div>
 
         {/* Also needed here, not just the picker variant, or a rejected replacement fails silently. */}
         {logoValidationError && <p className="text-[11px] text-danger">{logoValidationError}</p>}
 
-        {/* Nested upload sub-state actions (create/upload/activate) — the only states where
-            abandonPendingUpload() is ever called; see useReplaceTenantLogo.ts. */}
-        {logoState.step === 'uploading' && (
+        {isRetryable(logoState.step) && (
           <div className="flex flex-wrap items-center gap-2">
-            {logoState.upload.step === 'upload-failed' && (
-              <>
-                <Button
-                  type="button"
-                  size="xs"
-                  variant="outline"
-                  onClick={() => {
-                    setHasRetriedThisAttempt(true)
-                    callSafely(retryLogoUpload)
-                  }}
-                >
-                  Try again
-                </Button>
-                {hasRetriedThisAttempt && (
-                  <>
-                    <span className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>
-                      Still not working?
-                    </span>
-                    <Button type="button" size="xs" variant="link" onClick={() => setStartOverDialogOpen(true)}>
-                      Start a new upload
-                    </Button>
-                  </>
-                )}
-                <Button type="button" size="xs" variant="ghost" onClick={() => void continueWithoutLogo()}>
-                  Continue without logo
-                </Button>
-              </>
-            )}
-            {(logoState.upload.step === 'create-failed' ||
-              logoState.upload.step === 'create-uncertain' ||
-              logoState.upload.step === 'activate-failed' ||
-              logoState.upload.step === 'activate-not-uploaded' ||
-              logoState.upload.step === 'activate-uncertain') && (
-              <>
-                <Button type="button" size="xs" variant="outline" onClick={() => callSafely(retryLogoUpload)}>
-                  <FiRefreshCw size={11} /> Retry
-                </Button>
-                <Button type="button" size="xs" variant="ghost" onClick={() => void continueWithoutLogo()}>
-                  Continue without logo
-                </Button>
-              </>
-            )}
-            {inFlightUploadStep && uploadStalled && (
-              <>
-                <span className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>
-                  Still taking a while?
-                </span>
-                <Button type="button" size="xs" variant="ghost" onClick={() => void continueWithoutLogo()}>
-                  Continue without logo
-                </Button>
-              </>
-            )}
-          </div>
-        )}
-
-        <StartOverUploadDialog
-          open={startOverDialogOpen}
-          onOpenChange={setStartOverDialogOpen}
-          onConfirm={() => {
-            setStartOverDialogOpen(false)
-            setHasRetriedThisAttempt(false)
-            callSafely(startOverLogoUpload)
-          }}
-        />
-
-        {/* Top-level (post-link-stage) retryable states. */}
-        {isTopLevelRetryable(logoState.step) && (
-          <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" size="xs" variant="outline" onClick={() => callSafely(retryLogo)}>
+            <Button type="button" size="xs" variant="outline" onClick={() => callSafely(() => void retryLogo())}>
               <FiRefreshCw size={11} /> Retry
             </Button>
-            {'cleanup' in logoState && logoState.cleanup && (
-              <Button type="button" size="xs" variant="outline" onClick={() => callSafely(retryLogoCleanup)}>
-                Retry cleanup
-              </Button>
-            )}
             <Button type="button" size="xs" variant="ghost" onClick={finishWithoutLogo}>
               Continue without logo
             </Button>
           </div>
         )}
 
-        {/* Terminal failures — Continue is ALWAYS a plain close, recovery already ran. */}
-        {isTopLevelTerminalFailure(logoState.step) && (
+        {isTerminalFailure(logoState.step) && (
           <div className="flex flex-wrap items-center gap-2">
             <Button type="button" size="xs" variant="outline" onClick={openLogoPicker}>
               Choose another logo
             </Button>
-            {'cleanup' in logoState && logoState.cleanup && (
-              <Button type="button" size="xs" variant="outline" onClick={() => callSafely(retryLogoCleanup)}>
-                Retry cleanup
-              </Button>
-            )}
             <Button type="button" size="xs" variant="ghost" onClick={finishWithoutLogo}>
               Continue without logo
-            </Button>
-          </div>
-        )}
-
-        {/* Only reachable via the upload-substate "Continue without logo", never the top-level one. */}
-        {awaitingAbandonAck && (
-          <div className="text-[11px] rounded-lg px-2.5 py-1.5 bg-danger-soft border border-danger text-danger">
-            Company created. We couldn't confirm the logo upload was cleaned up.
-            <Button type="button" size="xs" variant="outline" className="ml-2" onClick={finishWithoutLogo}>
-              Continue anyway
-            </Button>
-          </div>
-        )}
-
-        {/* Sticky-false cleanup (see useUploadFile.ts) — done-effect refuses to auto-close past this. */}
-        {logoState.step === 'done' && logoState.priorDraftCleanupConfirmed === false && (
-          <div className="text-[11px] rounded-lg px-2.5 py-1.5 bg-danger-soft border border-danger text-danger">
-            Company created and logo attached. We couldn't confirm an earlier failed upload was cleaned up.
-            <Button type="button" size="xs" variant="outline" className="ml-2" onClick={finishWithoutLogo}>
-              Continue anyway
             </Button>
           </div>
         )}

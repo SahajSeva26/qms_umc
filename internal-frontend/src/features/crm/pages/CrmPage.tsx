@@ -59,7 +59,7 @@ const CrmPage = () => {
   // text, so it doesn't need this.
   const debouncedQ = useDebouncedValue(filters.q)
   const debouncedCode = useDebouncedValue(filters.code)
-  // All 6 filters are real, backend-supported params — needed server-side so count/totalPages
+  // All 7 filters are real, backend-supported params — needed server-side so count/totalPages
   // reflect the filtered total. matchesFilters below only re-applies status/title/date client-side.
   // report=true drives each row's stats.followUps (ListView only).
   const { leads, count, isLoading, error, moveStage, updateLead } = useLeads({
@@ -69,6 +69,7 @@ const CrmPage = () => {
     focusTherapy: filters.focusTherapy || undefined,
     fyFrom: filters.fyFrom || undefined,
     fyTo: filters.fyTo || undefined,
+    hasProject: filters.hasProject || undefined,
     page: String(page),
     limit: String(PAGE_SIZE),
     report: 'true',

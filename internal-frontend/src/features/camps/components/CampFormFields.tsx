@@ -289,6 +289,37 @@ const CampFormFields = ({
         )}
       </div>
 
+      <div>
+        <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>
+          {isDiet ? 'Field Officer' : 'Dietitian'} — secondary support (optional)
+        </Label>
+        <p className="text-[11px] mb-1.5" style={{ color: 'var(--qms-text-muted)' }}>
+          Recorded only, not auto-allocated — pick a {isDiet ? 'field officer' : 'dietitian'} to support this camp alongside the {isDiet ? 'dietitian' : 'field officer'} above.
+        </p>
+        {isDiet ? (
+          <CampFoPicker
+            value={fo}
+            label={foLabel}
+            coordinates={location?.coordinates}
+            date={date}
+            timeSlot={timeSlot}
+            onChange={(id, l) => { setField('fo', id); setFoLabel(l) }}
+            disabled={isLocked || !effectiveTenant}
+          />
+        ) : (
+          <CampFoPicker
+            workerType="dietitian"
+            value={dietitian}
+            label={dietitianLabel}
+            coordinates={location?.coordinates}
+            date={date}
+            timeSlot={timeSlot}
+            onChange={(id, l) => { setField('dietitian', id); setDietitianLabel(l) }}
+            disabled={isLocked || !effectiveTenant}
+          />
+        )}
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <Label className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Date</Label>

@@ -1,11 +1,12 @@
 import type { RoleEntity, RolePopulatedUser } from '@/types/accessManagement.types'
 import RoleStatusPill from '@/features/access-management/role/components/RoleStatusPill'
 
-// Deliberately no click-through to the global Role editor — its "back"
-// returns to Roles, not this Division, and it can't edit the MR's supervisor.
+// No click-through to the global Role editor (can't edit the MR's supervisor) — a row click opens
+// a local summary drawer instead (onSelectMr).
 
 interface DivisionMrsTableProps {
   mrs: RoleEntity[]
+  onSelectMr?: (mr: RoleEntity) => void
 }
 
 function userName(user: RoleEntity['user']): string {
@@ -25,7 +26,7 @@ function userPhone(user: RoleEntity['user']): string {
   return (user as RolePopulatedUser)?.phone ?? '—'
 }
 
-const DivisionMrsTable = ({ mrs }: DivisionMrsTableProps) => {
+const DivisionMrsTable = ({ mrs, onSelectMr }: DivisionMrsTableProps) => {
   return (
     <div
       className="rounded-xl border overflow-hidden"
@@ -51,7 +52,12 @@ const DivisionMrsTable = ({ mrs }: DivisionMrsTableProps) => {
           </thead>
           <tbody>
             {mrs.map((mr) => (
-              <tr key={mr.id} style={{ borderBottom: '1px solid var(--qms-border)' }}>
+              <tr
+                key={mr.id}
+                onClick={onSelectMr ? () => onSelectMr(mr) : undefined}
+                className={onSelectMr ? 'cursor-pointer hover:bg-(--qms-surface-hover)' : undefined}
+                style={{ borderBottom: '1px solid var(--qms-border)' }}
+              >
                 <td className="px-4 py-2.5">
                   <div className="font-semibold truncate" style={{ color: 'var(--qms-text)' }}>
                     {userName(mr.user)}

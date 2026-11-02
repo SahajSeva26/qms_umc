@@ -5,8 +5,10 @@ import type {
   BookingAvailabilityPayload,
   BookingAvailabilityResponse,
   CampEntity,
+  CampFile,
   CampMutationResponseEntity,
   CampSummary,
+  GetCampFilesQuery,
   SearchCampQuery,
 } from '@/types/campReal.types'
 
@@ -16,8 +18,8 @@ export interface MyCampsResponse {
   data: { count: number; items: CampEntity[]; summary: CampSummary }
 }
 
-// GET /camps/my — field-force's own camps (FO/dietitian/MR), scoped server-side to the
-// caller's own slot. Carries a top-level `summary` (status/type counts) beyond the page itself.
+// GET /camps/my — own-scoped camps per role (field-force: own slot; HO: division; ASM/RSM:
+// downline), with a top-level `summary` (status/type counts) beyond the page itself.
 const myCamps = async (query: SearchCampQuery) => {
   const res = await api.get<MyCampsResponse>('/camps/my', { params: query })
   return res.data
@@ -31,8 +33,8 @@ const getCamp = async (id: string) => {
   return res.data
 }
 
-// GET /camps — generic role-scoped search (HO/RSM/ASM's own dashboard; MR uses /camps/my
-// instead, see myCamps). The backend scopes results by role server-side.
+// GET /camps — generic role-scoped search, now used only by CampManagementPage's real filterable
+// list. HO/RSM/ASM's dashboard/schedule tabs moved to /camps/my (see myCamps) once it opened to them.
 const searchScopedCamps = async (query: SearchCampQuery) => {
   const res = await api.get<PaginatedResponse<CampEntity>>('/camps', { params: query })
   return res.data
@@ -55,10 +57,18 @@ const getBookingAvailability = async (payload: BookingAvailabilityPayload) => {
   return res.data
 }
 
+// GET /camps/files — read-only here (upload/activate/discard are FO/dietitian-only server-side).
+// Authorization is "can the caller read this camp" — an MR's camp:book permission already qualifies.
+const getCampFiles = async (query: GetCampFilesQuery) => {
+  const res = await api.get<PaginatedResponse<CampFile>>('/camps/files', { params: query })
+  return res.data
+}
+
 export const pharmaCampsService = {
   myCamps,
   getCamp,
   bookCamp,
   getBookingAvailability,
   searchScopedCamps,
+  getCampFiles,
 }

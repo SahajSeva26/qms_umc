@@ -9,8 +9,9 @@ export interface CrmFilterState {
   // ISO date strings (YYYY-MM-DD), or '' for unset.
   fyFrom: string
   fyTo: string
+  hasProject: '' | 'true' | 'false'
 }
 
-const DEFAULT_FILTERS: CrmFilterState = { status: '', q: '', code: '', focusTherapy: '', fyFrom: '', fyTo: '' }
+const DEFAULT_FILTERS: CrmFilterState = { status: '', q: '', code: '', focusTherapy: '', fyFrom: '', fyTo: '', hasProject: '' }
 
 export const useCrmFilters = () => useFilterState<CrmFilterState>(DEFAULT_FILTERS)

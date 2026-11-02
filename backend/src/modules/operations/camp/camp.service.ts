@@ -606,6 +606,9 @@ const search = async (filters: ISearchCampQuery, ctx: RequestContext, options?: 
     if (filters.dietitian) {
         where.dietitian = filters.dietitian;
     }
+    if (filters.mr) {
+        where.mr = filters.mr;
+    }
     if (filters.status) {
         where.status = filters.status;
     }

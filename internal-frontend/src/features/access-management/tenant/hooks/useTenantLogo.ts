@@ -1,9 +1,8 @@
 import { useQuery, type QueryKey } from '@tanstack/react-query'
-import { fileService } from '@/lib/file/file.service'
+import { accessManagementService } from '@/features/access-management/accessManagement.service'
 
-// Resolves a tenant's currently-active logo file. A direct useQuery (not useEntityQuery, whose
-// staleTime default of 5min is wrong for a short-lived, single-use presigned S3 url). Two calls:
-// search finds the active file's id, getFile(id) returns the actual url (search never does).
+// Direct useQuery, not useEntityQuery — its 5min staleTime default is wrong for a short-lived,
+// single-use presigned S3 url returned by GET /tenants/:id/logo.
 export const tenantLogoKeys = {
   detail: (tenantId: string): QueryKey => ['tenants', 'logo', tenantId],
 }
@@ -14,17 +13,10 @@ export interface TenantLogoResult {
 }
 
 async function fetchTenantLogo(tenantId: string): Promise<TenantLogoResult> {
-  const searchRes = await fileService.searchFiles({
-    entityType: 'tenant',
-    relation: 'logo',
-    entityId: tenantId,
-    status: 'active',
-  })
-  const found = searchRes.data?.items?.[0]
+  const res = await accessManagementService.getTenantLogo(tenantId)
+  const found = res.data?.items?.[0]
   if (!found) return { fileId: null, url: null }
-
-  const getRes = await fileService.getFile(found.id)
-  return { fileId: found.id, url: getRes.data?.url ?? null }
+  return { fileId: found.id, url: found.url ?? null }
 }
 
 export function useTenantLogo(tenantId: string) {

@@ -1,11 +1,7 @@
 import { useNavigate } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
 import { FiEdit2 } from 'react-icons/fi'
 import { Button } from '@/components/ui/button'
-import { useEntityImageUpload } from '@/components/widgets/upload/EntityImageUpload'
-import { useTenantLogo, tenantLogoKeys } from '@/features/access-management/tenant/hooks/useTenantLogo'
-import { useReplaceTenantLogo } from '@/features/access-management/tenant/hooks/useReplaceTenantLogo'
-import { ACCEPTED_LOGO_MIME_TYPES, validateLogoFile } from '@/features/access-management/tenant/tenant.constants'
+import { useTenantLogoField } from '@/features/access-management/tenant/hooks/useTenantLogoField'
 import { ROLE_ROUTES } from '@/features/access-management/role/role.routes'
 import TenantTypeBadge from '@/features/access-management/tenant/components/TenantTypeBadge'
 import TenantStatusPill from '@/features/access-management/tenant/components/TenantStatusPill'
@@ -27,20 +23,6 @@ interface TenantHeaderProps {
   onEditClick: () => void
 }
 
-const TENANT_LOGO_COPY = {
-  alt: 'Company logo',
-  uploadLabel: 'Upload logo',
-  changeLabel: 'Change logo',
-  noun: 'logo',
-  currentNoun: 'the current logo',
-  oldNoun: 'old logo',
-  newNoun: 'new logo',
-  previousNoun: 'previous logo',
-  linkConflictMessage: 'Another logo was just activated for this tenant.',
-  restoreFailedMessage: "We couldn't restore the previous logo — a manual fix may be needed. Retrying won't necessarily fix this on its own.",
-  restoredAfterFailureMessage: "The new logo couldn't be saved. Your previous logo has been restored. You can choose a file to try again.",
-}
-
 const TenantHeader = ({
   tenant,
   canManageTenant,
@@ -55,25 +37,9 @@ const TenantHeader = ({
   onEditClick,
 }: TenantHeaderProps) => {
   const navigate = useNavigate()
-  const queryClient = useQueryClient()
-  const logo = useTenantLogo(tenant.id)
-
-  const invalidateLogo = () => {
-    void queryClient.invalidateQueries({ queryKey: tenantLogoKeys.detail(tenant.id) })
-  }
-
-  const replaceLogo = useReplaceTenantLogo(tenant.id, logo.fileId, {
-    onSuccess: invalidateLogo,
-  })
-
-  const { column: logoColumn, feedback: logoFeedback, hasLongFeedback, startOverDialog } = useEntityImageUpload({
-    read: logo,
-    replace: replaceLogo,
-    size: 'lg',
+  const { column: logoColumn, feedback: logoFeedback, hasLongFeedback } = useTenantLogoField({
+    tenantId: tenant.id,
     canManage: canManageTenant,
-    copy: TENANT_LOGO_COPY,
-    accept: ACCEPTED_LOGO_MIME_TYPES.join(','),
-    validateFile: validateLogoFile,
   })
 
   return (
@@ -158,8 +124,6 @@ const TenantHeader = ({
           {logoFeedback}
         </div>
       )}
-
-      {startOverDialog}
     </div>
   )
 }

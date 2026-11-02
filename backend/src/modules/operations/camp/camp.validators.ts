@@ -166,6 +166,7 @@ export const SearchCampQuerySchema = z.object({
     doctor: objectId('Doctor').optional(),
     fo: objectId('FO').optional(),
     dietitian: objectId('Dietitian').optional(),
+    mr: objectId('MR').optional(),
     status: z.enum(Object.values(CAMP_STATUSES)).optional().openapi({ example: 'confirmed' }),
     type: z.enum(Object.values(CAMP_TYPES)).optional().openapi({ example: 'screening' }),
     billingType: z.enum(Object.values(BILLING_TYPES)).optional().openapi({ example: 'billable' }),

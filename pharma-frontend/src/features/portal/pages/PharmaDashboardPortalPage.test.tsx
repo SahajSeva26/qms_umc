@@ -8,7 +8,9 @@ import PharmaDashboardPortalPage from './PharmaDashboardPortalPage'
 vi.mock('@/hooks/useSession')
 vi.mock('@/features/camps/camps.service', () => ({
   pharmaCampsService: {
-    searchScopedCamps: vi.fn().mockResolvedValue({ success: true, message: '', data: { items: [], count: 0 } }),
+    myCamps: vi.fn().mockResolvedValue({
+      success: true, message: '', data: { items: [], count: 0, summary: { totalCamps: 0, statusCounts: [], typeCounts: [] } },
+    }),
   },
 }))
 // Full-weight (RHF + Zod + Maps SDK) — this file only needs to prove the tab mounts it with

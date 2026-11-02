@@ -6,8 +6,8 @@ export const pharmaMyCampKeys = {
   list: (query: SearchCampQuery) => ['pharma-my-camps', query] as const,
 }
 
-// GET /camps/my — the logged-in field-force member's (FO/dietitian/MR) own camps, with a
-// top-level status/type summary. Distinct from usePharmaCamps (project-scoped search).
+// GET /camps/my — the caller's own-scoped camps (field-force + HO/RSM/ASM), with a top-level
+// status/type summary. Distinct from usePharmaCamps (the generic search CampManagementPage uses).
 export const usePharmaMyCamps = (query: SearchCampQuery, options?: { keepPreviousData?: boolean }) =>
   useQuery({
     queryKey: pharmaMyCampKeys.list(query),

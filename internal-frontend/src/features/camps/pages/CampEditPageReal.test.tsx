@@ -300,7 +300,7 @@ describe('CampEditPageReal — snapshot-vs-final dirty gating', () => {
     expect(payload).not.toHaveProperty('devices')
   })
 
-  it('a legacy diet camp (type=diet, still carrying a historic camp.fo from before dietitian support) sends only dietitian, never fo', async () => {
+  it('a legacy diet camp (type=diet, still carrying a historic camp.fo from before dietitian support) preserves it as the secondary support worker, not wiped on save', async () => {
     await mockSessionAndPermission()
     const { campsRealService } = await import('@/features/camps/campsReal.service')
 
@@ -316,7 +316,9 @@ describe('CampEditPageReal — snapshot-vs-final dirty gating', () => {
 
     await waitFor(() => expect(campsRealService.updateCamp).toHaveBeenCalledTimes(1))
     const [, payload] = vi.mocked(campsRealService.updateCamp).mock.calls[0]
-    expect(payload).not.toHaveProperty('fo')
+    // Both fields are now sent — the backend accepts fo+dietitian simultaneously (the type-matching
+    // worker is primary, the opposite kind an optional recorded secondary) — the legacy fo survives.
+    expect(payload).toHaveProperty('fo', 'fo-legacy')
     expect(payload).toHaveProperty('dietitian', undefined)
   })
 })

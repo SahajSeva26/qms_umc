@@ -3,6 +3,7 @@ import api from '@/lib/api/api'
 import { validateApiResponse } from '@/lib/api/validateApiResponse'
 import { AuthMeResponseSchema } from '@/features/access-management/accessManagement.response-schemas'
 import type { ApiResponse, PaginatedResponse } from '@/types/common.types'
+import type { FileEntity } from '@/types/file.types'
 import type {
   CreateEmployeePayload,
   CreateRolePayload,
@@ -99,6 +100,25 @@ const bulkCreateTenants = async (file: File): Promise<BulkTenantResult> => {
 
 const updateTenant = async (id: string, payload: UpdateTenantPayload) => {
   const res = await api.put<ApiResponse<Tenant>>(`/tenants/${id}`, payload)
+  return res.data
+}
+
+// Logo: dedicated endpoints — the server owns replace semantics (any existing logo is discarded
+// server-side as part of createTenantLogo), so the client only drives create -> S3 PUT -> activate.
+const createTenantLogo = async (id: string, file: File) => {
+  const res = await api.post<ApiResponse<FileEntity[]>>(`/tenants/${id}/logo`, {
+    files: [{ fileName: file.name, fileSize: file.size, fileType: file.type }],
+  })
+  return res.data
+}
+
+const activateTenantLogo = async (id: string, fileId: string) => {
+  const res = await api.post<ApiResponse<FileEntity[]>>(`/tenants/${id}/logo/activate`, { fileId })
+  return res.data
+}
+
+const getTenantLogo = async (id: string) => {
+  const res = await api.get<PaginatedResponse<FileEntity>>(`/tenants/${id}/logo`)
   return res.data
 }
 
@@ -208,6 +228,9 @@ export const accessManagementService = {
   getTenant,
   createTenant,
   bulkCreateTenants,
+  createTenantLogo,
+  activateTenantLogo,
+  getTenantLogo,
   updateTenant,
   searchPermissionGroups,
   getPermissionGroup,

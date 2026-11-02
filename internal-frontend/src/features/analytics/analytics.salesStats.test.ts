@@ -7,7 +7,7 @@ function lead(tenant: string | { name: string }, estimatedValue: number): LeadEn
     id: `l-${Math.random()}`, code: 'l', tenant: typeof tenant === 'string' ? tenant : { name: tenant.name, code: 'c' },
     division: 'd', contactPerson: 'c', salesPerson: 's', focusTherapy: [], focusTherapyDoctor: [],
     title: 't', problemStatement: '', numberOfMRS: 0, currentlyDoing: [], projectType: 'screening',
-    offers: [], estimatedValue, confidence: 0, status: 'new', stageHistory: [], createdAt: '', updatedAt: '',
+    offers: [], estimatedValue, confidence: 0, status: 'new', hasProject: false, stageHistory: [], createdAt: '', updatedAt: '',
   }
 }
 

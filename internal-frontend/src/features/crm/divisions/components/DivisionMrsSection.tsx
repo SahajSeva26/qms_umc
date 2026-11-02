@@ -13,7 +13,8 @@ import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import SideDrawer from '@/components/ui/SideDrawer'
 import DivisionMrsTable from '@/features/crm/divisions/components/DivisionMrsTable'
 import MrProvisioningCard from '@/features/crm/divisions/components/MrProvisioningCard'
-import type { RoleStatus } from '@/types/accessManagement.types'
+import MrSummaryDrawer from '@/features/crm/divisions/components/MrSummaryDrawer'
+import type { RoleEntity, RoleStatus } from '@/types/accessManagement.types'
 import { EMPTY_ARRAY } from '@/utils/emptyArray'
 
 interface DivisionMrsSectionProps {
@@ -47,6 +48,7 @@ const DivisionMrsSection = ({ tenantId, divisionId }: DivisionMrsSectionProps) =
   const [statusFilter, setStatusFilter] = useState<RoleStatus | 'all'>('all')
   const { page, setPage, totalPages, resetToFirstPage } = usePagination(PAGE_SIZE)
   const [addDrawerOpen, setAddDrawerOpen] = useState(false)
+  const [selectedMr, setSelectedMr] = useState<RoleEntity | null>(null)
 
   const {
     data: mrRoleTypeData,
@@ -155,7 +157,7 @@ const DivisionMrsSection = ({ tenantId, divisionId }: DivisionMrsSectionProps) =
         </div>
       ) : (
         <QueryStateBlock isLoading={isListLoading} error={error} loadingLabel="Loading MRs…" errorLabel="Failed to load MRs. Please try again." onRetry={refetch}>
-          <DivisionMrsTable mrs={mrs} />
+          <DivisionMrsTable mrs={mrs} onSelectMr={setSelectedMr} />
           <PaginationControls page={page} totalPages={totalPages(totalCount)} onPageChange={setPage} />
         </QueryStateBlock>
       )}
@@ -167,6 +169,8 @@ const DivisionMrsSection = ({ tenantId, divisionId }: DivisionMrsSectionProps) =
           onSingleCreated={() => setAddDrawerOpen(false)}
         />
       </SideDrawer>
+
+      <MrSummaryDrawer mr={selectedMr} divisionId={divisionId} onClose={() => setSelectedMr(null)} />
     </div>
   )
 }

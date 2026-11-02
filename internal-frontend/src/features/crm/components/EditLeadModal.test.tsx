@@ -71,6 +71,7 @@ function leadFixture(overrides: Partial<LeadEntity> = {}): LeadEntity {
     followUpDate: '2026-05-01T00:00:00.000Z',
     confidence: 40,
     status: 'new',
+    hasProject: false,
     stageHistory: [],
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',

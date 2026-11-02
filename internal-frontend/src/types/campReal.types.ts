@@ -114,6 +114,7 @@ export interface SearchCampQuery {
   doctor?: string
   fo?: string
   dietitian?: string
+  mr?: string
   status?: CampStatus
   type?: CampType
   billingType?: BillingType
@@ -135,9 +136,9 @@ export interface CreateCampPayload {
   type?: CampType
   billingType?: BillingType
   patientExpectation?: number
-  /** Optional — when omitted, the backend best-effort auto-assigns the nearest available worker (FO or dietitian, by `type`) from `coordinates`; the camp still creates unassigned if none can be resolved. */
+  /** The type-matching worker (FO for screening/lab, dietitian for diet) is primary — when omitted, the backend best-effort auto-assigns the nearest available one from `coordinates`. The OPPOSITE kind may also be supplied as an optional recorded secondary (not auto-allocated); both may be set at once. */
   fo?: string
-  /** Diet-camp counterpart of `fo` — only one applies, by `type`; supplying the wrong one for the camp's type 400s. */
+  /** See `fo` — primary for diet camps, optional recorded secondary otherwise. */
   dietitian?: string
   /** Required. asm/rsm are no longer accepted — the backend derives them server-side from this MR's own supervisor chain (resolveMrChain). */
   mr: string
@@ -254,4 +255,24 @@ export interface BookingAvailabilityResponse {
   dateTo: string
   /** Keyed by YYYY-MM-DD — a map, not an array. */
   dates: Record<string, BookingAvailabilityDayEntry>
+}
+
+// Camp photos — one of three relations, each with its own per-relation status gate + cap (see
+// backend camp.constants.ts CAMP_FILE_CONFIG). Mirrors FileEntityRelation's camp subset.
+export type CampFileRelation = 'setup' | 'check-in-selfie' | 'closure'
+
+export interface CampFilePostPayload {
+  relation: CampFileRelation
+  entityId: string
+  files: { fileName: string; fileSize: number; fileType: string }[]
+}
+
+export interface CampFileActivatePayload {
+  entityId: string
+  fileIds: string[]
+}
+
+export interface GetCampFilesQuery {
+  entityId: string
+  relation?: CampFileRelation
 }

@@ -198,8 +198,10 @@ const CampDetailPageReal = () => {
         type,
         billingType,
         patientExpectation: patientExpectationNum,
-        // Backend 400s if both fo and dietitian are present — only send the one matching type.
-        ...(type === 'diet' ? { dietitian: dietitian || undefined } : { fo: fo || undefined }),
+        // The type-matching worker is primary; the opposite kind, if picked, is an optional recorded
+        // secondary — the backend now accepts both simultaneously (camp.service.ts set()).
+        fo: fo || undefined,
+        dietitian: dietitian || undefined,
         mr,
         date,
         timeSlot: timeSlot as CampTimeSlotValue,
@@ -376,11 +378,6 @@ const CampDetailPageReal = () => {
             setFoLabel={setFoLabel}
             dietitianLabel={dietitianLabel}
             setDietitianLabel={setDietitianLabel}
-            onTypeChange={(nextType) => {
-              // Clear the worker field that no longer applies, so a stale id isn't sent alongside the new type.
-              if (nextType === 'diet') { setField('fo', ''); setFoLabel('') }
-              else { setField('dietitian', ''); setDietitianLabel('') }
-            }}
             onLocationResolutionChange={setLocationResolution}
           />
         </div>

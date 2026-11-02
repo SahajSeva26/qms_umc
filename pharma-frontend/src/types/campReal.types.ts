@@ -156,3 +156,18 @@ export interface BookingAvailabilityResponse {
   /** Keyed by YYYY-MM-DD — a map, not an array. */
   dates: Record<string, BookingAvailabilityDayEntry>
 }
+
+// Camp photos — read-only here. Upload/activate/discard are role-gated to the camp's assigned
+// FO/dietitian server-side; an MR can only ever view, so no write types/calls exist in this app.
+export type CampFileRelation = 'setup' | 'check-in-selfie' | 'closure'
+
+export interface GetCampFilesQuery {
+  entityId: string
+  relation?: CampFileRelation
+}
+
+// Minimal slice of the generic file contract — only what a read-only gallery needs.
+export interface CampFile {
+  id: string
+  url?: string | null
+}

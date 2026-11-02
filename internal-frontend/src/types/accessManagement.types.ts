@@ -290,6 +290,24 @@ export interface RolePopulatedDivision {
   status?: string
 }
 
+// Nested one level deeper than the other populates — role.service.ts's supervisor populate selects
+// `user` only as {firstName, lastName} (not the full RolePopulatedUser shape).
+export interface RolePopulatedSupervisorUser {
+  _id?: string
+  firstName: string
+  lastName?: string
+}
+
+export interface RolePopulatedSupervisor {
+  _id?: string
+  code: string
+  name: string
+  type?: RolePopulatedRoleType | string | null
+  tenant?: string
+  division?: string | null
+  user?: RolePopulatedSupervisorUser | string | null
+}
+
 export interface RoleEntity {
   id: string
   code: string
@@ -309,6 +327,9 @@ export interface RoleEntity {
   // Populated {RolePopulatedDivision} on GET-by-id/search; always absent/null for platform-tenant
   // roles. Customer-tenant admin roles are exempt from REQUIRING one, but one can still be set.
   division?: RolePopulatedDivision | string | null
+  // Populated {RolePopulatedSupervisor} on GET-by-id/search; raw ObjectId string on create/update
+  // responses; absent/null for a role with no supervisor (e.g. a tree root).
+  supervisor?: RolePopulatedSupervisor | string | null
   createdAt: string
   updatedAt: string
 }

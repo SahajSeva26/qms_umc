@@ -334,6 +334,8 @@ export interface LeadEntity {
   followUpDate?: string
   confidence: number
   status: LeadStatus
+  // True once a project has been created from this lead (set server-side only, never user-editable).
+  hasProject: boolean
   stageHistory: LeadStageHistoryEntry[]
   createdAt: string
   updatedAt: string
@@ -363,6 +365,7 @@ export interface SearchLeadQuery {
   // ISO date strings (YYYY-MM-DD) — financial-year range bound to the lead's createdAt.
   fyFrom?: string
   fyTo?: string
+  hasProject?: 'true' | 'false'
   page?: string
   limit?: string
   // When 'true', each item gets a `stats` object (see LeadStats) — no top-level report block

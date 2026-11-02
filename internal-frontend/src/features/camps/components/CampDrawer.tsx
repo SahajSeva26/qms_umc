@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { FiEdit2, FiUser, FiTruck, FiCpu, FiFileText } from 'react-icons/fi'
+import { FiEdit2, FiUser, FiTruck, FiCpu, FiFileText, FiCamera } from 'react-icons/fi'
+import CampPhotosModal from '@/features/camps/components/CampPhotosModal'
+import type { CampPhotoRelationConfig } from '@/features/camps/components/CampPhotosModal'
+import { useCampFiles } from '@/features/camps/hooks/useCampFiles'
 import { useCampReal } from '@/features/camps/hooks/useCampReal'
 import { useCampsReal } from '@/features/camps/hooks/useCampsReal'
 import { useCampRefNames } from '@/features/camps/hooks/useCampRefNames'
@@ -13,7 +16,7 @@ import CampDrawerKpiRow from '@/features/camps/components/CampDrawerKpiRow'
 import CampStageHistoryList from '@/features/camps/components/CampStageHistoryList'
 import { Button } from '@/components/ui/button'
 import { useAllocateFo } from '@/features/camps/hooks/useAllocateFo'
-import type { CampType } from '@/types/campReal.types'
+import type { CampEntity, CampType, CampFileRelation } from '@/types/campReal.types'
 import { CAMP_TYPE_LABEL } from '@/types/campReal.types'
 import { specializationLabel } from '@/types/doctor.types'
 import { CAMP_TIME_SLOT_LABEL } from '@/types/campTimeSlot.constants'
@@ -116,6 +119,54 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled_charged: 'Cancelled (charged)',
 }
 
+const CAMP_PHOTO_RELATIONS: CampPhotoRelationConfig[] = [
+  { relation: 'setup', label: 'Setup', cap: 5 },
+  { relation: 'check-in-selfie', label: 'Check-in selfie', cap: 1 },
+  { relation: 'closure', label: 'Closure', cap: 3 },
+]
+
+const CAMP_PHOTO_RELATION_LABEL: Record<CampFileRelation, string> = {
+  setup: 'Setup photos',
+  'check-in-selfie': 'Check-in selfie',
+  closure: 'Closure photos',
+}
+
+// Mirrors the backend's CAMP_FILE_CONFIG status gate exactly — setup/selfie only while live,
+// closure also while closed — plus the assigned-worker check CampStageActionRow already uses.
+function canUploadCampPhoto(camp: CampEntity, relation: CampFileRelation, viewerRoleId: string | undefined, viewerRoleTypeCode: string | undefined): true | string {
+  if (!canActivateCamp(camp, viewerRoleId, viewerRoleTypeCode)) {
+    return 'Only the assigned FO/dietitian can add photos to this camp.'
+  }
+  const allowed = relation === 'closure' ? ['live', 'closed'].includes(camp.status) : camp.status === 'live'
+  if (allowed) return true
+  const label = CAMP_PHOTO_RELATION_LABEL[relation]
+  return relation === 'closure'
+    ? `${label} can only be added while this camp is live or closed.`
+    : `${label} can only be added while this camp is live — this camp is ${STATUS_LABEL[camp.status]?.toLowerCase() ?? camp.status}.`
+}
+
+// Read-only counts row — the actual gallery/upload UI lives in CampPhotosModal, opened via "Add
+// photos", which is hidden entirely once no relation is uploadable (e.g. a closed-out camp).
+const CampPhotosSummary = ({ camp, onOpen, canUploadAny }: { camp: CampEntity; onOpen: () => void; canUploadAny: boolean }) => (
+  <div className="flex items-center justify-between gap-3 rounded-[14px] border p-3 mb-2" style={{ borderColor: 'var(--qms-border)', background: 'var(--qms-surface)' }}>
+    <div className="flex flex-wrap gap-3 text-[12px]">
+      {CAMP_PHOTO_RELATIONS.map((r) => (
+        <CampPhotoCount key={r.relation} campId={camp.id} relation={r.relation} label={r.label} cap={r.cap} />
+      ))}
+    </div>
+    {canUploadAny && <Button variant="outline" size="sm" onClick={onOpen}>Add photos</Button>}
+  </div>
+)
+
+const CampPhotoCount = ({ campId, relation, label, cap }: { campId: string; relation: CampFileRelation; label: string; cap: number }) => {
+  const { files, isLoading } = useCampFiles(campId, relation)
+  return (
+    <span style={{ color: 'var(--qms-text-muted)' }}>
+      {label}: <span className="font-bold" style={{ color: 'var(--qms-text)' }}>{isLoading ? '…' : `${files.length}/${cap}`}</span>
+    </span>
+  )
+}
+
 const StatusPill = ({ status }: { status: string }) => {
   const color = STATUS_COLOR[status] ?? '#94a3b8'
   return (
@@ -137,6 +188,7 @@ const CampDrawerContent = ({ campId, onClose }: CampDrawerContentProps) => {
   const canManageScreening = hasAnyPermission(['screening:manage', 'system:manage'])
 
   const [tab, setTab] = useState<Tab>('Overview')
+  const [photosModalOpen, setPhotosModalOpen] = useState(false)
 
   const { data, isLoading, error } = useCampReal(campId)
   const camp = data?.data ?? null
@@ -300,6 +352,24 @@ const CampDrawerContent = ({ campId, onClose }: CampDrawerContentProps) => {
                   <span className="text-[12px]" style={{ color: 'var(--qms-text-muted)' }}>No devices allocated yet</span>
                 )}
               </div>
+
+              {['live', 'closed', 'cancelled_charged'].includes(camp.status) && (
+                <>
+                  <SectionHeader icon={FiCamera}>Camp photos</SectionHeader>
+                  <CampPhotosSummary
+                    camp={camp}
+                    onOpen={() => setPhotosModalOpen(true)}
+                    canUploadAny={CAMP_PHOTO_RELATIONS.some((r) => canUploadCampPhoto(camp, r.relation, session?.role.id, session?.roleType.code) === true)}
+                  />
+                  <CampPhotosModal
+                    open={photosModalOpen}
+                    onClose={() => setPhotosModalOpen(false)}
+                    campId={camp.id}
+                    relations={CAMP_PHOTO_RELATIONS}
+                    canUploadFor={(relation) => canUploadCampPhoto(camp, relation, session?.role.id, session?.roleType.code)}
+                  />
+                </>
+              )}
 
               <SectionHeader icon={FiFileText}>Notes &amp; billing</SectionHeader>
               <KvGrid>

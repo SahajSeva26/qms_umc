@@ -24,6 +24,7 @@ function leadFixture(overrides: Partial<LeadEntity> = {}): LeadEntity {
     confidence: 50,
     salesPerson: 'role-1',
     status: 'new',
+    hasProject: false,
     stageHistory: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),

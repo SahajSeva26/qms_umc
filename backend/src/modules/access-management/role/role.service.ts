@@ -38,7 +38,8 @@ const populate: any[] = [
     },
     {
         path: 'supervisor',
-        select: 'code name type tenant division',
+        select: 'code name type tenant division user',
+        populate: { path: 'user', select: 'firstName lastName' },
     },
 ];
 

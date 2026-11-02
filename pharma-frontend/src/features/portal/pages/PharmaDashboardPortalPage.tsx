@@ -37,10 +37,8 @@ const BASE_TABS: { id: TabId; label: string; icon: typeof FiBarChart2 }[] = [
 const MY_TEAM_ROLE_TYPES = new Set(['pharma-asm'])
 
 // Shared, thin portal shell for HO/RSM/ASM — the same tabs for all three roles, since the
-// underlying GET /camps the Schedule tab calls is server-scoped per role server-side (see
-// usePharmaCamps.ts for the full scoping note) — HO sees their whole division, ASM/RSM see their
-// downline (a booking-time snapshot, not a live hierarchy lookup). The "Book on behalf of MR" tab
-// reuses MrBookCampTab's own component (needsMrPicker=true) — same booking implementation as the
+// underlying GET /camps/my the Schedule/Dashboard tabs call is server-scoped per role server-side.
+// The "Book on behalf of MR" tab reuses MrBookCampTab's own component (needsMrPicker=true) — same booking implementation as the
 // MR's own tab, not a separate build; MrPicker's GET /roles/mrs search is itself server-scoped to
 // the caller's downline, and POST /camps/book's assertCanBook re-enforces the same hierarchy
 // independently, so no extra client-side role filtering is needed here. A fuller multi-tab portal

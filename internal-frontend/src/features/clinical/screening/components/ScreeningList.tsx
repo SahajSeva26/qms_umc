@@ -132,11 +132,6 @@ const ScreeningList = ({ campId, canWrite, onOpen }: ScreeningListProps) => {
                   <div className="text-[11px]" style={{ color: 'var(--qms-text-muted)' }}>{s.patient?.code} · {s.patient?.mobile}</div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  {s.referral && (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text-muted)' }}>
-                      REFERRED
-                    </span>
-                  )}
                   <span
                     className="text-[10px] font-bold px-2 py-0.5 rounded-full"
                     style={{

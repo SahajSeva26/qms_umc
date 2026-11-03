@@ -27,7 +27,6 @@ const patientName = (screening: ScreeningEntity) => {
 const ScreeningDetail = ({ screening, canWrite, canMoveStage, onClose }: ScreeningDetailProps) => {
   const isPending = screening.status === 'pending'
   const [symptomsText, setSymptomsText] = useState(screening.symptoms.join(', '))
-  const [referral, setReferral] = useState(screening.referral)
   const updateMutation = useUpdateScreening(screening.id)
 
   const requestOtp = useRequestConsentOtp(screening.id)
@@ -44,7 +43,7 @@ const ScreeningDetail = ({ screening, canWrite, canMoveStage, onClose }: Screeni
       .filter(Boolean)
     // Re-sync only if the textarea still matches what was submitted — a fresher in-flight edit must survive.
     updateMutation.mutate(
-      { symptoms, referral },
+      { symptoms },
       { onSuccess: () => setSymptomsText((current) => (current === submittedText ? symptoms.join(', ') : current)) },
     )
   }
@@ -81,16 +80,6 @@ const ScreeningDetail = ({ screening, canWrite, canMoveStage, onClose }: Screeni
           rows={2}
         />
       </div>
-
-      <label className="flex items-center gap-2 text-[13px]" style={{ color: 'var(--qms-text)' }}>
-        <input
-          type="checkbox"
-          checked={referral}
-          onChange={(e) => setReferral(e.target.checked)}
-          disabled={!isPending || !canWrite}
-        />
-        Refer to doctor
-      </label>
 
       {isPending && canWrite && (
         <Button size="sm" onClick={handleSave} disabled={updateMutation.isPending}>

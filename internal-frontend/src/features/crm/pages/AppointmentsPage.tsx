@@ -13,6 +13,7 @@ import AppointmentMonthGrid from '@/features/crm/appointments/components/Appoint
 import AppointmentList from '@/features/crm/appointments/components/AppointmentList'
 import AppointmentDrawer from '@/features/crm/appointments/components/AppointmentDrawer'
 import NewAppointmentDialog from '@/features/crm/appointments/components/NewAppointmentDialog'
+import TomorrowMeetingsCard from '@/features/crm/appointments/components/TomorrowMeetingsCard'
 import WeeklyPlanPanel from '@/features/crm/weeklyPlan/components/WeeklyPlanPanel'
 
 const AppointmentsPage = () => {
@@ -129,7 +130,9 @@ const AppointmentsPage = () => {
 
       {canViewReport && !reportLoading && !reportError && report && <AppointmentKpiStrip kpis={kpis} />}
 
-      <WeeklyPlanPanel />
+      <WeeklyPlanPanel>
+        <TomorrowMeetingsCard />
+      </WeeklyPlanPanel>
 
       <AppointmentCalendarToolbar
         weekStart={weekStart}

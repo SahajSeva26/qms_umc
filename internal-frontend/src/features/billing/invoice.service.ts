@@ -1,12 +1,17 @@
 import api from '@/lib/api/api'
 import type { ApiResponse, PaginatedResponse } from '@/types/common.types'
+import type { FileEntity } from '@/types/file.types'
 import type {
   CreateInvoicePayload,
+  GetInvoiceFilesQuery,
   InvoiceEntity,
+  InvoiceFileActivatePayload,
+  InvoiceFilePostPayload,
   InvoiceReportQuery,
   InvoiceReportResponse,
   MoveInvoiceStagePayload,
   SearchInvoiceQuery,
+  UpdateInvoicePayload,
 } from '@/types/invoice.types'
 
 const DEFAULT_LIMIT = '10'
@@ -34,9 +39,38 @@ const moveInvoiceStage = async (id: string, payload: MoveInvoiceStagePayload) =>
   return res.data
 }
 
+// Used here only to set the GRN number (grn.number) — everything else on this payload goes
+// through a dedicated edit flow this drawer doesn't have yet.
+const updateInvoice = async (id: string, payload: UpdateInvoicePayload) => {
+  const res = await api.put<ApiResponse<InvoiceEntity>>(`/invoices/${id}`, payload)
+  return res.data
+}
+
 // Tenant-wide pipeline totals + per-status breakdown, unaffected by list pagination.
 const getInvoiceReport = async (query: InvoiceReportQuery = {}) => {
   const res = await api.get<ApiResponse<InvoiceReportResponse>>('/invoices/report', { params: query })
+  return res.data
+}
+
+// GRN document — same create -> S3 PUT -> activate -> discard lifecycle as camp photos
+// (campsReal.service.ts), scoped to the invoice file endpoints instead.
+const createInvoiceFiles = async (payload: InvoiceFilePostPayload) => {
+  const res = await api.post<ApiResponse<FileEntity[]>>('/invoices/files', payload)
+  return res.data
+}
+
+const activateInvoiceFiles = async (payload: InvoiceFileActivatePayload) => {
+  const res = await api.post<ApiResponse<FileEntity[]>>('/invoices/files/activate', payload)
+  return res.data
+}
+
+const getInvoiceFiles = async (query: GetInvoiceFilesQuery) => {
+  const res = await api.get<PaginatedResponse<FileEntity>>('/invoices/files', { params: query })
+  return res.data
+}
+
+const discardInvoiceFile = async (fileId: string) => {
+  const res = await api.delete<ApiResponse<FileEntity>>(`/invoices/files/${fileId}`)
   return res.data
 }
 
@@ -45,5 +79,10 @@ export const invoiceService = {
   getInvoice,
   createInvoice,
   moveInvoiceStage,
+  updateInvoice,
   getInvoiceReport,
+  createInvoiceFiles,
+  activateInvoiceFiles,
+  getInvoiceFiles,
+  discardInvoiceFile,
 }

@@ -95,6 +95,12 @@ const MoveInvoiceStageDialog = ({ invoice, lineItemCount, onClose }: MoveInvoice
             </div>
           )}
 
+          {status === 'grn_signed' && (
+            <div className="text-[12px] rounded-lg px-3 py-2" style={{ background: 'var(--qms-surface-strong)', color: 'var(--qms-text-muted)' }}>
+              Record the GRN number and upload the signed document from the invoice detail panel after this move — this invoice can't be marked paid until one of them is set.
+            </div>
+          )}
+
           <div>
             <Label className="block text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--qms-text-muted)' }}>Reason *</Label>
             <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} className="text-[13px]" placeholder="Why is the status changing?" />

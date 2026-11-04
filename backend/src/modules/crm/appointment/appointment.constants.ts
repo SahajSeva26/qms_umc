@@ -26,6 +26,13 @@ export const APPOINTMENT_INVITE_STATUSES = {
     DECLINED: 'declined',
 } as const;
 
+export const APPOINTMENT_OUTCOME_TITLES = {
+    CONVERTED_TO_LEAD: 'converted-to-lead',
+    NOT_INTERESTED: 'not-interested',
+    NOT_RESPONDING: 'not-responding',
+    WILL_UPDATE_LATER: 'will-update-later',
+} as const;
+
 // MoM (minutes of meeting) must be submitted within this many WORKING hours of the meeting ending.
 // Fed to calculateWorkingExpiry (skips nights/weekends), so it is not 24 wall-clock hours.
 export const MOM_SUBMISSION_DEADLINE_HOURS = 24;

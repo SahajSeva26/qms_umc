@@ -1,7 +1,7 @@
 // File Model
 
 import mongoose from 'mongoose';
-import { ENTITY_TYPE, ENTITY_RELATION_ARRAY, FILE_STATUS, FILE_TYPE } from './file.constants';
+import { FILE_STATUS, FILE_TYPE } from './file.constants';
 
 const contentSchema = new mongoose.Schema({
     provider: {
@@ -51,14 +51,13 @@ const fileSchema = new mongoose.Schema(
                 type: String,
                 required: false,
             },
-            type: { 
+            // free-form: the entity type/relation are owned by the calling domain, not the file module
+            type: {
                 type: String,
-                enum: Object.values(ENTITY_TYPE), 
                 required: true,
             },
             relation: {
                 type: String,
-                enum: ENTITY_RELATION_ARRAY,
                 required: true,
             },
         },

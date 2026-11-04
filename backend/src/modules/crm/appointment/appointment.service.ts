@@ -185,6 +185,24 @@ const set = async (model: any, entity: any, ctx: RequestContext): Promise<Hydrat
         }
     }
 
+    // an outcome only makes sense once the meeting has concluded — it can be recorded only when the
+    // appointment is already done or cancelled (so it can't be set on a still-planned appointment).
+    if (model.outcome) {
+        if (entity.status !== APPOINTMENT_STATUSES.DONE && entity.status !== APPOINTMENT_STATUSES.CANCELLED) {
+            return throwAppError(
+                'Outcome can only be set on a done or cancelled appointment',
+                StatusCodes.UNPROCESSABLE_ENTITY,
+            );
+        }
+        entity.outcome = entity.outcome || ({} as any);
+        if (model.outcome.title !== undefined) {
+            entity.outcome.title = model.outcome.title;
+        }
+        if (model.outcome.reason !== undefined) {
+            entity.outcome.reason = model.outcome.reason;
+        }
+    }
+
     return entity;
 };
 

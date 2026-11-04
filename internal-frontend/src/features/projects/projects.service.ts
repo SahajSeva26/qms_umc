@@ -1,0 +1,89 @@
+import api from '@/lib/api/api'
+import type { ApiResponse, PaginatedResponse } from '@/types/common.types'
+import type { LeadEntity, SearchLeadQuery } from '@/types/crm.types'
+import type {
+  CreateProjectPayload,
+  MoveProjectStagePayload,
+  ProjectEntity,
+  ProjectReportQuery,
+  ProjectReportResponse,
+  ProjectSearchReport,
+  SearchProjectQuery,
+  UpdateProjectPayload,
+} from '@/types/project.types'
+
+// PaginatedResponse<T> has no room for a top-level report block — only present when the
+// caller passes report=true (see SearchProjectQuery.report).
+export type ProjectSearchResponse = PaginatedResponse<ProjectEntity> & { data: { report?: ProjectSearchReport } }
+
+// Follows the exact pattern of accessManagementService: same shared `api`
+// axios instance, same ApiResponse/PaginatedResponse envelope typing, a plain
+// object export, no class/default export.
+//
+// Default limit: 10 — matches the server-side default in
+// RequestHandler.getPagination. Callers that need more must pass their own
+// `limit` explicitly; no search fetches more than 10 by default.
+const DEFAULT_LIMIT = '10'
+
+const searchProjects = async (query: SearchProjectQuery) => {
+  const res = await api.get<ProjectSearchResponse>('/projects', {
+    params: { limit: DEFAULT_LIMIT, ...query },
+  })
+  return res.data
+}
+
+const getProject = async (id: string) => {
+  const res = await api.get<ApiResponse<ProjectEntity>>(`/projects/${id}`)
+  return res.data
+}
+
+const createProject = async (payload: CreateProjectPayload) => {
+  // NOTE: response is NOT populated — project.service.ts's create() never
+  // re-fetches with {populate:true} before returning. Callers needing
+  // populated relations should invalidate + refetch via useProject(id).
+  const res = await api.post<ApiResponse<ProjectEntity>>('/projects', payload)
+  return res.data
+}
+
+const updateProject = async (id: string, payload: UpdateProjectPayload) => {
+  // Same caveat as createProject — response echo is unpopulated.
+  const res = await api.put<ApiResponse<ProjectEntity>>(`/projects/${id}`, payload)
+  return res.data
+}
+
+const moveProjectStage = async (id: string, payload: MoveProjectStagePayload) => {
+  const res = await api.patch<ApiResponse<ProjectEntity>>(`/projects/${id}/stage`, payload)
+  return res.data
+}
+
+// Always a tenant-wide aggregate (accepts no filters server-side) — gated on
+// project:manage/tenant:manage, narrower than searchProjects' own read guard.
+const getProjectReport = async (query: ProjectReportQuery = {}) => {
+  const res = await api.get<ApiResponse<ProjectReportResponse>>('/projects/report', { params: query })
+  return res.data
+}
+
+// Scoped, self-contained call for the New Project wizard's Step 0 (pick a
+// lead) — deliberately NOT routed through crmService, which is still the
+// stale pre-migration mock file on this branch (crm.service.ts has no real
+// searchLeads export yet). Calling GET /leads directly here keeps this
+// feature's blast radius limited to Project; fixing crm.service.ts is a
+// separate, pre-existing task.
+// Defaults to hiding already-converted leads so the wizard doesn't offer creating a
+// second project off the same lead — callers may still override via query.hasProject.
+const searchWonLeads = async (query: SearchLeadQuery = {}) => {
+  const res = await api.get<PaginatedResponse<LeadEntity>>('/leads', {
+    params: { limit: DEFAULT_LIMIT, hasProject: 'false', ...query, status: 'won' },
+  })
+  return res.data
+}
+
+export const projectsService = {
+  searchProjects,
+  getProject,
+  createProject,
+  updateProject,
+  moveProjectStage,
+  searchWonLeads,
+  getProjectReport,
+}

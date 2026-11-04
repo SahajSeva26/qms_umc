@@ -1,10 +1,18 @@
 // Invoice Validators
 import { z } from 'zod';
-import { INVOICE_STATUS } from './invoice.constants';
+import { INVOICE_FILE_RELATIONS, INVOICE_STATUS } from './invoice.constants';
 import { isValidObjectID } from '../../../shared/utils/strings';
+import { FileMetaSchema } from '../../file/file.validators';
 
 const objectId = (label: string) =>
     z.string().refine((val) => isValidObjectID(val), { message: `${label} must be a valid id` });
+
+// GRN sub-object — just the GRN number lives on the invoice; the GRN document is decoupled into the
+// file module (see the invoice file routes). The grn_signed → paid transition requires at least one of
+// the two — a number here OR an active GRN file — enforced in the service.
+const GrnSchema = z.object({
+    number: z.string().min(1).optional().openapi({ example: 'GRN-2026-0042' }),
+});
 
 //1: create ====================================>
 // tenant is NOT accepted here — it is derived from the source project.
@@ -32,6 +40,7 @@ export const UpdateInvoicePayloadSchema = z.object({
     tax: z.number().nonnegative().optional(),
     discount: z.number().nonnegative().optional(),
     syncToTally: z.boolean().optional(),
+    grn: GrnSchema.optional(),
 });
 export type IUpdateInvoicePayload = z.infer<typeof UpdateInvoicePayloadSchema>;
 
@@ -46,6 +55,7 @@ export type IMoveStagePayload = z.infer<typeof MoveStagePayloadSchema>;
 export const SearchInvoiceQuerySchema = z.object({
     tenant: objectId('Tenant').optional(),
     project: objectId('Project').optional(),
+    code: z.string().optional().openapi({ example: 'inv-00012' }),
     status: z.enum(Object.values(INVOICE_STATUS)).optional().openapi({ example: 'issued' }),
     dateFrom: z.coerce.date().optional().openapi({ example: '2026-08-01' }),
     dateTo: z.coerce.date().optional().openapi({ example: '2026-08-31' }),
@@ -64,3 +74,37 @@ export const InvoiceReportQuerySchema = z.object({
     dateTo: z.coerce.date().optional().openapi({ example: '2026-08-31' }),
 });
 export type IInvoiceReportQuery = z.infer<typeof InvoiceReportQuerySchema>;
+
+//6: invoice file post ====================================>
+// create upload intent(s) for an invoice file relation (e.g. the GRN document). `entityId` = the
+// invoice; `files` = one metadata entry per file. The service validates the relation + each file
+// (mime/size), gates on invoice status, enforces the cap, then returns a presigned upload URL per file.
+export const InvoiceFilePostPayloadSchema = z.object({
+    relation: z.enum(Object.values(INVOICE_FILE_RELATIONS) as [string, ...string[]]).openapi({ example: 'grn' }),
+    entityId: objectId('Invoice').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
+    files: z
+        .array(FileMetaSchema)
+        .min(1)
+        .openapi({ example: [{ fileName: 'grn.pdf', fileSize: 20480, fileType: 'application/pdf' }] }),
+});
+export type IInvoiceFilePostPayload = z.infer<typeof InvoiceFilePostPayloadSchema>;
+
+//7: invoice file activate ====================================>
+// `entityId` = the invoice whose files these are; `fileIds` = the draft files (already uploaded to S3)
+// to flip active. The service verifies the files belong to the invoice, then delegates to the file module.
+export const InvoiceFileActivatePayloadSchema = z.object({
+    entityId: objectId('Invoice').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
+    fileIds: z.array(objectId('File')).min(1).openapi({ example: ['665f0c3a1a2b3c4d5e6f7a8a'] }),
+});
+export type IInvoiceFileActivatePayload = z.infer<typeof InvoiceFileActivatePayloadSchema>;
+
+//8: get invoice files ====================================>
+// list an invoice's active files; `relation` optionally narrows to one relation (else all relations).
+export const GetInvoiceFilesQuerySchema = z.object({
+    entityId: objectId('Invoice').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
+    relation: z
+        .enum(Object.values(INVOICE_FILE_RELATIONS) as [string, ...string[]])
+        .optional()
+        .openapi({ example: 'grn' }),
+});
+export type IGetInvoiceFilesQuery = z.infer<typeof GetInvoiceFilesQuerySchema>;

@@ -10,7 +10,7 @@ import {
     UpdateInventoryAssignmentPayloadSchema,
 } from './inventory-assignment.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
-import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { Authorize } from '../../../shared/middlewares/authorize.middleware';
 import { INVENTORY_ASSIGNMENT_PERMISSIONS } from './inventory-assignment.constants';
 
 export const InventoryAssignmentRouter = express.Router();
@@ -158,7 +158,7 @@ registry.registerPath({
 // reads are open to any authenticated user; only writes (create/update/remove) are permission-guarded.
 InventoryAssignmentRouter.get(
     '/report',
-    AuthorizeMiddleware([INVENTORY_ASSIGNMENT_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([INVENTORY_ASSIGNMENT_PERMISSIONS.MANAGE.code]),
     InventoryAssignmentController.report,
 );
 InventoryAssignmentRouter.get('/:id', InventoryAssignmentController.get);
@@ -166,25 +166,25 @@ InventoryAssignmentRouter.get('/', InventoryAssignmentController.search);
 
 InventoryAssignmentRouter.post(
     '/',
-    AuthorizeMiddleware([INVENTORY_ASSIGNMENT_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([INVENTORY_ASSIGNMENT_PERMISSIONS.MANAGE.code]),
     InventoryAssignmentController.create,
 );
 
 // direct assignment — manager only; :fo is the target field officer
 InventoryAssignmentRouter.post(
     '/direct-assignment/:fo',
-    AuthorizeMiddleware([INVENTORY_ASSIGNMENT_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([INVENTORY_ASSIGNMENT_PERMISSIONS.MANAGE.code]),
     InventoryAssignmentController.directAssign,
 );
 
 InventoryAssignmentRouter.put(
     '/:id',
-    AuthorizeMiddleware([INVENTORY_ASSIGNMENT_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([INVENTORY_ASSIGNMENT_PERMISSIONS.MANAGE.code]),
     InventoryAssignmentController.update,
 );
 
 InventoryAssignmentRouter.delete(
     '/:id',
-    AuthorizeMiddleware([INVENTORY_ASSIGNMENT_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([INVENTORY_ASSIGNMENT_PERMISSIONS.MANAGE.code]),
     InventoryAssignmentController.remove,
 );

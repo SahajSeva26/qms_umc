@@ -1,7 +1,25 @@
 import mongoose, { HydratedDocument } from 'mongoose';
 import { ITenant, TenantModel } from './tenant.model';
-import { CreateTenantPayloadSchema, ICreateTenantPayload, ISearchTenantQuery, IUpdateTenantPayload } from './tenant.validators';
-import { TENANT_COUNTER_ENTITY, TENANT_PERMISSIONS, TENANT_STATUS, TENANT_TYPE } from './tenant.constants';
+import {
+    CreateTenantPayloadSchema,
+    IActivateTenantLogoPayload,
+    ICreateTenantLogoPayload,
+    ICreateTenantPayload,
+    ISearchTenantQuery,
+    IUpdateTenantPayload,
+} from './tenant.validators';
+import {
+    TENANT_COUNTER_ENTITY,
+    TENANT_FILE_CONFIG,
+    TENANT_FILE_ENTITY_TYPE,
+    TENANT_FILE_RELATIONS,
+    TENANT_PERMISSIONS,
+    TENANT_STATUS,
+    TENANT_TYPE,
+} from './tenant.constants';
+import { FileService } from '../../file/file.service';
+import { FileMapper } from '../../file/file.mapper';
+import { FILE_STATUS } from '../../file/file.constants';
 import { CounterService } from '../../counter/counter.service';
 import { throwAppError, formatZodError } from '../../../shared/utils/error';
 import { CsvHelper } from '../../../shared/helpers/csvHelper';
@@ -522,12 +540,116 @@ const bulkCreate = async (file: Express.Multer.File, ctx: RequestContext) => {
     };
 };
 
+// POST /tenants/:id/logo — new logo upload request. Discards the tenant's existing logo (replace, cap 1),
+// then creates a draft File + presigned upload URL via the file module. The client PUTs the bytes, then
+// calls activateLogo. Route permission mirrors the tenant update routes (tenant:update / tenant:manage).
+const createLogo = async (tenantId: string, model: ICreateTenantLogoPayload, ctx: RequestContext) => {
+    // 1: the tenant must exist
+    const tenant = await get(tenantId, ctx);
+    if (!tenant) {
+        return throwAppError('Tenant not found', StatusCodes.NOT_FOUND);
+    }
+
+    // 2: the logo relation config (the LOGO key is a constant → always present)
+    const config = TENANT_FILE_CONFIG[TENANT_FILE_RELATIONS.LOGO]!;
+
+    // 3: enforce the relation's constraints on every file — mime type + size
+    for (const file of model.files) {
+        if (!config.mimeTypes.includes(file.fileType)) {
+            return throwAppError(
+                `"${file.fileName}" has an unsupported type "${file.fileType}" — a logo allows ${config.mimeTypes.join(', ')}`,
+                StatusCodes.BAD_REQUEST,
+            );
+        }
+        if (file.fileSize > config.maxSize) {
+            return throwAppError(
+                `"${file.fileName}" is too large — a logo allows at most ${config.maxSize} bytes`,
+                StatusCodes.BAD_REQUEST,
+            );
+        }
+    }
+
+    // 4: status gate — a logo may only be uploaded while the tenant is active
+    if (!config.statusAllowed.includes(tenant.status)) {
+        return throwAppError(
+            `A logo can only be uploaded while the tenant is ${config.statusAllowed.join(' or ')}`,
+            StatusCodes.CONFLICT,
+        );
+    }
+
+    // 5: REPLACE — discard any existing (non-discarded) logo so the new one takes its place (cap 1)
+    const existing = await FileService.search(
+        { entityId: tenant._id.toString(), entityType: TENANT_FILE_ENTITY_TYPE, relation: TENANT_FILE_RELATIONS.LOGO },
+        ctx,
+    );
+    for (const o of existing.items) {
+        await FileService.changeStatus((o._id as any).toString(), { status: FILE_STATUS.DISCARDED }, ctx);
+    }
+
+    // 6: create the draft file + presigned upload URL
+    const created = await FileService.create(
+        {
+            tenant: tenant._id.toString(),
+            entity: { id: tenant._id.toString(), type: TENANT_FILE_ENTITY_TYPE, relation: TENANT_FILE_RELATIONS.LOGO },
+            files: model.files,
+        } as any,
+        ctx,
+    );
+
+    return created.map((file) => FileMapper.toResponse(file, ctx));
+};
+
+// POST /tenants/:id/logo/activate — flip the uploaded draft logo to active (file module verifies the
+// S3 object exists first). Verifies the file belongs to THIS tenant as a logo.
+const activateLogo = async (tenantId: string, model: IActivateTenantLogoPayload, ctx: RequestContext) => {
+    // 1: the tenant must exist
+    const tenant = await get(tenantId, ctx);
+    if (!tenant) {
+        return throwAppError('Tenant not found', StatusCodes.NOT_FOUND);
+    }
+
+    // 2: the file must belong to THIS tenant as a logo
+    const file = await FileService.get(model.fileId, ctx);
+    if (
+        !file ||
+        file.entity?.type !== TENANT_FILE_ENTITY_TYPE ||
+        file.entity?.id?.toString() !== tenant._id.toString() ||
+        file.entity?.relation !== TENANT_FILE_RELATIONS.LOGO
+    ) {
+        return throwAppError('File does not belong to this tenant logo', StatusCodes.BAD_REQUEST);
+    }
+
+    // 3: flip the draft logo to active
+    const activated = await FileService.bulkActivate({ fileIds: [model.fileId] }, ctx);
+    return activated.map((f) => FileMapper.toResponse(f, ctx));
+};
+
+// GET /tenants/:id/logo — the tenant's active logo (with a presigned read url).
+const getLogo = async (tenantId: string, ctx: RequestContext) => {
+    // 1: the tenant must exist
+    const tenant = await get(tenantId, ctx);
+    if (!tenant) {
+        return throwAppError('Tenant not found', StatusCodes.NOT_FOUND);
+    }
+
+    // 2: the active logo file (presigned read url attached)
+    const result = await FileService.search(
+        { entityId: tenant._id.toString(), entityType: TENANT_FILE_ENTITY_TYPE, relation: TENANT_FILE_RELATIONS.LOGO, status: FILE_STATUS.ACTIVE },
+        ctx,
+        { withUrls: true } as any,
+    );
+    return FileMapper.toSearchResponse(result, ctx);
+};
+
 export const TenantService = {
     get,
     search,
     create: createTenant,
     update,
     bulkCreate,
+    createLogo,
+    activateLogo,
+    getLogo,
 };
 
 // ========================================================================================

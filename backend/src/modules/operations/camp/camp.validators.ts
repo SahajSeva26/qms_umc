@@ -1,7 +1,8 @@
 // Camp Validators
 import { z } from 'zod';
-import { BILLING_TYPES, CAMP_STATUSES, CAMP_TIME_SLOTS, CAMP_TYPES } from './camp.constants';
+import { BILLING_TYPES, CAMP_FILE_RELATIONS, CAMP_STATUSES, CAMP_TIME_SLOTS, CAMP_TYPES } from './camp.constants';
 import { isValidObjectID } from '../../../shared/utils/strings';
+import { FileMetaSchema } from '../../file/file.validators';
 
 const objectId = (label: string) =>
     z.string().refine((val) => isValidObjectID(val), { message: `${label} must be a valid id` });
@@ -165,6 +166,7 @@ export const SearchCampQuerySchema = z.object({
     doctor: objectId('Doctor').optional(),
     fo: objectId('FO').optional(),
     dietitian: objectId('Dietitian').optional(),
+    mr: objectId('MR').optional(),
     status: z.enum(Object.values(CAMP_STATUSES)).optional().openapi({ example: 'confirmed' }),
     type: z.enum(Object.values(CAMP_TYPES)).optional().openapi({ example: 'screening' }),
     billingType: z.enum(Object.values(BILLING_TYPES)).optional().openapi({ example: 'billable' }),
@@ -200,3 +202,39 @@ export const CampReportQuerySchema = z.object({
     status: z.enum(Object.values(CAMP_STATUSES)).optional().openapi({ example: 'closed' }),
 });
 export type ICampReportQuery = z.infer<typeof CampReportQuerySchema>;
+
+//6: camp files ====================================>
+// `files` is METADATA only (no binary) — forwarded as-is to the file module, which creates a draft
+// doc + presigned upload URL per entry. Reuses the file module's FileMetaSchema (same shape it expects).
+export const CampFilePostPayloadSchema = z.object({
+    relation: z.enum(Object.values(CAMP_FILE_RELATIONS) as [string, ...string[]]).openapi({ example: 'setup' }),
+    entityId: objectId('Camp').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
+    files: z
+        .array(FileMetaSchema)
+        .min(1)
+        .openapi({ example: [{ fileName: 'setup-1.jpg', fileSize: 20480, fileType: 'image/jpeg' }] }),
+});
+export type ICampFilePostPayload = z.infer<typeof CampFilePostPayloadSchema>;
+
+//7: camp file activate ====================================>
+// `entityId` = the camp whose files these are; `fileIds` = the draft files (already uploaded to S3) to
+// flip active. The service authorizes the camp's worker, then delegates the flip to the file module.
+export const CampFileActivatePayloadSchema = z.object({
+    entityId: objectId('Camp').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
+    fileIds: z
+        .array(objectId('File'))
+        .min(1)
+        .openapi({ example: ['665f0c3a1a2b3c4d5e6f7a8a'] }),
+});
+export type ICampFileActivatePayload = z.infer<typeof CampFileActivatePayloadSchema>;
+
+//8: get camp files ====================================>
+// list a camp's files; `relation` optionally narrows to one relation (else all relations).
+export const GetCampFilesQuerySchema = z.object({
+    entityId: objectId('Camp').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
+    relation: z
+        .enum(Object.values(CAMP_FILE_RELATIONS) as [string, ...string[]])
+        .optional()
+        .openapi({ example: 'setup' }),
+});
+export type IGetCampFilesQuery = z.infer<typeof GetCampFilesQuerySchema>;

@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 import {
     APPOINTMENT_INVITE_STATUSES,
     APPOINTMENT_MODES,
+    APPOINTMENT_OUTCOME_TITLES,
     APPOINTMENT_STATUSES,
     APPOINTMENT_TYPES,
 } from './appointment.constants';
@@ -156,6 +157,7 @@ const appointmentSchema = new mongoose.Schema(
                 default: '',
             },
         },
+
         status: {
             type: String,
             enum: Object.values(APPOINTMENT_STATUSES),
@@ -171,6 +173,16 @@ const appointmentSchema = new mongoose.Schema(
             },
             submissionDeadline: {
                 type: Date,
+            },
+        },
+        outcome: {
+            title: {
+                type: String,
+                enum: Object.values(APPOINTMENT_OUTCOME_TITLES),
+            },
+            reason: {
+                type: String,
+                default: '',
             },
         },
         // reminders: {

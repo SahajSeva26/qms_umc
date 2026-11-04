@@ -6,8 +6,11 @@ import {
     ApproveVoidCampPayloadSchema,
     BookCampPayloadSchema,
     BookingAvailabilityPayloadSchema,
+    CampFileActivatePayloadSchema,
+    CampFilePostPayloadSchema,
     CampReportQuerySchema,
     CreateCampPayloadSchema,
+    GetCampFilesQuerySchema,
     MoveStagePayloadSchema,
     SearchCampQuerySchema,
     UpdateCampPayloadSchema,
@@ -73,8 +76,9 @@ const search = async (req: any, res: any) => {
     }
 };
 
-// "my camps" — field-force (FO / dietitian / MR) see only the camps they're assigned to. Delegates
-// to CampService.myCamps, which own-scopes these non-manage roles to their own slot (fo/dietitian/mr).
+// "my camps" — field-force (FO / dietitian / MR) and pharma management (HO / RSM / ASM) see their
+// own scoped camps + a summary. Delegates to CampService.myCamps, which own-scopes each role: HO by
+// division, ASM/RSM by the slots stamped on their camps, FO/dietitian/MR by their own slot.
 const myCamps = async (req: any, res: any) => {
     try {
         const ctx: RequestContext = req.context;
@@ -371,6 +375,82 @@ const bookingAvailability = async (req: any, res: any) => {
     }
 };
 
+const campFiles = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+
+        const { data, success, error } = CampFilePostPayloadSchema.safeParse(req.body);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                fields: validationErrors,
+            });
+        }
+
+        const result = await CampService.campFiles(data, ctx);
+
+        return ResponseHandler.appResponse(res, StatusCodes.CREATED, true, 'ok', result);
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
+const campFileActivate = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+
+        const { data, success, error } = CampFileActivatePayloadSchema.safeParse(req.body);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                fields: validationErrors,
+            });
+        }
+
+        const result = await CampService.campFileActivate(data, ctx);
+
+        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'ok', result);
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
+const getCampFiles = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+
+        const { data, success, error } = GetCampFilesQuerySchema.safeParse(req.query);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                fields: validationErrors,
+            });
+        }
+
+        const result = await CampService.getCampFiles(data, ctx);
+
+        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Camp files fetched successfully', result);
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
+const campFileDiscard = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+        const { id } = req.params;
+        if (!id) {
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'File ID is required', null);
+        }
+
+        const result = await CampService.campFileDiscard(id, ctx);
+
+        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Camp file discarded', result);
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
 export const CampController = {
     get,
     search,
@@ -385,4 +465,8 @@ export const CampController = {
     allocateWorker,
     report,
     bookingAvailability,
+    campFiles,
+    campFileActivate,
+    getCampFiles,
+    campFileDiscard,
 };

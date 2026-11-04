@@ -1,6 +1,7 @@
 import { CAMP_PERMISSIONS } from '../../operations/camp/camp.constants';
 import { DOCTOR_PERMISSIONS } from '../../crm/doctor/doctor.constants';
 import { BRAND_PERMISSIONS } from '../../crm/brand/brand.constants';
+import { RATING_PERMISSIONS } from '../../operations/rating/rating.constants';
 
 export const ROLE_TYPE_STATUSES = {
     ACTIVE: 'active',
@@ -91,7 +92,15 @@ export const DEFAULT_PHARMA_ROLE_TYPES = [
         code: ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR,
         name: 'Pharma MR',
         description: 'Pharma MR',
-        // MR may add a doctor (doctor:create) — the service pins it to the MR's own division
-        permissions: [...PHARMA_CAMP_PERMISSIONS, ...PHARMA_BRAND_PERMISSIONS, DOCTOR_PERMISSIONS.CREATE.code] as string[],
+        // MR may add a doctor (doctor:create) — the service pins it to the MR's own division; and the
+        // MR rates the camp's worker (rating:create) + reads back their own ratings (get/search)
+        permissions: [
+            ...PHARMA_CAMP_PERMISSIONS,
+            ...PHARMA_BRAND_PERMISSIONS,
+            DOCTOR_PERMISSIONS.CREATE.code,
+            RATING_PERMISSIONS.CREATE.code,
+            RATING_PERMISSIONS.GET.code,
+            RATING_PERMISSIONS.SEARCH.code,
+        ] as string[],
     },
 ];

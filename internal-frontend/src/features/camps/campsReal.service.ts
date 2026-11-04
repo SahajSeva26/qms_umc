@@ -1,0 +1,153 @@
+import api from '@/lib/api/api'
+import type { ApiResponse, PaginatedResponse } from '@/types/common.types'
+import type {
+  ActivateCampPayload,
+  ApproveVoidCampPayload,
+  BookCampPayload,
+  BookingAvailabilityPayload,
+  BookingAvailabilityResponse,
+  CampEntity,
+  CampFileActivatePayload,
+  CampFilePostPayload,
+  CampMutationResponseEntity,
+  CampStatus,
+  CreateCampPayload,
+  GetCampFilesQuery,
+  MoveCampStagePayload,
+  SearchCampQuery,
+  UpdateCampPayload,
+  VoidCampPayload,
+} from '@/types/campReal.types'
+import type { CampReport } from '@/types/campReport.types'
+import type { FileEntity } from '@/types/file.types'
+import type { CampSummary } from '@/types/campReal.types'
+
+// Deliberately separate from `camps.service.ts`, the old mock store other files still depend on.
+const searchCamps = async (query: SearchCampQuery) => {
+  const res = await api.get<PaginatedResponse<CampEntity>>('/camps', { params: query })
+  return res.data
+}
+
+export interface MyCampsResponse {
+  success: boolean
+  message: string
+  data: { count: number; items: CampEntity[]; summary: CampSummary }
+}
+
+// GET /camps/my — field-force's own camps (FO/dietitian/MR), scoped server-side to the caller's
+// own slot. Carries a top-level `summary` (status/type counts) beyond the page itself.
+const myCamps = async (query: SearchCampQuery) => {
+  const res = await api.get<MyCampsResponse>('/camps/my', { params: query })
+  return res.data
+}
+
+const getCamp = async (id: string) => {
+  const res = await api.get<ApiResponse<CampEntity>>(`/camps/${id}`)
+  return res.data
+}
+
+// Mutations return the unpopulated in-memory document — fetch/refetch the camp for populated fields.
+const createCamp = async (payload: CreateCampPayload) => {
+  const res = await api.post<ApiResponse<CampMutationResponseEntity>>('/camps', payload)
+  return res.data
+}
+
+// Pharma field-force booking path — POST /camps/book, not /camps.
+const bookCamp = async (payload: BookCampPayload) => {
+  const res = await api.post<ApiResponse<CampMutationResponseEntity>>('/camps/book', payload)
+  return res.data
+}
+
+// Internal-team void-camp record (WF-4) — POST /camps/void-camp, not /camps. Lands in `requested`
+// with no lifecycle (no FO allocation/slot-clash/auto-confirm).
+const voidCamp = async (payload: VoidCampPayload) => {
+  const res = await api.post<ApiResponse<CampMutationResponseEntity>>('/camps/void-camp', payload)
+  return res.data
+}
+
+// Approves a void camp, moving it requested -> closed. camp:manage OR tenant:manage.
+const approveVoidCamp = async (id: string, payload: ApproveVoidCampPayload) => {
+  const res = await api.patch<ApiResponse<CampMutationResponseEntity>>(`/camps/${id}/approve-void`, payload)
+  return res.data
+}
+
+const updateCamp = async (id: string, payload: UpdateCampPayload) => {
+  const res = await api.put<ApiResponse<CampMutationResponseEntity>>(`/camps/${id}`, payload)
+  return res.data
+}
+
+const moveCampStage = async (id: string, payload: MoveCampStagePayload) => {
+  const res = await api.patch<ApiResponse<CampMutationResponseEntity>>(`/camps/${id}/stage`, payload)
+  return res.data
+}
+
+// Role-gated (not camp:manage) — the camp's assigned FO/dietitian starts their own confirmed camp
+// on site. Distinct from moveCampStage, which only camp:manage/tenant:manage holders can call.
+const activateCamp = async (id: string, payload: ActivateCampPayload) => {
+  const res = await api.patch<ApiResponse<CampMutationResponseEntity>>(`/camps/${id}/activate`, payload)
+  return res.data
+}
+
+const allocateFo = async (id: string) => {
+  const res = await api.post<ApiResponse<CampMutationResponseEntity>>(`/camps/${id}/allocate`)
+  return res.data
+}
+
+// Optional `status` scopes the whole report (incl. byType) to one status tab.
+const getCampReport = async (status?: CampStatus) => {
+  const res = await api.get<ApiResponse<CampReport>>('/camps/report', { params: status ? { status } : undefined })
+  return res.data
+}
+
+// Backend requires the payload key spelled `projectID` — translated here only.
+const getBookingAvailability = async (payload: BookingAvailabilityPayload) => {
+  const { projectId, type, ...rest } = payload
+  const res = await api.post<ApiResponse<BookingAvailabilityResponse>>('/camps/booking-availability', {
+    projectID: projectId,
+    ...(type ? { type } : {}),
+    ...rest,
+  })
+  return res.data
+}
+
+// Camp photos — setup/check-in-selfie/closure, role-gated server-side to the camp's assigned
+// worker (upload/activate/discard); reads inherit the normal camp read own-scope.
+const createCampFiles = async (payload: CampFilePostPayload) => {
+  const res = await api.post<ApiResponse<FileEntity[]>>('/camps/files', payload)
+  return res.data
+}
+
+const activateCampFiles = async (payload: CampFileActivatePayload) => {
+  const res = await api.post<ApiResponse<FileEntity[]>>('/camps/files/activate', payload)
+  return res.data
+}
+
+const getCampFiles = async (query: GetCampFilesQuery) => {
+  const res = await api.get<PaginatedResponse<FileEntity>>('/camps/files', { params: query })
+  return res.data
+}
+
+const discardCampFile = async (fileId: string) => {
+  const res = await api.delete<ApiResponse<FileEntity>>(`/camps/files/${fileId}`)
+  return res.data
+}
+
+export const campsRealService = {
+  searchCamps,
+  myCamps,
+  getCamp,
+  createCamp,
+  bookCamp,
+  voidCamp,
+  approveVoidCamp,
+  updateCamp,
+  moveCampStage,
+  activateCamp,
+  allocateFo,
+  getCampReport,
+  getBookingAvailability,
+  createCampFiles,
+  activateCampFiles,
+  getCampFiles,
+  discardCampFile,
+}

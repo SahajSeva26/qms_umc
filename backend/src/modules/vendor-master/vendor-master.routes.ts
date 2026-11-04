@@ -8,7 +8,7 @@ import {
     UpdateVendorMasterPayloadSchema,
 } from './vendor-master.validators';
 import { AuthMiddleware } from '../../shared/middlewares/authmiddleware';
-import { AuthorizeMiddleware } from '../../shared/middlewares/authorizeMiddleware';
+import { Authorize } from '../../shared/middlewares/authorize.middleware';
 import { VENDOR_MASTER_PERMISSIONS } from './vendor-master.constants';
 
 export const VendorMasterRouter = express.Router();
@@ -94,22 +94,22 @@ registry.registerPath({
 // is permission-guarded, and those permissions are only granted to platform role types.
 VendorMasterRouter.get(
     '/:id',
-    AuthorizeMiddleware([VENDOR_MASTER_PERMISSIONS.GET.code, VENDOR_MASTER_PERMISSIONS.MANAGE.code], 'OR'),
+    Authorize.anyPermissions([VENDOR_MASTER_PERMISSIONS.GET.code, VENDOR_MASTER_PERMISSIONS.MANAGE.code]),
     VendorMasterController.get,
 );
 VendorMasterRouter.get(
     '/',
-    AuthorizeMiddleware([VENDOR_MASTER_PERMISSIONS.SEARCH.code, VENDOR_MASTER_PERMISSIONS.MANAGE.code], 'OR'),
+    Authorize.anyPermissions([VENDOR_MASTER_PERMISSIONS.SEARCH.code, VENDOR_MASTER_PERMISSIONS.MANAGE.code]),
     VendorMasterController.search,
 );
 
 VendorMasterRouter.post(
     '/',
-    AuthorizeMiddleware([VENDOR_MASTER_PERMISSIONS.CREATE.code, VENDOR_MASTER_PERMISSIONS.MANAGE.code], 'OR'),
+    Authorize.anyPermissions([VENDOR_MASTER_PERMISSIONS.CREATE.code, VENDOR_MASTER_PERMISSIONS.MANAGE.code]),
     VendorMasterController.create,
 );
 VendorMasterRouter.put(
     '/:id',
-    AuthorizeMiddleware([VENDOR_MASTER_PERMISSIONS.UPDATE.code, VENDOR_MASTER_PERMISSIONS.MANAGE.code], 'OR'),
+    Authorize.anyPermissions([VENDOR_MASTER_PERMISSIONS.UPDATE.code, VENDOR_MASTER_PERMISSIONS.MANAGE.code]),
     VendorMasterController.update,
 );

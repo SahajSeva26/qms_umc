@@ -4,6 +4,7 @@ import { z } from 'zod';
 import {
     APPOINTMENT_INVITE_STATUSES,
     APPOINTMENT_MODES,
+    APPOINTMENT_OUTCOME_TITLES,
     APPOINTMENT_STATUSES,
     APPOINTMENT_TYPES,
 } from './appointment.constants';
@@ -21,6 +22,11 @@ const AgendaSchema = z.object({
 // (24 working hours) in the service, so it can never be set manually.
 const MomSchema = z.object({
     details: z.string().optional().openapi({ example: 'Client agreed to pilot in 3 cities' }),
+});
+
+const OutcomeSchema = z.object({
+    title: z.enum(Object.values(APPOINTMENT_OUTCOME_TITLES)).openapi({ example: 'converted-to-lead' }),
+    reason: z.string().optional().openapi({ example: 'Client ready to onboard' }),
 });
 
 //1: create ====================================>
@@ -58,6 +64,7 @@ export const UpdateAppointmentPayloadSchema = z.object({
     endTime: z.coerce.date().optional(),
     agenda: AgendaSchema.optional(),
     mom: MomSchema.optional(),
+    outcome: OutcomeSchema.optional(),
 });
 export type IUpdateAppointmentPayload = z.infer<typeof UpdateAppointmentPayloadSchema>;
 

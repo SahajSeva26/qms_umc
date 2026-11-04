@@ -27,6 +27,7 @@ export const LeadMapper = {
             confidence: lead.confidence,
             salesPerson: lead.salesPerson,
             status: lead.status,
+            hasProject: lead.hasProject === true,
             stageHistory: (lead.stageHistory || []).map((entry: any) => ({
                 from: entry.from,
                 to: entry.to,
@@ -71,6 +72,7 @@ export const LeadMapper = {
                 confidence: lead.confidence,
                 salesPerson: lead.salesPerson,
                 status: lead.status,
+                hasProject: lead.hasProject === true,
                 stageHistory: (lead.stageHistory || []).map((entry: any) => ({
                     from: entry.from,
                     to: entry.to,

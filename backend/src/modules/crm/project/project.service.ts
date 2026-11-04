@@ -307,6 +307,10 @@ const create = async (model: ICreateProjectPayload, ctx: RequestContext): Promis
         //4: set validates + applies team and the remaining fields
         let project = await set(model, entity, ctx);
         project = await project.save();
+
+        //5: mark the source lead as converted (one project per lead → this is the conversion moment)
+        await LeadService.markProjectCreated(lead._id.toString(), ctx);
+
         return project;
     });
 

@@ -2,7 +2,7 @@
 import mongoose, { HydratedDocument } from 'mongoose';
 import { FileModel, IFile } from './file.model';
 import { IBulkActivateFilesPayload, IChangeFileStatusPayload, ICreateFilePayload, ISearchFileQuery, IUpdateFilePayload } from './file.validators';
-import { ENTITY_RELATION, FILE_PERMISSIONS, FILE_STATUS, FILE_TRANSITION_MAP, FILE_TYPE, getRelationCap } from './file.constants';
+import { FILE_PERMISSIONS, FILE_STATUS, FILE_TRANSITION_MAP, FILE_TYPE } from './file.constants';
 import { throwAppError } from '../../shared/utils/error';
 import { StatusCodes } from 'http-status-codes';
 import { RequestContext } from '../../shared/utils/contextBuilder';
@@ -42,49 +42,6 @@ const resolveTenant = async (model: ICreateFilePayload, ctx: RequestContext): Pr
         return throwAppError('Tenant not found', StatusCodes.NOT_FOUND);
     }
     return (tenant._id || tenant.id)?.toString();
-};
-
-// The relation must be one the entity type declares (e.g. user→profile_picture, tenant→logo).
-const assertRelationCoherent = (type: string, relation: string) => {
-    const group = (ENTITY_RELATION as any)[type];
-    const allowed: string[] = group ? Object.values(group).map((r: any) => r.name) : [];
-    if (!allowed.includes(relation)) {
-        return throwAppError(`Relation "${relation}" is not valid for entity type "${type}"`, StatusCodes.BAD_REQUEST);
-    }
-};
-
-// Cap = max ACTIVE files an entity may hold for a relation; the existing-count only applies once an id is attached.
-const assertWithinRelationCap = async (entity: any, tenant: any, incoming: number) => {
-    const cap = getRelationCap(entity.type, entity.relation);
-    if (cap === undefined) {
-        return;
-    }
-    if (incoming > cap) {
-        return throwAppError(
-            `The "${entity.relation}" relation accepts at most ${cap} file(s)`,
-            StatusCodes.BAD_REQUEST,
-        );
-    }
-    if (!entity.id) {
-        return;
-    }
-    // Count existing ACTIVE files for this entity + relation.
-    const filter: any = {
-        'entity.id': entity.id,
-        'entity.type': entity.type,
-        'entity.relation': entity.relation,
-        status: FILE_STATUS.ACTIVE,
-    };
-    if (tenant) {
-        filter.tenant = tenant;
-    }
-    const existing = await FileModel.countDocuments(filter);
-    if (existing + incoming > cap) {
-        return throwAppError(
-            `The "${entity.relation}" relation already holds ${existing} of ${cap} active file(s). Please delete some first.`,
-            StatusCodes.CONFLICT,
-        );
-    }
 };
 
 // The acting role owns the file. ctx.role is the populated role doc; ctx.user.role is its id.
@@ -301,7 +258,10 @@ const search = async (filters: ISearchFileQuery, ctx: RequestContext, options?: 
 
     const [count, items] = await Promise.all([countPromise, dataPromise]);
 
-    // no presigned urls on listings — url is attached only on get/create/update
+    // by default no presigned urls on listings; a domain caller can opt in (e.g. a camp file drawer)
+    if ((options as any)?.withUrls) {
+        await Promise.all(items.map((it) => withUrl(it)));
+    }
     return { count, items };
 };
 
@@ -319,13 +279,8 @@ const create = async (model: ICreateFilePayload, ctx: RequestContext): Promise<H
     const tenant = await resolveTenant(model, ctx);
     model.tenant = tenant;
 
-    //2: coherence — the relation must be valid for the entity type
-    assertRelationCoherent(model.entity.type, model.entity.relation);
-
-    //3: enforce the relation cap (existing active-count only applies once an id is attached)
-    await assertWithinRelationCap(model.entity, tenant, model.files.length);
-
-    //4: the acting role owns every file
+    //2: the acting role owns every file (entity type/relation are accepted as-is — the calling
+    // domain owns all validation, incl. caps; the file module does not check them)
     const owner = resolveOwner(ctx);
 
     // One File doc per metadata entry — type + content derived per file. Track each persisted doc's id
@@ -380,11 +335,6 @@ const update = async (id: string, model: IUpdateFilePayload, ctx: RequestContext
         if (file.entity.id) {
             return throwAppError('File is already attached to an entity', StatusCodes.CONFLICT);
         }
-        await assertWithinRelationCap(
-            { id: model.entityId, type: file.entity.type, relation: file.entity.relation },
-            file.tenant?.toString(),
-            1,
-        );
     }
 
     //3: apply editable fields (entity.id assignment handled in set)
@@ -405,15 +355,8 @@ const changeStatus = async (id: string, model: IChangeFileStatusPayload, ctx: Re
     //2: no-op guard + validate the transition against the state machine
     assertStatusTransition(file, model.status);
 
-    //3: moving INTO active must respect the relation cap (existing active + this one <= maxFiles; the
-    // file isn't active yet, so it isn't already in the count) AND its object must exist in storage —
-    // the object check always runs when going active, never optional.
+    //3: moving INTO active, its object must exist in storage — always verified, never optional.
     if (model.status === FILE_STATUS.ACTIVE) {
-        await assertWithinRelationCap(
-            { id: file.entity?.id, type: file.entity?.type, relation: file.entity?.relation },
-            file.tenant?.toString(),
-            1,
-        );
         await assertObjectUploaded(file);
     }
 
@@ -422,9 +365,9 @@ const changeStatus = async (id: string, model: IChangeFileStatusPayload, ctx: Re
     return await file.save();
 };
 
-// Bulk flip a batch of draft files to active once the client has uploaded the objects to S3. Each
-// move reuses changeStatus (transition-map + relation-cap validated) inside one transaction — all or
-// nothing. The GET presigned url is attached for the response (the objects now exist).
+// Bulk flip a batch of draft files to active once the client has uploaded the objects to S3. The
+// transition + object existence are validated per file before the transaction; the flip runs in one
+// transaction (all or nothing). The GET presigned url is attached for the response.
 const bulkActivate = async (model: IBulkActivateFilesPayload, ctx: RequestContext): Promise<HydratedDocument<IFile>[]> => {
     //1: load every file (scoped), validate the transition, and verify its object exists — ALL before
     // the transaction (fail fast; keep the external S3 HeadObject calls out of the txn)
@@ -439,16 +382,10 @@ const bulkActivate = async (model: IBulkActivateFilesPayload, ctx: RequestContex
         files.push(file);
     }
 
-    //2: flip the batch active in one transaction. The relation-cap check stays INSIDE the txn so each
-    // file sees the ones already activated in this batch (an accurate running count).
+    //2: flip the batch active in one transaction (all or nothing).
     const activated = await withTransaction(async () => {
         const updated: HydratedDocument<IFile>[] = [];
         for (const file of files) {
-            await assertWithinRelationCap(
-                { id: file.entity?.id, type: file.entity?.type, relation: file.entity?.relation },
-                file.tenant?.toString(),
-                1,
-            );
             file.status = FILE_STATUS.ACTIVE;
             updated.push(await file.save());
         }

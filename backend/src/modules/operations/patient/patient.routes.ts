@@ -4,7 +4,7 @@ import { PatientController } from './patient.controller';
 import { registry } from '../../../shared/config/swagger/swagger.registry';
 import { CreatePatientPayloadSchema, SearchPatientQuerySchema, UpdatePatientPayloadSchema } from './patient.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
-import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { Authorize } from '../../../shared/middlewares/authorize.middleware';
 import { PATIENT_PERMISSIONS } from './patient.constants';
 
 export const PatientRouter = express.Router();
@@ -88,8 +88,8 @@ registry.registerPath({
 // =======================================================================
 // reads require the matching read permission (or manage); writes require the matching
 // write permission (or manage).
-PatientRouter.get('/:id', AuthorizeMiddleware([PATIENT_PERMISSIONS.GET.code, PATIENT_PERMISSIONS.MANAGE.code], 'OR'), PatientController.get);
-PatientRouter.get('/', AuthorizeMiddleware([PATIENT_PERMISSIONS.SEARCH.code, PATIENT_PERMISSIONS.MANAGE.code], 'OR'), PatientController.search);
+PatientRouter.get('/:id', Authorize.anyPermissions([PATIENT_PERMISSIONS.GET.code, PATIENT_PERMISSIONS.MANAGE.code]), PatientController.get);
+PatientRouter.get('/', Authorize.anyPermissions([PATIENT_PERMISSIONS.SEARCH.code, PATIENT_PERMISSIONS.MANAGE.code]), PatientController.search);
 
-PatientRouter.post('/', AuthorizeMiddleware([PATIENT_PERMISSIONS.CREATE.code, PATIENT_PERMISSIONS.MANAGE.code], 'OR'), PatientController.create);
-PatientRouter.put('/:id', AuthorizeMiddleware([PATIENT_PERMISSIONS.UPDATE.code, PATIENT_PERMISSIONS.MANAGE.code], 'OR'), PatientController.update);
+PatientRouter.post('/', Authorize.anyPermissions([PATIENT_PERMISSIONS.CREATE.code, PATIENT_PERMISSIONS.MANAGE.code]), PatientController.create);
+PatientRouter.put('/:id', Authorize.anyPermissions([PATIENT_PERMISSIONS.UPDATE.code, PATIENT_PERMISSIONS.MANAGE.code]), PatientController.update);

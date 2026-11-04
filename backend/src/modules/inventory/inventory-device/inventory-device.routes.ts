@@ -9,7 +9,7 @@ import {
     UpdateInventoryDevicePayloadSchema,
 } from './inventory-device.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
-import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { Authorize } from '../../../shared/middlewares/authorize.middleware';
 import { INVENTORY_DEVICE_PERMISSIONS } from './inventory-device.constants';
 
 export const InventoryDeviceRouter = express.Router();
@@ -115,7 +115,7 @@ registry.registerPath({
 // the report is manager-only; it MUST be registered before '/:id' so 'report' is not read as an id.
 InventoryDeviceRouter.get(
     '/report',
-    AuthorizeMiddleware([INVENTORY_DEVICE_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([INVENTORY_DEVICE_PERMISSIONS.MANAGE.code]),
     InventoryDeviceController.report,
 );
 InventoryDeviceRouter.get('/:id', InventoryDeviceController.get);
@@ -123,11 +123,11 @@ InventoryDeviceRouter.get('/', InventoryDeviceController.search);
 
 InventoryDeviceRouter.post(
     '/',
-    AuthorizeMiddleware([INVENTORY_DEVICE_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([INVENTORY_DEVICE_PERMISSIONS.MANAGE.code]),
     InventoryDeviceController.create,
 );
 InventoryDeviceRouter.put(
     '/:id',
-    AuthorizeMiddleware([INVENTORY_DEVICE_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([INVENTORY_DEVICE_PERMISSIONS.MANAGE.code]),
     InventoryDeviceController.update,
 );

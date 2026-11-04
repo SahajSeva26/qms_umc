@@ -7,7 +7,10 @@ import {
     ApproveVoidCampPayloadSchema,
     BookCampPayloadSchema,
     BookingAvailabilityPayloadSchema,
+    CampFileActivatePayloadSchema,
+    CampFilePostPayloadSchema,
     CampReportQuerySchema,
+    GetCampFilesQuerySchema,
     CreateCampPayloadSchema,
     MoveStagePayloadSchema,
     SearchCampQuerySchema,
@@ -15,8 +18,7 @@ import {
     VoidCampPayloadSchema,
 } from './camp.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
-import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
-import { RoleGuard } from '../../../shared/middlewares/roleGuard';
+import { Authorize } from '../../../shared/middlewares/authorize.middleware';
 import { reportRateLimiter } from '../../../shared/middlewares/rateLimiter';
 import { CAMP_PERMISSIONS } from './camp.constants';
 import { TENANT_PERMISSIONS } from '../../access-management/tenant/tenant.constants';
@@ -283,6 +285,69 @@ registry.registerPath({
     },
 });
 
+// camp files — create upload intent(s) for a relation (assigned FO/dietitian only)
+registry.registerPath({
+    method: 'post',
+    path: '/camps/files',
+    tags: ['CAMP'],
+    summary: 'Create camp file upload intent(s) for a relation (assigned FO/dietitian only)',
+    request: {
+        body: { content: { 'application/json': { schema: CampFilePostPayloadSchema } } },
+    },
+    responses: {
+        201: { description: 'ok' },
+        400: { description: 'Validation error / unknown relation' },
+        404: { description: 'Camp not found' },
+    },
+});
+
+// camp files — activate uploaded draft files for a camp (assigned FO/dietitian only)
+registry.registerPath({
+    method: 'post',
+    path: '/camps/files/activate',
+    tags: ['CAMP'],
+    summary: 'Activate uploaded camp draft files (assigned FO/dietitian only)',
+    request: {
+        body: { content: { 'application/json': { schema: CampFileActivatePayloadSchema } } },
+    },
+    responses: {
+        200: { description: 'ok' },
+        400: { description: 'Validation error / file does not belong to this camp' },
+        403: { description: 'Not the assigned worker' },
+        404: { description: 'Camp not found' },
+        409: { description: 'A file cannot be activated (not uploaded / invalid transition)' },
+    },
+});
+
+// camp files — list a camp's files (anyone who can read the camp)
+registry.registerPath({
+    method: 'get',
+    path: '/camps/files',
+    tags: ['CAMP'],
+    summary: "List a camp's active files (optionally for one relation)",
+    request: { query: GetCampFilesQuerySchema },
+    responses: {
+        200: { description: 'Camp files fetched successfully' },
+        400: { description: 'Validation error' },
+        404: { description: 'Camp not found' },
+    },
+});
+
+// camp files — discard a file (assigned FO/dietitian only); frees the relation's cap for a re-upload
+registry.registerPath({
+    method: 'delete',
+    path: '/camps/files/{id}',
+    tags: ['CAMP'],
+    summary: 'Discard a camp file (assigned FO/dietitian only)',
+    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+    responses: {
+        200: { description: 'Camp file discarded' },
+        400: { description: 'Validation error' },
+        403: { description: 'Not the assigned worker' },
+        404: { description: 'Camp file not found' },
+    },
+});
+
 // =======================================================================
 // ========================= EXPORT CAMP ROUTES ==========================
 // =======================================================================
@@ -292,24 +357,44 @@ const READ_GUARD = [CAMP_PERMISSIONS.SEARCH.code, ...GUARD]; // assigned field-f
 CampRouter.get(
     '/report',
     reportRateLimiter,
-    AuthorizeMiddleware(GUARD),
+    Authorize.anyPermissions(GUARD),
     CampController.report
 );
 
-// my camps — role-gated to field-force; MUST be before '/:id' so '/my' isn't treated as an id
+// my camps — role-gated to field-force + pharma management (HO/RSM/ASM); MUST be before '/:id'
+// so '/my' isn't treated as an id. The service own-scopes each role (HO → division, ASM/RSM → the
+// slots stamped on their camps, FO/dietitian/MR → their own slot), so the summary a manager sees
+// is the same scoped set as the list they drill into.
 CampRouter.get(
     '/my',
-    RoleGuard([
+    Authorize.roles([
         ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER,
         ALLOWED_ROLETYPE_CODES.PLATFORM.DIETITIAN,
         ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_MR,
+        ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_ASM,
+        ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_RSM,
+        ALLOWED_ROLETYPE_CODES.CUSTOMER.PHARMA_DIVISION_HEAD,
     ]),
     CampController.myCamps,
 );
 
+// camp files — list a camp's files; MUST be before '/:id' so 'files' isn't treated as an id. Read-gated
+// like the camp read routes (service own-scopes the caller to the camps they can see).
+CampRouter.get(
+    '/files',
+    Authorize.anyPermissions([
+        CAMP_PERMISSIONS.SEARCH.code,
+        CAMP_PERMISSIONS.GET.code,
+        CAMP_PERMISSIONS.BOOK.code,
+        CAMP_PERMISSIONS.MANAGE.code,
+        TENANT_PERMISSIONS.MANAGE.code,
+    ]),
+    CampController.getCampFiles,
+);
+
 CampRouter.get(
     '/:id',
-    AuthorizeMiddleware([
+    Authorize.anyPermissions([
         CAMP_PERMISSIONS.MANAGE.code,
         CAMP_PERMISSIONS.GET.code,
         CAMP_PERMISSIONS.BOOK.code, // pharma field-force (book-only) may read camps; service scopes them to their division
@@ -319,7 +404,7 @@ CampRouter.get(
 );
 CampRouter.put(
     '/:id',
-    AuthorizeMiddleware([
+    Authorize.anyPermissions([
         CAMP_PERMISSIONS.UPDATE.code,
         CAMP_PERMISSIONS.MANAGE.code,
         TENANT_PERMISSIONS.MANAGE.code,
@@ -328,27 +413,27 @@ CampRouter.put(
 );
 CampRouter.patch(
     '/:id/stage',
-    AuthorizeMiddleware([CAMP_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([CAMP_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
     CampController.moveStage,
 );
 // start a camp (confirmed → live) — role-gated to the field staff who run it; ownership + stage +
 // scheduled-date are enforced in the service. NOT permission-gated (field staff, not managers).
 CampRouter.patch(
     '/:id/activate',
-    RoleGuard([ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER, ALLOWED_ROLETYPE_CODES.PLATFORM.DIETITIAN]),
+    Authorize.roles([ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER, ALLOWED_ROLETYPE_CODES.PLATFORM.DIETITIAN]),
     CampController.activate,
 );
 
 // approve a void camp (requested → closed) — camp:manage (ops) / tenant:manage only
 CampRouter.patch(
     '/:id/approve-void',
-    AuthorizeMiddleware([CAMP_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([CAMP_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
     CampController.approveVoidCamp,
 );
 
 CampRouter.post(
     '/:id/allocate',
-    AuthorizeMiddleware([
+    Authorize.anyPermissions([
         CAMP_PERMISSIONS.UPDATE.code,
         CAMP_PERMISSIONS.MANAGE.code,
         TENANT_PERMISSIONS.MANAGE.code,
@@ -356,9 +441,10 @@ CampRouter.post(
     CampController.allocateWorker,
 );
 
+
 CampRouter.get(
     '/',
-    AuthorizeMiddleware([
+    Authorize.anyPermissions([
         CAMP_PERMISSIONS.SEARCH.code,
         CAMP_PERMISSIONS.MANAGE.code,
         CAMP_PERMISSIONS.BOOK.code, // pharma field-force (book-only) may read camps; service scopes them to their division
@@ -369,7 +455,7 @@ CampRouter.get(
 
 CampRouter.post(
     '/',
-    AuthorizeMiddleware([
+    Authorize.anyPermissions([
         CAMP_PERMISSIONS.CREATE.code,
         CAMP_PERMISSIONS.MANAGE.code,
         TENANT_PERMISSIONS.MANAGE.code,
@@ -381,7 +467,7 @@ CampRouter.post(
 // (ops managers) / tenant:manage, never to pharma field-force (no camp:book here).
 CampRouter.post(
     '/void-camp',
-    AuthorizeMiddleware([CAMP_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
+    Authorize.anyPermissions([CAMP_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code]),
     CampController.voidCamp,
 );
 
@@ -389,10 +475,36 @@ CampRouter.post(
 // camp:book holders (pharma role types); the service further restricts to customer tenants.
 CampRouter.post(
     '/booking-availability',
-    AuthorizeMiddleware([CAMP_PERMISSIONS.BOOK.code]),
+    Authorize.anyPermissions([CAMP_PERMISSIONS.BOOK.code]),
     CampController.bookingAvailability,
 );
 
 // pharma field-force booking — only pharma role types hold camp:book. The service then authorizes
 // the caller against the target MR (self / downline). No manage fallback: booking is pharma-only.
-CampRouter.post('/book', AuthorizeMiddleware([CAMP_PERMISSIONS.BOOK.code]), CampController.book);
+CampRouter.post('/book', Authorize.anyPermissions([CAMP_PERMISSIONS.BOOK.code]), CampController.book);
+
+// camp files — create upload intent(s). Role-gated to the field staff who run the camp; the service
+// resolves the camp (by entityId) + the relation config.
+CampRouter.post(
+    '/files',
+    Authorize.roles([ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER, ALLOWED_ROLETYPE_CODES.PLATFORM.DIETITIAN]),
+    CampController.campFiles,
+);
+
+// camp files — activate uploaded draft files. Role-gated to the field staff who run the camp; the
+// service authorizes the assigned worker + verifies the files belong to the camp, then bulk-activates.
+CampRouter.post(
+    '/files/activate',
+    Authorize.roles([ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER, ALLOWED_ROLETYPE_CODES.PLATFORM.DIETITIAN]),
+    CampController.campFileActivate,
+);
+
+// camp files — discard one (soft-delete). Role-gated to the field staff who run the camp; the service
+// derives the camp from the file + authorizes the assigned worker, then frees the cap for a re-upload.
+CampRouter.delete(
+    '/files/:id',
+    Authorize.roles([ALLOWED_ROLETYPE_CODES.PLATFORM.FIELD_OFFICER, ALLOWED_ROLETYPE_CODES.PLATFORM.DIETITIAN]),
+    CampController.campFileDiscard,
+);
+
+

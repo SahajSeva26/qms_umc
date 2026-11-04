@@ -4,7 +4,7 @@ import { InvoiceLineItemController } from './invoiceLineItem.controller';
 import { registry } from '../../../shared/config/swagger/swagger.registry';
 import { CreateInvoiceLineItemPayloadSchema, SearchInvoiceLineItemQuerySchema } from './invoiceLineItem.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
-import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { Authorize } from '../../../shared/middlewares/authorize.middleware';
 import { INVOICE_LINE_ITEM_PERMISSIONS } from './invoiceLineItem.constants';
 import { TENANT_PERMISSIONS } from '../../access-management/tenant/tenant.constants';
 
@@ -82,7 +82,7 @@ registry.registerPath({
 
 InvoiceLineItemRouter.get(
     '/:id',
-    AuthorizeMiddleware([
+    Authorize.anyPermissions([
         INVOICE_LINE_ITEM_PERMISSIONS.GET.code,
         INVOICE_LINE_ITEM_PERMISSIONS.MANAGE.code,
         TENANT_PERMISSIONS.MANAGE.code,
@@ -91,7 +91,7 @@ InvoiceLineItemRouter.get(
 );
 InvoiceLineItemRouter.delete(
     '/:id',
-    AuthorizeMiddleware([
+    Authorize.anyPermissions([
         INVOICE_LINE_ITEM_PERMISSIONS.DELETE.code,
         INVOICE_LINE_ITEM_PERMISSIONS.MANAGE.code,
         TENANT_PERMISSIONS.MANAGE.code,
@@ -100,7 +100,7 @@ InvoiceLineItemRouter.delete(
 );
 InvoiceLineItemRouter.get(
     '/',
-    AuthorizeMiddleware([
+    Authorize.anyPermissions([
         INVOICE_LINE_ITEM_PERMISSIONS.SEARCH.code,
         INVOICE_LINE_ITEM_PERMISSIONS.MANAGE.code,
         TENANT_PERMISSIONS.MANAGE.code,
@@ -109,7 +109,7 @@ InvoiceLineItemRouter.get(
 );
 InvoiceLineItemRouter.post(
     '/',
-    AuthorizeMiddleware([
+    Authorize.anyPermissions([
         INVOICE_LINE_ITEM_PERMISSIONS.CREATE.code,
         INVOICE_LINE_ITEM_PERMISSIONS.MANAGE.code,
         TENANT_PERMISSIONS.MANAGE.code,

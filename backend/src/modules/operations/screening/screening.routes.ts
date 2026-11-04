@@ -10,7 +10,7 @@ import {
     VerifyConsentPayloadSchema,
 } from './screening.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
-import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { Authorize } from '../../../shared/middlewares/authorize.middleware';
 import { SCREENING_PERMISSIONS } from './screening.constants';
 
 export const ScreeningRouter = express.Router();
@@ -129,11 +129,11 @@ registry.registerPath({
 // =======================================================================
 // reads require the matching read permission (or manage); writes/stage/consent require the
 // matching write permission (or manage).
-ScreeningRouter.get('/:id', AuthorizeMiddleware([SCREENING_PERMISSIONS.GET.code, SCREENING_PERMISSIONS.MANAGE.code], 'OR'), ScreeningController.get);
-ScreeningRouter.get('/', AuthorizeMiddleware([SCREENING_PERMISSIONS.SEARCH.code, SCREENING_PERMISSIONS.MANAGE.code], 'OR'), ScreeningController.search);
+ScreeningRouter.get('/:id', Authorize.anyPermissions([SCREENING_PERMISSIONS.GET.code, SCREENING_PERMISSIONS.MANAGE.code]), ScreeningController.get);
+ScreeningRouter.get('/', Authorize.anyPermissions([SCREENING_PERMISSIONS.SEARCH.code, SCREENING_PERMISSIONS.MANAGE.code]), ScreeningController.search);
 
-ScreeningRouter.post('/', AuthorizeMiddleware([SCREENING_PERMISSIONS.CREATE.code, SCREENING_PERMISSIONS.MANAGE.code], 'OR'), ScreeningController.create);
-ScreeningRouter.put('/:id', AuthorizeMiddleware([SCREENING_PERMISSIONS.UPDATE.code, SCREENING_PERMISSIONS.MANAGE.code], 'OR'), ScreeningController.update);
-ScreeningRouter.patch('/:id/stage', AuthorizeMiddleware([SCREENING_PERMISSIONS.UPDATE.code, SCREENING_PERMISSIONS.MANAGE.code], 'OR'), ScreeningController.moveStage);
-ScreeningRouter.post('/:id/request-consent-otp', AuthorizeMiddleware([SCREENING_PERMISSIONS.UPDATE.code, SCREENING_PERMISSIONS.MANAGE.code], 'OR'), ScreeningController.requestConsentOtp);
-ScreeningRouter.post('/:id/verify-consent', AuthorizeMiddleware([SCREENING_PERMISSIONS.UPDATE.code, SCREENING_PERMISSIONS.MANAGE.code], 'OR'), ScreeningController.verifyConsent);
+ScreeningRouter.post('/', Authorize.anyPermissions([SCREENING_PERMISSIONS.CREATE.code, SCREENING_PERMISSIONS.MANAGE.code]), ScreeningController.create);
+ScreeningRouter.put('/:id', Authorize.anyPermissions([SCREENING_PERMISSIONS.UPDATE.code, SCREENING_PERMISSIONS.MANAGE.code]), ScreeningController.update);
+ScreeningRouter.patch('/:id/stage', Authorize.anyPermissions([SCREENING_PERMISSIONS.UPDATE.code, SCREENING_PERMISSIONS.MANAGE.code]), ScreeningController.moveStage);
+ScreeningRouter.post('/:id/request-consent-otp', Authorize.anyPermissions([SCREENING_PERMISSIONS.UPDATE.code, SCREENING_PERMISSIONS.MANAGE.code]), ScreeningController.requestConsentOtp);
+ScreeningRouter.post('/:id/verify-consent', Authorize.anyPermissions([SCREENING_PERMISSIONS.UPDATE.code, SCREENING_PERMISSIONS.MANAGE.code]), ScreeningController.verifyConsent);

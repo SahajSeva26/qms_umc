@@ -2,13 +2,15 @@ import express from 'express';
 import { TenantController } from './tenant.controller';
 import { registry } from '../../../shared/config/swagger/swagger.registry';
 import {
+    ActivateTenantLogoPayloadSchema,
     BulkTenantOpenApiSchema,
+    CreateTenantLogoPayloadSchema,
     CreateTenantPayloadSchema,
     SearchTenantQuerySchema,
     UpdateTenantPayloadSchema,
 } from './tenant.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
-import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { Authorize } from '../../../shared/middlewares/authorize.middleware';
 import { csvUploader } from '../../../shared/middlewares/upload/csvUploader';
 import {
     PERMISSIONS,
@@ -138,6 +140,49 @@ registry.registerPath({
     },
 });
 
+// tenant logo — new upload request (discards the old logo); write-gated like the update routes
+registry.registerPath({
+    method: 'post',
+    path: '/tenants/{id}/logo',
+    tags: ['TENANT'],
+    summary: 'Create a tenant logo upload intent (discards the previous logo)',
+    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+    request: { body: { content: { 'application/json': { schema: CreateTenantLogoPayloadSchema } } } },
+    responses: {
+        201: { description: 'ok' },
+        400: { description: 'Validation error' },
+        404: { description: 'Tenant not found' },
+    },
+});
+
+// tenant logo — activate the uploaded draft logo
+registry.registerPath({
+    method: 'post',
+    path: '/tenants/{id}/logo/activate',
+    tags: ['TENANT'],
+    summary: 'Activate the uploaded tenant logo',
+    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+    request: { body: { content: { 'application/json': { schema: ActivateTenantLogoPayloadSchema } } } },
+    responses: {
+        200: { description: 'Tenant logo updated' },
+        400: { description: 'Validation error / file does not belong to this tenant' },
+        404: { description: 'Tenant not found' },
+    },
+});
+
+// tenant logo — fetch the active logo
+registry.registerPath({
+    method: 'get',
+    path: '/tenants/{id}/logo',
+    tags: ['TENANT'],
+    summary: "Get a tenant's active logo",
+    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+    responses: {
+        200: { description: 'Tenant logo fetched successfully' },
+        404: { description: 'Tenant not found' },
+    },
+});
+
 // ==========================================================================
 // ================= EXPORTED ROUTES ========================================
 // ==========================================================================
@@ -146,7 +191,7 @@ TenantRouter.get('/me', AuthMiddleware, TenantController.getTenantMe);
 
 TenantRouter.get(
     '/:id',
-    AuthorizeMiddleware([
+    Authorize.anyPermissions([
         PERMISSIONS.TENANT.GET.code,
         PERMISSIONS.TENANT.MANAGE.code,
     ]),
@@ -154,7 +199,7 @@ TenantRouter.get(
 );
 TenantRouter.get(
     '/',
-    AuthorizeMiddleware([
+    Authorize.anyPermissions([
         PERMISSIONS.TENANT.SEARCH.code,
         PERMISSIONS.TENANT.MANAGE.code,
     ]),
@@ -164,7 +209,7 @@ TenantRouter.get(
 // declared before POST '/' for clarity.
 TenantRouter.post(
     '/bulk',
-    AuthorizeMiddleware([
+    Authorize.anyPermissions([
         PERMISSIONS.TENANT.MANAGE.code,
         SYSTEM_PERMISSIONS.MANAGE.code,
     ]),
@@ -173,7 +218,7 @@ TenantRouter.post(
 );
 TenantRouter.post(
     '/',
-    AuthorizeMiddleware([
+    Authorize.anyPermissions([
         // PERMISSIONS.TENANT.CREATE.code,
         PERMISSIONS.TENANT.MANAGE.code,
         SYSTEM_PERMISSIONS.MANAGE.code,
@@ -182,9 +227,26 @@ TenantRouter.post(
 );
 TenantRouter.put(
     '/:id',
-    AuthorizeMiddleware([
+    Authorize.anyPermissions([
         PERMISSIONS.TENANT.UPDATE.code,
         PERMISSIONS.TENANT.MANAGE.code,
     ]),
     TenantController.update,
+);
+
+// tenant logo — writes gated like the update routes; read gated like the get route
+TenantRouter.post(
+    '/:id/logo',
+    Authorize.anyPermissions([PERMISSIONS.TENANT.UPDATE.code, PERMISSIONS.TENANT.MANAGE.code]),
+    TenantController.createLogo,
+);
+TenantRouter.post(
+    '/:id/logo/activate',
+    Authorize.anyPermissions([PERMISSIONS.TENANT.UPDATE.code, PERMISSIONS.TENANT.MANAGE.code]),
+    TenantController.activateLogo,
+);
+TenantRouter.get(
+    '/:id/logo',
+    Authorize.anyPermissions([PERMISSIONS.TENANT.GET.code, PERMISSIONS.TENANT.MANAGE.code]),
+    TenantController.getLogo,
 );

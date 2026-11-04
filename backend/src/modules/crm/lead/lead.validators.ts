@@ -80,6 +80,8 @@ export const SearchLeadQuerySchema = z
         salesPerson: objectId('Sales person').optional(),
         fyFrom: z.coerce.date().optional().openapi({ example: '2026-04-01' }),
         fyTo: z.coerce.date().optional().openapi({ example: '2027-03-31' }),
+        // filter by whether a project has been created from the lead ('true' = converted leads only)
+        hasProject: z.enum(['true', 'false']).optional().openapi({ example: 'true' }),
         // when 'true', each row also carries a `stats.followUps` count (appointments linked to the lead)
         report: z.string().optional().openapi({ example: 'true' }),
         page: z.string().optional().openapi({ example: '1' }),

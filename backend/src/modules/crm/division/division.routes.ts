@@ -9,7 +9,7 @@ import {
     UpdateDivisionPayloadSchema,
 } from './division.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
-import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { Authorize } from '../../../shared/middlewares/authorize.middleware';
 import { DIVISION_PERMISSIONS } from './division.constants';
 import { TENANT_PERMISSIONS } from '../../access-management/tenant/tenant.constants';
 import { LEAD_PERMISSIONS } from '../lead/lead.constants';
@@ -132,7 +132,7 @@ registry.registerPath({
 // =======================================================================
 DivisionRouter.get(
     '/:id',
-    AuthorizeMiddleware([
+    Authorize.anyPermissions([
         DIVISION_PERMISSIONS.MANAGE.code,
         DIVISION_PERMISSIONS.SEARCH.code,
         DIVISION_PERMISSIONS.GET.code,
@@ -142,13 +142,13 @@ DivisionRouter.get(
 );
 DivisionRouter.put(
     '/:id',
-    AuthorizeMiddleware([DIVISION_PERMISSIONS.MANAGE.code, DIVISION_PERMISSIONS.UPDATE.code, TENANT_PERMISSIONS.ADMIN.code]),
+    Authorize.anyPermissions([DIVISION_PERMISSIONS.MANAGE.code, DIVISION_PERMISSIONS.UPDATE.code, TENANT_PERMISSIONS.ADMIN.code]),
     DivisionController.update,
 );
 
 DivisionRouter.get(
     '/',
-    AuthorizeMiddleware([
+    Authorize.anyPermissions([
         DIVISION_PERMISSIONS.MANAGE.code,
         DIVISION_PERMISSIONS.SEARCH.code,
         TENANT_PERMISSIONS.ADMIN.code,
@@ -158,13 +158,13 @@ DivisionRouter.get(
 );
 DivisionRouter.post(
     '/',
-    AuthorizeMiddleware([DIVISION_PERMISSIONS.MANAGE.code, DIVISION_PERMISSIONS.CREATE.code]),
+    Authorize.anyPermissions([DIVISION_PERMISSIONS.MANAGE.code, DIVISION_PERMISSIONS.CREATE.code]),
     DivisionController.create,
 );
 
 DivisionRouter.post(
     '/bulk-mr',
-    AuthorizeMiddleware([DIVISION_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.ADMIN.code]),
+    Authorize.anyPermissions([DIVISION_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.ADMIN.code]),
     csvUploader.single('file'),
     DivisionController.bulkCreateMr,
 );

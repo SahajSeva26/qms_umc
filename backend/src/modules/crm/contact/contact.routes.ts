@@ -7,7 +7,7 @@ import {
     UpdateContactPayloadSchema,
 } from './contact.validators';
 import { AuthMiddleware } from '../../../shared/middlewares/authmiddleware';
-import { AuthorizeMiddleware } from '../../../shared/middlewares/authorizeMiddleware';
+import { Authorize } from '../../../shared/middlewares/authorize.middleware';
 import { CONTACT_PERMISSIONS } from './contact.constants';
 import { TENANT_PERMISSIONS } from '../../access-management/tenant/tenant.constants';
 
@@ -95,8 +95,8 @@ registry.registerPath({
 const GUARD = [CONTACT_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.MANAGE.code, TENANT_PERMISSIONS.ADMIN.code];
 const READ_GUARD = [CONTACT_PERMISSIONS.SEARCH.code, ...GUARD];
 
-ContactRouter.get('/:id', AuthorizeMiddleware(READ_GUARD), ContactController.get);
-ContactRouter.put('/:id', AuthorizeMiddleware(GUARD), ContactController.update);
+ContactRouter.get('/:id', Authorize.anyPermissions(READ_GUARD), ContactController.get);
+ContactRouter.put('/:id', Authorize.anyPermissions(GUARD), ContactController.update);
 
-ContactRouter.get('/', AuthorizeMiddleware(READ_GUARD), ContactController.search);
-ContactRouter.post('/', AuthorizeMiddleware(GUARD), ContactController.create);
+ContactRouter.get('/', Authorize.anyPermissions(READ_GUARD), ContactController.search);
+ContactRouter.post('/', Authorize.anyPermissions(GUARD), ContactController.create);

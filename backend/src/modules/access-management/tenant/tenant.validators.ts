@@ -2,6 +2,10 @@ import { z } from 'zod';
 import { TENANT_STATUS, TENANT_TYPE } from './tenant.constants';
 import { isValidObjectID } from '../../../shared/utils/strings';
 import { RegisterUserPayloadSchema } from '../../auth/auth.validators';
+import { FileMetaSchema } from '../../file/file.validators';
+
+const objectId = (label: string) =>
+    z.string().refine((val) => isValidObjectID(val), { message: `${label} must be a valid id` });
 
 // coordinates are stored GeoJSON-style: [longitude, latitude] (lng first)
 const CoordinatesSchema = z
@@ -116,6 +120,24 @@ export const SearchTenantQuerySchema = z.object({
     report: z.enum(['true', 'false']).optional().openapi({ example: 'true' }),
 });
 export type ISearchTenantQuery = z.infer<typeof SearchTenantQuerySchema>;
+
+//5: tenant logo ====================================>
+// tenant id comes from the route (/tenants/:id/logo). create: a single file METADATA (no binary),
+// forwarded to the file module → draft doc + presigned upload URL. A new request discards the old logo.
+export const CreateTenantLogoPayloadSchema = z.object({
+    files: z
+        .array(FileMetaSchema)
+        .min(1)
+        .max(1)
+        .openapi({ example: [{ fileName: 'logo.png', fileSize: 20480, fileType: 'image/png' }] }),
+});
+export type ICreateTenantLogoPayload = z.infer<typeof CreateTenantLogoPayloadSchema>;
+
+// activate: flip the uploaded draft logo to active.
+export const ActivateTenantLogoPayloadSchema = z.object({
+    fileId: objectId('File').openapi({ example: '665f0c3a1a2b3c4d5e6f7a8a' }),
+});
+export type IActivateTenantLogoPayload = z.infer<typeof ActivateTenantLogoPayloadSchema>;
 
 //4: bulk create (CSV upload) ====================================>
 // No shared form fields — every per-client field comes from the CSV rows (incl. the sales person,

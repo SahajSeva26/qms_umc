@@ -13,6 +13,7 @@ import AppointmentMonthGrid from '@/features/crm/appointments/components/Appoint
 import AppointmentList from '@/features/crm/appointments/components/AppointmentList'
 import AppointmentDrawer from '@/features/crm/appointments/components/AppointmentDrawer'
 import NewAppointmentDialog from '@/features/crm/appointments/components/NewAppointmentDialog'
+import WeeklyPlanPanel from '@/features/crm/weeklyPlan/components/WeeklyPlanPanel'
 
 const AppointmentsPage = () => {
   const { hasPermission } = usePermission()
@@ -127,6 +128,8 @@ const AppointmentsPage = () => {
       )}
 
       {canViewReport && !reportLoading && !reportError && report && <AppointmentKpiStrip kpis={kpis} />}
+
+      <WeeklyPlanPanel />
 
       <AppointmentCalendarToolbar
         weekStart={weekStart}

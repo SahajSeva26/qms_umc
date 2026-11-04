@@ -55,6 +55,7 @@ export type IMoveStagePayload = z.infer<typeof MoveStagePayloadSchema>;
 export const SearchInvoiceQuerySchema = z.object({
     tenant: objectId('Tenant').optional(),
     project: objectId('Project').optional(),
+    code: z.string().optional().openapi({ example: 'inv-00012' }),
     status: z.enum(Object.values(INVOICE_STATUS)).optional().openapi({ example: 'issued' }),
     dateFrom: z.coerce.date().optional().openapi({ example: '2026-08-01' }),
     dateTo: z.coerce.date().optional().openapi({ example: '2026-08-31' }),

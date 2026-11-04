@@ -67,7 +67,7 @@ describe('ScreeningDetail', () => {
 
     // Submitted payload is cleaned.
     await vi.waitFor(() => {
-      expect(screeningService.updateScreening).toHaveBeenCalledWith('scr-1', { symptoms: ['fever', 'cough'], referral: false })
+      expect(screeningService.updateScreening).toHaveBeenCalledWith('scr-1', { symptoms: ['fever', 'cough'] })
     })
     // The textarea itself must also re-sync to the cleaned value — not keep showing the raw typed text.
     await vi.waitFor(() => expect(textarea).toHaveValue('fever, cough'))

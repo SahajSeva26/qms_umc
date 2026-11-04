@@ -24,6 +24,9 @@ export const InvoiceMapper = {
             // accounting sync
             syncToTally: invoice.syncToTally,
 
+            // goods receipt note — document populated (file module) when requested, else the raw id
+            grn: invoice.grn || null,
+
             // lifecycle
             status: invoice.status,
             stageHistory: (invoice.stageHistory || []).map((entry: any) => ({
@@ -67,6 +70,9 @@ export const InvoiceMapper = {
 
                 // accounting sync
                 syncToTally: invoice.syncToTally,
+
+                // goods receipt note — document populated (file module) when requested, else the raw id
+                grn: invoice.grn || null,
 
                 // lifecycle
                 status: invoice.status,

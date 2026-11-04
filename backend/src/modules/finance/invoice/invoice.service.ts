@@ -1,9 +1,28 @@
 // Invoice Service
 import mongoose, { HydratedDocument } from 'mongoose';
 import { InvoiceModel, IInvoice } from './invoice.model';
-import { ICreateInvoicePayload, IInvoiceReportQuery, IMoveStagePayload, ISearchInvoiceQuery, IUpdateInvoicePayload } from './invoice.validators';
-import { INVOICE_COUNTER_ENTITY, INVOICE_STATUS, INVOICE_TRANSITION_MAP } from './invoice.constants';
+import {
+    ICreateInvoicePayload,
+    IGetInvoiceFilesQuery,
+    IInvoiceFileActivatePayload,
+    IInvoiceFilePostPayload,
+    IInvoiceReportQuery,
+    IMoveStagePayload,
+    ISearchInvoiceQuery,
+    IUpdateInvoicePayload,
+} from './invoice.validators';
+import {
+    INVOICE_COUNTER_ENTITY,
+    INVOICE_FILE_CONFIG,
+    INVOICE_FILE_ENTITY_TYPE,
+    INVOICE_FILE_RELATIONS,
+    INVOICE_STATUS,
+    INVOICE_TRANSITION_MAP,
+} from './invoice.constants';
 import { InvoiceLineItemModel } from '../invoiceLineItem/invoiceLineItem.model';
+import { FileService } from '../../file/file.service';
+import { FileMapper } from '../../file/file.mapper';
+import { FILE_STATUS } from '../../file/file.constants';
 import { canTransition } from '../../crm/lead/lead.validators';
 import { withTransaction } from '../../../shared/helpers/transactionHelper';
 import { CounterService } from '../../counter/counter.service';
@@ -69,6 +88,21 @@ export const assertCampBillable = async (camp: any) => {
     }
 };
 
+// True if the invoice has at least one ACTIVE GRN document in the file module (relation 'grn').
+// Used by the grn_signed → paid gate alongside the on-invoice GRN number.
+const hasActiveGrnDocument = async (invoiceId: string, ctx: RequestContext): Promise<boolean> => {
+    const result = await FileService.search(
+        {
+            entityId: invoiceId,
+            entityType: INVOICE_FILE_ENTITY_TYPE,
+            relation: INVOICE_FILE_RELATIONS.GRN,
+            status: FILE_STATUS.ACTIVE,
+        } as any,
+        ctx,
+    );
+    return result.count > 0;
+};
+
 // ========================================================================================
 // CORE FUNCTIONS
 // ========================================================================================
@@ -82,6 +116,12 @@ const set = async (model: any, entity: HydratedDocument<IInvoice>, ctx: RequestC
     if (model.tax !== undefined) entity.tax = model.tax;
     if (model.discount !== undefined) entity.discount = model.discount;
     if (model.syncToTally !== undefined) entity.syncToTally = model.syncToTally;
+
+    // GRN number (the document is decoupled into the file module — see the invoice file wrapper)
+    if (model.grn?.number !== undefined) {
+        if (!entity.grn) (entity as any).grn = {};
+        (entity as any).grn.number = model.grn.number;
+    }
 
     const total = computeInvoiceTotal(entity.subtotal || 0, entity.tax || 0, entity.discount || 0);
     if (total < 0) {
@@ -258,6 +298,19 @@ const moveStage = async (id: string, model: IMoveStagePayload, ctx: RequestConte
         return throwAppError(`Invalid stage transition from '${from}' to '${to}'`, StatusCodes.BAD_REQUEST);
     }
 
+    //3.1: GRN gate — an invoice can only be marked paid once receipt is evidenced: a GRN number
+    // (on the invoice) OR an uploaded, active GRN document (in the file module) must be present.
+    if (to === INVOICE_STATUS.PAID) {
+        const hasNumber = !!invoice.grn?.number?.trim();
+        const hasDocument = hasNumber ? false : await hasActiveGrnDocument(invoice._id.toString(), ctx);
+        if (!hasNumber && !hasDocument) {
+            return throwAppError(
+                'A GRN number or GRN document is required before the invoice can be marked paid',
+                StatusCodes.UNPROCESSABLE_ENTITY,
+            );
+        }
+    }
+
     //4: append to the append-only journal + flip the cached status (one atomic save)
     // snapshot the actor's identity from the token so history stays true even if the user/role later changes
     const actorName = `${ctx.user?.firstName || ''} ${ctx.user?.lastName || ''}`.trim();
@@ -315,6 +368,141 @@ const report = async (filters: IInvoiceReportQuery, ctx: RequestContext) => {
     };
 };
 
+// ========================================================================================
+// FILE WRAPPER (decoupled — files live in the file module, keyed by entity {type:'invoice', relation})
+// ========================================================================================
+
+// POST /invoices/files — create upload intent(s) for an invoice file relation (e.g. the GRN document).
+// Resolves + authorizes the invoice via the own-scoped get() (+ the route permission guard), validates
+// the relation + each file (mime/size), gates on invoice status, enforces the per-relation cap, then
+// creates a draft file per entry via the file module and returns a presigned PUT uploadUrl for each.
+const invoiceFiles = async (model: IInvoiceFilePostPayload, ctx: RequestContext) => {
+    //1: get the invoice (scoped) — if the caller can't see it, 404
+    const invoice = await InvoiceService.get(model.entityId, ctx);
+    if (!invoice) {
+        return throwAppError('Invoice not found', StatusCodes.NOT_FOUND);
+    }
+
+    //2: per-relation config
+    const config = INVOICE_FILE_CONFIG[model.relation];
+    if (!config) {
+        return throwAppError(`Unknown invoice file relation "${model.relation}"`, StatusCodes.BAD_REQUEST);
+    }
+
+    //3: per-file constraints — mime type + size (before any create)
+    for (const file of model.files) {
+        if (!config.mimeTypes.includes(file.fileType)) {
+            return throwAppError(
+                `"${file.fileName}" has an unsupported type "${file.fileType}" — "${model.relation}" allows ${config.mimeTypes.join(', ')}`,
+                StatusCodes.BAD_REQUEST,
+            );
+        }
+        if (file.fileSize > config.maxSize) {
+            return throwAppError(
+                `"${file.fileName}" is too large — "${model.relation}" allows at most ${config.maxSize} bytes per file`,
+                StatusCodes.BAD_REQUEST,
+            );
+        }
+    }
+
+    //4: status gate — files for this relation may only be uploaded while the invoice is in an allowed status
+    if (!config.statusAllowed.includes(invoice.status as string)) {
+        return throwAppError(
+            `"${model.relation}" files can only be uploaded while the invoice is ${config.statusAllowed.join(' or ')}`,
+            StatusCodes.CONFLICT,
+        );
+    }
+
+    //5: cap check — existing ACTIVE files for this invoice+relation + the requested count must not exceed
+    // the relation's cap. The file module doesn't enforce caps, so we own it here.
+    const existing = await FileService.search(
+        { entityId: invoice._id.toString(), entityType: INVOICE_FILE_ENTITY_TYPE, relation: model.relation, status: FILE_STATUS.ACTIVE } as any,
+        ctx,
+    );
+    if (existing.count + model.files.length > config.cap) {
+        return throwAppError(
+            `"${model.relation}" allows at most ${config.cap} file(s); ${existing.count} already present`,
+            StatusCodes.CONFLICT,
+        );
+    }
+
+    //6: create a draft file per entry via the file module — each returns a presigned PUT uploadUrl. The
+    // frontend PUTs the bytes to each url, then flips the batch active via POST /invoices/files/activate.
+    const tenantId = (invoice.tenant as any)?._id?.toString() || invoice.tenant?.toString();
+    const created = await FileService.create(
+        {
+            tenant: tenantId,
+            entity: { id: invoice._id.toString(), type: INVOICE_FILE_ENTITY_TYPE, relation: model.relation },
+            files: model.files,
+        } as any,
+        ctx,
+    );
+
+    return created.map((file) => FileMapper.toResponse(file, ctx));
+};
+
+// POST /invoices/files/activate — flip the invoice's uploaded draft files to active. Authorizes via the
+// own-scoped get(), verifies the files belong to THIS invoice, then delegates the draft → active flip to
+// the file module (which verifies each object exists in S3).
+const invoiceFileActivate = async (model: IInvoiceFileActivatePayload, ctx: RequestContext) => {
+    //1: get the invoice (scoped)
+    const invoice = await InvoiceService.get(model.entityId, ctx);
+    if (!invoice) {
+        return throwAppError('Invoice not found', StatusCodes.NOT_FOUND);
+    }
+
+    //2: every file must belong to THIS invoice — stops this route activating another invoice's files
+    for (const id of model.fileIds) {
+        const file = await FileService.get(id, ctx);
+        if (!file || file.entity?.type !== INVOICE_FILE_ENTITY_TYPE || file.entity?.id?.toString() !== invoice._id.toString()) {
+            return throwAppError(`File "${id}" does not belong to this invoice`, StatusCodes.BAD_REQUEST);
+        }
+    }
+
+    //3: delegate the draft → active flip to the file module (verifies each S3 object exists first)
+    const activated = await FileService.bulkActivate({ fileIds: model.fileIds }, ctx);
+    return activated.map((file) => FileMapper.toResponse(file, ctx));
+};
+
+// GET /invoices/files?entityId=&relation= — list an invoice's ACTIVE files (optionally for one relation),
+// with presigned read URLs. Authorization = "can the caller read this invoice" (own-scoped get()).
+const getInvoiceFiles = async (query: IGetInvoiceFilesQuery, ctx: RequestContext) => {
+    //1: get the invoice (scoped) — if the caller can't read it, 404
+    const invoice = await InvoiceService.get(query.entityId, ctx);
+    if (!invoice) {
+        return throwAppError('Invoice not found', StatusCodes.NOT_FOUND);
+    }
+
+    //2: list the invoice's active files (optionally narrowed to one relation), with presigned read URLs
+    const result = await FileService.search(
+        { entityId: invoice._id.toString(), entityType: INVOICE_FILE_ENTITY_TYPE, relation: query.relation, status: FILE_STATUS.ACTIVE } as any,
+        ctx,
+        { withUrls: true } as any,
+    );
+    return FileMapper.toSearchResponse(result, ctx);
+};
+
+// DELETE /invoices/files/:id — discard one of an invoice's files (soft-delete → discarded). Since the cap
+// counts ACTIVE files only, this frees the relation's cap so a replacement can be uploaded. The owning
+// invoice is derived from the file's own entity ref, then authorized via the own-scoped get().
+const invoiceFileDiscard = async (fileId: string, ctx: RequestContext) => {
+    //1: load the file (scoped) + confirm it's an invoice file
+    const file = await FileService.get(fileId, ctx);
+    if (!file || file.entity?.type !== INVOICE_FILE_ENTITY_TYPE || !file.entity?.id) {
+        return throwAppError('Invoice file not found', StatusCodes.NOT_FOUND);
+    }
+
+    //2: load the owning invoice (scoped) to authorize the caller
+    const invoice = await InvoiceService.get(file.entity.id.toString(), ctx);
+    if (!invoice) {
+        return throwAppError('Invoice not found', StatusCodes.NOT_FOUND);
+    }
+
+    //3: soft-delete (draft or active → discarded); frees the relation's cap for a re-upload
+    const discarded = await FileService.changeStatus(fileId, { status: FILE_STATUS.DISCARDED }, ctx);
+    return FileMapper.toResponse(discarded, ctx);
+};
+
 export const InvoiceService = {
     get,
     search,
@@ -322,4 +510,8 @@ export const InvoiceService = {
     update,
     moveStage,
     report,
+    invoiceFiles,
+    invoiceFileActivate,
+    getInvoiceFiles,
+    invoiceFileDiscard,
 };

@@ -3,6 +3,9 @@ import { ResponseHandler } from '../../../shared/utils/responseHandler';
 import { formatZodError } from '../../../shared/utils/error';
 import {
     CreateInvoicePayloadSchema,
+    GetInvoiceFilesQuerySchema,
+    InvoiceFileActivatePayloadSchema,
+    InvoiceFilePostPayloadSchema,
     InvoiceReportQuerySchema,
     MoveStagePayloadSchema,
     SearchInvoiceQuerySchema,
@@ -174,6 +177,82 @@ const report = async (req: any, res: any) => {
     }
 };
 
+const invoiceFiles = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+
+        const { data, success, error } = InvoiceFilePostPayloadSchema.safeParse(req.body);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                fields: validationErrors,
+            });
+        }
+
+        const result = await InvoiceService.invoiceFiles(data, ctx);
+
+        return ResponseHandler.appResponse(res, StatusCodes.CREATED, true, 'Invoice file upload intent created', result);
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
+const invoiceFileActivate = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+
+        const { data, success, error } = InvoiceFileActivatePayloadSchema.safeParse(req.body);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                fields: validationErrors,
+            });
+        }
+
+        const result = await InvoiceService.invoiceFileActivate(data, ctx);
+
+        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Invoice files activated', result);
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
+const getInvoiceFiles = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+
+        const { data, success, error } = GetInvoiceFilesQuerySchema.safeParse(req.query);
+        if (!success) {
+            const validationErrors = formatZodError(error);
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'Validation Error', {
+                errors: validationErrors,
+            });
+        }
+
+        const result = await InvoiceService.getInvoiceFiles(data, ctx);
+
+        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Invoice files fetched successfully', result);
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
+const invoiceFileDiscard = async (req: any, res: any) => {
+    try {
+        const ctx: RequestContext = req.context;
+        const { id } = req?.params;
+        if (!id) {
+            return ResponseHandler.appResponse(res, StatusCodes.BAD_REQUEST, false, 'File ID is required', null);
+        }
+
+        const result = await InvoiceService.invoiceFileDiscard(id, ctx);
+
+        return ResponseHandler.appResponse(res, StatusCodes.OK, true, 'Invoice file discarded', result);
+    } catch (error: any) {
+        return ResponseHandler.appResponse(res, error?.statusCode, false, error?.message, null);
+    }
+};
+
 export const InvoiceController = {
     get,
     search,
@@ -181,4 +260,8 @@ export const InvoiceController = {
     update,
     moveStage,
     report,
+    invoiceFiles,
+    invoiceFileActivate,
+    getInvoiceFiles,
+    invoiceFileDiscard,
 };

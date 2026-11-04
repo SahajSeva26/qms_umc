@@ -89,6 +89,17 @@ const invoiceSchema = new mongoose.Schema(
             default: 0,
         },
 
+        // Goods Receipt Note — evidence of receipt recorded before payment. Only the GRN number lives
+        // on the invoice; the GRN document is decoupled into the file module (entityType 'invoice',
+        // relation 'grn', capped at 1) like camp photos. The grn_signed → paid move requires at least
+        // one of the two — a number here OR an active GRN file (see moveStage).
+        grn: {
+            number: {
+                type: String,
+                trim: true,
+            },
+        },
+
         status: {
             type: String,
             enum: Object.values(INVOICE_STATUS),

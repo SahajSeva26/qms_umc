@@ -1,16 +1,14 @@
 import type { InvoiceStatus } from '@/types/invoice.types'
 
-// The prototype's four visible milestones map onto the real backend workflow.
-// `issued` is an intermediate backend state between Approved and GRN, so it
-// remains on the Approved milestone rather than inventing a fifth UI stage.
-const STEPS = ['Generated', 'Approved', 'GRN', 'Paid'] as const
+// All 5 non-terminal backend statuses get their own milestone.
+const STEPS = ['Generated', 'Approved', 'Issued', 'GRN', 'Paid'] as const
 
 const STATUS_STAGE: Record<Exclude<InvoiceStatus, 'cancelled'>, number> = {
   draft: 0,
   approved: 1,
-  issued: 1,
-  grn_signed: 2,
-  paid: 3,
+  issued: 2,
+  grn_signed: 3,
+  paid: 4,
 }
 
 interface InvoiceStageStepperProps {

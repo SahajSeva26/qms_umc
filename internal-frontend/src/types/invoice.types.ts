@@ -67,6 +67,31 @@ export interface InvoiceStageHistoryEntry {
   createdAt: string
 }
 
+// Goods Receipt Note — only the number lives on the invoice; the signed GRN document itself is a
+// separate file (relation 'grn' on the invoice file endpoints), capped at 1, like camp photos.
+export interface InvoiceGrn {
+  number?: string
+}
+
+// Mirrors backend invoice.constants.ts INVOICE_FILE_RELATIONS — currently just the GRN document.
+export type InvoiceFileRelation = 'grn'
+
+export interface InvoiceFilePostPayload {
+  relation: InvoiceFileRelation
+  entityId: string
+  files: { fileName: string; fileSize: number; fileType: string }[]
+}
+
+export interface InvoiceFileActivatePayload {
+  entityId: string
+  fileIds: string[]
+}
+
+export interface GetInvoiceFilesQuery {
+  entityId: string
+  relation?: InvoiceFileRelation
+}
+
 // get()/search() populate tenant/project; create()/update()/moveStage() echo back bare ObjectId strings.
 export interface InvoiceEntity {
   id: string
@@ -81,6 +106,8 @@ export interface InvoiceEntity {
   total: number
   status: InvoiceStatus
   syncToTally: boolean
+  // GRN number only — the signed GRN document lives in the file module (see InvoiceFileRelation).
+  grn: InvoiceGrn | null
   stageHistory: InvoiceStageHistoryEntry[]
   // search()-only: count of billed camps (InvoiceLineItems) on this invoice. Absent on get()/create().
   lineItemCount?: number
@@ -136,6 +163,7 @@ export interface UpdateInvoicePayload {
   tax?: number
   discount?: number
   syncToTally?: boolean
+  grn?: InvoiceGrn
 }
 
 export interface MoveInvoiceStagePayload {

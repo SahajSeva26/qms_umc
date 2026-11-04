@@ -15,6 +15,7 @@ import { ADMIN_ROUTES }     from '@/features/admin/admin.paths'
 import { ACCESS_MANAGEMENT_ROUTES }      from '@/features/access-management/accessManagement.paths'
 import { EMPLOYEE_ROUTES }  from '@/features/access-management/employee/employee.paths'
 import { QA_FEEDBACK_ROUTES } from '@/features/qa-feedback/qa-feedback.paths'
+import { FIELD_WORKSPACE_ROUTES } from '@/features/fieldWorkspace/fieldWorkspace.paths'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -87,6 +88,9 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { id: 'dietprofile',  label: 'Dietitian Profiles',          icon: 'UserCheck',     path: DIET_ROUTES.DIET_PROFILES },
 
   // Operations — Field Network
+  // Role-type-only (field-officer), same mechanism as 'employees' — see visibleNav.ts.
+  { id: 'myworkspace',  label: 'My FO Workspace',             icon: 'Briefcase',     path: FIELD_WORKSPACE_ROUTES.MY_WORKSPACE },
+
   { id: 'fieldofficers', label: 'FO Management',              icon: 'Navigation',    path: FO_ROUTES.FIELD_OFFICERS },
 
   // Gated by role TYPE (RoleGuard), not permission codes — see visibleNav.ts's isNavItemVisible
@@ -176,7 +180,7 @@ export const FULL_NAV_SECTIONS: NavSection[] = [
       { title: 'Camps',             items: ['camps', 'campsscreening', 'campsdiet'/* , 'telecamps', 'diet', 'dedicatedops' */].map((id) => NAV_BY_ID[id]) },
       // Commented out, not deleted — this whole subsection is still mock-backed.
       // { title: 'Dietitians',        items: ['dietapprovals', 'dietpayment', 'dietprofile'].map((id) => NAV_BY_ID[id]) },
-      { title: 'Field Network',     items: ['fieldofficers', 'employees', 'doctors', 'geoprofiles'].map((id) => NAV_BY_ID[id]) },
+      { title: 'Field Network',     items: ['myworkspace', 'fieldofficers', 'employees', 'doctors', 'geoprofiles'].map((id) => NAV_BY_ID[id]) },
       // Commented out, not deleted — this whole subsection is still mock-backed.
       // { title: 'Coverage & Alerts', items: ['hqmapping', 'remindauto'].map((id) => NAV_BY_ID[id]) },
     ],

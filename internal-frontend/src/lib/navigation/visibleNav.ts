@@ -55,6 +55,8 @@ function isRealSystemManage(session: VisibleNavSession): boolean {
 export function isNavItemVisible(item: NavItem, session: VisibleNavSession): boolean {
   if (item.id === 'pharma') return isPharmaRoleType(session.roleTypeCode)
   if (item.id === 'employees') return session.isSettled && canReadEmployees(session.roleTypeCode, session.permissions)
+  // Role-type-only — only a field-officer has a "my workspace" to view; not a manager perk.
+  if (item.id === 'myworkspace') return session.isSettled && session.roleTypeCode === 'field-officer'
   // Role-type-only, deliberately NOT permission-gated and NOT system:manage-bypassed — exactly
   // sales-head/sales-rep, per explicit request (not visible to admin/system even though they hold
   // tenant:manage/system:manage).

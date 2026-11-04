@@ -20,10 +20,24 @@ import type {
 } from '@/types/campReal.types'
 import type { CampReport } from '@/types/campReport.types'
 import type { FileEntity } from '@/types/file.types'
+import type { CampSummary } from '@/types/campReal.types'
 
 // Deliberately separate from `camps.service.ts`, the old mock store other files still depend on.
 const searchCamps = async (query: SearchCampQuery) => {
   const res = await api.get<PaginatedResponse<CampEntity>>('/camps', { params: query })
+  return res.data
+}
+
+export interface MyCampsResponse {
+  success: boolean
+  message: string
+  data: { count: number; items: CampEntity[]; summary: CampSummary }
+}
+
+// GET /camps/my — field-force's own camps (FO/dietitian/MR), scoped server-side to the caller's
+// own slot. Carries a top-level `summary` (status/type counts) beyond the page itself.
+const myCamps = async (query: SearchCampQuery) => {
+  const res = await api.get<MyCampsResponse>('/camps/my', { params: query })
   return res.data
 }
 
@@ -120,6 +134,7 @@ const discardCampFile = async (fileId: string) => {
 
 export const campsRealService = {
   searchCamps,
+  myCamps,
   getCamp,
   createCamp,
   bookCamp,

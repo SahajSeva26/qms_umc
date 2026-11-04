@@ -4,14 +4,20 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useInvoice } from '@/features/billing/hooks/useInvoice'
 import { useBillingProject } from '@/features/billing/hooks/useBillingProject'
 import { useInvoiceLineItems, invoiceLineItemKeys } from '@/features/billing/hooks/useInvoiceLineItems'
+import { useAllInvoiceLineItems } from '@/features/billing/hooks/useAllInvoiceLineItems'
 import { useRemoveInvoiceLineItem } from '@/features/billing/hooks/useRemoveInvoiceLineItem'
+import { useTenant } from '@/features/access-management/tenant/hooks/useTenant'
 import InvoiceStatusPill from '@/features/billing/components/InvoiceStatusPill'
 import AddCampToInvoiceDialog from '@/features/billing/components/AddCampToInvoiceDialog'
 import MoveInvoiceStageDialog from '@/features/billing/components/MoveInvoiceStageDialog'
+import InvoicePrintOverlay from '@/features/billing/components/InvoicePrintOverlay'
+import InvoiceGrnPanel from '@/features/billing/components/InvoiceGrnPanel'
+import { useUpdateInvoiceGrn } from '@/features/billing/hooks/useUpdateInvoiceGrn'
 import SideDrawer from '@/components/ui/SideDrawer'
 import QueryStateBlock from '@/components/ui/QueryStateBlock'
 import PaginationControls from '@/components/ui/PaginationControls'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { usePagination } from '@/hooks/usePagination'
 import { usePermission } from '@/hooks/usePermission'
 import { formatDate, formatINRFull } from '@/utils/formatters'
@@ -26,6 +32,50 @@ const Row = ({ label, value }: { label: string; value: ReactNode }) => (
     <span className="text-right font-semibold" style={{ color: 'var(--qms-text)' }}>{value}</span>
   </div>
 )
+
+interface GrnNumberFieldProps {
+  invoiceId: string
+  value: string | undefined
+  editable: boolean
+}
+
+// Inline edit for the real grn.number field (PUT /invoices/:id) — separate from the GRN
+// document, which is a file (see InvoiceGrnPanel).
+const GrnNumberField = ({ invoiceId, value, editable }: GrnNumberFieldProps) => {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value ?? '')
+  const updateGrn = useUpdateInvoiceGrn(invoiceId)
+
+  if (!editing) {
+    return (
+      <div className="flex items-center justify-between gap-3 py-1.5 text-[13px]" style={{ borderBottom: '1px solid var(--qms-border)' }}>
+        <span style={{ color: 'var(--qms-text-muted)' }}>GRN number</span>
+        <span className="flex items-center gap-2">
+          <span className="font-semibold" style={{ color: 'var(--qms-text)' }}>{value || '—'}</span>
+          {editable && (
+            <button type="button" onClick={() => { setDraft(value ?? ''); setEditing(true) }} className="text-[11px] font-bold underline" style={{ color: 'var(--qms-brand)' }}>
+              Edit
+            </button>
+          )}
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-2 py-1.5">
+      <Input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="e.g. GRN-00231" className="text-[13px]" disabled={updateGrn.isPending} />
+      <Button
+        size="sm"
+        disabled={updateGrn.isPending || !draft.trim()}
+        onClick={() => updateGrn.mutate(draft.trim(), { onSuccess: () => setEditing(false) })}
+      >
+        {updateGrn.isPending ? 'Saving…' : 'Save'}
+      </Button>
+      <Button variant="secondary" size="sm" disabled={updateGrn.isPending} onClick={() => setEditing(false)}>Cancel</Button>
+    </div>
+  )
+}
 
 interface InvoiceDetailDrawerProps {
   invoiceId: string | null
@@ -52,6 +102,22 @@ const InvoiceDetailDrawer = ({ invoiceId, onClose }: InvoiceDetailDrawerProps) =
   const [addCampOpening, setAddCampOpening] = useState(false)
   const [stageDialogOpen, setStageDialogOpen] = useState(false)
   const [addSubmitting, setAddSubmitting] = useState(false)
+  const [printOpen, setPrintOpen] = useState(false)
+  const invoiceTenantId = invoice ? (typeof invoice.tenant === 'string' ? invoice.tenant : invoice.tenant._id) : undefined
+  // Only fired once the user actually opens the print view — the full-document fetch (every
+  // line item, the buyer's full tenant record for GST/address) isn't needed just to view the drawer.
+  const {
+    data: printTenantData,
+    isLoading: printTenantLoading,
+    error: printTenantError,
+    refetch: refetchPrintTenant,
+  } = useTenant(printOpen ? invoiceTenantId : undefined)
+  const {
+    data: printLineItems,
+    isLoading: printLineItemsLoading,
+    error: printLineItemsError,
+    refetch: refetchPrintLineItems,
+  } = useAllInvoiceLineItems(printOpen ? (invoiceId ?? undefined) : undefined)
 
   // Identifies "this exact invoice session," bumped on every invoiceId
   // change (including reopening the SAME id) so async work below can detect a since-reopened session.
@@ -174,12 +240,24 @@ const InvoiceDetailDrawer = ({ invoiceId, onClose }: InvoiceDetailDrawerProps) =
   }
 
   const isDraft = invoice?.status === 'draft'
+  // 'paid' is the real terminal-success status (empty transitions in INVOICE_TRANSITION_MAP) —
+  // the actual completed equivalent for an invoice, not a guessed one.
+  const isPaid = invoice?.status === 'paid'
   // Line-item routes accept invoice-line-item:* or tenant:manage — NOT
   // invoice:manage, a separate permission namespace (verified against invoiceLineItem.routes.ts).
   const canReadLines = hasAnyPermission(['invoice-line-item:search', 'invoice-line-item:manage', 'tenant:manage'])
   const canAddLine = hasAnyPermission(['invoice-line-item:create', 'invoice-line-item:manage', 'tenant:manage'])
   const canRemoveLine = hasAnyPermission(['invoice-line-item:delete', 'invoice-line-item:manage', 'tenant:manage'])
   const canMoveStage = hasAnyPermission(['invoice:manage', 'tenant:manage'])
+  // Printing needs GET /tenants/:id (tenant:get/tenant:manage — tenant.routes.ts) for the buyer's
+  // GST/address AND invoice-line-item reads (canReadLines) for the camp lines — both are separate
+  // backend guards from invoice:get itself, so a caller who can open this drawer may still lack one.
+  const canReadTenant = hasAnyPermission(['tenant:get', 'tenant:manage'])
+  const canPrint = canReadLines && canReadTenant
+  // GRN number edit (PUT /invoices/:id) and the GRN document upload (POST /invoices/files) are
+  // both gated by invoice:update/manage (or tenant:manage) per invoice.routes.ts.
+  const canEditGrn = hasAnyPermission(['invoice:update', 'invoice:manage', 'tenant:manage'])
+  const showGrnSection = invoice?.status === 'issued' || invoice?.status === 'grn_signed' || invoice?.status === 'paid'
 
   // Approval must never fire against an unconfirmed line count — isFetching
   // catches a background refetch, lineItemsError catches a stale pre-deletion `data`. Skipped if this viewer can't read lines at all.
@@ -193,7 +271,13 @@ const InvoiceDetailDrawer = ({ invoiceId, onClose }: InvoiceDetailDrawerProps) =
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-2">
               <InvoiceStatusPill status={invoice.status} />
-              {canMoveStage && (
+              <div className="flex items-center gap-2">
+                {isPaid && canPrint && (
+                  <Button variant="outline" size="sm" onClick={() => setPrintOpen(true)}>
+                    Print invoice
+                  </Button>
+                )}
+                {canMoveStage && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -203,7 +287,8 @@ const InvoiceDetailDrawer = ({ invoiceId, onClose }: InvoiceDetailDrawerProps) =
                 >
                   Change status
                 </Button>
-              )}
+                )}
+              </div>
             </div>
 
             <div>
@@ -272,6 +357,13 @@ const InvoiceDetailDrawer = ({ invoiceId, onClose }: InvoiceDetailDrawerProps) =
               )}
             </div>
 
+            {showGrnSection && (
+              <div>
+                <GrnNumberField invoiceId={invoice.id} value={invoice.grn?.number} editable={canEditGrn} />
+                <InvoiceGrnPanel invoiceId={invoice.id} canUpload={canEditGrn} />
+              </div>
+            )}
+
             {invoice.stageHistory.length > 0 && (
               <div>
                 <div className="text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: 'var(--qms-text-muted)' }}>Status history</div>
@@ -301,6 +393,17 @@ const InvoiceDetailDrawer = ({ invoiceId, onClose }: InvoiceDetailDrawerProps) =
       )}
       {stageDialogOpen && invoice && (
         <MoveInvoiceStageDialog invoice={invoice} lineItemCount={lineItemCount} onClose={() => setStageDialogOpen(false)} />
+      )}
+      {printOpen && invoice && (
+        <InvoicePrintOverlay
+          invoice={invoice}
+          buyer={printTenantData?.data ?? null}
+          lineItems={printLineItems ?? []}
+          isLoading={printTenantLoading || printLineItemsLoading}
+          error={printTenantError ?? printLineItemsError}
+          onRetry={() => { void refetchPrintTenant(); void refetchPrintLineItems() }}
+          onClose={() => setPrintOpen(false)}
+        />
       )}
     </SideDrawer>
   )

@@ -8,11 +8,12 @@
     "build": "tsc",
     "prestart": "npm run build",
     "start": "node dist/bin/server.js",
-    "seed:dummy": "tsx src/shared/env/script/seedDummyData.ts",
-    "worker:notification": "tsx watch src/workers/notification.worker.ts"
+    "worker:dev": "tsx watch src/bin/worker.ts",
+    "worker:start": "node dist/bin/worker.js",
+    "seed:dummy": "tsx src/shared/env/script/seedDummyData.ts"
   },
   "engines": {
-    "node": "22.x"
+    "node": "26.x"
   },
   "author": "",
   "license": "ISC",
@@ -38,6 +39,7 @@
     "multer": "^2.2.0",
     "pino": "^10.3.1",
     "pino-http": "^11.0.0",
+    "pm2": "^7.1.2",
     "swagger-ui-express": "^5.0.1",
     "uuid": "^14.0.1",
     "zod": "^4.4.3"

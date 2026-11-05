@@ -3,7 +3,8 @@
 // per-recipient/per-channel template, persists a Notification row, and sends via the channel
 // provider. Runs as the SYSTEM user (no HTTP request → it builds its own context).
 //
-// Run separately from the API: `npm run worker:notification`.
+// Run via the bin/worker.ts aggregator (`npm run worker:dev`), or standalone for debugging:
+// `npx tsx src/workers/notification.worker.ts` (the "notification worker" debug config does this).
 
 // MUST be first: registers the Zod OpenAPI extension before any module validator is imported below.
 import '../shared/config/swagger/swagger.registry';
@@ -229,13 +230,19 @@ async function pollMessages(ctx: RequestContext): Promise<void> {
     }
 }
 
+// Build context + poll. connectDB is the caller's responsibility (bin entry or standalone block
+// below) so multiple workers can share one connection.
+export async function startNotificationWorker(): Promise<void> {
+    const ctx = await buildWorkerContext();
+    await pollMessages(ctx);
+}
+
 // Only start when run as the entry point, so the module can be imported (e.g. tests) without
 // connecting to the DB or starting the consume loop.
 if (require.main === module) {
     (async () => {
         await connectDB();
-        const ctx = await buildWorkerContext();
-        await pollMessages(ctx);
+        await startNotificationWorker();
     })().catch((error) => {
         logger.error({ err: error }, 'Notification worker terminated');
         process.exitCode = 1;

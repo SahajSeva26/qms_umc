@@ -12,6 +12,13 @@ module.exports = {
       script: "dist/bin/server.js",
       interpreter: "node",
 
+      // Non-secret environment switches only. All secrets (DB_URI, JWT, AWS,
+      // Google Maps, etc.) are loaded from .env via dotenv — never put them here
+      // since this file is git-tracked.
+      env: {
+        APP_ENV: "production",
+      },
+
       instances: 1,
       exec_mode: "fork",
 
@@ -37,6 +44,13 @@ module.exports = {
       cwd: rootDir,
       script: "dist/bin/worker.js",
       interpreter: "node",
+
+      // Non-secret environment switches only. All secrets (DB_URI, JWT, AWS,
+      // Google Maps, etc.) are loaded from .env via dotenv — never put them here
+      // since this file is git-tracked.
+      env: {
+        APP_ENV: "production",
+      },
 
       instances: 1,
       exec_mode: "fork",

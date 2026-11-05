@@ -1,11 +1,9 @@
-import process from "process";
-import {app} from "./app";
-import connectDB from "../shared/config/connectDB";
-import logger from "../shared/utils/logger";
-import ENV from "../shared/config/app.config";
-import { runSeed } from "../shared/env";
-
-
+import process from 'process';
+import { app } from './app';
+import connectDB, { disconnectDB } from '../shared/config/connectDB';
+import logger from '../shared/utils/logger';
+import ENV from '../shared/config/app.config';
+import { runSeed } from '../shared/env';
 
 async function main() {
     logger.info('Starting server...');
@@ -24,7 +22,8 @@ async function main() {
         });
     } catch (err) {
         logger.error({ err }, 'Failed to start server');
-        process.exit(1);
+        await disconnectDB().catch(() => {});
+        process.exitCode = 1;
     }
 }
 

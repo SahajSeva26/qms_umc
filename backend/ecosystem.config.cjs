@@ -1,8 +1,13 @@
 
 const path = require("path");
+const fs = require("fs");
 
 const rootDir = __dirname;
 const logsDir = path.join(rootDir, "logs");
+
+// Ensure the log directory exists before PM2 opens the out/error files.
+// On a fresh clone (e.g. Railway) logs/ is gitignored and won't be present.
+fs.mkdirSync(logsDir, { recursive: true });
 
 module.exports = {
   apps: [

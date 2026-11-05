@@ -8,6 +8,7 @@
     "build": "tsc",
     "prestart": "npm run build",
     "start": "node dist/bin/server.js",
+    "prod": "pm2-runtime start ecosystem.config.cjs",
     "worker:dev": "tsx watch src/bin/worker.ts",
     "worker:start": "node dist/bin/worker.js",
     "seed:dummy": "tsx src/shared/env/script/seedDummyData.ts"
